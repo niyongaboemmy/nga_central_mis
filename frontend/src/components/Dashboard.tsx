@@ -1,15 +1,23 @@
 import React from "react";
 
-const Dashboard = () => {
+interface DashboardProps {
+  onLogout?: () => void;
+}
+
+const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
   const handleLogout = () => {
     localStorage.removeItem("token");
-    window.location.reload();
+    if (onLogout) {
+      onLogout();
+    } else {
+      window.location.reload();
+    }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-background-light to-indigo-50 dark:from-background-dark dark:via-background-dark dark:to-background-dark">
       {/* Header */}
-      <header className="bg-white shadow-sm border-b border-gray-200">
+      <header className="bg-card-light dark:bg-card-dark shadow-sm border-b border-border-light dark:border-border-dark">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-4">
             <div className="flex items-center">
@@ -29,15 +37,17 @@ const Dashboard = () => {
                 </svg>
               </div>
               <div>
-                <h1 className="text-xl font-bold text-gray-900">
+                <h1 className="text-xl font-bold text-text-primary-light dark:text-text-primary-dark">
                   NGA Central MIS
                 </h1>
-                <p className="text-sm text-gray-600">Dashboard</p>
+                <p className="text-sm text-text-secondary-light dark:text-text-secondary-dark">
+                  Dashboard
+                </p>
               </div>
             </div>
             <button
               onClick={handleLogout}
-              className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors duration-200"
+              className="inline-flex items-center px-4 py-2 border border-border-light dark:border-border-dark rounded-lg text-sm font-medium text-text-primary-light dark:text-text-primary-dark bg-card-light dark:bg-card-dark hover:bg-surface-light dark:hover:bg-surface-dark transition-colors duration-200"
             >
               <svg
                 className="w-4 h-4 mr-2"
@@ -61,21 +71,21 @@ const Dashboard = () => {
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">
+          <h2 className="text-2xl font-bold text-text-primary-light dark:text-text-primary-dark mb-2">
             Welcome to NGA MIS
           </h2>
-          <p className="text-gray-600">
+          <p className="text-text-secondary-light dark:text-text-secondary-dark">
             Your central management information system dashboard
           </p>
         </div>
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <div className="bg-card-light dark:bg-card-dark rounded-xl shadow-sm border border-border-light dark:border-border-dark p-6">
             <div className="flex items-center">
-              <div className="p-2 bg-blue-100 rounded-lg">
+              <div className="p-2 bg-blue-100 dark:bg-blue-900/20 rounded-lg">
                 <svg
-                  className="w-6 h-6 text-blue-600"
+                  className="w-6 h-6 text-blue-600 dark:text-blue-400"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -89,19 +99,21 @@ const Dashboard = () => {
                 </svg>
               </div>
               <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">
+                <p className="text-sm font-medium text-text-secondary-light dark:text-text-secondary-dark">
                   Total Students
                 </p>
-                <p className="text-2xl font-bold text-gray-900">1,247</p>
+                <p className="text-2xl font-bold text-text-primary-light dark:text-text-primary-dark">
+                  1,247
+                </p>
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <div className="bg-card-light dark:bg-card-dark rounded-xl shadow-sm border border-border-light dark:border-border-dark p-6">
             <div className="flex items-center">
-              <div className="p-2 bg-green-100 rounded-lg">
+              <div className="p-2 bg-green-100 dark:bg-green-900/20 rounded-lg">
                 <svg
-                  className="w-6 h-6 text-green-600"
+                  className="w-6 h-6 text-green-600 dark:text-green-400"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -115,19 +127,21 @@ const Dashboard = () => {
                 </svg>
               </div>
               <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">
+                <p className="text-sm font-medium text-text-secondary-light dark:text-text-secondary-dark">
                   Total Teachers
                 </p>
-                <p className="text-2xl font-bold text-gray-900">89</p>
+                <p className="text-2xl font-bold text-text-primary-light dark:text-text-primary-dark">
+                  89
+                </p>
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <div className="bg-card-light dark:bg-card-dark rounded-xl shadow-sm border border-border-light dark:border-border-dark p-6">
             <div className="flex items-center">
-              <div className="p-2 bg-purple-100 rounded-lg">
+              <div className="p-2 bg-purple-100 dark:bg-purple-900/20 rounded-lg">
                 <svg
-                  className="w-6 h-6 text-purple-600"
+                  className="w-6 h-6 text-purple-600 dark:text-purple-400"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -141,19 +155,21 @@ const Dashboard = () => {
                 </svg>
               </div>
               <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">
+                <p className="text-sm font-medium text-text-secondary-light dark:text-text-secondary-dark">
                   Active Classes
                 </p>
-                <p className="text-2xl font-bold text-gray-900">24</p>
+                <p className="text-2xl font-bold text-text-primary-light dark:text-text-primary-dark">
+                  24
+                </p>
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <div className="bg-card-light dark:bg-card-dark rounded-xl shadow-sm border border-border-light dark:border-border-dark p-6">
             <div className="flex items-center">
-              <div className="p-2 bg-orange-100 rounded-lg">
+              <div className="p-2 bg-orange-100 dark:bg-orange-900/20 rounded-lg">
                 <svg
-                  className="w-6 h-6 text-orange-600"
+                  className="w-6 h-6 text-orange-600 dark:text-orange-400"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -167,25 +183,27 @@ const Dashboard = () => {
                 </svg>
               </div>
               <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">
+                <p className="text-sm font-medium text-text-secondary-light dark:text-text-secondary-dark">
                   Reports Today
                 </p>
-                <p className="text-2xl font-bold text-gray-900">12</p>
+                <p className="text-2xl font-bold text-text-primary-light dark:text-text-primary-dark">
+                  12
+                </p>
               </div>
             </div>
           </div>
         </div>
 
         {/* Quick Actions */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">
+        <div className="bg-card-light dark:bg-card-dark rounded-xl shadow-sm border border-border-light dark:border-border-dark p-6">
+          <h3 className="text-lg font-semibold text-text-primary-light dark:text-text-primary-dark mb-4">
             Quick Actions
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <button className="flex items-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors duration-200">
-              <div className="p-2 bg-blue-100 rounded-lg mr-3">
+            <button className="flex items-center p-4 border border-border-light dark:border-border-dark rounded-lg hover:bg-surface-light dark:hover:bg-surface-dark transition-colors duration-200">
+              <div className="p-2 bg-blue-100 dark:bg-blue-900/20 rounded-lg mr-3">
                 <svg
-                  className="w-5 h-5 text-blue-600"
+                  className="w-5 h-5 text-blue-600 dark:text-blue-400"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -199,17 +217,19 @@ const Dashboard = () => {
                 </svg>
               </div>
               <div>
-                <p className="font-medium text-gray-900">Manage Students</p>
-                <p className="text-sm text-gray-600">
+                <p className="font-medium text-text-primary-light dark:text-text-primary-dark">
+                  Manage Students
+                </p>
+                <p className="text-sm text-text-secondary-light dark:text-text-secondary-dark">
                   Add, edit, or view student records
                 </p>
               </div>
             </button>
 
-            <button className="flex items-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors duration-200">
-              <div className="p-2 bg-green-100 rounded-lg mr-3">
+            <button className="flex items-center p-4 border border-border-light dark:border-border-dark rounded-lg hover:bg-surface-light dark:hover:bg-surface-dark transition-colors duration-200">
+              <div className="p-2 bg-green-100 dark:bg-green-900/20 rounded-lg mr-3">
                 <svg
-                  className="w-5 h-5 text-green-600"
+                  className="w-5 h-5 text-green-600 dark:text-green-400"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -223,17 +243,19 @@ const Dashboard = () => {
                 </svg>
               </div>
               <div>
-                <p className="font-medium text-gray-900">Grade Management</p>
-                <p className="text-sm text-gray-600">
+                <p className="font-medium text-text-primary-light dark:text-text-primary-dark">
+                  Grade Management
+                </p>
+                <p className="text-sm text-text-secondary-light dark:text-text-secondary-dark">
                   Manage grades and assessments
                 </p>
               </div>
             </button>
 
-            <button className="flex items-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors duration-200">
-              <div className="p-2 bg-purple-100 rounded-lg mr-3">
+            <button className="flex items-center p-4 border border-border-light dark:border-border-dark rounded-lg hover:bg-surface-light dark:hover:bg-surface-dark transition-colors duration-200">
+              <div className="p-2 bg-purple-100 dark:bg-purple-900/20 rounded-lg mr-3">
                 <svg
-                  className="w-5 h-5 text-purple-600"
+                  className="w-5 h-5 text-purple-600 dark:text-purple-400"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -247,8 +269,10 @@ const Dashboard = () => {
                 </svg>
               </div>
               <div>
-                <p className="font-medium text-gray-900">Reports</p>
-                <p className="text-sm text-gray-600">
+                <p className="font-medium text-text-primary-light dark:text-text-primary-dark">
+                  Reports
+                </p>
+                <p className="text-sm text-text-secondary-light dark:text-text-secondary-dark">
                   Generate and view reports
                 </p>
               </div>

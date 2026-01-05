@@ -1,3 +1,225 @@
 {"level":"info","message":"Server running on port 5001 in development mode","service":"nga-central-mis","timestamp":"2026-01-05T18:49:20.530Z"}
 {"level":"info","message":"SIGINT received, shutting down gracefully","service":"nga-central-mis","timestamp":"2026-01-05T18:50:05.904Z"}
 {"level":"info","message":"Server running on port 5001 in development mode","service":"nga-central-mis","timestamp":"2026-01-05T18:50:10.038Z"}
+{"body":{"password":"1234567","username":"emmanuelniyongabo44@gmail.com"},"ip":"::1","level":"info","message":"POST /auth/login","service":"nga-central-mis","timestamp":"2026-01-05T20:10:16.463Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Login attempt for user: emmanuelniyongabo44@gmail.com","service":"nga-central-mis","timestamp":"2026-01-05T20:10:16.465Z"}
+{"level":"warn","message":"Failed login attempt: user emmanuelniyongabo44@gmail.com not found","service":"nga-central-mis","timestamp":"2026-01-05T20:10:16.508Z"}
+{"duration":50,"level":"info","message":"POST /auth/login 500 - 50ms","service":"nga-central-mis","statusCode":500,"timestamp":"2026-01-05T20:10:16.512Z"}
+{"body":{"password":"1234567","username":"emmanuelniyongabo44@gmail.com"},"ip":"::1","level":"info","message":"POST /auth/login","service":"nga-central-mis","timestamp":"2026-01-05T20:10:24.966Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Login attempt for user: emmanuelniyongabo44@gmail.com","service":"nga-central-mis","timestamp":"2026-01-05T20:10:24.973Z"}
+{"level":"warn","message":"Failed login attempt: user emmanuelniyongabo44@gmail.com not found","service":"nga-central-mis","timestamp":"2026-01-05T20:10:24.985Z"}
+{"duration":22,"level":"info","message":"POST /auth/login 500 - 22ms","service":"nga-central-mis","statusCode":500,"timestamp":"2026-01-05T20:10:24.987Z"}
+{"body":{"password":"1234567","username":"emmanuelniyongabo44@gmail.com"},"ip":"::1","level":"info","message":"POST /auth/login","service":"nga-central-mis","timestamp":"2026-01-05T20:10:27.778Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Login attempt for user: emmanuelniyongabo44@gmail.com","service":"nga-central-mis","timestamp":"2026-01-05T20:10:27.779Z"}
+{"level":"warn","message":"Failed login attempt: user emmanuelniyongabo44@gmail.com not found","service":"nga-central-mis","timestamp":"2026-01-05T20:10:27.789Z"}
+{"duration":13,"level":"info","message":"POST /auth/login 500 - 13ms","service":"nga-central-mis","statusCode":500,"timestamp":"2026-01-05T20:10:27.790Z"}
+{"body":{"password":"1234567","username":"emmanuelniyongabo44@gmail.com"},"ip":"::1","level":"info","message":"POST /auth/login","service":"nga-central-mis","timestamp":"2026-01-05T20:10:28.716Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Login attempt for user: emmanuelniyongabo44@gmail.com","service":"nga-central-mis","timestamp":"2026-01-05T20:10:28.719Z"}
+{"level":"warn","message":"Failed login attempt: user emmanuelniyongabo44@gmail.com not found","service":"nga-central-mis","timestamp":"2026-01-05T20:10:28.728Z"}
+{"duration":24,"level":"info","message":"POST /auth/login 500 - 24ms","service":"nga-central-mis","statusCode":500,"timestamp":"2026-01-05T20:10:28.740Z"}
+{"body":{"password":"1234567","username":"emmanuelniyongabo44@gmail.com"},"ip":"::1","level":"info","message":"POST /auth/login","service":"nga-central-mis","timestamp":"2026-01-05T20:10:29.174Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Login attempt for user: emmanuelniyongabo44@gmail.com","service":"nga-central-mis","timestamp":"2026-01-05T20:10:29.175Z"}
+{"level":"warn","message":"Failed login attempt: user emmanuelniyongabo44@gmail.com not found","service":"nga-central-mis","timestamp":"2026-01-05T20:10:29.177Z"}
+{"duration":4,"level":"info","message":"POST /auth/login 500 - 4ms","service":"nga-central-mis","statusCode":500,"timestamp":"2026-01-05T20:10:29.178Z"}
+{"body":{"password":"1234567","username":"emmanuelniyongabo44@gmail.com"},"ip":"::1","level":"info","message":"POST /auth/login","service":"nga-central-mis","timestamp":"2026-01-05T20:10:29.657Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Login attempt for user: emmanuelniyongabo44@gmail.com","service":"nga-central-mis","timestamp":"2026-01-05T20:10:29.658Z"}
+{"level":"warn","message":"Failed login attempt: user emmanuelniyongabo44@gmail.com not found","service":"nga-central-mis","timestamp":"2026-01-05T20:10:29.660Z"}
+{"duration":4,"level":"info","message":"POST /auth/login 500 - 4ms","service":"nga-central-mis","statusCode":500,"timestamp":"2026-01-05T20:10:29.661Z"}
+{"body":{"password":"1234567","username":"emmanuelniyongabo44@gmail.com"},"ip":"::1","level":"info","message":"POST /auth/login","service":"nga-central-mis","timestamp":"2026-01-05T20:10:30.270Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Login attempt for user: emmanuelniyongabo44@gmail.com","service":"nga-central-mis","timestamp":"2026-01-05T20:10:30.271Z"}
+{"level":"warn","message":"Failed login attempt: user emmanuelniyongabo44@gmail.com not found","service":"nga-central-mis","timestamp":"2026-01-05T20:10:30.273Z"}
+{"duration":4,"level":"info","message":"POST /auth/login 500 - 4ms","service":"nga-central-mis","statusCode":500,"timestamp":"2026-01-05T20:10:30.274Z"}
+{"body":{"password":"1234567","username":"emmanuelniyongabo44@gmail.com"},"ip":"::1","level":"info","message":"POST /auth/login","service":"nga-central-mis","timestamp":"2026-01-05T20:10:30.705Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Login attempt for user: emmanuelniyongabo44@gmail.com","service":"nga-central-mis","timestamp":"2026-01-05T20:10:30.705Z"}
+{"level":"warn","message":"Failed login attempt: user emmanuelniyongabo44@gmail.com not found","service":"nga-central-mis","timestamp":"2026-01-05T20:10:30.708Z"}
+{"duration":4,"level":"info","message":"POST /auth/login 500 - 4ms","service":"nga-central-mis","statusCode":500,"timestamp":"2026-01-05T20:10:30.709Z"}
+{"body":{"password":"1234567","username":"emmanuelniyongabo44@gmail.com"},"ip":"::1","level":"info","message":"POST /auth/login","service":"nga-central-mis","timestamp":"2026-01-05T20:10:31.173Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Login attempt for user: emmanuelniyongabo44@gmail.com","service":"nga-central-mis","timestamp":"2026-01-05T20:10:31.174Z"}
+{"level":"warn","message":"Failed login attempt: user emmanuelniyongabo44@gmail.com not found","service":"nga-central-mis","timestamp":"2026-01-05T20:10:31.177Z"}
+{"duration":5,"level":"info","message":"POST /auth/login 500 - 5ms","service":"nga-central-mis","statusCode":500,"timestamp":"2026-01-05T20:10:31.179Z"}
+{"body":{"password":"1234567","username":"emmanuelniyongabo44@gmail.com"},"ip":"::1","level":"info","message":"POST /auth/login","service":"nga-central-mis","timestamp":"2026-01-05T20:10:31.646Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Login attempt for user: emmanuelniyongabo44@gmail.com","service":"nga-central-mis","timestamp":"2026-01-05T20:10:31.646Z"}
+{"level":"warn","message":"Failed login attempt: user emmanuelniyongabo44@gmail.com not found","service":"nga-central-mis","timestamp":"2026-01-05T20:10:31.648Z"}
+{"duration":20,"level":"info","message":"POST /auth/login 500 - 20ms","service":"nga-central-mis","statusCode":500,"timestamp":"2026-01-05T20:10:31.666Z"}
+{"body":{"password":"1234567","username":"emmanuelniyongabo44@gmail.com"},"ip":"::1","level":"info","message":"POST /auth/login","service":"nga-central-mis","timestamp":"2026-01-05T20:10:45.736Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Login attempt for user: emmanuelniyongabo44@gmail.com","service":"nga-central-mis","timestamp":"2026-01-05T20:10:45.737Z"}
+{"level":"warn","message":"Failed login attempt: user emmanuelniyongabo44@gmail.com not found","service":"nga-central-mis","timestamp":"2026-01-05T20:10:45.742Z"}
+{"duration":7,"level":"info","message":"POST /auth/login 500 - 7ms","service":"nga-central-mis","statusCode":500,"timestamp":"2026-01-05T20:10:45.743Z"}
+{"level":"info","message":"SIGINT received, shutting down gracefully","service":"nga-central-mis","timestamp":"2026-01-05T20:10:49.905Z"}
+{"level":"info","message":"Server running on port 5001 in development mode","service":"nga-central-mis","timestamp":"2026-01-05T20:10:57.878Z"}
+{"level":"info","message":"SIGINT received, shutting down gracefully","service":"nga-central-mis","timestamp":"2026-01-05T20:16:41.866Z"}
+{"level":"info","message":"Server running on port 5001 in development mode","service":"nga-central-mis","timestamp":"2026-01-05T20:16:49.565Z"}
+{"body":{"password":"1234567","username":"emmanuelniyongabo44@gmail.com"},"ip":"::1","level":"info","message":"POST /auth/login","service":"nga-central-mis","timestamp":"2026-01-05T20:16:56.180Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Login attempt for user: emmanuelniyongabo44@gmail.com","service":"nga-central-mis","timestamp":"2026-01-05T20:16:56.181Z"}
+{"level":"warn","message":"Failed login attempt: user emmanuelniyongabo44@gmail.com not found","service":"nga-central-mis","timestamp":"2026-01-05T20:16:56.206Z"}
+{"duration":31,"level":"info","message":"POST /auth/login 500 - 31ms","service":"nga-central-mis","statusCode":500,"timestamp":"2026-01-05T20:16:56.211Z"}
+{"body":{"password":"1234567","username":"emmanuelniyongabo44@gmail.com"},"ip":"::1","level":"info","message":"POST /auth/login","service":"nga-central-mis","timestamp":"2026-01-05T20:18:19.674Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Login attempt for user: emmanuelniyongabo44@gmail.com","service":"nga-central-mis","timestamp":"2026-01-05T20:18:19.682Z"}
+{"level":"warn","message":"Failed login attempt: user emmanuelniyongabo44@gmail.com not found","service":"nga-central-mis","timestamp":"2026-01-05T20:18:19.685Z"}
+{"duration":18,"level":"info","message":"POST /auth/login 500 - 18ms","service":"nga-central-mis","statusCode":500,"timestamp":"2026-01-05T20:18:19.686Z"}
+{"body":{"password":"1234567","username":"emmanuelniyongabo44@gmail.com"},"ip":"::1","level":"info","message":"POST /auth/login","service":"nga-central-mis","timestamp":"2026-01-05T20:18:20.824Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Login attempt for user: emmanuelniyongabo44@gmail.com","service":"nga-central-mis","timestamp":"2026-01-05T20:18:20.824Z"}
+{"level":"warn","message":"Failed login attempt: user emmanuelniyongabo44@gmail.com not found","service":"nga-central-mis","timestamp":"2026-01-05T20:18:20.825Z"}
+{"duration":2,"level":"info","message":"POST /auth/login 500 - 2ms","service":"nga-central-mis","statusCode":500,"timestamp":"2026-01-05T20:18:20.826Z"}
+{"body":{"password":"1234567","username":"emmanuelniyongabo44@gmail.com"},"ip":"::1","level":"info","message":"POST /auth/login","service":"nga-central-mis","timestamp":"2026-01-05T20:18:21.488Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Login attempt for user: emmanuelniyongabo44@gmail.com","service":"nga-central-mis","timestamp":"2026-01-05T20:18:21.489Z"}
+{"level":"warn","message":"Failed login attempt: user emmanuelniyongabo44@gmail.com not found","service":"nga-central-mis","timestamp":"2026-01-05T20:18:21.490Z"}
+{"duration":3,"level":"info","message":"POST /auth/login 500 - 3ms","service":"nga-central-mis","statusCode":500,"timestamp":"2026-01-05T20:18:21.491Z"}
+{"body":{"password":"1234567","username":"emmanuelniyongabo44@gmail.com"},"ip":"::1","level":"info","message":"POST /auth/login","service":"nga-central-mis","timestamp":"2026-01-05T20:18:22.011Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Login attempt for user: emmanuelniyongabo44@gmail.com","service":"nga-central-mis","timestamp":"2026-01-05T20:18:22.021Z"}
+{"level":"warn","message":"Failed login attempt: user emmanuelniyongabo44@gmail.com not found","service":"nga-central-mis","timestamp":"2026-01-05T20:18:22.042Z"}
+{"duration":39,"level":"info","message":"POST /auth/login 500 - 39ms","service":"nga-central-mis","statusCode":500,"timestamp":"2026-01-05T20:18:22.050Z"}
+{"body":{"password":"1234567","username":"emmanuelniyongabo44@gmail.com"},"ip":"::1","level":"info","message":"POST /auth/login","service":"nga-central-mis","timestamp":"2026-01-05T20:18:22.671Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Login attempt for user: emmanuelniyongabo44@gmail.com","service":"nga-central-mis","timestamp":"2026-01-05T20:18:22.671Z"}
+{"level":"warn","message":"Failed login attempt: user emmanuelniyongabo44@gmail.com not found","service":"nga-central-mis","timestamp":"2026-01-05T20:18:22.672Z"}
+{"duration":2,"level":"info","message":"POST /auth/login 500 - 2ms","service":"nga-central-mis","statusCode":500,"timestamp":"2026-01-05T20:18:22.673Z"}
+{"body":{"password":"1234567","username":"emmanuelniyongabo44@gmail.com"},"ip":"::1","level":"info","message":"POST /auth/login","service":"nga-central-mis","timestamp":"2026-01-05T20:18:23.223Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Login attempt for user: emmanuelniyongabo44@gmail.com","service":"nga-central-mis","timestamp":"2026-01-05T20:18:23.223Z"}
+{"level":"warn","message":"Failed login attempt: user emmanuelniyongabo44@gmail.com not found","service":"nga-central-mis","timestamp":"2026-01-05T20:18:23.227Z"}
+{"duration":4,"level":"info","message":"POST /auth/login 500 - 4ms","service":"nga-central-mis","statusCode":500,"timestamp":"2026-01-05T20:18:23.228Z"}
+{"body":{"password":"1234567","username":"emmanuelniyongabo44@gmail.com"},"ip":"::1","level":"info","message":"POST /auth/login","service":"nga-central-mis","timestamp":"2026-01-05T20:18:23.704Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Login attempt for user: emmanuelniyongabo44@gmail.com","service":"nga-central-mis","timestamp":"2026-01-05T20:18:23.704Z"}
+{"level":"warn","message":"Failed login attempt: user emmanuelniyongabo44@gmail.com not found","service":"nga-central-mis","timestamp":"2026-01-05T20:18:23.706Z"}
+{"duration":3,"level":"info","message":"POST /auth/login 500 - 3ms","service":"nga-central-mis","statusCode":500,"timestamp":"2026-01-05T20:18:23.707Z"}
+{"body":{"password":"1234567","username":"emmanuelniyongabo44@gmail.com"},"ip":"::1","level":"info","message":"POST /auth/login","service":"nga-central-mis","timestamp":"2026-01-05T20:18:24.297Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Login attempt for user: emmanuelniyongabo44@gmail.com","service":"nga-central-mis","timestamp":"2026-01-05T20:18:24.300Z"}
+{"level":"warn","message":"Failed login attempt: user emmanuelniyongabo44@gmail.com not found","service":"nga-central-mis","timestamp":"2026-01-05T20:18:24.312Z"}
+{"duration":23,"level":"info","message":"POST /auth/login 500 - 23ms","service":"nga-central-mis","statusCode":500,"timestamp":"2026-01-05T20:18:24.319Z"}
+{"body":{"password":"1234567","username":"emmanuelniyongabo44@gmail.com"},"ip":"::1","level":"info","message":"POST /auth/login","service":"nga-central-mis","timestamp":"2026-01-05T20:21:23.594Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Login attempt for user: emmanuelniyongabo44@gmail.com","service":"nga-central-mis","timestamp":"2026-01-05T20:21:23.596Z"}
+{"level":"warn","message":"Failed login attempt: user emmanuelniyongabo44@gmail.com not found","service":"nga-central-mis","timestamp":"2026-01-05T20:21:23.602Z"}
+{"duration":13,"level":"info","message":"POST /auth/login 500 - 13ms","service":"nga-central-mis","statusCode":500,"timestamp":"2026-01-05T20:21:23.605Z"}
+{"level":"info","message":"SIGINT received, shutting down gracefully","service":"nga-central-mis","timestamp":"2026-01-05T20:21:36.183Z"}
+{"level":"info","message":"Server running on port 5001 in development mode","service":"nga-central-mis","timestamp":"2026-01-05T20:21:39.894Z"}
+{"body":{"password":"1234567","username":"emmanuelniyongabo44@gmail.com"},"ip":"::1","level":"info","message":"POST /auth/login","service":"nga-central-mis","timestamp":"2026-01-05T20:21:43.577Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Login attempt for user: emmanuelniyongabo44@gmail.com","service":"nga-central-mis","timestamp":"2026-01-05T20:21:43.578Z"}
+{"level":"warn","message":"Failed login attempt: user emmanuelniyongabo44@gmail.com not found","service":"nga-central-mis","timestamp":"2026-01-05T20:21:43.601Z"}
+{"duration":29,"level":"info","message":"POST /auth/login 401 - 29ms","service":"nga-central-mis","statusCode":401,"timestamp":"2026-01-05T20:21:43.605Z"}
+{"body":{"password":"1234567","username":"emmanuelniyongabo44@gmail.com"},"ip":"::1","level":"info","message":"POST /auth/login","service":"nga-central-mis","timestamp":"2026-01-05T20:21:48.898Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Login attempt for user: emmanuelniyongabo44@gmail.com","service":"nga-central-mis","timestamp":"2026-01-05T20:21:48.899Z"}
+{"level":"warn","message":"Failed login attempt: user emmanuelniyongabo44@gmail.com not found","service":"nga-central-mis","timestamp":"2026-01-05T20:21:48.902Z"}
+{"duration":6,"level":"info","message":"POST /auth/login 401 - 6ms","service":"nga-central-mis","statusCode":401,"timestamp":"2026-01-05T20:21:48.904Z"}
+{"body":{"password":"1234567","username":"emmanuelniyongabo44@gmail.com"},"ip":"::1","level":"info","message":"POST /auth/login","service":"nga-central-mis","timestamp":"2026-01-05T20:23:02.774Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Login attempt for user: emmanuelniyongabo44@gmail.com","service":"nga-central-mis","timestamp":"2026-01-05T20:23:02.776Z"}
+{"level":"warn","message":"Failed login attempt: user emmanuelniyongabo44@gmail.com not found","service":"nga-central-mis","timestamp":"2026-01-05T20:23:02.780Z"}
+{"duration":8,"level":"info","message":"POST /auth/login 401 - 8ms","service":"nga-central-mis","statusCode":401,"timestamp":"2026-01-05T20:23:02.782Z"}
+{"body":{"password":"1234567","username":"emmanuelniyongabo44@gmail.com"},"ip":"::1","level":"info","message":"POST /auth/login","service":"nga-central-mis","timestamp":"2026-01-05T20:23:05.416Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Login attempt for user: emmanuelniyongabo44@gmail.com","service":"nga-central-mis","timestamp":"2026-01-05T20:23:05.416Z"}
+{"level":"warn","message":"Failed login attempt: user emmanuelniyongabo44@gmail.com not found","service":"nga-central-mis","timestamp":"2026-01-05T20:23:05.420Z"}
+{"duration":6,"level":"info","message":"POST /auth/login 401 - 6ms","service":"nga-central-mis","statusCode":401,"timestamp":"2026-01-05T20:23:05.422Z"}
+{"body":{"password":"1234567","username":"emmanuelniyongabo44@gmail.com"},"ip":"::1","level":"info","message":"POST /auth/login","service":"nga-central-mis","timestamp":"2026-01-05T20:23:06.157Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Login attempt for user: emmanuelniyongabo44@gmail.com","service":"nga-central-mis","timestamp":"2026-01-05T20:23:06.157Z"}
+{"level":"warn","message":"Failed login attempt: user emmanuelniyongabo44@gmail.com not found","service":"nga-central-mis","timestamp":"2026-01-05T20:23:06.170Z"}
+{"duration":14,"level":"info","message":"POST /auth/login 401 - 14ms","service":"nga-central-mis","statusCode":401,"timestamp":"2026-01-05T20:23:06.171Z"}
+{"body":{"password":"1234567","username":"emmanuelniyongabo44@gmail.com"},"ip":"::1","level":"info","message":"POST /auth/login","service":"nga-central-mis","timestamp":"2026-01-05T20:23:06.681Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Login attempt for user: emmanuelniyongabo44@gmail.com","service":"nga-central-mis","timestamp":"2026-01-05T20:23:06.681Z"}
+{"level":"warn","message":"Failed login attempt: user emmanuelniyongabo44@gmail.com not found","service":"nga-central-mis","timestamp":"2026-01-05T20:23:06.684Z"}
+{"duration":5,"level":"info","message":"POST /auth/login 401 - 5ms","service":"nga-central-mis","statusCode":401,"timestamp":"2026-01-05T20:23:06.686Z"}
+{"body":{"password":"1234567","username":"emmanuelniyongabo44@gmail.com"},"ip":"::1","level":"info","message":"POST /auth/login","service":"nga-central-mis","timestamp":"2026-01-05T20:23:07.135Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Login attempt for user: emmanuelniyongabo44@gmail.com","service":"nga-central-mis","timestamp":"2026-01-05T20:23:07.135Z"}
+{"level":"warn","message":"Failed login attempt: user emmanuelniyongabo44@gmail.com not found","service":"nga-central-mis","timestamp":"2026-01-05T20:23:07.138Z"}
+{"duration":5,"level":"info","message":"POST /auth/login 401 - 5ms","service":"nga-central-mis","statusCode":401,"timestamp":"2026-01-05T20:23:07.140Z"}
+{"body":{"password":"1234567","username":"emmanuelniyongabo44@gmail.com"},"ip":"::1","level":"info","message":"POST /auth/login","service":"nga-central-mis","timestamp":"2026-01-05T20:23:07.534Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Login attempt for user: emmanuelniyongabo44@gmail.com","service":"nga-central-mis","timestamp":"2026-01-05T20:23:07.534Z"}
+{"level":"warn","message":"Failed login attempt: user emmanuelniyongabo44@gmail.com not found","service":"nga-central-mis","timestamp":"2026-01-05T20:23:07.537Z"}
+{"duration":4,"level":"info","message":"POST /auth/login 401 - 4ms","service":"nga-central-mis","statusCode":401,"timestamp":"2026-01-05T20:23:07.539Z"}
+{"body":{"password":"1234567","username":"emmanuelniyongabo44@gmail.com"},"ip":"::1","level":"info","message":"POST /auth/login","service":"nga-central-mis","timestamp":"2026-01-05T20:23:07.788Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Login attempt for user: emmanuelniyongabo44@gmail.com","service":"nga-central-mis","timestamp":"2026-01-05T20:23:07.789Z"}
+{"level":"warn","message":"Failed login attempt: user emmanuelniyongabo44@gmail.com not found","service":"nga-central-mis","timestamp":"2026-01-05T20:23:07.793Z"}
+{"duration":6,"level":"info","message":"POST /auth/login 401 - 6ms","service":"nga-central-mis","statusCode":401,"timestamp":"2026-01-05T20:23:07.794Z"}
+{"body":{"password":"1234567","username":"emmanuelniyongabo44@gmail.com"},"ip":"::1","level":"info","message":"POST /auth/login","service":"nga-central-mis","timestamp":"2026-01-05T20:23:08.022Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Login attempt for user: emmanuelniyongabo44@gmail.com","service":"nga-central-mis","timestamp":"2026-01-05T20:23:08.022Z"}
+{"level":"warn","message":"Failed login attempt: user emmanuelniyongabo44@gmail.com not found","service":"nga-central-mis","timestamp":"2026-01-05T20:23:08.025Z"}
+{"duration":5,"level":"info","message":"POST /auth/login 401 - 5ms","service":"nga-central-mis","statusCode":401,"timestamp":"2026-01-05T20:23:08.027Z"}
+{"body":{"password":"1234567","username":"emmanuelniyongabo44@gmail.com"},"ip":"::1","level":"info","message":"POST /auth/login","service":"nga-central-mis","timestamp":"2026-01-05T20:23:08.246Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Login attempt for user: emmanuelniyongabo44@gmail.com","service":"nga-central-mis","timestamp":"2026-01-05T20:23:08.247Z"}
+{"level":"warn","message":"Failed login attempt: user emmanuelniyongabo44@gmail.com not found","service":"nga-central-mis","timestamp":"2026-01-05T20:23:08.248Z"}
+{"duration":3,"level":"info","message":"POST /auth/login 401 - 3ms","service":"nga-central-mis","statusCode":401,"timestamp":"2026-01-05T20:23:08.249Z"}
+{"body":{"password":"1234567","username":"emmanuelniyongabo44@gmail.com"},"ip":"::1","level":"info","message":"POST /auth/login","service":"nga-central-mis","timestamp":"2026-01-05T20:23:08.504Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Login attempt for user: emmanuelniyongabo44@gmail.com","service":"nga-central-mis","timestamp":"2026-01-05T20:23:08.505Z"}
+{"level":"warn","message":"Failed login attempt: user emmanuelniyongabo44@gmail.com not found","service":"nga-central-mis","timestamp":"2026-01-05T20:23:08.507Z"}
+{"duration":5,"level":"info","message":"POST /auth/login 401 - 5ms","service":"nga-central-mis","statusCode":401,"timestamp":"2026-01-05T20:23:08.509Z"}
+{"body":{"password":"1234567","username":"emmanuelniyongabo44@gmail.com"},"ip":"::1","level":"info","message":"POST /auth/login","service":"nga-central-mis","timestamp":"2026-01-05T20:23:08.800Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Login attempt for user: emmanuelniyongabo44@gmail.com","service":"nga-central-mis","timestamp":"2026-01-05T20:23:08.801Z"}
+{"level":"warn","message":"Failed login attempt: user emmanuelniyongabo44@gmail.com not found","service":"nga-central-mis","timestamp":"2026-01-05T20:23:08.803Z"}
+{"duration":4,"level":"info","message":"POST /auth/login 401 - 4ms","service":"nga-central-mis","statusCode":401,"timestamp":"2026-01-05T20:23:08.804Z"}
+{"body":{"password":"1234567","username":"emmanuelniyongabo44@gmail.com"},"ip":"::1","level":"info","message":"POST /auth/login","service":"nga-central-mis","timestamp":"2026-01-05T20:23:09.226Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Login attempt for user: emmanuelniyongabo44@gmail.com","service":"nga-central-mis","timestamp":"2026-01-05T20:23:09.226Z"}
+{"level":"warn","message":"Failed login attempt: user emmanuelniyongabo44@gmail.com not found","service":"nga-central-mis","timestamp":"2026-01-05T20:23:09.228Z"}
+{"duration":3,"level":"info","message":"POST /auth/login 401 - 3ms","service":"nga-central-mis","statusCode":401,"timestamp":"2026-01-05T20:23:09.229Z"}
+{"body":{"password":"1234567","username":"emmanuelniyongabo44@gmail.com"},"ip":"::1","level":"info","message":"POST /auth/login","service":"nga-central-mis","timestamp":"2026-01-05T20:23:09.687Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Login attempt for user: emmanuelniyongabo44@gmail.com","service":"nga-central-mis","timestamp":"2026-01-05T20:23:09.688Z"}
+{"level":"warn","message":"Failed login attempt: user emmanuelniyongabo44@gmail.com not found","service":"nga-central-mis","timestamp":"2026-01-05T20:23:09.690Z"}
+{"duration":4,"level":"info","message":"POST /auth/login 401 - 4ms","service":"nga-central-mis","statusCode":401,"timestamp":"2026-01-05T20:23:09.691Z"}
+{"body":{"password":"1234567","username":"emmanuelniyongabo44@gmail.com"},"ip":"::1","level":"info","message":"POST /auth/login","service":"nga-central-mis","timestamp":"2026-01-05T20:23:10.178Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Login attempt for user: emmanuelniyongabo44@gmail.com","service":"nga-central-mis","timestamp":"2026-01-05T20:23:10.178Z"}
+{"level":"warn","message":"Failed login attempt: user emmanuelniyongabo44@gmail.com not found","service":"nga-central-mis","timestamp":"2026-01-05T20:23:10.180Z"}
+{"duration":4,"level":"info","message":"POST /auth/login 401 - 4ms","service":"nga-central-mis","statusCode":401,"timestamp":"2026-01-05T20:23:10.182Z"}
+{"body":{"password":"1234567","username":"emmanuelniyongabo44@gmail.com"},"ip":"::1","level":"info","message":"POST /auth/login","service":"nga-central-mis","timestamp":"2026-01-05T20:23:10.658Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Login attempt for user: emmanuelniyongabo44@gmail.com","service":"nga-central-mis","timestamp":"2026-01-05T20:23:10.658Z"}
+{"level":"warn","message":"Failed login attempt: user emmanuelniyongabo44@gmail.com not found","service":"nga-central-mis","timestamp":"2026-01-05T20:23:10.663Z"}
+{"duration":7,"level":"info","message":"POST /auth/login 401 - 7ms","service":"nga-central-mis","statusCode":401,"timestamp":"2026-01-05T20:23:10.664Z"}
+{"body":{"password":"1234567","username":"emmanuelniyongabo44@gmail.com"},"ip":"::1","level":"info","message":"POST /auth/login","service":"nga-central-mis","timestamp":"2026-01-05T20:23:11.115Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Login attempt for user: emmanuelniyongabo44@gmail.com","service":"nga-central-mis","timestamp":"2026-01-05T20:23:11.115Z"}
+{"level":"warn","message":"Failed login attempt: user emmanuelniyongabo44@gmail.com not found","service":"nga-central-mis","timestamp":"2026-01-05T20:23:11.117Z"}
+{"duration":4,"level":"info","message":"POST /auth/login 401 - 4ms","service":"nga-central-mis","statusCode":401,"timestamp":"2026-01-05T20:23:11.118Z"}
+{"body":{"password":"1234567","username":"emmanuelniyongabo44@gmail.com"},"ip":"::1","level":"info","message":"POST /auth/login","service":"nga-central-mis","timestamp":"2026-01-05T20:23:11.488Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Login attempt for user: emmanuelniyongabo44@gmail.com","service":"nga-central-mis","timestamp":"2026-01-05T20:23:11.488Z"}
+{"level":"warn","message":"Failed login attempt: user emmanuelniyongabo44@gmail.com not found","service":"nga-central-mis","timestamp":"2026-01-05T20:23:11.490Z"}
+{"duration":3,"level":"info","message":"POST /auth/login 401 - 3ms","service":"nga-central-mis","statusCode":401,"timestamp":"2026-01-05T20:23:11.491Z"}
+{"body":{"password":"1234567","username":"emmanuelniyongabo44@gmail.com"},"ip":"::1","level":"info","message":"POST /auth/login","service":"nga-central-mis","timestamp":"2026-01-05T20:23:15.323Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Login attempt for user: emmanuelniyongabo44@gmail.com","service":"nga-central-mis","timestamp":"2026-01-05T20:23:15.324Z"}
+{"level":"warn","message":"Failed login attempt: user emmanuelniyongabo44@gmail.com not found","service":"nga-central-mis","timestamp":"2026-01-05T20:23:15.328Z"}
+{"duration":5,"level":"info","message":"POST /auth/login 401 - 5ms","service":"nga-central-mis","statusCode":401,"timestamp":"2026-01-05T20:23:15.328Z"}
+{"body":{"password":"1234567","username":"emmanuelniyongabo44@gmail.com"},"ip":"::1","level":"info","message":"POST /auth/login","service":"nga-central-mis","timestamp":"2026-01-05T20:23:15.988Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Login attempt for user: emmanuelniyongabo44@gmail.com","service":"nga-central-mis","timestamp":"2026-01-05T20:23:15.990Z"}
+{"level":"warn","message":"Failed login attempt: user emmanuelniyongabo44@gmail.com not found","service":"nga-central-mis","timestamp":"2026-01-05T20:23:16.027Z"}
+{"duration":66,"level":"info","message":"POST /auth/login 401 - 66ms","service":"nga-central-mis","statusCode":401,"timestamp":"2026-01-05T20:23:16.054Z"}
+{"body":{"password":"1234567","username":"emmanuelniyongabo44@gmail.com"},"ip":"::1","level":"info","message":"POST /auth/login","service":"nga-central-mis","timestamp":"2026-01-05T20:23:16.465Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Login attempt for user: emmanuelniyongabo44@gmail.com","service":"nga-central-mis","timestamp":"2026-01-05T20:23:16.466Z"}
+{"level":"warn","message":"Failed login attempt: user emmanuelniyongabo44@gmail.com not found","service":"nga-central-mis","timestamp":"2026-01-05T20:23:16.467Z"}
+{"duration":3,"level":"info","message":"POST /auth/login 401 - 3ms","service":"nga-central-mis","statusCode":401,"timestamp":"2026-01-05T20:23:16.468Z"}
+{"body":{"password":"1234567","username":"emmanuelniyongabo44@gmail.com"},"ip":"::1","level":"info","message":"POST /auth/login","service":"nga-central-mis","timestamp":"2026-01-05T20:23:17.042Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Login attempt for user: emmanuelniyongabo44@gmail.com","service":"nga-central-mis","timestamp":"2026-01-05T20:23:17.043Z"}
+{"level":"warn","message":"Failed login attempt: user emmanuelniyongabo44@gmail.com not found","service":"nga-central-mis","timestamp":"2026-01-05T20:23:17.044Z"}
+{"duration":3,"level":"info","message":"POST /auth/login 401 - 3ms","service":"nga-central-mis","statusCode":401,"timestamp":"2026-01-05T20:23:17.045Z"}
+{"body":{"password":"1234567","username":"emmanuelniyongabo44@gmail.com"},"ip":"::1","level":"info","message":"POST /auth/login","service":"nga-central-mis","timestamp":"2026-01-05T20:23:20.384Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Login attempt for user: emmanuelniyongabo44@gmail.com","service":"nga-central-mis","timestamp":"2026-01-05T20:23:20.384Z"}
+{"level":"warn","message":"Failed login attempt: user emmanuelniyongabo44@gmail.com not found","service":"nga-central-mis","timestamp":"2026-01-05T20:23:20.387Z"}
+{"duration":4,"level":"info","message":"POST /auth/login 401 - 4ms","service":"nga-central-mis","statusCode":401,"timestamp":"2026-01-05T20:23:20.388Z"}
+{"body":{"password":"1234567","username":"admin"},"ip":"::1","level":"info","message":"POST /auth/login","service":"nga-central-mis","timestamp":"2026-01-05T20:24:31.106Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Login attempt for user: admin","service":"nga-central-mis","timestamp":"2026-01-05T20:24:31.108Z"}
+{"level":"warn","message":"Failed login attempt: invalid password for user admin","service":"nga-central-mis","timestamp":"2026-01-05T20:24:31.135Z"}
+{"duration":31,"level":"info","message":"POST /auth/login 401 - 31ms","service":"nga-central-mis","statusCode":401,"timestamp":"2026-01-05T20:24:31.136Z"}
+{"body":{"password":"admin","username":"admin"},"ip":"::1","level":"info","message":"POST /auth/login","service":"nga-central-mis","timestamp":"2026-01-05T20:24:35.920Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Login attempt for user: admin","service":"nga-central-mis","timestamp":"2026-01-05T20:24:35.920Z"}
+{"level":"warn","message":"Failed login attempt: invalid password for user admin","service":"nga-central-mis","timestamp":"2026-01-05T20:24:35.922Z"}
+{"duration":2,"level":"info","message":"POST /auth/login 401 - 2ms","service":"nga-central-mis","statusCode":401,"timestamp":"2026-01-05T20:24:35.922Z"}
+{"body":{"password":"1234567","username":"emmanuelniyongabo44@gmail.com"},"ip":"::1","level":"info","message":"POST /auth/login","service":"nga-central-mis","timestamp":"2026-01-05T20:26:37.204Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Login attempt for user: emmanuelniyongabo44@gmail.com","service":"nga-central-mis","timestamp":"2026-01-05T20:26:37.206Z"}
+{"level":"warn","message":"Failed login attempt: user emmanuelniyongabo44@gmail.com not found","service":"nga-central-mis","timestamp":"2026-01-05T20:26:37.210Z"}
+{"duration":8,"level":"info","message":"POST /auth/login 401 - 8ms","service":"nga-central-mis","statusCode":401,"timestamp":"2026-01-05T20:26:37.212Z"}
+{"body":{"password":"1234567","username":"emmanuelniyongabo44@gmail.com"},"ip":"::1","level":"info","message":"POST /auth/login","service":"nga-central-mis","timestamp":"2026-01-05T20:26:38.183Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Login attempt for user: emmanuelniyongabo44@gmail.com","service":"nga-central-mis","timestamp":"2026-01-05T20:26:38.183Z"}
+{"level":"warn","message":"Failed login attempt: user emmanuelniyongabo44@gmail.com not found","service":"nga-central-mis","timestamp":"2026-01-05T20:26:38.191Z"}
+{"duration":9,"level":"info","message":"POST /auth/login 401 - 9ms","service":"nga-central-mis","statusCode":401,"timestamp":"2026-01-05T20:26:38.192Z"}
+{"body":{"password":"1234567","username":"emmanuelniyongabo44@gmail.com"},"ip":"::1","level":"info","message":"POST /auth/login","service":"nga-central-mis","timestamp":"2026-01-05T20:30:02.887Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Login attempt for user: emmanuelniyongabo44@gmail.com","service":"nga-central-mis","timestamp":"2026-01-05T20:30:02.890Z"}
+{"level":"warn","message":"Failed login attempt: user emmanuelniyongabo44@gmail.com not found","service":"nga-central-mis","timestamp":"2026-01-05T20:30:02.897Z"}
+{"duration":13,"level":"info","message":"POST /auth/login 401 - 13ms","service":"nga-central-mis","statusCode":401,"timestamp":"2026-01-05T20:30:02.898Z"}
+{"body":{"password":"1234567","username":"emmanuelniyongabo44@gmail.com"},"ip":"::1","level":"info","message":"POST /auth/login","service":"nga-central-mis","timestamp":"2026-01-05T20:30:30.577Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Login attempt for user: emmanuelniyongabo44@gmail.com","service":"nga-central-mis","timestamp":"2026-01-05T20:30:30.578Z"}
+{"level":"warn","message":"Failed login attempt: user emmanuelniyongabo44@gmail.com not found","service":"nga-central-mis","timestamp":"2026-01-05T20:30:30.584Z"}
+{"duration":8,"level":"info","message":"POST /auth/login 401 - 8ms","service":"nga-central-mis","statusCode":401,"timestamp":"2026-01-05T20:30:30.585Z"}
+{"body":{"password":"1234567","username":"emmanuelniyongabo44@gmail.com"},"ip":"::1","level":"info","message":"POST /auth/login","service":"nga-central-mis","timestamp":"2026-01-05T20:30:31.240Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Login attempt for user: emmanuelniyongabo44@gmail.com","service":"nga-central-mis","timestamp":"2026-01-05T20:30:31.240Z"}
+{"level":"warn","message":"Failed login attempt: user emmanuelniyongabo44@gmail.com not found","service":"nga-central-mis","timestamp":"2026-01-05T20:30:31.242Z"}
+{"duration":2,"level":"info","message":"POST /auth/login 401 - 2ms","service":"nga-central-mis","statusCode":401,"timestamp":"2026-01-05T20:30:31.242Z"}
+{"body":{"password":"1234567","username":"niyongabo"},"ip":"::1","level":"info","message":"POST /auth/login","service":"nga-central-mis","timestamp":"2026-01-05T21:41:32.659Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Login attempt for user: niyongabo","service":"nga-central-mis","timestamp":"2026-01-05T21:41:32.664Z"}
+{"level":"warn","message":"Failed login attempt: user niyongabo not found","service":"nga-central-mis","timestamp":"2026-01-05T21:41:32.685Z"}
+{"duration":33,"level":"info","message":"POST /auth/login 401 - 33ms","service":"nga-central-mis","statusCode":401,"timestamp":"2026-01-05T21:41:32.691Z"}
+{"body":{"password":"1234567","username":"admin"},"ip":"::1","level":"info","message":"POST /auth/login","service":"nga-central-mis","timestamp":"2026-01-05T21:41:37.859Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Login attempt for user: admin","service":"nga-central-mis","timestamp":"2026-01-05T21:41:37.859Z"}
+{"level":"warn","message":"Failed login attempt: invalid password for user admin","service":"nga-central-mis","timestamp":"2026-01-05T21:41:37.875Z"}
+{"duration":18,"level":"info","message":"POST /auth/login 401 - 18ms","service":"nga-central-mis","statusCode":401,"timestamp":"2026-01-05T21:41:37.876Z"}

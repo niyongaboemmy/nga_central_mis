@@ -14,7 +14,7 @@ const Button: React.FC<ButtonProps> = ({
   ...props
 }) => {
   const baseClasses =
-    "font-medium rounded focus:outline-none focus:ring-2 focus:ring-offset-2 transition-colors";
+    "font-medium rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2 transition-all duration-200";
 
   const variantClasses = {
     primary: "bg-blue-600 hover:bg-blue-700 text-white focus:ring-blue-500",

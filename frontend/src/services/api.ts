@@ -35,10 +35,17 @@ api.interceptors.response.use(
   },
   (error: AxiosError): Promise<AxiosError> => {
     if (error.response?.status === 401) {
-      // Token expired or invalid
-      localStorage.removeItem("token");
-      // Optionally redirect to login
-      window.location.href = "/login";
+      // Only redirect if we have a token (meaning user was logged in)
+      const token = localStorage.getItem("token");
+      if (
+        token &&
+        !error.config?.url?.includes("/auth/login") &&
+        !error.config?.url?.includes("/auth/verify-otp")
+      ) {
+        // Token expired or invalid - redirect to login
+        localStorage.removeItem("token");
+        window.location.href = "/";
+      }
     }
     return Promise.reject(error);
   }

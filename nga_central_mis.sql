@@ -70,6 +70,22 @@ INSERT INTO `AcademicYear` (`academic_year_id`, `name`, `start_date`, `end_date`
 -- --------------------------------------------------------
 
 --
+-- Table structure for table `OTP`
+--
+
+CREATE TABLE `OTP` (
+  `otp_id` bigint(20) NOT NULL,
+  `user_id` bigint(20) NOT NULL,
+  `otp_code` varchar(6) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `otp_type` enum('LOGIN_2FA','PASSWORD_RESET','EMAIL_VERIFICATION') COLLATE utf8mb4_unicode_ci DEFAULT 'LOGIN_2FA',
+  `expires_at` datetime NOT NULL,
+  `is_used` tinyint(1) DEFAULT '0',
+  `created_at` datetime DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
 -- Table structure for table `AuthCredential`
 --
 
@@ -496,6 +512,14 @@ ALTER TABLE `AcademicYear`
   ADD PRIMARY KEY (`academic_year_id`);
 
 --
+-- Indexes for table `OTP`
+--
+ALTER TABLE `OTP`
+  ADD PRIMARY KEY (`otp_id`),
+  ADD KEY `user_id` (`user_id`),
+  ADD KEY `otp_lookup` (`user_id`,`otp_code`,`otp_type`,`is_used`,`expires_at`);
+
+--
 -- Indexes for table `AuthCredential`
 --
 ALTER TABLE `AuthCredential`
@@ -622,6 +646,12 @@ ALTER TABLE `AcademicYear`
   MODIFY `academic_year_id` bigint(20) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
 
 --
+-- AUTO_INCREMENT for table `OTP`
+--
+ALTER TABLE `OTP`
+  MODIFY `otp_id` bigint(20) NOT NULL AUTO_INCREMENT;
+
+--
 -- AUTO_INCREMENT for table `AuthCredential`
 --
 ALTER TABLE `AuthCredential`
@@ -684,6 +714,12 @@ ALTER TABLE `UserProfile`
 --
 ALTER TABLE `AcademicTerm`
   ADD CONSTRAINT `academicterm_ibfk_1` FOREIGN KEY (`academic_year_id`) REFERENCES `AcademicYear` (`academic_year_id`);
+
+--
+-- Constraints for table `OTP`
+--
+ALTER TABLE `OTP`
+  ADD CONSTRAINT `otp_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `User` (`user_id`);
 
 --
 -- Constraints for table `AuthCredential`
