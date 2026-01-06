@@ -223,3 +223,4 @@
 {"level":"info","message":"Login attempt for user: admin","service":"nga-central-mis","timestamp":"2026-01-05T21:41:37.859Z"}
 {"level":"warn","message":"Failed login attempt: invalid password for user admin","service":"nga-central-mis","timestamp":"2026-01-05T21:41:37.875Z"}
 {"duration":18,"level":"info","message":"POST /auth/login 401 - 18ms","service":"nga-central-mis","statusCode":401,"timestamp":"2026-01-05T21:41:37.876Z"}
+{"level":"info","message":"SIGINT received, shutting down gracefully","service":"nga-central-mis","timestamp":"2026-01-06T00:20:12.200Z"}
