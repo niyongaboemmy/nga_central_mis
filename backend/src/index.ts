@@ -57,7 +57,6 @@ process.on("SIGINT", () => {
   process.exit(0);
 });
 
-// Start server
 app.listen(config.port, () => {
   logger.info(
     `Server running on port ${config.port} in ${config.nodeEnv} mode`

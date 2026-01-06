@@ -7,7 +7,7 @@ import axios, {
 
 // Create axios instance with default config
 const api: AxiosInstance = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || "http://localhost:5001",
+  baseURL: import.meta.env.VITE_API_BASE_URL || "https://ngamisapi.vms.rw",
   timeout: 10000,
   headers: {
     "Content-Type": "application/json",

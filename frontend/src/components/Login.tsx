@@ -181,7 +181,7 @@ const Login: React.FC<LoginProps> = ({
 
   return (
     <motion.div
-      className="min-h-screen relative overflow-hidden bg-gradient-to-br from-gray-50 to-blue-50 dark:from-slate-950 dark:to-slate-950 pt-6"
+      className="min-h-screen relative overflow-hidden bg-gradient-to-br from-gray-50 to-blue-50 dark:from-black dark:to-black pt-6"
       initial="initial"
       animate="animate"
       exit="exit"
@@ -346,7 +346,7 @@ const Login: React.FC<LoginProps> = ({
               >
                 {/* Login Form Card */}
                 <motion.div
-                  className="bg-white/80 dark:bg-slate-800/50 backdrop-blur-xl rounded-3xl p-8 border border-white dark:border-slate-700/50 shadow-2xl"
+                  className="bg-white/80 dark:bg-slate-800/60 backdrop-blur-xl rounded-3xl p-8 border border-white dark:border-slate-700/50 shadow-2xl"
                   initial={{ opacity: 0, scale: 0.95 }}
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ duration: 0.4, ease: "easeOut" }}
@@ -377,7 +377,7 @@ const Login: React.FC<LoginProps> = ({
                       Welcome Back
                     </motion.h1>
                     <motion.p
-                      className="text-gray-600/60 dark:text-gray-300/60"
+                      className="text-gray-600/60 dark:text-gray-300/60 text-sm"
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
                       transition={{ delay: 0.3 }}

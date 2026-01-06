@@ -49,6 +49,26 @@ interface Config {
   };
 }
 
+// Database configuration - supports local and remote switching
+const dbConnection = process.env.DB_CONNECTION || "local";
+
+const databaseConfig: DatabaseConfig =
+  dbConnection === "remote"
+    ? {
+        host: process.env.DB_HOST_REMOTE || "mysql.uk.cloudlogin.co",
+        port: parseInt(process.env.DB_PORT_REMOTE || "3306", 10),
+        username: process.env.DB_USERNAME_REMOTE || "ngarw_mis",
+        password: process.env.DB_PASSWORD_REMOTE || "NgaMisDbPass@90",
+        name: process.env.DB_NAME_REMOTE || "ngarw_mis",
+      }
+    : {
+        host: process.env.DB_HOST || "localhost",
+        port: parseInt(process.env.DB_PORT || "8889", 10),
+        username: process.env.DB_USERNAME || "root",
+        password: process.env.DB_PASSWORD || "root",
+        name: process.env.DB_NAME || "nga_central_mis",
+      };
+
 // Development configuration
 const developmentConfig: Config = {
   port: parseInt(process.env.PORT || "5001", 10),
@@ -56,13 +76,7 @@ const developmentConfig: Config = {
   envType: "development",
   jwtSecret: process.env.JWT_SECRET || "dev_secret_key_change_in_production",
   jwtExpiresIn: process.env.JWT_EXPIRES_IN || "1h",
-  database: {
-    host: process.env.DB_HOST || "localhost",
-    port: parseInt(process.env.DB_PORT || "8889", 10),
-    username: process.env.DB_USERNAME || "root",
-    password: process.env.DB_PASSWORD || "root",
-    name: process.env.DB_NAME || "nga_central_mis",
-  },
+  database: databaseConfig,
   cors: {
     origin: process.env.CORS_ORIGIN
       ? process.env.CORS_ORIGIN.split(",")
@@ -149,7 +163,7 @@ if (missingEnvVars.length > 0) {
 // Log environment info
 console.log(`🚀 Running in ${config.envType} mode`);
 console.log(
-  `📦 Database: ${config.database.host}:${config.database.port}/${config.database.name}`
+  `📦 Database: ${config.database.host}:${config.database.port}/${config.database.name} (${dbConnection} connection)`
 );
 console.log(`📧 Email: ${config.email.smtp.host}:${config.email.smtp.port}`);
 
