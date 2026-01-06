@@ -11,6 +11,7 @@ import AboutUs from "./components/AboutUs";
 import ContactUs from "./components/ContactUs";
 import PasswordRecovery from "./components/PasswordRecovery";
 import Login from "./components/Login";
+import Profile from "./components/Profile";
 import Dashboard from "./components/Dashboard";
 import SystemLayout from "./components/SystemLayout";
 import Footer from "./components/ui/Footer";
@@ -158,6 +159,11 @@ const DashboardPage: React.FC = () => {
   return <Dashboard onLogout={handleLogout} />;
 };
 
+// Profile page with sidebar
+const ProfilePage: React.FC = () => {
+  return <Profile />;
+};
+
 function App() {
   return (
     <UserProvider>
@@ -230,6 +236,18 @@ function App() {
               <ProtectedRoute>
                 <SystemLayoutWrapper>
                   <DashboardPage />
+                </SystemLayoutWrapper>
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Profile - protected with sidebar */}
+          <Route
+            path="/profile"
+            element={
+              <ProtectedRoute>
+                <SystemLayoutWrapper>
+                  <ProfilePage />
                 </SystemLayoutWrapper>
               </ProtectedRoute>
             }

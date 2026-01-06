@@ -1,5 +1,5 @@
 import { db } from "../db";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { User, UserProfile } from "../db/schema";
 import { sanitizeString, validateEmail } from "../utils/sanitization";
 import {
@@ -10,6 +10,216 @@ import {
 import { successResponse } from "../utils/response";
 import { asyncHandler } from "../middleware/asyncHandler";
 import logger from "../utils/logger";
+
+// Helper function to convert date to MySQL DATE format
+const formatDateForMySQL = (dateStr: string | undefined) => {
+  if (!dateStr) return null;
+  try {
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) return null;
+    return date.toISOString().split("T")[0];
+  } catch {
+    return null;
+  }
+};
+
+// Helper function to validate gender
+const validateGender = (
+  gender: string | undefined
+): "MALE" | "FEMALE" | "OTHER" | null => {
+  if (!gender) return null;
+  const normalized = gender.toUpperCase().trim();
+  if (["MALE", "FEMALE", "OTHER"].includes(normalized)) {
+    return normalized as "MALE" | "FEMALE" | "OTHER";
+  }
+  return null;
+};
+
+export const updateCurrentUserProfile = asyncHandler(
+  async (req: any, res: any) => {
+    const userId = req.user?.userId;
+
+    if (!userId) {
+      throw new ValidationError("User not authenticated");
+    }
+
+    const {
+      first_name,
+      last_name,
+      gender,
+      date_of_birth,
+      address,
+      external_id,
+    } = req.body;
+
+    logger.info("Updating current user profile", { userId });
+
+    // Validate gender
+    const validatedGender = validateGender(gender);
+    if (gender !== undefined && validatedGender === null) {
+      throw new ValidationError("Gender must be MALE, FEMALE, or OTHER");
+    }
+
+    // Format date for MySQL
+    const formattedDateOfBirth = formatDateForMySQL(date_of_birth);
+
+    // Check if profile exists
+    const existingProfile = await db
+      .select()
+      .from(UserProfile)
+      .where(eq(UserProfile.user_id, userId))
+      .limit(1);
+
+    if (existingProfile.length === 0) {
+      // Create new profile
+      await db.insert(UserProfile).values({
+        user_id: userId,
+        first_name: first_name ? sanitizeString(first_name) : null,
+        last_name: last_name ? sanitizeString(last_name) : null,
+        gender: validatedGender,
+        date_of_birth: formattedDateOfBirth
+          ? sql`${formattedDateOfBirth}`
+          : null,
+        address: address ? sanitizeString(address) : null,
+        external_id: external_id ? sanitizeString(external_id) : null,
+      });
+    } else {
+      // Update existing profile
+      const updateData: any = {};
+      if (
+        first_name !== undefined &&
+        first_name !== null &&
+        first_name.trim() !== ""
+      )
+        updateData.first_name = sanitizeString(first_name);
+      if (
+        last_name !== undefined &&
+        last_name !== null &&
+        last_name.trim() !== ""
+      )
+        updateData.last_name = sanitizeString(last_name);
+      if (validatedGender !== null) updateData.gender = validatedGender;
+      if (formattedDateOfBirth !== null)
+        updateData.date_of_birth = sql`${formattedDateOfBirth}`;
+      if (address !== undefined && address !== null && address.trim() !== "")
+        updateData.address = sanitizeString(address);
+      if (
+        external_id !== undefined &&
+        external_id !== null &&
+        external_id.trim() !== ""
+      )
+        updateData.external_id = sanitizeString(external_id);
+
+      await db
+        .update(UserProfile)
+        .set(updateData)
+        .where(eq(UserProfile.user_id, userId));
+    }
+
+    // Fetch updated profile
+    const updatedProfile = await db
+      .select()
+      .from(UserProfile)
+      .where(eq(UserProfile.user_id, userId))
+      .limit(1);
+
+    successResponse(
+      res,
+      "Profile updated successfully",
+      updatedProfile[0] || null
+    );
+  }
+);
+
+export const updateUserProfile = asyncHandler(async (req: any, res: any) => {
+  const { id } = req.params;
+  const userId = parseInt(id);
+
+  if (isNaN(userId)) {
+    throw new ValidationError("Invalid user ID");
+  }
+
+  const { first_name, last_name, gender, date_of_birth, address, external_id } =
+    req.body;
+
+  logger.info("Updating user profile", {
+    userId,
+    requestedBy: req.user?.userId,
+  });
+
+  // Validate gender
+  const validatedGender = validateGender(gender);
+  if (gender !== undefined && validatedGender === null) {
+    throw new ValidationError("Gender must be MALE, FEMALE, or OTHER");
+  }
+
+  // Format date for MySQL
+  const formattedDateOfBirth = formatDateForMySQL(date_of_birth);
+
+  // Check if profile exists
+  const existingProfile = await db
+    .select()
+    .from(UserProfile)
+    .where(eq(UserProfile.user_id, userId))
+    .limit(1);
+
+  if (existingProfile.length === 0) {
+    // Create new profile
+    await db.insert(UserProfile).values({
+      user_id: userId,
+      first_name: first_name ? sanitizeString(first_name) : null,
+      last_name: last_name ? sanitizeString(last_name) : null,
+      gender: validatedGender,
+      date_of_birth: formattedDateOfBirth ? sql`${formattedDateOfBirth}` : null,
+      address: address ? sanitizeString(address) : null,
+      external_id: external_id ? sanitizeString(external_id) : null,
+    });
+  } else {
+    // Update existing profile
+    const updateData: any = {};
+    if (
+      first_name !== undefined &&
+      first_name !== null &&
+      first_name.trim() !== ""
+    )
+      updateData.first_name = sanitizeString(first_name);
+    if (
+      last_name !== undefined &&
+      last_name !== null &&
+      last_name.trim() !== ""
+    )
+      updateData.last_name = sanitizeString(last_name);
+    if (validatedGender !== null) updateData.gender = validatedGender;
+    if (formattedDateOfBirth !== null)
+      updateData.date_of_birth = sql`${formattedDateOfBirth}`;
+    if (address !== undefined && address !== null && address.trim() !== "")
+      updateData.address = sanitizeString(address);
+    if (
+      external_id !== undefined &&
+      external_id !== null &&
+      external_id.trim() !== ""
+    )
+      updateData.external_id = sanitizeString(external_id);
+
+    await db
+      .update(UserProfile)
+      .set(updateData)
+      .where(eq(UserProfile.user_id, userId));
+  }
+
+  // Fetch updated profile
+  const updatedProfile = await db
+    .select()
+    .from(UserProfile)
+    .where(eq(UserProfile.user_id, userId))
+    .limit(1);
+
+  successResponse(
+    res,
+    "Profile updated successfully",
+    updatedProfile[0] || null
+  );
+});
 
 export const getCurrentUser = asyncHandler(async (req: any, res: any) => {
   const userId = req.user?.userId;

@@ -27,6 +27,8 @@ export interface UserProfile {
   address?: string;
   user_type?: string;
   external_id?: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface UserWithProfile {
@@ -80,6 +82,28 @@ export const getUser = async (
   try {
     const response = await api.get<BackendResponse<UserWithProfile>>(
       `/users/${id}`
+    );
+    if (onSuccess && response.data.data) {
+      onSuccess(response.data.data);
+    }
+    return response.data.data;
+  } catch (error) {
+    if (onError) {
+      onError(error);
+    }
+    throw error;
+  }
+};
+
+export const updateProfile = async (
+  profileData: Partial<UserProfile>,
+  onSuccess?: (profile: UserProfile) => void,
+  onError?: (error: any) => void
+): Promise<UserProfile | void> => {
+  try {
+    const response = await api.put<BackendResponse<UserProfile>>(
+      "/users/me/profile",
+      profileData
     );
     if (onSuccess && response.data.data) {
       onSuccess(response.data.data);

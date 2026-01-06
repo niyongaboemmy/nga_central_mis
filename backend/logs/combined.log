@@ -499,3 +499,193 @@
 {"ip":"::1","level":"info","message":"GET /users/me","service":"nga-central-mis","timestamp":"2026-01-06T20:27:55.167Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
 {"level":"info","message":"Fetching current user","service":"nga-central-mis","timestamp":"2026-01-06T20:27:55.169Z","userId":1}
 {"duration":3,"level":"info","message":"GET /users/me 304 - 3ms","service":"nga-central-mis","statusCode":304,"timestamp":"2026-01-06T20:27:55.170Z"}
+{"body":{"password":"Ngb155155!","username":"emmanuelniyongabo44@gmail.com"},"ip":"::1","level":"info","message":"POST /auth/login","service":"nga-central-mis","timestamp":"2026-01-06T22:18:34.465Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Login attempt for: emmanuelniyongabo44@gmail.com","service":"nga-central-mis","timestamp":"2026-01-06T22:18:34.469Z"}
+{"level":"info","message":"OTP saved","service":"nga-central-mis","timestamp":"2026-01-06T22:18:34.813Z","type":"LOGIN_2FA","userId":1}
+{"level":"info","message":"Email sent successfully","messageId":"<87b49917-5616-4b37-5cb7-3c9d5215447a@nga.ac.rw>","service":"nga-central-mis","timestamp":"2026-01-06T22:18:46.787Z","to":"emmanuelniyongabo44@gmail.com"}
+{"level":"info","message":"Password verified, OTP sent for user: superadmin","service":"nga-central-mis","timestamp":"2026-01-06T22:18:46.792Z"}
+{"body":{"password":"Ngb155155!","username":"emmanuelniyongabo44@gmail.com"},"ip":"::1","level":"info","message":"POST /auth/login","service":"nga-central-mis","timestamp":"2026-01-06T22:18:52.741Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Login attempt for: emmanuelniyongabo44@gmail.com","service":"nga-central-mis","timestamp":"2026-01-06T22:18:52.741Z"}
+{"level":"info","message":"OTP saved","service":"nga-central-mis","timestamp":"2026-01-06T22:18:53.014Z","type":"LOGIN_2FA","userId":1}
+{"level":"info","message":"Email sent successfully","messageId":"<b706a294-0a01-83c9-9f9b-0de715d5dcc0@nga.ac.rw>","service":"nga-central-mis","timestamp":"2026-01-06T22:18:56.802Z","to":"emmanuelniyongabo44@gmail.com"}
+{"level":"info","message":"Password verified, OTP sent for user: superadmin","service":"nga-central-mis","timestamp":"2026-01-06T22:18:56.805Z"}
+{"duration":4065,"level":"info","message":"POST /auth/login 200 - 4065ms","service":"nga-central-mis","statusCode":200,"timestamp":"2026-01-06T22:18:56.806Z"}
+{"body":{"otp":"729707"},"ip":"::1","level":"info","message":"POST /auth/verify-otp","service":"nga-central-mis","timestamp":"2026-01-06T22:19:11.137Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"OTP verified successfully","service":"nga-central-mis","timestamp":"2026-01-06T22:19:11.149Z","type":"LOGIN_2FA","userId":1}
+{"level":"info","message":"OTP verified, login completed for user: superadmin","service":"nga-central-mis","timestamp":"2026-01-06T22:19:11.153Z"}
+{"duration":18,"level":"info","message":"POST /auth/verify-otp 200 - 18ms","service":"nga-central-mis","statusCode":200,"timestamp":"2026-01-06T22:19:11.155Z"}
+{"ip":"::1","level":"info","message":"GET /users/me","service":"nga-central-mis","timestamp":"2026-01-06T22:19:11.159Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Fetching current user","service":"nga-central-mis","timestamp":"2026-01-06T22:19:11.162Z","userId":1}
+{"duration":4,"level":"info","message":"GET /users/me 304 - 4ms","service":"nga-central-mis","statusCode":304,"timestamp":"2026-01-06T22:19:11.163Z"}
+{"ip":"::1","level":"info","message":"GET /users/me","service":"nga-central-mis","timestamp":"2026-01-06T22:25:05.933Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Fetching current user","service":"nga-central-mis","timestamp":"2026-01-06T22:25:05.948Z","userId":1}
+{"duration":18,"level":"info","message":"GET /users/me 304 - 18ms","service":"nga-central-mis","statusCode":304,"timestamp":"2026-01-06T22:25:05.950Z"}
+{"body":{"address":null,"date_of_birth":null,"external_id":null,"first_name":"System","gender":"MALE","last_name":"Owner"},"ip":"::1","level":"info","message":"PUT /users/me/profile","service":"nga-central-mis","timestamp":"2026-01-06T22:28:02.523Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"duration":4,"level":"info","message":"PUT /users/me/profile 404 - 4ms","service":"nga-central-mis","statusCode":404,"timestamp":"2026-01-06T22:28:02.527Z"}
+{"body":{"address":null,"date_of_birth":null,"external_id":null,"first_name":"System","gender":"MALE","last_name":"Owner"},"ip":"::1","level":"info","message":"PUT /users/me/profile","service":"nga-central-mis","timestamp":"2026-01-06T22:28:05.229Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"duration":0,"level":"info","message":"PUT /users/me/profile 404 - 0ms","service":"nga-central-mis","statusCode":404,"timestamp":"2026-01-06T22:28:05.229Z"}
+{"body":{"address":null,"date_of_birth":null,"external_id":null,"first_name":"System","gender":"MALE","last_name":"Owner"},"ip":"::1","level":"info","message":"PUT /users/me/profile","service":"nga-central-mis","timestamp":"2026-01-06T22:28:09.511Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"duration":1,"level":"info","message":"PUT /users/me/profile 404 - 1ms","service":"nga-central-mis","statusCode":404,"timestamp":"2026-01-06T22:28:09.512Z"}
+{"body":{"address":null,"date_of_birth":null,"external_id":null,"first_name":"System","gender":"MALE","last_name":"Owner"},"ip":"::1","level":"info","message":"PUT /users/me/profile","service":"nga-central-mis","timestamp":"2026-01-06T22:28:11.208Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"duration":1,"level":"info","message":"PUT /users/me/profile 404 - 1ms","service":"nga-central-mis","statusCode":404,"timestamp":"2026-01-06T22:28:11.209Z"}
+{"body":{"address":null,"date_of_birth":null,"external_id":null,"first_name":"System","gender":"MALE","last_name":"Owner"},"ip":"::1","level":"info","message":"PUT /users/me/profile","service":"nga-central-mis","timestamp":"2026-01-06T22:29:01.393Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"duration":1,"level":"info","message":"PUT /users/me/profile 404 - 1ms","service":"nga-central-mis","statusCode":404,"timestamp":"2026-01-06T22:29:01.394Z"}
+{"body":{"address":null,"date_of_birth":null,"external_id":null,"first_name":"System","gender":"MALE","last_name":"Owner"},"ip":"::1","level":"info","message":"PUT /users/me/profile","service":"nga-central-mis","timestamp":"2026-01-06T22:29:06.315Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"duration":1,"level":"info","message":"PUT /users/me/profile 404 - 1ms","service":"nga-central-mis","statusCode":404,"timestamp":"2026-01-06T22:29:06.316Z"}
+{"body":{"address":null,"date_of_birth":null,"external_id":null,"first_name":"System","gender":"MALE","last_name":"Owner"},"ip":"::1","level":"info","message":"PUT /users/me/profile","service":"nga-central-mis","timestamp":"2026-01-06T22:29:33.034Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"duration":1,"level":"info","message":"PUT /users/me/profile 404 - 1ms","service":"nga-central-mis","statusCode":404,"timestamp":"2026-01-06T22:29:33.035Z"}
+{"level":"info","message":"SIGINT received, shutting down gracefully","service":"nga-central-mis","timestamp":"2026-01-06T22:29:40.785Z"}
+{"level":"info","message":"Server running on port 5001 in development mode","service":"nga-central-mis","timestamp":"2026-01-06T22:29:46.603Z"}
+{"host":"mail.hackflix.net","level":"info","message":"Email service connected successfully","port":465,"service":"nga-central-mis","timestamp":"2026-01-06T22:29:49.903Z"}
+{"body":{"address":null,"date_of_birth":null,"external_id":null,"first_name":"System","gender":"MALE","last_name":"Owner"},"ip":"::1","level":"info","message":"PUT /users/me/profile","service":"nga-central-mis","timestamp":"2026-01-06T22:29:52.529Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Updating current user profile","service":"nga-central-mis","timestamp":"2026-01-06T22:29:52.552Z","userId":1}
+{"duration":33,"level":"info","message":"PUT /users/me/profile 500 - 33ms","service":"nga-central-mis","statusCode":500,"timestamp":"2026-01-06T22:29:52.562Z"}
+{"body":{"address":null,"date_of_birth":null,"external_id":null,"first_name":"System","gender":"MALE","last_name":"Owner"},"ip":"::1","level":"info","message":"PUT /users/me/profile","service":"nga-central-mis","timestamp":"2026-01-06T22:34:21.996Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Updating current user profile","service":"nga-central-mis","timestamp":"2026-01-06T22:34:22.003Z","userId":1}
+{"duration":10,"level":"info","message":"PUT /users/me/profile 500 - 10ms","service":"nga-central-mis","statusCode":500,"timestamp":"2026-01-06T22:34:22.006Z"}
+{"ip":"::1","level":"info","message":"GET /users/me","service":"nga-central-mis","timestamp":"2026-01-06T22:40:36.644Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Fetching current user","service":"nga-central-mis","timestamp":"2026-01-06T22:40:36.649Z","userId":1}
+{"duration":26,"level":"info","message":"GET /users/me 500 - 26ms","service":"nga-central-mis","statusCode":500,"timestamp":"2026-01-06T22:40:36.670Z"}
+{"ip":"::1","level":"info","message":"GET /users/me","service":"nga-central-mis","timestamp":"2026-01-06T22:40:36.671Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Fetching current user","service":"nga-central-mis","timestamp":"2026-01-06T22:40:36.673Z","userId":1}
+{"duration":5,"level":"info","message":"GET /users/me 500 - 5ms","service":"nga-central-mis","statusCode":500,"timestamp":"2026-01-06T22:40:36.676Z"}
+{"body":{"password":"Ngb155155!","username":"emmanuelniyongabo44@gmail.com"},"ip":"::1","level":"info","message":"POST /auth/login","service":"nga-central-mis","timestamp":"2026-01-06T22:40:41.059Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Login attempt for: emmanuelniyongabo44@gmail.com","service":"nga-central-mis","timestamp":"2026-01-06T22:40:41.059Z"}
+{"level":"info","message":"OTP saved","service":"nga-central-mis","timestamp":"2026-01-06T22:40:41.347Z","type":"LOGIN_2FA","userId":1}
+{"level":"info","message":"Email sent successfully","messageId":"<835fcf6c-d8e3-4470-7100-b7cc3632bcf2@nga.ac.rw>","service":"nga-central-mis","timestamp":"2026-01-06T22:40:46.512Z","to":"emmanuelniyongabo44@gmail.com"}
+{"level":"info","message":"Password verified, OTP sent for user: superadmin","service":"nga-central-mis","timestamp":"2026-01-06T22:40:46.513Z"}
+{"duration":5456,"level":"info","message":"POST /auth/login 200 - 5456ms","service":"nga-central-mis","statusCode":200,"timestamp":"2026-01-06T22:40:46.514Z"}
+{"body":{"otp":"826654"},"ip":"::1","level":"info","message":"POST /auth/verify-otp","service":"nga-central-mis","timestamp":"2026-01-06T22:40:59.242Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"OTP verified successfully","service":"nga-central-mis","timestamp":"2026-01-06T22:40:59.250Z","type":"LOGIN_2FA","userId":1}
+{"duration":12,"level":"info","message":"POST /auth/verify-otp 500 - 12ms","service":"nga-central-mis","statusCode":500,"timestamp":"2026-01-06T22:40:59.254Z"}
+{"body":{"otp":"826654"},"ip":"::1","level":"info","message":"POST /auth/verify-otp","service":"nga-central-mis","timestamp":"2026-01-06T22:41:00.615Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"warn","message":"Invalid OTP attempt","service":"nga-central-mis","timestamp":"2026-01-06T22:41:00.619Z","type":"LOGIN_2FA","userId":1}
+{"duration":10,"level":"info","message":"POST /auth/verify-otp 401 - 10ms","service":"nga-central-mis","statusCode":401,"timestamp":"2026-01-06T22:41:00.625Z"}
+{"body":{"otp":"826654"},"ip":"::1","level":"info","message":"POST /auth/verify-otp","service":"nga-central-mis","timestamp":"2026-01-06T22:41:03.674Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"warn","message":"Invalid OTP attempt","service":"nga-central-mis","timestamp":"2026-01-06T22:41:03.682Z","type":"LOGIN_2FA","userId":1}
+{"duration":10,"level":"info","message":"POST /auth/verify-otp 401 - 10ms","service":"nga-central-mis","statusCode":401,"timestamp":"2026-01-06T22:41:03.684Z"}
+{"body":{"password":"Ngb155155!","username":"emmanuelniyongabo44@gmail.com"},"ip":"::1","level":"info","message":"POST /auth/login","service":"nga-central-mis","timestamp":"2026-01-06T22:41:12.725Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Login attempt for: emmanuelniyongabo44@gmail.com","service":"nga-central-mis","timestamp":"2026-01-06T22:41:12.725Z"}
+{"level":"info","message":"OTP saved","service":"nga-central-mis","timestamp":"2026-01-06T22:41:13.010Z","type":"LOGIN_2FA","userId":1}
+{"level":"info","message":"Email sent successfully","messageId":"<5a9da867-b84b-10b4-f727-447349178394@nga.ac.rw>","service":"nga-central-mis","timestamp":"2026-01-06T22:41:16.465Z","to":"emmanuelniyongabo44@gmail.com"}
+{"level":"info","message":"Password verified, OTP sent for user: superadmin","service":"nga-central-mis","timestamp":"2026-01-06T22:41:16.469Z"}
+{"duration":3747,"level":"info","message":"POST /auth/login 200 - 3747ms","service":"nga-central-mis","statusCode":200,"timestamp":"2026-01-06T22:41:16.471Z"}
+{"body":{"otp":"100928"},"ip":"::1","level":"info","message":"POST /auth/verify-otp","service":"nga-central-mis","timestamp":"2026-01-06T22:41:29.320Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"OTP verified successfully","service":"nga-central-mis","timestamp":"2026-01-06T22:41:29.325Z","type":"LOGIN_2FA","userId":1}
+{"duration":10,"level":"info","message":"POST /auth/verify-otp 500 - 10ms","service":"nga-central-mis","statusCode":500,"timestamp":"2026-01-06T22:41:29.330Z"}
+{"body":{"otp":"100928"},"ip":"::1","level":"info","message":"POST /auth/verify-otp","service":"nga-central-mis","timestamp":"2026-01-06T22:41:30.562Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"warn","message":"Invalid OTP attempt","service":"nga-central-mis","timestamp":"2026-01-06T22:41:30.567Z","type":"LOGIN_2FA","userId":1}
+{"duration":7,"level":"info","message":"POST /auth/verify-otp 401 - 7ms","service":"nga-central-mis","statusCode":401,"timestamp":"2026-01-06T22:41:30.569Z"}
+{"body":{"otp":"100928"},"ip":"::1","level":"info","message":"POST /auth/verify-otp","service":"nga-central-mis","timestamp":"2026-01-06T22:41:30.751Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"warn","message":"Invalid OTP attempt","service":"nga-central-mis","timestamp":"2026-01-06T22:41:30.755Z","type":"LOGIN_2FA","userId":1}
+{"duration":5,"level":"info","message":"POST /auth/verify-otp 401 - 5ms","service":"nga-central-mis","statusCode":401,"timestamp":"2026-01-06T22:41:30.756Z"}
+{"body":{"otp":"100928"},"ip":"::1","level":"info","message":"POST /auth/verify-otp","service":"nga-central-mis","timestamp":"2026-01-06T22:41:35.473Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"warn","message":"Invalid OTP attempt","service":"nga-central-mis","timestamp":"2026-01-06T22:41:35.475Z","type":"LOGIN_2FA","userId":1}
+{"duration":2,"level":"info","message":"POST /auth/verify-otp 401 - 2ms","service":"nga-central-mis","statusCode":401,"timestamp":"2026-01-06T22:41:35.475Z"}
+{"body":{"password":"Ngb155155!","username":"emmanuelniyongabo44@gmail.com"},"ip":"::1","level":"info","message":"POST /auth/login","service":"nga-central-mis","timestamp":"2026-01-06T22:41:55.665Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Login attempt for: emmanuelniyongabo44@gmail.com","service":"nga-central-mis","timestamp":"2026-01-06T22:41:55.665Z"}
+{"level":"info","message":"OTP saved","service":"nga-central-mis","timestamp":"2026-01-06T22:41:55.939Z","type":"LOGIN_2FA","userId":1}
+{"level":"info","message":"Email sent successfully","messageId":"<6876c9b5-b2a0-8a1a-09cc-8682e2d3c336@nga.ac.rw>","service":"nga-central-mis","timestamp":"2026-01-06T22:41:59.885Z","to":"emmanuelniyongabo44@gmail.com"}
+{"level":"info","message":"Password verified, OTP sent for user: superadmin","service":"nga-central-mis","timestamp":"2026-01-06T22:41:59.887Z"}
+{"duration":4223,"level":"info","message":"POST /auth/login 200 - 4223ms","service":"nga-central-mis","statusCode":200,"timestamp":"2026-01-06T22:41:59.888Z"}
+{"body":{"otp":"138566"},"ip":"::1","level":"info","message":"POST /auth/verify-otp","service":"nga-central-mis","timestamp":"2026-01-06T22:42:12.179Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"OTP verified successfully","service":"nga-central-mis","timestamp":"2026-01-06T22:42:12.186Z","type":"LOGIN_2FA","userId":1}
+{"duration":11,"level":"info","message":"POST /auth/verify-otp 500 - 11ms","service":"nga-central-mis","statusCode":500,"timestamp":"2026-01-06T22:42:12.190Z"}
+{"body":{"otp":"100928"},"ip":"::1","level":"info","message":"POST /auth/verify-otp","service":"nga-central-mis","timestamp":"2026-01-06T22:42:19.408Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"warn","message":"Invalid OTP attempt","service":"nga-central-mis","timestamp":"2026-01-06T22:42:19.412Z","type":"LOGIN_2FA","userId":1}
+{"duration":5,"level":"info","message":"POST /auth/verify-otp 401 - 5ms","service":"nga-central-mis","statusCode":401,"timestamp":"2026-01-06T22:42:19.413Z"}
+{"body":{"otp":"100928"},"ip":"::1","level":"info","message":"POST /auth/verify-otp","service":"nga-central-mis","timestamp":"2026-01-06T22:42:20.481Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"warn","message":"Invalid OTP attempt","service":"nga-central-mis","timestamp":"2026-01-06T22:42:20.484Z","type":"LOGIN_2FA","userId":1}
+{"duration":4,"level":"info","message":"POST /auth/verify-otp 401 - 4ms","service":"nga-central-mis","statusCode":401,"timestamp":"2026-01-06T22:42:20.485Z"}
+{"body":{"password":"Ngb155155!","username":"emmanuelniyongabo44@gmail.com"},"ip":"::1","level":"info","message":"POST /auth/login","service":"nga-central-mis","timestamp":"2026-01-06T22:43:01.630Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Login attempt for: emmanuelniyongabo44@gmail.com","service":"nga-central-mis","timestamp":"2026-01-06T22:43:01.630Z"}
+{"level":"info","message":"OTP saved","service":"nga-central-mis","timestamp":"2026-01-06T22:43:01.930Z","type":"LOGIN_2FA","userId":1}
+{"level":"info","message":"Email sent successfully","messageId":"<8ba803d2-1c64-1d0a-38fa-17eea55e2310@nga.ac.rw>","service":"nga-central-mis","timestamp":"2026-01-06T22:43:05.420Z","to":"emmanuelniyongabo44@gmail.com"}
+{"level":"info","message":"Password verified, OTP sent for user: superadmin","service":"nga-central-mis","timestamp":"2026-01-06T22:43:05.421Z"}
+{"duration":3793,"level":"info","message":"POST /auth/login 200 - 3793ms","service":"nga-central-mis","statusCode":200,"timestamp":"2026-01-06T22:43:05.422Z"}
+{"body":{"otp":"100928"},"ip":"::1","level":"info","message":"POST /auth/verify-otp","service":"nga-central-mis","timestamp":"2026-01-06T22:43:24.191Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"warn","message":"Invalid OTP attempt","service":"nga-central-mis","timestamp":"2026-01-06T22:43:24.195Z","type":"LOGIN_2FA","userId":1}
+{"duration":5,"level":"info","message":"POST /auth/verify-otp 401 - 5ms","service":"nga-central-mis","statusCode":401,"timestamp":"2026-01-06T22:43:24.196Z"}
+{"body":{"otp":"138566"},"ip":"::1","level":"info","message":"POST /auth/verify-otp","service":"nga-central-mis","timestamp":"2026-01-06T22:43:31.128Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"warn","message":"Invalid OTP attempt","service":"nga-central-mis","timestamp":"2026-01-06T22:43:31.132Z","type":"LOGIN_2FA","userId":1}
+{"duration":5,"level":"info","message":"POST /auth/verify-otp 401 - 5ms","service":"nga-central-mis","statusCode":401,"timestamp":"2026-01-06T22:43:31.133Z"}
+{"body":{"otp":"754266"},"ip":"::1","level":"info","message":"POST /auth/verify-otp","service":"nga-central-mis","timestamp":"2026-01-06T22:43:37.220Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"OTP verified successfully","service":"nga-central-mis","timestamp":"2026-01-06T22:43:37.225Z","type":"LOGIN_2FA","userId":1}
+{"duration":19,"level":"info","message":"POST /auth/verify-otp 500 - 19ms","service":"nga-central-mis","statusCode":500,"timestamp":"2026-01-06T22:43:37.239Z"}
+{"level":"info","message":"SIGINT received, shutting down gracefully","service":"nga-central-mis","timestamp":"2026-01-06T22:44:14.072Z"}
+{"level":"info","message":"Server running on port 5001 in development mode","service":"nga-central-mis","timestamp":"2026-01-06T22:44:19.930Z"}
+{"host":"mail.hackflix.net","level":"info","message":"Email service connected successfully","port":465,"service":"nga-central-mis","timestamp":"2026-01-06T22:44:21.675Z"}
+{"body":{"otp":"754266"},"ip":"::1","level":"info","message":"POST /auth/verify-otp","service":"nga-central-mis","timestamp":"2026-01-06T22:44:22.556Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"warn","message":"Invalid OTP attempt","service":"nga-central-mis","timestamp":"2026-01-06T22:44:22.579Z","type":"LOGIN_2FA","userId":1}
+{"duration":26,"level":"info","message":"POST /auth/verify-otp 401 - 26ms","service":"nga-central-mis","statusCode":401,"timestamp":"2026-01-06T22:44:22.582Z"}
+{"level":"info","message":"SIGINT received, shutting down gracefully","service":"nga-central-mis","timestamp":"2026-01-06T22:45:27.968Z"}
+{"level":"info","message":"Server running on port 5001 in development mode","service":"nga-central-mis","timestamp":"2026-01-06T22:45:31.719Z"}
+{"host":"mail.hackflix.net","level":"info","message":"Email service connected successfully","port":465,"service":"nga-central-mis","timestamp":"2026-01-06T22:45:33.478Z"}
+{"body":{"otp":"754266"},"ip":"::1","level":"info","message":"POST /auth/verify-otp","service":"nga-central-mis","timestamp":"2026-01-06T22:45:35.651Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"warn","message":"Invalid OTP attempt","service":"nga-central-mis","timestamp":"2026-01-06T22:45:35.672Z","type":"LOGIN_2FA","userId":1}
+{"duration":25,"level":"info","message":"POST /auth/verify-otp 401 - 25ms","service":"nga-central-mis","statusCode":401,"timestamp":"2026-01-06T22:45:35.676Z"}
+{"body":{"password":"Ngb155155!","username":"emmanuelniyongabo44@gmail.com"},"ip":"::1","level":"info","message":"POST /auth/login","service":"nga-central-mis","timestamp":"2026-01-06T22:45:39.302Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Login attempt for: emmanuelniyongabo44@gmail.com","service":"nga-central-mis","timestamp":"2026-01-06T22:45:39.303Z"}
+{"level":"info","message":"OTP saved","service":"nga-central-mis","timestamp":"2026-01-06T22:45:39.587Z","type":"LOGIN_2FA","userId":1}
+{"level":"info","message":"Email sent successfully","messageId":"<4fe745fe-597c-fdf8-dd3a-0116dcb4e718@nga.ac.rw>","service":"nga-central-mis","timestamp":"2026-01-06T22:45:43.560Z","to":"emmanuelniyongabo44@gmail.com"}
+{"level":"info","message":"Password verified, OTP sent for user: superadmin","service":"nga-central-mis","timestamp":"2026-01-06T22:45:43.563Z"}
+{"duration":4262,"level":"info","message":"POST /auth/login 200 - 4262ms","service":"nga-central-mis","statusCode":200,"timestamp":"2026-01-06T22:45:43.564Z"}
+{"body":{"otp":"619708"},"ip":"::1","level":"info","message":"POST /auth/verify-otp","service":"nga-central-mis","timestamp":"2026-01-06T22:47:06.704Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"OTP verified successfully","service":"nga-central-mis","timestamp":"2026-01-06T22:47:06.715Z","type":"LOGIN_2FA","userId":1}
+{"level":"info","message":"OTP verified, login completed for user: superadmin","service":"nga-central-mis","timestamp":"2026-01-06T22:47:06.719Z"}
+{"duration":16,"level":"info","message":"POST /auth/verify-otp 200 - 16ms","service":"nga-central-mis","statusCode":200,"timestamp":"2026-01-06T22:47:06.720Z"}
+{"ip":"::1","level":"info","message":"GET /users/me","service":"nga-central-mis","timestamp":"2026-01-06T22:47:06.725Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Fetching current user","service":"nga-central-mis","timestamp":"2026-01-06T22:47:06.727Z","userId":1}
+{"duration":4,"level":"info","message":"GET /users/me 200 - 4ms","service":"nga-central-mis","statusCode":200,"timestamp":"2026-01-06T22:47:06.729Z"}
+{"body":{"address":null,"date_of_birth":null,"external_id":null,"first_name":"Manudi","gender":"MALE","last_name":"Owner"},"ip":"::1","level":"info","message":"PUT /users/me/profile","service":"nga-central-mis","timestamp":"2026-01-06T22:48:01.159Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Updating current user profile","service":"nga-central-mis","timestamp":"2026-01-06T22:48:01.162Z","userId":1}
+{"duration":7,"level":"info","message":"PUT /users/me/profile 500 - 7ms","service":"nga-central-mis","statusCode":500,"timestamp":"2026-01-06T22:48:01.166Z"}
+{"body":{"address":null,"date_of_birth":null,"external_id":null,"first_name":"Manudi","gender":"MALE","last_name":"Owner"},"ip":"::1","level":"info","message":"PUT /users/me/profile","service":"nga-central-mis","timestamp":"2026-01-06T22:48:06.593Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Updating current user profile","service":"nga-central-mis","timestamp":"2026-01-06T22:48:06.597Z","userId":1}
+{"duration":6,"level":"info","message":"PUT /users/me/profile 500 - 6ms","service":"nga-central-mis","statusCode":500,"timestamp":"2026-01-06T22:48:06.599Z"}
+{"level":"info","message":"SIGINT received, shutting down gracefully","service":"nga-central-mis","timestamp":"2026-01-06T22:48:14.907Z"}
+{"level":"info","message":"Server running on port 5001 in development mode","service":"nga-central-mis","timestamp":"2026-01-06T22:48:19.053Z"}
+{"host":"mail.hackflix.net","level":"info","message":"Email service connected successfully","port":465,"service":"nga-central-mis","timestamp":"2026-01-06T22:48:20.825Z"}
+{"body":{"address":null,"date_of_birth":null,"external_id":null,"first_name":"Manudi","gender":"MALE","last_name":"Owner"},"ip":"::1","level":"info","message":"PUT /users/me/profile","service":"nga-central-mis","timestamp":"2026-01-06T22:48:22.690Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Updating current user profile","service":"nga-central-mis","timestamp":"2026-01-06T22:48:22.706Z","userId":1}
+{"duration":22,"level":"info","message":"PUT /users/me/profile 500 - 22ms","service":"nga-central-mis","statusCode":500,"timestamp":"2026-01-06T22:48:22.711Z"}
+{"ip":"::1","level":"info","message":"GET /users/me","service":"nga-central-mis","timestamp":"2026-01-06T22:48:50.047Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Fetching current user","service":"nga-central-mis","timestamp":"2026-01-06T22:48:50.052Z","userId":1}
+{"duration":10,"level":"info","message":"GET /users/me 304 - 10ms","service":"nga-central-mis","statusCode":304,"timestamp":"2026-01-06T22:48:50.056Z"}
+{"ip":"::1","level":"info","message":"GET /users/me","service":"nga-central-mis","timestamp":"2026-01-06T22:48:50.056Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Fetching current user","service":"nga-central-mis","timestamp":"2026-01-06T22:48:50.058Z","userId":1}
+{"duration":7,"level":"info","message":"GET /users/me 304 - 7ms","service":"nga-central-mis","statusCode":304,"timestamp":"2026-01-06T22:48:50.063Z"}
+{"level":"info","message":"SIGINT received, shutting down gracefully","service":"nga-central-mis","timestamp":"2026-01-06T22:50:10.852Z"}
+{"level":"info","message":"Server running on port 5001 in development mode","service":"nga-central-mis","timestamp":"2026-01-06T22:50:15.490Z"}
+{"host":"mail.hackflix.net","level":"info","message":"Email service connected successfully","port":465,"service":"nga-central-mis","timestamp":"2026-01-06T22:50:17.735Z"}
+{"body":{"address":null,"date_of_birth":null,"external_id":null,"first_name":"Manudi","gender":"MALE","last_name":"Owner"},"ip":"::1","level":"info","message":"PUT /users/me/profile","service":"nga-central-mis","timestamp":"2026-01-06T22:50:29.100Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Updating current user profile","service":"nga-central-mis","timestamp":"2026-01-06T22:50:29.119Z","userId":1}
+{"duration":26,"level":"info","message":"PUT /users/me/profile 200 - 26ms","service":"nga-central-mis","statusCode":200,"timestamp":"2026-01-06T22:50:29.126Z"}
+{"ip":"::1","level":"info","message":"GET /users/me","service":"nga-central-mis","timestamp":"2026-01-06T22:50:29.133Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Fetching current user","service":"nga-central-mis","timestamp":"2026-01-06T22:50:29.135Z","userId":1}
+{"duration":5,"level":"info","message":"GET /users/me 200 - 5ms","service":"nga-central-mis","statusCode":200,"timestamp":"2026-01-06T22:50:29.138Z"}
+{"body":{"address":null,"date_of_birth":"2026-01-07","external_id":null,"first_name":"Manudi","gender":"MALE","last_name":"Owner"},"ip":"::1","level":"info","message":"PUT /users/me/profile","service":"nga-central-mis","timestamp":"2026-01-06T22:50:43.271Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Updating current user profile","service":"nga-central-mis","timestamp":"2026-01-06T22:50:43.275Z","userId":1}
+{"duration":10,"level":"info","message":"PUT /users/me/profile 200 - 10ms","service":"nga-central-mis","statusCode":200,"timestamp":"2026-01-06T22:50:43.281Z"}
+{"ip":"::1","level":"info","message":"GET /users/me","service":"nga-central-mis","timestamp":"2026-01-06T22:50:43.285Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Fetching current user","service":"nga-central-mis","timestamp":"2026-01-06T22:50:43.288Z","userId":1}
+{"duration":5,"level":"info","message":"GET /users/me 200 - 5ms","service":"nga-central-mis","statusCode":200,"timestamp":"2026-01-06T22:50:43.290Z"}
+{"body":{"address":"Kigali Rwanda","date_of_birth":"2026-01-07T00:00:00.000Z","external_id":null,"first_name":"Manudi","gender":"MALE","last_name":"Owner"},"ip":"::1","level":"info","message":"PUT /users/me/profile","service":"nga-central-mis","timestamp":"2026-01-06T22:50:59.186Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Updating current user profile","service":"nga-central-mis","timestamp":"2026-01-06T22:50:59.189Z","userId":1}
+{"duration":12,"level":"info","message":"PUT /users/me/profile 500 - 12ms","service":"nga-central-mis","statusCode":500,"timestamp":"2026-01-06T22:50:59.198Z"}
+{"level":"info","message":"SIGINT received, shutting down gracefully","service":"nga-central-mis","timestamp":"2026-01-06T22:54:56.340Z"}
+{"level":"info","message":"Server running on port 5001 in development mode","service":"nga-central-mis","timestamp":"2026-01-06T22:55:01.002Z"}
+{"host":"mail.hackflix.net","level":"info","message":"Email service connected successfully","port":465,"service":"nga-central-mis","timestamp":"2026-01-06T22:55:05.045Z"}
+{"body":{"address":"Kigali Rwanda","date_of_birth":"2026-01-07T00:00:00.000Z","external_id":null,"first_name":"Manudi","gender":"MALE","last_name":"Owner"},"ip":"::1","level":"info","message":"PUT /users/me/profile","service":"nga-central-mis","timestamp":"2026-01-06T22:55:08.050Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Updating current user profile","service":"nga-central-mis","timestamp":"2026-01-06T22:55:08.066Z","userId":1}
+{"duration":23,"level":"info","message":"PUT /users/me/profile 200 - 23ms","service":"nga-central-mis","statusCode":200,"timestamp":"2026-01-06T22:55:08.072Z"}
+{"ip":"::1","level":"info","message":"GET /users/me","service":"nga-central-mis","timestamp":"2026-01-06T22:55:08.077Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Fetching current user","service":"nga-central-mis","timestamp":"2026-01-06T22:55:08.084Z","userId":1}
+{"duration":13,"level":"info","message":"GET /users/me 200 - 13ms","service":"nga-central-mis","statusCode":200,"timestamp":"2026-01-06T22:55:08.090Z"}
+{"ip":"::1","level":"info","message":"GET /users/me","service":"nga-central-mis","timestamp":"2026-01-06T22:55:13.318Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Fetching current user","service":"nga-central-mis","timestamp":"2026-01-06T22:55:13.320Z","userId":1}
+{"duration":5,"level":"info","message":"GET /users/me 304 - 5ms","service":"nga-central-mis","statusCode":304,"timestamp":"2026-01-06T22:55:13.322Z"}
+{"ip":"::1","level":"info","message":"GET /users/me","service":"nga-central-mis","timestamp":"2026-01-06T22:55:13.323Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Fetching current user","service":"nga-central-mis","timestamp":"2026-01-06T22:55:13.324Z","userId":1}
+{"duration":4,"level":"info","message":"GET /users/me 304 - 4ms","service":"nga-central-mis","statusCode":304,"timestamp":"2026-01-06T22:55:13.327Z"}
+{"level":"info","message":"SIGINT received, shutting down gracefully","service":"nga-central-mis","timestamp":"2026-01-06T22:56:22.334Z"}
