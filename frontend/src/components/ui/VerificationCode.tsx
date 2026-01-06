@@ -1,4 +1,5 @@
 import React, { useRef, useState, useEffect, useCallback } from "react";
+import { motion } from "framer-motion";
 
 interface VerificationCodeProps {
   length?: number;
@@ -126,7 +127,7 @@ const VerificationCode: React.FC<VerificationCodeProps> = ({
   return (
     <div className="flex justify-center gap-2">
       {Array.from({ length }, (_, index) => (
-        <input
+        <motion.input
           key={index}
           ref={(ref) => {
             inputRefs.current[index] = ref;
@@ -139,14 +140,23 @@ const VerificationCode: React.FC<VerificationCodeProps> = ({
           onKeyDown={(e) => handleKeyDown(index, e)}
           onPaste={handlePaste}
           onFocus={handleFocus}
-          className={`w-12 h-14 text-center text-xl font-semibold border-2 rounded-xl focus:outline-none focus:ring-4 transition-all duration-200
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          whileFocus={{
+            scale: 1.05,
+            borderColor: error ? "#EF4444" : "#2f98ff",
+          }}
+          transition={{ duration: 0.2, delay: index * 0.05 }}
+          className={`w-12 h-14 text-center text-xl font-semibold rounded-xl border-2 focus:outline-none focus:ring-2 transition-all duration-200 cursor-text
             ${
               error
-                ? "border-red-500 focus:border-red-500 focus:ring-red-500/20"
-                : "border-border-light dark:border-border-dark/30 focus:border-blue-500 focus:ring-blue-500/20"
+                ? "border-red-500 bg-red-50 dark:bg-red-900/20 focus:border-red-500 focus:ring-red-500/20"
+                : values[index]
+                ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 focus:border-blue-500 focus:ring-blue-500/20"
+                : "border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800/50 focus:border-blue-500 focus:ring-blue-500/20"
             }
-            bg-surface-light dark:bg-surface-dark/30 text-text-primary-light dark:text-text-primary-dark
-            placeholder-text-secondary-light dark:placeholder-text-secondary-dark`}
+            text-gray-900 dark:text-white
+            placeholder-gray-300 dark:placeholder-gray-500`}
           aria-label={`Verification code digit ${index + 1}`}
         />
       ))}

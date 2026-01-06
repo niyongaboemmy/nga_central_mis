@@ -1,9 +1,117 @@
 import React, { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { Button, Input, Alert } from "./ui";
+import { MdEmail, MdPhone, MdLocationOn } from "react-icons/md";
+import {
+  FaCommentDots,
+  FaPaperPlane,
+  FaQuestion,
+  FaArrowRight,
+} from "react-icons/fa";
 
 interface ContactUsProps {
   onNavigateBack: () => void;
 }
+
+// Animated floating particles
+const FloatingParticles = () => (
+  <div className="absolute inset-0 overflow-hidden pointer-events-none">
+    {[...Array(10)].map((_, i) => (
+      <motion.div
+        key={i}
+        initial={{
+          opacity: 0,
+          x: Math.random() * window.innerWidth,
+          y: window.innerHeight + 50,
+        }}
+        animate={{
+          opacity: [0, 1, 0],
+          y: -100,
+        }}
+        transition={{
+          repeat: Infinity,
+          duration: 10 + Math.random() * 10,
+          delay: Math.random() * 10,
+          ease: "linear",
+        }}
+        className="absolute"
+        style={{
+          left: `${Math.random() * 100}%`,
+        }}
+      >
+        <div className="w-2 h-2 bg-blue-400 rounded-full" />
+      </motion.div>
+    ))}
+  </div>
+);
+
+// Animated background shapes
+const BackgroundShapes = () => (
+  <>
+    <motion.div
+      animate={{
+        y: [0, -30, 0],
+        x: [0, 20, 0],
+        scale: [1, 1.2, 1],
+      }}
+      transition={{ repeat: Infinity, duration: 10, ease: "easeInOut" }}
+      className="absolute top-20 left-[5%] w-80 h-80 bg-blue-200/20 rounded-full blur-3xl"
+    />
+    <motion.div
+      animate={{
+        y: [0, 40, 0],
+        x: [0, -20, 0],
+        scale: [1, 1.3, 1],
+      }}
+      transition={{
+        repeat: Infinity,
+        duration: 12,
+        ease: "easeInOut",
+        delay: 1,
+      }}
+      className="absolute bottom-40 right-[5%] w-[400px] h-[400px] bg-blue-200/20 rounded-full blur-3xl"
+    />
+  </>
+);
+
+// Contact info card
+const ContactInfoCard = ({
+  icon,
+  title,
+  value,
+  delay,
+  color,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  value: string;
+  delay: number;
+  color: string;
+}) => (
+  <motion.div
+    initial={{ opacity: 0, y: 20 }}
+    whileInView={{ opacity: 1, y: 0 }}
+    transition={{ delay }}
+    whileHover={{ scale: 1.02, y: -5 }}
+    className="group bg-white/80 dark:bg-slate-800/40 backdrop-blur-sm rounded-3xl p-6 shadow-lg border border-gray-100 dark:border-slate-700/30"
+  >
+    <div className="flex items-center gap-4">
+      <div>
+        <div
+          className={`w-14 h-14 bg-gradient-to-br ${color} text-white rounded-xl flex items-center justify-center shadow-lg`}
+        >
+          {icon}
+        </div>
+      </div>
+      <div>
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+          {title}
+        </h3>
+        <p className="text-gray-600 dark:text-gray-300">{value}</p>
+      </div>
+    </div>
+  </motion.div>
+);
 
 const ContactUs: React.FC<ContactUsProps> = ({ onNavigateBack }) => {
   const [formData, setFormData] = useState({
@@ -29,172 +137,166 @@ const ContactUs: React.FC<ContactUsProps> = ({ onNavigateBack }) => {
 
   const contactInfo = [
     {
-      icon: (
-        <svg
-          className="w-8 h-8"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
-          />
-        </svg>
-      ),
+      icon: <MdEmail className="w-6 h-6" />,
       title: "Email",
       value: "support@ngacentralmis.com",
+      color: "from-blue-500 to-blue-600",
     },
     {
-      icon: (
-        <svg
-          className="w-8 h-8"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"
-          />
-        </svg>
-      ),
+      icon: <MdPhone className="w-6 h-6" />,
       title: "Phone",
       value: "+1 (555) 123-4567",
+      color: "from-green-500 to-green-600",
     },
     {
-      icon: (
-        <svg
-          className="w-8 h-8"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
-          />
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
-          />
-        </svg>
-      ),
+      icon: <MdLocationOn className="w-6 h-6" />,
       title: "Address",
-      value: "123 Business Ave, Suite 100, New York, NY 10001",
+      value: "123 Education Ave, Suite 100",
+      color: "from-amber-500 to-amber-600",
     },
   ];
 
   const faqs = [
     {
-      question: "How do I get started with NGA Central MIS?",
+      question: "How do I get started?",
       answer:
-        "Simply click the 'Sign In' button and create an account. Our onboarding process will guide you through the setup.",
+        "Simply click 'Sign In' and create an account. Our onboarding process will guide you through setup.",
     },
     {
-      question: "Is there a free trial available?",
+      question: "Is there a free trial?",
       answer:
-        "Yes, we offer a 14-day free trial with full access to all features. No credit card required.",
+        "Yes! We offer a 14-day free trial with full access to all features. No credit card required.",
     },
     {
-      question: "What support options are available?",
+      question: "What support is available?",
       answer:
-        "We offer 24/7 email support, live chat during business hours, and dedicated phone support for enterprise customers.",
+        "We provide 24/7 email support, live chat during business hours, and dedicated phone support for enterprise.",
     },
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-background-light to-indigo-50 dark:from-background-dark dark:via-background-dark dark:to-background-dark">
+    <div className="min-h-screen bg-gray-50 dark:bg-slate-950 overflow-hidden relative">
+      <FloatingParticles />
+      <BackgroundShapes />
+
       {/* Hero Section */}
-      <section className="pt-28 pb-20 px-4 sm:px-6 lg:px-8">
+      <section className="relative z-10 pt-40 pb-20 px-4">
         <div className="max-w-7xl mx-auto">
-          <div className="text-center">
-            <h1 className="text-4xl md:text-5xl font-bold text-text-primary-light dark:text-text-primary-dark mb-6">
-              Contact Us
-            </h1>
-            <p className="text-xl text-text-secondary-light dark:text-text-secondary-dark max-w-3xl mx-auto">
-              Have questions? We're here to help. Reach out to us through any of
-              the channels below.
-            </p>
-          </div>
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6 }}
+            className="text-center"
+          >
+            <motion.span
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="inline-block px-4 py-2 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-full text-sm font-medium mb-4"
+            >
+              Get in Touch
+            </motion.span>
+            <motion.h1
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1 }}
+              className="text-4xl md:text-5xl font-bold text-gray-900 dark:text-white mb-6"
+            >
+              We'd Love to{" "}
+              <span className="bg-gradient-to-r from-blue-600 via-blue-400 to-blue-600 bg-clip-text text-transparent">
+                Hear From You
+              </span>
+            </motion.h1>
+            <motion.p
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.2 }}
+              className="text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto"
+            >
+              Have questions? Our team is here to help you succeed.
+            </motion.p>
+          </motion.div>
         </div>
       </section>
 
       {/* Contact Info & Form Section */}
-      <section className="py-20 px-4 sm:px-6 lg:px-8 bg-surface-light dark:bg-surface-dark">
+      <section className="relative z-10 py-16 px-4">
         <div className="max-w-7xl mx-auto">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {/* Contact Info */}
-            <div className="lg:col-span-1 space-y-6">
-              {contactInfo.map((info, index) => (
-                <div
-                  key={index}
-                  className="bg-card-light dark:bg-card-dark rounded-2xl p-6 shadow-lg border border-border-light dark:border-border-dark"
-                >
-                  <div className="w-12 h-12 bg-gradient-to-r from-blue-600/10 to-indigo-600/10 rounded-xl flex items-center justify-center mb-4">
-                    <div className="text-blue-600 dark:text-blue-400">
-                      {info.icon}
-                    </div>
-                  </div>
-                  <h3 className="text-lg font-semibold text-text-primary-light dark:text-text-primary-dark mb-1">
-                    {info.title}
-                  </h3>
-                  <p className="text-text-secondary-light dark:text-text-secondary-dark">
-                    {info.value}
-                  </p>
-                </div>
-              ))}
-            </div>
+          <div className="grid lg:grid-cols-3 gap-8 mb-16">
+            {contactInfo.map((info, index) => (
+              <ContactInfoCard
+                key={index}
+                icon={info.icon}
+                title={info.title}
+                value={info.value}
+                delay={index * 0.1}
+                color={info.color}
+              />
+            ))}
+          </div>
 
-            {/* Contact Form */}
-            <div className="lg:col-span-2">
-              <div className="bg-card-light dark:bg-card-dark rounded-2xl p-8 shadow-lg border border-border-light dark:border-border-dark">
-                <h2 className="text-2xl font-bold text-text-primary-light dark:text-text-primary-dark mb-6">
+          {/* Contact Form */}
+          <div className="max-w-2xl mx-auto">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              whileInView={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.5 }}
+              className="bg-white/80 dark:bg-slate-800/30 backdrop-blur-sm rounded-3xl p-8 shadow-xl border border-gray-100 dark:border-slate-700/20"
+            >
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                className="text-center mb-8"
+              >
+                <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-blue-500 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
+                  <FaCommentDots className="w-8 h-8 text-white" />
+                </div>
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
                   Send us a Message
                 </h2>
+                <p className="text-gray-600 dark:text-gray-300">
+                  We'll get back to you within 24 hours
+                </p>
+              </motion.div>
 
-                {submitted ? (
-                  <div className="text-center py-12">
-                    <div className="w-20 h-20 bg-green-100 dark:bg-green-900/20 rounded-full flex items-center justify-center mx-auto mb-6">
-                      <svg
-                        className="w-10 h-10 text-green-600 dark:text-green-400"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M5 13l4 4L19 7"
-                        />
-                      </svg>
-                    </div>
-                    <h3 className="text-2xl font-semibold text-text-primary-light dark:text-text-primary-dark mb-2">
-                      Message Sent!
-                    </h3>
-                    <p className="text-text-secondary-light dark:text-text-secondary-dark mb-6">
-                      Thank you for reaching out. We'll get back to you within
-                      24 hours.
-                    </p>
-                    <Button
-                      onClick={() => setSubmitted(false)}
-                      className="px-6"
+              {submitted ? (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="text-center py-12"
+                >
+                  <div className="w-20 h-20 bg-green-100 dark:bg-green-900/20 rounded-full flex items-center justify-center mx-auto mb-6">
+                    <svg
+                      className="w-10 h-10 text-green-600 dark:text-green-400"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
                     >
-                      Send Another Message
-                    </Button>
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M5 13l4 4L19 7"
+                      />
+                    </svg>
                   </div>
-                ) : (
-                  <form onSubmit={handleSubmit} className="space-y-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <h3 className="text-2xl font-semibold text-gray-900 dark:text-white mb-2">
+                    Message Sent! ✓
+                  </h3>
+                  <p className="text-gray-600 dark:text-gray-300 mb-6">
+                    Thank you for reaching out. We'll get back to you soon!
+                  </p>
+                  <Button onClick={() => setSubmitted(false)} className="px-8">
+                    Send Another Message
+                  </Button>
+                </motion.div>
+              ) : (
+                <form onSubmit={handleSubmit} className="space-y-6">
+                  <div className="grid md:grid-cols-2 gap-6">
+                    <motion.div
+                      initial={{ opacity: 0, x: -20 }}
+                      whileInView={{ opacity: 1, x: 0 }}
+                      transition={{ delay: 0.1 }}
+                    >
                       <Input
                         type="text"
                         value={formData.name}
@@ -202,9 +304,15 @@ const ContactUs: React.FC<ContactUsProps> = ({ onNavigateBack }) => {
                           setFormData({ ...formData, name: e.target.value })
                         }
                         placeholder="Your Name"
-                        label="Name"
+                        label=""
                         required
                       />
+                    </motion.div>
+                    <motion.div
+                      initial={{ opacity: 0, x: 20 }}
+                      whileInView={{ opacity: 1, x: 0 }}
+                      transition={{ delay: 0.2 }}
+                    >
                       <Input
                         type="email"
                         value={formData.email}
@@ -212,10 +320,16 @@ const ContactUs: React.FC<ContactUsProps> = ({ onNavigateBack }) => {
                           setFormData({ ...formData, email: e.target.value })
                         }
                         placeholder="your@email.com"
-                        label="Email"
+                        label=""
                         required
                       />
-                    </div>
+                    </motion.div>
+                  </div>
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.3 }}
+                  >
                     <Input
                       type="text"
                       value={formData.subject}
@@ -223,81 +337,127 @@ const ContactUs: React.FC<ContactUsProps> = ({ onNavigateBack }) => {
                         setFormData({ ...formData, subject: e.target.value })
                       }
                       placeholder="What's this about?"
-                      label="Subject"
+                      label=""
                       required
                     />
-                    <div className="space-y-2">
-                      <label className="block text-sm font-medium text-text-primary-light dark:text-text-primary-dark">
-                        Message
-                      </label>
-                      <textarea
-                        value={formData.message}
-                        onChange={(e) =>
-                          setFormData({ ...formData, message: e.target.value })
-                        }
-                        placeholder="Tell us how we can help you..."
-                        rows={5}
-                        className="w-full px-4 py-3 border-2 border-border-light dark:border-border-dark rounded-xl focus:border-blue-500 focus:ring-4 focus:ring-blue-500/20 transition-all duration-200 bg-surface-light dark:bg-surface-dark text-text-primary-light dark:text-text-primary-dark resize-none"
-                        required
-                      />
-                    </div>
+                  </motion.div>
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.4 }}
+                    className="space-y-2"
+                  >
+                    <textarea
+                      value={formData.message}
+                      onChange={(e) =>
+                        setFormData({ ...formData, message: e.target.value })
+                      }
+                      placeholder="Tell us how we can help you..."
+                      rows={5}
+                      className="w-full px-4 py-3 border-2 border-gray-200 dark:border-slate-600 rounded-2xl focus:border-blue-500 focus:ring-4 focus:ring-blue-500/20 transition-all duration-200 bg-white dark:bg-slate-800/30 text-gray-900 dark:text-white resize-none"
+                      required
+                    />
+                  </motion.div>
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.5 }}
+                  >
                     <Button
                       type="submit"
-                      className="w-full py-4"
+                      className="w-full py-3 bg-gradient-to-r from-blue-600 to-blue-600 hover:from-blue-700 hover:to-blue-700"
                       disabled={loading}
                     >
                       {loading ? (
                         <div className="flex items-center justify-center">
-                          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                          <motion.div
+                            className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"
+                            animate={{ rotate: 360 }}
+                            transition={{
+                              duration: 1,
+                              repeat: Infinity,
+                              ease: "linear",
+                            }}
+                          />
                           Sending...
                         </div>
                       ) : (
-                        "Send Message"
+                        <span className="flex items-center justify-center">
+                          Send Message <FaPaperPlane className="w-4 h-4 ml-2" />
+                        </span>
                       )}
                     </Button>
-                  </form>
-                )}
-              </div>
-            </div>
+                  </motion.div>
+                </form>
+              )}
+            </motion.div>
           </div>
         </div>
       </section>
 
       {/* FAQ Section */}
-      <section className="py-20 px-4 sm:px-6 lg:px-8">
+      <section className="relative z-10 py-20 px-4">
         <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold text-text-primary-light dark:text-text-primary-dark mb-4">
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            className="text-center mb-16"
+          >
+            <motion.span
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              className="inline-block px-4 py-2 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-full text-sm font-medium mb-4"
+            >
+              Common Questions
+            </motion.span>
+            <h2 className="text-4xl md:text-5xl font-bold text-gray-900 dark:text-white mb-4">
               Frequently Asked Questions
             </h2>
-            <p className="text-lg text-text-secondary-light dark:text-text-secondary-dark max-w-2xl mx-auto">
-              Quick answers to common questions
-            </p>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          </motion.div>
+
+          <div className="grid md:grid-cols-3 gap-8">
             {faqs.map((faq, index) => (
-              <div
+              <motion.div
                 key={index}
-                className="bg-card-light dark:bg-card-dark rounded-2xl p-8 shadow-lg border border-border-light dark:border-border-dark"
+                initial={{ opacity: 0, y: 30 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.1 }}
+                whileHover={{
+                  y: -5,
+                  boxShadow: "0 20px 40px rgba(0,0,0,0.1)",
+                }}
+                className="group bg-white/80 dark:bg-slate-800/40 backdrop-blur-sm rounded-3xl p-8 shadow-lg border border-gray-100 dark:border-slate-800"
               >
-                <h3 className="text-lg font-semibold text-text-primary-light dark:text-text-primary-dark mb-3">
+                <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-500 rounded-xl flex items-center justify-center mb-4">
+                  <FaQuestion className="w-5 h-5 text-white" />
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">
                   {faq.question}
                 </h3>
-                <p className="text-text-secondary-light dark:text-text-secondary-dark">
+                <p className="text-gray-600 dark:text-gray-300 text-sm">
                   {faq.answer}
                 </p>
-              </div>
+                <motion.div
+                  initial={{ opacity: 0, x: -10 }}
+                  whileHover={{ opacity: 1, x: 0 }}
+                  className="absolute bottom-4 right-4 w-8 h-8 bg-gray-100 dark:bg-slate-700 rounded-full flex items-center justify-center"
+                >
+                  <FaArrowRight className="w-4 h-4 text-gray-600 dark:text-gray-300" />
+                </motion.div>
+              </motion.div>
             ))}
           </div>
         </div>
       </section>
 
       {/* Back Button */}
-      <section className="py-12 px-4 sm:px-6 lg:px-8">
+      <section className="relative z-10 py-16 px-4">
         <div className="max-w-7xl mx-auto text-center">
-          <button
+          <motion.button
             onClick={onNavigateBack}
-            className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-medium rounded-full transition-all duration-200"
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            className="inline-flex items-center px-8 py-3 bg-gradient-to-r from-blue-600 to-blue-600 hover:from-blue-700 hover:to-blue-700 text-white font-semibold rounded-full shadow-lg shadow-blue-500/25 transition-all"
           >
             <svg
               className="w-5 h-5 mr-2"
@@ -313,28 +473,9 @@ const ContactUs: React.FC<ContactUsProps> = ({ onNavigateBack }) => {
               />
             </svg>
             Back to Home
-          </button>
+          </motion.button>
         </div>
       </section>
-
-      {/* Footer */}
-      <footer className="bg-surface-light dark:bg-surface-dark py-12 px-4 sm:px-6 lg:px-8 border-t border-border-light dark:border-border-dark">
-        <div className="max-w-7xl mx-auto text-center">
-          <div className="flex items-center justify-center space-x-3 mb-4">
-            <img
-              src="/logo.svg"
-              alt="NGA Central MIS"
-              className="w-8 h-8 rounded-full"
-            />
-            <span className="font-semibold text-text-primary-light dark:text-text-primary-dark">
-              NGA Central MIS
-            </span>
-          </div>
-          <p className="text-text-secondary-light dark:text-text-secondary-dark">
-            © 2024 NGA Central MIS. All rights reserved.
-          </p>
-        </div>
-      </footer>
     </div>
   );
 };

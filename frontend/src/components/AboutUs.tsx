@@ -1,251 +1,379 @@
 import React from "react";
+import { motion } from "framer-motion";
+import { Star, Target, Heart, Lightbulb } from "lucide-react";
+import LOGO from "../assets/logo.png";
 
 interface AboutUsProps {
   onNavigateBack: () => void;
 }
 
-const AboutUs: React.FC<AboutUsProps> = ({ onNavigateBack }) => {
-  const teamMembers = [
-    {
-      name: "John Smith",
-      role: "Project Manager",
-      bio: "Over 15 years of experience in managing enterprise software projects.",
-    },
-    {
-      name: "Sarah Johnson",
-      role: "Lead Developer",
-      bio: "Full-stack developer with expertise in modern web technologies.",
-    },
-    {
-      name: "Michael Brown",
-      role: "UI/UX Designer",
-      bio: "Creating intuitive and beautiful user experiences for over 10 years.",
-    },
-    {
-      name: "Emily Davis",
-      role: "QA Engineer",
-      bio: "Ensuring software quality with comprehensive testing strategies.",
-    },
-  ];
+// Animated floating particles
+const FloatingParticles = () => (
+  <div className="absolute inset-0 overflow-hidden pointer-events-none">
+    {[...Array(8)].map((_, i) => (
+      <motion.div
+        key={i}
+        initial={{
+          opacity: 0,
+          x: Math.random() * window.innerWidth,
+          y: window.innerHeight + 50,
+        }}
+        animate={{
+          opacity: [0, 1, 0],
+          y: -100,
+        }}
+        transition={{
+          repeat: Infinity,
+          duration: 10 + Math.random() * 10,
+          delay: Math.random() * 10,
+          ease: "linear",
+        }}
+        className="absolute"
+        style={{
+          left: `${Math.random() * 100}%`,
+        }}
+      >
+        <Star className="w-3 h-3 text-yellow-400" fill="currentColor" />
+      </motion.div>
+    ))}
+  </div>
+);
 
+// Animated background shapes
+const BackgroundShapes = () => (
+  <>
+    <motion.div
+      animate={{
+        y: [0, -30, 0],
+        x: [0, 20, 0],
+        scale: [1, 1.2, 1],
+      }}
+      transition={{ repeat: Infinity, duration: 10, ease: "easeInOut" }}
+      className="absolute top-20 right-[5%] w-80 h-80 bg-blue-200/20 rounded-full blur-3xl"
+    />
+    <motion.div
+      animate={{
+        y: [0, 40, 0],
+        x: [0, -20, 0],
+        scale: [1, 1.3, 1],
+      }}
+      transition={{
+        repeat: Infinity,
+        duration: 12,
+        ease: "easeInOut",
+        delay: 1,
+      }}
+      className="absolute bottom-40 left-[5%] w-[400px] h-[400px] bg-blue-400/20 rounded-full blur-3xl"
+    />
+  </>
+);
+
+// Cute animated icons
+const MissionIcon = () => (
+  <motion.div
+    animate={{ y: [0, -5, 0] }}
+    transition={{ repeat: Infinity, duration: 2 }}
+    className="w-16 h-16"
+  >
+    <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="32" cy="32" r="28" fill="#3B82F6" />
+      <path
+        d="M32 12 L32 32 L44 32"
+        stroke="white"
+        strokeWidth="4"
+        strokeLinecap="round"
+      />
+      <circle cx="32" cy="32" r="4" fill="white" />
+    </svg>
+  </motion.div>
+);
+
+const ValuesIcon = () => (
+  <motion.div
+    animate={{ scale: [1, 1.1, 1] }}
+    transition={{ repeat: Infinity, duration: 2 }}
+    className="w-16 h-16"
+  >
+    <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path
+        d="M32 8 L56 14 V30 C56 42 44 52 32 56 C20 52 8 42 8 30 V14 L32 8Z"
+        fill="#8B5CF6"
+      />
+      <path d="M32 24 L40 32 L32 48 L24 32 Z" fill="white" />
+      <path
+        d="M26 28 L32 22 L38 28"
+        stroke="#8B5CF6"
+        strokeWidth="2"
+        strokeLinecap="round"
+        fill="none"
+      />
+    </svg>
+  </motion.div>
+);
+
+const InnovationIcon = () => (
+  <motion.div
+    animate={{ rotate: [0, 10, 0, -10, 0] }}
+    transition={{ repeat: Infinity, duration: 3 }}
+    className="w-16 h-16"
+  >
+    <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="32" cy="32" r="28" fill="#F59E0B" />
+      <path
+        d="M32 16 L32 32 L44 44"
+        stroke="white"
+        strokeWidth="4"
+        strokeLinecap="round"
+        fill="none"
+      />
+      <circle cx="32" cy="32" r="3" fill="white" />
+      <path
+        d="M20 20 L28 28"
+        stroke="white"
+        strokeWidth="3"
+        strokeLinecap="round"
+      />
+    </svg>
+  </motion.div>
+);
+
+const UserCentricIcon = () => (
+  <motion.div
+    animate={{ x: [0, 3, 0, -3, 0] }}
+    transition={{ repeat: Infinity, duration: 2.5 }}
+    className="w-16 h-16"
+  >
+    <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="16" cy="20" r="10" fill="#F472B6" />
+      <circle cx="48" cy="20" r="10" fill="#60A5FA" />
+      <circle cx="32" cy="24" r="10" fill="#A78BFA" />
+      <path d="M6 38 Q16 32 26 38" fill="#F472B6" />
+      <path d="M38 38 Q48 32 58 38" fill="#60A5FA" />
+      <path d="M22 42 Q32 36 42 42" fill="#A78BFA" />
+    </svg>
+  </motion.div>
+);
+
+// Modern stat card
+const StatCard = ({
+  value,
+  label,
+  delay,
+}: {
+  value: string;
+  label: string;
+  delay: number;
+}) => (
+  <motion.div
+    initial={{ opacity: 0, scale: 0.8 }}
+    whileInView={{ opacity: 1, scale: 1 }}
+    transition={{ delay }}
+    whileHover={{ scale: 1.05 }}
+    className="bg-white/80 dark:bg-slate-800/40 backdrop-blur-sm rounded-2xl p-6 text-center shadow-lg border border-gray-100 dark:border-slate-700/30"
+  >
+    <motion.span
+      initial={{ scale: 0.5 }}
+      whileInView={{ scale: 1 }}
+      transition={{ delay, type: "spring" }}
+      className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-blue-400 bg-clip-text text-transparent"
+    >
+      {value}
+    </motion.span>
+    <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">{label}</p>
+  </motion.div>
+);
+
+const AboutUs: React.FC<AboutUsProps> = ({ onNavigateBack }) => {
   const values = [
     {
-      icon: (
-        <svg
-          className="w-10 h-10"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
-          />
-        </svg>
-      ),
-      title: "Security First",
-      description: "We prioritize the security of your data above all else.",
+      icon: <Target />,
+      cuteIcon: <MissionIcon />,
+      title: "Our Mission",
+      description:
+        "To empower educational institutions with innovative management solutions that streamline operations, enhance productivity, and enable data-driven decision-making for excellence in education.",
+      color: "from-blue-500 to-blue-600",
     },
     {
-      icon: (
-        <svg
-          className="w-10 h-10"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M13 10V3L4 14h7v7l9-11h-7z"
-          />
-        </svg>
-      ),
+      icon: <Lightbulb />,
+      cuteIcon: <InnovationIcon />,
       title: "Innovation",
       description:
-        "Constantly evolving to bring you the latest technology solutions.",
+        "We continuously evolve to bring cutting-edge technology solutions that transform how institutions manage their daily operations and strategic planning.",
+      color: "from-amber-500 to-amber-600",
     },
     {
-      icon: (
-        <svg
-          className="w-10 h-10"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
-          />
-        </svg>
-      ),
-      title: "User-Centric",
-      description: "Every feature is designed with our users' needs in mind.",
+      icon: <Heart />,
+      cuteIcon: <UserCentricIcon />,
+      title: "User-Centric Design",
+      description:
+        "Every feature is thoughtfully designed with our users' needs in mind, ensuring intuitive experiences that maximize efficiency and user satisfaction.",
+      color: "from-pink-500 to-pink-600",
+    },
+    {
+      icon: <Target />,
+      cuteIcon: <ValuesIcon />,
+      title: "Integrity & Trust",
+      description:
+        "We prioritize data security and privacy, building systems that institutions can rely on with confidence and peace of mind.",
+      color: "from-blue-400 to-blue-400",
     },
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-background-light to-indigo-50 dark:from-background-dark dark:via-background-dark dark:to-background-dark">
+    <div className="min-h-screen bg-gray-50 dark:bg-slate-950 overflow-hidden relative">
+      <FloatingParticles />
+      <BackgroundShapes />
+
       {/* Hero Section */}
-      <section className="pt-28 pb-20 px-4 sm:px-6 lg:px-8">
+      <section className="relative z-10 pt-40 pb-20 px-4">
         <div className="max-w-7xl mx-auto">
-          <div className="text-center">
-            <h1 className="text-4xl md:text-5xl font-bold text-text-primary-light dark:text-text-primary-dark mb-6">
-              About Us
-            </h1>
-            <p className="text-xl text-text-secondary-light dark:text-text-secondary-dark max-w-3xl mx-auto">
-              We are dedicated to transforming how organizations manage their
-              operations through innovative technology solutions.
-            </p>
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6 }}
+            className="text-center"
+          >
+            <motion.span
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="inline-block px-4 py-2 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-full text-sm font-medium mb-4"
+            >
+              About NGA Central MIS
+            </motion.span>
+            <motion.h1
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1 }}
+              className="text-4xl md:text-5xl font-bold text-gray-900 dark:text-white mb-6"
+            >
+              Empowering{" "}
+              <span className="bg-gradient-to-r from-blue-600 via-blue-400 to-blue-600 bg-clip-text text-transparent">
+                Educational Excellence
+              </span>
+            </motion.h1>
+            <motion.p
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.2 }}
+              className="text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto"
+            >
+              A modern education management system designed to transform how
+              institutions operate and succeed.
+            </motion.p>
+          </motion.div>
+        </div>
+      </section>
+
+      {/* Stats Section */}
+      <section className="relative z-10 py-12 px-4">
+        <div className="max-w-5xl mx-auto">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+            <StatCard value="500+" label="Institutions" delay={0} />
+            <StatCard value="50K+" label="Students" delay={0.1} />
+            <StatCard value="99.9%" label="Uptime" delay={0.2} />
+            <StatCard value="24/7" label="Support" delay={0.3} />
           </div>
         </div>
       </section>
 
-      {/* Mission Section */}
-      <section className="py-20 px-4 sm:px-6 lg:px-8 bg-surface-light dark:bg-surface-dark">
+      {/* Mission & Values Section */}
+      <section className="relative z-10 py-20 px-4">
         <div className="max-w-7xl mx-auto">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-            <div>
-              <h2 className="text-3xl font-bold text-text-primary-light dark:text-text-primary-dark mb-6">
-                Our Mission
-              </h2>
-              <p className="text-lg text-text-secondary-light dark:text-text-secondary-dark mb-6">
-                At NGA Central MIS, our mission is to empower organizations with
-                comprehensive management solutions that streamline operations,
-                enhance productivity, and drive informed decision-making.
-              </p>
-              <p className="text-lg text-text-secondary-light dark:text-text-secondary-dark mb-6">
-                We believe that effective management information systems are the
-                backbone of successful organizations. Our team works tirelessly
-                to deliver solutions that are not just functional, but
-                transformative.
-              </p>
-              <p className="text-lg text-text-secondary-light dark:text-text-secondary-dark">
-                Since our inception, we have helped countless organizations
-                achieve their goals through technology, and we continue to
-                innovate and expand our offerings to meet the evolving needs of
-                modern businesses.
-              </p>
-            </div>
-            <div className="relative">
-              <div className="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-3xl p-8 shadow-2xl">
-                <div className="grid grid-cols-2 gap-6">
-                  <div className="text-center">
-                    <div className="text-4xl font-bold text-white mb-2">
-                      500+
-                    </div>
-                    <div className="text-blue-100">Clients</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-4xl font-bold text-white mb-2">
-                      10M+
-                    </div>
-                    <div className="text-blue-100">Users</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-4xl font-bold text-white mb-2">
-                      99.9%
-                    </div>
-                    <div className="text-blue-100">Uptime</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-4xl font-bold text-white mb-2">
-                      24/7
-                    </div>
-                    <div className="text-blue-100">Support</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Values Section */}
-      <section className="py-20 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold text-text-primary-light dark:text-text-primary-dark mb-4">
-              Our Values
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            className="text-center mb-16"
+          >
+            <motion.span
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              className="inline-block px-4 py-2 bg-blue-500 dark:bg-blue-400/30 text-white dark:text-blue-400 rounded-full text-sm font-medium mb-4"
+            >
+              Our Purpose
+            </motion.span>
+            <h2 className="text-4xl md:text-5xl font-bold text-gray-900 dark:text-white mb-4">
+              Mission & Values
             </h2>
-            <p className="text-lg text-text-secondary-light dark:text-text-secondary-dark max-w-2xl mx-auto">
+            <p className="text-xl text-gray-600 dark:text-gray-300 max-w-2xl mx-auto">
               The principles that guide everything we do
             </p>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {values.map((value, index) => (
-              <div
-                key={index}
-                className="bg-card-light dark:bg-card-dark rounded-2xl p-8 shadow-lg hover:shadow-xl transition-all duration-300 border border-border-light dark:border-border-dark text-center"
-              >
-                <div className="w-20 h-20 bg-gradient-to-r from-blue-600/10 to-indigo-600/10 rounded-full flex items-center justify-center mx-auto mb-6">
-                  <div className="text-blue-600 dark:text-blue-400">
-                    {value.icon}
-                  </div>
-                </div>
-                <h3 className="text-xl font-semibold text-text-primary-light dark:text-text-primary-dark mb-3">
-                  {value.title}
-                </h3>
-                <p className="text-text-secondary-light dark:text-text-secondary-dark">
-                  {value.description}
-                </p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
+          </motion.div>
 
-      {/* Team Section */}
-      <section className="py-20 px-4 sm:px-6 lg:px-8 bg-surface-light dark:bg-surface-dark">
-        <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold text-text-primary-light dark:text-text-primary-dark mb-4">
-              Meet Our Team
-            </h2>
-            <p className="text-lg text-text-secondary-light dark:text-text-secondary-dark max-w-2xl mx-auto">
-              The passionate professionals behind NGA Central MIS
-            </p>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-            {teamMembers.map((member, index) => (
-              <div
+          <div className="grid md:grid-cols-2 gap-8">
+            {values.map((value, index) => (
+              <motion.div
                 key={index}
-                className="bg-card-light dark:bg-card-dark rounded-2xl p-6 shadow-lg hover:shadow-xl transition-all duration-300 border border-border-light dark:border-border-dark text-center"
+                initial={{ opacity: 0, y: 30 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.1 }}
+                whileHover={{
+                  y: -8,
+                  boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
+                }}
+                className="group relative bg-white dark:bg-slate-800/50 rounded-3xl p-8 shadow-lg border border-gray-100 dark:border-slate-700/30 overflow-hidden"
               >
-                <div className="w-24 h-24 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-full mx-auto mb-4 flex items-center justify-center">
-                  <span className="text-3xl font-bold text-white">
-                    {member.name
-                      .split(" ")
-                      .map((n) => n[0])
-                      .join("")}
-                  </span>
+                {/* Animated background blob */}
+                <motion.div
+                  animate={{
+                    scale: [1, 1.2, 1],
+                    opacity: [0.1, 0.15, 0.1],
+                  }}
+                  transition={{ repeat: Infinity, duration: 4 }}
+                  className={`absolute -top-10 -right-10 w-40 h-40 rounded-full bg-gradient-to-r ${value.color} blur-2xl`}
+                />
+
+                {/* Content */}
+                <div className="relative">
+                  <div className="flex items-center gap-4 mb-6">
+                    <motion.div
+                      whileHover={{ rotate: 10, scale: 1.1 }}
+                      className="w-16 h-16"
+                    >
+                      {value.cuteIcon}
+                    </motion.div>
+                    <h3 className="text-2xl font-bold text-gray-900 dark:text-white">
+                      {value.title}
+                    </h3>
+                  </div>
+                  <p className="text-base text-gray-600 dark:text-gray-300 leading-relaxed">
+                    {value.description}
+                  </p>
                 </div>
-                <h3 className="text-lg font-semibold text-text-primary-light dark:text-text-primary-dark mb-1">
-                  {member.name}
-                </h3>
-                <p className="text-blue-600 dark:text-blue-400 text-sm mb-3">
-                  {member.role}
-                </p>
-                <p className="text-text-secondary-light dark:text-text-secondary-dark text-sm">
-                  {member.bio}
-                </p>
-              </div>
+
+                {/* Hover indicator */}
+                <motion.div
+                  initial={{ opacity: 0, x: -10 }}
+                  whileHover={{ opacity: 1, x: 0 }}
+                  className="absolute bottom-4 right-4 w-8 h-8 bg-gray-100 dark:bg-slate-700 rounded-full flex items-center justify-center"
+                >
+                  <svg
+                    className="w-4 h-4 text-gray-600 dark:text-gray-300"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M9 5l7 7-7 7"
+                    />
+                  </svg>
+                </motion.div>
+              </motion.div>
             ))}
           </div>
         </div>
       </section>
 
       {/* Back Button */}
-      <section className="py-12 px-4 sm:px-6 lg:px-8">
+      <section className="relative z-10 py-16 px-4">
         <div className="max-w-7xl mx-auto text-center">
-          <button
+          <motion.button
             onClick={onNavigateBack}
-            className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-medium rounded-full transition-all duration-200"
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            className="inline-flex items-center px-8 py-3 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-400 text-white font-semibold rounded-full shadow-lg shadow-blue-500/25 transition-all"
           >
             <svg
               className="w-5 h-5 mr-2"
@@ -261,28 +389,9 @@ const AboutUs: React.FC<AboutUsProps> = ({ onNavigateBack }) => {
               />
             </svg>
             Back to Home
-          </button>
+          </motion.button>
         </div>
       </section>
-
-      {/* Footer */}
-      <footer className="bg-surface-light dark:bg-surface-dark py-12 px-4 sm:px-6 lg:px-8 border-t border-border-light dark:border-border-dark">
-        <div className="max-w-7xl mx-auto text-center">
-          <div className="flex items-center justify-center space-x-3 mb-4">
-            <img
-              src="/logo.svg"
-              alt="NGA Central MIS"
-              className="w-8 h-8 rounded-full"
-            />
-            <span className="font-semibold text-text-primary-light dark:text-text-primary-dark">
-              NGA Central MIS
-            </span>
-          </div>
-          <p className="text-text-secondary-light dark:text-text-secondary-dark">
-            © 2024 NGA Central MIS. All rights reserved.
-          </p>
-        </div>
-      </footer>
     </div>
   );
 };
