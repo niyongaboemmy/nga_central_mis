@@ -11,6 +11,37 @@ import { successResponse } from "../utils/response";
 import { asyncHandler } from "../middleware/asyncHandler";
 import logger from "../utils/logger";
 
+export const getCurrentUser = asyncHandler(async (req: any, res: any) => {
+  const userId = req.user?.userId;
+
+  if (!userId) {
+    throw new ValidationError("User not authenticated");
+  }
+
+  logger.info("Fetching current user", { userId });
+
+  const user = await db
+    .select()
+    .from(User)
+    .where(eq(User.user_id, userId))
+    .limit(1);
+
+  if (user.length === 0) {
+    throw new NotFoundError("User not found");
+  }
+
+  const profile = await db
+    .select()
+    .from(UserProfile)
+    .where(eq(UserProfile.user_id, userId))
+    .limit(1);
+
+  successResponse(res, "User profile retrieved successfully", {
+    user: user[0],
+    profile: profile[0] || null,
+  });
+});
+
 export const getUsers = asyncHandler(async (req: any, res: any) => {
   logger.info("Fetching all users", { userId: req.user?.userId });
 

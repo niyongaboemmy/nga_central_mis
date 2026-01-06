@@ -1,5 +1,12 @@
 import api from "../services/api";
 
+// Backend response wrapper
+interface BackendResponse<T> {
+  success: boolean;
+  message: string;
+  data?: T;
+}
+
 export interface User {
   user_id: number;
   username: string;
@@ -32,11 +39,31 @@ export const getUsers = async (
   onError?: (error: any) => void
 ): Promise<User[] | void> => {
   try {
-    const response = await api.get<User[]>("/users");
-    if (onSuccess) {
-      onSuccess(response.data);
+    const response = await api.get<BackendResponse<User[]>>("/users");
+    if (onSuccess && response.data.data) {
+      onSuccess(response.data.data);
     }
-    return response.data;
+    return response.data.data;
+  } catch (error) {
+    if (onError) {
+      onError(error);
+    }
+    throw error;
+  }
+};
+
+export const getCurrentUser = async (
+  onSuccess?: (user: UserWithProfile) => void,
+  onError?: (error: any) => void
+): Promise<UserWithProfile | void> => {
+  try {
+    const response = await api.get<BackendResponse<UserWithProfile>>(
+      "/users/me"
+    );
+    if (onSuccess && response.data.data) {
+      onSuccess(response.data.data);
+    }
+    return response.data.data;
   } catch (error) {
     if (onError) {
       onError(error);
@@ -51,11 +78,13 @@ export const getUser = async (
   onError?: (error: any) => void
 ): Promise<UserWithProfile | void> => {
   try {
-    const response = await api.get<UserWithProfile>(`/users/${id}`);
-    if (onSuccess) {
-      onSuccess(response.data);
+    const response = await api.get<BackendResponse<UserWithProfile>>(
+      `/users/${id}`
+    );
+    if (onSuccess && response.data.data) {
+      onSuccess(response.data.data);
     }
-    return response.data;
+    return response.data.data;
   } catch (error) {
     if (onError) {
       onError(error);
@@ -70,11 +99,11 @@ export const createUser = async (
   onError?: (error: any) => void
 ): Promise<User | void> => {
   try {
-    const response = await api.post<User>("/users", userData);
-    if (onSuccess) {
-      onSuccess(response.data);
+    const response = await api.post<BackendResponse<User>>("/users", userData);
+    if (onSuccess && response.data.data) {
+      onSuccess(response.data.data);
     }
-    return response.data;
+    return response.data.data;
   } catch (error) {
     if (onError) {
       onError(error);

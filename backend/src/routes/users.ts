@@ -1,5 +1,6 @@
 import express from "express";
 import {
+  getCurrentUser,
   getUsers,
   getUser,
   createUser,
@@ -10,6 +11,7 @@ import { authenticate, authorize } from "../middleware/auth";
 
 const router = express.Router();
 
+router.get("/me", authenticate, getCurrentUser);
 router.get("/", authenticate, authorize("MANAGE_USERS"), getUsers);
 router.get("/:id", authenticate, getUser);
 router.post("/", authenticate, authorize("MANAGE_USERS"), createUser);

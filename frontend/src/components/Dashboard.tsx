@@ -4,86 +4,25 @@ interface DashboardProps {
   onLogout?: () => void;
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
-  const handleLogout = () => {
-    localStorage.removeItem("token");
-    if (onLogout) {
-      onLogout();
-    } else {
-      window.location.reload();
-    }
-  };
-
+const Dashboard: React.FC<DashboardProps> = ({}) => {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-background-light to-indigo-50 dark:from-background-dark dark:via-background-dark dark:to-background-dark">
-      {/* Header */}
-      <header className="bg-card-light dark:bg-card-dark shadow-sm border-b border-border-light dark:border-border-dark">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-4">
-            <div className="flex items-center">
-              <div className="inline-flex items-center justify-center w-10 h-10 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-lg mr-3">
-                <svg
-                  className="w-6 h-6 text-white"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"
-                  />
-                </svg>
-              </div>
-              <div>
-                <h1 className="text-xl font-bold text-text-primary-light dark:text-text-primary-dark">
-                  NGA Central MIS
-                </h1>
-                <p className="text-sm text-text-secondary-light dark:text-text-secondary-dark">
-                  Dashboard
-                </p>
-              </div>
-            </div>
-            <button
-              onClick={handleLogout}
-              className="inline-flex items-center px-4 py-2 border border-border-light dark:border-border-dark rounded-lg text-sm font-medium text-text-primary-light dark:text-text-primary-dark bg-card-light dark:bg-card-dark hover:bg-surface-light dark:hover:bg-surface-dark transition-colors duration-200"
-            >
-              <svg
-                className="w-4 h-4 mr-2"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
-                />
-              </svg>
-              Logout
-            </button>
-          </div>
-        </div>
-      </header>
-
+    <div className="min-h-screen">
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
           <h2 className="text-2xl font-bold text-text-primary-light dark:text-text-primary-dark mb-2">
             Welcome to NGA MIS
           </h2>
-          <p className="text-text-secondary-light dark:text-text-secondary-dark">
+          <p className="text-text-secondary-light dark:text-text-secondary-dark/50">
             Your central management information system dashboard
           </p>
         </div>
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <div className="bg-card-light dark:bg-card-dark rounded-xl shadow-sm border border-border-light dark:border-border-dark p-6">
+          <div className="bg-card-light dark:bg-card-dark/30 rounded-3xl shadow-sm border border-white dark:border-border-dark/30 p-6">
             <div className="flex items-center">
-              <div className="p-2 bg-blue-100 dark:bg-blue-900/20 rounded-lg">
+              <div className="p-2 bg-blue-100 dark:bg-blue-900/20 rounded-2xl">
                 <svg
                   className="w-6 h-6 text-blue-600 dark:text-blue-400"
                   fill="none"
@@ -109,9 +48,9 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
             </div>
           </div>
 
-          <div className="bg-card-light dark:bg-card-dark rounded-xl shadow-sm border border-border-light dark:border-border-dark p-6">
+          <div className="bg-card-light dark:bg-card-dark/30 rounded-3xl shadow-sm border border-white dark:border-border-dark/30 p-6">
             <div className="flex items-center">
-              <div className="p-2 bg-green-100 dark:bg-green-900/20 rounded-lg">
+              <div className="p-2 bg-green-100 dark:bg-green-900/20 rounded-2xl">
                 <svg
                   className="w-6 h-6 text-green-600 dark:text-green-400"
                   fill="none"
@@ -137,9 +76,9 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
             </div>
           </div>
 
-          <div className="bg-card-light dark:bg-card-dark rounded-xl shadow-sm border border-border-light dark:border-border-dark p-6">
+          <div className="bg-card-light dark:bg-card-dark/30 rounded-3xl shadow-sm border border-white dark:border-border-dark/30 p-6">
             <div className="flex items-center">
-              <div className="p-2 bg-purple-100 dark:bg-purple-900/20 rounded-lg">
+              <div className="p-2 bg-purple-100 dark:bg-purple-900/20 rounded-2xl">
                 <svg
                   className="w-6 h-6 text-purple-600 dark:text-purple-400"
                   fill="none"
@@ -165,9 +104,9 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
             </div>
           </div>
 
-          <div className="bg-card-light dark:bg-card-dark rounded-xl shadow-sm border border-border-light dark:border-border-dark p-6">
+          <div className="bg-card-light dark:bg-card-dark/30 rounded-3xl shadow-sm border border-white dark:border-border-dark/30 p-6">
             <div className="flex items-center">
-              <div className="p-2 bg-orange-100 dark:bg-orange-900/20 rounded-lg">
+              <div className="p-2 bg-orange-100 dark:bg-orange-900/20 rounded-2xl">
                 <svg
                   className="w-6 h-6 text-orange-600 dark:text-orange-400"
                   fill="none"
@@ -195,13 +134,13 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
         </div>
 
         {/* Quick Actions */}
-        <div className="bg-card-light dark:bg-card-dark rounded-xl shadow-sm border border-border-light dark:border-border-dark p-6">
+        <div className="bg-card-light dark:bg-card-dark/30 rounded-3xl shadow-sm border border-white dark:border-border-dark/30 p-6">
           <h3 className="text-lg font-semibold text-text-primary-light dark:text-text-primary-dark mb-4">
             Quick Actions
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <button className="flex items-center p-4 border border-border-light dark:border-border-dark rounded-lg hover:bg-surface-light dark:hover:bg-surface-dark transition-colors duration-200">
-              <div className="p-2 bg-blue-100 dark:bg-blue-900/20 rounded-lg mr-3">
+            <button className="flex items-center p-4 border border-white dark:border-border-dark/30 rounded-2xl bg-gray-100 dark:bg-gray-800/50 hover:bg-surface-light dark:hover:bg-surface-dark/40 transition-colors duration-200">
+              <div className="p-2 bg-blue-100 dark:bg-blue-900/20 rounded-2xl mr-3">
                 <svg
                   className="w-5 h-5 text-blue-600 dark:text-blue-400"
                   fill="none"
@@ -226,8 +165,8 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
               </div>
             </button>
 
-            <button className="flex items-center p-4 border border-border-light dark:border-border-dark rounded-lg hover:bg-surface-light dark:hover:bg-surface-dark transition-colors duration-200">
-              <div className="p-2 bg-green-100 dark:bg-green-900/20 rounded-lg mr-3">
+            <button className="flex items-center p-4 border border-white dark:border-border-dark/30 rounded-2xl bg-gray-100 dark:bg-gray-800/50 hover:bg-surface-light dark:hover:bg-surface-dark/40 transition-colors duration-200">
+              <div className="p-2 bg-green-100 dark:bg-green-900/20 rounded-2xl mr-3">
                 <svg
                   className="w-5 h-5 text-green-600 dark:text-green-400"
                   fill="none"
@@ -252,8 +191,8 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
               </div>
             </button>
 
-            <button className="flex items-center p-4 border border-border-light dark:border-border-dark rounded-lg hover:bg-surface-light dark:hover:bg-surface-dark transition-colors duration-200">
-              <div className="p-2 bg-purple-100 dark:bg-purple-900/20 rounded-lg mr-3">
+            <button className="flex items-center p-4 border border-white dark:border-border-dark/30 rounded-2xl bg-gray-100 dark:bg-gray-800/50 hover:bg-surface-light dark:hover:bg-surface-dark/40 transition-colors duration-200">
+              <div className="p-2 bg-purple-100 dark:bg-purple-900/20 rounded-2xl mr-3">
                 <svg
                   className="w-5 h-5 text-purple-600 dark:text-purple-400"
                   fill="none"

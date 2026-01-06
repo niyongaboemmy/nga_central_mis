@@ -6,4 +6,5 @@ export { default as ThemeToggle } from "./ThemeToggle";
 export { default as Navbar } from "./Navbar";
 export { default as Footer } from "./Footer";
 export { default as VerificationCode } from "./VerificationCode";
+export { default as Sidebar } from "./Sidebar";
 export type { AlertType } from "./Alert";

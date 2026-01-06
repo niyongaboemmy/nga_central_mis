@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from "react";
+import React from "react";
 import {
   BrowserRouter as Router,
   Routes,
   Route,
   useNavigate,
+  Navigate,
 } from "react-router-dom";
 import Landing from "./components/Landing";
 import AboutUs from "./components/AboutUs";
@@ -11,8 +12,10 @@ import ContactUs from "./components/ContactUs";
 import PasswordRecovery from "./components/PasswordRecovery";
 import Login from "./components/Login";
 import Dashboard from "./components/Dashboard";
-import Navbar from "./components/ui/Navbar";
+import SystemLayout from "./components/SystemLayout";
 import Footer from "./components/ui/Footer";
+import Navbar from "./components/ui/Navbar";
+import { UserProvider, useUser } from "./contexts/UserContext";
 import "./App.css";
 
 // Wrapper components for pages that need the Navbar
@@ -39,9 +42,13 @@ const ContactPage: React.FC = () => {
 
 const LoginPage: React.FC = () => {
   const navigate = useNavigate();
+  const { refreshUser } = useUser();
   return (
     <Login
-      onLoginSuccess={() => navigate("/dashboard")}
+      onLoginSuccess={async () => {
+        await refreshUser();
+        navigate("/dashboard");
+      }}
       onNavigateToPasswordRecovery={() => navigate("/password-recovery")}
     />
   );
@@ -52,33 +59,51 @@ const PasswordRecoveryPage: React.FC = () => {
   return <PasswordRecovery onNavigateBackToLogin={() => navigate("/login")} />;
 };
 
-const DashboardPage: React.FC = () => {
-  const navigate = useNavigate();
-  const handleLogout = () => {
-    localStorage.removeItem("token");
-    navigate("/");
-  };
-  return <Dashboard onLogout={handleLogout} />;
+// Protected Route wrapper
+const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({
+  children,
+}) => {
+  const { isAuthenticated, isLoading } = useUser();
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background-light dark:bg-background-dark">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+
+  return <>{children}</>;
 };
 
-// Navbar wrapper for pages with full navigation
-const FullNavbarWrapper: React.FC<{ children: React.ReactNode }> = ({
+// Public Route wrapper (redirects to dashboard if already logged in)
+const PublicRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { isAuthenticated, isLoading } = useUser();
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background-light dark:bg-background-dark">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
+  if (isAuthenticated) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  return <>{children}</>;
+};
+
+// Simple public layout with just Navbar and Footer (no SystemLayout)
+const PublicLayout: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
   const navigate = useNavigate();
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-
-  useEffect(() => {
-    const token = localStorage.getItem("token");
-    if (token) {
-      setIsLoggedIn(true);
-    }
-  }, []);
-
-  if (isLoggedIn) {
-    return <>{children}</>;
-  }
-
   return (
     <>
       <Navbar
@@ -89,30 +114,17 @@ const FullNavbarWrapper: React.FC<{ children: React.ReactNode }> = ({
         showNavigation={true}
         showAuthButtons={true}
       />
-      {children}
+      <div className="pt-16">{children}</div>
       <Footer />
     </>
   );
 };
 
 // Inner pages with back button navbar
-const BackButtonNavbarWrapper: React.FC<{ children: React.ReactNode }> = ({
+const BackButtonLayout: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
   const navigate = useNavigate();
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-
-  useEffect(() => {
-    const token = localStorage.getItem("token");
-    if (token) {
-      setIsLoggedIn(true);
-    }
-  }, []);
-
-  if (isLoggedIn) {
-    return <>{children}</>;
-  }
-
   return (
     <>
       <Navbar
@@ -120,70 +132,152 @@ const BackButtonNavbarWrapper: React.FC<{ children: React.ReactNode }> = ({
         showNavigation={false}
         showAuthButtons={false}
       />
-      {children}
+      <div className="pt-16">{children}</div>
       <Footer />
     </>
   );
 };
 
+// System layout with sidebar for authenticated users
+const SystemLayoutWrapper: React.FC<{ children: React.ReactNode }> = ({
+  children,
+}) => {
+  return <SystemLayout showSidebar={true}>{children}</SystemLayout>;
+};
+
+// Dashboard page with sidebar
+const DashboardPage: React.FC = () => {
+  const { logout } = useUser();
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    logout();
+    navigate("/");
+  };
+
+  return <Dashboard onLogout={handleLogout} />;
+};
+
 function App() {
   return (
-    <Router basename="/mis">
-      <Routes>
-        {/* Landing page with full navbar */}
-        <Route
-          path="/"
-          element={
-            <FullNavbarWrapper>
-              <LandingPage />
-            </FullNavbarWrapper>
-          }
-        />
+    <UserProvider>
+      <Router basename="/mis">
+        <Routes>
+          {/* Landing page with full navbar */}
+          <Route
+            path="/"
+            element={
+              <PublicRoute>
+                <PublicLayout>
+                  <LandingPage />
+                </PublicLayout>
+              </PublicRoute>
+            }
+          />
 
-        {/* About page with full navbar */}
-        <Route
-          path="/about"
-          element={
-            <FullNavbarWrapper>
-              <AboutPage />
-            </FullNavbarWrapper>
-          }
-        />
+          {/* About page with full navbar */}
+          <Route
+            path="/about"
+            element={
+              <PublicRoute>
+                <PublicLayout>
+                  <AboutPage />
+                </PublicLayout>
+              </PublicRoute>
+            }
+          />
 
-        {/* Contact page with full navbar */}
-        <Route
-          path="/contact"
-          element={
-            <FullNavbarWrapper>
-              <ContactPage />
-            </FullNavbarWrapper>
-          }
-        />
+          {/* Contact page with full navbar */}
+          <Route
+            path="/contact"
+            element={
+              <PublicRoute>
+                <PublicLayout>
+                  <ContactPage />
+                </PublicLayout>
+              </PublicRoute>
+            }
+          />
 
-        {/* Login page with full navbar (navigation links but no Sign In button) */}
-        <Route
-          path="/login"
-          element={
-            <FullNavbarWrapper>
-              <LoginPage />
-            </FullNavbarWrapper>
-          }
-        />
+          {/* Login page with full navbar */}
+          <Route
+            path="/login"
+            element={
+              <PublicRoute>
+                <PublicLayout>
+                  <LoginPage />
+                </PublicLayout>
+              </PublicRoute>
+            }
+          />
 
-        {/* Password recovery with back button navbar */}
-        <Route
-          path="/password-recovery"
-          element={
-            <BackButtonNavbarWrapper>
-              <PasswordRecoveryPage />
-            </BackButtonNavbarWrapper>
-          }
-        />
+          {/* Password recovery with back button navbar */}
+          <Route
+            path="/password-recovery"
+            element={
+              <PublicRoute>
+                <BackButtonLayout>
+                  <PasswordRecoveryPage />
+                </BackButtonLayout>
+              </PublicRoute>
+            }
+          />
 
-        {/* Dashboard - protected */}
-        <Route path="/dashboard" element={<DashboardPage />} />
-      </Routes>
-    </Router>
+          {/* Dashboard - protected with sidebar */}
+          <Route
+            path="/dashboard"
+            element={
+              <ProtectedRoute>
+                <SystemLayoutWrapper>
+                  <DashboardPage />
+                </SystemLayoutWrapper>
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Users page - protected with sidebar */}
+          <Route
+            path="/users"
+            element={
+              <ProtectedRoute>
+                <SystemLayoutWrapper>
+                  <div className="text-center py-12">
+                    <h2 className="text-2xl font-bold text-text-primary-light dark:text-text-primary-dark">
+                      Users Management
+                    </h2>
+                    <p className="mt-2 text-text-secondary-light dark:text-text-secondary-dark">
+                      This page is under construction
+                    </p>
+                  </div>
+                </SystemLayoutWrapper>
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Settings page - protected with sidebar */}
+          <Route
+            path="/settings"
+            element={
+              <ProtectedRoute>
+                <SystemLayoutWrapper>
+                  <div className="text-center py-12">
+                    <h2 className="text-2xl font-bold text-text-primary-light dark:text-text-primary-dark">
+                      Settings
+                    </h2>
+                    <p className="mt-2 text-text-secondary-light dark:text-text-secondary-dark">
+                      This page is under construction
+                    </p>
+                  </div>
+                </SystemLayoutWrapper>
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Fallback route */}
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </Router>
+    </UserProvider>
   );
 }
 
