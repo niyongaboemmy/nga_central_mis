@@ -13,23 +13,47 @@ class EmailService {
   private transporter: nodemailer.Transporter;
 
   constructor() {
+    const smtpConfig = config.email.smtp;
+    const port = smtpConfig.port;
+    const secure = port === 465; // SSL for 465, STARTTLS for other ports
+
     this.transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST || "smtp.gmail.com",
-      port: parseInt(process.env.SMTP_PORT || "587"),
-      secure: false, // true for 465, false for other ports
+      host: smtpConfig.host,
+      port: port,
+      secure: secure, // true for 465, false for 587
       auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS,
+        user: smtpConfig.user,
+        pass: smtpConfig.pass,
       },
+      tls: {
+        // Do not fail on invalid certificates
+        rejectUnauthorized: false,
+      },
+      connectionTimeout: 10000, // 10 seconds
+      greetingTimeout: 10000, // 10 seconds
+      socketTimeout: 15000, // 15 seconds
     });
+
+    // Verify connection on startup
+    this.verifyConnection();
+  }
+
+  private async verifyConnection(): Promise<void> {
+    try {
+      await this.transporter.verify();
+      logger.info("Email service connected successfully", {
+        host: config.email.smtp.host,
+        port: config.email.smtp.port,
+      });
+    } catch (error) {
+      logger.warn("Email service connection failed", { error });
+    }
   }
 
   async sendEmail(options: EmailOptions): Promise<void> {
     try {
       const mailOptions = {
-        from: `"${process.env.EMAIL_FROM_NAME || "NGA MIS"}" <${
-          process.env.EMAIL_FROM || process.env.SMTP_USER
-        }>`,
+        from: `"${config.email.fromName}" <${config.email.from}>`,
         to: options.to,
         subject: options.subject,
         html: options.html,
@@ -41,9 +65,14 @@ class EmailService {
         messageId: info.messageId,
         to: options.to,
       });
-    } catch (error) {
-      logger.error("Failed to send email", { error, to: options.to });
-      throw new Error("Failed to send email");
+    } catch (error: any) {
+      logger.error("Failed to send email", {
+        error: error.message,
+        code: error.code,
+        command: error.command,
+        to: options.to,
+      });
+      throw new Error(`Failed to send email: ${error.message}`);
     }
   }
 
@@ -68,7 +97,7 @@ class EmailService {
         </div>
         <p>This code will expire in 10 minutes.</p>
         <p>If you didn't request this code, please ignore this email.</p>
-        <p>Best regards,<br>NGA Central MIS Team</p>
+        <p>Best regards,<br>${config.email.fromName} Team</p>
       </div>
     `;
 
@@ -84,7 +113,7 @@ class EmailService {
       If you didn't request this code, please ignore this email.
 
       Best regards,
-      NGA Central MIS Team
+      ${config.email.fromName} Team
     `;
 
     await this.sendEmail({

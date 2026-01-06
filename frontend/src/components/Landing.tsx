@@ -1,21 +1,13 @@
 import React from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import {
-  BookOpen,
-  Users,
   BarChart3,
-  GraduationCap,
-  Shield,
-  Clock,
   TrendingUp,
   Activity,
   PieChart,
   ArrowRight,
   Star,
-  Sparkles,
 } from "lucide-react";
-import { Button } from "./ui";
-import LOGO from "../assets/logo.png";
 
 // Animated floating particles
 const FloatingParticles = () => (
@@ -25,12 +17,12 @@ const FloatingParticles = () => (
         key={i}
         initial={{
           opacity: 0,
-          x: Math.random() * window.innerWidth,
-          y: window.innerHeight + 50,
+          x: `${Math.random() * 100}%`,
+          y: "100%",
         }}
         animate={{
           opacity: [0, 1, 0],
-          y: -100,
+          y: "-10%",
         }}
         transition={{
           repeat: Infinity,
@@ -666,7 +658,7 @@ const ModernFeatureCard = ({
       y: -8,
       boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
     }}
-    className="group relative bg-white dark:bg-slate-800 rounded-3xl p-8 shadow-lg border border-gray-100 dark:border-slate-700 overflow-hidden"
+    className="group relative bg-white dark:bg-slate-800/70 rounded-3xl p-8 shadow-lg border border-white dark:border-slate-700/40 overflow-hidden"
   >
     {/* Animated background blob */}
     <motion.div
@@ -692,7 +684,7 @@ const ModernFeatureCard = ({
     <h3 className="relative text-2xl font-bold text-gray-900 dark:text-white text-center mb-4">
       {title}
     </h3>
-    <p className="relative text-base text-gray-600 dark:text-gray-300 text-center leading-relaxed">
+    <p className="relative text-base text-gray-600/70 dark:text-gray-300/60 text-center leading-relaxed">
       {description}
     </p>
 
@@ -704,42 +696,6 @@ const ModernFeatureCard = ({
     >
       <ArrowRight className="w-4 h-4 text-gray-600 dark:text-gray-300" />
     </motion.div>
-  </motion.div>
-);
-
-// Animated stats counter
-const StatCounter = ({
-  value,
-  label,
-  delay,
-  icon: Icon,
-}: {
-  value: string;
-  label: string;
-  delay: number;
-  icon?: React.ElementType;
-}) => (
-  <motion.div
-    initial={{ opacity: 0, y: 20 }}
-    whileInView={{ opacity: 1, y: 0 }}
-    transition={{ delay }}
-    whileHover={{ scale: 1.05 }}
-    className="text-center"
-  >
-    {Icon && (
-      <div className="w-14 h-14 bg-gradient-to-br from-blue-500 to-blue-500 rounded-xl flex items-center justify-center mx-auto mb-3 shadow-lg">
-        <Icon className="w-7 h-7 text-white" />
-      </div>
-    )}
-    <motion.span
-      initial={{ scale: 0.5 }}
-      whileInView={{ scale: 1 }}
-      transition={{ delay, type: "spring" }}
-      className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-blue-600 to-blue-500 bg-clip-text text-transparent"
-    >
-      {value}
-    </motion.span>
-    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{label}</p>
   </motion.div>
 );
 
@@ -763,7 +719,7 @@ const ChartCard = ({
       y: -5,
       boxShadow: "0 20px 40px rgba(0,0,0,0.1)",
     }}
-    className="bg-white dark:bg-slate-800 rounded-3xl p-6 shadow-lg border border-gray-100 dark:border-slate-700"
+    className="bg-white dark:bg-slate-800/70 rounded-3xl p-6 shadow-lg border border-white dark:border-slate-700/50"
   >
     <div className="flex items-center gap-3 mb-6">
       <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-500 rounded-full flex items-center justify-center shadow-md">
@@ -777,32 +733,6 @@ const ChartCard = ({
   </motion.div>
 );
 
-// Animated CTA Button
-const AnimatedCTAButton = ({
-  children,
-  onClick,
-}: {
-  children: React.ReactNode;
-  onClick: () => void;
-}) => (
-  <motion.button
-    onClick={onClick}
-    whileHover={{ scale: 1.05 }}
-    whileTap={{ scale: 0.95 }}
-    className="relative px-10 py-4 bg-white text-blue-600 font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all overflow-hidden"
-  >
-    <motion.div
-      animate={{ x: ["-100%", "100%"] }}
-      transition={{ repeat: Infinity, duration: 2, ease: "linear" }}
-      className="absolute inset-0 bg-gradient-to-r from-transparent via-blue-100/50 to-transparent skew-x-12"
-    />
-    <span className="relative flex items-center gap-2">
-      {children}
-      <Sparkles className="w-5 h-5" />
-    </span>
-  </motion.button>
-);
-
 interface LandingProps {
   onNavigateToLogin: () => void;
   onNavigateToAbout: () => void;
@@ -812,7 +742,7 @@ interface LandingProps {
 const Landing: React.FC<LandingProps> = ({
   onNavigateToLogin,
   onNavigateToAbout,
-  onNavigateToContact,
+  // onNavigateToContact,
 }) => {
   const features = [
     {
@@ -859,9 +789,12 @@ const Landing: React.FC<LandingProps> = ({
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-slate-950 overflow-hidden">
-      <FloatingParticles />
-      <BackgroundShapes />
+    <div className="min-h-screen bg-blue-100/50 dark:bg-black overflow-x-hidden">
+      {/* Background Effects Container - clips overflow */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        <FloatingParticles />
+        <BackgroundShapes />
+      </div>
 
       {/* Hero Section */}
       <section className="relative z-10 pt-40 pb-24 px-4">
@@ -926,7 +859,7 @@ const Landing: React.FC<LandingProps> = ({
                   onClick={onNavigateToAbout}
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
-                  className="px-8 py-3.5 bg-white dark:bg-slate-800 text-gray-700 dark:text-gray-200 font-semibold rounded-full shadow-lg border border-gray-200 dark:border-slate-700 hover:shadow-xl transition-all"
+                  className="px-8 py-3.5 bg-white dark:bg-slate-800/50 text-gray-700 dark:text-gray-200 font-semibold rounded-full shadow-lg border border-white dark:border-slate-700 hover:shadow-xl transition-all"
                 >
                   Learn More
                 </motion.button>
@@ -963,7 +896,7 @@ const Landing: React.FC<LandingProps> = ({
                       transition={{ repeat: Infinity, duration: 1 }}
                       className="text-sm font-bold text-gray-900 dark:text-white"
                     >
-                      +25% Growth
+                      +25% Performance
                     </motion.p>
                     <p className="text-xs text-gray-500 dark:text-gray-400">
                       This month

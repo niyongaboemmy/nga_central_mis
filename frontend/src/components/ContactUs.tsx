@@ -6,7 +6,7 @@ import {
   FaCommentDots,
   FaPaperPlane,
   FaQuestion,
-  FaArrowRight,
+  FaChevronDown,
 } from "react-icons/fa";
 
 interface ContactUsProps {
@@ -93,7 +93,7 @@ const ContactInfoCard = ({
     whileInView={{ opacity: 1, y: 0 }}
     transition={{ delay }}
     whileHover={{ scale: 1.02, y: -5 }}
-    className="group bg-white/80 dark:bg-slate-800/40 backdrop-blur-sm rounded-3xl p-6 shadow-lg border border-gray-100 dark:border-slate-700/30"
+    className="group bg-white/80 dark:bg-slate-800/40 backdrop-blur-sm rounded-3xl p-6 shadow-lg border border-white dark:border-slate-700/30"
   >
     <div className="flex items-center gap-4">
       <div>
@@ -122,6 +122,7 @@ const ContactUs: React.FC<ContactUsProps> = ({ onNavigateBack }) => {
   });
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -158,24 +159,59 @@ const ContactUs: React.FC<ContactUsProps> = ({ onNavigateBack }) => {
 
   const faqs = [
     {
-      question: "How do I get started?",
+      question: "How do I create and manage student accounts?",
       answer:
-        "Simply click 'Sign In' and create an account. Our onboarding process will guide you through setup.",
+        "Administrators can easily add new students through the Dashboard > Students section. You can import bulk student data via CSV, assign unique IDs, and manage enrollment status all in one place.",
     },
     {
-      question: "Is there a free trial?",
+      question: "How do I track student performance and grades?",
       answer:
-        "Yes! We offer a 14-day free trial with full access to all features. No credit card required.",
+        "Navigate to the Results section to record and monitor grades. The platform supports continuous assessment, semester grades, and automatic GPA calculations. You can generate detailed performance reports for individual students or entire classes.",
     },
     {
-      question: "What support is available?",
+      question: "How do I generate reports and analytics?",
       answer:
-        "We provide 24/7 email support, live chat during business hours, and dedicated phone support for enterprise.",
+        "The Reports section offers comprehensive analytics including enrollment statistics, attendance rates, grade distributions, and financial reports. Export data in PDF, Excel, or CSV formats for further analysis.",
+    },
+    {
+      question: "Can parents and students access the portal?",
+      answer:
+        "Yes! Students and parents have dedicated portal access to view grades, attendance records, fee balances, and school announcements. Access credentials are managed by administrators.",
+    },
+    {
+      question: "How do I manage staff and instructor accounts?",
+      answer:
+        "Go to Staff Management to add teachers and administrative personnel. You can assign roles, set permissions, assign class responsibilities, and manage schedules from one central dashboard.",
+    },
+    {
+      question: "Is my data secure and backed up?",
+      answer:
+        "Absolutely. We use industry-standard encryption to protect all data. Automatic daily backups ensure your information is safe. All data is stored in secure, compliant cloud infrastructure.",
+    },
+    {
+      question: "How do I handle fee payments and financial records?",
+      answer:
+        "The Finance module manages fee structures, payment tracking, receipts, and financial reports. Parents can make payments through the portal, and administrators can track all transactions in real-time.",
+    },
+    {
+      question: "How do I reset my password or recover my account?",
+      answer:
+        "Click 'Forgot Password' on the login page and enter your registered email. You'll receive a verification code to reset your password. For account recovery, contact your system administrator.",
+    },
+    {
+      question: "Can I access the platform on mobile devices?",
+      answer:
+        "Yes! The platform is fully responsive and works on smartphones and tablets. We also offer dedicated mobile apps for iOS and Android with push notifications for important updates.",
+    },
+    {
+      question: "How do I contact technical support?",
+      answer:
+        "You can reach our support team via email at support@ngacentralmis.com, call us at +1 (555) 123-4567, or use the contact form above. Enterprise clients get dedicated support representatives.",
     },
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-slate-950 overflow-hidden relative">
+    <div className="min-h-screen bg-gray-100 dark:bg-slate-950 overflow-hidden relative">
       <FloatingParticles />
       <BackgroundShapes />
 
@@ -240,7 +276,7 @@ const ContactUs: React.FC<ContactUsProps> = ({ onNavigateBack }) => {
               initial={{ opacity: 0, scale: 0.95 }}
               whileInView={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.5 }}
-              className="bg-white/80 dark:bg-slate-800/30 backdrop-blur-sm rounded-3xl p-8 shadow-xl border border-gray-100 dark:border-slate-700/20"
+              className="bg-white/80 dark:bg-slate-800/30 backdrop-blur-sm rounded-3xl p-8 shadow-xl border border-white dark:border-slate-700/20"
             >
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
@@ -397,11 +433,11 @@ const ContactUs: React.FC<ContactUsProps> = ({ onNavigateBack }) => {
 
       {/* FAQ Section */}
       <section className="relative z-10 py-20 px-4">
-        <div className="max-w-7xl mx-auto">
+        <div className="max-w-4xl mx-auto">
           <motion.div
             initial={{ opacity: 0, y: 30 }}
             whileInView={{ opacity: 1, y: 0 }}
-            className="text-center mb-16"
+            className="text-center mb-12"
           >
             <motion.span
               initial={{ opacity: 0, y: 20 }}
@@ -415,35 +451,56 @@ const ContactUs: React.FC<ContactUsProps> = ({ onNavigateBack }) => {
             </h2>
           </motion.div>
 
-          <div className="grid md:grid-cols-3 gap-8">
+          <div className="space-y-4">
             {faqs.map((faq, index) => (
               <motion.div
                 key={index}
-                initial={{ opacity: 0, y: 30 }}
+                initial={{ opacity: 0, y: 20 }}
                 whileInView={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.1 }}
-                whileHover={{
-                  y: -5,
-                  boxShadow: "0 20px 40px rgba(0,0,0,0.1)",
-                }}
-                className="group bg-white/80 dark:bg-slate-800/40 backdrop-blur-sm rounded-3xl p-8 shadow-lg border border-gray-100 dark:border-slate-800"
+                transition={{ delay: index * 0.05 }}
+                className="bg-white/80 dark:bg-slate-800/40 backdrop-blur-sm rounded-2xl shadow-md border border-white dark:border-slate-700/30 overflow-hidden"
               >
-                <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-500 rounded-xl flex items-center justify-center mb-4">
-                  <FaQuestion className="w-5 h-5 text-white" />
-                </div>
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">
-                  {faq.question}
-                </h3>
-                <p className="text-gray-600 dark:text-gray-300 text-sm">
-                  {faq.answer}
-                </p>
-                <motion.div
-                  initial={{ opacity: 0, x: -10 }}
-                  whileHover={{ opacity: 1, x: 0 }}
-                  className="absolute bottom-4 right-4 w-8 h-8 bg-gray-100 dark:bg-slate-700 rounded-full flex items-center justify-center"
+                <button
+                  onClick={() =>
+                    setOpenFaqIndex(openFaqIndex === index ? null : index)
+                  }
+                  className="w-full px-6 py-5 flex items-center justify-between text-left hover:bg-gray-50 dark:hover:bg-slate-700/20 transition-colors"
                 >
-                  <FaArrowRight className="w-4 h-4 text-gray-600 dark:text-gray-300" />
-                </motion.div>
+                  <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center flex-shrink-0">
+                      <FaQuestion className="w-5 h-5 text-white" />
+                    </div>
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white pr-4">
+                      {faq.question}
+                    </h3>
+                  </div>
+                  <motion.div
+                    animate={{ rotate: openFaqIndex === index ? 180 : 0 }}
+                    transition={{ duration: 0.2 }}
+                    className="flex-shrink-0"
+                  >
+                    <FaChevronDown className="w-5 h-5 text-gray-400" />
+                  </motion.div>
+                </button>
+
+                <AnimatePresence>
+                  {openFaqIndex === index && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: "auto", opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.3, ease: "easeInOut" }}
+                    >
+                      <div className="px-6 pb-6 pl-[5.5rem]">
+                        <Alert
+                          type="info"
+                          message={faq.answer}
+                          className="bg-blue-50 dark:bg-blue-900/20 border-blue-400 text-blue-800 dark:text-blue-200 shadow-sm"
+                        />
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </motion.div>
             ))}
           </div>

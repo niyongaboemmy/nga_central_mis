@@ -224,3 +224,105 @@
 {"level":"warn","message":"Failed login attempt: invalid password for user admin","service":"nga-central-mis","timestamp":"2026-01-05T21:41:37.875Z"}
 {"duration":18,"level":"info","message":"POST /auth/login 401 - 18ms","service":"nga-central-mis","statusCode":401,"timestamp":"2026-01-05T21:41:37.876Z"}
 {"level":"info","message":"SIGINT received, shutting down gracefully","service":"nga-central-mis","timestamp":"2026-01-06T00:20:12.200Z"}
+{"level":"info","message":"Server running on port 5001 in development mode","service":"nga-central-mis","timestamp":"2026-01-06T10:22:46.675Z"}
+{"body":{"email":"emmanuelniyongabo44@gmail.com"},"ip":"::1","level":"info","message":"POST /auth/forgot-password","service":"nga-central-mis","timestamp":"2026-01-06T10:23:00.944Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"OTP saved","service":"nga-central-mis","timestamp":"2026-01-06T10:23:00.992Z","type":"PASSWORD_RESET","userId":1}
+{"body":{"email":"emmanuelniyongabo44@gmail.com"},"ip":"::1","level":"info","message":"POST /auth/forgot-password","service":"nga-central-mis","timestamp":"2026-01-06T10:23:14.153Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"OTP saved","service":"nga-central-mis","timestamp":"2026-01-06T10:23:14.160Z","type":"PASSWORD_RESET","userId":1}
+{"error":{"code":"ETIMEDOUT","command":"CONN"},"level":"error","message":"Failed to send email","service":"nga-central-mis","timestamp":"2026-01-06T10:23:31.709Z","to":"emmanuelniyongabo44@gmail.com"}
+{"error":{"code":"ETIMEDOUT","command":"CONN"},"level":"error","message":"Failed to send email","service":"nga-central-mis","timestamp":"2026-01-06T10:23:44.524Z","to":"emmanuelniyongabo44@gmail.com"}
+{"level":"info","message":"SIGINT received, shutting down gracefully","service":"nga-central-mis","timestamp":"2026-01-06T10:26:19.011Z"}
+{"level":"info","message":"Server running on port 5001 in development mode","service":"nga-central-mis","timestamp":"2026-01-06T10:26:23.959Z"}
+{"body":{"email":"emmanuelniyongabo44@gmail.com"},"ip":"::1","level":"info","message":"POST /auth/forgot-password","service":"nga-central-mis","timestamp":"2026-01-06T10:26:26.527Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"OTP saved","service":"nga-central-mis","timestamp":"2026-01-06T10:26:26.585Z","type":"PASSWORD_RESET","userId":1}
+{"host":"mail.hackflix.net","level":"info","message":"Email service connected successfully","port":465,"service":"nga-central-mis","timestamp":"2026-01-06T10:26:27.267Z"}
+{"level":"info","message":"Email sent successfully","messageId":"<202f293c-d1e1-cf89-1cea-b11e00f51af2@nga.ac.rw>","service":"nga-central-mis","timestamp":"2026-01-06T10:26:30.254Z","to":"emmanuelniyongabo44@gmail.com"}
+{"level":"info","message":"Password reset OTP sent for user: superadmin","service":"nga-central-mis","timestamp":"2026-01-06T10:26:30.261Z"}
+{"duration":3736,"level":"info","message":"POST /auth/forgot-password 200 - 3736ms","service":"nga-central-mis","statusCode":200,"timestamp":"2026-01-06T10:26:30.262Z"}
+{"body":{"email":"emmanuelniyongabo44@gmail.com"},"ip":"::1","level":"info","message":"POST /auth/forgot-password","service":"nga-central-mis","timestamp":"2026-01-06T10:32:12.379Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"OTP saved","service":"nga-central-mis","timestamp":"2026-01-06T10:32:12.392Z","type":"PASSWORD_RESET","userId":1}
+{"level":"info","message":"Email sent successfully","messageId":"<58430102-2a5c-e19b-2e45-e9780936f56d@nga.ac.rw>","service":"nga-central-mis","timestamp":"2026-01-06T10:32:18.274Z","to":"emmanuelniyongabo44@gmail.com"}
+{"level":"info","message":"Password reset OTP sent for user: superadmin","service":"nga-central-mis","timestamp":"2026-01-06T10:32:18.279Z"}
+{"duration":5904,"level":"info","message":"POST /auth/forgot-password 200 - 5904ms","service":"nga-central-mis","statusCode":200,"timestamp":"2026-01-06T10:32:18.282Z"}
+{"level":"info","message":"SIGINT received, shutting down gracefully","service":"nga-central-mis","timestamp":"2026-01-06T10:36:55.815Z"}
+{"level":"info","message":"Server running on port 5001 in development mode","service":"nga-central-mis","timestamp":"2026-01-06T10:37:02.505Z"}
+{"host":"mail.hackflix.net","level":"info","message":"Email service connected successfully","port":465,"service":"nga-central-mis","timestamp":"2026-01-06T10:37:06.338Z"}
+{"body":{"email":"emmanuelniyongabo44@gmail.com"},"ip":"::1","level":"info","message":"POST /auth/forgot-password","service":"nga-central-mis","timestamp":"2026-01-06T10:37:35.039Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"OTP saved","service":"nga-central-mis","timestamp":"2026-01-06T10:37:35.064Z","type":"PASSWORD_RESET","userId":1}
+{"level":"info","message":"Email sent successfully","messageId":"<8779e056-61e7-0379-68c3-476b362df537@nga.ac.rw>","service":"nga-central-mis","timestamp":"2026-01-06T10:37:38.659Z","to":"emmanuelniyongabo44@gmail.com"}
+{"level":"info","message":"Password reset OTP sent for user: superadmin","service":"nga-central-mis","timestamp":"2026-01-06T10:37:38.661Z"}
+{"duration":3623,"level":"info","message":"POST /auth/forgot-password 200 - 3623ms","service":"nga-central-mis","statusCode":200,"timestamp":"2026-01-06T10:37:38.662Z"}
+{"level":"info","message":"SIGINT received, shutting down gracefully","service":"nga-central-mis","timestamp":"2026-01-06T10:42:06.683Z"}
+{"level":"info","message":"Server running on port 5001 in development mode","service":"nga-central-mis","timestamp":"2026-01-06T10:42:15.926Z"}
+{"host":"mail.hackflix.net","level":"info","message":"Email service connected successfully","port":465,"service":"nga-central-mis","timestamp":"2026-01-06T10:42:18.644Z"}
+{"body":{"email":"emmanuelniyongabo44@gmail.com"},"ip":"::1","level":"info","message":"POST /auth/forgot-password","service":"nga-central-mis","timestamp":"2026-01-06T10:42:24.917Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"OTP saved","service":"nga-central-mis","timestamp":"2026-01-06T10:42:24.943Z","type":"PASSWORD_RESET","userId":1}
+{"level":"info","message":"Email sent successfully","messageId":"<1e858c06-4511-dc8b-8796-5eb466cf008e@nga.ac.rw>","service":"nga-central-mis","timestamp":"2026-01-06T10:42:28.909Z","to":"emmanuelniyongabo44@gmail.com"}
+{"level":"info","message":"Password reset OTP sent for user: superadmin","service":"nga-central-mis","timestamp":"2026-01-06T10:42:28.914Z"}
+{"duration":4000,"level":"info","message":"POST /auth/forgot-password 200 - 4000ms","service":"nga-central-mis","statusCode":200,"timestamp":"2026-01-06T10:42:28.918Z"}
+{"body":{"otp":""},"ip":"::1","level":"info","message":"POST /auth/verify-reset-otp","service":"nga-central-mis","timestamp":"2026-01-06T10:42:40.715Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"duration":215,"level":"info","message":"POST /auth/verify-reset-otp 400 - 215ms","service":"nga-central-mis","statusCode":400,"timestamp":"2026-01-06T10:42:40.930Z"}
+{"body":{"otp":"413235"},"ip":"::1","level":"info","message":"POST /auth/verify-reset-otp","service":"nga-central-mis","timestamp":"2026-01-06T10:42:52.876Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"OTP verified successfully","service":"nga-central-mis","timestamp":"2026-01-06T10:42:52.895Z","type":"PASSWORD_RESET","userId":1}
+{"level":"info","message":"Password reset OTP verified for userId: 1","service":"nga-central-mis","timestamp":"2026-01-06T10:42:52.896Z"}
+{"duration":20,"level":"info","message":"POST /auth/verify-reset-otp 200 - 20ms","service":"nga-central-mis","statusCode":200,"timestamp":"2026-01-06T10:42:52.896Z"}
+{"body":{"newPassword":"Ngb155155!"},"ip":"::1","level":"info","message":"POST /auth/reset-password","service":"nga-central-mis","timestamp":"2026-01-06T10:44:50.054Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Password reset completed for userId: 1","service":"nga-central-mis","timestamp":"2026-01-06T10:44:50.348Z"}
+{"duration":296,"level":"info","message":"POST /auth/reset-password 200 - 296ms","service":"nga-central-mis","statusCode":200,"timestamp":"2026-01-06T10:44:50.349Z"}
+{"body":{"password":"Ngb155155!","username":"emmanuelniyongabo44@gmail.com"},"ip":"::1","level":"info","message":"POST /auth/login","service":"nga-central-mis","timestamp":"2026-01-06T10:45:55.068Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Login attempt for user: emmanuelniyongabo44@gmail.com","service":"nga-central-mis","timestamp":"2026-01-06T10:45:55.076Z"}
+{"level":"warn","message":"Failed login attempt: user emmanuelniyongabo44@gmail.com not found","service":"nga-central-mis","timestamp":"2026-01-06T10:45:55.087Z"}
+{"duration":23,"level":"info","message":"POST /auth/login 401 - 23ms","service":"nga-central-mis","statusCode":401,"timestamp":"2026-01-06T10:45:55.091Z"}
+{"body":{"password":"Ngb155155!","username":"emmanuelniyongabo44@gmail.com"},"ip":"::1","level":"info","message":"POST /auth/login","service":"nga-central-mis","timestamp":"2026-01-06T10:46:00.900Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Login attempt for user: emmanuelniyongabo44@gmail.com","service":"nga-central-mis","timestamp":"2026-01-06T10:46:00.901Z"}
+{"level":"warn","message":"Failed login attempt: user emmanuelniyongabo44@gmail.com not found","service":"nga-central-mis","timestamp":"2026-01-06T10:46:00.927Z"}
+{"duration":29,"level":"info","message":"POST /auth/login 401 - 29ms","service":"nga-central-mis","statusCode":401,"timestamp":"2026-01-06T10:46:00.929Z"}
+{"body":{"email":"emmanuelniyongabo44@gmail.com"},"ip":"::1","level":"info","message":"POST /auth/forgot-password","service":"nga-central-mis","timestamp":"2026-01-06T10:46:33.816Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"OTP saved","service":"nga-central-mis","timestamp":"2026-01-06T10:46:33.825Z","type":"PASSWORD_RESET","userId":1}
+{"level":"info","message":"Email sent successfully","messageId":"<588932aa-a178-4d87-cf6e-25e661ed47f4@nga.ac.rw>","service":"nga-central-mis","timestamp":"2026-01-06T10:46:37.548Z","to":"emmanuelniyongabo44@gmail.com"}
+{"level":"info","message":"Password reset OTP sent for user: superadmin","service":"nga-central-mis","timestamp":"2026-01-06T10:46:37.551Z"}
+{"duration":3737,"level":"info","message":"POST /auth/forgot-password 200 - 3737ms","service":"nga-central-mis","statusCode":200,"timestamp":"2026-01-06T10:46:37.553Z"}
+{"body":{"otp":"941782"},"ip":"::1","level":"info","message":"POST /auth/verify-reset-otp","service":"nga-central-mis","timestamp":"2026-01-06T10:46:54.123Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"OTP verified successfully","service":"nga-central-mis","timestamp":"2026-01-06T10:46:54.130Z","type":"PASSWORD_RESET","userId":1}
+{"level":"info","message":"Password reset OTP verified for userId: 1","service":"nga-central-mis","timestamp":"2026-01-06T10:46:54.131Z"}
+{"duration":9,"level":"info","message":"POST /auth/verify-reset-otp 200 - 9ms","service":"nga-central-mis","statusCode":200,"timestamp":"2026-01-06T10:46:54.131Z"}
+{"body":{"newPassword":"Ngb155155!"},"ip":"::1","level":"info","message":"POST /auth/reset-password","service":"nga-central-mis","timestamp":"2026-01-06T10:47:16.456Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Password reset completed for userId: 1","service":"nga-central-mis","timestamp":"2026-01-06T10:47:17.169Z"}
+{"duration":727,"level":"info","message":"POST /auth/reset-password 200 - 727ms","service":"nga-central-mis","statusCode":200,"timestamp":"2026-01-06T10:47:17.185Z"}
+{"body":{"password":"Ngb155155!","username":"emmanuelniyongabo44@gmail.com"},"ip":"::1","level":"info","message":"POST /auth/login","service":"nga-central-mis","timestamp":"2026-01-06T10:47:30.040Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Login attempt for user: emmanuelniyongabo44@gmail.com","service":"nga-central-mis","timestamp":"2026-01-06T10:47:30.041Z"}
+{"level":"warn","message":"Failed login attempt: user emmanuelniyongabo44@gmail.com not found","service":"nga-central-mis","timestamp":"2026-01-06T10:47:30.046Z"}
+{"duration":7,"level":"info","message":"POST /auth/login 401 - 7ms","service":"nga-central-mis","statusCode":401,"timestamp":"2026-01-06T10:47:30.047Z"}
+{"body":{"password":"Ngb155155!","username":"superadmin"},"ip":"::1","level":"info","message":"POST /auth/login","service":"nga-central-mis","timestamp":"2026-01-06T10:47:55.375Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Login attempt for user: superadmin","service":"nga-central-mis","timestamp":"2026-01-06T10:47:55.376Z"}
+{"level":"info","message":"OTP saved","service":"nga-central-mis","timestamp":"2026-01-06T10:47:55.662Z","type":"LOGIN_2FA","userId":1}
+{"level":"info","message":"Email sent successfully","messageId":"<6343051c-14ab-d025-7b27-603895c20121@nga.ac.rw>","service":"nga-central-mis","timestamp":"2026-01-06T10:47:59.759Z","to":"emmanuelniyongabo44@gmail.com"}
+{"level":"info","message":"Password verified, OTP sent for user: superadmin","service":"nga-central-mis","timestamp":"2026-01-06T10:47:59.761Z"}
+{"duration":4389,"level":"info","message":"POST /auth/login 200 - 4389ms","service":"nga-central-mis","statusCode":200,"timestamp":"2026-01-06T10:47:59.763Z"}
+{"body":{"otp":""},"ip":"::1","level":"info","message":"POST /auth/verify-otp","service":"nga-central-mis","timestamp":"2026-01-06T10:48:12.800Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"duration":108,"level":"info","message":"POST /auth/verify-otp 400 - 108ms","service":"nga-central-mis","statusCode":400,"timestamp":"2026-01-06T10:48:12.904Z"}
+{"body":{"otp":"250161"},"ip":"::1","level":"info","message":"POST /auth/verify-otp","service":"nga-central-mis","timestamp":"2026-01-06T10:48:14.181Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"OTP verified successfully","service":"nga-central-mis","timestamp":"2026-01-06T10:48:14.185Z","type":"LOGIN_2FA","userId":1}
+{"level":"info","message":"OTP verified, login completed for user: superadmin","service":"nga-central-mis","timestamp":"2026-01-06T10:48:14.196Z"}
+{"duration":16,"level":"info","message":"POST /auth/verify-otp 200 - 16ms","service":"nga-central-mis","statusCode":200,"timestamp":"2026-01-06T10:48:14.197Z"}
+{"body":{"password":"Ngb155155!","username":"emmanuelniyongabo44@gmail.com"},"ip":"::1","level":"info","message":"POST /auth/login","service":"nga-central-mis","timestamp":"2026-01-06T10:53:19.612Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Login attempt for user: emmanuelniyongabo44@gmail.com","service":"nga-central-mis","timestamp":"2026-01-06T10:53:19.613Z"}
+{"level":"warn","message":"Failed login attempt: user emmanuelniyongabo44@gmail.com not found","service":"nga-central-mis","timestamp":"2026-01-06T10:53:19.630Z"}
+{"duration":20,"level":"info","message":"POST /auth/login 401 - 20ms","service":"nga-central-mis","statusCode":401,"timestamp":"2026-01-06T10:53:19.632Z"}
+{"body":{"password":"Ngb155155!","username":"emmanuelniyongabo44@gmail.com"},"ip":"::1","level":"info","message":"POST /auth/login","service":"nga-central-mis","timestamp":"2026-01-06T10:53:24.098Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Login attempt for user: emmanuelniyongabo44@gmail.com","service":"nga-central-mis","timestamp":"2026-01-06T10:53:24.099Z"}
+{"level":"warn","message":"Failed login attempt: user emmanuelniyongabo44@gmail.com not found","service":"nga-central-mis","timestamp":"2026-01-06T10:53:24.100Z"}
+{"duration":3,"level":"info","message":"POST /auth/login 401 - 3ms","service":"nga-central-mis","statusCode":401,"timestamp":"2026-01-06T10:53:24.101Z"}
+{"level":"info","message":"SIGINT received, shutting down gracefully","service":"nga-central-mis","timestamp":"2026-01-06T10:53:26.553Z"}
+{"level":"info","message":"Server running on port 5001 in development mode","service":"nga-central-mis","timestamp":"2026-01-06T10:53:32.058Z"}
+{"body":{"password":"Ngb155155!","username":"emmanuelniyongabo44@gmail.com"},"ip":"::1","level":"info","message":"POST /auth/login","service":"nga-central-mis","timestamp":"2026-01-06T10:53:34.240Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Login attempt for: emmanuelniyongabo44@gmail.com","service":"nga-central-mis","timestamp":"2026-01-06T10:53:34.241Z"}
+{"level":"info","message":"OTP saved","service":"nga-central-mis","timestamp":"2026-01-06T10:53:34.582Z","type":"LOGIN_2FA","userId":1}
+{"host":"mail.hackflix.net","level":"info","message":"Email service connected successfully","port":465,"service":"nga-central-mis","timestamp":"2026-01-06T10:53:34.898Z"}
+{"level":"info","message":"Email sent successfully","messageId":"<8d26721a-ed56-2838-ceff-eecc2b2eece4@nga.ac.rw>","service":"nga-central-mis","timestamp":"2026-01-06T10:53:38.661Z","to":"emmanuelniyongabo44@gmail.com"}
+{"level":"info","message":"Password verified, OTP sent for user: superadmin","service":"nga-central-mis","timestamp":"2026-01-06T10:53:38.666Z"}
+{"duration":4430,"level":"info","message":"POST /auth/login 200 - 4430ms","service":"nga-central-mis","statusCode":200,"timestamp":"2026-01-06T10:53:38.669Z"}
+{"body":{"otp":"727533"},"ip":"::1","level":"info","message":"POST /auth/verify-otp","service":"nga-central-mis","timestamp":"2026-01-06T10:53:51.200Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"OTP verified successfully","service":"nga-central-mis","timestamp":"2026-01-06T10:53:51.224Z","type":"LOGIN_2FA","userId":1}
+{"level":"info","message":"OTP verified, login completed for user: superadmin","service":"nga-central-mis","timestamp":"2026-01-06T10:53:51.228Z"}
+{"duration":30,"level":"info","message":"POST /auth/verify-otp 200 - 30ms","service":"nga-central-mis","statusCode":200,"timestamp":"2026-01-06T10:53:51.229Z"}

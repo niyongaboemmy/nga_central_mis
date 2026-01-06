@@ -1,0 +1,2 @@
+{"error":{"code":"ETIMEDOUT","command":"CONN"},"level":"error","message":"Failed to send email","service":"nga-central-mis","timestamp":"2026-01-06T10:23:31.709Z","to":"emmanuelniyongabo44@gmail.com"}
+{"error":{"code":"ETIMEDOUT","command":"CONN"},"level":"error","message":"Failed to send email","service":"nga-central-mis","timestamp":"2026-01-06T10:23:44.524Z","to":"emmanuelniyongabo44@gmail.com"}

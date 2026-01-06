@@ -1,7 +1,6 @@
 import React from "react";
 import { motion } from "framer-motion";
 import { Star, Target, Heart, Lightbulb } from "lucide-react";
-import LOGO from "../assets/logo.png";
 
 interface AboutUsProps {
   onNavigateBack: () => void;
@@ -169,7 +168,7 @@ const StatCard = ({
     whileInView={{ opacity: 1, scale: 1 }}
     transition={{ delay }}
     whileHover={{ scale: 1.05 }}
-    className="bg-white/80 dark:bg-slate-800/40 backdrop-blur-sm rounded-2xl p-6 text-center shadow-lg border border-gray-100 dark:border-slate-700/30"
+    className="bg-white/80 dark:bg-slate-800/40 backdrop-blur-sm rounded-3xl p-6 text-center shadow-lg border border-white dark:border-slate-700/30"
   >
     <motion.span
       initial={{ scale: 0.5 }}
@@ -220,7 +219,7 @@ const AboutUs: React.FC<AboutUsProps> = ({ onNavigateBack }) => {
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-slate-950 overflow-hidden relative">
+    <div className="min-h-screen bg-gray-100 dark:bg-slate-950 overflow-hidden relative">
       <FloatingParticles />
       <BackgroundShapes />
 
@@ -310,7 +309,7 @@ const AboutUs: React.FC<AboutUsProps> = ({ onNavigateBack }) => {
                   y: -8,
                   boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
                 }}
-                className="group relative bg-white dark:bg-slate-800/50 rounded-3xl p-8 shadow-lg border border-gray-100 dark:border-slate-700/30 overflow-hidden"
+                className="group relative bg-white dark:bg-slate-800/50 rounded-3xl p-8 shadow-lg border border-white dark:border-slate-700/30 overflow-hidden"
               >
                 {/* Animated background blob */}
                 <motion.div

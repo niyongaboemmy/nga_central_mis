@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Button, Input, Alert, VerificationCode } from "./ui";
+import { Alert, VerificationCode } from "./ui";
 import { login, verifyOTP } from "../api/auth";
 import {
   Star,
@@ -8,7 +8,6 @@ import {
   ArrowRight,
   User,
   Shield,
-  Mail,
   CheckCircle,
 } from "lucide-react";
 
@@ -142,13 +141,6 @@ const Login: React.FC<LoginProps> = ({
     }
   };
 
-  // Animation variants
-  const pageVariants = {
-    initial: { opacity: 0 },
-    animate: { opacity: 1 },
-    exit: { opacity: 0 },
-  };
-
   const formVariants = {
     initial: { opacity: 0, x: -50 },
     animate: { opacity: 1, x: 0 },
@@ -212,7 +204,7 @@ const Login: React.FC<LoginProps> = ({
               >
                 {/* OTP Form Card */}
                 <motion.div
-                  className="bg-white/80 dark:bg-slate-800/50 backdrop-blur-xl rounded-3xl p-8 border border-gray-100 dark:border-slate-700/50 shadow-2xl"
+                  className="bg-white/80 dark:bg-slate-800/50 backdrop-blur-xl rounded-3xl p-8 border border-white dark:border-slate-700/50 shadow-2xl"
                   initial={{ opacity: 0, scale: 0.9 }}
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ duration: 0.3, delay: 0.1 }}
@@ -270,11 +262,11 @@ const Login: React.FC<LoginProps> = ({
                         onChange={setOtp}
                         onComplete={(code) => {
                           setOtp(code);
-                          if (code.length === 6) {
-                            handleOTPSubmit({
-                              preventDefault: () => {},
-                            } as any);
-                          }
+                          // if (code.length === 6) {
+                          //   handleOTPSubmit({
+                          //     preventDefault: () => {},
+                          //   } as any);
+                          // }
                         }}
                         error={!!error}
                       />
@@ -354,7 +346,7 @@ const Login: React.FC<LoginProps> = ({
               >
                 {/* Login Form Card */}
                 <motion.div
-                  className="bg-white/80 dark:bg-slate-800/50 backdrop-blur-xl rounded-3xl p-8 border border-gray-100 dark:border-slate-700/50 shadow-2xl"
+                  className="bg-white/80 dark:bg-slate-800/50 backdrop-blur-xl rounded-3xl p-8 border border-white dark:border-slate-700/50 shadow-2xl"
                   initial={{ opacity: 0, scale: 0.95 }}
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ duration: 0.4, ease: "easeOut" }}
@@ -385,7 +377,7 @@ const Login: React.FC<LoginProps> = ({
                       Welcome Back
                     </motion.h1>
                     <motion.p
-                      className="text-gray-600 dark:text-gray-300"
+                      className="text-gray-600/60 dark:text-gray-300/60"
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
                       transition={{ delay: 0.3 }}
@@ -410,7 +402,7 @@ const Login: React.FC<LoginProps> = ({
                           type="text"
                           value={username}
                           onChange={(e) => setUsername(e.target.value)}
-                          placeholder="Enter your username"
+                          placeholder="Enter your username or email"
                           className="w-full pl-12 pr-4 py-4 bg-gray-50 dark:bg-slate-900/50 border-2 border-gray-200 dark:border-slate-600 rounded-2xl focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/20 transition-all duration-200 text-gray-900 dark:text-white placeholder-gray-400"
                           required
                         />

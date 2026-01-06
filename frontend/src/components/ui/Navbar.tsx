@@ -124,7 +124,7 @@ const Navbar: React.FC<NavbarProps> = ({
               {showAuthButtons && onNavigateToLogin && !isActive("/login") && (
                 <button
                   onClick={onNavigateToLogin}
-                  className="px-5 py-2 text-sm font-medium text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 rounded-full transition-all duration-200 transform hover:scale-105 shadow-md hover:shadow-lg"
+                  className="px-5 py-2 text-sm font-medium text-white bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-500 rounded-full transition-all duration-200 transform hover:scale-105 shadow-md hover:shadow-lg"
                 >
                   Sign In
                 </button>

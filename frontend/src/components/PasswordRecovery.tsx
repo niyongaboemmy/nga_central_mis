@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Input, Alert, VerificationCode } from "./ui";
+import { Alert, VerificationCode } from "./ui";
 import {
   Star,
   Mail,
@@ -10,6 +10,7 @@ import {
   Shield,
   Key,
 } from "lucide-react";
+import { forgotPassword, verifyResetOTP, resetPassword } from "../api/auth";
 
 interface PasswordRecoveryProps {
   onNavigateBackToLogin: () => void;
@@ -95,6 +96,7 @@ const PasswordRecovery: React.FC<PasswordRecoveryProps> = ({
   const [step, setStep] = useState<"email" | "otp" | "newPassword">("email");
   const [email, setEmail] = useState("");
   const [otp, setOtp] = useState("");
+  const [tempToken, setTempToken] = useState<string>("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -107,10 +109,16 @@ const PasswordRecovery: React.FC<PasswordRecoveryProps> = ({
     setError("");
 
     try {
-      await new Promise((resolve) => setTimeout(resolve, 1500));
+      const response = await forgotPassword(email);
+      if (response?.tempToken) {
+        setTempToken(response.tempToken);
+      }
       setStep("otp");
-    } catch (err) {
-      setError("Failed to send verification code. Please try again.");
+    } catch (err: any) {
+      setError(
+        err.response?.data?.message ||
+          "Failed to send verification code. Please try again."
+      );
     } finally {
       setLoading(false);
     }
@@ -118,14 +126,30 @@ const PasswordRecovery: React.FC<PasswordRecoveryProps> = ({
 
   const handleOTPSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!otp) {
+      return;
+    }
     setLoading(true);
     setError("");
 
     try {
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      if (!tempToken) {
+        throw new Error("Session expired. Please start over.");
+      }
+
+      // Debug: Log the OTP being sent
+      console.log("Verifying OTP:", otp);
+      console.log("Using token:", tempToken.substring(0, 20) + "...");
+
+      await verifyResetOTP(otp, tempToken);
       setStep("newPassword");
-    } catch (err) {
-      setError("Invalid verification code. Please try again.");
+    } catch (err: any) {
+      console.error("OTP Verification Error:", err);
+      const errorMessage =
+        err.response?.data?.message ||
+        err.message ||
+        "Invalid verification code. Please try again.";
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -149,10 +173,13 @@ const PasswordRecovery: React.FC<PasswordRecoveryProps> = ({
     }
 
     try {
-      await new Promise((resolve) => setTimeout(resolve, 1500));
+      await resetPassword(newPassword);
       setSuccess(true);
-    } catch (err) {
-      setError("Failed to reset password. Please try again.");
+    } catch (err: any) {
+      setError(
+        err.response?.data?.message ||
+          "Failed to reset password. Please try again."
+      );
     } finally {
       setLoading(false);
     }
@@ -219,18 +246,6 @@ const PasswordRecovery: React.FC<PasswordRecoveryProps> = ({
     }
   };
 
-  // Get step description
-  const getStepDescription = () => {
-    switch (step) {
-      case "email":
-        return "Enter your email to receive a verification code";
-      case "otp":
-        return "Enter the verification code sent to your email";
-      case "newPassword":
-        return "Enter your new password";
-    }
-  };
-
   if (success) {
     return (
       <motion.div
@@ -246,7 +261,7 @@ const PasswordRecovery: React.FC<PasswordRecoveryProps> = ({
         <div className="relative z-10 pt-20 pb-8 px-4">
           <div className="w-full max-w-md mx-auto">
             <motion.div
-              className="bg-white/80 dark:bg-slate-800/50 backdrop-blur-xl rounded-3xl p-8 border border-gray-100 dark:border-slate-800 shadow-2xl text-center"
+              className="bg-white/80 dark:bg-slate-800/50 backdrop-blur-xl rounded-3xl p-8 border border-white dark:border-slate-800 shadow-2xl text-center flex flex-col items-center justify-center"
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.4 }}
@@ -268,7 +283,7 @@ const PasswordRecovery: React.FC<PasswordRecoveryProps> = ({
                 Password Reset Successful
               </motion.h1>
               <motion.p
-                className="text-gray-600 dark:text-gray-300 mb-6"
+                className="text-gray-600/60 dark:text-gray-300/70 mb-6"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.3 }}
@@ -348,7 +363,7 @@ const PasswordRecovery: React.FC<PasswordRecoveryProps> = ({
 
           {/* Form Card */}
           <motion.div
-            className="bg-white/80 dark:bg-slate-800/50 backdrop-blur-xl rounded-3xl p-8 border border-gray-100 dark:border-slate-800 shadow-2xl"
+            className="bg-white/80 dark:bg-slate-800/50 backdrop-blur-xl rounded-3xl p-8 border border-white dark:border-slate-800 shadow-2xl"
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.3, delay: 0.1 }}
@@ -459,9 +474,11 @@ const PasswordRecovery: React.FC<PasswordRecoveryProps> = ({
                     >
                       <VerificationCode
                         length={6}
-                        onChange={setOtp}
-                        onComplete={(code) => {
+                        onChange={(code) => {
                           setOtp(code);
+                          if (code.length > 0) {
+                            setError(""); // Clear error when user starts typing
+                          }
                           if (code.length === 6) {
                             handleOTPSubmit({
                               preventDefault: () => {},
