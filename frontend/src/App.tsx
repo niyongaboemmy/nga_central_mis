@@ -128,7 +128,7 @@ const BackButtonNavbarWrapper: React.FC<{ children: React.ReactNode }> = ({
 
 function App() {
   return (
-    <Router>
+    <Router basename="/mis">
       <Routes>
         {/* Landing page with full navbar */}
         <Route

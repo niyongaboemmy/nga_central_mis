@@ -10,6 +10,16 @@
       content="NGA Central Management Information System"
     />
     <title>NGA Central MIS</title>
+    <script>
+      // Redirect /public/mis/* to /mis/* before React loads
+      (function () {
+        var path = window.location.pathname;
+        if (path.includes("/public/mis/")) {
+          var newPath = path.replace("/public/mis", "/mis/");
+          window.location.replace(newPath);
+        }
+      })();
+    </script>
   </head>
   <body class="bg-gray-100 dark:bg-black">
     <div id="root"></div>
