@@ -49,46 +49,46 @@ const FloatingParticles = () => (
 );
 
 // Animated background shapes
-const BackgroundShapes = () => (
-  <>
-    <motion.div
-      animate={{
-        y: [0, -30, 0],
-        x: [0, 20, 0],
-        scale: [1, 1.2, 1],
-      }}
-      transition={{ repeat: Infinity, duration: 10, ease: "easeInOut" }}
-      className="absolute top-20 right-[5%] w-96 h-96 bg-blue-200/20 rounded-full blur-3xl"
-    />
-    <motion.div
-      animate={{
-        y: [0, 40, 0],
-        x: [0, -30, 0],
-        scale: [1, 1.3, 1],
-      }}
-      transition={{
-        repeat: Infinity,
-        duration: 12,
-        ease: "easeInOut",
-        delay: 1,
-      }}
-      className="absolute bottom-20 left-[5%] w-[500px] h-[500px] bg-blue-200/20 rounded-full blur-3xl"
-    />
-    <motion.div
-      animate={{
-        scale: [1, 1.4, 1],
-        opacity: [0.15, 0.25, 0.15],
-      }}
-      transition={{
-        repeat: Infinity,
-        duration: 8,
-        ease: "easeInOut",
-        delay: 2,
-      }}
-      className="absolute top-1/3 right-1/3 w-[400px] h-[400px] bg-indigo-200/20 rounded-full blur-3xl"
-    />
-  </>
-);
+// const BackgroundShapes = () => (
+//   <>
+//     <motion.div
+//       animate={{
+//         y: [0, -30, 0],
+//         x: [0, 20, 0],
+//         scale: [1, 1.2, 1],
+//       }}
+//       transition={{ repeat: Infinity, duration: 10, ease: "easeInOut" }}
+//       className="absolute top-20 right-[5%] w-96 h-96 bg-blue-200/20 rounded-full blur-3xl"
+//     />
+//     <motion.div
+//       animate={{
+//         y: [0, 40, 0],
+//         x: [0, -30, 0],
+//         scale: [1, 1.3, 1],
+//       }}
+//       transition={{
+//         repeat: Infinity,
+//         duration: 12,
+//         ease: "easeInOut",
+//         delay: 1,
+//       }}
+//       className="absolute bottom-20 left-[5%] w-[500px] h-[500px] bg-blue-200/20 rounded-full blur-3xl"
+//     />
+//     <motion.div
+//       animate={{
+//         scale: [1, 1.4, 1],
+//         opacity: [0.15, 0.25, 0.15],
+//       }}
+//       transition={{
+//         repeat: Infinity,
+//         duration: 8,
+//         ease: "easeInOut",
+//         delay: 2,
+//       }}
+//       className="absolute top-1/3 right-1/3 w-[400px] h-[400px] bg-indigo-200/20 rounded-full blur-3xl"
+//     />
+//   </>
+// );
 
 // Cute user avatar with animation
 const UserAvatar = ({
@@ -350,10 +350,10 @@ const Profile: React.FC = () => {
   return (
     <div className="min-h-screen bg-blue-50/50 dark:bg-black overflow-hidden relative">
       {/* Background Effects */}
-      <div className="fixed inset-0 pointer-events-none">
+      {/* <div className="fixed inset-0 pointer-events-none">
         <FloatingParticles />
         <BackgroundShapes />
-      </div>
+      </div> */}
 
       <div className="relative z-10 pb-10 pt-4 px-4 md:px-6">
         <div className="max-w-7xl mx-auto">
