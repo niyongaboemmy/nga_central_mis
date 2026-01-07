@@ -158,10 +158,14 @@ export const createUser = async (
 };
 
 export const bulkCreateUsers = async (
-  file: File
+  file: File,
+  roleId?: number
 ): Promise<{ success: number; failed: number; errors: string[] }> => {
   const formData = new FormData();
   formData.append("file", file);
+  if (roleId) {
+    formData.append("role_id", roleId.toString());
+  }
 
   try {
     const response = await api.post<
@@ -176,6 +180,26 @@ export const bulkCreateUsers = async (
       },
     });
     return response.data.data || { success: 0, failed: 0, errors: [] };
+  } catch (error: any) {
+    throw error;
+  }
+};
+
+export const downloadUserTemplate = async (): Promise<void> => {
+  try {
+    const response = await api.get("/users/template", {
+      responseType: "blob",
+    });
+
+    // Create download link
+    const url = window.URL.createObjectURL(new Blob([response.data]));
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", "user_template.xlsx");
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
   } catch (error: any) {
     throw error;
   }

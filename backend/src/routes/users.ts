@@ -10,6 +10,7 @@ import {
   updateCurrentUserProfile,
   updateUserProfile,
   bulkCreateUsers,
+  downloadTemplate,
 } from "../controllers/userController";
 import { authenticate, authorize } from "../middleware/auth";
 
@@ -37,6 +38,12 @@ const upload = multer({
 router.get("/me", authenticate, getCurrentUser);
 router.put("/me/profile", authenticate, updateCurrentUserProfile);
 router.get("/", authenticate, authorize("MANAGE_USERS"), getUsers);
+router.get(
+  "/template",
+  authenticate,
+  authorize("MANAGE_USERS"),
+  downloadTemplate
+);
 router.get("/:id", authenticate, getUser);
 router.put("/:id/profile", authenticate, updateUserProfile);
 router.post("/", authenticate, authorize("MANAGE_USERS"), createUser);

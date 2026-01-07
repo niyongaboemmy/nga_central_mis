@@ -18,6 +18,8 @@ import { successResponse } from "../utils/response";
 import { asyncHandler } from "../middleware/asyncHandler";
 import logger from "../utils/logger";
 import * as XLSX from "xlsx";
+import * as fs from "fs";
+import * as path from "path";
 
 // Helper function to convert date to MySQL DATE format
 const formatDateForMySQL = (dateStr: string | undefined) => {
@@ -727,7 +729,12 @@ export const bulkCreateUsers = asyncHandler(async (req: any, res: any) => {
     throw new ValidationError("No file uploaded");
   }
 
-  logger.info("Processing bulk user upload", { uploadedBy: req.user?.userId });
+  const { role_id } = req.body;
+
+  logger.info("Processing bulk user upload", {
+    uploadedBy: req.user?.userId,
+    roleId: role_id,
+  });
 
   // Parse Excel file
   const workbook = XLSX.read(req.file.buffer, { type: "buffer" });
@@ -743,17 +750,43 @@ export const bulkCreateUsers = asyncHandler(async (req: any, res: any) => {
   let successCount = 0;
   let failedCount = 0;
 
-  // Expected columns in Excel file
-  const requiredFields = ["username", "email"];
-  const optionalFields = [
-    "phone_number",
-    "first_name",
-    "last_name",
-    "gender",
-    "date_of_birth",
-    "address",
-    "user_type",
-  ];
+  // Validate role_id if provided
+  let selectedRoleName: string | null = null;
+  if (role_id) {
+    const roleIdNum = parseInt(role_id);
+    if (isNaN(roleIdNum)) {
+      throw new ValidationError("Invalid role ID");
+    }
+    const roleResult = await db
+      .select({ name: Role.name })
+      .from(Role)
+      .where(eq(Role.role_id, roleIdNum))
+      .limit(1);
+    if (roleResult.length > 0) {
+      selectedRoleName = roleResult[0].name;
+    } else {
+      throw new ValidationError("Role not found");
+    }
+  }
+
+  // Get user_type from role name
+  const validUserTypes = [
+    "STUDENT",
+    "TEACHER",
+    "PARENT",
+    "ADMIN",
+    "STAFF",
+  ] as const;
+  let validatedUserType: "STUDENT" | "TEACHER" | "PARENT" | "ADMIN" | "STAFF" =
+    "STUDENT";
+  if (selectedRoleName && validUserTypes.includes(selectedRoleName as any)) {
+    validatedUserType = selectedRoleName as
+      | "STUDENT"
+      | "TEACHER"
+      | "PARENT"
+      | "ADMIN"
+      | "STAFF";
+  }
 
   for (let i = 0; i < data.length; i++) {
     const row = data[i] as any;
@@ -821,12 +854,6 @@ export const bulkCreateUsers = asyncHandler(async (req: any, res: any) => {
       // Format date
       const dateOfBirth = formatDateForMySQL(row.date_of_birth?.toString());
 
-      // Validate user type
-      const userType = row.user_type?.toString().toUpperCase();
-      const validUserTypes = ["STUDENT", "TEACHER", "PARENT", "STAFF", "ADMIN"];
-      const validatedUserType =
-        userType && validUserTypes.includes(userType) ? userType : "STUDENT"; // Default to STUDENT
-
       // Insert user
       await db.insert(User).values({
         username: sanitizeString(username),
@@ -856,6 +883,14 @@ export const bulkCreateUsers = asyncHandler(async (req: any, res: any) => {
         });
       }
 
+      // Assign role if role_id is provided
+      if (role_id) {
+        await db.insert(UserRole).values({
+          user_id: newUserId,
+          role_id: parseInt(role_id),
+        });
+      }
+
       successCount++;
     } catch (error: any) {
       errors.push(`Row ${rowNum}: ${error.message}`);
@@ -868,6 +903,7 @@ export const bulkCreateUsers = asyncHandler(async (req: any, res: any) => {
     failedCount,
     totalRows: data.length,
     uploadedBy: req.user?.userId,
+    roleId: role_id,
   });
 
   successResponse(
@@ -875,4 +911,105 @@ export const bulkCreateUsers = asyncHandler(async (req: any, res: any) => {
     `Bulk upload complete: ${successCount} created, ${failedCount} failed`,
     { success: successCount, failed: failedCount, errors: errors.slice(0, 10) }
   );
+});
+
+// Download user template
+export const downloadTemplate = asyncHandler(async (req: any, res: any) => {
+  logger.info("Downloading user template", { userId: req.user?.userId });
+
+  // Create template data
+  const templateData = [
+    {
+      username: "john_doe_001",
+      email: "john.doe@example.com",
+      phone_number: "+250788123456",
+      first_name: "John",
+      last_name: "Doe",
+      gender: "MALE",
+      date_of_birth: "2010-01-15",
+      address: "Kigali, Rwanda",
+      user_type: "STUDENT",
+    },
+    {
+      username: "jane_smith_002",
+      email: "jane.smith@example.com",
+      phone_number: "+250788654321",
+      first_name: "Jane",
+      last_name: "Smith",
+      gender: "FEMALE",
+      date_of_birth: "2008-05-20",
+      address: "Kigali, Rwanda",
+      user_type: "TEACHER",
+    },
+    {
+      username: "parent_001",
+      email: "parent@example.com",
+      phone_number: "+250788111222",
+      first_name: "Parent",
+      last_name: "One",
+      gender: "MALE",
+      date_of_birth: "1980-03-10",
+      address: "Kigali, Rwanda",
+      user_type: "PARENT",
+    },
+    {
+      username: "admin_user",
+      email: "admin@example.com",
+      phone_number: "+250788999888",
+      first_name: "Admin",
+      last_name: "User",
+      gender: "MALE",
+      date_of_birth: "1985-07-25",
+      address: "Kigali, Rwanda",
+      user_type: "ADMIN",
+    },
+    {
+      username: "staff_member",
+      email: "staff@example.com",
+      phone_number: "+250788777666",
+      first_name: "Staff",
+      last_name: "Member",
+      gender: "FEMALE",
+      date_of_birth: "1990-11-30",
+      address: "Kigali, Rwanda",
+      user_type: "STAFF",
+    },
+  ];
+
+  // Create workbook
+  const workbook = XLSX.utils.book_new();
+  const worksheet = XLSX.utils.json_to_sheet(templateData);
+
+  // Set column widths
+  const wscols = [
+    { wch: 20 }, // username
+    { wch: 30 }, // email
+    { wch: 20 }, // phone_number
+    { wch: 15 }, // first_name
+    { wch: 15 }, // last_name
+    { wch: 10 }, // gender
+    { wch: 15 }, // date_of_birth
+    { wch: 30 }, // address
+    { wch: 15 }, // user_type
+  ];
+
+  // @ts-ignore
+  worksheet["!cols"] = wscols;
+
+  // Add worksheet to workbook
+  XLSX.utils.book_append_sheet(workbook, worksheet, "Users");
+
+  // Set response headers
+  res.setHeader(
+    "Content-Type",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+  );
+  res.setHeader(
+    "Content-Disposition",
+    "attachment; filename=user_template.xlsx"
+  );
+
+  // Send file
+  const buffer = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
+  res.send(buffer);
 });
