@@ -274,3 +274,124 @@ export const TeacherSubjectAssignment = mysqlTable(
     ),
   })
 );
+
+// DocumentFolder table for user document management
+export const DocumentFolder = mysqlTable("DocumentFolder", {
+  folder_id: bigint("folder_id", { mode: "number" })
+    .primaryKey()
+    .autoincrement(),
+  user_id: bigint("user_id", { mode: "number" })
+    .notNull()
+    .references(() => User.user_id),
+  parent_folder_id: bigint("parent_folder_id", { mode: "number" }),
+  name: varchar("name", { length: 255 }).notNull(),
+  description: varchar("description", { length: 500 }),
+  color: varchar("color", { length: 7 }).default("#008d3b"),
+  created_at: datetime("created_at").default(sql`CURRENT_TIMESTAMP`),
+  updated_at: datetime("updated_at").default(
+    sql`CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP`
+  ),
+});
+
+// Document table for file storage
+export const Document = mysqlTable("Document", {
+  document_id: bigint("document_id", { mode: "number" })
+    .primaryKey()
+    .autoincrement(),
+  user_id: bigint("user_id", { mode: "number" })
+    .notNull()
+    .references(() => User.user_id),
+  folder_id: bigint("folder_id", { mode: "number" }),
+  file_name: varchar("file_name", { length: 255 }).notNull(),
+  original_name: varchar("original_name", { length: 255 }).notNull(),
+  file_path: varchar("file_path", { length: 500 }).notNull(),
+  file_size: bigint("file_size", { mode: "number" }).notNull(),
+  mime_type: varchar("mime_type", { length: 100 }).notNull(),
+  file_extension: varchar("file_extension", { length: 20 }).notNull(),
+  is_public: tinyint("is_public").default(0),
+  description: varchar("description", { length: 500 }),
+  tags: varchar("tags", { length: 500 }),
+  created_at: datetime("created_at").default(sql`CURRENT_TIMESTAMP`),
+  updated_at: datetime("updated_at").default(
+    sql`CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP`
+  ),
+});
+
+// DocumentVersion table for version control
+export const DocumentVersion = mysqlTable("DocumentVersion", {
+  version_id: bigint("version_id", { mode: "number" })
+    .primaryKey()
+    .autoincrement(),
+  document_id: bigint("document_id", { mode: "number" })
+    .notNull()
+    .references(() => Document.document_id),
+  user_id: bigint("user_id", { mode: "number" })
+    .notNull()
+    .references(() => User.user_id),
+  version_number: int("version_number").notNull(),
+  file_name: varchar("file_name", { length: 255 }).notNull(),
+  file_path: varchar("file_path", { length: 500 }).notNull(),
+  file_size: bigint("file_size", { mode: "number" }).notNull(),
+  change_description: varchar("change_description", { length: 500 }),
+  created_at: datetime("created_at").default(sql`CURRENT_TIMESTAMP`),
+});
+
+// DocumentPermission table for sharing documents
+export const DocumentPermission = mysqlTable(
+  "DocumentPermission",
+  {
+    permission_id: bigint("permission_id", { mode: "number" })
+      .primaryKey()
+      .autoincrement(),
+    document_id: bigint("document_id", { mode: "number" })
+      .notNull()
+      .references(() => Document.document_id),
+    user_id: bigint("user_id", { mode: "number" })
+      .notNull()
+      .references(() => User.user_id),
+    permission_type: mysqlEnum("permission_type", [
+      "VIEW",
+      "EDIT",
+      "DOWNLOAD",
+      "SHARE",
+    ]).default("VIEW"),
+    shared_by: bigint("shared_by", { mode: "number" })
+      .notNull()
+      .references(() => User.user_id),
+    shared_with: mysqlEnum("shared_with", ["user", "role"]).default("user"),
+    expires_at: datetime("expires_at"),
+    created_at: datetime("created_at").default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => ({
+    pk: primaryKey(table.permission_id),
+  })
+);
+
+// FolderPermission table for sharing folders
+export const FolderPermission = mysqlTable(
+  "FolderPermission",
+  {
+    permission_id: bigint("permission_id", { mode: "number" })
+      .primaryKey()
+      .autoincrement(),
+    folder_id: bigint("folder_id", { mode: "number" })
+      .notNull()
+      .references(() => DocumentFolder.folder_id),
+    user_id: bigint("user_id", { mode: "number" })
+      .notNull()
+      .references(() => User.user_id),
+    permission_type: mysqlEnum("permission_type", [
+      "VIEW",
+      "EDIT",
+      "SHARE",
+    ]).default("VIEW"),
+    shared_by: bigint("shared_by", { mode: "number" })
+      .notNull()
+      .references(() => User.user_id),
+    expires_at: datetime("expires_at"),
+    created_at: datetime("created_at").default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => ({
+    pk: primaryKey(table.permission_id),
+  })
+);

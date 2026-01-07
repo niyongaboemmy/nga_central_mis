@@ -13,6 +13,20 @@ export const successResponse = (
   });
 };
 
+export const paginatedResponse = (
+  res: Response,
+  message: string,
+  data: any[],
+  pagination: { page: number; limit: number; total: number; totalPages: number }
+) => {
+  return res.status(200).json({
+    success: true,
+    message,
+    data,
+    pagination,
+  });
+};
+
 export const errorResponse = (
   res: Response,
   message: string,

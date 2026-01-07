@@ -1,5 +1,5 @@
 import { db } from "../db";
-import { eq, sql, and } from "drizzle-orm";
+import { eq, sql, and, or, like, ilike } from "drizzle-orm";
 import {
   User,
   UserProfile,
@@ -1012,4 +1012,49 @@ export const downloadTemplate = asyncHandler(async (req: any, res: any) => {
   // Send file
   const buffer = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
   res.send(buffer);
+});
+
+// Search users by email, phone, username, or name (for document sharing)
+export const searchUsers = asyncHandler(async (req: any, res: any) => {
+  const userId = req.user?.userId;
+  const { q } = req.query;
+
+  if (!q || (typeof q === "string" && q.trim().length === 0)) {
+    throw new ValidationError("Search query is required");
+  }
+
+  const searchTerm = `%${q}%`;
+
+  // Search users by username, email, phone, or first/last name
+  const users = await db
+    .select({
+      user_id: User.user_id,
+      username: User.username,
+      email: User.email,
+      phone_number: User.phone_number,
+      status: User.status,
+      first_name: UserProfile.first_name,
+      last_name: UserProfile.last_name,
+    })
+    .from(User)
+    .leftJoin(UserProfile, eq(User.user_id, UserProfile.user_id))
+    .where(
+      and(
+        eq(User.status, "ACTIVE"),
+        or(
+          ilike(User.username, searchTerm),
+          ilike(User.email, searchTerm),
+          ilike(User.phone_number, searchTerm),
+          ilike(UserProfile.first_name, searchTerm),
+          ilike(UserProfile.last_name, searchTerm)
+        )
+      )
+    )
+    .limit(20);
+
+  logger.info(
+    `User search for "${q}" by user ${userId}, found ${users.length} results`
+  );
+
+  successResponse(res, "Users retrieved successfully", users);
 });

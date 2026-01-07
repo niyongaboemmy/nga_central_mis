@@ -22,6 +22,7 @@ import { UserProvider, useUser } from "./contexts/UserContext";
 import { ToastProvider, useToast } from "./contexts/ToastContext";
 import { ToastStore } from "./services/api";
 import "./App.css";
+import Documents from "./components/documents/Documents";
 
 // Wrapper components for pages that need the Navbar
 const LandingPage: React.FC = () => {
@@ -168,6 +169,11 @@ const ProfilePage: React.FC = () => {
   return <Profile />;
 };
 
+// Documents page with sidebar
+const DocumentsPage: React.FC = () => {
+  return <Documents />;
+};
+
 // Permissions page with sidebar
 const PermissionsPage: React.FC = () => {
   return <Permissions />;
@@ -277,6 +283,18 @@ function App() {
                   <ProtectedRoute>
                     <SystemLayoutWrapper>
                       <ProfilePage />
+                    </SystemLayoutWrapper>
+                  </ProtectedRoute>
+                }
+              />
+
+              {/* Documents - protected with sidebar */}
+              <Route
+                path="/documents"
+                element={
+                  <ProtectedRoute>
+                    <SystemLayoutWrapper>
+                      <DocumentsPage />
                     </SystemLayoutWrapper>
                   </ProtectedRoute>
                 }

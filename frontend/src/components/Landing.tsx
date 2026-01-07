@@ -287,7 +287,7 @@ const AreaChart = () => (
         initial={{ scaleY: 0 }}
         whileInView={{ scaleY: 1 }}
         transition={{ duration: 1.5 }}
-        transformOrigin="bottom"
+        // transformOrigin="bottom"
       />
       <motion.path
         d="M0 100 Q50 80 100 70 T200 50 T300 30"

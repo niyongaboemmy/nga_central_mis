@@ -11,6 +11,7 @@ import {
   updateUserProfile,
   bulkCreateUsers,
   downloadTemplate,
+  searchUsers,
 } from "../controllers/userController";
 import { authenticate, authorize } from "../middleware/auth";
 
@@ -56,5 +57,8 @@ router.post(
 );
 router.put("/:id", authenticate, authorize("MANAGE_USERS"), updateUser);
 router.delete("/:id", authenticate, authorize("MANAGE_USERS"), deleteUser);
+
+// Search users (for document sharing) - available to all authenticated users
+router.get("/search", authenticate, searchUsers);
 
 export default router;
