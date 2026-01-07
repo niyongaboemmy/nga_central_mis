@@ -5,7 +5,7 @@ import React, {
   useEffect,
   useCallback,
 } from "react";
-import { getCurrentUser, UserWithProfile } from "../api/users";
+import { getCurrentUser, UserWithProfile, UserRole } from "../api/users";
 import { logout as apiLogout } from "../api/auth";
 import { removeToken, getToken } from "../utils/auth";
 
@@ -13,6 +13,8 @@ interface UserContextType {
   user: UserWithProfile | null;
   isLoading: boolean;
   isAuthenticated: boolean;
+  permissions: string[];
+  roles: UserRole[];
   login: (tempToken: string) => Promise<void>;
   logout: () => void;
   refreshUser: () => Promise<void>;
@@ -25,6 +27,9 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({
 }) => {
   const [user, setUser] = useState<UserWithProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+
+  const permissions = user?.permissions || [];
+  const roles = user?.roles || [];
 
   const refreshUser = useCallback(async () => {
     const token = getToken();
@@ -69,6 +74,8 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({
         user,
         isLoading,
         isAuthenticated,
+        permissions,
+        roles,
         login,
         logout,
         refreshUser,

@@ -83,6 +83,7 @@ export const Role = mysqlTable("Role", {
   role_id: bigint("role_id", { mode: "number" }).primaryKey().autoincrement(),
   name: varchar("name", { length: 100 }).notNull().unique(),
   description: varchar("description", { length: 255 }),
+  status: mysqlEnum("status", ["ACTIVE", "DISABLED"]).default("ACTIVE"),
 });
 
 // Permission table
@@ -90,6 +91,7 @@ export const Permission = mysqlTable("Permission", {
   perm_id: bigint("perm_id", { mode: "number" }).primaryKey().autoincrement(),
   name: varchar("name", { length: 150 }).notNull().unique(),
   description: varchar("description", { length: 255 }),
+  status: mysqlEnum("status", ["ACTIVE", "DISABLED"]).default("ACTIVE"),
 });
 
 // RolePermission junction table

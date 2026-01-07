@@ -1,6 +1,13 @@
 import { db } from "../db";
-import { eq, sql } from "drizzle-orm";
-import { User, UserProfile } from "../db/schema";
+import { eq, sql, and } from "drizzle-orm";
+import {
+  User,
+  UserProfile,
+  Role,
+  Permission,
+  UserRole,
+  RolePermission,
+} from "../db/schema";
 import { sanitizeString, validateEmail } from "../utils/sanitization";
 import {
   ValidationError,
@@ -246,9 +253,83 @@ export const getCurrentUser = asyncHandler(async (req: any, res: any) => {
     .where(eq(UserProfile.user_id, userId))
     .limit(1);
 
+  // Get user roles
+  const userRoles = await db
+    .select({
+      role_id: Role.role_id,
+      name: Role.name,
+      description: Role.description,
+      status: Role.status,
+    })
+    .from(UserRole)
+    .innerJoin(Role, eq(UserRole.role_id, Role.role_id))
+    .where(eq(UserRole.user_id, userId));
+
+  // Check if user is SUPER_ADMIN
+  const isSuperAdmin = userRoles.some((r) => r.name === "SUPER_ADMIN");
+
+  // Get permissions for each role
+  const rolesWithPermissions = await Promise.all(
+    userRoles.map(async (role) => {
+      const permissions = await db
+        .select({
+          perm_id: Permission.perm_id,
+          name: Permission.name,
+          description: Permission.description,
+          status: Permission.status,
+        })
+        .from(RolePermission)
+        .innerJoin(
+          Permission,
+          and(
+            eq(RolePermission.perm_id, Permission.perm_id),
+            eq(Permission.status, "ACTIVE")
+          )
+        )
+        .where(eq(RolePermission.role_id, role.role_id));
+
+      return { ...role, permissions };
+    })
+  );
+
+  // Get flat list of permission names
+  let permissions: string[];
+
+  if (isSuperAdmin) {
+    // SUPER_ADMIN gets all permissions
+    permissions = [
+      "MANAGE_USERS",
+      "MANAGE_ROLES",
+      "MANAGE_PERMISSIONS",
+      "MANAGE_ACADEMICS",
+      "MANAGE_CLASSES",
+      "MANAGE_STUDENTS",
+      "MANAGE_TEACHERS",
+      "MANAGE_PARENTS",
+      "MANAGE_FEES",
+      "VIEW_FINANCE",
+      "MARK_ATTENDANCE",
+      "VIEW_ATTENDANCE",
+      "ENTER_MARKS",
+      "VIEW_RESULTS",
+      "SEND_ANNOUNCEMENTS",
+      "UPLOAD_DOCUMENTS",
+      "VIEW_REPORTS",
+      "GENERATE_REPORTS",
+      "MANAGE_SETTINGS",
+      "ADMIN",
+    ];
+  } else {
+    permissions = rolesWithPermissions.flatMap((r) =>
+      r.permissions.map((p: any) => p.name)
+    );
+  }
+
   successResponse(res, "User profile retrieved successfully", {
     user: user[0],
     profile: profile[0] || null,
+    roles: rolesWithPermissions,
+    permissions,
   });
 });
 
@@ -257,7 +338,63 @@ export const getUsers = asyncHandler(async (req: any, res: any) => {
 
   const users = await db.select().from(User);
 
-  successResponse(res, "Users retrieved successfully", users);
+  // Get users with their roles
+  const usersWithRoles = await Promise.all(
+    users.map(async (user) => {
+      const userRoles = await db
+        .select({
+          role_id: Role.role_id,
+          name: Role.name,
+          description: Role.description,
+          status: Role.status,
+        })
+        .from(UserRole)
+        .innerJoin(Role, eq(UserRole.role_id, Role.role_id))
+        .where(eq(UserRole.user_id, user.user_id));
+
+      // Get permissions for each role
+      const rolesWithPermissions = await Promise.all(
+        userRoles.map(async (role) => {
+          const permissions = await db
+            .select({
+              perm_id: Permission.perm_id,
+              name: Permission.name,
+              description: Permission.description,
+              status: Permission.status,
+            })
+            .from(RolePermission)
+            .innerJoin(
+              Permission,
+              and(
+                eq(RolePermission.perm_id, Permission.perm_id),
+                eq(Permission.status, "ACTIVE")
+              )
+            )
+            .where(eq(RolePermission.role_id, role.role_id));
+
+          return { ...role, permissions };
+        })
+      );
+
+      // Get profile
+      const profile = await db
+        .select()
+        .from(UserProfile)
+        .where(eq(UserProfile.user_id, user.user_id))
+        .limit(1);
+
+      return {
+        user,
+        profile: profile[0] || null,
+        roles: rolesWithPermissions,
+        permissions: rolesWithPermissions.flatMap((r) =>
+          r.permissions.map((p) => p.name)
+        ),
+      };
+    })
+  );
+
+  successResponse(res, "Users retrieved successfully", usersWithRoles);
 });
 
 export const getUser = asyncHandler(async (req: any, res: any) => {
@@ -280,6 +417,42 @@ export const getUser = asyncHandler(async (req: any, res: any) => {
     throw new NotFoundError("User not found");
   }
 
+  // Get user roles
+  const userRoles = await db
+    .select({
+      role_id: Role.role_id,
+      name: Role.name,
+      description: Role.description,
+      status: Role.status,
+    })
+    .from(UserRole)
+    .innerJoin(Role, eq(UserRole.role_id, Role.role_id))
+    .where(eq(UserRole.user_id, userId));
+
+  // Get permissions for each role
+  const rolesWithPermissions = await Promise.all(
+    userRoles.map(async (role) => {
+      const permissions = await db
+        .select({
+          perm_id: Permission.perm_id,
+          name: Permission.name,
+          description: Permission.description,
+          status: Permission.status,
+        })
+        .from(RolePermission)
+        .innerJoin(
+          Permission,
+          and(
+            eq(RolePermission.perm_id, Permission.perm_id),
+            eq(Permission.status, "ACTIVE")
+          )
+        )
+        .where(eq(RolePermission.role_id, role.role_id));
+
+      return { ...role, permissions };
+    })
+  );
+
   const profile = await db
     .select()
     .from(UserProfile)
@@ -289,6 +462,10 @@ export const getUser = asyncHandler(async (req: any, res: any) => {
   successResponse(res, "User retrieved successfully", {
     user: user[0],
     profile: profile[0] || null,
+    roles: rolesWithPermissions,
+    permissions: rolesWithPermissions.flatMap((r) =>
+      r.permissions.map((p: any) => p.name)
+    ),
   });
 });
 

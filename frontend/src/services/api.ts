@@ -5,6 +5,21 @@ import axios, {
   InternalAxiosRequestConfig,
 } from "axios";
 
+// Simple toast store for use in API interceptor
+class ToastStore {
+  private static instance: {
+    showToast?: (message: string, type?: any) => void;
+  } = {};
+
+  static setShowToast(fn: (message: string, type?: any) => void) {
+    this.instance.showToast = fn;
+  }
+
+  static getShowToast() {
+    return this.instance.showToast;
+  }
+}
+
 // Create axios instance with default config
 const api: AxiosInstance = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || "https://ngamisapi.vms.rw",
@@ -34,6 +49,8 @@ api.interceptors.response.use(
     return response;
   },
   (error: AxiosError): Promise<AxiosError> => {
+    const showToast = ToastStore.getShowToast();
+
     if (error.response?.status === 401) {
       // Only redirect if we have a token (meaning user was logged in)
       const token = localStorage.getItem("token");
@@ -46,10 +63,18 @@ api.interceptors.response.use(
         localStorage.removeItem("token");
         window.location.href = "/";
       }
+    } else if (error.response?.status === 403) {
+      // Show toast for forbidden access
+      if (showToast) {
+        showToast("You don't have permission to access this resource", "error");
+      }
     }
     return Promise.reject(error);
   }
 );
+
+// Export toast store for use in App.tsx
+export { ToastStore };
 
 // API methods wrapper for common operations
 export const apiService = {

@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import {
   BrowserRouter as Router,
   Routes,
@@ -13,10 +13,14 @@ import PasswordRecovery from "./components/PasswordRecovery";
 import Login from "./components/Login";
 import Profile from "./components/Profile";
 import Dashboard from "./components/Dashboard";
+import Permissions from "./components/Permissions";
+import Users from "./components/Users";
 import SystemLayout from "./components/SystemLayout";
 import Footer from "./components/ui/Footer";
 import Navbar from "./components/ui/Navbar";
 import { UserProvider, useUser } from "./contexts/UserContext";
+import { ToastProvider, useToast } from "./contexts/ToastContext";
+import { ToastStore } from "./services/api";
 import "./App.css";
 
 // Wrapper components for pages that need the Navbar
@@ -164,137 +168,169 @@ const ProfilePage: React.FC = () => {
   return <Profile />;
 };
 
+// Permissions page with sidebar
+const PermissionsPage: React.FC = () => {
+  return <Permissions />;
+};
+
+// Users page with sidebar
+const UsersPage: React.FC = () => {
+  return <Users />;
+};
+
+// Initialize toast store for API interceptor
+const ToastInitializer: React.FC<{ children: React.ReactNode }> = ({
+  children,
+}) => {
+  const { showToast } = useToast();
+
+  useEffect(() => {
+    ToastStore.setShowToast(showToast);
+  }, [showToast]);
+
+  return <>{children}</>;
+};
+
 function App() {
   return (
     <UserProvider>
-      <Router basename="/mis">
-        <Routes>
-          {/* Landing page with full navbar */}
-          <Route
-            path="/"
-            element={
-              <PublicRoute>
-                <PublicLayout>
-                  <LandingPage />
-                </PublicLayout>
-              </PublicRoute>
-            }
-          />
+      <ToastProvider>
+        <ToastInitializer>
+          <Router basename="/mis">
+            <Routes>
+              {/* Landing page with full navbar */}
+              <Route
+                path="/"
+                element={
+                  <PublicRoute>
+                    <PublicLayout>
+                      <LandingPage />
+                    </PublicLayout>
+                  </PublicRoute>
+                }
+              />
 
-          {/* About page with full navbar */}
-          <Route
-            path="/about"
-            element={
-              <PublicRoute>
-                <PublicLayout>
-                  <AboutPage />
-                </PublicLayout>
-              </PublicRoute>
-            }
-          />
+              {/* About page with full navbar */}
+              <Route
+                path="/about"
+                element={
+                  <PublicRoute>
+                    <PublicLayout>
+                      <AboutPage />
+                    </PublicLayout>
+                  </PublicRoute>
+                }
+              />
 
-          {/* Contact page with full navbar */}
-          <Route
-            path="/contact"
-            element={
-              <PublicRoute>
-                <PublicLayout>
-                  <ContactPage />
-                </PublicLayout>
-              </PublicRoute>
-            }
-          />
+              {/* Contact page with full navbar */}
+              <Route
+                path="/contact"
+                element={
+                  <PublicRoute>
+                    <PublicLayout>
+                      <ContactPage />
+                    </PublicLayout>
+                  </PublicRoute>
+                }
+              />
 
-          {/* Login page with full navbar */}
-          <Route
-            path="/login"
-            element={
-              <PublicRoute>
-                <PublicLayout>
-                  <LoginPage />
-                </PublicLayout>
-              </PublicRoute>
-            }
-          />
+              {/* Login page with full navbar */}
+              <Route
+                path="/login"
+                element={
+                  <PublicRoute>
+                    <PublicLayout>
+                      <LoginPage />
+                    </PublicLayout>
+                  </PublicRoute>
+                }
+              />
 
-          {/* Password recovery with back button navbar */}
-          <Route
-            path="/password-recovery"
-            element={
-              <PublicRoute>
-                <BackButtonLayout>
-                  <PasswordRecoveryPage />
-                </BackButtonLayout>
-              </PublicRoute>
-            }
-          />
+              {/* Password recovery with back button navbar */}
+              <Route
+                path="/password-recovery"
+                element={
+                  <PublicRoute>
+                    <BackButtonLayout>
+                      <PasswordRecoveryPage />
+                    </BackButtonLayout>
+                  </PublicRoute>
+                }
+              />
 
-          {/* Dashboard - protected with sidebar */}
-          <Route
-            path="/dashboard"
-            element={
-              <ProtectedRoute>
-                <SystemLayoutWrapper>
-                  <DashboardPage />
-                </SystemLayoutWrapper>
-              </ProtectedRoute>
-            }
-          />
+              {/* Dashboard - protected with sidebar */}
+              <Route
+                path="/dashboard"
+                element={
+                  <ProtectedRoute>
+                    <SystemLayoutWrapper>
+                      <DashboardPage />
+                    </SystemLayoutWrapper>
+                  </ProtectedRoute>
+                }
+              />
 
-          {/* Profile - protected with sidebar */}
-          <Route
-            path="/profile"
-            element={
-              <ProtectedRoute>
-                <SystemLayoutWrapper>
-                  <ProfilePage />
-                </SystemLayoutWrapper>
-              </ProtectedRoute>
-            }
-          />
+              {/* Profile - protected with sidebar */}
+              <Route
+                path="/profile"
+                element={
+                  <ProtectedRoute>
+                    <SystemLayoutWrapper>
+                      <ProfilePage />
+                    </SystemLayoutWrapper>
+                  </ProtectedRoute>
+                }
+              />
 
-          {/* Users page - protected with sidebar */}
-          <Route
-            path="/users"
-            element={
-              <ProtectedRoute>
-                <SystemLayoutWrapper>
-                  <div className="text-center py-12">
-                    <h2 className="text-2xl font-bold text-text-primary-light dark:text-text-primary-dark">
-                      Users Management
-                    </h2>
-                    <p className="mt-2 text-text-secondary-light dark:text-text-secondary-dark">
-                      This page is under construction
-                    </p>
-                  </div>
-                </SystemLayoutWrapper>
-              </ProtectedRoute>
-            }
-          />
+              {/* Users page - protected with sidebar */}
+              <Route
+                path="/users"
+                element={
+                  <ProtectedRoute>
+                    <SystemLayoutWrapper>
+                      <UsersPage />
+                    </SystemLayoutWrapper>
+                  </ProtectedRoute>
+                }
+              />
 
-          {/* Settings page - protected with sidebar */}
-          <Route
-            path="/settings"
-            element={
-              <ProtectedRoute>
-                <SystemLayoutWrapper>
-                  <div className="text-center py-12">
-                    <h2 className="text-2xl font-bold text-text-primary-light dark:text-text-primary-dark">
-                      Settings
-                    </h2>
-                    <p className="mt-2 text-text-secondary-light dark:text-text-secondary-dark">
-                      This page is under construction
-                    </p>
-                  </div>
-                </SystemLayoutWrapper>
-              </ProtectedRoute>
-            }
-          />
+              {/* Settings page - protected with sidebar */}
+              <Route
+                path="/settings"
+                element={
+                  <ProtectedRoute>
+                    <SystemLayoutWrapper>
+                      <div className="text-center py-12">
+                        <h2 className="text-2xl font-bold text-text-primary-light dark:text-text-primary-dark">
+                          Settings
+                        </h2>
+                        <p className="mt-2 text-text-secondary-light dark:text-text-secondary-dark">
+                          This page is under construction
+                        </p>
+                      </div>
+                    </SystemLayoutWrapper>
+                  </ProtectedRoute>
+                }
+              />
 
-          {/* Fallback route */}
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </Router>
+              {/* Permissions page - protected with sidebar */}
+              <Route
+                path="/permissions"
+                element={
+                  <ProtectedRoute>
+                    <SystemLayoutWrapper>
+                      <PermissionsPage />
+                    </SystemLayoutWrapper>
+                  </ProtectedRoute>
+                }
+              />
+
+              {/* Fallback route */}
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </Router>
+        </ToastInitializer>
+      </ToastProvider>
     </UserProvider>
   );
 }

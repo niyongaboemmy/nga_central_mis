@@ -1,5 +1,7 @@
 import React from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { useUser } from "../../contexts/UserContext";
+import { Permissions } from "../../constants/permissions";
 
 interface SidebarProps {
   isCollapsed?: boolean;
@@ -10,11 +12,18 @@ interface NavItem {
   label: string;
   path: string;
   icon: React.ReactNode;
+  requiredPermission?: string;
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ isCollapsed = false, onToggle }) => {
   const location = useLocation();
   const navigate = useNavigate();
+  const { permissions } = useUser();
+
+  const hasPermission = (perm?: string) => {
+    if (!perm) return true;
+    return permissions.includes(perm) || permissions.includes("ADMIN");
+  };
 
   const navItems: NavItem[] = [
     {
@@ -73,6 +82,27 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed = false, onToggle }) => {
           />
         </svg>
       ),
+      requiredPermission: Permissions.MANAGE_USERS,
+    },
+    {
+      label: "Permissions",
+      path: "/permissions",
+      icon: (
+        <svg
+          className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`}
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
+          />
+        </svg>
+      ),
+      requiredPermission: Permissions.MANAGE_ROLES,
     },
     {
       label: "Settings",
@@ -148,23 +178,25 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed = false, onToggle }) => {
       {/* Navigation */}
       <nav className="flex-1 py-4 overflow-y-auto text-sm">
         <ul className="space-y-1 px-3">
-          {navItems.map((item) => (
-            <li key={item.path}>
-              <button
-                onClick={() => navigate(item.path)}
-                className={`w-full flex items-center ${
-                  isCollapsed ? "justify-center" : ""
-                } space-x-3 px-3 py-3 rounded-xl transition-all duration-200 ${
-                  isActive(item.path)
-                    ? "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"
-                    : "font-light text-text-secondary-light dark:text-text-secondary-dark hover:bg-surface-light dark:hover:bg-surface-dark hover:text-text-primary-light dark:hover:text-text-primary-dark"
-                }`}
-              >
-                <span className={`flex-shrink-0`}>{item.icon}</span>
-                {!isCollapsed && <span className="">{item.label}</span>}
-              </button>
-            </li>
-          ))}
+          {navItems
+            .filter((item) => hasPermission(item.requiredPermission))
+            .map((item) => (
+              <li key={item.path}>
+                <button
+                  onClick={() => navigate(item.path)}
+                  className={`w-full flex items-center ${
+                    isCollapsed ? "justify-center" : ""
+                  } space-x-3 px-3 py-3 rounded-xl transition-all duration-200 ${
+                    isActive(item.path)
+                      ? "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"
+                      : "font-light text-text-secondary-light dark:text-text-secondary-dark hover:bg-surface-light dark:hover:bg-surface-dark hover:text-text-primary-light dark:hover:text-text-primary-dark"
+                  }`}
+                >
+                  <span className={`flex-shrink-0`}>{item.icon}</span>
+                  {!isCollapsed && <span className="">{item.label}</span>}
+                </button>
+              </li>
+            ))}
         </ul>
       </nav>
 

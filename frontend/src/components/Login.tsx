@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Alert, VerificationCode } from "./ui";
 import { login, verifyOTP } from "../api/auth";
+import { useUser } from "../contexts/UserContext";
 import {
   Star,
   Lock,
@@ -9,6 +10,7 @@ import {
   User,
   Shield,
   CheckCircle,
+  Key,
 } from "lucide-react";
 
 interface LoginProps {
@@ -94,11 +96,14 @@ const Login: React.FC<LoginProps> = ({
   onLoginSuccess,
   onNavigateToPasswordRecovery,
 }) => {
+  const { permissions, refreshUser } = useUser();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [otp, setOtp] = useState("");
   const [tempToken, setTempToken] = useState("");
-  const [step, setStep] = useState<"credentials" | "otp">("credentials");
+  const [step, setStep] = useState<"credentials" | "otp" | "success">(
+    "credentials"
+  );
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -129,9 +134,13 @@ const Login: React.FC<LoginProps> = ({
 
     try {
       await verifyOTP(otp, tempToken);
-      if (onLoginSuccess) {
-        onLoginSuccess();
-      }
+      await refreshUser();
+      setStep("success");
+      setTimeout(() => {
+        if (onLoginSuccess) {
+          onLoginSuccess();
+        }
+      }, 2000);
     } catch (error: any) {
       setError(
         error.response?.data?.message || "Invalid OTP code. Please try again."
@@ -159,7 +168,7 @@ const Login: React.FC<LoginProps> = ({
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
     >
-      {[0, 1].map((i) => (
+      {[0, 1, 2].map((i) => (
         <motion.div
           key={i}
           className={`w-3 h-3 rounded-full ${
@@ -167,8 +176,14 @@ const Login: React.FC<LoginProps> = ({
               ? step === "credentials"
                 ? "bg-gradient-to-r from-blue-500 to-blue-600"
                 : "bg-gray-300 dark:bg-gray-600"
-              : step === "otp"
-              ? "bg-gradient-to-r from-blue-500 to-blue-600"
+              : i === 1
+              ? step === "otp"
+                ? "bg-gradient-to-r from-blue-500 to-blue-600"
+                : step === "success"
+                ? "bg-green-500"
+                : "bg-gray-300 dark:bg-gray-600"
+              : step === "success"
+              ? "bg-gradient-to-r from-green-500 to-green-600"
               : "bg-gray-300 dark:bg-gray-600"
           }`}
           initial={{ scale: 0 }}
@@ -193,7 +208,108 @@ const Login: React.FC<LoginProps> = ({
       <div className="relative z-10 pt-20 pb-8 px-4">
         <div className="w-full max-w-md mx-auto">
           <AnimatePresence mode="wait">
-            {step === "otp" ? (
+            {step === "success" ? (
+              <motion.div
+                key="success"
+                variants={formVariants}
+                initial="initial"
+                animate="animate"
+                exit="exit"
+                transition={{ duration: 0.3 }}
+              >
+                {/* Success Card with Permissions */}
+                <motion.div
+                  className="bg-white/80 dark:bg-slate-800/50 backdrop-blur-xl rounded-3xl p-8 border border-white dark:border-slate-700/50 shadow-2xl"
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ duration: 0.3, delay: 0.1 }}
+                >
+                  {/* Centered Icon */}
+                  <motion.div
+                    className="flex justify-center mb-6"
+                    initial={{ scale: 0, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    transition={{ type: "spring", stiffness: 200 }}
+                  >
+                    <motion.div
+                      className="flex items-center justify-center w-20 h-20 bg-gradient-to-br from-green-500 to-green-600 rounded-full shadow-lg shadow-green-500/25"
+                      whileHover={{ scale: 1.05 }}
+                      transition={{ type: "spring", stiffness: 300 }}
+                    >
+                      <CheckCircle className="w-10 h-10 text-white" />
+                    </motion.div>
+                  </motion.div>
+
+                  <motion.div className="text-center mb-2">
+                    <motion.h1
+                      className="text-2xl font-bold text-gray-900 dark:text-white mb-2"
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.2 }}
+                    >
+                      Login Successful!
+                    </motion.h1>
+                    <motion.p
+                      className="text-gray-600 dark:text-gray-300"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ delay: 0.3 }}
+                    >
+                      Welcome to NGA Central MIS
+                    </motion.p>
+                  </motion.div>
+
+                  <ProgressIndicator />
+
+                  {/* Permissions Section */}
+                  <motion.div
+                    className="mt-6"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.4 }}
+                  >
+                    <div className="flex items-center gap-2 mb-3">
+                      <Key className="w-4 h-4 text-blue-500" />
+                      <span className="text-sm font-medium text-gray-700 dark:text-gray-200">
+                        Your Permissions
+                      </span>
+                    </div>
+                    <div className="bg-gray-50 dark:bg-slate-900/50 rounded-2xl p-4 max-h-48 overflow-y-auto">
+                      {permissions.length > 0 ? (
+                        <div className="flex flex-wrap gap-2">
+                          {permissions.map((perm, index) => (
+                            <motion.span
+                              key={perm}
+                              initial={{ opacity: 0, scale: 0.8 }}
+                              animate={{ opacity: 1, scale: 1 }}
+                              transition={{ delay: 0.5 + index * 0.05 }}
+                              className="px-3 py-1.5 bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 rounded-full text-xs font-medium"
+                            >
+                              {perm}
+                            </motion.span>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-gray-500 dark:text-gray-400 text-center">
+                          No permissions assigned
+                        </p>
+                      )}
+                    </div>
+                  </motion.div>
+
+                  <motion.div
+                    className="mt-6 text-center"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 0.6 }}
+                  >
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                      Redirecting to dashboard...
+                    </p>
+                  </motion.div>
+                </motion.div>
+              </motion.div>
+            ) : step === "otp" ? (
               <motion.div
                 key="otp"
                 variants={formVariants}
