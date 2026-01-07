@@ -15,6 +15,7 @@ export interface User {
   status: string;
   created_at: string;
   updated_at: string;
+  roles?: number[];
 }
 
 export interface UserProfile {
@@ -130,7 +131,15 @@ export const updateProfile = async (
 };
 
 export const createUser = async (
-  userData: Partial<User>,
+  userData: Partial<User> & {
+    roles?: number[];
+    first_name?: string;
+    last_name?: string;
+    gender?: string;
+    date_of_birth?: string;
+    address?: string;
+    user_type?: string;
+  },
   onSuccess?: (user: User) => void,
   onError?: (error: any) => void
 ): Promise<User | void> => {
@@ -144,6 +153,30 @@ export const createUser = async (
     if (onError) {
       onError(error);
     }
+    throw error;
+  }
+};
+
+export const bulkCreateUsers = async (
+  file: File
+): Promise<{ success: number; failed: number; errors: string[] }> => {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  try {
+    const response = await api.post<
+      BackendResponse<{
+        success: number;
+        failed: number;
+        errors: string[];
+      }>
+    >("/users/bulk", formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    });
+    return response.data.data || { success: 0, failed: 0, errors: [] };
+  } catch (error: any) {
     throw error;
   }
 };

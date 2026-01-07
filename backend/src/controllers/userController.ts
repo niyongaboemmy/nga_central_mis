@@ -17,6 +17,7 @@ import {
 import { successResponse } from "../utils/response";
 import { asyncHandler } from "../middleware/asyncHandler";
 import logger from "../utils/logger";
+import * as XLSX from "xlsx";
 
 // Helper function to convert date to MySQL DATE format
 const formatDateForMySQL = (dateStr: string | undefined) => {
@@ -470,7 +471,18 @@ export const getUser = asyncHandler(async (req: any, res: any) => {
 });
 
 export const createUser = asyncHandler(async (req: any, res: any) => {
-  const { username, email, phone_number, status } = req.body;
+  const {
+    username,
+    email,
+    phone_number,
+    status,
+    roles,
+    first_name,
+    last_name,
+    gender,
+    date_of_birth,
+    address,
+  } = req.body;
 
   // Sanitize inputs
   const sanitizedUsername = sanitizeString(username);
@@ -478,6 +490,11 @@ export const createUser = asyncHandler(async (req: any, res: any) => {
   const sanitizedPhone = phone_number
     ? sanitizeString(phone_number)
     : undefined;
+  const sanitizedFirstName = first_name
+    ? sanitizeString(first_name)
+    : undefined;
+  const sanitizedLastName = last_name ? sanitizeString(last_name) : undefined;
+  const sanitizedAddress = address ? sanitizeString(address) : undefined;
 
   // Validate inputs
   if (!sanitizedUsername || !sanitizedEmail) {
@@ -515,12 +532,83 @@ export const createUser = asyncHandler(async (req: any, res: any) => {
     createdBy: req.user?.userId,
   });
 
+  // Insert user
   await db.insert(User).values({
     username: sanitizedUsername,
     email: sanitizedEmail,
     phone_number: sanitizedPhone,
     status: status || "ACTIVE",
   });
+
+  // Get the newly created user's ID
+  const newUserResult = await db
+    .select({ user_id: User.user_id })
+    .from(User)
+    .where(eq(User.username, sanitizedUsername))
+    .limit(1);
+  const newUserId = newUserResult[0]?.user_id;
+
+  // Validate gender
+  const validatedGender = validateGender(gender);
+
+  // Format date
+  const formattedDateOfBirth = formatDateForMySQL(date_of_birth);
+
+  // Get user_type from the first selected role (if roles are provided)
+  // Map role names to valid user_type values
+  const validUserTypes = ["STUDENT", "TEACHER", "ADMIN", "PARENT", "STAFF"];
+  let userType: "STUDENT" | "TEACHER" | "ADMIN" | "PARENT" | "STAFF" | null =
+    null;
+  if (roles && Array.isArray(roles) && roles.length > 0) {
+    const firstRoleId = roles[0];
+    const roleResult = await db
+      .select({ name: Role.name })
+      .from(Role)
+      .where(eq(Role.role_id, firstRoleId))
+      .limit(1);
+    if (roleResult.length > 0) {
+      const roleName = roleResult[0].name?.toUpperCase();
+      if (validUserTypes.includes(roleName)) {
+        userType = roleName as
+          | "STUDENT"
+          | "TEACHER"
+          | "ADMIN"
+          | "PARENT"
+          | "STAFF";
+      } else {
+        userType = "STAFF"; // Default for unknown roles
+      }
+    }
+  }
+
+  // Create profile if any profile data is provided
+  if (
+    sanitizedFirstName ||
+    sanitizedLastName ||
+    validatedGender ||
+    formattedDateOfBirth ||
+    sanitizedAddress ||
+    userType
+  ) {
+    await db.insert(UserProfile).values({
+      user_id: newUserId,
+      first_name: sanitizedFirstName || null,
+      last_name: sanitizedLastName || null,
+      gender: validatedGender,
+      date_of_birth: formattedDateOfBirth ? sql`${formattedDateOfBirth}` : null,
+      address: sanitizedAddress || null,
+      user_type: userType || "STAFF",
+    });
+  }
+
+  // Assign roles if provided
+  if (roles && Array.isArray(roles) && roles.length > 0) {
+    const roleInserts = roles.map((roleId: number) => ({
+      user_id: newUserId,
+      role_id: roleId,
+    }));
+    await db.insert(UserRole).values(roleInserts);
+  }
 
   successResponse(res, "User created successfully", null, 201);
 });
@@ -631,4 +719,160 @@ export const deleteUser = asyncHandler(async (req: any, res: any) => {
   await db.delete(User).where(eq(User.user_id, userId));
 
   successResponse(res, "User deleted successfully");
+});
+
+// Bulk create users from Excel
+export const bulkCreateUsers = asyncHandler(async (req: any, res: any) => {
+  if (!req.file) {
+    throw new ValidationError("No file uploaded");
+  }
+
+  logger.info("Processing bulk user upload", { uploadedBy: req.user?.userId });
+
+  // Parse Excel file
+  const workbook = XLSX.read(req.file.buffer, { type: "buffer" });
+  const sheetName = workbook.SheetNames[0];
+  const sheet = workbook.Sheets[sheetName];
+  const data = XLSX.utils.sheet_to_json(sheet);
+
+  if (!data || data.length === 0) {
+    throw new ValidationError("Excel file is empty");
+  }
+
+  const errors: string[] = [];
+  let successCount = 0;
+  let failedCount = 0;
+
+  // Expected columns in Excel file
+  const requiredFields = ["username", "email"];
+  const optionalFields = [
+    "phone_number",
+    "first_name",
+    "last_name",
+    "gender",
+    "date_of_birth",
+    "address",
+    "user_type",
+  ];
+
+  for (let i = 0; i < data.length; i++) {
+    const row = data[i] as any;
+    const rowNum = i + 2; // Excel row number (1-based, with header)
+
+    try {
+      // Validate required fields
+      const username = row.username?.toString().trim();
+      const email = row.email?.toString().trim();
+
+      if (!username || !email) {
+        errors.push(`Row ${rowNum}: Missing required fields (username, email)`);
+        failedCount++;
+        continue;
+      }
+
+      if (!validateEmail(email)) {
+        errors.push(`Row ${rowNum}: Invalid email format for ${email}`);
+        failedCount++;
+        continue;
+      }
+
+      // Check for duplicates
+      const existingUser = await db
+        .select()
+        .from(User)
+        .where(eq(User.username, sanitizeString(username)))
+        .limit(1);
+
+      if (existingUser.length > 0) {
+        errors.push(`Row ${rowNum}: Username "${username}" already exists`);
+        failedCount++;
+        continue;
+      }
+
+      const existingEmail = await db
+        .select()
+        .from(User)
+        .where(eq(User.email, sanitizeString(email)))
+        .limit(1);
+
+      if (existingEmail.length > 0) {
+        errors.push(`Row ${rowNum}: Email "${email}" already exists`);
+        failedCount++;
+        continue;
+      }
+
+      // Sanitize optional fields
+      const phoneNumber = row.phone_number
+        ? sanitizeString(row.phone_number.toString())
+        : undefined;
+      const firstName = row.first_name
+        ? sanitizeString(row.first_name.toString())
+        : undefined;
+      const lastName = row.last_name
+        ? sanitizeString(row.last_name.toString())
+        : undefined;
+      const address = row.address
+        ? sanitizeString(row.address.toString())
+        : undefined;
+
+      // Validate gender
+      const gender = validateGender(row.gender?.toString());
+
+      // Format date
+      const dateOfBirth = formatDateForMySQL(row.date_of_birth?.toString());
+
+      // Validate user type
+      const userType = row.user_type?.toString().toUpperCase();
+      const validUserTypes = ["STUDENT", "TEACHER", "PARENT", "STAFF", "ADMIN"];
+      const validatedUserType =
+        userType && validUserTypes.includes(userType) ? userType : "STUDENT"; // Default to STUDENT
+
+      // Insert user
+      await db.insert(User).values({
+        username: sanitizeString(username),
+        email: sanitizeString(email),
+        phone_number: phoneNumber,
+        status: "ACTIVE",
+      });
+
+      // Get the newly created user's ID
+      const newUserResult = await db
+        .select({ user_id: User.user_id })
+        .from(User)
+        .where(eq(User.username, sanitizeString(username)))
+        .limit(1);
+      const newUserId = newUserResult[0]?.user_id;
+
+      // Insert profile if any profile data is provided
+      if (firstName || lastName || gender || dateOfBirth || address) {
+        await db.insert(UserProfile).values({
+          user_id: newUserId,
+          first_name: firstName || null,
+          last_name: lastName || null,
+          gender: gender,
+          date_of_birth: dateOfBirth ? sql`${dateOfBirth}` : null,
+          address: address || null,
+          user_type: validatedUserType,
+        });
+      }
+
+      successCount++;
+    } catch (error: any) {
+      errors.push(`Row ${rowNum}: ${error.message}`);
+      failedCount++;
+    }
+  }
+
+  logger.info("Bulk user upload complete", {
+    successCount,
+    failedCount,
+    totalRows: data.length,
+    uploadedBy: req.user?.userId,
+  });
+
+  successResponse(
+    res,
+    `Bulk upload complete: ${successCount} created, ${failedCount} failed`,
+    { success: successCount, failed: failedCount, errors: errors.slice(0, 10) }
+  );
 });

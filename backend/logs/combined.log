@@ -1418,3 +1418,238 @@
 {"ip":"::1","level":"info","message":"GET /users","service":"nga-central-mis","timestamp":"2026-01-07T11:52:07.066Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
 {"level":"info","message":"Fetching all users","service":"nga-central-mis","timestamp":"2026-01-07T11:52:07.067Z","userId":1}
 {"duration":8,"level":"info","message":"GET /users 304 - 8ms","service":"nga-central-mis","statusCode":304,"timestamp":"2026-01-07T11:52:07.074Z"}
+{"ip":"::1","level":"info","message":"GET /users/me","service":"nga-central-mis","timestamp":"2026-01-07T12:28:03.617Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"duration":2,"level":"info","message":"GET /users/me 401 - 2ms","service":"nga-central-mis","statusCode":401,"timestamp":"2026-01-07T12:28:03.619Z"}
+{"ip":"::1","level":"info","message":"GET /users/me","service":"nga-central-mis","timestamp":"2026-01-07T12:28:03.621Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"duration":1,"level":"info","message":"GET /users/me 401 - 1ms","service":"nga-central-mis","statusCode":401,"timestamp":"2026-01-07T12:28:03.622Z"}
+{"level":"info","message":"SIGINT received, shutting down gracefully","service":"nga-central-mis","timestamp":"2026-01-07T12:28:29.168Z"}
+{"level":"info","message":"Server running on port 5001 in development mode","service":"nga-central-mis","timestamp":"2026-01-07T12:28:38.271Z"}
+{"host":"mail.hackflix.net","level":"info","message":"Email service connected successfully","port":465,"service":"nga-central-mis","timestamp":"2026-01-07T12:28:44.571Z"}
+{"body":{"password":"Ngb155155!","username":"emmanuelniyongabo44@gmail.com"},"ip":"::1","level":"info","message":"POST /auth/login","service":"nga-central-mis","timestamp":"2026-01-07T12:29:34.248Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Login attempt for: emmanuelniyongabo44@gmail.com","service":"nga-central-mis","timestamp":"2026-01-07T12:29:34.249Z"}
+{"level":"info","message":"OTP saved","service":"nga-central-mis","timestamp":"2026-01-07T12:29:34.549Z","type":"LOGIN_2FA","userId":1}
+{"level":"info","message":"Email sent successfully","messageId":"<5ffc2d61-4e06-9cca-4a7a-570c98af818f@nga.ac.rw>","service":"nga-central-mis","timestamp":"2026-01-07T12:29:39.938Z","to":"emmanuelniyongabo44@gmail.com"}
+{"level":"info","message":"Password verified, OTP sent for user: superadmin","service":"nga-central-mis","timestamp":"2026-01-07T12:29:39.941Z"}
+{"duration":5696,"level":"info","message":"POST /auth/login 200 - 5696ms","service":"nga-central-mis","statusCode":200,"timestamp":"2026-01-07T12:29:39.944Z"}
+{"body":{"otp":"754284"},"ip":"::1","level":"info","message":"POST /auth/verify-otp","service":"nga-central-mis","timestamp":"2026-01-07T12:29:53.404Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"OTP verified successfully","service":"nga-central-mis","timestamp":"2026-01-07T12:29:53.415Z","type":"LOGIN_2FA","userId":1}
+{"level":"info","message":"OTP verified, login completed for user: superadmin","service":"nga-central-mis","timestamp":"2026-01-07T12:29:53.418Z"}
+{"duration":15,"level":"info","message":"POST /auth/verify-otp 200 - 15ms","service":"nga-central-mis","statusCode":200,"timestamp":"2026-01-07T12:29:53.419Z"}
+{"ip":"::1","level":"info","message":"GET /users/me","service":"nga-central-mis","timestamp":"2026-01-07T12:29:53.422Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Fetching current user","service":"nga-central-mis","timestamp":"2026-01-07T12:29:53.424Z","userId":1}
+{"duration":15,"level":"info","message":"GET /users/me 304 - 15ms","service":"nga-central-mis","statusCode":304,"timestamp":"2026-01-07T12:29:53.437Z"}
+{"ip":"::1","level":"info","message":"GET /users/me","service":"nga-central-mis","timestamp":"2026-01-07T12:29:55.444Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Fetching current user","service":"nga-central-mis","timestamp":"2026-01-07T12:29:55.449Z","userId":1}
+{"duration":12,"level":"info","message":"GET /users/me 304 - 12ms","service":"nga-central-mis","statusCode":304,"timestamp":"2026-01-07T12:29:55.456Z"}
+{"ip":"::1","level":"info","message":"GET /permissions/roles","service":"nga-central-mis","timestamp":"2026-01-07T12:29:58.153Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"ip":"::1","level":"info","message":"GET /permissions/permissions","service":"nga-central-mis","timestamp":"2026-01-07T12:29:58.155Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"duration":6,"level":"info","message":"GET /permissions/roles 304 - 6ms","service":"nga-central-mis","statusCode":304,"timestamp":"2026-01-07T12:29:58.159Z"}
+{"ip":"::1","level":"info","message":"GET /permissions/roles","service":"nga-central-mis","timestamp":"2026-01-07T12:29:58.160Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"duration":8,"level":"info","message":"GET /permissions/permissions 304 - 8ms","service":"nga-central-mis","statusCode":304,"timestamp":"2026-01-07T12:29:58.163Z"}
+{"duration":4,"level":"info","message":"GET /permissions/roles 304 - 4ms","service":"nga-central-mis","statusCode":304,"timestamp":"2026-01-07T12:29:58.164Z"}
+{"ip":"::1","level":"info","message":"GET /permissions/permissions","service":"nga-central-mis","timestamp":"2026-01-07T12:29:58.165Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"duration":2,"level":"info","message":"GET /permissions/permissions 304 - 2ms","service":"nga-central-mis","statusCode":304,"timestamp":"2026-01-07T12:29:58.167Z"}
+{"ip":"::1","level":"info","message":"GET /users","service":"nga-central-mis","timestamp":"2026-01-07T12:30:06.212Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Fetching all users","service":"nga-central-mis","timestamp":"2026-01-07T12:30:06.216Z","userId":1}
+{"duration":20,"level":"info","message":"GET /users 304 - 20ms","service":"nga-central-mis","statusCode":304,"timestamp":"2026-01-07T12:30:06.232Z"}
+{"ip":"::1","level":"info","message":"GET /users","service":"nga-central-mis","timestamp":"2026-01-07T12:30:06.233Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Fetching all users","service":"nga-central-mis","timestamp":"2026-01-07T12:30:06.235Z","userId":1}
+{"duration":6,"level":"info","message":"GET /users 304 - 6ms","service":"nga-central-mis","statusCode":304,"timestamp":"2026-01-07T12:30:06.239Z"}
+{"ip":"::1","level":"info","message":"GET /permissions/roles","service":"nga-central-mis","timestamp":"2026-01-07T12:30:12.749Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"ip":"::1","level":"info","message":"GET /permissions/permissions","service":"nga-central-mis","timestamp":"2026-01-07T12:30:12.752Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"duration":6,"level":"info","message":"GET /permissions/roles 304 - 6ms","service":"nga-central-mis","statusCode":304,"timestamp":"2026-01-07T12:30:12.755Z"}
+{"duration":4,"level":"info","message":"GET /permissions/permissions 304 - 4ms","service":"nga-central-mis","statusCode":304,"timestamp":"2026-01-07T12:30:12.756Z"}
+{"ip":"::1","level":"info","message":"GET /permissions/roles","service":"nga-central-mis","timestamp":"2026-01-07T12:30:12.757Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"ip":"::1","level":"info","message":"GET /permissions/permissions","service":"nga-central-mis","timestamp":"2026-01-07T12:30:12.759Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"duration":4,"level":"info","message":"GET /permissions/roles 304 - 4ms","service":"nga-central-mis","statusCode":304,"timestamp":"2026-01-07T12:30:12.761Z"}
+{"duration":3,"level":"info","message":"GET /permissions/permissions 304 - 3ms","service":"nga-central-mis","statusCode":304,"timestamp":"2026-01-07T12:30:12.762Z"}
+{"ip":"::1","level":"info","message":"GET /users","service":"nga-central-mis","timestamp":"2026-01-07T12:30:15.327Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Fetching all users","service":"nga-central-mis","timestamp":"2026-01-07T12:30:15.329Z","userId":1}
+{"duration":12,"level":"info","message":"GET /users 304 - 12ms","service":"nga-central-mis","statusCode":304,"timestamp":"2026-01-07T12:30:15.339Z"}
+{"ip":"::1","level":"info","message":"GET /users","service":"nga-central-mis","timestamp":"2026-01-07T12:30:15.340Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Fetching all users","service":"nga-central-mis","timestamp":"2026-01-07T12:30:15.341Z","userId":1}
+{"duration":8,"level":"info","message":"GET /users 304 - 8ms","service":"nga-central-mis","statusCode":304,"timestamp":"2026-01-07T12:30:15.348Z"}
+{"body":{"email":"munyemanaemmanuel@gmail.com","phone_number":"0782634364","status":"ACTIVE","username":"munyemana"},"ip":"::1","level":"info","message":"POST /users","service":"nga-central-mis","timestamp":"2026-01-07T12:31:20.532Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"createdBy":1,"email":"munyemanaemmanuel@gmail.com","level":"info","message":"Creating new user","service":"nga-central-mis","timestamp":"2026-01-07T12:31:20.536Z","username":"munyemana"}
+{"duration":7,"level":"info","message":"POST /users 201 - 7ms","service":"nga-central-mis","statusCode":201,"timestamp":"2026-01-07T12:31:20.539Z"}
+{"ip":"::1","level":"info","message":"GET /users","service":"nga-central-mis","timestamp":"2026-01-07T12:31:20.542Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Fetching all users","service":"nga-central-mis","timestamp":"2026-01-07T12:31:20.544Z","userId":1}
+{"duration":31,"level":"info","message":"GET /users 200 - 31ms","service":"nga-central-mis","statusCode":200,"timestamp":"2026-01-07T12:31:20.573Z"}
+{"ip":"::1","level":"info","message":"GET /users","service":"nga-central-mis","timestamp":"2026-01-07T12:33:26.563Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Fetching all users","service":"nga-central-mis","timestamp":"2026-01-07T12:33:26.576Z","userId":1}
+{"duration":29,"level":"info","message":"GET /users 304 - 29ms","service":"nga-central-mis","statusCode":304,"timestamp":"2026-01-07T12:33:26.590Z"}
+{"ip":"::1","level":"info","message":"GET /users","service":"nga-central-mis","timestamp":"2026-01-07T12:35:37.818Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Fetching all users","service":"nga-central-mis","timestamp":"2026-01-07T12:35:37.828Z","userId":1}
+{"duration":34,"level":"info","message":"GET /users 304 - 34ms","service":"nga-central-mis","statusCode":304,"timestamp":"2026-01-07T12:35:37.849Z"}
+{"ip":"::1","level":"info","message":"GET /users/me","service":"nga-central-mis","timestamp":"2026-01-07T12:36:40.731Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Fetching current user","service":"nga-central-mis","timestamp":"2026-01-07T12:36:40.777Z","userId":1}
+{"duration":67,"level":"info","message":"GET /users/me 304 - 67ms","service":"nga-central-mis","statusCode":304,"timestamp":"2026-01-07T12:36:40.794Z"}
+{"ip":"::1","level":"info","message":"GET /users/me","service":"nga-central-mis","timestamp":"2026-01-07T12:36:40.795Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Fetching current user","service":"nga-central-mis","timestamp":"2026-01-07T12:36:40.798Z","userId":1}
+{"duration":7,"level":"info","message":"GET /users/me 304 - 7ms","service":"nga-central-mis","statusCode":304,"timestamp":"2026-01-07T12:36:40.802Z"}
+{"ip":"::1","level":"info","message":"GET /users","service":"nga-central-mis","timestamp":"2026-01-07T12:36:40.857Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Fetching all users","service":"nga-central-mis","timestamp":"2026-01-07T12:36:40.861Z","userId":1}
+{"duration":17,"level":"info","message":"GET /users 304 - 17ms","service":"nga-central-mis","statusCode":304,"timestamp":"2026-01-07T12:36:40.874Z"}
+{"ip":"::1","level":"info","message":"GET /users","service":"nga-central-mis","timestamp":"2026-01-07T12:36:40.876Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Fetching all users","service":"nga-central-mis","timestamp":"2026-01-07T12:36:40.878Z","userId":1}
+{"duration":13,"level":"info","message":"GET /users 304 - 13ms","service":"nga-central-mis","statusCode":304,"timestamp":"2026-01-07T12:36:40.889Z"}
+{"ip":"::1","level":"info","message":"GET /permissions/roles?status=ACTIVE","service":"nga-central-mis","timestamp":"2026-01-07T12:37:43.526Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"duration":24,"level":"info","message":"GET /permissions/roles?status=ACTIVE 200 - 24ms","service":"nga-central-mis","statusCode":200,"timestamp":"2026-01-07T12:37:43.550Z"}
+{"ip":"::1","level":"info","message":"GET /users/me","service":"nga-central-mis","timestamp":"2026-01-07T12:38:14.411Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Fetching current user","service":"nga-central-mis","timestamp":"2026-01-07T12:38:14.413Z","userId":1}
+{"duration":8,"level":"info","message":"GET /users/me 304 - 8ms","service":"nga-central-mis","statusCode":304,"timestamp":"2026-01-07T12:38:14.419Z"}
+{"ip":"::1","level":"info","message":"GET /users/me","service":"nga-central-mis","timestamp":"2026-01-07T12:38:14.420Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Fetching current user","service":"nga-central-mis","timestamp":"2026-01-07T12:38:14.421Z","userId":1}
+{"duration":3,"level":"info","message":"GET /users/me 304 - 3ms","service":"nga-central-mis","statusCode":304,"timestamp":"2026-01-07T12:38:14.423Z"}
+{"ip":"::1","level":"info","message":"GET /users","service":"nga-central-mis","timestamp":"2026-01-07T12:38:14.495Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Fetching all users","service":"nga-central-mis","timestamp":"2026-01-07T12:38:14.503Z","userId":1}
+{"duration":26,"level":"info","message":"GET /users 304 - 26ms","service":"nga-central-mis","statusCode":304,"timestamp":"2026-01-07T12:38:14.521Z"}
+{"ip":"::1","level":"info","message":"GET /users","service":"nga-central-mis","timestamp":"2026-01-07T12:38:14.522Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Fetching all users","service":"nga-central-mis","timestamp":"2026-01-07T12:38:14.524Z","userId":1}
+{"duration":7,"level":"info","message":"GET /users 304 - 7ms","service":"nga-central-mis","statusCode":304,"timestamp":"2026-01-07T12:38:14.529Z"}
+{"level":"info","message":"SIGINT received, shutting down gracefully","service":"nga-central-mis","timestamp":"2026-01-07T12:38:20.723Z"}
+{"level":"info","message":"Server running on port 5001 in development mode","service":"nga-central-mis","timestamp":"2026-01-07T12:38:26.468Z"}
+{"host":"mail.hackflix.net","level":"info","message":"Email service connected successfully","port":465,"service":"nga-central-mis","timestamp":"2026-01-07T12:38:29.362Z"}
+{"ip":"::1","level":"info","message":"GET /permissions/roles?status=ACTIVE","service":"nga-central-mis","timestamp":"2026-01-07T12:38:39.287Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"duration":63,"level":"info","message":"GET /permissions/roles?status=ACTIVE 304 - 63ms","service":"nga-central-mis","statusCode":304,"timestamp":"2026-01-07T12:38:39.350Z"}
+{"ip":"::1","level":"info","message":"GET /permissions/roles?status=ACTIVE","service":"nga-central-mis","timestamp":"2026-01-07T12:38:54.443Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"duration":11,"level":"info","message":"GET /permissions/roles?status=ACTIVE 304 - 11ms","service":"nga-central-mis","statusCode":304,"timestamp":"2026-01-07T12:38:54.454Z"}
+{"body":{"email":"munyandekwe@gmail.com","phone_number":"0782634361","roles":[4],"status":"ACTIVE","username":"Munyandekwe"},"ip":"::1","level":"info","message":"POST /users","service":"nga-central-mis","timestamp":"2026-01-07T12:39:42.761Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"createdBy":1,"email":"munyandekwe@gmail.com","level":"info","message":"Creating new user","service":"nga-central-mis","timestamp":"2026-01-07T12:39:42.767Z","username":"Munyandekwe"}
+{"duration":10,"level":"info","message":"POST /users 201 - 10ms","service":"nga-central-mis","statusCode":201,"timestamp":"2026-01-07T12:39:42.771Z"}
+{"ip":"::1","level":"info","message":"GET /users","service":"nga-central-mis","timestamp":"2026-01-07T12:39:42.773Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Fetching all users","service":"nga-central-mis","timestamp":"2026-01-07T12:39:42.775Z","userId":1}
+{"duration":20,"level":"info","message":"GET /users 200 - 20ms","service":"nga-central-mis","statusCode":200,"timestamp":"2026-01-07T12:39:42.793Z"}
+{"ip":"::1","level":"info","message":"GET /users/me","service":"nga-central-mis","timestamp":"2026-01-07T12:40:02.536Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Fetching current user","service":"nga-central-mis","timestamp":"2026-01-07T12:40:02.539Z","userId":1}
+{"duration":10,"level":"info","message":"GET /users/me 304 - 10ms","service":"nga-central-mis","statusCode":304,"timestamp":"2026-01-07T12:40:02.546Z"}
+{"ip":"::1","level":"info","message":"GET /users/me","service":"nga-central-mis","timestamp":"2026-01-07T12:40:02.547Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Fetching current user","service":"nga-central-mis","timestamp":"2026-01-07T12:40:02.549Z","userId":1}
+{"duration":4,"level":"info","message":"GET /users/me 304 - 4ms","service":"nga-central-mis","statusCode":304,"timestamp":"2026-01-07T12:40:02.551Z"}
+{"ip":"::1","level":"info","message":"GET /users","service":"nga-central-mis","timestamp":"2026-01-07T12:40:02.597Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Fetching all users","service":"nga-central-mis","timestamp":"2026-01-07T12:40:02.600Z","userId":1}
+{"duration":14,"level":"info","message":"GET /users 304 - 14ms","service":"nga-central-mis","statusCode":304,"timestamp":"2026-01-07T12:40:02.611Z"}
+{"ip":"::1","level":"info","message":"GET /users","service":"nga-central-mis","timestamp":"2026-01-07T12:40:02.613Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Fetching all users","service":"nga-central-mis","timestamp":"2026-01-07T12:40:02.615Z","userId":1}
+{"duration":43,"level":"info","message":"GET /users 304 - 43ms","service":"nga-central-mis","statusCode":304,"timestamp":"2026-01-07T12:40:02.656Z"}
+{"ip":"::1","level":"info","message":"GET /users","service":"nga-central-mis","timestamp":"2026-01-07T12:43:45.353Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Fetching all users","service":"nga-central-mis","timestamp":"2026-01-07T12:43:45.367Z","userId":1}
+{"duration":44,"level":"info","message":"GET /users 304 - 44ms","service":"nga-central-mis","statusCode":304,"timestamp":"2026-01-07T12:43:45.396Z"}
+{"ip":"::1","level":"info","message":"GET /users","service":"nga-central-mis","timestamp":"2026-01-07T12:44:06.357Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"ip":"::1","level":"info","message":"GET /users/me","service":"nga-central-mis","timestamp":"2026-01-07T12:44:06.363Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Fetching all users","service":"nga-central-mis","timestamp":"2026-01-07T12:44:06.368Z","userId":1}
+{"level":"info","message":"Fetching current user","service":"nga-central-mis","timestamp":"2026-01-07T12:44:06.371Z","userId":1}
+{"duration":24,"level":"info","message":"GET /users/me 304 - 24ms","service":"nga-central-mis","statusCode":304,"timestamp":"2026-01-07T12:44:06.387Z"}
+{"duration":33,"level":"info","message":"GET /users 304 - 33ms","service":"nga-central-mis","statusCode":304,"timestamp":"2026-01-07T12:44:06.389Z"}
+{"ip":"::1","level":"info","message":"GET /users","service":"nga-central-mis","timestamp":"2026-01-07T12:44:06.389Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Fetching all users","service":"nga-central-mis","timestamp":"2026-01-07T12:44:06.390Z","userId":1}
+{"duration":6,"level":"info","message":"GET /users 304 - 6ms","service":"nga-central-mis","statusCode":304,"timestamp":"2026-01-07T12:44:06.395Z"}
+{"ip":"::1","level":"info","message":"GET /users","service":"nga-central-mis","timestamp":"2026-01-07T12:44:16.333Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Fetching all users","service":"nga-central-mis","timestamp":"2026-01-07T12:44:16.335Z","userId":1}
+{"duration":8,"level":"info","message":"GET /users 304 - 8ms","service":"nga-central-mis","statusCode":304,"timestamp":"2026-01-07T12:44:16.341Z"}
+{"ip":"::1","level":"info","message":"GET /users","service":"nga-central-mis","timestamp":"2026-01-07T12:44:27.330Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Fetching all users","service":"nga-central-mis","timestamp":"2026-01-07T12:44:27.332Z","userId":1}
+{"duration":9,"level":"info","message":"GET /users 304 - 9ms","service":"nga-central-mis","statusCode":304,"timestamp":"2026-01-07T12:44:27.339Z"}
+{"ip":"::1","level":"info","message":"GET /users","service":"nga-central-mis","timestamp":"2026-01-07T12:44:44.330Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Fetching all users","service":"nga-central-mis","timestamp":"2026-01-07T12:44:44.333Z","userId":1}
+{"duration":9,"level":"info","message":"GET /users 304 - 9ms","service":"nga-central-mis","statusCode":304,"timestamp":"2026-01-07T12:44:44.339Z"}
+{"ip":"::1","level":"info","message":"GET /users","service":"nga-central-mis","timestamp":"2026-01-07T12:50:07.327Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Fetching all users","service":"nga-central-mis","timestamp":"2026-01-07T12:50:07.332Z","userId":1}
+{"duration":18,"level":"info","message":"GET /users 304 - 18ms","service":"nga-central-mis","statusCode":304,"timestamp":"2026-01-07T12:50:07.345Z"}
+{"level":"info","message":"SIGINT received, shutting down gracefully","service":"nga-central-mis","timestamp":"2026-01-07T12:50:27.422Z"}
+{"level":"info","message":"Server running on port 5001 in development mode","service":"nga-central-mis","timestamp":"2026-01-07T12:50:36.157Z"}
+{"host":"mail.hackflix.net","level":"info","message":"Email service connected successfully","port":465,"service":"nga-central-mis","timestamp":"2026-01-07T12:50:39.244Z"}
+{"ip":"::1","level":"info","message":"GET /users/me","service":"nga-central-mis","timestamp":"2026-01-07T12:50:55.180Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Fetching current user","service":"nga-central-mis","timestamp":"2026-01-07T12:50:55.198Z","userId":1}
+{"duration":24,"level":"info","message":"GET /users/me 304 - 24ms","service":"nga-central-mis","statusCode":304,"timestamp":"2026-01-07T12:50:55.204Z"}
+{"ip":"::1","level":"info","message":"GET /users/me","service":"nga-central-mis","timestamp":"2026-01-07T12:50:55.205Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Fetching current user","service":"nga-central-mis","timestamp":"2026-01-07T12:50:55.207Z","userId":1}
+{"duration":4,"level":"info","message":"GET /users/me 304 - 4ms","service":"nga-central-mis","statusCode":304,"timestamp":"2026-01-07T12:50:55.209Z"}
+{"ip":"::1","level":"info","message":"GET /users","service":"nga-central-mis","timestamp":"2026-01-07T12:50:55.244Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Fetching all users","service":"nga-central-mis","timestamp":"2026-01-07T12:50:55.248Z","userId":1}
+{"duration":24,"level":"info","message":"GET /users 304 - 24ms","service":"nga-central-mis","statusCode":304,"timestamp":"2026-01-07T12:50:55.267Z"}
+{"ip":"::1","level":"info","message":"GET /users","service":"nga-central-mis","timestamp":"2026-01-07T12:50:55.268Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Fetching all users","service":"nga-central-mis","timestamp":"2026-01-07T12:50:55.269Z","userId":1}
+{"duration":6,"level":"info","message":"GET /users 304 - 6ms","service":"nga-central-mis","statusCode":304,"timestamp":"2026-01-07T12:50:55.274Z"}
+{"ip":"::1","level":"info","message":"GET /permissions/roles?status=ACTIVE","service":"nga-central-mis","timestamp":"2026-01-07T12:50:58.554Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"duration":5,"level":"info","message":"GET /permissions/roles?status=ACTIVE 304 - 5ms","service":"nga-central-mis","statusCode":304,"timestamp":"2026-01-07T12:50:58.558Z"}
+{"body":{"address":"Kigali Rwanda","date_of_birth":"2025-12-29","email":"muhirwaclement@gmail.com","first_name":"Muhirwa","gender":"MALE","last_name":"Clement","phone_number":"0782745473","roles":[4],"status":"ACTIVE","username":"Muhirwa"},"ip":"::1","level":"info","message":"POST /users","service":"nga-central-mis","timestamp":"2026-01-07T12:51:55.020Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"createdBy":1,"email":"muhirwaclement@gmail.com","level":"info","message":"Creating new user","service":"nga-central-mis","timestamp":"2026-01-07T12:51:55.023Z","username":"Muhirwa"}
+{"duration":9,"level":"info","message":"POST /users 201 - 9ms","service":"nga-central-mis","statusCode":201,"timestamp":"2026-01-07T12:51:55.029Z"}
+{"ip":"::1","level":"info","message":"GET /users","service":"nga-central-mis","timestamp":"2026-01-07T12:51:55.037Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Fetching all users","service":"nga-central-mis","timestamp":"2026-01-07T12:51:55.044Z","userId":1}
+{"duration":16,"level":"info","message":"GET /users 200 - 16ms","service":"nga-central-mis","statusCode":200,"timestamp":"2026-01-07T12:51:55.053Z"}
+{"ip":"::1","level":"info","message":"GET /users/me","service":"nga-central-mis","timestamp":"2026-01-07T12:52:02.887Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Fetching current user","service":"nga-central-mis","timestamp":"2026-01-07T12:52:02.890Z","userId":1}
+{"duration":8,"level":"info","message":"GET /users/me 304 - 8ms","service":"nga-central-mis","statusCode":304,"timestamp":"2026-01-07T12:52:02.892Z"}
+{"ip":"::1","level":"info","message":"GET /users/me","service":"nga-central-mis","timestamp":"2026-01-07T12:52:02.894Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Fetching current user","service":"nga-central-mis","timestamp":"2026-01-07T12:52:02.895Z","userId":1}
+{"duration":5,"level":"info","message":"GET /users/me 304 - 5ms","service":"nga-central-mis","statusCode":304,"timestamp":"2026-01-07T12:52:02.898Z"}
+{"ip":"::1","level":"info","message":"GET /users","service":"nga-central-mis","timestamp":"2026-01-07T12:52:02.946Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Fetching all users","service":"nga-central-mis","timestamp":"2026-01-07T12:52:02.948Z","userId":1}
+{"duration":7,"level":"info","message":"GET /users 304 - 7ms","service":"nga-central-mis","statusCode":304,"timestamp":"2026-01-07T12:52:02.953Z"}
+{"ip":"::1","level":"info","message":"GET /users","service":"nga-central-mis","timestamp":"2026-01-07T12:52:02.954Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Fetching all users","service":"nga-central-mis","timestamp":"2026-01-07T12:52:02.955Z","userId":1}
+{"duration":9,"level":"info","message":"GET /users 304 - 9ms","service":"nga-central-mis","statusCode":304,"timestamp":"2026-01-07T12:52:02.963Z"}
+{"level":"info","message":"SIGINT received, shutting down gracefully","service":"nga-central-mis","timestamp":"2026-01-07T13:01:20.363Z"}
+{"level":"info","message":"Server running on port 5001 in development mode","service":"nga-central-mis","timestamp":"2026-01-07T13:01:26.824Z"}
+{"host":"mail.hackflix.net","level":"info","message":"Email service connected successfully","port":465,"service":"nga-central-mis","timestamp":"2026-01-07T13:01:30.373Z"}
+{"ip":"::1","level":"info","message":"GET /users/me","service":"nga-central-mis","timestamp":"2026-01-07T13:01:54.090Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Fetching current user","service":"nga-central-mis","timestamp":"2026-01-07T13:01:54.107Z","userId":1}
+{"duration":26,"level":"info","message":"GET /users/me 304 - 26ms","service":"nga-central-mis","statusCode":304,"timestamp":"2026-01-07T13:01:54.116Z"}
+{"ip":"::1","level":"info","message":"GET /users/me","service":"nga-central-mis","timestamp":"2026-01-07T13:01:54.117Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Fetching current user","service":"nga-central-mis","timestamp":"2026-01-07T13:01:54.119Z","userId":1}
+{"duration":6,"level":"info","message":"GET /users/me 304 - 6ms","service":"nga-central-mis","statusCode":304,"timestamp":"2026-01-07T13:01:54.123Z"}
+{"ip":"::1","level":"info","message":"GET /users","service":"nga-central-mis","timestamp":"2026-01-07T13:01:54.155Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Fetching all users","service":"nga-central-mis","timestamp":"2026-01-07T13:01:54.159Z","userId":1}
+{"duration":23,"level":"info","message":"GET /users 304 - 23ms","service":"nga-central-mis","statusCode":304,"timestamp":"2026-01-07T13:01:54.178Z"}
+{"ip":"::1","level":"info","message":"GET /users","service":"nga-central-mis","timestamp":"2026-01-07T13:01:54.179Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Fetching all users","service":"nga-central-mis","timestamp":"2026-01-07T13:01:54.180Z","userId":1}
+{"duration":8,"level":"info","message":"GET /users 304 - 8ms","service":"nga-central-mis","statusCode":304,"timestamp":"2026-01-07T13:01:54.187Z"}
+{"ip":"::1","level":"info","message":"GET /users/me","service":"nga-central-mis","timestamp":"2026-01-07T13:02:42.587Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Fetching current user","service":"nga-central-mis","timestamp":"2026-01-07T13:02:42.590Z","userId":1}
+{"duration":6,"level":"info","message":"GET /users/me 304 - 6ms","service":"nga-central-mis","statusCode":304,"timestamp":"2026-01-07T13:02:42.593Z"}
+{"ip":"::1","level":"info","message":"GET /users/me","service":"nga-central-mis","timestamp":"2026-01-07T13:02:42.594Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Fetching current user","service":"nga-central-mis","timestamp":"2026-01-07T13:02:42.596Z","userId":1}
+{"duration":5,"level":"info","message":"GET /users/me 304 - 5ms","service":"nga-central-mis","statusCode":304,"timestamp":"2026-01-07T13:02:42.599Z"}
+{"ip":"::1","level":"info","message":"GET /users","service":"nga-central-mis","timestamp":"2026-01-07T13:02:42.641Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Fetching all users","service":"nga-central-mis","timestamp":"2026-01-07T13:02:42.645Z","userId":1}
+{"duration":23,"level":"info","message":"GET /users 304 - 23ms","service":"nga-central-mis","statusCode":304,"timestamp":"2026-01-07T13:02:42.664Z"}
+{"ip":"::1","level":"info","message":"GET /users","service":"nga-central-mis","timestamp":"2026-01-07T13:02:42.664Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Fetching all users","service":"nga-central-mis","timestamp":"2026-01-07T13:02:42.666Z","userId":1}
+{"duration":10,"level":"info","message":"GET /users 304 - 10ms","service":"nga-central-mis","statusCode":304,"timestamp":"2026-01-07T13:02:42.674Z"}
+{"ip":"::1","level":"info","message":"GET /permissions/roles?status=ACTIVE","service":"nga-central-mis","timestamp":"2026-01-07T13:02:50.538Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"duration":10,"level":"info","message":"GET /permissions/roles?status=ACTIVE 304 - 10ms","service":"nga-central-mis","statusCode":304,"timestamp":"2026-01-07T13:02:50.548Z"}
+{"body":{"address":"Kigali Rwanda","date_of_birth":"2026-01-07","email":"kalisadoe@gmail.com","first_name":"Kalisa","gender":"MALE","last_name":"Doe","phone_number":"0787453778","roles":[3],"status":"ACTIVE","username":"Kalisa"},"ip":"::1","level":"info","message":"POST /users","service":"nga-central-mis","timestamp":"2026-01-07T13:05:41.586Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"createdBy":1,"email":"kalisadoe@gmail.com","level":"info","message":"Creating new user","service":"nga-central-mis","timestamp":"2026-01-07T13:05:41.595Z","username":"Kalisa"}
+{"duration":14,"level":"info","message":"POST /users 201 - 14ms","service":"nga-central-mis","statusCode":201,"timestamp":"2026-01-07T13:05:41.600Z"}
+{"ip":"::1","level":"info","message":"GET /users","service":"nga-central-mis","timestamp":"2026-01-07T13:05:41.603Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Fetching all users","service":"nga-central-mis","timestamp":"2026-01-07T13:05:41.604Z","userId":1}
+{"duration":10,"level":"info","message":"GET /users 200 - 10ms","service":"nga-central-mis","statusCode":200,"timestamp":"2026-01-07T13:05:41.613Z"}
+{"ip":"::1","level":"info","message":"GET /permissions/roles?status=ACTIVE","service":"nga-central-mis","timestamp":"2026-01-07T13:14:35.792Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"duration":9,"level":"info","message":"GET /permissions/roles?status=ACTIVE 304 - 9ms","service":"nga-central-mis","statusCode":304,"timestamp":"2026-01-07T13:14:35.801Z"}
+{"body":{"address":"Kigali","date_of_birth":"2025-12-29","email":"keilla@gmail.com","first_name":"Igisubizo","gender":"MALE","last_name":"Eric","phone_number":"0782287648","roles":[6],"status":"ACTIVE","username":"Keila"},"ip":"::1","level":"info","message":"POST /users","service":"nga-central-mis","timestamp":"2026-01-07T13:15:23.803Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"createdBy":1,"email":"keilla@gmail.com","level":"info","message":"Creating new user","service":"nga-central-mis","timestamp":"2026-01-07T13:15:23.809Z","username":"Keila"}
+{"duration":11,"level":"info","message":"POST /users 201 - 11ms","service":"nga-central-mis","statusCode":201,"timestamp":"2026-01-07T13:15:23.814Z"}
+{"ip":"::1","level":"info","message":"GET /users","service":"nga-central-mis","timestamp":"2026-01-07T13:15:23.817Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Fetching all users","service":"nga-central-mis","timestamp":"2026-01-07T13:15:23.818Z","userId":1}
+{"duration":12,"level":"info","message":"GET /users 200 - 12ms","service":"nga-central-mis","statusCode":200,"timestamp":"2026-01-07T13:15:23.830Z"}
+{"ip":"::1","level":"info","message":"GET /permissions/roles?status=ACTIVE","service":"nga-central-mis","timestamp":"2026-01-07T13:16:19.458Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"duration":4,"level":"info","message":"GET /permissions/roles?status=ACTIVE 304 - 4ms","service":"nga-central-mis","statusCode":304,"timestamp":"2026-01-07T13:16:19.462Z"}
+{"body":{"address":"kigali","date_of_birth":"2026-01-06","email":"Kali","first_name":"Kil","gender":"FEMALE","last_name":"Kil","phone_number":"078293784","roles":[3,2,6],"status":"ACTIVE","username":"kail"},"ip":"::1","level":"info","message":"POST /users","service":"nga-central-mis","timestamp":"2026-01-07T13:17:14.643Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"duration":18,"level":"info","message":"POST /users 400 - 18ms","service":"nga-central-mis","statusCode":400,"timestamp":"2026-01-07T13:17:14.661Z"}
+{"body":{"address":"kigali","date_of_birth":"2026-01-06","email":"kail@gmail.com","first_name":"Kil","gender":"FEMALE","last_name":"Kil","phone_number":"078293784","roles":[6],"status":"ACTIVE","username":"kail"},"ip":"::1","level":"info","message":"POST /users","service":"nga-central-mis","timestamp":"2026-01-07T13:18:01.122Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"createdBy":1,"email":"kail@gmail.com","level":"info","message":"Creating new user","service":"nga-central-mis","timestamp":"2026-01-07T13:18:01.126Z","username":"kail"}
+{"duration":9,"level":"info","message":"POST /users 201 - 9ms","service":"nga-central-mis","statusCode":201,"timestamp":"2026-01-07T13:18:01.131Z"}
+{"ip":"::1","level":"info","message":"GET /users","service":"nga-central-mis","timestamp":"2026-01-07T13:18:01.135Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Fetching all users","service":"nga-central-mis","timestamp":"2026-01-07T13:18:01.138Z","userId":1}
+{"duration":15,"level":"info","message":"GET /users 200 - 15ms","service":"nga-central-mis","statusCode":200,"timestamp":"2026-01-07T13:18:01.150Z"}
+{"ip":"::1","level":"info","message":"GET /users","service":"nga-central-mis","timestamp":"2026-01-07T13:22:32.433Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Fetching all users","service":"nga-central-mis","timestamp":"2026-01-07T13:22:32.444Z","userId":1}
+{"duration":35,"level":"info","message":"GET /users 304 - 35ms","service":"nga-central-mis","statusCode":304,"timestamp":"2026-01-07T13:22:32.468Z"}
+{"ip":"::1","level":"info","message":"GET /permissions/roles?status=ACTIVE","service":"nga-central-mis","timestamp":"2026-01-07T13:28:37.738Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"duration":8,"level":"info","message":"GET /permissions/roles?status=ACTIVE 304 - 8ms","service":"nga-central-mis","statusCode":304,"timestamp":"2026-01-07T13:28:37.746Z"}
+{"ip":"::1","level":"info","message":"GET /permissions/roles?status=ACTIVE","service":"nga-central-mis","timestamp":"2026-01-07T13:30:49.518Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"duration":13,"level":"info","message":"GET /permissions/roles?status=ACTIVE 401 - 13ms","service":"nga-central-mis","statusCode":401,"timestamp":"2026-01-07T13:30:49.531Z"}
+{"ip":"::1","level":"info","message":"GET /users","service":"nga-central-mis","timestamp":"2026-01-07T13:30:49.545Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"duration":2,"level":"info","message":"GET /users 401 - 2ms","service":"nga-central-mis","statusCode":401,"timestamp":"2026-01-07T13:30:49.547Z"}

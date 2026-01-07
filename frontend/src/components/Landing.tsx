@@ -797,7 +797,7 @@ const Landing: React.FC<LandingProps> = ({
       </div>
 
       {/* Hero Section */}
-      <section className="relative z-10 pt-40 pb-24 px-4">
+      <section className="relative z-10 pt-20 pb-24 px-4">
         <div className="max-w-7xl mx-auto">
           <div className="grid lg:grid-cols-2 gap-12 items-center">
             <motion.div
