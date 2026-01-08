@@ -13,7 +13,7 @@ const Dashboard: React.FC<DashboardProps> = ({}) => {
           <h2 className="text-2xl font-bold text-text-primary-light dark:text-text-primary-dark mb-2">
             Welcome to NGA MIS
           </h2>
-          <p className="text-text-secondary-light dark:text-text-secondary-dark/50">
+          <p className="text-text-secondary-light dark:text-text-secondary-dark/70/50">
             Your central management information system dashboard
           </p>
         </div>
@@ -38,7 +38,7 @@ const Dashboard: React.FC<DashboardProps> = ({}) => {
                 </svg>
               </div>
               <div className="ml-4">
-                <p className="text-sm font-medium text-text-secondary-light dark:text-text-secondary-dark">
+                <p className="text-sm font-medium text-text-secondary-light dark:text-text-secondary-dark/70">
                   Total Students
                 </p>
                 <p className="text-2xl font-bold text-text-primary-light dark:text-text-primary-dark">
@@ -66,7 +66,7 @@ const Dashboard: React.FC<DashboardProps> = ({}) => {
                 </svg>
               </div>
               <div className="ml-4">
-                <p className="text-sm font-medium text-text-secondary-light dark:text-text-secondary-dark">
+                <p className="text-sm font-medium text-text-secondary-light dark:text-text-secondary-dark/70">
                   Total Teachers
                 </p>
                 <p className="text-2xl font-bold text-text-primary-light dark:text-text-primary-dark">
@@ -94,7 +94,7 @@ const Dashboard: React.FC<DashboardProps> = ({}) => {
                 </svg>
               </div>
               <div className="ml-4">
-                <p className="text-sm font-medium text-text-secondary-light dark:text-text-secondary-dark">
+                <p className="text-sm font-medium text-text-secondary-light dark:text-text-secondary-dark/70">
                   Active Classes
                 </p>
                 <p className="text-2xl font-bold text-text-primary-light dark:text-text-primary-dark">
@@ -122,7 +122,7 @@ const Dashboard: React.FC<DashboardProps> = ({}) => {
                 </svg>
               </div>
               <div className="ml-4">
-                <p className="text-sm font-medium text-text-secondary-light dark:text-text-secondary-dark">
+                <p className="text-sm font-medium text-text-secondary-light dark:text-text-secondary-dark/70">
                   Reports Today
                 </p>
                 <p className="text-2xl font-bold text-text-primary-light dark:text-text-primary-dark">
@@ -159,7 +159,7 @@ const Dashboard: React.FC<DashboardProps> = ({}) => {
                 <p className="font-medium text-text-primary-light dark:text-text-primary-dark">
                   Manage Students
                 </p>
-                <p className="text-sm text-text-secondary-light dark:text-text-secondary-dark">
+                <p className="text-sm text-text-secondary-light dark:text-text-secondary-dark/70">
                   Add, edit, or view student records
                 </p>
               </div>
@@ -185,7 +185,7 @@ const Dashboard: React.FC<DashboardProps> = ({}) => {
                 <p className="font-medium text-text-primary-light dark:text-text-primary-dark">
                   Grade Management
                 </p>
-                <p className="text-sm text-text-secondary-light dark:text-text-secondary-dark">
+                <p className="text-sm text-text-secondary-light dark:text-text-secondary-dark/70">
                   Manage grades and assessments
                 </p>
               </div>
@@ -211,7 +211,7 @@ const Dashboard: React.FC<DashboardProps> = ({}) => {
                 <p className="font-medium text-text-primary-light dark:text-text-primary-dark">
                   Reports
                 </p>
-                <p className="text-sm text-text-secondary-light dark:text-text-secondary-dark">
+                <p className="text-sm text-text-secondary-light dark:text-text-secondary-dark/70">
                   Generate and view reports
                 </p>
               </div>

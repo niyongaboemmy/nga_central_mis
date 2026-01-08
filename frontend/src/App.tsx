@@ -23,6 +23,7 @@ import { ToastProvider, useToast } from "./contexts/ToastContext";
 import { ToastStore } from "./services/api";
 import "./App.css";
 import Documents from "./components/documents/Documents";
+import Academics from "./components/Academics";
 
 // Wrapper components for pages that need the Navbar
 const LandingPage: React.FC = () => {
@@ -174,6 +175,11 @@ const DocumentsPage: React.FC = () => {
   return <Documents />;
 };
 
+// Academics page with sidebar
+const AcademicsPage: React.FC = () => {
+  return <Academics />;
+};
+
 // Permissions page with sidebar
 const PermissionsPage: React.FC = () => {
   return <Permissions />;
@@ -300,6 +306,18 @@ function App() {
                 }
               />
 
+              {/* Academics - protected with sidebar */}
+              <Route
+                path="/academics"
+                element={
+                  <ProtectedRoute>
+                    <SystemLayoutWrapper>
+                      <AcademicsPage />
+                    </SystemLayoutWrapper>
+                  </ProtectedRoute>
+                }
+              />
+
               {/* Users page - protected with sidebar */}
               <Route
                 path="/users"
@@ -322,7 +340,7 @@ function App() {
                         <h2 className="text-2xl font-bold text-text-primary-light dark:text-text-primary-dark">
                           Settings
                         </h2>
-                        <p className="mt-2 text-text-secondary-light dark:text-text-secondary-dark">
+                        <p className="mt-2 text-text-secondary-light dark:text-text-secondary-dark/70">
                           This page is under construction
                         </p>
                       </div>

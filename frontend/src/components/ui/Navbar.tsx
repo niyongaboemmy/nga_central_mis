@@ -78,7 +78,7 @@ const Navbar: React.FC<NavbarProps> = ({
   const handleLogout = () => {
     logout();
     setIsUserDropdownOpen(false);
-    window.location.href = "/";
+    window.location.href = "/mis/login";
   };
 
   const NavLink: React.FC<{
@@ -91,7 +91,7 @@ const Navbar: React.FC<NavbarProps> = ({
       className={`px-3 py-1.5 text-sm rounded-lg transition-all duration-200 font-medium flex items-center space-x-2 relative ${
         isActive
           ? "text-blue-600 dark:text-blue-400"
-          : "text-text-secondary-light dark:text-text-secondary-dark hover:text-blue-600 dark:hover:text-blue-400"
+          : "text-text-secondary-light dark:text-text-secondary-dark/70 hover:text-blue-600 dark:hover:text-blue-400"
       }`}
     >
       {children}
@@ -181,12 +181,12 @@ const Navbar: React.FC<NavbarProps> = ({
                       <p className="text-sm font-medium text-text-primary-light dark:text-text-primary-dark">
                         {getUserDisplayName()}
                       </p>
-                      <p className="text-xs text-text-secondary-light dark:text-text-secondary-dark">
+                      <p className="text-xs text-text-secondary-light dark:text-text-secondary-dark/70">
                         {user.user?.email}
                       </p>
                     </div>
                     <svg
-                      className={`w-4 h-4 text-text-secondary-light dark:text-text-secondary-dark transition-transform ${
+                      className={`w-4 h-4 text-text-secondary-light dark:text-text-secondary-dark/70 transition-transform ${
                         isUserDropdownOpen ? "rotate-180" : ""
                       }`}
                       fill="none"
@@ -209,13 +209,13 @@ const Navbar: React.FC<NavbarProps> = ({
                         <p className="text-sm font-medium text-text-primary-light dark:text-text-primary-dark">
                           {getUserDisplayName()}
                         </p>
-                        <p className="text-xs text-text-secondary-light dark:text-text-secondary-dark truncate">
+                        <p className="text-xs text-text-secondary-light dark:text-text-secondary-dark/70 truncate">
                           {user.user?.email}
                         </p>
                       </div>
                       <button
                         onClick={() => setIsUserDropdownOpen(false)}
-                        className="w-full text-left px-4 py-2 text-sm text-text-secondary-light dark:text-text-secondary-dark hover:bg-surface-light dark:hover:bg-surface-dark flex items-center space-x-2"
+                        className="w-full text-left px-4 py-2 text-sm text-text-secondary-light dark:text-text-secondary-dark/70 hover:bg-surface-light dark:hover:bg-surface-dark flex items-center space-x-2"
                       >
                         <svg
                           className="w-4 h-4"
@@ -234,7 +234,7 @@ const Navbar: React.FC<NavbarProps> = ({
                       </button>
                       <button
                         onClick={() => setIsUserDropdownOpen(false)}
-                        className="w-full text-left px-4 py-2 text-sm text-text-secondary-light dark:text-text-secondary-dark hover:bg-surface-light dark:hover:bg-surface-dark flex items-center space-x-2"
+                        className="w-full text-left px-4 py-2 text-sm text-text-secondary-light dark:text-text-secondary-dark/70 hover:bg-surface-light dark:hover:bg-surface-dark flex items-center space-x-2"
                       >
                         <svg
                           className="w-4 h-4"
@@ -301,7 +301,7 @@ const Navbar: React.FC<NavbarProps> = ({
               <ThemeToggle />
               <button
                 onClick={toggleMobileMenu}
-                className="inline-flex items-center justify-center p-2 rounded-lg text-text-secondary-light dark:text-text-secondary-dark hover:text-blue-600 dark:hover:text-blue-400 hover:bg-surface-light dark:hover:bg-surface-dark transition-all duration-200 focus:outline-none"
+                className="inline-flex items-center justify-center p-2 rounded-lg text-text-secondary-light dark:text-text-secondary-dark/70 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-surface-light dark:hover:bg-surface-dark transition-all duration-200 focus:outline-none"
                 aria-label="Toggle menu"
               >
                 {isMobileMenuOpen ? (
@@ -356,7 +356,7 @@ const Navbar: React.FC<NavbarProps> = ({
                     <p className="text-sm font-medium text-text-primary-light dark:text-text-primary-dark truncate">
                       {getUserDisplayName()}
                     </p>
-                    <p className="text-xs text-text-secondary-light dark:text-text-secondary-dark truncate">
+                    <p className="text-xs text-text-secondary-light dark:text-text-secondary-dark/70 truncate">
                       {user.user?.email}
                     </p>
                   </div>
@@ -375,7 +375,7 @@ const Navbar: React.FC<NavbarProps> = ({
                     className={`w-full text-left px-4 py-3 rounded-xl transition-all duration-200 font-medium flex items-center space-x-3 ${
                       isActive("/")
                         ? "text-blue-600 dark:text-blue-400"
-                        : "text-text-secondary-light dark:text-text-secondary-dark hover:text-blue-600 dark:hover:text-blue-400"
+                        : "text-text-secondary-light dark:text-text-secondary-dark/70 hover:text-blue-600 dark:hover:text-blue-400"
                     }`}
                   >
                     <svg
@@ -406,7 +406,7 @@ const Navbar: React.FC<NavbarProps> = ({
                     className={`w-full text-left px-4 py-3 rounded-xl transition-all duration-200 font-medium flex items-center space-x-3 ${
                       isActive("/about")
                         ? "text-blue-600 dark:text-blue-400"
-                        : "text-text-secondary-light dark:text-text-secondary-dark hover:text-blue-600 dark:hover:text-blue-400"
+                        : "text-text-secondary-light dark:text-text-secondary-dark/70 hover:text-blue-600 dark:hover:text-blue-400"
                     }`}
                   >
                     <svg
@@ -437,7 +437,7 @@ const Navbar: React.FC<NavbarProps> = ({
                     className={`w-full text-left px-4 py-3 rounded-xl transition-all duration-200 font-medium flex items-center space-x-3 ${
                       isActive("/contact")
                         ? "text-blue-600 dark:text-blue-400"
-                        : "text-text-secondary-light dark:text-text-secondary-dark hover:text-blue-600 dark:hover:text-blue-400"
+                        : "text-text-secondary-light dark:text-text-secondary-dark/70 hover:text-blue-600 dark:hover:text-blue-400"
                     }`}
                   >
                     <svg
@@ -497,7 +497,7 @@ const Navbar: React.FC<NavbarProps> = ({
                   className={`w-full text-left px-4 py-3 mt-4 font-medium rounded-xl transition-all duration-200 transform hover:scale-[1.02] flex items-center space-x-2 ${
                     isActive("/login")
                       ? "text-blue-600 dark:text-blue-400"
-                      : "text-text-secondary-light dark:text-text-secondary-dark hover:text-blue-600 dark:hover:text-blue-400"
+                      : "text-text-secondary-light dark:text-text-secondary-dark/70 hover:text-blue-600 dark:hover:text-blue-400"
                   }`}
                 >
                   <svg

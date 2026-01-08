@@ -1,0 +1,261 @@
+import express from "express";
+import {
+  // Academic Years
+  getAcademicYears,
+  getAcademicYear,
+  createAcademicYear,
+  updateAcademicYear,
+  deleteAcademicYear,
+
+  // Academic Terms
+  getAcademicTerms,
+  getAcademicTerm,
+  createAcademicTerm,
+  updateAcademicTerm,
+  deleteAcademicTerm,
+
+  // Programs
+  getPrograms,
+  getProgram,
+  createProgram,
+  updateProgram,
+  deleteProgram,
+
+  // Grades
+  getGrades,
+  getGrade,
+  createGrade,
+  updateGrade,
+  deleteGrade,
+
+  // Subjects
+  getSubjects,
+  getSubject,
+  createSubject,
+  updateSubject,
+  deleteSubject,
+
+  // Grade-Subject Assignments
+  getGradeSubjects,
+  assignSubjectToGrade,
+  removeSubjectFromGrade,
+
+  // Class Groups
+  getClassGroups,
+  getClassGroup,
+  createClassGroup,
+  updateClassGroup,
+  deleteClassGroup,
+} from "../controllers/academicController";
+import { authenticate, authorize } from "../middleware/auth";
+
+const router = express.Router();
+
+// Academic Years routes
+router.get(
+  "/years",
+  authenticate,
+  authorize("MANAGE_ACADEMICS"),
+  getAcademicYears
+);
+router.get(
+  "/years/:id",
+  authenticate,
+  authorize("MANAGE_ACADEMICS"),
+  getAcademicYear
+);
+router.post(
+  "/years",
+  authenticate,
+  authorize("MANAGE_ACADEMICS"),
+  createAcademicYear
+);
+router.put(
+  "/years/:id",
+  authenticate,
+  authorize("MANAGE_ACADEMICS"),
+  updateAcademicYear
+);
+router.delete(
+  "/years/:id",
+  authenticate,
+  authorize("MANAGE_ACADEMICS"),
+  deleteAcademicYear
+);
+
+// Academic Terms routes
+router.get(
+  "/terms",
+  authenticate,
+  authorize("MANAGE_ACADEMICS"),
+  getAcademicTerms
+);
+router.get(
+  "/terms/:id",
+  authenticate,
+  authorize("MANAGE_ACADEMICS"),
+  getAcademicTerm
+);
+router.post(
+  "/terms",
+  authenticate,
+  authorize("MANAGE_ACADEMICS"),
+  createAcademicTerm
+);
+router.put(
+  "/terms/:id",
+  authenticate,
+  authorize("MANAGE_ACADEMICS"),
+  updateAcademicTerm
+);
+router.delete(
+  "/terms/:id",
+  authenticate,
+  authorize("MANAGE_ACADEMICS"),
+  deleteAcademicTerm
+);
+
+// Programs routes
+router.get(
+  "/programs",
+  authenticate,
+  authorize("MANAGE_ACADEMICS"),
+  getPrograms
+);
+router.get(
+  "/programs/:id",
+  authenticate,
+  authorize("MANAGE_ACADEMICS"),
+  getProgram
+);
+router.post(
+  "/programs",
+  authenticate,
+  authorize("MANAGE_ACADEMICS"),
+  createProgram
+);
+router.put(
+  "/programs/:id",
+  authenticate,
+  authorize("MANAGE_ACADEMICS"),
+  updateProgram
+);
+router.delete(
+  "/programs/:id",
+  authenticate,
+  authorize("MANAGE_ACADEMICS"),
+  deleteProgram
+);
+
+// Grades routes
+router.get("/grades", authenticate, authorize("MANAGE_ACADEMICS"), getGrades);
+router.get(
+  "/grades/:id",
+  authenticate,
+  authorize("MANAGE_ACADEMICS"),
+  getGrade
+);
+router.post(
+  "/grades",
+  authenticate,
+  authorize("MANAGE_ACADEMICS"),
+  createGrade
+);
+router.put(
+  "/grades/:id",
+  authenticate,
+  authorize("MANAGE_ACADEMICS"),
+  updateGrade
+);
+router.delete(
+  "/grades/:id",
+  authenticate,
+  authorize("MANAGE_ACADEMICS"),
+  deleteGrade
+);
+
+// Grade-Subject Assignment routes
+router.get(
+  "/grades/:grade_id/subjects",
+  authenticate,
+  authorize("MANAGE_ACADEMICS"),
+  getGradeSubjects
+);
+router.post(
+  "/grades/assign-subject",
+  authenticate,
+  authorize("MANAGE_ACADEMICS"),
+  assignSubjectToGrade
+);
+router.delete(
+  "/grades/:grade_id/subjects/:subject_id",
+  authenticate,
+  authorize("MANAGE_ACADEMICS"),
+  removeSubjectFromGrade
+);
+
+// Subjects routes
+router.get(
+  "/subjects",
+  authenticate,
+  authorize("MANAGE_ACADEMICS"),
+  getSubjects
+);
+router.get(
+  "/subjects/:id",
+  authenticate,
+  authorize("MANAGE_ACADEMICS"),
+  getSubject
+);
+router.post(
+  "/subjects",
+  authenticate,
+  authorize("MANAGE_ACADEMICS"),
+  createSubject
+);
+router.put(
+  "/subjects/:id",
+  authenticate,
+  authorize("MANAGE_ACADEMICS"),
+  updateSubject
+);
+router.delete(
+  "/subjects/:id",
+  authenticate,
+  authorize("MANAGE_ACADEMICS"),
+  deleteSubject
+);
+
+// Class Groups routes
+router.get(
+  "/class-groups",
+  authenticate,
+  authorize("MANAGE_ACADEMICS"),
+  getClassGroups
+);
+router.get(
+  "/class-groups/:id",
+  authenticate,
+  authorize("MANAGE_ACADEMICS"),
+  getClassGroup
+);
+router.post(
+  "/class-groups",
+  authenticate,
+  authorize("MANAGE_ACADEMICS"),
+  createClassGroup
+);
+router.put(
+  "/class-groups/:id",
+  authenticate,
+  authorize("MANAGE_ACADEMICS"),
+  updateClassGroup
+);
+router.delete(
+  "/class-groups/:id",
+  authenticate,
+  authorize("MANAGE_ACADEMICS"),
+  deleteClassGroup
+);
+
+export default router;

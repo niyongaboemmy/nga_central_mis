@@ -14,7 +14,7 @@ const Footer: React.FC<FooterProps> = ({ className = "" }) => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex flex-col sm:flex-row items-center justify-between space-y-2 sm:space-y-0">
           {/* Copyright */}
-          <div className="text-sm text-text-secondary-light dark:text-text-secondary-dark">
+          <div className="text-sm text-text-secondary-light dark:text-text-secondary-dark/70">
             © {currentYear} NGA Central MIS. All rights reserved.
           </div>
 
@@ -22,19 +22,19 @@ const Footer: React.FC<FooterProps> = ({ className = "" }) => {
           <div className="flex items-center space-x-6">
             <a
               href="#"
-              className="text-sm text-text-secondary-light dark:text-text-secondary-dark hover:text-blue-600 dark:hover:text-blue-400 transition-colors duration-200"
+              className="text-sm text-text-secondary-light dark:text-text-secondary-dark/70 hover:text-blue-600 dark:hover:text-blue-400 transition-colors duration-200"
             >
               Privacy Policy
             </a>
             <a
               href="#"
-              className="text-sm text-text-secondary-light dark:text-text-secondary-dark hover:text-blue-600 dark:hover:text-blue-400 transition-colors duration-200"
+              className="text-sm text-text-secondary-light dark:text-text-secondary-dark/70 hover:text-blue-600 dark:hover:text-blue-400 transition-colors duration-200"
             >
               Terms of Service
             </a>
             <a
               href="#"
-              className="text-sm text-text-secondary-light dark:text-text-secondary-dark hover:text-blue-600 dark:hover:text-blue-400 transition-colors duration-200"
+              className="text-sm text-text-secondary-light dark:text-text-secondary-dark/70 hover:text-blue-600 dark:hover:text-blue-400 transition-colors duration-200"
             >
               Help
             </a>

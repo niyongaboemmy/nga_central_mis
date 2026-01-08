@@ -179,16 +179,13 @@ const ShareModal: React.FC<ShareModalProps> = ({
         className="bg-white dark:bg-gray-800 rounded-3xl shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-hidden flex flex-col"
       >
         {/* Header */}
-        <div className="relative bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 p-6 text-white">
+        <div className="relative bg-gradient-to-r from-blue-500 via-blue-500 to-blue-500 p-6 text-white">
           <div className="absolute inset-0 bg-black/10" />
           <div className="relative flex items-start justify-between">
             <div className="flex items-center gap-4">
               <div className="w-14 h-14 bg-white/20 backdrop-blur-lg rounded-2xl flex items-center justify-center">
                 {isFolderItem ? (
-                  <FiFolder
-                    className="w-8 h-8"
-                    style={{ color: (shareItem as Folder).color }}
-                  />
+                  <FiFolder className="w-8 h-8 text-white" />
                 ) : (
                   <div className="transform hover:scale-110 transition-transform">
                     {getFileIconComponent(shareItem as Document, 48)}
@@ -242,7 +239,7 @@ const ShareModal: React.FC<ShareModalProps> = ({
               {shareTab === tab.id && (
                 <motion.div
                   layoutId="activeTab"
-                  className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-blue-500 to-purple-500"
+                  className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-blue-500 to-blue-500"
                 />
               )}
             </motion.button>
@@ -451,7 +448,7 @@ const ShareModal: React.FC<ShareModalProps> = ({
                           initial={{ opacity: 0, x: -20 }}
                           animate={{ opacity: 1, x: 0 }}
                           exit={{ opacity: 0, x: 20 }}
-                          className="flex items-center justify-between p-3 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 rounded-2xl border border-blue-100 dark:border-blue-800"
+                          className="flex items-center justify-between p-3 bg-gradient-to-r from-blue-50 to-blue-50 dark:from-blue-900/20 dark:to-blue-900/20 rounded-2xl border border-blue-100 dark:border-blue-800"
                         >
                           <div className="flex items-center gap-3">
                             <div
@@ -516,7 +513,7 @@ const ShareModal: React.FC<ShareModalProps> = ({
                           selectedShareRoles.find(
                             (r) => r.role_id === role.role_id
                           )
-                            ? "border-purple-500 bg-purple-50 dark:bg-purple-900/20"
+                            ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20"
                             : "border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500"
                         }`}
                       >
@@ -526,7 +523,7 @@ const ShareModal: React.FC<ShareModalProps> = ({
                               selectedShareRoles.find(
                                 (r) => r.role_id === role.role_id
                               )
-                                ? "bg-purple-500 text-white"
+                                ? "bg-blue-500 text-white"
                                 : "bg-gray-100 dark:bg-gray-700 text-gray-500"
                             }`}
                           >
@@ -545,7 +542,7 @@ const ShareModal: React.FC<ShareModalProps> = ({
                           {selectedShareRoles.find(
                             (r) => r.role_id === role.role_id
                           ) && (
-                            <FiCheckCircle className="w-5 h-5 text-purple-500" />
+                            <FiCheckCircle className="w-5 h-5 text-blue-500" />
                           )}
                         </div>
                       </motion.button>
@@ -572,7 +569,7 @@ const ShareModal: React.FC<ShareModalProps> = ({
                           initial={{ opacity: 0, scale: 0.8 }}
                           animate={{ opacity: 1, scale: 1 }}
                           exit={{ opacity: 0, scale: 0.8 }}
-                          className="flex items-center gap-2 px-4 py-2 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded-full"
+                          className="flex items-center gap-2 px-4 py-2 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full"
                         >
                           <FiShield className="w-4 h-4" />
                           <span className="text-sm font-medium">
@@ -582,7 +579,7 @@ const ShareModal: React.FC<ShareModalProps> = ({
                             whileHover={{ scale: 1.1 }}
                             whileTap={{ scale: 0.9 }}
                             onClick={() => onRemoveRole(role.role_id)}
-                            className="p-0.5 hover:bg-purple-200 dark:hover:bg-purple-800 rounded-full"
+                            className="p-0.5 hover:bg-blue-200 dark:hover:bg-blue-800 rounded-full"
                           >
                             <FiX className="w-3 h-3" />
                           </motion.button>
@@ -597,9 +594,9 @@ const ShareModal: React.FC<ShareModalProps> = ({
 
           {shareTab === "links" && (
             <div className="space-y-6">
-              <div className="p-6 bg-gradient-to-br from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 rounded-2xl border border-blue-100 dark:border-blue-800">
+              <div className="p-6 bg-gradient-to-br from-blue-50 to-blue-50 dark:from-blue-900/20 dark:to-blue-900/20 rounded-2xl border border-blue-100 dark:border-blue-800">
                 <div className="flex items-start gap-4">
-                  <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-500 rounded-xl flex items-center justify-center text-white">
+                  <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-500 rounded-xl flex items-center justify-center text-white">
                     <FiLink className="w-6 h-6" />
                   </div>
                   <div className="flex-1">
@@ -658,7 +655,7 @@ const ShareModal: React.FC<ShareModalProps> = ({
                     id: "SHARE",
                     icon: FiShare2,
                     label: "Share",
-                    color: "purple",
+                    color: "blue",
                   },
                 ].map((perm) => (
                   <motion.button
@@ -716,7 +713,7 @@ const ShareModal: React.FC<ShareModalProps> = ({
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               onClick={onClose}
-              className="px-6 py-2.5 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-xl transition-all"
+              className="px-6 py-2 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full transition-all"
             >
               Cancel
             </motion.button>
@@ -729,9 +726,9 @@ const ShareModal: React.FC<ShareModalProps> = ({
                   selectedShareRoles.length === 0) ||
                 isSharing
               }
-              className={`px-8 py-2.5 bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-xl shadow-lg shadow-blue-500/30 transition-all disabled:opacity-50 flex items-center gap-2 ${
+              className={`px-8 py-2 bg-gradient-to-r from-blue-500 to-blue-500 text-white rounded-full shadow-lg shadow-blue-500/30 transition-all disabled:opacity-50 flex items-center gap-2 ${
                 selectedShareUsers.length > 0 || selectedShareRoles.length > 0
-                  ? "hover:from-blue-600 hover:to-purple-600"
+                  ? "hover:from-blue-600 hover:to-blue-600"
                   : ""
               }`}
             >

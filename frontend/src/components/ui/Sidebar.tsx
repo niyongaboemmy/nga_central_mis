@@ -84,6 +84,26 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed = false, onToggle }) => {
       ),
     },
     {
+      label: "Academics",
+      path: "/academics",
+      icon: (
+        <svg
+          className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`}
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
+          />
+        </svg>
+      ),
+      requiredPermission: Permissions.MANAGE_ACADEMICS,
+    },
+    {
       label: "Users",
       path: "/users",
       icon: (
@@ -177,7 +197,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed = false, onToggle }) => {
           className="p-2 rounded-lg hover:bg-surface-light dark:hover:bg-surface-dark transition-colors"
         >
           <svg
-            className={`text-text-secondary-light dark:text-text-secondary-dark transition-transform ${
+            className={`text-text-secondary-light dark:text-text-secondary-dark/70 transition-transform ${
               isCollapsed ? "rotate-180 w-5 h-5" : "w-4 h-4"
             }`}
             fill="none"
@@ -208,7 +228,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed = false, onToggle }) => {
                   } space-x-3 px-3 py-3 rounded-xl transition-all duration-200 ${
                     isActive(item.path)
                       ? "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"
-                      : "font-light text-text-secondary-light dark:text-text-secondary-dark hover:bg-surface-light dark:hover:bg-surface-dark hover:text-text-primary-light dark:hover:text-text-primary-dark"
+                      : "font-light text-text-secondary-light dark:text-text-secondary-dark/70 hover:bg-surface-light dark:hover:bg-surface-dark hover:text-text-primary-light dark:hover:text-text-primary-dark"
                   }`}
                 >
                   <span className={`flex-shrink-0`}>{item.icon}</span>
@@ -222,7 +242,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed = false, onToggle }) => {
       {/* Bottom section */}
       <div className="p-4 border-t border-border-light dark:border-gray-700/30">
         {!isCollapsed && (
-          <div className="text-xs text-text-secondary-light dark:text-text-secondary-dark text-center">
+          <div className="text-xs text-text-secondary-light dark:text-text-secondary-dark/70 text-center">
             NGA MIS v1.0
           </div>
         )}

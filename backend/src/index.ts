@@ -10,6 +10,7 @@ import userRoutes from "./routes/users";
 import permissionRoutes from "./routes/permissions";
 import healthRoutes from "./routes/health";
 import documentRoutes from "./routes/documents";
+import academicRoutes from "./routes/academics";
 
 dotenv.config();
 
@@ -46,6 +47,7 @@ app.use("/auth", authRoutes);
 app.use("/users", userRoutes);
 app.use("/permissions", permissionRoutes);
 app.use("/documents", documentRoutes);
+app.use("/academics", academicRoutes);
 
 // Error handling middleware (must be last)
 app.use(errorHandler);
