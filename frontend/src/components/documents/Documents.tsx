@@ -19,6 +19,7 @@ import CreateFolderModal from "./CreateFolderModal";
 import ShareModal from "./ShareModal";
 import ContextMenu from "./ContextMenu";
 import StatusBar from "./StatusBar";
+import LoadingOverlay from "./LoadingOverlay";
 import type {
   BreadcrumbItem,
   TabType,
@@ -63,6 +64,15 @@ const Documents: React.FC = () => {
   const [uploadProgress, setUploadProgress] = useState<{
     [key: string]: number;
   }>({});
+  const [isCreatingFolder, setIsCreatingFolder] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isRemovingAccess, setIsRemovingAccess] = useState(false);
+  const [isRemovingPermission, setIsRemovingPermission] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [isLoadingFolderTree, setIsLoadingFolderTree] = useState(false);
+  const [deletingItem, setDeletingItem] = useState<Folder | Document | null>(
+    null
+  );
 
   // Share modal state
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
@@ -129,11 +139,14 @@ const Documents: React.FC = () => {
 
   // Fetch folder tree (for sidebar)
   const fetchFolderTree = async () => {
+    setIsLoadingFolderTree(true);
     try {
       const response = await folderApi.getAll();
       setFolderTree(response.data.data || []);
     } catch (error) {
       console.error("Failed to fetch folder tree:", error);
+    } finally {
+      setIsLoadingFolderTree(false);
     }
   };
 
@@ -345,6 +358,7 @@ const Documents: React.FC = () => {
       return;
     }
 
+    setIsCreatingFolder(true);
     try {
       await folderApi.create({
         name: newFolderName,
@@ -360,6 +374,8 @@ const Documents: React.FC = () => {
         error.response?.data?.message || "Failed to create folder",
         "error"
       );
+    } finally {
+      setIsCreatingFolder(false);
     }
   };
 
@@ -376,6 +392,8 @@ const Documents: React.FC = () => {
 
     if (!window.confirm(confirmMessage)) return;
 
+    setIsDeleting(true);
+    setDeletingItem(item);
     try {
       if (isFolderItem) {
         await folderApi.delete((item as Folder).folder_id);
@@ -391,8 +409,11 @@ const Documents: React.FC = () => {
       fetchFolderTree();
     } catch (error: any) {
       showToast("Failed to delete item", "error");
+    } finally {
+      setIsDeleting(false);
+      setDeletingItem(null);
+      setContextMenu(null);
     }
-    setContextMenu(null);
   };
 
   // Remove shared document access
@@ -400,6 +421,7 @@ const Documents: React.FC = () => {
     const confirmMessage = `Are you sure you want to remove access to "${sharedDoc.document.original_name}"?`;
     if (!window.confirm(confirmMessage)) return;
 
+    setIsRemovingAccess(true);
     try {
       await documentApi.revokeAccess(sharedDoc.permission.permission_id);
       showToast("Access removed successfully", "success");
@@ -409,12 +431,15 @@ const Documents: React.FC = () => {
         error.response?.data?.message || "Failed to remove access",
         "error"
       );
+    } finally {
+      setIsRemovingAccess(false);
+      setContextMenu(null);
     }
-    setContextMenu(null);
   };
 
   // Remove permission from share modal
   const handleRemovePermission = async (permissionId: number) => {
+    setIsRemovingPermission(true);
     try {
       if (shareItem && (shareItem as Folder).folder_id !== undefined) {
         await folderPermissionApi.revokeAccess(permissionId);
@@ -430,11 +455,14 @@ const Documents: React.FC = () => {
         error.response?.data?.message || "Failed to remove access",
         "error"
       );
+    } finally {
+      setIsRemovingPermission(false);
     }
   };
 
   // Download document
   const handleDownload = async (doc: Document) => {
+    setIsDownloading(true);
     try {
       const response = await documentApi.download(doc.document_id);
       const url = window.URL.createObjectURL(new Blob([response.data]));
@@ -448,8 +476,10 @@ const Documents: React.FC = () => {
       showToast("Download started", "success");
     } catch (error) {
       showToast("Failed to download file", "error");
+    } finally {
+      setIsDownloading(false);
+      setContextMenu(null);
     }
-    setContextMenu(null);
   };
 
   // Open share modal
@@ -622,6 +652,19 @@ const Documents: React.FC = () => {
     </AnimatePresence>
   );
 
+  // Get loading message based on current operation
+  const getLoadingMessage = () => {
+    if (isDeleting && deletingItem) {
+      const isFolderItem = (deletingItem as Folder).folder_id !== undefined;
+      return isFolderItem
+        ? `Deleting folder "${(deletingItem as Folder).name}"...`
+        : `Deleting "${(deletingItem as Document).original_name}"...`;
+    }
+    if (isDownloading) return "Preparing download...";
+    if (isRemovingAccess) return "Removing access...";
+    return "Processing...";
+  };
+
   return (
     <div className="flex bg-gray-50 dark:bg-black h-full">
       {/* Folder Tree Sidebar */}
@@ -631,6 +674,7 @@ const Documents: React.FC = () => {
             showFolderTree={showFolderTree}
             currentFolderId={currentFolderId}
             folderTree={folderTree}
+            isLoading={isLoadingFolderTree}
             onNavigateToFolder={navigateToFolder}
             onGoToRoot={() => {
               setBreadcrumbs([{ id: null, name: "My Documents" }]);
@@ -722,6 +766,7 @@ const Documents: React.FC = () => {
       <CreateFolderModal
         isOpen={isCreateFolderModalOpen}
         folderName={newFolderName}
+        isCreating={isCreatingFolder}
         onFolderNameChange={setNewFolderName}
         onCreate={handleCreateFolder}
         onClose={() => {
@@ -746,6 +791,7 @@ const Documents: React.FC = () => {
         isLoadingRoles={isLoadingRoles}
         existingPermissions={existingPermissions}
         isLoadingPermissions={isLoadingPermissions}
+        isRemovingPermission={isRemovingPermission}
         expirationDate={expirationDate}
         copySuccess={copySuccess}
         searchError={searchError}
@@ -789,6 +835,12 @@ const Documents: React.FC = () => {
 
       {/* Upload Progress */}
       {renderUploadProgress()}
+
+      {/* Global Loading Overlay */}
+      <LoadingOverlay
+        isVisible={isDeleting || isDownloading || isRemovingAccess}
+        message={getLoadingMessage()}
+      />
 
       {/* Hidden file input */}
       <input

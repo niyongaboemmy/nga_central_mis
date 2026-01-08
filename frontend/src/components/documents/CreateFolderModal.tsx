@@ -5,6 +5,7 @@ import { modalVariants } from "./types";
 interface CreateFolderModalProps {
   isOpen: boolean;
   folderName: string;
+  isCreating: boolean;
   onFolderNameChange: (name: string) => void;
   onCreate: () => void;
   onClose: () => void;
@@ -13,6 +14,7 @@ interface CreateFolderModalProps {
 const CreateFolderModal: React.FC<CreateFolderModalProps> = ({
   isOpen,
   folderName,
+  isCreating,
   onFolderNameChange,
   onCreate,
   onClose,
@@ -31,7 +33,7 @@ const CreateFolderModal: React.FC<CreateFolderModalProps> = ({
         initial="hidden"
         animate={isOpen ? "visible" : "hidden"}
         exit="exit"
-        className="bg-white dark:bg-gray-800 rounded-2xl p-6 w-full max-w-md shadow-2xl"
+        className="bg-white dark:bg-gray-900 rounded-2xl p-6 w-full max-w-md shadow-3xl"
       >
         <h2 className="text-xl font-semibold text-gray-700 dark:text-gray-200 mb-4">
           Create New Folder
@@ -42,16 +44,18 @@ const CreateFolderModal: React.FC<CreateFolderModalProps> = ({
           value={folderName}
           onChange={(e) => onFolderNameChange(e.target.value)}
           placeholder="Folder name"
-          className="w-full px-4 py-3 border border-gray-200 dark:border-gray-600 rounded-xl bg-gray-50 dark:bg-gray-700 text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 mb-4 transition-all"
+          className="w-full px-4 py-3 border border-gray-200 dark:border-gray-600 rounded-2xl bg-gray-50 dark:bg-gray-800/70 text-gray-700 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 mb-4 transition-all"
           autoFocus
-          onKeyDown={(e) => e.key === "Enter" && onCreate()}
+          onKeyDown={(e) => e.key === "Enter" && !isCreating && onCreate()}
+          disabled={isCreating}
         />
         <div className="flex justify-end gap-3">
           <motion.button
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
             onClick={onClose}
-            className="px-4 py-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-all"
+            disabled={isCreating}
+            className="px-5 py-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-all disabled:opacity-50"
           >
             Cancel
           </motion.button>
@@ -59,9 +63,17 @@ const CreateFolderModal: React.FC<CreateFolderModalProps> = ({
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
             onClick={onCreate}
-            className="px-4 py-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg hover:from-blue-600 hover:to-blue-700 shadow-lg shadow-blue-500/30 transition-all"
+            disabled={isCreating}
+            className="px-6 py-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-full hover:from-blue-600 hover:to-blue-700 shadow-blue-500/30 transition-all disabled:opacity-50 flex items-center gap-2"
           >
-            Create
+            {isCreating ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                Creating...
+              </>
+            ) : (
+              "Create"
+            )}
           </motion.button>
         </div>
       </motion.div>

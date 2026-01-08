@@ -94,6 +94,7 @@ interface ShareModalProps {
   isLoadingRoles: boolean;
   existingPermissions: any[];
   isLoadingPermissions: boolean;
+  isRemovingPermission: boolean;
   expirationDate: string;
   copySuccess: boolean;
   searchError: string | null;
@@ -127,6 +128,7 @@ const ShareModal: React.FC<ShareModalProps> = ({
   isLoadingRoles,
   existingPermissions,
   isLoadingPermissions,
+  isRemovingPermission,
   expirationDate,
   copySuccess,
   searchError,
@@ -306,9 +308,14 @@ const ShareModal: React.FC<ShareModalProps> = ({
                             onClick={() =>
                               handleRemovePermission(perm.permission_id)
                             }
-                            className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                            disabled={isRemovingPermission}
+                            className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors disabled:opacity-50"
                           >
-                            <FiTrash className="w-4 h-4" />
+                            {isRemovingPermission ? (
+                              <div className="w-4 h-4 border-2 border-red-300 border-t-red-500 rounded-full animate-spin" />
+                            ) : (
+                              <FiTrash className="w-4 h-4" />
+                            )}
                           </motion.button>
                         </div>
                       </motion.div>

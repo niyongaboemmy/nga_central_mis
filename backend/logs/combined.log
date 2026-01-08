@@ -4314,3 +4314,4 @@
 {"duration":2,"level":"info","message":"GET /documents/folders 304 - 2ms","service":"nga-central-mis","statusCode":304,"timestamp":"2026-01-07T23:49:25.454Z"}
 {"ip":"::1","level":"info","message":"GET /documents/folders","service":"nga-central-mis","timestamp":"2026-01-07T23:49:25.455Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
 {"duration":2,"level":"info","message":"GET /documents/folders 304 - 2ms","service":"nga-central-mis","statusCode":304,"timestamp":"2026-01-07T23:49:25.457Z"}
+{"level":"info","message":"SIGINT received, shutting down gracefully","service":"nga-central-mis","timestamp":"2026-01-07T23:50:18.480Z"}
