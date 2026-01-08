@@ -603,8 +603,15 @@ export const getGrades = asyncHandler(async (req: any, res: any) => {
   }
 
   const grades = await db
-    .select()
+    .select({
+      grade_id: Grade.grade_id,
+      program_id: Grade.program_id,
+      name: Grade.name,
+      level_order: Grade.level_order,
+      program_name: Program.name,
+    })
     .from(Grade)
+    .innerJoin(Program, eq(Grade.program_id, Program.program_id))
     .where(whereCondition)
     .orderBy(Grade.level_order);
 
@@ -771,9 +778,51 @@ export const deleteGrade = asyncHandler(async (req: any, res: any) => {
 export const getSubjects = asyncHandler(async (req: any, res: any) => {
   logger.info("Fetching all subjects");
 
-  const subjects = await db.select().from(Subject).orderBy(Subject.name);
+  const subjects = await db
+    .select({
+      subject_id: Subject.subject_id,
+      code: Subject.code,
+      name: Subject.name,
+      description: Subject.description,
+      grade_id: Grade.grade_id,
+      grade_name: Grade.name,
+      program_id: Program.program_id,
+      program_name: Program.name,
+    })
+    .from(Subject)
+    .leftJoin(GradeSubject, eq(Subject.subject_id, GradeSubject.subject_id))
+    .leftJoin(Grade, eq(GradeSubject.grade_id, Grade.grade_id))
+    .leftJoin(Program, eq(Grade.program_id, Program.program_id))
+    .orderBy(Subject.name);
 
-  successResponse(res, "Subjects retrieved successfully", subjects);
+  // Group subjects by subject_id and collect their grades/programs
+  const subjectMap = new Map<number, any>();
+
+  subjects.forEach((row) => {
+    const subjectId = row.subject_id;
+    if (!subjectMap.has(subjectId)) {
+      subjectMap.set(subjectId, {
+        subject_id: row.subject_id,
+        code: row.code,
+        name: row.name,
+        description: row.description,
+        grades: [],
+      });
+    }
+
+    if (row.grade_id) {
+      subjectMap.get(subjectId).grades.push({
+        grade_id: row.grade_id,
+        grade_name: row.grade_name,
+        program_id: row.program_id,
+        program_name: row.program_name,
+      });
+    }
+  });
+
+  const result = Array.from(subjectMap.values());
+
+  successResponse(res, "Subjects retrieved successfully", result);
 });
 
 export const getSubject = asyncHandler(async (req: any, res: any) => {

@@ -29,6 +29,7 @@ export interface Grade {
   program_id: number;
   name: string;
   level_order: number;
+  program_name?: string;
 }
 
 export interface Subject {
@@ -36,6 +37,12 @@ export interface Subject {
   code: string | null;
   name: string;
   description: string | null;
+  grades?: Array<{
+    grade_id: number;
+    grade_name: string;
+    program_id: number;
+    program_name: string;
+  }>;
 }
 
 export interface ClassGroup {

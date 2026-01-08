@@ -150,8 +150,8 @@ const ClassGroupsTab: React.FC<ClassGroupsTabProps> = ({
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="">
+      <div className="flex items-center justify-between mb-6">
         <div>
           <h2 className="text-xl font-semibold text-black dark:text-text-primary-dark">
             Class Groups
