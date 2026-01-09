@@ -1,6 +1,6 @@
 import React from "react";
 import { motion } from "framer-motion";
-import { FiUsers, FiFolder } from "react-icons/fi";
+import { FiUsers } from "react-icons/fi";
 import {
   type Folder,
   type Document,
@@ -25,76 +25,42 @@ const itemIsFolder = (item: Folder | Document): item is Folder => {
   );
 };
 
-interface DocumentsContentProps {
-  isLoading: boolean;
+interface SharedWithMeContentProps {
   isLoadingShared: boolean;
-  activeTab: "my-documents" | "shared-with-me";
   viewMode: ViewMode;
-  folders: Folder[];
-  filteredDocuments: Document[];
   filteredSharedDocuments: SharedDocument[];
   filteredSharedFolders: any[];
   sortBy: SortOption;
   sortOrder: "asc" | "desc";
   currentSharedFolder: any | null;
-  onNavigateToFolder: (folder: Folder) => void;
+  folders: Folder[];
+  filteredDocuments: Document[];
   onNavigateToSharedFolder: (sharedFolder: any) => Promise<void>;
   onNavigateToSharedSubFolder: (folder: Folder) => Promise<void>;
   onPreview: (doc: Document) => void;
   onContextMenu: (
     e: React.MouseEvent,
-    item: Folder | Document | SharedDocument,
-    type: "folder" | "document" | "shared-document" | "shared-folder"
+    item: SharedDocument | any,
+    type: "shared-document" | "shared-folder" | "folder" | "document"
   ) => void;
 }
 
-const DocumentsContent: React.FC<DocumentsContentProps> = ({
-  isLoading,
+const SharedWithMeContent: React.FC<SharedWithMeContentProps> = ({
   isLoadingShared,
-  activeTab,
   viewMode,
-  folders,
-  filteredDocuments,
   filteredSharedDocuments,
   filteredSharedFolders,
   sortBy,
   sortOrder,
   currentSharedFolder,
-  onNavigateToFolder,
+  folders,
+  filteredDocuments,
   onNavigateToSharedFolder,
   onNavigateToSharedSubFolder,
   onPreview,
   onContextMenu,
 }) => {
-  // Sort items helper
-  const getSortedItems = () => {
-    const allItems = [...folders, ...filteredDocuments];
-    return allItems.sort((a, b) => {
-      let comparison = 0;
-      const aIsFolder = itemIsFolder(a);
-      const bIsFolder = itemIsFolder(b);
-
-      if (aIsFolder && bIsFolder) {
-        comparison = a.name.localeCompare(b.name);
-      } else if (!aIsFolder && !bIsFolder) {
-        if (sortBy === "name") {
-          comparison = a.original_name.localeCompare(b.original_name);
-        } else if (sortBy === "size") {
-          comparison = a.file_size - b.file_size;
-        } else if (sortBy === "date") {
-          comparison =
-            new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
-        } else {
-          comparison = a.file_extension.localeCompare(b.file_extension);
-        }
-      } else {
-        comparison = aIsFolder ? -1 : 1;
-      }
-      return sortOrder === "asc" ? comparison : -comparison;
-    });
-  };
-
-  if (isLoading || (activeTab === "shared-with-me" && isLoadingShared)) {
+  if (isLoadingShared) {
     return (
       <div className="flex items-center justify-center h-full">
         <motion.div
@@ -106,31 +72,8 @@ const DocumentsContent: React.FC<DocumentsContentProps> = ({
     );
   }
 
-  // Empty state for my documents
-  if (activeTab === "my-documents" && getSortedItems().length === 0) {
-    return (
-      <motion.div
-        initial={{ opacity: 0, scale: 0.9 }}
-        animate={{ opacity: 1, scale: 1 }}
-        className="flex flex-col items-center justify-center h-full text-gray-400"
-      >
-        <motion.div
-          animate={{ y: [0, -10, 0] }}
-          transition={{ duration: 2, repeat: Infinity }}
-        >
-          <FiFolder className="w-20 h-20 mb-4 opacity-50" />
-        </motion.div>
-        <p className="text-xl font-medium text-gray-500">
-          This folder is empty
-        </p>
-        <p className="text-sm mt-2">Upload files or create a new folder</p>
-      </motion.div>
-    );
-  }
-
   // Empty state for shared documents
   if (
-    activeTab === "shared-with-me" &&
     filteredSharedDocuments.length === 0 &&
     filteredSharedFolders.length === 0
   ) {
@@ -154,80 +97,7 @@ const DocumentsContent: React.FC<DocumentsContentProps> = ({
     );
   }
 
-  // My documents view
-  if (activeTab === "my-documents") {
-    const sortedItems = getSortedItems();
-
-    return viewMode === "grid" ? (
-      <motion.div
-        variants={containerVariants}
-        initial="hidden"
-        animate="visible"
-        className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4"
-      >
-        {sortedItems.map((item, i) => (
-          <motion.div key={i + 1} variants={itemVariants}>
-            {itemIsFolder(item) ? (
-              <FolderItem
-                folder={item}
-                viewMode="grid"
-                onClick={() => onNavigateToFolder(item)}
-                onContextMenu={(e) => onContextMenu(e, item, "folder")}
-              />
-            ) : (
-              <FileItem
-                document={item}
-                viewMode="grid"
-                onClick={() => onPreview(item)}
-                onContextMenu={(e) => onContextMenu(e, item, "document")}
-              />
-            )}
-          </motion.div>
-        ))}
-      </motion.div>
-    ) : (
-      <div className="w-full">
-        {/* Windows 11 style list header */}
-        <div className="px-4 py-2 border-b border-gray-200 dark:border-gray-700/20 bg-gray-50 dark:bg-gray-800/50">
-          <div className="flex items-center text-sm text-gray-500 dark:text-gray-400">
-            <div className="w-8 mr-3"></div>
-            <div className="flex-1">Name</div>
-            <div className="hidden md:flex w-20">Size</div>
-            <div className="hidden lg:flex w-16">Type</div>
-            <div className="hidden xl:flex w-24">Modified</div>
-            <div className="w-8"></div>
-          </div>
-        </div>
-
-        {/* List items */}
-        <div className="divide-y divide-gray-100 dark:divide-gray-700/20">
-          {sortedItems.map((item, index) => (
-            <div key={index + 1}>
-              {itemIsFolder(item) ? (
-                <FolderItem
-                  folder={item}
-                  viewMode="list"
-                  onClick={() => onNavigateToFolder(item)}
-                  onContextMenu={(e) => onContextMenu(e, item, "folder")}
-                  onMoreClick={(e) => onContextMenu(e, item, "folder")}
-                />
-              ) : (
-                <FileItem
-                  document={item}
-                  viewMode="list"
-                  onClick={() => onPreview(item)}
-                  onContextMenu={(e) => onContextMenu(e, item, "document")}
-                  onMoreClick={(e) => onContextMenu(e, item, "document")}
-                />
-              )}
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  }
-
-  // Shared with me view
+  // Shared with me view when inside a shared folder
   if (currentSharedFolder) {
     // We're inside a shared folder, show its contents like my-documents
     const sortedItems = [...folders, ...filteredDocuments].sort((a, b) => {
@@ -272,15 +142,10 @@ const DocumentsContent: React.FC<DocumentsContentProps> = ({
                   onContextMenu={(e) => onContextMenu(e, item, "folder")}
                   showOwner={true}
                   ownerName={
-                    currentSharedFolder?.permission?.shared_by_user
-                      ? `${
-                          currentSharedFolder.permission.shared_by_user
-                            .first_name || ""
-                        } ${
-                          currentSharedFolder.permission.shared_by_user
-                            .last_name || ""
-                        }`.trim() ||
-                        currentSharedFolder.permission.shared_by_user.username
+                    item.owner
+                      ? `${item.owner.first_name || ""} ${
+                          item.owner.last_name || ""
+                        }`.trim() || item.owner.username
                       : "Unknown"
                   }
                 />
@@ -313,9 +178,9 @@ const DocumentsContent: React.FC<DocumentsContentProps> = ({
             <div className="flex items-center text-sm text-gray-500 dark:text-gray-400">
               <div className="w-8 mr-3"></div>
               <div className="flex-1">Name</div>
-              <div className="hidden md:flex w-20">Size</div>
-              <div className="hidden lg:flex w-16">Type</div>
-              <div className="hidden xl:flex w-24">Modified</div>
+              <div className="hidden sm:flex w-20">Size</div>
+              <div className="hidden sm:flex w-16">Type</div>
+              <div className="hidden sm:flex w-24">Modified</div>
               <div className="w-8"></div>
             </div>
           </div>
@@ -390,10 +255,10 @@ const DocumentsContent: React.FC<DocumentsContentProps> = ({
           <div className="flex items-center text-sm text-gray-500 dark:text-gray-400">
             <div className="w-8 mr-3"></div>
             <div className="flex-1">Name</div>
-            <div className="hidden md:flex w-20">Shared by</div>
-            <div className="hidden lg:flex w-16">Items</div>
-            <div className="hidden xl:flex w-20">Permission</div>
-            <div className="hidden 2xl:flex w-24">Date Shared</div>
+            <div className="hidden sm:flex w-20">Shared by</div>
+            <div className="hidden sm:flex w-16">Items</div>
+            <div className="hidden sm:flex w-20">Permission</div>
+            <div className="hidden sm:flex w-24">Date Shared</div>
             <div className="w-8"></div>
           </div>
         </div>
@@ -401,7 +266,7 @@ const DocumentsContent: React.FC<DocumentsContentProps> = ({
         {/* List items */}
         <div className="divide-y divide-gray-100 dark:divide-gray-700/20">
           {allSharedItems.map((shared, index) => (
-            <div key={index + 1}>
+            <div key={`shared-${shared.type}-${index + 1}`}>
               {shared.type === "document" ? (
                 <SharedDocumentItem
                   sharedDocument={shared}
@@ -466,4 +331,4 @@ const DocumentsContent: React.FC<DocumentsContentProps> = ({
   );
 };
 
-export default DocumentsContent;
+export default SharedWithMeContent;

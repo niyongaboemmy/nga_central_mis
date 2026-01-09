@@ -15,6 +15,7 @@ import { roleApi, folderPermissionApi } from "../../api/documents";
 import FolderTree from "./FolderTree";
 import DocumentsToolbar from "./DocumentsToolbar";
 import DocumentsContent from "./DocumentsContent";
+import SharedWithMeContent from "./SharedWithMeContent";
 import CreateFolderModal from "./CreateFolderModal";
 import RenameModal from "./RenameModal";
 import ShareModal from "./ShareModal";
@@ -168,8 +169,18 @@ const Documents: React.FC = () => {
           }),
         ]);
 
-        setFolders(foldersRes.data.data || []);
-        setDocuments(documentsRes.data.data || []);
+        setFolders(
+          foldersRes.data.data?.map((item: any) => ({
+            ...item.folder,
+            owner: item.owner,
+          })) || []
+        );
+        setDocuments(
+          documentsRes.data.data?.map((item: any) => ({
+            ...item.document,
+            owner: item.owner,
+          })) || []
+        );
       } else {
         // Regular owned folder navigation
         const [foldersRes, documentsRes] = await Promise.all([
@@ -181,8 +192,18 @@ const Documents: React.FC = () => {
           }),
         ]);
 
-        setFolders(foldersRes.data.data || []);
-        setDocuments(documentsRes.data.data || []);
+        setFolders(
+          foldersRes.data.data?.map((item: any) => ({
+            ...item.folder,
+            owner: item.owner,
+          })) || []
+        );
+        setDocuments(
+          documentsRes.data.data?.map((item: any) => ({
+            ...item.document,
+            owner: item.owner,
+          })) || []
+        );
       }
     } catch (error: any) {
       showToast("Failed to load documents", "error");
@@ -213,7 +234,12 @@ const Documents: React.FC = () => {
     setIsLoadingFolderTree(true);
     try {
       const response = await folderApi.getAll();
-      setFolderTree(response.data.data || []);
+      setFolderTree(
+        response.data.data?.map((item: any) => ({
+          ...item.folder,
+          owner: item.owner,
+        })) || []
+      );
     } catch (error) {
       console.error("Failed to fetch folder tree:", error);
     } finally {
@@ -439,8 +465,18 @@ const Documents: React.FC = () => {
       ]);
       setCurrentFolderId(parseInt(sharedFolder.folder.folder_id));
       setCurrentSharedFolder(sharedFolder);
-      setFolders(foldersRes.data.data || []);
-      setDocuments(documentsRes.data.data || []);
+      setFolders(
+        foldersRes.data.data?.map((item: any) => ({
+          ...item.folder,
+          owner: item.owner,
+        })) || []
+      );
+      setDocuments(
+        documentsRes.data.data?.map((item: any) => ({
+          ...item.document,
+          owner: item.owner,
+        })) || []
+      );
       setSelectedItems([]);
     } catch (error: any) {
       showToast("Failed to load folder contents", "error");
@@ -478,8 +514,18 @@ const Documents: React.FC = () => {
       ]);
       setCurrentFolderId(folder.folder_id);
       // Keep currentSharedFolder set for the parent
-      setFolders(foldersRes.data.data || []);
-      setDocuments(documentsRes.data.data || []);
+      setFolders(
+        foldersRes.data.data?.map((item: any) => ({
+          ...item.folder,
+          owner: item.owner,
+        })) || []
+      );
+      setDocuments(
+        documentsRes.data.data?.map((item: any) => ({
+          ...item.document,
+          owner: item.owner,
+        })) || []
+      );
       setSelectedItems([]);
     } catch (error: any) {
       showToast("Failed to load folder contents", "error");
@@ -1097,24 +1143,42 @@ const Documents: React.FC = () => {
             });
           }}
         >
-          <DocumentsContent
-            isLoading={isLoading}
-            isLoadingShared={isLoadingShared}
-            activeTab={activeTab}
-            viewMode={viewMode}
-            folders={folders}
-            filteredDocuments={filteredDocuments}
-            filteredSharedDocuments={filteredSharedDocuments}
-            filteredSharedFolders={filteredSharedFolders}
-            sortBy={sortBy}
-            sortOrder={sortOrder}
-            currentSharedFolder={currentSharedFolder}
-            onNavigateToFolder={navigateToFolder}
-            onNavigateToSharedFolder={navigateToSharedFolder}
-            onNavigateToSharedSubFolder={navigateToSharedSubFolder}
-            onContextMenu={handleContextMenu}
-            onPreview={handlePreview}
-          />
+          {activeTab === "shared-with-me" ? (
+            <SharedWithMeContent
+              isLoadingShared={isLoadingShared}
+              viewMode={viewMode}
+              filteredSharedDocuments={filteredSharedDocuments}
+              filteredSharedFolders={filteredSharedFolders}
+              sortBy={sortBy}
+              sortOrder={sortOrder}
+              currentSharedFolder={currentSharedFolder}
+              folders={folders}
+              filteredDocuments={filteredDocuments}
+              onNavigateToSharedFolder={navigateToSharedFolder}
+              onNavigateToSharedSubFolder={navigateToSharedSubFolder}
+              onPreview={handlePreview}
+              onContextMenu={handleContextMenu}
+            />
+          ) : (
+            <DocumentsContent
+              isLoading={isLoading}
+              isLoadingShared={isLoadingShared}
+              activeTab={activeTab}
+              viewMode={viewMode}
+              folders={folders}
+              filteredDocuments={filteredDocuments}
+              filteredSharedDocuments={filteredSharedDocuments}
+              filteredSharedFolders={filteredSharedFolders}
+              sortBy={sortBy}
+              sortOrder={sortOrder}
+              currentSharedFolder={currentSharedFolder}
+              onNavigateToFolder={navigateToFolder}
+              onNavigateToSharedFolder={navigateToSharedFolder}
+              onNavigateToSharedSubFolder={navigateToSharedSubFolder}
+              onContextMenu={handleContextMenu}
+              onPreview={handlePreview}
+            />
+          )}
         </div>
 
         {/* Status Bar */}
@@ -1226,6 +1290,7 @@ const Documents: React.FC = () => {
         <ContextMenu
           contextMenu={contextMenu}
           activeTab={activeTab}
+          isInSharedFolder={!!currentSharedFolder}
           onNavigateToFolder={navigateToFolder}
           onDownload={handleDownload}
           onOpenShareModal={handleOpenShareModal}

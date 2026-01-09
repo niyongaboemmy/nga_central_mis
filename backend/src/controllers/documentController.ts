@@ -159,8 +159,19 @@ export const getFolders = asyncHandler(async (req: any, res: any) => {
 
   // Get folders owned by the user
   const ownedFolders = await db
-    .select()
+    .select({
+      folder: DocumentFolder,
+      owner: {
+        user_id: User.user_id,
+        username: User.username,
+        email: User.email,
+        first_name: UserProfile.first_name,
+        last_name: UserProfile.last_name,
+      },
+    })
     .from(DocumentFolder)
+    .innerJoin(User, eq(DocumentFolder.user_id, User.user_id))
+    .leftJoin(UserProfile, eq(User.user_id, UserProfile.user_id))
     .where(
       and(
         eq(DocumentFolder.user_id, userId),
@@ -178,12 +189,21 @@ export const getFolders = asyncHandler(async (req: any, res: any) => {
       .select({
         folder: DocumentFolder,
         permission: FolderPermission,
+        owner: {
+          user_id: User.user_id,
+          username: User.username,
+          email: User.email,
+          first_name: UserProfile.first_name,
+          last_name: UserProfile.last_name,
+        },
       })
       .from(FolderPermission)
       .innerJoin(
         DocumentFolder,
         eq(FolderPermission.folder_id, DocumentFolder.folder_id)
       )
+      .innerJoin(User, eq(DocumentFolder.user_id, User.user_id))
+      .leftJoin(UserProfile, eq(User.user_id, UserProfile.user_id))
       .where(
         and(
           eq(FolderPermission.user_id, userId),
@@ -221,8 +241,19 @@ export const getFolders = asyncHandler(async (req: any, res: any) => {
 
       if (parentFolder.length > 0) {
         const subFolders = await db
-          .select()
+          .select({
+            folder: DocumentFolder,
+            owner: {
+              user_id: User.user_id,
+              username: User.username,
+              email: User.email,
+              first_name: UserProfile.first_name,
+              last_name: UserProfile.last_name,
+            },
+          })
           .from(DocumentFolder)
+          .innerJoin(User, eq(DocumentFolder.user_id, User.user_id))
+          .leftJoin(UserProfile, eq(User.user_id, UserProfile.user_id))
           .where(
             and(
               eq(DocumentFolder.parent_folder_id, parentId),
@@ -231,8 +262,8 @@ export const getFolders = asyncHandler(async (req: any, res: any) => {
           );
 
         // Mark these as accessible due to parent permission
-        sharedFolders = subFolders.map((folder) => ({
-          folder,
+        sharedFolders = subFolders.map((item) => ({
+          ...item,
           permission: parentSharedCheck[0], // Use parent permission
         }));
       }
@@ -241,20 +272,23 @@ export const getFolders = asyncHandler(async (req: any, res: any) => {
 
   // Combine owned and shared folders, removing duplicates
   const allFolders = [...ownedFolders];
-  const ownedFolderIds = new Set(ownedFolders.map((f) => f.folder_id));
+  const ownedFolderIds = new Set(ownedFolders.map((f) => f.folder.folder_id));
 
   for (const shared of sharedFolders) {
     if (!ownedFolderIds.has(shared.folder.folder_id)) {
       allFolders.push({
-        ...shared.folder,
-        is_shared: true,
-        permission_type: shared.permission.permission_type,
+        folder: {
+          ...shared.folder,
+          is_shared: true,
+          permission_type: shared.permission.permission_type,
+        },
+        owner: shared.owner,
       });
     }
   }
 
   // Sort by name
-  allFolders.sort((a, b) => a.name.localeCompare(b.name));
+  allFolders.sort((a, b) => a.folder.name.localeCompare(b.folder.name));
 
   successResponse(res, "Folders retrieved successfully", allFolders);
 });
@@ -672,9 +706,32 @@ export const getSharedFolders = asyncHandler(async (req: any, res: any) => {
       )
     );
 
+  // Add folder owner information
+  const sharedWithOwners = await Promise.all(
+    shared.map(async (item) => {
+      const owner = await db
+        .select({
+          user_id: User.user_id,
+          username: User.username,
+          email: User.email,
+          first_name: UserProfile.first_name,
+          last_name: UserProfile.last_name,
+        })
+        .from(User)
+        .leftJoin(UserProfile, eq(User.user_id, UserProfile.user_id))
+        .where(eq(User.user_id, item.folder.user_id))
+        .limit(1);
+
+      return {
+        ...item,
+        folder_owner: owner[0] || null,
+      };
+    })
+  );
+
   // Add content counts for each folder
   const sharedWithCounts = await Promise.all(
-    shared.map(async (item) => {
+    sharedWithOwners.map(async (item) => {
       const [subFoldersCount, documentsCount] = await Promise.all([
         // Count subfolders
         db
@@ -895,8 +952,19 @@ export const getDocuments = asyncHandler(async (req: any, res: any) => {
   }
 
   const documents = await db
-    .select()
+    .select({
+      document: Document,
+      owner: {
+        user_id: User.user_id,
+        username: User.username,
+        email: User.email,
+        first_name: UserProfile.first_name,
+        last_name: UserProfile.last_name,
+      },
+    })
     .from(Document)
+    .innerJoin(User, eq(Document.user_id, User.user_id))
+    .leftJoin(UserProfile, eq(User.user_id, UserProfile.user_id))
     .where(and(...conditions))
     .orderBy(orderByArgs)
     .limit(limitNum)

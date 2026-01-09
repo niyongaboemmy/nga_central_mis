@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useRef, useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import {
   FiFolder,
@@ -25,6 +25,7 @@ interface ContextMenuProps {
       | "background";
   } | null;
   activeTab: "my-documents" | "shared-with-me";
+  isInSharedFolder?: boolean;
   onNavigateToFolder: (folder: Folder) => void;
   onDownload: (doc: Document) => void;
   onOpenShareModal: (item: Folder | Document) => void;
@@ -41,6 +42,7 @@ interface ContextMenuProps {
 const ContextMenu: React.FC<ContextMenuProps> = ({
   contextMenu,
   activeTab,
+  isInSharedFolder = false,
   onNavigateToFolder,
   onDownload,
   onOpenShareModal,
@@ -53,17 +55,55 @@ const ContextMenu: React.FC<ContextMenuProps> = ({
   onUploadFiles,
   onClose,
 }) => {
+  const menuRef = useRef<HTMLDivElement>(null);
+  const [adjustedPosition, setAdjustedPosition] = useState({ x: 0, y: 0 });
+
+  // Always call hooks in the same order
+  useEffect(() => {
+    if (contextMenu && menuRef.current) {
+      const menuRect = menuRef.current.getBoundingClientRect();
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+
+      let adjustedX = contextMenu.x;
+      let adjustedY = contextMenu.y;
+
+      // Check if menu goes off the right edge
+      if (contextMenu.x + menuRect.width > viewportWidth) {
+        adjustedX = contextMenu.x - menuRect.width;
+      }
+
+      // Check if menu goes off the bottom edge
+      if (contextMenu.y + menuRect.height > viewportHeight) {
+        adjustedY = contextMenu.y - menuRect.height;
+      }
+
+      // Ensure menu doesn't go off the left edge
+      if (adjustedX < 0) {
+        adjustedX = 10; // Small margin from left edge
+      }
+
+      // Ensure menu doesn't go off the top edge
+      if (adjustedY < 0) {
+        adjustedY = 10; // Small margin from top edge
+      }
+
+      setAdjustedPosition({ x: adjustedX, y: adjustedY });
+    }
+  }, [contextMenu]);
+
   if (!contextMenu) return null;
 
-  const { x, y, item, type } = contextMenu;
+  const { item, type } = contextMenu;
 
   return (
     <motion.div
+      ref={menuRef}
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: 0.95 }}
       className="fixed bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 py-1 z-50 min-w-48 overflow-hidden"
-      style={{ left: x, top: y }}
+      style={{ left: adjustedPosition.x, top: adjustedPosition.y }}
     >
       {type === "folder" && item && (
         <>
@@ -78,37 +118,43 @@ const ContextMenu: React.FC<ContextMenuProps> = ({
             <FiFolder className="w-4 h-4 text-blue-500" />
             Open
           </motion.button>
-          <motion.button
-            whileHover={{ x: 5 }}
-            onClick={() => {
-              onOpenShareModal(item as Folder);
-            }}
-            className="w-full px-4 py-3 text-left text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-3 transition-colors"
-          >
-            <FiShare2 className="w-4 h-4 text-blue-500" />
-            Share
-          </motion.button>
-          <motion.button
-            whileHover={{ x: 5 }}
-            onClick={() => {
-              onOpenRenameModal(item as Folder);
-              onClose();
-            }}
-            className="w-full px-4 py-3 text-left text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-3 transition-colors"
-          >
-            <FiEdit2 className="w-4 h-4 text-gray-400" />
-            Rename
-          </motion.button>
-          <motion.button
-            whileHover={{ x: 5 }}
-            onClick={() => {
-              onDelete(item as Folder);
-            }}
-            className="w-full px-4 py-3 text-left text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-3 transition-colors"
-          >
-            <FiTrash2 className="w-4 h-4" />
-            Delete
-          </motion.button>
+          {!isInSharedFolder && (
+            <>
+              <motion.button
+                whileHover={{ x: 5 }}
+                onClick={() => {
+                  onOpenShareModal(item as Folder);
+                }}
+                className="w-full px-4 py-3 text-left text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-3 transition-colors"
+              >
+                <FiShare2 className="w-4 h-4 text-blue-500" />
+                Share
+              </motion.button>
+              <motion.button
+                whileHover={{ x: 5 }}
+                onClick={() => {
+                  onOpenRenameModal(item as Folder);
+                  onClose();
+                }}
+                className="w-full px-4 py-3 text-left text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-3 transition-colors"
+              >
+                <FiEdit2 className="w-4 h-4 text-gray-400" />
+                Rename
+              </motion.button>
+            </>
+          )}
+          {!isInSharedFolder && (
+            <motion.button
+              whileHover={{ x: 5 }}
+              onClick={() => {
+                onDelete(item as Folder);
+              }}
+              className="w-full px-4 py-3 text-left text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-3 transition-colors"
+            >
+              <FiTrash2 className="w-4 h-4" />
+              Delete
+            </motion.button>
+          )}
         </>
       )}
       {type === "document" && item && (
@@ -135,37 +181,43 @@ const ContextMenu: React.FC<ContextMenuProps> = ({
             <FiDownload className="w-4 h-4 text-green-500" />
             Download
           </motion.button>
-          <motion.button
-            whileHover={{ x: 5 }}
-            onClick={() => {
-              onOpenShareModal(item as Document);
-            }}
-            className="w-full px-4 py-3 text-left text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-3 transition-colors"
-          >
-            <FiShare2 className="w-4 h-4 text-blue-500" />
-            Share
-          </motion.button>
-          <motion.button
-            whileHover={{ x: 5 }}
-            onClick={() => {
-              onOpenRenameModal(item as Document);
-              onClose();
-            }}
-            className="w-full px-4 py-3 text-left text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-3 transition-colors"
-          >
-            <FiEdit2 className="w-4 h-4 text-gray-400" />
-            Rename
-          </motion.button>
-          <motion.button
-            whileHover={{ x: 5 }}
-            onClick={() => {
-              onDelete(item as Document);
-            }}
-            className="w-full px-4 py-3 text-left text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-3 transition-colors"
-          >
-            <FiTrash2 className="w-4 h-4" />
-            Delete
-          </motion.button>
+          {!isInSharedFolder && (
+            <>
+              <motion.button
+                whileHover={{ x: 5 }}
+                onClick={() => {
+                  onOpenShareModal(item as Document);
+                }}
+                className="w-full px-4 py-3 text-left text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-3 transition-colors"
+              >
+                <FiShare2 className="w-4 h-4 text-blue-500" />
+                Share
+              </motion.button>
+              <motion.button
+                whileHover={{ x: 5 }}
+                onClick={() => {
+                  onOpenRenameModal(item as Document);
+                  onClose();
+                }}
+                className="w-full px-4 py-3 text-left text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-3 transition-colors"
+              >
+                <FiEdit2 className="w-4 h-4 text-gray-400" />
+                Rename
+              </motion.button>
+            </>
+          )}
+          {!isInSharedFolder && (
+            <motion.button
+              whileHover={{ x: 5 }}
+              onClick={() => {
+                onDelete(item as Document);
+              }}
+              className="w-full px-4 py-3 text-left text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-3 transition-colors"
+            >
+              <FiTrash2 className="w-4 h-4" />
+              Delete
+            </motion.button>
+          )}
         </>
       )}
       {type === "shared-document" && item && (

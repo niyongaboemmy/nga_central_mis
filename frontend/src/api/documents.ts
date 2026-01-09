@@ -10,6 +10,13 @@ export interface Folder {
   color: string;
   created_at: string;
   updated_at: string;
+  owner?: {
+    user_id: number;
+    username: string;
+    email: string;
+    first_name: string | null;
+    last_name: string | null;
+  };
 }
 
 export interface Document {
@@ -27,6 +34,13 @@ export interface Document {
   tags: string | null;
   created_at: string;
   updated_at: string;
+  owner?: {
+    user_id: number;
+    username: string;
+    email: string;
+    first_name: string | null;
+    last_name: string | null;
+  };
 }
 
 export interface DocumentVersion {
