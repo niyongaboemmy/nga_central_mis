@@ -146,7 +146,8 @@ export const getFolders = asyncHandler(async (req: any, res: any) => {
 
   const parentId = parentFolderId ? parseInt(parentFolderId) : null;
 
-  const folders = await db
+  // Get folders owned by the user
+  const ownedFolders = await db
     .select()
     .from(DocumentFolder)
     .where(
@@ -156,17 +157,59 @@ export const getFolders = asyncHandler(async (req: any, res: any) => {
           ? isNull(DocumentFolder.parent_folder_id)
           : eq(DocumentFolder.parent_folder_id, parentId)
       )
-    )
-    .orderBy(asc(DocumentFolder.name));
+    );
 
-  successResponse(res, "Folders retrieved successfully", folders);
+  // Get folders shared with the user (only root level shared folders for now)
+  let sharedFolders: any[] = [];
+  if (parentId === null) {
+    sharedFolders = await db
+      .select({
+        folder: DocumentFolder,
+        permission: FolderPermission,
+      })
+      .from(FolderPermission)
+      .innerJoin(
+        DocumentFolder,
+        eq(FolderPermission.folder_id, DocumentFolder.folder_id)
+      )
+      .where(
+        and(
+          eq(FolderPermission.user_id, userId),
+          isNull(DocumentFolder.parent_folder_id), // Only root level shared folders
+          or(
+            isNull(FolderPermission.expires_at),
+            gt(FolderPermission.expires_at, new Date())
+          )
+        )
+      );
+  }
+
+  // Combine owned and shared folders, removing duplicates
+  const allFolders = [...ownedFolders];
+  const ownedFolderIds = new Set(ownedFolders.map((f) => f.folder_id));
+
+  for (const shared of sharedFolders) {
+    if (!ownedFolderIds.has(shared.folder.folder_id)) {
+      allFolders.push({
+        ...shared.folder,
+        is_shared: true,
+        permission_type: shared.permission.permission_type,
+      });
+    }
+  }
+
+  // Sort by name
+  allFolders.sort((a, b) => a.name.localeCompare(b.name));
+
+  successResponse(res, "Folders retrieved successfully", allFolders);
 });
 
 export const getFolderById = asyncHandler(async (req: any, res: any) => {
   const userId = req.user.userId;
   const { folderId } = req.params;
 
-  const folder = await db
+  // First try to get owned folder
+  let folder = await db
     .select()
     .from(DocumentFolder)
     .where(
@@ -176,6 +219,41 @@ export const getFolderById = asyncHandler(async (req: any, res: any) => {
       )
     )
     .limit(1);
+
+  // If not found, check if it's a shared folder
+  if (folder.length === 0) {
+    const sharedFolder = await db
+      .select({
+        folder: DocumentFolder,
+        permission: FolderPermission,
+      })
+      .from(FolderPermission)
+      .innerJoin(
+        DocumentFolder,
+        eq(FolderPermission.folder_id, DocumentFolder.folder_id)
+      )
+      .where(
+        and(
+          eq(FolderPermission.folder_id, parseInt(folderId)),
+          eq(FolderPermission.user_id, userId),
+          or(
+            isNull(FolderPermission.expires_at),
+            gt(FolderPermission.expires_at, new Date())
+          )
+        )
+      )
+      .limit(1);
+
+    if (sharedFolder.length > 0) {
+      folder = [
+        {
+          ...sharedFolder[0].folder,
+          is_shared: true,
+          permission_type: sharedFolder[0].permission.permission_type,
+        } as any,
+      ];
+    }
+  }
 
   if (folder.length === 0) {
     throw new NotFoundError("Folder not found");
@@ -642,10 +720,36 @@ export const getDocuments = asyncHandler(async (req: any, res: any) => {
   const offset = (pageNum - 1) * limitNum;
 
   // Build query conditions
-  const conditions: any[] = [eq(Document.user_id, userId)];
+  let conditions: any[] = [eq(Document.user_id, userId)];
+  let isSharedFolder = false;
 
   if (folderId) {
-    conditions.push(eq(Document.folder_id, parseInt(folderId as string)));
+    const folderIdNum = parseInt(folderId as string);
+
+    // Check if this is a shared folder
+    const sharedFolderCheck = await db
+      .select()
+      .from(FolderPermission)
+      .where(
+        and(
+          eq(FolderPermission.folder_id, folderIdNum),
+          eq(FolderPermission.user_id, userId),
+          or(
+            isNull(FolderPermission.expires_at),
+            gt(FolderPermission.expires_at, new Date())
+          )
+        )
+      )
+      .limit(1);
+
+    if (sharedFolderCheck.length > 0) {
+      // This is a shared folder, get documents from it
+      conditions = [eq(Document.folder_id, folderIdNum)];
+      isSharedFolder = true;
+    } else {
+      // Regular owned folder
+      conditions.push(eq(Document.folder_id, folderIdNum));
+    }
   } else {
     conditions.push(isNull(Document.folder_id));
   }

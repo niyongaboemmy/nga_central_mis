@@ -285,5 +285,17 @@ export const folderPermissionApi = {
   revokeAccess: (permissionId: number) =>
     apiService.delete(`/documents/folders/permissions/${permissionId}`),
 
-  getSharedWithMe: () => apiService.get("/documents/shared/folders"),
+  getSharedWithMe: () =>
+    apiService.get<{
+      data: {
+        folder_id: string;
+        user_id: string;
+        parent_folder_id: string | null;
+        name: string;
+        description: string | null;
+        color: string;
+        created_at: string;
+        updated_at: string;
+      }[];
+    }>("/documents/shared/folders"),
 };

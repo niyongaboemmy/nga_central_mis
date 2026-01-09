@@ -44,9 +44,34 @@ const Documents: React.FC = () => {
   const [filteredSharedDocuments, setFilteredSharedDocuments] = useState<
     SharedDocument[]
   >([]);
-  const [sharedFolders, setSharedFolders] = useState<any[]>([]);
-  const [filteredSharedFolders, setFilteredSharedFolders] = useState<any[]>([]);
+  const [sharedFolders, setSharedFolders] = useState<
+    {
+      folder_id: string;
+      user_id: string;
+      parent_folder_id: string | null;
+      name: string;
+      description: string | null;
+      color: string;
+      created_at: string;
+      updated_at: string;
+    }[]
+  >([]);
+  const [filteredSharedFolders, setFilteredSharedFolders] = useState<
+    {
+      folder_id: string;
+      user_id: string;
+      parent_folder_id: string | null;
+      name: string;
+      description: string | null;
+      color: string;
+      created_at: string;
+      updated_at: string;
+    }[]
+  >([]);
   const [currentFolderId, setCurrentFolderId] = useState<number | null>(null);
+  const [currentSharedFolder, setCurrentSharedFolder] = useState<any | null>(
+    null
+  );
   const [breadcrumbs, setBreadcrumbs] = useState<BreadcrumbItem[]>([
     { id: null, name: "My Documents" },
   ]);
@@ -61,8 +86,13 @@ const Documents: React.FC = () => {
   const [contextMenu, setContextMenu] = useState<{
     x: number;
     y: number;
-    item: Folder | Document | SharedDocument | null;
-    type: "folder" | "document" | "shared-document" | "background";
+    item: Folder | Document | SharedDocument | any | null;
+    type:
+      | "folder"
+      | "document"
+      | "shared-document"
+      | "shared-folder"
+      | "background";
   } | null>(null);
   const [isCreateFolderModalOpen, setIsCreateFolderModalOpen] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
@@ -127,23 +157,36 @@ const Documents: React.FC = () => {
   const fetchData = useCallback(async () => {
     setIsLoading(true);
     try {
-      const [foldersRes, documentsRes] = await Promise.all([
-        folderApi.getAll(currentFolderId || undefined),
-        documentApi.getAll({
+      if (currentSharedFolder) {
+        // We're in a shared folder, fetch its contents
+        const documentsRes = await documentApi.getAll({
           folderId: currentFolderId || undefined,
           sortBy: sortBy,
           sortOrder: sortOrder,
-        }),
-      ]);
+        });
 
-      setFolders(foldersRes.data.data || []);
-      setDocuments(documentsRes.data.data || []);
+        setFolders([]); // No subfolders in shared view for now
+        setDocuments(documentsRes.data.data || []);
+      } else {
+        // Regular owned folder navigation
+        const [foldersRes, documentsRes] = await Promise.all([
+          folderApi.getAll(currentFolderId || undefined),
+          documentApi.getAll({
+            folderId: currentFolderId || undefined,
+            sortBy: sortBy,
+            sortOrder: sortOrder,
+          }),
+        ]);
+
+        setFolders(foldersRes.data.data || []);
+        setDocuments(documentsRes.data.data || []);
+      }
     } catch (error: any) {
       showToast("Failed to load documents", "error");
     } finally {
       setIsLoading(false);
     }
-  }, [currentFolderId, sortBy, sortOrder, showToast]);
+  }, [currentFolderId, currentSharedFolder, sortBy, sortOrder, showToast]);
 
   // Fetch shared documents
   const fetchSharedDocuments = useCallback(async () => {
@@ -249,6 +292,7 @@ const Documents: React.FC = () => {
     if (!searchQuery.trim()) {
       setFilteredDocuments(documents);
       setFilteredSharedDocuments(sharedDocuments);
+      setFilteredSharedFolders(sharedFolders);
       return;
     }
 
@@ -283,8 +327,7 @@ const Documents: React.FC = () => {
         sharedDoc.permission.shared_by_user?.email.toLowerCase().includes(query)
     );
     setFilteredSharedDocuments(filteredShared);
-
-    // Filter shared folders (assuming similar structure)
+    // Filter shared folders
     const filteredSharedF = sharedFolders.filter(
       (sharedFolder: any) =>
         sharedFolder.folder?.name.toLowerCase().includes(query) ||
@@ -358,6 +401,22 @@ const Documents: React.FC = () => {
       return [...prev, { id: folder.folder_id, name: folder.name }];
     });
     setCurrentFolderId(folder.folder_id);
+    setCurrentSharedFolder(null);
+    setSelectedItems([]);
+  };
+
+  // Navigate to shared folder
+  const navigateToSharedFolder = (sharedFolder: any) => {
+    setBreadcrumbs((prev) => [
+      ...prev,
+      {
+        id: sharedFolder.folder.folder_id,
+        name: sharedFolder.folder.name,
+        isShared: true,
+      },
+    ]);
+    setCurrentFolderId(sharedFolder.folder.folder_id);
+    setCurrentSharedFolder(sharedFolder);
     setSelectedItems([]);
   };
 
@@ -366,6 +425,13 @@ const Documents: React.FC = () => {
     const newBreadcrumbs = breadcrumbs.slice(0, index + 1);
     setBreadcrumbs(newBreadcrumbs);
     setCurrentFolderId(newBreadcrumbs[newBreadcrumbs.length - 1].id);
+
+    // Check if we're navigating away from a shared folder
+    const targetBreadcrumb = newBreadcrumbs[newBreadcrumbs.length - 1];
+    if (!targetBreadcrumb.isShared) {
+      setCurrentSharedFolder(null);
+    }
+
     setSelectedItems([]);
   };
 
@@ -769,7 +835,12 @@ const Documents: React.FC = () => {
   const handleContextMenu = (
     e: React.MouseEvent,
     item: any,
-    type: "folder" | "document" | "shared-document"
+    type:
+      | "folder"
+      | "document"
+      | "shared-document"
+      | "shared-folder"
+      | "background"
   ) => {
     setContextMenu({
       x: e.clientX,
@@ -864,6 +935,7 @@ const Documents: React.FC = () => {
           sortBy={sortBy}
           sortOrder={sortOrder}
           sharedDocumentsCount={sharedDocuments.length}
+          sharedFoldersCount={sharedFolders.length}
           showFolderTree={showFolderTree}
           isUploading={isUploading}
           currentFolderId={currentFolderId}
@@ -923,6 +995,7 @@ const Documents: React.FC = () => {
             sortBy={sortBy}
             sortOrder={sortOrder}
             onNavigateToFolder={navigateToFolder}
+            onNavigateToSharedFolder={navigateToSharedFolder}
             onContextMenu={handleContextMenu}
             onPreview={handlePreview}
           />

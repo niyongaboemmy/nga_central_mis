@@ -21,6 +21,7 @@ interface DocumentsToolbarProps {
   sortBy: SortOption;
   sortOrder: "asc" | "desc";
   sharedDocumentsCount: number;
+  sharedFoldersCount: number;
   showFolderTree: boolean;
   isUploading: boolean;
   currentFolderId: number | null;
@@ -45,6 +46,7 @@ const DocumentsToolbar: React.FC<DocumentsToolbarProps> = ({
   sortBy,
   sortOrder,
   sharedDocumentsCount,
+  sharedFoldersCount,
   showFolderTree,
   isUploading,
   onTabChange,
@@ -95,9 +97,9 @@ const DocumentsToolbar: React.FC<DocumentsToolbarProps> = ({
         >
           <FiUsers className="w-4 h-4" />
           Shared with Me
-          {sharedDocumentsCount > 0 && (
+          {(sharedDocumentsCount > 0 || sharedFoldersCount > 0) && (
             <span className="ml-1 px-1.5 py-0.5 text-xs bg-blue-500 text-white rounded-full">
-              {sharedDocumentsCount}
+              {sharedDocumentsCount + sharedFoldersCount}
             </span>
           )}
         </motion.button>

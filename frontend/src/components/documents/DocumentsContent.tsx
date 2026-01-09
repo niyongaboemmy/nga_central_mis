@@ -83,11 +83,12 @@ interface DocumentsContentProps {
   sortBy: SortOption;
   sortOrder: "asc" | "desc";
   onNavigateToFolder: (folder: Folder) => void;
+  onNavigateToSharedFolder: (sharedFolder: any) => void;
   onPreview: (doc: Document) => void;
   onContextMenu: (
     e: React.MouseEvent,
     item: Folder | Document | SharedDocument,
-    type: "folder" | "document" | "shared-document"
+    type: "folder" | "document" | "shared-document" | "shared-folder"
   ) => void;
 }
 
@@ -103,6 +104,7 @@ const DocumentsContent: React.FC<DocumentsContentProps> = ({
   sortBy,
   sortOrder,
   onNavigateToFolder,
+  onNavigateToSharedFolder,
   onPreview,
   onContextMenu,
 }) => {
@@ -398,7 +400,6 @@ const DocumentsContent: React.FC<DocumentsContentProps> = ({
           key={`shared-${shared.type}-${
             shared.permission?.permission_id || shared.folder?.folder_id
           }`}
-          // variants={itemVariants}
           whileHover={{ scale: 1.03, y: -5 }}
           whileTap={{ scale: 0.98 }}
           onContextMenu={(e) => {
@@ -407,14 +408,14 @@ const DocumentsContent: React.FC<DocumentsContentProps> = ({
             onContextMenu(
               e,
               shared,
-              shared.type === "document" ? "shared-document" : "folder"
+              shared.type === "document" ? "shared-document" : "shared-folder"
             );
           }}
           onClick={() => {
             if (shared.type === "document") {
               onPreview(shared.document);
             } else {
-              // Handle folder click - perhaps navigate or show details
+              onNavigateToSharedFolder(shared);
             }
           }}
           className="p-4 rounded-2xl border cursor-pointer transition-all hover:shadow-xl border-gray-200 dark:border-gray-700/20 bg-white dark:bg-gray-800/40 hover:border-blue-300 dark:hover:border-blue-500"

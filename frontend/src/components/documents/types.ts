@@ -7,6 +7,7 @@ export type ShareTabType = "people" | "roles" | "links";
 export interface BreadcrumbItem {
   id: number | null;
   name: string;
+  isShared?: boolean;
 }
 
 export interface DocumentPermission {
@@ -40,7 +41,12 @@ export interface ContextMenuItem {
   x: number;
   y: number;
   item: any | null;
-  type: "folder" | "document" | "shared-document" | "background";
+  type:
+    | "folder"
+    | "document"
+    | "shared-document"
+    | "shared-folder"
+    | "background";
 }
 
 // Helper function to get item key

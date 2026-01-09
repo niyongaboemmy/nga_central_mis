@@ -16,8 +16,13 @@ interface ContextMenuProps {
   contextMenu: {
     x: number;
     y: number;
-    item: Folder | Document | SharedDocument | null;
-    type: "folder" | "document" | "shared-document" | "background";
+    item: Folder | Document | SharedDocument | any | null;
+    type:
+      | "folder"
+      | "document"
+      | "shared-document"
+      | "shared-folder"
+      | "background";
   } | null;
   activeTab: "my-documents" | "shared-with-me";
   onNavigateToFolder: (folder: Folder) => void;
@@ -196,6 +201,33 @@ const ContextMenu: React.FC<ContextMenuProps> = ({
           >
             <FiEye className="w-4 h-4 text-blue-500" />
             View Details
+          </motion.button>
+        </>
+      )}
+      {type === "shared-folder" && item && (
+        <>
+          <motion.button
+            whileHover={{ x: 5 }}
+            onClick={() => {
+              // Navigate to shared folder
+              onNavigateToFolder(item.folder);
+              onClose();
+            }}
+            className="w-full px-4 py-3 text-left text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-3 transition-colors"
+          >
+            <FiFolder className="w-4 h-4 text-blue-500" />
+            Open
+          </motion.button>
+          <motion.button
+            whileHover={{ x: 5 }}
+            onClick={() => {
+              // Remove shared folder access - need to implement this
+              onClose();
+            }}
+            className="w-full px-4 py-3 text-left text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-3 transition-colors"
+          >
+            <FiTrash2 className="w-4 h-4" />
+            Remove Access
           </motion.button>
         </>
       )}
