@@ -176,10 +176,10 @@ const ShareModal: React.FC<ShareModalProps> = ({
         initial="hidden"
         animate="visible"
         exit="exit"
-        className="bg-white dark:bg-gray-800 rounded-3xl shadow-2xl w-full max-w-2xl sm:max-w-4xl max-h-[90vh] overflow-hidden flex flex-col"
+        className="bg-white dark:bg-gray-800 rounded-3xl shadow-2xl w-full max-w-lg sm:max-w-2xl min-h-[70vh] max-h-[100vh] overflow-hidden flex flex-col"
       >
         {/* Header */}
-        <div className="relative bg-gradient-to-r from-blue-500 via-blue-500 to-blue-500 p-4 sm:p-6 text-white">
+        <div className="relative bg-gradient-to-r from-blue-500 via-blue-500 to-blue-500 p-3 sm:p-4 text-white">
           <div className="absolute inset-0 bg-black/10" />
           <div className="relative flex items-start justify-between">
             <div className="flex items-center gap-3 sm:gap-4">
@@ -193,7 +193,7 @@ const ShareModal: React.FC<ShareModalProps> = ({
                 )}
               </div>
               <div>
-                <h2 className="text-2xl font-bold">
+                <h2 className="text-xl font-bold">
                   Share "
                   {isFolderItem
                     ? (shareItem as Folder).name
@@ -209,7 +209,7 @@ const ShareModal: React.FC<ShareModalProps> = ({
               whileHover={{ scale: 1.1, rotate: 90 }}
               whileTap={{ scale: 0.9 }}
               onClick={onClose}
-              className="p-2 bg-white/20 backdrop-blur-lg rounded-xl hover:bg-white/30 transition-colors"
+              className="p-2 bg-white/20 backdrop-blur-lg rounded-full hover:bg-white/30 transition-colors"
             >
               <FiX className="w-5 h-5" />
             </motion.button>
@@ -247,14 +247,16 @@ const ShareModal: React.FC<ShareModalProps> = ({
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto p-4 sm:p-6">
+        <div className="flex-1 overflow-y-auto p-3 sm:p-4">
           {shareTab === "people" && (
-            <div className="space-y-6">
+            <div className={"space-y-3"}>
               {/* Existing permissions */}
               <div>
-                <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">
-                  People with access
-                </h3>
+                {existingPermissions.length > 0 && (
+                  <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-400 uppercase tracking-wider mb-3">
+                    People with access
+                  </h3>
+                )}
                 {isLoadingPermissions ? (
                   <div className="flex items-center justify-center py-8">
                     <div className="w-8 h-8 border-2 border-blue-200 border-t-blue-600 rounded-full animate-spin" />
@@ -306,7 +308,7 @@ const ShareModal: React.FC<ShareModalProps> = ({
                               handleRemovePermission(perm.permission_id)
                             }
                             disabled={isRemovingPermission}
-                            className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors disabled:opacity-50"
+                            className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-full transition-colors disabled:opacity-50"
                           >
                             {isRemovingPermission ? (
                               <div className="w-4 h-4 border-2 border-red-300 border-t-red-500 rounded-full animate-spin" />
@@ -319,21 +321,21 @@ const ShareModal: React.FC<ShareModalProps> = ({
                     ))}
                   </div>
                 ) : (
-                  <div className="flex flex-col items-center justify-center py-8 text-center">
-                    <div className="w-16 h-16 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center mb-3">
+                  <div className="flex flex-col items-center justify-center py-0 text-center">
+                    {/* <div className="w-16 h-16 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center mb-3">
                       <FiUser className="w-8 h-8 text-gray-400" />
                     </div>
                     <p className="text-gray-500">No one has access yet</p>
                     <p className="text-sm text-gray-400">
                       Add people below to share this file
-                    </p>
+                    </p> */}
                   </div>
                 )}
               </div>
 
               {/* Add people section */}
               <div>
-                <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">
+                <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-400 uppercase tracking-wider mb-3">
                   Add people
                 </h3>
                 <div className="relative flex gap-2">
@@ -344,14 +346,14 @@ const ShareModal: React.FC<ShareModalProps> = ({
                     value={userSearchQuery}
                     onChange={(e) => onUserSearchQueryChange(e.target.value)}
                     placeholder="Search by email, name, or username..."
-                    className="w-full pl-12 pr-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                    className="w-full pl-12 pr-4 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-full text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all text-base"
                   />
                   <motion.button
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                     onClick={onSearchUsers}
                     disabled={isSearchingUsers || userSearchQuery.length < 2}
-                    className="px-4 py-3 bg-blue-500 text-white rounded-xl hover:bg-blue-600 transition-all disabled:opacity-50 flex items-center gap-2"
+                    className="px-4 py-2 bg-blue-500 text-white rounded-full hover:bg-blue-600 transition-all disabled:opacity-50 flex items-center gap-2"
                   >
                     <FiSearch className="w-4 h-4" />
                     Search
@@ -438,7 +440,7 @@ const ShareModal: React.FC<ShareModalProps> = ({
                     animate={{ opacity: 1, height: "auto" }}
                     exit={{ opacity: 0, height: 0 }}
                   >
-                    <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">
+                    <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-400 uppercase tracking-wider mb-3">
                       Selected to add ({selectedShareUsers.length})
                     </h3>
                     <div className="space-y-2">
@@ -474,7 +476,7 @@ const ShareModal: React.FC<ShareModalProps> = ({
                             whileHover={{ scale: 1.1 }}
                             whileTap={{ scale: 0.9 }}
                             onClick={() => onRemoveUser(user.user_id)}
-                            className="p-2 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-lg transition-colors"
+                            className="p-2 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-full transition-colors"
                           >
                             <FiX className="w-4 h-4 text-red-500" />
                           </motion.button>
@@ -488,9 +490,9 @@ const ShareModal: React.FC<ShareModalProps> = ({
           )}
 
           {shareTab === "roles" && (
-            <div className="space-y-6">
+            <div className="space-y-4">
               <div>
-                <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">
+                <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-400 uppercase tracking-wider mb-3">
                   Select Roles
                 </h3>
                 {isLoadingRoles ? (
@@ -509,7 +511,7 @@ const ShareModal: React.FC<ShareModalProps> = ({
                         whileHover={{ scale: 1.02 }}
                         whileTap={{ scale: 0.98 }}
                         onClick={() => onToggleRole(role)}
-                        className={`p-4 rounded-xl border-2 transition-all text-left ${
+                        className={`p-1.5 rounded-2xl border-2 transition-all text-left ${
                           selectedShareRoles.find(
                             (r) => r.role_id === role.role_id
                           )
@@ -519,7 +521,7 @@ const ShareModal: React.FC<ShareModalProps> = ({
                       >
                         <div className="flex items-center gap-3">
                           <div
-                            className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                            className={`w-8 h-8 rounded-xl flex items-center justify-center ${
                               selectedShareRoles.find(
                                 (r) => r.role_id === role.role_id
                               )
@@ -527,14 +529,14 @@ const ShareModal: React.FC<ShareModalProps> = ({
                                 : "bg-gray-100 dark:bg-gray-700 text-gray-500"
                             }`}
                           >
-                            <FiShield className="w-5 h-5" />
+                            <FiShield className="w-4 h-4" />
                           </div>
                           <div className="flex-1">
-                            <p className="font-medium text-gray-700 dark:text-gray-200">
+                            <p className="font-medium text-sm text-black dark:text-gray-200">
                               {role.name}
                             </p>
                             {role.description && (
-                              <p className="text-sm text-gray-500 truncate">
+                              <p className="text-xs text-gray-500 truncate">
                                 {role.description}
                               </p>
                             )}
@@ -559,7 +561,7 @@ const ShareModal: React.FC<ShareModalProps> = ({
                     animate={{ opacity: 1, height: "auto" }}
                     exit={{ opacity: 0, height: 0 }}
                   >
-                    <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">
+                    <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-400 uppercase tracking-wider mb-3">
                       Selected roles ({selectedShareRoles.length})
                     </h3>
                     <div className="flex flex-wrap gap-2">
@@ -569,7 +571,7 @@ const ShareModal: React.FC<ShareModalProps> = ({
                           initial={{ opacity: 0, scale: 0.8 }}
                           animate={{ opacity: 1, scale: 1 }}
                           exit={{ opacity: 0, scale: 0.8 }}
-                          className="flex items-center gap-2 px-4 py-2 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full"
+                          className="flex items-center gap-2 px-4 py-2 bg-blue-100/70 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full"
                         >
                           <FiShield className="w-4 h-4" />
                           <span className="text-sm font-medium">
@@ -593,8 +595,8 @@ const ShareModal: React.FC<ShareModalProps> = ({
           )}
 
           {shareTab === "links" && (
-            <div className="space-y-6">
-              <div className="p-6 bg-gradient-to-br from-blue-50 to-blue-50 dark:from-blue-900/20 dark:to-blue-900/20 rounded-2xl border border-blue-100 dark:border-blue-800">
+            <div className="space-y-4">
+              <div className="p-4 bg-gradient-to-br from-blue-50 to-blue-50 dark:from-blue-900/20 dark:to-blue-900/20 rounded-2xl border border-blue-100 dark:border-blue-800">
                 <div className="flex items-start gap-4">
                   <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-500 rounded-xl flex items-center justify-center text-white">
                     <FiLink className="w-6 h-6" />
@@ -611,7 +613,7 @@ const ShareModal: React.FC<ShareModalProps> = ({
                       whileHover={{ scale: 1.02 }}
                       whileTap={{ scale: 0.98 }}
                       onClick={onCopyLink}
-                      className={`mt-4 flex items-center gap-2 px-4 py-2 rounded-xl transition-all ${
+                      className={`mt-4 flex items-center gap-2 px-4 py-2 rounded-full transition-all ${
                         copySuccess
                           ? "bg-green-500 text-white"
                           : "bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 border border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600"
@@ -638,12 +640,12 @@ const ShareModal: React.FC<ShareModalProps> = ({
           {/* Permission selector */}
           {(shareTab === "people" || shareTab === "roles") && (
             <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
-              <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">
+              <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-400 uppercase tracking-wider mb-3">
                 Permission level
               </h3>
-              <div className="grid grid-cols-4 gap-3">
+              <div className="grid grid-cols-4 gap-2">
                 {[
-                  { id: "VIEW", icon: FiEye, label: "View", color: "gray" },
+                  { id: "VIEW", icon: FiEye, label: "View", color: "blue" },
                   {
                     id: "DOWNLOAD",
                     icon: FiDownload,
@@ -663,26 +665,26 @@ const ShareModal: React.FC<ShareModalProps> = ({
                     whileHover={{ scale: 1.03 }}
                     whileTap={{ scale: 0.97 }}
                     onClick={() => onPermissionChange(perm.id)}
-                    className={`p-4 rounded-xl border-2 transition-all text-center ${
+                    className={`p-1 rounded-full border-2 transition-all flex items-center justify-center gap-2 ${
                       sharePermission === perm.id
                         ? `border-${perm.color}-500 bg-${perm.color}-50 dark:bg-${perm.color}-900/20`
                         : "border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500"
                     }`}
                   >
                     <div
-                      className={`w-10 h-10 mx-auto mb-2 rounded-xl bg-${perm.color}-100 dark:bg-${perm.color}-900/30 flex items-center justify-center`}
+                      className={`p-1.5 mx-auto rounded-full w-max bg-${perm.color}-100 dark:bg-${perm.color}-900/30 flex items-center justify-center`}
                     >
-                      <perm.icon className={`w-5 h-5 text-${perm.color}-600`} />
+                      <perm.icon className={`w-4 h-4 text-${perm.color}-600`} />
                     </div>
-                    <p
-                      className={`text-sm font-medium ${
+                    <div
+                      className={`text-sm font-medium w-full text-left ${
                         sharePermission === perm.id
                           ? `text-${perm.color}-600 dark:text-${perm.color}-400`
                           : "text-gray-600 dark:text-gray-300"
                       }`}
                     >
                       {perm.label}
-                    </p>
+                    </div>
                   </motion.button>
                 ))}
               </div>
@@ -699,7 +701,7 @@ const ShareModal: React.FC<ShareModalProps> = ({
                   type="datetime-local"
                   value={expirationDate}
                   onChange={(e) => onExpirationDateChange(e.target.value)}
-                  className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                  className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-2xl text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
                 />
               </div>
             </div>
@@ -707,7 +709,7 @@ const ShareModal: React.FC<ShareModalProps> = ({
         </div>
 
         {/* Footer Actions */}
-        <div className="p-4 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
+        <div className="p-3 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
           <div className="flex justify-between items-center">
             <motion.button
               whileHover={{ scale: 1.02 }}
