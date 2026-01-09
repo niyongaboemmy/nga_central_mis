@@ -4,8 +4,8 @@ import {
   FiFolder,
   FiUsers,
   FiSearch,
-  //   FiGrid,
-  //   FiList,
+  FiGrid,
+  FiList,
   FiHome,
   FiChevronRight,
   FiFolderPlus,
@@ -25,6 +25,7 @@ interface DocumentsToolbarProps {
   showFolderTree: boolean;
   isUploading: boolean;
   currentFolderId: number | null;
+  currentSharedFolder: any | null;
   onTabChange: (tab: TabType) => void;
   onBreadcrumbClick: (index: number) => void;
   onGoToRoot: () => void;
@@ -41,7 +42,7 @@ interface DocumentsToolbarProps {
 const DocumentsToolbar: React.FC<DocumentsToolbarProps> = ({
   activeTab,
   breadcrumbs,
-  //   viewMode,
+  viewMode,
   searchQuery,
   sortBy,
   sortOrder,
@@ -49,10 +50,11 @@ const DocumentsToolbar: React.FC<DocumentsToolbarProps> = ({
   sharedFoldersCount,
   showFolderTree,
   isUploading,
+  currentSharedFolder,
   onTabChange,
   onBreadcrumbClick,
   onGoToRoot,
-  //   onViewModeChange,
+  onViewModeChange,
   onSearchChange,
   onSortChange,
   onSortOrderChange,
@@ -108,7 +110,7 @@ const DocumentsToolbar: React.FC<DocumentsToolbarProps> = ({
       {/* Toolbar */}
       <div className="px-4 py-3 flex items-center justify-between gap-4">
         {/* Breadcrumb */}
-        {activeTab === "my-documents" && (
+        {(activeTab === "my-documents" || currentSharedFolder) && (
           <div className="flex items-center gap-1 text-sm flex-1 min-w-0">
             <motion.button
               whileHover={{ scale: 1.1 }}
@@ -168,7 +170,7 @@ const DocumentsToolbar: React.FC<DocumentsToolbarProps> = ({
               className="pl-10 pr-4 py-2 border border-gray-200 dark:bg-gray-800/30 dark:border-gray-700/50 dark:placeholder:text-gray-600 dark:bg rounded-xl bg-gray-gray-700 text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent w-32 sm:w-48 lg:w-64 transition-all"
             />
           </div>
-          {/* <div className="flex items-center border border-gray-200 dark:border-gray-700/50 rounded-xl overflow-hidden">
+          <div className="flex items-center border border-gray-200 dark:border-gray-700/50 rounded-xl overflow-hidden">
             <motion.button
               whileTap={{ scale: 0.95 }}
               onClick={() => onViewModeChange("grid")}
@@ -191,19 +193,19 @@ const DocumentsToolbar: React.FC<DocumentsToolbarProps> = ({
             >
               <FiList className="w-5 h-5" />
             </motion.button>
-          </div> */}
+          </div>
         </div>
       </div>
 
       {/* Second Toolbar Row */}
-      {activeTab === "my-documents" && (
+      {(activeTab === "my-documents" || activeTab === "shared-with-me") && (
         <div className="px-4 pb-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-4">
           <div className="flex items-center gap-2 flex-wrap">
             <motion.button
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
               onClick={onGoBack}
-              disabled={breadcrumbs.length === 1}
+              disabled={breadcrumbs.length <= 1}
               className="px-3 sm:px-4 py-2 text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all"
             >
               ← Back
@@ -232,28 +234,32 @@ const DocumentsToolbar: React.FC<DocumentsToolbarProps> = ({
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={onCreateFolder}
-              className="flex items-center gap-2 px-4 sm:px-5 py-2 text-sm sm:text-base bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-full hover:from-blue-600 hover:to-blue-700 shadow-blue-500/30 transition-all"
-            >
-              <FiFolderPlus className="w-4 h-4" />
-              <span className="hidden xs:inline">New Folder</span>
-              {/* <span className="xs:hidden">Folder</span> */}
-            </motion.button>
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={onUploadClick}
-              disabled={isUploading}
-              className="flex items-center gap-2 px-4 sm:px-5 py-2 text-sm sm:text-base bg-gradient-to-r from-green-500 to-green-600 text-white rounded-full hover:from-green-600 hover:to-green-700 shadow-green-500/30 transition-all disabled:opacity-50"
-            >
-              <FiUpload className="w-4 h-4" />
-              <span className="hidden xs:inline">
-                {isUploading ? "Uploading..." : "Upload"}
-              </span>
-            </motion.button>
+            {activeTab === "my-documents" && (
+              <>
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={onCreateFolder}
+                  className="flex items-center gap-2 px-4 sm:px-5 py-2 text-sm sm:text-base bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-full hover:from-blue-600 hover:to-blue-700 shadow-blue-500/30 transition-all"
+                >
+                  <FiFolderPlus className="w-4 h-4" />
+                  <span className="hidden xs:inline">New Folder</span>
+                  {/* <span className="xs:hidden">Folder</span> */}
+                </motion.button>
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={onUploadClick}
+                  disabled={isUploading}
+                  className="flex items-center gap-2 px-4 sm:px-5 py-2 text-sm sm:text-base bg-gradient-to-r from-green-500 to-green-600 text-white rounded-full hover:from-green-600 hover:to-green-700 shadow-green-500/30 transition-all disabled:opacity-50"
+                >
+                  <FiUpload className="w-4 h-4" />
+                  <span className="hidden xs:inline">
+                    {isUploading ? "Uploading..." : "Upload"}
+                  </span>
+                </motion.button>
+              </>
+            )}
           </div>
         </div>
       )}

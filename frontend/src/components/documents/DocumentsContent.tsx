@@ -82,8 +82,10 @@ interface DocumentsContentProps {
   filteredSharedFolders: any[];
   sortBy: SortOption;
   sortOrder: "asc" | "desc";
+  currentSharedFolder: any | null;
   onNavigateToFolder: (folder: Folder) => void;
-  onNavigateToSharedFolder: (sharedFolder: any) => void;
+  onNavigateToSharedFolder: (sharedFolder: any) => Promise<void>;
+  onNavigateToSharedSubFolder: (folder: Folder) => Promise<void>;
   onPreview: (doc: Document) => void;
   onContextMenu: (
     e: React.MouseEvent,
@@ -103,8 +105,10 @@ const DocumentsContent: React.FC<DocumentsContentProps> = ({
   filteredSharedFolders,
   sortBy,
   sortOrder,
+  currentSharedFolder,
   onNavigateToFolder,
   onNavigateToSharedFolder,
+  onNavigateToSharedSubFolder,
   onPreview,
   onContextMenu,
 }) => {
@@ -383,10 +387,394 @@ const DocumentsContent: React.FC<DocumentsContentProps> = ({
   }
 
   // Shared with me view
+  if (currentSharedFolder) {
+    // We're inside a shared folder, show its contents like my-documents
+    const sortedItems = [...folders, ...filteredDocuments].sort((a, b) => {
+      let comparison = 0;
+      const aIsFolder = itemIsFolder(a);
+      const bIsFolder = itemIsFolder(b);
+
+      if (aIsFolder && bIsFolder) {
+        comparison = a.name.localeCompare(b.name);
+      } else if (!aIsFolder && !bIsFolder) {
+        if (sortBy === "name") {
+          comparison = a.original_name.localeCompare(b.original_name);
+        } else if (sortBy === "size") {
+          comparison = a.file_size - b.file_size;
+        } else if (sortBy === "date") {
+          comparison =
+            new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+        } else {
+          comparison = a.file_extension.localeCompare(b.file_extension);
+        }
+      } else {
+        comparison = aIsFolder ? -1 : 1;
+      }
+      return sortOrder === "asc" ? comparison : -comparison;
+    });
+
+    if (viewMode === "grid") {
+      return (
+        <motion.div
+          variants={containerVariants}
+          initial="hidden"
+          animate="visible"
+          className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4"
+        >
+          {sortedItems.map((item, i) => (
+            <motion.div
+              key={i + 1}
+              variants={itemVariants}
+              whileHover={{ scale: 1.03, y: -5 }}
+              whileTap={{ scale: 0.98 }}
+              onContextMenu={(e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                onContextMenu(
+                  e,
+                  item,
+                  itemIsFolder(item) ? "folder" : "document"
+                );
+              }}
+              onClick={async () => {
+                if (itemIsFolder(item)) {
+                  await onNavigateToSharedSubFolder(item);
+                } else {
+                  onPreview(item);
+                }
+              }}
+              className="p-4 rounded-2xl border cursor-pointer transition-all hover:shadow-xl border-gray-200 dark:border-gray-700/20 bg-white dark:bg-gray-800/40 hover:border-blue-300 dark:hover:border-blue-500"
+            >
+              <div className="flex flex-col items-center text-center">
+                {itemIsFolder(item) ? (
+                  <motion.div
+                    whileHover={{ rotate: 5 }}
+                    transition={{ type: "spring", stiffness: 300 }}
+                  >
+                    <FiFolder
+                      className="w-14 h-14 mb-3"
+                      style={{ color: item.color }}
+                    />
+                  </motion.div>
+                ) : (
+                  <div className="mb-3 transform hover:scale-110 transition-transform duration-200">
+                    {getFileIconComponent(item)}
+                  </div>
+                )}
+                <p className="text-sm font-medium text-gray-700 dark:text-gray-200 truncate w-full px-2">
+                  {getItemName(item)}
+                </p>
+                {itemIsFolder(item) ? (
+                  <p className="text-xs text-gray-400 mt-1">Folder</p>
+                ) : (
+                  <p className="text-xs text-gray-400 mt-1">
+                    {formatFileSize(item.file_size)}
+                  </p>
+                )}
+                {/* Show owner for shared folder contents */}
+                <div className="flex items-center gap-1 mt-1">
+                  <FiUser className="w-3 h-3 text-gray-400" />
+                  <p className="text-xs text-gray-400 truncate">
+                    {currentSharedFolder?.permission?.shared_by_user
+                      ? `${
+                          currentSharedFolder.permission.shared_by_user
+                            .first_name || ""
+                        } ${
+                          currentSharedFolder.permission.shared_by_user
+                            .last_name || ""
+                        }`.trim() ||
+                        currentSharedFolder.permission.shared_by_user.username
+                      : "Unknown"}
+                  </p>
+                </div>
+              </div>
+            </motion.div>
+          ))}
+        </motion.div>
+      );
+    } else {
+      // List view for shared folder contents
+      return (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="w-full"
+        >
+          {/* Desktop table header */}
+          <div className="hidden md:grid grid-cols-12 gap-4 px-4 py-3 text-left text-sm text-gray-500 border-b border-gray-200 dark:border-gray-700/20 bg-gray-50 dark:bg-gray-800/50 rounded-t-lg">
+            <div className="col-span-6">Name</div>
+            <div className="col-span-2">Size</div>
+            <div className="col-span-2">Type</div>
+            <div className="col-span-2">Modified</div>
+            <div className="w-12"></div>
+          </div>
+
+          {/* List items */}
+          <div className="space-y-2">
+            {sortedItems.map((item, index) => (
+              <motion.div
+                key={getItemKey(item)}
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: index * 0.03 }}
+                onContextMenu={(e) => {
+                  e.stopPropagation();
+                  e.preventDefault();
+                  onContextMenu(
+                    e,
+                    item,
+                    itemIsFolder(item) ? "folder" : "document"
+                  );
+                }}
+                onClick={async () => {
+                  if (itemIsFolder(item)) {
+                    await onNavigateToSharedSubFolder(item);
+                  } else {
+                    onPreview(item);
+                  }
+                }}
+                className="cursor-pointer rounded-xl border transition-all hover:shadow-md border-gray-200 dark:border-gray-700/20 bg-white dark:bg-gray-800/40 hover:border-blue-300 dark:hover:border-blue-500"
+              >
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-2 md:gap-4 px-4 py-3 items-center">
+                  {/* Name column */}
+                  <div className="col-span-1 md:col-span-6 flex items-center gap-3 min-w-0">
+                    {itemIsFolder(item) ? (
+                      <motion.div whileHover={{ rotate: 5 }}>
+                        <FiFolder
+                          className="w-5 h-5 flex-shrink-0"
+                          style={{ color: item.color }}
+                        />
+                      </motion.div>
+                    ) : (
+                      <div className="w-5 h-5 flex-shrink-0 transform hover:scale-110 transition-transform">
+                        {getFileIconComponent(item, 20)}
+                      </div>
+                    )}
+                    <span className="font-medium text-gray-700 dark:text-gray-200 truncate">
+                      {getItemName(item)}
+                    </span>
+                  </div>
+
+                  {/* Size column */}
+                  <div className="hidden md:block col-span-2 text-sm text-gray-500">
+                    {itemIsFolder(item) ? "—" : formatFileSize(item.file_size)}
+                  </div>
+
+                  {/* Type column */}
+                  <div className="hidden md:block col-span-2 text-sm text-gray-500">
+                    {itemIsFolder(item)
+                      ? "File folder"
+                      : item.file_extension.toUpperCase()}
+                  </div>
+
+                  {/* Modified column */}
+                  <div className="flex md:hidden text-xs text-gray-400">
+                    {itemIsFolder(item)
+                      ? ""
+                      : `${formatFileSize(
+                          item.file_size
+                        )} - ${item.file_extension.toUpperCase()}`}
+                  </div>
+                  <div className="hidden md:block col-span-2 text-sm text-gray-500">
+                    {new Date(getItemDate(item)).toLocaleDateString()}
+                  </div>
+
+                  {/* Actions column */}
+                  <div className="flex md:col-span-1 justify-end">
+                    <motion.button
+                      whileHover={{ scale: 1.1 }}
+                      whileTap={{ scale: 0.9 }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onContextMenu(
+                          e,
+                          item,
+                          itemIsFolder(item) ? "folder" : "document"
+                        );
+                      }}
+                      className="p-2 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg transition-colors"
+                    >
+                      <FiMoreVertical className="w-4 h-4 text-gray-400" />
+                    </motion.button>
+                  </div>
+                </div>
+                {/* Owner info for list view */}
+                <div className="px-4 pb-2 flex items-center gap-1">
+                  <FiUser className="w-3 h-3 text-gray-400" />
+                  <p className="text-xs text-gray-400">
+                    Shared by:{" "}
+                    {currentSharedFolder?.permission?.shared_by_user
+                      ? `${
+                          currentSharedFolder.permission.shared_by_user
+                            .first_name || ""
+                        } ${
+                          currentSharedFolder.permission.shared_by_user
+                            .last_name || ""
+                        }`.trim() ||
+                        currentSharedFolder.permission.shared_by_user.username
+                      : "Unknown"}
+                  </p>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        </motion.div>
+      );
+    }
+  }
+
+  // Root shared view - flat list
   const allSharedItems = [
     ...filteredSharedDocuments.map((item) => ({ ...item, type: "document" })),
     ...filteredSharedFolders.map((item) => ({ ...item, type: "folder" })),
-  ];
+  ].sort((a, b) => {
+    // Sort by name
+    const aName =
+      a.type === "document" ? a.document.original_name : a.folder.name;
+    const bName =
+      b.type === "document" ? b.document.original_name : b.folder.name;
+    return sortOrder === "asc"
+      ? aName.localeCompare(bName)
+      : bName.localeCompare(aName);
+  });
+
+  if (viewMode === "list") {
+    return (
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        className="w-full"
+      >
+        {/* Desktop table header */}
+        <div className="hidden md:grid grid-cols-12 gap-4 px-4 py-3 text-left text-sm text-gray-500 border-b border-gray-200 dark:border-gray-700/20 bg-gray-50 dark:bg-gray-800/50 rounded-t-lg">
+          <div className="col-span-5">Name</div>
+          <div className="col-span-2">Shared by</div>
+          <div className="col-span-1">Items</div>
+          <div className="col-span-2">Permission</div>
+          <div className="col-span-2">Date Shared</div>
+          <div className="w-12"></div>
+        </div>
+
+        {/* List items */}
+        <div className="space-y-2">
+          {allSharedItems.map((shared, index) => (
+            <motion.div
+              key={`shared-${shared.type}-${
+                shared.permission?.permission_id || shared.folder?.folder_id
+              }`}
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: index * 0.03 }}
+              onContextMenu={(e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                onContextMenu(
+                  e,
+                  shared,
+                  shared.type === "document"
+                    ? "shared-document"
+                    : "shared-folder"
+                );
+              }}
+              onClick={async () => {
+                if (shared.type === "document") {
+                  onPreview(shared.document);
+                } else {
+                  await onNavigateToSharedFolder(shared);
+                }
+              }}
+              className="cursor-pointer rounded-xl border transition-all hover:shadow-md border-gray-200 dark:border-gray-700/20 bg-white dark:bg-gray-800/40 hover:border-blue-300 dark:hover:border-blue-500"
+            >
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-2 md:gap-4 px-4 py-3 items-center">
+                {/* Name column */}
+                <div className="col-span-1 md:col-span-5 flex items-center gap-3 min-w-0">
+                  <div className="w-5 h-5 flex-shrink-0 transform hover:scale-110 transition-transform">
+                    {shared.type === "document" ? (
+                      getFileIconComponent(shared.document, 20)
+                    ) : (
+                      <FiFolder className="w-5 h-5 text-blue-500" />
+                    )}
+                  </div>
+                  <span className="font-medium text-gray-700 dark:text-gray-200 truncate">
+                    {shared.type === "document"
+                      ? shared.document.original_name
+                      : shared.folder.name}
+                  </span>
+                </div>
+
+                {/* Shared by column */}
+                <div className="hidden md:block col-span-2 text-sm text-gray-500">
+                  {shared.permission?.shared_by_user
+                    ? `${shared.permission.shared_by_user.first_name || ""} ${
+                        shared.permission.shared_by_user.last_name || ""
+                      }`.trim() || shared.permission.shared_by_user.username
+                    : "Unknown"}
+                </div>
+
+                {/* Items column */}
+                <div className="hidden md:block col-span-1 text-sm text-gray-500">
+                  {shared.type === "folder" && shared.content_count
+                    ? shared.content_count.total
+                    : "—"}
+                </div>
+
+                {/* Permission column */}
+                <div className="hidden md:block col-span-2 text-sm text-gray-500">
+                  <span
+                    className={`px-2 py-0.5 rounded-full text-xs ${
+                      shared.permission?.permission_type === "VIEW"
+                        ? "bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300"
+                        : shared.permission?.permission_type === "EDIT"
+                        ? "bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400"
+                        : "bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400"
+                    }`}
+                  >
+                    {shared.permission?.permission_type || "VIEW"}
+                  </span>
+                </div>
+
+                {/* Date shared column */}
+                <div className="flex md:hidden text-xs text-gray-400">
+                  {shared.permission?.shared_by_user
+                    ? `${shared.permission.shared_by_user.first_name || ""} ${
+                        shared.permission.shared_by_user.last_name || ""
+                      }`.trim() || shared.permission.shared_by_user.username
+                    : "Unknown"}{" "}
+                  • {shared.permission?.permission_type || "VIEW"}
+                </div>
+                <div className="hidden md:block col-span-2 text-sm text-gray-500">
+                  {new Date(
+                    shared.permission?.created_at || ""
+                  ).toLocaleDateString()}
+                </div>
+
+                {/* Actions column */}
+                <div className="flex md:col-span-1 justify-end">
+                  <motion.button
+                    whileHover={{ scale: 1.1 }}
+                    whileTap={{ scale: 0.9 }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onContextMenu(
+                        e,
+                        shared,
+                        shared.type === "document"
+                          ? "shared-document"
+                          : "shared-folder"
+                      );
+                    }}
+                    className="p-2 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg transition-colors"
+                  >
+                    <FiMoreVertical className="w-4 h-4 text-gray-400" />
+                  </motion.button>
+                </div>
+              </div>
+            </motion.div>
+          ))}
+        </div>
+      </motion.div>
+    );
+  }
 
   return (
     <motion.div
@@ -411,11 +799,11 @@ const DocumentsContent: React.FC<DocumentsContentProps> = ({
               shared.type === "document" ? "shared-document" : "shared-folder"
             );
           }}
-          onClick={() => {
+          onClick={async () => {
             if (shared.type === "document") {
               onPreview(shared.document);
             } else {
-              onNavigateToSharedFolder(shared);
+              await onNavigateToSharedFolder(shared);
             }
           }}
           className="p-4 rounded-2xl border cursor-pointer transition-all hover:shadow-xl border-gray-200 dark:border-gray-700/20 bg-white dark:bg-gray-800/40 hover:border-blue-300 dark:hover:border-blue-500"
@@ -433,6 +821,12 @@ const DocumentsContent: React.FC<DocumentsContentProps> = ({
                 ? shared.document.original_name
                 : shared.folder.name}
             </p>
+            {shared.type === "folder" && shared.content_count && (
+              <p className="text-xs text-gray-400 mt-1">
+                {shared.content_count.total} item
+                {shared.content_count.total !== 1 ? "s" : ""}
+              </p>
+            )}
             <div className="flex items-center gap-1 mt-1">
               <FiUser className="w-3 h-3 text-gray-400" />
               <p className="text-xs text-gray-400">

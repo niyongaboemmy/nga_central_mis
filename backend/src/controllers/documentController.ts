@@ -10,7 +10,18 @@ import {
   Role,
   UserRole,
 } from "../db/schema";
-import { eq, and, desc, asc, isNull, gt, or, SQL, inArray } from "drizzle-orm";
+import {
+  eq,
+  and,
+  desc,
+  asc,
+  isNull,
+  gt,
+  or,
+  SQL,
+  inArray,
+  sql,
+} from "drizzle-orm";
 import {
   ValidationError,
   NotFoundError,
@@ -159,9 +170,10 @@ export const getFolders = asyncHandler(async (req: any, res: any) => {
       )
     );
 
-  // Get folders shared with the user (only root level shared folders for now)
+  // Get folders shared with the user
   let sharedFolders: any[] = [];
   if (parentId === null) {
+    // Root level shared folders
     sharedFolders = await db
       .select({
         folder: DocumentFolder,
@@ -175,13 +187,56 @@ export const getFolders = asyncHandler(async (req: any, res: any) => {
       .where(
         and(
           eq(FolderPermission.user_id, userId),
-          isNull(DocumentFolder.parent_folder_id), // Only root level shared folders
+          isNull(DocumentFolder.parent_folder_id),
           or(
             isNull(FolderPermission.expires_at),
             gt(FolderPermission.expires_at, new Date())
           )
         )
       );
+  } else {
+    // Check if the parent folder is shared with the user
+    const parentSharedCheck = await db
+      .select()
+      .from(FolderPermission)
+      .where(
+        and(
+          eq(FolderPermission.folder_id, parentId),
+          eq(FolderPermission.user_id, userId),
+          or(
+            isNull(FolderPermission.expires_at),
+            gt(FolderPermission.expires_at, new Date())
+          )
+        )
+      )
+      .limit(1);
+
+    if (parentSharedCheck.length > 0) {
+      // Parent is shared, get all subfolders (owned by the original owner)
+      const parentFolder = await db
+        .select()
+        .from(DocumentFolder)
+        .where(eq(DocumentFolder.folder_id, parentId))
+        .limit(1);
+
+      if (parentFolder.length > 0) {
+        const subFolders = await db
+          .select()
+          .from(DocumentFolder)
+          .where(
+            and(
+              eq(DocumentFolder.parent_folder_id, parentId),
+              eq(DocumentFolder.user_id, parentFolder[0].user_id)
+            )
+          );
+
+        // Mark these as accessible due to parent permission
+        sharedFolders = subFolders.map((folder) => ({
+          folder,
+          permission: parentSharedCheck[0], // Use parent permission
+        }));
+      }
+    }
   }
 
   // Combine owned and shared folders, removing duplicates
@@ -617,7 +672,43 @@ export const getSharedFolders = asyncHandler(async (req: any, res: any) => {
       )
     );
 
-  successResponse(res, "Shared folders retrieved successfully", shared);
+  // Add content counts for each folder
+  const sharedWithCounts = await Promise.all(
+    shared.map(async (item) => {
+      const [subFoldersCount, documentsCount] = await Promise.all([
+        // Count subfolders
+        db
+          .select({ count: sql<number>`count(*)` })
+          .from(DocumentFolder)
+          .where(
+            and(
+              eq(DocumentFolder.parent_folder_id, item.folder.folder_id),
+              eq(DocumentFolder.user_id, item.folder.user_id) // Only count owner's subfolders
+            )
+          ),
+        // Count documents
+        db
+          .select({ count: sql<number>`count(*)` })
+          .from(Document)
+          .where(eq(Document.folder_id, item.folder.folder_id)),
+      ]);
+
+      return {
+        ...item,
+        content_count: {
+          folders: subFoldersCount[0].count,
+          documents: documentsCount[0].count,
+          total: subFoldersCount[0].count + documentsCount[0].count,
+        },
+      };
+    })
+  );
+
+  successResponse(
+    res,
+    "Shared folders retrieved successfully",
+    sharedWithCounts
+  );
 });
 
 // ======================

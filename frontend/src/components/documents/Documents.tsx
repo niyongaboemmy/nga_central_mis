@@ -159,13 +159,16 @@ const Documents: React.FC = () => {
     try {
       if (currentSharedFolder) {
         // We're in a shared folder, fetch its contents
-        const documentsRes = await documentApi.getAll({
-          folderId: currentFolderId || undefined,
-          sortBy: sortBy,
-          sortOrder: sortOrder,
-        });
+        const [foldersRes, documentsRes] = await Promise.all([
+          folderApi.getAll(currentFolderId || undefined),
+          documentApi.getAll({
+            folderId: currentFolderId || undefined,
+            sortBy: sortBy,
+            sortOrder: sortOrder,
+          }),
+        ]);
 
-        setFolders([]); // No subfolders in shared view for now
+        setFolders(foldersRes.data.data || []);
         setDocuments(documentsRes.data.data || []);
       } else {
         // Regular owned folder navigation
@@ -406,29 +409,107 @@ const Documents: React.FC = () => {
   };
 
   // Navigate to shared folder
-  const navigateToSharedFolder = (sharedFolder: any) => {
-    setBreadcrumbs((prev) => [
-      ...prev,
-      {
-        id: sharedFolder.folder.folder_id,
-        name: sharedFolder.folder.name,
-        isShared: true,
-      },
-    ]);
-    setCurrentFolderId(sharedFolder.folder.folder_id);
-    setCurrentSharedFolder(sharedFolder);
-    setSelectedItems([]);
+  const navigateToSharedFolder = async (sharedFolder: any) => {
+    // First check if folder has content
+    try {
+      const [foldersRes, documentsRes] = await Promise.all([
+        folderApi.getAll(parseInt(sharedFolder.folder.folder_id)),
+        documentApi.getAll({
+          folderId: parseInt(sharedFolder.folder.folder_id),
+          sortBy: sortBy,
+          sortOrder: sortOrder,
+        }),
+      ]);
+
+      const hasContent =
+        foldersRes.data.data.length > 0 || documentsRes.data.data.length > 0;
+
+      if (!hasContent) {
+        showToast(`"${sharedFolder.folder.name}" is empty`, "info");
+        return;
+      }
+
+      setBreadcrumbs((prev) => [
+        ...prev,
+        {
+          id: parseInt(sharedFolder.folder.folder_id),
+          name: sharedFolder.folder.name,
+          isShared: true,
+        },
+      ]);
+      setCurrentFolderId(parseInt(sharedFolder.folder.folder_id));
+      setCurrentSharedFolder(sharedFolder);
+      setFolders(foldersRes.data.data || []);
+      setDocuments(documentsRes.data.data || []);
+      setSelectedItems([]);
+    } catch (error: any) {
+      showToast("Failed to load folder contents", "error");
+    }
+  };
+
+  // Navigate to shared subfolder (within shared context)
+  const navigateToSharedSubFolder = async (folder: Folder) => {
+    // Check if folder has content
+    try {
+      const [foldersRes, documentsRes] = await Promise.all([
+        folderApi.getAll(folder.folder_id),
+        documentApi.getAll({
+          folderId: folder.folder_id,
+          sortBy: sortBy,
+          sortOrder: sortOrder,
+        }),
+      ]);
+
+      const hasContent =
+        foldersRes.data.data.length > 0 || documentsRes.data.data.length > 0;
+
+      if (!hasContent) {
+        showToast(`"${folder.name}" is empty`, "info");
+        return;
+      }
+
+      setBreadcrumbs((prev) => [
+        ...prev,
+        {
+          id: folder.folder_id,
+          name: folder.name,
+          isShared: true,
+        },
+      ]);
+      setCurrentFolderId(folder.folder_id);
+      // Keep currentSharedFolder set for the parent
+      setFolders(foldersRes.data.data || []);
+      setDocuments(documentsRes.data.data || []);
+      setSelectedItems([]);
+    } catch (error: any) {
+      showToast("Failed to load folder contents", "error");
+    }
   };
 
   // Navigate to breadcrumb
   const navigateToBreadcrumb = (index: number) => {
     const newBreadcrumbs = breadcrumbs.slice(0, index + 1);
     setBreadcrumbs(newBreadcrumbs);
-    setCurrentFolderId(newBreadcrumbs[newBreadcrumbs.length - 1].id);
-
-    // Check if we're navigating away from a shared folder
     const targetBreadcrumb = newBreadcrumbs[newBreadcrumbs.length - 1];
-    if (!targetBreadcrumb.isShared) {
+
+    if (targetBreadcrumb.id === null) {
+      // Root breadcrumb
+      setCurrentFolderId(null);
+      setCurrentSharedFolder(null);
+    } else if (targetBreadcrumb.isShared) {
+      // Navigating to a shared folder or subfolder
+      setCurrentFolderId(targetBreadcrumb.id);
+      // Find the shared folder object - it might be a subfolder
+      const sharedFolder = sharedFolders.find(
+        (f) => parseInt(f.folder_id) === targetBreadcrumb.id
+      );
+      if (sharedFolder) {
+        setCurrentSharedFolder(sharedFolder);
+      }
+      // If not found, it's a subfolder of a shared folder, keep currentSharedFolder
+    } else {
+      // Regular folder
+      setCurrentFolderId(targetBreadcrumb.id);
       setCurrentSharedFolder(null);
     }
 
@@ -440,7 +521,26 @@ const Documents: React.FC = () => {
     if (breadcrumbs.length > 1) {
       const newBreadcrumbs = breadcrumbs.slice(0, -1);
       setBreadcrumbs(newBreadcrumbs);
-      setCurrentFolderId(newBreadcrumbs[newBreadcrumbs.length - 1].id);
+      const targetBreadcrumb = newBreadcrumbs[newBreadcrumbs.length - 1];
+
+      if (targetBreadcrumb.id === null) {
+        // Going back to root
+        setCurrentFolderId(null);
+        setCurrentSharedFolder(null);
+      } else if (targetBreadcrumb.isShared) {
+        setCurrentFolderId(targetBreadcrumb.id);
+        // Keep currentSharedFolder if it's a subfolder
+        const sharedFolder = sharedFolders.find(
+          (f) => parseInt(f.folder_id) === targetBreadcrumb.id
+        );
+        if (sharedFolder) {
+          setCurrentSharedFolder(sharedFolder);
+        }
+        // If not found, it's a subfolder, keep currentSharedFolder
+      } else {
+        setCurrentFolderId(targetBreadcrumb.id);
+        setCurrentSharedFolder(null);
+      }
       setSelectedItems([]);
     }
   };
@@ -939,18 +1039,32 @@ const Documents: React.FC = () => {
           showFolderTree={showFolderTree}
           isUploading={isUploading}
           currentFolderId={currentFolderId}
+          currentSharedFolder={currentSharedFolder}
           onTabChange={(tab) => {
             setActiveTab(tab);
             if (tab === "my-documents") {
               setSearchQuery("");
               setCurrentFolderId(null);
+              setCurrentSharedFolder(null);
               setBreadcrumbs([{ id: null, name: "My Documents" }]);
+            } else if (tab === "shared-with-me") {
+              setSearchQuery("");
+              setCurrentFolderId(null);
+              setCurrentSharedFolder(null);
+              setBreadcrumbs([{ id: null, name: "Shared with Me" }]);
             }
           }}
           onBreadcrumbClick={navigateToBreadcrumb}
           onGoToRoot={() => {
-            setBreadcrumbs([{ id: null, name: "My Documents" }]);
-            setCurrentFolderId(null);
+            if (activeTab === "my-documents") {
+              setBreadcrumbs([{ id: null, name: "My Documents" }]);
+              setCurrentFolderId(null);
+              setCurrentSharedFolder(null);
+            } else {
+              setBreadcrumbs([{ id: null, name: "Shared with Me" }]);
+              setCurrentFolderId(null);
+              setCurrentSharedFolder(null);
+            }
           }}
           onViewModeChange={setViewMode}
           onSearchChange={setSearchQuery}
@@ -994,8 +1108,10 @@ const Documents: React.FC = () => {
             filteredSharedFolders={filteredSharedFolders}
             sortBy={sortBy}
             sortOrder={sortOrder}
+            currentSharedFolder={currentSharedFolder}
             onNavigateToFolder={navigateToFolder}
             onNavigateToSharedFolder={navigateToSharedFolder}
+            onNavigateToSharedSubFolder={navigateToSharedSubFolder}
             onContextMenu={handleContextMenu}
             onPreview={handlePreview}
           />
