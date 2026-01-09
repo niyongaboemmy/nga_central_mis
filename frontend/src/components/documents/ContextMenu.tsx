@@ -27,6 +27,7 @@ interface ContextMenuProps {
   activeTab: "my-documents" | "shared-with-me";
   isInSharedFolder?: boolean;
   onNavigateToFolder: (folder: Folder) => void;
+  onNavigateToSharedFolder: (sharedFolder: any) => void;
   onDownload: (doc: Document) => void;
   onOpenShareModal: (item: Folder | Document) => void;
   onOpenRenameModal: (item: Folder | Document) => void;
@@ -34,6 +35,7 @@ interface ContextMenuProps {
   onOpenSharedDetailsModal: (sharedDoc: SharedDocument) => void;
   onDelete: (item: Folder | Document) => void;
   onRemoveSharedAccess: (sharedDoc: SharedDocument) => void;
+  onRemoveSharedFolderAccess: (sharedFolder: any) => void;
   onCreateFolder: () => void;
   onUploadFiles: () => void;
   onClose: () => void;
@@ -44,6 +46,7 @@ const ContextMenu: React.FC<ContextMenuProps> = ({
   activeTab,
   isInSharedFolder = false,
   onNavigateToFolder,
+  onNavigateToSharedFolder,
   onDownload,
   onOpenShareModal,
   onOpenRenameModal,
@@ -51,6 +54,7 @@ const ContextMenu: React.FC<ContextMenuProps> = ({
   onOpenSharedDetailsModal,
   onDelete,
   onRemoveSharedAccess,
+  onRemoveSharedFolderAccess,
   onCreateFolder,
   onUploadFiles,
   onClose,
@@ -262,7 +266,7 @@ const ContextMenu: React.FC<ContextMenuProps> = ({
             whileHover={{ x: 5 }}
             onClick={() => {
               // Navigate to shared folder
-              onNavigateToFolder(item.folder);
+              onNavigateToSharedFolder(item);
               onClose();
             }}
             className="w-full px-4 py-3 text-left text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-3 transition-colors"
@@ -273,8 +277,7 @@ const ContextMenu: React.FC<ContextMenuProps> = ({
           <motion.button
             whileHover={{ x: 5 }}
             onClick={() => {
-              // Remove shared folder access - need to implement this
-              onClose();
+              onRemoveSharedFolderAccess(item);
             }}
             className="w-full px-4 py-3 text-left text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-3 transition-colors"
           >

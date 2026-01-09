@@ -831,6 +831,29 @@ const Documents: React.FC = () => {
     }
   };
 
+  // Remove shared folder access
+  const handleRemoveSharedFolderAccess = async (sharedFolder: any) => {
+    const confirmMessage = `Are you sure you want to remove access to "${sharedFolder.folder.name}"?`;
+    if (!window.confirm(confirmMessage)) return;
+
+    setIsRemovingPermission(true);
+    try {
+      await folderPermissionApi.revokeAccess(
+        sharedFolder.permission?.permission_id
+      );
+      showToast("Access removed successfully", "success");
+      fetchSharedDocuments();
+    } catch (error: any) {
+      showToast(
+        error.response?.data?.message || "Failed to remove access",
+        "error"
+      );
+    } finally {
+      setIsRemovingPermission(false);
+      setContextMenu(null);
+    }
+  };
+
   // Remove permission from share modal
   const handleRemovePermission = async (permissionId: number) => {
     setIsRemovingPermission(true);
@@ -1305,6 +1328,7 @@ const Documents: React.FC = () => {
           activeTab={activeTab}
           isInSharedFolder={!!currentSharedFolder}
           onNavigateToFolder={navigateToFolder}
+          onNavigateToSharedFolder={navigateToSharedFolder}
           onDownload={handleDownload}
           onOpenShareModal={handleOpenShareModal}
           onOpenRenameModal={handleOpenRenameModal}
@@ -1312,6 +1336,7 @@ const Documents: React.FC = () => {
           onOpenSharedDetailsModal={handleOpenSharedDetailsModal}
           onDelete={handleDelete}
           onRemoveSharedAccess={handleRemoveSharedAccess}
+          onRemoveSharedFolderAccess={handleRemoveSharedFolderAccess}
           onCreateFolder={() => setIsCreateFolderModalOpen(true)}
           onUploadFiles={() => fileInputRef.current?.click()}
           onClose={() => setContextMenu(null)}
