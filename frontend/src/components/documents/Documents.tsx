@@ -16,7 +16,10 @@ import FolderTree from "./FolderTree";
 import DocumentsToolbar from "./DocumentsToolbar";
 import DocumentsContent from "./DocumentsContent";
 import CreateFolderModal from "./CreateFolderModal";
+import RenameModal from "./RenameModal";
 import ShareModal from "./ShareModal";
+import DocumentPreviewModal from "./DocumentPreviewModal";
+import SharedDocumentDetailsModal from "./SharedDocumentDetailsModal";
 import ContextMenu from "./ContextMenu";
 import StatusBar from "./StatusBar";
 import LoadingOverlay from "./LoadingOverlay";
@@ -36,14 +39,19 @@ const Documents: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabType>("my-documents");
   const [folders, setFolders] = useState<Folder[]>([]);
   const [documents, setDocuments] = useState<Document[]>([]);
+  const [filteredDocuments, setFilteredDocuments] = useState<Document[]>([]);
   const [sharedDocuments, setSharedDocuments] = useState<SharedDocument[]>([]);
+  const [filteredSharedDocuments, setFilteredSharedDocuments] = useState<
+    SharedDocument[]
+  >([]);
+  const [sharedFolders, setSharedFolders] = useState<any[]>([]);
+  const [filteredSharedFolders, setFilteredSharedFolders] = useState<any[]>([]);
   const [currentFolderId, setCurrentFolderId] = useState<number | null>(null);
   const [breadcrumbs, setBreadcrumbs] = useState<BreadcrumbItem[]>([
     { id: null, name: "My Documents" },
   ]);
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
   const [searchQuery, setSearchQuery] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [sortBy, setSortBy] = useState<SortOption>("name");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
   const [isUploading, setIsUploading] = useState(false);
@@ -58,13 +66,27 @@ const Documents: React.FC = () => {
   } | null>(null);
   const [isCreateFolderModalOpen, setIsCreateFolderModalOpen] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
+  const [isRenameModalOpen, setIsRenameModalOpen] = useState(false);
+  const [renameItem, setRenameItem] = useState<Folder | Document | null>(null);
+  const [newItemName, setNewItemName] = useState("");
+  const [renamePlaceholder, setRenamePlaceholder] = useState("New name");
+  const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
+  const [previewDocument, setPreviewDocument] = useState<Document | null>(null);
+  const [isSharedDetailsModalOpen, setIsSharedDetailsModalOpen] =
+    useState(false);
+  const [sharedDetailsDocument, setSharedDetailsDocument] =
+    useState<SharedDocument | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingShared, setIsLoadingShared] = useState(false);
   const [folderTree, setFolderTree] = useState<Folder[]>([]);
-  const [showFolderTree, setShowFolderTree] = useState(true);
+  const [showFolderTree, setShowFolderTree] = useState(
+    window.innerWidth >= 768
+  ); // md breakpoint
   const [uploadProgress, setUploadProgress] = useState<{
     [key: string]: number;
   }>({});
   const [isCreatingFolder, setIsCreatingFolder] = useState(false);
+  const [isRenaming, setIsRenaming] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isRemovingAccess, setIsRemovingAccess] = useState(false);
   const [isRemovingPermission, setIsRemovingPermission] = useState(false);
@@ -109,7 +131,6 @@ const Documents: React.FC = () => {
         folderApi.getAll(currentFolderId || undefined),
         documentApi.getAll({
           folderId: currentFolderId || undefined,
-          search: debouncedSearch || undefined,
           sortBy: sortBy,
           sortOrder: sortOrder,
         }),
@@ -122,18 +143,22 @@ const Documents: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [currentFolderId, debouncedSearch, sortBy, sortOrder, showToast]);
+  }, [currentFolderId, sortBy, sortOrder, showToast]);
 
   // Fetch shared documents
   const fetchSharedDocuments = useCallback(async () => {
-    setIsLoading(true);
+    setIsLoadingShared(true);
     try {
-      const response = await documentApi.getSharedWithMe();
-      setSharedDocuments(response.data.data || []);
+      const [docsResponse, foldersResponse] = await Promise.all([
+        documentApi.getSharedWithMe(),
+        folderPermissionApi.getSharedWithMe(),
+      ]);
+      setSharedDocuments(docsResponse.data.data || []);
+      setSharedFolders(foldersResponse.data.data || []);
     } catch (error: any) {
-      showToast("Failed to load shared documents", "error");
+      showToast("Failed to load shared items", "error");
     } finally {
-      setIsLoading(false);
+      setIsLoadingShared(false);
     }
   }, [showToast]);
 
@@ -167,12 +192,7 @@ const Documents: React.FC = () => {
   const fetchPermissions = async (item: Folder | Document) => {
     setIsLoadingPermissions(true);
     try {
-      if ((item as Folder).folder_id !== undefined) {
-        const response = await folderPermissionApi.getPermissions(
-          (item as Folder).folder_id
-        );
-        setExistingPermissions(response.data.data || []);
-      } else {
+      if ((item as Document).document_id !== undefined) {
         const response = await documentApi.getPermissions(
           (item as Document).document_id
         );
@@ -187,6 +207,11 @@ const Documents: React.FC = () => {
         } else {
           setExistingPermissions([]);
         }
+      } else {
+        const response = await folderPermissionApi.getPermissions(
+          (item as Folder).folder_id
+        );
+        setExistingPermissions(response.data.data || []);
       }
     } catch (error) {
       console.error("Failed to fetch permissions:", error);
@@ -217,15 +242,72 @@ const Documents: React.FC = () => {
       fetchSharedDocuments();
     }
     fetchFolderTree();
-  }, [fetchData, fetchSharedDocuments, activeTab, debouncedSearch]);
+  }, [fetchData, fetchSharedDocuments, activeTab]);
 
-  // Debounce search
+  // Filter documents and shared documents based on search query
+  const filterItems = useCallback(() => {
+    if (!searchQuery.trim()) {
+      setFilteredDocuments(documents);
+      setFilteredSharedDocuments(sharedDocuments);
+      return;
+    }
+
+    const query = searchQuery.toLowerCase().trim();
+
+    // Filter documents
+    const filteredDocs = documents.filter(
+      (doc) =>
+        doc.original_name.toLowerCase().includes(query) ||
+        doc.file_extension.toLowerCase().includes(query) ||
+        (doc.description && doc.description.toLowerCase().includes(query)) ||
+        (doc.tags && doc.tags.toLowerCase().includes(query))
+    );
+    setFilteredDocuments(filteredDocs);
+
+    // Filter shared documents
+    const filteredShared = sharedDocuments.filter(
+      (sharedDoc) =>
+        sharedDoc.document.original_name.toLowerCase().includes(query) ||
+        sharedDoc.document.file_extension.toLowerCase().includes(query) ||
+        (sharedDoc.document.description &&
+          sharedDoc.document.description.toLowerCase().includes(query)) ||
+        (sharedDoc.document.tags &&
+          sharedDoc.document.tags.toLowerCase().includes(query)) ||
+        (
+          sharedDoc.permission.shared_by_user?.first_name +
+          " " +
+          sharedDoc.permission.shared_by_user?.last_name
+        )
+          .toLowerCase()
+          .includes(query) ||
+        sharedDoc.permission.shared_by_user?.email.toLowerCase().includes(query)
+    );
+    setFilteredSharedDocuments(filteredShared);
+
+    // Filter shared folders (assuming similar structure)
+    const filteredSharedF = sharedFolders.filter(
+      (sharedFolder: any) =>
+        sharedFolder.folder?.name.toLowerCase().includes(query) ||
+        (sharedFolder.folder?.description &&
+          sharedFolder.folder.description.toLowerCase().includes(query)) ||
+        (
+          sharedFolder.permission?.shared_by_user?.first_name +
+          " " +
+          sharedFolder.permission?.shared_by_user?.last_name
+        )
+          .toLowerCase()
+          .includes(query) ||
+        sharedFolder.permission?.shared_by_user?.email
+          .toLowerCase()
+          .includes(query)
+    );
+    setFilteredSharedFolders(filteredSharedF);
+  }, [searchQuery, documents, sharedDocuments, sharedFolders]);
+
+  // Update filtered results when data or search changes
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedSearch(searchQuery);
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [searchQuery]);
+    filterItems();
+  }, [filterItems]);
 
   // Handle click outside context menu
   useEffect(() => {
@@ -265,10 +347,16 @@ const Documents: React.FC = () => {
 
   // Navigate to folder
   const navigateToFolder = (folder: Folder) => {
-    setBreadcrumbs((prev) => [
-      ...prev,
-      { id: folder.folder_id, name: folder.name },
-    ]);
+    setBreadcrumbs((prev) => {
+      // Check if the folder is already in breadcrumbs
+      const existingIndex = prev.findIndex((b) => b.id === folder.folder_id);
+      if (existingIndex !== -1) {
+        // If found, slice up to and including that folder
+        return prev.slice(0, existingIndex + 1);
+      }
+      // If not found, add it to the end
+      return [...prev, { id: folder.folder_id, name: folder.name }];
+    });
     setCurrentFolderId(folder.folder_id);
     setSelectedItems([]);
   };
@@ -379,29 +467,110 @@ const Documents: React.FC = () => {
     }
   };
 
+  // Rename item
+  const handleRename = async () => {
+    if (!renameItem || !newItemName.trim()) {
+      showToast("Name is required", "error");
+      return;
+    }
+
+    setIsRenaming(true);
+    try {
+      const isDocument = (renameItem as Document).document_id !== undefined;
+      if (isDocument) {
+        // For documents, append the original extension
+        const doc = renameItem as Document;
+        const lastDotIndex = doc.original_name.lastIndexOf(".");
+        const extension =
+          lastDotIndex > 0 ? doc.original_name.substring(lastDotIndex) : "";
+        const fullName = newItemName.trim() + extension;
+
+        await documentApi.update(doc.document_id, {
+          original_name: fullName,
+        });
+        showToast("Document renamed successfully", "success");
+      } else {
+        await folderApi.update((renameItem as Folder).folder_id, {
+          name: newItemName,
+        });
+        showToast("Folder renamed successfully", "success");
+      }
+      setIsRenameModalOpen(false);
+      setRenameItem(null);
+      setNewItemName("");
+      fetchData();
+      fetchFolderTree();
+    } catch (error: any) {
+      showToast(error.response?.data?.message || "Failed to rename", "error");
+    } finally {
+      setIsRenaming(false);
+    }
+  };
+
+  // Open rename modal
+  const handleOpenRenameModal = (item: Folder | Document) => {
+    setRenameItem(item);
+    const isDocument = (item as Document).document_id !== undefined;
+    if (isDocument) {
+      // For documents, show name without extension
+      const doc = item as Document;
+      const lastDotIndex = doc.original_name.lastIndexOf(".");
+      const nameWithoutExt =
+        lastDotIndex > 0
+          ? doc.original_name.substring(0, lastDotIndex)
+          : doc.original_name;
+      setNewItemName(nameWithoutExt);
+      setRenamePlaceholder("New file name (extension preserved)");
+    } else {
+      // For folders, show full name
+      setNewItemName((item as Folder).name);
+      setRenamePlaceholder("New folder name");
+    }
+    setIsRenameModalOpen(true);
+    setContextMenu(null);
+  };
+
+  // Open preview modal
+  const handleOpenPreviewModal = (document: Document) => {
+    setPreviewDocument(document);
+    setIsPreviewModalOpen(true);
+    setContextMenu(null);
+  };
+
+  // Handle preview (for default click)
+  const handlePreview = (document: Document) => {
+    setPreviewDocument(document);
+    setIsPreviewModalOpen(true);
+  };
+
+  // Open shared document details modal
+  const handleOpenSharedDetailsModal = (sharedDoc: SharedDocument) => {
+    setSharedDetailsDocument(sharedDoc);
+    setIsSharedDetailsModalOpen(true);
+    setContextMenu(null);
+  };
+
   // Delete item
   const handleDelete = async (item: Folder | Document) => {
-    const isFolderItem = (item as Folder).folder_id !== undefined;
-    const confirmMessage = isFolderItem
-      ? `Are you sure you want to delete folder "${
+    const isDocument = (item as Document).document_id !== undefined;
+    const confirmMessage = isDocument
+      ? `Are you sure you want to delete "${(item as Document).original_name}"?`
+      : `Are you sure you want to delete folder "${
           (item as Folder).name
-        }" and all its contents?`
-      : `Are you sure you want to delete "${
-          (item as Document).original_name
-        }"?`;
+        }" and all its contents?`;
 
     if (!window.confirm(confirmMessage)) return;
 
     setIsDeleting(true);
     setDeletingItem(item);
     try {
-      if (isFolderItem) {
-        await folderApi.delete((item as Folder).folder_id);
-      } else {
+      if (isDocument) {
         await documentApi.delete((item as Document).document_id);
+      } else {
+        await folderApi.delete((item as Folder).folder_id);
       }
       showToast(
-        `${isFolderItem ? "Folder" : "File"} deleted successfully`,
+        `${isDocument ? "File" : "Folder"} deleted successfully`,
         "success"
       );
       setSelectedItems((prev) => prev.filter((i) => i !== item));
@@ -441,10 +610,10 @@ const Documents: React.FC = () => {
   const handleRemovePermission = async (permissionId: number) => {
     setIsRemovingPermission(true);
     try {
-      if (shareItem && (shareItem as Folder).folder_id !== undefined) {
-        await folderPermissionApi.revokeAccess(permissionId);
-      } else if (shareItem) {
+      if (shareItem && (shareItem as Document).document_id !== undefined) {
         await documentApi.revokeAccess(permissionId);
+      } else if (shareItem) {
+        await folderPermissionApi.revokeAccess(permissionId);
       }
       showToast("Access removed successfully", "success");
       if (shareItem) {
@@ -560,23 +729,14 @@ const Documents: React.FC = () => {
       return;
     }
 
-    const isFolderItem = (shareItem as Folder).folder_id !== undefined;
-    const itemId = isFolderItem
-      ? (shareItem as Folder).folder_id
-      : (shareItem as Document).document_id;
+    const isDocument = (shareItem as Document).document_id !== undefined;
+    const itemId = isDocument
+      ? (shareItem as Document).document_id
+      : (shareItem as Folder).folder_id;
 
     setIsSharing(true);
     try {
-      if (isFolderItem) {
-        await folderPermissionApi.share(itemId, {
-          userIds: selectedShareUsers.map((u) => u.user_id),
-          roleIds: selectedShareRoles.map((r) => r.role_id.toString()),
-          permissionType: sharePermission,
-          expiresAt: expirationDate || undefined,
-        });
-        showToast("Folder shared successfully", "success");
-        fetchFolderPermissions(itemId);
-      } else {
+      if (isDocument) {
         await documentApi.share(itemId, {
           userIds: selectedShareUsers.map((u) => u.user_id),
           roleIds: selectedShareRoles.map((r) => r.role_id.toString()),
@@ -585,6 +745,15 @@ const Documents: React.FC = () => {
         });
         showToast("Document shared successfully", "success");
         fetchPermissions(shareItem);
+      } else {
+        await folderPermissionApi.share(itemId, {
+          userIds: selectedShareUsers.map((u) => u.user_id),
+          roleIds: selectedShareRoles.map((r) => r.role_id.toString()),
+          permissionType: sharePermission,
+          expiresAt: expirationDate || undefined,
+        });
+        showToast("Folder shared successfully", "success");
+        fetchFolderPermissions(itemId);
       }
       setSelectedShareUsers([]);
       setSelectedShareRoles([]);
@@ -655,10 +824,10 @@ const Documents: React.FC = () => {
   // Get loading message based on current operation
   const getLoadingMessage = () => {
     if (isDeleting && deletingItem) {
-      const isFolderItem = (deletingItem as Folder).folder_id !== undefined;
-      return isFolderItem
-        ? `Deleting folder "${(deletingItem as Folder).name}"...`
-        : `Deleting "${(deletingItem as Document).original_name}"...`;
+      const isDocument = (deletingItem as Document).document_id !== undefined;
+      return isDocument
+        ? `Deleting "${(deletingItem as Document).original_name}"...`
+        : `Deleting folder "${(deletingItem as Folder).name}"...`;
     }
     if (isDownloading) return "Preparing download...";
     if (isRemovingAccess) return "Removing access...";
@@ -725,8 +894,13 @@ const Documents: React.FC = () => {
 
         {/* Content Area */}
         <div
-          className="flex- overflow-auto p-4"
-          style={{ height: "calc(100vh - 270px)" }}
+          className="flex- overflow-auto p-4 w-full"
+          style={{
+            height:
+              activeTab === "shared-with-me"
+                ? "calc(100vh - 215px)"
+                : "calc(100vh - 270px)",
+          }}
           onContextMenu={(e) => {
             e.preventDefault();
             setContextMenu({
@@ -739,16 +913,18 @@ const Documents: React.FC = () => {
         >
           <DocumentsContent
             isLoading={isLoading}
+            isLoadingShared={isLoadingShared}
             activeTab={activeTab}
             viewMode={viewMode}
             folders={folders}
-            documents={documents}
-            sharedDocuments={sharedDocuments}
+            filteredDocuments={filteredDocuments}
+            filteredSharedDocuments={filteredSharedDocuments}
+            filteredSharedFolders={filteredSharedFolders}
             sortBy={sortBy}
             sortOrder={sortOrder}
             onNavigateToFolder={navigateToFolder}
-            onDownload={handleDownload}
             onContextMenu={handleContextMenu}
+            onPreview={handlePreview}
           />
         </div>
 
@@ -758,6 +934,7 @@ const Documents: React.FC = () => {
           foldersCount={folders.length}
           documentsCount={documents.length}
           sharedDocumentsCount={sharedDocuments.length}
+          sharedFoldersCount={sharedFolders.length}
           viewMode={viewMode}
         />
       </div>
@@ -772,6 +949,44 @@ const Documents: React.FC = () => {
         onClose={() => {
           setIsCreateFolderModalOpen(false);
           setNewFolderName("");
+        }}
+      />
+
+      {/* Rename Modal */}
+      <RenameModal
+        isOpen={isRenameModalOpen}
+        itemName={newItemName}
+        isRenaming={isRenaming}
+        placeholder={renamePlaceholder}
+        onItemNameChange={setNewItemName}
+        onRename={handleRename}
+        onClose={() => {
+          setIsRenameModalOpen(false);
+          setRenameItem(null);
+          setNewItemName("");
+          setRenamePlaceholder("New name");
+        }}
+      />
+
+      {/* Document Preview Modal */}
+      <DocumentPreviewModal
+        isOpen={isPreviewModalOpen}
+        document={previewDocument}
+        onClose={() => {
+          setIsPreviewModalOpen(false);
+          setPreviewDocument(null);
+        }}
+      />
+
+      {/* Shared Document Details Modal */}
+      <SharedDocumentDetailsModal
+        isOpen={isSharedDetailsModalOpen}
+        sharedDocument={sharedDetailsDocument}
+        onPreview={handlePreview}
+        onDownload={handleDownload}
+        onClose={() => {
+          setIsSharedDetailsModalOpen(false);
+          setSharedDetailsDocument(null);
         }}
       />
 
@@ -825,6 +1040,9 @@ const Documents: React.FC = () => {
           onNavigateToFolder={navigateToFolder}
           onDownload={handleDownload}
           onOpenShareModal={handleOpenShareModal}
+          onOpenRenameModal={handleOpenRenameModal}
+          onOpenPreviewModal={handleOpenPreviewModal}
+          onOpenSharedDetailsModal={handleOpenSharedDetailsModal}
           onDelete={handleDelete}
           onRemoveSharedAccess={handleRemoveSharedAccess}
           onCreateFolder={() => setIsCreateFolderModalOpen(true)}

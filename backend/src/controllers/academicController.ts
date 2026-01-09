@@ -8,6 +8,9 @@ import {
   Subject,
   ClassGroup,
   GradeSubject,
+  TeacherSubjectAssignment,
+  User,
+  UserProfile,
 } from "../db/schema";
 import { sanitizeString } from "../utils/sanitization";
 import {
@@ -793,6 +796,7 @@ export const getSubjects = asyncHandler(async (req: any, res: any) => {
     .leftJoin(GradeSubject, eq(Subject.subject_id, GradeSubject.subject_id))
     .leftJoin(Grade, eq(GradeSubject.grade_id, Grade.grade_id))
     .leftJoin(Program, eq(Grade.program_id, Program.program_id))
+    .where(eq(Subject.status, "ACTIVE"))
     .orderBy(Subject.name);
 
   // Group subjects by subject_id and collect their grades/programs
@@ -836,7 +840,7 @@ export const getSubject = asyncHandler(async (req: any, res: any) => {
   const subject = await db
     .select()
     .from(Subject)
-    .where(eq(Subject.subject_id, subjectId))
+    .where(and(eq(Subject.subject_id, subjectId), eq(Subject.status, "ACTIVE")))
     .limit(1);
 
   if (subject.length === 0) {
@@ -962,11 +966,15 @@ export const deleteSubject = asyncHandler(async (req: any, res: any) => {
     throw new NotFoundError("Subject not found");
   }
 
-  await db.delete(Subject).where(eq(Subject.subject_id, subjectId));
+  // Instead of deleting, set status to DISABLED
+  await db
+    .update(Subject)
+    .set({ status: "DISABLED" })
+    .where(eq(Subject.subject_id, subjectId));
 
-  logger.info("Subject deleted", { subjectId });
+  logger.info("Subject disabled", { subjectId });
 
-  successResponse(res, "Subject deleted successfully");
+  successResponse(res, "Subject disabled successfully");
 });
 
 // Grade-Subject Assignment Management
@@ -1004,7 +1012,9 @@ export const getGradeSubjects = asyncHandler(async (req: any, res: any) => {
     })
     .from(GradeSubject)
     .innerJoin(Subject, eq(GradeSubject.subject_id, Subject.subject_id))
-    .where(eq(GradeSubject.grade_id, gradeId))
+    .where(
+      and(eq(GradeSubject.grade_id, gradeId), eq(Subject.status, "ACTIVE"))
+    )
     .orderBy(Subject.name);
 
   successResponse(res, "Grade subjects retrieved successfully", gradeSubjects);
@@ -1035,11 +1045,11 @@ export const assignSubjectToGrade = asyncHandler(async (req: any, res: any) => {
     throw new NotFoundError("Grade not found");
   }
 
-  // Verify subject exists
+  // Verify subject exists and is active
   const subject = await db
     .select()
     .from(Subject)
-    .where(eq(Subject.subject_id, subjectId))
+    .where(and(eq(Subject.subject_id, subjectId), eq(Subject.status, "ACTIVE")))
     .limit(1);
 
   if (subject.length === 0) {
@@ -1111,6 +1121,313 @@ export const removeSubjectFromGrade = asyncHandler(
     logger.info("Subject removed from grade", { gradeId, subjectId });
 
     successResponse(res, "Subject removed from grade successfully");
+  }
+);
+
+// Teacher-Subject Assignment Management
+export const getTeacherSubjectAssignments = asyncHandler(
+  async (req: any, res: any) => {
+    const { teacherId } = req.params;
+
+    if (!teacherId) {
+      throw new ValidationError("Teacher ID is required");
+    }
+
+    const teacherIdNum = parseInt(teacherId);
+    if (isNaN(teacherIdNum)) {
+      throw new ValidationError("Invalid teacher ID");
+    }
+
+    // Verify user exists and is a teacher
+    const user = await db
+      .select()
+      .from(User)
+      .innerJoin(UserProfile, eq(User.user_id, UserProfile.user_id))
+      .where(eq(User.user_id, teacherIdNum))
+      .limit(1);
+
+    if (user.length === 0) {
+      throw new NotFoundError("User not found");
+    }
+
+    if (user[0].UserProfile.user_type !== "TEACHER") {
+      throw new ValidationError("User is not a teacher");
+    }
+
+    const assignments = await db
+      .select({
+        assignment_id: sql`${TeacherSubjectAssignment.user_id} || '-' || ${TeacherSubjectAssignment.subject_id} || '-' || ${TeacherSubjectAssignment.class_group_id} || '-' || ${TeacherSubjectAssignment.academic_term_id}`,
+        user_id: TeacherSubjectAssignment.user_id,
+        subject_id: TeacherSubjectAssignment.subject_id,
+        subject_name: Subject.name,
+        subject_code: Subject.code,
+        class_group_id: TeacherSubjectAssignment.class_group_id,
+        class_group_name: ClassGroup.name,
+        grade_name: Grade.name,
+        program_name: Program.name,
+        academic_term_id: TeacherSubjectAssignment.academic_term_id,
+        academic_term_name: AcademicTerm.name,
+        academic_year_name: AcademicYear.name,
+        assigned_at: TeacherSubjectAssignment.assigned_at,
+      })
+      .from(TeacherSubjectAssignment)
+      .innerJoin(
+        Subject,
+        eq(TeacherSubjectAssignment.subject_id, Subject.subject_id)
+      )
+      .innerJoin(
+        ClassGroup,
+        eq(TeacherSubjectAssignment.class_group_id, ClassGroup.class_group_id)
+      )
+      .innerJoin(Grade, eq(ClassGroup.grade_id, Grade.grade_id))
+      .innerJoin(Program, eq(Grade.program_id, Program.program_id))
+      .innerJoin(
+        AcademicTerm,
+        eq(
+          TeacherSubjectAssignment.academic_term_id,
+          AcademicTerm.academic_term_id
+        )
+      )
+      .innerJoin(
+        AcademicYear,
+        eq(AcademicTerm.academic_year_id, AcademicYear.academic_year_id)
+      )
+      .where(eq(TeacherSubjectAssignment.user_id, teacherIdNum))
+      .orderBy(Subject.name);
+
+    successResponse(
+      res,
+      "Teacher subject assignments retrieved successfully",
+      assignments
+    );
+  }
+);
+
+export const getSubjectTeacherAssignments = asyncHandler(
+  async (req: any, res: any) => {
+    const { subject_id } = req.params;
+
+    if (!subject_id) {
+      throw new ValidationError("Subject ID is required");
+    }
+
+    const subjId = parseInt(subject_id as string);
+    if (isNaN(subjId)) {
+      throw new ValidationError("Invalid subject ID");
+    }
+
+    const assignments = await db
+      .select({
+        assignment_id: sql`${TeacherSubjectAssignment.user_id} || '-' || ${TeacherSubjectAssignment.subject_id} || '-' || ${TeacherSubjectAssignment.class_group_id} || '-' || ${TeacherSubjectAssignment.academic_term_id}`,
+        user_id: TeacherSubjectAssignment.user_id,
+        teacher_name: sql`CONCAT(${UserProfile.first_name}, ' ', ${UserProfile.last_name})`,
+        teacher_username: User.username,
+        subject_id: TeacherSubjectAssignment.subject_id,
+        class_group_id: TeacherSubjectAssignment.class_group_id,
+        class_group_name: ClassGroup.name,
+        grade_name: Grade.name,
+        program_name: Program.name,
+        academic_term_id: TeacherSubjectAssignment.academic_term_id,
+        academic_term_name: AcademicTerm.name,
+        academic_year_name: AcademicYear.name,
+        assigned_at: TeacherSubjectAssignment.assigned_at,
+      })
+      .from(TeacherSubjectAssignment)
+      .innerJoin(User, eq(TeacherSubjectAssignment.user_id, User.user_id))
+      .innerJoin(UserProfile, eq(User.user_id, UserProfile.user_id))
+      .innerJoin(
+        ClassGroup,
+        eq(TeacherSubjectAssignment.class_group_id, ClassGroup.class_group_id)
+      )
+      .innerJoin(Grade, eq(ClassGroup.grade_id, Grade.grade_id))
+      .innerJoin(Program, eq(Grade.program_id, Program.program_id))
+      .innerJoin(
+        AcademicTerm,
+        eq(
+          TeacherSubjectAssignment.academic_term_id,
+          AcademicTerm.academic_term_id
+        )
+      )
+      .innerJoin(
+        AcademicYear,
+        eq(AcademicTerm.academic_year_id, AcademicYear.academic_year_id)
+      )
+      .where(eq(TeacherSubjectAssignment.subject_id, subjId))
+      .orderBy(UserProfile.first_name, UserProfile.last_name);
+
+    successResponse(
+      res,
+      "Subject teacher assignments retrieved successfully",
+      assignments
+    );
+  }
+);
+
+export const assignTeacherToSubject = asyncHandler(
+  async (req: any, res: any) => {
+    const { user_id, subject_id, class_group_id, academic_term_id } = req.body;
+
+    if (!user_id || !subject_id || !class_group_id || !academic_term_id) {
+      throw new ValidationError(
+        "User ID, Subject ID, Class Group ID, and Academic Term ID are required"
+      );
+    }
+
+    const teacherId = parseInt(user_id);
+    const subjId = parseInt(subject_id);
+    const classGroupId = parseInt(class_group_id);
+    const academicTermId = parseInt(academic_term_id);
+
+    if (
+      isNaN(teacherId) ||
+      isNaN(subjId) ||
+      isNaN(classGroupId) ||
+      isNaN(academicTermId)
+    ) {
+      throw new ValidationError("Invalid IDs provided");
+    }
+
+    // Verify teacher exists and is a teacher
+    const teacher = await db
+      .select()
+      .from(User)
+      .innerJoin(UserProfile, eq(User.user_id, UserProfile.user_id))
+      .where(
+        and(eq(User.user_id, teacherId), eq(UserProfile.user_type, "TEACHER"))
+      )
+      .limit(1);
+
+    if (teacher.length === 0) {
+      throw new NotFoundError("Teacher not found");
+    }
+
+    // Verify subject exists and is active
+    const subject = await db
+      .select()
+      .from(Subject)
+      .where(and(eq(Subject.subject_id, subjId), eq(Subject.status, "ACTIVE")))
+      .limit(1);
+
+    if (subject.length === 0) {
+      throw new NotFoundError("Subject not found");
+    }
+
+    // Verify class group exists
+    const classGroup = await db
+      .select()
+      .from(ClassGroup)
+      .where(eq(ClassGroup.class_group_id, classGroupId))
+      .limit(1);
+
+    if (classGroup.length === 0) {
+      throw new NotFoundError("Class group not found");
+    }
+
+    // Verify academic term exists
+    const academicTerm = await db
+      .select()
+      .from(AcademicTerm)
+      .where(eq(AcademicTerm.academic_term_id, academicTermId))
+      .limit(1);
+
+    if (academicTerm.length === 0) {
+      throw new NotFoundError("Academic term not found");
+    }
+
+    // Check if assignment already exists
+    const existingAssignment = await db
+      .select()
+      .from(TeacherSubjectAssignment)
+      .where(
+        and(
+          eq(TeacherSubjectAssignment.user_id, teacherId),
+          eq(TeacherSubjectAssignment.subject_id, subjId),
+          eq(TeacherSubjectAssignment.class_group_id, classGroupId),
+          eq(TeacherSubjectAssignment.academic_term_id, academicTermId)
+        )
+      )
+      .limit(1);
+
+    if (existingAssignment.length > 0) {
+      throw new ConflictError(
+        "Teacher is already assigned to this subject for the specified class group and term"
+      );
+    }
+
+    await db.insert(TeacherSubjectAssignment).values({
+      user_id: teacherId,
+      subject_id: subjId,
+      class_group_id: classGroupId,
+      academic_term_id: academicTermId,
+    });
+
+    logger.info("Teacher assigned to subject", {
+      teacherId,
+      subjId,
+      classGroupId,
+      academicTermId,
+    });
+
+    successResponse(res, "Teacher assigned to subject successfully", null, 201);
+  }
+);
+
+export const removeTeacherFromSubject = asyncHandler(
+  async (req: any, res: any) => {
+    const { user_id, subject_id, class_group_id, academic_term_id } =
+      req.params;
+
+    const teacherId = parseInt(user_id);
+    const subjId = parseInt(subject_id);
+    const classGroupId = parseInt(class_group_id);
+    const academicTermId = parseInt(academic_term_id);
+
+    if (
+      isNaN(teacherId) ||
+      isNaN(subjId) ||
+      isNaN(classGroupId) ||
+      isNaN(academicTermId)
+    ) {
+      throw new ValidationError("Invalid IDs provided");
+    }
+
+    // Check if assignment exists
+    const existingAssignment = await db
+      .select()
+      .from(TeacherSubjectAssignment)
+      .where(
+        and(
+          eq(TeacherSubjectAssignment.user_id, teacherId),
+          eq(TeacherSubjectAssignment.subject_id, subjId),
+          eq(TeacherSubjectAssignment.class_group_id, classGroupId),
+          eq(TeacherSubjectAssignment.academic_term_id, academicTermId)
+        )
+      )
+      .limit(1);
+
+    if (existingAssignment.length === 0) {
+      throw new NotFoundError("Teacher assignment not found");
+    }
+
+    await db
+      .delete(TeacherSubjectAssignment)
+      .where(
+        and(
+          eq(TeacherSubjectAssignment.user_id, teacherId),
+          eq(TeacherSubjectAssignment.subject_id, subjId),
+          eq(TeacherSubjectAssignment.class_group_id, classGroupId),
+          eq(TeacherSubjectAssignment.academic_term_id, academicTermId)
+        )
+      );
+
+    logger.info("Teacher removed from subject", {
+      teacherId,
+      subjId,
+      classGroupId,
+      academicTermId,
+    });
+
+    successResponse(res, "Teacher removed from subject successfully");
   }
 );
 

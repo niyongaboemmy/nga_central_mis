@@ -4,11 +4,14 @@ import {
   Grade,
   gradeSubjectsApi,
   gradesApi,
+  teacherSubjectAssignmentsApi,
+  SubjectTeacherAssignment,
 } from "../../api/academics";
 import Button from "../ui/Button";
 import Modal from "../ui/Modal";
 import ConfirmModal from "../ui/ConfirmModal";
 import Input from "../ui/Input";
+import { Eye, Users, BookOpen, Calendar, User as UserIcon } from "lucide-react";
 
 interface SubjectsTabProps {
   data: Subject[];
@@ -48,7 +51,12 @@ const SubjectsTab: React.FC<SubjectsTabProps> = ({
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [selectedSubject, setSelectedSubject] = useState<Subject | null>(null);
+  const [subjectTeachers, setSubjectTeachers] = useState<
+    SubjectTeacherAssignment[]
+  >([]);
+  const [loadingTeachers, setLoadingTeachers] = useState(false);
   const [formData, setFormData] = useState<SubjectFormData>({
     name: "",
     code: "",
@@ -290,6 +298,24 @@ const SubjectsTab: React.FC<SubjectsTabProps> = ({
     setShowDeleteModal(true);
   };
 
+  const handleViewDetails = async (subject: Subject) => {
+    setSelectedSubject(subject);
+    setShowDetailsModal(true);
+    setLoadingTeachers(true);
+
+    try {
+      const response = await teacherSubjectAssignmentsApi.getBySubject(
+        subject.subject_id
+      );
+      setSubjectTeachers(response.data?.data || []);
+    } catch (error) {
+      console.error("Failed to load subject teachers:", error);
+      setSubjectTeachers([]);
+    } finally {
+      setLoadingTeachers(false);
+    }
+  };
+
   const confirmDelete = async () => {
     if (!selectedSubject) return;
 
@@ -402,6 +428,13 @@ const SubjectsTab: React.FC<SubjectsTabProps> = ({
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-right text-sm font-medium">
                         <div className="flex items-center justify-end space-x-2">
+                          <button
+                            onClick={() => handleViewDetails(item)}
+                            className="text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-300"
+                            title="View details"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </button>
                           <button
                             onClick={() => handleEdit(item)}
                             className="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300"
@@ -1083,6 +1116,155 @@ const SubjectsTab: React.FC<SubjectsTabProps> = ({
         message={`Are you sure you want to delete "${selectedSubject?.name}"? This action cannot be undone.`}
         isLoading={submitting}
       />
+
+      {/* Subject Details Modal */}
+      <Modal
+        isOpen={showDetailsModal}
+        onClose={() => {
+          setShowDetailsModal(false);
+          setSelectedSubject(null);
+          setSubjectTeachers([]);
+        }}
+        title={`Subject Details - ${selectedSubject?.name}`}
+        size="xl"
+      >
+        {selectedSubject && (
+          <div className="space-y-6">
+            {/* Subject Info */}
+            <div className="bg-white dark:bg-gray-800/40 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
+              <div className="flex items-center gap-4 mb-4">
+                <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/30 rounded-xl flex items-center justify-center">
+                  <BookOpen className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-semibold text-gray-900 dark:text-white">
+                    {selectedSubject.name}
+                  </h3>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    {selectedSubject.code && `Code: ${selectedSubject.code}`}
+                  </p>
+                </div>
+              </div>
+
+              {selectedSubject.description && (
+                <div className="mt-4">
+                  <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Description
+                  </h4>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-800/50 rounded-lg p-3">
+                    {selectedSubject.description}
+                  </p>
+                </div>
+              )}
+
+              {/* Grades Info */}
+              <div className="mt-4 grid grid-cols-2 gap-4">
+                <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-3">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Users className="w-4 h-4 text-gray-500" />
+                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Grades Assigned
+                    </span>
+                  </div>
+                  <p className="text-lg font-bold text-gray-900 dark:text-white">
+                    {selectedSubject.grades?.length || 0}
+                  </p>
+                </div>
+
+                <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-3">
+                  <div className="flex items-center gap-2 mb-1">
+                    <UserIcon className="w-4 h-4 text-gray-500" />
+                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Teachers Assigned
+                    </span>
+                  </div>
+                  <p className="text-lg font-bold text-gray-900 dark:text-white">
+                    {subjectTeachers.length}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Assigned Teachers */}
+            <div>
+              <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                <Users className="w-5 h-5" />
+                Assigned Teachers
+              </h4>
+
+              {loadingTeachers ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                  <span className="ml-2 text-sm text-gray-500">
+                    Loading teachers...
+                  </span>
+                </div>
+              ) : subjectTeachers.length === 0 ? (
+                <div className="text-center py-8">
+                  <UserIcon className="w-12 h-12 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+                    No teachers assigned
+                  </h3>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    This subject hasn't been assigned to any teachers yet.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {subjectTeachers.map((assignment) => (
+                    <div
+                      key={assignment.assignment_id}
+                      className="bg-white dark:bg-gray-800/40 rounded-xl border border-gray-200 dark:border-gray-700 p-4 hover:shadow-sm transition-shadow"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 bg-green-100 dark:bg-green-900/30 rounded-lg flex items-center justify-center">
+                            <UserIcon className="w-5 h-5 text-green-600 dark:text-green-400" />
+                          </div>
+                          <div>
+                            <h5 className="font-medium text-gray-900 dark:text-white">
+                              {assignment.teacher_name}
+                            </h5>
+                            <p className="text-sm text-gray-500 dark:text-gray-400">
+                              @{assignment.teacher_username}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="text-right text-sm text-gray-500 dark:text-gray-400">
+                          <div className="flex items-center gap-1 mb-1">
+                            <Users className="w-3 h-3" />
+                            {assignment.class_group_name}
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <Calendar className="w-3 h-3" />
+                            {assignment.academic_term_name}
+                          </div>
+                          <div className="text-xs mt-1">
+                            {assignment.grade_name} • {assignment.program_name}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        <div className="flex justify-end mt-6">
+          <Button
+            variant="secondary"
+            onClick={() => {
+              setShowDetailsModal(false);
+              setSelectedSubject(null);
+              setSubjectTeachers([]);
+            }}
+          >
+            Close
+          </Button>
+        </div>
+      </Modal>
     </div>
   );
 };

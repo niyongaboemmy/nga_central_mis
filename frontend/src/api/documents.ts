@@ -125,7 +125,12 @@ export const documentApi = {
 
   update: (
     documentId: number,
-    data: { description?: string; tags?: string; is_public?: boolean }
+    data: {
+      description?: string;
+      tags?: string;
+      is_public?: boolean;
+      original_name?: string;
+    }
   ) => apiService.put(`/documents/${documentId}`, data),
 
   delete: (documentId: number) => apiService.delete(`/documents/${documentId}`),

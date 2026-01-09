@@ -73,15 +73,17 @@ const getFileIconComponent = (doc: Document, size: number = 48) => {
 
 interface DocumentsContentProps {
   isLoading: boolean;
+  isLoadingShared: boolean;
   activeTab: "my-documents" | "shared-with-me";
   viewMode: ViewMode;
   folders: Folder[];
-  documents: Document[];
-  sharedDocuments: SharedDocument[];
+  filteredDocuments: Document[];
+  filteredSharedDocuments: SharedDocument[];
+  filteredSharedFolders: any[];
   sortBy: SortOption;
   sortOrder: "asc" | "desc";
   onNavigateToFolder: (folder: Folder) => void;
-  onDownload: (doc: Document) => void;
+  onPreview: (doc: Document) => void;
   onContextMenu: (
     e: React.MouseEvent,
     item: Folder | Document | SharedDocument,
@@ -91,20 +93,22 @@ interface DocumentsContentProps {
 
 const DocumentsContent: React.FC<DocumentsContentProps> = ({
   isLoading,
+  isLoadingShared,
   activeTab,
   viewMode,
   folders,
-  documents,
-  sharedDocuments,
+  filteredDocuments,
+  filteredSharedDocuments,
+  filteredSharedFolders,
   sortBy,
   sortOrder,
   onNavigateToFolder,
-  onDownload,
+  onPreview,
   onContextMenu,
 }) => {
   // Sort items helper
   const getSortedItems = () => {
-    const allItems = [...folders, ...documents];
+    const allItems = [...folders, ...filteredDocuments];
     return allItems.sort((a, b) => {
       let comparison = 0;
       const aIsFolder = itemIsFolder(a);
@@ -140,7 +144,7 @@ const DocumentsContent: React.FC<DocumentsContentProps> = ({
     return item.created_at;
   };
 
-  if (isLoading) {
+  if (isLoading || (activeTab === "shared-with-me" && isLoadingShared)) {
     return (
       <div className="flex items-center justify-center h-full">
         <motion.div
@@ -175,7 +179,11 @@ const DocumentsContent: React.FC<DocumentsContentProps> = ({
   }
 
   // Empty state for shared documents
-  if (activeTab === "shared-with-me" && sharedDocuments.length === 0) {
+  if (
+    activeTab === "shared-with-me" &&
+    filteredSharedDocuments.length === 0 &&
+    filteredSharedFolders.length === 0
+  ) {
     return (
       <motion.div
         initial={{ opacity: 0, scale: 0.9 }}
@@ -205,11 +213,11 @@ const DocumentsContent: React.FC<DocumentsContentProps> = ({
         variants={containerVariants}
         initial="hidden"
         animate="visible"
-        className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4"
+        className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4"
       >
-        {sortedItems.map((item) => (
+        {sortedItems.map((item, i) => (
           <motion.div
-            key={getItemKey(item)}
+            key={i + 1}
             variants={itemVariants}
             whileHover={{ scale: 1.03, y: -5 }}
             whileTap={{ scale: 0.98 }}
@@ -226,7 +234,7 @@ const DocumentsContent: React.FC<DocumentsContentProps> = ({
               if (itemIsFolder(item)) {
                 onNavigateToFolder(item);
               } else {
-                onDownload(item);
+                onPreview(item);
               }
             }}
             className="p-4 rounded-2xl border cursor-pointer transition-all hover:shadow-xl border-gray-200 dark:border-gray-700/20 bg-white dark:bg-gray-800/40 hover:border-blue-300 dark:hover:border-blue-500"
@@ -296,6 +304,8 @@ const DocumentsContent: React.FC<DocumentsContentProps> = ({
               onClick={() => {
                 if (itemIsFolder(item)) {
                   onNavigateToFolder(item);
+                } else {
+                  onPreview(item);
                 }
               }}
               className="cursor-pointer rounded-xl border transition-all hover:shadow-md border-gray-200 dark:border-gray-700/20 bg-white dark:bg-gray-800/40 hover:border-blue-300 dark:hover:border-blue-500"
@@ -371,38 +381,61 @@ const DocumentsContent: React.FC<DocumentsContentProps> = ({
   }
 
   // Shared with me view
+  const allSharedItems = [
+    ...filteredSharedDocuments.map((item) => ({ ...item, type: "document" })),
+    ...filteredSharedFolders.map((item) => ({ ...item, type: "folder" })),
+  ];
+
   return (
     <motion.div
       variants={containerVariants}
       initial="hidden"
       animate="visible"
-      className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4"
+      className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-4"
     >
-      {sharedDocuments.map((shared) => (
+      {allSharedItems.map((shared) => (
         <motion.div
-          key={`shared-${shared.permission.permission_id}`}
-          variants={itemVariants}
+          key={`shared-${shared.type}-${
+            shared.permission?.permission_id || shared.folder?.folder_id
+          }`}
+          // variants={itemVariants}
           whileHover={{ scale: 1.03, y: -5 }}
           whileTap={{ scale: 0.98 }}
           onContextMenu={(e) => {
             e.stopPropagation();
             e.preventDefault();
-            onContextMenu(e, shared, "shared-document");
+            onContextMenu(
+              e,
+              shared,
+              shared.type === "document" ? "shared-document" : "folder"
+            );
           }}
-          onClick={() => onDownload(shared.document)}
+          onClick={() => {
+            if (shared.type === "document") {
+              onPreview(shared.document);
+            } else {
+              // Handle folder click - perhaps navigate or show details
+            }
+          }}
           className="p-4 rounded-2xl border cursor-pointer transition-all hover:shadow-xl border-gray-200 dark:border-gray-700/20 bg-white dark:bg-gray-800/40 hover:border-blue-300 dark:hover:border-blue-500"
         >
           <div className="flex flex-col items-center text-center">
             <div className="mb-3 transform hover:scale-110 transition-transform duration-200">
-              {getFileIconComponent(shared.document)}
+              {shared.type === "document" ? (
+                getFileIconComponent(shared.document)
+              ) : (
+                <FiFolder className="w-12 h-12 text-blue-500" />
+              )}
             </div>
             <p className="text-sm font-medium text-gray-700 dark:text-gray-200 truncate w-full px-2">
-              {shared.document.original_name}
+              {shared.type === "document"
+                ? shared.document.original_name
+                : shared.folder.name}
             </p>
             <div className="flex items-center gap-1 mt-1">
               <FiUser className="w-3 h-3 text-gray-400" />
               <p className="text-xs text-gray-400">
-                {shared.permission.shared_by_user
+                {shared.permission?.shared_by_user
                   ? `${shared.permission.shared_by_user.first_name || ""} ${
                       shared.permission.shared_by_user.last_name || ""
                     }`.trim() || shared.permission.shared_by_user.username
@@ -411,14 +444,14 @@ const DocumentsContent: React.FC<DocumentsContentProps> = ({
             </div>
             <span
               className={`text-xs mt-1 px-2 py-0.5 rounded-full ${
-                shared.permission.permission_type === "VIEW"
+                shared.permission?.permission_type === "VIEW"
                   ? "bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300"
-                  : shared.permission.permission_type === "EDIT"
+                  : shared.permission?.permission_type === "EDIT"
                   ? "bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400"
                   : "bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400"
               }`}
             >
-              {shared.permission.permission_type}
+              {shared.permission?.permission_type || "VIEW"}
             </span>
           </div>
         </motion.div>

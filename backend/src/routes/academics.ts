@@ -40,6 +40,12 @@ import {
   assignSubjectToGrade,
   removeSubjectFromGrade,
 
+  // Teacher-Subject Assignments
+  getTeacherSubjectAssignments,
+  getSubjectTeacherAssignments,
+  assignTeacherToSubject,
+  removeTeacherFromSubject,
+
   // Class Groups
   getClassGroups,
   getClassGroup,
@@ -192,6 +198,32 @@ router.delete(
   authenticate,
   authorize("MANAGE_ACADEMICS"),
   removeSubjectFromGrade
+);
+
+// Teacher-Subject Assignment routes
+router.get(
+  "/teachers/:teacherId/subjects",
+  authenticate,
+  authorize("MANAGE_ACADEMICS"),
+  getTeacherSubjectAssignments
+);
+router.get(
+  "/subjects/:subject_id/teachers",
+  authenticate,
+  authorize("MANAGE_ACADEMICS"),
+  getSubjectTeacherAssignments
+);
+router.post(
+  "/teachers/assign-subject",
+  authenticate,
+  authorize("MANAGE_ACADEMICS"),
+  assignTeacherToSubject
+);
+router.delete(
+  "/teachers/:user_id/subjects/:subject_id/class-groups/:class_group_id/terms/:academic_term_id",
+  authenticate,
+  authorize("MANAGE_ACADEMICS"),
+  removeTeacherFromSubject
 );
 
 // Subjects routes

@@ -23,6 +23,9 @@ interface ContextMenuProps {
   onNavigateToFolder: (folder: Folder) => void;
   onDownload: (doc: Document) => void;
   onOpenShareModal: (item: Folder | Document) => void;
+  onOpenRenameModal: (item: Folder | Document) => void;
+  onOpenPreviewModal: (doc: Document) => void;
+  onOpenSharedDetailsModal: (sharedDoc: SharedDocument) => void;
   onDelete: (item: Folder | Document) => void;
   onRemoveSharedAccess: (sharedDoc: SharedDocument) => void;
   onCreateFolder: () => void;
@@ -36,6 +39,9 @@ const ContextMenu: React.FC<ContextMenuProps> = ({
   onNavigateToFolder,
   onDownload,
   onOpenShareModal,
+  onOpenRenameModal,
+  onOpenPreviewModal,
+  onOpenSharedDetailsModal,
   onDelete,
   onRemoveSharedAccess,
   onCreateFolder,
@@ -80,7 +86,7 @@ const ContextMenu: React.FC<ContextMenuProps> = ({
           <motion.button
             whileHover={{ x: 5 }}
             onClick={() => {
-              // Rename functionality
+              onOpenRenameModal(item as Folder);
               onClose();
             }}
             className="w-full px-4 py-3 text-left text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-3 transition-colors"
@@ -105,6 +111,17 @@ const ContextMenu: React.FC<ContextMenuProps> = ({
           <motion.button
             whileHover={{ x: 5 }}
             onClick={() => {
+              onOpenPreviewModal(item as Document);
+              onClose();
+            }}
+            className="w-full px-4 py-3 text-left text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-3 transition-colors"
+          >
+            <FiEye className="w-4 h-4 text-purple-500" />
+            Preview
+          </motion.button>
+          <motion.button
+            whileHover={{ x: 5 }}
+            onClick={() => {
               onDownload(item as Document);
               onClose();
             }}
@@ -126,6 +143,7 @@ const ContextMenu: React.FC<ContextMenuProps> = ({
           <motion.button
             whileHover={{ x: 5 }}
             onClick={() => {
+              onOpenRenameModal(item as Document);
               onClose();
             }}
             className="w-full px-4 py-3 text-left text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-3 transition-colors"
@@ -171,6 +189,7 @@ const ContextMenu: React.FC<ContextMenuProps> = ({
           <motion.button
             whileHover={{ x: 5 }}
             onClick={() => {
+              onOpenSharedDetailsModal(item as SharedDocument);
               onClose();
             }}
             className="w-full px-4 py-3 text-left text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-3 transition-colors"

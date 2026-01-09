@@ -176,13 +176,13 @@ const ShareModal: React.FC<ShareModalProps> = ({
         initial="hidden"
         animate="visible"
         exit="exit"
-        className="bg-white dark:bg-gray-800 rounded-3xl shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-hidden flex flex-col"
+        className="bg-white dark:bg-gray-800 rounded-3xl shadow-2xl w-full max-w-2xl sm:max-w-4xl max-h-[90vh] overflow-hidden flex flex-col"
       >
         {/* Header */}
-        <div className="relative bg-gradient-to-r from-blue-500 via-blue-500 to-blue-500 p-6 text-white">
+        <div className="relative bg-gradient-to-r from-blue-500 via-blue-500 to-blue-500 p-4 sm:p-6 text-white">
           <div className="absolute inset-0 bg-black/10" />
           <div className="relative flex items-start justify-between">
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3 sm:gap-4">
               <div className="w-14 h-14 bg-white/20 backdrop-blur-lg rounded-2xl flex items-center justify-center">
                 {isFolderItem ? (
                   <FiFolder className="w-8 h-8 text-white" />
@@ -247,7 +247,7 @@ const ShareModal: React.FC<ShareModalProps> = ({
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto p-6">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6">
           {shareTab === "people" && (
             <div className="space-y-6">
               {/* Existing permissions */}
@@ -707,7 +707,7 @@ const ShareModal: React.FC<ShareModalProps> = ({
         </div>
 
         {/* Footer Actions */}
-        <div className="p-6 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
+        <div className="p-4 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
           <div className="flex justify-between items-center">
             <motion.button
               whileHover={{ scale: 1.02 }}

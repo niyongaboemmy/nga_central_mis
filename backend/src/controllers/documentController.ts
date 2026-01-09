@@ -740,7 +740,7 @@ export const getDocumentById = asyncHandler(async (req: any, res: any) => {
 export const updateDocument = asyncHandler(async (req: any, res: any) => {
   const userId = req.user.userId;
   const { documentId } = req.params;
-  const { description, tags, is_public } = req.body;
+  const { description, tags, is_public, original_name } = req.body;
 
   // Check if document exists and belongs to user
   const existingDoc = await db
@@ -767,6 +767,12 @@ export const updateDocument = asyncHandler(async (req: any, res: any) => {
   }
   if (is_public !== undefined) {
     updateData.is_public = is_public ? 1 : 0;
+  }
+  if (original_name !== undefined) {
+    if (original_name.trim().length === 0) {
+      throw new ValidationError("Document name cannot be empty");
+    }
+    updateData.original_name = sanitizeString(original_name);
   }
 
   await db

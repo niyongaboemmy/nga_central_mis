@@ -14,8 +14,10 @@ import {
   CheckCircle,
   Ban,
   Clock4,
+  BookOpen,
 } from "lucide-react";
 import { UserWithProfile, UserRole, Permission } from "../api/users";
+import TeacherSubjectAssignment from "./academics/TeacherSubjectAssignment";
 
 // Status badge with icon
 const StatusBadge = ({ status }: { status: string }) => {
@@ -202,7 +204,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
   user,
 }) => {
   const [activeTab, setActiveTab] = React.useState<
-    "info" | "roles" | "activity"
+    "info" | "roles" | "subjects" | "activity"
   >("info");
 
   if (!user) return null;
@@ -290,6 +292,9 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                 {[
                   { id: "info", label: "Info", icon: UserIcon },
                   { id: "roles", label: "Roles", icon: Shield },
+                  ...(getUserType() === "TEACHER"
+                    ? [{ id: "subjects", label: "Subjects", icon: BookOpen }]
+                    : []),
                   { id: "activity", label: "Activity", icon: Clock },
                 ].map((tab) => (
                   <button
@@ -403,6 +408,41 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                         </div>
                       </div>
                     )}
+                  </div>
+                )}
+
+                {activeTab === "subjects" && getUserType() === "TEACHER" && (
+                  <div className="space-y-6">
+                    {/* Header with back button */}
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={() => setActiveTab("info")}
+                        className="p-2 text-gray-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
+                      >
+                        ←
+                      </button>
+                      <div>
+                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                          Subject Assignments
+                        </h3>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">
+                          Manage subject assignments for this teacher
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Teacher Subject Assignment Component */}
+                    <TeacherSubjectAssignment
+                      teacherId={user.user.user_id}
+                      teacherName={
+                        user.profile?.first_name && user.profile?.last_name
+                          ? `${user.profile.first_name} ${user.profile.last_name}`
+                          : user.user.username
+                      }
+                      isOpen={true}
+                      onClose={() => setActiveTab("info")}
+                      onSuccess={() => {}} // Could refresh user data if needed
+                    />
                   </div>
                 )}
 

@@ -8,6 +8,7 @@ interface StatusBarProps {
   foldersCount: number;
   documentsCount: number;
   sharedDocumentsCount: number;
+  sharedFoldersCount: number;
   viewMode: ViewMode;
 }
 
@@ -16,6 +17,7 @@ const StatusBar: React.FC<StatusBarProps> = ({
   foldersCount,
   documentsCount,
   sharedDocumentsCount,
+  sharedFoldersCount,
   viewMode,
 }) => {
   return (
@@ -27,7 +29,7 @@ const StatusBar: React.FC<StatusBarProps> = ({
       <span>
         {activeTab === "my-documents"
           ? `${foldersCount + documentsCount} items`
-          : `${sharedDocumentsCount} shared documents`}
+          : `${sharedDocumentsCount + sharedFoldersCount} shared items`}
       </span>
       <div className="flex items-center gap-4">
         {activeTab === "my-documents" && (

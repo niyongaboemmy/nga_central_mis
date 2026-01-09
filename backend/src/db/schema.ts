@@ -153,6 +153,7 @@ export const Subject = mysqlTable("Subject", {
   code: varchar("code", { length: 50 }).unique(),
   name: varchar("name", { length: 150 }).notNull(),
   description: varchar("description", { length: 255 }),
+  status: mysqlEnum("status", ["ACTIVE", "DISABLED"]).default("ACTIVE"),
 });
 
 // GradeSubject junction table

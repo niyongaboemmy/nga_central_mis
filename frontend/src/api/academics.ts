@@ -148,3 +148,62 @@ export const gradeSubjectsApi = {
   remove: (gradeId: number, subjectId: number) =>
     api.delete(`/academics/grades/${gradeId}/subjects/${subjectId}`),
 };
+
+// Teacher-Subject Assignment API
+export interface TeacherSubjectAssignment {
+  assignment_id: string;
+  user_id: number;
+  subject_id: number;
+  subject_name: string;
+  subject_code: string | null;
+  class_group_id: number;
+  class_group_name: string;
+  grade_name: string;
+  program_name: string;
+  academic_term_id: number;
+  academic_term_name: string;
+  academic_year_name: string;
+  assigned_at: string;
+}
+
+export interface SubjectTeacherAssignment {
+  assignment_id: string;
+  user_id: number;
+  teacher_name: string;
+  teacher_username: string;
+  subject_id: number;
+  class_group_id: number;
+  class_group_name: string;
+  grade_name: string;
+  program_name: string;
+  academic_term_id: number;
+  academic_term_name: string;
+  academic_year_name: string;
+  assigned_at: string;
+}
+
+export const teacherSubjectAssignmentsApi = {
+  getByTeacher: (teacherId: number) =>
+    api.get<{ data: TeacherSubjectAssignment[] }>(
+      `/academics/teachers/${teacherId}/subjects`
+    ),
+  getBySubject: (subjectId: number) =>
+    api.get<{ data: SubjectTeacherAssignment[] }>(
+      `/academics/subjects/${subjectId}/teachers`
+    ),
+  assign: (data: {
+    user_id: number;
+    subject_id: number;
+    class_group_id: number;
+    academic_term_id: number;
+  }) => api.post("/academics/teachers/assign-subject", data),
+  remove: (
+    teacherId: number,
+    subjectId: number,
+    classGroupId: number,
+    academicTermId: number
+  ) =>
+    api.delete(
+      `/academics/teachers/${teacherId}/subjects/${subjectId}/class-groups/${classGroupId}/terms/${academicTermId}`
+    ),
+};

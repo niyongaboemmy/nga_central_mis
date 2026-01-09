@@ -29,7 +29,7 @@ const FolderTree: React.FC<FolderTreeProps> = ({
       }}
       exit={{ width: 0, opacity: 0 }}
       transition={{ duration: 0.2 }}
-      className="bg-white dark:bg-gray-800/40 border-r border-gray-200 dark:border-gray-700/30 flex flex-col overflow-hidden"
+      className="hidden bg-white dark:bg-gray-800/40 border-r border-gray-200 dark:border-gray-700/30 lg:flex flex-col overflow-hidden"
     >
       <div className="p-4 border-b border-gray-200 dark:border-gray-700/40 bg-gray-50 dark:bg-gray-800/40">
         <h3 className="font-semibold text-gray-700 dark:text-gray-200 flex items-center gap-2">
