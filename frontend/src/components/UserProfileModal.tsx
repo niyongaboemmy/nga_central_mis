@@ -232,7 +232,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
             initial={{ scale: 0.95, opacity: 0, y: 20 }}
             animate={{ scale: 1, opacity: 1, y: 0 }}
             exit={{ scale: 0.95, opacity: 0, y: 20 }}
-            className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-2xl shadow-2xl overflow-hidden"
+            className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-2xl shadow-2xl overflow-hidden max-h-screen"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header Banner */}
@@ -262,55 +262,59 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
 
             {/* User Info */}
             <div className="pt-14 px-6 pb-4">
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.15 }}
-              >
-                <h2 className="text-xl font-bold text-gray-900 dark:text-white">
-                  {user.profile?.first_name && user.profile?.last_name
-                    ? `${user.profile.first_name} ${user.profile.last_name}`
-                    : user.user.username}
-                </h2>
-                <p className="text-sm text-gray-500 dark:text-gray-400">
-                  @{user.user.username}
-                </p>
+              <h2 className="text-xl font-bold text-gray-900 dark:text-white -mb-2">
+                {user.profile?.first_name && user.profile?.last_name
+                  ? `${user.profile.first_name} ${user.profile.last_name}`
+                  : user.user.username}
+              </h2>
+              <div className="flex flex-row items-center justify-between gap-3 w-full">
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.15 }}
+                >
+                  <div className="flex flex-row items-center gap-2">
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                      @{user.user.username}
+                    </p>
 
-                <div className="flex items-center gap-2 mt-2">
-                  <UserTypeBadge type={getUserType()} />
-                  <StatusBadge status={user.user.status} />
-                </div>
-              </motion.div>
+                    <div className="flex items-center gap-2 mt-2">
+                      <UserTypeBadge type={getUserType()} />
+                      <StatusBadge status={user.user.status} />
+                    </div>
+                  </div>
+                </motion.div>
 
-              {/* Tabs */}
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.2 }}
-                className="flex gap-1 mt-4 p-1 bg-gray-100 dark:bg-slate-800 rounded-full"
-              >
-                {[
-                  { id: "info", label: "Info", icon: UserIcon },
-                  { id: "roles", label: "Roles", icon: Shield },
-                  ...(getUserType() === "TEACHER"
-                    ? [{ id: "subjects", label: "Subjects", icon: BookOpen }]
-                    : []),
-                  { id: "activity", label: "Activity", icon: Clock },
-                ].map((tab) => (
-                  <button
-                    key={tab.id}
-                    onClick={() => setActiveTab(tab.id as typeof activeTab)}
-                    className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-full text-xs font-medium transition-all ${
-                      activeTab === tab.id
-                        ? "bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm"
-                        : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200"
-                    }`}
-                  >
-                    <tab.icon className="w-4 h-4" />
-                    {tab.label}
-                  </button>
-                ))}
-              </motion.div>
+                {/* Tabs */}
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.2 }}
+                  className="flex gap-1 mt-4 p-1 bg-gray-100 dark:bg-slate-800 rounded-full"
+                >
+                  {[
+                    { id: "info", label: "Info", icon: UserIcon },
+                    { id: "roles", label: "Roles", icon: Shield },
+                    ...(getUserType() === "TEACHER"
+                      ? [{ id: "subjects", label: "Subjects", icon: BookOpen }]
+                      : []),
+                    { id: "activity", label: "Activity", icon: Clock },
+                  ].map((tab) => (
+                    <button
+                      key={tab.id}
+                      onClick={() => setActiveTab(tab.id as typeof activeTab)}
+                      className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-full text-xs font-medium transition-all ${
+                        activeTab === tab.id
+                          ? "bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm"
+                          : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200"
+                      }`}
+                    >
+                      <tab.icon className="w-4 h-4" />
+                      {tab.label}
+                    </button>
+                  ))}
+                </motion.div>
+              </div>
 
               {/* Tab Content */}
               <motion.div
@@ -318,7 +322,8 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.2 }}
-                className="mt-4 max-h-80 overflow-y-auto"
+                className="mt-4 overflow-y-auto"
+                style={{ maxHeight: "calc(100vh - 270px)" }}
               >
                 {activeTab === "info" && (
                   <div className="space-y-3">
