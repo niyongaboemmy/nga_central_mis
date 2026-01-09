@@ -316,6 +316,19 @@ const Documents: React.FC = () => {
     fetchFolderTree();
   }, [fetchData, fetchSharedDocuments, activeTab]);
 
+  // Reset breadcrumbs when switching tabs
+  useEffect(() => {
+    if (activeTab === "my-documents") {
+      setBreadcrumbs([{ id: null, name: "My Documents" }]);
+      setCurrentFolderId(null);
+      setCurrentSharedFolder(null);
+    } else if (activeTab === "shared-with-me") {
+      setBreadcrumbs([{ id: null, name: "Shared with Me" }]);
+      setCurrentFolderId(null);
+      setCurrentSharedFolder(null);
+    }
+  }, [activeTab]);
+
   // Filter documents and shared documents based on search query
   const filterItems = useCallback(() => {
     if (!searchQuery.trim()) {
@@ -1084,8 +1097,7 @@ const Documents: React.FC = () => {
           sharedFoldersCount={sharedFolders.length}
           showFolderTree={showFolderTree}
           isUploading={isUploading}
-          currentFolderId={currentFolderId}
-          currentSharedFolder={currentSharedFolder}
+          // currentFolderId={currentFolderId}
           onTabChange={(tab) => {
             setActiveTab(tab);
             if (tab === "my-documents") {
@@ -1119,7 +1131,6 @@ const Documents: React.FC = () => {
             setSortOrder(sortOrder === "asc" ? "desc" : "asc")
           }
           onToggleFolderTree={() => setShowFolderTree(!showFolderTree)}
-          onGoBack={goBack}
           onCreateFolder={() => setIsCreateFolderModalOpen(true)}
           onUploadClick={() => fileInputRef.current?.click()}
         />
@@ -1130,8 +1141,8 @@ const Documents: React.FC = () => {
           style={{
             height:
               activeTab === "shared-with-me"
-                ? "calc(100vh - 215px)"
-                : "calc(100vh - 270px)",
+                ? "calc(100vh - 210px)"
+                : "calc(100vh - 210px)",
           }}
           onContextMenu={(e) => {
             e.preventDefault();
@@ -1189,6 +1200,8 @@ const Documents: React.FC = () => {
           sharedDocumentsCount={sharedDocuments.length}
           sharedFoldersCount={sharedFolders.length}
           viewMode={viewMode}
+          onGoBack={goBack}
+          breadcrumbsLength={breadcrumbs.length}
         />
       </div>
 
