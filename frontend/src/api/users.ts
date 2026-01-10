@@ -36,6 +36,8 @@ export interface UserWithProfile {
   user: User;
   profile: UserProfile | null;
   roles?: UserRole[];
+  permissions?: string[];
+  forcePasswordChange?: boolean;
 }
 
 export interface UserRole {

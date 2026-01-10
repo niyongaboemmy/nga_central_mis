@@ -1,8 +1,11 @@
+import bcrypt from "bcryptjs";
+import crypto from "crypto";
 import { db } from "../db";
 import { eq, sql, and, or, like, ilike } from "drizzle-orm";
 import {
   User,
   UserProfile,
+  AuthCredential,
   Role,
   Permission,
   UserRole,
@@ -17,6 +20,7 @@ import {
 import { successResponse } from "../utils/response";
 import { asyncHandler } from "../middleware/asyncHandler";
 import logger from "../utils/logger";
+import emailService from "../utils/email";
 import * as XLSX from "xlsx";
 import * as fs from "fs";
 import * as path from "path";
@@ -256,6 +260,13 @@ export const getCurrentUser = asyncHandler(async (req: any, res: any) => {
     .where(eq(UserProfile.user_id, userId))
     .limit(1);
 
+  // Get auth credentials to check force_password_change
+  const auth = await db
+    .select({ force_password_change: AuthCredential.force_password_change })
+    .from(AuthCredential)
+    .where(eq(AuthCredential.user_id, userId))
+    .limit(1);
+
   // Get user roles
   const userRoles = await db
     .select({
@@ -333,6 +344,7 @@ export const getCurrentUser = asyncHandler(async (req: any, res: any) => {
     profile: profile[0] || null,
     roles: rolesWithPermissions,
     permissions,
+    forcePasswordChange: auth[0]?.force_password_change === 1,
   });
 });
 
@@ -549,6 +561,34 @@ export const createUser = asyncHandler(async (req: any, res: any) => {
     .where(eq(User.username, sanitizedUsername))
     .limit(1);
   const newUserId = newUserResult[0]?.user_id;
+
+  // Generate random password
+  const randomPassword = crypto.randomBytes(8).toString("hex");
+
+  // Hash the password
+  const salt = await bcrypt.genSalt(12);
+  const passwordHash = await bcrypt.hash(randomPassword, salt);
+
+  // Insert auth credentials with force password change
+  await db.insert(AuthCredential).values({
+    user_id: newUserId,
+    password_hash: passwordHash,
+    force_password_change: 1,
+  });
+
+  // Send email with credentials (don't await to avoid blocking)
+  try {
+    emailService.sendAccountCreation(
+      sanitizedEmail,
+      sanitizedUsername,
+      randomPassword
+    );
+  } catch (emailError) {
+    logger.warn("Failed to send account creation email", {
+      emailError,
+      userId: newUserId,
+    });
+  }
 
   // Validate gender
   const validatedGender = validateGender(gender);
@@ -869,6 +909,34 @@ export const bulkCreateUsers = asyncHandler(async (req: any, res: any) => {
         .where(eq(User.username, sanitizeString(username)))
         .limit(1);
       const newUserId = newUserResult[0]?.user_id;
+
+      // Generate random password
+      const randomPassword = crypto.randomBytes(8).toString("hex");
+
+      // Hash the password
+      const salt = await bcrypt.genSalt(12);
+      const passwordHash = await bcrypt.hash(randomPassword, salt);
+
+      // Insert auth credentials with force password change
+      await db.insert(AuthCredential).values({
+        user_id: newUserId,
+        password_hash: passwordHash,
+        force_password_change: 1,
+      });
+
+      // Send email with credentials (don't await to avoid blocking)
+      try {
+        emailService.sendAccountCreation(
+          sanitizeString(email),
+          sanitizeString(username),
+          randomPassword
+        );
+      } catch (emailError) {
+        logger.warn("Failed to send account creation email for bulk user", {
+          emailError,
+          userId: newUserId,
+        });
+      }
 
       // Insert profile if any profile data is provided
       if (firstName || lastName || gender || dateOfBirth || address) {

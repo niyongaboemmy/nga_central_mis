@@ -137,6 +137,7 @@ const Login: React.FC<LoginProps> = ({
     try {
       await verifyOTP(otp, tempToken);
       await refreshUser();
+
       setStep("success");
       setTimeout(() => {
         if (onLoginSuccess) {
@@ -207,7 +208,7 @@ const Login: React.FC<LoginProps> = ({
       <FloatingParticles />
       <BackgroundShapes />
 
-      <div className="relative z-10 pt-20 pb-8 px-4">
+      <div className="relative z-10 pt-0 pb-8 px-4">
         <div className="w-full max-w-md mx-auto">
           <AnimatePresence mode="wait">
             {step === "success" ? (
@@ -623,7 +624,7 @@ const Login: React.FC<LoginProps> = ({
                       whileHover={{ scale: 1.05 }}
                       whileTap={{ scale: 0.95 }}
                     >
-                      Forgot your password?
+                      Forgot your password or New Account?
                     </motion.button>
                   </motion.div>
                 </motion.div>

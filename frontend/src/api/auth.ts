@@ -17,6 +17,7 @@ export interface VerifyOTPResponse {
   user: any;
   profile: any;
   permissions: string[];
+  forcePasswordChange?: boolean;
 }
 
 // Generic wrapper interface for backend responses
@@ -202,6 +203,37 @@ export const resetPassword = async (
     }
 
     return response.data.data;
+  } catch (error) {
+    if (onError) {
+      onError(error);
+    }
+    throw error;
+  }
+};
+
+export interface ChangePasswordData {
+  currentPassword: string;
+  newPassword: string;
+}
+
+export interface ChangePasswordResponse {
+  message: string;
+}
+
+export const changePassword = async (
+  data: ChangePasswordData,
+  onSuccess?: (response: ChangePasswordResponse) => void,
+  onError?: (error: any) => void
+): Promise<ChangePasswordResponse | void> => {
+  try {
+    const response: AxiosResponse<BackendResponse<ChangePasswordResponse>> =
+      await api.post("/auth/change-password", data);
+
+    if (onSuccess) {
+      onSuccess({ message: response.data.message });
+    }
+
+    return { message: response.data.message };
   } catch (error) {
     if (onError) {
       onError(error);

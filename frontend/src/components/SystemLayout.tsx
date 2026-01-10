@@ -1,7 +1,8 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Navbar from "./ui/Navbar";
 import Sidebar from "./ui/Sidebar";
 import WelcomePopup from "./WelcomePopup";
+import ChangePasswordModal from "./ChangePasswordModal";
 import { useUser } from "../contexts/UserContext";
 
 interface SystemLayoutProps {
@@ -16,7 +17,18 @@ const SystemLayout: React.FC<SystemLayoutProps> = ({
   showSidebar = false,
 }) => {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-  const { showWelcomePopup, setShowWelcomePopup } = useUser();
+  const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
+  const [showChangePasswordModalUser, setShowChangePasswordModalUser] =
+    useState(false);
+  const { showWelcomePopup, setShowWelcomePopup, user, refreshUser } =
+    useUser();
+
+  useEffect(() => {
+    // Check if password change is required
+    if (user?.forcePasswordChange) {
+      setShowChangePasswordModal(true);
+    }
+  }, [user]);
 
   return (
     <div className="min-h-screen bg-gray-100 dark:bg-black">
@@ -43,6 +55,7 @@ const SystemLayout: React.FC<SystemLayoutProps> = ({
             showNavigation={false}
             showAuthButtons={false}
             showUserCard={true}
+            onChangePassword={() => setShowChangePasswordModalUser(true)}
           />
         </>
       )}
@@ -69,6 +82,27 @@ const SystemLayout: React.FC<SystemLayoutProps> = ({
       {showWelcomePopup && (
         <WelcomePopup onClose={() => setShowWelcomePopup(false)} />
       )}
+
+      {/* Change Password Modal - Forced */}
+      <ChangePasswordModal
+        isOpen={showChangePasswordModal}
+        onClose={() => setShowChangePasswordModal(false)}
+        onSuccess={async () => {
+          setShowChangePasswordModal(false);
+          await refreshUser(); // Refresh user data to update forcePasswordChange status
+        }}
+        isForced={true}
+      />
+
+      {/* Change Password Modal - User initiated */}
+      <ChangePasswordModal
+        isOpen={showChangePasswordModalUser}
+        onClose={() => setShowChangePasswordModalUser(false)}
+        onSuccess={() => {
+          setShowChangePasswordModalUser(false);
+        }}
+        isForced={false}
+      />
     </div>
   );
 };

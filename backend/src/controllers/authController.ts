@@ -138,6 +138,13 @@ export const verifyOTP = asyncHandler(async (req: any, res: any) => {
     .where(eq(UserProfile.user_id, userId))
     .limit(1);
 
+  // Get auth credentials to check force_password_change
+  const auth = await db
+    .select({ force_password_change: AuthCredential.force_password_change })
+    .from(AuthCredential)
+    .where(eq(AuthCredential.user_id, userId))
+    .limit(1);
+
   // Generate final JWT token
   const token = jwt.sign(
     { userId, username: user[0].username },
@@ -152,6 +159,7 @@ export const verifyOTP = asyncHandler(async (req: any, res: any) => {
     user: user[0],
     profile: profile[0] || null,
     permissions,
+    forcePasswordChange: auth[0]?.force_password_change === 1,
   });
 });
 
@@ -270,4 +278,58 @@ export const resetPassword = asyncHandler(async (req: any, res: any) => {
     res,
     "Password has been reset successfully. You can now login with your new password."
   );
+});
+
+export const changePassword = asyncHandler(async (req: any, res: any) => {
+  const { currentPassword, newPassword } = req.body;
+  const userId = req.user.userId;
+
+  if (!newPassword) {
+    throw new ValidationError("New password is required");
+  }
+
+  if (newPassword.length < 8) {
+    throw new ValidationError(
+      "New password must be at least 8 characters long"
+    );
+  }
+
+  // Get current auth credentials
+  const auth = await db
+    .select()
+    .from(AuthCredential)
+    .where(eq(AuthCredential.user_id, userId))
+    .limit(1);
+
+  if (auth.length === 0) {
+    throw new AuthenticationError("Authentication credentials not found");
+  }
+
+  // Verify current password if provided (not required for forced changes)
+  if (currentPassword) {
+    const isValidPassword = await bcrypt.compare(
+      currentPassword,
+      auth[0].password_hash
+    );
+    if (!isValidPassword) {
+      throw new AuthenticationError("Current password is incorrect");
+    }
+  }
+
+  // Hash new password
+  const salt = await bcrypt.genSalt(12);
+  const passwordHash = await bcrypt.hash(newPassword, salt);
+
+  // Update password and reset force_password_change
+  await db
+    .update(AuthCredential)
+    .set({
+      password_hash: passwordHash,
+      force_password_change: 0,
+    })
+    .where(eq(AuthCredential.user_id, userId));
+
+  logger.info(`Password changed for userId: ${userId}`);
+
+  successResponse(res, "Password changed successfully");
 });

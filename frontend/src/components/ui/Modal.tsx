@@ -7,7 +7,8 @@ interface ModalProps {
   onClose: () => void;
   title: string;
   children: React.ReactNode;
-  size?: "sm" | "md" | "lg" | "xl";
+  size?: "sm" | "md" | "lg" | "xl" | "2xl";
+  showCloseButton?: boolean;
 }
 
 const Modal: React.FC<ModalProps> = ({
@@ -16,12 +17,14 @@ const Modal: React.FC<ModalProps> = ({
   title,
   children,
   size = "md",
+  showCloseButton = true,
 }) => {
   const sizeClasses = {
     sm: "max-w-sm",
     md: "max-w-md",
     lg: "max-w-lg",
     xl: "max-w-2xl",
+    "2xl": "max-w-5xl",
   };
 
   return (
@@ -44,7 +47,7 @@ const Modal: React.FC<ModalProps> = ({
               duration: 0.3,
               ease: [0.16, 1, 0.3, 1],
             }}
-            className={`relative w-full ${sizeClasses[size]} max-h-[90vh] bg-white dark:bg-slate-800 rounded-3xl shadow-2xl border border-white/20 dark:border-slate-700/50 overflow-hidden flex flex-col`}
+            className={`relative w-full ${sizeClasses[size]} max-h-[90vh] bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-white/20 dark:border-slate-700/50 overflow-hidden flex flex-col`}
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
@@ -52,14 +55,16 @@ const Modal: React.FC<ModalProps> = ({
               <h2 className="text-xl font-bold text-gray-900 dark:text-white">
                 {title}
               </h2>
-              <motion.button
-                whileHover={{ scale: 1.1, rotate: 90 }}
-                whileTap={{ scale: 0.9 }}
-                onClick={onClose}
-                className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 text-gray-500 dark:text-gray-400 transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </motion.button>
+              {showCloseButton && (
+                <motion.button
+                  whileHover={{ scale: 1.1, rotate: 90 }}
+                  whileTap={{ scale: 0.9 }}
+                  onClick={onClose}
+                  className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 text-gray-500 dark:text-gray-400 transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </motion.button>
+              )}
             </div>
 
             {/* Content */}

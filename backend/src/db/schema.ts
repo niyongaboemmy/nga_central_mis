@@ -56,6 +56,7 @@ export const AuthCredential = mysqlTable("AuthCredential", {
     .notNull()
     .references(() => User.user_id),
   password_hash: varchar("password_hash", { length: 255 }).notNull(),
+  force_password_change: tinyint("force_password_change").default(0),
   mfa_enabled: tinyint("mfa_enabled").default(0),
   failed_attempts: int("failed_attempts").default(0),
   locked_until: datetime("locked_until"),

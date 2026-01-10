@@ -123,6 +123,55 @@ class EmailService {
       text,
     });
   }
+
+  async sendAccountCreation(
+    email: string,
+    username: string,
+    password: string
+  ): Promise<void> {
+    const html = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #333;">Welcome to NGA Central MIS</h2>
+        <p>Hello,</p>
+        <p>Your account has been created successfully. Here are your login credentials:</p>
+        <div style="background-color: #f4f4f4; padding: 20px; margin: 20px 0; border-radius: 8px;">
+          <p><strong>Username:</strong> ${username}</p>
+          <p><strong>Temporary Password:</strong> ${password}</p>
+        </div>
+        <p style="color: #d32f2f; font-weight: bold;">Important: You will be required to change your password on your first login.</p>
+        <p>Please log in and update your password immediately for security reasons.</p>
+        <p>If you have any questions, please contact support.</p>
+        <p>Best regards,<br>${config.email.fromName} Team</p>
+      </div>
+    `;
+
+    const text = `
+      Welcome to NGA Central MIS
+
+      Hello,
+
+      Your account has been created successfully. Here are your login credentials:
+
+      Username: ${username}
+      Temporary Password: ${password}
+
+      Important: You will be required to change your password on your first login.
+
+      Please log in and update your password immediately for security reasons.
+
+      If you have any questions, please contact support.
+
+      Best regards,
+      ${config.email.fromName} Team
+    `;
+
+    await this.sendEmail({
+      to: email,
+      subject: "Your NGA Central MIS Account Credentials",
+      html,
+      text,
+    });
+  }
 }
 
 export default new EmailService();

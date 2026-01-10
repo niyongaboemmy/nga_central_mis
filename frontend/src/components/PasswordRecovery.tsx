@@ -129,18 +129,16 @@ const PasswordRecovery: React.FC<PasswordRecoveryProps> = ({
     if (!otp) {
       return;
     }
+    if (!tempToken) {
+      // Debug: Log the OTP being sent
+      console.log("Verifying OTP:", otp);
+      console.log("Using token:", tempToken.substring(0, 20) + "...");
+      return setError("Session expired. Please start over.");
+    }
     setLoading(true);
     setError("");
 
     try {
-      if (!tempToken) {
-        throw new Error("Session expired. Please start over.");
-      }
-
-      // Debug: Log the OTP being sent
-      console.log("Verifying OTP:", otp);
-      console.log("Using token:", tempToken.substring(0, 20) + "...");
-
       await verifyResetOTP(otp, tempToken);
       setStep("newPassword");
     } catch (err: any) {
@@ -258,7 +256,7 @@ const PasswordRecovery: React.FC<PasswordRecoveryProps> = ({
         <FloatingParticles />
         <BackgroundShapes />
 
-        <div className="relative z-10 pt-20 pb-8 px-4">
+        <div className="relative z-10 pt-5 pb-8 px-4">
           <div className="w-full max-w-md mx-auto">
             <motion.div
               className="bg-white/80 dark:bg-slate-800/50 backdrop-blur-xl rounded-3xl p-8 border border-white dark:border-slate-800 shadow-2xl text-center flex flex-col items-center justify-center"
@@ -326,7 +324,7 @@ const PasswordRecovery: React.FC<PasswordRecoveryProps> = ({
 
   return (
     <motion.div
-      className="min-h-screen relative overflow-hidden bg-gradient-to-br from-gray-50 to-blue-50 dark:from-slate-950 dark:to-slate-950 pt-8"
+      className="min-h-screen relative overflow-hidden bg-gradient-to-br from-gray-50 to-blue-50 dark:from-slate-950 dark:to-slate-950"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
@@ -335,7 +333,7 @@ const PasswordRecovery: React.FC<PasswordRecoveryProps> = ({
       <FloatingParticles />
       <BackgroundShapes />
 
-      <div className="relative z-10 pt-20 pb-8 px-4">
+      <div className="relative z-10 pt-5 pb-8 px-4">
         <div className="w-full max-w-md mx-auto">
           {/* Header */}
           <motion.div
@@ -479,11 +477,11 @@ const PasswordRecovery: React.FC<PasswordRecoveryProps> = ({
                           if (code.length > 0) {
                             setError(""); // Clear error when user starts typing
                           }
-                          if (code.length === 6) {
-                            handleOTPSubmit({
-                              preventDefault: () => {},
-                            } as any);
-                          }
+                          // if (code.length === 6) {
+                          //   handleOTPSubmit({
+                          //     preventDefault: () => {},
+                          //   } as any);
+                          // }
                         }}
                         error={!!error}
                       />
