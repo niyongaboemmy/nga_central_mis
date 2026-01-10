@@ -45,6 +45,8 @@ import {
   getSubjectTeacherAssignments,
   assignTeacherToSubject,
   removeTeacherFromSubject,
+  getMyAssignedSubjects,
+  getSubjectEnrolledStudents,
 
   // Class Groups
   getClassGroups,
@@ -288,6 +290,20 @@ router.delete(
   authenticate,
   authorize("MANAGE_ACADEMICS"),
   deleteClassGroup
+);
+
+// Teacher Assigned Subjects routes
+router.get(
+  "/my-assigned-subjects",
+  authenticate,
+  authorize("VIEW_MY_ASSIGNED_SUBJECTS"),
+  getMyAssignedSubjects
+);
+router.get(
+  "/subjects/:subject_id/terms/:academic_term_id/students",
+  authenticate,
+  authorize("VIEW_MY_ASSIGNED_SUBJECTS"),
+  getSubjectEnrolledStudents
 );
 
 export default router;

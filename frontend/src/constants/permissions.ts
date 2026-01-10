@@ -28,6 +28,7 @@ export const Permissions = {
   // Teacher management
   MANAGE_TEACHERS: "MANAGE_TEACHERS",
   VIEW_TEACHERS: "VIEW_TEACHERS",
+  VIEW_MY_ASSIGNED_SUBJECTS: "VIEW_MY_ASSIGNED_SUBJECTS",
 
   // Parent management
   MANAGE_PARENTS: "MANAGE_PARENTS",
@@ -120,7 +121,11 @@ export const permissionGroups = {
   academics: [Permissions.MANAGE_ACADEMICS, Permissions.VIEW_ACADEMICS],
   classes: [Permissions.MANAGE_CLASSES, Permissions.VIEW_CLASSES],
   students: [Permissions.MANAGE_STUDENTS, Permissions.VIEW_STUDENTS],
-  teachers: [Permissions.MANAGE_TEACHERS, Permissions.VIEW_TEACHERS],
+  teachers: [
+    Permissions.MANAGE_TEACHERS,
+    Permissions.VIEW_TEACHERS,
+    Permissions.VIEW_MY_ASSIGNED_SUBJECTS,
+  ],
   parents: [Permissions.MANAGE_PARENTS, Permissions.VIEW_PARENTS],
   grades: [Permissions.MANAGE_GRADES, Permissions.VIEW_GRADES],
   attendance: [Permissions.MANAGE_ATTENDANCE, Permissions.VIEW_ATTENDANCE],

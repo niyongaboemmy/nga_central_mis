@@ -6,7 +6,7 @@ import Button from "./ui/Button";
 import PasswordStrengthGuide from "./ui/PasswordStrengthGuide";
 import { changePassword } from "../api/auth";
 import { useToast } from "../contexts/ToastContext";
-import { Eye, EyeOff, Lock, Key } from "lucide-react";
+import { Lock } from "lucide-react";
 
 interface ChangePasswordModalProps {
   isOpen: boolean;

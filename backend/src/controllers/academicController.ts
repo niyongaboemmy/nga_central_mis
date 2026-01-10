@@ -9,6 +9,8 @@ import {
   ClassGroup,
   GradeSubject,
   TeacherSubjectAssignment,
+  StudentSubjectEnrollment,
+  StudentClassGroup,
   User,
   UserProfile,
 } from "../db/schema";
@@ -1643,3 +1645,168 @@ export const deleteClassGroup = asyncHandler(async (req: any, res: any) => {
 
   successResponse(res, "Class group deleted successfully");
 });
+
+// Teacher Assigned Subjects for Dashboard
+export const getMyAssignedSubjects = asyncHandler(
+  async (req: any, res: any) => {
+    const teacherId = req.user?.user_id || req.user?.id || req.user?.userId;
+    if (!req.user || teacherId == null || teacherId === undefined) {
+      throw new ValidationError("User not authenticated");
+    }
+    const teacherIdNum =
+      typeof teacherId === "string" ? parseInt(teacherId) : teacherId;
+    if (isNaN(teacherIdNum)) {
+      throw new ValidationError("Invalid user ID");
+    }
+
+    // Get all assignments for the teacher
+    const assignments = await db
+      .select({
+        assignment_id: sql`${TeacherSubjectAssignment.user_id} || '-' || ${TeacherSubjectAssignment.subject_id} || '-' || ${TeacherSubjectAssignment.class_group_id} || '-' || ${TeacherSubjectAssignment.academic_term_id}`,
+        subject_id: TeacherSubjectAssignment.subject_id,
+        subject_name: Subject.name,
+        subject_code: Subject.code,
+        class_group_id: TeacherSubjectAssignment.class_group_id,
+        class_group_name: ClassGroup.name,
+        grade_id: Grade.grade_id,
+        grade_name: Grade.name,
+        program_id: Program.program_id,
+        program_name: Program.name,
+        academic_term_id: TeacherSubjectAssignment.academic_term_id,
+        academic_term_name: AcademicTerm.name,
+        academic_year_name: AcademicYear.name,
+        assigned_at: TeacherSubjectAssignment.assigned_at,
+      })
+      .from(TeacherSubjectAssignment)
+      .innerJoin(
+        Subject,
+        eq(TeacherSubjectAssignment.subject_id, Subject.subject_id)
+      )
+      .innerJoin(
+        ClassGroup,
+        eq(TeacherSubjectAssignment.class_group_id, ClassGroup.class_group_id)
+      )
+      .innerJoin(Grade, eq(ClassGroup.grade_id, Grade.grade_id))
+      .innerJoin(Program, eq(Grade.program_id, Program.program_id))
+      .innerJoin(
+        AcademicTerm,
+        eq(
+          TeacherSubjectAssignment.academic_term_id,
+          AcademicTerm.academic_term_id
+        )
+      )
+      .innerJoin(
+        AcademicYear,
+        eq(AcademicTerm.academic_year_id, AcademicYear.academic_year_id)
+      )
+      .where(eq(TeacherSubjectAssignment.user_id, teacherIdNum))
+      .orderBy(Subject.name);
+
+    // Group by subject to avoid duplicates
+    const subjectMap = new Map<number, any>();
+
+    assignments.forEach((assignment) => {
+      const subjectId = assignment.subject_id;
+      if (!subjectMap.has(subjectId)) {
+        subjectMap.set(subjectId, {
+          subject_id: assignment.subject_id,
+          subject_name: assignment.subject_name,
+          subject_code: assignment.subject_code,
+          grades: [],
+        });
+      }
+
+      const grade = {
+        grade_id: assignment.grade_id,
+        grade_name: assignment.grade_name,
+        program_id: assignment.program_id,
+        program_name: assignment.program_name,
+        class_group_id: assignment.class_group_id,
+        class_group_name: assignment.class_group_name,
+        academic_term_id: assignment.academic_term_id,
+        academic_term_name: assignment.academic_term_name,
+        academic_year_name: assignment.academic_year_name,
+        assigned_at: assignment.assigned_at,
+      };
+
+      subjectMap.get(subjectId).grades.push(grade);
+    });
+
+    const result = Array.from(subjectMap.values());
+
+    successResponse(res, "Assigned subjects retrieved successfully", result);
+  }
+);
+
+// Get students enrolled in a specific subject for a teacher
+export const getSubjectEnrolledStudents = asyncHandler(
+  async (req: any, res: any) => {
+    const teacherId = req.user?.user_id || req.user?.id || req.user?.userId;
+    if (!teacherId) {
+      throw new ValidationError("User not authenticated");
+    }
+    const teacherIdNum =
+      typeof teacherId === "string" ? parseInt(teacherId) : teacherId;
+    if (isNaN(teacherIdNum)) {
+      throw new ValidationError("Invalid user ID");
+    }
+    const { subject_id, academic_term_id } = req.params;
+
+    const subjId = parseInt(subject_id);
+    const termId = parseInt(academic_term_id);
+
+    if (isNaN(subjId) || isNaN(termId)) {
+      throw new ValidationError("Invalid subject ID or academic term ID");
+    }
+
+    // Verify the teacher is assigned to this subject
+    const assignment = await db
+      .select()
+      .from(TeacherSubjectAssignment)
+      .where(
+        and(
+          eq(TeacherSubjectAssignment.user_id, teacherIdNum),
+          eq(TeacherSubjectAssignment.subject_id, subjId),
+          eq(TeacherSubjectAssignment.academic_term_id, termId)
+        )
+      )
+      .limit(1);
+
+    if (assignment.length === 0) {
+      throw new ValidationError("Teacher is not assigned to this subject");
+    }
+
+    // Get enrolled students
+    const students = await db
+      .select({
+        user_id: User.user_id,
+        username: User.username,
+        first_name: UserProfile.first_name,
+        last_name: UserProfile.last_name,
+        gender: UserProfile.gender,
+        class_group_name: ClassGroup.name,
+        grade_name: Grade.name,
+        program_name: Program.name,
+        enrolled_at: StudentSubjectEnrollment.enrolled_at,
+      })
+      .from(StudentSubjectEnrollment)
+      .innerJoin(User, eq(StudentSubjectEnrollment.user_id, User.user_id))
+      .innerJoin(UserProfile, eq(User.user_id, UserProfile.user_id))
+      .leftJoin(StudentClassGroup, eq(User.user_id, StudentClassGroup.user_id))
+      .leftJoin(
+        ClassGroup,
+        eq(StudentClassGroup.class_group_id, ClassGroup.class_group_id)
+      )
+      .leftJoin(Grade, eq(ClassGroup.grade_id, Grade.grade_id))
+      .leftJoin(Program, eq(Grade.program_id, Program.program_id))
+      .where(
+        and(
+          eq(StudentSubjectEnrollment.subject_id, subjId),
+          eq(StudentSubjectEnrollment.academic_term_id, termId)
+        )
+      )
+      .orderBy(UserProfile.first_name, UserProfile.last_name);
+
+    successResponse(res, "Enrolled students retrieved successfully", students);
+  }
+);

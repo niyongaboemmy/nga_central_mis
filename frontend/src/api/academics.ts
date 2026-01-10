@@ -207,3 +207,43 @@ export const teacherSubjectAssignmentsApi = {
       `/academics/teachers/${teacherId}/subjects/${subjectId}/class-groups/${classGroupId}/terms/${academicTermId}`
     ),
 };
+
+// My Assigned Subjects API (for teachers)
+export interface MyAssignedSubject {
+  subject_id: number;
+  subject_name: string;
+  subject_code: string | null;
+  grades: Array<{
+    grade_id: number;
+    grade_name: string;
+    program_id: number;
+    program_name: string;
+    class_group_id: number;
+    class_group_name: string;
+    academic_term_id: number;
+    academic_term_name: string;
+    academic_year_name: string;
+    assigned_at: string;
+  }>;
+}
+
+export interface EnrolledStudent {
+  user_id: number;
+  username: string;
+  first_name: string;
+  last_name: string;
+  gender: string | null;
+  class_group_name: string | null;
+  grade_name: string | null;
+  program_name: string | null;
+  enrolled_at: string;
+}
+
+export const myAssignedSubjectsApi = {
+  getAll: () =>
+    api.get<{ data: MyAssignedSubject[] }>("/academics/my-assigned-subjects"),
+  getEnrolledStudents: (subjectId: number, academicTermId: number) =>
+    api.get<{ data: EnrolledStudent[] }>(
+      `/academics/subjects/${subjectId}/terms/${academicTermId}/students`
+    ),
+};

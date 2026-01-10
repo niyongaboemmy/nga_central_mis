@@ -25,6 +25,7 @@ import { ToastStore } from "./services/api";
 import "./App.css";
 import Documents from "./components/documents/Documents";
 import Academics from "./components/Academics";
+import TeacherAssignedSubjects from "./components/TeacherAssignedSubjects";
 
 // Wrapper components for pages that need the Navbar
 const LandingPage: React.FC = () => {
@@ -191,6 +192,11 @@ const AcademicsPage: React.FC = () => {
   return <Academics />;
 };
 
+// Teacher Assigned Subjects page with sidebar
+const TeacherAssignedSubjectsPage: React.FC = () => {
+  return <TeacherAssignedSubjects />;
+};
+
 // Permissions page with sidebar
 const PermissionsPage: React.FC = () => {
   return <Permissions />;
@@ -324,6 +330,18 @@ function App() {
                   <ProtectedRoute>
                     <SystemLayoutWrapper>
                       <AcademicsPage />
+                    </SystemLayoutWrapper>
+                  </ProtectedRoute>
+                }
+              />
+
+              {/* Teacher Assigned Subjects - protected with sidebar */}
+              <Route
+                path="/my-subjects"
+                element={
+                  <ProtectedRoute>
+                    <SystemLayoutWrapper>
+                      <TeacherAssignedSubjectsPage />
                     </SystemLayoutWrapper>
                   </ProtectedRoute>
                 }
