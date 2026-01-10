@@ -13,6 +13,7 @@ import PasswordRecovery from "./components/PasswordRecovery";
 import Login from "./components/Login";
 import Profile from "./components/Profile";
 import Dashboard from "./components/Dashboard";
+import SuperAdminDashboard from "./components/SuperAdminDashboard";
 import Permissions from "./components/Permissions";
 import Users from "./components/Users";
 import SystemLayout from "./components/SystemLayout";
@@ -154,13 +155,23 @@ const SystemLayoutWrapper: React.FC<{ children: React.ReactNode }> = ({
 
 // Dashboard page with sidebar
 const DashboardPage: React.FC = () => {
-  const { logout } = useUser();
+  const { logout, user } = useUser();
   const navigate = useNavigate();
 
   const handleLogout = () => {
     logout();
     navigate("/");
   };
+
+  // Check if user has any role with SUPER_ADMIN_DASHBOARD permission
+  const hasSuperAdminDashboard =
+    user?.roles?.some((role) =>
+      role.permissions?.some((perm) => perm.name === "SUPER_ADMIN_DASHBOARD")
+    ) || false;
+
+  if (hasSuperAdminDashboard) {
+    return <SuperAdminDashboard onLogout={handleLogout} />;
+  }
 
   return <Dashboard onLogout={handleLogout} />;
 };

@@ -258,7 +258,7 @@ const UserRow = ({
 
 // Users Management Page
 const Users: React.FC = () => {
-  const { permissions } = useUser();
+  const { user } = useUser();
   const [users, setUsers] = useState<UserWithProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -271,8 +271,12 @@ const Users: React.FC = () => {
   const [filterType, setFilterType] = useState<string>("all");
   const [expandedUsers, setExpandedUsers] = useState<number[]>([]);
 
-  const canManage =
-    permissions.includes("MANAGE_USERS") || permissions.includes("ADMIN");
+  const canManage = user?.roles?.find((itm) =>
+    itm.permissions?.find(
+      (perm) =>
+        perm.name.includes("MANAGE_USERS") || perm.name.includes("ADMIN")
+    )
+  );
 
   useEffect(() => {
     loadUsers();

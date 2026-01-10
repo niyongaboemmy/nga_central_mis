@@ -13,8 +13,9 @@ interface UserContextType {
   user: UserWithProfile | null;
   isLoading: boolean;
   isAuthenticated: boolean;
-  permissions: string[];
   roles: UserRole[];
+  showWelcomePopup: boolean;
+  setShowWelcomePopup: (show: boolean) => void;
   login: (tempToken: string) => Promise<void>;
   logout: () => void;
   refreshUser: () => Promise<void>;
@@ -27,8 +28,8 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({
 }) => {
   const [user, setUser] = useState<UserWithProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [showWelcomePopup, setShowWelcomePopup] = useState(false);
 
-  const permissions = user?.permissions || [];
   const roles = user?.roles || [];
 
   const refreshUser = useCallback(async () => {
@@ -58,6 +59,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({
     // The actual login flow stores the token via verifyOTP
     // This method is called after successful OTP verification
     await refreshUser();
+    setShowWelcomePopup(true);
   };
 
   const logout = () => {
@@ -74,8 +76,9 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({
         user,
         isLoading,
         isAuthenticated,
-        permissions,
         roles,
+        showWelcomePopup,
+        setShowWelcomePopup,
         login,
         logout,
         refreshUser,

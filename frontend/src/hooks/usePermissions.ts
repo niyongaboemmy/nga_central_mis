@@ -1,84 +1,74 @@
 import { useUser } from "../contexts/UserContext";
-import {
-  Permissions,
-  PermissionValue,
-  hasPermission as checkPermission,
-  hasAnyPermission as checkAnyPermission,
-  hasAllPermissions as checkAllPermissions,
-} from "../constants/permissions";
 
 /**
  * Hook for easy permission-based access control in React components
+ * Uses role-based permission checking through user.roles structure
  *
  * @example
- * ```tsx
- * const { hasPermission } = usePermissions();
- *
- * // Single permission check
- * if (hasPermission(Permissions.MANAGE_USERS)) {
- *   // Show admin features
- * }
- *
- * // Multiple permissions (any)
- * if (hasAnyPermission([Permissions.MANAGE_USERS, Permissions.VIEW_USERS])) {
- *   // Show user-related features
- * }
- * ```
  */
 export const usePermissions = () => {
-  const { permissions } = useUser();
+  const { user } = useUser();
 
   /**
    * Check if the current user has a specific permission
+   * Traverses user.roles[].permissions[] to find matching permission name
    */
-  const hasPermission = (requiredPermission: PermissionValue): boolean => {
-    return checkPermission(permissions, requiredPermission);
+  const hasPermission = (perm?: string): boolean => {
+    if (!perm) return true;
+    return (
+      user?.roles?.some((role: any) =>
+        role.permissions?.some((permission: any) => permission.name === perm)
+      ) ?? false
+    );
   };
 
   /**
    * Check if the current user has any of the specified permissions
    */
-  const hasAnyPermission = (
-    requiredPermissions: PermissionValue[]
-  ): boolean => {
-    return checkAnyPermission(permissions, requiredPermissions);
+  const hasAnyPermission = (perms: string[]): boolean => {
+    return perms.some((perm) => hasPermission(perm));
   };
 
   /**
    * Check if the current user has all of the specified permissions
    */
-  const hasAllPermissions = (
-    requiredPermissions: PermissionValue[]
-  ): boolean => {
-    return checkAllPermissions(permissions, requiredPermissions);
+  const hasAllPermissions = (perms: string[]): boolean => {
+    return perms.every((perm) => hasPermission(perm));
   };
 
   /**
-   * Check if user is admin
+   * Check if user has admin role or admin permissions
    */
   const isAdmin = (): boolean => {
-    return permissions.includes(Permissions.ADMIN);
+    return (
+      hasPermission("ADMIN") ||
+      (user?.roles?.some((role: any) => role.name === "SUPER_ADMIN") ?? false)
+    );
   };
 
   /**
    * Get all permissions assigned to the user
    */
   const getUserPermissions = (): string[] => {
+    const permissions: string[] = [];
+    user?.roles?.forEach((role: any) => {
+      role.permissions?.forEach((permission: any) => {
+        if (!permissions.includes(permission.name)) {
+          permissions.push(permission.name);
+        }
+      });
+    });
     return permissions;
   };
 
   return {
-    permissions,
+    user,
     hasPermission,
     hasAnyPermission,
     hasAllPermissions,
     isAdmin,
     getUserPermissions,
-    Permissions, // Export the constants for direct use
   };
 };
-
-// Re-export Permissions for convenience
-export { Permissions };
 
 export default usePermissions;

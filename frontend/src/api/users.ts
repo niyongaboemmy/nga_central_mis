@@ -36,7 +36,6 @@ export interface UserWithProfile {
   user: User;
   profile: UserProfile | null;
   roles?: UserRole[];
-  permissions: string[];
 }
 
 export interface UserRole {

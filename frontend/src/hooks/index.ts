@@ -1,2 +1,2 @@
-export { usePermissions, Permissions } from "./usePermissions";
+export { usePermissions } from "./usePermissions";
 export { useUser } from "../contexts/UserContext";

@@ -1014,7 +1014,7 @@ export const downloadTemplate = asyncHandler(async (req: any, res: any) => {
   res.send(buffer);
 });
 
-// Search users by email, phone, username, or name (for document sharing)
+// Search users by any keyword including email, username, phone, name, address, etc. (for document sharing)
 export const searchUsers = asyncHandler(async (req: any, res: any) => {
   const userId = req.user?.userId;
   const { q } = req.query;
@@ -1025,7 +1025,7 @@ export const searchUsers = asyncHandler(async (req: any, res: any) => {
 
   const searchTerm = `%${q}%`;
 
-  // Search users by username, email, phone, or first/last name
+  // Search users by username, email, phone, first/last name, full name, address, external_id, user_type
   const users = await db
     .select({
       user_id: User.user_id,
@@ -1035,6 +1035,9 @@ export const searchUsers = asyncHandler(async (req: any, res: any) => {
       status: User.status,
       first_name: UserProfile.first_name,
       last_name: UserProfile.last_name,
+      address: UserProfile.address,
+      external_id: UserProfile.external_id,
+      user_type: UserProfile.user_type,
     })
     .from(User)
     .leftJoin(UserProfile, eq(User.user_id, UserProfile.user_id))
@@ -1046,7 +1049,11 @@ export const searchUsers = asyncHandler(async (req: any, res: any) => {
           ilike(User.email, searchTerm),
           ilike(User.phone_number, searchTerm),
           ilike(UserProfile.first_name, searchTerm),
-          ilike(UserProfile.last_name, searchTerm)
+          ilike(UserProfile.last_name, searchTerm),
+          sql`LOWER(CONCAT(${UserProfile.first_name}, ' ', ${UserProfile.last_name})) LIKE LOWER(${searchTerm})`,
+          ilike(UserProfile.address, searchTerm),
+          ilike(UserProfile.external_id, searchTerm),
+          ilike(UserProfile.user_type, searchTerm)
         )
       )
     )

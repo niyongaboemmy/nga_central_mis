@@ -1,6 +1,8 @@
 import React, { useState } from "react";
 import Navbar from "./ui/Navbar";
 import Sidebar from "./ui/Sidebar";
+import WelcomePopup from "./WelcomePopup";
+import { useUser } from "../contexts/UserContext";
 
 interface SystemLayoutProps {
   children: React.ReactNode;
@@ -14,6 +16,7 @@ const SystemLayout: React.FC<SystemLayoutProps> = ({
   showSidebar = false,
 }) => {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const { showWelcomePopup, setShowWelcomePopup } = useUser();
 
   return (
     <div className="min-h-screen bg-gray-100 dark:bg-black">
@@ -61,6 +64,11 @@ const SystemLayout: React.FC<SystemLayoutProps> = ({
           {children}
         </div>
       </main>
+
+      {/* Welcome Popup */}
+      {showWelcomePopup && (
+        <WelcomePopup onClose={() => setShowWelcomePopup(false)} />
+      )}
     </div>
   );
 };

@@ -18,11 +18,13 @@ interface NavItem {
 const Sidebar: React.FC<SidebarProps> = ({ isCollapsed = false, onToggle }) => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { permissions } = useUser();
+  const { user } = useUser();
 
   const hasPermission = (perm?: string) => {
     if (!perm) return true;
-    return permissions.includes(perm) || permissions.includes("ADMIN");
+    return user?.roles?.some((role) =>
+      role.permissions?.some((permission) => permission.name === perm)
+    );
   };
 
   const navItems: NavItem[] = [

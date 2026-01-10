@@ -12,7 +12,7 @@ import {
   ToggleLeft,
   ToggleRight,
 } from "lucide-react";
-import { useUser } from "../contexts/UserContext";
+import { usePermissions } from "../hooks/usePermissions";
 import {
   getRoles,
   getPermissions,
@@ -155,7 +155,7 @@ const FormInput = ({
 
 // Permissions Management Page
 const Permissions: React.FC = () => {
-  const { permissions } = useUser();
+  const { hasPermission } = usePermissions();
   const [activeTab, setActiveTab] = useState<"roles" | "permissions">("roles");
   const [roles, setRoles] = useState<Role[]>([]);
   const [permissionsList, setPermissionsList] = useState<Permission[]>([]);
@@ -175,11 +175,11 @@ const Permissions: React.FC = () => {
   const [permForm, setPermForm] = useState({ name: "", description: "" });
   const [selectedPerms, setSelectedPerms] = useState<number[]>([]);
 
-  // Check if user has admin permissions
+  // Check if user has admin permissions using role-based checking
   const canManage =
-    permissions.includes("MANAGE_ROLES") ||
-    permissions.includes("MANAGE_PERMISSIONS") ||
-    permissions.includes("ADMIN");
+    hasPermission("MANAGE_ROLES") ||
+    hasPermission("MANAGE_PERMISSIONS") ||
+    hasPermission("ADMIN");
 
   useEffect(() => {
     loadData();

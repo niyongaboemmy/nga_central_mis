@@ -1,10 +1,54 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
+import { getDashboardStats, DashboardStats } from "../api/dashboard";
 
 interface DashboardProps {
   onLogout?: () => void;
 }
 
 const Dashboard: React.FC<DashboardProps> = ({}) => {
+  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const data = await getDashboardStats();
+        setStats(data);
+      } catch (err) {
+        console.error("Failed to fetch dashboard stats:", err);
+        setError("Failed to load dashboard data");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchStats();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-red-600 mb-4">{error}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="min-h-screen">
       {/* Main Content */}
@@ -42,7 +86,7 @@ const Dashboard: React.FC<DashboardProps> = ({}) => {
                   Total Students
                 </p>
                 <p className="text-2xl font-bold text-text-primary-light dark:text-text-primary-dark">
-                  1,247
+                  {stats?.totalStudents.toLocaleString() || 0}
                 </p>
               </div>
             </div>
@@ -70,7 +114,7 @@ const Dashboard: React.FC<DashboardProps> = ({}) => {
                   Total Teachers
                 </p>
                 <p className="text-2xl font-bold text-text-primary-light dark:text-text-primary-dark">
-                  89
+                  {stats?.totalTeachers.toLocaleString() || 0}
                 </p>
               </div>
             </div>
@@ -98,7 +142,7 @@ const Dashboard: React.FC<DashboardProps> = ({}) => {
                   Active Classes
                 </p>
                 <p className="text-2xl font-bold text-text-primary-light dark:text-text-primary-dark">
-                  24
+                  {stats?.activeClassGroups.toLocaleString() || 0}
                 </p>
               </div>
             </div>
@@ -126,7 +170,7 @@ const Dashboard: React.FC<DashboardProps> = ({}) => {
                   Reports Today
                 </p>
                 <p className="text-2xl font-bold text-text-primary-light dark:text-text-primary-dark">
-                  12
+                  {stats?.currentAcademicTerms.toLocaleString() || 0}
                 </p>
               </div>
             </div>

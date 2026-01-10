@@ -56,15 +56,21 @@ export type PermissionKey = keyof typeof Permissions;
 export type PermissionValue = (typeof Permissions)[PermissionKey];
 
 /**
- * Check if a user has a specific permission
- * @param userPermissions - Array of permission names assigned to the user
- * @param requiredPermission - The permission to check for
- * @returns true if user has the permission or is an admin
+ * DEPRECATED: These functions are deprecated.
+ * Use the role-based hasPermission from usePermissions hook instead.
+ *
+ * The new system checks permissions through user.roles[].permissions[]
+ * instead of flat permission arrays.
  */
+
+// Legacy functions - kept for backward compatibility but deprecated
 export const hasPermission = (
   userPermissions: string[],
   requiredPermission: PermissionValue
 ): boolean => {
+  console.warn(
+    "hasPermission from constants/permissions.ts is deprecated. Use usePermissions hook instead."
+  );
   // Admin has all permissions
   if (userPermissions.includes(Permissions.ADMIN)) {
     return true;
@@ -72,32 +78,26 @@ export const hasPermission = (
   return userPermissions.includes(requiredPermission);
 };
 
-/**
- * Check if user has any of the specified permissions
- * @param userPermissions - Array of permission names assigned to the user
- * @param requiredPermissions - Array of permissions to check for
- * @returns true if user has any of the permissions or is an admin
- */
 export const hasAnyPermission = (
   userPermissions: string[],
   requiredPermissions: PermissionValue[]
 ): boolean => {
+  console.warn(
+    "hasAnyPermission from constants/permissions.ts is deprecated. Use usePermissions hook instead."
+  );
   if (userPermissions.includes(Permissions.ADMIN)) {
     return true;
   }
   return requiredPermissions.some((perm) => userPermissions.includes(perm));
 };
 
-/**
- * Check if user has all of the specified permissions
- * @param userPermissions - Array of permission names assigned to the user
- * @param requiredPermissions - Array of permissions to check for
- * @returns true if user has all permissions or is an admin
- */
 export const hasAllPermissions = (
   userPermissions: string[],
   requiredPermissions: PermissionValue[]
 ): boolean => {
+  console.warn(
+    "hasAllPermissions from constants/permissions.ts is deprecated. Use usePermissions hook instead."
+  );
   if (userPermissions.includes(Permissions.ADMIN)) {
     return true;
   }

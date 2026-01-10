@@ -34,3 +34,11 @@ export const getUserFromToken = (): any => {
     return null;
   }
 };
+
+// Permission checking utility
+export const hasPermission = (user: any, perm?: string) => {
+  if (!perm) return true;
+  return user?.roles?.some((role: any) =>
+    role.permissions?.some((permission: any) => permission.name === perm)
+  );
+};

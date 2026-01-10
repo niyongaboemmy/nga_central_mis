@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Alert, VerificationCode } from "./ui";
 import { login, verifyOTP } from "../api/auth";
 import { useUser } from "../contexts/UserContext";
+import { usePermissions } from "../hooks/usePermissions";
 import {
   Star,
   Lock,
@@ -96,7 +97,8 @@ const Login: React.FC<LoginProps> = ({
   onLoginSuccess,
   onNavigateToPasswordRecovery,
 }) => {
-  const { permissions, refreshUser } = useUser();
+  const { refreshUser } = useUser();
+  const { getUserPermissions } = usePermissions();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [otp, setOtp] = useState("");
@@ -275,25 +277,30 @@ const Login: React.FC<LoginProps> = ({
                       </span>
                     </div>
                     <div className="bg-gray-50 dark:bg-slate-900/50 rounded-2xl p-4 max-h-48 overflow-y-auto">
-                      {permissions.length > 0 ? (
-                        <div className="flex flex-wrap gap-2">
-                          {permissions.map((perm, index) => (
-                            <motion.span
-                              key={perm}
-                              initial={{ opacity: 0, scale: 0.8 }}
-                              animate={{ opacity: 1, scale: 1 }}
-                              transition={{ delay: 0.5 + index * 0.05 }}
-                              className="px-3 py-1.5 bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 rounded-full text-xs font-medium"
-                            >
-                              {perm}
-                            </motion.span>
-                          ))}
-                        </div>
-                      ) : (
-                        <p className="text-sm text-gray-500 dark:text-gray-400 text-center">
-                          No permissions assigned
-                        </p>
-                      )}
+                      {(() => {
+                        const userPermissions = getUserPermissions();
+                        return userPermissions.length > 0 ? (
+                          <div className="flex flex-wrap gap-2">
+                            {userPermissions.map(
+                              (perm: string, index: number) => (
+                                <motion.span
+                                  key={perm}
+                                  initial={{ opacity: 0, scale: 0.8 }}
+                                  animate={{ opacity: 1, scale: 1 }}
+                                  transition={{ delay: 0.5 + index * 0.05 }}
+                                  className="px-3 py-1.5 bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 rounded-full text-xs font-medium"
+                                >
+                                  {perm}
+                                </motion.span>
+                              )
+                            )}
+                          </div>
+                        ) : (
+                          <p className="text-sm text-gray-500 dark:text-gray-400 text-center">
+                            No permissions assigned
+                          </p>
+                        );
+                      })()}
                     </div>
                   </motion.div>
 
