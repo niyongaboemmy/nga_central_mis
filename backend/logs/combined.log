@@ -1075,18 +1075,3 @@
 {"duration":12,"level":"info","message":"GET /academics/subjects/7/terms/1/students 304 - 12ms","service":"nga-central-mis","statusCode":304,"timestamp":"2026-01-10T23:55:29.899Z"}
 {"ip":"::1","level":"info","message":"GET /academics/subjects/7/terms/1/students","service":"nga-central-mis","timestamp":"2026-01-10T23:55:42.072Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
 {"duration":46,"level":"info","message":"GET /academics/subjects/7/terms/1/students 304 - 46ms","service":"nga-central-mis","statusCode":304,"timestamp":"2026-01-10T23:55:42.116Z"}
-{"ip":"::1","level":"info","message":"GET /academics/subjects/7/terms/1/students","service":"nga-central-mis","timestamp":"2026-01-10T23:56:26.318Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
-{"duration":56,"level":"info","message":"GET /academics/subjects/7/terms/1/students 304 - 56ms","service":"nga-central-mis","statusCode":304,"timestamp":"2026-01-10T23:56:26.374Z"}
-{"ip":"::1","level":"info","message":"GET /academics/subjects/7/terms/1/students","service":"nga-central-mis","timestamp":"2026-01-10T23:56:26.374Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
-{"duration":4,"level":"info","message":"GET /academics/subjects/7/terms/1/students 304 - 4ms","service":"nga-central-mis","statusCode":304,"timestamp":"2026-01-10T23:56:26.378Z"}
-{"ip":"::1","level":"info","message":"GET /users/me","service":"nga-central-mis","timestamp":"2026-01-10T23:56:38.471Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
-{"level":"info","message":"Fetching current user","service":"nga-central-mis","timestamp":"2026-01-10T23:56:38.488Z","userId":20}
-{"duration":29,"level":"info","message":"GET /users/me 304 - 29ms","service":"nga-central-mis","statusCode":304,"timestamp":"2026-01-10T23:56:38.500Z"}
-{"ip":"::1","level":"info","message":"GET /users/me","service":"nga-central-mis","timestamp":"2026-01-10T23:56:38.501Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
-{"level":"info","message":"Fetching current user","service":"nga-central-mis","timestamp":"2026-01-10T23:56:38.506Z","userId":20}
-{"ip":"::1","level":"info","message":"GET /academics/my-assigned-subjects","service":"nga-central-mis","timestamp":"2026-01-10T23:56:38.520Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
-{"duration":26,"level":"info","message":"GET /users/me 304 - 26ms","service":"nga-central-mis","statusCode":304,"timestamp":"2026-01-10T23:56:38.527Z"}
-{"duration":19,"level":"info","message":"GET /academics/my-assigned-subjects 304 - 19ms","service":"nga-central-mis","statusCode":304,"timestamp":"2026-01-10T23:56:38.539Z"}
-{"ip":"::1","level":"info","message":"GET /academics/my-assigned-subjects","service":"nga-central-mis","timestamp":"2026-01-10T23:56:38.539Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
-{"duration":9,"level":"info","message":"GET /academics/my-assigned-subjects 304 - 9ms","service":"nga-central-mis","statusCode":304,"timestamp":"2026-01-10T23:56:38.549Z"}
-{"level":"info","message":"SIGINT received, shutting down gracefully","service":"nga-central-mis","timestamp":"2026-01-11T08:14:22.216Z"}
