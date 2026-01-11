@@ -11,23 +11,14 @@ const logger = winston.createLogger({
   format: logFormat,
   defaultMeta: { service: "nga-central-mis" },
   transports: [
-    // Write all logs with importance level of `error` or less to `error.log`
-    new winston.transports.File({ filename: "logs/error.log", level: "error" }),
-    // Write all logs with importance level of `info` or less to `combined.log`
-    new winston.transports.File({ filename: "logs/combined.log" }),
-  ],
-});
-
-// If we're not in production then log to the console with a simple format
-if (process.env.NODE_ENV !== "production") {
-  logger.add(
+    // Log to console for all environments, especially for serverless platforms like Vercel
     new winston.transports.Console({
       format: winston.format.combine(
         winston.format.colorize(),
         winston.format.simple()
       ),
-    })
-  );
-}
+    }),
+  ],
+});
 
 export default logger;
