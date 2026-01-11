@@ -1094,6 +1094,7 @@ export const downloadDocument = asyncHandler(async (req: any, res: any) => {
   const userId = req.user.userId;
   const { documentId } = req.params;
 
+  // 1️⃣ Fetch document record from DB
   const document = await db
     .select()
     .from(Document)
@@ -1101,13 +1102,15 @@ export const downloadDocument = asyncHandler(async (req: any, res: any) => {
     .limit(1);
 
   if (document.length === 0) {
-    throw new NotFoundError("Document not found");
+    throw new NotFoundError("Document not found in database");
   }
 
-  // Check if user has access to the document
+  const doc = document[0];
+
+  // 2️⃣ Check if user has access
   const hasAccess =
-    document[0].user_id === userId ||
-    document[0].is_public === 1 ||
+    doc.user_id === userId ||
+    doc.is_public === 1 ||
     (await checkDocumentPermission(parseInt(documentId), userId, "DOWNLOAD"));
 
   if (!hasAccess) {
@@ -1116,34 +1119,51 @@ export const downloadDocument = asyncHandler(async (req: any, res: any) => {
     );
   }
 
-  try {
-    logger.info(`Attempting to download file: ${document[0].file_path}`);
-
-    // Download file as buffer from FTP
-    const fileBuffer = await ftpService.downloadToBuffer(document[0].file_path);
-
-    logger.info(
-      `Document downloaded: ${documentId} by user ${userId}, size: ${fileBuffer.length} bytes`
-    );
-
-    // Set headers for file download
-    res.setHeader(
-      "Content-Type",
-      document[0].mime_type || "application/octet-stream"
-    );
-    res.setHeader(
-      "Content-Disposition",
-      `attachment; filename="${document[0].original_name}"`
-    );
-    res.setHeader("Content-Length", fileBuffer.length);
-
-    // Send the buffer directly
-    res.send(fileBuffer);
-  } catch (error) {
-    logger.error("FTP download failed:", error);
-    logger.error("File path from database:", document[0].file_path);
+  // 3️⃣ Verify file exists on FTP
+  const fileExists = await ftpService.fileExists(doc.file_path);
+  if (!fileExists) {
+    logger.error(`FTP file not found: ${doc.file_path}`);
     throw new NotFoundError("File not found on server");
   }
+
+  // 4️⃣ Download file buffer
+  let fileBuffer: Buffer;
+  try {
+    fileBuffer = await ftpService.downloadToBuffer(doc.file_path);
+  } catch (error) {
+    logger.error("FTP download failed:", error);
+    throw new NotFoundError("File not found on server");
+  }
+
+  // 5️⃣ Check buffer
+  if (!fileBuffer || fileBuffer.length === 0) {
+    logger.error("Downloaded file buffer is empty", doc.file_path);
+    throw new NotFoundError("File is empty or corrupted");
+  }
+
+  // 6️⃣ Determine MIME type
+  let mimeType = doc.mime_type || "application/octet-stream";
+  const ext = doc.file_extension?.toLowerCase();
+  if (ext === "pdf") mimeType = "application/pdf";
+  else if (ext === "txt") mimeType = "text/plain";
+  else if (ext === "jpg" || ext === "jpeg") mimeType = "image/jpeg";
+  else if (ext === "png") mimeType = "image/png";
+  // add other common types as needed
+
+  // 7️⃣ Set headers
+  res.setHeader("Content-Type", mimeType);
+  res.setHeader(
+    "Content-Disposition",
+    `inline; filename="${doc.original_name || doc.file_name}"`
+  ); // "inline" lets PDF preview in browser
+  res.setHeader("Content-Length", fileBuffer.length);
+
+  logger.info(
+    `Document downloaded: ${doc.document_id} by user ${userId}, size: ${fileBuffer.length} bytes`
+  );
+
+  // 8️⃣ Send buffer
+  res.send(fileBuffer);
 });
 
 // ======================
