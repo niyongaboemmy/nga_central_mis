@@ -37,20 +37,27 @@ class FTPService {
 
     try {
       await client.access(this.config);
-      // Log current working directory
-      try {
-        const pwd = await client.pwd();
-        logger.info(`FTP connected. Current directory: ${pwd}`);
-      } catch (pwdError) {
-        logger.warn(
-          "Could not get current directory:",
-          (pwdError as Error).message
-        );
-      }
+      logger.info(`FTP connected. Current directory: ${await client.pwd()}`);
       return client;
     } catch (error) {
       logger.error("FTP connection failed:", error);
-      throw new Error("Failed to connect to FTP server");
+      throw new Error(
+        `Failed to connect to FTP server: ${(error as Error).message}`
+      );
+    }
+  }
+
+  private async ensureDirectoryExists(client: Client, remotePath: string) {
+    try {
+      // basic-ftp ensureDir will create nested directories and navigate into it
+      await client.ensureDir(remotePath);
+      logger.debug(`Ensured directory exists and navigated to: ${remotePath}`);
+    } catch (error) {
+      logger.error(
+        `Failed to ensure directory ${remotePath}:`,
+        (error as Error).message
+      );
+      throw error;
     }
   }
 
@@ -59,28 +66,23 @@ class FTPService {
     remotePath: string
   ): Promise<void> {
     const client = await this.getClient();
-
     try {
-      // Ensure remote directory exists and navigate to it
       const remoteDir = path.dirname(remotePath);
       const fileName = path.basename(remotePath);
+
       await this.ensureDirectoryExists(client, remoteDir);
 
-      // Upload file (using just the filename since we're in the correct directory)
       if (typeof localPathOrBuffer === "string") {
-        // File path
         await client.uploadFrom(localPathOrBuffer, fileName);
       } else {
-        // Buffer - create a readable stream from buffer
-        const bufferStream = new Readable();
-        bufferStream.push(localPathOrBuffer);
-        bufferStream.push(null); // Signal end of stream
+        const bufferStream = Readable.from(localPathOrBuffer);
         await client.uploadFrom(bufferStream, fileName);
       }
+
       logger.info(`File uploaded to FTP: ${remotePath}`);
     } catch (error) {
       logger.error("FTP upload failed:", error);
-      throw new Error("Failed to upload file to FTP server");
+      throw new Error(`Failed to upload file: ${(error as Error).message}`);
     } finally {
       client.close();
     }
@@ -88,38 +90,25 @@ class FTPService {
 
   async downloadFile(remotePath: string, localPath: string): Promise<void> {
     const client = await this.getClient();
-
     try {
-      // Ensure local directory exists
       const localDir = path.dirname(localPath);
-      if (!fs.existsSync(localDir)) {
-        fs.mkdirSync(localDir, { recursive: true });
-      }
+      if (!fs.existsSync(localDir)) fs.mkdirSync(localDir, { recursive: true });
 
-      // Navigate to remote directory and download file
       const remoteDir = path.dirname(remotePath);
       const fileName = path.basename(remotePath);
-      logger.info(
-        `FTP download: remotePath=${remotePath}, remoteDir=${remoteDir}, fileName=${fileName}`
-      );
 
       await this.ensureDirectoryExists(client, remoteDir);
 
-      // Check if file exists before downloading
+      // Check if file exists
       const list = await client.list(".");
-      const fileExists = list.some((item: any) => item.name === fileName);
-      logger.info(`FTP file exists check: ${fileName} exists=${fileExists}`);
+      const fileExists = list.some((item) => item.name === fileName);
+      if (!fileExists) throw new Error(`File ${fileName} not found on FTP`);
 
-      if (!fileExists) {
-        throw new Error(`File ${fileName} not found in directory ${remoteDir}`);
-      }
-
-      // Download file (using just the filename since we're in the correct directory)
       await client.downloadTo(localPath, fileName);
       logger.info(`File downloaded from FTP: ${remotePath}`);
     } catch (error) {
       logger.error("FTP download failed:", error);
-      throw new Error("Failed to download file from FTP server");
+      throw new Error(`Failed to download file: ${(error as Error).message}`);
     } finally {
       client.close();
     }
@@ -127,88 +116,33 @@ class FTPService {
 
   async downloadToBuffer(remotePath: string): Promise<Buffer> {
     const client = await this.getClient();
-
     try {
-      // Navigate to remote directory
       const remoteDir = path.dirname(remotePath);
       const fileName = path.basename(remotePath);
-      logger.info(
-        `FTP download to buffer: remotePath=${remotePath}, remoteDir=${remoteDir}, fileName=${fileName}`
-      );
-
-      // Log current directory before navigation
-      try {
-        const currentDir = await client.pwd();
-        logger.info(`FTP current directory before navigation: ${currentDir}`);
-      } catch (pwdError) {
-        logger.warn(
-          "Could not get current directory:",
-          (pwdError as Error).message
-        );
-      }
 
       await this.ensureDirectoryExists(client, remoteDir);
 
-      // Log current directory after navigation
-      try {
-        const currentDir = await client.pwd();
-        logger.info(`FTP current directory after navigation: ${currentDir}`);
-      } catch (pwdError) {
-        logger.warn(
-          "Could not get current directory:",
-          (pwdError as Error).message
-        );
-      }
-
-      // List all files in current directory
-      const list = await client.list(".");
-      logger.info(
-        `FTP directory listing:`,
-        list.map((item: any) => `${item.name} (${item.type})`).join(", ")
-      );
-
-      const fileExists = list.some((item: any) => item.name === fileName);
-      logger.info(`FTP file exists check: ${fileName} exists=${fileExists}`);
-
-      if (!fileExists) {
-        throw new Error(`File ${fileName} not found in directory ${remoteDir}`);
-      }
-
-      // Create a writable stream to collect data
-      const chunks: Buffer[] = [];
-      let resolvePromise: (buffer: Buffer) => void;
-      let rejectPromise: (error: Error) => void;
-
-      const writableStream = new Writable({
-        write(chunk: Buffer, encoding, callback) {
-          chunks.push(chunk);
-          callback();
-        },
-        final(callback) {
-          const buffer = Buffer.concat(chunks);
-          logger.info(
-            `File downloaded to buffer from FTP: ${remotePath}, size: ${buffer.length} bytes`
-          );
-          resolvePromise(buffer);
-          callback();
-        },
-      });
-
-      writableStream.on("error", (error) => {
-        rejectPromise(error);
-      });
-
-      // Download to the writable stream
-      await client.downloadTo(writableStream, fileName);
-
-      // Return promise that resolves when stream ends
       return new Promise<Buffer>((resolve, reject) => {
-        resolvePromise = resolve;
-        rejectPromise = reject;
+        const chunks: Buffer[] = [];
+        const writable = new Writable({
+          write(chunk: Buffer, encoding, callback) {
+            chunks.push(chunk);
+            callback();
+          },
+          final(callback) {
+            resolve(Buffer.concat(chunks));
+            callback();
+          },
+        });
+
+        writable.on("error", reject);
+        client.downloadTo(writable, fileName).catch(reject);
       });
     } catch (error) {
       logger.error("FTP download to buffer failed:", error);
-      throw new Error("Failed to download file from FTP server");
+      throw new Error(
+        `Failed to download file to buffer: ${(error as Error).message}`
+      );
     } finally {
       client.close();
     }
@@ -216,67 +150,32 @@ class FTPService {
 
   async deleteFile(remotePath: string): Promise<void> {
     const client = await this.getClient();
-
     try {
-      // Navigate to remote directory and delete file
       const remoteDir = path.dirname(remotePath);
       const fileName = path.basename(remotePath);
-      await this.ensureDirectoryExists(client, remoteDir);
 
-      // Delete file (using just the filename since we're in the correct directory)
+      await this.ensureDirectoryExists(client, remoteDir);
       await client.remove(fileName);
+
       logger.info(`File deleted from FTP: ${remotePath}`);
     } catch (error) {
       logger.error("FTP delete failed:", error);
-      throw new Error("Failed to delete file from FTP server");
+      throw new Error(`Failed to delete file: ${(error as Error).message}`);
     } finally {
       client.close();
     }
   }
 
-  async ensureDirectoryExists(
-    client: Client,
-    remotePath: string
-  ): Promise<void> {
-    const parts = remotePath.split("/").filter((part) => part.length > 0);
-    let currentPath = "";
-
-    for (const part of parts) {
-      currentPath += "/" + part;
-      try {
-        await client.ensureDir(currentPath);
-        logger.debug(`Ensured directory exists: ${currentPath}`);
-      } catch (error) {
-        // Directory might already exist, continue
-        logger.debug(
-          `Directory ${currentPath} may already exist:`,
-          (error as Error).message
-        );
-      }
-    }
-
-    // Navigate to the target directory
-    try {
-      await client.cd(remotePath);
-      logger.debug(`Changed to directory: ${remotePath}`);
-    } catch (error) {
-      logger.error(
-        `Failed to change to directory ${remotePath}:`,
-        (error as Error).message
-      );
-      throw error;
-    }
-  }
-
   async createDirectory(remotePath: string): Promise<void> {
     const client = await this.getClient();
-
     try {
       await this.ensureDirectoryExists(client, remotePath);
       logger.info(`Directory created on FTP: ${remotePath}`);
     } catch (error) {
       logger.error("FTP directory creation failed:", error);
-      throw new Error("Failed to create directory on FTP server");
+      throw new Error(
+        `Failed to create directory: ${(error as Error).message}`
+      );
     } finally {
       client.close();
     }
@@ -284,15 +183,13 @@ class FTPService {
 
   async fileExists(remotePath: string): Promise<boolean> {
     const client = await this.getClient();
-
     try {
-      // Navigate to remote directory and check for file
       const remoteDir = path.dirname(remotePath);
       const fileName = path.basename(remotePath);
-      await this.ensureDirectoryExists(client, remoteDir);
 
+      await this.ensureDirectoryExists(client, remoteDir);
       const list = await client.list(".");
-      return list.some((item: any) => item.name === fileName);
+      return list.some((item) => item.name === fileName);
     } catch (error) {
       logger.error("FTP file check failed:", error);
       return false;
