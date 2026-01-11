@@ -1160,3 +1160,21 @@
 {"level":"info","message":"SIGINT received, shutting down gracefully","service":"nga-central-mis","timestamp":"2026-01-11T13:31:57.669Z"}
 {"level":"info","message":"Server running on port 5001 in development mode","service":"nga-central-mis","timestamp":"2026-01-11T13:32:03.496Z"}
 {"host":"mail.hackflix.net","level":"info","message":"Email service connected successfully","port":465,"service":"nga-central-mis","timestamp":"2026-01-11T13:32:05.050Z"}
+{"ip":"::1","level":"info","message":"GET /users/me","service":"nga-central-mis","timestamp":"2026-01-11T13:38:58.790Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Fetching current user","service":"nga-central-mis","timestamp":"2026-01-11T13:38:58.839Z","userId":1}
+{"duration":64,"level":"info","message":"GET /users/me 304 - 64ms","service":"nga-central-mis","statusCode":304,"timestamp":"2026-01-11T13:38:58.853Z"}
+{"ip":"::1","level":"info","message":"GET /users/me","service":"nga-central-mis","timestamp":"2026-01-11T13:38:58.854Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"level":"info","message":"Fetching current user","service":"nga-central-mis","timestamp":"2026-01-11T13:38:58.857Z","userId":1}
+{"duration":6,"level":"info","message":"GET /users/me 304 - 6ms","service":"nga-central-mis","statusCode":304,"timestamp":"2026-01-11T13:38:58.860Z"}
+{"ip":"::1","level":"info","message":"GET /documents/folders","service":"nga-central-mis","timestamp":"2026-01-11T13:38:58.934Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"ip":"::1","level":"info","message":"GET /documents?sortBy=name&sortOrder=asc","service":"nga-central-mis","timestamp":"2026-01-11T13:38:58.937Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"duration":17,"level":"info","message":"GET /documents/folders 304 - 17ms","service":"nga-central-mis","statusCode":304,"timestamp":"2026-01-11T13:38:58.952Z"}
+{"ip":"::1","level":"info","message":"GET /documents/folders","service":"nga-central-mis","timestamp":"2026-01-11T13:38:58.953Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"duration":3,"level":"info","message":"GET /documents/folders 304 - 3ms","service":"nga-central-mis","statusCode":304,"timestamp":"2026-01-11T13:38:58.956Z"}
+{"ip":"::1","level":"info","message":"GET /documents/folders","service":"nga-central-mis","timestamp":"2026-01-11T13:38:58.958Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"duration":22,"level":"info","message":"GET /documents?sortBy=name&sortOrder=asc 304 - 22ms","service":"nga-central-mis","statusCode":304,"timestamp":"2026-01-11T13:38:58.959Z"}
+{"ip":"::1","level":"info","message":"GET /documents?sortBy=name&sortOrder=asc","service":"nga-central-mis","timestamp":"2026-01-11T13:38:58.960Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"duration":4,"level":"info","message":"GET /documents/folders 304 - 4ms","service":"nga-central-mis","statusCode":304,"timestamp":"2026-01-11T13:38:58.962Z"}
+{"ip":"::1","level":"info","message":"GET /documents/folders","service":"nga-central-mis","timestamp":"2026-01-11T13:38:58.963Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"duration":5,"level":"info","message":"GET /documents?sortBy=name&sortOrder=asc 304 - 5ms","service":"nga-central-mis","statusCode":304,"timestamp":"2026-01-11T13:38:58.965Z"}
+{"duration":4,"level":"info","message":"GET /documents/folders 304 - 4ms","service":"nga-central-mis","statusCode":304,"timestamp":"2026-01-11T13:38:58.967Z"}

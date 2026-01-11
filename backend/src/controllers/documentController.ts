@@ -808,11 +808,8 @@ export const uploadDocument = asyncHandler(async (req: any, res: any) => {
   const remoteFilePath = `${userId}/${fileName}`;
 
   try {
-    // Upload file to FTP server
-    await ftpService.uploadFile(file.path, remoteFilePath);
-
-    // Remove temp file after successful upload
-    fs.unlinkSync(file.path);
+    // Upload file buffer to FTP server
+    await ftpService.uploadFile(file.buffer, remoteFilePath);
 
     const result = await db.insert(Document).values({
       user_id: userId,
@@ -839,14 +836,7 @@ export const uploadDocument = asyncHandler(async (req: any, res: any) => {
 
     successResponse(res, "Document uploaded successfully", document[0]);
   } catch (error) {
-    // Clean up temp file if upload failed
-    try {
-      if (fs.existsSync(file.path)) {
-        fs.unlinkSync(file.path);
-      }
-    } catch (cleanupError) {
-      logger.warn("Failed to clean up temp file:", cleanupError);
-    }
+    logger.error("Document upload failed:", error);
     throw error;
   }
 });
@@ -1214,11 +1204,8 @@ export const uploadNewVersion = asyncHandler(async (req: any, res: any) => {
   );
 
   try {
-    // Upload file to FTP server
-    await ftpService.uploadFile(file.path, filePath);
-
-    // Remove temp file after successful upload
-    fs.unlinkSync(file.path);
+    // Upload file buffer to FTP server
+    await ftpService.uploadFile(file.buffer, filePath);
 
     // Save version
     const result = await db.insert(DocumentVersion).values({
@@ -1247,14 +1234,7 @@ export const uploadNewVersion = asyncHandler(async (req: any, res: any) => {
 
     successResponse(res, "New version uploaded successfully", version[0]);
   } catch (error) {
-    // Clean up temp file if upload failed
-    try {
-      if (fs.existsSync(file.path)) {
-        fs.unlinkSync(file.path);
-      }
-    } catch (cleanupError) {
-      logger.warn("Failed to clean up temp file:", cleanupError);
-    }
+    logger.error("Version upload failed:", error);
     throw error;
   }
 });

@@ -1,6 +1,7 @@
 import { Client } from "basic-ftp";
 import fs from "fs";
 import path from "path";
+import { Readable } from "stream";
 import logger from "./logger";
 
 interface FTPConfig {
@@ -43,7 +44,10 @@ class FTPService {
     }
   }
 
-  async uploadFile(localPath: string, remotePath: string): Promise<void> {
+  async uploadFile(
+    localPathOrBuffer: string | Buffer,
+    remotePath: string
+  ): Promise<void> {
     const client = await this.getClient();
 
     try {
@@ -53,7 +57,14 @@ class FTPService {
       await this.ensureDirectoryExists(client, remoteDir);
 
       // Upload file (using just the filename since we're in the correct directory)
-      await client.uploadFrom(localPath, fileName);
+      if (typeof localPathOrBuffer === "string") {
+        // File path
+        await client.uploadFrom(localPathOrBuffer, fileName);
+      } else {
+        // Buffer - convert to readable stream
+        const stream = Readable.from(localPathOrBuffer);
+        await client.uploadFrom(stream, fileName);
+      }
       logger.info(`File uploaded to FTP: ${remotePath}`);
     } catch (error) {
       logger.error("FTP upload failed:", error);
