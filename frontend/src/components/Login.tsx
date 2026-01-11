@@ -131,6 +131,7 @@ const Login: React.FC<LoginProps> = ({
 
   const handleOTPSubmit = async (e: any) => {
     e.preventDefault();
+    if (loading) return; // Prevent multiple submissions
     setLoading(true);
     setError("");
 

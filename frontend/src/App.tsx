@@ -51,11 +51,9 @@ const ContactPage: React.FC = () => {
 
 const LoginPage: React.FC = () => {
   const navigate = useNavigate();
-  const { refreshUser } = useUser();
   return (
     <Login
-      onLoginSuccess={async () => {
-        await refreshUser();
+      onLoginSuccess={() => {
         navigate("/dashboard");
       }}
       onNavigateToPasswordRecovery={() => navigate("/password-recovery")}

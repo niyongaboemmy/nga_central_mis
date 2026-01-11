@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { getDashboardStats, DashboardStats } from "../api/dashboard";
 
 interface DashboardProps {
@@ -9,8 +9,12 @@ const Dashboard: React.FC<DashboardProps> = ({}) => {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const hasFetchedRef = useRef(false);
 
   useEffect(() => {
+    if (hasFetchedRef.current) return;
+    hasFetchedRef.current = true;
+
     const fetchStats = async () => {
       try {
         const data = await getDashboardStats();

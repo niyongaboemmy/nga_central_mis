@@ -4,6 +4,7 @@ import React, {
   useState,
   useEffect,
   useCallback,
+  useRef,
 } from "react";
 import { getCurrentUser, UserWithProfile, UserRole } from "../api/users";
 import { logout as apiLogout } from "../api/auth";
@@ -29,6 +30,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({
   const [user, setUser] = useState<UserWithProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [showWelcomePopup, setShowWelcomePopup] = useState(false);
+  const isRefreshingRef = useRef(false);
 
   const roles = user?.roles || [];
 
@@ -40,6 +42,11 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({
       return;
     }
 
+    if (isRefreshingRef.current) {
+      return; // Prevent concurrent calls
+    }
+
+    isRefreshingRef.current = true;
     try {
       const userData = await getCurrentUser();
       setUser(userData || null);
@@ -48,6 +55,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({
       setUser(null);
     } finally {
       setIsLoading(false);
+      isRefreshingRef.current = false;
     }
   }, []);
 
