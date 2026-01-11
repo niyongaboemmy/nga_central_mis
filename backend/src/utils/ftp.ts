@@ -1,7 +1,7 @@
 import { Client } from "basic-ftp";
 import fs from "fs";
 import path from "path";
-import { Readable } from "stream";
+import { Readable, PassThrough } from "stream";
 import logger from "./logger";
 
 interface FTPConfig {
@@ -117,6 +117,59 @@ class FTPService {
       logger.info(`File downloaded from FTP: ${remotePath}`);
     } catch (error) {
       logger.error("FTP download failed:", error);
+      throw new Error("Failed to download file from FTP server");
+    } finally {
+      client.close();
+    }
+  }
+
+  async downloadToBuffer(remotePath: string): Promise<Buffer> {
+    const client = await this.getClient();
+
+    try {
+      // Navigate to remote directory
+      const remoteDir = path.dirname(remotePath);
+      const fileName = path.basename(remotePath);
+      logger.info(
+        `FTP download to buffer: remotePath=${remotePath}, remoteDir=${remoteDir}, fileName=${fileName}`
+      );
+
+      await this.ensureDirectoryExists(client, remoteDir);
+
+      // Check if file exists
+      const list = await client.list(".");
+      const fileExists = list.some((item: any) => item.name === fileName);
+      logger.info(`FTP file exists check: ${fileName} exists=${fileExists}`);
+
+      if (!fileExists) {
+        throw new Error(`File ${fileName} not found in directory ${remoteDir}`);
+      }
+
+      // Create a PassThrough stream to collect data
+      const passThrough = new PassThrough();
+      const chunks: Buffer[] = [];
+
+      // Collect data from the stream
+      passThrough.on("data", (chunk: Buffer) => {
+        chunks.push(chunk);
+      });
+
+      // Download to the PassThrough stream
+      await client.downloadTo(passThrough, fileName);
+
+      // Wait for stream to end and return buffer
+      return new Promise((resolve, reject) => {
+        passThrough.on("end", () => {
+          const buffer = Buffer.concat(chunks);
+          logger.info(
+            `File downloaded to buffer from FTP: ${remotePath}, size: ${buffer.length} bytes`
+          );
+          resolve(buffer);
+        });
+        passThrough.on("error", reject);
+      });
+    } catch (error) {
+      logger.error("FTP download to buffer failed:", error);
       throw new Error("Failed to download file from FTP server");
     } finally {
       client.close();

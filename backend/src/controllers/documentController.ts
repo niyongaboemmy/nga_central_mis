@@ -1119,28 +1119,26 @@ export const downloadDocument = asyncHandler(async (req: any, res: any) => {
   try {
     logger.info(`Attempting to download file: ${document[0].file_path}`);
 
-    // For serverless environments, use /tmp directory
-    const tempFilePath = path.join(
-      "/tmp",
-      `download-${Date.now()}-${document[0].file_name}`
+    // Download file as buffer from FTP
+    const fileBuffer = await ftpService.downloadToBuffer(document[0].file_path);
+
+    logger.info(
+      `Document downloaded: ${documentId} by user ${userId}, size: ${fileBuffer.length} bytes`
     );
 
-    // Download file from FTP to temp location
-    await ftpService.downloadFile(document[0].file_path, tempFilePath);
+    // Set headers for file download
+    res.setHeader(
+      "Content-Type",
+      document[0].mime_type || "application/octet-stream"
+    );
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="${document[0].original_name}"`
+    );
+    res.setHeader("Content-Length", fileBuffer.length);
 
-    logger.info(`Document downloaded: ${documentId} by user ${userId}`);
-
-    // Send file and clean up temp file after response
-    res.download(tempFilePath, document[0].original_name, (err: any) => {
-      // Clean up temp file after download
-      try {
-        if (fs.existsSync(tempFilePath)) {
-          fs.unlinkSync(tempFilePath);
-        }
-      } catch (cleanupError) {
-        logger.warn("Failed to clean up temp download file:", cleanupError);
-      }
-    });
+    // Send the buffer directly
+    res.send(fileBuffer);
   } catch (error) {
     logger.error("FTP download failed:", error);
     logger.error("File path from database:", document[0].file_path);
