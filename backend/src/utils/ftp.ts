@@ -1,7 +1,7 @@
 import { Client } from "basic-ftp";
 import fs from "fs";
 import path from "path";
-import { Readable, PassThrough } from "stream";
+import { Readable, Writable } from "stream";
 import logger from "./logger";
 
 interface FTPConfig {
@@ -71,9 +71,11 @@ class FTPService {
         // File path
         await client.uploadFrom(localPathOrBuffer, fileName);
       } else {
-        // Buffer - convert to readable stream
-        const stream = Readable.from(localPathOrBuffer);
-        await client.uploadFrom(stream, fileName);
+        // Buffer - create a readable stream from buffer
+        const bufferStream = new Readable();
+        bufferStream.push(localPathOrBuffer);
+        bufferStream.push(null); // Signal end of stream
+        await client.uploadFrom(bufferStream, fileName);
       }
       logger.info(`File uploaded to FTP: ${remotePath}`);
     } catch (error) {
@@ -172,28 +174,37 @@ class FTPService {
         throw new Error(`File ${fileName} not found in directory ${remoteDir}`);
       }
 
-      // Create a PassThrough stream to collect data
-      const passThrough = new PassThrough();
+      // Create a writable stream to collect data
       const chunks: Buffer[] = [];
+      let resolvePromise: (buffer: Buffer) => void;
+      let rejectPromise: (error: Error) => void;
 
-      // Collect data from the stream
-      passThrough.on("data", (chunk: Buffer) => {
-        chunks.push(chunk);
-      });
-
-      // Download to the PassThrough stream
-      await client.downloadTo(passThrough, fileName);
-
-      // Wait for stream to end and return buffer
-      return new Promise((resolve, reject) => {
-        passThrough.on("end", () => {
+      const writableStream = new Writable({
+        write(chunk: Buffer, encoding, callback) {
+          chunks.push(chunk);
+          callback();
+        },
+        final(callback) {
           const buffer = Buffer.concat(chunks);
           logger.info(
             `File downloaded to buffer from FTP: ${remotePath}, size: ${buffer.length} bytes`
           );
-          resolve(buffer);
-        });
-        passThrough.on("error", reject);
+          resolvePromise(buffer);
+          callback();
+        },
+      });
+
+      writableStream.on("error", (error) => {
+        rejectPromise(error);
+      });
+
+      // Download to the writable stream
+      await client.downloadTo(writableStream, fileName);
+
+      // Return promise that resolves when stream ends
+      return new Promise<Buffer>((resolve, reject) => {
+        resolvePromise = resolve;
+        rejectPromise = reject;
       });
     } catch (error) {
       logger.error("FTP download to buffer failed:", error);
