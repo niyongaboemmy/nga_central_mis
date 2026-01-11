@@ -1022,13 +1022,40 @@ export const getDocumentById = asyncHandler(async (req: any, res: any) => {
     throw new ValidationError("Invalid document ID");
   }
 
-  const document = await db
+  // First try to get owned document
+  let document = await db
     .select()
     .from(Document)
     .where(
       and(eq(Document.document_id, documentIdNum), eq(Document.user_id, userId))
     )
     .limit(1);
+
+  // If not found, check if it's a shared document
+  if (document.length === 0) {
+    const sharedDocument = await db
+      .select()
+      .from(DocumentPermission)
+      .innerJoin(
+        Document,
+        eq(DocumentPermission.document_id, Document.document_id)
+      )
+      .where(
+        and(
+          eq(DocumentPermission.document_id, documentIdNum),
+          eq(DocumentPermission.user_id, userId),
+          or(
+            isNull(DocumentPermission.expires_at),
+            gt(DocumentPermission.expires_at, new Date())
+          )
+        )
+      )
+      .limit(1);
+
+    if (sharedDocument.length > 0) {
+      document = [sharedDocument[0].Document];
+    }
+  }
 
   if (document.length === 0) {
     throw new NotFoundError("Document not found");
@@ -1151,8 +1178,31 @@ export const downloadDocument = asyncHandler(async (req: any, res: any) => {
     throw new NotFoundError("Document not found");
   }
 
-  if (doc.user_id !== userId && doc.is_public !== 1) {
-    throw new AuthenticationError("Access denied");
+  // Check if user owns the document
+  if (doc.user_id === userId) {
+    // User owns the document, allow access
+  } else if (doc.is_public === 1) {
+    // Document is public, allow access
+  } else {
+    // Check if user has permission to access this shared document
+    const permission = await db
+      .select()
+      .from(DocumentPermission)
+      .where(
+        and(
+          eq(DocumentPermission.document_id, Number(documentId)),
+          eq(DocumentPermission.user_id, userId),
+          or(
+            isNull(DocumentPermission.expires_at),
+            gt(DocumentPermission.expires_at, new Date())
+          )
+        )
+      )
+      .limit(1);
+
+    if (permission.length === 0) {
+      throw new AuthenticationError("Access denied");
+    }
   }
 
   // Check FTP file exists
