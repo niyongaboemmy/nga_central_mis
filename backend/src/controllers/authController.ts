@@ -266,11 +266,26 @@ export const resetPassword = asyncHandler(async (req: any, res: any) => {
   const salt = await bcrypt.genSalt(12);
   const passwordHash = await bcrypt.hash(newPassword, salt);
 
-  // Update password
-  await db
-    .update(AuthCredential)
-    .set({ password_hash: passwordHash })
-    .where(eq(AuthCredential.user_id, userId));
+  // Check if AuthCredential row exists for the user
+  const existingAuth = await db
+    .select()
+    .from(AuthCredential)
+    .where(eq(AuthCredential.user_id, userId))
+    .limit(1);
+
+  if (existingAuth.length > 0) {
+    // Update existing password
+    await db
+      .update(AuthCredential)
+      .set({ password_hash: passwordHash })
+      .where(eq(AuthCredential.user_id, userId));
+  } else {
+    // Insert new AuthCredential row
+    await db.insert(AuthCredential).values({
+      user_id: userId,
+      password_hash: passwordHash,
+    });
+  }
 
   logger.info(`Password reset completed for userId: ${userId}`);
 
