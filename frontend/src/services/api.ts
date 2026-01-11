@@ -61,7 +61,7 @@ api.interceptors.response.use(
       ) {
         // Token expired or invalid - redirect to login
         localStorage.removeItem("token");
-        window.location.href = "/";
+        window.location.href = "/mis/";
       }
     } else if (error.response?.status === 403) {
       // Show toast for forbidden access

@@ -8874,3 +8874,5 @@
 {"ip":"::1","level":"info","message":"GET /permissions/permissions","service":"nga-central-mis","timestamp":"2026-01-11T22:42:59.665Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
 {"duration":4,"level":"info","message":"GET /permissions/roles 304 - 4ms","service":"nga-central-mis","statusCode":304,"timestamp":"2026-01-11T22:42:59.667Z"}
 {"duration":5,"level":"info","message":"GET /permissions/permissions 304 - 5ms","service":"nga-central-mis","statusCode":304,"timestamp":"2026-01-11T22:42:59.670Z"}
+{"ip":"::1","level":"info","message":"GET /dashboard/stats","service":"nga-central-mis","timestamp":"2026-01-11T22:49:52.894Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
+{"duration":4,"level":"info","message":"GET /dashboard/stats 401 - 4ms","service":"nga-central-mis","statusCode":401,"timestamp":"2026-01-11T22:49:52.898Z"}
