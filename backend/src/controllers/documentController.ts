@@ -672,16 +672,30 @@ export const revokeFolderAccess = asyncHandler(async (req: any, res: any) => {
   const userId = req.user.userId;
   const { permissionId } = req.params;
 
-  // Check if permission exists and was created by the user
+  // Check if user is SUPER_ADMIN
+  const userRoles = await db
+    .select({
+      role_id: Role.role_id,
+      name: Role.name,
+    })
+    .from(UserRole)
+    .innerJoin(Role, eq(UserRole.role_id, Role.role_id))
+    .where(eq(UserRole.user_id, userId));
+
+  const isSuperAdmin = userRoles.some((r) => r.name === "SUPER_ADMIN");
+
+  // Check if permission exists and was created by the user (or user is SUPER_ADMIN)
+  const conditions = [
+    eq(FolderPermission.permission_id, parseInt(permissionId)),
+  ];
+  if (!isSuperAdmin) {
+    conditions.push(eq(FolderPermission.shared_by, userId));
+  }
+
   const permission = await db
     .select()
     .from(FolderPermission)
-    .where(
-      and(
-        eq(FolderPermission.permission_id, parseInt(permissionId)),
-        eq(FolderPermission.shared_by, userId)
-      )
-    )
+    .where(and(...conditions))
     .limit(1);
 
   if (permission.length === 0) {
@@ -1569,16 +1583,30 @@ export const revokeDocumentAccess = asyncHandler(async (req: any, res: any) => {
   const userId = req.user.userId;
   const { permissionId } = req.params;
 
-  // Check if permission exists and was created by the user
+  // Check if user is SUPER_ADMIN
+  const userRoles = await db
+    .select({
+      role_id: Role.role_id,
+      name: Role.name,
+    })
+    .from(UserRole)
+    .innerJoin(Role, eq(UserRole.role_id, Role.role_id))
+    .where(eq(UserRole.user_id, userId));
+
+  const isSuperAdmin = userRoles.some((r) => r.name === "SUPER_ADMIN");
+
+  // Check if permission exists and was created by the user (or user is SUPER_ADMIN)
+  const conditions = [
+    eq(DocumentPermission.permission_id, parseInt(permissionId)),
+  ];
+  if (!isSuperAdmin) {
+    conditions.push(eq(DocumentPermission.shared_by, userId));
+  }
+
   const permission = await db
     .select()
     .from(DocumentPermission)
-    .where(
-      and(
-        eq(DocumentPermission.permission_id, parseInt(permissionId)),
-        eq(DocumentPermission.shared_by, userId)
-      )
-    )
+    .where(and(...conditions))
     .limit(1);
 
   if (permission.length === 0) {
