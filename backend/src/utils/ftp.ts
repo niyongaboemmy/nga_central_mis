@@ -134,10 +134,37 @@ class FTPService {
         `FTP download to buffer: remotePath=${remotePath}, remoteDir=${remoteDir}, fileName=${fileName}`
       );
 
+      // Log current directory before navigation
+      try {
+        const currentDir = await client.pwd();
+        logger.info(`FTP current directory before navigation: ${currentDir}`);
+      } catch (pwdError) {
+        logger.warn(
+          "Could not get current directory:",
+          (pwdError as Error).message
+        );
+      }
+
       await this.ensureDirectoryExists(client, remoteDir);
 
-      // Check if file exists
+      // Log current directory after navigation
+      try {
+        const currentDir = await client.pwd();
+        logger.info(`FTP current directory after navigation: ${currentDir}`);
+      } catch (pwdError) {
+        logger.warn(
+          "Could not get current directory:",
+          (pwdError as Error).message
+        );
+      }
+
+      // List all files in current directory
       const list = await client.list(".");
+      logger.info(
+        `FTP directory listing:`,
+        list.map((item: any) => `${item.name} (${item.type})`).join(", ")
+      );
+
       const fileExists = list.some((item: any) => item.name === fileName);
       logger.info(`FTP file exists check: ${fileName} exists=${fileExists}`);
 
