@@ -1128,6 +1128,10 @@ export const downloadDocument = asyncHandler(async (req: any, res: any) => {
       `download-${Date.now()}-${document[0].file_name}`
     );
 
+    logger.info(
+      `Attempting to download file: ${document[0].file_path} to ${tempFilePath}`
+    );
+
     // Download file from FTP to temp location
     await ftpService.downloadFile(document[0].file_path, tempFilePath);
 
@@ -1146,6 +1150,7 @@ export const downloadDocument = asyncHandler(async (req: any, res: any) => {
     });
   } catch (error) {
     logger.error("FTP download failed:", error);
+    logger.error("File path from database:", document[0].file_path);
     throw new NotFoundError("File not found on server");
   }
 });

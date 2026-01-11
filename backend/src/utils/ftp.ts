@@ -87,7 +87,20 @@ class FTPService {
       // Navigate to remote directory and download file
       const remoteDir = path.dirname(remotePath);
       const fileName = path.basename(remotePath);
+      logger.info(
+        `FTP download: remotePath=${remotePath}, remoteDir=${remoteDir}, fileName=${fileName}`
+      );
+
       await this.ensureDirectoryExists(client, remoteDir);
+
+      // Check if file exists before downloading
+      const list = await client.list(".");
+      const fileExists = list.some((item: any) => item.name === fileName);
+      logger.info(`FTP file exists check: ${fileName} exists=${fileExists}`);
+
+      if (!fileExists) {
+        throw new Error(`File ${fileName} not found in directory ${remoteDir}`);
+      }
 
       // Download file (using just the filename since we're in the correct directory)
       await client.downloadTo(localPath, fileName);
@@ -131,10 +144,26 @@ class FTPService {
       currentPath += "/" + part;
       try {
         await client.ensureDir(currentPath);
+        logger.debug(`Ensured directory exists: ${currentPath}`);
       } catch (error) {
         // Directory might already exist, continue
-        logger.debug(`Directory ${currentPath} may already exist`);
+        logger.debug(
+          `Directory ${currentPath} may already exist:`,
+          (error as Error).message
+        );
       }
+    }
+
+    // Navigate to the target directory
+    try {
+      await client.cd(remotePath);
+      logger.debug(`Changed to directory: ${remotePath}`);
+    } catch (error) {
+      logger.error(
+        `Failed to change to directory ${remotePath}:`,
+        (error as Error).message
+      );
+      throw error;
     }
   }
 
