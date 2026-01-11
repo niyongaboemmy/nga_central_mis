@@ -1113,15 +1113,15 @@ export const searchUsers = asyncHandler(async (req: any, res: any) => {
       and(
         eq(User.status, "ACTIVE"),
         or(
-          ilike(User.username, searchTerm),
-          ilike(User.email, searchTerm),
-          ilike(User.phone_number, searchTerm),
-          ilike(UserProfile.first_name, searchTerm),
-          ilike(UserProfile.last_name, searchTerm),
+          sql`LOWER(${User.username}) LIKE LOWER(${searchTerm})`,
+          sql`LOWER(${User.email}) LIKE LOWER(${searchTerm})`,
+          sql`LOWER(${User.phone_number}) LIKE LOWER(${searchTerm})`,
+          sql`LOWER(${UserProfile.first_name}) LIKE LOWER(${searchTerm})`,
+          sql`LOWER(${UserProfile.last_name}) LIKE LOWER(${searchTerm})`,
           sql`LOWER(CONCAT(${UserProfile.first_name}, ' ', ${UserProfile.last_name})) LIKE LOWER(${searchTerm})`,
-          ilike(UserProfile.address, searchTerm),
-          ilike(UserProfile.external_id, searchTerm),
-          ilike(UserProfile.user_type, searchTerm)
+          sql`LOWER(${UserProfile.address}) LIKE LOWER(${searchTerm})`,
+          sql`LOWER(${UserProfile.external_id}) LIKE LOWER(${searchTerm})`,
+          sql`LOWER(${UserProfile.user_type}) LIKE LOWER(${searchTerm})`
         )
       )
     )

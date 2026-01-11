@@ -176,7 +176,7 @@ const ShareModal: React.FC<ShareModalProps> = ({
         initial="hidden"
         animate="visible"
         exit="exit"
-        className="bg-white dark:bg-gray-800 rounded-3xl shadow-2xl w-full max-w-lg sm:max-w-2xl min-h-[70vh] max-h-[100vh] overflow-hidden flex flex-col"
+        className="bg-white dark:bg-gray-800 rounded-3xl shadow-2xl w-full max-w-lg sm:max-w-2xl md:max-w-4xl min-h-[70vh] max-h-[100vh] overflow-hidden flex flex-col"
       >
         {/* Header */}
         <div className="relative bg-gradient-to-r from-blue-500 via-blue-500 to-blue-500 p-3 sm:p-4 text-white">
@@ -247,7 +247,7 @@ const ShareModal: React.FC<ShareModalProps> = ({
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto p-3 sm:p-4">
+        <div className="flex-1 overflow-y-auto p-3 sm:p-4 md:p-8">
           {shareTab === "people" && (
             <div className={"space-y-3"}>
               {/* Existing permissions */}

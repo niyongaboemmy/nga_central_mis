@@ -45,6 +45,8 @@ router.get(
   authorize("MANAGE_USERS"),
   downloadTemplate
 );
+// Search users (for document sharing) - available to all authenticated users
+router.get("/search", authenticate, searchUsers);
 router.get("/:id", authenticate, getUser);
 router.put("/:id/profile", authenticate, updateUserProfile);
 router.post("/", authenticate, authorize("MANAGE_USERS"), createUser);
@@ -57,8 +59,5 @@ router.post(
 );
 router.put("/:id", authenticate, authorize("MANAGE_USERS"), updateUser);
 router.delete("/:id", authenticate, authorize("MANAGE_USERS"), deleteUser);
-
-// Search users (for document sharing) - available to all authenticated users
-router.get("/search", authenticate, searchUsers);
 
 export default router;
