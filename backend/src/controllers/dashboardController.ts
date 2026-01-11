@@ -1,5 +1,5 @@
 import { db } from "../db";
-import { eq, sql, count, sum, gte } from "drizzle-orm";
+import { eq, sql, count, sum, gte, inArray, and } from "drizzle-orm";
 import {
   User,
   UserProfile,
@@ -7,27 +7,34 @@ import {
   Grade,
   Subject,
   ClassGroup,
+  AcademicYear,
   AcademicTerm,
   Document,
   DocumentFolder,
   DocumentVersion,
   Role,
   UserRole,
+  TeacherSubjectAssignment,
+  StudentSubjectEnrollment,
+  StudentClassGroup,
 } from "../db/schema";
 import { successResponse } from "../utils/response";
 import { asyncHandler } from "../middleware/asyncHandler";
 
 // Dashboard statistics interface
 interface DashboardStats {
-  totalStudents: number;
-  totalTeachers: number;
-  totalAdmins: number;
-  totalStaff: number;
+  // Academic information
+  currentAcademicYear: string | null;
+  currentAcademicTerm: string | null;
   totalPrograms: number;
   totalGrades: number;
   totalSubjects: number;
   activeClassGroups: number;
-  currentAcademicTerms: number;
+  // User statistics
+  totalStudents: number;
+  totalTeachers: number;
+  totalAdmins: number;
+  totalStaff: number;
   // Document management stats
   totalDocuments: number;
   totalFolders: number;
@@ -39,6 +46,15 @@ interface DashboardStats {
   // System health
   systemHealth: number; // percentage
   databaseStatus: "healthy" | "warning" | "error";
+}
+
+// Teacher dashboard statistics interface
+interface TeacherDashboardStats {
+  assignedSubjects: number;
+  totalStudents: number;
+  assignedClassGroups: number;
+  currentAcademicTerm: string | null;
+  // Recent activities could be added later
 }
 
 // Get dashboard statistics
@@ -54,6 +70,19 @@ export const getDashboardStats = asyncHandler(async (req: any, res: any) => {
     .where(eq(User.status, "ACTIVE"))
     .groupBy(UserProfile.user_type);
 
+  // Get current academic year and term
+  const [currentYearResult] = await db
+    .select({ name: AcademicYear.name })
+    .from(AcademicYear)
+    .where(eq(AcademicYear.is_current, 1))
+    .limit(1);
+
+  const [currentTermResult] = await db
+    .select({ name: AcademicTerm.name })
+    .from(AcademicTerm)
+    .where(eq(AcademicTerm.is_current, 1))
+    .limit(1);
+
   // Get academic data counts
   const [programsResult] = await db.select({ count: count() }).from(Program);
   const [gradesResult] = await db.select({ count: count() }).from(Grade);
@@ -61,10 +90,6 @@ export const getDashboardStats = asyncHandler(async (req: any, res: any) => {
   const [classGroupsResult] = await db
     .select({ count: count() })
     .from(ClassGroup);
-  const [currentTermsResult] = await db
-    .select({ count: count() })
-    .from(AcademicTerm)
-    .where(eq(AcademicTerm.is_current, 1));
 
   // Get document management stats
   const [documentsResult] = await db.select({ count: count() }).from(Document);
@@ -135,15 +160,18 @@ export const getDashboardStats = asyncHandler(async (req: any, res: any) => {
   }
 
   const stats: DashboardStats = {
-    totalStudents,
-    totalTeachers,
-    totalAdmins,
-    totalStaff,
+    // Academic information
+    currentAcademicYear: currentYearResult?.name || null,
+    currentAcademicTerm: currentTermResult?.name || null,
     totalPrograms: programsResult.count,
     totalGrades: gradesResult.count,
     totalSubjects: subjectsResult.count,
     activeClassGroups: classGroupsResult.count,
-    currentAcademicTerms: currentTermsResult.count,
+    // User statistics
+    totalStudents,
+    totalTeachers,
+    totalAdmins,
+    totalStaff,
     // Document stats
     totalDocuments: documentsResult.count,
     totalFolders: foldersResult.count,
@@ -159,3 +187,66 @@ export const getDashboardStats = asyncHandler(async (req: any, res: any) => {
 
   successResponse(res, "Dashboard statistics retrieved successfully", stats);
 });
+
+// Get teacher dashboard statistics
+export const getTeacherDashboardStats = asyncHandler(
+  async (req: any, res: any) => {
+    const teacherId = req.user.userId;
+
+    // Get current academic term
+    const [currentTermResult] = await db
+      .select({
+        academic_term_id: AcademicTerm.academic_term_id,
+        name: AcademicTerm.name,
+      })
+      .from(AcademicTerm)
+      .where(eq(AcademicTerm.is_current, 1))
+      .limit(1);
+
+    // Get assigned subjects count (all assignments, not filtered by term)
+    const assignedSubjectsResult = await db
+      .select()
+      .from(TeacherSubjectAssignment)
+      .where(eq(TeacherSubjectAssignment.user_id, teacherId));
+    const assignedSubjects = assignedSubjectsResult.length;
+
+    // Get unique class groups assigned to teacher
+    const assignedClassGroupsResult = await db
+      .select({ class_group_id: TeacherSubjectAssignment.class_group_id })
+      .from(TeacherSubjectAssignment)
+      .where(eq(TeacherSubjectAssignment.user_id, teacherId));
+    const uniqueClassGroups = [
+      ...new Set(assignedClassGroupsResult.map((r) => r.class_group_id)),
+    ];
+    const assignedClassGroups = uniqueClassGroups.length;
+
+    // Get total students in teacher's assigned subjects
+    let totalStudents = 0;
+    if (assignedSubjectsResult.length > 0) {
+      // Get all subject IDs assigned to this teacher
+      const subjectIds = [
+        ...new Set(assignedSubjectsResult.map((r) => r.subject_id)),
+      ];
+
+      // Count students enrolled in these subjects (all terms)
+      const [studentsResult] = await db
+        .select({ count: count(StudentSubjectEnrollment.user_id) })
+        .from(StudentSubjectEnrollment)
+        .where(inArray(StudentSubjectEnrollment.subject_id, subjectIds));
+      totalStudents = studentsResult?.count || 0;
+    }
+
+    const stats: TeacherDashboardStats = {
+      assignedSubjects,
+      totalStudents,
+      assignedClassGroups,
+      currentAcademicTerm: currentTermResult?.name || null,
+    };
+
+    successResponse(
+      res,
+      "Teacher dashboard statistics retrieved successfully",
+      stats
+    );
+  }
+);

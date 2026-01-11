@@ -2,15 +2,18 @@ import api from "../services/api";
 
 // Dashboard statistics interface
 export interface DashboardStats {
-  totalStudents: number;
-  totalTeachers: number;
-  totalAdmins: number;
-  totalStaff: number;
+  // Academic information
+  currentAcademicYear: string | null;
+  currentAcademicTerm: string | null;
   totalPrograms: number;
   totalGrades: number;
   totalSubjects: number;
   activeClassGroups: number;
-  currentAcademicTerms: number;
+  // User statistics
+  totalStudents: number;
+  totalTeachers: number;
+  totalAdmins: number;
+  totalStaff: number;
   // Document management stats
   totalDocuments: number;
   totalFolders: number;
@@ -24,8 +27,25 @@ export interface DashboardStats {
   databaseStatus: "healthy" | "warning" | "error";
 }
 
+// Teacher dashboard statistics interface
+export interface TeacherDashboardStats {
+  assignedSubjects: number;
+  totalStudents: number;
+  assignedClassGroups: number;
+  currentAcademicTerm: string | null;
+}
+
 // Dashboard API
 export const getDashboardStats = async (): Promise<DashboardStats> => {
   const response = await api.get<{ data: DashboardStats }>("/dashboard/stats");
   return response.data.data;
 };
+
+// Teacher dashboard API
+export const getTeacherDashboardStats =
+  async (): Promise<TeacherDashboardStats> => {
+    const response = await api.get<{ data: TeacherDashboardStats }>(
+      "/dashboard/teacher-stats"
+    );
+    return response.data.data;
+  };

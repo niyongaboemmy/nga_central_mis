@@ -29,6 +29,7 @@ export const Permissions = {
   MANAGE_TEACHERS: "MANAGE_TEACHERS",
   VIEW_TEACHERS: "VIEW_TEACHERS",
   VIEW_MY_ASSIGNED_SUBJECTS: "VIEW_MY_ASSIGNED_SUBJECTS",
+  TEACHER_DASHBOARD: "TEACHER_DASHBOARD",
 
   // Parent management
   MANAGE_PARENTS: "MANAGE_PARENTS",
@@ -125,6 +126,7 @@ export const permissionGroups = {
     Permissions.MANAGE_TEACHERS,
     Permissions.VIEW_TEACHERS,
     Permissions.VIEW_MY_ASSIGNED_SUBJECTS,
+    Permissions.TEACHER_DASHBOARD,
   ],
   parents: [Permissions.MANAGE_PARENTS, Permissions.VIEW_PARENTS],
   grades: [Permissions.MANAGE_GRADES, Permissions.VIEW_GRADES],

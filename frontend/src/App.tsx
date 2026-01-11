@@ -14,6 +14,7 @@ import Login from "./components/Login";
 import Profile from "./components/Profile";
 import Dashboard from "./components/Dashboard";
 import SuperAdminDashboard from "./components/SuperAdminDashboard";
+import TeacherDashboard from "./components/TeacherDashboard";
 import Permissions from "./components/Permissions";
 import Users from "./components/Users";
 import SystemLayout from "./components/SystemLayout";
@@ -168,8 +169,18 @@ const DashboardPage: React.FC = () => {
       role.permissions?.some((perm) => perm.name === "SUPER_ADMIN_DASHBOARD")
     ) || false;
 
+  // Check if user has any role with TEACHER_DASHBOARD permission
+  const hasTeacherDashboard =
+    user?.roles?.some((role) =>
+      role.permissions?.some((perm) => perm.name === "TEACHER_DASHBOARD")
+    ) || false;
+
   if (hasSuperAdminDashboard) {
     return <SuperAdminDashboard onLogout={handleLogout} />;
+  }
+
+  if (hasTeacherDashboard) {
+    return <TeacherDashboard onLogout={handleLogout} />;
   }
 
   return <Dashboard onLogout={handleLogout} />;

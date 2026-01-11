@@ -105,7 +105,7 @@ const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({}) => {
     { name: "Programs", value: stats!.totalPrograms },
     { name: "Grades", value: stats!.totalGrades },
     { name: "Subjects", value: stats!.totalSubjects },
-    { name: "Active Terms", value: stats!.currentAcademicTerms },
+    { name: "Active Classes", value: stats!.activeClassGroups },
   ];
 
   const documentData = [
