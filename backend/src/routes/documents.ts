@@ -7,6 +7,7 @@ import {
   getFolderById,
   updateFolder,
   deleteFolder,
+  getFolderTree,
   uploadDocument,
   getDocuments,
   getDocumentById,
@@ -61,6 +62,9 @@ router.post("/folders", createFolder);
 
 // Get all folders (with optional parentFolderId query)
 router.get("/folders", getFolders);
+
+// Get folder tree for Quick Access
+router.get("/folders/tree", getFolderTree);
 
 // Get a specific folder
 router.get("/folders/:folderId", getFolderById);

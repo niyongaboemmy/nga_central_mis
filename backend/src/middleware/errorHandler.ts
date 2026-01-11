@@ -40,6 +40,13 @@ export const errorHandler = (
     });
   }
 
+  if (err.message && err.message.includes("Unknown column")) {
+    return res.status(400).json({
+      success: false,
+      message: "Invalid query parameters or database schema issue",
+    });
+  }
+
   // Default to internal server error
   res.status(500).json({
     success: false,

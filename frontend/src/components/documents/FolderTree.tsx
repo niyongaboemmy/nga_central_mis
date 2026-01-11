@@ -1,16 +1,106 @@
-import React from "react";
+import React, { useState } from "react";
 import { motion } from "framer-motion";
-import { FiFolder, FiHome } from "react-icons/fi";
+import { FiFolder, FiHome, FiChevronRight } from "react-icons/fi";
 import type { Folder } from "../../api/documents";
+
+interface FolderTreeNode {
+  folder_id: number;
+  user_id: number;
+  parent_folder_id: number | null;
+  name: string;
+  description: string | null;
+  color: string;
+  created_at: string;
+  updated_at: string;
+  children?: FolderTreeNode[];
+  is_shared?: boolean;
+}
 
 interface FolderTreeProps {
   showFolderTree: boolean;
   currentFolderId: number | null;
-  folderTree: Folder[];
+  folderTree: FolderTreeNode[];
   isLoading?: boolean;
   onNavigateToFolder: (folder: Folder) => void;
   onGoToRoot: () => void;
 }
+
+const FolderNode: React.FC<{
+  node: FolderTreeNode;
+  level: number;
+  currentFolderId: number | null;
+  onNavigateToFolder: (folder: Folder) => void;
+}> = ({ node, level, currentFolderId, onNavigateToFolder }) => {
+  const [isExpanded, setIsExpanded] = useState(level < 2); // Auto-expand first 2 levels
+
+  const hasChildren = node.children && node.children.length > 0;
+
+  return (
+    <div>
+      <motion.button
+        initial={{ opacity: 0, x: -20 }}
+        animate={{ opacity: 1, x: 0 }}
+        whileHover={{ scale: 1.02 }}
+        whileTap={{ scale: 0.98 }}
+        onClick={() => {
+          onNavigateToFolder(node as Folder);
+          if (hasChildren) {
+            setIsExpanded(!isExpanded);
+          }
+        }}
+        className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left text-sm transition-all ${
+          currentFolderId === node.folder_id
+            ? "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 shadow-sm"
+            : "text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-900"
+        }`}
+        style={{ paddingLeft: `${12 + level * 16}px` }}
+      >
+        {hasChildren ? (
+          <motion.div
+            animate={{ rotate: isExpanded ? 90 : 0 }}
+            transition={{ duration: 0.2 }}
+          >
+            <FiChevronRight className="w-4 h-4 flex-shrink-0" />
+          </motion.div>
+        ) : (
+          <div className="w-4 h-4 flex-shrink-0" />
+        )}
+        <motion.div
+          whileHover={{ rotate: hasChildren ? 0 : 10 }}
+          transition={{ type: "spring", stiffness: 300 }}
+        >
+          <FiFolder
+            className="w-4 h-4 flex-shrink-0"
+            style={{ color: node.color }}
+          />
+        </motion.div>
+        <span className="truncate">{node.name}</span>
+        {node.is_shared && (
+          <span className="text-xs text-orange-500 ml-auto">shared</span>
+        )}
+      </motion.button>
+
+      {hasChildren && isExpanded && (
+        <motion.div
+          initial={{ opacity: 0, height: 0 }}
+          animate={{ opacity: 1, height: "auto" }}
+          exit={{ opacity: 0, height: 0 }}
+          transition={{ duration: 0.2 }}
+        >
+          {node.children!.map((child) => (
+            <FolderNode
+              key={child.folder_id}
+              node={child}
+              level={level + 1}
+              currentFolderId={currentFolderId}
+              onNavigateToFolder={onNavigateToFolder}
+            />
+          ))}
+        </motion.div>
+      )}
+    </div>
+  );
+};
 
 const FolderTree: React.FC<FolderTreeProps> = ({
   showFolderTree,
@@ -24,7 +114,7 @@ const FolderTree: React.FC<FolderTreeProps> = ({
     <motion.div
       initial={{ width: 0, opacity: 0 }}
       animate={{
-        width: showFolderTree ? 280 : 0,
+        width: showFolderTree ? 320 : 0,
         opacity: showFolderTree ? 1 : 0,
       }}
       exit={{ width: 0, opacity: 0 }}
@@ -44,7 +134,7 @@ const FolderTree: React.FC<FolderTreeProps> = ({
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
           onClick={onGoToRoot}
-          className={`w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-left text-sm transition-all ${
+          className={`w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-left text-sm transition-all mb-2 ${
             currentFolderId === null
               ? "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 shadow-sm"
               : "text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-900"
@@ -53,6 +143,7 @@ const FolderTree: React.FC<FolderTreeProps> = ({
           <FiHome className="w-4 h-4" />
           My Documents
         </motion.button>
+
         {isLoading ? (
           <div className="flex items-center justify-center py-4">
             <div className="w-5 h-5 border-2 border-blue-200 border-t-blue-500 rounded-full animate-spin" />
@@ -62,30 +153,17 @@ const FolderTree: React.FC<FolderTreeProps> = ({
             No folders yet
           </div>
         ) : (
-          folderTree.map((folder, index) => (
-            <motion.button
-              key={folder.folder_id}
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: index * 0.05 }}
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={() => onNavigateToFolder(folder)}
-              className={`w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-left text-sm transition-all ${
-                currentFolderId === folder.folder_id
-                  ? "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 shadow-sm"
-                  : "text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-900"
-              }`}
-            >
-              <motion.div
-                whileHover={{ rotate: 10 }}
-                transition={{ type: "spring", stiffness: 300 }}
-              >
-                <FiFolder className="w-4 h-4" style={{ color: folder.color }} />
-              </motion.div>
-              <span className="truncate">{folder.name}</span>
-            </motion.button>
-          ))
+          <div className="space-y-1">
+            {folderTree.map((node) => (
+              <FolderNode
+                key={node.folder_id}
+                node={node}
+                level={0}
+                currentFolderId={currentFolderId}
+                onNavigateToFolder={onNavigateToFolder}
+              />
+            ))}
+          </div>
         )}
       </div>
     </motion.div>

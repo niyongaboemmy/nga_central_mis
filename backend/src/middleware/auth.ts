@@ -2,6 +2,7 @@ import jwt from "jsonwebtoken";
 import { db } from "../db";
 import { eq, and } from "drizzle-orm";
 import { UserRole, Role } from "../db/schema";
+import { ValidationError } from "../errors/CustomError";
 
 const SUPER_ADMIN_ROLE = "SUPER_ADMIN";
 
@@ -25,6 +26,12 @@ export const authenticate = async (req: any, res: any, next: any) => {
   try {
     const decoded: any = jwt.verify(token, process.env.JWT_SECRET!);
     req.user = decoded;
+
+    // Ensure userId is a valid number
+    req.user.userId = Number(decoded.userId);
+    if (isNaN(req.user.userId) || req.user.userId <= 0) {
+      throw new ValidationError("Invalid user ID in token");
+    }
 
     // Check if user has SUPER_ADMIN role - grant all permissions
     const userRoles = await getUserRoles(decoded.userId);

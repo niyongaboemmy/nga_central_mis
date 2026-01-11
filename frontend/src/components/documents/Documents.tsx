@@ -109,7 +109,7 @@ const Documents: React.FC = () => {
     useState<SharedDocument | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingShared, setIsLoadingShared] = useState(false);
-  const [folderTree, setFolderTree] = useState<Folder[]>([]);
+  const [folderTree, setFolderTree] = useState<any[]>([]);
   const [showFolderTree, setShowFolderTree] = useState(
     window.innerWidth >= 768
   ); // md breakpoint
@@ -154,7 +154,6 @@ const Documents: React.FC = () => {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const contextMenuRef = useRef<HTMLDivElement>(null);
-  const lastActiveTabRef = useRef<string | null>(null);
   const ongoingRequestsRef = useRef<Map<string, Promise<any>>>(new Map());
 
   // Request deduplication helper
@@ -288,13 +287,8 @@ const Documents: React.FC = () => {
 
     setIsLoadingFolderTree(true);
     try {
-      const request = folderApi.getAll().then((response) => {
-        setFolderTree(
-          response.data.data?.map((item: any) => ({
-            ...item.folder,
-            owner: item.owner,
-          })) || []
-        );
+      const request = folderApi.getTree().then((response) => {
+        setFolderTree(response.data.data || []);
         return response;
       });
 
@@ -369,15 +363,18 @@ const Documents: React.FC = () => {
     }
   };
 
+  // Initial load
+  useEffect(() => {
+    fetchFolderTree();
+  }, [fetchFolderTree]);
+
   useEffect(() => {
     if (activeTab === "my-documents") {
       fetchData();
-      fetchFolderTree();
     } else {
       fetchSharedDocuments();
-      fetchFolderTree();
     }
-  }, [fetchData, fetchSharedDocuments, fetchFolderTree, activeTab]);
+  }, [fetchData, fetchSharedDocuments, activeTab]);
 
   // Reset breadcrumbs when switching tabs
   useEffect(() => {
@@ -755,7 +752,6 @@ const Documents: React.FC = () => {
       await Promise.all(uploadPromises);
       showToast(`${files.length} file(s) uploaded successfully`, "success");
       fetchData();
-      fetchFolderTree();
     } catch (error: any) {
       showToast(
         error.response?.data?.message || "Failed to upload files",

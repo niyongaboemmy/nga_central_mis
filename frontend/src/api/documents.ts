@@ -101,11 +101,26 @@ export const folderApi = {
     color?: string;
   }) => apiService.post("/documents/folders", data),
 
-  getAll: (parentFolderId?: number) =>
-    apiService.get("/documents/folders", { params: { parentFolderId } }),
+  getAll: (parentFolderId?: number) => {
+    const params: any = {};
+    if (
+      parentFolderId &&
+      typeof parentFolderId === "number" &&
+      parentFolderId > 0
+    ) {
+      params.parentFolderId = parentFolderId;
+    }
+    return apiService.get("/documents/folders", { params });
+  },
 
-  getById: (folderId: number) =>
-    apiService.get(`/documents/folders/${folderId}`),
+  getTree: () => apiService.get("/documents/folders/tree"),
+
+  getById: (folderId: number) => {
+    if (typeof folderId !== "number" || isNaN(folderId) || folderId <= 0) {
+      throw new Error("Invalid folder ID");
+    }
+    return apiService.get(`/documents/folders/${folderId}`);
+  },
 
   update: (
     folderId: number,

@@ -153,8 +153,33 @@ export const createFolder = asyncHandler(async (req: any, res: any) => {
 });
 
 export const getFolders = asyncHandler(async (req: any, res: any) => {
-  const userId = req.user.userId;
+  // Validate user authentication
+  if (!req.user || !req.user.userId) {
+    return res.status(401).json({
+      success: false,
+      message: "User not authenticated",
+    });
+  }
+
+  const rawUserId = req.user.userId;
+  const userId = Number(rawUserId);
+
+  // Validate userId
+  if (!rawUserId || isNaN(userId) || !Number.isInteger(userId) || userId <= 0) {
+    return res.status(400).json({
+      success: false,
+      message: "Invalid user ID: must be a positive integer",
+    });
+  }
+
   const { parentFolderId } = req.query;
+
+  if (
+    parentFolderId &&
+    (isNaN(Number(parentFolderId)) || Number(parentFolderId) <= 0)
+  ) {
+    throw new ValidationError("Invalid parentFolderId");
+  }
 
   const parentId = parentFolderId ? parseInt(parentFolderId) : null;
 
@@ -297,6 +322,12 @@ export const getFolders = asyncHandler(async (req: any, res: any) => {
 export const getFolderById = asyncHandler(async (req: any, res: any) => {
   const userId = req.user.userId;
   const { folderId } = req.params;
+
+  // Validate folderId
+  const folderIdNum = parseInt(folderId);
+  if (isNaN(folderIdNum) || folderIdNum <= 0) {
+    throw new ValidationError("Invalid folder ID");
+  }
 
   // First try to get owned folder
   let folder = await db
@@ -971,14 +1002,17 @@ export const getDocumentById = asyncHandler(async (req: any, res: any) => {
   const userId = req.user.userId;
   const { documentId } = req.params;
 
+  // Validate documentId
+  const documentIdNum = parseInt(documentId);
+  if (isNaN(documentIdNum) || documentIdNum <= 0) {
+    throw new ValidationError("Invalid document ID");
+  }
+
   const document = await db
     .select()
     .from(Document)
     .where(
-      and(
-        eq(Document.document_id, parseInt(documentId)),
-        eq(Document.user_id, userId)
-      )
+      and(eq(Document.document_id, documentIdNum), eq(Document.user_id, userId))
     )
     .limit(1);
 
@@ -1229,11 +1263,17 @@ export const getDocumentVersions = asyncHandler(async (req: any, res: any) => {
   const userId = req.user.userId;
   const { documentId } = req.params;
 
+  // Validate documentId
+  const documentIdNum = parseInt(documentId);
+  if (isNaN(documentIdNum) || documentIdNum <= 0) {
+    throw new ValidationError("Invalid document ID");
+  }
+
   // Check if document exists and user has access
   const document = await db
     .select()
     .from(Document)
-    .where(eq(Document.document_id, parseInt(documentId)))
+    .where(eq(Document.document_id, documentIdNum))
     .limit(1);
 
   if (document.length === 0) {
@@ -1554,6 +1594,83 @@ export const revokeDocumentAccess = asyncHandler(async (req: any, res: any) => {
   logger.info(`Document permission ${permissionId} revoked by user ${userId}`);
 
   successResponse(res, "Access revoked successfully", null);
+});
+
+// Get folder tree for Quick Access
+export const getFolderTree = asyncHandler(async (req: any, res: any) => {
+  try {
+    // Validate user authentication
+    if (!req.user || !req.user.userId) {
+      return res.status(401).json({
+        success: false,
+        message: "User not authenticated",
+      });
+    }
+
+    const rawUserId = req.user.userId;
+    const userId = Number(rawUserId);
+
+    // Validate userId
+    if (
+      !rawUserId ||
+      isNaN(userId) ||
+      !Number.isInteger(userId) ||
+      userId <= 0
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid user ID: must be a positive integer",
+      });
+    }
+
+    // Ensure userId is valid before query
+    if (isNaN(userId)) {
+      throw new ValidationError("Invalid user ID");
+    }
+
+    // Fetch folders from database using raw SQL to avoid NaN issues
+    const result = await db.execute(sql`
+      SELECT folder_id, user_id, parent_folder_id, name, description, color, created_at, updated_at
+      FROM DocumentFolder
+      WHERE user_id = ${userId}
+      ORDER BY name ASC
+    `);
+    const folders = (result as any)[0];
+
+    // Build tree structure
+    const buildTree = (items: any[], parentId: number | null = null): any[] => {
+      return items
+        .filter((item) => item.parent_folder_id === parentId)
+        .map((child) => ({
+          ...child,
+          children: buildTree(items, child.folder_id),
+        }));
+    };
+
+    const tree = buildTree(folders);
+
+    successResponse(res, "Folder tree retrieved successfully", tree);
+  } catch (error: any) {
+    logger.error("Error retrieving folder tree:", error);
+
+    // Handle specific database errors
+    if (
+      error.code === "ER_BAD_FIELD_ERROR" ||
+      error.message.includes("Unknown column")
+    ) {
+      throw new ValidationError(
+        "Invalid query parameters or database schema issue"
+      );
+    }
+
+    // Handle connection errors
+    if (error.code === "ECONNREFUSED" || error.code === "ENOTFOUND") {
+      throw new ValidationError("Database connection failed");
+    }
+
+    // Default internal server error
+    throw new ValidationError("Failed to retrieve folder tree");
+  }
 });
 
 // ======================
