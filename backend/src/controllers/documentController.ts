@@ -1094,76 +1094,46 @@ export const downloadDocument = asyncHandler(async (req: any, res: any) => {
   const userId = req.user.userId;
   const { documentId } = req.params;
 
-  // 1️⃣ Fetch document record from DB
-  const document = await db
+  const [doc] = await db
     .select()
     .from(Document)
-    .where(eq(Document.document_id, parseInt(documentId)))
-    .limit(1);
+    .where(eq(Document.document_id, Number(documentId)));
 
-  if (document.length === 0) {
-    throw new NotFoundError("Document not found in database");
+  if (!doc) {
+    throw new NotFoundError("Document not found");
   }
 
-  const doc = document[0];
-
-  // 2️⃣ Check if user has access
-  const hasAccess =
-    doc.user_id === userId ||
-    doc.is_public === 1 ||
-    (await checkDocumentPermission(parseInt(documentId), userId, "DOWNLOAD"));
-
-  if (!hasAccess) {
-    throw new AuthenticationError(
-      "You don't have permission to download this document"
-    );
+  if (doc.user_id !== userId && doc.is_public !== 1) {
+    throw new AuthenticationError("Access denied");
   }
 
-  // 3️⃣ Verify file exists on FTP
-  const fileExists = await ftpService.fileExists(doc.file_path);
-  if (!fileExists) {
-    logger.error(`FTP file not found: ${doc.file_path}`);
+  // Check FTP file exists
+  const exists = await ftpService.fileExists(doc.file_path);
+  if (!exists) {
     throw new NotFoundError("File not found on server");
   }
 
-  // 4️⃣ Download file buffer
-  let fileBuffer: Buffer;
-  try {
-    fileBuffer = await ftpService.downloadToBuffer(doc.file_path);
-  } catch (error) {
-    logger.error("FTP download failed:", error);
-    throw new NotFoundError("File not found on server");
-  }
+  // Download file to memory
+  const buffer = await ftpService.downloadToBuffer(doc.file_path);
 
-  // 5️⃣ Check buffer
-  if (!fileBuffer || fileBuffer.length === 0) {
-    logger.error("Downloaded file buffer is empty", doc.file_path);
+  if (!buffer.length) {
     throw new NotFoundError("File is empty or corrupted");
   }
 
-  // 6️⃣ Determine MIME type
-  let mimeType = doc.mime_type || "application/octet-stream";
-  const ext = doc.file_extension?.toLowerCase();
-  if (ext === "pdf") mimeType = "application/pdf";
-  else if (ext === "txt") mimeType = "text/plain";
-  else if (ext === "jpg" || ext === "jpeg") mimeType = "image/jpeg";
-  else if (ext === "png") mimeType = "image/png";
-  // add other common types as needed
+  // Force correct headers for PDF
+  const mime =
+    doc.file_extension?.toLowerCase() === "pdf"
+      ? "application/pdf"
+      : doc.mime_type || "application/octet-stream";
 
-  // 7️⃣ Set headers
-  res.setHeader("Content-Type", mimeType);
+  res.setHeader("Content-Type", mime);
   res.setHeader(
     "Content-Disposition",
-    `inline; filename="${doc.original_name || doc.file_name}"`
-  ); // "inline" lets PDF preview in browser
-  res.setHeader("Content-Length", fileBuffer.length);
-
-  logger.info(
-    `Document downloaded: ${doc.document_id} by user ${userId}, size: ${fileBuffer.length} bytes`
+    `inline; filename="${doc.original_name}"`
   );
+  res.setHeader("Content-Length", buffer.length);
 
-  // 8️⃣ Send buffer
-  res.send(fileBuffer);
+  res.send(buffer);
 });
 
 // ======================

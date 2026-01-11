@@ -116,33 +116,31 @@ class FTPService {
 
   async downloadToBuffer(remotePath: string): Promise<Buffer> {
     const client = await this.getClient();
+
     try {
-      const remoteDir = path.dirname(remotePath);
-      const fileName = path.basename(remotePath);
+      const remoteDir = path.posix.dirname(remotePath);
+      const fileName = path.posix.basename(remotePath);
 
-      await this.ensureDirectoryExists(client, remoteDir);
+      await client.cd(remoteDir);
 
-      return new Promise<Buffer>((resolve, reject) => {
-        const chunks: Buffer[] = [];
-        const writable = new Writable({
-          write(chunk: Buffer, encoding, callback) {
-            chunks.push(chunk);
-            callback();
-          },
-          final(callback) {
-            resolve(Buffer.concat(chunks));
-            callback();
-          },
-        });
+      const chunks: Buffer[] = [];
 
-        writable.on("error", reject);
-        client.downloadTo(writable, fileName).catch(reject);
+      const writable = new Writable({
+        write(chunk, _encoding, callback) {
+          chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+          callback();
+        },
       });
-    } catch (error) {
-      logger.error("FTP download to buffer failed:", error);
-      throw new Error(
-        `Failed to download file to buffer: ${(error as Error).message}`
-      );
+
+      await client.downloadTo(writable, fileName);
+
+      const buffer = Buffer.concat(chunks);
+
+      if (!buffer.length) {
+        throw new Error("Downloaded buffer is empty");
+      }
+
+      return buffer;
     } finally {
       client.close();
     }
