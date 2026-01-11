@@ -123,6 +123,7 @@ const Documents: React.FC = () => {
   const [isRemovingPermission, setIsRemovingPermission] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const [isLoadingFolderTree, setIsLoadingFolderTree] = useState(false);
+  const [isNavigating, setIsNavigating] = useState(false);
   const [deletingItem, setDeletingItem] = useState<Folder | Document | null>(
     null
   );
@@ -153,99 +154,160 @@ const Documents: React.FC = () => {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const contextMenuRef = useRef<HTMLDivElement>(null);
+  const lastActiveTabRef = useRef<string | null>(null);
+  const ongoingRequestsRef = useRef<Map<string, Promise<any>>>(new Map());
+
+  // Request deduplication helper
+  const deduplicateRequest = useCallback(
+    async (key: string, requestFn: () => Promise<any>) => {
+      if (ongoingRequestsRef.current.has(key)) {
+        return ongoingRequestsRef.current.get(key);
+      }
+
+      const request = requestFn().finally(() => {
+        ongoingRequestsRef.current.delete(key);
+      });
+
+      ongoingRequestsRef.current.set(key, request);
+      return request;
+    },
+    []
+  );
 
   // Fetch folders and documents
   const fetchData = useCallback(async () => {
+    const requestKey = `fetchData-${currentFolderId || "root"}-${
+      currentSharedFolder ? "shared" : "owned"
+    }-${sortBy}-${sortOrder}`;
+
     setIsLoading(true);
     try {
-      if (currentSharedFolder) {
-        // We're in a shared folder, fetch its contents
-        const [foldersRes, documentsRes] = await Promise.all([
-          folderApi.getAll(currentFolderId || undefined),
-          documentApi.getAll({
-            folderId: currentFolderId || undefined,
-            sortBy: sortBy,
-            sortOrder: sortOrder,
-          }),
-        ]);
+      const result = await deduplicateRequest(requestKey, async () => {
+        if (currentSharedFolder) {
+          // We're in a shared folder, fetch its contents
+          const [foldersRes, documentsRes] = await Promise.all([
+            folderApi.getAll(currentFolderId || undefined),
+            documentApi.getAll({
+              folderId: currentFolderId || undefined,
+              sortBy: sortBy,
+              sortOrder: sortOrder,
+            }),
+          ]);
 
-        setFolders(
-          foldersRes.data.data?.map((item: any) => ({
-            ...item.folder,
-            owner: item.owner,
-          })) || []
-        );
-        setDocuments(
-          documentsRes.data.data?.map((item: any) => ({
-            ...item.document,
-            owner: item.owner,
-          })) || []
-        );
-      } else {
-        // Regular owned folder navigation
-        const [foldersRes, documentsRes] = await Promise.all([
-          folderApi.getAll(currentFolderId || undefined),
-          documentApi.getAll({
-            folderId: currentFolderId || undefined,
-            sortBy: sortBy,
-            sortOrder: sortOrder,
-          }),
-        ]);
+          return {
+            folders:
+              foldersRes.data.data?.map((item: any) => ({
+                ...item.folder,
+                owner: item.owner,
+              })) || [],
+            documents:
+              documentsRes.data.data?.map((item: any) => ({
+                ...item.document,
+                owner: item.owner,
+              })) || [],
+          };
+        } else {
+          // Regular owned folder navigation
+          const [foldersRes, documentsRes] = await Promise.all([
+            folderApi.getAll(currentFolderId || undefined),
+            documentApi.getAll({
+              folderId: currentFolderId || undefined,
+              sortBy: sortBy,
+              sortOrder: sortOrder,
+            }),
+          ]);
 
-        setFolders(
-          foldersRes.data.data?.map((item: any) => ({
-            ...item.folder,
-            owner: item.owner,
-          })) || []
-        );
-        setDocuments(
-          documentsRes.data.data?.map((item: any) => ({
-            ...item.document,
-            owner: item.owner,
-          })) || []
-        );
-      }
+          return {
+            folders:
+              foldersRes.data.data?.map((item: any) => ({
+                ...item.folder,
+                owner: item.owner,
+              })) || [],
+            documents:
+              documentsRes.data.data?.map((item: any) => ({
+                ...item.document,
+                owner: item.owner,
+              })) || [],
+          };
+        }
+      });
+
+      setFolders(result.folders);
+      setDocuments(result.documents);
     } catch (error: any) {
       showToast("Failed to load documents", "error");
     } finally {
       setIsLoading(false);
     }
-  }, [currentFolderId, currentSharedFolder, sortBy, sortOrder, showToast]);
+  }, [
+    currentFolderId,
+    currentSharedFolder,
+    sortBy,
+    sortOrder,
+    showToast,
+    deduplicateRequest,
+  ]);
 
   // Fetch shared documents
   const fetchSharedDocuments = useCallback(async () => {
+    const requestKey = "fetchSharedDocuments";
+
+    if (ongoingRequestsRef.current.has(requestKey)) {
+      return ongoingRequestsRef.current.get(requestKey);
+    }
+
     setIsLoadingShared(true);
     try {
-      const [docsResponse, foldersResponse] = await Promise.all([
+      const request = Promise.all([
         documentApi.getSharedWithMe(),
         folderPermissionApi.getSharedWithMe(),
-      ]);
-      setSharedDocuments(docsResponse.data.data || []);
-      setSharedFolders(foldersResponse.data.data || []);
+      ]).then(([docsResponse, foldersResponse]) => {
+        setSharedDocuments(docsResponse.data.data || []);
+        setSharedFolders(foldersResponse.data.data || []);
+        return { docsResponse, foldersResponse };
+      });
+
+      ongoingRequestsRef.current.set(requestKey, request);
+
+      await request;
     } catch (error: any) {
       showToast("Failed to load shared items", "error");
     } finally {
       setIsLoadingShared(false);
+      ongoingRequestsRef.current.delete(requestKey);
     }
   }, [showToast]);
 
   // Fetch folder tree (for sidebar)
-  const fetchFolderTree = async () => {
+  const fetchFolderTree = useCallback(async () => {
+    const requestKey = "fetchFolderTree";
+
+    if (ongoingRequestsRef.current.has(requestKey)) {
+      return ongoingRequestsRef.current.get(requestKey);
+    }
+
     setIsLoadingFolderTree(true);
     try {
-      const response = await folderApi.getAll();
-      setFolderTree(
-        response.data.data?.map((item: any) => ({
-          ...item.folder,
-          owner: item.owner,
-        })) || []
-      );
+      const request = folderApi.getAll().then((response) => {
+        setFolderTree(
+          response.data.data?.map((item: any) => ({
+            ...item.folder,
+            owner: item.owner,
+          })) || []
+        );
+        return response;
+      });
+
+      ongoingRequestsRef.current.set(requestKey, request);
+
+      await request;
     } catch (error) {
       console.error("Failed to fetch folder tree:", error);
     } finally {
       setIsLoadingFolderTree(false);
+      ongoingRequestsRef.current.delete(requestKey);
     }
-  };
+  }, []);
 
   // Fetch roles for sharing
   const fetchRoles = async () => {
@@ -310,11 +372,12 @@ const Documents: React.FC = () => {
   useEffect(() => {
     if (activeTab === "my-documents") {
       fetchData();
+      fetchFolderTree();
     } else {
       fetchSharedDocuments();
+      fetchFolderTree();
     }
-    fetchFolderTree();
-  }, [fetchData, fetchSharedDocuments, activeTab]);
+  }, [fetchData, fetchSharedDocuments, fetchFolderTree, activeTab]);
 
   // Reset breadcrumbs when switching tabs
   useEffect(() => {
@@ -432,6 +495,9 @@ const Documents: React.FC = () => {
 
   // Navigate to folder
   const navigateToFolder = (folder: Folder) => {
+    if (isNavigating) return; // Prevent multiple rapid clicks
+    setIsNavigating(true);
+
     setBreadcrumbs((prev) => {
       // Check if the folder is already in breadcrumbs
       const existingIndex = prev.findIndex((b) => b.id === folder.folder_id);
@@ -445,38 +511,57 @@ const Documents: React.FC = () => {
     setCurrentFolderId(folder.folder_id);
     setCurrentSharedFolder(null);
     setSelectedItems([]);
+
+    // Reset navigation flag after a short delay
+    setTimeout(() => setIsNavigating(false), 300);
   };
 
   // Navigate to shared folder
   const navigateToSharedFolder = async (sharedFolder: any) => {
-    // First check if folder has content
+    if (isNavigating) return; // Prevent multiple rapid clicks
+    setIsNavigating(true);
+
+    const folderId = parseInt(sharedFolder.folder.folder_id);
+    const requestKey = `navigateToShared-${folderId}-${sortBy}-${sortOrder}`;
+
+    // Check if already navigating to this folder
+    if (ongoingRequestsRef.current.has(requestKey)) {
+      setIsNavigating(false);
+      return;
+    }
+
     try {
-      const [foldersRes, documentsRes] = await Promise.all([
-        folderApi.getAll(parseInt(sharedFolder.folder.folder_id)),
+      const request = Promise.all([
+        folderApi.getAll(folderId),
         documentApi.getAll({
-          folderId: parseInt(sharedFolder.folder.folder_id),
+          folderId: folderId,
           sortBy: sortBy,
           sortOrder: sortOrder,
         }),
       ]);
+
+      ongoingRequestsRef.current.set(requestKey, request);
+
+      const [foldersRes, documentsRes] = await request;
 
       const hasContent =
         foldersRes.data.data.length > 0 || documentsRes.data.data.length > 0;
 
       if (!hasContent) {
         showToast(`"${sharedFolder.folder.name}" is empty`, "info");
+        ongoingRequestsRef.current.delete(requestKey);
         return;
       }
 
       setBreadcrumbs((prev) => [
         ...prev,
         {
-          id: parseInt(sharedFolder.folder.folder_id),
+          id: folderId,
           name: sharedFolder.folder.name,
           isShared: true,
         },
       ]);
-      setCurrentFolderId(parseInt(sharedFolder.folder.folder_id));
+      setCurrentFolderId(folderId);
       setCurrentSharedFolder(sharedFolder);
       setFolders(
         foldersRes.data.data?.map((item: any) => ({
@@ -493,14 +578,27 @@ const Documents: React.FC = () => {
       setSelectedItems([]);
     } catch (error: any) {
       showToast("Failed to load folder contents", "error");
+    } finally {
+      ongoingRequestsRef.current.delete(requestKey);
+      setIsNavigating(false);
     }
   };
 
   // Navigate to shared subfolder (within shared context)
   const navigateToSharedSubFolder = async (folder: Folder) => {
-    // Check if folder has content
+    if (isNavigating) return; // Prevent multiple rapid clicks
+    setIsNavigating(true);
+
+    const requestKey = `navigateToSharedSub-${folder.folder_id}-${sortBy}-${sortOrder}`;
+
+    // Check if already navigating to this folder
+    if (ongoingRequestsRef.current.has(requestKey)) {
+      setIsNavigating(false);
+      return;
+    }
+
     try {
-      const [foldersRes, documentsRes] = await Promise.all([
+      const request = Promise.all([
         folderApi.getAll(folder.folder_id),
         documentApi.getAll({
           folderId: folder.folder_id,
@@ -509,11 +607,16 @@ const Documents: React.FC = () => {
         }),
       ]);
 
+      ongoingRequestsRef.current.set(requestKey, request);
+
+      const [foldersRes, documentsRes] = await request;
+
       const hasContent =
         foldersRes.data.data.length > 0 || documentsRes.data.data.length > 0;
 
       if (!hasContent) {
         showToast(`"${folder.name}" is empty`, "info");
+        ongoingRequestsRef.current.delete(requestKey);
         return;
       }
 
@@ -542,6 +645,9 @@ const Documents: React.FC = () => {
       setSelectedItems([]);
     } catch (error: any) {
       showToast("Failed to load folder contents", "error");
+    } finally {
+      ongoingRequestsRef.current.delete(requestKey);
+      setIsNavigating(false);
     }
   };
 
