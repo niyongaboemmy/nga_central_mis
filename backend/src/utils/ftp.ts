@@ -37,6 +37,16 @@ class FTPService {
 
     try {
       await client.access(this.config);
+      // Log current working directory
+      try {
+        const pwd = await client.pwd();
+        logger.info(`FTP connected. Current directory: ${pwd}`);
+      } catch (pwdError) {
+        logger.warn(
+          "Could not get current directory:",
+          (pwdError as Error).message
+        );
+      }
       return client;
     } catch (error) {
       logger.error("FTP connection failed:", error);

@@ -1117,19 +1117,12 @@ export const downloadDocument = asyncHandler(async (req: any, res: any) => {
   }
 
   try {
-    // Create a temporary local file path for download
-    const tempDir = path.join(process.env.UPLOAD_PATH || "./uploads", "temp");
-    if (!fs.existsSync(tempDir)) {
-      fs.mkdirSync(tempDir, { recursive: true });
-    }
+    logger.info(`Attempting to download file: ${document[0].file_path}`);
 
+    // For serverless environments, use /tmp directory
     const tempFilePath = path.join(
-      tempDir,
+      "/tmp",
       `download-${Date.now()}-${document[0].file_name}`
-    );
-
-    logger.info(
-      `Attempting to download file: ${document[0].file_path} to ${tempFilePath}`
     );
 
     // Download file from FTP to temp location
