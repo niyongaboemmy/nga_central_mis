@@ -31,6 +31,7 @@ import { successResponse, paginatedResponse } from "../utils/response";
 import { asyncHandler } from "../middleware/asyncHandler";
 import { sanitizeString } from "../utils/sanitization";
 import logger from "../utils/logger";
+import ftpService from "../utils/ftp";
 import fs from "fs";
 import path from "path";
 
@@ -428,18 +429,12 @@ export const deleteFolder = asyncHandler(async (req: any, res: any) => {
     .from(Document)
     .where(eq(Document.folder_id, parseInt(folderId)));
 
-  // Delete physical files
+  // Delete physical files from FTP
   for (const doc of documents) {
     try {
-      const filePath = path.join(
-        process.env.UPLOAD_PATH || "./uploads",
-        doc.file_path
-      );
-      if (fs.existsSync(filePath)) {
-        fs.unlinkSync(filePath);
-      }
+      await ftpService.deleteFile(doc.file_path);
     } catch (error) {
-      logger.warn(`Failed to delete file: ${doc.file_path}`);
+      logger.warn(`Failed to delete file from FTP: ${doc.file_path}`);
     }
   }
 
@@ -810,46 +805,50 @@ export const uploadDocument = asyncHandler(async (req: any, res: any) => {
   const fileName = `${Date.now()}-${Math.random()
     .toString(36)
     .substring(2)}${fileExtension}`;
-  const filePath = path.join(userId.toString(), fileName);
+  const remoteFilePath = `${userId}/${fileName}`;
 
-  // Ensure upload directory exists
-  const uploadDir = path.join(
-    process.env.UPLOAD_PATH || "./uploads",
-    userId.toString()
-  );
-  if (!fs.existsSync(uploadDir)) {
-    fs.mkdirSync(uploadDir, { recursive: true });
+  try {
+    // Upload file to FTP server
+    await ftpService.uploadFile(file.path, remoteFilePath);
+
+    // Remove temp file after successful upload
+    fs.unlinkSync(file.path);
+
+    const result = await db.insert(Document).values({
+      user_id: userId,
+      folder_id: folderId ? parseInt(folderId) : null,
+      file_name: fileName,
+      original_name: file.originalname,
+      file_path: remoteFilePath,
+      file_size: file.size,
+      mime_type: file.mimetype,
+      file_extension: fileExtension.replace(".", ""),
+      description: description ? sanitizeString(description) : null,
+      tags: tags ? sanitizeString(tags) : null,
+    });
+
+    const documentId = result[0].insertId;
+
+    const document = await db
+      .select()
+      .from(Document)
+      .where(eq(Document.document_id, documentId))
+      .limit(1);
+
+    logger.info(`Document uploaded: ${documentId} by user ${userId}`);
+
+    successResponse(res, "Document uploaded successfully", document[0]);
+  } catch (error) {
+    // Clean up temp file if upload failed
+    try {
+      if (fs.existsSync(file.path)) {
+        fs.unlinkSync(file.path);
+      }
+    } catch (cleanupError) {
+      logger.warn("Failed to clean up temp file:", cleanupError);
+    }
+    throw error;
   }
-
-  // Move file to upload directory
-  const destPath = path.join(process.env.UPLOAD_PATH || "./uploads", filePath);
-  fs.copyFileSync(file.path, destPath);
-  fs.unlinkSync(file.path); // Remove temp file
-
-  const result = await db.insert(Document).values({
-    user_id: userId,
-    folder_id: folderId ? parseInt(folderId) : null,
-    file_name: fileName,
-    original_name: file.originalname,
-    file_path: filePath,
-    file_size: file.size,
-    mime_type: file.mimetype,
-    file_extension: fileExtension.replace(".", ""),
-    description: description ? sanitizeString(description) : null,
-    tags: tags ? sanitizeString(tags) : null,
-  });
-
-  const documentId = result[0].insertId;
-
-  const document = await db
-    .select()
-    .from(Document)
-    .where(eq(Document.document_id, documentId))
-    .limit(1);
-
-  logger.info(`Document uploaded: ${documentId} by user ${userId}`);
-
-  successResponse(res, "Document uploaded successfully", document[0]);
 });
 
 export const getDocuments = asyncHandler(async (req: any, res: any) => {
@@ -1074,17 +1073,11 @@ export const deleteDocument = asyncHandler(async (req: any, res: any) => {
     throw new NotFoundError("Document not found");
   }
 
-  // Delete physical file
+  // Delete physical file from FTP
   try {
-    const filePath = path.join(
-      process.env.UPLOAD_PATH || "./uploads",
-      document[0].file_path
-    );
-    if (fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath);
-    }
+    await ftpService.deleteFile(document[0].file_path);
   } catch (error) {
-    logger.warn(`Failed to delete file: ${document[0].file_path}`);
+    logger.warn(`Failed to delete file from FTP: ${document[0].file_path}`);
   }
 
   // Delete document versions
@@ -1133,18 +1126,38 @@ export const downloadDocument = asyncHandler(async (req: any, res: any) => {
     );
   }
 
-  const filePath = path.join(
-    process.env.UPLOAD_PATH || "./uploads",
-    document[0].file_path
-  );
+  try {
+    // Create a temporary local file path for download
+    const tempDir = path.join(process.env.UPLOAD_PATH || "./uploads", "temp");
+    if (!fs.existsSync(tempDir)) {
+      fs.mkdirSync(tempDir, { recursive: true });
+    }
 
-  if (!fs.existsSync(filePath)) {
+    const tempFilePath = path.join(
+      tempDir,
+      `download-${Date.now()}-${document[0].file_name}`
+    );
+
+    // Download file from FTP to temp location
+    await ftpService.downloadFile(document[0].file_path, tempFilePath);
+
+    logger.info(`Document downloaded: ${documentId} by user ${userId}`);
+
+    // Send file and clean up temp file after response
+    res.download(tempFilePath, document[0].original_name, (err: any) => {
+      // Clean up temp file after download
+      try {
+        if (fs.existsSync(tempFilePath)) {
+          fs.unlinkSync(tempFilePath);
+        }
+      } catch (cleanupError) {
+        logger.warn("Failed to clean up temp download file:", cleanupError);
+      }
+    });
+  } catch (error) {
+    logger.error("FTP download failed:", error);
     throw new NotFoundError("File not found on server");
   }
-
-  logger.info(`Document downloaded: ${documentId} by user ${userId}`);
-
-  res.download(filePath, document[0].original_name);
 });
 
 // ======================
@@ -1200,48 +1213,50 @@ export const uploadNewVersion = asyncHandler(async (req: any, res: any) => {
     fileName
   );
 
-  // Ensure upload directory exists
-  const versionDir = path.join(
-    process.env.UPLOAD_PATH || "./uploads",
-    userId.toString(),
-    "versions",
-    documentId.toString()
-  );
-  if (!fs.existsSync(versionDir)) {
-    fs.mkdirSync(versionDir, { recursive: true });
+  try {
+    // Upload file to FTP server
+    await ftpService.uploadFile(file.path, filePath);
+
+    // Remove temp file after successful upload
+    fs.unlinkSync(file.path);
+
+    // Save version
+    const result = await db.insert(DocumentVersion).values({
+      document_id: parseInt(documentId),
+      user_id: userId,
+      version_number: newVersionNumber,
+      file_name: fileName,
+      file_path: filePath,
+      file_size: file.size,
+      change_description: changeDescription
+        ? sanitizeString(changeDescription)
+        : null,
+    });
+
+    const versionId = result[0].insertId;
+
+    const version = await db
+      .select()
+      .from(DocumentVersion)
+      .where(eq(DocumentVersion.version_id, versionId))
+      .limit(1);
+
+    logger.info(
+      `New version uploaded: ${documentId} v${newVersionNumber} by user ${userId}`
+    );
+
+    successResponse(res, "New version uploaded successfully", version[0]);
+  } catch (error) {
+    // Clean up temp file if upload failed
+    try {
+      if (fs.existsSync(file.path)) {
+        fs.unlinkSync(file.path);
+      }
+    } catch (cleanupError) {
+      logger.warn("Failed to clean up temp file:", cleanupError);
+    }
+    throw error;
   }
-
-  // Move file to upload directory
-  const destPath = path.join(process.env.UPLOAD_PATH || "./uploads", filePath);
-  fs.copyFileSync(file.path, destPath);
-  fs.unlinkSync(file.path);
-
-  // Save version
-  const result = await db.insert(DocumentVersion).values({
-    document_id: parseInt(documentId),
-    user_id: userId,
-    version_number: newVersionNumber,
-    file_name: fileName,
-    file_path: filePath,
-    file_size: file.size,
-    change_description: changeDescription
-      ? sanitizeString(changeDescription)
-      : null,
-  });
-
-  const versionId = result[0].insertId;
-
-  const version = await db
-    .select()
-    .from(DocumentVersion)
-    .where(eq(DocumentVersion.version_id, versionId))
-    .limit(1);
-
-  logger.info(
-    `New version uploaded: ${documentId} v${newVersionNumber} by user ${userId}`
-  );
-
-  successResponse(res, "New version uploaded successfully", version[0]);
 });
 
 export const getDocumentVersions = asyncHandler(async (req: any, res: any) => {
