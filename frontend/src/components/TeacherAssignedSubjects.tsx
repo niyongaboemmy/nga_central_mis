@@ -243,7 +243,7 @@ const TeacherAssignedSubjects: React.FC = () => {
                   {subject.grades.map((grade, index) => (
                     <div
                       key={index}
-                      className="bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-600 rounded-2xl p-4 hover:bg-gray-100 dark:hover:bg-gray-800/40 transition-all duration-200 hover:border-blue-300 dark:hover:border-blue-500"
+                      className="bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-600/20 rounded-2xl p-4 hover:bg-gray-100 dark:hover:bg-gray-800/40 transition-all duration-200 hover:border-blue-300 dark:hover:border-blue-500"
                     >
                       <div className="flex items-center justify-between gap-4">
                         <div className="flex-1">

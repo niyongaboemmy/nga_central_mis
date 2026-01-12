@@ -35,6 +35,13 @@ export interface TeacherDashboardStats {
   currentAcademicTerm: string | null;
 }
 
+// Basic dashboard statistics interface
+export interface BasicDashboardStats {
+  currentAcademicYear: string;
+  currentAcademicTerm: string;
+  currentUserRole: string | null;
+}
+
 // Dashboard API
 export const getDashboardStats = async (): Promise<DashboardStats> => {
   const response = await api.get<{ data: DashboardStats }>("/dashboard/stats");
@@ -46,6 +53,15 @@ export const getTeacherDashboardStats =
   async (): Promise<TeacherDashboardStats> => {
     const response = await api.get<{ data: TeacherDashboardStats }>(
       "/dashboard/teacher-stats"
+    );
+    return response.data.data;
+  };
+
+// Basic dashboard API
+export const getBasicDashboardStats =
+  async (): Promise<BasicDashboardStats> => {
+    const response = await api.get<{ data: BasicDashboardStats }>(
+      "/dashboard/basic-stats"
     );
     return response.data.data;
   };

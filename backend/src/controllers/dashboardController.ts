@@ -250,3 +250,44 @@ export const getTeacherDashboardStats = asyncHandler(
     );
   }
 );
+
+// Get basic dashboard stats for default dashboard
+export const getBasicDashboardStats = asyncHandler(
+  async (req: any, res: any) => {
+    const userId = req.user.userId;
+
+    // Get current academic year
+    const [currentYearResult] = await db
+      .select({ name: AcademicYear.name })
+      .from(AcademicYear)
+      .where(eq(AcademicYear.is_current, 1))
+      .limit(1);
+
+    // Get current academic term
+    const [currentTermResult] = await db
+      .select({ name: AcademicTerm.name })
+      .from(AcademicTerm)
+      .where(eq(AcademicTerm.is_current, 1))
+      .limit(1);
+
+    // Get current user role
+    const [userRoleResult] = await db
+      .select({ roleName: Role.name })
+      .from(UserRole)
+      .innerJoin(Role, eq(UserRole.role_id, Role.role_id))
+      .where(eq(UserRole.user_id, userId))
+      .limit(1);
+
+    const stats = {
+      currentAcademicYear: currentYearResult?.name || "2024-2025",
+      currentAcademicTerm: currentTermResult?.name || "Term 2",
+      currentUserRole: userRoleResult?.roleName || null,
+    };
+
+    successResponse(
+      res,
+      "Basic dashboard statistics retrieved successfully",
+      stats
+    );
+  }
+);

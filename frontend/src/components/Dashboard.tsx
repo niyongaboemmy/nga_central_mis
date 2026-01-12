@@ -1,12 +1,14 @@
 import React, { useEffect, useState, useRef } from "react";
-import { getDashboardStats, DashboardStats } from "../api/dashboard";
+import { motion } from "framer-motion";
+import { FiCalendar, FiClock, FiUser } from "react-icons/fi";
+import { getBasicDashboardStats, BasicDashboardStats } from "../api/dashboard";
 
 interface DashboardProps {
   onLogout?: () => void;
 }
 
 const Dashboard: React.FC<DashboardProps> = ({}) => {
-  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [stats, setStats] = useState<BasicDashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const hasFetchedRef = useRef(false);
@@ -17,7 +19,7 @@ const Dashboard: React.FC<DashboardProps> = ({}) => {
 
     const fetchStats = async () => {
       try {
-        const data = await getDashboardStats();
+        const data = await getBasicDashboardStats();
         setStats(data);
       } catch (err) {
         console.error("Failed to fetch dashboard stats:", err);
@@ -30,106 +32,213 @@ const Dashboard: React.FC<DashboardProps> = ({}) => {
     fetchStats();
   }, []);
 
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: {
+        duration: 0.5,
+        staggerChildren: 0.1,
+      },
+    },
+  };
+
+  const itemVariants = {
+    hidden: { opacity: 0, y: 12 },
+    visible: { opacity: 1, y: 0, transition: { duration: 0.4 } },
+  };
+
+  const cardVariants = {
+    hidden: { opacity: 0, scale: 0.95 },
+    visible: { opacity: 1, scale: 1, transition: { duration: 0.4 } },
+    hover: { scale: 1.02, transition: { duration: 0.2 } },
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        <motion.div
+          initial={{ scale: 0.9, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ duration: 0.4 }}
+          className="text-center"
+        >
+          <motion.div
+            animate={{ rotate: 360 }}
+            transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+            className="w-12 h-12 border-3 border-blue-200 border-t-blue-600 rounded-full mx-auto mb-4"
+          />
+          <motion.p
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.2 }}
+            className="text-sm text-gray-600 dark:text-gray-400"
+          >
+            Loading your dashboard...
+          </motion.p>
+        </motion.div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-red-600 mb-4">{error}</p>
-          <button
+      <div className="min-h-screen flex items-center justify-center p-4">
+        <motion.div
+          initial={{ scale: 0.9, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ duration: 0.4 }}
+          className="text-center bg-white dark:bg-gray-900 rounded-2xl p-8 shadow-lg border border-gray-200 dark:border-gray-800 max-w-sm"
+        >
+          <div className="w-12 h-12 bg-red-100 dark:bg-red-900/20 rounded-xl flex items-center justify-center mx-auto mb-4">
+            <FiUser className="w-6 h-6 text-red-600" />
+          </div>
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+            Error
+          </h2>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
+            {error}
+          </p>
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
             onClick={() => window.location.reload()}
-            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+            className="px-6 py-2 bg-gradient-to-r from-blue-600 to-blue-600 text-white text-sm font-medium rounded-xl hover:shadow-lg transition-all duration-200"
           >
-            Retry
-          </button>
-        </div>
+            Try Again
+          </motion.button>
+        </motion.div>
       </div>
     );
   }
+
   return (
-    <div className="min-h-screen">
-      {/* Hero Section */}
-      <div className="relative overflow-hidden">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-24">
-          <div className="text-center">
-            <h1 className="text-4xl sm:text-6xl font-bold text-gray-900 dark:text-white mb-6">
-              Welcome to{" "}
-              <span className="bg-gradient-to-r from-blue-600 to-blue-600 bg-clip-text text-transparent">
+    <div className="min-h-screen relative overflow-hidden">
+      {/* Subtle animated background */}
+      <div className="absolute inset-0 -z-10 overflow-hidden">
+        <motion.div
+          animate={{ x: [0, 50, 0], y: [0, -30, 0] }}
+          transition={{ duration: 25, repeat: Infinity, ease: "linear" }}
+          className="absolute top-10 left-5 w-24 h-24 bg-blue-200 rounded-full opacity-8 blur-3xl"
+        />
+        <motion.div
+          animate={{ x: [0, -60, 0], y: [0, 40, 0] }}
+          transition={{ duration: 30, repeat: Infinity, ease: "linear" }}
+          className="absolute top-1/2 right-10 w-32 h-32 bg-blue-200 rounded-full opacity-8 blur-3xl"
+        />
+      </div>
+
+      <motion.div
+        variants={containerVariants}
+        initial="hidden"
+        animate="visible"
+        className="relative z-10"
+      >
+        {/* Header Section */}
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 sm:pt-8 pb-6">
+          <motion.div variants={itemVariants}>
+            <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white mb-2">
+              Welcome back to{" "}
+              <span className="bg-gradient-to-r from-blue-600 via-blue-600 to-blue-600 bg-clip-text text-transparent">
                 NGA MIS
               </span>
             </h1>
-            <p className="text-xl sm:text-xl text-gray-600 dark:text-gray-300 mb-8 max-w-3xl mx-auto">
+            <p className="text-base text-gray-600 dark:text-gray-400">
               Your comprehensive management information system for academic
               excellence
             </p>
-
-            {/* Current Academic Info */}
-            {(stats?.currentAcademicYear || stats?.currentAcademicTerm) && (
-              <div className="bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm rounded-3xl p-6 md:p-10 max-w-md mx-auto mb-12 border border-gray-200 dark:border-gray-700/40">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-                  Current Academic Period
-                </h3>
-                <div className="space-y-2">
-                  {stats?.currentAcademicYear && (
-                    <div className="flex justify-between items-center">
-                      <span className="text-gray-600 dark:text-gray-400">
-                        Academic Year:
-                      </span>
-                      <span className="font-medium text-gray-900 dark:text-white">
-                        {stats.currentAcademicYear}
-                      </span>
-                    </div>
-                  )}
-                  {stats?.currentAcademicTerm && (
-                    <div className="flex justify-between items-center">
-                      <span className="text-gray-600 dark:text-gray-400">
-                        Current Term:
-                      </span>
-                      <span className="font-medium text-gray-900 dark:text-white">
-                        {stats.currentAcademicTerm}
-                      </span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
+          </motion.div>
         </div>
 
-        {/* Background Pattern */}
-        <div className="absolute inset-0 -z-10 overflow-hidden">
-          <svg
-            className="absolute left-[max(50%,25rem)] top-0 h-[64rem] w-[128rem] -translate-x-1/2 stroke-gray-200 dark:stroke-gray-700 [mask-image:radial-gradient(64rem_64rem_at_top,white,transparent)]"
-            aria-hidden="true"
+        {/* Stats Cards */}
+        {stats && (
+          <motion.div
+            variants={itemVariants}
+            className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-8"
           >
-            <defs>
-              <pattern
-                id="e813992c-7d03-4cc4-a2bd-151760b470a0"
-                width={200}
-                height={200}
-                x="50%"
-                y={-1}
-                patternUnits="userSpaceOnUse"
+            <div className="grid grid-cols-1 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {/* Academic Year Card */}
+              <motion.div
+                variants={cardVariants}
+                whileHover="hover"
+                className="group bg-white dark:bg-gray-900/70 backdrop-blur-md rounded-3xl p-5 lg:p-7 shadow-sm border border-white dark:border-gray-800/60 transition-all duration-300"
               >
-                <path d="M100 200V.5M.5 .5H200" fill="none" />
-              </pattern>
-            </defs>
-            <rect
-              width="100%"
-              height="100%"
-              strokeWidth={0}
-              fill="url(#e813992c-7d03-4cc4-a2bd-151760b470a0)"
-            />
-          </svg>
-        </div>
-      </div>
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="p-2 bg-blue-100 dark:bg-blue-900/60 rounded-xl group-hover:scale-110 transition-transform duration-300">
+                    <FiCalendar className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                  </div>
+                  <span className="text-xs font-medium text-gray-500 dark:text-gray-500 uppercase tracking-wide">
+                    Academic Year
+                  </span>
+                </div>
+                <p className="text-xl font-bold text-gray-900 dark:text-white">
+                  {stats.currentAcademicYear}
+                </p>
+              </motion.div>
+
+              {/* Current Term Card */}
+              <motion.div
+                variants={cardVariants}
+                whileHover="hover"
+                className="group bg-white dark:bg-gray-900/70 backdrop-blur-md rounded-3xl p-5 lg:p-7 shadow-sm 2xl:p-10 bordewhiteay-200/60 dark:border-gray-800/60 transition-all duration-300"
+              >
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="p-2 bg-blue-100 dark:bg-blue-900/60 rounded-xl group-hover:scale-110 transition-transform duration-300">
+                    <FiClock className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                  </div>
+                  <span className="text-xs font-medium text-gray-500 dark:text-gray-500 uppercase tracking-wide">
+                    Current Term
+                  </span>
+                </div>
+                <p className="text-xl font-bold text-gray-900 dark:text-white">
+                  {stats.currentAcademicTerm}
+                </p>
+              </motion.div>
+
+              {/* User Role Card */}
+              {stats.currentUserRole && (
+                <motion.div
+                  variants={cardVariants}
+                  whileHover="hover"
+                  className="group bg-white dark:bg-gray-900/70 backdrop-blur-md rounded-3xl p-5 lg:p-7 shadow-sm 2xl:p-10 bordewhiteay-200/60 dark:border-gray-800/60 transition-all duration-300"
+                >
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="p-2 bg-blue-100 dark:bg-blue-900/60 rounded-xl group-hover:scale-110 transition-transform duration-300">
+                      <FiUser className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                    </div>
+                    <span className="text-xs font-medium text-gray-500 dark:text-gray-500 uppercase tracking-wide">
+                      Your Role
+                    </span>
+                  </div>
+                  <p className="text-xl font-bold text-gray-900 dark:text-white">
+                    {stats.currentUserRole}
+                  </p>
+                </motion.div>
+              )}
+            </div>
+          </motion.div>
+        )}
+
+        {/* Motivational Message */}
+        <motion.div
+          variants={itemVariants}
+          className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-12"
+        >
+          <motion.div
+            animate={{ y: [0, -6, 0] }}
+            transition={{ duration: 4, repeat: Infinity }}
+            className="bg-gradient-to-r from-blue-100 to-blue-100 dark:from-blue-900/10 dark:to-blue-900/10 rounded-3xl p-6 border border-blue-200/40 dark:border-blue-800/40 text-center"
+          >
+            <p className="text-sm text-gray-700 dark:text-gray-300 italic mb-2">
+              "Education is the most powerful weapon which you can use to change
+              the world."
+            </p>
+            <p className="text-xs text-gray-600 dark:text-gray-400">
+              — Nelson Mandela
+            </p>
+          </motion.div>
+        </motion.div>
+      </motion.div>
     </div>
   );
 };
