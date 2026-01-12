@@ -9772,3 +9772,12 @@
 {"duration":9,"level":"info","message":"GET /documents/folders/tree 304 - 9ms","service":"nga-central-mis","statusCode":304,"timestamp":"2026-01-12T10:56:10.281Z"}
 {"duration":7,"level":"info","message":"GET /documents?sortBy=name&sortOrder=asc 304 - 7ms","service":"nga-central-mis","statusCode":304,"timestamp":"2026-01-12T10:56:10.282Z"}
 {"duration":14,"level":"info","message":"GET /documents/folders 304 - 14ms","service":"nga-central-mis","statusCode":304,"timestamp":"2026-01-12T10:56:10.288Z"}
+{"ip":"::1","level":"info","message":"GET /users/me","service":"nga-central-mis","timestamp":"2026-01-12T11:00:29.087Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.5 Safari/605.1.15"}
+{"level":"info","message":"Fetching current user","service":"nga-central-mis","timestamp":"2026-01-12T11:00:29.096Z","userId":20}
+{"duration":14,"level":"info","message":"GET /users/me 304 - 14ms","service":"nga-central-mis","statusCode":304,"timestamp":"2026-01-12T11:00:29.100Z"}
+{"ip":"::1","level":"info","message":"GET /documents/folders/tree","service":"nga-central-mis","timestamp":"2026-01-12T11:00:29.165Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.5 Safari/605.1.15"}
+{"ip":"::1","level":"info","message":"GET /documents/folders","service":"nga-central-mis","timestamp":"2026-01-12T11:00:29.188Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.5 Safari/605.1.15"}
+{"ip":"::1","level":"info","message":"GET /documents?sortBy=name&sortOrder=asc","service":"nga-central-mis","timestamp":"2026-01-12T11:00:29.190Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.5 Safari/605.1.15"}
+{"duration":31,"level":"info","message":"GET /documents/folders/tree 304 - 31ms","service":"nga-central-mis","statusCode":304,"timestamp":"2026-01-12T11:00:29.196Z"}
+{"duration":11,"level":"info","message":"GET /documents/folders 304 - 11ms","service":"nga-central-mis","statusCode":304,"timestamp":"2026-01-12T11:00:29.199Z"}
+{"duration":10,"level":"info","message":"GET /documents?sortBy=name&sortOrder=asc 304 - 10ms","service":"nga-central-mis","statusCode":304,"timestamp":"2026-01-12T11:00:29.200Z"}

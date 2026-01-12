@@ -354,7 +354,7 @@ const Academics: React.FC = () => {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 }}
-            className="bg-white dark:bg-slate-800/70 rounded-full border border-white dark:border-slate-700/40 p-3"
+            className="bg-white dark:bg-slate-800/70 rounded-2xl lg:rounded-full border border-white dark:border-slate-700/40 p-3"
           >
             <nav
               className="flex flex-wrap gap-2 justify-start"
