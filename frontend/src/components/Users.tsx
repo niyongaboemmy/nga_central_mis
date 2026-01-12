@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import {
   Users as UsersIcon,
@@ -270,6 +270,7 @@ const Users: React.FC = () => {
   const [excelModalOpen, setExcelModalOpen] = useState(false);
   const [filterType, setFilterType] = useState<string>("all");
   const [expandedUsers, setExpandedUsers] = useState<number[]>([]);
+  const loadingRef = useRef(false);
 
   const canManage = user?.roles?.find((itm) =>
     itm.permissions?.find(
@@ -283,6 +284,8 @@ const Users: React.FC = () => {
   }, []);
 
   const loadUsers = async () => {
+    if (loadingRef.current) return;
+    loadingRef.current = true;
     setLoading(true);
     try {
       const data = await getUsers();
@@ -291,6 +294,7 @@ const Users: React.FC = () => {
       console.error("Failed to load users:", error);
     } finally {
       setLoading(false);
+      loadingRef.current = false;
     }
   };
 

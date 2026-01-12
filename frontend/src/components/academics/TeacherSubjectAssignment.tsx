@@ -183,7 +183,7 @@ const TeacherSubjectAssignment: React.FC<TeacherSubjectAssignmentProps> = ({
   if (!isOpen) return null;
 
   return (
-    <>
+    <div className={`${showAssignModal ? "-mt-4" : ""}`}>
       <div className="space-y-6">
         {/* Header with stats */}
         <div className="flex items-center justify-between">
@@ -241,18 +241,18 @@ const TeacherSubjectAssignment: React.FC<TeacherSubjectAssignmentProps> = ({
                     {termAssignments.map((assignment) => (
                       <div
                         key={assignment.assignment_id}
-                        className="bg-white dark:bg-gray-800/40 rounded-xl border border-gray-200 dark:border-gray-700 p-4 hover:shadow-sm transition-shadow"
+                        className="bg-white dark:bg-gray-800/40 rounded-2xl border border-gray-200 dark:border-gray-700/40 p-3 hover:shadow-sm transition-shadow"
                       >
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 bg-green-100 dark:bg-green-900/30 rounded-lg flex items-center justify-center">
-                              <BookOpen className="w-5 h-5 text-green-600 dark:text-green-400" />
+                            <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center">
+                              <BookOpen className="w-5 h-5 text-blue-600 dark:text-blue-400" />
                             </div>
                             <div>
-                              <h5 className="font-medium text-gray-900 dark:text-white">
+                              <h5 className="font-semibold text-gray-900 dark:text-white text-sm">
                                 {assignment.subject_name}
                                 {assignment.subject_code && (
-                                  <span className="text-sm text-gray-500 dark:text-gray-400 ml-2">
+                                  <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">
                                     ({assignment.subject_code})
                                   </span>
                                 )}
@@ -438,7 +438,7 @@ const TeacherSubjectAssignment: React.FC<TeacherSubjectAssignmentProps> = ({
         message={`Are you sure you want to remove "${selectedAssignment?.subject_name}" assignment from ${teacherName}? This action cannot be undone.`}
         isLoading={submitting}
       />
-    </>
+    </div>
   );
 };
 

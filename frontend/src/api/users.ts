@@ -285,6 +285,67 @@ export const getRoles = async (
   }
 };
 
+// ==================== User Role Management ====================
+
+export const getUserRoles = async (
+  userId: number,
+  onSuccess?: (roles: UserRole[]) => void,
+  onError?: (error: any) => void
+): Promise<UserRole[] | void> => {
+  try {
+    const response = await api.get<BackendResponse<UserRole[]>>(
+      `/users/${userId}/roles`
+    );
+    if (onSuccess && response.data.data) {
+      onSuccess(response.data.data);
+    }
+    return response.data.data;
+  } catch (error) {
+    if (onError) {
+      onError(error);
+    }
+    throw error;
+  }
+};
+
+export const assignRoleToUser = async (
+  userId: number,
+  roleId: number,
+  onSuccess?: () => void,
+  onError?: (error: any) => void
+): Promise<void> => {
+  try {
+    await api.post(`/users/${userId}/roles`, { role_id: roleId });
+    if (onSuccess) {
+      onSuccess();
+    }
+  } catch (error) {
+    if (onError) {
+      onError(error);
+    }
+    throw error;
+  }
+};
+
+export const removeRoleFromUser = async (
+  userId: number,
+  roleId: number,
+  onSuccess?: () => void,
+  onError?: (error: any) => void
+): Promise<void> => {
+  try {
+    await api.delete(`/users/${userId}/roles/${roleId}`);
+    if (onSuccess) {
+      onSuccess();
+    }
+  } catch (error) {
+    if (onError) {
+      onError(error);
+    }
+    throw error;
+  }
+};
+
 export const getRole = async (
   id: number,
   onSuccess?: (role: Role) => void,

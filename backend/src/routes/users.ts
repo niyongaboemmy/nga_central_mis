@@ -12,6 +12,9 @@ import {
   bulkCreateUsers,
   downloadTemplate,
   searchUsers,
+  assignRoleToUser,
+  removeRoleFromUser,
+  getUserRoles,
 } from "../controllers/userController";
 import { authenticate, authorize } from "../middleware/auth";
 
@@ -59,5 +62,20 @@ router.post(
 );
 router.put("/:id", authenticate, authorize("MANAGE_USERS"), updateUser);
 router.delete("/:id", authenticate, authorize("MANAGE_USERS"), deleteUser);
+
+// User role management
+router.get("/:id/roles", authenticate, authorize("MANAGE_USERS"), getUserRoles);
+router.post(
+  "/:id/roles",
+  authenticate,
+  authorize("MANAGE_USERS"),
+  assignRoleToUser
+);
+router.delete(
+  "/:id/roles/:roleId",
+  authenticate,
+  authorize("MANAGE_USERS"),
+  removeRoleFromUser
+);
 
 export default router;

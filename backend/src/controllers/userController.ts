@@ -1133,3 +1133,187 @@ export const searchUsers = asyncHandler(async (req: any, res: any) => {
 
   successResponse(res, "Users retrieved successfully", users);
 });
+
+// Assign role to user
+export const assignRoleToUser = asyncHandler(async (req: any, res: any) => {
+  const { id } = req.params;
+  const { role_id } = req.body;
+  const userId = parseInt(id);
+  const roleId = parseInt(role_id);
+
+  if (isNaN(userId) || isNaN(roleId)) {
+    throw new ValidationError("Invalid user ID or role ID");
+  }
+
+  logger.info("Assigning role to user", {
+    userId,
+    roleId,
+    assignedBy: req.user?.userId,
+  });
+
+  // Check if user exists
+  const user = await db
+    .select()
+    .from(User)
+    .where(eq(User.user_id, userId))
+    .limit(1);
+
+  if (user.length === 0) {
+    throw new NotFoundError("User not found");
+  }
+
+  // Check if role exists and is active
+  const role = await db
+    .select()
+    .from(Role)
+    .where(and(eq(Role.role_id, roleId), eq(Role.status, "ACTIVE")))
+    .limit(1);
+
+  if (role.length === 0) {
+    throw new NotFoundError("Role not found or inactive");
+  }
+
+  // Check if user already has this role
+  const existingRole = await db
+    .select()
+    .from(UserRole)
+    .where(and(eq(UserRole.user_id, userId), eq(UserRole.role_id, roleId)))
+    .limit(1);
+
+  if (existingRole.length > 0) {
+    throw new ConflictError("User already has this role");
+  }
+
+  // Remove any existing roles for this user (one role per user policy)
+  await db.delete(UserRole).where(eq(UserRole.user_id, userId));
+
+  // Assign new role
+  await db.insert(UserRole).values({
+    user_id: userId,
+    role_id: roleId,
+  });
+
+  successResponse(res, "Role assigned to user successfully");
+});
+
+// Remove role from user
+export const removeRoleFromUser = asyncHandler(async (req: any, res: any) => {
+  const { id, roleId } = req.params;
+  const userId = parseInt(id);
+  const roleIdNum = parseInt(roleId);
+
+  if (isNaN(userId) || isNaN(roleIdNum)) {
+    throw new ValidationError("Invalid user ID or role ID");
+  }
+
+  logger.info("Removing role from user", {
+    userId,
+    roleId: roleIdNum,
+    removedBy: req.user?.userId,
+  });
+
+  // Check if user exists
+  const user = await db
+    .select()
+    .from(User)
+    .where(eq(User.user_id, userId))
+    .limit(1);
+
+  if (user.length === 0) {
+    throw new NotFoundError("User not found");
+  }
+
+  // Check if role assignment exists
+  const existingRole = await db
+    .select()
+    .from(UserRole)
+    .where(and(eq(UserRole.user_id, userId), eq(UserRole.role_id, roleIdNum)))
+    .limit(1);
+
+  if (existingRole.length === 0) {
+    throw new NotFoundError("User does not have this role");
+  }
+
+  // Prevent removing SUPER_ADMIN role
+  const role = await db
+    .select({ name: Role.name })
+    .from(Role)
+    .where(eq(Role.role_id, roleIdNum))
+    .limit(1);
+
+  if (role.length > 0 && role[0].name === "SUPER_ADMIN") {
+    throw new ValidationError("Cannot remove SUPER_ADMIN role");
+  }
+
+  // Remove role
+  await db
+    .delete(UserRole)
+    .where(and(eq(UserRole.user_id, userId), eq(UserRole.role_id, roleIdNum)));
+
+  successResponse(res, "Role removed from user successfully");
+});
+
+// Get user roles
+export const getUserRoles = asyncHandler(async (req: any, res: any) => {
+  const { id } = req.params;
+  const userId = parseInt(id);
+
+  if (isNaN(userId)) {
+    throw new ValidationError("Invalid user ID");
+  }
+
+  logger.info("Fetching user roles", { userId, requestedBy: req.user?.userId });
+
+  // Check if user exists
+  const user = await db
+    .select()
+    .from(User)
+    .where(eq(User.user_id, userId))
+    .limit(1);
+
+  if (user.length === 0) {
+    throw new NotFoundError("User not found");
+  }
+
+  // Get user roles with permissions
+  const userRoles = await db
+    .select({
+      role_id: Role.role_id,
+      name: Role.name,
+      description: Role.description,
+      status: Role.status,
+    })
+    .from(UserRole)
+    .innerJoin(Role, eq(UserRole.role_id, Role.role_id))
+    .where(eq(UserRole.user_id, userId));
+
+  // Get permissions for each role
+  const rolesWithPermissions = await Promise.all(
+    userRoles.map(async (role) => {
+      const permissions = await db
+        .select({
+          perm_id: Permission.perm_id,
+          name: Permission.name,
+          description: Permission.description,
+          status: Permission.status,
+        })
+        .from(RolePermission)
+        .innerJoin(
+          Permission,
+          and(
+            eq(RolePermission.perm_id, Permission.perm_id),
+            eq(Permission.status, "ACTIVE")
+          )
+        )
+        .where(eq(RolePermission.role_id, role.role_id));
+
+      return { ...role, permissions };
+    })
+  );
+
+  successResponse(
+    res,
+    "User roles retrieved successfully",
+    rolesWithPermissions
+  );
+});

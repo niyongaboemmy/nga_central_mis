@@ -223,6 +223,7 @@ export const StudentClassGroup = mysqlTable(
       .notNull()
       .references(() => ClassGroup.class_group_id),
     assigned_at: datetime("assigned_at").default(sql`CURRENT_TIMESTAMP`),
+    status: mysqlEnum("status", ["ACTIVE", "DISABLED"]).default("ACTIVE"),
   },
   (table) => ({
     pk: primaryKey(table.user_id, table.class_group_id),
@@ -243,6 +244,7 @@ export const StudentSubjectEnrollment = mysqlTable(
       .notNull()
       .references(() => AcademicTerm.academic_term_id),
     enrolled_at: datetime("enrolled_at").default(sql`CURRENT_TIMESTAMP`),
+    status: mysqlEnum("status", ["ACTIVE", "DISABLED"]).default("ACTIVE"),
   },
   (table) => ({
     pk: primaryKey(table.user_id, table.subject_id, table.academic_term_id),

@@ -1,5 +1,5 @@
 import { db } from "../db";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and, sql, SQL } from "drizzle-orm";
 import {
   AcademicYear,
   AcademicTerm,
@@ -1461,8 +1461,17 @@ export const getClassGroups = asyncHandler(async (req: any, res: any) => {
   }
 
   const classGroups = await db
-    .select()
+    .select({
+      class_group_id: ClassGroup.class_group_id,
+      academic_year_id: ClassGroup.academic_year_id,
+      grade_id: ClassGroup.grade_id,
+      name: ClassGroup.name,
+      grade_name: Grade.name,
+      program_name: Program.name,
+    })
     .from(ClassGroup)
+    .innerJoin(Grade, eq(ClassGroup.grade_id, Grade.grade_id))
+    .innerJoin(Program, eq(Grade.program_id, Program.program_id))
     .where(whereCondition)
     .orderBy(ClassGroup.name);
 
@@ -1808,5 +1817,529 @@ export const getSubjectEnrolledStudents = asyncHandler(
       .orderBy(UserProfile.first_name, UserProfile.last_name);
 
     successResponse(res, "Enrolled students retrieved successfully", students);
+  }
+);
+
+// Student Subject Enrollment Management
+export const getStudentEnrolledSubjects = asyncHandler(
+  async (req: any, res: any) => {
+    const { studentId } = req.params;
+    const { academic_term_id } = req.query;
+
+    const studentIdNum = parseInt(studentId);
+    if (isNaN(studentIdNum)) {
+      throw new ValidationError("Invalid student ID");
+    }
+
+    // Verify user exists and is a student
+    const user = await db
+      .select()
+      .from(User)
+      .innerJoin(UserProfile, eq(User.user_id, UserProfile.user_id))
+      .where(
+        and(
+          eq(User.user_id, studentIdNum),
+          eq(UserProfile.user_type, "STUDENT")
+        )
+      )
+      .limit(1);
+
+    if (user.length === 0) {
+      throw new NotFoundError("Student not found");
+    }
+
+    let whereCondition: SQL<unknown> = eq(
+      StudentSubjectEnrollment.user_id,
+      studentIdNum
+    );
+
+    if (academic_term_id) {
+      const termId = Number(academic_term_id);
+      if (!Number.isNaN(termId)) {
+        whereCondition =
+          and(
+            whereCondition,
+            eq(StudentSubjectEnrollment.academic_term_id, termId)
+          ) ?? whereCondition;
+      }
+    }
+
+    const enrolledSubjects = await db
+      .select({
+        enrollment_id: sql`${StudentSubjectEnrollment.user_id} || '-' || ${StudentSubjectEnrollment.subject_id} || '-' || ${StudentSubjectEnrollment.academic_term_id}`,
+        subject_id: StudentSubjectEnrollment.subject_id,
+        subject_name: Subject.name,
+        subject_code: Subject.code,
+        subject_description: Subject.description,
+        academic_term_id: StudentSubjectEnrollment.academic_term_id,
+        academic_term_name: AcademicTerm.name,
+        academic_year_name: AcademicYear.name,
+        enrolled_at: StudentSubjectEnrollment.enrolled_at,
+      })
+      .from(StudentSubjectEnrollment)
+      .innerJoin(
+        Subject,
+        eq(StudentSubjectEnrollment.subject_id, Subject.subject_id)
+      )
+      .innerJoin(
+        AcademicTerm,
+        eq(
+          StudentSubjectEnrollment.academic_term_id,
+          AcademicTerm.academic_term_id
+        )
+      )
+      .innerJoin(
+        AcademicYear,
+        eq(AcademicTerm.academic_year_id, AcademicYear.academic_year_id)
+      )
+      .where(
+        whereCondition
+          ? and(whereCondition, eq(StudentSubjectEnrollment.status, "ACTIVE"))
+          : eq(StudentSubjectEnrollment.status, "ACTIVE")
+      )
+      .orderBy(Subject.name);
+
+    successResponse(
+      res,
+      "Student enrolled subjects retrieved successfully",
+      enrolledSubjects
+    );
+  }
+);
+
+export const getAvailableSubjectsForStudent = asyncHandler(
+  async (req: any, res: any) => {
+    const { studentId } = req.params;
+    const { academic_term_id } = req.query;
+
+    const studentIdNum = parseInt(studentId);
+    if (isNaN(studentIdNum)) {
+      throw new ValidationError("Invalid student ID");
+    }
+
+    if (!academic_term_id) {
+      throw new ValidationError("Academic term ID is required");
+    }
+
+    const termId = parseInt(academic_term_id as string);
+    if (isNaN(termId)) {
+      throw new ValidationError("Invalid academic term ID");
+    }
+
+    // Verify user exists and is a student
+    const user = await db
+      .select()
+      .from(User)
+      .innerJoin(UserProfile, eq(User.user_id, UserProfile.user_id))
+      .where(
+        and(
+          eq(User.user_id, studentIdNum),
+          eq(UserProfile.user_type, "STUDENT")
+        )
+      )
+      .limit(1);
+
+    if (user.length === 0) {
+      throw new NotFoundError("Student not found");
+    }
+
+    // Get student's class group for the academic year of the term
+    const studentClassGroup = await db
+      .select({
+        class_group_id: StudentClassGroup.class_group_id,
+        grade_id: ClassGroup.grade_id,
+        academic_year_id: ClassGroup.academic_year_id,
+      })
+      .from(StudentClassGroup)
+      .innerJoin(
+        ClassGroup,
+        eq(StudentClassGroup.class_group_id, ClassGroup.class_group_id)
+      )
+      .where(
+        and(
+          eq(StudentClassGroup.user_id, studentIdNum),
+          eq(StudentClassGroup.status, "ACTIVE")
+        )
+      )
+      .limit(1);
+
+    if (studentClassGroup.length === 0) {
+      throw new ValidationError("Student is not assigned to any class group");
+    }
+
+    const classGroup = studentClassGroup[0];
+
+    // Get subjects assigned to the student's grade
+    const gradeSubjects = await db
+      .select({
+        subject_id: GradeSubject.subject_id,
+        subject_name: Subject.name,
+        subject_code: Subject.code,
+        subject_description: Subject.description,
+      })
+      .from(GradeSubject)
+      .innerJoin(Subject, eq(GradeSubject.subject_id, Subject.subject_id))
+      .where(
+        and(
+          eq(GradeSubject.grade_id, classGroup.grade_id),
+          eq(Subject.status, "ACTIVE")
+        )
+      )
+      .orderBy(Subject.name);
+
+    // Get already enrolled subjects for this term
+    const enrolledSubjects = await db
+      .select({ subject_id: StudentSubjectEnrollment.subject_id })
+      .from(StudentSubjectEnrollment)
+      .where(
+        and(
+          eq(StudentSubjectEnrollment.user_id, studentIdNum),
+          eq(StudentSubjectEnrollment.academic_term_id, termId),
+          eq(StudentSubjectEnrollment.status, "ACTIVE")
+        )
+      );
+
+    const enrolledSubjectIds = new Set(
+      enrolledSubjects.map((e) => e.subject_id)
+    );
+
+    // Filter out already enrolled subjects
+    const availableSubjects = gradeSubjects.filter(
+      (subject) => !enrolledSubjectIds.has(subject.subject_id)
+    );
+
+    successResponse(
+      res,
+      "Available subjects for student retrieved successfully",
+      availableSubjects
+    );
+  }
+);
+
+export const enrollStudentInSubject = asyncHandler(
+  async (req: any, res: any) => {
+    const { user_id, subject_id, academic_term_id } = req.body;
+
+    if (!user_id || !subject_id || !academic_term_id) {
+      throw new ValidationError(
+        "User ID, Subject ID, and Academic Term ID are required"
+      );
+    }
+
+    const studentId = parseInt(user_id);
+    const subjId = parseInt(subject_id);
+    const termId = parseInt(academic_term_id);
+
+    if (isNaN(studentId) || isNaN(subjId) || isNaN(termId)) {
+      throw new ValidationError("Invalid IDs provided");
+    }
+
+    // Verify student exists and is a student
+    const student = await db
+      .select()
+      .from(User)
+      .innerJoin(UserProfile, eq(User.user_id, UserProfile.user_id))
+      .where(
+        and(eq(User.user_id, studentId), eq(UserProfile.user_type, "STUDENT"))
+      )
+      .limit(1);
+
+    if (student.length === 0) {
+      throw new NotFoundError("Student not found");
+    }
+
+    // Verify subject exists and is active
+    const subject = await db
+      .select()
+      .from(Subject)
+      .where(and(eq(Subject.subject_id, subjId), eq(Subject.status, "ACTIVE")))
+      .limit(1);
+
+    if (subject.length === 0) {
+      throw new NotFoundError("Subject not found");
+    }
+
+    // Verify academic term exists
+    const academicTerm = await db
+      .select()
+      .from(AcademicTerm)
+      .where(eq(AcademicTerm.academic_term_id, termId))
+      .limit(1);
+
+    if (academicTerm.length === 0) {
+      throw new NotFoundError("Academic term not found");
+    }
+
+    // Check if enrollment already exists
+    const existingEnrollment = await db
+      .select()
+      .from(StudentSubjectEnrollment)
+      .where(
+        and(
+          eq(StudentSubjectEnrollment.user_id, studentId),
+          eq(StudentSubjectEnrollment.subject_id, subjId),
+          eq(StudentSubjectEnrollment.academic_term_id, termId)
+        )
+      )
+      .limit(1);
+
+    if (existingEnrollment.length > 0) {
+      throw new ConflictError(
+        "Student is already enrolled in this subject for the specified term"
+      );
+    }
+
+    await db.insert(StudentSubjectEnrollment).values({
+      user_id: studentId,
+      subject_id: subjId,
+      academic_term_id: termId,
+    });
+
+    logger.info("Student enrolled in subject", { studentId, subjId, termId });
+
+    successResponse(res, "Student enrolled in subject successfully", null, 201);
+  }
+);
+
+export const unenrollStudentFromSubject = asyncHandler(
+  async (req: any, res: any) => {
+    const { user_id, subject_id, academic_term_id } = req.params;
+
+    const studentId = parseInt(user_id);
+    const subjId = parseInt(subject_id);
+    const termId = parseInt(academic_term_id);
+
+    if (isNaN(studentId) || isNaN(subjId) || isNaN(termId)) {
+      throw new ValidationError("Invalid IDs provided");
+    }
+
+    // Check if enrollment exists and is active
+    const existingEnrollment = await db
+      .select()
+      .from(StudentSubjectEnrollment)
+      .where(
+        and(
+          eq(StudentSubjectEnrollment.user_id, studentId),
+          eq(StudentSubjectEnrollment.subject_id, subjId),
+          eq(StudentSubjectEnrollment.academic_term_id, termId),
+          eq(StudentSubjectEnrollment.status, "ACTIVE")
+        )
+      )
+      .limit(1);
+
+    if (existingEnrollment.length === 0) {
+      throw new NotFoundError("Student enrollment not found");
+    }
+
+    await db
+      .update(StudentSubjectEnrollment)
+      .set({ status: "DISABLED" })
+      .where(
+        and(
+          eq(StudentSubjectEnrollment.user_id, studentId),
+          eq(StudentSubjectEnrollment.subject_id, subjId),
+          eq(StudentSubjectEnrollment.academic_term_id, termId)
+        )
+      );
+
+    logger.info("Student unenrolled from subject", {
+      studentId,
+      subjId,
+      termId,
+    });
+
+    successResponse(res, "Student unenrolled from subject successfully");
+  }
+);
+
+// Student Class Group Assignment Management
+export const getStudentClassGroup = asyncHandler(async (req: any, res: any) => {
+  const { studentId } = req.params;
+
+  const studentIdNum = parseInt(studentId);
+  if (isNaN(studentIdNum)) {
+    throw new ValidationError("Invalid student ID");
+  }
+
+  // Verify user exists and is a student
+  const user = await db
+    .select()
+    .from(User)
+    .innerJoin(UserProfile, eq(User.user_id, UserProfile.user_id))
+    .where(
+      and(eq(User.user_id, studentIdNum), eq(UserProfile.user_type, "STUDENT"))
+    )
+    .limit(1);
+
+  if (user.length === 0) {
+    throw new NotFoundError("Student not found");
+  }
+
+  const studentClassGroup = await db
+    .select({
+      class_group_id: ClassGroup.class_group_id,
+      class_group_name: ClassGroup.name,
+      grade_id: Grade.grade_id,
+      grade_name: Grade.name,
+      program_id: Program.program_id,
+      program_name: Program.name,
+      academic_year_id: AcademicYear.academic_year_id,
+      academic_year_name: AcademicYear.name,
+      assigned_at: StudentClassGroup.assigned_at,
+    })
+    .from(StudentClassGroup)
+    .innerJoin(
+      ClassGroup,
+      eq(StudentClassGroup.class_group_id, ClassGroup.class_group_id)
+    )
+    .innerJoin(Grade, eq(ClassGroup.grade_id, Grade.grade_id))
+    .innerJoin(Program, eq(Grade.program_id, Program.program_id))
+    .innerJoin(
+      AcademicYear,
+      eq(ClassGroup.academic_year_id, AcademicYear.academic_year_id)
+    )
+    .where(
+      and(
+        eq(StudentClassGroup.user_id, studentIdNum),
+        eq(StudentClassGroup.status, "ACTIVE")
+      )
+    )
+    .limit(1);
+
+  successResponse(
+    res,
+    "Student class group retrieved successfully",
+    studentClassGroup[0] || null
+  );
+});
+
+export const assignStudentToClassGroup = asyncHandler(
+  async (req: any, res: any) => {
+    const { user_id, class_group_id } = req.body;
+
+    if (!user_id || !class_group_id) {
+      throw new ValidationError("User ID and Class Group ID are required");
+    }
+
+    const studentId = parseInt(user_id);
+    const classGroupId = parseInt(class_group_id);
+
+    if (isNaN(studentId) || isNaN(classGroupId)) {
+      throw new ValidationError("Invalid IDs provided");
+    }
+
+    // Verify student exists and is a student
+    const student = await db
+      .select()
+      .from(User)
+      .innerJoin(UserProfile, eq(User.user_id, UserProfile.user_id))
+      .where(
+        and(eq(User.user_id, studentId), eq(UserProfile.user_type, "STUDENT"))
+      )
+      .limit(1);
+
+    if (student.length === 0) {
+      throw new NotFoundError("Student not found");
+    }
+
+    // Verify class group exists
+    const classGroup = await db
+      .select()
+      .from(ClassGroup)
+      .where(eq(ClassGroup.class_group_id, classGroupId))
+      .limit(1);
+
+    if (classGroup.length === 0) {
+      throw new NotFoundError("Class group not found");
+    }
+
+    // Check if assignment already exists
+    const existingAssignment = await db
+      .select()
+      .from(StudentClassGroup)
+      .where(
+        and(
+          eq(StudentClassGroup.user_id, studentId),
+          eq(StudentClassGroup.class_group_id, classGroupId)
+        )
+      )
+      .limit(1);
+
+    if (existingAssignment.length > 0) {
+      throw new ConflictError(
+        "Student is already assigned to this class group"
+      );
+    }
+
+    await db.insert(StudentClassGroup).values({
+      user_id: studentId,
+      class_group_id: classGroupId,
+    });
+
+    logger.info("Student assigned to class group", { studentId, classGroupId });
+
+    successResponse(
+      res,
+      "Student assigned to class group successfully",
+      null,
+      201
+    );
+  }
+);
+
+export const removeStudentFromClassGroup = asyncHandler(
+  async (req: any, res: any) => {
+    const { user_id, class_group_id } = req.params;
+
+    const studentId = parseInt(user_id);
+    const classGroupId = parseInt(class_group_id);
+
+    if (isNaN(studentId) || isNaN(classGroupId)) {
+      throw new ValidationError("Invalid IDs provided");
+    }
+
+    // Check if assignment exists and is active
+    const existingAssignment = await db
+      .select()
+      .from(StudentClassGroup)
+      .where(
+        and(
+          eq(StudentClassGroup.user_id, studentId),
+          eq(StudentClassGroup.class_group_id, classGroupId),
+          eq(StudentClassGroup.status, "ACTIVE")
+        )
+      )
+      .limit(1);
+
+    if (existingAssignment.length === 0) {
+      throw new NotFoundError("Student class group assignment not found");
+    }
+
+    // Disable the class group assignment
+    await db
+      .update(StudentClassGroup)
+      .set({ status: "DISABLED" })
+      .where(
+        and(
+          eq(StudentClassGroup.user_id, studentId),
+          eq(StudentClassGroup.class_group_id, classGroupId)
+        )
+      );
+
+    // Disable all related subject enrollments for this student
+    await db
+      .update(StudentSubjectEnrollment)
+      .set({ status: "DISABLED" })
+      .where(eq(StudentSubjectEnrollment.user_id, studentId));
+
+    logger.info("Student removed from class group and subjects disabled", {
+      studentId,
+      classGroupId,
+    });
+
+    successResponse(
+      res,
+      "Student removed from class group and subject enrollments disabled successfully"
+    );
   }
 );

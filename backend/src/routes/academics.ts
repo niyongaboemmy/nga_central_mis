@@ -48,6 +48,17 @@ import {
   getMyAssignedSubjects,
   getSubjectEnrolledStudents,
 
+  // Student Subject Enrollment
+  getStudentEnrolledSubjects,
+  getAvailableSubjectsForStudent,
+  enrollStudentInSubject,
+  unenrollStudentFromSubject,
+
+  // Student Class Group Assignment
+  getStudentClassGroup,
+  assignStudentToClassGroup,
+  removeStudentFromClassGroup,
+
   // Class Groups
   getClassGroups,
   getClassGroup,
@@ -304,6 +315,52 @@ router.get(
   authenticate,
   authorize("VIEW_MY_ASSIGNED_SUBJECTS"),
   getSubjectEnrolledStudents
+);
+
+// Student Subject Enrollment routes
+router.get(
+  "/students/:studentId/enrolled-subjects",
+  authenticate,
+  authorize("MANAGE_USERS"),
+  getStudentEnrolledSubjects
+);
+router.get(
+  "/students/:studentId/available-subjects",
+  authenticate,
+  authorize("MANAGE_USERS"),
+  getAvailableSubjectsForStudent
+);
+router.post(
+  "/students/enroll-subject",
+  authenticate,
+  authorize("MANAGE_USERS"),
+  enrollStudentInSubject
+);
+router.delete(
+  "/students/:user_id/subjects/:subject_id/terms/:academic_term_id",
+  authenticate,
+  authorize("MANAGE_USERS"),
+  unenrollStudentFromSubject
+);
+
+// Student Class Group Assignment routes
+router.get(
+  "/students/:studentId/class-group",
+  authenticate,
+  authorize("MANAGE_USERS"),
+  getStudentClassGroup
+);
+router.post(
+  "/students/assign-class-group",
+  authenticate,
+  authorize("MANAGE_USERS"),
+  assignStudentToClassGroup
+);
+router.delete(
+  "/students/:user_id/class-groups/:class_group_id",
+  authenticate,
+  authorize("MANAGE_USERS"),
+  removeStudentFromClassGroup
 );
 
 export default router;

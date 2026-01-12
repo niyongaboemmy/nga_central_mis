@@ -50,6 +50,20 @@ export interface ClassGroup {
   academic_year_id: number;
   grade_id: number;
   name: string;
+  grade_name?: string;
+  program_name?: string;
+}
+
+export interface StudentClassGroup {
+  class_group_id: number;
+  class_group_name: string;
+  grade_id: number;
+  grade_name: string;
+  program_id: number;
+  program_name: string;
+  academic_year_id: number;
+  academic_year_name: string;
+  assigned_at: string;
 }
 
 // Academic Years API
@@ -246,4 +260,62 @@ export const myAssignedSubjectsApi = {
     api.get<{ data: EnrolledStudent[] }>(
       `/academics/subjects/${subjectId}/terms/${academicTermId}/students`
     ),
+};
+
+// Student Subject Enrollment API
+export interface StudentEnrolledSubject {
+  enrollment_id: string;
+  subject_id: number;
+  subject_name: string;
+  subject_code: string | null;
+  subject_description: string | null;
+  academic_term_id: number;
+  academic_term_name: string;
+  academic_year_name: string;
+  enrolled_at: string;
+}
+
+export interface AvailableSubject {
+  subject_id: number;
+  subject_name: string;
+  subject_code: string | null;
+  subject_description: string | null;
+}
+
+export const studentEnrollmentApi = {
+  getEnrolledSubjects: (studentId: number, academicTermId?: number) =>
+    api.get<{ data: StudentEnrolledSubject[] }>(
+      `/academics/students/${studentId}/enrolled-subjects`,
+      {
+        params: academicTermId
+          ? { academic_term_id: academicTermId }
+          : undefined,
+      }
+    ),
+  getAvailableSubjects: (studentId: number, academicTermId: number) =>
+    api.get<{ data: AvailableSubject[] }>(
+      `/academics/students/${studentId}/available-subjects`,
+      { params: { academic_term_id: academicTermId } }
+    ),
+  enroll: (data: {
+    user_id: number;
+    subject_id: number;
+    academic_term_id: number;
+  }) => api.post("/academics/students/enroll-subject", data),
+  unenroll: (studentId: number, subjectId: number, academicTermId: number) =>
+    api.delete(
+      `/academics/students/${studentId}/subjects/${subjectId}/terms/${academicTermId}`
+    ),
+};
+
+// Student Class Group Assignment API
+export const studentClassGroupApi = {
+  getByStudent: (studentId: number) =>
+    api.get<{ data: StudentClassGroup | null }>(
+      `/academics/students/${studentId}/class-group`
+    ),
+  assign: (data: { user_id: number; class_group_id: number }) =>
+    api.post("/academics/students/assign-class-group", data),
+  remove: (studentId: number, classGroupId: number) =>
+    api.delete(`/academics/students/${studentId}/class-groups/${classGroupId}`),
 };
