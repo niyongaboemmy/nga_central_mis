@@ -11,6 +11,7 @@ interface NavbarProps {
   onNavigateBack?: () => void;
   onNavigateToHome?: () => void;
   onChangePassword?: () => void;
+  onToggleSidebar?: () => void;
   showNavigation?: boolean;
   showAuthButtons?: boolean;
   showUserCard?: boolean;
@@ -23,6 +24,7 @@ const Navbar: React.FC<NavbarProps> = ({
   onNavigateBack,
   onNavigateToHome,
   onChangePassword,
+  onToggleSidebar,
   showNavigation = true,
   showAuthButtons = true,
   showUserCard = false,
@@ -120,8 +122,8 @@ const Navbar: React.FC<NavbarProps> = ({
                     alt="NGA Central MIS"
                     className="w-10 h-10 rounded-full group-hover:shadow-lg transition-shadow"
                   />
-                  <span className="text-lg font-bold text-text-primary-light dark:text-text-primary-dark hidden sm:block">
-                    NGA Central MIS
+                  <span className="text-xl font-bold text-text-primary-light dark:text-text-primary-dark">
+                    NGA MIS
                   </span>
                 </button>
               ) : (
@@ -131,8 +133,8 @@ const Navbar: React.FC<NavbarProps> = ({
                     alt="NGA Central MIS"
                     className="w-10 h-10 rounded-full"
                   />
-                  <span className="text-lg font-bold text-text-primary-light dark:text-text-primary-dark hidden sm:block">
-                    NGA Central MIS
+                  <span className="text-xl font-bold text-text-primary-light dark:text-text-primary-dark">
+                    NGA MIS
                   </span>
                 </div>
               )}
@@ -332,11 +334,25 @@ const Navbar: React.FC<NavbarProps> = ({
             <div className="flex md:hidden items-center space-x-3">
               <ThemeToggle />
               <button
-                onClick={toggleMobileMenu}
+                onClick={onToggleSidebar || toggleMobileMenu}
                 className="inline-flex items-center justify-center p-2 rounded-lg text-text-secondary-light dark:text-text-secondary-dark/70 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-surface-light dark:hover:bg-surface-dark transition-all duration-200 focus:outline-none"
                 aria-label="Toggle menu"
               >
-                {isMobileMenuOpen ? (
+                {onToggleSidebar ? (
+                  <svg
+                    className="w-6 h-6"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M4 6h16M4 12h16M4 18h16"
+                    />
+                  </svg>
+                ) : isMobileMenuOpen ? (
                   <svg
                     className="w-6 h-6"
                     fill="none"
@@ -557,7 +573,7 @@ const Navbar: React.FC<NavbarProps> = ({
       </nav>
 
       {/* Mobile Menu Overlay */}
-      {isMobileMenuOpen && (
+      {!onToggleSidebar && isMobileMenuOpen && (
         <div
           className="fixed inset-0 z-40 bg-black/20 dark:bg-black/40 md:hidden"
           onClick={closeMobileMenu}

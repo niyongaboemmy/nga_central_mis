@@ -6,6 +6,7 @@ import { Permissions } from "../../constants/permissions";
 interface SidebarProps {
   isCollapsed?: boolean;
   onToggle?: () => void;
+  onMenuClick?: () => void;
 }
 
 interface NavItem {
@@ -15,7 +16,11 @@ interface NavItem {
   requiredPermission?: string;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ isCollapsed = false, onToggle }) => {
+const Sidebar: React.FC<SidebarProps> = ({
+  isCollapsed = false,
+  onToggle,
+  onMenuClick,
+}) => {
   const location = useLocation();
   const navigate = useNavigate();
   const { user } = useUser();
@@ -244,7 +249,10 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed = false, onToggle }) => {
             .map((item) => (
               <li key={item.path}>
                 <button
-                  onClick={() => navigate(item.path)}
+                  onClick={() => {
+                    navigate(item.path);
+                    onMenuClick?.();
+                  }}
                   className={`w-full flex items-center ${
                     isCollapsed ? "justify-center" : ""
                   } space-x-3 px-3 py-3 rounded-xl transition-all duration-200 ${
@@ -252,6 +260,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed = false, onToggle }) => {
                       ? "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"
                       : "font-light text-text-secondary-light dark:text-text-secondary-dark/70 hover:bg-surface-light dark:hover:bg-surface-dark hover:text-text-primary-light dark:hover:text-text-primary-dark"
                   }`}
+                  title={item.label}
                 >
                   <span className={`flex-shrink-0`}>{item.icon}</span>
                   {!isCollapsed && <span className="">{item.label}</span>}

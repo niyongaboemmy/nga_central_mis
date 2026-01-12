@@ -17,6 +17,8 @@ const SystemLayout: React.FC<SystemLayoutProps> = ({
   showSidebar = false,
 }) => {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [screenWidth, setScreenWidth] = useState(window.innerWidth);
   const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
   const [showChangePasswordModalUser, setShowChangePasswordModalUser] =
     useState(false);
@@ -29,6 +31,27 @@ const SystemLayout: React.FC<SystemLayoutProps> = ({
       setShowChangePasswordModal(true);
     }
   }, [user]);
+
+  useEffect(() => {
+    const handleResize = () => setScreenWidth(window.innerWidth);
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  useEffect(() => {
+    // Hide on small screens, show on medium and large
+    if (screenWidth < 640) {
+      // Small screens: sidebar hidden
+      setIsSidebarCollapsed(true); // Reset
+    }
+    if (screenWidth < 1040) {
+      // Medium and large screens: expanded
+      setIsSidebarCollapsed(true);
+    } else {
+      // Medium and large screens: expanded
+      setIsSidebarCollapsed(false);
+    }
+  }, [screenWidth]);
 
   return (
     <div className="min-h-screen bg-gray-100 dark:bg-black">
@@ -47,15 +70,35 @@ const SystemLayout: React.FC<SystemLayoutProps> = ({
       {/* Sidebar Layout */}
       {showSidebar && (
         <>
-          <Sidebar
-            isCollapsed={isSidebarCollapsed}
-            onToggle={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-          />
+          {screenWidth >= 640 ? (
+            <Sidebar
+              isCollapsed={isSidebarCollapsed}
+              onToggle={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+              onMenuClick={() => screenWidth < 640 && setIsSidebarOpen(false)}
+            />
+          ) : (
+            isSidebarOpen && (
+              <>
+                <div
+                  className="fixed inset-0 z-50 bg-black/50"
+                  onClick={() => setIsSidebarOpen(false)}
+                />
+                <div className="fixed top-16 left-0 z-50 h-[calc(100vh-4rem)] w-64 bg-white dark:bg-gray-800 shadow-lg">
+                  <Sidebar
+                    isCollapsed={false}
+                    onToggle={() => setIsSidebarOpen(false)}
+                    onMenuClick={() => setIsSidebarOpen(false)}
+                  />
+                </div>
+              </>
+            )
+          )}
           <Navbar
             showNavigation={false}
             showAuthButtons={false}
             showUserCard={true}
             onChangePassword={() => setShowChangePasswordModalUser(true)}
+            onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
           />
         </>
       )}
@@ -63,7 +106,7 @@ const SystemLayout: React.FC<SystemLayoutProps> = ({
       {/* Main Content */}
       <main
         className={`transition-all duration-300 ${
-          showSidebar
+          showSidebar && screenWidth >= 640
             ? `pt-16 ${isSidebarCollapsed ? "ml-20" : "ml-64"}`
             : "pt-16"
         }`}
