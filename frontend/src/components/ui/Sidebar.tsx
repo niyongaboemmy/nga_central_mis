@@ -194,6 +194,7 @@ const Sidebar: React.FC<SidebarProps> = ({
           />
         </svg>
       ),
+      requiredPermission: Permissions.MANAGE_SETTINGS,
     },
   ];
 
