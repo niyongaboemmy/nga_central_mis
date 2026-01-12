@@ -111,8 +111,8 @@ const Documents: React.FC = () => {
   const [isLoadingShared, setIsLoadingShared] = useState(false);
   const [folderTree, setFolderTree] = useState<any[]>([]);
   const [showFolderTree, setShowFolderTree] = useState(
-    window.innerWidth >= 768
-  ); // md breakpoint
+    window.innerWidth >= 700
+  ); // tablet breakpoint
   const [uploadProgress, setUploadProgress] = useState<{
     [key: string]: number;
   }>({});
@@ -155,6 +155,28 @@ const Documents: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const contextMenuRef = useRef<HTMLDivElement>(null);
   const ongoingRequestsRef = useRef<Map<string, Promise<any>>>(new Map());
+
+  // Handle window resize to automatically hide folder tree on small screens
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth < 700) {
+        setShowFolderTree(false);
+      }
+    };
+
+    window.addEventListener("resize", handleResize);
+    // Call once on mount in case initial size is <700
+    handleResize();
+
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  // Toggle folder tree visibility, but prevent showing on small screens
+  const toggleFolderTree = () => {
+    if (window.innerWidth >= 700) {
+      setShowFolderTree(!showFolderTree);
+    }
+  };
 
   // Request deduplication helper
   const deduplicateRequest = useCallback(
@@ -1255,7 +1277,7 @@ const Documents: React.FC = () => {
           onSortOrderChange={() =>
             setSortOrder(sortOrder === "asc" ? "desc" : "asc")
           }
-          onToggleFolderTree={() => setShowFolderTree(!showFolderTree)}
+          onToggleFolderTree={toggleFolderTree}
           onCreateFolder={() => setIsCreateFolderModalOpen(true)}
           onUploadClick={() => fileInputRef.current?.click()}
         />
