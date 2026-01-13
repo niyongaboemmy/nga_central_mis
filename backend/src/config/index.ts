@@ -80,7 +80,12 @@ const developmentConfig: Config = {
   cors: {
     origin: process.env.CORS_ORIGIN
       ? process.env.CORS_ORIGIN.split(",")
-      : ["http://localhost:3000", "http://localhost:5173", "https://nga.ac.rw"],
+      : [
+          "http://localhost:3000",
+          "http://localhost:5173",
+          "https://nga.ac.rw",
+          "https://www.nga.ac.rw",
+        ],
     credentials: process.env.CORS_CREDENTIALS === "true",
   },
   logLevel: process.env.LOG_LEVEL || "debug",
