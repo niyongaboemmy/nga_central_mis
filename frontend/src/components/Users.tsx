@@ -103,7 +103,7 @@ const Users: React.FC = () => {
   const [availableRoles, setAvailableRoles] = useState<Role[]>([]);
   const [pagination, setPagination] = useState({
     page: 1,
-    limit: 50,
+    limit: 100,
     total: 0,
     totalPages: 0,
   });
@@ -128,16 +128,13 @@ const Users: React.FC = () => {
         if (roles.length > 0) {
           // Default to first role's role_id (as string) to match backend userRole filter
           setSelectedRole(roles[0].role_id.toString());
+          loadUsers(roles[0].role_id.toString(), selectedStatus);
         }
       }
     } catch (error) {
       console.error("Failed to load roles:", error);
     }
   };
-
-  useEffect(() => {
-    loadRoles();
-  }, []);
 
   const loadUsers = async (role_id: string, status: string) => {
     if (loadingRef.current) return;
@@ -170,7 +167,7 @@ const Users: React.FC = () => {
 
   // Load users whenever filters change
   useEffect(() => {
-    loadUsers(selectedRole, selectedStatus);
+    loadRoles();
   }, [selectedRole, selectedStatus, pagination.page, searchTerm]);
 
   const viewUserProfile = (userData: UserWithProfile) => {
@@ -350,6 +347,7 @@ const Users: React.FC = () => {
                   onClick={() => {
                     setSelectedRole(role.role_id.toString());
                     setPagination((prev) => ({ ...prev, page: 1 }));
+                    loadUsers(role.role_id.toString(), selectedStatus);
                   }}
                   className={`px-3 py-1 rounded-full text-xs font-medium transition-all whitespace-nowrap ${
                     selectedRole.toString() === role.role_id.toString()
