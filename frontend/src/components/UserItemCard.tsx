@@ -58,6 +58,7 @@ interface UserItemCardProps {
   isExpanded: boolean;
   onToggleExpand: () => void;
   onToggleStatus?: () => void;
+  isToggling?: boolean;
 }
 
 const UserItemCard: React.FC<UserItemCardProps> = ({
@@ -67,6 +68,7 @@ const UserItemCard: React.FC<UserItemCardProps> = ({
   isExpanded,
   onToggleExpand,
   onToggleStatus,
+  isToggling = false,
 }) => {
   return (
     <motion.div
@@ -183,13 +185,22 @@ const UserItemCard: React.FC<UserItemCardProps> = ({
                       e.stopPropagation();
                       onToggleStatus();
                     }}
+                    disabled={isToggling}
                     className={`px-5 py-2 rounded-full transition-colors text-sm font-medium ${
-                      user.user.status === "ACTIVE"
+                      isToggling
+                        ? "opacity-50 cursor-not-allowed"
+                        : user.user.status === "ACTIVE"
                         ? "bg-red-500 hover:bg-red-600 text-white"
                         : "bg-green-500 hover:bg-green-600 text-white"
                     }`}
                   >
-                    {user.user.status === "ACTIVE" ? "Disable" : "Enable"}
+                    {isToggling ? (
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mx-auto" />
+                    ) : user.user.status === "ACTIVE" ? (
+                      "Disable"
+                    ) : (
+                      "Enable"
+                    )}
                   </button>
                 )}
               </div>

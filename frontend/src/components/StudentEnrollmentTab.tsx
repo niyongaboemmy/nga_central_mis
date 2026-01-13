@@ -11,7 +11,6 @@ import {
   ArrowRight,
   ArrowLeft,
   Users,
-  Target,
 } from "lucide-react";
 import {
   studentEnrollmentApi,
@@ -301,23 +300,6 @@ const StudentEnrollmentTab: React.FC<StudentEnrollmentTabProps> = ({
   const prevStep = () => setCurrentStep(1);
 
   if (!isOpen) return null;
-
-  const steps = [
-    {
-      id: 1,
-      title: "Class Group Assignment",
-      description: "Assign student to a class group",
-      icon: Users,
-      completed: !!studentClassGroup,
-    },
-    {
-      id: 2,
-      title: "Subject Enrollment",
-      description: "Enroll in subjects for the term",
-      icon: Target,
-      completed: false,
-    },
-  ];
 
   return (
     <div className="space-y-6">

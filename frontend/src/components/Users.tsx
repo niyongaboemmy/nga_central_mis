@@ -109,6 +109,7 @@ const Users: React.FC = () => {
   });
   const loadingRef = useRef(false);
   const loadRolesCalledRef = useRef(false);
+  const [togglingUserId, setTogglingUserId] = useState<number | null>(null);
 
   const canManage = user?.roles?.find((itm) =>
     itm.permissions?.find(
@@ -178,6 +179,7 @@ const Users: React.FC = () => {
   };
 
   const toggleUserStatus = async (userId: number, currentStatus: string) => {
+    setTogglingUserId(userId);
     try {
       if (currentStatus === "ACTIVE") {
         await disableUser(userId);
@@ -193,6 +195,8 @@ const Users: React.FC = () => {
         error.response?.data?.message || "Failed to update user status",
         "error"
       );
+    } finally {
+      setTogglingUserId(null);
     }
   };
 
@@ -412,6 +416,7 @@ const Users: React.FC = () => {
                     onToggleStatus={() =>
                       toggleUserStatus(user.user.user_id, user.user.status)
                     }
+                    isToggling={togglingUserId === user.user.user_id}
                   />
                 ))
               ) : (
