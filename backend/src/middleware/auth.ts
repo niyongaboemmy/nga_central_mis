@@ -72,8 +72,14 @@ export const authenticate = async (req: any, res: any, next: any) => {
 };
 
 export const authorize =
-  (requiredPerm: string) => (req: any, res: any, next: any) => {
-    if (!req.user.permissions.includes(requiredPerm)) {
+  (requiredPerm: string | string[]) => (req: any, res: any, next: any) => {
+    const permissions = Array.isArray(requiredPerm)
+      ? requiredPerm
+      : [requiredPerm];
+    const hasPermission = permissions.some((perm) =>
+      req.user.permissions.includes(perm)
+    );
+    if (!hasPermission) {
       return res.status(403).json({ message: "Forbidden" });
     }
     next();

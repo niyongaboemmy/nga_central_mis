@@ -8,6 +8,9 @@ export const Permissions = {
   // User management
   MANAGE_USERS: "MANAGE_USERS",
   VIEW_USERS: "VIEW_USERS",
+  ENABLE_DISABLE_USERS: "ENABLE_DISABLE_USERS",
+  CHANGE_USER_ROLES: "CHANGE_USER_ROLES",
+  MANAGE_PROGRAM_LEADS: "MANAGE_PROGRAM_LEADS",
 
   // Role & Permission management
   MANAGE_ROLES: "MANAGE_ROLES",
@@ -24,12 +27,15 @@ export const Permissions = {
   // Student management
   MANAGE_STUDENTS: "MANAGE_STUDENTS",
   VIEW_STUDENTS: "VIEW_STUDENTS",
+  MANAGE_STUDENT_ENROLLMENTS: "MANAGE_STUDENT_ENROLLMENTS",
+  ASSIGN_STUDENT_CLASS_GROUPS: "ASSIGN_STUDENT_CLASS_GROUPS",
 
   // Teacher management
   MANAGE_TEACHERS: "MANAGE_TEACHERS",
   VIEW_TEACHERS: "VIEW_TEACHERS",
   VIEW_MY_ASSIGNED_SUBJECTS: "VIEW_MY_ASSIGNED_SUBJECTS",
   TEACHER_DASHBOARD: "TEACHER_DASHBOARD",
+  ASSIGN_TEACHER_SUBJECTS: "ASSIGN_TEACHER_SUBJECTS",
 
   // Parent management
   MANAGE_PARENTS: "MANAGE_PARENTS",
@@ -52,6 +58,10 @@ export const Permissions = {
 
   // Admin
   ADMIN: "ADMIN",
+
+  // Program Management
+  VIEW_PROGRAM_USERS: "VIEW_PROGRAM_USERS",
+  VIEW_PROGRAM_ACADEMICS: "VIEW_PROGRAM_ACADEMICS",
 } as const;
 
 export type PermissionKey = keyof typeof Permissions;
@@ -117,16 +127,28 @@ export const getAllPermissions = (): PermissionValue[] => {
  * Group permissions by category
  */
 export const permissionGroups = {
-  users: [Permissions.MANAGE_USERS, Permissions.VIEW_USERS],
+  users: [
+    Permissions.MANAGE_USERS,
+    Permissions.VIEW_USERS,
+    Permissions.ENABLE_DISABLE_USERS,
+    Permissions.CHANGE_USER_ROLES,
+    Permissions.MANAGE_PROGRAM_LEADS,
+  ],
   roles: [Permissions.MANAGE_ROLES, Permissions.MANAGE_PERMISSIONS],
   academics: [Permissions.MANAGE_ACADEMICS, Permissions.VIEW_ACADEMICS],
   classes: [Permissions.MANAGE_CLASSES, Permissions.VIEW_CLASSES],
-  students: [Permissions.MANAGE_STUDENTS, Permissions.VIEW_STUDENTS],
+  students: [
+    Permissions.MANAGE_STUDENTS,
+    Permissions.VIEW_STUDENTS,
+    Permissions.MANAGE_STUDENT_ENROLLMENTS,
+    Permissions.ASSIGN_STUDENT_CLASS_GROUPS,
+  ],
   teachers: [
     Permissions.MANAGE_TEACHERS,
     Permissions.VIEW_TEACHERS,
     Permissions.VIEW_MY_ASSIGNED_SUBJECTS,
     Permissions.TEACHER_DASHBOARD,
+    Permissions.ASSIGN_TEACHER_SUBJECTS,
   ],
   parents: [Permissions.MANAGE_PARENTS, Permissions.VIEW_PARENTS],
   grades: [Permissions.MANAGE_GRADES, Permissions.VIEW_GRADES],

@@ -17,6 +17,10 @@ import {
   getUserRoles,
   enableUser,
   disableUser,
+  getProgramRoles,
+  getProgramUsersByRole,
+  getProgramUsers,
+  getUserPrograms,
 } from "../controllers/userController";
 import { authenticate, authorize } from "../middleware/auth";
 
@@ -53,6 +57,7 @@ router.get(
 // Search users (for document sharing) - available to all authenticated users
 router.get("/search", authenticate, searchUsers);
 router.get("/:id", authenticate, getUser);
+router.get("/:id/programs", authenticate, getUserPrograms);
 router.put("/:id/profile", authenticate, updateUserProfile);
 router.post("/", authenticate, authorize("MANAGE_USERS"), createUser);
 router.post(
@@ -87,6 +92,26 @@ router.delete(
   authenticate,
   authorize("MANAGE_USERS"),
   removeRoleFromUser
+);
+
+// Program-based user management
+router.get(
+  "/programs/:programId/roles",
+  authenticate,
+  authorize("VIEW_PROGRAM_USERS"),
+  getProgramRoles
+);
+router.get(
+  "/programs/:programId/roles/:roleId/users",
+  authenticate,
+  authorize("VIEW_PROGRAM_USERS"),
+  getProgramUsersByRole
+);
+router.get(
+  "/programs/:programId/users",
+  authenticate,
+  authorize("VIEW_PROGRAM_USERS"),
+  getProgramUsers
 );
 
 export default router;

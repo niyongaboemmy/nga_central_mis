@@ -1,7 +1,7 @@
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import { db } from "../db";
-import { eq, sql, and, or } from "drizzle-orm";
+import { eq, sql, and, or, inArray } from "drizzle-orm";
 import {
   User,
   UserProfile,
@@ -10,6 +10,12 @@ import {
   Permission,
   UserRole,
   RolePermission,
+  Program,
+  UserProgramLead,
+  Grade,
+  ClassGroup,
+  StudentClassGroup,
+  TeacherSubjectAssignment,
 } from "../db/schema";
 import { sanitizeString, validateEmail } from "../utils/sanitization";
 import {
@@ -332,6 +338,7 @@ export const getCurrentUser = asyncHandler(async (req: any, res: any) => {
       "GENERATE_REPORTS",
       "MANAGE_SETTINGS",
       "ADMIN",
+      "VIEW_PROGRAM_USERS",
     ];
   } else {
     permissions = rolesWithPermissions.flatMap((r) =>
@@ -339,11 +346,23 @@ export const getCurrentUser = asyncHandler(async (req: any, res: any) => {
     );
   }
 
+  // Get assigned programs for program leads
+  const assignedPrograms = await db
+    .select({
+      program_id: Program.program_id,
+      name: Program.name,
+      description: Program.description,
+    })
+    .from(UserProgramLead)
+    .innerJoin(Program, eq(UserProgramLead.program_id, Program.program_id))
+    .where(eq(UserProgramLead.user_id, userId));
+
   successResponse(res, "User profile retrieved successfully", {
     user: user[0],
     profile: profile[0] || null,
     roles: rolesWithPermissions,
     permissions,
+    assignedPrograms,
     forcePasswordChange: auth[0]?.force_password_change === 1,
   });
 });
@@ -1452,4 +1471,562 @@ export const getUserRoles = asyncHandler(async (req: any, res: any) => {
     "User roles retrieved successfully",
     rolesWithPermissions
   );
+});
+
+// Get roles for a program (roles that have users associated with the program)
+export const getProgramRoles = asyncHandler(async (req: any, res: any) => {
+  const { programId } = req.params;
+  const programIdNum = parseInt(programId);
+  const userId = req.user?.userId;
+
+  if (isNaN(programIdNum)) {
+    throw new ValidationError("Invalid program ID");
+  }
+
+  logger.info("Fetching roles for program", {
+    programId: programIdNum,
+    requestedBy: userId,
+  });
+
+  // Check if program exists
+  const program = await db
+    .select()
+    .from(Program)
+    .where(eq(Program.program_id, programIdNum))
+    .limit(1);
+
+  if (program.length === 0) {
+    throw new NotFoundError("Program not found");
+  }
+
+  // Check if user is a lead of this program
+  const userLead = await db
+    .select()
+    .from(UserProgramLead)
+    .where(
+      and(
+        eq(UserProgramLead.user_id, userId),
+        eq(UserProgramLead.program_id, programIdNum)
+      )
+    )
+    .limit(1);
+
+  if (userLead.length === 0) {
+    throw new ValidationError(
+      "You do not have permission to view users in this program"
+    );
+  }
+
+  // Get all users associated with the program
+  // Students: via StudentClassGroup -> ClassGroup -> Grade -> Program
+  const studentUsers = await db
+    .select({ user_id: User.user_id })
+    .from(User)
+    .innerJoin(StudentClassGroup, eq(User.user_id, StudentClassGroup.user_id))
+    .innerJoin(
+      ClassGroup,
+      eq(StudentClassGroup.class_group_id, ClassGroup.class_group_id)
+    )
+    .innerJoin(Grade, eq(ClassGroup.grade_id, Grade.grade_id))
+    .where(eq(Grade.program_id, programIdNum));
+
+  // Teachers: via TeacherSubjectAssignment -> ClassGroup -> Grade -> Program
+  const teacherUsers = await db
+    .select({ user_id: User.user_id })
+    .from(User)
+    .innerJoin(
+      TeacherSubjectAssignment,
+      eq(User.user_id, TeacherSubjectAssignment.user_id)
+    )
+    .innerJoin(
+      ClassGroup,
+      eq(TeacherSubjectAssignment.class_group_id, ClassGroup.class_group_id)
+    )
+    .innerJoin(Grade, eq(ClassGroup.grade_id, Grade.grade_id))
+    .where(eq(Grade.program_id, programIdNum));
+
+  // Program leads: via UserProgramLead
+  const leadUsers = await db
+    .select({ user_id: User.user_id })
+    .from(User)
+    .innerJoin(UserProgramLead, eq(User.user_id, UserProgramLead.user_id))
+    .where(eq(UserProgramLead.program_id, programIdNum));
+
+  // Combine all user IDs
+  const allUserIds = [
+    ...new Set([
+      ...studentUsers.map((u) => u.user_id),
+      ...teacherUsers.map((u) => u.user_id),
+      ...leadUsers.map((u) => u.user_id),
+    ]),
+  ];
+
+  if (allUserIds.length === 0) {
+    successResponse(res, "No roles found for this program", []);
+    return;
+  }
+
+  // Get distinct roles for these users
+  const roles = await db
+    .select({
+      role_id: Role.role_id,
+      name: Role.name,
+      description: Role.description,
+      status: Role.status,
+    })
+    .from(Role)
+    .innerJoin(UserRole, eq(Role.role_id, UserRole.role_id))
+    .where(
+      and(eq(Role.status, "ACTIVE"), inArray(UserRole.user_id, allUserIds))
+    )
+    .groupBy(Role.role_id, Role.name, Role.description, Role.status);
+
+  successResponse(res, "Program roles retrieved successfully", roles);
+});
+
+// Get users by program and role
+export const getProgramUsersByRole = asyncHandler(
+  async (req: any, res: any) => {
+    const { programId, roleId } = req.params;
+    const programIdNum = parseInt(programId);
+    const roleIdNum = parseInt(roleId);
+    const { page = 1, limit = 10, search } = req.query;
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit);
+    const offset = (pageNum - 1) * limitNum;
+    const userId = req.user?.userId;
+
+    if (isNaN(programIdNum) || isNaN(roleIdNum)) {
+      throw new ValidationError("Invalid program ID or role ID");
+    }
+
+    logger.info("Fetching users by program and role", {
+      programId: programIdNum,
+      roleId: roleIdNum,
+      page: pageNum,
+      limit: limitNum,
+      search,
+      requestedBy: userId,
+    });
+
+    // Check if program and role exist
+    const program = await db
+      .select()
+      .from(Program)
+      .where(eq(Program.program_id, programIdNum))
+      .limit(1);
+
+    if (program.length === 0) {
+      throw new NotFoundError("Program not found");
+    }
+
+    const role = await db
+      .select()
+      .from(Role)
+      .where(and(eq(Role.role_id, roleIdNum), eq(Role.status, "ACTIVE")))
+      .limit(1);
+
+    if (role.length === 0) {
+      throw new NotFoundError("Role not found or inactive");
+    }
+
+    // Check if user is a lead of this program
+    const userLead = await db
+      .select()
+      .from(UserProgramLead)
+      .where(
+        and(
+          eq(UserProgramLead.user_id, userId),
+          eq(UserProgramLead.program_id, programIdNum)
+        )
+      )
+      .limit(1);
+
+    if (userLead.length === 0) {
+      throw new ValidationError(
+        "You do not have permission to view users in this program"
+      );
+    }
+
+    // Get users associated with the program who have the specified role
+    // Students: via StudentClassGroup -> ClassGroup -> Grade -> Program
+    const studentUsers = await db
+      .select({
+        user_id: User.user_id,
+        username: User.username,
+        email: User.email,
+        phone_number: User.phone_number,
+        status: User.status,
+        first_name: UserProfile.first_name,
+        last_name: UserProfile.last_name,
+        user_type: UserProfile.user_type,
+      })
+      .from(User)
+      .leftJoin(UserProfile, eq(User.user_id, UserProfile.user_id))
+      .innerJoin(StudentClassGroup, eq(User.user_id, StudentClassGroup.user_id))
+      .innerJoin(
+        ClassGroup,
+        eq(StudentClassGroup.class_group_id, ClassGroup.class_group_id)
+      )
+      .innerJoin(Grade, eq(ClassGroup.grade_id, Grade.grade_id))
+      .innerJoin(UserRole, eq(User.user_id, UserRole.user_id))
+      .where(
+        and(
+          eq(Grade.program_id, programIdNum),
+          eq(UserRole.role_id, roleIdNum),
+          eq(StudentClassGroup.status, "ACTIVE")
+        )
+      );
+
+    // Teachers: via TeacherSubjectAssignment -> ClassGroup -> Grade -> Program
+    const teacherUsers = await db
+      .select({
+        user_id: User.user_id,
+        username: User.username,
+        email: User.email,
+        phone_number: User.phone_number,
+        status: User.status,
+        first_name: UserProfile.first_name,
+        last_name: UserProfile.last_name,
+        user_type: UserProfile.user_type,
+      })
+      .from(User)
+      .leftJoin(UserProfile, eq(User.user_id, UserProfile.user_id))
+      .innerJoin(
+        TeacherSubjectAssignment,
+        eq(User.user_id, TeacherSubjectAssignment.user_id)
+      )
+      .innerJoin(
+        ClassGroup,
+        eq(TeacherSubjectAssignment.class_group_id, ClassGroup.class_group_id)
+      )
+      .innerJoin(Grade, eq(ClassGroup.grade_id, Grade.grade_id))
+      .innerJoin(UserRole, eq(User.user_id, UserRole.user_id))
+      .where(
+        and(eq(Grade.program_id, programIdNum), eq(UserRole.role_id, roleIdNum))
+      );
+
+    // Program leads: via UserProgramLead
+    const leadUsers = await db
+      .select({
+        user_id: User.user_id,
+        username: User.username,
+        email: User.email,
+        phone_number: User.phone_number,
+        status: User.status,
+        first_name: UserProfile.first_name,
+        last_name: UserProfile.last_name,
+        user_type: UserProfile.user_type,
+      })
+      .from(User)
+      .leftJoin(UserProfile, eq(User.user_id, UserProfile.user_id))
+      .innerJoin(UserProgramLead, eq(User.user_id, UserProgramLead.user_id))
+      .innerJoin(UserRole, eq(User.user_id, UserRole.user_id))
+      .where(
+        and(
+          eq(UserProgramLead.program_id, programIdNum),
+          eq(UserRole.role_id, roleIdNum)
+        )
+      );
+
+    // Combine all users
+    const allUsers = [...studentUsers, ...teacherUsers, ...leadUsers];
+
+    // Remove duplicates based on user_id
+    const uniqueUsers = allUsers.filter(
+      (user, index, self) =>
+        index === self.findIndex((u) => u.user_id === user.user_id)
+    );
+
+    // Apply search filter
+    let filteredUsers = uniqueUsers;
+    if (search) {
+      const searchLower = search.toLowerCase();
+      filteredUsers = uniqueUsers.filter(
+        (user) =>
+          user.username?.toLowerCase().includes(searchLower) ||
+          user.email?.toLowerCase().includes(searchLower) ||
+          user.first_name?.toLowerCase().includes(searchLower) ||
+          user.last_name?.toLowerCase().includes(searchLower) ||
+          user.phone_number?.toLowerCase().includes(searchLower)
+      );
+    }
+
+    // Apply pagination
+    const totalCount = filteredUsers.length;
+    const paginatedUsers = filteredUsers.slice(offset, offset + limitNum);
+
+    const totalPages = Math.ceil(totalCount / limitNum);
+    res.setHeader("X-Total-Count", totalCount.toString());
+    res.setHeader("X-Total-Pages", totalPages.toString());
+    res.setHeader("X-Current-Page", pageNum.toString());
+    res.setHeader("X-Per-Page", limitNum.toString());
+
+    successResponse(res, "Users retrieved successfully", paginatedUsers);
+  }
+);
+
+// Get all users in a program (for program leads)
+export const getProgramUsers = asyncHandler(async (req: any, res: any) => {
+  const { programId } = req.params;
+  const programIdNum = parseInt(programId);
+  const { page = 1, limit = 10, search } = req.query;
+  const pageNum = parseInt(page);
+  const limitNum = parseInt(limit);
+  const offset = (pageNum - 1) * limitNum;
+  const userId = req.user?.userId;
+
+  if (isNaN(programIdNum)) {
+    throw new ValidationError("Invalid program ID");
+  }
+
+  logger.info("Fetching all users in program", {
+    programId: programIdNum,
+    page: pageNum,
+    limit: limitNum,
+    search,
+    requestedBy: userId,
+  });
+
+  // Check if program exists
+  const program = await db
+    .select()
+    .from(Program)
+    .where(eq(Program.program_id, programIdNum))
+    .limit(1);
+
+  if (program.length === 0) {
+    throw new NotFoundError("Program not found");
+  }
+
+  // Check if user is a lead of this program
+  const userLead = await db
+    .select()
+    .from(UserProgramLead)
+    .where(
+      and(
+        eq(UserProgramLead.user_id, userId),
+        eq(UserProgramLead.program_id, programIdNum)
+      )
+    )
+    .limit(1);
+
+  if (userLead.length === 0) {
+    throw new ValidationError(
+      "You do not have permission to view users in this program"
+    );
+  }
+
+  // Get all users associated with the program
+  // Students: via StudentClassGroup -> ClassGroup -> Grade -> Program
+  const studentUsers = await db
+    .select({
+      user_id: User.user_id,
+      username: User.username,
+      email: User.email,
+      phone_number: User.phone_number,
+      status: User.status,
+      first_name: UserProfile.first_name,
+      last_name: UserProfile.last_name,
+      user_type: UserProfile.user_type,
+      role_name: Role.name,
+    })
+    .from(User)
+    .leftJoin(UserProfile, eq(User.user_id, UserProfile.user_id))
+    .innerJoin(StudentClassGroup, eq(User.user_id, StudentClassGroup.user_id))
+    .innerJoin(
+      ClassGroup,
+      eq(StudentClassGroup.class_group_id, ClassGroup.class_group_id)
+    )
+    .innerJoin(Grade, eq(ClassGroup.grade_id, Grade.grade_id))
+    .innerJoin(UserRole, eq(User.user_id, UserRole.user_id))
+    .innerJoin(Role, eq(UserRole.role_id, Role.role_id))
+    .where(
+      and(
+        eq(Grade.program_id, programIdNum),
+        eq(StudentClassGroup.status, "ACTIVE")
+      )
+    );
+
+  // Teachers: via TeacherSubjectAssignment -> ClassGroup -> Grade -> Program
+  const teacherUsers = await db
+    .select({
+      user_id: User.user_id,
+      username: User.username,
+      email: User.email,
+      phone_number: User.phone_number,
+      status: User.status,
+      first_name: UserProfile.first_name,
+      last_name: UserProfile.last_name,
+      user_type: UserProfile.user_type,
+      role_name: Role.name,
+    })
+    .from(User)
+    .leftJoin(UserProfile, eq(User.user_id, UserProfile.user_id))
+    .innerJoin(
+      TeacherSubjectAssignment,
+      eq(User.user_id, TeacherSubjectAssignment.user_id)
+    )
+    .innerJoin(
+      ClassGroup,
+      eq(TeacherSubjectAssignment.class_group_id, ClassGroup.class_group_id)
+    )
+    .innerJoin(Grade, eq(ClassGroup.grade_id, Grade.grade_id))
+    .innerJoin(UserRole, eq(User.user_id, UserRole.user_id))
+    .innerJoin(Role, eq(UserRole.role_id, Role.role_id))
+    .where(eq(Grade.program_id, programIdNum));
+
+  // Program leads: via UserProgramLead
+  const leadUsers = await db
+    .select({
+      user_id: User.user_id,
+      username: User.username,
+      email: User.email,
+      phone_number: User.phone_number,
+      status: User.status,
+      first_name: UserProfile.first_name,
+      last_name: UserProfile.last_name,
+      user_type: UserProfile.user_type,
+      role_name: Role.name,
+    })
+    .from(User)
+    .leftJoin(UserProfile, eq(User.user_id, UserProfile.user_id))
+    .innerJoin(UserProgramLead, eq(User.user_id, UserProgramLead.user_id))
+    .innerJoin(UserRole, eq(User.user_id, UserRole.user_id))
+    .innerJoin(Role, eq(UserRole.role_id, Role.role_id))
+    .where(eq(UserProgramLead.program_id, programIdNum));
+
+  // Combine all users
+  const allUsers = [...studentUsers, ...teacherUsers, ...leadUsers];
+
+  // Remove duplicates based on user_id
+  const uniqueUsers = allUsers.filter(
+    (user, index, self) =>
+      index === self.findIndex((u) => u.user_id === user.user_id)
+  );
+
+  // Apply search filter
+  let filteredUsers = uniqueUsers;
+  if (search) {
+    const searchLower = search.toLowerCase();
+    filteredUsers = uniqueUsers.filter(
+      (user) =>
+        user.username?.toLowerCase().includes(searchLower) ||
+        user.email?.toLowerCase().includes(searchLower) ||
+        user.first_name?.toLowerCase().includes(searchLower) ||
+        user.last_name?.toLowerCase().includes(searchLower) ||
+        user.phone_number?.toLowerCase().includes(searchLower) ||
+        user.role_name?.toLowerCase().includes(searchLower)
+    );
+  }
+
+  // Apply pagination
+  const totalCount = filteredUsers.length;
+  const paginatedUsers = filteredUsers.slice(offset, offset + limitNum);
+
+  const totalPages = Math.ceil(totalCount / limitNum);
+  res.setHeader("X-Total-Count", totalCount.toString());
+  res.setHeader("X-Total-Pages", totalPages.toString());
+  res.setHeader("X-Current-Page", pageNum.toString());
+  res.setHeader("X-Per-Page", limitNum.toString());
+
+  successResponse(res, "Users retrieved successfully", paginatedUsers);
+});
+
+// Get all programs associated with a user (as lead, student, or teacher)
+export const getUserPrograms = asyncHandler(async (req: any, res: any) => {
+  const { id } = req.params;
+  const userId = parseInt(id);
+
+  if (isNaN(userId)) {
+    throw new ValidationError("Invalid user ID");
+  }
+
+  logger.info("Fetching programs for user", {
+    userId,
+    requestedBy: req.user?.userId,
+  });
+
+  // Check if user exists
+  const user = await db
+    .select()
+    .from(User)
+    .where(eq(User.user_id, userId))
+    .limit(1);
+
+  if (user.length === 0) {
+    throw new NotFoundError("User not found");
+  }
+
+  // Get programs where user is a lead
+  const leadProgramsRaw = await db
+    .select({
+      program_id: Program.program_id,
+      name: Program.name,
+      description: Program.description,
+    })
+    .from(UserProgramLead)
+    .innerJoin(Program, eq(UserProgramLead.program_id, Program.program_id))
+    .where(eq(UserProgramLead.user_id, userId));
+
+  const leadPrograms = leadProgramsRaw.map((p) => ({
+    ...p,
+    relationship: "LEAD",
+  }));
+
+  // Get programs where user is a student
+  const studentProgramsRaw = await db
+    .select({
+      program_id: Program.program_id,
+      name: Program.name,
+      description: Program.description,
+    })
+    .from(StudentClassGroup)
+    .innerJoin(
+      ClassGroup,
+      eq(StudentClassGroup.class_group_id, ClassGroup.class_group_id)
+    )
+    .innerJoin(Grade, eq(ClassGroup.grade_id, Grade.grade_id))
+    .innerJoin(Program, eq(Grade.program_id, Program.program_id))
+    .where(
+      and(
+        eq(StudentClassGroup.user_id, userId),
+        eq(StudentClassGroup.status, "ACTIVE")
+      )
+    );
+
+  const studentPrograms = studentProgramsRaw.map((p) => ({
+    ...p,
+    relationship: "STUDENT",
+  }));
+
+  // Get programs where user is a teacher
+  const teacherProgramsRaw = await db
+    .select({
+      program_id: Program.program_id,
+      name: Program.name,
+      description: Program.description,
+    })
+    .from(TeacherSubjectAssignment)
+    .innerJoin(
+      ClassGroup,
+      eq(TeacherSubjectAssignment.class_group_id, ClassGroup.class_group_id)
+    )
+    .innerJoin(Grade, eq(ClassGroup.grade_id, Grade.grade_id))
+    .innerJoin(Program, eq(Grade.program_id, Program.program_id))
+    .where(eq(TeacherSubjectAssignment.user_id, userId));
+
+  const teacherPrograms = teacherProgramsRaw.map((p) => ({
+    ...p,
+    relationship: "TEACHER",
+  }));
+
+  // Combine all programs and remove duplicates, keeping the highest priority relationship
+  const allPrograms = [...leadPrograms, ...studentPrograms, ...teacherPrograms];
+  const uniquePrograms = allPrograms.filter(
+    (program, index, self) =>
+      index === self.findIndex((p) => p.program_id === program.program_id)
+  );
+
+  successResponse(res, "User programs retrieved successfully", uniquePrograms);
 });

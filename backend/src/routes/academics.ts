@@ -65,6 +65,11 @@ import {
   createClassGroup,
   updateClassGroup,
   deleteClassGroup,
+
+  // Program Users
+  getUsersByProgram,
+  assignUserToProgram,
+  removeUserFromProgram,
 } from "../controllers/academicController";
 import { authenticate, authorize } from "../middleware/auth";
 
@@ -103,12 +108,7 @@ router.delete(
 );
 
 // Academic Terms routes
-router.get(
-  "/terms",
-  authenticate,
-  authorize("MANAGE_ACADEMICS"),
-  getAcademicTerms
-);
+router.get("/terms", authenticate, getAcademicTerms);
 router.get(
   "/terms/:id",
   authenticate,
@@ -166,8 +166,33 @@ router.delete(
   deleteProgram
 );
 
+// Program Users routes
+router.get(
+  "/programs/:programId/users",
+  authenticate,
+  authorize("VIEW_PROGRAM_USERS"),
+  getUsersByProgram
+);
+router.post(
+  "/programs/assign-lead",
+  authenticate,
+  authorize("MANAGE_ACADEMICS"),
+  assignUserToProgram
+);
+router.delete(
+  "/programs/:program_id/leads/:user_id",
+  authenticate,
+  authorize("MANAGE_ACADEMICS"),
+  removeUserFromProgram
+);
+
 // Grades routes
-router.get("/grades", authenticate, authorize("MANAGE_ACADEMICS"), getGrades);
+router.get(
+  "/grades",
+  authenticate,
+  authorize(["MANAGE_ACADEMICS", "VIEW_PROGRAM_ACADEMICS"]),
+  getGrades
+);
 router.get(
   "/grades/:id",
   authenticate,
@@ -197,7 +222,7 @@ router.delete(
 router.get(
   "/grades/:grade_id/subjects",
   authenticate,
-  authorize("MANAGE_ACADEMICS"),
+  authorize(["MANAGE_ACADEMICS", "VIEW_PROGRAM_ACADEMICS"]),
   getGradeSubjects
 );
 router.post(
@@ -217,7 +242,6 @@ router.delete(
 router.get(
   "/teachers/:teacherId/subjects",
   authenticate,
-  authorize("MANAGE_ACADEMICS"),
   getTeacherSubjectAssignments
 );
 router.get(
@@ -240,12 +264,7 @@ router.delete(
 );
 
 // Subjects routes
-router.get(
-  "/subjects",
-  authenticate,
-  authorize("MANAGE_ACADEMICS"),
-  getSubjects
-);
+router.get("/subjects", authenticate, getSubjects);
 router.get(
   "/subjects/:id",
   authenticate,
@@ -272,12 +291,7 @@ router.delete(
 );
 
 // Class Groups routes
-router.get(
-  "/class-groups",
-  authenticate,
-  authorize("MANAGE_ACADEMICS"),
-  getClassGroups
-);
+router.get("/class-groups", authenticate, getClassGroups);
 router.get(
   "/class-groups/:id",
   authenticate,

@@ -2,7 +2,14 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { db } from "../db";
 import { eq } from "drizzle-orm";
-import { User, AuthCredential, UserProfile, OTP } from "../db/schema";
+import {
+  User,
+  AuthCredential,
+  UserProfile,
+  OTP,
+  Program,
+  UserProgramLead,
+} from "../db/schema";
 import { getUserPermissions } from "../utils/auth";
 import { sanitizeString, validateEmail } from "../utils/sanitization";
 import { sendOTPByEmail, verifyOTP as verifyOTPUtil } from "../utils/otp";
@@ -145,6 +152,17 @@ export const verifyOTP = asyncHandler(async (req: any, res: any) => {
     .where(eq(AuthCredential.user_id, userId))
     .limit(1);
 
+  // Get assigned programs for program leads
+  const assignedPrograms = await db
+    .select({
+      program_id: Program.program_id,
+      name: Program.name,
+      description: Program.description,
+    })
+    .from(UserProgramLead)
+    .innerJoin(Program, eq(UserProgramLead.program_id, Program.program_id))
+    .where(eq(UserProgramLead.user_id, userId));
+
   // Generate final JWT token
   const token = jwt.sign(
     { userId, username: user[0].username },
@@ -159,6 +177,7 @@ export const verifyOTP = asyncHandler(async (req: any, res: any) => {
     user: user[0],
     profile: profile[0] || null,
     permissions,
+    assignedPrograms,
     forcePasswordChange: auth[0]?.force_password_change === 1,
   });
 });

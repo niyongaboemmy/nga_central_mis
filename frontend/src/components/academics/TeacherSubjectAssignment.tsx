@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
   TeacherSubjectAssignment as TeacherSubjectAssignmentType,
   teacherSubjectAssignmentsApi,
@@ -12,6 +12,8 @@ import {
 import Button from "../ui/Button";
 import Modal from "../ui/Modal";
 import ConfirmModal from "../ui/ConfirmModal";
+import { usePermissions } from "../../hooks/usePermissions";
+import { Permissions } from "../../constants/permissions";
 import {
   BookOpen,
   Users,
@@ -42,6 +44,7 @@ const TeacherSubjectAssignment: React.FC<TeacherSubjectAssignmentProps> = ({
   onClose: _onClose,
   onSuccess,
 }) => {
+  const { hasPermission } = usePermissions();
   const [assignments, setAssignments] = useState<
     TeacherSubjectAssignmentType[]
   >([]);
@@ -60,13 +63,22 @@ const TeacherSubjectAssignment: React.FC<TeacherSubjectAssignmentProps> = ({
   });
   const [formErrors, setFormErrors] = useState<Partial<AssignmentFormData>>({});
   const [submitting, setSubmitting] = useState(false);
+  const loadedTeacherIdRef = useRef<number | null>(null);
 
   // Load data when modal opens
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && loadedTeacherIdRef.current !== teacherId) {
       loadData();
+      loadedTeacherIdRef.current = teacherId;
     }
   }, [isOpen, teacherId]);
+
+  // Reset loaded ref when modal closes
+  useEffect(() => {
+    if (!isOpen) {
+      loadedTeacherIdRef.current = null;
+    }
+  }, [isOpen]);
 
   const loadData = async () => {
     setLoading(true);
@@ -201,13 +213,15 @@ const TeacherSubjectAssignment: React.FC<TeacherSubjectAssignmentProps> = ({
               </p>
             </div>
           </div>
-          <Button
-            onClick={() => setShowAssignModal(true)}
-            className="flex items-center gap-2"
-          >
-            <Plus className="w-4 h-4" />
-            Assign Subject
-          </Button>
+          {hasPermission(Permissions.ASSIGN_TEACHER_SUBJECTS) && (
+            <Button
+              onClick={() => setShowAssignModal(true)}
+              className="flex items-center gap-2"
+            >
+              <Plus className="w-4 h-4" />
+              Assign Subject
+            </Button>
+          )}
         </div>
 
         {/* Assignments list */}
@@ -224,9 +238,11 @@ const TeacherSubjectAssignment: React.FC<TeacherSubjectAssignmentProps> = ({
             <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
               This teacher hasn't been assigned to any subjects yet.
             </p>
-            <Button onClick={() => setShowAssignModal(true)}>
-              Assign First Subject
-            </Button>
+            {hasPermission(Permissions.ASSIGN_TEACHER_SUBJECTS) && (
+              <Button onClick={() => setShowAssignModal(true)}>
+                Assign First Subject
+              </Button>
+            )}
           </div>
         ) : (
           <div className="space-y-6">
@@ -277,12 +293,16 @@ const TeacherSubjectAssignment: React.FC<TeacherSubjectAssignmentProps> = ({
                                 assignment.assigned_at
                               ).toLocaleDateString()}
                             </span>
-                            <button
-                              onClick={() => handleDelete(assignment)}
-                              className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
+                            {hasPermission(
+                              Permissions.ASSIGN_TEACHER_SUBJECTS
+                            ) && (
+                              <button
+                                onClick={() => handleDelete(assignment)}
+                                className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            )}
                           </div>
                         </div>
                       </div>

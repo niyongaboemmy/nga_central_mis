@@ -1,5 +1,5 @@
 import { db } from "../db";
-import { eq, and, sql, SQL } from "drizzle-orm";
+import { eq, and, or, sql, SQL } from "drizzle-orm";
 import {
   AcademicYear,
   AcademicTerm,
@@ -13,6 +13,7 @@ import {
   StudentClassGroup,
   User,
   UserProfile,
+  UserProgramLead,
 } from "../db/schema";
 import { sanitizeString } from "../utils/sanitization";
 import {
@@ -597,13 +598,41 @@ export const deleteProgram = asyncHandler(async (req: any, res: any) => {
 // Grades Management
 export const getGrades = asyncHandler(async (req: any, res: any) => {
   const { program_id } = req.query;
+  const userPermissions = req.user.permissions;
 
   let whereCondition = undefined;
+
+  // If user has VIEW_PROGRAM_ACADEMICS but not MANAGE_ACADEMICS,
+  // they can only view grades from their assigned programs
+  if (
+    userPermissions.includes("VIEW_PROGRAM_ACADEMICS") &&
+    !userPermissions.includes("MANAGE_ACADEMICS")
+  ) {
+    // Get user's assigned programs
+    const userPrograms = await db
+      .select({ program_id: UserProgramLead.program_id })
+      .from(UserProgramLead)
+      .where(eq(UserProgramLead.user_id, req.user.userId));
+
+    const assignedProgramIds = userPrograms.map((up) => up.program_id);
+
+    if (assignedProgramIds.length === 0) {
+      return successResponse(res, "Grades retrieved successfully", []);
+    }
+
+    whereCondition = and(
+      whereCondition || undefined,
+      sql`${Grade.program_id} IN (${assignedProgramIds.join(",")})`
+    );
+  }
 
   if (program_id) {
     const progId = parseInt(program_id as string);
     if (!isNaN(progId)) {
-      whereCondition = eq(Grade.program_id, progId);
+      whereCondition = and(
+        whereCondition || undefined,
+        eq(Grade.program_id, progId)
+      );
     }
   }
 
@@ -782,6 +811,36 @@ export const deleteGrade = asyncHandler(async (req: any, res: any) => {
 // Subjects Management
 export const getSubjects = asyncHandler(async (req: any, res: any) => {
   logger.info("Fetching all subjects");
+  const userPermissions = req.user.permissions;
+
+  let whereCondition: SQL<unknown> = eq(Subject.status, "ACTIVE");
+
+  // If user has VIEW_PROGRAM_ACADEMICS but not MANAGE_ACADEMICS,
+  // filter to only subjects assigned to grades in their programs
+  if (
+    userPermissions.includes("VIEW_PROGRAM_ACADEMICS") &&
+    !userPermissions.includes("MANAGE_ACADEMICS")
+  ) {
+    // Get user's assigned programs
+    const userPrograms = await db
+      .select({ program_id: UserProgramLead.program_id })
+      .from(UserProgramLead)
+      .where(eq(UserProgramLead.user_id, req.user.userId));
+
+    const assignedProgramIds = userPrograms.map((up) => up.program_id);
+
+    if (assignedProgramIds.length === 0) {
+      return successResponse(res, "Subjects retrieved successfully", []);
+    }
+
+    whereCondition = and(
+      whereCondition,
+      or(
+        sql`${Program.program_id} IN (${assignedProgramIds.join(",")})`,
+        sql`${Grade.grade_id} IS NULL`
+      )
+    )!;
+  }
 
   const subjects = await db
     .select({
@@ -793,15 +852,24 @@ export const getSubjects = asyncHandler(async (req: any, res: any) => {
       grade_name: Grade.name,
       program_id: Program.program_id,
       program_name: Program.name,
+      teacher_id: User.user_id,
+      teacher_name: sql`CONCAT(${UserProfile.first_name}, ' ', ${UserProfile.last_name})`,
+      teacher_username: User.username,
     })
     .from(Subject)
     .leftJoin(GradeSubject, eq(Subject.subject_id, GradeSubject.subject_id))
     .leftJoin(Grade, eq(GradeSubject.grade_id, Grade.grade_id))
     .leftJoin(Program, eq(Grade.program_id, Program.program_id))
-    .where(eq(Subject.status, "ACTIVE"))
+    .leftJoin(
+      TeacherSubjectAssignment,
+      eq(Subject.subject_id, TeacherSubjectAssignment.subject_id)
+    )
+    .leftJoin(User, eq(TeacherSubjectAssignment.user_id, User.user_id))
+    .leftJoin(UserProfile, eq(User.user_id, UserProfile.user_id))
+    .where(whereCondition)
     .orderBy(Subject.name);
 
-  // Group subjects by subject_id and collect their grades/programs
+  // Group subjects by subject_id and collect their grades/programs and teachers
   const subjectMap = new Map<number, any>();
 
   subjects.forEach((row) => {
@@ -813,6 +881,7 @@ export const getSubjects = asyncHandler(async (req: any, res: any) => {
         name: row.name,
         description: row.description,
         grades: [],
+        teachers: [],
       });
     }
 
@@ -824,6 +893,22 @@ export const getSubjects = asyncHandler(async (req: any, res: any) => {
         program_name: row.program_name,
       });
     }
+
+    if (row.teacher_id) {
+      subjectMap.get(subjectId).teachers.push({
+        teacher_id: row.teacher_id,
+        teacher_name: row.teacher_name,
+        teacher_username: row.teacher_username,
+      });
+    }
+  });
+
+  // Remove duplicate teachers
+  subjectMap.forEach((subject) => {
+    subject.teachers = subject.teachers.filter(
+      (teacher: any, index: number, self: any[]) =>
+        index === self.findIndex((t) => t.teacher_id === teacher.teacher_id)
+    );
   });
 
   const result = Array.from(subjectMap.values());
@@ -981,13 +1066,14 @@ export const deleteSubject = asyncHandler(async (req: any, res: any) => {
 
 // Grade-Subject Assignment Management
 export const getGradeSubjects = asyncHandler(async (req: any, res: any) => {
-  const { grade_id } = req.query;
+  const { grade_id } = req.params;
+  const userPermissions = req.user.permissions;
 
   if (!grade_id) {
     throw new ValidationError("Grade ID is required");
   }
 
-  const gradeId = parseInt(grade_id as string);
+  const gradeId = parseInt(grade_id);
   if (isNaN(gradeId)) {
     throw new ValidationError("Invalid grade ID");
   }
@@ -1001,6 +1087,27 @@ export const getGradeSubjects = asyncHandler(async (req: any, res: any) => {
 
   if (grade.length === 0) {
     throw new NotFoundError("Grade not found");
+  }
+
+  // If user has VIEW_PROGRAM_ACADEMICS but not MANAGE_ACADEMICS,
+  // verify that the grade belongs to one of their assigned programs
+  if (
+    userPermissions.includes("VIEW_PROGRAM_ACADEMICS") &&
+    !userPermissions.includes("MANAGE_ACADEMICS")
+  ) {
+    // Get user's assigned programs
+    const userPrograms = await db
+      .select({ program_id: UserProgramLead.program_id })
+      .from(UserProgramLead)
+      .where(eq(UserProgramLead.user_id, req.user.userId));
+
+    const assignedProgramIds = userPrograms.map((up) => up.program_id);
+
+    if (!assignedProgramIds.includes(grade[0].program_id)) {
+      throw new ValidationError(
+        "Access denied: Grade not in your assigned programs"
+      );
+    }
   }
 
   const gradeSubjects = await db
@@ -1436,27 +1543,60 @@ export const removeTeacherFromSubject = asyncHandler(
 // Class Groups Management
 export const getClassGroups = asyncHandler(async (req: any, res: any) => {
   const { academic_year_id, grade_id } = req.query;
+  const userPermissions = req.user.permissions;
 
-  let whereCondition = undefined;
+  let whereCondition: SQL<unknown> | undefined = undefined;
+
+  // If user has VIEW_PROGRAM_ACADEMICS but not MANAGE_ACADEMICS,
+  // filter to only class groups in grades from their programs
+  if (
+    userPermissions.includes("VIEW_PROGRAM_ACADEMICS") &&
+    !userPermissions.includes("MANAGE_ACADEMICS")
+  ) {
+    // Get user's assigned programs
+    const userPrograms = await db
+      .select({ program_id: UserProgramLead.program_id })
+      .from(UserProgramLead)
+      .where(eq(UserProgramLead.user_id, req.user.userId));
+
+    const assignedProgramIds = userPrograms.map((up) => up.program_id);
+
+    if (assignedProgramIds.length === 0) {
+      return successResponse(res, "Class groups retrieved successfully", []);
+    }
+
+    whereCondition = sql`${Program.program_id} IN (${assignedProgramIds.join(
+      ","
+    )})`;
+  }
 
   if (academic_year_id && grade_id) {
     const yearId = parseInt(academic_year_id as string);
     const grdId = parseInt(grade_id as string);
     if (!isNaN(yearId) && !isNaN(grdId)) {
-      whereCondition = and(
+      const yearGradeCondition = and(
         eq(ClassGroup.academic_year_id, yearId),
         eq(ClassGroup.grade_id, grdId)
       );
+      whereCondition = whereCondition
+        ? and(whereCondition, yearGradeCondition)!
+        : yearGradeCondition;
     }
   } else if (academic_year_id) {
     const yearId = parseInt(academic_year_id as string);
     if (!isNaN(yearId)) {
-      whereCondition = eq(ClassGroup.academic_year_id, yearId);
+      const yearCondition = eq(ClassGroup.academic_year_id, yearId);
+      whereCondition = whereCondition
+        ? and(whereCondition, yearCondition)!
+        : yearCondition;
     }
   } else if (grade_id) {
     const grdId = parseInt(grade_id as string);
     if (!isNaN(grdId)) {
-      whereCondition = eq(ClassGroup.grade_id, grdId);
+      const gradeCondition = eq(ClassGroup.grade_id, grdId);
+      whereCondition = whereCondition
+        ? and(whereCondition, gradeCondition)!
+        : gradeCondition;
     }
   }
 
@@ -2341,5 +2481,216 @@ export const removeStudentFromClassGroup = asyncHandler(
       res,
       "Student removed from class group and subject enrollments disabled successfully"
     );
+  }
+);
+
+// Get users by program (for program leads)
+export const getUsersByProgram = asyncHandler(async (req: any, res: any) => {
+  const { programId } = req.params;
+  const { page = 1, limit = 10, search, status } = req.query;
+
+  const programIdNum = parseInt(programId);
+  if (isNaN(programIdNum)) {
+    throw new ValidationError("Invalid program ID");
+  }
+
+  // Verify program exists
+  const program = await db
+    .select()
+    .from(Program)
+    .where(eq(Program.program_id, programIdNum))
+    .limit(1);
+
+  if (program.length === 0) {
+    throw new NotFoundError("Program not found");
+  }
+
+  const pageNum = parseInt(page);
+  const limitNum = parseInt(limit);
+  const offset = (pageNum - 1) * limitNum;
+
+  let whereConditions: any[] = [];
+
+  if (search) {
+    whereConditions.push(
+      or(
+        sql`${User.username} LIKE ${`%${search}%`}`,
+        sql`${User.email} LIKE ${`%${search}%`}`,
+        sql`${UserProfile.first_name} LIKE ${`%${search}%`}`,
+        sql`${UserProfile.last_name} LIKE ${`%${search}%`}`
+      )
+    );
+  }
+
+  if (status && status !== "all") {
+    whereConditions.push(eq(User.status, status.toUpperCase()));
+  }
+
+  // Get users who are in grades of this program
+  const totalCountResult = await db
+    .select({ count: sql<number>`count(distinct ${User.user_id})` })
+    .from(User)
+    .innerJoin(UserProfile, eq(User.user_id, UserProfile.user_id))
+    .innerJoin(StudentClassGroup, eq(User.user_id, StudentClassGroup.user_id))
+    .innerJoin(
+      ClassGroup,
+      eq(StudentClassGroup.class_group_id, ClassGroup.class_group_id)
+    )
+    .innerJoin(Grade, eq(ClassGroup.grade_id, Grade.grade_id))
+    .where(
+      and(
+        eq(Grade.program_id, programIdNum),
+        eq(StudentClassGroup.status, "ACTIVE"),
+        ...whereConditions
+      )
+    );
+
+  const totalCount = totalCountResult[0]?.count || 0;
+
+  const users = await db
+    .select({
+      user_id: User.user_id,
+      username: User.username,
+      email: User.email,
+      phone_number: User.phone_number,
+      status: User.status,
+      first_name: UserProfile.first_name,
+      last_name: UserProfile.last_name,
+      user_type: UserProfile.user_type,
+      grade_name: Grade.name,
+      class_group_name: ClassGroup.name,
+    })
+    .from(User)
+    .innerJoin(UserProfile, eq(User.user_id, UserProfile.user_id))
+    .innerJoin(StudentClassGroup, eq(User.user_id, StudentClassGroup.user_id))
+    .innerJoin(
+      ClassGroup,
+      eq(StudentClassGroup.class_group_id, ClassGroup.class_group_id)
+    )
+    .innerJoin(Grade, eq(ClassGroup.grade_id, Grade.grade_id))
+    .where(
+      and(
+        eq(Grade.program_id, programIdNum),
+        eq(StudentClassGroup.status, "ACTIVE"),
+        ...whereConditions
+      )
+    )
+    .limit(limitNum)
+    .offset(offset)
+    .orderBy(UserProfile.first_name, UserProfile.last_name);
+
+  const totalPages = Math.ceil(totalCount / limitNum);
+
+  res.setHeader("X-Total-Count", totalCount.toString());
+  res.setHeader("X-Total-Pages", totalPages.toString());
+  res.setHeader("X-Current-Page", pageNum.toString());
+  res.setHeader("X-Per-Page", limitNum.toString());
+
+  successResponse(res, "Users retrieved successfully", users);
+});
+
+// Assign user to program as lead
+export const assignUserToProgram = asyncHandler(async (req: any, res: any) => {
+  const { user_id, program_id } = req.body;
+
+  if (!user_id || !program_id) {
+    throw new ValidationError("User ID and Program ID are required");
+  }
+
+  const userId = parseInt(user_id);
+  const programId = parseInt(program_id);
+
+  if (isNaN(userId) || isNaN(programId)) {
+    throw new ValidationError("Invalid user ID or program ID");
+  }
+
+  // Verify user exists
+  const user = await db
+    .select()
+    .from(User)
+    .where(eq(User.user_id, userId))
+    .limit(1);
+
+  if (user.length === 0) {
+    throw new NotFoundError("User not found");
+  }
+
+  // Verify program exists
+  const program = await db
+    .select()
+    .from(Program)
+    .where(eq(Program.program_id, programId))
+    .limit(1);
+
+  if (program.length === 0) {
+    throw new NotFoundError("Program not found");
+  }
+
+  // Check if assignment already exists
+  const existingAssignment = await db
+    .select()
+    .from(UserProgramLead)
+    .where(
+      and(
+        eq(UserProgramLead.user_id, userId),
+        eq(UserProgramLead.program_id, programId)
+      )
+    )
+    .limit(1);
+
+  if (existingAssignment.length > 0) {
+    throw new ConflictError("User is already assigned to this program");
+  }
+
+  await db.insert(UserProgramLead).values({
+    user_id: userId,
+    program_id: programId,
+  });
+
+  logger.info("User assigned to program as lead", { userId, programId });
+
+  successResponse(res, "User assigned to program successfully", null, 201);
+});
+
+// Remove user from program lead
+export const removeUserFromProgram = asyncHandler(
+  async (req: any, res: any) => {
+    const { user_id, program_id } = req.params;
+
+    const userId = parseInt(user_id);
+    const programId = parseInt(program_id);
+
+    if (isNaN(userId) || isNaN(programId)) {
+      throw new ValidationError("Invalid user ID or program ID");
+    }
+
+    // Check if assignment exists
+    const existingAssignment = await db
+      .select()
+      .from(UserProgramLead)
+      .where(
+        and(
+          eq(UserProgramLead.user_id, userId),
+          eq(UserProgramLead.program_id, programId)
+        )
+      )
+      .limit(1);
+
+    if (existingAssignment.length === 0) {
+      throw new NotFoundError("User is not assigned to this program");
+    }
+
+    await db
+      .delete(UserProgramLead)
+      .where(
+        and(
+          eq(UserProgramLead.user_id, userId),
+          eq(UserProgramLead.program_id, programId)
+        )
+      );
+
+    logger.info("User removed from program lead", { userId, programId });
+
+    successResponse(res, "User removed from program successfully");
   }
 );

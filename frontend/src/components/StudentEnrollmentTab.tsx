@@ -24,6 +24,8 @@ import {
   ClassGroup,
 } from "../api/academics";
 import { useToast } from "../contexts/ToastContext";
+import { usePermissions } from "../hooks/usePermissions";
+import { Permissions } from "../constants/permissions";
 
 interface StudentEnrollmentTabProps {
   studentId: number;
@@ -41,6 +43,7 @@ const StudentEnrollmentTab: React.FC<StudentEnrollmentTabProps> = ({
   showHeader = true,
 }) => {
   const { showToast } = useToast();
+  const { hasPermission } = usePermissions();
   const [enrolledSubjects, setEnrolledSubjects] = useState<
     StudentEnrolledSubject[]
   >([]);
@@ -375,12 +378,16 @@ const StudentEnrollmentTab: React.FC<StudentEnrollmentTabProps> = ({
                       >
                         Continue to Subjects
                       </button>
-                      <button
-                        onClick={handleRemoveClassGroup}
-                        className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-full transition-colors"
-                      >
-                        Remove
-                      </button>
+                      {hasPermission(
+                        Permissions.ASSIGN_STUDENT_CLASS_GROUPS
+                      ) && (
+                        <button
+                          onClick={handleRemoveClassGroup}
+                          className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-full transition-colors"
+                        >
+                          Remove
+                        </button>
+                      )}
                     </div>
                   </div>
 
@@ -418,25 +425,29 @@ const StudentEnrollmentTab: React.FC<StudentEnrollmentTabProps> = ({
                                   </p>
                                 </div>
                               </div>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleAssignClassGroup(
-                                    classGroup.class_group_id
-                                  );
-                                }}
-                                disabled={assigningClassGroup}
-                                className="flex items-center gap-2 px-4 py-2 border border-blue-500 hover:border-blue-700 text-blue-600 dark:text-white hover:bg-blue-600 hover:text-white text-sm font-medium rounded-full transition-colors disabled:opacity-50"
-                              >
-                                {assigningClassGroup ? (
-                                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                                ) : (
-                                  <>
-                                    <ArrowRight className="w-4 h-4" />
-                                    Change To This
-                                  </>
-                                )}
-                              </button>
+                              {hasPermission(
+                                Permissions.ASSIGN_STUDENT_CLASS_GROUPS
+                              ) && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleAssignClassGroup(
+                                      classGroup.class_group_id
+                                    );
+                                  }}
+                                  disabled={assigningClassGroup}
+                                  className="flex items-center gap-2 px-4 py-2 border border-blue-500 hover:border-blue-700 text-blue-600 dark:text-white hover:bg-blue-600 hover:text-white text-sm font-medium rounded-full transition-colors disabled:opacity-50"
+                                >
+                                  {assigningClassGroup ? (
+                                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                                  ) : (
+                                    <>
+                                      <ArrowRight className="w-4 h-4" />
+                                      Change To This
+                                    </>
+                                  )}
+                                </button>
+                              )}
                             </div>
                           </motion.div>
                         ))}
@@ -483,25 +494,29 @@ const StudentEnrollmentTab: React.FC<StudentEnrollmentTabProps> = ({
                                 </p>
                               </div>
                             </div>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleAssignClassGroup(
-                                  classGroup.class_group_id
-                                );
-                              }}
-                              disabled={assigningClassGroup}
-                              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-full transition-colors disabled:opacity-50"
-                            >
-                              {assigningClassGroup ? (
-                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                              ) : (
-                                <>
-                                  <Plus className="w-4 h-4" />
-                                  Assign
-                                </>
-                              )}
-                            </button>
+                            {hasPermission(
+                              Permissions.ASSIGN_STUDENT_CLASS_GROUPS
+                            ) && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleAssignClassGroup(
+                                    classGroup.class_group_id
+                                  );
+                                }}
+                                disabled={assigningClassGroup}
+                                className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-full transition-colors disabled:opacity-50"
+                              >
+                                {assigningClassGroup ? (
+                                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                                ) : (
+                                  <>
+                                    <Plus className="w-4 h-4" />
+                                    Assign
+                                  </>
+                                )}
+                              </button>
+                            )}
                           </div>
                         </motion.div>
                       ))}
@@ -576,13 +591,15 @@ const StudentEnrollmentTab: React.FC<StudentEnrollmentTabProps> = ({
                   <h5 className="text-md font-bold text-gray-900 dark:text-white">
                     Enrolled Subjects ({enrolledSubjects.length})
                   </h5>
-                  <button
-                    onClick={openEnrollModal}
-                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-full transition-colors"
-                  >
-                    <Plus className="w-4 h-4" />
-                    Add Subject
-                  </button>
+                  {hasPermission(Permissions.MANAGE_STUDENT_ENROLLMENTS) && (
+                    <button
+                      onClick={openEnrollModal}
+                      className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-full transition-colors"
+                    >
+                      <Plus className="w-4 h-4" />
+                      Add Subject
+                    </button>
+                  )}
                 </div>
 
                 {loading ? (
@@ -627,18 +644,22 @@ const StudentEnrollmentTab: React.FC<StudentEnrollmentTabProps> = ({
                               </p>
                             </div>
                           </div>
-                          <button
-                            onClick={() => handleUnenroll(subject.subject_id)}
-                            disabled={unenrolling === subject.enrollment_id}
-                            className="flex items-center gap-2 px-3 py-1.5 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/30 text-sm font-medium rounded-full transition-colors disabled:opacity-50"
-                          >
-                            {unenrolling === subject.enrollment_id ? (
-                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-600"></div>
-                            ) : (
-                              <X className="w-4 h-4" />
-                            )}
-                            Remove
-                          </button>
+                          {hasPermission(
+                            Permissions.MANAGE_STUDENT_ENROLLMENTS
+                          ) && (
+                            <button
+                              onClick={() => handleUnenroll(subject.subject_id)}
+                              disabled={unenrolling === subject.enrollment_id}
+                              className="flex items-center gap-2 px-3 py-1.5 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/30 text-sm font-medium rounded-full transition-colors disabled:opacity-50"
+                            >
+                              {unenrolling === subject.enrollment_id ? (
+                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-600"></div>
+                              ) : (
+                                <X className="w-4 h-4" />
+                              )}
+                              Remove
+                            </button>
+                          )}
                         </div>
                       </motion.div>
                     ))}
@@ -739,18 +760,22 @@ const StudentEnrollmentTab: React.FC<StudentEnrollmentTabProps> = ({
                             </p>
                           )}
                         </div>
-                        <button
-                          onClick={() => handleEnroll(subject.subject_id)}
-                          disabled={enrolling === subject.subject_id}
-                          className="flex items-center gap-2 px-3 py-1.5 pr-5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-full transition-colors disabled:opacity-50"
-                        >
-                          {enrolling === subject.subject_id ? (
-                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                          ) : (
-                            <Plus className="w-4 h-4" />
-                          )}
-                          Add
-                        </button>
+                        {hasPermission(
+                          Permissions.MANAGE_STUDENT_ENROLLMENTS
+                        ) && (
+                          <button
+                            onClick={() => handleEnroll(subject.subject_id)}
+                            disabled={enrolling === subject.subject_id}
+                            className="flex items-center gap-2 px-3 py-1.5 pr-5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-full transition-colors disabled:opacity-50"
+                          >
+                            {enrolling === subject.subject_id ? (
+                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                            ) : (
+                              <Plus className="w-4 h-4" />
+                            )}
+                            Add
+                          </button>
+                        )}
                       </div>
                     ))
                   )}

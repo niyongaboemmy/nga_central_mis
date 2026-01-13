@@ -319,3 +319,40 @@ export const studentClassGroupApi = {
   remove: (studentId: number, classGroupId: number) =>
     api.delete(`/academics/students/${studentId}/class-groups/${classGroupId}`),
 };
+
+// Program Users API
+export interface ProgramUser {
+  user_id: number;
+  username: string;
+  email: string;
+  phone_number?: string;
+  status: string;
+  first_name?: string;
+  last_name?: string;
+  user_type?: string;
+  grade_name?: string;
+  class_group_name?: string;
+}
+
+export const programUsersApi = {
+  getByProgram: (
+    programId: number,
+    params?: {
+      page?: number;
+      limit?: number;
+      search?: string;
+      status?: string;
+    }
+  ) =>
+    api.get<{ data: ProgramUser[] }>(`/academics/programs/${programId}/users`, {
+      params,
+    }),
+};
+
+// Program Leads API
+export const programLeadsApi = {
+  assign: (data: { user_id: number; program_id: number }) =>
+    api.post("/academics/programs/assign-lead", data),
+  remove: (programId: number, userId: number) =>
+    api.delete(`/academics/programs/${programId}/leads/${userId}`),
+};

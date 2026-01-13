@@ -27,6 +27,8 @@ import "./App.css";
 import Documents from "./components/documents/Documents";
 import Academics from "./components/Academics";
 import TeacherAssignedSubjects from "./components/TeacherAssignedSubjects";
+import ProgramUsersPage from "./components/ProgramUsersPage";
+import ProgramAcademicPage from "./components/ProgramAcademicPage";
 
 // Wrapper components for pages that need the Navbar
 const LandingPage: React.FC = () => {
@@ -216,6 +218,16 @@ const UsersPage: React.FC = () => {
   return <Users />;
 };
 
+// Program Users page with sidebar
+const ProgramUsersPageWrapper: React.FC = () => {
+  return <ProgramUsersPage />;
+};
+
+// Program Academic page with sidebar
+const ProgramAcademicPageWrapper: React.FC = () => {
+  return <ProgramAcademicPage />;
+};
+
 // Initialize toast store for API interceptor
 const ToastInitializer: React.FC<{ children: React.ReactNode }> = ({
   children,
@@ -363,6 +375,30 @@ function App() {
                   <ProtectedRoute>
                     <SystemLayoutWrapper>
                       <UsersPage />
+                    </SystemLayoutWrapper>
+                  </ProtectedRoute>
+                }
+              />
+
+              {/* Program Users page - protected with sidebar */}
+              <Route
+                path="/program-users"
+                element={
+                  <ProtectedRoute>
+                    <SystemLayoutWrapper>
+                      <ProgramUsersPageWrapper />
+                    </SystemLayoutWrapper>
+                  </ProtectedRoute>
+                }
+              />
+
+              {/* Program Academic page - protected with sidebar */}
+              <Route
+                path="/program-academics"
+                element={
+                  <ProtectedRoute>
+                    <SystemLayoutWrapper>
+                      <ProgramAcademicPageWrapper />
                     </SystemLayoutWrapper>
                   </ProtectedRoute>
                 }

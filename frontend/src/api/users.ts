@@ -37,7 +37,14 @@ export interface UserWithProfile {
   profile: UserProfile | null;
   roles?: UserRole[];
   permissions?: string[];
+  assignedPrograms?: Program[];
   forcePasswordChange?: boolean;
+}
+
+export interface Program {
+  program_id: number;
+  name: string;
+  description?: string;
 }
 
 export interface UserRole {
@@ -201,6 +208,34 @@ export const getUser = async (
   try {
     const response = await api.get<BackendResponse<UserWithProfile>>(
       `/users/${id}`
+    );
+    if (onSuccess && response.data.data) {
+      onSuccess(response.data.data);
+    }
+    return response.data.data;
+  } catch (error) {
+    if (onError) {
+      onError(error);
+    }
+    throw error;
+  }
+};
+
+export interface UserProgram {
+  program_id: number;
+  name: string;
+  description?: string;
+  relationship: string;
+}
+
+export const getUserPrograms = async (
+  userId: number,
+  onSuccess?: (programs: UserProgram[]) => void,
+  onError?: (error: any) => void
+): Promise<UserProgram[] | void> => {
+  try {
+    const response = await api.get<BackendResponse<UserProgram[]>>(
+      `/users/${userId}/programs`
     );
     if (onSuccess && response.data.data) {
       onSuccess(response.data.data);
@@ -752,6 +787,141 @@ export const getRolePermissions = async (
       onSuccess(response.data.data);
     }
     return response.data.data;
+  } catch (error) {
+    if (onError) {
+      onError(error);
+    }
+    throw error;
+  }
+};
+
+// ==================== Program-based User Management ====================
+
+export const getProgramRoles = async (
+  programId: number,
+  onSuccess?: (roles: Role[]) => void,
+  onError?: (error: any) => void
+): Promise<Role[] | void> => {
+  try {
+    const response = await api.get<BackendResponse<Role[]>>(
+      `/users/programs/${programId}/roles`
+    );
+    if (onSuccess && response.data.data) {
+      onSuccess(response.data.data);
+    }
+    return response.data.data;
+  } catch (error) {
+    if (onError) {
+      onError(error);
+    }
+    throw error;
+  }
+};
+
+export interface ProgramUser {
+  user_id: number;
+  username: string;
+  email: string;
+  phone_number?: string;
+  status: string;
+  first_name?: string;
+  last_name?: string;
+  user_type?: string;
+}
+
+export const getProgramUsersByRole = async (
+  programId: number,
+  roleId: number,
+  params?: {
+    page?: number;
+    limit?: number;
+    search?: string;
+  },
+  onSuccess?: (users: {
+    users: ProgramUser[];
+    total: number;
+    page: number;
+    totalPages: number;
+  }) => void,
+  onError?: (error: any) => void
+): Promise<{
+  users: ProgramUser[];
+  total: number;
+  page: number;
+  totalPages: number;
+} | void> => {
+  try {
+    const response = await api.get<BackendResponse<ProgramUser[]>>(
+      `/users/programs/${programId}/roles/${roleId}/users`,
+      { params }
+    );
+
+    const total = parseInt(response.headers["x-total-count"] || "0");
+    const totalPages = Math.ceil(total / (params?.limit || 10));
+
+    const result = {
+      users: response.data.data || [],
+      total,
+      page: params?.page || 1,
+      totalPages,
+    };
+
+    if (onSuccess) {
+      onSuccess(result);
+    }
+    return result;
+  } catch (error) {
+    if (onError) {
+      onError(error);
+    }
+    throw error;
+  }
+};
+
+export interface ProgramUserWithRole extends ProgramUser {
+  role_name?: string;
+}
+
+export const getProgramUsers = async (
+  programId: number,
+  params?: {
+    page?: number;
+    limit?: number;
+    search?: string;
+  },
+  onSuccess?: (users: {
+    users: ProgramUserWithRole[];
+    total: number;
+    page: number;
+    totalPages: number;
+  }) => void,
+  onError?: (error: any) => void
+): Promise<{
+  users: ProgramUserWithRole[];
+  total: number;
+  page: number;
+  totalPages: number;
+} | void> => {
+  try {
+    const response = await api.get<BackendResponse<ProgramUserWithRole[]>>(
+      `/users/programs/${programId}/users`,
+      { params }
+    );
+
+    const total = parseInt(response.headers["x-total-count"] || "0");
+    const totalPages = Math.ceil(total / (params?.limit || 10));
+
+    const result = {
+      users: response.data.data || [],
+      total,
+      page: params?.page || 1,
+      totalPages,
+    };
+
+    if (onSuccess) {
+      onSuccess(result);
+    }
+    return result;
   } catch (error) {
     if (onError) {
       onError(error);

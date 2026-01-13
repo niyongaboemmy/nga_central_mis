@@ -27,8 +27,13 @@ import {
   Role,
   enableUser,
   disableUser,
+  getUserPrograms,
+  UserProgram,
 } from "../api/users";
+import { programsApi, Program, programLeadsApi } from "../api/academics";
 import { useToast } from "../contexts/ToastContext";
+import { usePermissions } from "../hooks/usePermissions";
+import { Permissions } from "../constants/permissions";
 import TeacherSubjectAssignment from "./academics/TeacherSubjectAssignment";
 import StudentEnrollmentTab from "./StudentEnrollmentTab";
 
@@ -217,13 +222,43 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
   user,
 }) => {
   const { showToast } = useToast();
+  const { hasPermission } = usePermissions();
   const [activeTab, setActiveTab] = React.useState<
-    "info" | "roles" | "subjects" | "enrollment" | "activity"
+    "info" | "roles" | "programs" | "subjects" | "enrollment" | "activity"
   >("info");
   const [showAddRoleModal, setShowAddRoleModal] = React.useState(false);
   const [availableRoles, setAvailableRoles] = React.useState<Role[]>([]);
   const [assigningRole, setAssigningRole] = React.useState(false);
   const [changingStatus, setChangingStatus] = React.useState(false);
+  const [availablePrograms, setAvailablePrograms] = React.useState<Program[]>(
+    []
+  );
+  const [userPrograms, setUserPrograms] = React.useState<UserProgram[]>([]);
+  const [showAddProgramModal, setShowAddProgramModal] = React.useState(false);
+  const [assigningProgram, setAssigningProgram] = React.useState(false);
+  const [loadingPrograms, setLoadingPrograms] = React.useState(false);
+
+  // Load user programs when modal opens
+  React.useEffect(() => {
+    if (user && isOpen) {
+      loadUserPrograms();
+    }
+  }, [user, isOpen]);
+
+  const loadUserPrograms = async () => {
+    if (!user) return;
+    setLoadingPrograms(true);
+    try {
+      const programs = await getUserPrograms(user.user.user_id);
+      if (programs) {
+        setUserPrograms(programs);
+      }
+    } catch (error) {
+      console.error("Failed to load user programs:", error);
+    } finally {
+      setLoadingPrograms(false);
+    }
+  };
 
   if (!user) return null;
 
@@ -239,6 +274,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
   const tabs = [
     { id: "info", label: "Info", icon: UserIcon },
     { id: "roles", label: "Roles", icon: Shield },
+    { id: "programs", label: "Programs", icon: Building },
     ...(getUserType() === "TEACHER"
       ? [{ id: "subjects", label: "Subjects", icon: BookOpen }]
       : []),
@@ -297,6 +333,54 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
       setShowAddRoleModal(true);
     } catch (error) {
       showToast("Failed to load available roles", "error");
+    }
+  };
+
+  const openAddProgramModal = async () => {
+    try {
+      const response = await programsApi.getAll();
+      const programs = response.data.data;
+      if (programs) {
+        setAvailablePrograms(programs);
+      }
+      setShowAddProgramModal(true);
+    } catch (error) {
+      showToast("Failed to load available programs", "error");
+    }
+  };
+
+  const handleAssignProgram = async (programId: number) => {
+    setAssigningProgram(true);
+    try {
+      await programLeadsApi.assign({
+        user_id: user.user.user_id,
+        program_id: programId,
+      });
+      showToast("Program assigned successfully", "success");
+      // Refresh user programs
+      await loadUserPrograms();
+    } catch (error: any) {
+      showToast(
+        error.response?.data?.message || "Failed to assign program",
+        "error"
+      );
+    } finally {
+      setAssigningProgram(false);
+      setShowAddProgramModal(false);
+    }
+  };
+
+  const handleRemoveProgram = async (programId: number) => {
+    try {
+      await programLeadsApi.remove(programId, user.user.user_id);
+      showToast("Program removed successfully", "success");
+      // Refresh user programs
+      await loadUserPrograms();
+    } catch (error: any) {
+      showToast(
+        error.response?.data?.message || "Failed to remove program",
+        "error"
+      );
     }
   };
 
@@ -422,20 +506,22 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                   >
                     {activeTab === "info" && (
                       <div className="space-y-4">
-                        <div className="flex justify-end">
-                          <button
-                            onClick={handleToggleUserStatus}
-                            className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
-                              user.user.status === "ACTIVE"
-                                ? "bg-red-500 hover:bg-red-600 text-white"
-                                : "bg-green-500 hover:bg-green-600 text-white"
-                            }`}
-                          >
-                            {user.user.status === "ACTIVE"
-                              ? "Disable User"
-                              : "Enable User"}
-                          </button>
-                        </div>
+                        {hasPermission(Permissions.ENABLE_DISABLE_USERS) && (
+                          <div className="flex justify-end">
+                            <button
+                              onClick={handleToggleUserStatus}
+                              className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+                                user.user.status === "ACTIVE"
+                                  ? "bg-red-500 hover:bg-red-600 text-white"
+                                  : "bg-green-500 hover:bg-green-600 text-white"
+                              }`}
+                            >
+                              {user.user.status === "ACTIVE"
+                                ? "Disable User"
+                                : "Enable User"}
+                            </button>
+                          </div>
+                        )}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           <InfoItem
                             icon={Mail}
@@ -496,15 +582,17 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                                 permissions={role.permissions || []}
                               />
                             ))}
-                            <div className="flex justify-center pt-4">
-                              <button
-                                onClick={openChangeRoleModal}
-                                className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-full transition-colors"
-                              >
-                                <Edit className="w-4 h-4" />
-                                Change Role
-                              </button>
-                            </div>
+                            {hasPermission(Permissions.CHANGE_USER_ROLES) && (
+                              <div className="flex justify-center pt-4">
+                                <button
+                                  onClick={openChangeRoleModal}
+                                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-full transition-colors"
+                                >
+                                  <Edit className="w-4 h-4" />
+                                  Change Role
+                                </button>
+                              </div>
+                            )}
                           </div>
                         ) : (
                           <div className="text-center py-12">
@@ -515,13 +603,15 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                             <p className="text-sm text-gray-400 dark:text-gray-500 mb-4">
                               This user needs to be assigned a role.
                             </p>
-                            <button
-                              onClick={openChangeRoleModal}
-                              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors mx-auto"
-                            >
-                              <Plus className="w-4 h-4" />
-                              Assign Role
-                            </button>
+                            {hasPermission(Permissions.CHANGE_USER_ROLES) && (
+                              <button
+                                onClick={openChangeRoleModal}
+                                className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors mx-auto"
+                              >
+                                <Plus className="w-4 h-4" />
+                                Assign Role
+                              </button>
+                            )}
                           </div>
                         )}
 
@@ -540,6 +630,103 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                                 </span>
                               ))}
                             </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {activeTab === "programs" && (
+                      <div className="space-y-4">
+                        {loadingPrograms ? (
+                          <div className="flex items-center justify-center py-6">
+                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
+                          </div>
+                        ) : userPrograms && userPrograms.length > 0 ? (
+                          <div className="space-y-4">
+                            {userPrograms.map((program: UserProgram) => (
+                              <motion.div
+                                key={program.program_id}
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                className="p-4 md:p-6 bg-gradient-to-br from-blue-100/40 to-blue-100/40 dark:from-blue-900/30 dark:to-blue-900/30 rounded-2xl border border-blue-200/30 dark:border-blue-700/30"
+                              >
+                                <div className="flex items-center justify-between mb-3">
+                                  <div className="flex items-center gap-2.5">
+                                    <div className="w-10 h-10 bg-gradient-to-br from-blue-400 to-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/20">
+                                      <Building className="w-5 h-5 text-white" />
+                                    </div>
+                                    <div>
+                                      <h4 className="font-semibold text-gray-900 dark:text-white">
+                                        {program.name}
+                                      </h4>
+                                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                                        {program.relationship === "LEAD"
+                                          ? "Program Lead"
+                                          : program.relationship === "STUDENT"
+                                          ? "Student"
+                                          : program.relationship === "TEACHER"
+                                          ? "Teacher"
+                                          : "Associated"}
+                                      </p>
+                                    </div>
+                                  </div>
+                                  {program.relationship === "LEAD" &&
+                                    hasPermission(
+                                      Permissions.MANAGE_PROGRAM_LEADS
+                                    ) && (
+                                      <button
+                                        onClick={() =>
+                                          handleRemoveProgram(
+                                            program.program_id
+                                          )
+                                        }
+                                        className="px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white text-xs font-medium rounded-full transition-colors"
+                                      >
+                                        Remove
+                                      </button>
+                                    )}
+                                </div>
+                                {program.description && (
+                                  <p className="text-sm text-gray-600 dark:text-gray-300">
+                                    {program.description}
+                                  </p>
+                                )}
+                              </motion.div>
+                            ))}
+                            {hasPermission(
+                              Permissions.MANAGE_PROGRAM_LEADS
+                            ) && (
+                              <div className="flex justify-center pt-4">
+                                <button
+                                  onClick={openAddProgramModal}
+                                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-full transition-colors"
+                                >
+                                  <Plus className="w-4 h-4" />
+                                  Assign Program Lead
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="text-center py-12">
+                            <Building className="w-16 h-16 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
+                            <p className="text-lg font-medium text-gray-500 dark:text-gray-400 mb-2">
+                              No programs associated
+                            </p>
+                            <p className="text-sm text-gray-400 dark:text-gray-500 mb-4">
+                              This user is not associated with any programs.
+                            </p>
+                            {hasPermission(
+                              Permissions.MANAGE_PROGRAM_LEADS
+                            ) && (
+                              <button
+                                onClick={openAddProgramModal}
+                                className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors mx-auto"
+                              >
+                                <Plus className="w-4 h-4" />
+                                Assign Program Lead
+                              </button>
+                            )}
                           </div>
                         )}
                       </div>
@@ -647,29 +834,33 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                                 </p>
                               </div>
                             </div>
-                            <button
-                              onClick={handleStatusChange}
-                              disabled={changingStatus}
-                              className={`flex items-center gap-2 px-4 py-2 rounded-full transition-colors ${
-                                user.user.status === "ACTIVE"
-                                  ? "bg-red-500 hover:bg-red-600 text-white"
-                                  : "bg-green-500 hover:bg-green-600 text-white"
-                              } disabled:opacity-50`}
-                            >
-                              {changingStatus ? (
-                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                              ) : user.user.status === "ACTIVE" ? (
-                                <>
-                                  <Ban className="w-4 h-4" />
-                                  Disable
-                                </>
-                              ) : (
-                                <>
-                                  <CheckCircle className="w-4 h-4" />
-                                  Enable
-                                </>
-                              )}
-                            </button>
+                            {hasPermission(
+                              Permissions.ENABLE_DISABLE_USERS
+                            ) && (
+                              <button
+                                onClick={handleStatusChange}
+                                disabled={changingStatus}
+                                className={`flex items-center gap-2 px-4 py-2 rounded-full transition-colors ${
+                                  user.user.status === "ACTIVE"
+                                    ? "bg-red-500 hover:bg-red-600 text-white"
+                                    : "bg-green-500 hover:bg-green-600 text-white"
+                                } disabled:opacity-50`}
+                              >
+                                {changingStatus ? (
+                                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                                ) : user.user.status === "ACTIVE" ? (
+                                  <>
+                                    <Ban className="w-4 h-4" />
+                                    Disable
+                                  </>
+                                ) : (
+                                  <>
+                                    <CheckCircle className="w-4 h-4" />
+                                    Enable
+                                  </>
+                                )}
+                              </button>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -747,6 +938,86 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                             <>
                               <Edit className="w-4 h-4" />
                               Change To
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Add Program Modal */}
+      <AnimatePresence>
+        {showAddProgramModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+            onClick={() => setShowAddProgramModal(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-2xl shadow-3xl overflow-hidden"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                    Assign Program Lead
+                  </h3>
+                  <button
+                    onClick={() => setShowAddProgramModal(false)}
+                    className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 rounded-lg"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                <div className="space-y-3 max-h-96 overflow-y-auto">
+                  {availablePrograms.length === 0 ? (
+                    <div className="text-center py-8">
+                      <Building className="w-12 h-12 text-gray-300 dark:text-gray-600 mx-auto mb-2" />
+                      <p className="text-sm text-gray-500 dark:text-gray-400">
+                        No available programs to assign
+                      </p>
+                    </div>
+                  ) : (
+                    availablePrograms.map((program) => (
+                      <div
+                        key={program.program_id}
+                        className="flex items-center justify-between p-3 bg-gray-50 dark:bg-slate-800 rounded-2xl"
+                      >
+                        <div>
+                          <h5 className="font-medium text-gray-900 dark:text-white text-sm">
+                            {program.name}
+                          </h5>
+                          {program.description && (
+                            <p className="text-sm text-gray-500 dark:text-gray-400/50">
+                              {program.description}
+                            </p>
+                          )}
+                        </div>
+                        <button
+                          onClick={() =>
+                            handleAssignProgram(program.program_id)
+                          }
+                          disabled={assigningProgram}
+                          className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-full transition-colors disabled:opacity-50"
+                        >
+                          {assigningProgram ? (
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                          ) : (
+                            <>
+                              <Plus className="w-4 h-4" />
+                              Assign
                             </>
                           )}
                         </button>

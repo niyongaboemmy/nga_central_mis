@@ -136,6 +136,23 @@ export const Program = mysqlTable("Program", {
   description: varchar("description", { length: 255 }),
 });
 
+// UserProgramLead junction table
+export const UserProgramLead = mysqlTable(
+  "UserProgramLead",
+  {
+    user_id: bigint("user_id", { mode: "number" })
+      .notNull()
+      .references(() => User.user_id),
+    program_id: bigint("program_id", { mode: "number" })
+      .notNull()
+      .references(() => Program.program_id),
+    assigned_at: datetime("assigned_at").default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => ({
+    pk: primaryKey(table.user_id, table.program_id),
+  })
+);
+
 // Grade table
 export const Grade = mysqlTable("Grade", {
   grade_id: bigint("grade_id", { mode: "number" }).primaryKey().autoincrement(),
