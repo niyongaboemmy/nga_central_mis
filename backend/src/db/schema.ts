@@ -296,6 +296,23 @@ export const TeacherSubjectAssignment = mysqlTable(
   })
 );
 
+// UserGrade junction table for class teacher grade assignments
+export const UserGrade = mysqlTable(
+  "UserGrade",
+  {
+    user_id: bigint("user_id", { mode: "number" })
+      .notNull()
+      .references(() => User.user_id),
+    grade_id: bigint("grade_id", { mode: "number" })
+      .notNull()
+      .references(() => Grade.grade_id),
+    assigned_at: datetime("assigned_at").default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => ({
+    pk: primaryKey(table.user_id, table.grade_id),
+  })
+);
+
 // DocumentFolder table for user document management
 export const DocumentFolder = mysqlTable("DocumentFolder", {
   folder_id: bigint("folder_id", { mode: "number" })

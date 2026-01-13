@@ -29,6 +29,8 @@ import Academics from "./components/Academics";
 import TeacherAssignedSubjects from "./components/TeacherAssignedSubjects";
 import ProgramUsersPage from "./components/ProgramUsersPage";
 import ProgramAcademicPage from "./components/ProgramAcademicPage";
+import ClassTeacherUsersPage from "./components/ClassTeacherUsersPage";
+import ClassTeacherSubjectsPage from "./components/ClassTeacherSubjectsPage";
 
 // Wrapper components for pages that need the Navbar
 const LandingPage: React.FC = () => {
@@ -228,6 +230,16 @@ const ProgramAcademicPageWrapper: React.FC = () => {
   return <ProgramAcademicPage />;
 };
 
+// Class Teacher Users page with sidebar
+const ClassTeacherUsersPageWrapper: React.FC = () => {
+  return <ClassTeacherUsersPage />;
+};
+
+// Class Teacher Subjects page with sidebar
+const ClassTeacherSubjectsPageWrapper: React.FC = () => {
+  return <ClassTeacherSubjectsPage />;
+};
+
 // Initialize toast store for API interceptor
 const ToastInitializer: React.FC<{ children: React.ReactNode }> = ({
   children,
@@ -399,6 +411,30 @@ function App() {
                   <ProtectedRoute>
                     <SystemLayoutWrapper>
                       <ProgramAcademicPageWrapper />
+                    </SystemLayoutWrapper>
+                  </ProtectedRoute>
+                }
+              />
+
+              {/* Class Teacher Users page - protected with sidebar */}
+              <Route
+                path="/class-users"
+                element={
+                  <ProtectedRoute>
+                    <SystemLayoutWrapper>
+                      <ClassTeacherUsersPageWrapper />
+                    </SystemLayoutWrapper>
+                  </ProtectedRoute>
+                }
+              />
+
+              {/* Class Teacher Subjects page - protected with sidebar */}
+              <Route
+                path="/class-subjects"
+                element={
+                  <ProtectedRoute>
+                    <SystemLayoutWrapper>
+                      <ClassTeacherSubjectsPageWrapper />
                     </SystemLayoutWrapper>
                   </ProtectedRoute>
                 }

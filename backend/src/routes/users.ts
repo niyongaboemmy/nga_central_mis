@@ -21,6 +21,11 @@ import {
   getProgramUsersByRole,
   getProgramUsers,
   getUserPrograms,
+  assignGradeToUser,
+  removeGradeFromUser,
+  getUserGrades,
+  getUsersByGrade,
+  getSubjectsByGrade,
 } from "../controllers/userController";
 import { authenticate, authorize } from "../middleware/auth";
 
@@ -112,6 +117,35 @@ router.get(
   authenticate,
   authorize("VIEW_PROGRAM_USERS"),
   getProgramUsers
+);
+
+// Grade assignment for class teachers
+router.get("/:id/grades", authenticate, getUserGrades);
+router.post(
+  "/:id/grades",
+  authenticate,
+  authorize("ASSIGN_GRADE_TO_CLASS_TEACHER"),
+  assignGradeToUser
+);
+router.delete(
+  "/:id/grades/:gradeId",
+  authenticate,
+  authorize("ASSIGN_GRADE_TO_CLASS_TEACHER"),
+  removeGradeFromUser
+);
+
+// View users and subjects by grade (for class teachers)
+router.get(
+  "/grades/:gradeId/users",
+  authenticate,
+  authorize("VIEW_USERS_BY_CLASS_TEACHER_GRADE"),
+  getUsersByGrade
+);
+router.get(
+  "/grades/:gradeId/subjects",
+  authenticate,
+  authorize("VIEW_SUBJECTS_BY_CLASS_TEACHER_GRADE"),
+  getSubjectsByGrade
 );
 
 export default router;

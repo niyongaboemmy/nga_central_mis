@@ -29,8 +29,18 @@ import {
   disableUser,
   getUserPrograms,
   UserProgram,
+  getUserGrades,
+  assignGradeToUser,
+  removeGradeFromUser,
+  UserGrade,
 } from "../api/users";
-import { programsApi, Program, programLeadsApi } from "../api/academics";
+import {
+  programsApi,
+  Program,
+  programLeadsApi,
+  Grade,
+  gradesApi,
+} from "../api/academics";
 import { useToast } from "../contexts/ToastContext";
 import { usePermissions } from "../hooks/usePermissions";
 import { Permissions } from "../constants/permissions";
@@ -224,7 +234,13 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
   const { showToast } = useToast();
   const { hasPermission } = usePermissions();
   const [activeTab, setActiveTab] = React.useState<
-    "info" | "roles" | "programs" | "subjects" | "enrollment" | "activity"
+    | "info"
+    | "roles"
+    | "programs"
+    | "subjects"
+    | "enrollment"
+    | "activity"
+    | "grades"
   >("info");
   const [showAddRoleModal, setShowAddRoleModal] = React.useState(false);
   const [availableRoles, setAvailableRoles] = React.useState<Role[]>([]);
@@ -237,11 +253,17 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
   const [showAddProgramModal, setShowAddProgramModal] = React.useState(false);
   const [assigningProgram, setAssigningProgram] = React.useState(false);
   const [loadingPrograms, setLoadingPrograms] = React.useState(false);
+  const [userGrades, setUserGrades] = React.useState<UserGrade[]>([]);
+  const [loadingGrades, setLoadingGrades] = React.useState(false);
+  const [availableGrades, setAvailableGrades] = React.useState<Grade[]>([]);
+  const [showAddGradeModal, setShowAddGradeModal] = React.useState(false);
+  const [assigningGrade, setAssigningGrade] = React.useState(false);
 
-  // Load user programs when modal opens
+  // Load user programs and grades when modal opens
   React.useEffect(() => {
     if (user && isOpen) {
       loadUserPrograms();
+      loadUserGrades();
     }
   }, [user, isOpen]);
 
@@ -260,6 +282,21 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
     }
   };
 
+  const loadUserGrades = async () => {
+    if (!user) return;
+    setLoadingGrades(true);
+    try {
+      const grades = await getUserGrades(user.user.user_id);
+      if (grades) {
+        setUserGrades(grades);
+      }
+    } catch (error) {
+      console.error("Failed to load user grades:", error);
+    } finally {
+      setLoadingGrades(false);
+    }
+  };
+
   if (!user) return null;
 
   const getUserType = (): string => user.profile?.user_type || "USER";
@@ -275,6 +312,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
     { id: "info", label: "Info", icon: UserIcon },
     { id: "roles", label: "Roles", icon: Shield },
     { id: "programs", label: "Programs", icon: Building },
+    { id: "grades", label: "Grades", icon: Award },
     ...(getUserType() === "TEACHER"
       ? [{ id: "subjects", label: "Subjects", icon: BookOpen }]
       : []),
@@ -381,6 +419,56 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
         error.response?.data?.message || "Failed to remove program",
         "error"
       );
+    }
+  };
+
+  const handleRemoveGrade = async (gradeId: number) => {
+    try {
+      await removeGradeFromUser(user.user.user_id, gradeId);
+      showToast("Grade removed successfully", "success");
+      // Refresh user grades
+      await loadUserGrades();
+    } catch (error: any) {
+      showToast(
+        error.response?.data?.message || "Failed to remove grade",
+        "error"
+      );
+    }
+  };
+
+  const openAddGradeModal = async () => {
+    try {
+      const response = await gradesApi.getAll();
+      const grades = response.data.data;
+      if (grades) {
+        // Filter out grades already assigned to this user
+        const assignedGradeIds = userGrades.map((g) => g.grade_id);
+        const available = grades.filter(
+          (g) => !assignedGradeIds.includes(g.grade_id)
+        );
+        setAvailableGrades(available);
+      }
+      setShowAddGradeModal(true);
+    } catch (error) {
+      showToast("Failed to load available grades", "error");
+    }
+  };
+
+  const handleAssignGrade = async (gradeId: number) => {
+    setAssigningGrade(true);
+    try {
+      await assignGradeToUser(user.user.user_id, gradeId);
+      showToast("Grade assigned successfully", "success");
+      // Refresh user grades
+      await loadUserGrades();
+    } catch (error: any) {
+      showToast(
+        error.response?.data?.message || "Failed to assign grade",
+        "error"
+      );
+    } finally {
+      setAssigningGrade(false);
+      setShowAddGradeModal(false);
     }
   };
 
@@ -732,6 +820,85 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                       </div>
                     )}
 
+                    {activeTab === "grades" && (
+                      <div className="space-y-4">
+                        {hasPermission(
+                          Permissions.ASSIGN_GRADE_TO_CLASS_TEACHER
+                        ) && (
+                          <div className="flex justify-end">
+                            <button
+                              onClick={openAddGradeModal}
+                              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-full transition-colors"
+                            >
+                              <Plus className="w-4 h-4" />
+                              Assign Grade
+                            </button>
+                          </div>
+                        )}
+                        {loadingGrades ? (
+                          <div className="flex items-center justify-center py-6">
+                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
+                          </div>
+                        ) : userGrades && userGrades.length > 0 ? (
+                          <div className="space-y-4">
+                            {userGrades.map((grade: UserGrade) => (
+                              <motion.div
+                                key={grade.grade_id}
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                className="p-4 md:p-6 bg-gradient-to-br from-blue-100/40 to-blue-100/40 dark:from-blue-900/30 dark:to-blue-900/30 rounded-2xl border border-blue-200/30 dark:border-blue-700/30"
+                              >
+                                <div className="flex items-center justify-between mb-3">
+                                  <div className="flex items-center gap-2.5">
+                                    <div className="w-10 h-10 bg-gradient-to-br from-blue-400 to-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/20">
+                                      <Award className="w-5 h-5 text-white" />
+                                    </div>
+                                    <div>
+                                      <h4 className="font-semibold text-gray-900 dark:text-white">
+                                        {grade.name}
+                                      </h4>
+                                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                                        {grade.program_name} • Level{" "}
+                                        {grade.level_order}
+                                      </p>
+                                    </div>
+                                  </div>
+                                  {hasPermission(
+                                    Permissions.ASSIGN_GRADE_TO_CLASS_TEACHER
+                                  ) && (
+                                    <button
+                                      onClick={() =>
+                                        handleRemoveGrade(grade.grade_id)
+                                      }
+                                      className="px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white text-xs font-medium rounded-full transition-colors"
+                                    >
+                                      Remove
+                                    </button>
+                                  )}
+                                </div>
+                                <p className="text-sm text-gray-600 dark:text-gray-300">
+                                  Assigned on{" "}
+                                  {new Date(
+                                    grade.assigned_at
+                                  ).toLocaleDateString()}
+                                </p>
+                              </motion.div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="text-center py-12">
+                            <Award className="w-16 h-16 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
+                            <p className="text-lg font-medium text-gray-500 dark:text-gray-400 mb-2">
+                              No grades assigned
+                            </p>
+                            <p className="text-sm text-gray-400 dark:text-gray-500 mb-4">
+                              This teacher is not assigned to any grades yet.
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
                     {activeTab === "subjects" &&
                       getUserType() === "TEACHER" && (
                         <div className="space-y-6">
@@ -1013,6 +1180,82 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                           className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-full transition-colors disabled:opacity-50"
                         >
                           {assigningProgram ? (
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                          ) : (
+                            <>
+                              <Plus className="w-4 h-4" />
+                              Assign
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Add Grade Modal */}
+      <AnimatePresence>
+        {showAddGradeModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+            onClick={() => setShowAddGradeModal(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-2xl shadow-3xl overflow-hidden"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                    Assign Grade
+                  </h3>
+                  <button
+                    onClick={() => setShowAddGradeModal(false)}
+                    className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 rounded-lg"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                <div className="space-y-3 max-h-96 overflow-y-auto">
+                  {availableGrades.length === 0 ? (
+                    <div className="text-center py-8">
+                      <Award className="w-12 h-12 text-gray-300 dark:text-gray-600 mx-auto mb-2" />
+                      <p className="text-sm text-gray-500 dark:text-gray-400">
+                        No available grades to assign
+                      </p>
+                    </div>
+                  ) : (
+                    availableGrades.map((grade) => (
+                      <div
+                        key={grade.grade_id}
+                        className="flex items-center justify-between p-3 bg-gray-50 dark:bg-slate-800 rounded-2xl"
+                      >
+                        <div>
+                          <h5 className="font-medium text-gray-900 dark:text-white text-sm">
+                            {grade.name}
+                          </h5>
+                          <p className="text-sm text-gray-500 dark:text-gray-400/50">
+                            Level {grade.level_order}
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => handleAssignGrade(grade.grade_id)}
+                          disabled={assigningGrade}
+                          className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-full transition-colors disabled:opacity-50"
+                        >
+                          {assigningGrade ? (
                             <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
                           ) : (
                             <>

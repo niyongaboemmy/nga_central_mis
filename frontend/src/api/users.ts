@@ -38,6 +38,7 @@ export interface UserWithProfile {
   roles?: UserRole[];
   permissions?: string[];
   assignedPrograms?: Program[];
+  assignedGrades?: UserGrade[];
   forcePasswordChange?: boolean;
 }
 
@@ -165,6 +166,198 @@ export const getUsersWithPagination = async (
       users: response.data.data || [],
       total,
       page,
+      totalPages,
+    };
+
+    if (onSuccess) {
+      onSuccess(result);
+    }
+    return result;
+  } catch (error) {
+    if (onError) {
+      onError(error);
+    }
+    throw error;
+  }
+};
+
+// ==================== Grade Assignment for Class Teachers ====================
+
+export interface UserGrade {
+  grade_id: number;
+  name: string;
+  level_order: number;
+  program_id: number;
+  program_name: string;
+  assigned_at: string;
+}
+
+export const getUserGrades = async (
+  userId: number,
+  onSuccess?: (grades: UserGrade[]) => void,
+  onError?: (error: any) => void
+): Promise<UserGrade[] | void> => {
+  try {
+    const response = await api.get<BackendResponse<UserGrade[]>>(
+      `/users/${userId}/grades`
+    );
+    if (onSuccess && response.data.data) {
+      onSuccess(response.data.data);
+    }
+    return response.data.data;
+  } catch (error) {
+    if (onError) {
+      onError(error);
+    }
+    throw error;
+  }
+};
+
+export const assignGradeToUser = async (
+  userId: number,
+  gradeId: number,
+  onSuccess?: () => void,
+  onError?: (error: any) => void
+): Promise<void> => {
+  try {
+    await api.post(`/users/${userId}/grades`, { grade_id: gradeId });
+    if (onSuccess) {
+      onSuccess();
+    }
+  } catch (error) {
+    if (onError) {
+      onError(error);
+    }
+    throw error;
+  }
+};
+
+export const removeGradeFromUser = async (
+  userId: number,
+  gradeId: number,
+  onSuccess?: () => void,
+  onError?: (error: any) => void
+): Promise<void> => {
+  try {
+    await api.delete(`/users/${userId}/grades/${gradeId}`);
+    if (onSuccess) {
+      onSuccess();
+    }
+  } catch (error) {
+    if (onError) {
+      onError(error);
+    }
+    throw error;
+  }
+};
+
+export interface GradeUser {
+  user_id: number;
+  username: string;
+  email: string;
+  phone_number?: string;
+  status: string;
+  first_name?: string;
+  last_name?: string;
+  user_type?: string;
+  role_name?: string;
+}
+
+export const getUsersByGrade = async (
+  gradeId: number,
+  params?: {
+    page?: number;
+    limit?: number;
+    search?: string;
+  },
+  onSuccess?: (users: {
+    users: GradeUser[];
+    total: number;
+    page: number;
+    totalPages: number;
+  }) => void,
+  onError?: (error: any) => void
+): Promise<{
+  users: GradeUser[];
+  total: number;
+  page: number;
+  totalPages: number;
+} | void> => {
+  try {
+    const response = await api.get<BackendResponse<GradeUser[]>>(
+      `/users/grades/${gradeId}/users`,
+      { params }
+    );
+
+    const total = parseInt(response.headers["x-total-count"] || "0");
+    const totalPages = Math.ceil(total / (params?.limit || 10));
+
+    const result = {
+      users: response.data.data || [],
+      total,
+      page: params?.page || 1,
+      totalPages,
+    };
+
+    if (onSuccess) {
+      onSuccess(result);
+    }
+    return result;
+  } catch (error) {
+    if (onError) {
+      onError(error);
+    }
+    throw error;
+  }
+};
+
+export interface GradeSubject {
+  subject_id: number;
+  code?: string;
+  name: string;
+  description?: string;
+  status: string;
+  teachers?: Array<{
+    user_id: number;
+    username: string;
+    first_name?: string;
+    last_name?: string;
+  }>;
+}
+
+export const getSubjectsByGrade = async (
+  gradeId: number,
+  params?: {
+    page?: number;
+    limit?: number;
+    search?: string;
+  },
+  onSuccess?: (subjects: {
+    subjects: GradeSubject[];
+    total: number;
+    page: number;
+    totalPages: number;
+  }) => void,
+  onError?: (error: any) => void
+): Promise<{
+  subjects: GradeSubject[];
+  total: number;
+  page: number;
+  totalPages: number;
+} | void> => {
+  try {
+    const response = await api.get<BackendResponse<GradeSubject[]>>(
+      `/users/grades/${gradeId}/subjects`,
+      { params }
+    );
+
+    const total = parseInt(response.headers["x-total-count"] || "0");
+    const totalPages = Math.ceil(total / (params?.limit || 10));
+
+    const result = {
+      subjects: response.data.data || [],
+      total,
+      page: params?.page || 1,
       totalPages,
     };
 

@@ -62,6 +62,11 @@ export const Permissions = {
   // Program Management
   VIEW_PROGRAM_USERS: "VIEW_PROGRAM_USERS",
   VIEW_PROGRAM_ACADEMICS: "VIEW_PROGRAM_ACADEMICS",
+
+  // Class Teacher Management
+  ASSIGN_GRADE_TO_CLASS_TEACHER: "ASSIGN_GRADE_TO_CLASS_TEACHER",
+  VIEW_USERS_BY_CLASS_TEACHER_GRADE: "VIEW_USERS_BY_CLASS_TEACHER_GRADE",
+  VIEW_SUBJECTS_BY_CLASS_TEACHER_GRADE: "VIEW_SUBJECTS_BY_CLASS_TEACHER_GRADE",
 } as const;
 
 export type PermissionKey = keyof typeof Permissions;
@@ -149,6 +154,9 @@ export const permissionGroups = {
     Permissions.VIEW_MY_ASSIGNED_SUBJECTS,
     Permissions.TEACHER_DASHBOARD,
     Permissions.ASSIGN_TEACHER_SUBJECTS,
+    Permissions.ASSIGN_GRADE_TO_CLASS_TEACHER,
+    Permissions.VIEW_USERS_BY_CLASS_TEACHER_GRADE,
+    Permissions.VIEW_SUBJECTS_BY_CLASS_TEACHER_GRADE,
   ],
   parents: [Permissions.MANAGE_PARENTS, Permissions.VIEW_PARENTS],
   grades: [Permissions.MANAGE_GRADES, Permissions.VIEW_GRADES],

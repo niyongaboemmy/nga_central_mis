@@ -13,9 +13,13 @@ import {
   Program,
   UserProgramLead,
   Grade,
+  Subject,
+  GradeSubject,
   ClassGroup,
   StudentClassGroup,
   TeacherSubjectAssignment,
+  StudentSubjectEnrollment,
+  UserGrade,
 } from "../db/schema";
 import { sanitizeString, validateEmail } from "../utils/sanitization";
 import {
@@ -339,6 +343,16 @@ export const getCurrentUser = asyncHandler(async (req: any, res: any) => {
       "MANAGE_SETTINGS",
       "ADMIN",
       "VIEW_PROGRAM_USERS",
+      "VIEW_PROGRAM_ACADEMICS",
+      "ENABLE_DISABLE_USERS",
+      "CHANGE_USER_ROLES",
+      "MANAGE_PROGRAM_LEADS",
+      "ASSIGN_TEACHER_SUBJECTS",
+      "MANAGE_STUDENT_ENROLLMENTS",
+      "ASSIGN_STUDENT_CLASS_GROUPS",
+      "ASSIGN_GRADE_TO_CLASS_TEACHER",
+      "VIEW_USERS_BY_CLASS_TEACHER_GRADE",
+      "VIEW_SUBJECTS_BY_CLASS_TEACHER_GRADE",
     ];
   } else {
     permissions = rolesWithPermissions.flatMap((r) =>
@@ -357,12 +371,29 @@ export const getCurrentUser = asyncHandler(async (req: any, res: any) => {
     .innerJoin(Program, eq(UserProgramLead.program_id, Program.program_id))
     .where(eq(UserProgramLead.user_id, userId));
 
+  // Get assigned grades for class teachers
+  const assignedGrades = await db
+    .select({
+      grade_id: Grade.grade_id,
+      name: Grade.name,
+      level_order: Grade.level_order,
+      program_id: Grade.program_id,
+      program_name: Program.name,
+      assigned_at: UserGrade.assigned_at,
+    })
+    .from(UserGrade)
+    .innerJoin(Grade, eq(UserGrade.grade_id, Grade.grade_id))
+    .innerJoin(Program, eq(Grade.program_id, Program.program_id))
+    .where(eq(UserGrade.user_id, userId))
+    .orderBy(Grade.level_order);
+
   successResponse(res, "User profile retrieved successfully", {
     user: user[0],
     profile: profile[0] || null,
     roles: rolesWithPermissions,
     permissions,
     assignedPrograms,
+    assignedGrades,
     forcePasswordChange: auth[0]?.force_password_change === 1,
   });
 });
@@ -2029,4 +2060,421 @@ export const getUserPrograms = asyncHandler(async (req: any, res: any) => {
   );
 
   successResponse(res, "User programs retrieved successfully", uniquePrograms);
+});
+
+// Assign grade to class teacher
+export const assignGradeToUser = asyncHandler(async (req: any, res: any) => {
+  const { id } = req.params;
+  const { grade_id } = req.body;
+  const userId = parseInt(id);
+  const gradeId = parseInt(grade_id);
+
+  if (isNaN(userId) || isNaN(gradeId)) {
+    throw new ValidationError("Invalid user ID or grade ID");
+  }
+
+  logger.info("Assigning grade to user", {
+    userId,
+    gradeId,
+    assignedBy: req.user?.userId,
+  });
+
+  // Check if user exists
+  const user = await db
+    .select()
+    .from(User)
+    .where(eq(User.user_id, userId))
+    .limit(1);
+
+  if (user.length === 0) {
+    throw new NotFoundError("User not found");
+  }
+
+  // Check if grade exists
+  const grade = await db
+    .select()
+    .from(Grade)
+    .where(eq(Grade.grade_id, gradeId))
+    .limit(1);
+
+  if (grade.length === 0) {
+    throw new NotFoundError("Grade not found");
+  }
+
+  // Check if user already has this grade
+  const existingAssignment = await db
+    .select()
+    .from(UserGrade)
+    .where(and(eq(UserGrade.user_id, userId), eq(UserGrade.grade_id, gradeId)))
+    .limit(1);
+
+  if (existingAssignment.length > 0) {
+    throw new ConflictError("User already has this grade assigned");
+  }
+
+  // Assign grade
+  await db.insert(UserGrade).values({
+    user_id: userId,
+    grade_id: gradeId,
+  });
+
+  successResponse(res, "Grade assigned to user successfully");
+});
+
+// Remove grade from class teacher
+export const removeGradeFromUser = asyncHandler(async (req: any, res: any) => {
+  const { id, gradeId } = req.params;
+  const userId = parseInt(id);
+  const gradeIdNum = parseInt(gradeId);
+
+  if (isNaN(userId) || isNaN(gradeIdNum)) {
+    throw new ValidationError("Invalid user ID or grade ID");
+  }
+
+  logger.info("Removing grade from user", {
+    userId,
+    gradeId: gradeIdNum,
+    removedBy: req.user?.userId,
+  });
+
+  // Check if assignment exists
+  const existingAssignment = await db
+    .select()
+    .from(UserGrade)
+    .where(
+      and(eq(UserGrade.user_id, userId), eq(UserGrade.grade_id, gradeIdNum))
+    )
+    .limit(1);
+
+  if (existingAssignment.length === 0) {
+    throw new NotFoundError("User does not have this grade assigned");
+  }
+
+  // Remove assignment
+  await db
+    .delete(UserGrade)
+    .where(
+      and(eq(UserGrade.user_id, userId), eq(UserGrade.grade_id, gradeIdNum))
+    );
+
+  successResponse(res, "Grade removed from user successfully");
+});
+
+// Get grades assigned to a user
+export const getUserGrades = asyncHandler(async (req: any, res: any) => {
+  const { id } = req.params;
+  const userId = parseInt(id);
+
+  if (isNaN(userId)) {
+    throw new ValidationError("Invalid user ID");
+  }
+
+  logger.info("Fetching grades for user", {
+    userId,
+    requestedBy: req.user?.userId,
+  });
+
+  // Check if user exists
+  const user = await db
+    .select()
+    .from(User)
+    .where(eq(User.user_id, userId))
+    .limit(1);
+
+  if (user.length === 0) {
+    throw new NotFoundError("User not found");
+  }
+
+  // Get assigned grades
+  const grades = await db
+    .select({
+      grade_id: Grade.grade_id,
+      name: Grade.name,
+      level_order: Grade.level_order,
+      program_id: Grade.program_id,
+      program_name: Program.name,
+      assigned_at: UserGrade.assigned_at,
+    })
+    .from(UserGrade)
+    .innerJoin(Grade, eq(UserGrade.grade_id, Grade.grade_id))
+    .innerJoin(Program, eq(Grade.program_id, Program.program_id))
+    .where(eq(UserGrade.user_id, userId))
+    .orderBy(Grade.level_order);
+
+  successResponse(res, "User grades retrieved successfully", grades);
+});
+
+// Get users by grade (for class teachers to view users in their grades)
+export const getUsersByGrade = asyncHandler(async (req: any, res: any) => {
+  const { gradeId } = req.params;
+  const gradeIdNum = parseInt(gradeId);
+  const { page = 1, limit = 10, search } = req.query;
+  const pageNum = parseInt(page);
+  const limitNum = parseInt(limit);
+  const offset = (pageNum - 1) * limitNum;
+  const userId = req.user?.userId;
+
+  if (isNaN(gradeIdNum)) {
+    throw new ValidationError("Invalid grade ID");
+  }
+
+  logger.info("Fetching users by grade", {
+    gradeId: gradeIdNum,
+    page: pageNum,
+    limit: limitNum,
+    search,
+    requestedBy: userId,
+  });
+
+  // Check if grade exists
+  const grade = await db
+    .select()
+    .from(Grade)
+    .where(eq(Grade.grade_id, gradeIdNum))
+    .limit(1);
+
+  if (grade.length === 0) {
+    throw new NotFoundError("Grade not found");
+  }
+
+  // Get students in this grade (via class groups)
+  const students = await db
+    .select({
+      user_id: User.user_id,
+      username: User.username,
+      email: User.email,
+      phone_number: User.phone_number,
+      status: User.status,
+      first_name: UserProfile.first_name,
+      last_name: UserProfile.last_name,
+      user_type: UserProfile.user_type,
+      role_name: Role.name,
+    })
+    .from(User)
+    .leftJoin(UserProfile, eq(User.user_id, UserProfile.user_id))
+    .innerJoin(StudentClassGroup, eq(User.user_id, StudentClassGroup.user_id))
+    .innerJoin(
+      ClassGroup,
+      eq(StudentClassGroup.class_group_id, ClassGroup.class_group_id)
+    )
+    .innerJoin(UserRole, eq(User.user_id, UserRole.user_id))
+    .innerJoin(Role, eq(UserRole.role_id, Role.role_id))
+    .where(
+      and(
+        sql`${ClassGroup.grade_id} = ${gradeIdNum}`,
+        eq(StudentClassGroup.status, "ACTIVE")
+      )
+    );
+
+  // Get teachers assigned to subjects in this grade (via teacher subject assignments)
+  const teachers = await db
+    .select({
+      user_id: User.user_id,
+      username: User.username,
+      email: User.email,
+      phone_number: User.phone_number,
+      status: User.status,
+      first_name: UserProfile.first_name,
+      last_name: UserProfile.last_name,
+      user_type: UserProfile.user_type,
+      role_name: Role.name,
+    })
+    .from(User)
+    .leftJoin(UserProfile, eq(User.user_id, UserProfile.user_id))
+    .innerJoin(
+      TeacherSubjectAssignment,
+      eq(User.user_id, TeacherSubjectAssignment.user_id)
+    )
+    .innerJoin(
+      ClassGroup,
+      eq(TeacherSubjectAssignment.class_group_id, ClassGroup.class_group_id)
+    )
+    .innerJoin(UserRole, eq(User.user_id, UserRole.user_id))
+    .innerJoin(Role, eq(UserRole.role_id, Role.role_id))
+    .where(sql`${ClassGroup.grade_id} = ${gradeIdNum}`);
+
+  // Combine students and teachers, remove duplicates
+  const allUsers = [...students, ...teachers];
+  const users = allUsers.filter(
+    (user, index, self) =>
+      index === self.findIndex((u) => u.user_id === user.user_id)
+  );
+
+  // Apply search filter
+  let filteredUsers = users;
+  if (search) {
+    const searchLower = search.toLowerCase();
+    filteredUsers = users.filter(
+      (user) =>
+        user.username?.toLowerCase().includes(searchLower) ||
+        user.email?.toLowerCase().includes(searchLower) ||
+        user.first_name?.toLowerCase().includes(searchLower) ||
+        user.last_name?.toLowerCase().includes(searchLower) ||
+        user.phone_number?.toLowerCase().includes(searchLower) ||
+        user.role_name?.toLowerCase().includes(searchLower)
+    );
+  }
+
+  // Apply pagination
+  const totalCount = filteredUsers.length;
+  const paginatedUsers = filteredUsers.slice(offset, offset + limitNum);
+
+  const totalPages = Math.ceil(totalCount / limitNum);
+  res.setHeader("X-Total-Count", totalCount.toString());
+  res.setHeader("X-Total-Pages", totalPages.toString());
+  res.setHeader("X-Current-Page", pageNum.toString());
+  res.setHeader("X-Per-Page", limitNum.toString());
+
+  successResponse(res, "Users retrieved successfully", paginatedUsers);
+});
+
+// Get subjects by grade (for class teachers to view subjects in their grades)
+export const getSubjectsByGrade = asyncHandler(async (req: any, res: any) => {
+  const { gradeId } = req.params;
+  const gradeIdNum = parseInt(gradeId);
+  const { page = 1, limit = 10, search } = req.query;
+  const pageNum = parseInt(page);
+  const limitNum = parseInt(limit);
+  const offset = (pageNum - 1) * limitNum;
+  const userId = req.user?.userId;
+
+  if (isNaN(gradeIdNum)) {
+    throw new ValidationError("Invalid grade ID");
+  }
+
+  logger.info("Fetching subjects by grade", {
+    gradeId: gradeIdNum,
+    page: pageNum,
+    limit: limitNum,
+    search,
+    requestedBy: userId,
+  });
+
+  // Check if grade exists
+  const grade = await db
+    .select()
+    .from(Grade)
+    .where(eq(Grade.grade_id, gradeIdNum))
+    .limit(1);
+
+  if (grade.length === 0) {
+    throw new NotFoundError("Grade not found");
+  }
+
+  // Get subjects with their assigned teachers in this grade
+  const subjectsWithTeachers = await db
+    .select({
+      subject_id: Subject.subject_id,
+      code: Subject.code,
+      name: Subject.name,
+      description: Subject.description,
+      status: Subject.status,
+      teacher_id: User.user_id,
+      teacher_username: User.username,
+      teacher_first_name: UserProfile.first_name,
+      teacher_last_name: UserProfile.last_name,
+    })
+    .from(Subject)
+    .innerJoin(
+      TeacherSubjectAssignment,
+      eq(Subject.subject_id, TeacherSubjectAssignment.subject_id)
+    )
+    .innerJoin(
+      ClassGroup,
+      eq(TeacherSubjectAssignment.class_group_id, ClassGroup.class_group_id)
+    )
+    .leftJoin(User, eq(TeacherSubjectAssignment.user_id, User.user_id))
+    .leftJoin(UserProfile, eq(User.user_id, UserProfile.user_id))
+    .where(sql`${ClassGroup.grade_id} = ${gradeIdNum}`);
+
+  // Group subjects by subject_id and collect teachers
+  const subjectMap = new Map();
+
+  subjectsWithTeachers.forEach((row) => {
+    const subjectId = row.subject_id;
+    if (!subjectMap.has(subjectId)) {
+      subjectMap.set(subjectId, {
+        subject_id: row.subject_id,
+        code: row.code,
+        name: row.name,
+        description: row.description,
+        status: row.status,
+        teachers: [],
+      });
+    }
+
+    if (row.teacher_id) {
+      subjectMap.get(subjectId).teachers.push({
+        user_id: row.teacher_id,
+        username: row.teacher_username,
+        first_name: row.teacher_first_name,
+        last_name: row.teacher_last_name,
+      });
+    }
+  });
+
+  // Also get subjects enrolled by students (that might not have teachers assigned yet)
+  const studentOnlySubjects = await db
+    .select({
+      subject_id: Subject.subject_id,
+      code: Subject.code,
+      name: Subject.name,
+      description: Subject.description,
+      status: Subject.status,
+    })
+    .from(Subject)
+    .innerJoin(
+      StudentSubjectEnrollment,
+      eq(Subject.subject_id, StudentSubjectEnrollment.subject_id)
+    )
+    .innerJoin(
+      StudentClassGroup,
+      eq(StudentSubjectEnrollment.user_id, StudentClassGroup.user_id)
+    )
+    .innerJoin(
+      ClassGroup,
+      eq(StudentClassGroup.class_group_id, ClassGroup.class_group_id)
+    )
+    .where(
+      and(
+        sql`${ClassGroup.grade_id} = ${gradeIdNum}`,
+        eq(StudentClassGroup.status, "ACTIVE")
+      )
+    );
+
+  // Add student-only subjects that don't have teachers
+  studentOnlySubjects.forEach((subject) => {
+    if (!subjectMap.has(subject.subject_id)) {
+      subjectMap.set(subject.subject_id, {
+        ...subject,
+        teachers: [],
+      });
+    }
+  });
+
+  const subjects = Array.from(subjectMap.values());
+
+  // Apply search filter
+  let filteredSubjects = subjects;
+  if (search) {
+    const searchLower = search.toLowerCase();
+    filteredSubjects = subjects.filter(
+      (subject) =>
+        subject.code?.toLowerCase().includes(searchLower) ||
+        subject.name?.toLowerCase().includes(searchLower) ||
+        subject.description?.toLowerCase().includes(searchLower)
+    );
+  }
+
+  // Apply pagination
+  const totalCount = filteredSubjects.length;
+  const paginatedSubjects = filteredSubjects.slice(offset, offset + limitNum);
+
+  const totalPages = Math.ceil(totalCount / limitNum);
+  res.setHeader("X-Total-Count", totalCount.toString());
+  res.setHeader("X-Total-Pages", totalPages.toString());
+  res.setHeader("X-Current-Page", pageNum.toString());
+  res.setHeader("X-Per-Page", limitNum.toString());
+
+  successResponse(res, "Subjects retrieved successfully", paginatedSubjects);
 });

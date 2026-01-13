@@ -58,6 +58,17 @@ export const authenticate = async (req: any, res: any, next: any) => {
         "GENERATE_REPORTS",
         "MANAGE_SETTINGS",
         "ADMIN",
+        "VIEW_PROGRAM_USERS",
+        "VIEW_PROGRAM_ACADEMICS",
+        "ENABLE_DISABLE_USERS",
+        "CHANGE_USER_ROLES",
+        "MANAGE_PROGRAM_LEADS",
+        "ASSIGN_TEACHER_SUBJECTS",
+        "MANAGE_STUDENT_ENROLLMENTS",
+        "ASSIGN_STUDENT_CLASS_GROUPS",
+        "ASSIGN_GRADE_TO_CLASS_TEACHER",
+        "VIEW_USERS_BY_CLASS_TEACHER_GRADE",
+        "VIEW_SUBJECTS_BY_CLASS_TEACHER_GRADE",
       ];
     } else {
       // Regular users get permissions from their roles
