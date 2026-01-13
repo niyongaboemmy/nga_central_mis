@@ -48,18 +48,123 @@ export interface UserRole {
   permissions?: Permission[];
 }
 
+// ==================== User Types (for user_type-based filters) ====================
+
+export const getUserTypes = async (
+  onSuccess?: (types: string[]) => void,
+  onError?: (error: any) => void
+): Promise<string[] | void> => {
+  try {
+    const response = await api.get<BackendResponse<string[]>>("/users/types");
+    if (onSuccess && response.data.data) {
+      onSuccess(response.data.data);
+    }
+    return response.data.data;
+  } catch (error) {
+    if (onError) {
+      onError(error);
+    }
+    throw error;
+  }
+};
+
 export const getUsers = async (
+  params?: {
+    userRole?: string;
+    page?: number;
+    limit?: number;
+    search?: string;
+  },
   onSuccess?: (users: UserWithProfile[]) => void,
   onError?: (error: any) => void
 ): Promise<UserWithProfile[] | void> => {
   try {
     const response = await api.get<BackendResponse<UserWithProfile[]>>(
-      "/users"
+      "/users",
+      { params }
     );
     if (onSuccess && response.data.data) {
       onSuccess(response.data.data);
     }
     return response.data.data;
+  } catch (error) {
+    if (onError) {
+      onError(error);
+    }
+    throw error;
+  }
+};
+
+export const getUsersByRole = async (
+  userRole: string,
+  page: number = 1,
+  limit: number = 10,
+  onSuccess?: (users: UserWithProfile[]) => void,
+  onError?: (error: any) => void
+): Promise<UserWithProfile[] | void> => {
+  try {
+    const response = await api.get<BackendResponse<UserWithProfile[]>>(
+      "/users",
+      {
+        params: { userRole, page, limit },
+      }
+    );
+    if (onSuccess && response.data.data) {
+      onSuccess(response.data.data);
+    }
+    return response.data.data;
+  } catch (error) {
+    if (onError) {
+      onError(error);
+    }
+    throw error;
+  }
+};
+
+export const getUsersWithPagination = async (
+  page: number = 1,
+  limit: number = 10,
+  userRole?: string,
+  searchTerm?: string,
+  status?: string,
+  onSuccess?: (users: {
+    users: UserWithProfile[];
+    total: number;
+    page: number;
+    totalPages: number;
+  }) => void,
+  onError?: (error: any) => void
+): Promise<{
+  users: UserWithProfile[];
+  total: number;
+  page: number;
+  totalPages: number;
+} | void> => {
+  try {
+    const params: any = { page, limit };
+    if (userRole) params.userRole = userRole;
+    if (searchTerm) params.search = searchTerm;
+    if (status) params.status = status;
+
+    const response = await api.get<BackendResponse<UserWithProfile[]>>(
+      "/users",
+      { params }
+    );
+
+    const total = parseInt(response.headers["x-total-count"] || "0");
+    const totalPages = Math.ceil(total / limit);
+
+    const result = {
+      users: response.data.data || [],
+      total,
+      page,
+      totalPages,
+    };
+
+    if (onSuccess) {
+      onSuccess(result);
+    }
+    return result;
   } catch (error) {
     if (onError) {
       onError(error);
@@ -232,6 +337,42 @@ export const deleteUser = async (
 ): Promise<void> => {
   try {
     await api.delete(`/users/${id}`);
+    if (onSuccess) {
+      onSuccess();
+    }
+  } catch (error) {
+    if (onError) {
+      onError(error);
+    }
+    throw error;
+  }
+};
+
+export const enableUser = async (
+  id: number,
+  onSuccess?: () => void,
+  onError?: (error: any) => void
+): Promise<void> => {
+  try {
+    await api.put(`/users/${id}/enable`);
+    if (onSuccess) {
+      onSuccess();
+    }
+  } catch (error) {
+    if (onError) {
+      onError(error);
+    }
+    throw error;
+  }
+};
+
+export const disableUser = async (
+  id: number,
+  onSuccess?: () => void,
+  onError?: (error: any) => void
+): Promise<void> => {
+  try {
+    await api.put(`/users/${id}/disable`);
     if (onSuccess) {
       onSuccess();
     }

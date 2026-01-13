@@ -25,6 +25,8 @@ import {
   getRoles,
   assignRoleToUser,
   Role,
+  enableUser,
+  disableUser,
 } from "../api/users";
 import { useToast } from "../contexts/ToastContext";
 import TeacherSubjectAssignment from "./academics/TeacherSubjectAssignment";
@@ -221,6 +223,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
   const [showAddRoleModal, setShowAddRoleModal] = React.useState(false);
   const [availableRoles, setAvailableRoles] = React.useState<Role[]>([]);
   const [assigningRole, setAssigningRole] = React.useState(false);
+  const [changingStatus, setChangingStatus] = React.useState(false);
 
   if (!user) return null;
 
@@ -263,6 +266,27 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
     }
   };
 
+  const handleToggleUserStatus = async () => {
+    if (!user) return;
+
+    try {
+      if (user.user.status === "ACTIVE") {
+        await disableUser(user.user.user_id);
+        showToast("User disabled successfully", "success");
+      } else {
+        await enableUser(user.user.user_id);
+        showToast("User enabled successfully", "success");
+      }
+      // Refresh user data
+      window.location.reload(); // Temporary solution
+    } catch (error: any) {
+      showToast(
+        error.response?.data?.message || "Failed to update user status",
+        "error"
+      );
+    }
+  };
+
   const openChangeRoleModal = async () => {
     try {
       const roles = await getRoles("ACTIVE");
@@ -273,6 +297,28 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
       setShowAddRoleModal(true);
     } catch (error) {
       showToast("Failed to load available roles", "error");
+    }
+  };
+
+  const handleStatusChange = async () => {
+    setChangingStatus(true);
+    try {
+      if (user.user.status === "ACTIVE") {
+        await disableUser(user.user.user_id);
+        showToast("User disabled successfully", "success");
+      } else {
+        await enableUser(user.user.user_id);
+        showToast("User enabled successfully", "success");
+      }
+      // Refresh user data - this would need to be passed from parent component
+      window.location.reload(); // Temporary solution
+    } catch (error: any) {
+      showToast(
+        error.response?.data?.message || "Failed to change user status",
+        "error"
+      );
+    } finally {
+      setChangingStatus(false);
     }
   };
 
@@ -376,6 +422,20 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                   >
                     {activeTab === "info" && (
                       <div className="space-y-4">
+                        <div className="flex justify-end">
+                          <button
+                            onClick={handleToggleUserStatus}
+                            className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+                              user.user.status === "ACTIVE"
+                                ? "bg-red-500 hover:bg-red-600 text-white"
+                                : "bg-green-500 hover:bg-green-600 text-white"
+                            }`}
+                          >
+                            {user.user.status === "ACTIVE"
+                              ? "Disable User"
+                              : "Enable User"}
+                          </button>
+                        </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           <InfoItem
                             icon={Mail}
@@ -557,6 +617,59 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                                   : "Profile not yet setup"}
                               </p>
                             </div>
+                          </div>
+                        </div>
+
+                        <div className="p-6 bg-gradient-to-r from-orange-50 to-orange-100 dark:from-orange-900/20 dark:to-orange-800/20 rounded-xl border border-orange-200 dark:border-orange-800">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-4">
+                              <div
+                                className={`w-12 h-12 rounded-full flex items-center justify-center ${
+                                  user.user.status === "ACTIVE"
+                                    ? "bg-green-100 dark:bg-green-900/30"
+                                    : "bg-red-100 dark:bg-red-900/30"
+                                }`}
+                              >
+                                {user.user.status === "ACTIVE" ? (
+                                  <CheckCircle className="w-6 h-6 text-green-600 dark:text-green-400" />
+                                ) : (
+                                  <Ban className="w-6 h-6 text-red-600 dark:text-red-400" />
+                                )}
+                              </div>
+                              <div>
+                                <p className="text-lg font-semibold text-gray-900 dark:text-white">
+                                  Account Status
+                                </p>
+                                <p className="text-sm text-gray-500 dark:text-gray-400">
+                                  {user.user.status === "ACTIVE"
+                                    ? "User can login and access the system"
+                                    : "User cannot login to the system"}
+                                </p>
+                              </div>
+                            </div>
+                            <button
+                              onClick={handleStatusChange}
+                              disabled={changingStatus}
+                              className={`flex items-center gap-2 px-4 py-2 rounded-full transition-colors ${
+                                user.user.status === "ACTIVE"
+                                  ? "bg-red-500 hover:bg-red-600 text-white"
+                                  : "bg-green-500 hover:bg-green-600 text-white"
+                              } disabled:opacity-50`}
+                            >
+                              {changingStatus ? (
+                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                              ) : user.user.status === "ACTIVE" ? (
+                                <>
+                                  <Ban className="w-4 h-4" />
+                                  Disable
+                                </>
+                              ) : (
+                                <>
+                                  <CheckCircle className="w-4 h-4" />
+                                  Enable
+                                </>
+                              )}
+                            </button>
                           </div>
                         </div>
                       </div>

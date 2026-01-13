@@ -1,7 +1,7 @@
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import { db } from "../db";
-import { eq, sql, and, or, like, ilike } from "drizzle-orm";
+import { eq, sql, and, or } from "drizzle-orm";
 import {
   User,
   UserProfile,
@@ -349,11 +349,54 @@ export const getCurrentUser = asyncHandler(async (req: any, res: any) => {
 });
 
 export const getUsers = asyncHandler(async (req: any, res: any) => {
-  logger.info("Fetching all users", { userId: req.user?.userId });
+  const { userRole, page = 1, limit = 10, search, status } = req.query;
+  const pageNum = parseInt(page);
+  const limitNum = parseInt(limit);
+  const offset = (pageNum - 1) * limitNum;
 
-  const users = await db.select().from(User);
+  logger.info("Fetching users with filters", {
+    userId: req.user?.userId,
+    userRole,
+    page: pageNum,
+    limit: limitNum,
+    search,
+    status,
+  });
 
-  // Get users with their roles
+  const whereConditions: any[] = [];
+
+  if (search) {
+    whereConditions.push(
+      or(
+        sql`${User.username} LIKE ${`%${search}%`}`,
+        sql`${User.email} LIKE ${`%${search}%`}`,
+        sql`${User.phone_number} LIKE ${`%${search}%`}`
+      )
+    );
+  }
+
+  if (status && status !== "all") {
+    whereConditions.push(eq(User.status, status.toUpperCase()));
+  }
+
+  const totalCountResult = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(User)
+    .where(
+      whereConditions.length > 0 ? and(...whereConditions) : (undefined as any)
+    );
+
+  const totalCount = totalCountResult[0]?.count || 0;
+
+  const users = await db
+    .select()
+    .from(User)
+    .where(
+      whereConditions.length > 0 ? and(...whereConditions) : (undefined as any)
+    )
+    .limit(limitNum)
+    .offset(offset);
+
   const usersWithRoles = await Promise.all(
     users.map(async (user) => {
       const userRoles = await db
@@ -367,7 +410,6 @@ export const getUsers = asyncHandler(async (req: any, res: any) => {
         .innerJoin(Role, eq(UserRole.role_id, Role.role_id))
         .where(eq(UserRole.user_id, user.user_id));
 
-      // Get permissions for each role
       const rolesWithPermissions = await Promise.all(
         userRoles.map(async (role) => {
           const permissions = await db
@@ -391,14 +433,13 @@ export const getUsers = asyncHandler(async (req: any, res: any) => {
         })
       );
 
-      // Get profile
       const profile = await db
         .select()
         .from(UserProfile)
         .where(eq(UserProfile.user_id, user.user_id))
         .limit(1);
 
-      return {
+      const userWithProfile = {
         user,
         profile: profile[0] || null,
         roles: rolesWithPermissions,
@@ -406,10 +447,32 @@ export const getUsers = asyncHandler(async (req: any, res: any) => {
           r.permissions.map((p) => p.name)
         ),
       };
+
+      if (userRole && userRole !== "all") {
+        const userRoleId = parseInt(userRole as string, 10);
+        if (!isNaN(userRoleId)) {
+          const hasRole = userRoles.some(
+            (role) => role.role_id.toString() === userRoleId.toString()
+          );
+          if (!hasRole) {
+            return null;
+          }
+        }
+      }
+
+      return userWithProfile;
     })
   );
 
-  successResponse(res, "Users retrieved successfully", usersWithRoles);
+  const filteredUsers = usersWithRoles.filter((user) => user !== null);
+
+  const totalPages = Math.ceil(totalCount / limitNum);
+  res.setHeader("X-Total-Count", totalCount.toString());
+  res.setHeader("X-Total-Pages", totalPages.toString());
+  res.setHeader("X-Current-Page", pageNum.toString());
+  res.setHeader("X-Per-Page", limitNum.toString());
+
+  successResponse(res, "Users retrieved successfully", filteredUsers);
 });
 
 export const getUser = asyncHandler(async (req: any, res: any) => {
@@ -1251,6 +1314,79 @@ export const removeRoleFromUser = asyncHandler(async (req: any, res: any) => {
     .where(and(eq(UserRole.user_id, userId), eq(UserRole.role_id, roleIdNum)));
 
   successResponse(res, "Role removed from user successfully");
+});
+
+// Disable user
+export const disableUser = asyncHandler(async (req: any, res: any) => {
+  const { id } = req.params;
+  const userId = parseInt(id);
+
+  if (isNaN(userId)) {
+    throw new ValidationError("Invalid user ID");
+  }
+
+  logger.info("Disabling user", {
+    userId,
+    disabledBy: req.user?.userId,
+  });
+
+  // Check if user exists
+  const user = await db
+    .select()
+    .from(User)
+    .where(eq(User.user_id, userId))
+    .limit(1);
+
+  if (user.length === 0) {
+    throw new NotFoundError("User not found");
+  }
+
+  // Prevent disabling own account
+  if (req.user?.userId === userId) {
+    throw new ValidationError("Cannot disable your own account");
+  }
+
+  // Update user status to INACTIVE (disabled)
+  await db
+    .update(User)
+    .set({ status: "INACTIVE" })
+    .where(eq(User.user_id, userId));
+
+  successResponse(res, "User disabled successfully");
+});
+
+// Enable user
+export const enableUser = asyncHandler(async (req: any, res: any) => {
+  const { id } = req.params;
+  const userId = parseInt(id);
+
+  if (isNaN(userId)) {
+    throw new ValidationError("Invalid user ID");
+  }
+
+  logger.info("Enabling user", {
+    userId,
+    enabledBy: req.user?.userId,
+  });
+
+  // Check if user exists
+  const user = await db
+    .select()
+    .from(User)
+    .where(eq(User.user_id, userId))
+    .limit(1);
+
+  if (user.length === 0) {
+    throw new NotFoundError("User not found");
+  }
+
+  // Update user status to ACTIVE
+  await db
+    .update(User)
+    .set({ status: "ACTIVE" })
+    .where(eq(User.user_id, userId));
+
+  successResponse(res, "User enabled successfully");
 });
 
 // Get user roles

@@ -3,19 +3,28 @@ import { motion } from "framer-motion";
 import {
   Users as UsersIcon,
   User as UserIcon,
-  Shield,
-  Mail,
   Search,
-  ChevronDown,
   CheckCircle,
+  XCircle,
   Plus,
   FileSpreadsheet,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { useUser } from "../contexts/UserContext";
-import { getUsers, UserWithProfile, UserRole } from "../api/users";
+import {
+  getUsersWithPagination,
+  UserWithProfile,
+  enableUser,
+  disableUser,
+  getRoles,
+  Role,
+} from "../api/users";
 import UserProfileModal from "./UserProfileModal";
 import ExcelUploadModal from "./ExcelUploadModal";
 import { CreateUserModal } from "./CreateUserModal";
+import UserItemCard from "./UserItemCard";
+import { useToast } from "../contexts/ToastContext";
 
 // Animated floating particles
 const FloatingParticles = () => (
@@ -47,59 +56,6 @@ const FloatingParticles = () => (
   </div>
 );
 
-// Status badge with icon
-const StatusBadge = ({ status }: { status: string }) => {
-  const config: Record<string, { color: string; icon: React.ElementType }> = {
-    ACTIVE: {
-      color:
-        "bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400",
-      icon: CheckCircle,
-    },
-    INACTIVE: {
-      color:
-        "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400",
-      icon: CheckCircle,
-    },
-    SUSPENDED: {
-      color: "bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-400",
-      icon: CheckCircle,
-    },
-  };
-  const { color, icon: Icon } = config[status] || config.ACTIVE;
-
-  return (
-    <span
-      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${color}`}
-    >
-      <Icon className="w-3 h-3" />
-      {status}
-    </span>
-  );
-};
-
-// User type badge
-const UserTypeBadge = ({ type }: { type: string }) => {
-  const colors: Record<string, string> = {
-    ADMIN:
-      "bg-violet-100 text-violet-600 dark:bg-violet-900/30 dark:text-violet-400",
-    STUDENT: "bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400",
-    TEACHER:
-      "bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400",
-    PARENT:
-      "bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400",
-    STAFF: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400",
-  };
-  const color =
-    colors[type] ||
-    "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400";
-
-  return (
-    <span className={`px-2 py-0.5 rounded-lg text-xs font-medium ${color}`}>
-      {type}
-    </span>
-  );
-};
-
 // Compact stat card
 const StatCard = ({
   icon: Icon,
@@ -128,137 +84,10 @@ const StatCard = ({
   </motion.div>
 );
 
-// Compact user row
-const UserRow = ({
-  user,
-  index,
-  onView,
-  isExpanded,
-  onToggleExpand,
-}: {
-  user: UserWithProfile;
-  index: number;
-  onView: () => void;
-  isExpanded: boolean;
-  onToggleExpand: () => void;
-}) => {
-  const userType = user.profile?.user_type || "USER";
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 5 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: index * 0.02 }}
-      className="group"
-    >
-      <div
-        className="flex items-center gap-3 p-3 bg-white/90 dark:bg-slate-800/40 backdrop-blur-sm rounded-2xl border border-white/50 dark:border-slate-700/20 hover:bg-white/80 dark:hover:bg-slate-800/80 hover:shadow-sm transition-all cursor-pointer"
-        onClick={onToggleExpand}
-      >
-        {/* Avatar */}
-        <div className="relative">
-          <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center">
-            <UserIcon className="w-5 h-5 text-white" />
-          </div>
-          <div
-            className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white dark:border-slate-800 ${
-              user.user.status === "ACTIVE" ? "bg-green-500" : "bg-slate-400"
-            }`}
-          />
-        </div>
-
-        {/* User Info */}
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-1.5">
-            <h3 className="font-medium text-gray-900 dark:text-white text-sm truncate">
-              {user.profile?.first_name && user.profile?.last_name
-                ? `${user.profile.first_name} ${user.profile.last_name}`
-                : user.user.username}
-            </h3>
-            <UserTypeBadge type={userType} />
-          </div>
-          <p className="text-xs text-gray-400 truncate">{user.user.email}</p>
-        </div>
-
-        {/* Quick Stats */}
-        <div className="hidden sm:flex items-center gap-4 text-xs">
-          <span className="text-gray-500">{user.roles?.length || 0} roles</span>
-          <StatusBadge status={user.user.status} />
-        </div>
-
-        {/* Expand Icon */}
-        <motion.div
-          animate={{ rotate: isExpanded ? 180 : 0 }}
-          className="text-gray-400"
-        >
-          <ChevronDown className="w-4 h-4" />
-        </motion.div>
-      </div>
-
-      {/* Expanded Content */}
-      <motion.div
-        initial={{ height: 0, opacity: 0 }}
-        animate={{
-          height: isExpanded ? "auto" : 0,
-          opacity: isExpanded ? 1 : 0,
-        }}
-        className="overflow-hidden"
-      >
-        <div className="pt-2 pl-3 pr-3 pb-2">
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-            {/* Contact */}
-            <div className="p-4 bg-gray-50 dark:bg-slate-900/50 rounded-xl text-xs">
-              <div className="flex items-center gap-1.5 mb-1">
-                <Mail className="w-3 h-3 text-gray-400" />
-                <span className="font-bold text-black dark:text-gray-300 text-sm">
-                  Contact
-                </span>
-              </div>
-              <p className="text-gray-500 truncate">{user.user.email}</p>
-              <p className="text-gray-500">
-                {user.user.phone_number || "No phone"}
-              </p>
-            </div>
-
-            {/* Roles */}
-            <div className="p-4 bg-gray-50 dark:bg-slate-900/50 rounded-xl text-xs">
-              <div className="flex items-center gap-1.5 mb-1">
-                <Shield className="w-3 h-3 text-violet-500" />
-                <span className="font-bold text-black dark:text-gray-300 text-sm">
-                  Roles
-                </span>
-              </div>
-              {user.roles && user.roles.length > 0 ? (
-                <p className="text-gray-500">
-                  {user.roles.map((r: UserRole) => r.name).join(", ")}
-                </p>
-              ) : (
-                <p className="text-gray-500">No roles</p>
-              )}
-            </div>
-
-            {/* Actions */}
-            <div className="p-4 bg-gray-50 dark:bg-slate-900/50 rounded-xl text-xs flex items-center justify-center">
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onView();
-                }}
-                className="px-5 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-full transition-colors text-sm font-medium"
-              >
-                View Profile
-              </button>
-            </div>
-          </div>
-        </div>
-      </motion.div>
-    </motion.div>
-  );
-};
-
 // Users Management Page
 const Users: React.FC = () => {
   const { user } = useUser();
+  const { showToast } = useToast();
   const [users, setUsers] = useState<UserWithProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -268,9 +97,18 @@ const Users: React.FC = () => {
   const [userModalOpen, setUserModalOpen] = useState(false);
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [excelModalOpen, setExcelModalOpen] = useState(false);
-  const [filterType, setFilterType] = useState<string>("all");
+  const [selectedRole, setSelectedRole] = useState<string>("all");
+  const [selectedStatus, setSelectedStatus] = useState<string>("ACTIVE");
   const [expandedUsers, setExpandedUsers] = useState<number[]>([]);
+  const [availableRoles, setAvailableRoles] = useState<Role[]>([]);
+  const [pagination, setPagination] = useState({
+    page: 1,
+    limit: 50,
+    total: 0,
+    totalPages: 0,
+  });
   const loadingRef = useRef(false);
+  const loadRolesCalledRef = useRef(false);
 
   const canManage = user?.roles?.find((itm) =>
     itm.permissions?.find(
@@ -279,32 +117,83 @@ const Users: React.FC = () => {
     )
   );
 
+  const loadRoles = async () => {
+    if (loadRolesCalledRef.current) return;
+    loadRolesCalledRef.current = true;
+    try {
+      const roles = await getRoles();
+      if (roles) {
+        setAvailableRoles(roles);
+        if (roles.length > 0) {
+          // Default to first role's role_id (as string) to match backend userRole filter
+          setSelectedRole(roles[0].role_id.toString());
+        }
+      }
+    } catch (error) {
+      console.error("Failed to load roles:", error);
+    }
+  };
+
   useEffect(() => {
-    loadUsers();
+    loadRoles();
   }, []);
 
-  const loadUsers = async () => {
+  const loadUsers = async (role_id: string, status: string) => {
     if (loadingRef.current) return;
     loadingRef.current = true;
     setLoading(true);
     try {
-      const data = await getUsers();
-      setUsers(data || []);
+      const result = await getUsersWithPagination(
+        pagination.page,
+        pagination.limit,
+        role_id === "all" ? undefined : role_id,
+        searchTerm || undefined,
+        status === "all" ? undefined : status
+      );
+      if (result) {
+        setUsers(result.users);
+        setPagination((prev) => ({
+          ...prev,
+          total: result.total,
+          totalPages: result.totalPages,
+        }));
+      }
     } catch (error) {
       console.error("Failed to load users:", error);
+      showToast("Failed to load users", "error");
     } finally {
       setLoading(false);
       loadingRef.current = false;
     }
   };
 
+  // Load users whenever filters change
+  useEffect(() => {
+    loadUsers(selectedRole, selectedStatus);
+  }, [selectedRole, selectedStatus, pagination.page, searchTerm]);
+
   const viewUserProfile = (userData: UserWithProfile) => {
     setSelectedUser(userData);
     setUserModalOpen(true);
   };
 
-  const getUserType = (user: UserWithProfile): string => {
-    return user.profile?.user_type || "USER";
+  const toggleUserStatus = async (userId: number, currentStatus: string) => {
+    try {
+      if (currentStatus === "ACTIVE") {
+        await disableUser(userId);
+        showToast("User disabled successfully", "success");
+      } else {
+        await enableUser(userId);
+        showToast("User enabled successfully", "success");
+      }
+      // Refresh the user list
+      await loadUsers(selectedRole, selectedStatus);
+    } catch (error: any) {
+      showToast(
+        error.response?.data?.message || "Failed to update user status",
+        "error"
+      );
+    }
   };
 
   const toggleExpand = (userId: number) => {
@@ -315,27 +204,22 @@ const Users: React.FC = () => {
     );
   };
 
-  const filteredUsers = users.filter((user) => {
-    const matchesSearch =
-      user.user.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.profile?.first_name
-        ?.toLowerCase()
-        .includes(searchTerm.toLowerCase()) ||
-      user.profile?.last_name?.toLowerCase().includes(searchTerm.toLowerCase());
+  const handlePageChange = (newPage: number) => {
+    if (newPage >= 1 && newPage <= pagination.totalPages) {
+      setPagination((prev) => ({ ...prev, page: newPage }));
+    }
+  };
 
-    const matchesType =
-      filterType === "all" || getUserType(user) === filterType;
-    return matchesSearch && matchesType;
-  });
-
-  const userTypes = ["all", "ADMIN", "STUDENT", "TEACHER", "PARENT", "STAFF"];
+  const getUserType = (user: UserWithProfile): string => {
+    return user.profile?.user_type || "USER";
+  };
 
   const stats = {
-    total: users.length,
+    total: pagination.total,
     admins: users.filter((u) => getUserType(u) === "ADMIN").length,
     students: users.filter((u) => getUserType(u) === "STUDENT").length,
     active: users.filter((u) => u.user.status === "ACTIVE").length,
+    disabled: users.filter((u) => u.user.status === "INACTIVE").length,
   };
 
   if (!canManage) {
@@ -408,7 +292,7 @@ const Users: React.FC = () => {
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.05 }}
-            className="grid grid-cols-4 gap-2 mb-4"
+            className="grid grid-cols-5 gap-2 mb-4"
           >
             <StatCard icon={UsersIcon} label="Total" value={stats.total} />
             <StatCard icon={UsersIcon} label="Admins" value={stats.admins} />
@@ -418,6 +302,7 @@ const Users: React.FC = () => {
               value={stats.students}
             />
             <StatCard icon={CheckCircle} label="Active" value={stats.active} />
+            <StatCard icon={XCircle} label="Disabled" value={stats.disabled} />
           </motion.div>
 
           {/* Search & Filters */}
@@ -432,27 +317,75 @@ const Users: React.FC = () => {
               <input
                 type="text"
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                onChange={(e) => {
+                  setSearchTerm(e.target.value);
+                  setPagination((prev) => ({ ...prev, page: 1 })); // Reset to first page on search
+                }}
                 placeholder="Search users..."
                 className="w-full pl-10 pr-3 py-2.5 bg-white dark:bg-gray-800/40 border border-gray-200 dark:border-slate-700 dark:text-white rounded-[0.8rem] text-sm focus:outline-none focus:border-blue-500"
               />
             </div>
-            <div className="flex gap-1 overflow-x-auto pb-1">
-              {userTypes.map((type) => (
+            <div className="flex gap-1 overflow-x-auto pb-1 pt-2">
+              <button
+                key="all"
+                onClick={() => {
+                  setSelectedRole("all");
+                  setPagination((prev) => ({ ...prev, page: 1 })); // Reset to first page on role change
+                }}
+                className={`px-3 py-1 rounded-full text-xs font-medium transition-all whitespace-nowrap ${
+                  selectedRole === "all"
+                    ? "bg-blue-500 text-white"
+                    : "bg-white/60 dark:bg-slate-800/60 text-gray-600 dark:text-gray-300"
+                }`}
+              >
+                All
+              </button>
+              {availableRoles.map((role) => (
                 <button
-                  key={type}
-                  onClick={() => setFilterType(type)}
+                  key={role.role_id}
+                  onClick={() => {
+                    setSelectedRole(role.role_id.toString());
+                    setPagination((prev) => ({ ...prev, page: 1 }));
+                  }}
                   className={`px-3 py-1 rounded-full text-xs font-medium transition-all whitespace-nowrap ${
-                    filterType === type
+                    selectedRole.toString() === role.role_id.toString()
                       ? "bg-blue-500 text-white"
                       : "bg-white/60 dark:bg-slate-800/60 text-gray-600 dark:text-gray-300"
                   }`}
                 >
-                  {type === "all"
-                    ? "All"
-                    : type.charAt(0) + type.slice(1).toLowerCase()}
+                  {role.name}
                 </button>
               ))}
+            </div>
+            <div className="flex gap-0 overflow-x-auto pb-0 pt-2 border-b border-gray-200 dark:border-slate-700">
+              <button
+                key="active"
+                onClick={() => {
+                  setSelectedStatus("ACTIVE");
+                  setPagination((prev) => ({ ...prev, page: 1 }));
+                }}
+                className={`px-4 py-2 text-sm font-medium transition-all whitespace-nowrap ${
+                  selectedStatus === "ACTIVE"
+                    ? "text-blue-500 border-b-2 border-blue-500 bg-blue-50 dark:bg-blue-900/20"
+                    : "text-gray-600 dark:text-gray-300 border-b-2 border-transparent hover:text-blue-500"
+                }`}
+              >
+                Active
+              </button>
+              <button
+                key="disabled"
+                onClick={() => {
+                  setSelectedStatus("INACTIVE");
+                  setPagination((prev) => ({ ...prev, page: 1 }));
+                }}
+                className={`px-4 py-2 text-sm font-medium transition-all whitespace-nowrap ${
+                  selectedStatus === "INACTIVE"
+                    ? "text-blue-500 border-b-2 border-blue-500 bg-blue-50 dark:bg-blue-900/20"
+                    : "text-gray-600 dark:text-gray-300 border-b-2 border-transparent hover:text-blue-500"
+                }`}
+              >
+                Disabled
+              </button>
             </div>
           </motion.div>
 
@@ -467,15 +400,18 @@ const Users: React.FC = () => {
               animate={{ opacity: 1 }}
               className="space-y-2"
             >
-              {filteredUsers.length > 0 ? (
-                filteredUsers.map((user, index) => (
-                  <UserRow
+              {users.length > 0 ? (
+                users.map((user: UserWithProfile, index: number) => (
+                  <UserItemCard
                     key={user.user.user_id}
                     user={user}
                     index={index}
                     onView={() => viewUserProfile(user)}
                     isExpanded={expandedUsers.includes(user.user.user_id)}
                     onToggleExpand={() => toggleExpand(user.user.user_id)}
+                    onToggleStatus={() =>
+                      toggleUserStatus(user.user.user_id, user.user.status)
+                    }
                   />
                 ))
               ) : (
@@ -483,6 +419,179 @@ const Users: React.FC = () => {
                   No users found
                 </div>
               )}
+            </motion.div>
+          )}
+
+          {/* Enhanced Pagination */}
+          {!loading && pagination.total > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2 }}
+              className="mt-6 pt-4 border-t border-gray-200 dark:border-slate-700"
+            >
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                {/* Left side - Results info and rows per page */}
+                <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                  <div className="text-sm text-gray-500">
+                    Showing {(pagination.page - 1) * pagination.limit + 1} to{" "}
+                    {Math.min(
+                      pagination.page * pagination.limit,
+                      pagination.total
+                    )}{" "}
+                    of {pagination.total} users
+                  </div>
+
+                  {/* Rows per page selector */}
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-gray-500">Show:</span>
+                    <select
+                      value={pagination.limit}
+                      onChange={(e) => {
+                        const newLimit = parseInt(e.target.value);
+                        setPagination((prev) => ({
+                          ...prev,
+                          limit: newLimit,
+                          page: 1, // Reset to first page when changing limit
+                        }));
+                      }}
+                      className="px-2 py-1 text-sm bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-md focus:outline-none focus:border-blue-500"
+                    >
+                      <option value={10}>10</option>
+                      <option value={20}>20</option>
+                      <option value={50}>50</option>
+                      <option value={100}>100</option>
+                    </select>
+                    <span className="text-sm text-gray-500">per page</span>
+                  </div>
+                </div>
+
+                {/* Right side - Page navigation */}
+                {pagination.totalPages > 1 && (
+                  <div className="flex items-center gap-2">
+                    {/* First page */}
+                    <button
+                      onClick={() => handlePageChange(1)}
+                      disabled={pagination.page === 1}
+                      className="p-2 rounded-lg bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors"
+                      title="First page"
+                    >
+                      <ChevronLeft className="w-4 h-4 rotate-180" />
+                      <ChevronLeft className="w-4 h-4 -ml-2 rotate-180" />
+                    </button>
+
+                    {/* Previous page */}
+                    <button
+                      onClick={() => handlePageChange(pagination.page - 1)}
+                      disabled={pagination.page === 1}
+                      className="p-2 rounded-lg bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors"
+                      title="Previous page"
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                    </button>
+
+                    {/* Page numbers */}
+                    <div className="flex items-center gap-1">
+                      {(() => {
+                        const pages = [];
+                        const startPage = Math.max(1, pagination.page - 2);
+                        const endPage = Math.min(
+                          pagination.totalPages,
+                          pagination.page + 2
+                        );
+
+                        // Add first page if not in range
+                        if (startPage > 1) {
+                          pages.push(
+                            <button
+                              key={1}
+                              onClick={() => handlePageChange(1)}
+                              className="px-3 py-1 text-sm rounded-md bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors"
+                            >
+                              1
+                            </button>
+                          );
+                          if (startPage > 2) {
+                            pages.push(
+                              <span
+                                key="start-ellipsis"
+                                className="px-2 text-gray-400"
+                              >
+                                ...
+                              </span>
+                            );
+                          }
+                        }
+
+                        // Add pages in range
+                        for (let i = startPage; i <= endPage; i++) {
+                          pages.push(
+                            <button
+                              key={i}
+                              onClick={() => handlePageChange(i)}
+                              className={`px-3 py-1 text-sm rounded-md transition-colors ${
+                                i === pagination.page
+                                  ? "bg-blue-500 text-white border-blue-500"
+                                  : "bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-700"
+                              }`}
+                            >
+                              {i}
+                            </button>
+                          );
+                        }
+
+                        // Add last page if not in range
+                        if (endPage < pagination.totalPages) {
+                          if (endPage < pagination.totalPages - 1) {
+                            pages.push(
+                              <span
+                                key="end-ellipsis"
+                                className="px-2 text-gray-400"
+                              >
+                                ...
+                              </span>
+                            );
+                          }
+                          pages.push(
+                            <button
+                              key={pagination.totalPages}
+                              onClick={() =>
+                                handlePageChange(pagination.totalPages)
+                              }
+                              className="px-3 py-1 text-sm rounded-md bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors"
+                            >
+                              {pagination.totalPages}
+                            </button>
+                          );
+                        }
+
+                        return pages;
+                      })()}
+                    </div>
+
+                    {/* Next page */}
+                    <button
+                      onClick={() => handlePageChange(pagination.page + 1)}
+                      disabled={pagination.page === pagination.totalPages}
+                      className="p-2 rounded-lg bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors"
+                      title="Next page"
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+
+                    {/* Last page */}
+                    <button
+                      onClick={() => handlePageChange(pagination.totalPages)}
+                      disabled={pagination.page === pagination.totalPages}
+                      className="p-2 rounded-lg bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors"
+                      title="Last page"
+                    >
+                      <ChevronRight className="w-4 h-4 -mr-2" />
+                      <ChevronRight className="w-4 h-4 -mr-2" />
+                    </button>
+                  </div>
+                )}
+              </div>
             </motion.div>
           )}
         </div>
@@ -498,13 +607,13 @@ const Users: React.FC = () => {
       <CreateUserModal
         isOpen={createModalOpen}
         onClose={() => setCreateModalOpen(false)}
-        onSuccess={loadUsers}
+        onSuccess={() => loadUsers(selectedRole, selectedStatus)}
       />
 
       <ExcelUploadModal
         isOpen={excelModalOpen}
         onClose={() => setExcelModalOpen(false)}
-        onSuccess={loadUsers}
+        onSuccess={() => loadUsers(selectedRole, selectedStatus)}
       />
     </div>
   );

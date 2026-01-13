@@ -15,6 +15,8 @@ import {
   assignRoleToUser,
   removeRoleFromUser,
   getUserRoles,
+  enableUser,
+  disableUser,
 } from "../controllers/userController";
 import { authenticate, authorize } from "../middleware/auth";
 
@@ -62,6 +64,15 @@ router.post(
 );
 router.put("/:id", authenticate, authorize("MANAGE_USERS"), updateUser);
 router.delete("/:id", authenticate, authorize("MANAGE_USERS"), deleteUser);
+
+// User status management
+router.put("/:id/enable", authenticate, authorize("MANAGE_USERS"), enableUser);
+router.put(
+  "/:id/disable",
+  authenticate,
+  authorize("MANAGE_USERS"),
+  disableUser
+);
 
 // User role management
 router.get("/:id/roles", authenticate, authorize("MANAGE_USERS"), getUserRoles);
