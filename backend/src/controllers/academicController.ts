@@ -1,5 +1,6 @@
 import { db } from "../db";
 import { eq, and, or, sql, SQL } from "drizzle-orm";
+import { alias } from "drizzle-orm/mysql-core";
 import {
   AcademicYear,
   AcademicTerm,
@@ -815,6 +816,10 @@ export const getSubjects = asyncHandler(async (req: any, res: any) => {
 
   let whereCondition: SQL<unknown> = eq(Subject.status, "ACTIVE");
 
+  // Define aliases to avoid ambiguity
+  const GradeFromClass = alias(Grade, "grade_from_class");
+  const ProgramFromClass = alias(Program, "program_from_class");
+
   // If user has VIEW_PROGRAM_ACADEMICS but not MANAGE_ACADEMICS,
   // filter to only subjects assigned to grades in their programs
   if (
@@ -836,8 +841,10 @@ export const getSubjects = asyncHandler(async (req: any, res: any) => {
     whereCondition = and(
       whereCondition,
       or(
-        sql`${Program.program_id} IN (${assignedProgramIds.join(",")})`,
-        sql`${Grade.grade_id} IS NULL`
+        sql`${ProgramFromClass.program_id} IN (${assignedProgramIds.join(
+          ","
+        )})`,
+        sql`${GradeFromClass.grade_id} IS NULL`
       )
     )!;
   }
@@ -848,28 +855,32 @@ export const getSubjects = asyncHandler(async (req: any, res: any) => {
       code: Subject.code,
       name: Subject.name,
       description: Subject.description,
-      grade_id: Grade.grade_id,
-      grade_name: Grade.name,
-      program_id: Program.program_id,
-      program_name: Program.name,
-      teacher_id: User.user_id,
-      teacher_name: sql`CONCAT(${UserProfile.first_name}, ' ', ${UserProfile.last_name})`,
-      teacher_username: User.username,
+      grade_id: GradeFromClass.grade_id,
+      grade_name: GradeFromClass.name,
+      program_id: ProgramFromClass.program_id,
+      program_name: ProgramFromClass.name,
     })
     .from(Subject)
-    .leftJoin(GradeSubject, eq(Subject.subject_id, GradeSubject.subject_id))
-    .leftJoin(Grade, eq(GradeSubject.grade_id, Grade.grade_id))
-    .leftJoin(Program, eq(Grade.program_id, Program.program_id))
     .leftJoin(
       TeacherSubjectAssignment,
-      eq(Subject.subject_id, TeacherSubjectAssignment.subject_id)
+      sql`${Subject.subject_id} = ${TeacherSubjectAssignment.subject_id}`
     )
-    .leftJoin(User, eq(TeacherSubjectAssignment.user_id, User.user_id))
-    .leftJoin(UserProfile, eq(User.user_id, UserProfile.user_id))
+    .leftJoin(
+      ClassGroup,
+      sql`${TeacherSubjectAssignment.class_group_id} = ${ClassGroup.class_group_id}`
+    )
+    .leftJoin(
+      GradeFromClass,
+      sql`${ClassGroup.grade_id} = ${GradeFromClass.grade_id}`
+    )
+    .leftJoin(
+      ProgramFromClass,
+      sql`${GradeFromClass.program_id} = ${ProgramFromClass.program_id}`
+    )
     .where(whereCondition)
     .orderBy(Subject.name);
 
-  // Group subjects by subject_id and collect their grades/programs and teachers
+  // Group subjects by subject_id and collect their grades/programs
   const subjectMap = new Map<number, any>();
 
   subjects.forEach((row) => {
@@ -881,7 +892,6 @@ export const getSubjects = asyncHandler(async (req: any, res: any) => {
         name: row.name,
         description: row.description,
         grades: [],
-        teachers: [],
       });
     }
 
@@ -893,22 +903,6 @@ export const getSubjects = asyncHandler(async (req: any, res: any) => {
         program_name: row.program_name,
       });
     }
-
-    if (row.teacher_id) {
-      subjectMap.get(subjectId).teachers.push({
-        teacher_id: row.teacher_id,
-        teacher_name: row.teacher_name,
-        teacher_username: row.teacher_username,
-      });
-    }
-  });
-
-  // Remove duplicate teachers
-  subjectMap.forEach((subject) => {
-    subject.teachers = subject.teachers.filter(
-      (teacher: any, index: number, self: any[]) =>
-        index === self.findIndex((t) => t.teacher_id === teacher.teacher_id)
-    );
   });
 
   const result = Array.from(subjectMap.values());
