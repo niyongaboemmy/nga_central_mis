@@ -168,9 +168,7 @@ export const verifyOTP = asyncHandler(async (req: any, res: any) => {
   // Get user roles
   const userRoles = await db
     .select({
-      role_id: Role.role_id,
       name: Role.name,
-      description: Role.description,
     })
     .from(UserRole)
     .innerJoin(Role, eq(UserRole.role_id, Role.role_id))
@@ -191,7 +189,7 @@ export const verifyOTP = asyncHandler(async (req: any, res: any) => {
     profile: profile[0] || null,
     permissions,
     assignedPrograms,
-    roles: userRoles,
+    roles: userRoles.map((role) => role.name),
     forcePasswordChange: auth[0]?.force_password_change === 1,
   });
 });
