@@ -1,6 +1,9 @@
 import validator from "validator";
 
-export const sanitizeString = (str: string): string => {
+export const sanitizeString = (str: string | undefined): string => {
+  if (typeof str !== "string") {
+    return "";
+  }
   return validator.escape(str.trim());
 };
 
