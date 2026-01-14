@@ -11,6 +11,8 @@ import {
   UserProgramLead,
   UserRole,
   Role,
+  Permission,
+  RolePermission,
 } from "../db/schema";
 import { getUserPermissions } from "../utils/auth";
 import { sanitizeString, validateEmail } from "../utils/sanitization";
@@ -165,14 +167,43 @@ export const verifyOTP = asyncHandler(async (req: any, res: any) => {
     .innerJoin(Program, eq(UserProgramLead.program_id, Program.program_id))
     .where(eq(UserProgramLead.user_id, userId));
 
-  // Get user roles
-  const userRoles = await db
-    .select({
-      name: Role.name,
-    })
+  // Get user roles with permissions
+  const userRoleIds = await db
+    .select({ role_id: UserRole.role_id })
     .from(UserRole)
-    .innerJoin(Role, eq(UserRole.role_id, Role.role_id))
     .where(eq(UserRole.user_id, userId));
+
+  const roles = [];
+  for (const { role_id } of userRoleIds) {
+    const role = await db
+      .select({
+        role_id: Role.role_id,
+        name: Role.name,
+        description: Role.description,
+        status: Role.status,
+      })
+      .from(Role)
+      .where(eq(Role.role_id, role_id))
+      .limit(1);
+
+    if (role.length > 0) {
+      const permissions = await db
+        .select({
+          perm_id: Permission.perm_id,
+          name: Permission.name,
+          description: Permission.description,
+          status: Permission.status,
+        })
+        .from(RolePermission)
+        .innerJoin(Permission, eq(RolePermission.perm_id, Permission.perm_id))
+        .where(eq(RolePermission.role_id, role_id));
+
+      roles.push({
+        ...role[0],
+        permissions,
+      });
+    }
+  }
 
   // Generate final JWT token
   const token = jwt.sign(
@@ -189,7 +220,7 @@ export const verifyOTP = asyncHandler(async (req: any, res: any) => {
     profile: profile[0] || null,
     permissions,
     assignedPrograms,
-    roles: userRoles.map((role) => role.name),
+    roles,
     forcePasswordChange: auth[0]?.force_password_change === 1,
   });
 });
