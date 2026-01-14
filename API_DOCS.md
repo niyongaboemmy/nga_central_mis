@@ -326,6 +326,92 @@ Remove role from user.
 
 **Authentication:** Required (MANAGE_USERS permission)
 
+### GET /users/:id/programs
+
+Get programs associated with a user.
+
+**Authentication:** Required
+
+### GET /users/programs/:programId/roles
+
+Get roles for users in a program.
+
+**Authentication:** Required (VIEW_PROGRAM_USERS permission)
+
+### GET /users/programs/:programId/roles/:roleId/users
+
+Get users by program and role.
+
+**Authentication:** Required (VIEW_PROGRAM_USERS permission)
+
+**Query Parameters:**
+
+- `page`: Page number
+- `limit`: Items per page
+- `search`: Search term
+
+### GET /users/programs/:programId/users
+
+Get all users in a program.
+
+**Authentication:** Required (VIEW_PROGRAM_USERS permission)
+
+**Query Parameters:**
+
+- `page`: Page number
+- `limit`: Items per page
+- `search`: Search term
+
+### GET /users/:id/grades
+
+Get grades assigned to a user.
+
+**Authentication:** Required
+
+### POST /users/:id/grades
+
+Assign grade to class teacher.
+
+**Authentication:** Required (ASSIGN_GRADE_TO_CLASS_TEACHER permission)
+
+**Request Body:**
+
+```json
+{
+  "grade_id": 1
+}
+```
+
+### DELETE /users/:id/grades/:gradeId
+
+Remove grade from class teacher.
+
+**Authentication:** Required (ASSIGN_GRADE_TO_CLASS_TEACHER permission)
+
+### GET /users/grades/:gradeId/users
+
+Get users by grade.
+
+**Authentication:** Required (VIEW_USERS_BY_CLASS_TEACHER_GRADE permission)
+
+**Query Parameters:**
+
+- `page`: Page number
+- `limit`: Items per page
+- `search`: Search term
+
+### GET /users/grades/:gradeId/subjects
+
+Get subjects by grade.
+
+**Authentication:** Required (VIEW_SUBJECTS_BY_CLASS_TEACHER_GRADE permission)
+
+**Query Parameters:**
+
+- `page`: Page number
+- `limit`: Items per page
+- `search`: Search term
+
 ---
 
 ## Permission Management Endpoints
@@ -743,7 +829,7 @@ Delete academic year.
 
 Get all academic terms.
 
-**Authentication:** Required (MANAGE_ACADEMICS permission)
+**Authentication:** Required
 
 #### GET /academics/terms/:id
 
@@ -819,6 +905,40 @@ Update program.
 #### DELETE /academics/programs/:id
 
 Delete program.
+
+**Authentication:** Required (MANAGE_ACADEMICS permission)
+
+#### GET /academics/programs/:programId/users
+
+Get users in a program.
+
+**Authentication:** Required (VIEW_PROGRAM_USERS permission)
+
+**Query Parameters:**
+
+- `page`: Page number
+- `limit`: Items per page
+- `search`: Search term
+- `status`: User status filter
+
+#### POST /academics/programs/assign-lead
+
+Assign user as program lead.
+
+**Authentication:** Required (MANAGE_ACADEMICS permission)
+
+**Request Body:**
+
+```json
+{
+  "user_id": 1,
+  "program_id": 1
+}
+```
+
+#### DELETE /academics/programs/:program_id/leads/:user_id
+
+Remove user as program lead.
 
 **Authentication:** Required (MANAGE_ACADEMICS permission)
 
