@@ -9,6 +9,8 @@ import {
   OTP,
   Program,
   UserProgramLead,
+  UserRole,
+  Role,
 } from "../db/schema";
 import { getUserPermissions } from "../utils/auth";
 import { sanitizeString, validateEmail } from "../utils/sanitization";
@@ -163,6 +165,17 @@ export const verifyOTP = asyncHandler(async (req: any, res: any) => {
     .innerJoin(Program, eq(UserProgramLead.program_id, Program.program_id))
     .where(eq(UserProgramLead.user_id, userId));
 
+  // Get user roles
+  const userRoles = await db
+    .select({
+      role_id: Role.role_id,
+      name: Role.name,
+      description: Role.description,
+    })
+    .from(UserRole)
+    .innerJoin(Role, eq(UserRole.role_id, Role.role_id))
+    .where(eq(UserRole.user_id, userId));
+
   // Generate final JWT token
   const token = jwt.sign(
     { userId, username: user[0].username },
@@ -178,6 +191,7 @@ export const verifyOTP = asyncHandler(async (req: any, res: any) => {
     profile: profile[0] || null,
     permissions,
     assignedPrograms,
+    roles: userRoles,
     forcePasswordChange: auth[0]?.force_password_change === 1,
   });
 });
