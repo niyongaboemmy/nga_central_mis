@@ -1253,10 +1253,6 @@ export const getTeacherSubjectAssignments = asyncHandler(
       throw new NotFoundError("User not found");
     }
 
-    if (user[0].UserProfile.user_type !== "TEACHER") {
-      throw new ValidationError("User is not a teacher");
-    }
-
     const assignments = await db
       .select({
         assignment_id: sql`${TeacherSubjectAssignment.user_id} || '-' || ${TeacherSubjectAssignment.subject_id} || '-' || ${TeacherSubjectAssignment.class_group_id} || '-' || ${TeacherSubjectAssignment.academic_term_id}`,

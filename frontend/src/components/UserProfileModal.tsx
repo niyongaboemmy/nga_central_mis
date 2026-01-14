@@ -313,9 +313,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
     { id: "roles", label: "Roles", icon: Shield },
     { id: "programs", label: "Programs", icon: Building },
     { id: "grades", label: "Grades", icon: Award },
-    ...(getUserType() === "TEACHER"
-      ? [{ id: "subjects", label: "Subjects", icon: BookOpen }]
-      : []),
+    { id: "subjects", label: "Subjects", icon: BookOpen },
     ...(getUserType() === "STUDENT"
       ? [{ id: "enrollment", label: "Enrollment", icon: BookOpen }]
       : []),
@@ -899,23 +897,21 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                       </div>
                     )}
 
-                    {activeTab === "subjects" &&
-                      getUserType() === "TEACHER" && (
-                        <div className="space-y-6">
-                          <TeacherSubjectAssignment
-                            teacherId={user.user.user_id}
-                            teacherName={
-                              user.profile?.first_name &&
-                              user.profile?.last_name
-                                ? `${user.profile.first_name} ${user.profile.last_name}`
-                                : user.user.username
-                            }
-                            isOpen={true}
-                            onClose={() => setActiveTab("info")}
-                            onSuccess={() => {}} // Could refresh user data if needed
-                          />
-                        </div>
-                      )}
+                    {activeTab === "subjects" && (
+                      <div className="space-y-6">
+                        <TeacherSubjectAssignment
+                          teacherId={user.user.user_id}
+                          teacherName={
+                            user.profile?.first_name && user.profile?.last_name
+                              ? `${user.profile.first_name} ${user.profile.last_name}`
+                              : user.user.username
+                          }
+                          isOpen={true}
+                          onClose={() => setActiveTab("info")}
+                          onSuccess={() => {}} // Could refresh user data if needed
+                        />
+                      </div>
+                    )}
 
                     {activeTab === "enrollment" &&
                       getUserType() === "STUDENT" && (
