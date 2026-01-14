@@ -83,6 +83,7 @@ const developmentConfig: Config = {
       : [
           "http://localhost:3000",
           "http://localhost:5173",
+          "http://localhost:5001",
           "https://nga.ac.rw",
           "https://www.nga.ac.rw",
         ],
@@ -122,7 +123,11 @@ const productionConfig: Config = {
   cors: {
     origin: process.env.CORS_ORIGIN
       ? process.env.CORS_ORIGIN.split(",")
-      : ["https://mis.nga.ac.rw", "https://www.nga.ac.rw"],
+      : [
+          "https://mis.nga.ac.rw",
+          "https://www.nga.ac.rw",
+          "http://localhost:5001",
+        ],
     credentials: true,
   },
   logLevel: process.env.LOG_LEVEL || "info",
