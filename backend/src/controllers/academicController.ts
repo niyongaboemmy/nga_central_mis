@@ -1391,9 +1391,7 @@ export const assignTeacherToSubject = asyncHandler(
       .select()
       .from(User)
       .innerJoin(UserProfile, eq(User.user_id, UserProfile.user_id))
-      .where(
-        and(eq(User.user_id, teacherId), eq(UserProfile.user_type, "TEACHER"))
-      )
+      .where(eq(User.user_id, teacherId))
       .limit(1);
 
     if (teacher.length === 0) {
