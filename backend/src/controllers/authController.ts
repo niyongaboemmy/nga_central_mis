@@ -207,9 +207,14 @@ export const verifyOTP = asyncHandler(async (req: any, res: any) => {
 
   // Generate final JWT token
   const token = jwt.sign(
-    { userId, username: user[0].username },
+    {
+      userId,
+      username: user[0].username,
+      role_id: roles[0]?.role_id || "",
+      role_name: roles[0]?.name || "",
+    },
     config.jwtSecret,
-    { expiresIn: "1h" }
+    { expiresIn: "24h" }
   );
 
   logger.info(`OTP verified, login completed for user: ${user[0].username}`);
