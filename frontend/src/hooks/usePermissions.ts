@@ -1,3 +1,4 @@
+import { Permission, Role } from "@/api/users";
 import { useUser } from "../contexts/UserContext";
 
 /**
@@ -16,8 +17,10 @@ export const usePermissions = () => {
   const hasPermission = (perm?: string): boolean => {
     if (!perm) return true;
     return (
-      user?.roles?.some((role: any) =>
-        role.permissions?.some((permission: any) => permission.name === perm)
+      user?.roles?.some((role: Role) =>
+        role.permissions?.some(
+          (permission: Permission) => permission.name === perm
+        )
       ) ?? false
     );
   };
@@ -25,15 +28,15 @@ export const usePermissions = () => {
   /**
    * Check if the current user has any of the specified permissions
    */
-  const hasAnyPermission = (perms: string[]): boolean => {
-    return perms.some((perm) => hasPermission(perm));
+  const hasAnyPermission = (perms: Permission[]): boolean => {
+    return perms.some((perm) => hasPermission(perm.name));
   };
 
   /**
    * Check if the current user has all of the specified permissions
    */
-  const hasAllPermissions = (perms: string[]): boolean => {
-    return perms.every((perm) => hasPermission(perm));
+  const hasAllPermissions = (perms: Permission[]): boolean => {
+    return perms.every((perm) => hasPermission(perm.name));
   };
 
   /**
@@ -42,7 +45,7 @@ export const usePermissions = () => {
   const isAdmin = (): boolean => {
     return (
       hasPermission("ADMIN") ||
-      (user?.roles?.some((role: any) => role.name === "SUPER_ADMIN") ?? false)
+      (user?.roles?.some((role: Role) => role.name === "SUPER_ADMIN") ?? false)
     );
   };
 
@@ -51,8 +54,8 @@ export const usePermissions = () => {
    */
   const getUserPermissions = (): string[] => {
     const permissions: string[] = [];
-    user?.roles?.forEach((role: any) => {
-      role.permissions?.forEach((permission: any) => {
+    user?.roles?.forEach((role: Role) => {
+      role.permissions?.forEach((permission: Permission) => {
         if (!permissions.includes(permission.name)) {
           permissions.push(permission.name);
         }
