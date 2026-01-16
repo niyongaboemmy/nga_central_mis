@@ -15343,3 +15343,4 @@
 {"duration":9,"level":"info","message":"GET /users/grades/9/users?page=1&limit=100 304 - 9ms","service":"nga-central-mis","statusCode":304,"timestamp":"2026-01-15T09:00:24.834Z"}
 {"ip":"::1","level":"info","message":"GET /users/me","service":"nga-central-mis","timestamp":"2026-01-15T10:56:09.206Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"}
 {"duration":12,"level":"info","message":"GET /users/me 401 - 12ms","service":"nga-central-mis","statusCode":401,"timestamp":"2026-01-15T10:56:09.217Z"}
+{"level":"info","message":"SIGINT received, shutting down gracefully","service":"nga-central-mis","timestamp":"2026-01-16T08:04:03.307Z"}

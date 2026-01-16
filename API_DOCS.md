@@ -102,7 +102,7 @@ User login.
 
 ```json
 {
-  "email": "user@example.com",
+  "username": "username or email",
   "password": "password"
 }
 ```
@@ -200,9 +200,12 @@ Update current user profile.
 
 ```json
 {
-  "firstName": "John",
-  "lastName": "Doe",
-  "phone": "+1234567890"
+  "first_name": "John",
+  "last_name": "Doe",
+  "gender": "MALE",
+  "date_of_birth": "1990-01-01",
+  "address": "Address",
+  "external_id": "external_id"
 }
 ```
 
@@ -247,6 +250,19 @@ Update user profile.
 
 **Authentication:** Required
 
+**Request Body:**
+
+```json
+{
+  "first_name": "John",
+  "last_name": "Doe",
+  "gender": "MALE",
+  "date_of_birth": "1990-01-01",
+  "address": "Address",
+  "external_id": "external_id"
+}
+```
+
 ### POST /users/
 
 Create new user.
@@ -257,10 +273,15 @@ Create new user.
 
 ```json
 {
+  "username": "username",
   "email": "user@example.com",
-  "firstName": "John",
-  "lastName": "Doe",
-  "roleIds": [1, 2]
+  "first_name": "John",
+  "last_name": "Doe",
+  "phone_number": "+1234567890",
+  "gender": "MALE",
+  "date_of_birth": "1990-01-01",
+  "address": "Address",
+  "roles": [1, 2]
 }
 ```
 
@@ -316,7 +337,7 @@ Assign role to user.
 
 ```json
 {
-  "roleId": 1
+  "role_id": 1
 }
 ```
 
@@ -1044,8 +1065,8 @@ Assign subject to grade.
 
 ```json
 {
-  "gradeId": 1,
-  "subjectId": 1
+  "grade_id": 1,
+  "subject_id": 1
 }
 ```
 
@@ -1079,10 +1100,10 @@ Assign teacher to subject.
 
 ```json
 {
-  "userId": 1,
-  "subjectId": 1,
-  "classGroupId": 1,
-  "academicTermId": 1
+  "user_id": 1,
+  "subject_id": 1,
+  "class_group_id": 1,
+  "academic_term_id": 1
 }
 ```
 
@@ -1170,9 +1191,9 @@ Enroll student in subject.
 
 ```json
 {
-  "userId": 1,
-  "subjectId": 1,
-  "academicTermId": 1
+  "user_id": 1,
+  "subject_id": 1,
+  "academic_term_id": 1
 }
 ```
 
@@ -1200,8 +1221,8 @@ Assign student to class group.
 
 ```json
 {
-  "userId": 1,
-  "classGroupId": 1
+  "user_id": 1,
+  "class_group_id": 1
 }
 ```
 
