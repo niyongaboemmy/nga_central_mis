@@ -52,6 +52,7 @@ export const Permissions = {
   // Reports
   VIEW_REPORTS: "VIEW_REPORTS",
   GENERATE_REPORTS: "GENERATE_REPORTS",
+  ACCESS_REPORT_CARD_MODULE: "ACCESS_REPORT_CARD_MODULE",
 
   // System settings
   MANAGE_SETTINGS: "MANAGE_SETTINGS",
@@ -161,7 +162,11 @@ export const permissionGroups = {
   parents: [Permissions.MANAGE_PARENTS, Permissions.VIEW_PARENTS],
   grades: [Permissions.MANAGE_GRADES, Permissions.VIEW_GRADES],
   attendance: [Permissions.MANAGE_ATTENDANCE, Permissions.VIEW_ATTENDANCE],
-  reports: [Permissions.VIEW_REPORTS, Permissions.GENERATE_REPORTS],
+  reports: [
+    Permissions.VIEW_REPORTS,
+    Permissions.GENERATE_REPORTS,
+    Permissions.ACCESS_REPORT_CARD_MODULE,
+  ],
   settings: [Permissions.MANAGE_SETTINGS],
   admin: [Permissions.ADMIN],
 } as const;
