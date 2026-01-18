@@ -1,5 +1,5 @@
 import { db } from "../db";
-import { eq, and, or, sql, SQL } from "drizzle-orm";
+import { eq, and, or, sql, SQL, desc } from "drizzle-orm";
 import { alias } from "drizzle-orm/mysql-core";
 import {
   AcademicYear,
@@ -2085,11 +2085,12 @@ export const getAvailableSubjectsForStudent = asyncHandler(
     const yearId = Number(term[0].academic_year_id);
 
     // Get student's class group for the academic year of the term
-    const studentClassGroup = await db
+    let studentClassGroup = await db
       .select({
         class_group_id: StudentClassGroup.class_group_id,
         grade_id: ClassGroup.grade_id,
         academic_year_id: ClassGroup.academic_year_id,
+        assigned_at: StudentClassGroup.assigned_at,
       })
       .from(StudentClassGroup)
       .innerJoin(
@@ -2105,9 +2106,33 @@ export const getAvailableSubjectsForStudent = asyncHandler(
       )
       .limit(1);
 
+    // Fallback: If no class group found for specific year, get any active class group (most recent)
+    if (studentClassGroup.length === 0) {
+      studentClassGroup = await db
+        .select({
+          class_group_id: StudentClassGroup.class_group_id,
+          grade_id: ClassGroup.grade_id,
+          academic_year_id: ClassGroup.academic_year_id,
+          assigned_at: StudentClassGroup.assigned_at,
+        })
+        .from(StudentClassGroup)
+        .innerJoin(
+          ClassGroup,
+          eq(StudentClassGroup.class_group_id, ClassGroup.class_group_id),
+        )
+        .where(
+          and(
+            eq(StudentClassGroup.user_id, studentIdNum),
+            eq(StudentClassGroup.status, "ACTIVE"),
+          ),
+        )
+        .orderBy(desc(StudentClassGroup.assigned_at))
+        .limit(1);
+    }
+
     if (studentClassGroup.length === 0) {
       throw new ValidationError(
-        "Student is not assigned to any class group for this academic year",
+        "Student is not assigned to any active class group",
       );
     }
 
@@ -2115,18 +2140,22 @@ export const getAvailableSubjectsForStudent = asyncHandler(
     const gradeId = Number(classGroup.grade_id);
 
     // Get subjects assigned to the student's grade
-    const gradeSubjects = await db
+    const subjects = await db
       .select({
-        subject_id: GradeSubject.subject_id,
-        subject_name: Subject.name,
-        subject_code: Subject.code,
-        subject_description: Subject.description,
+        subject_id: Subject.subject_id,
+        code: Subject.code,
+        name: Subject.name,
+        description: Subject.description,
+        grade_id: Grade.grade_id,
+        grade_name: Grade.name,
+        program_id: Program.program_id,
+        program_name: Program.name,
       })
       .from(GradeSubject)
       .innerJoin(Subject, eq(GradeSubject.subject_id, Subject.subject_id))
-      .where(
-        and(eq(GradeSubject.grade_id, gradeId), eq(Subject.status, "ACTIVE")),
-      )
+      .innerJoin(Grade, eq(GradeSubject.grade_id, Grade.grade_id))
+      .innerJoin(Program, eq(Grade.program_id, Program.program_id))
+      .where(eq(GradeSubject.grade_id, gradeId))
       .orderBy(Subject.name);
 
     // Get already enrolled subjects for this term
@@ -2145,16 +2174,40 @@ export const getAvailableSubjectsForStudent = asyncHandler(
       enrolledSubjects.map((e) => Number(e.subject_id)),
     );
 
-    // Filter out already enrolled subjects
-    const availableSubjects = gradeSubjects.filter(
-      (subject) => !enrolledSubjectIds.has(Number(subject.subject_id)),
-    );
+    // Group by subject_id like in getSubjects and filter out enrolled subjects
+    const subjectMap = new Map<number, any>();
 
-    successResponse(
-      res,
-      "Available subjects for student retrieved successfully",
-      availableSubjects,
-    );
+    subjects.forEach((row) => {
+      const subjectId = Number(row.subject_id);
+
+      // Skip if student is already enrolled in this subject
+      if (enrolledSubjectIds.has(subjectId)) {
+        return;
+      }
+
+      if (!subjectMap.has(subjectId)) {
+        subjectMap.set(subjectId, {
+          subject_id: row.subject_id,
+          code: row.code,
+          name: row.name,
+          description: row.description,
+          grades: [],
+        });
+      }
+
+      if (row.grade_id) {
+        subjectMap.get(subjectId).grades.push({
+          grade_id: row.grade_id,
+          grade_name: row.grade_name,
+          program_id: row.program_id,
+          program_name: row.program_name,
+        });
+      }
+    });
+
+    const result = Array.from(subjectMap.values());
+
+    successResponse(res, "Subjects retrieved successfully", result);
   },
 );
 

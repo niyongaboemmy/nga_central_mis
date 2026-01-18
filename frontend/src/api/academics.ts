@@ -199,11 +199,11 @@ export interface SubjectTeacherAssignment {
 export const teacherSubjectAssignmentsApi = {
   getByTeacher: (teacherId: number) =>
     api.get<{ data: TeacherSubjectAssignment[] }>(
-      `/academics/teachers/${teacherId}/subjects`
+      `/academics/teachers/${teacherId}/subjects`,
     ),
   getBySubject: (subjectId: number) =>
     api.get<{ data: SubjectTeacherAssignment[] }>(
-      `/academics/subjects/${subjectId}/teachers`
+      `/academics/subjects/${subjectId}/teachers`,
     ),
   assign: (data: {
     user_id: number;
@@ -215,10 +215,10 @@ export const teacherSubjectAssignmentsApi = {
     teacherId: number,
     subjectId: number,
     classGroupId: number,
-    academicTermId: number
+    academicTermId: number,
   ) =>
     api.delete(
-      `/academics/teachers/${teacherId}/subjects/${subjectId}/class-groups/${classGroupId}/terms/${academicTermId}`
+      `/academics/teachers/${teacherId}/subjects/${subjectId}/class-groups/${classGroupId}/terms/${academicTermId}`,
     ),
 };
 
@@ -258,7 +258,7 @@ export const myAssignedSubjectsApi = {
     api.get<{ data: MyAssignedSubject[] }>("/academics/my-assigned-subjects"),
   getEnrolledStudents: (subjectId: number, academicTermId: number) =>
     api.get<{ data: EnrolledStudent[] }>(
-      `/academics/subjects/${subjectId}/terms/${academicTermId}/students`
+      `/academics/subjects/${subjectId}/terms/${academicTermId}/students`,
     ),
 };
 
@@ -277,9 +277,15 @@ export interface StudentEnrolledSubject {
 
 export interface AvailableSubject {
   subject_id: number;
-  subject_name: string;
-  subject_code: string | null;
-  subject_description: string | null;
+  code: string | null;
+  name: string;
+  description: string | null;
+  grades?: Array<{
+    grade_id: number;
+    grade_name: string;
+    program_id: number;
+    program_name: string;
+  }>;
 }
 
 export const studentEnrollmentApi = {
@@ -290,12 +296,12 @@ export const studentEnrollmentApi = {
         params: academicTermId
           ? { academic_term_id: academicTermId }
           : undefined,
-      }
+      },
     ),
   getAvailableSubjects: (studentId: number, academicTermId: number) =>
     api.get<{ data: AvailableSubject[] }>(
       `/academics/students/${studentId}/available-subjects`,
-      { params: { academic_term_id: academicTermId } }
+      { params: { academic_term_id: academicTermId } },
     ),
   enroll: (data: {
     user_id: number;
@@ -304,7 +310,7 @@ export const studentEnrollmentApi = {
   }) => api.post("/academics/students/enroll-subject", data),
   unenroll: (studentId: number, subjectId: number, academicTermId: number) =>
     api.delete(
-      `/academics/students/${studentId}/subjects/${subjectId}/terms/${academicTermId}`
+      `/academics/students/${studentId}/subjects/${subjectId}/terms/${academicTermId}`,
     ),
 };
 
@@ -312,7 +318,7 @@ export const studentEnrollmentApi = {
 export const studentClassGroupApi = {
   getByStudent: (studentId: number) =>
     api.get<{ data: StudentClassGroup | null }>(
-      `/academics/students/${studentId}/class-group`
+      `/academics/students/${studentId}/class-group`,
     ),
   assign: (data: { user_id: number; class_group_id: number }) =>
     api.post("/academics/students/assign-class-group", data),
@@ -342,7 +348,7 @@ export const programUsersApi = {
       limit?: number;
       search?: string;
       status?: string;
-    }
+    },
   ) =>
     api.get<{ data: ProgramUser[] }>(`/academics/programs/${programId}/users`, {
       params,

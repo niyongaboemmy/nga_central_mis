@@ -73,7 +73,7 @@ const StudentEnrollmentTab: React.FC<StudentEnrollmentTabProps> = ({
         setAcademicTerms(termsResponse.data.data);
         // Set current term as default
         const currentTerm = termsResponse.data.data.find(
-          (term) => term.is_current === 1
+          (term) => term.is_current === 1,
         );
         if (currentTerm) {
           setSelectedTerm(currentTerm);
@@ -82,9 +82,8 @@ const StudentEnrollmentTab: React.FC<StudentEnrollmentTabProps> = ({
         }
 
         // Load student class group
-        const classGroupResponse = await studentClassGroupApi.getByStudent(
-          studentId
-        );
+        const classGroupResponse =
+          await studentClassGroupApi.getByStudent(studentId);
         const classGroup = classGroupResponse.data.data;
         setStudentClassGroup(classGroup);
         setCurrentStep(classGroup ? 2 : 1);
@@ -113,7 +112,7 @@ const StudentEnrollmentTab: React.FC<StudentEnrollmentTabProps> = ({
     try {
       const response = await studentEnrollmentApi.getEnrolledSubjects(
         studentId,
-        selectedTerm.academic_term_id
+        selectedTerm.academic_term_id,
       );
       setEnrolledSubjects(response.data.data);
     } catch (error) {
@@ -130,7 +129,7 @@ const StudentEnrollmentTab: React.FC<StudentEnrollmentTabProps> = ({
     try {
       const response = await studentEnrollmentApi.getAvailableSubjects(
         studentId,
-        selectedTerm.academic_term_id
+        selectedTerm.academic_term_id,
       );
       setAvailableSubjects(response.data.data);
     } catch (error) {
@@ -170,7 +169,7 @@ const StudentEnrollmentTab: React.FC<StudentEnrollmentTabProps> = ({
       await studentEnrollmentApi.unenroll(
         studentId,
         subjectId,
-        selectedTerm.academic_term_id
+        selectedTerm.academic_term_id,
       );
       showToast("Student unenrolled successfully", "success");
       loadEnrolledSubjects();
@@ -221,16 +220,16 @@ const StudentEnrollmentTab: React.FC<StudentEnrollmentTabProps> = ({
               studentEnrollmentApi.unenroll(
                 studentId,
                 subject.subject_id,
-                selectedTerm.academic_term_id
-              )
-            )
+                selectedTerm.academic_term_id,
+              ),
+            ),
           );
         }
 
         // Remove existing class group assignment
         await studentClassGroupApi.remove(
           studentId,
-          studentClassGroup.class_group_id
+          studentClassGroup.class_group_id,
         );
       }
 
@@ -271,21 +270,21 @@ const StudentEnrollmentTab: React.FC<StudentEnrollmentTabProps> = ({
             studentEnrollmentApi.unenroll(
               studentId,
               subject.subject_id,
-              selectedTerm.academic_term_id
-            )
-          )
+              selectedTerm.academic_term_id,
+            ),
+          ),
         );
       }
 
       // Remove class group assignment
       await studentClassGroupApi.remove(
         studentId,
-        studentClassGroup.class_group_id
+        studentClassGroup.class_group_id,
       );
 
       showToast(
         "Student removed from class group and unenrolled from all subjects",
-        "success"
+        "success",
       );
 
       // Clear all front-end variables
@@ -379,7 +378,7 @@ const StudentEnrollmentTab: React.FC<StudentEnrollmentTabProps> = ({
                         Continue to Subjects
                       </button>
                       {hasPermission(
-                        Permissions.ASSIGN_STUDENT_CLASS_GROUPS
+                        Permissions.ASSIGN_STUDENT_CLASS_GROUPS,
                       ) && (
                         <button
                           onClick={handleRemoveClassGroup}
@@ -400,7 +399,7 @@ const StudentEnrollmentTab: React.FC<StudentEnrollmentTabProps> = ({
                         .filter(
                           (cg) =>
                             cg.class_group_id !==
-                            studentClassGroup.class_group_id
+                            studentClassGroup.class_group_id,
                         )
                         .map((classGroup) => (
                           <motion.div
@@ -426,13 +425,13 @@ const StudentEnrollmentTab: React.FC<StudentEnrollmentTabProps> = ({
                                 </div>
                               </div>
                               {hasPermission(
-                                Permissions.ASSIGN_STUDENT_CLASS_GROUPS
+                                Permissions.ASSIGN_STUDENT_CLASS_GROUPS,
                               ) && (
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     handleAssignClassGroup(
-                                      classGroup.class_group_id
+                                      classGroup.class_group_id,
                                     );
                                   }}
                                   disabled={assigningClassGroup}
@@ -495,13 +494,13 @@ const StudentEnrollmentTab: React.FC<StudentEnrollmentTabProps> = ({
                               </div>
                             </div>
                             {hasPermission(
-                              Permissions.ASSIGN_STUDENT_CLASS_GROUPS
+                              Permissions.ASSIGN_STUDENT_CLASS_GROUPS,
                             ) && (
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   handleAssignClassGroup(
-                                    classGroup.class_group_id
+                                    classGroup.class_group_id,
                                   );
                                 }}
                                 disabled={assigningClassGroup}
@@ -566,7 +565,7 @@ const StudentEnrollmentTab: React.FC<StudentEnrollmentTabProps> = ({
                     onChange={(e) => {
                       const termId = parseInt(e.target.value);
                       const term = academicTerms.find(
-                        (t) => t.academic_term_id === termId
+                        (t) => t.academic_term_id === termId,
                       );
                       setSelectedTerm(term || null);
                     }}
@@ -639,13 +638,13 @@ const StudentEnrollmentTab: React.FC<StudentEnrollmentTabProps> = ({
                               <p className="text-xs text-gray-400 dark:text-gray-500">
                                 Enrolled:{" "}
                                 {new Date(
-                                  subject.enrolled_at
+                                  subject.enrolled_at,
                                 ).toLocaleDateString()}
                               </p>
                             </div>
                           </div>
                           {hasPermission(
-                            Permissions.MANAGE_STUDENT_ENROLLMENTS
+                            Permissions.MANAGE_STUDENT_ENROLLMENTS,
                           ) && (
                             <button
                               onClick={() => handleUnenroll(subject.subject_id)}
@@ -752,16 +751,30 @@ const StudentEnrollmentTab: React.FC<StudentEnrollmentTabProps> = ({
                       >
                         <div>
                           <h5 className="font-medium text-gray-900 dark:text-white">
-                            {subject.subject_name}
+                            {subject.name}
                           </h5>
-                          {subject.subject_code && (
-                            <p className="text-sm text-gray-500 dark:text-gray-400">
-                              Code: {subject.subject_code}
-                            </p>
+                          {(subject.code ||
+                            (subject.grades && subject.grades.length > 0)) && (
+                            <div className="flex flex-wrap gap-2 mt-1">
+                              {subject.code && (
+                                <span className="text-xs px-2 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 rounded-md">
+                                  {subject.code}
+                                </span>
+                              )}
+                              {subject.grades &&
+                                subject.grades.map((g) => (
+                                  <span
+                                    key={g.grade_id}
+                                    className="text-xs px-2 py-0.5 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-md border border-blue-100 dark:border-blue-800/20"
+                                  >
+                                    {g.grade_name}
+                                  </span>
+                                ))}
+                            </div>
                           )}
                         </div>
                         {hasPermission(
-                          Permissions.MANAGE_STUDENT_ENROLLMENTS
+                          Permissions.MANAGE_STUDENT_ENROLLMENTS,
                         ) && (
                           <button
                             onClick={() => handleEnroll(subject.subject_id)}
