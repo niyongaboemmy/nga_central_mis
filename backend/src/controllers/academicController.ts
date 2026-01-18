@@ -1,5 +1,5 @@
 import { db } from "../db";
-import { eq, and, or, sql, SQL, desc } from "drizzle-orm";
+import { eq, and, or, sql, SQL, desc, not } from "drizzle-orm";
 import { alias } from "drizzle-orm/mysql-core";
 import {
   AcademicYear,
@@ -2052,20 +2052,22 @@ export const getAvailableSubjectsForStudent = asyncHandler(
     }
 
     // 1. Get student's current active class group and its grade info
+    // We use leftJoin for Grade and Program to avoid missing subjects if metadata is disconnected
     const studentClassGroup = await db
       .select({
         grade_id: ClassGroup.grade_id,
         grade_name: Grade.name,
         program_id: Grade.program_id,
         program_name: Program.name,
+        class_group_id: ClassGroup.class_group_id,
       })
       .from(StudentClassGroup)
       .innerJoin(
         ClassGroup,
         eq(StudentClassGroup.class_group_id, ClassGroup.class_group_id),
       )
-      .innerJoin(Grade, eq(ClassGroup.grade_id, Grade.grade_id))
-      .innerJoin(Program, eq(Grade.program_id, Program.program_id))
+      .leftJoin(Grade, eq(ClassGroup.grade_id, Grade.grade_id))
+      .leftJoin(Program, eq(Grade.program_id, Program.program_id))
       .where(
         and(
           eq(StudentClassGroup.user_id, studentIdNum),
@@ -2076,16 +2078,21 @@ export const getAvailableSubjectsForStudent = asyncHandler(
       .limit(1);
 
     if (studentClassGroup.length === 0) {
-      throw new ValidationError(
-        "Student is not assigned to any active class group",
+      // If no active class group found, return success with empty array and a clear message
+      return successResponse(
+        res,
+        "No active class group found for student",
+        [],
       );
     }
 
-    const { grade_id, grade_name, program_id, program_name } =
+    const { grade_id, grade_name, program_id, program_name, class_group_id } =
       studentClassGroup[0];
     const gradeIdNum = Number(grade_id);
+    const classGroupIdNum = Number(class_group_id);
 
-    // 2. Get ALL subjects associated with this grade ID
+    // 2. Get subjects associated with this grade ID AND assigned to this class group for this term
+    // We join with TeacherSubjectAssignment to ensure the subject is actually "active" for this group/term
     const subjects = await db
       .select({
         subject_id: Subject.subject_id,
@@ -2095,20 +2102,30 @@ export const getAvailableSubjectsForStudent = asyncHandler(
       })
       .from(GradeSubject)
       .innerJoin(Subject, eq(GradeSubject.subject_id, Subject.subject_id))
+      .innerJoin(
+        TeacherSubjectAssignment,
+        and(
+          eq(TeacherSubjectAssignment.subject_id, Subject.subject_id),
+          eq(TeacherSubjectAssignment.class_group_id, classGroupIdNum),
+          eq(TeacherSubjectAssignment.academic_term_id, termId),
+        ),
+      )
       .where(eq(GradeSubject.grade_id, gradeIdNum))
       .orderBy(Subject.name);
 
-    // 3. Get active enrollments for this student and term
-    const enrolledEntries = await db
-      .select({ subject_id: StudentSubjectEnrollment.subject_id })
-      .from(StudentSubjectEnrollment)
-      .where(
-        and(
-          eq(StudentSubjectEnrollment.user_id, studentIdNum),
-          eq(StudentSubjectEnrollment.academic_term_id, termId),
-          eq(StudentSubjectEnrollment.status, "ACTIVE"),
-        ),
-      );
+    // 3. Get active enrollments for this student and term to filter out
+    const enrolledEntries = isNaN(termId)
+      ? []
+      : await db
+          .select({ subject_id: StudentSubjectEnrollment.subject_id })
+          .from(StudentSubjectEnrollment)
+          .where(
+            and(
+              eq(StudentSubjectEnrollment.user_id, studentIdNum),
+              eq(StudentSubjectEnrollment.academic_term_id, termId),
+              eq(StudentSubjectEnrollment.status, "ACTIVE"),
+            ),
+          );
 
     const enrolledIds = new Set(
       enrolledEntries.map((e) => Number(e.subject_id)),
@@ -2125,9 +2142,9 @@ export const getAvailableSubjectsForStudent = asyncHandler(
         grades: [
           {
             grade_id: grade_id,
-            grade_name: grade_name,
+            grade_name: grade_name || "Unknown Grade",
             program_id: program_id,
-            program_name: program_name,
+            program_name: program_name || "Unknown Program",
           },
         ],
       }));
@@ -2393,7 +2410,7 @@ export const assignStudentToClassGroup = asyncHandler(
         and(
           eq(StudentClassGroup.user_id, studentId),
           eq(StudentClassGroup.status, "ACTIVE"),
-          sql`${StudentClassGroup.class_group_id} != ${classGroupId}`,
+          not(eq(StudentClassGroup.class_group_id, classGroupId)),
         ),
       );
 
