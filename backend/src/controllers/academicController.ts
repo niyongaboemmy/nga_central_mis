@@ -2100,17 +2100,17 @@ export const getAvailableSubjectsForStudent = asyncHandler(
         name: Subject.name,
         description: Subject.description,
       })
-      .from(GradeSubject)
-      .innerJoin(Subject, eq(GradeSubject.subject_id, Subject.subject_id))
+      .from(TeacherSubjectAssignment)
       .innerJoin(
-        TeacherSubjectAssignment,
+        Subject,
+        eq(TeacherSubjectAssignment.subject_id, Subject.subject_id),
+      )
+      .where(
         and(
-          eq(TeacherSubjectAssignment.subject_id, Subject.subject_id),
           eq(TeacherSubjectAssignment.class_group_id, classGroupIdNum),
           eq(TeacherSubjectAssignment.academic_term_id, termId),
         ),
       )
-      .where(eq(GradeSubject.grade_id, gradeIdNum))
       .orderBy(Subject.name);
 
     // 3. Get active enrollments for this student and term to filter out
