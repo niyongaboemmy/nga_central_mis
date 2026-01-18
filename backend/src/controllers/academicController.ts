@@ -2041,56 +2041,21 @@ export const getAvailableSubjectsForStudent = asyncHandler(
     const { academic_term_id } = req.query;
 
     const studentIdNum = Number(studentId);
+    const termId = Number(academic_term_id);
+
     if (isNaN(studentIdNum)) {
       throw new ValidationError("Invalid student ID");
     }
 
-    if (!academic_term_id) {
-      throw new ValidationError("Academic term ID is required");
-    }
-
-    const termId = Number(academic_term_id);
     if (isNaN(termId)) {
       throw new ValidationError("Invalid academic term ID");
     }
 
-    // Verify user exists and is a student
-    const user = await db
-      .select()
-      .from(User)
-      .innerJoin(UserProfile, eq(User.user_id, UserProfile.user_id))
-      .where(
-        and(
-          eq(User.user_id, studentIdNum),
-          eq(UserProfile.user_type, "STUDENT"),
-        ),
-      )
-      .limit(1);
-
-    if (user.length === 0) {
-      throw new NotFoundError("Student not found");
-    }
-
-    // Get the academic term to find the academic year
-    const term = await db
-      .select({ academic_year_id: AcademicTerm.academic_year_id })
-      .from(AcademicTerm)
-      .where(eq(AcademicTerm.academic_term_id, termId))
-      .limit(1);
-
-    if (term.length === 0) {
-      throw new NotFoundError("Academic term not found");
-    }
-
-    const yearId = Number(term[0].academic_year_id);
-
-    // Get student's class group for the academic year of the term
-    let studentClassGroup = await db
+    // Get student's current active class group
+    // We prioritize the most recent active assignment to determine their current grade
+    const studentClassGroup = await db
       .select({
-        class_group_id: StudentClassGroup.class_group_id,
         grade_id: ClassGroup.grade_id,
-        academic_year_id: ClassGroup.academic_year_id,
-        assigned_at: StudentClassGroup.assigned_at,
       })
       .from(StudentClassGroup)
       .innerJoin(
@@ -2101,34 +2066,10 @@ export const getAvailableSubjectsForStudent = asyncHandler(
         and(
           eq(StudentClassGroup.user_id, studentIdNum),
           eq(StudentClassGroup.status, "ACTIVE"),
-          eq(ClassGroup.academic_year_id, yearId),
         ),
       )
+      .orderBy(desc(StudentClassGroup.assigned_at))
       .limit(1);
-
-    // Fallback: If no class group found for specific year, get any active class group (most recent)
-    if (studentClassGroup.length === 0) {
-      studentClassGroup = await db
-        .select({
-          class_group_id: StudentClassGroup.class_group_id,
-          grade_id: ClassGroup.grade_id,
-          academic_year_id: ClassGroup.academic_year_id,
-          assigned_at: StudentClassGroup.assigned_at,
-        })
-        .from(StudentClassGroup)
-        .innerJoin(
-          ClassGroup,
-          eq(StudentClassGroup.class_group_id, ClassGroup.class_group_id),
-        )
-        .where(
-          and(
-            eq(StudentClassGroup.user_id, studentIdNum),
-            eq(StudentClassGroup.status, "ACTIVE"),
-          ),
-        )
-        .orderBy(desc(StudentClassGroup.assigned_at))
-        .limit(1);
-    }
 
     if (studentClassGroup.length === 0) {
       throw new ValidationError(
@@ -2136,10 +2077,10 @@ export const getAvailableSubjectsForStudent = asyncHandler(
       );
     }
 
-    const classGroup = studentClassGroup[0];
-    const gradeId = Number(classGroup.grade_id);
+    const gradeId = Number(studentClassGroup[0].grade_id);
 
     // Get subjects assigned to the student's grade
+    // Using leftJoin for Grade and Program to ensure we don't miss rows if metadata is inconsistent
     const subjects = await db
       .select({
         subject_id: Subject.subject_id,
@@ -2180,7 +2121,7 @@ export const getAvailableSubjectsForStudent = asyncHandler(
     subjects.forEach((row) => {
       const subjectId = Number(row.subject_id);
 
-      // Skip if student is already enrolled in this subject
+      // Skip if student is already enrolled in this subject for this term
       if (enrolledSubjectIds.has(subjectId)) {
         return;
       }
@@ -2195,12 +2136,13 @@ export const getAvailableSubjectsForStudent = asyncHandler(
         });
       }
 
+      // Add grade info if it exists
       if (row.grade_id) {
         subjectMap.get(subjectId).grades.push({
           grade_id: row.grade_id,
-          grade_name: row.grade_name,
+          grade_name: row.grade_name || "Unknown Grade",
           program_id: row.program_id,
-          program_name: row.program_name,
+          program_name: row.program_name || "Unknown Program",
         });
       }
     });
@@ -2416,8 +2358,8 @@ export const assignStudentToClassGroup = asyncHandler(
       throw new ValidationError("User ID and Class Group ID are required");
     }
 
-    const studentId = parseInt(user_id);
-    const classGroupId = parseInt(class_group_id);
+    const studentId = Number(user_id);
+    const classGroupId = Number(class_group_id);
 
     if (isNaN(studentId) || isNaN(classGroupId)) {
       throw new ValidationError("Invalid IDs provided");
@@ -2460,10 +2402,25 @@ export const assignStudentToClassGroup = asyncHandler(
       )
       .limit(1);
 
+    // Disable all OTHER active class group assignments for this student
+    await db
+      .update(StudentClassGroup)
+      .set({ status: "DISABLED" })
+      .where(
+        and(
+          eq(StudentClassGroup.user_id, studentId),
+          eq(StudentClassGroup.status, "ACTIVE"),
+          sql`${StudentClassGroup.class_group_id} != ${classGroupId}`,
+        ),
+      );
+
     if (existingAssignment.length > 0) {
       if (existingAssignment[0].status === "ACTIVE") {
-        throw new ConflictError(
+        return successResponse(
+          res,
           "Student is already assigned to this class group",
+          null,
+          200,
         );
       } else {
         // Reactivate the assignment
@@ -2487,7 +2444,7 @@ export const assignStudentToClassGroup = asyncHandler(
 
         return successResponse(
           res,
-          "Student assigned to class group successfully (reactivated)",
+          "Student assigned to class group successfully",
           null,
           200,
         );
@@ -2497,6 +2454,7 @@ export const assignStudentToClassGroup = asyncHandler(
     await db.insert(StudentClassGroup).values({
       user_id: studentId,
       class_group_id: classGroupId,
+      status: "ACTIVE",
     });
 
     logger.info("Student assigned to class group", { studentId, classGroupId });
