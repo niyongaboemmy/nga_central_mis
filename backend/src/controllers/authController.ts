@@ -13,6 +13,9 @@ import {
   Role,
   Permission,
   RolePermission,
+  AcademicYear,
+  AcademicTerm,
+  Grade,
 } from "../db/schema";
 import { getUserPermissions } from "../utils/auth";
 import { sanitizeString, validateEmail } from "../utils/sanitization";
@@ -88,11 +91,11 @@ export const login = asyncHandler(async (req: any, res: any) => {
   // Verify password
   const isValidPassword = await bcrypt.compare(
     sanitizedPassword,
-    auth[0].password_hash
+    auth[0].password_hash,
   );
   if (!isValidPassword) {
     logger.warn(
-      `Failed login attempt: invalid password for user ${sanitizedInput}`
+      `Failed login attempt: invalid password for user ${sanitizedInput}`,
     );
     throw new AuthenticationError("Invalid credentials");
   }
@@ -104,7 +107,7 @@ export const login = asyncHandler(async (req: any, res: any) => {
   const tempToken = jwt.sign(
     { userId: user[0].user_id, username: user[0].username, requiresOTP: true },
     config.jwtSecret,
-    { expiresIn: "5m" }
+    { expiresIn: "5m" },
   );
 
   logger.info(`Password verified, OTP sent for user: ${user[0].username}`);
@@ -115,7 +118,7 @@ export const login = asyncHandler(async (req: any, res: any) => {
     {
       tempToken,
       requiresOTP: true,
-    }
+    },
   );
 });
 
@@ -205,6 +208,50 @@ export const verifyOTP = asyncHandler(async (req: any, res: any) => {
     }
   }
 
+  // Get all academic years
+  const academicYears = await db
+    .select()
+    .from(AcademicYear)
+    .orderBy(AcademicYear.start_date);
+
+  // Get current academic year
+  const currentAcademicYear = await db
+    .select()
+    .from(AcademicYear)
+    .where(eq(AcademicYear.is_current, 1))
+    .limit(1);
+
+  // Get all academic terms for the current academic year
+  let currentAcademicTerms: any[] = [];
+  if (currentAcademicYear.length > 0) {
+    currentAcademicTerms = await db
+      .select()
+      .from(AcademicTerm)
+      .where(
+        eq(
+          AcademicTerm.academic_year_id,
+          currentAcademicYear[0].academic_year_id,
+        ),
+      )
+      .orderBy(AcademicTerm.start_date);
+  }
+
+  // Get all programs
+  const allPrograms = await db.select().from(Program).orderBy(Program.name);
+
+  // Get all grades with program information
+  const allGrades = await db
+    .select({
+      grade_id: Grade.grade_id,
+      name: Grade.name,
+      level_order: Grade.level_order,
+      program_id: Grade.program_id,
+      program_name: Program.name,
+    })
+    .from(Grade)
+    .innerJoin(Program, eq(Grade.program_id, Program.program_id))
+    .orderBy(Grade.level_order);
+
   // Generate final JWT token
   const token = jwt.sign(
     {
@@ -212,9 +259,14 @@ export const verifyOTP = asyncHandler(async (req: any, res: any) => {
       username: user[0].username,
       role_id: roles[0]?.role_id || "",
       role_name: roles[0]?.name || "",
+      academicYears,
+      currentAcademicYear: currentAcademicYear[0] || null,
+      currentAcademicTerms,
+      allPrograms,
+      allGrades,
     },
     config.jwtSecret,
-    { expiresIn: "24h" }
+    { expiresIn: "24h" },
   );
 
   logger.info(`OTP verified, login completed for user: ${user[0].username}`);
@@ -227,6 +279,11 @@ export const verifyOTP = asyncHandler(async (req: any, res: any) => {
     assignedPrograms,
     roles,
     forcePasswordChange: auth[0]?.force_password_change === 1,
+    academicYears,
+    currentAcademicYear: currentAcademicYear[0] || null,
+    currentAcademicTerms,
+    allPrograms,
+    allGrades,
   });
 });
 
@@ -253,11 +310,11 @@ export const forgotPassword = asyncHandler(async (req: any, res: any) => {
   if (user.length === 0) {
     // Don't reveal if user exists or not
     logger.info(
-      `Password reset requested for non-existent email: ${sanitizedEmail}`
+      `Password reset requested for non-existent email: ${sanitizedEmail}`,
     );
     successResponse(
       res,
-      "If an account exists with this email, a verification code has been sent."
+      "If an account exists with this email, a verification code has been sent.",
     );
     return;
   }
@@ -273,7 +330,7 @@ export const forgotPassword = asyncHandler(async (req: any, res: any) => {
       purpose: "PASSWORD_RESET",
     },
     config.jwtSecret,
-    { expiresIn: "10m" }
+    { expiresIn: "10m" },
   );
 
   logger.info(`Password reset OTP sent for user: ${user[0].username}`);
@@ -284,7 +341,7 @@ export const forgotPassword = asyncHandler(async (req: any, res: any) => {
     {
       tempToken,
       requiresOTP: true,
-    }
+    },
   );
 });
 
@@ -306,7 +363,7 @@ export const verifyResetOTP = asyncHandler(async (req: any, res: any) => {
   const resetToken = jwt.sign(
     { userId, purpose: "PASSWORD_RESET_CONFIRM" },
     config.jwtSecret,
-    { expiresIn: "10m" }
+    { expiresIn: "10m" },
   );
 
   logger.info(`Password reset OTP verified for userId: ${userId}`);
@@ -358,7 +415,7 @@ export const resetPassword = asyncHandler(async (req: any, res: any) => {
 
   successResponse(
     res,
-    "Password has been reset successfully. You can now login with your new password."
+    "Password has been reset successfully. You can now login with your new password.",
   );
 });
 
@@ -372,7 +429,7 @@ export const changePassword = asyncHandler(async (req: any, res: any) => {
 
   if (newPassword.length < 8) {
     throw new ValidationError(
-      "New password must be at least 8 characters long"
+      "New password must be at least 8 characters long",
     );
   }
 
@@ -391,7 +448,7 @@ export const changePassword = asyncHandler(async (req: any, res: any) => {
   if (currentPassword) {
     const isValidPassword = await bcrypt.compare(
       currentPassword,
-      auth[0].password_hash
+      auth[0].password_hash,
     );
     if (!isValidPassword) {
       throw new AuthenticationError("Current password is incorrect");

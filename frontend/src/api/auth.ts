@@ -12,12 +12,19 @@ export interface LoginResponse {
   requiresOTP: boolean;
 }
 
+import { AcademicYear, AcademicTerm, Grade, Program } from "./users";
+
 export interface VerifyOTPResponse {
   token: string;
   user: any;
   profile: any;
   permissions: string[];
   forcePasswordChange?: boolean;
+  academicYears?: AcademicYear[];
+  currentAcademicYear?: AcademicYear | null;
+  currentAcademicTerms?: AcademicTerm[];
+  allPrograms?: Program[];
+  allGrades?: Grade[];
 }
 
 // Generic wrapper interface for backend responses
@@ -30,7 +37,7 @@ interface BackendResponse<T> {
 export const login = async (
   data: LoginData,
   onSuccess?: (response: LoginResponse) => void,
-  onError?: (error: any) => void
+  onError?: (error: any) => void,
 ): Promise<LoginResponse | void> => {
   try {
     const response: AxiosResponse<BackendResponse<LoginResponse>> =
@@ -53,7 +60,7 @@ export const verifyOTP = async (
   otp: string,
   tempToken: string,
   onSuccess?: (response: VerifyOTPResponse) => void,
-  onError?: (error: any) => void
+  onError?: (error: any) => void,
 ): Promise<VerifyOTPResponse | void> => {
   try {
     const response: AxiosResponse<BackendResponse<VerifyOTPResponse>> =
@@ -64,7 +71,7 @@ export const verifyOTP = async (
           headers: {
             Authorization: `Bearer ${tempToken}`,
           },
-        }
+        },
       );
 
     setToken(response.data.data!.token);
@@ -84,7 +91,7 @@ export const verifyOTP = async (
 
 export const logout = (
   onSuccess?: () => void,
-  onError?: (error: any) => void
+  onError?: (error: any) => void,
 ): void => {
   try {
     // Clear token from storage
@@ -110,7 +117,7 @@ export interface ForgotPasswordResponse {
 export const forgotPassword = async (
   email: string,
   onSuccess?: (response: ForgotPasswordResponse) => void,
-  onError?: (error: any) => void
+  onError?: (error: any) => void,
 ): Promise<ForgotPasswordResponse | void> => {
   try {
     const response: AxiosResponse<BackendResponse<ForgotPasswordResponse>> =
@@ -147,7 +154,7 @@ export const verifyResetOTP = async (
   otp: string,
   tempToken: string,
   onSuccess?: (response: VerifyResetOTPResponse) => void,
-  onError?: (error: any) => void
+  onError?: (error: any) => void,
 ): Promise<VerifyResetOTPResponse | void> => {
   try {
     const response: AxiosResponse<BackendResponse<VerifyResetOTPResponse>> =
@@ -158,7 +165,7 @@ export const verifyResetOTP = async (
           headers: {
             Authorization: `Bearer ${tempToken}`,
           },
-        }
+        },
       );
 
     console.log("Verify reset OTP full response:", response);
@@ -189,7 +196,7 @@ export interface ResetPasswordResponse {
 export const resetPassword = async (
   newPassword: string,
   onSuccess?: (response: ResetPasswordResponse) => void,
-  onError?: (error: any) => void
+  onError?: (error: any) => void,
 ): Promise<ResetPasswordResponse | void> => {
   try {
     const response: AxiosResponse<BackendResponse<ResetPasswordResponse>> =
@@ -223,7 +230,7 @@ export interface ChangePasswordResponse {
 export const changePassword = async (
   data: ChangePasswordData,
   onSuccess?: (response: ChangePasswordResponse) => void,
-  onError?: (error: any) => void
+  onError?: (error: any) => void,
 ): Promise<ChangePasswordResponse | void> => {
   try {
     const response: AxiosResponse<BackendResponse<ChangePasswordResponse>> =
