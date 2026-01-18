@@ -219,12 +219,7 @@ router.delete(
 );
 
 // Grade-Subject Assignment routes
-router.get(
-  "/grades/:grade_id/subjects",
-  authenticate,
-  authorize(["MANAGE_ACADEMICS", "VIEW_PROGRAM_ACADEMICS"]),
-  getGradeSubjects,
-);
+router.get("/grades/:grade_id/subjects", authenticate, getGradeSubjects);
 router.post(
   "/grades/assign-subject",
   authenticate,
@@ -247,7 +242,6 @@ router.get(
 router.get(
   "/subjects/:subject_id/teachers",
   authenticate,
-  authorize("MANAGE_ACADEMICS"),
   getSubjectTeacherAssignments,
 );
 router.post(
@@ -265,12 +259,7 @@ router.delete(
 
 // Subjects routes
 router.get("/subjects", authenticate, getSubjects);
-router.get(
-  "/subjects/:id",
-  authenticate,
-  authorize("MANAGE_ACADEMICS"),
-  getSubject,
-);
+router.get("/subjects/:id", authenticate, getSubject);
 router.post(
   "/subjects",
   authenticate,
@@ -292,12 +281,7 @@ router.delete(
 
 // Class Groups routes
 router.get("/class-groups", authenticate, getClassGroups);
-router.get(
-  "/class-groups/:id",
-  authenticate,
-  authorize("MANAGE_ACADEMICS"),
-  getClassGroup,
-);
+router.get("/class-groups/:id", authenticate, getClassGroup);
 router.post(
   "/class-groups",
   authenticate,
@@ -327,7 +311,6 @@ router.get(
 router.get(
   "/subjects/:subject_id/terms/:academic_term_id/students",
   authenticate,
-  authorize("VIEW_MY_ASSIGNED_SUBJECTS"),
   getSubjectEnrolledStudents,
 );
 
@@ -335,13 +318,11 @@ router.get(
 router.get(
   "/students/:studentId/enrolled-subjects",
   authenticate,
-  authorize("MANAGE_USERS"),
   getStudentEnrolledSubjects,
 );
 router.get(
   "/students/:studentId/available-subjects",
   authenticate,
-  authorize("MANAGE_USERS"),
   getAvailableSubjectsForStudent,
 );
 router.post(
