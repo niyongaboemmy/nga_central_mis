@@ -147,8 +147,8 @@ export const updateAcademicYear = asyncHandler(async (req: any, res: any) => {
       .where(
         and(
           eq(AcademicYear.name, sanitizedName),
-          sql`${AcademicYear.academic_year_id} != ${academicYearId}`
-        )
+          sql`${AcademicYear.academic_year_id} != ${academicYearId}`,
+        ),
       )
       .limit(1);
 
@@ -221,7 +221,7 @@ export const deleteAcademicYear = asyncHandler(async (req: any, res: any) => {
 
   if (termsCount[0].count > 0) {
     throw new ValidationError(
-      "Cannot delete academic year with existing terms"
+      "Cannot delete academic year with existing terms",
     );
   }
 
@@ -282,7 +282,7 @@ export const createAcademicTerm = asyncHandler(async (req: any, res: any) => {
 
   if (!academic_year_id || !name || !start_date || !end_date) {
     throw new ValidationError(
-      "Academic year ID, name, start date, and end date are required"
+      "Academic year ID, name, start date, and end date are required",
     );
   }
 
@@ -536,8 +536,8 @@ export const updateProgram = asyncHandler(async (req: any, res: any) => {
       .where(
         and(
           eq(Program.name, sanitizedName),
-          sql`${Program.program_id} != ${programId}`
-        )
+          sql`${Program.program_id} != ${programId}`,
+        ),
       )
       .limit(1);
 
@@ -623,7 +623,7 @@ export const getGrades = asyncHandler(async (req: any, res: any) => {
 
     whereCondition = and(
       whereCondition || undefined,
-      sql`${Grade.program_id} IN (${assignedProgramIds.join(",")})`
+      sql`${Grade.program_id} IN (${assignedProgramIds.join(",")})`,
     );
   }
 
@@ -632,7 +632,7 @@ export const getGrades = asyncHandler(async (req: any, res: any) => {
     if (!isNaN(progId)) {
       whereCondition = and(
         whereCondition || undefined,
-        eq(Grade.program_id, progId)
+        eq(Grade.program_id, progId),
       );
     }
   }
@@ -842,10 +842,10 @@ export const getSubjects = asyncHandler(async (req: any, res: any) => {
       whereCondition,
       or(
         sql`${ProgramFromClass.program_id} IN (${assignedProgramIds.join(
-          ","
+          ",",
         )})`,
-        sql`${GradeFromClass.grade_id} IS NULL`
-      )
+        sql`${GradeFromClass.grade_id} IS NULL`,
+      ),
     )!;
   }
 
@@ -863,19 +863,19 @@ export const getSubjects = asyncHandler(async (req: any, res: any) => {
     .from(Subject)
     .leftJoin(
       TeacherSubjectAssignment,
-      sql`${Subject.subject_id} = ${TeacherSubjectAssignment.subject_id}`
+      sql`${Subject.subject_id} = ${TeacherSubjectAssignment.subject_id}`,
     )
     .leftJoin(
       ClassGroup,
-      sql`${TeacherSubjectAssignment.class_group_id} = ${ClassGroup.class_group_id}`
+      sql`${TeacherSubjectAssignment.class_group_id} = ${ClassGroup.class_group_id}`,
     )
     .leftJoin(
       GradeFromClass,
-      sql`${ClassGroup.grade_id} = ${GradeFromClass.grade_id}`
+      sql`${ClassGroup.grade_id} = ${GradeFromClass.grade_id}`,
     )
     .leftJoin(
       ProgramFromClass,
-      sql`${GradeFromClass.program_id} = ${ProgramFromClass.program_id}`
+      sql`${GradeFromClass.program_id} = ${ProgramFromClass.program_id}`,
     )
     .where(whereCondition)
     .orderBy(Subject.name);
@@ -999,8 +999,8 @@ export const updateSubject = asyncHandler(async (req: any, res: any) => {
         .where(
           and(
             eq(Subject.code, sanitizedCode),
-            sql`${Subject.subject_id} != ${subjectId}`
-          )
+            sql`${Subject.subject_id} != ${subjectId}`,
+          ),
         )
         .limit(1);
 
@@ -1099,7 +1099,7 @@ export const getGradeSubjects = asyncHandler(async (req: any, res: any) => {
 
     if (!assignedProgramIds.includes(grade[0].program_id)) {
       throw new ValidationError(
-        "Access denied: Grade not in your assigned programs"
+        "Access denied: Grade not in your assigned programs",
       );
     }
   }
@@ -1116,7 +1116,7 @@ export const getGradeSubjects = asyncHandler(async (req: any, res: any) => {
     .from(GradeSubject)
     .innerJoin(Subject, eq(GradeSubject.subject_id, Subject.subject_id))
     .where(
-      and(eq(GradeSubject.grade_id, gradeId), eq(Subject.status, "ACTIVE"))
+      and(eq(GradeSubject.grade_id, gradeId), eq(Subject.status, "ACTIVE")),
     )
     .orderBy(Subject.name);
 
@@ -1166,8 +1166,8 @@ export const assignSubjectToGrade = asyncHandler(async (req: any, res: any) => {
     .where(
       and(
         eq(GradeSubject.grade_id, gradeId),
-        eq(GradeSubject.subject_id, subjectId)
-      )
+        eq(GradeSubject.subject_id, subjectId),
+      ),
     )
     .limit(1);
 
@@ -1203,8 +1203,8 @@ export const removeSubjectFromGrade = asyncHandler(
       .where(
         and(
           eq(GradeSubject.grade_id, gradeId),
-          eq(GradeSubject.subject_id, subjectId)
-        )
+          eq(GradeSubject.subject_id, subjectId),
+        ),
       )
       .limit(1);
 
@@ -1217,14 +1217,14 @@ export const removeSubjectFromGrade = asyncHandler(
       .where(
         and(
           eq(GradeSubject.grade_id, gradeId),
-          eq(GradeSubject.subject_id, subjectId)
-        )
+          eq(GradeSubject.subject_id, subjectId),
+        ),
       );
 
     logger.info("Subject removed from grade", { gradeId, subjectId });
 
     successResponse(res, "Subject removed from grade successfully");
-  }
+  },
 );
 
 // Teacher-Subject Assignment Management
@@ -1272,11 +1272,11 @@ export const getTeacherSubjectAssignments = asyncHandler(
       .from(TeacherSubjectAssignment)
       .innerJoin(
         Subject,
-        eq(TeacherSubjectAssignment.subject_id, Subject.subject_id)
+        eq(TeacherSubjectAssignment.subject_id, Subject.subject_id),
       )
       .innerJoin(
         ClassGroup,
-        eq(TeacherSubjectAssignment.class_group_id, ClassGroup.class_group_id)
+        eq(TeacherSubjectAssignment.class_group_id, ClassGroup.class_group_id),
       )
       .innerJoin(Grade, eq(ClassGroup.grade_id, Grade.grade_id))
       .innerJoin(Program, eq(Grade.program_id, Program.program_id))
@@ -1284,12 +1284,12 @@ export const getTeacherSubjectAssignments = asyncHandler(
         AcademicTerm,
         eq(
           TeacherSubjectAssignment.academic_term_id,
-          AcademicTerm.academic_term_id
-        )
+          AcademicTerm.academic_term_id,
+        ),
       )
       .innerJoin(
         AcademicYear,
-        eq(AcademicTerm.academic_year_id, AcademicYear.academic_year_id)
+        eq(AcademicTerm.academic_year_id, AcademicYear.academic_year_id),
       )
       .where(eq(TeacherSubjectAssignment.user_id, teacherIdNum))
       .orderBy(Subject.name);
@@ -1297,9 +1297,9 @@ export const getTeacherSubjectAssignments = asyncHandler(
     successResponse(
       res,
       "Teacher subject assignments retrieved successfully",
-      assignments
+      assignments,
     );
-  }
+  },
 );
 
 export const getSubjectTeacherAssignments = asyncHandler(
@@ -1336,7 +1336,7 @@ export const getSubjectTeacherAssignments = asyncHandler(
       .innerJoin(UserProfile, eq(User.user_id, UserProfile.user_id))
       .innerJoin(
         ClassGroup,
-        eq(TeacherSubjectAssignment.class_group_id, ClassGroup.class_group_id)
+        eq(TeacherSubjectAssignment.class_group_id, ClassGroup.class_group_id),
       )
       .innerJoin(Grade, eq(ClassGroup.grade_id, Grade.grade_id))
       .innerJoin(Program, eq(Grade.program_id, Program.program_id))
@@ -1344,12 +1344,12 @@ export const getSubjectTeacherAssignments = asyncHandler(
         AcademicTerm,
         eq(
           TeacherSubjectAssignment.academic_term_id,
-          AcademicTerm.academic_term_id
-        )
+          AcademicTerm.academic_term_id,
+        ),
       )
       .innerJoin(
         AcademicYear,
-        eq(AcademicTerm.academic_year_id, AcademicYear.academic_year_id)
+        eq(AcademicTerm.academic_year_id, AcademicYear.academic_year_id),
       )
       .where(eq(TeacherSubjectAssignment.subject_id, subjId))
       .orderBy(UserProfile.first_name, UserProfile.last_name);
@@ -1357,9 +1357,9 @@ export const getSubjectTeacherAssignments = asyncHandler(
     successResponse(
       res,
       "Subject teacher assignments retrieved successfully",
-      assignments
+      assignments,
     );
-  }
+  },
 );
 
 export const assignTeacherToSubject = asyncHandler(
@@ -1368,7 +1368,7 @@ export const assignTeacherToSubject = asyncHandler(
 
     if (!user_id || !subject_id || !class_group_id || !academic_term_id) {
       throw new ValidationError(
-        "User ID, Subject ID, Class Group ID, and Academic Term ID are required"
+        "User ID, Subject ID, Class Group ID, and Academic Term ID are required",
       );
     }
 
@@ -1440,14 +1440,14 @@ export const assignTeacherToSubject = asyncHandler(
           eq(TeacherSubjectAssignment.user_id, teacherId),
           eq(TeacherSubjectAssignment.subject_id, subjId),
           eq(TeacherSubjectAssignment.class_group_id, classGroupId),
-          eq(TeacherSubjectAssignment.academic_term_id, academicTermId)
-        )
+          eq(TeacherSubjectAssignment.academic_term_id, academicTermId),
+        ),
       )
       .limit(1);
 
     if (existingAssignment.length > 0) {
       throw new ConflictError(
-        "Teacher is already assigned to this subject for the specified class group and term"
+        "Teacher is already assigned to this subject for the specified class group and term",
       );
     }
 
@@ -1466,7 +1466,7 @@ export const assignTeacherToSubject = asyncHandler(
     });
 
     successResponse(res, "Teacher assigned to subject successfully", null, 201);
-  }
+  },
 );
 
 export const removeTeacherFromSubject = asyncHandler(
@@ -1497,8 +1497,8 @@ export const removeTeacherFromSubject = asyncHandler(
           eq(TeacherSubjectAssignment.user_id, teacherId),
           eq(TeacherSubjectAssignment.subject_id, subjId),
           eq(TeacherSubjectAssignment.class_group_id, classGroupId),
-          eq(TeacherSubjectAssignment.academic_term_id, academicTermId)
-        )
+          eq(TeacherSubjectAssignment.academic_term_id, academicTermId),
+        ),
       )
       .limit(1);
 
@@ -1513,8 +1513,8 @@ export const removeTeacherFromSubject = asyncHandler(
           eq(TeacherSubjectAssignment.user_id, teacherId),
           eq(TeacherSubjectAssignment.subject_id, subjId),
           eq(TeacherSubjectAssignment.class_group_id, classGroupId),
-          eq(TeacherSubjectAssignment.academic_term_id, academicTermId)
-        )
+          eq(TeacherSubjectAssignment.academic_term_id, academicTermId),
+        ),
       );
 
     logger.info("Teacher removed from subject", {
@@ -1525,7 +1525,7 @@ export const removeTeacherFromSubject = asyncHandler(
     });
 
     successResponse(res, "Teacher removed from subject successfully");
-  }
+  },
 );
 
 // Class Groups Management
@@ -1554,7 +1554,7 @@ export const getClassGroups = asyncHandler(async (req: any, res: any) => {
     }
 
     whereCondition = sql`${Program.program_id} IN (${assignedProgramIds.join(
-      ","
+      ",",
     )})`;
   }
 
@@ -1564,7 +1564,7 @@ export const getClassGroups = asyncHandler(async (req: any, res: any) => {
     if (!isNaN(yearId) && !isNaN(grdId)) {
       const yearGradeCondition = and(
         eq(ClassGroup.academic_year_id, yearId),
-        eq(ClassGroup.grade_id, grdId)
+        eq(ClassGroup.grade_id, grdId),
       );
       whereCondition = whereCondition
         ? and(whereCondition, yearGradeCondition)!
@@ -1632,7 +1632,7 @@ export const createClassGroup = asyncHandler(async (req: any, res: any) => {
 
   if (!academic_year_id || !grade_id || !name) {
     throw new ValidationError(
-      "Academic year ID, grade ID, and name are required"
+      "Academic year ID, grade ID, and name are required",
     );
   }
 
@@ -1817,11 +1817,11 @@ export const getMyAssignedSubjects = asyncHandler(
       .from(TeacherSubjectAssignment)
       .innerJoin(
         Subject,
-        eq(TeacherSubjectAssignment.subject_id, Subject.subject_id)
+        eq(TeacherSubjectAssignment.subject_id, Subject.subject_id),
       )
       .innerJoin(
         ClassGroup,
-        eq(TeacherSubjectAssignment.class_group_id, ClassGroup.class_group_id)
+        eq(TeacherSubjectAssignment.class_group_id, ClassGroup.class_group_id),
       )
       .innerJoin(Grade, eq(ClassGroup.grade_id, Grade.grade_id))
       .innerJoin(Program, eq(Grade.program_id, Program.program_id))
@@ -1829,12 +1829,12 @@ export const getMyAssignedSubjects = asyncHandler(
         AcademicTerm,
         eq(
           TeacherSubjectAssignment.academic_term_id,
-          AcademicTerm.academic_term_id
-        )
+          AcademicTerm.academic_term_id,
+        ),
       )
       .innerJoin(
         AcademicYear,
-        eq(AcademicTerm.academic_year_id, AcademicYear.academic_year_id)
+        eq(AcademicTerm.academic_year_id, AcademicYear.academic_year_id),
       )
       .where(eq(TeacherSubjectAssignment.user_id, teacherIdNum))
       .orderBy(Subject.name);
@@ -1872,7 +1872,7 @@ export const getMyAssignedSubjects = asyncHandler(
     const result = Array.from(subjectMap.values());
 
     successResponse(res, "Assigned subjects retrieved successfully", result);
-  }
+  },
 );
 
 // Get students enrolled in a specific subject for a teacher
@@ -1904,8 +1904,8 @@ export const getSubjectEnrolledStudents = asyncHandler(
         and(
           eq(TeacherSubjectAssignment.user_id, teacherIdNum),
           eq(TeacherSubjectAssignment.subject_id, subjId),
-          eq(TeacherSubjectAssignment.academic_term_id, termId)
-        )
+          eq(TeacherSubjectAssignment.academic_term_id, termId),
+        ),
       )
       .limit(1);
 
@@ -1932,20 +1932,20 @@ export const getSubjectEnrolledStudents = asyncHandler(
       .leftJoin(StudentClassGroup, eq(User.user_id, StudentClassGroup.user_id))
       .leftJoin(
         ClassGroup,
-        eq(StudentClassGroup.class_group_id, ClassGroup.class_group_id)
+        eq(StudentClassGroup.class_group_id, ClassGroup.class_group_id),
       )
       .leftJoin(Grade, eq(ClassGroup.grade_id, Grade.grade_id))
       .leftJoin(Program, eq(Grade.program_id, Program.program_id))
       .where(
         and(
           eq(StudentSubjectEnrollment.subject_id, subjId),
-          eq(StudentSubjectEnrollment.academic_term_id, termId)
-        )
+          eq(StudentSubjectEnrollment.academic_term_id, termId),
+        ),
       )
       .orderBy(UserProfile.first_name, UserProfile.last_name);
 
     successResponse(res, "Enrolled students retrieved successfully", students);
-  }
+  },
 );
 
 // Student Subject Enrollment Management
@@ -1967,8 +1967,8 @@ export const getStudentEnrolledSubjects = asyncHandler(
       .where(
         and(
           eq(User.user_id, studentIdNum),
-          eq(UserProfile.user_type, "STUDENT")
-        )
+          eq(UserProfile.user_type, "STUDENT"),
+        ),
       )
       .limit(1);
 
@@ -1978,7 +1978,7 @@ export const getStudentEnrolledSubjects = asyncHandler(
 
     let whereCondition: SQL<unknown> = eq(
       StudentSubjectEnrollment.user_id,
-      studentIdNum
+      studentIdNum,
     );
 
     if (academic_term_id) {
@@ -1987,7 +1987,7 @@ export const getStudentEnrolledSubjects = asyncHandler(
         whereCondition =
           and(
             whereCondition,
-            eq(StudentSubjectEnrollment.academic_term_id, termId)
+            eq(StudentSubjectEnrollment.academic_term_id, termId),
           ) ?? whereCondition;
       }
     }
@@ -2007,32 +2007,32 @@ export const getStudentEnrolledSubjects = asyncHandler(
       .from(StudentSubjectEnrollment)
       .innerJoin(
         Subject,
-        eq(StudentSubjectEnrollment.subject_id, Subject.subject_id)
+        eq(StudentSubjectEnrollment.subject_id, Subject.subject_id),
       )
       .innerJoin(
         AcademicTerm,
         eq(
           StudentSubjectEnrollment.academic_term_id,
-          AcademicTerm.academic_term_id
-        )
+          AcademicTerm.academic_term_id,
+        ),
       )
       .innerJoin(
         AcademicYear,
-        eq(AcademicTerm.academic_year_id, AcademicYear.academic_year_id)
+        eq(AcademicTerm.academic_year_id, AcademicYear.academic_year_id),
       )
       .where(
         whereCondition
           ? and(whereCondition, eq(StudentSubjectEnrollment.status, "ACTIVE"))
-          : eq(StudentSubjectEnrollment.status, "ACTIVE")
+          : eq(StudentSubjectEnrollment.status, "ACTIVE"),
       )
       .orderBy(Subject.name);
 
     successResponse(
       res,
       "Student enrolled subjects retrieved successfully",
-      enrolledSubjects
+      enrolledSubjects,
     );
-  }
+  },
 );
 
 export const getAvailableSubjectsForStudent = asyncHandler(
@@ -2040,7 +2040,7 @@ export const getAvailableSubjectsForStudent = asyncHandler(
     const { studentId } = req.params;
     const { academic_term_id } = req.query;
 
-    const studentIdNum = parseInt(studentId);
+    const studentIdNum = Number(studentId);
     if (isNaN(studentIdNum)) {
       throw new ValidationError("Invalid student ID");
     }
@@ -2049,7 +2049,7 @@ export const getAvailableSubjectsForStudent = asyncHandler(
       throw new ValidationError("Academic term ID is required");
     }
 
-    const termId = parseInt(academic_term_id as string);
+    const termId = Number(academic_term_id);
     if (isNaN(termId)) {
       throw new ValidationError("Invalid academic term ID");
     }
@@ -2062,14 +2062,27 @@ export const getAvailableSubjectsForStudent = asyncHandler(
       .where(
         and(
           eq(User.user_id, studentIdNum),
-          eq(UserProfile.user_type, "STUDENT")
-        )
+          eq(UserProfile.user_type, "STUDENT"),
+        ),
       )
       .limit(1);
 
     if (user.length === 0) {
       throw new NotFoundError("Student not found");
     }
+
+    // Get the academic term to find the academic year
+    const term = await db
+      .select({ academic_year_id: AcademicTerm.academic_year_id })
+      .from(AcademicTerm)
+      .where(eq(AcademicTerm.academic_term_id, termId))
+      .limit(1);
+
+    if (term.length === 0) {
+      throw new NotFoundError("Academic term not found");
+    }
+
+    const yearId = Number(term[0].academic_year_id);
 
     // Get student's class group for the academic year of the term
     const studentClassGroup = await db
@@ -2081,21 +2094,25 @@ export const getAvailableSubjectsForStudent = asyncHandler(
       .from(StudentClassGroup)
       .innerJoin(
         ClassGroup,
-        eq(StudentClassGroup.class_group_id, ClassGroup.class_group_id)
+        eq(StudentClassGroup.class_group_id, ClassGroup.class_group_id),
       )
       .where(
         and(
           eq(StudentClassGroup.user_id, studentIdNum),
-          eq(StudentClassGroup.status, "ACTIVE")
-        )
+          eq(StudentClassGroup.status, "ACTIVE"),
+          eq(ClassGroup.academic_year_id, yearId),
+        ),
       )
       .limit(1);
 
     if (studentClassGroup.length === 0) {
-      throw new ValidationError("Student is not assigned to any class group");
+      throw new ValidationError(
+        "Student is not assigned to any class group for this academic year",
+      );
     }
 
     const classGroup = studentClassGroup[0];
+    const gradeId = Number(classGroup.grade_id);
 
     // Get subjects assigned to the student's grade
     const gradeSubjects = await db
@@ -2108,10 +2125,7 @@ export const getAvailableSubjectsForStudent = asyncHandler(
       .from(GradeSubject)
       .innerJoin(Subject, eq(GradeSubject.subject_id, Subject.subject_id))
       .where(
-        and(
-          eq(GradeSubject.grade_id, classGroup.grade_id),
-          eq(Subject.status, "ACTIVE")
-        )
+        and(eq(GradeSubject.grade_id, gradeId), eq(Subject.status, "ACTIVE")),
       )
       .orderBy(Subject.name);
 
@@ -2123,25 +2137,25 @@ export const getAvailableSubjectsForStudent = asyncHandler(
         and(
           eq(StudentSubjectEnrollment.user_id, studentIdNum),
           eq(StudentSubjectEnrollment.academic_term_id, termId),
-          eq(StudentSubjectEnrollment.status, "ACTIVE")
-        )
+          eq(StudentSubjectEnrollment.status, "ACTIVE"),
+        ),
       );
 
     const enrolledSubjectIds = new Set(
-      enrolledSubjects.map((e) => e.subject_id)
+      enrolledSubjects.map((e) => Number(e.subject_id)),
     );
 
     // Filter out already enrolled subjects
     const availableSubjects = gradeSubjects.filter(
-      (subject) => !enrolledSubjectIds.has(subject.subject_id)
+      (subject) => !enrolledSubjectIds.has(Number(subject.subject_id)),
     );
 
     successResponse(
       res,
       "Available subjects for student retrieved successfully",
-      availableSubjects
+      availableSubjects,
     );
-  }
+  },
 );
 
 export const enrollStudentInSubject = asyncHandler(
@@ -2150,7 +2164,7 @@ export const enrollStudentInSubject = asyncHandler(
 
     if (!user_id || !subject_id || !academic_term_id) {
       throw new ValidationError(
-        "User ID, Subject ID, and Academic Term ID are required"
+        "User ID, Subject ID, and Academic Term ID are required",
       );
     }
 
@@ -2168,7 +2182,7 @@ export const enrollStudentInSubject = asyncHandler(
       .from(User)
       .innerJoin(UserProfile, eq(User.user_id, UserProfile.user_id))
       .where(
-        and(eq(User.user_id, studentId), eq(UserProfile.user_type, "STUDENT"))
+        and(eq(User.user_id, studentId), eq(UserProfile.user_type, "STUDENT")),
       )
       .limit(1);
 
@@ -2206,14 +2220,14 @@ export const enrollStudentInSubject = asyncHandler(
         and(
           eq(StudentSubjectEnrollment.user_id, studentId),
           eq(StudentSubjectEnrollment.subject_id, subjId),
-          eq(StudentSubjectEnrollment.academic_term_id, termId)
-        )
+          eq(StudentSubjectEnrollment.academic_term_id, termId),
+        ),
       )
       .limit(1);
 
     if (existingEnrollment.length > 0) {
       throw new ConflictError(
-        "Student is already enrolled in this subject for the specified term"
+        "Student is already enrolled in this subject for the specified term",
       );
     }
 
@@ -2226,7 +2240,7 @@ export const enrollStudentInSubject = asyncHandler(
     logger.info("Student enrolled in subject", { studentId, subjId, termId });
 
     successResponse(res, "Student enrolled in subject successfully", null, 201);
-  }
+  },
 );
 
 export const unenrollStudentFromSubject = asyncHandler(
@@ -2250,8 +2264,8 @@ export const unenrollStudentFromSubject = asyncHandler(
           eq(StudentSubjectEnrollment.user_id, studentId),
           eq(StudentSubjectEnrollment.subject_id, subjId),
           eq(StudentSubjectEnrollment.academic_term_id, termId),
-          eq(StudentSubjectEnrollment.status, "ACTIVE")
-        )
+          eq(StudentSubjectEnrollment.status, "ACTIVE"),
+        ),
       )
       .limit(1);
 
@@ -2266,8 +2280,8 @@ export const unenrollStudentFromSubject = asyncHandler(
         and(
           eq(StudentSubjectEnrollment.user_id, studentId),
           eq(StudentSubjectEnrollment.subject_id, subjId),
-          eq(StudentSubjectEnrollment.academic_term_id, termId)
-        )
+          eq(StudentSubjectEnrollment.academic_term_id, termId),
+        ),
       );
 
     logger.info("Student unenrolled from subject", {
@@ -2277,7 +2291,7 @@ export const unenrollStudentFromSubject = asyncHandler(
     });
 
     successResponse(res, "Student unenrolled from subject successfully");
-  }
+  },
 );
 
 // Student Class Group Assignment Management
@@ -2295,7 +2309,7 @@ export const getStudentClassGroup = asyncHandler(async (req: any, res: any) => {
     .from(User)
     .innerJoin(UserProfile, eq(User.user_id, UserProfile.user_id))
     .where(
-      and(eq(User.user_id, studentIdNum), eq(UserProfile.user_type, "STUDENT"))
+      and(eq(User.user_id, studentIdNum), eq(UserProfile.user_type, "STUDENT")),
     )
     .limit(1);
 
@@ -2318,26 +2332,26 @@ export const getStudentClassGroup = asyncHandler(async (req: any, res: any) => {
     .from(StudentClassGroup)
     .innerJoin(
       ClassGroup,
-      eq(StudentClassGroup.class_group_id, ClassGroup.class_group_id)
+      eq(StudentClassGroup.class_group_id, ClassGroup.class_group_id),
     )
     .innerJoin(Grade, eq(ClassGroup.grade_id, Grade.grade_id))
     .innerJoin(Program, eq(Grade.program_id, Program.program_id))
     .innerJoin(
       AcademicYear,
-      eq(ClassGroup.academic_year_id, AcademicYear.academic_year_id)
+      eq(ClassGroup.academic_year_id, AcademicYear.academic_year_id),
     )
     .where(
       and(
         eq(StudentClassGroup.user_id, studentIdNum),
-        eq(StudentClassGroup.status, "ACTIVE")
-      )
+        eq(StudentClassGroup.status, "ACTIVE"),
+      ),
     )
     .limit(1);
 
   successResponse(
     res,
     "Student class group retrieved successfully",
-    studentClassGroup[0] || null
+    studentClassGroup[0] || null,
   );
 });
 
@@ -2362,7 +2376,7 @@ export const assignStudentToClassGroup = asyncHandler(
       .from(User)
       .innerJoin(UserProfile, eq(User.user_id, UserProfile.user_id))
       .where(
-        and(eq(User.user_id, studentId), eq(UserProfile.user_type, "STUDENT"))
+        and(eq(User.user_id, studentId), eq(UserProfile.user_type, "STUDENT")),
       )
       .limit(1);
 
@@ -2388,14 +2402,14 @@ export const assignStudentToClassGroup = asyncHandler(
       .where(
         and(
           eq(StudentClassGroup.user_id, studentId),
-          eq(StudentClassGroup.class_group_id, classGroupId)
-        )
+          eq(StudentClassGroup.class_group_id, classGroupId),
+        ),
       )
       .limit(1);
 
     if (existingAssignment.length > 0) {
       throw new ConflictError(
-        "Student is already assigned to this class group"
+        "Student is already assigned to this class group",
       );
     }
 
@@ -2410,9 +2424,9 @@ export const assignStudentToClassGroup = asyncHandler(
       res,
       "Student assigned to class group successfully",
       null,
-      201
+      201,
     );
-  }
+  },
 );
 
 export const removeStudentFromClassGroup = asyncHandler(
@@ -2434,8 +2448,8 @@ export const removeStudentFromClassGroup = asyncHandler(
         and(
           eq(StudentClassGroup.user_id, studentId),
           eq(StudentClassGroup.class_group_id, classGroupId),
-          eq(StudentClassGroup.status, "ACTIVE")
-        )
+          eq(StudentClassGroup.status, "ACTIVE"),
+        ),
       )
       .limit(1);
 
@@ -2450,8 +2464,8 @@ export const removeStudentFromClassGroup = asyncHandler(
       .where(
         and(
           eq(StudentClassGroup.user_id, studentId),
-          eq(StudentClassGroup.class_group_id, classGroupId)
-        )
+          eq(StudentClassGroup.class_group_id, classGroupId),
+        ),
       );
 
     // Disable all related subject enrollments for this student
@@ -2467,9 +2481,9 @@ export const removeStudentFromClassGroup = asyncHandler(
 
     successResponse(
       res,
-      "Student removed from class group and subject enrollments disabled successfully"
+      "Student removed from class group and subject enrollments disabled successfully",
     );
-  }
+  },
 );
 
 // Get users by program (for program leads)
@@ -2505,8 +2519,8 @@ export const getUsersByProgram = asyncHandler(async (req: any, res: any) => {
         sql`${User.username} LIKE ${`%${search}%`}`,
         sql`${User.email} LIKE ${`%${search}%`}`,
         sql`${UserProfile.first_name} LIKE ${`%${search}%`}`,
-        sql`${UserProfile.last_name} LIKE ${`%${search}%`}`
-      )
+        sql`${UserProfile.last_name} LIKE ${`%${search}%`}`,
+      ),
     );
   }
 
@@ -2522,15 +2536,15 @@ export const getUsersByProgram = asyncHandler(async (req: any, res: any) => {
     .innerJoin(StudentClassGroup, eq(User.user_id, StudentClassGroup.user_id))
     .innerJoin(
       ClassGroup,
-      eq(StudentClassGroup.class_group_id, ClassGroup.class_group_id)
+      eq(StudentClassGroup.class_group_id, ClassGroup.class_group_id),
     )
     .innerJoin(Grade, eq(ClassGroup.grade_id, Grade.grade_id))
     .where(
       and(
         eq(Grade.program_id, programIdNum),
         eq(StudentClassGroup.status, "ACTIVE"),
-        ...whereConditions
-      )
+        ...whereConditions,
+      ),
     );
 
   const totalCount = totalCountResult[0]?.count || 0;
@@ -2553,15 +2567,15 @@ export const getUsersByProgram = asyncHandler(async (req: any, res: any) => {
     .innerJoin(StudentClassGroup, eq(User.user_id, StudentClassGroup.user_id))
     .innerJoin(
       ClassGroup,
-      eq(StudentClassGroup.class_group_id, ClassGroup.class_group_id)
+      eq(StudentClassGroup.class_group_id, ClassGroup.class_group_id),
     )
     .innerJoin(Grade, eq(ClassGroup.grade_id, Grade.grade_id))
     .where(
       and(
         eq(Grade.program_id, programIdNum),
         eq(StudentClassGroup.status, "ACTIVE"),
-        ...whereConditions
-      )
+        ...whereConditions,
+      ),
     )
     .limit(limitNum)
     .offset(offset)
@@ -2621,8 +2635,8 @@ export const assignUserToProgram = asyncHandler(async (req: any, res: any) => {
     .where(
       and(
         eq(UserProgramLead.user_id, userId),
-        eq(UserProgramLead.program_id, programId)
-      )
+        eq(UserProgramLead.program_id, programId),
+      ),
     )
     .limit(1);
 
@@ -2659,8 +2673,8 @@ export const removeUserFromProgram = asyncHandler(
       .where(
         and(
           eq(UserProgramLead.user_id, userId),
-          eq(UserProgramLead.program_id, programId)
-        )
+          eq(UserProgramLead.program_id, programId),
+        ),
       )
       .limit(1);
 
@@ -2673,12 +2687,12 @@ export const removeUserFromProgram = asyncHandler(
       .where(
         and(
           eq(UserProgramLead.user_id, userId),
-          eq(UserProgramLead.program_id, programId)
-        )
+          eq(UserProgramLead.program_id, programId),
+        ),
       );
 
     logger.info("User removed from program lead", { userId, programId });
 
     successResponse(res, "User removed from program successfully");
-  }
+  },
 );
