@@ -80,31 +80,31 @@ router.get(
   "/years",
   authenticate,
   authorize("MANAGE_ACADEMICS"),
-  getAcademicYears
+  getAcademicYears,
 );
 router.get(
   "/years/:id",
   authenticate,
   authorize("MANAGE_ACADEMICS"),
-  getAcademicYear
+  getAcademicYear,
 );
 router.post(
   "/years",
   authenticate,
   authorize("MANAGE_ACADEMICS"),
-  createAcademicYear
+  createAcademicYear,
 );
 router.put(
   "/years/:id",
   authenticate,
   authorize("MANAGE_ACADEMICS"),
-  updateAcademicYear
+  updateAcademicYear,
 );
 router.delete(
   "/years/:id",
   authenticate,
   authorize("MANAGE_ACADEMICS"),
-  deleteAcademicYear
+  deleteAcademicYear,
 );
 
 // Academic Terms routes
@@ -113,25 +113,25 @@ router.get(
   "/terms/:id",
   authenticate,
   authorize("MANAGE_ACADEMICS"),
-  getAcademicTerm
+  getAcademicTerm,
 );
 router.post(
   "/terms",
   authenticate,
   authorize("MANAGE_ACADEMICS"),
-  createAcademicTerm
+  createAcademicTerm,
 );
 router.put(
   "/terms/:id",
   authenticate,
   authorize("MANAGE_ACADEMICS"),
-  updateAcademicTerm
+  updateAcademicTerm,
 );
 router.delete(
   "/terms/:id",
   authenticate,
   authorize("MANAGE_ACADEMICS"),
-  deleteAcademicTerm
+  deleteAcademicTerm,
 );
 
 // Programs routes
@@ -139,31 +139,31 @@ router.get(
   "/programs",
   authenticate,
   authorize("MANAGE_ACADEMICS"),
-  getPrograms
+  getPrograms,
 );
 router.get(
   "/programs/:id",
   authenticate,
   authorize("MANAGE_ACADEMICS"),
-  getProgram
+  getProgram,
 );
 router.post(
   "/programs",
   authenticate,
   authorize("MANAGE_ACADEMICS"),
-  createProgram
+  createProgram,
 );
 router.put(
   "/programs/:id",
   authenticate,
   authorize("MANAGE_ACADEMICS"),
-  updateProgram
+  updateProgram,
 );
 router.delete(
   "/programs/:id",
   authenticate,
   authorize("MANAGE_ACADEMICS"),
-  deleteProgram
+  deleteProgram,
 );
 
 // Program Users routes
@@ -171,19 +171,19 @@ router.get(
   "/programs/:programId/users",
   authenticate,
   authorize("VIEW_PROGRAM_USERS"),
-  getUsersByProgram
+  getUsersByProgram,
 );
 router.post(
   "/programs/assign-lead",
   authenticate,
   authorize("MANAGE_ACADEMICS"),
-  assignUserToProgram
+  assignUserToProgram,
 );
 router.delete(
   "/programs/:program_id/leads/:user_id",
   authenticate,
   authorize("MANAGE_ACADEMICS"),
-  removeUserFromProgram
+  removeUserFromProgram,
 );
 
 // Grades routes
@@ -191,31 +191,31 @@ router.get(
   "/grades",
   authenticate,
   authorize(["MANAGE_ACADEMICS", "VIEW_PROGRAM_ACADEMICS"]),
-  getGrades
+  getGrades,
 );
 router.get(
   "/grades/:id",
   authenticate,
   authorize("MANAGE_ACADEMICS"),
-  getGrade
+  getGrade,
 );
 router.post(
   "/grades",
   authenticate,
   authorize("MANAGE_ACADEMICS"),
-  createGrade
+  createGrade,
 );
 router.put(
   "/grades/:id",
   authenticate,
   authorize("MANAGE_ACADEMICS"),
-  updateGrade
+  updateGrade,
 );
 router.delete(
   "/grades/:id",
   authenticate,
   authorize("MANAGE_ACADEMICS"),
-  deleteGrade
+  deleteGrade,
 );
 
 // Grade-Subject Assignment routes
@@ -223,44 +223,44 @@ router.get(
   "/grades/:grade_id/subjects",
   authenticate,
   authorize(["MANAGE_ACADEMICS", "VIEW_PROGRAM_ACADEMICS"]),
-  getGradeSubjects
+  getGradeSubjects,
 );
 router.post(
   "/grades/assign-subject",
   authenticate,
   authorize("MANAGE_ACADEMICS"),
-  assignSubjectToGrade
+  assignSubjectToGrade,
 );
 router.delete(
   "/grades/:grade_id/subjects/:subject_id",
   authenticate,
   authorize("MANAGE_ACADEMICS"),
-  removeSubjectFromGrade
+  removeSubjectFromGrade,
 );
 
 // Teacher-Subject Assignment routes
 router.get(
   "/teachers/:teacherId/subjects",
   authenticate,
-  getTeacherSubjectAssignments
+  getTeacherSubjectAssignments,
 );
 router.get(
   "/subjects/:subject_id/teachers",
   authenticate,
   authorize("MANAGE_ACADEMICS"),
-  getSubjectTeacherAssignments
+  getSubjectTeacherAssignments,
 );
 router.post(
   "/teachers/assign-subject",
   authenticate,
   authorize("MANAGE_ACADEMICS"),
-  assignTeacherToSubject
+  assignTeacherToSubject,
 );
 router.delete(
   "/teachers/:user_id/subjects/:subject_id/class-groups/:class_group_id/terms/:academic_term_id",
   authenticate,
   authorize("MANAGE_ACADEMICS"),
-  removeTeacherFromSubject
+  removeTeacherFromSubject,
 );
 
 // Subjects routes
@@ -269,25 +269,25 @@ router.get(
   "/subjects/:id",
   authenticate,
   authorize("MANAGE_ACADEMICS"),
-  getSubject
+  getSubject,
 );
 router.post(
   "/subjects",
   authenticate,
   authorize("MANAGE_ACADEMICS"),
-  createSubject
+  createSubject,
 );
 router.put(
   "/subjects/:id",
   authenticate,
   authorize("MANAGE_ACADEMICS"),
-  updateSubject
+  updateSubject,
 );
 router.delete(
   "/subjects/:id",
   authenticate,
   authorize("MANAGE_ACADEMICS"),
-  deleteSubject
+  deleteSubject,
 );
 
 // Class Groups routes
@@ -296,25 +296,25 @@ router.get(
   "/class-groups/:id",
   authenticate,
   authorize("MANAGE_ACADEMICS"),
-  getClassGroup
+  getClassGroup,
 );
 router.post(
   "/class-groups",
   authenticate,
   authorize("MANAGE_ACADEMICS"),
-  createClassGroup
+  createClassGroup,
 );
 router.put(
   "/class-groups/:id",
   authenticate,
   authorize("MANAGE_ACADEMICS"),
-  updateClassGroup
+  updateClassGroup,
 );
 router.delete(
   "/class-groups/:id",
   authenticate,
   authorize("MANAGE_ACADEMICS"),
-  deleteClassGroup
+  deleteClassGroup,
 );
 
 // Teacher Assigned Subjects routes
@@ -322,13 +322,13 @@ router.get(
   "/my-assigned-subjects",
   authenticate,
   authorize("VIEW_MY_ASSIGNED_SUBJECTS"),
-  getMyAssignedSubjects
+  getMyAssignedSubjects,
 );
 router.get(
   "/subjects/:subject_id/terms/:academic_term_id/students",
   authenticate,
   authorize("VIEW_MY_ASSIGNED_SUBJECTS"),
-  getSubjectEnrolledStudents
+  getSubjectEnrolledStudents,
 );
 
 // Student Subject Enrollment routes
@@ -336,25 +336,25 @@ router.get(
   "/students/:studentId/enrolled-subjects",
   authenticate,
   authorize("MANAGE_USERS"),
-  getStudentEnrolledSubjects
+  getStudentEnrolledSubjects,
 );
 router.get(
   "/students/:studentId/available-subjects",
   authenticate,
   authorize("MANAGE_USERS"),
-  getAvailableSubjectsForStudent
+  getAvailableSubjectsForStudent,
 );
 router.post(
   "/students/enroll-subject",
   authenticate,
   authorize("MANAGE_USERS"),
-  enrollStudentInSubject
+  enrollStudentInSubject,
 );
 router.delete(
   "/students/:user_id/subjects/:subject_id/terms/:academic_term_id",
   authenticate,
   authorize("MANAGE_USERS"),
-  unenrollStudentFromSubject
+  unenrollStudentFromSubject,
 );
 
 // Student Class Group Assignment routes
@@ -362,19 +362,19 @@ router.get(
   "/students/:studentId/class-group",
   authenticate,
   authorize("MANAGE_USERS"),
-  getStudentClassGroup
+  getStudentClassGroup,
 );
 router.post(
   "/students/assign-class-group",
   authenticate,
   authorize("MANAGE_USERS"),
-  assignStudentToClassGroup
+  assignStudentToClassGroup,
 );
 router.delete(
   "/students/:user_id/class-groups/:class_group_id",
   authenticate,
   authorize("MANAGE_USERS"),
-  removeStudentFromClassGroup
+  removeStudentFromClassGroup,
 );
 
 export default router;

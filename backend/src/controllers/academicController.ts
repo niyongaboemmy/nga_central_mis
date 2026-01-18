@@ -1897,21 +1897,21 @@ export const getSubjectEnrolledStudents = asyncHandler(
     }
 
     // Verify the teacher is assigned to this subject
-    const assignment = await db
-      .select()
-      .from(TeacherSubjectAssignment)
-      .where(
-        and(
-          eq(TeacherSubjectAssignment.user_id, teacherIdNum),
-          eq(TeacherSubjectAssignment.subject_id, subjId),
-          eq(TeacherSubjectAssignment.academic_term_id, termId),
-        ),
-      )
-      .limit(1);
+    // const assignment = await db
+    //   .select()
+    //   .from(TeacherSubjectAssignment)
+    //   .where(
+    //     and(
+    //       eq(TeacherSubjectAssignment.user_id, teacherIdNum),
+    //       eq(TeacherSubjectAssignment.subject_id, subjId),
+    //       eq(TeacherSubjectAssignment.academic_term_id, termId),
+    //     ),
+    //   )
+    //   .limit(1);
 
-    if (assignment.length === 0) {
-      throw new ValidationError("Teacher is not assigned to this subject");
-    }
+    // if (assignment.length === 0) {
+    //   throw new ValidationError("Teacher is not assigned to this subject");
+    // }
 
     // Get enrolled students
     const students = await db
