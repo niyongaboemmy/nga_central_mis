@@ -2051,17 +2051,21 @@ export const getAvailableSubjectsForStudent = asyncHandler(
       throw new ValidationError("Invalid academic term ID");
     }
 
-    // Get student's current active class group
-    // We prioritize the most recent active assignment to determine their current grade
+    // 1. Get student's current active class group and its grade info
     const studentClassGroup = await db
       .select({
         grade_id: ClassGroup.grade_id,
+        grade_name: Grade.name,
+        program_id: Grade.program_id,
+        program_name: Program.name,
       })
       .from(StudentClassGroup)
       .innerJoin(
         ClassGroup,
         eq(StudentClassGroup.class_group_id, ClassGroup.class_group_id),
       )
+      .innerJoin(Grade, eq(ClassGroup.grade_id, Grade.grade_id))
+      .innerJoin(Program, eq(Grade.program_id, Program.program_id))
       .where(
         and(
           eq(StudentClassGroup.user_id, studentIdNum),
@@ -2077,30 +2081,25 @@ export const getAvailableSubjectsForStudent = asyncHandler(
       );
     }
 
-    const gradeId = Number(studentClassGroup[0].grade_id);
+    const { grade_id, grade_name, program_id, program_name } =
+      studentClassGroup[0];
+    const gradeIdNum = Number(grade_id);
 
-    // Get subjects assigned to the student's grade
-    // Using leftJoin for Grade and Program to ensure we don't miss rows if metadata is inconsistent
+    // 2. Get ALL subjects associated with this grade ID
     const subjects = await db
       .select({
         subject_id: Subject.subject_id,
         code: Subject.code,
         name: Subject.name,
         description: Subject.description,
-        grade_id: Grade.grade_id,
-        grade_name: Grade.name,
-        program_id: Program.program_id,
-        program_name: Program.name,
       })
       .from(GradeSubject)
       .innerJoin(Subject, eq(GradeSubject.subject_id, Subject.subject_id))
-      .leftJoin(Grade, eq(GradeSubject.grade_id, Grade.grade_id))
-      .leftJoin(Program, eq(Grade.program_id, Program.program_id))
-      .where(eq(GradeSubject.grade_id, gradeId))
+      .where(eq(GradeSubject.grade_id, gradeIdNum))
       .orderBy(Subject.name);
 
-    // Get already enrolled subjects for this term
-    const enrolledSubjects = await db
+    // 3. Get active enrollments for this student and term
+    const enrolledEntries = await db
       .select({ subject_id: StudentSubjectEnrollment.subject_id })
       .from(StudentSubjectEnrollment)
       .where(
@@ -2111,43 +2110,27 @@ export const getAvailableSubjectsForStudent = asyncHandler(
         ),
       );
 
-    const enrolledSubjectIds = new Set(
-      enrolledSubjects.map((e) => Number(e.subject_id)),
+    const enrolledIds = new Set(
+      enrolledEntries.map((e) => Number(e.subject_id)),
     );
 
-    // Group by subject_id like in getSubjects and filter out enrolled subjects
-    const subjectMap = new Map<number, any>();
-
-    subjects.forEach((row) => {
-      const subjectId = Number(row.subject_id);
-
-      // Skip if student is already enrolled in this subject for this term
-      if (enrolledSubjectIds.has(subjectId)) {
-        return;
-      }
-
-      if (!subjectMap.has(subjectId)) {
-        subjectMap.set(subjectId, {
-          subject_id: row.subject_id,
-          code: row.code,
-          name: row.name,
-          description: row.description,
-          grades: [],
-        });
-      }
-
-      // Add grade info if it exists
-      if (row.grade_id) {
-        subjectMap.get(subjectId).grades.push({
-          grade_id: row.grade_id,
-          grade_name: row.grade_name || "Unknown Grade",
-          program_id: row.program_id,
-          program_name: row.program_name || "Unknown Program",
-        });
-      }
-    });
-
-    const result = Array.from(subjectMap.values());
+    // 4. Transform results into the requested format, filtering out already enrolled subjects
+    const result = subjects
+      .filter((s) => !enrolledIds.has(Number(s.subject_id)))
+      .map((s) => ({
+        subject_id: s.subject_id,
+        code: s.code,
+        name: s.name,
+        description: s.description,
+        grades: [
+          {
+            grade_id: grade_id,
+            grade_name: grade_name,
+            program_id: program_id,
+            program_name: program_name,
+          },
+        ],
+      }));
 
     successResponse(res, "Subjects retrieved successfully", result);
   },
