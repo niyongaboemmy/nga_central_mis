@@ -247,7 +247,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
   const [assigningRole, setAssigningRole] = React.useState(false);
   const [changingStatus, setChangingStatus] = React.useState(false);
   const [availablePrograms, setAvailablePrograms] = React.useState<Program[]>(
-    []
+    [],
   );
   const [userPrograms, setUserPrograms] = React.useState<UserProgram[]>([]);
   const [showAddProgramModal, setShowAddProgramModal] = React.useState(false);
@@ -305,18 +305,19 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
   const allPermissions =
     user.roles?.flatMap((role: UserRole) => role.permissions || []) || [];
   const uniquePermissions = Array.from(
-    new Map(allPermissions.map((p: Permission) => [p.perm_id, p])).values()
+    new Map(allPermissions.map((p: Permission) => [p.perm_id, p])).values(),
   );
 
   const tabs = [
     { id: "info", label: "Info", icon: UserIcon },
     { id: "roles", label: "Roles", icon: Shield },
-    { id: "programs", label: "Programs", icon: Building },
-    { id: "grades", label: "Grades", icon: Award },
-    { id: "subjects", label: "Subjects", icon: BookOpen },
     ...(getUserType() === "STUDENT"
       ? [{ id: "enrollment", label: "Enrollment", icon: BookOpen }]
-      : []),
+      : [
+          { id: "programs", label: "Programs", icon: Building },
+          { id: "grades", label: "Grades", icon: Award },
+          { id: "subjects", label: "Subjects", icon: BookOpen },
+        ]),
     { id: "activity", label: "Activity", icon: Clock },
   ];
 
@@ -330,7 +331,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
     } catch (error: any) {
       showToast(
         error.response?.data?.message || "Failed to change role",
-        "error"
+        "error",
       );
     } finally {
       setAssigningRole(false);
@@ -354,7 +355,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
     } catch (error: any) {
       showToast(
         error.response?.data?.message || "Failed to update user status",
-        "error"
+        "error",
       );
     }
   };
@@ -398,7 +399,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
     } catch (error: any) {
       showToast(
         error.response?.data?.message || "Failed to assign program",
-        "error"
+        "error",
       );
     } finally {
       setAssigningProgram(false);
@@ -415,7 +416,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
     } catch (error: any) {
       showToast(
         error.response?.data?.message || "Failed to remove program",
-        "error"
+        "error",
       );
     }
   };
@@ -429,7 +430,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
     } catch (error: any) {
       showToast(
         error.response?.data?.message || "Failed to remove grade",
-        "error"
+        "error",
       );
     }
   };
@@ -442,7 +443,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
         // Filter out grades already assigned to this user
         const assignedGradeIds = userGrades.map((g) => g.grade_id);
         const available = grades.filter(
-          (g) => !assignedGradeIds.includes(g.grade_id)
+          (g) => !assignedGradeIds.includes(g.grade_id),
         );
         setAvailableGrades(available);
       }
@@ -462,7 +463,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
     } catch (error: any) {
       showToast(
         error.response?.data?.message || "Failed to assign grade",
-        "error"
+        "error",
       );
     } finally {
       setAssigningGrade(false);
@@ -485,7 +486,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
     } catch (error: any) {
       showToast(
         error.response?.data?.message || "Failed to change user status",
-        "error"
+        "error",
       );
     } finally {
       setChangingStatus(false);
@@ -631,7 +632,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                             value={
                               user.profile?.date_of_birth
                                 ? new Date(
-                                    user.profile.date_of_birth
+                                    user.profile.date_of_birth,
                                   ).toLocaleDateString()
                                 : "Not specified"
                             }
@@ -646,7 +647,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                           icon={Clock}
                           label="Account Created"
                           value={new Date(
-                            user.user.created_at
+                            user.user.created_at,
                           ).toLocaleDateString("en-US", {
                             year: "numeric",
                             month: "long",
@@ -749,21 +750,21 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                                         {program.relationship === "LEAD"
                                           ? "Program Lead"
                                           : program.relationship === "STUDENT"
-                                          ? "Student"
-                                          : program.relationship === "TEACHER"
-                                          ? "Teacher"
-                                          : "Associated"}
+                                            ? "Student"
+                                            : program.relationship === "TEACHER"
+                                              ? "Teacher"
+                                              : "Associated"}
                                       </p>
                                     </div>
                                   </div>
                                   {program.relationship === "LEAD" &&
                                     hasPermission(
-                                      Permissions.MANAGE_PROGRAM_LEADS
+                                      Permissions.MANAGE_PROGRAM_LEADS,
                                     ) && (
                                       <button
                                         onClick={() =>
                                           handleRemoveProgram(
-                                            program.program_id
+                                            program.program_id,
                                           )
                                         }
                                         className="px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white text-xs font-medium rounded-full transition-colors"
@@ -780,7 +781,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                               </motion.div>
                             ))}
                             {hasPermission(
-                              Permissions.MANAGE_PROGRAM_LEADS
+                              Permissions.MANAGE_PROGRAM_LEADS,
                             ) && (
                               <div className="flex justify-center pt-4">
                                 <button
@@ -803,7 +804,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                               This user is not associated with any programs.
                             </p>
                             {hasPermission(
-                              Permissions.MANAGE_PROGRAM_LEADS
+                              Permissions.MANAGE_PROGRAM_LEADS,
                             ) && (
                               <button
                                 onClick={openAddProgramModal}
@@ -821,7 +822,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                     {activeTab === "grades" && (
                       <div className="space-y-4">
                         {hasPermission(
-                          Permissions.ASSIGN_GRADE_TO_CLASS_TEACHER
+                          Permissions.ASSIGN_GRADE_TO_CLASS_TEACHER,
                         ) && (
                           <div className="flex justify-end">
                             <button
@@ -862,7 +863,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                                     </div>
                                   </div>
                                   {hasPermission(
-                                    Permissions.ASSIGN_GRADE_TO_CLASS_TEACHER
+                                    Permissions.ASSIGN_GRADE_TO_CLASS_TEACHER,
                                   ) && (
                                     <button
                                       onClick={() =>
@@ -877,7 +878,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                                 <p className="text-sm text-gray-600 dark:text-gray-300">
                                   Assigned on{" "}
                                   {new Date(
-                                    grade.assigned_at
+                                    grade.assigned_at,
                                   ).toLocaleDateString()}
                                 </p>
                               </motion.div>
@@ -930,7 +931,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
 
                     {activeTab === "activity" && (
                       <div className="space-y-4">
-                        <div className="p-6 bg-gradient-to-r from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-800/20 rounded-xl border border-green-200 dark:border-green-800">
+                        <div className="p-6 bg-gradient-to-r from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-800/20 rounded-3xl border border-green-200 dark:border-green-800">
                           <div className="flex items-center gap-4 mb-3">
                             <div className="w-12 h-12 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center">
                               <CheckCircle className="w-6 h-6 text-green-600 dark:text-green-400" />
@@ -941,7 +942,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                               </p>
                               <p className="text-sm text-gray-500 dark:text-gray-400">
                                 {new Date(
-                                  user.user.created_at
+                                  user.user.created_at,
                                 ).toLocaleDateString()}
                               </p>
                             </div>
@@ -952,7 +953,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                           </p>
                         </div>
 
-                        <div className="p-6 bg-gradient-to-r from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 rounded-xl border border-blue-200 dark:border-blue-800">
+                        <div className="p-6 bg-gradient-to-r from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 rounded-3xl border border-blue-200 dark:border-blue-800">
                           <div className="flex items-center gap-4">
                             <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center">
                               <UserIcon className="w-6 h-6 text-blue-600 dark:text-blue-400" />
@@ -970,7 +971,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                           </div>
                         </div>
 
-                        <div className="p-6 bg-gradient-to-r from-orange-50 to-orange-100 dark:from-orange-900/20 dark:to-orange-800/20 rounded-xl border border-orange-200 dark:border-orange-800">
+                        <div className="p-6 bg-gradient-to-r from-orange-50 to-orange-100 dark:from-orange-900/20 dark:to-orange-800/20 rounded-3xl border border-orange-200 dark:border-orange-800">
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-4">
                               <div
@@ -998,7 +999,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                               </div>
                             </div>
                             {hasPermission(
-                              Permissions.ENABLE_DISABLE_USERS
+                              Permissions.ENABLE_DISABLE_USERS,
                             ) && (
                               <button
                                 onClick={handleStatusChange}

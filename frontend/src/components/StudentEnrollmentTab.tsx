@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   BookOpen,
@@ -62,23 +62,39 @@ const StudentEnrollmentTab: React.FC<StudentEnrollmentTabProps> = ({
     ClassGroup[]
   >([]);
   const [assigningClassGroup, setAssigningClassGroup] = useState(false);
+  const [removingClassGroup, setRemovingClassGroup] = useState(false);
+  const [loadingAvailable, setLoadingAvailable] = useState(false);
   const [currentStep, setCurrentStep] = useState<1 | 2>(1);
+  const loadingInitialRef = useRef(false);
+  const lastFetchedEnrolled = useRef<{
+    studentId: number;
+    termId: number;
+  } | null>(null);
+  const lastFetchedAvailable = useRef<{
+    studentId: number;
+    termId: number;
+  } | null>(null);
+  const fetchingEnrolledRef = useRef(false);
+  const fetchingAvailableRef = useRef(false);
 
   // Load academic terms and student class group
   useEffect(() => {
     const loadInitialData = async () => {
+      if (loadingInitialRef.current) return;
+      loadingInitialRef.current = true;
+
       try {
         // Load academic terms
         const termsResponse = await academicTermsApi.getAll();
-        setAcademicTerms(termsResponse.data.data);
+        const terms = termsResponse.data.data;
+        setAcademicTerms(terms);
+
         // Set current term as default
-        const currentTerm = termsResponse.data.data.find(
-          (term) => term.is_current === 1,
-        );
+        const currentTerm = terms.find((term) => term.is_current === 1);
         if (currentTerm) {
           setSelectedTerm(currentTerm);
-        } else if (termsResponse.data.data.length > 0) {
-          setSelectedTerm(termsResponse.data.data[0]);
+        } else if (terms.length > 0) {
+          setSelectedTerm(terms[0]);
         }
 
         // Load student class group
@@ -90,6 +106,8 @@ const StudentEnrollmentTab: React.FC<StudentEnrollmentTabProps> = ({
       } catch (error) {
         console.error("Failed to load initial data:", error);
         showToast("Failed to load data", "error");
+      } finally {
+        loadingInitialRef.current = false;
       }
     };
 
@@ -98,20 +116,27 @@ const StudentEnrollmentTab: React.FC<StudentEnrollmentTabProps> = ({
     }
   }, [isOpen, studentId]);
 
-  // Load enrolled subjects when term changes
+  // Unified data loading effect (Strictly Enrolled Subjects)
   useEffect(() => {
     if (selectedTerm && isOpen) {
       loadEnrolledSubjects();
-      // Also load available subjects if we're on step 2
-      if (currentStep === 2) {
-        loadAvailableSubjects();
-      }
     }
-  }, [selectedTerm, isOpen, currentStep]);
+  }, [selectedTerm?.academic_term_id, isOpen, currentStep, studentId]);
 
-  const loadEnrolledSubjects = async () => {
+  const loadEnrolledSubjects = async (force = false) => {
     if (!selectedTerm) return;
 
+    // Prevent redundant calls and race conditions
+    if (
+      fetchingEnrolledRef.current ||
+      (!force &&
+        lastFetchedEnrolled.current?.studentId === studentId &&
+        lastFetchedEnrolled.current?.termId === selectedTerm.academic_term_id)
+    ) {
+      return;
+    }
+
+    fetchingEnrolledRef.current = true;
     setLoading(true);
     try {
       const response = await studentEnrollmentApi.getEnrolledSubjects(
@@ -119,26 +144,50 @@ const StudentEnrollmentTab: React.FC<StudentEnrollmentTabProps> = ({
         selectedTerm.academic_term_id,
       );
       setEnrolledSubjects(response.data.data);
+      lastFetchedEnrolled.current = {
+        studentId,
+        termId: selectedTerm.academic_term_id,
+      };
     } catch (error) {
       console.error("Failed to load enrolled subjects:", error);
       showToast("Failed to load enrolled subjects", "error");
     } finally {
       setLoading(false);
+      fetchingEnrolledRef.current = false;
     }
   };
 
-  const loadAvailableSubjects = async () => {
+  const loadAvailableSubjects = async (force = false) => {
     if (!selectedTerm) return;
 
+    // Prevent redundant calls and race conditions
+    if (
+      fetchingAvailableRef.current ||
+      (!force &&
+        lastFetchedAvailable.current?.studentId === studentId &&
+        lastFetchedAvailable.current?.termId === selectedTerm.academic_term_id)
+    ) {
+      return;
+    }
+
+    fetchingAvailableRef.current = true;
+    setLoadingAvailable(true);
     try {
       const response = await studentEnrollmentApi.getAvailableSubjects(
         studentId,
         selectedTerm.academic_term_id,
       );
       setAvailableSubjects(response.data.data);
+      lastFetchedAvailable.current = {
+        studentId,
+        termId: selectedTerm.academic_term_id,
+      };
     } catch (error) {
       console.error("Failed to load available subjects:", error);
       showToast("Failed to load available subjects", "error");
+    } finally {
+      setLoadingAvailable(false);
+      fetchingAvailableRef.current = false;
     }
   };
 
@@ -153,8 +202,7 @@ const StudentEnrollmentTab: React.FC<StudentEnrollmentTabProps> = ({
         academic_term_id: selectedTerm.academic_term_id,
       });
       showToast("Student enrolled successfully", "success");
-      loadEnrolledSubjects();
-      loadAvailableSubjects();
+      loadEnrolledSubjects(true);
       setShowEnrollModal(false);
     } catch (error) {
       console.error("Failed to enroll student:", error);
@@ -176,8 +224,7 @@ const StudentEnrollmentTab: React.FC<StudentEnrollmentTabProps> = ({
         selectedTerm.academic_term_id,
       );
       showToast("Student unenrolled successfully", "success");
-      loadEnrolledSubjects();
-      loadAvailableSubjects();
+      loadEnrolledSubjects(true);
     } catch (error) {
       console.error("Failed to unenroll student:", error);
       showToast("Failed to unenroll student", "error");
@@ -187,7 +234,7 @@ const StudentEnrollmentTab: React.FC<StudentEnrollmentTabProps> = ({
   };
 
   const openEnrollModal = () => {
-    loadAvailableSubjects();
+    loadAvailableSubjects(true);
     setShowEnrollModal(true);
   };
 
@@ -254,16 +301,6 @@ const StudentEnrollmentTab: React.FC<StudentEnrollmentTabProps> = ({
       setEnrolledSubjects([]);
       setAvailableSubjects([]);
 
-      // Pre-load available subjects for the next step
-      if (selectedTerm) {
-        const subjectsResponse =
-          await studentEnrollmentApi.getAvailableSubjects(
-            studentId,
-            selectedTerm.academic_term_id,
-          );
-        setAvailableSubjects(subjectsResponse.data.data);
-      }
-
       setCurrentStep(2);
     } catch (error) {
       console.error("Failed to assign class group:", error);
@@ -276,6 +313,7 @@ const StudentEnrollmentTab: React.FC<StudentEnrollmentTabProps> = ({
   const handleRemoveClassGroup = async () => {
     if (!studentClassGroup) return;
 
+    setRemovingClassGroup(true);
     try {
       // First, unenroll from all subjects if any are enrolled
       if (enrolledSubjects.length > 0 && selectedTerm) {
@@ -309,6 +347,8 @@ const StudentEnrollmentTab: React.FC<StudentEnrollmentTabProps> = ({
     } catch (error) {
       console.error("Failed to remove class group:", error);
       showToast("Failed to remove class group", "error");
+    } finally {
+      setRemovingClassGroup(false);
     }
   };
 
@@ -316,6 +356,17 @@ const StudentEnrollmentTab: React.FC<StudentEnrollmentTabProps> = ({
   const prevStep = () => setCurrentStep(1);
 
   if (!isOpen) return null;
+
+  if (academicTerms.length === 0 && isOpen) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px]">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
+        <p className="text-gray-500 dark:text-gray-400 font-medium animate-pulse">
+          Initializing enrollment wizard...
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -396,9 +447,14 @@ const StudentEnrollmentTab: React.FC<StudentEnrollmentTabProps> = ({
                       ) && (
                         <button
                           onClick={handleRemoveClassGroup}
-                          className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-full transition-colors"
+                          disabled={removingClassGroup}
+                          className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-full transition-colors disabled:opacity-50 flex items-center gap-2"
                         >
-                          Remove
+                          {removingClassGroup ? (
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                          ) : (
+                            "Remove"
+                          )}
                         </button>
                       )}
                     </div>
@@ -749,10 +805,17 @@ const StudentEnrollmentTab: React.FC<StudentEnrollmentTabProps> = ({
                   </button>
                 </div>
 
-                <div className="space-y-3 max-h-96 overflow-y-auto">
-                  {availableSubjects.length === 0 ? (
-                    <div className="text-center py-8">
-                      <AlertCircle className="w-12 h-12 text-gray-300 dark:text-gray-600 mx-auto mb-2" />
+                <div className="space-y-3 max-h-96 overflow-y-auto min-h-[200px] flex flex-col">
+                  {loadingAvailable ? (
+                    <div className="flex-1 flex flex-col items-center justify-center py-12">
+                      <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600 mb-4"></div>
+                      <p className="text-gray-500 dark:text-gray-400 animate-pulse">
+                        Finding available subjects...
+                      </p>
+                    </div>
+                  ) : availableSubjects.length === 0 ? (
+                    <div className="flex-1 flex flex-col items-center justify-center py-8">
+                      <AlertCircle className="w-12 h-12 text-gray-300 dark:text-gray-600 mb-2" />
                       <p className="text-sm text-gray-500 dark:text-gray-400">
                         No available subjects for enrollment
                       </p>
