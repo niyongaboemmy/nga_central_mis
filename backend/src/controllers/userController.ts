@@ -20,6 +20,8 @@ import {
   TeacherSubjectAssignment,
   StudentSubjectEnrollment,
   UserGrade,
+  AcademicYear,
+  AcademicTerm,
 } from "../db/schema";
 import { sanitizeString, validateEmail } from "../utils/sanitization";
 import {
@@ -49,7 +51,7 @@ const formatDateForMySQL = (dateStr: string | undefined) => {
 
 // Helper function to validate gender
 const validateGender = (
-  gender: string | undefined
+  gender: string | undefined,
 ): "MALE" | "FEMALE" | "OTHER" | null => {
   if (!gender) return null;
   const normalized = gender.toUpperCase().trim();
@@ -150,9 +152,9 @@ export const updateCurrentUserProfile = asyncHandler(
     successResponse(
       res,
       "Profile updated successfully",
-      updatedProfile[0] || null
+      updatedProfile[0] || null,
     );
-  }
+  },
 );
 
 export const updateUserProfile = asyncHandler(async (req: any, res: any) => {
@@ -241,7 +243,7 @@ export const updateUserProfile = asyncHandler(async (req: any, res: any) => {
   successResponse(
     res,
     "Profile updated successfully",
-    updatedProfile[0] || null
+    updatedProfile[0] || null,
   );
 });
 
@@ -307,13 +309,13 @@ export const getCurrentUser = asyncHandler(async (req: any, res: any) => {
           Permission,
           and(
             eq(RolePermission.perm_id, Permission.perm_id),
-            eq(Permission.status, "ACTIVE")
-          )
+            eq(Permission.status, "ACTIVE"),
+          ),
         )
         .where(eq(RolePermission.role_id, role.role_id));
 
       return { ...role, permissions };
-    })
+    }),
   );
 
   // Get flat list of permission names
@@ -356,7 +358,7 @@ export const getCurrentUser = asyncHandler(async (req: any, res: any) => {
     ];
   } else {
     permissions = rolesWithPermissions.flatMap((r) =>
-      r.permissions.map((p: any) => p.name)
+      r.permissions.map((p: any) => p.name),
     );
   }
 
@@ -387,6 +389,50 @@ export const getCurrentUser = asyncHandler(async (req: any, res: any) => {
     .where(eq(UserGrade.user_id, userId))
     .orderBy(Grade.level_order);
 
+  // Get all academic years
+  const academicYears = await db
+    .select()
+    .from(AcademicYear)
+    .orderBy(AcademicYear.start_date);
+
+  // Get current academic year
+  const currentAcademicYear = await db
+    .select()
+    .from(AcademicYear)
+    .where(eq(AcademicYear.is_current, 1))
+    .limit(1);
+
+  // Get all academic terms for the current academic year
+  let currentAcademicTerms: any[] = [];
+  if (currentAcademicYear.length > 0) {
+    currentAcademicTerms = await db
+      .select()
+      .from(AcademicTerm)
+      .where(
+        eq(
+          AcademicTerm.academic_year_id,
+          currentAcademicYear[0].academic_year_id,
+        ),
+      )
+      .orderBy(AcademicTerm.start_date);
+  }
+
+  // Get all programs
+  const allPrograms = await db.select().from(Program).orderBy(Program.name);
+
+  // Get all grades with program information
+  const allGrades = await db
+    .select({
+      grade_id: Grade.grade_id,
+      name: Grade.name,
+      level_order: Grade.level_order,
+      program_id: Grade.program_id,
+      program_name: Program.name,
+    })
+    .from(Grade)
+    .innerJoin(Program, eq(Grade.program_id, Program.program_id))
+    .orderBy(Grade.level_order);
+
   successResponse(res, "User profile retrieved successfully", {
     user: user[0],
     profile: profile[0] || null,
@@ -395,6 +441,11 @@ export const getCurrentUser = asyncHandler(async (req: any, res: any) => {
     assignedPrograms,
     assignedGrades,
     forcePasswordChange: auth[0]?.force_password_change === 1,
+    academicYears,
+    currentAcademicYear: currentAcademicYear[0] || null,
+    currentAcademicTerms,
+    allPrograms,
+    allGrades,
   });
 });
 
@@ -420,8 +471,8 @@ export const getUsers = asyncHandler(async (req: any, res: any) => {
       or(
         sql`${User.username} LIKE ${`%${search}%`}`,
         sql`${User.email} LIKE ${`%${search}%`}`,
-        sql`${User.phone_number} LIKE ${`%${search}%`}`
-      )
+        sql`${User.phone_number} LIKE ${`%${search}%`}`,
+      ),
     );
   }
 
@@ -433,7 +484,7 @@ export const getUsers = asyncHandler(async (req: any, res: any) => {
     .select({ count: sql<number>`count(*)` })
     .from(User)
     .where(
-      whereConditions.length > 0 ? and(...whereConditions) : (undefined as any)
+      whereConditions.length > 0 ? and(...whereConditions) : (undefined as any),
     );
 
   const totalCount = totalCountResult[0]?.count || 0;
@@ -442,7 +493,7 @@ export const getUsers = asyncHandler(async (req: any, res: any) => {
     .select()
     .from(User)
     .where(
-      whereConditions.length > 0 ? and(...whereConditions) : (undefined as any)
+      whereConditions.length > 0 ? and(...whereConditions) : (undefined as any),
     )
     .limit(limitNum)
     .offset(offset);
@@ -474,13 +525,13 @@ export const getUsers = asyncHandler(async (req: any, res: any) => {
               Permission,
               and(
                 eq(RolePermission.perm_id, Permission.perm_id),
-                eq(Permission.status, "ACTIVE")
-              )
+                eq(Permission.status, "ACTIVE"),
+              ),
             )
             .where(eq(RolePermission.role_id, role.role_id));
 
           return { ...role, permissions };
-        })
+        }),
       );
 
       const profile = await db
@@ -494,7 +545,7 @@ export const getUsers = asyncHandler(async (req: any, res: any) => {
         profile: profile[0] || null,
         roles: rolesWithPermissions,
         permissions: rolesWithPermissions.flatMap((r) =>
-          r.permissions.map((p) => p.name)
+          r.permissions.map((p) => p.name),
         ),
       };
 
@@ -502,7 +553,7 @@ export const getUsers = asyncHandler(async (req: any, res: any) => {
         const userRoleId = parseInt(userRole as string, 10);
         if (!isNaN(userRoleId)) {
           const hasRole = userRoles.some(
-            (role) => role.role_id.toString() === userRoleId.toString()
+            (role) => role.role_id.toString() === userRoleId.toString(),
           );
           if (!hasRole) {
             return null;
@@ -511,7 +562,7 @@ export const getUsers = asyncHandler(async (req: any, res: any) => {
       }
 
       return userWithProfile;
-    })
+    }),
   );
 
   const filteredUsers = usersWithRoles.filter((user) => user !== null);
@@ -572,13 +623,13 @@ export const getUser = asyncHandler(async (req: any, res: any) => {
           Permission,
           and(
             eq(RolePermission.perm_id, Permission.perm_id),
-            eq(Permission.status, "ACTIVE")
-          )
+            eq(Permission.status, "ACTIVE"),
+          ),
         )
         .where(eq(RolePermission.role_id, role.role_id));
 
       return { ...role, permissions };
-    })
+    }),
   );
 
   const profile = await db
@@ -592,7 +643,7 @@ export const getUser = asyncHandler(async (req: any, res: any) => {
     profile: profile[0] || null,
     roles: rolesWithPermissions,
     permissions: rolesWithPermissions.flatMap((r) =>
-      r.permissions.map((p: any) => p.name)
+      r.permissions.map((p: any) => p.name),
     ),
   });
 });
@@ -694,7 +745,7 @@ export const createUser = asyncHandler(async (req: any, res: any) => {
     emailService.sendAccountCreation(
       sanitizedEmail,
       sanitizedUsername,
-      randomPassword
+      randomPassword,
     );
   } catch (emailError) {
     logger.warn("Failed to send account creation email", {
@@ -1042,7 +1093,7 @@ export const bulkCreateUsers = asyncHandler(async (req: any, res: any) => {
         emailService.sendAccountCreation(
           sanitizeString(email),
           sanitizeString(username),
-          randomPassword
+          randomPassword,
         );
       } catch (emailError) {
         logger.warn("Failed to send account creation email for bulk user", {
@@ -1090,7 +1141,7 @@ export const bulkCreateUsers = asyncHandler(async (req: any, res: any) => {
   successResponse(
     res,
     `Bulk upload complete: ${successCount} created, ${failedCount} failed`,
-    { success: successCount, failed: failedCount, errors: errors.slice(0, 10) }
+    { success: successCount, failed: failedCount, errors: errors.slice(0, 10) },
   );
 });
 
@@ -1183,11 +1234,11 @@ export const downloadTemplate = asyncHandler(async (req: any, res: any) => {
   // Set response headers
   res.setHeader(
     "Content-Type",
-    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   );
   res.setHeader(
     "Content-Disposition",
-    "attachment; filename=user_template.xlsx"
+    "attachment; filename=user_template.xlsx",
   );
 
   // Send file
@@ -1234,14 +1285,14 @@ export const searchUsers = asyncHandler(async (req: any, res: any) => {
           sql`LOWER(CONCAT(${UserProfile.first_name}, ' ', ${UserProfile.last_name})) LIKE LOWER(${searchTerm})`,
           sql`LOWER(${UserProfile.address}) LIKE LOWER(${searchTerm})`,
           sql`LOWER(${UserProfile.external_id}) LIKE LOWER(${searchTerm})`,
-          sql`LOWER(${UserProfile.user_type}) LIKE LOWER(${searchTerm})`
-        )
-      )
+          sql`LOWER(${UserProfile.user_type}) LIKE LOWER(${searchTerm})`,
+        ),
+      ),
     )
     .limit(20);
 
   logger.info(
-    `User search for "${q}" by user ${userId}, found ${users.length} results`
+    `User search for "${q}" by user ${userId}, found ${users.length} results`,
   );
 
   successResponse(res, "Users retrieved successfully", users);
@@ -1488,19 +1539,19 @@ export const getUserRoles = asyncHandler(async (req: any, res: any) => {
           Permission,
           and(
             eq(RolePermission.perm_id, Permission.perm_id),
-            eq(Permission.status, "ACTIVE")
-          )
+            eq(Permission.status, "ACTIVE"),
+          ),
         )
         .where(eq(RolePermission.role_id, role.role_id));
 
       return { ...role, permissions };
-    })
+    }),
   );
 
   successResponse(
     res,
     "User roles retrieved successfully",
-    rolesWithPermissions
+    rolesWithPermissions,
   );
 });
 
@@ -1537,14 +1588,14 @@ export const getProgramRoles = asyncHandler(async (req: any, res: any) => {
     .where(
       and(
         eq(UserProgramLead.user_id, userId),
-        eq(UserProgramLead.program_id, programIdNum)
-      )
+        eq(UserProgramLead.program_id, programIdNum),
+      ),
     )
     .limit(1);
 
   if (userLead.length === 0) {
     throw new ValidationError(
-      "You do not have permission to view users in this program"
+      "You do not have permission to view users in this program",
     );
   }
 
@@ -1556,7 +1607,7 @@ export const getProgramRoles = asyncHandler(async (req: any, res: any) => {
     .innerJoin(StudentClassGroup, eq(User.user_id, StudentClassGroup.user_id))
     .innerJoin(
       ClassGroup,
-      eq(StudentClassGroup.class_group_id, ClassGroup.class_group_id)
+      eq(StudentClassGroup.class_group_id, ClassGroup.class_group_id),
     )
     .innerJoin(Grade, eq(ClassGroup.grade_id, Grade.grade_id))
     .where(eq(Grade.program_id, programIdNum));
@@ -1567,11 +1618,11 @@ export const getProgramRoles = asyncHandler(async (req: any, res: any) => {
     .from(User)
     .innerJoin(
       TeacherSubjectAssignment,
-      eq(User.user_id, TeacherSubjectAssignment.user_id)
+      eq(User.user_id, TeacherSubjectAssignment.user_id),
     )
     .innerJoin(
       ClassGroup,
-      eq(TeacherSubjectAssignment.class_group_id, ClassGroup.class_group_id)
+      eq(TeacherSubjectAssignment.class_group_id, ClassGroup.class_group_id),
     )
     .innerJoin(Grade, eq(ClassGroup.grade_id, Grade.grade_id))
     .where(eq(Grade.program_id, programIdNum));
@@ -1608,7 +1659,7 @@ export const getProgramRoles = asyncHandler(async (req: any, res: any) => {
     .from(Role)
     .innerJoin(UserRole, eq(Role.role_id, UserRole.role_id))
     .where(
-      and(eq(Role.status, "ACTIVE"), inArray(UserRole.user_id, allUserIds))
+      and(eq(Role.status, "ACTIVE"), inArray(UserRole.user_id, allUserIds)),
     )
     .groupBy(Role.role_id, Role.name, Role.description, Role.status);
 
@@ -1668,14 +1719,14 @@ export const getProgramUsersByRole = asyncHandler(
       .where(
         and(
           eq(UserProgramLead.user_id, userId),
-          eq(UserProgramLead.program_id, programIdNum)
-        )
+          eq(UserProgramLead.program_id, programIdNum),
+        ),
       )
       .limit(1);
 
     if (userLead.length === 0) {
       throw new ValidationError(
-        "You do not have permission to view users in this program"
+        "You do not have permission to view users in this program",
       );
     }
 
@@ -1697,7 +1748,7 @@ export const getProgramUsersByRole = asyncHandler(
       .innerJoin(StudentClassGroup, eq(User.user_id, StudentClassGroup.user_id))
       .innerJoin(
         ClassGroup,
-        eq(StudentClassGroup.class_group_id, ClassGroup.class_group_id)
+        eq(StudentClassGroup.class_group_id, ClassGroup.class_group_id),
       )
       .innerJoin(Grade, eq(ClassGroup.grade_id, Grade.grade_id))
       .innerJoin(UserRole, eq(User.user_id, UserRole.user_id))
@@ -1705,8 +1756,8 @@ export const getProgramUsersByRole = asyncHandler(
         and(
           eq(Grade.program_id, programIdNum),
           eq(UserRole.role_id, roleIdNum),
-          eq(StudentClassGroup.status, "ACTIVE")
-        )
+          eq(StudentClassGroup.status, "ACTIVE"),
+        ),
       );
 
     // Teachers: via TeacherSubjectAssignment -> ClassGroup -> Grade -> Program
@@ -1725,16 +1776,19 @@ export const getProgramUsersByRole = asyncHandler(
       .leftJoin(UserProfile, eq(User.user_id, UserProfile.user_id))
       .innerJoin(
         TeacherSubjectAssignment,
-        eq(User.user_id, TeacherSubjectAssignment.user_id)
+        eq(User.user_id, TeacherSubjectAssignment.user_id),
       )
       .innerJoin(
         ClassGroup,
-        eq(TeacherSubjectAssignment.class_group_id, ClassGroup.class_group_id)
+        eq(TeacherSubjectAssignment.class_group_id, ClassGroup.class_group_id),
       )
       .innerJoin(Grade, eq(ClassGroup.grade_id, Grade.grade_id))
       .innerJoin(UserRole, eq(User.user_id, UserRole.user_id))
       .where(
-        and(eq(Grade.program_id, programIdNum), eq(UserRole.role_id, roleIdNum))
+        and(
+          eq(Grade.program_id, programIdNum),
+          eq(UserRole.role_id, roleIdNum),
+        ),
       );
 
     // Program leads: via UserProgramLead
@@ -1756,8 +1810,8 @@ export const getProgramUsersByRole = asyncHandler(
       .where(
         and(
           eq(UserProgramLead.program_id, programIdNum),
-          eq(UserRole.role_id, roleIdNum)
-        )
+          eq(UserRole.role_id, roleIdNum),
+        ),
       );
 
     // Combine all users
@@ -1766,7 +1820,7 @@ export const getProgramUsersByRole = asyncHandler(
     // Remove duplicates based on user_id
     const uniqueUsers = allUsers.filter(
       (user, index, self) =>
-        index === self.findIndex((u) => u.user_id === user.user_id)
+        index === self.findIndex((u) => u.user_id === user.user_id),
     );
 
     // Apply search filter
@@ -1779,7 +1833,7 @@ export const getProgramUsersByRole = asyncHandler(
           user.email?.toLowerCase().includes(searchLower) ||
           user.first_name?.toLowerCase().includes(searchLower) ||
           user.last_name?.toLowerCase().includes(searchLower) ||
-          user.phone_number?.toLowerCase().includes(searchLower)
+          user.phone_number?.toLowerCase().includes(searchLower),
       );
     }
 
@@ -1794,7 +1848,7 @@ export const getProgramUsersByRole = asyncHandler(
     res.setHeader("X-Per-Page", limitNum.toString());
 
     successResponse(res, "Users retrieved successfully", paginatedUsers);
-  }
+  },
 );
 
 // Get all users in a program (for program leads)
@@ -1837,14 +1891,14 @@ export const getProgramUsers = asyncHandler(async (req: any, res: any) => {
     .where(
       and(
         eq(UserProgramLead.user_id, userId),
-        eq(UserProgramLead.program_id, programIdNum)
-      )
+        eq(UserProgramLead.program_id, programIdNum),
+      ),
     )
     .limit(1);
 
   if (userLead.length === 0) {
     throw new ValidationError(
-      "You do not have permission to view users in this program"
+      "You do not have permission to view users in this program",
     );
   }
 
@@ -1867,7 +1921,7 @@ export const getProgramUsers = asyncHandler(async (req: any, res: any) => {
     .innerJoin(StudentClassGroup, eq(User.user_id, StudentClassGroup.user_id))
     .innerJoin(
       ClassGroup,
-      eq(StudentClassGroup.class_group_id, ClassGroup.class_group_id)
+      eq(StudentClassGroup.class_group_id, ClassGroup.class_group_id),
     )
     .innerJoin(Grade, eq(ClassGroup.grade_id, Grade.grade_id))
     .innerJoin(UserRole, eq(User.user_id, UserRole.user_id))
@@ -1875,8 +1929,8 @@ export const getProgramUsers = asyncHandler(async (req: any, res: any) => {
     .where(
       and(
         eq(Grade.program_id, programIdNum),
-        eq(StudentClassGroup.status, "ACTIVE")
-      )
+        eq(StudentClassGroup.status, "ACTIVE"),
+      ),
     );
 
   // Teachers: via TeacherSubjectAssignment -> ClassGroup -> Grade -> Program
@@ -1896,11 +1950,11 @@ export const getProgramUsers = asyncHandler(async (req: any, res: any) => {
     .leftJoin(UserProfile, eq(User.user_id, UserProfile.user_id))
     .innerJoin(
       TeacherSubjectAssignment,
-      eq(User.user_id, TeacherSubjectAssignment.user_id)
+      eq(User.user_id, TeacherSubjectAssignment.user_id),
     )
     .innerJoin(
       ClassGroup,
-      eq(TeacherSubjectAssignment.class_group_id, ClassGroup.class_group_id)
+      eq(TeacherSubjectAssignment.class_group_id, ClassGroup.class_group_id),
     )
     .innerJoin(Grade, eq(ClassGroup.grade_id, Grade.grade_id))
     .innerJoin(UserRole, eq(User.user_id, UserRole.user_id))
@@ -1933,7 +1987,7 @@ export const getProgramUsers = asyncHandler(async (req: any, res: any) => {
   // Remove duplicates based on user_id
   const uniqueUsers = allUsers.filter(
     (user, index, self) =>
-      index === self.findIndex((u) => u.user_id === user.user_id)
+      index === self.findIndex((u) => u.user_id === user.user_id),
   );
 
   // Apply search filter
@@ -1947,7 +2001,7 @@ export const getProgramUsers = asyncHandler(async (req: any, res: any) => {
         user.first_name?.toLowerCase().includes(searchLower) ||
         user.last_name?.toLowerCase().includes(searchLower) ||
         user.phone_number?.toLowerCase().includes(searchLower) ||
-        user.role_name?.toLowerCase().includes(searchLower)
+        user.role_name?.toLowerCase().includes(searchLower),
     );
   }
 
@@ -2015,15 +2069,15 @@ export const getUserPrograms = asyncHandler(async (req: any, res: any) => {
     .from(StudentClassGroup)
     .innerJoin(
       ClassGroup,
-      eq(StudentClassGroup.class_group_id, ClassGroup.class_group_id)
+      eq(StudentClassGroup.class_group_id, ClassGroup.class_group_id),
     )
     .innerJoin(Grade, eq(ClassGroup.grade_id, Grade.grade_id))
     .innerJoin(Program, eq(Grade.program_id, Program.program_id))
     .where(
       and(
         eq(StudentClassGroup.user_id, userId),
-        eq(StudentClassGroup.status, "ACTIVE")
-      )
+        eq(StudentClassGroup.status, "ACTIVE"),
+      ),
     );
 
   const studentPrograms = studentProgramsRaw.map((p) => ({
@@ -2041,7 +2095,7 @@ export const getUserPrograms = asyncHandler(async (req: any, res: any) => {
     .from(TeacherSubjectAssignment)
     .innerJoin(
       ClassGroup,
-      eq(TeacherSubjectAssignment.class_group_id, ClassGroup.class_group_id)
+      eq(TeacherSubjectAssignment.class_group_id, ClassGroup.class_group_id),
     )
     .innerJoin(Grade, eq(ClassGroup.grade_id, Grade.grade_id))
     .innerJoin(Program, eq(Grade.program_id, Program.program_id))
@@ -2056,7 +2110,7 @@ export const getUserPrograms = asyncHandler(async (req: any, res: any) => {
   const allPrograms = [...leadPrograms, ...studentPrograms, ...teacherPrograms];
   const uniquePrograms = allPrograms.filter(
     (program, index, self) =>
-      index === self.findIndex((p) => p.program_id === program.program_id)
+      index === self.findIndex((p) => p.program_id === program.program_id),
   );
 
   successResponse(res, "User programs retrieved successfully", uniquePrograms);
@@ -2142,7 +2196,7 @@ export const removeGradeFromUser = asyncHandler(async (req: any, res: any) => {
     .select()
     .from(UserGrade)
     .where(
-      and(eq(UserGrade.user_id, userId), eq(UserGrade.grade_id, gradeIdNum))
+      and(eq(UserGrade.user_id, userId), eq(UserGrade.grade_id, gradeIdNum)),
     )
     .limit(1);
 
@@ -2154,7 +2208,7 @@ export const removeGradeFromUser = asyncHandler(async (req: any, res: any) => {
   await db
     .delete(UserGrade)
     .where(
-      and(eq(UserGrade.user_id, userId), eq(UserGrade.grade_id, gradeIdNum))
+      and(eq(UserGrade.user_id, userId), eq(UserGrade.grade_id, gradeIdNum)),
     );
 
   successResponse(res, "Grade removed from user successfully");
@@ -2255,15 +2309,15 @@ export const getUsersByGrade = asyncHandler(async (req: any, res: any) => {
     .innerJoin(StudentClassGroup, eq(User.user_id, StudentClassGroup.user_id))
     .innerJoin(
       ClassGroup,
-      eq(StudentClassGroup.class_group_id, ClassGroup.class_group_id)
+      eq(StudentClassGroup.class_group_id, ClassGroup.class_group_id),
     )
     .innerJoin(UserRole, eq(User.user_id, UserRole.user_id))
     .innerJoin(Role, eq(UserRole.role_id, Role.role_id))
     .where(
       and(
         sql`${ClassGroup.grade_id} = ${gradeIdNum}`,
-        eq(StudentClassGroup.status, "ACTIVE")
-      )
+        eq(StudentClassGroup.status, "ACTIVE"),
+      ),
     );
 
   // Get teachers assigned to subjects in this grade (via teacher subject assignments)
@@ -2283,11 +2337,11 @@ export const getUsersByGrade = asyncHandler(async (req: any, res: any) => {
     .leftJoin(UserProfile, eq(User.user_id, UserProfile.user_id))
     .innerJoin(
       TeacherSubjectAssignment,
-      eq(User.user_id, TeacherSubjectAssignment.user_id)
+      eq(User.user_id, TeacherSubjectAssignment.user_id),
     )
     .innerJoin(
       ClassGroup,
-      eq(TeacherSubjectAssignment.class_group_id, ClassGroup.class_group_id)
+      eq(TeacherSubjectAssignment.class_group_id, ClassGroup.class_group_id),
     )
     .innerJoin(UserRole, eq(User.user_id, UserRole.user_id))
     .innerJoin(Role, eq(UserRole.role_id, Role.role_id))
@@ -2297,7 +2351,7 @@ export const getUsersByGrade = asyncHandler(async (req: any, res: any) => {
   const allUsers = [...students, ...teachers];
   const users = allUsers.filter(
     (user, index, self) =>
-      index === self.findIndex((u) => u.user_id === user.user_id)
+      index === self.findIndex((u) => u.user_id === user.user_id),
   );
 
   // Apply search filter
@@ -2311,7 +2365,7 @@ export const getUsersByGrade = asyncHandler(async (req: any, res: any) => {
         user.first_name?.toLowerCase().includes(searchLower) ||
         user.last_name?.toLowerCase().includes(searchLower) ||
         user.phone_number?.toLowerCase().includes(searchLower) ||
-        user.role_name?.toLowerCase().includes(searchLower)
+        user.role_name?.toLowerCase().includes(searchLower),
     );
   }
 
@@ -2377,11 +2431,11 @@ export const getSubjectsByGrade = asyncHandler(async (req: any, res: any) => {
     .from(Subject)
     .innerJoin(
       TeacherSubjectAssignment,
-      eq(Subject.subject_id, TeacherSubjectAssignment.subject_id)
+      eq(Subject.subject_id, TeacherSubjectAssignment.subject_id),
     )
     .innerJoin(
       ClassGroup,
-      eq(TeacherSubjectAssignment.class_group_id, ClassGroup.class_group_id)
+      eq(TeacherSubjectAssignment.class_group_id, ClassGroup.class_group_id),
     )
     .leftJoin(User, eq(TeacherSubjectAssignment.user_id, User.user_id))
     .leftJoin(UserProfile, eq(User.user_id, UserProfile.user_id))
@@ -2425,21 +2479,21 @@ export const getSubjectsByGrade = asyncHandler(async (req: any, res: any) => {
     .from(Subject)
     .innerJoin(
       StudentSubjectEnrollment,
-      eq(Subject.subject_id, StudentSubjectEnrollment.subject_id)
+      eq(Subject.subject_id, StudentSubjectEnrollment.subject_id),
     )
     .innerJoin(
       StudentClassGroup,
-      eq(StudentSubjectEnrollment.user_id, StudentClassGroup.user_id)
+      eq(StudentSubjectEnrollment.user_id, StudentClassGroup.user_id),
     )
     .innerJoin(
       ClassGroup,
-      eq(StudentClassGroup.class_group_id, ClassGroup.class_group_id)
+      eq(StudentClassGroup.class_group_id, ClassGroup.class_group_id),
     )
     .where(
       and(
         sql`${ClassGroup.grade_id} = ${gradeIdNum}`,
-        eq(StudentClassGroup.status, "ACTIVE")
-      )
+        eq(StudentClassGroup.status, "ACTIVE"),
+      ),
     );
 
   // Add student-only subjects that don't have teachers
@@ -2462,7 +2516,7 @@ export const getSubjectsByGrade = asyncHandler(async (req: any, res: any) => {
       (subject) =>
         subject.code?.toLowerCase().includes(searchLower) ||
         subject.name?.toLowerCase().includes(searchLower) ||
-        subject.description?.toLowerCase().includes(searchLower)
+        subject.description?.toLowerCase().includes(searchLower),
     );
   }
 

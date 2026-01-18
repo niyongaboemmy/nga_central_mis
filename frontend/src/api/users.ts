@@ -32,6 +32,31 @@ export interface UserProfile {
   updated_at?: string;
 }
 
+export interface AcademicYear {
+  academic_year_id: number;
+  name: string;
+  start_date?: string;
+  end_date?: string;
+  is_current?: number;
+}
+
+export interface AcademicTerm {
+  academic_term_id: number;
+  academic_year_id: number;
+  name?: string;
+  start_date?: string;
+  end_date?: string;
+  is_current?: number;
+}
+
+export interface Grade {
+  grade_id: number;
+  name: string;
+  level_order: number;
+  program_id: number;
+  program_name: string;
+}
+
 export interface UserWithProfile {
   user: User;
   profile: UserProfile | null;
@@ -40,6 +65,11 @@ export interface UserWithProfile {
   assignedPrograms?: Program[];
   assignedGrades?: UserGrade[];
   forcePasswordChange?: boolean;
+  academicYears?: AcademicYear[];
+  currentAcademicYear?: AcademicYear | null;
+  currentAcademicTerms?: AcademicTerm[];
+  allPrograms?: Program[];
+  allGrades?: Grade[];
 }
 
 export interface Program {
@@ -60,7 +90,7 @@ export interface UserRole {
 
 export const getUserTypes = async (
   onSuccess?: (types: string[]) => void,
-  onError?: (error: any) => void
+  onError?: (error: any) => void,
 ): Promise<string[] | void> => {
   try {
     const response = await api.get<BackendResponse<string[]>>("/users/types");
@@ -84,12 +114,12 @@ export const getUsers = async (
     search?: string;
   },
   onSuccess?: (users: UserWithProfile[]) => void,
-  onError?: (error: any) => void
+  onError?: (error: any) => void,
 ): Promise<UserWithProfile[] | void> => {
   try {
     const response = await api.get<BackendResponse<UserWithProfile[]>>(
       "/users",
-      { params }
+      { params },
     );
     if (onSuccess && response.data.data) {
       onSuccess(response.data.data);
@@ -108,14 +138,14 @@ export const getUsersByRole = async (
   page: number = 1,
   limit: number = 10,
   onSuccess?: (users: UserWithProfile[]) => void,
-  onError?: (error: any) => void
+  onError?: (error: any) => void,
 ): Promise<UserWithProfile[] | void> => {
   try {
     const response = await api.get<BackendResponse<UserWithProfile[]>>(
       "/users",
       {
         params: { userRole, page, limit },
-      }
+      },
     );
     if (onSuccess && response.data.data) {
       onSuccess(response.data.data);
@@ -141,7 +171,7 @@ export const getUsersWithPagination = async (
     page: number;
     totalPages: number;
   }) => void,
-  onError?: (error: any) => void
+  onError?: (error: any) => void,
 ): Promise<{
   users: UserWithProfile[];
   total: number;
@@ -156,7 +186,7 @@ export const getUsersWithPagination = async (
 
     const response = await api.get<BackendResponse<UserWithProfile[]>>(
       "/users",
-      { params }
+      { params },
     );
 
     const total = parseInt(response.headers["x-total-count"] || "0");
@@ -195,11 +225,11 @@ export interface UserGrade {
 export const getUserGrades = async (
   userId: number,
   onSuccess?: (grades: UserGrade[]) => void,
-  onError?: (error: any) => void
+  onError?: (error: any) => void,
 ): Promise<UserGrade[] | void> => {
   try {
     const response = await api.get<BackendResponse<UserGrade[]>>(
-      `/users/${userId}/grades`
+      `/users/${userId}/grades`,
     );
     if (onSuccess && response.data.data) {
       onSuccess(response.data.data);
@@ -217,7 +247,7 @@ export const assignGradeToUser = async (
   userId: number,
   gradeId: number,
   onSuccess?: () => void,
-  onError?: (error: any) => void
+  onError?: (error: any) => void,
 ): Promise<void> => {
   try {
     await api.post(`/users/${userId}/grades`, { grade_id: gradeId });
@@ -236,7 +266,7 @@ export const removeGradeFromUser = async (
   userId: number,
   gradeId: number,
   onSuccess?: () => void,
-  onError?: (error: any) => void
+  onError?: (error: any) => void,
 ): Promise<void> => {
   try {
     await api.delete(`/users/${userId}/grades/${gradeId}`);
@@ -276,7 +306,7 @@ export const getUsersByGrade = async (
     page: number;
     totalPages: number;
   }) => void,
-  onError?: (error: any) => void
+  onError?: (error: any) => void,
 ): Promise<{
   users: GradeUser[];
   total: number;
@@ -286,7 +316,7 @@ export const getUsersByGrade = async (
   try {
     const response = await api.get<BackendResponse<GradeUser[]>>(
       `/users/grades/${gradeId}/users`,
-      { params }
+      { params },
     );
 
     const total = parseInt(response.headers["x-total-count"] || "0");
@@ -338,7 +368,7 @@ export const getSubjectsByGrade = async (
     page: number;
     totalPages: number;
   }) => void,
-  onError?: (error: any) => void
+  onError?: (error: any) => void,
 ): Promise<{
   subjects: GradeSubject[];
   total: number;
@@ -348,7 +378,7 @@ export const getSubjectsByGrade = async (
   try {
     const response = await api.get<BackendResponse<GradeSubject[]>>(
       `/users/grades/${gradeId}/subjects`,
-      { params }
+      { params },
     );
 
     const total = parseInt(response.headers["x-total-count"] || "0");
@@ -375,12 +405,11 @@ export const getSubjectsByGrade = async (
 
 export const getCurrentUser = async (
   onSuccess?: (user: UserWithProfile) => void,
-  onError?: (error: any) => void
+  onError?: (error: any) => void,
 ): Promise<UserWithProfile | void> => {
   try {
-    const response = await api.get<BackendResponse<UserWithProfile>>(
-      "/users/me"
-    );
+    const response =
+      await api.get<BackendResponse<UserWithProfile>>("/users/me");
     if (onSuccess && response.data.data) {
       onSuccess(response.data.data);
     }
@@ -396,11 +425,11 @@ export const getCurrentUser = async (
 export const getUser = async (
   id: number,
   onSuccess?: (user: UserWithProfile) => void,
-  onError?: (error: any) => void
+  onError?: (error: any) => void,
 ): Promise<UserWithProfile | void> => {
   try {
     const response = await api.get<BackendResponse<UserWithProfile>>(
-      `/users/${id}`
+      `/users/${id}`,
     );
     if (onSuccess && response.data.data) {
       onSuccess(response.data.data);
@@ -424,11 +453,11 @@ export interface UserProgram {
 export const getUserPrograms = async (
   userId: number,
   onSuccess?: (programs: UserProgram[]) => void,
-  onError?: (error: any) => void
+  onError?: (error: any) => void,
 ): Promise<UserProgram[] | void> => {
   try {
     const response = await api.get<BackendResponse<UserProgram[]>>(
-      `/users/${userId}/programs`
+      `/users/${userId}/programs`,
     );
     if (onSuccess && response.data.data) {
       onSuccess(response.data.data);
@@ -445,12 +474,12 @@ export const getUserPrograms = async (
 export const updateProfile = async (
   profileData: Partial<UserProfile>,
   onSuccess?: (profile: UserProfile) => void,
-  onError?: (error: any) => void
+  onError?: (error: any) => void,
 ): Promise<UserProfile | void> => {
   try {
     const response = await api.put<BackendResponse<UserProfile>>(
       "/users/me/profile",
-      profileData
+      profileData,
     );
     if (onSuccess && response.data.data) {
       onSuccess(response.data.data);
@@ -475,7 +504,7 @@ export const createUser = async (
     user_type?: string;
   },
   onSuccess?: (user: User) => void,
-  onError?: (error: any) => void
+  onError?: (error: any) => void,
 ): Promise<User | void> => {
   try {
     const response = await api.post<BackendResponse<User>>("/users", userData);
@@ -493,7 +522,7 @@ export const createUser = async (
 
 export const bulkCreateUsers = async (
   file: File,
-  roleId?: number
+  roleId?: number,
 ): Promise<{ success: number; failed: number; errors: string[] }> => {
   const formData = new FormData();
   formData.append("file", file);
@@ -543,7 +572,7 @@ export const updateUser = async (
   id: number,
   userData: Partial<User>,
   onSuccess?: () => void,
-  onError?: (error: any) => void
+  onError?: (error: any) => void,
 ): Promise<void> => {
   try {
     await api.put(`/users/${id}`, userData);
@@ -561,7 +590,7 @@ export const updateUser = async (
 export const deleteUser = async (
   id: number,
   onSuccess?: () => void,
-  onError?: (error: any) => void
+  onError?: (error: any) => void,
 ): Promise<void> => {
   try {
     await api.delete(`/users/${id}`);
@@ -579,7 +608,7 @@ export const deleteUser = async (
 export const enableUser = async (
   id: number,
   onSuccess?: () => void,
-  onError?: (error: any) => void
+  onError?: (error: any) => void,
 ): Promise<void> => {
   try {
     await api.put(`/users/${id}/enable`);
@@ -597,7 +626,7 @@ export const enableUser = async (
 export const disableUser = async (
   id: number,
   onSuccess?: () => void,
-  onError?: (error: any) => void
+  onError?: (error: any) => void,
 ): Promise<void> => {
   try {
     await api.put(`/users/${id}/disable`);
@@ -634,13 +663,13 @@ export interface Permission {
 export const getRoles = async (
   status?: string,
   onSuccess?: (roles: Role[]) => void,
-  onError?: (error: any) => void
+  onError?: (error: any) => void,
 ): Promise<Role[] | void> => {
   try {
     const params = status ? { status } : {};
     const response = await api.get<BackendResponse<Role[]>>(
       "/permissions/roles",
-      { params }
+      { params },
     );
     if (onSuccess && response.data.data) {
       onSuccess(response.data.data);
@@ -659,11 +688,11 @@ export const getRoles = async (
 export const getUserRoles = async (
   userId: number,
   onSuccess?: (roles: UserRole[]) => void,
-  onError?: (error: any) => void
+  onError?: (error: any) => void,
 ): Promise<UserRole[] | void> => {
   try {
     const response = await api.get<BackendResponse<UserRole[]>>(
-      `/users/${userId}/roles`
+      `/users/${userId}/roles`,
     );
     if (onSuccess && response.data.data) {
       onSuccess(response.data.data);
@@ -681,7 +710,7 @@ export const assignRoleToUser = async (
   userId: number,
   roleId: number,
   onSuccess?: () => void,
-  onError?: (error: any) => void
+  onError?: (error: any) => void,
 ): Promise<void> => {
   try {
     await api.post(`/users/${userId}/roles`, { role_id: roleId });
@@ -700,7 +729,7 @@ export const removeRoleFromUser = async (
   userId: number,
   roleId: number,
   onSuccess?: () => void,
-  onError?: (error: any) => void
+  onError?: (error: any) => void,
 ): Promise<void> => {
   try {
     await api.delete(`/users/${userId}/roles/${roleId}`);
@@ -718,11 +747,11 @@ export const removeRoleFromUser = async (
 export const getRole = async (
   id: number,
   onSuccess?: (role: Role) => void,
-  onError?: (error: any) => void
+  onError?: (error: any) => void,
 ): Promise<Role | void> => {
   try {
     const response = await api.get<BackendResponse<Role>>(
-      `/permissions/roles/${id}`
+      `/permissions/roles/${id}`,
     );
     if (onSuccess && response.data.data) {
       onSuccess(response.data.data);
@@ -739,12 +768,12 @@ export const getRole = async (
 export const createRole = async (
   data: { name: string; description?: string },
   onSuccess?: (role: Role) => void,
-  onError?: (error: any) => void
+  onError?: (error: any) => void,
 ): Promise<Role | void> => {
   try {
     const response = await api.post<BackendResponse<Role>>(
       "/permissions/roles",
-      data
+      data,
     );
     if (onSuccess && response.data.data) {
       onSuccess(response.data.data);
@@ -762,12 +791,12 @@ export const updateRole = async (
   id: number,
   data: Partial<{ name: string; description: string; status: string }>,
   onSuccess?: (role: Role) => void,
-  onError?: (error: any) => void
+  onError?: (error: any) => void,
 ): Promise<Role | void> => {
   try {
     const response = await api.put<BackendResponse<Role>>(
       `/permissions/roles/${id}`,
-      data
+      data,
     );
     if (onSuccess && response.data.data) {
       onSuccess(response.data.data);
@@ -784,7 +813,7 @@ export const updateRole = async (
 export const disableRole = async (
   id: number,
   onSuccess?: () => void,
-  onError?: (error: any) => void
+  onError?: (error: any) => void,
 ): Promise<void> => {
   try {
     await api.put(`/permissions/roles/${id}/disable`);
@@ -802,7 +831,7 @@ export const disableRole = async (
 export const enableRole = async (
   id: number,
   onSuccess?: () => void,
-  onError?: (error: any) => void
+  onError?: (error: any) => void,
 ): Promise<void> => {
   try {
     await api.put(`/permissions/roles/${id}/enable`);
@@ -822,13 +851,13 @@ export const enableRole = async (
 export const getPermissions = async (
   status?: string,
   onSuccess?: (permissions: Permission[]) => void,
-  onError?: (error: any) => void
+  onError?: (error: any) => void,
 ): Promise<Permission[] | void> => {
   try {
     const params = status ? { status } : {};
     const response = await api.get<BackendResponse<Permission[]>>(
       "/permissions/permissions",
-      { params }
+      { params },
     );
     if (onSuccess && response.data.data) {
       onSuccess(response.data.data);
@@ -845,11 +874,11 @@ export const getPermissions = async (
 export const getPermission = async (
   id: number,
   onSuccess?: (permission: Permission) => void,
-  onError?: (error: any) => void
+  onError?: (error: any) => void,
 ): Promise<Permission | void> => {
   try {
     const response = await api.get<BackendResponse<Permission>>(
-      `/permissions/permissions/${id}`
+      `/permissions/permissions/${id}`,
     );
     if (onSuccess && response.data.data) {
       onSuccess(response.data.data);
@@ -866,12 +895,12 @@ export const getPermission = async (
 export const createPermission = async (
   data: { name: string; description?: string },
   onSuccess?: (permission: Permission) => void,
-  onError?: (error: any) => void
+  onError?: (error: any) => void,
 ): Promise<Permission | void> => {
   try {
     const response = await api.post<BackendResponse<Permission>>(
       "/permissions/permissions",
-      data
+      data,
     );
     if (onSuccess && response.data.data) {
       onSuccess(response.data.data);
@@ -889,12 +918,12 @@ export const updatePermission = async (
   id: number,
   data: Partial<{ name: string; description: string; status: string }>,
   onSuccess?: (permission: Permission) => void,
-  onError?: (error: any) => void
+  onError?: (error: any) => void,
 ): Promise<Permission | void> => {
   try {
     const response = await api.put<BackendResponse<Permission>>(
       `/permissions/permissions/${id}`,
-      data
+      data,
     );
     if (onSuccess && response.data.data) {
       onSuccess(response.data.data);
@@ -911,7 +940,7 @@ export const updatePermission = async (
 export const disablePermission = async (
   id: number,
   onSuccess?: () => void,
-  onError?: (error: any) => void
+  onError?: (error: any) => void,
 ): Promise<void> => {
   try {
     await api.put(`/permissions/permissions/${id}/disable`);
@@ -929,7 +958,7 @@ export const disablePermission = async (
 export const enablePermission = async (
   id: number,
   onSuccess?: () => void,
-  onError?: (error: any) => void
+  onError?: (error: any) => void,
 ): Promise<void> => {
   try {
     await api.put(`/permissions/permissions/${id}/enable`);
@@ -950,7 +979,7 @@ export const assignPermissionsToRole = async (
   roleId: number,
   permissionIds: number[],
   onSuccess?: () => void,
-  onError?: (error: any) => void
+  onError?: (error: any) => void,
 ): Promise<void> => {
   try {
     await api.post(`/permissions/roles/${roleId}/permissions`, {
@@ -970,11 +999,11 @@ export const assignPermissionsToRole = async (
 export const getRolePermissions = async (
   roleId: number,
   onSuccess?: (permissions: Permission[]) => void,
-  onError?: (error: any) => void
+  onError?: (error: any) => void,
 ): Promise<Permission[] | void> => {
   try {
     const response = await api.get<BackendResponse<Permission[]>>(
-      `/permissions/roles/${roleId}/permissions`
+      `/permissions/roles/${roleId}/permissions`,
     );
     if (onSuccess && response.data.data) {
       onSuccess(response.data.data);
@@ -993,11 +1022,11 @@ export const getRolePermissions = async (
 export const getProgramRoles = async (
   programId: number,
   onSuccess?: (roles: Role[]) => void,
-  onError?: (error: any) => void
+  onError?: (error: any) => void,
 ): Promise<Role[] | void> => {
   try {
     const response = await api.get<BackendResponse<Role[]>>(
-      `/users/programs/${programId}/roles`
+      `/users/programs/${programId}/roles`,
     );
     if (onSuccess && response.data.data) {
       onSuccess(response.data.data);
@@ -1036,7 +1065,7 @@ export const getProgramUsersByRole = async (
     page: number;
     totalPages: number;
   }) => void,
-  onError?: (error: any) => void
+  onError?: (error: any) => void,
 ): Promise<{
   users: ProgramUser[];
   total: number;
@@ -1046,7 +1075,7 @@ export const getProgramUsersByRole = async (
   try {
     const response = await api.get<BackendResponse<ProgramUser[]>>(
       `/users/programs/${programId}/roles/${roleId}/users`,
-      { params }
+      { params },
     );
 
     const total = parseInt(response.headers["x-total-count"] || "0");
@@ -1088,7 +1117,7 @@ export const getProgramUsers = async (
     page: number;
     totalPages: number;
   }) => void,
-  onError?: (error: any) => void
+  onError?: (error: any) => void,
 ): Promise<{
   users: ProgramUserWithRole[];
   total: number;
@@ -1098,7 +1127,7 @@ export const getProgramUsers = async (
   try {
     const response = await api.get<BackendResponse<ProgramUserWithRole[]>>(
       `/users/programs/${programId}/users`,
-      { params }
+      { params },
     );
 
     const total = parseInt(response.headers["x-total-count"] || "0");
