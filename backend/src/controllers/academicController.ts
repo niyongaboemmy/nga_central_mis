@@ -2153,8 +2153,8 @@ export const getAvailableSubjectsForStudent = asyncHandler(
       })
       .from(GradeSubject)
       .innerJoin(Subject, eq(GradeSubject.subject_id, Subject.subject_id))
-      .innerJoin(Grade, eq(GradeSubject.grade_id, Grade.grade_id))
-      .innerJoin(Program, eq(Grade.program_id, Program.program_id))
+      .leftJoin(Grade, eq(GradeSubject.grade_id, Grade.grade_id))
+      .leftJoin(Program, eq(Grade.program_id, Program.program_id))
       .where(eq(GradeSubject.grade_id, gradeId))
       .orderBy(Subject.name);
 
@@ -2461,9 +2461,37 @@ export const assignStudentToClassGroup = asyncHandler(
       .limit(1);
 
     if (existingAssignment.length > 0) {
-      throw new ConflictError(
-        "Student is already assigned to this class group",
-      );
+      if (existingAssignment[0].status === "ACTIVE") {
+        throw new ConflictError(
+          "Student is already assigned to this class group",
+        );
+      } else {
+        // Reactivate the assignment
+        await db
+          .update(StudentClassGroup)
+          .set({
+            status: "ACTIVE",
+            assigned_at: sql`CURRENT_TIMESTAMP`,
+          })
+          .where(
+            and(
+              eq(StudentClassGroup.user_id, studentId),
+              eq(StudentClassGroup.class_group_id, classGroupId),
+            ),
+          );
+
+        logger.info("Student class group assignment reactivated", {
+          studentId,
+          classGroupId,
+        });
+
+        return successResponse(
+          res,
+          "Student assigned to class group successfully (reactivated)",
+          null,
+          200,
+        );
+      }
     }
 
     await db.insert(StudentClassGroup).values({

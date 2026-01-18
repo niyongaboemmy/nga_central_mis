@@ -102,8 +102,12 @@ const StudentEnrollmentTab: React.FC<StudentEnrollmentTabProps> = ({
   useEffect(() => {
     if (selectedTerm && isOpen) {
       loadEnrolledSubjects();
+      // Also load available subjects if we're on step 2
+      if (currentStep === 2) {
+        loadAvailableSubjects();
+      }
     }
-  }, [selectedTerm, isOpen]);
+  }, [selectedTerm, isOpen, currentStep]);
 
   const loadEnrolledSubjects = async () => {
     if (!selectedTerm) return;
@@ -249,6 +253,16 @@ const StudentEnrollmentTab: React.FC<StudentEnrollmentTabProps> = ({
       // Clear subject data since class group changed
       setEnrolledSubjects([]);
       setAvailableSubjects([]);
+
+      // Pre-load available subjects for the next step
+      if (selectedTerm) {
+        const subjectsResponse =
+          await studentEnrollmentApi.getAvailableSubjects(
+            studentId,
+            selectedTerm.academic_term_id,
+          );
+        setAvailableSubjects(subjectsResponse.data.data);
+      }
 
       setCurrentStep(2);
     } catch (error) {
