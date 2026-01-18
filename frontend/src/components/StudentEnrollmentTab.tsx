@@ -63,6 +63,7 @@ const StudentEnrollmentTab: React.FC<StudentEnrollmentTabProps> = ({
   >([]);
   const [assigningClassGroup, setAssigningClassGroup] = useState(false);
   const [removingClassGroup, setRemovingClassGroup] = useState(false);
+  const [loadingClassGroups, setLoadingClassGroups] = useState(false);
   const [loadingAvailable, setLoadingAvailable] = useState(false);
   const [currentStep, setCurrentStep] = useState<1 | 2>(1);
   const loadingInitialRef = useRef(false);
@@ -242,6 +243,7 @@ const StudentEnrollmentTab: React.FC<StudentEnrollmentTabProps> = ({
   useEffect(() => {
     if (isOpen && currentStep === 1 && availableClassGroups.length === 0) {
       const loadClassGroups = async () => {
+        setLoadingClassGroups(true);
         try {
           const currentYear =
             academicTerms.find((term) => term.is_current === 1)
@@ -253,6 +255,8 @@ const StudentEnrollmentTab: React.FC<StudentEnrollmentTabProps> = ({
         } catch (error) {
           console.error("Failed to load class groups:", error);
           showToast("Failed to load class groups", "error");
+        } finally {
+          setLoadingClassGroups(false);
         }
       };
       loadClassGroups();
@@ -465,61 +469,69 @@ const StudentEnrollmentTab: React.FC<StudentEnrollmentTabProps> = ({
                       Want to change class groups? Select a different one below:
                     </p>
                     <div className="grid gap-3 max-h-96 overflow-y-auto">
-                      {availableClassGroups
-                        .filter(
-                          (cg) =>
-                            cg.class_group_id !==
-                            studentClassGroup.class_group_id,
-                        )
-                        .map((classGroup) => (
-                          <motion.div
-                            key={classGroup.class_group_id}
-                            className="bg-white dark:bg-gray-900/30 border border-gray-200 dark:border-slate-700/30 rounded-2xl p-4 hover:shadow-md transition-shadow cursor-pointer"
-                            onClick={() =>
-                              handleAssignClassGroup(classGroup.class_group_id)
-                            }
-                          >
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/30 rounded-xl flex items-center justify-center">
-                                  <Users className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                      {loadingClassGroups ? (
+                        <div className="flex items-center justify-center py-12">
+                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
+                        </div>
+                      ) : (
+                        availableClassGroups
+                          .filter(
+                            (cg) =>
+                              cg.class_group_id !==
+                              studentClassGroup.class_group_id,
+                          )
+                          .map((classGroup) => (
+                            <motion.div
+                              key={classGroup.class_group_id}
+                              className="bg-white dark:bg-gray-900/30 border border-gray-200 dark:border-slate-700/30 rounded-2xl p-4 hover:shadow-md transition-shadow cursor-pointer"
+                              onClick={() =>
+                                handleAssignClassGroup(
+                                  classGroup.class_group_id,
+                                )
+                              }
+                            >
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                  <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/30 rounded-xl flex items-center justify-center">
+                                    <Users className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                                  </div>
+                                  <div>
+                                    <h5 className="font-medium text-gray-900 dark:text-white">
+                                      {classGroup.name}
+                                    </h5>
+                                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                                      {classGroup.grade_name} -{" "}
+                                      {classGroup.program_name}
+                                    </p>
+                                  </div>
                                 </div>
-                                <div>
-                                  <h5 className="font-medium text-gray-900 dark:text-white">
-                                    {classGroup.name}
-                                  </h5>
-                                  <p className="text-sm text-gray-500 dark:text-gray-400">
-                                    {classGroup.grade_name} -{" "}
-                                    {classGroup.program_name}
-                                  </p>
-                                </div>
+                                {hasPermission(
+                                  Permissions.ASSIGN_STUDENT_CLASS_GROUPS,
+                                ) && (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleAssignClassGroup(
+                                        classGroup.class_group_id,
+                                      );
+                                    }}
+                                    disabled={assigningClassGroup}
+                                    className="flex items-center gap-2 px-4 py-2 border border-blue-500 hover:border-blue-700 text-blue-600 dark:text-white hover:bg-blue-600 hover:text-white text-sm font-medium rounded-full transition-colors disabled:opacity-50"
+                                  >
+                                    {assigningClassGroup ? (
+                                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                                    ) : (
+                                      <>
+                                        <ArrowRight className="w-4 h-4" />
+                                        Change To This
+                                      </>
+                                    )}
+                                  </button>
+                                )}
                               </div>
-                              {hasPermission(
-                                Permissions.ASSIGN_STUDENT_CLASS_GROUPS,
-                              ) && (
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleAssignClassGroup(
-                                      classGroup.class_group_id,
-                                    );
-                                  }}
-                                  disabled={assigningClassGroup}
-                                  className="flex items-center gap-2 px-4 py-2 border border-blue-500 hover:border-blue-700 text-blue-600 dark:text-white hover:bg-blue-600 hover:text-white text-sm font-medium rounded-full transition-colors disabled:opacity-50"
-                                >
-                                  {assigningClassGroup ? (
-                                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                                  ) : (
-                                    <>
-                                      <ArrowRight className="w-4 h-4" />
-                                      Change To This
-                                    </>
-                                  )}
-                                </button>
-                              )}
-                            </div>
-                          </motion.div>
-                        ))}
+                            </motion.div>
+                          ))
+                      )}
                     </div>
                   </div>
                 </motion.div>
@@ -531,7 +543,11 @@ const StudentEnrollmentTab: React.FC<StudentEnrollmentTabProps> = ({
                     </p>
                   </div>
 
-                  {availableClassGroups.length === 0 ? (
+                  {loadingClassGroups ? (
+                    <div className="flex items-center justify-center py-12">
+                      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600" />
+                    </div>
+                  ) : availableClassGroups.length === 0 ? (
                     <div className="text-center py-12">
                       <AlertCircle className="w-12 h-12 text-gray-300 dark:text-gray-600 mx-auto mb-3" />
                       <p className="text-gray-500 dark:text-gray-400">
