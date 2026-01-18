@@ -689,7 +689,7 @@ const StudentEnrollmentTab: React.FC<StudentEnrollmentTabProps> = ({
                         key={subject.enrollment_id}
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
-                        className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-2xl p-3 px-4"
+                        className="bg-white dark:bg-slate-800/40 border border-gray-200 dark:border-slate-700/20 rounded-2xl p-3 px-4"
                       >
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-3">

@@ -253,11 +253,18 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
   const [showAddProgramModal, setShowAddProgramModal] = React.useState(false);
   const [assigningProgram, setAssigningProgram] = React.useState(false);
   const [loadingPrograms, setLoadingPrograms] = React.useState(false);
+  const [loadingAvailablePrograms, setLoadingAvailablePrograms] =
+    React.useState(false);
+  const [removingProgram, setRemovingProgram] = React.useState(false);
   const [userGrades, setUserGrades] = React.useState<UserGrade[]>([]);
   const [loadingGrades, setLoadingGrades] = React.useState(false);
+  const [loadingAvailableGrades, setLoadingAvailableGrades] =
+    React.useState(false);
+  const [removingGrade, setRemovingGrade] = React.useState(false);
   const [availableGrades, setAvailableGrades] = React.useState<Grade[]>([]);
   const [showAddGradeModal, setShowAddGradeModal] = React.useState(false);
   const [assigningGrade, setAssigningGrade] = React.useState(false);
+  const [loadingRoles, setLoadingRoles] = React.useState(false);
 
   // Load user programs and grades when modal opens
   React.useEffect(() => {
@@ -342,6 +349,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
   const handleToggleUserStatus = async () => {
     if (!user) return;
 
+    setChangingStatus(true);
     try {
       if (user.user.status === "ACTIVE") {
         await disableUser(user.user.user_id);
@@ -357,10 +365,13 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
         error.response?.data?.message || "Failed to update user status",
         "error",
       );
+    } finally {
+      setChangingStatus(false);
     }
   };
 
   const openChangeRoleModal = async () => {
+    setLoadingRoles(true);
     try {
       const roles = await getRoles("ACTIVE");
       if (roles) {
@@ -370,10 +381,13 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
       setShowAddRoleModal(true);
     } catch (error) {
       showToast("Failed to load available roles", "error");
+    } finally {
+      setLoadingRoles(false);
     }
   };
 
   const openAddProgramModal = async () => {
+    setLoadingAvailablePrograms(true);
     try {
       const response = await programsApi.getAll();
       const programs = response.data.data;
@@ -383,6 +397,8 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
       setShowAddProgramModal(true);
     } catch (error) {
       showToast("Failed to load available programs", "error");
+    } finally {
+      setLoadingAvailablePrograms(false);
     }
   };
 
@@ -408,6 +424,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
   };
 
   const handleRemoveProgram = async (programId: number) => {
+    setRemovingProgram(true);
     try {
       await programLeadsApi.remove(programId, user.user.user_id);
       showToast("Program removed successfully", "success");
@@ -418,10 +435,13 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
         error.response?.data?.message || "Failed to remove program",
         "error",
       );
+    } finally {
+      setRemovingProgram(false);
     }
   };
 
   const handleRemoveGrade = async (gradeId: number) => {
+    setRemovingGrade(true);
     try {
       await removeGradeFromUser(user.user.user_id, gradeId);
       showToast("Grade removed successfully", "success");
@@ -432,10 +452,13 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
         error.response?.data?.message || "Failed to remove grade",
         "error",
       );
+    } finally {
+      setRemovingGrade(false);
     }
   };
 
   const openAddGradeModal = async () => {
+    setLoadingAvailableGrades(true);
     try {
       const response = await gradesApi.getAll();
       const grades = response.data.data;
@@ -450,6 +473,8 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
       setShowAddGradeModal(true);
     } catch (error) {
       showToast("Failed to load available grades", "error");
+    } finally {
+      setLoadingAvailableGrades(false);
     }
   };
 
@@ -597,15 +622,20 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                           <div className="flex justify-end">
                             <button
                               onClick={handleToggleUserStatus}
-                              className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+                              disabled={changingStatus}
+                              className={`px-4 py-2 rounded-full text-sm font-medium transition-colors flex items-center gap-2 ${
                                 user.user.status === "ACTIVE"
                                   ? "bg-red-500 hover:bg-red-600 text-white"
                                   : "bg-green-500 hover:bg-green-600 text-white"
-                              }`}
+                              } disabled:opacity-50`}
                             >
-                              {user.user.status === "ACTIVE"
-                                ? "Disable User"
-                                : "Enable User"}
+                              {changingStatus ? (
+                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                              ) : user.user.status === "ACTIVE" ? (
+                                "Disable User"
+                              ) : (
+                                "Enable User"
+                              )}
                             </button>
                           </div>
                         )}
@@ -673,9 +703,14 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                               <div className="flex justify-center pt-4">
                                 <button
                                   onClick={openChangeRoleModal}
-                                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-full transition-colors"
+                                  disabled={loadingRoles}
+                                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-full transition-colors disabled:opacity-50"
                                 >
-                                  <Edit className="w-4 h-4" />
+                                  {loadingRoles ? (
+                                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                                  ) : (
+                                    <Edit className="w-4 h-4" />
+                                  )}
                                   Change Role
                                 </button>
                               </div>
@@ -767,9 +802,14 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                                             program.program_id,
                                           )
                                         }
-                                        className="px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white text-xs font-medium rounded-full transition-colors"
+                                        disabled={removingProgram}
+                                        className="px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white text-xs font-medium rounded-full transition-colors disabled:opacity-50 min-w-[70px] flex items-center justify-center"
                                       >
-                                        Remove
+                                        {removingProgram ? (
+                                          <div className="animate-spin rounded-full h-3.5 w-3.5 border-b-2 border-white"></div>
+                                        ) : (
+                                          "Remove"
+                                        )}
                                       </button>
                                     )}
                                 </div>
@@ -786,9 +826,14 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                               <div className="flex justify-center pt-4">
                                 <button
                                   onClick={openAddProgramModal}
-                                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-full transition-colors"
+                                  disabled={loadingAvailablePrograms}
+                                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-full transition-colors disabled:opacity-50"
                                 >
-                                  <Plus className="w-4 h-4" />
+                                  {loadingAvailablePrograms ? (
+                                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                                  ) : (
+                                    <Plus className="w-4 h-4" />
+                                  )}
                                   Assign Program Lead
                                 </button>
                               </div>
@@ -808,9 +853,14 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                             ) && (
                               <button
                                 onClick={openAddProgramModal}
-                                className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors mx-auto"
+                                disabled={loadingAvailablePrograms}
+                                className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors mx-auto disabled:opacity-50"
                               >
-                                <Plus className="w-4 h-4" />
+                                {loadingAvailablePrograms ? (
+                                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                                ) : (
+                                  <Plus className="w-4 h-4" />
+                                )}
                                 Assign Program Lead
                               </button>
                             )}
@@ -827,9 +877,14 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                           <div className="flex justify-end">
                             <button
                               onClick={openAddGradeModal}
-                              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-full transition-colors"
+                              disabled={loadingAvailableGrades}
+                              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-full transition-colors disabled:opacity-50"
                             >
-                              <Plus className="w-4 h-4" />
+                              {loadingAvailableGrades ? (
+                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                              ) : (
+                                <Plus className="w-4 h-4" />
+                              )}
                               Assign Grade
                             </button>
                           </div>
@@ -869,9 +924,14 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                                       onClick={() =>
                                         handleRemoveGrade(grade.grade_id)
                                       }
-                                      className="px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white text-xs font-medium rounded-full transition-colors"
+                                      disabled={removingGrade}
+                                      className="px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white text-xs font-medium rounded-full transition-colors disabled:opacity-50 min-w-[70px] flex items-center justify-center"
                                     >
-                                      Remove
+                                      {removingGrade ? (
+                                        <div className="animate-spin rounded-full h-3.5 w-3.5 border-b-2 border-white"></div>
+                                      ) : (
+                                        "Remove"
+                                      )}
                                     </button>
                                   )}
                                 </div>
