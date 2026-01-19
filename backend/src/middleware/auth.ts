@@ -3,6 +3,7 @@ import { db } from "../db";
 import { eq, and } from "drizzle-orm";
 import { UserRole, Role } from "../db/schema";
 import { ValidationError } from "../errors/CustomError";
+import { ALL_PERMISSIONS } from "../utils/permissions";
 
 const SUPER_ADMIN_ROLE = "SUPER_ADMIN";
 
@@ -12,7 +13,7 @@ const getUserRoles = async (userId: number): Promise<string[]> => {
     .from(UserRole)
     .innerJoin(
       Role,
-      and(eq(UserRole.role_id, Role.role_id), eq(Role.status, "ACTIVE"))
+      and(eq(UserRole.role_id, Role.role_id), eq(Role.status, "ACTIVE")),
     )
     .where(eq(UserRole.user_id, userId));
   return roles.map((r) => r.name);
@@ -37,39 +38,7 @@ export const authenticate = async (req: any, res: any, next: any) => {
     const userRoles = await getUserRoles(decoded.userId);
     if (userRoles.includes(SUPER_ADMIN_ROLE)) {
       // SUPER_ADMIN gets all permissions
-      req.user.permissions = [
-        "MANAGE_USERS",
-        "MANAGE_ROLES",
-        "MANAGE_PERMISSIONS",
-        "MANAGE_ACADEMICS",
-        "MANAGE_CLASSES",
-        "MANAGE_STUDENTS",
-        "MANAGE_TEACHERS",
-        "MANAGE_PARENTS",
-        "MANAGE_FEES",
-        "VIEW_FINANCE",
-        "MARK_ATTENDANCE",
-        "VIEW_ATTENDANCE",
-        "ENTER_MARKS",
-        "VIEW_RESULTS",
-        "SEND_ANNOUNCEMENTS",
-        "UPLOAD_DOCUMENTS",
-        "VIEW_REPORTS",
-        "GENERATE_REPORTS",
-        "MANAGE_SETTINGS",
-        "ADMIN",
-        "VIEW_PROGRAM_USERS",
-        "VIEW_PROGRAM_ACADEMICS",
-        "ENABLE_DISABLE_USERS",
-        "CHANGE_USER_ROLES",
-        "MANAGE_PROGRAM_LEADS",
-        "ASSIGN_TEACHER_SUBJECTS",
-        "MANAGE_STUDENT_ENROLLMENTS",
-        "ASSIGN_STUDENT_CLASS_GROUPS",
-        "ASSIGN_GRADE_TO_CLASS_TEACHER",
-        "VIEW_USERS_BY_CLASS_TEACHER_GRADE",
-        "VIEW_SUBJECTS_BY_CLASS_TEACHER_GRADE",
-      ];
+      req.user.permissions = ALL_PERMISSIONS;
     } else {
       // Regular users get permissions from their roles
       const { getUserPermissions } = await import("../utils/auth");
@@ -88,7 +57,7 @@ export const authorize =
       ? requiredPerm
       : [requiredPerm];
     const hasPermission = permissions.some((perm) =>
-      req.user.permissions.includes(perm)
+      req.user.permissions.includes(perm),
     );
     if (!hasPermission) {
       return res.status(403).json({ message: "Forbidden" });

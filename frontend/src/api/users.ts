@@ -1151,3 +1151,76 @@ export const getProgramUsers = async (
     throw error;
   }
 };
+
+export const updateUserProfile = async (
+  userId: number,
+  data: Partial<UserProfile>,
+) => {
+  const response = await api.put<BackendResponse<UserProfile>>(
+    `/users/${userId}/profile`,
+    data,
+  );
+  return response.data;
+};
+
+// ==================== Parenting API ====================
+
+export interface ParentingRelation {
+  parenting_id: number;
+  user_id: number;
+  username: string;
+  email: string;
+  first_name?: string;
+  last_name?: string;
+  relationship: string;
+  created_at: string;
+  user_type?: string;
+}
+
+export const parentingApi = {
+  getParents: async (studentId: number) => {
+    const response = await api.get<BackendResponse<ParentingRelation[]>>(
+      `/parenting/student/${studentId}/parents`,
+    );
+    return response.data;
+  },
+
+  getStudents: async (parentId: number) => {
+    const response = await api.get<BackendResponse<ParentingRelation[]>>(
+      `/parenting/parent/${parentId}/students`,
+    );
+    return response.data;
+  },
+
+  assign: async (data: {
+    student_id: number;
+    parent_id: number;
+    relationship?: string;
+  }) => {
+    const response = await api.post<BackendResponse<any>>(
+      "/parenting/assign",
+      data,
+    );
+    return response.data;
+  },
+
+  remove: async (data: { student_id: number; parent_id: number }) => {
+    const response = await api.post<BackendResponse<any>>(
+      "/parenting/remove",
+      data,
+    );
+    return response.data;
+  },
+
+  search: async (params: {
+    query: string;
+    excludeIds?: string;
+    type?: "parent" | "student";
+  }) => {
+    const response = await api.get<BackendResponse<User[]>>(
+      "/parenting/search",
+      { params },
+    );
+    return response.data;
+  },
+};

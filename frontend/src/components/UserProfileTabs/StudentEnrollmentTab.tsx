@@ -22,10 +22,10 @@ import {
   StudentClassGroup,
   classGroupsApi,
   ClassGroup,
-} from "../api/academics";
-import { useToast } from "../contexts/ToastContext";
-import { usePermissions } from "../hooks/usePermissions";
-import { Permissions } from "../constants/permissions";
+} from "../../api/academics";
+import { useToast } from "../../contexts/ToastContext";
+import { usePermissions } from "../../hooks/usePermissions";
+import { Permissions } from "../../constants/permissions";
 
 interface StudentEnrollmentTabProps {
   studentId: number;

@@ -3,20 +3,15 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   User as UserIcon,
   Shield,
-  Mail,
-  Phone,
-  Calendar,
-  MapPin,
   Building,
   Clock,
   Award,
   X,
-  CheckCircle,
-  Ban,
-  Clock4,
-  BookOpen,
   Plus,
   Edit,
+  Users,
+  BookOpen,
+  Save,
 } from "lucide-react";
 import {
   UserWithProfile,
@@ -33,6 +28,7 @@ import {
   assignGradeToUser,
   removeGradeFromUser,
   UserGrade,
+  updateUserProfile,
 } from "../api/users";
 import {
   programsApi,
@@ -45,191 +41,30 @@ import { useToast } from "../contexts/ToastContext";
 import { usePermissions } from "../hooks/usePermissions";
 import { Permissions } from "../constants/permissions";
 import TeacherSubjectAssignment from "./academics/TeacherSubjectAssignment";
-import StudentEnrollmentTab from "./StudentEnrollmentTab";
-
-// Status badge with icon
-const StatusBadge = ({ status }: { status: string }) => {
-  const config: Record<
-    string,
-    { color: string; icon: React.ElementType; label: string }
-  > = {
-    ACTIVE: {
-      color: "bg-gradient-to-r from-green-500 to-green-600",
-      icon: CheckCircle,
-      label: "Active",
-    },
-    INACTIVE: {
-      color: "bg-gradient-to-r from-slate-400 to-slate-500",
-      icon: Clock4,
-      label: "Inactive",
-    },
-    SUSPENDED: {
-      color: "bg-gradient-to-r from-rose-500 to-rose-600",
-      icon: Ban,
-      label: "Suspended",
-    },
-  };
-  const { color, icon: Icon, label } = config[status] || config.ACTIVE;
-
-  return (
-    <span
-      className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold text-white ${color}`}
-    >
-      <Icon className="w-3.5 h-3.5" />
-      {label}
-    </span>
-  );
-};
-
-// User type badge
-const UserTypeBadge = ({ type }: { type: string }) => {
-  const colors: Record<string, string> = {
-    ADMIN: "bg-gradient-to-r from-blue-500 to-blue-600",
-    STUDENT: "bg-gradient-to-r from-blue-500 to-blue-600",
-    TEACHER: "bg-gradient-to-r from-blue-500 to-blue-600",
-    PARENT: "bg-gradient-to-r from-blue-500 to-blue-600",
-    STAFF: "bg-gradient-to-r from-slate-500 to-slate-600",
-  };
-  const color = colors[type] || "bg-gradient-to-r from-gray-500 to-gray-600";
-
-  return (
-    <span
-      className={`px-2.5 py-1 rounded-full text-xs font-normal text-white ${color}`}
-    >
-      {type}
-    </span>
-  );
-};
-
-// Info item component
-const InfoItem = ({
-  icon: Icon,
-  label,
-  value,
-  highlight,
-}: {
-  icon: React.ElementType;
-  label: string;
-  value: string;
-  highlight?: boolean;
-}) => (
-  <div
-    className={`flex items-start gap-3 p-3 rounded-xl transition-all hover:shadow-md cursor-pointer ${
-      highlight
-        ? "bg-blue-50 dark:bg-blue-900/20"
-        : "bg-gray-50/50 dark:bg-slate-800/50"
-    }`}
-  >
-    <div
-      className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${
-        highlight
-          ? "bg-blue-100 dark:bg-blue-900/40"
-          : "bg-gray-100 dark:bg-slate-700"
-      }`}
-    >
-      <Icon
-        className={`w-4.5 h-4.5 ${
-          highlight
-            ? "text-blue-600 dark:text-blue-400"
-            : "text-gray-500 dark:text-gray-400"
-        }`}
-      />
-    </div>
-    <div className="flex-1 min-w-0">
-      <p className="text-xs text-gray-400 dark:text-gray-500 mb-0.5">{label}</p>
-      <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
-        {value}
-      </p>
-    </div>
-  </div>
-);
-
-// Role card component
-const RoleCard = ({
-  role,
-  permissions,
-}: {
-  role: UserRole;
-  permissions: Permission[];
-}) => {
-  const [isExpanded, setIsExpanded] = React.useState(false);
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="p-4 md:p-6 bg-gradient-to-br from-blue-100/40 to-blue-100/40 dark:from-slate-900/60 dark:to-slate-900/60 rounded-2xl border border-blue-200/30 dark:border-slate-700/30"
-    >
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2.5">
-          <div className="w-10 h-10 bg-gradient-to-br from-blue-400 to-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/20">
-            <Shield className="w-5 h-5 text-white" />
-          </div>
-          <div>
-            <h4 className="font-semibold text-gray-900 dark:text-white">
-              {role.name}
-            </h4>
-            <p className="text-xs text-gray-500 dark:text-gray-400">
-              {role.description || "No description"}
-            </p>
-          </div>
-        </div>
-        <StatusBadge status={role.status} />
-      </div>
-
-      {permissions.length > 0 && (
-        <div>
-          <button
-            onClick={() => setIsExpanded(!isExpanded)}
-            className="flex items-center gap-1 text-xs font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors mb-2"
-          >
-            <Award className="w-4 h-4" />
-            {permissions.length} Permissions
-            {isExpanded ? (
-              <Clock className="w-3.5 h-3.5" />
-            ) : (
-              <Clock className="w-3.5 h-3.5" />
-            )}
-          </button>
-
-          <AnimatePresence>
-            {isExpanded && (
-              <motion.div
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: "auto", opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                className="overflow-hidden"
-              >
-                <div className="flex flex-wrap gap-1.5 pt-2">
-                  {permissions.map((perm) => (
-                    <span
-                      key={perm.perm_id}
-                      className="px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 rounded-lg text-xs font-medium"
-                    >
-                      {perm.name}
-                    </span>
-                  ))}
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
-      )}
-    </motion.div>
-  );
-};
+import { StatusBadge, UserTypeBadge } from "./UserProfileTabs/TabShared";
+import InfoTab from "./UserProfileTabs/InfoTab";
+import RolesTab from "./UserProfileTabs/RolesTab";
+import ProgramsTab from "./UserProfileTabs/ProgramsTab";
+import GradesTab from "./UserProfileTabs/GradesTab";
+import ActivityTab from "./UserProfileTabs/ActivityTab";
+import FamilyTab from "./UserProfileTabs/FamilyTab";
+import StudentEnrollmentTab from "./UserProfileTabs/StudentEnrollmentTab";
 
 // Main User Profile Modal Component
 interface UserProfileModalProps {
   isOpen: boolean;
   onClose: () => void;
   user: UserWithProfile | null;
+  onViewUser?: (userId: number) => void;
+  isSwitchingUser?: boolean;
 }
 
 const UserProfileModal: React.FC<UserProfileModalProps> = ({
   isOpen,
   onClose,
   user,
+  onViewUser,
+  isSwitchingUser,
 }) => {
   const { showToast } = useToast();
   const { hasPermission } = usePermissions();
@@ -241,6 +76,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
     | "enrollment"
     | "activity"
     | "grades"
+    | "family"
   >("info");
   const [showAddRoleModal, setShowAddRoleModal] = React.useState(false);
   const [availableRoles, setAvailableRoles] = React.useState<Role[]>([]);
@@ -265,12 +101,36 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
   const [showAddGradeModal, setShowAddGradeModal] = React.useState(false);
   const [assigningGrade, setAssigningGrade] = React.useState(false);
   const [loadingRoles, setLoadingRoles] = React.useState(false);
+  const [isEditingInfo, setIsEditingInfo] = React.useState(false);
+  const [isSavingInfo, setIsSavingInfo] = React.useState(false);
+  const [editedInfo, setEditedInfo] = React.useState<{
+    first_name?: string;
+    last_name?: string;
+    gender?: "MALE" | "FEMALE" | "OTHER";
+    date_of_birth?: string;
+    address?: string;
+    external_id?: string;
+    phone_number?: string;
+  }>({});
 
   // Load user programs and grades when modal opens
   React.useEffect(() => {
     if (user && isOpen) {
       loadUserPrograms();
       loadUserGrades();
+      // Initialize edited info when user changes or modal opens
+      setEditedInfo({
+        first_name: user.profile?.first_name || "",
+        last_name: user.profile?.last_name || "",
+        gender: user.profile?.gender as any,
+        date_of_birth: user.profile?.date_of_birth
+          ? new Date(user.profile.date_of_birth).toISOString().split("T")[0]
+          : "",
+        address: user.profile?.address || "",
+        external_id: user.profile?.external_id || "",
+        phone_number: user.user.phone_number || "",
+      });
+      setIsEditingInfo(false);
     }
   }, [user, isOpen]);
 
@@ -304,6 +164,27 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
     }
   };
 
+  const handleSaveInfo = async () => {
+    if (!user) return;
+    setIsSavingInfo(true);
+    try {
+      await updateUserProfile(user.user.user_id, editedInfo);
+      showToast("Profile updated successfully", "success");
+      setIsEditingInfo(false);
+      // Refresh user data using parent's onViewUser
+      if (onViewUser) {
+        onViewUser(user.user.user_id);
+      }
+    } catch (error: any) {
+      showToast(
+        error.response?.data?.message || "Failed to update profile",
+        "error",
+      );
+    } finally {
+      setIsSavingInfo(false);
+    }
+  };
+
   if (!user) return null;
 
   const getUserType = (): string => user.profile?.user_type || "USER";
@@ -325,6 +206,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
           { id: "grades", label: "Grades", icon: Award },
           { id: "subjects", label: "Subjects", icon: BookOpen },
         ]),
+    { id: "family", label: "Family", icon: Users },
     { id: "activity", label: "Activity", icon: Clock },
   ];
 
@@ -496,28 +378,6 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
     }
   };
 
-  const handleStatusChange = async () => {
-    setChangingStatus(true);
-    try {
-      if (user.user.status === "ACTIVE") {
-        await disableUser(user.user.user_id);
-        showToast("User disabled successfully", "success");
-      } else {
-        await enableUser(user.user.user_id);
-        showToast("User enabled successfully", "success");
-      }
-      // Refresh user data - this would need to be passed from parent component
-      window.location.reload(); // Temporary solution
-    } catch (error: any) {
-      showToast(
-        error.response?.data?.message || "Failed to change user status",
-        "error",
-      );
-    } finally {
-      setChangingStatus(false);
-    }
-  };
-
   return (
     <AnimatePresence>
       {isOpen && (
@@ -532,9 +392,30 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
             initial={{ scale: 0.95, opacity: 0, y: 20 }}
             animate={{ scale: 1, opacity: 1, y: 0 }}
             exit={{ scale: 0.95, opacity: 0, y: 20 }}
-            className="bg-white dark:bg-gray-950 w-full h-full overflow-hidden"
+            className="bg-white dark:bg-gray-950 w-full h-full overflow-hidden relative"
             onClick={(e) => e.stopPropagation()}
           >
+            {/* Loading Overlay */}
+            <AnimatePresence>
+              {isSwitchingUser && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="absolute inset-0 z-[100] bg-white/80 dark:bg-gray-950/80 backdrop-blur-sm flex flex-col items-center justify-center"
+                >
+                  <div className="relative">
+                    <div className="w-16 h-16 border-4 border-blue-500/20 border-t-blue-500 rounded-full animate-spin"></div>
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <Users className="w-6 h-6 text-blue-500 animate-pulse" />
+                    </div>
+                  </div>
+                  <p className="mt-4 text-sm font-medium text-gray-600 dark:text-gray-300 animate-pulse">
+                    Switching Profile...
+                  </p>
+                </motion.div>
+              )}
+            </AnimatePresence>
             <div className="grid grid-cols-1 lg:grid-cols-[350px_1fr] h-full">
               {/* Left Column: Profile Card and Tabs */}
               <div className="flex flex-col bg-gradient-to-b from-blue-50 to-gray-50 dark:from-gray-900/60 dark:to-gray-900/60 border-r border-gray-200 dark:border-slate-700/40 overflow-y-auto relative">
@@ -600,12 +481,68 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                   <h2 className="text-lg pl-3 font-semibold text-gray-900 dark:text-white">
                     {tabs.find((tab) => tab.id === activeTab)?.label}
                   </h2>
-                  <button
-                    onClick={onClose}
-                    className="p-2 bg-gray-100 dark:bg-slate-700 hover:bg-red-100 dark:hover:bg-red-900/20 hover:scale-110 rounded-full transition-all group"
-                  >
-                    <X className="w-5 h-5 text-gray-600 dark:text-gray-400 group-hover:text-red-500 transition-colors" />
-                  </button>
+                  <div className="flex justify-end gap-3 md:gap-5">
+                    {activeTab === "info" &&
+                      hasPermission(Permissions.UPDATE_USER_PROFILE_INFO) && (
+                        <div className="flex gap-2">
+                          {isEditingInfo ? (
+                            <>
+                              <button
+                                onClick={() => setIsEditingInfo(false)}
+                                className="px-4 py-2 bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-gray-200 rounded-full text-sm font-medium hover:bg-gray-200 transition-colors"
+                              >
+                                Cancel
+                              </button>
+                              <button
+                                onClick={handleSaveInfo}
+                                disabled={isSavingInfo}
+                                className="px-5 py-2 bg-blue-500 hover:bg-blue-600 text-white text-sm font-medium rounded-full transition-colors flex items-center gap-2"
+                              >
+                                {isSavingInfo ? (
+                                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                                ) : (
+                                  <Save className="w-4 h-4" />
+                                )}
+                                Save
+                              </button>
+                            </>
+                          ) : (
+                            <button
+                              onClick={() => setIsEditingInfo(true)}
+                              className="px-5 py-2 bg-blue-500 hover:bg-blue-600 text-white text-sm font-medium rounded-full transition-colors flex items-center gap-2"
+                            >
+                              <Edit className="w-4 h-4" />
+                              Edit Info
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    {hasPermission(Permissions.ENABLE_DISABLE_USERS) && (
+                      <button
+                        onClick={handleToggleUserStatus}
+                        disabled={changingStatus}
+                        className={`px-4 py-2 rounded-full text-sm font-medium transition-colors flex items-center gap-2 ${
+                          user.user.status === "ACTIVE"
+                            ? "bg-red-500 hover:bg-red-600 text-white"
+                            : "bg-green-500 hover:bg-green-600 text-white"
+                        } disabled:opacity-50`}
+                      >
+                        {changingStatus ? (
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                        ) : user.user.status === "ACTIVE" ? (
+                          "Disable User"
+                        ) : (
+                          "Enable User"
+                        )}
+                      </button>
+                    )}
+                    <button
+                      onClick={onClose}
+                      className="p-2 bg-gray-100 dark:bg-slate-700 hover:bg-red-100 dark:hover:bg-red-900/20 hover:scale-110 rounded-full transition-all group"
+                    >
+                      <X className="w-5 h-5 text-gray-600 dark:text-gray-400 group-hover:text-red-500 transition-colors" />
+                    </button>
+                  </div>
                 </div>
 
                 {/* Tab Content */}
@@ -617,345 +554,48 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                     transition={{ duration: 0.2 }}
                   >
                     {activeTab === "info" && (
-                      <div className="space-y-4">
-                        {hasPermission(Permissions.ENABLE_DISABLE_USERS) && (
-                          <div className="flex justify-end">
-                            <button
-                              onClick={handleToggleUserStatus}
-                              disabled={changingStatus}
-                              className={`px-4 py-2 rounded-full text-sm font-medium transition-colors flex items-center gap-2 ${
-                                user.user.status === "ACTIVE"
-                                  ? "bg-red-500 hover:bg-red-600 text-white"
-                                  : "bg-green-500 hover:bg-green-600 text-white"
-                              } disabled:opacity-50`}
-                            >
-                              {changingStatus ? (
-                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                              ) : user.user.status === "ACTIVE" ? (
-                                "Disable User"
-                              ) : (
-                                "Enable User"
-                              )}
-                            </button>
-                          </div>
-                        )}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <InfoItem
-                            icon={Mail}
-                            label="Email"
-                            value={user.user.email}
-                            highlight
-                          />
-                          <InfoItem
-                            icon={Phone}
-                            label="Phone"
-                            value={user.user.phone_number || "Not provided"}
-                          />
-                          <InfoItem
-                            icon={Building}
-                            label="Gender"
-                            value={user.profile?.gender || "Not specified"}
-                          />
-                          <InfoItem
-                            icon={Calendar}
-                            label="Date of Birth"
-                            value={
-                              user.profile?.date_of_birth
-                                ? new Date(
-                                    user.profile.date_of_birth,
-                                  ).toLocaleDateString()
-                                : "Not specified"
-                            }
-                          />
-                          <InfoItem
-                            icon={MapPin}
-                            label="Address"
-                            value={user.profile?.address || "Not provided"}
-                          />
-                        </div>
-                        <InfoItem
-                          icon={Clock}
-                          label="Account Created"
-                          value={new Date(
-                            user.user.created_at,
-                          ).toLocaleDateString("en-US", {
-                            year: "numeric",
-                            month: "long",
-                            day: "numeric",
-                          })}
-                          highlight
-                        />
-                      </div>
+                      <InfoTab
+                        user={user}
+                        isEditingInfo={isEditingInfo}
+                        editedInfo={editedInfo}
+                        setEditedInfo={setEditedInfo}
+                      />
                     )}
 
                     {activeTab === "roles" && (
-                      <div className="space-y-4">
-                        {user.roles && user.roles.length > 0 ? (
-                          <div className="space-y-4">
-                            {user.roles.map((role: UserRole) => (
-                              <RoleCard
-                                key={role.role_id}
-                                role={role}
-                                permissions={role.permissions || []}
-                              />
-                            ))}
-                            {hasPermission(Permissions.CHANGE_USER_ROLES) && (
-                              <div className="flex justify-center pt-4">
-                                <button
-                                  onClick={openChangeRoleModal}
-                                  disabled={loadingRoles}
-                                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-full transition-colors disabled:opacity-50"
-                                >
-                                  {loadingRoles ? (
-                                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                                  ) : (
-                                    <Edit className="w-4 h-4" />
-                                  )}
-                                  Change Role
-                                </button>
-                              </div>
-                            )}
-                          </div>
-                        ) : (
-                          <div className="text-center py-12">
-                            <Shield className="w-16 h-16 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
-                            <p className="text-lg font-medium text-gray-500 dark:text-gray-400 mb-2">
-                              No role assigned
-                            </p>
-                            <p className="text-sm text-gray-400 dark:text-gray-500 mb-4">
-                              This user needs to be assigned a role.
-                            </p>
-                            {hasPermission(Permissions.CHANGE_USER_ROLES) && (
-                              <button
-                                onClick={openChangeRoleModal}
-                                className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors mx-auto"
-                              >
-                                <Plus className="w-4 h-4" />
-                                Assign Role
-                              </button>
-                            )}
-                          </div>
-                        )}
-
-                        {uniquePermissions.length > 0 && (
-                          <div className="mt-6 p-4 md:p-6 bg-blue-100/40 dark:bg-gray-900 rounded-2xl">
-                            <p className="text-sm font-semibold text-gray-900 dark:text-white mb-3">
-                              All Permissions ({uniquePermissions.length})
-                            </p>
-                            <div className="flex flex-wrap gap-2">
-                              {uniquePermissions.map((perm: Permission) => (
-                                <span
-                                  key={perm.perm_id}
-                                  className="px-3 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-lg text-sm font-medium"
-                                >
-                                  {perm.name}
-                                </span>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </div>
+                      <RolesTab
+                        user={user}
+                        hasPermission={hasPermission}
+                        openChangeRoleModal={openChangeRoleModal}
+                        loadingRoles={loadingRoles}
+                        uniquePermissions={uniquePermissions}
+                      />
                     )}
 
                     {activeTab === "programs" && (
-                      <div className="space-y-4">
-                        {loadingPrograms ? (
-                          <div className="flex items-center justify-center py-6">
-                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
-                          </div>
-                        ) : userPrograms && userPrograms.length > 0 ? (
-                          <div className="space-y-4">
-                            {userPrograms.map((program: UserProgram) => (
-                              <motion.div
-                                key={program.program_id}
-                                initial={{ opacity: 0, y: 10 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                className="p-4 md:p-6 bg-gradient-to-br from-blue-100/40 to-blue-100/40 dark:from-blue-900/30 dark:to-blue-900/30 rounded-2xl border border-blue-200/30 dark:border-blue-700/30"
-                              >
-                                <div className="flex items-center justify-between mb-3">
-                                  <div className="flex items-center gap-2.5">
-                                    <div className="w-10 h-10 bg-gradient-to-br from-blue-400 to-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/20">
-                                      <Building className="w-5 h-5 text-white" />
-                                    </div>
-                                    <div>
-                                      <h4 className="font-semibold text-gray-900 dark:text-white">
-                                        {program.name}
-                                      </h4>
-                                      <p className="text-xs text-gray-500 dark:text-gray-400">
-                                        {program.relationship === "LEAD"
-                                          ? "Program Lead"
-                                          : program.relationship === "STUDENT"
-                                            ? "Student"
-                                            : program.relationship === "TEACHER"
-                                              ? "Teacher"
-                                              : "Associated"}
-                                      </p>
-                                    </div>
-                                  </div>
-                                  {program.relationship === "LEAD" &&
-                                    hasPermission(
-                                      Permissions.MANAGE_PROGRAM_LEADS,
-                                    ) && (
-                                      <button
-                                        onClick={() =>
-                                          handleRemoveProgram(
-                                            program.program_id,
-                                          )
-                                        }
-                                        disabled={removingProgram}
-                                        className="px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white text-xs font-medium rounded-full transition-colors disabled:opacity-50 min-w-[70px] flex items-center justify-center"
-                                      >
-                                        {removingProgram ? (
-                                          <div className="animate-spin rounded-full h-3.5 w-3.5 border-b-2 border-white"></div>
-                                        ) : (
-                                          "Remove"
-                                        )}
-                                      </button>
-                                    )}
-                                </div>
-                                {program.description && (
-                                  <p className="text-sm text-gray-600 dark:text-gray-300">
-                                    {program.description}
-                                  </p>
-                                )}
-                              </motion.div>
-                            ))}
-                            {hasPermission(
-                              Permissions.MANAGE_PROGRAM_LEADS,
-                            ) && (
-                              <div className="flex justify-center pt-4">
-                                <button
-                                  onClick={openAddProgramModal}
-                                  disabled={loadingAvailablePrograms}
-                                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-full transition-colors disabled:opacity-50"
-                                >
-                                  {loadingAvailablePrograms ? (
-                                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                                  ) : (
-                                    <Plus className="w-4 h-4" />
-                                  )}
-                                  Assign Program Lead
-                                </button>
-                              </div>
-                            )}
-                          </div>
-                        ) : (
-                          <div className="text-center py-12">
-                            <Building className="w-16 h-16 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
-                            <p className="text-lg font-medium text-gray-500 dark:text-gray-400 mb-2">
-                              No programs associated
-                            </p>
-                            <p className="text-sm text-gray-400 dark:text-gray-500 mb-4">
-                              This user is not associated with any programs.
-                            </p>
-                            {hasPermission(
-                              Permissions.MANAGE_PROGRAM_LEADS,
-                            ) && (
-                              <button
-                                onClick={openAddProgramModal}
-                                disabled={loadingAvailablePrograms}
-                                className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors mx-auto disabled:opacity-50"
-                              >
-                                {loadingAvailablePrograms ? (
-                                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                                ) : (
-                                  <Plus className="w-4 h-4" />
-                                )}
-                                Assign Program Lead
-                              </button>
-                            )}
-                          </div>
-                        )}
-                      </div>
+                      <ProgramsTab
+                        user={user}
+                        userPrograms={userPrograms}
+                        loadingPrograms={loadingPrograms}
+                        hasPermission={hasPermission}
+                        handleRemoveProgram={handleRemoveProgram}
+                        removingProgram={removingProgram}
+                        openAddProgramModal={openAddProgramModal}
+                        loadingAvailablePrograms={loadingAvailablePrograms}
+                      />
                     )}
 
                     {activeTab === "grades" && (
-                      <div className="space-y-4">
-                        {hasPermission(
-                          Permissions.ASSIGN_GRADE_TO_CLASS_TEACHER,
-                        ) && (
-                          <div className="flex justify-end">
-                            <button
-                              onClick={openAddGradeModal}
-                              disabled={loadingAvailableGrades}
-                              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-full transition-colors disabled:opacity-50"
-                            >
-                              {loadingAvailableGrades ? (
-                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                              ) : (
-                                <Plus className="w-4 h-4" />
-                              )}
-                              Assign Grade
-                            </button>
-                          </div>
-                        )}
-                        {loadingGrades ? (
-                          <div className="flex items-center justify-center py-6">
-                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
-                          </div>
-                        ) : userGrades && userGrades.length > 0 ? (
-                          <div className="space-y-4">
-                            {userGrades.map((grade: UserGrade) => (
-                              <motion.div
-                                key={grade.grade_id}
-                                initial={{ opacity: 0, y: 10 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                className="p-4 md:p-6 bg-gradient-to-br from-blue-100/40 to-blue-100/40 dark:from-blue-900/30 dark:to-blue-900/30 rounded-2xl border border-blue-200/30 dark:border-blue-700/30"
-                              >
-                                <div className="flex items-center justify-between mb-3">
-                                  <div className="flex items-center gap-2.5">
-                                    <div className="w-10 h-10 bg-gradient-to-br from-blue-400 to-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/20">
-                                      <Award className="w-5 h-5 text-white" />
-                                    </div>
-                                    <div>
-                                      <h4 className="font-semibold text-gray-900 dark:text-white">
-                                        {grade.name}
-                                      </h4>
-                                      <p className="text-xs text-gray-500 dark:text-gray-400">
-                                        {grade.program_name} • Level{" "}
-                                        {grade.level_order}
-                                      </p>
-                                    </div>
-                                  </div>
-                                  {hasPermission(
-                                    Permissions.ASSIGN_GRADE_TO_CLASS_TEACHER,
-                                  ) && (
-                                    <button
-                                      onClick={() =>
-                                        handleRemoveGrade(grade.grade_id)
-                                      }
-                                      disabled={removingGrade}
-                                      className="px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white text-xs font-medium rounded-full transition-colors disabled:opacity-50 min-w-[70px] flex items-center justify-center"
-                                    >
-                                      {removingGrade ? (
-                                        <div className="animate-spin rounded-full h-3.5 w-3.5 border-b-2 border-white"></div>
-                                      ) : (
-                                        "Remove"
-                                      )}
-                                    </button>
-                                  )}
-                                </div>
-                                <p className="text-sm text-gray-600 dark:text-gray-300">
-                                  Assigned on{" "}
-                                  {new Date(
-                                    grade.assigned_at,
-                                  ).toLocaleDateString()}
-                                </p>
-                              </motion.div>
-                            ))}
-                          </div>
-                        ) : (
-                          <div className="text-center py-12">
-                            <Award className="w-16 h-16 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
-                            <p className="text-lg font-medium text-gray-500 dark:text-gray-400 mb-2">
-                              No grades assigned
-                            </p>
-                            <p className="text-sm text-gray-400 dark:text-gray-500 mb-4">
-                              This teacher is not assigned to any grades yet.
-                            </p>
-                          </div>
-                        )}
-                      </div>
+                      <GradesTab
+                        user={user}
+                        userGrades={userGrades}
+                        loadingGrades={loadingGrades}
+                        hasPermission={hasPermission}
+                        handleRemoveGrade={handleRemoveGrade}
+                        removingGrade={removingGrade}
+                        openAddGradeModal={openAddGradeModal}
+                        loadingAvailableGrades={loadingAvailableGrades}
+                      />
                     )}
 
                     {activeTab === "subjects" && (
@@ -989,105 +629,17 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                         />
                       )}
 
+                    {activeTab === "family" && (
+                      <FamilyTab user={user} onViewUser={onViewUser} />
+                    )}
+
                     {activeTab === "activity" && (
-                      <div className="space-y-4">
-                        <div className="p-6 bg-gradient-to-r from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-800/20 rounded-3xl border border-green-200 dark:border-green-800">
-                          <div className="flex items-center gap-4 mb-3">
-                            <div className="w-12 h-12 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center">
-                              <CheckCircle className="w-6 h-6 text-green-600 dark:text-green-400" />
-                            </div>
-                            <div>
-                              <p className="text-lg font-semibold text-gray-900 dark:text-white">
-                                Account Created
-                              </p>
-                              <p className="text-sm text-gray-500 dark:text-gray-400">
-                                {new Date(
-                                  user.user.created_at,
-                                ).toLocaleDateString()}
-                              </p>
-                            </div>
-                          </div>
-                          <p className="text-sm text-gray-600 dark:text-gray-300">
-                            User account was successfully created and is ready
-                            for use.
-                          </p>
-                        </div>
-
-                        <div className="p-6 bg-gradient-to-r from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 rounded-3xl border border-blue-200 dark:border-blue-800">
-                          <div className="flex items-center gap-4">
-                            <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center">
-                              <UserIcon className="w-6 h-6 text-blue-600 dark:text-blue-400" />
-                            </div>
-                            <div>
-                              <p className="text-lg font-semibold text-gray-900 dark:text-white">
-                                Profile Setup
-                              </p>
-                              <p className="text-sm text-gray-500 dark:text-gray-400">
-                                {user.profile
-                                  ? "Profile information is complete"
-                                  : "Profile not yet setup"}
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="p-6 bg-gradient-to-r from-orange-50 to-orange-100 dark:from-orange-900/20 dark:to-orange-800/20 rounded-3xl border border-orange-200 dark:border-orange-800">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-4">
-                              <div
-                                className={`w-12 h-12 rounded-full flex items-center justify-center ${
-                                  user.user.status === "ACTIVE"
-                                    ? "bg-green-100 dark:bg-green-900/30"
-                                    : "bg-red-100 dark:bg-red-900/30"
-                                }`}
-                              >
-                                {user.user.status === "ACTIVE" ? (
-                                  <CheckCircle className="w-6 h-6 text-green-600 dark:text-green-400" />
-                                ) : (
-                                  <Ban className="w-6 h-6 text-red-600 dark:text-red-400" />
-                                )}
-                              </div>
-                              <div>
-                                <p className="text-lg font-semibold text-gray-900 dark:text-white">
-                                  Account Status
-                                </p>
-                                <p className="text-sm text-gray-500 dark:text-gray-400">
-                                  {user.user.status === "ACTIVE"
-                                    ? "User can login and access the system"
-                                    : "User cannot login to the system"}
-                                </p>
-                              </div>
-                            </div>
-                            {hasPermission(
-                              Permissions.ENABLE_DISABLE_USERS,
-                            ) && (
-                              <button
-                                onClick={handleStatusChange}
-                                disabled={changingStatus}
-                                className={`flex items-center gap-2 px-4 py-2 rounded-full transition-colors ${
-                                  user.user.status === "ACTIVE"
-                                    ? "bg-red-500 hover:bg-red-600 text-white"
-                                    : "bg-green-500 hover:bg-green-600 text-white"
-                                } disabled:opacity-50`}
-                              >
-                                {changingStatus ? (
-                                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                                ) : user.user.status === "ACTIVE" ? (
-                                  <>
-                                    <Ban className="w-4 h-4" />
-                                    Disable
-                                  </>
-                                ) : (
-                                  <>
-                                    <CheckCircle className="w-4 h-4" />
-                                    Enable
-                                  </>
-                                )}
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      </div>
+                      <ActivityTab
+                        user={user}
+                        handleToggleUserStatus={handleToggleUserStatus}
+                        changingStatus={changingStatus}
+                        hasPermission={hasPermission}
+                      />
                     )}
                   </motion.div>
                 </div>

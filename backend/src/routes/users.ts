@@ -57,20 +57,25 @@ router.get(
   "/template",
   authenticate,
   authorize("MANAGE_USERS"),
-  downloadTemplate
+  downloadTemplate,
 );
 // Search users (for document sharing) - available to all authenticated users
 router.get("/search", authenticate, searchUsers);
 router.get("/:id", authenticate, getUser);
 router.get("/:id/programs", authenticate, getUserPrograms);
-router.put("/:id/profile", authenticate, updateUserProfile);
+router.put(
+  "/:id/profile",
+  authenticate,
+  authorize("UPDATE_USER_PROFILE_INFO"),
+  updateUserProfile,
+);
 router.post("/", authenticate, authorize("MANAGE_USERS"), createUser);
 router.post(
   "/bulk",
   authenticate,
   authorize("MANAGE_USERS"),
   upload.single("file"),
-  bulkCreateUsers
+  bulkCreateUsers,
 );
 router.put("/:id", authenticate, authorize("MANAGE_USERS"), updateUser);
 router.delete("/:id", authenticate, authorize("MANAGE_USERS"), deleteUser);
@@ -81,7 +86,7 @@ router.put(
   "/:id/disable",
   authenticate,
   authorize("MANAGE_USERS"),
-  disableUser
+  disableUser,
 );
 
 // User role management
@@ -90,13 +95,13 @@ router.post(
   "/:id/roles",
   authenticate,
   authorize("MANAGE_USERS"),
-  assignRoleToUser
+  assignRoleToUser,
 );
 router.delete(
   "/:id/roles/:roleId",
   authenticate,
   authorize("MANAGE_USERS"),
-  removeRoleFromUser
+  removeRoleFromUser,
 );
 
 // Program-based user management
@@ -104,19 +109,19 @@ router.get(
   "/programs/:programId/roles",
   authenticate,
   authorize("VIEW_PROGRAM_USERS"),
-  getProgramRoles
+  getProgramRoles,
 );
 router.get(
   "/programs/:programId/roles/:roleId/users",
   authenticate,
   authorize("VIEW_PROGRAM_USERS"),
-  getProgramUsersByRole
+  getProgramUsersByRole,
 );
 router.get(
   "/programs/:programId/users",
   authenticate,
   authorize("VIEW_PROGRAM_USERS"),
-  getProgramUsers
+  getProgramUsers,
 );
 
 // Grade assignment for class teachers
@@ -125,13 +130,13 @@ router.post(
   "/:id/grades",
   authenticate,
   authorize("ASSIGN_GRADE_TO_CLASS_TEACHER"),
-  assignGradeToUser
+  assignGradeToUser,
 );
 router.delete(
   "/:id/grades/:gradeId",
   authenticate,
   authorize("ASSIGN_GRADE_TO_CLASS_TEACHER"),
-  removeGradeFromUser
+  removeGradeFromUser,
 );
 
 // View users and subjects by grade (for class teachers)
@@ -139,13 +144,13 @@ router.get(
   "/grades/:gradeId/users",
   authenticate,
   authorize("VIEW_USERS_BY_CLASS_TEACHER_GRADE"),
-  getUsersByGrade
+  getUsersByGrade,
 );
 router.get(
   "/grades/:gradeId/subjects",
   authenticate,
   authorize("VIEW_SUBJECTS_BY_CLASS_TEACHER_GRADE"),
-  getSubjectsByGrade
+  getSubjectsByGrade,
 );
 
 export default router;

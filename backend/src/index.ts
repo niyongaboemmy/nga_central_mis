@@ -12,6 +12,7 @@ import healthRoutes from "./routes/health";
 import documentRoutes from "./routes/documents";
 import academicRoutes from "./routes/academics";
 import dashboardRoutes from "./routes/dashboard";
+import parentingRoutes from "./routes/parenting";
 
 dotenv.config();
 
@@ -22,7 +23,7 @@ app.use(
   cors({
     origin: config.cors.origin,
     credentials: config.cors.credentials,
-  })
+  }),
 );
 
 // Body parsing middleware
@@ -50,6 +51,7 @@ app.use("/permissions", permissionRoutes);
 app.use("/documents", documentRoutes);
 app.use("/academics", academicRoutes);
 app.use("/dashboard", dashboardRoutes);
+app.use("/parenting", parentingRoutes);
 
 // Error handling middleware (must be last)
 app.use(errorHandler);
@@ -67,6 +69,6 @@ process.on("SIGINT", () => {
 
 app.listen(config.port, () => {
   logger.info(
-    `Server running on port ${config.port} in ${config.nodeEnv} mode`
+    `Server running on port ${config.port} in ${config.nodeEnv} mode`,
   );
 });

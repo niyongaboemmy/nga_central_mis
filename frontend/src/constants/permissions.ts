@@ -11,6 +11,7 @@ export const Permissions = {
   ENABLE_DISABLE_USERS: "ENABLE_DISABLE_USERS",
   CHANGE_USER_ROLES: "CHANGE_USER_ROLES",
   MANAGE_PROGRAM_LEADS: "MANAGE_PROGRAM_LEADS",
+  UPDATE_USER_PROFILE_INFO: "UPDATE_USER_PROFILE_INFO",
 
   // Role & Permission management
   MANAGE_ROLES: "MANAGE_ROLES",
@@ -84,10 +85,10 @@ export type PermissionValue = (typeof Permissions)[PermissionKey];
 // Legacy functions - kept for backward compatibility but deprecated
 export const hasPermission = (
   userPermissions: string[],
-  requiredPermission: PermissionValue
+  requiredPermission: PermissionValue,
 ): boolean => {
   console.warn(
-    "hasPermission from constants/permissions.ts is deprecated. Use usePermissions hook instead."
+    "hasPermission from constants/permissions.ts is deprecated. Use usePermissions hook instead.",
   );
   // Admin has all permissions
   if (userPermissions.includes(Permissions.ADMIN)) {
@@ -98,10 +99,10 @@ export const hasPermission = (
 
 export const hasAnyPermission = (
   userPermissions: string[],
-  requiredPermissions: PermissionValue[]
+  requiredPermissions: PermissionValue[],
 ): boolean => {
   console.warn(
-    "hasAnyPermission from constants/permissions.ts is deprecated. Use usePermissions hook instead."
+    "hasAnyPermission from constants/permissions.ts is deprecated. Use usePermissions hook instead.",
   );
   if (userPermissions.includes(Permissions.ADMIN)) {
     return true;
@@ -111,10 +112,10 @@ export const hasAnyPermission = (
 
 export const hasAllPermissions = (
   userPermissions: string[],
-  requiredPermissions: PermissionValue[]
+  requiredPermissions: PermissionValue[],
 ): boolean => {
   console.warn(
-    "hasAllPermissions from constants/permissions.ts is deprecated. Use usePermissions hook instead."
+    "hasAllPermissions from constants/permissions.ts is deprecated. Use usePermissions hook instead.",
   );
   if (userPermissions.includes(Permissions.ADMIN)) {
     return true;
@@ -139,6 +140,7 @@ export const permissionGroups = {
     Permissions.ENABLE_DISABLE_USERS,
     Permissions.CHANGE_USER_ROLES,
     Permissions.MANAGE_PROGRAM_LEADS,
+    Permissions.UPDATE_USER_PROFILE_INFO,
   ],
   roles: [Permissions.MANAGE_ROLES, Permissions.MANAGE_PERMISSIONS],
   academics: [Permissions.MANAGE_ACADEMICS, Permissions.VIEW_ACADEMICS],

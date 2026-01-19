@@ -8,6 +8,7 @@ import {
   tinyint,
   int,
   primaryKey,
+  uniqueIndex,
 } from "drizzle-orm/mysql-core";
 import { sql } from "drizzle-orm";
 
@@ -18,11 +19,11 @@ export const User = mysqlTable("User", {
   email: varchar("email", { length: 150 }).notNull().unique(),
   phone_number: varchar("phone_number", { length: 50 }),
   status: mysqlEnum("status", ["ACTIVE", "INACTIVE", "SUSPENDED"]).default(
-    "ACTIVE"
+    "ACTIVE",
   ),
   created_at: datetime("created_at").default(sql`CURRENT_TIMESTAMP`),
   updated_at: datetime("updated_at").default(
-    sql`CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP`
+    sql`CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP`,
   ),
 });
 
@@ -108,7 +109,7 @@ export const RolePermission = mysqlTable(
   },
   (table) => ({
     pk: primaryKey(table.role_id, table.perm_id),
-  })
+  }),
 );
 
 // UserRole junction table
@@ -124,7 +125,7 @@ export const UserRole = mysqlTable(
   },
   (table) => ({
     pk: primaryKey(table.user_id, table.role_id),
-  })
+  }),
 );
 
 // Program table
@@ -150,7 +151,7 @@ export const UserProgramLead = mysqlTable(
   },
   (table) => ({
     pk: primaryKey(table.user_id, table.program_id),
-  })
+  }),
 );
 
 // Grade table
@@ -187,7 +188,7 @@ export const GradeSubject = mysqlTable(
   },
   (table) => ({
     pk: primaryKey(table.grade_id, table.subject_id),
-  })
+  }),
 );
 
 // AcademicYear table
@@ -244,7 +245,7 @@ export const StudentClassGroup = mysqlTable(
   },
   (table) => ({
     pk: primaryKey(table.user_id, table.class_group_id),
-  })
+  }),
 );
 
 // StudentSubjectEnrollment table
@@ -265,7 +266,7 @@ export const StudentSubjectEnrollment = mysqlTable(
   },
   (table) => ({
     pk: primaryKey(table.user_id, table.subject_id, table.academic_term_id),
-  })
+  }),
 );
 
 // TeacherSubjectAssignment table
@@ -291,9 +292,9 @@ export const TeacherSubjectAssignment = mysqlTable(
       table.user_id,
       table.subject_id,
       table.class_group_id,
-      table.academic_term_id
+      table.academic_term_id,
     ),
-  })
+  }),
 );
 
 // UserGrade junction table for class teacher grade assignments
@@ -310,7 +311,7 @@ export const UserGrade = mysqlTable(
   },
   (table) => ({
     pk: primaryKey(table.user_id, table.grade_id),
-  })
+  }),
 );
 
 // DocumentFolder table for user document management
@@ -327,7 +328,7 @@ export const DocumentFolder = mysqlTable("DocumentFolder", {
   color: varchar("color", { length: 7 }).default("#008d3b"),
   created_at: datetime("created_at").default(sql`CURRENT_TIMESTAMP`),
   updated_at: datetime("updated_at").default(
-    sql`CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP`
+    sql`CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP`,
   ),
 });
 
@@ -351,7 +352,7 @@ export const Document = mysqlTable("Document", {
   tags: varchar("tags", { length: 500 }),
   created_at: datetime("created_at").default(sql`CURRENT_TIMESTAMP`),
   updated_at: datetime("updated_at").default(
-    sql`CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP`
+    sql`CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP`,
   ),
 });
 
@@ -402,7 +403,7 @@ export const DocumentPermission = mysqlTable(
   },
   (table) => ({
     pk: primaryKey(table.permission_id),
-  })
+  }),
 );
 
 // FolderPermission table for sharing folders
@@ -431,5 +432,29 @@ export const FolderPermission = mysqlTable(
   },
   (table) => ({
     pk: primaryKey(table.permission_id),
-  })
+  }),
+);
+
+// Parenting table
+export const Parenting = mysqlTable(
+  "Parenting",
+  {
+    parenting_id: bigint("parenting_id", { mode: "number" })
+      .primaryKey()
+      .autoincrement(),
+    student_id: bigint("student_id", { mode: "number" })
+      .notNull()
+      .references(() => User.user_id),
+    parent_id: bigint("parent_id", { mode: "number" })
+      .notNull()
+      .references(() => User.user_id),
+    relationship: varchar("relationship", { length: 50 }).default("PARENT"),
+    created_at: datetime("created_at").default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => ({
+    unique_pair: uniqueIndex("unique_student_parent").on(
+      table.student_id,
+      table.parent_id,
+    ),
+  }),
 );

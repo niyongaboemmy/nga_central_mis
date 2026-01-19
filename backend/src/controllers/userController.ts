@@ -1,7 +1,18 @@
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import { db } from "../db";
-import { eq, sql, and, or, inArray } from "drizzle-orm";
+import {
+  sql,
+  eq,
+  and,
+  or,
+  like,
+  desc,
+  count,
+  inArray,
+  sql as drizzleSql,
+} from "drizzle-orm";
+import { ALL_PERMISSIONS } from "../utils/permissions";
 import {
   User,
   UserProfile,
@@ -165,8 +176,15 @@ export const updateUserProfile = asyncHandler(async (req: any, res: any) => {
     throw new ValidationError("Invalid user ID");
   }
 
-  const { first_name, last_name, gender, date_of_birth, address, external_id } =
-    req.body;
+  const {
+    first_name,
+    last_name,
+    gender,
+    date_of_birth,
+    address,
+    external_id,
+    phone_number,
+  } = req.body;
 
   logger.info("Updating user profile", {
     userId,
@@ -231,6 +249,14 @@ export const updateUserProfile = asyncHandler(async (req: any, res: any) => {
       .update(UserProfile)
       .set(updateData)
       .where(eq(UserProfile.user_id, userId));
+  }
+
+  // Update User table if phone_number is provided
+  if (phone_number !== undefined && phone_number !== null) {
+    await db
+      .update(User)
+      .set({ phone_number: sanitizeString(phone_number) })
+      .where(eq(User.user_id, userId));
   }
 
   // Fetch updated profile
@@ -323,39 +349,7 @@ export const getCurrentUser = asyncHandler(async (req: any, res: any) => {
 
   if (isSuperAdmin) {
     // SUPER_ADMIN gets all permissions
-    permissions = [
-      "MANAGE_USERS",
-      "MANAGE_ROLES",
-      "MANAGE_PERMISSIONS",
-      "MANAGE_ACADEMICS",
-      "MANAGE_CLASSES",
-      "MANAGE_STUDENTS",
-      "MANAGE_TEACHERS",
-      "MANAGE_PARENTS",
-      "MANAGE_FEES",
-      "VIEW_FINANCE",
-      "MARK_ATTENDANCE",
-      "VIEW_ATTENDANCE",
-      "ENTER_MARKS",
-      "VIEW_RESULTS",
-      "SEND_ANNOUNCEMENTS",
-      "UPLOAD_DOCUMENTS",
-      "VIEW_REPORTS",
-      "GENERATE_REPORTS",
-      "MANAGE_SETTINGS",
-      "ADMIN",
-      "VIEW_PROGRAM_USERS",
-      "VIEW_PROGRAM_ACADEMICS",
-      "ENABLE_DISABLE_USERS",
-      "CHANGE_USER_ROLES",
-      "MANAGE_PROGRAM_LEADS",
-      "ASSIGN_TEACHER_SUBJECTS",
-      "MANAGE_STUDENT_ENROLLMENTS",
-      "ASSIGN_STUDENT_CLASS_GROUPS",
-      "ASSIGN_GRADE_TO_CLASS_TEACHER",
-      "VIEW_USERS_BY_CLASS_TEACHER_GRADE",
-      "VIEW_SUBJECTS_BY_CLASS_TEACHER_GRADE",
-    ];
+    permissions = ALL_PERMISSIONS as string[];
   } else {
     permissions = rolesWithPermissions.flatMap((r) =>
       r.permissions.map((p: any) => p.name),

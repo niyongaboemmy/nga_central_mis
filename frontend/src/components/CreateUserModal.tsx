@@ -1,4 +1,4 @@
-import { Role, createUser, getRoles } from "../api/users";
+import { Role, createUser, getRoles, User as UserType } from "../api/users";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   UserPlus,
@@ -22,7 +22,7 @@ interface FormFieldProps {
   type?: string;
   value: string;
   onChange: (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
   ) => void;
   error?: string;
   required?: boolean;
@@ -120,7 +120,7 @@ const FormField: React.FC<FormFieldProps> = ({
 interface CreateUserModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSuccess: () => void;
+  onSuccess: (user: UserType) => void;
 }
 
 export const CreateUserModal: React.FC<CreateUserModalProps> = ({
@@ -180,7 +180,7 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({
   };
 
   const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
   ) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
@@ -197,7 +197,7 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({
     setSelectedRoles((prev) =>
       prev.includes(roleId)
         ? prev.filter((id) => id !== roleId)
-        : [...prev, roleId]
+        : [...prev, roleId],
     );
   };
 
@@ -246,13 +246,14 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({
           date_of_birth: formData.date_of_birth || undefined,
           address: formData.address || undefined,
         },
-        () => {},
+        (user) => {
+          onSuccess(user);
+        },
         (err) => {
           throw err;
-        }
+        },
       );
 
-      onSuccess();
       onClose();
       resetForm();
     } catch (err: any) {

@@ -79,7 +79,11 @@ const UserItemCard: React.FC<UserItemCardProps> = ({
     >
       <div
         className="flex items-center gap-3 p-3 bg-white/90 dark:bg-slate-800/40 backdrop-blur-sm rounded-2xl border border-white/50 dark:border-slate-700/20 hover:bg-white/80 dark:hover:bg-slate-800/80 hover:shadow-sm transition-all cursor-pointer"
-        onClick={onToggleExpand}
+        onClick={(e) => {
+          e.stopPropagation();
+          onToggleExpand();
+          onView();
+        }}
       >
         {/* Avatar */}
         <div className="relative">
@@ -169,7 +173,7 @@ const UserItemCard: React.FC<UserItemCardProps> = ({
 
             {/* Actions */}
             <div className="p-4 bg-gray-50 dark:bg-slate-900/50 rounded-xl text-xs">
-              <div className="flex flex-col gap-2">
+              <div className="flex flex-row gap-2">
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
@@ -190,8 +194,8 @@ const UserItemCard: React.FC<UserItemCardProps> = ({
                       isToggling
                         ? "opacity-50 cursor-not-allowed"
                         : user.user.status === "ACTIVE"
-                        ? "bg-red-500 hover:bg-red-600 text-white"
-                        : "bg-green-500 hover:bg-green-600 text-white"
+                          ? "bg-red-500 hover:bg-red-600 text-white"
+                          : "bg-green-500 hover:bg-green-600 text-white"
                     }`}
                   >
                     {isToggling ? (

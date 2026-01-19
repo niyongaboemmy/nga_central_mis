@@ -1,0 +1,13 @@
+{
+  "version": "5",
+  "dialect": "mysql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "5",
+      "when": 1768846246930,
+      "tag": "0000_solid_lake",
+      "breakpoints": true
+    }
+  ]
+}

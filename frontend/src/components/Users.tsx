@@ -19,6 +19,8 @@ import {
   disableUser,
   getRoles,
   Role,
+  getUser,
+  User,
 } from "../api/users";
 import UserProfileModal from "./UserProfileModal";
 import ExcelUploadModal from "./ExcelUploadModal";
@@ -92,7 +94,7 @@ const Users: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedUser, setSelectedUser] = useState<UserWithProfile | null>(
-    null
+    null,
   );
   const [userModalOpen, setUserModalOpen] = useState(false);
   const [createModalOpen, setCreateModalOpen] = useState(false);
@@ -110,12 +112,13 @@ const Users: React.FC = () => {
   const loadingRef = useRef(false);
   const loadRolesCalledRef = useRef(false);
   const [togglingUserId, setTogglingUserId] = useState<number | null>(null);
+  const [isSwitchingUser, setIsSwitchingUser] = useState(false);
 
   const canManage = user?.roles?.find((itm) =>
     itm.permissions?.find(
       (perm) =>
-        perm.name.includes("MANAGE_USERS") || perm.name.includes("ADMIN")
-    )
+        perm.name.includes("MANAGE_USERS") || perm.name.includes("ADMIN"),
+    ),
   );
 
   const loadRoles = async () => {
@@ -146,7 +149,7 @@ const Users: React.FC = () => {
         pagination.limit,
         role_id === "all" ? undefined : role_id,
         searchTerm || undefined,
-        status === "all" ? undefined : status
+        status === "all" ? undefined : status,
       );
       if (result) {
         setUsers(result.users);
@@ -175,6 +178,23 @@ const Users: React.FC = () => {
     setUserModalOpen(true);
   };
 
+  const handleCreateSuccess = async (newUser: User) => {
+    // Refresh list in background
+    loadUsers(selectedRole, selectedStatus);
+
+    // Fetch full profile and open modal
+    try {
+      const fullUser = await getUser(newUser.user_id);
+      if (fullUser) {
+        viewUserProfile(fullUser);
+        showToast("User created successfully", "success");
+      }
+    } catch (error) {
+      console.error("Failed to load new user profile", error);
+      showToast("User created but failed to open details", "warning");
+    }
+  };
+
   const toggleUserStatus = async (userId: number, currentStatus: string) => {
     setTogglingUserId(userId);
     try {
@@ -190,7 +210,7 @@ const Users: React.FC = () => {
     } catch (error: any) {
       showToast(
         error.response?.data?.message || "Failed to update user status",
-        "error"
+        "error",
       );
     } finally {
       setTogglingUserId(null);
@@ -201,7 +221,7 @@ const Users: React.FC = () => {
     setExpandedUsers((prev) =>
       prev.includes(userId)
         ? prev.filter((id) => id !== userId)
-        : [...prev, userId]
+        : [...prev, userId],
     );
   };
 
@@ -247,6 +267,29 @@ const Users: React.FC = () => {
       </div>
     );
   }
+
+  const handleSwitchUser = async (userId: number) => {
+    setIsSwitchingUser(true);
+    const startTime = Date.now();
+    try {
+      const userData = await getUser(userId);
+
+      // Ensure minimum 600ms delay
+      const elapsedTime = Date.now() - startTime;
+      if (elapsedTime < 600) {
+        await new Promise((resolve) => setTimeout(resolve, 600 - elapsedTime));
+      }
+
+      if (userData) {
+        setSelectedUser(userData);
+      }
+    } catch (error) {
+      console.error("Failed to switch user", error);
+      showToast("Failed to load user profile", "error");
+    } finally {
+      setIsSwitchingUser(false);
+    }
+  };
 
   return (
     <div className="min-h-screen overflow-hidden relative">
@@ -330,10 +373,13 @@ const Users: React.FC = () => {
               <button
                 key="all"
                 onClick={() => {
-                  setSelectedRole("all");
-                  setPagination((prev) => ({ ...prev, page: 1 })); // Reset to first page on role change
+                  if (!loading) {
+                    setSelectedRole("all");
+                    setPagination((prev) => ({ ...prev, page: 1 })); // Reset to first page on role change
+                    loadUsers("all", selectedStatus);
+                  }
                 }}
-                className={`px-3 py-1 rounded-full text-xs font-medium transition-all whitespace-nowrap ${
+                className={`px-3 py-1 ${loading ? "cursor-not-allowed" : ""} rounded-full text-xs font-medium transition-all whitespace-nowrap ${
                   selectedRole === "all"
                     ? "bg-blue-500 text-white"
                     : "bg-white/60 dark:bg-slate-800/60 text-gray-600 dark:text-gray-300"
@@ -345,11 +391,13 @@ const Users: React.FC = () => {
                 <button
                   key={role.role_id}
                   onClick={() => {
-                    setSelectedRole(role.role_id.toString());
-                    setPagination((prev) => ({ ...prev, page: 1 }));
-                    loadUsers(role.role_id.toString(), selectedStatus);
+                    if (!loading) {
+                      setSelectedRole(role.role_id.toString());
+                      setPagination((prev) => ({ ...prev, page: 1 }));
+                      loadUsers(role.role_id.toString(), selectedStatus);
+                    }
                   }}
-                  className={`px-3 py-1 rounded-full text-xs font-medium transition-all whitespace-nowrap ${
+                  className={`px-3 py-1 ${loading ? "cursor-not-allowed" : ""} rounded-full text-xs font-medium transition-all whitespace-nowrap ${
                     selectedRole.toString() === role.role_id.toString()
                       ? "bg-blue-500 text-white"
                       : "bg-white/60 dark:bg-slate-800/60 text-gray-600 dark:text-gray-300"
@@ -363,10 +411,12 @@ const Users: React.FC = () => {
               <button
                 key="active"
                 onClick={() => {
-                  setSelectedStatus("ACTIVE");
-                  setPagination((prev) => ({ ...prev, page: 1 }));
+                  if (!loading) {
+                    setSelectedStatus("ACTIVE");
+                    setPagination((prev) => ({ ...prev, page: 1 }));
+                  }
                 }}
-                className={`px-4 py-2 text-sm font-medium transition-all whitespace-nowrap ${
+                className={`px-4 py-2 ${loading ? "cursor-not-allowed" : ""} text-sm font-medium transition-all whitespace-nowrap ${
                   selectedStatus === "ACTIVE"
                     ? "text-blue-500 border-b-2 border-blue-500 bg-blue-50 dark:bg-blue-900/20"
                     : "text-gray-600 dark:text-gray-300 border-b-2 border-transparent hover:text-blue-500"
@@ -377,10 +427,12 @@ const Users: React.FC = () => {
               <button
                 key="disabled"
                 onClick={() => {
-                  setSelectedStatus("INACTIVE");
-                  setPagination((prev) => ({ ...prev, page: 1 }));
+                  if (!loading) {
+                    setSelectedStatus("INACTIVE");
+                    setPagination((prev) => ({ ...prev, page: 1 }));
+                  }
                 }}
-                className={`px-4 py-2 text-sm font-medium transition-all whitespace-nowrap ${
+                className={`px-4 py-2 ${loading ? "cursor-not-allowed" : ""} text-sm font-medium transition-all whitespace-nowrap ${
                   selectedStatus === "INACTIVE"
                     ? "text-blue-500 border-b-2 border-blue-500 bg-blue-50 dark:bg-blue-900/20"
                     : "text-gray-600 dark:text-gray-300 border-b-2 border-transparent hover:text-blue-500"
@@ -440,7 +492,7 @@ const Users: React.FC = () => {
                     Showing {(pagination.page - 1) * pagination.limit + 1} to{" "}
                     {Math.min(
                       pagination.page * pagination.limit,
-                      pagination.total
+                      pagination.total,
                     )}{" "}
                     of {pagination.total} users
                   </div>
@@ -500,7 +552,7 @@ const Users: React.FC = () => {
                         const startPage = Math.max(1, pagination.page - 2);
                         const endPage = Math.min(
                           pagination.totalPages,
-                          pagination.page + 2
+                          pagination.page + 2,
                         );
 
                         // Add first page if not in range
@@ -512,7 +564,7 @@ const Users: React.FC = () => {
                               className="px-3 py-1 text-sm rounded-md bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors"
                             >
                               1
-                            </button>
+                            </button>,
                           );
                           if (startPage > 2) {
                             pages.push(
@@ -521,7 +573,7 @@ const Users: React.FC = () => {
                                 className="px-2 text-gray-400"
                               >
                                 ...
-                              </span>
+                              </span>,
                             );
                           }
                         }
@@ -539,7 +591,7 @@ const Users: React.FC = () => {
                               }`}
                             >
                               {i}
-                            </button>
+                            </button>,
                           );
                         }
 
@@ -552,7 +604,7 @@ const Users: React.FC = () => {
                                 className="px-2 text-gray-400"
                               >
                                 ...
-                              </span>
+                              </span>,
                             );
                           }
                           pages.push(
@@ -564,7 +616,7 @@ const Users: React.FC = () => {
                               className="px-3 py-1 text-sm rounded-md bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors"
                             >
                               {pagination.totalPages}
-                            </button>
+                            </button>,
                           );
                         }
 
@@ -605,12 +657,14 @@ const Users: React.FC = () => {
         isOpen={userModalOpen}
         onClose={() => setUserModalOpen(false)}
         user={selectedUser}
+        onViewUser={handleSwitchUser}
+        isSwitchingUser={isSwitchingUser}
       />
 
       <CreateUserModal
         isOpen={createModalOpen}
         onClose={() => setCreateModalOpen(false)}
-        onSuccess={() => loadUsers(selectedRole, selectedStatus)}
+        onSuccess={handleCreateSuccess}
       />
 
       <ExcelUploadModal
