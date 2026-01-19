@@ -37,12 +37,22 @@ export interface Subject {
   code: string | null;
   name: string;
   description: string | null;
+  course_category_id: number | null;
+  category_name?: string;
+  max_marks: number | null;
   grades?: Array<{
     grade_id: number;
     grade_name: string;
     program_id: number;
     program_name: string;
   }>;
+}
+
+export interface CourseCategory {
+  category_id: number;
+  name: string;
+  description: string | null;
+  status: string;
 }
 
 export interface ClassGroup {
@@ -125,6 +135,21 @@ export const subjectsApi = {
   update: (id: number, data: Partial<Omit<Subject, "subject_id">>) =>
     api.put<Subject>(`/academics/subjects/${id}`, data),
   delete: (id: number) => api.delete(`/academics/subjects/${id}`),
+};
+
+// Course Categories API
+export const courseCategoriesApi = {
+  getAll: () =>
+    api.get<{ data: CourseCategory[] }>("/academics/course-categories"),
+  getById: (id: number) =>
+    api.get<CourseCategory>(`/academics/course-categories/${id}`),
+  create: (data: Omit<CourseCategory, "category_id" | "status">) =>
+    api.post<CourseCategory>("/academics/course-categories", data),
+  update: (
+    id: number,
+    data: Partial<Omit<CourseCategory, "category_id" | "status">>,
+  ) => api.put<CourseCategory>(`/academics/course-categories/${id}`, data),
+  delete: (id: number) => api.delete(`/academics/course-categories/${id}`),
 };
 
 // Class Groups API

@@ -7,6 +7,7 @@ import {
   Program,
   Grade,
   Subject,
+  CourseCategory,
   ClassGroup,
   GradeSubject,
   TeacherSubjectAssignment,
@@ -979,6 +980,211 @@ export const deleteGrade = asyncHandler(async (req: any, res: any) => {
   successResponse(res, "Grade deleted successfully");
 });
 
+// CourseCategory Management
+export const getCourseCategories = asyncHandler(async (req: any, res: any) => {
+  logger.info("Fetching all course categories");
+
+  const categories = await db
+    .select()
+    .from(CourseCategory)
+    .where(eq(CourseCategory.status, "ACTIVE"))
+    .orderBy(CourseCategory.name);
+
+  successResponse(res, "Course categories retrieved successfully", categories);
+});
+
+export const getCourseCategoryById = asyncHandler(
+  async (req: any, res: any) => {
+    const { id } = req.params;
+    const categoryId = parseInt(id);
+
+    if (isNaN(categoryId)) {
+      throw new ValidationError("Invalid course category ID");
+    }
+
+    const category = await db
+      .select()
+      .from(CourseCategory)
+      .where(eq(CourseCategory.category_id, categoryId))
+      .limit(1);
+
+    if (category.length === 0) {
+      throw new NotFoundError("Course category not found");
+    }
+
+    successResponse(res, "Course category retrieved successfully", category[0]);
+  },
+);
+
+export const createCourseCategory = asyncHandler(async (req: any, res: any) => {
+  const { name, description } = req.body;
+
+  if (!name) {
+    throw new ValidationError("Category name is required");
+  }
+
+  const sanitizedName = sanitizeString(name);
+  const sanitizedDescription = description
+    ? sanitizeString(description)
+    : undefined;
+
+  // Check if name already exists
+  const existingCategory = await db
+    .select()
+    .from(CourseCategory)
+    .where(eq(CourseCategory.name, sanitizedName))
+    .limit(1);
+
+  if (existingCategory.length > 0) {
+    throw new ConflictError("Course category with this name already exists");
+  }
+
+  const result = await db.insert(CourseCategory).values({
+    name: sanitizedName,
+    description: sanitizedDescription || null,
+  });
+
+  const categoryId = (result as any).insertId;
+  logger.info("Course category created", { name: sanitizedName });
+
+  // Record activity
+  if (req.user?.userId) {
+    await recordActivity(
+      req.user.userId,
+      "COURSE_CATEGORY_CREATE",
+      `Created course category: ${sanitizedName}`,
+      "CourseCategory",
+      categoryId,
+      { name: sanitizedName, description },
+      req.user.userId,
+    );
+  }
+
+  successResponse(res, "Course category created successfully", null, 201);
+});
+
+export const updateCourseCategory = asyncHandler(async (req: any, res: any) => {
+  const { id } = req.params;
+  const categoryId = parseInt(id);
+  const { name, description } = req.body;
+
+  if (isNaN(categoryId)) {
+    throw new ValidationError("Invalid course category ID");
+  }
+
+  const existingCategory = await db
+    .select()
+    .from(CourseCategory)
+    .where(eq(CourseCategory.category_id, categoryId))
+    .limit(1);
+
+  if (existingCategory.length === 0) {
+    throw new NotFoundError("Course category not found");
+  }
+
+  const updateData: any = {};
+
+  if (name !== undefined) {
+    const sanitizedName = sanitizeString(name);
+    // Check for name conflicts
+    const nameConflict = await db
+      .select()
+      .from(CourseCategory)
+      .where(
+        and(
+          eq(CourseCategory.name, sanitizedName),
+          sql`${CourseCategory.category_id} != ${categoryId}`,
+        ),
+      )
+      .limit(1);
+
+    if (nameConflict.length > 0) {
+      throw new ConflictError("Course category with this name already exists");
+    }
+    updateData.name = sanitizedName;
+  }
+
+  if (description !== undefined) {
+    updateData.description = description ? sanitizeString(description) : null;
+  }
+
+  await db
+    .update(CourseCategory)
+    .set(updateData)
+    .where(eq(CourseCategory.category_id, categoryId));
+
+  logger.info("Course category updated", { categoryId });
+
+  // Record activity
+  if (req.user?.userId) {
+    await recordActivity(
+      req.user.userId,
+      "COURSE_CATEGORY_UPDATE",
+      `Updated course category: ${updateData.name || "ID " + categoryId}`,
+      "CourseCategory",
+      categoryId,
+      updateData,
+      req.user.userId,
+    );
+  }
+
+  successResponse(res, "Course category updated successfully");
+});
+
+export const deleteCourseCategory = asyncHandler(async (req: any, res: any) => {
+  const { id } = req.params;
+  const categoryId = parseInt(id);
+
+  if (isNaN(categoryId)) {
+    throw new ValidationError("Invalid course category ID");
+  }
+
+  const existingCategory = await db
+    .select()
+    .from(CourseCategory)
+    .where(eq(CourseCategory.category_id, categoryId))
+    .limit(1);
+
+  if (existingCategory.length === 0) {
+    throw new NotFoundError("Course category not found");
+  }
+
+  // Check if category is used by any subjects
+  const subjectsCount = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(Subject)
+    .where(eq(Subject.course_category_id, categoryId));
+
+  if (subjectsCount[0].count > 0) {
+    throw new ValidationError(
+      "Cannot delete course category with existing subjects",
+    );
+  }
+
+  // Instead of deleting, set status to DISABLED
+  await db
+    .update(CourseCategory)
+    .set({ status: "DISABLED" })
+    .where(eq(CourseCategory.category_id, categoryId));
+
+  logger.info("Course category deleted", { categoryId });
+
+  // Record activity
+  if (req.user?.userId) {
+    await recordActivity(
+      req.user.userId,
+      "COURSE_CATEGORY_DELETE",
+      `Deleted course category ID: ${categoryId}`,
+      "CourseCategory",
+      categoryId,
+      undefined,
+      req.user.userId,
+    );
+  }
+
+  successResponse(res, "Course category deleted successfully");
+});
+
 // Subjects Management
 export const getSubjects = asyncHandler(async (req: any, res: any) => {
   logger.info("Fetching all subjects");
@@ -1025,12 +1231,19 @@ export const getSubjects = asyncHandler(async (req: any, res: any) => {
       code: Subject.code,
       name: Subject.name,
       description: Subject.description,
+      course_category_id: Subject.course_category_id,
+      category_name: CourseCategory.name,
+      max_marks: Subject.max_marks,
       grade_id: GradeFromClass.grade_id,
       grade_name: GradeFromClass.name,
       program_id: ProgramFromClass.program_id,
       program_name: ProgramFromClass.name,
     })
     .from(Subject)
+    .leftJoin(
+      CourseCategory,
+      eq(Subject.course_category_id, CourseCategory.category_id),
+    )
     .leftJoin(
       TeacherSubjectAssignment,
       sql`${Subject.subject_id} = ${TeacherSubjectAssignment.subject_id}`,
@@ -1061,6 +1274,9 @@ export const getSubjects = asyncHandler(async (req: any, res: any) => {
         code: row.code,
         name: row.name,
         description: row.description,
+        course_category_id: row.course_category_id,
+        category_name: row.category_name,
+        max_marks: row.max_marks,
         grades: [],
       });
     }
@@ -1102,7 +1318,7 @@ export const getSubject = asyncHandler(async (req: any, res: any) => {
 });
 
 export const createSubject = asyncHandler(async (req: any, res: any) => {
-  const { code, name, description } = req.body;
+  const { code, name, description, course_category_id, max_marks } = req.body;
 
   if (!name) {
     throw new ValidationError("Subject name is required");
@@ -1113,6 +1329,32 @@ export const createSubject = asyncHandler(async (req: any, res: any) => {
   const sanitizedDescription = description
     ? sanitizeString(description)
     : undefined;
+
+  // Validate course_category_id if provided
+  if (course_category_id !== undefined && course_category_id !== null) {
+    const categoryId = parseInt(course_category_id);
+    if (isNaN(categoryId)) {
+      throw new ValidationError("Invalid course category ID");
+    }
+
+    const category = await db
+      .select()
+      .from(CourseCategory)
+      .where(eq(CourseCategory.category_id, categoryId))
+      .limit(1);
+
+    if (category.length === 0) {
+      throw new NotFoundError("Course category not found");
+    }
+  }
+
+  // Validate max_marks if provided
+  if (max_marks !== undefined && max_marks !== null) {
+    const marks = parseInt(max_marks);
+    if (isNaN(marks) || marks < 0) {
+      throw new ValidationError("Max marks must be a positive number");
+    }
+  }
 
   // Check if code already exists (if provided)
   if (sanitizedCode) {
@@ -1131,6 +1373,8 @@ export const createSubject = asyncHandler(async (req: any, res: any) => {
     code: sanitizedCode || null,
     name: sanitizedName,
     description: sanitizedDescription || null,
+    course_category_id: course_category_id || null,
+    max_marks: max_marks || null,
   });
 
   const subjectId = (result as any).insertId;
@@ -1155,7 +1399,7 @@ export const createSubject = asyncHandler(async (req: any, res: any) => {
 export const updateSubject = asyncHandler(async (req: any, res: any) => {
   const { id } = req.params;
   const subjectId = parseInt(id);
-  const { code, name, description } = req.body;
+  const { code, name, description, course_category_id, max_marks } = req.body;
 
   if (isNaN(subjectId)) {
     throw new ValidationError("Invalid subject ID");
@@ -1201,6 +1445,40 @@ export const updateSubject = asyncHandler(async (req: any, res: any) => {
 
   if (description !== undefined) {
     updateData.description = description ? sanitizeString(description) : null;
+  }
+
+  if (course_category_id !== undefined) {
+    if (course_category_id !== null) {
+      const categoryId = parseInt(course_category_id);
+      if (isNaN(categoryId)) {
+        throw new ValidationError("Invalid course category ID");
+      }
+
+      const category = await db
+        .select()
+        .from(CourseCategory)
+        .where(eq(CourseCategory.category_id, categoryId))
+        .limit(1);
+
+      if (category.length === 0) {
+        throw new NotFoundError("Course category not found");
+      }
+      updateData.course_category_id = categoryId;
+    } else {
+      updateData.course_category_id = null;
+    }
+  }
+
+  if (max_marks !== undefined) {
+    if (max_marks !== null) {
+      const marks = parseInt(max_marks);
+      if (isNaN(marks) || marks < 0) {
+        throw new ValidationError("Max marks must be a positive number");
+      }
+      updateData.max_marks = marks;
+    } else {
+      updateData.max_marks = null;
+    }
   }
 
   await db

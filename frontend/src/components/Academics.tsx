@@ -16,12 +16,14 @@ import {
   gradesApi,
   subjectsApi,
   classGroupsApi,
+  courseCategoriesApi,
   AcademicYear,
   AcademicTerm,
   Program,
   Grade,
   Subject,
   ClassGroup,
+  CourseCategory,
 } from "../api/academics";
 
 // Import sub-components
@@ -31,6 +33,7 @@ import ProgramsTab from "./academics/ProgramsTab";
 import GradesTab from "./academics/GradesTab";
 import SubjectsTab from "./academics/SubjectsTab";
 import ClassGroupsTab from "./academics/ClassGroupsTab";
+import CourseCategoriesTab from "./academics/CourseCategoriesTab";
 
 const Academics: React.FC = () => {
   const { showToast } = useToast();
@@ -43,6 +46,9 @@ const Academics: React.FC = () => {
   const [grades, setGrades] = useState<Grade[]>([]);
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [classGroups, setClassGroups] = useState<ClassGroup[]>([]);
+  const [courseCategories, setCourseCategories] = useState<CourseCategory[]>(
+    [],
+  );
 
   // Loading states
   const [loading, setLoading] = useState({
@@ -52,6 +58,7 @@ const Academics: React.FC = () => {
     grades: false,
     subjects: false,
     classGroups: false,
+    courseCategories: false,
   });
 
   // Fetch data functions
@@ -127,6 +134,18 @@ const Academics: React.FC = () => {
     }
   };
 
+  const fetchCourseCategories = async () => {
+    setLoading((prev) => ({ ...prev, courseCategories: true }));
+    try {
+      const response = await courseCategoriesApi.getAll();
+      setCourseCategories(response.data.data);
+    } catch (error: any) {
+      showToast("Failed to fetch course categories", "error");
+    } finally {
+      setLoading((prev) => ({ ...prev, courseCategories: false }));
+    }
+  };
+
   // Initial data fetch
   useEffect(() => {
     fetchAcademicYears();
@@ -135,6 +154,7 @@ const Academics: React.FC = () => {
     fetchGrades();
     fetchSubjects();
     fetchClassGroups();
+    fetchCourseCategories();
   }, []);
 
   const tabs = [
@@ -161,6 +181,12 @@ const Academics: React.FC = () => {
       label: "Grades",
       icon: BarChart3,
       color: "text-orange-500",
+    },
+    {
+      id: "course-categories",
+      label: "Course Categories",
+      icon: BookOpen,
+      color: "text-pink-500",
     },
     {
       id: "subjects",
@@ -269,6 +295,29 @@ const Academics: React.FC = () => {
               await gradesApi.delete(id);
               fetchGrades();
               showToast("Grade deleted successfully", "success");
+            }}
+          />
+        );
+      case "course-categories":
+        return (
+          <CourseCategoriesTab
+            data={courseCategories}
+            loading={loading.courseCategories}
+            onRefresh={fetchCourseCategories}
+            onCreate={async (data) => {
+              await courseCategoriesApi.create(data);
+              fetchCourseCategories();
+              showToast("Course category created successfully", "success");
+            }}
+            onUpdate={async (id, data) => {
+              await courseCategoriesApi.update(id, data);
+              fetchCourseCategories();
+              showToast("Course category updated successfully", "success");
+            }}
+            onDelete={async (id) => {
+              await courseCategoriesApi.delete(id);
+              fetchCourseCategories();
+              showToast("Course category deleted successfully", "success");
             }}
           />
         );

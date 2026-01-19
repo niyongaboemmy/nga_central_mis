@@ -165,6 +165,16 @@ export const Grade = mysqlTable("Grade", {
   level_order: int("level_order").notNull(),
 });
 
+// CourseCategory table
+export const CourseCategory = mysqlTable("CourseCategory", {
+  category_id: bigint("category_id", { mode: "number" })
+    .primaryKey()
+    .autoincrement(),
+  name: varchar("name", { length: 100 }).notNull().unique(),
+  description: varchar("description", { length: 255 }),
+  status: mysqlEnum("status", ["ACTIVE", "DISABLED"]).default("ACTIVE"),
+});
+
 // Subject table
 export const Subject = mysqlTable("Subject", {
   subject_id: bigint("subject_id", { mode: "number" })
@@ -173,6 +183,10 @@ export const Subject = mysqlTable("Subject", {
   code: varchar("code", { length: 50 }).unique(),
   name: varchar("name", { length: 150 }).notNull(),
   description: varchar("description", { length: 255 }),
+  course_category_id: bigint("course_category_id", {
+    mode: "number",
+  }).references(() => CourseCategory.category_id),
+  max_marks: int("max_marks"),
   status: mysqlEnum("status", ["ACTIVE", "DISABLED"]).default("ACTIVE"),
 });
 

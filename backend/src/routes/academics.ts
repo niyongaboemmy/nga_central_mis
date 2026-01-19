@@ -28,6 +28,13 @@ import {
   updateGrade,
   deleteGrade,
 
+  // Course Categories
+  getCourseCategories,
+  getCourseCategoryById,
+  createCourseCategory,
+  updateCourseCategory,
+  deleteCourseCategory,
+
   // Subjects
   getSubjects,
   getSubject,
@@ -216,6 +223,38 @@ router.delete(
   authenticate,
   authorize("MANAGE_ACADEMICS"),
   deleteGrade,
+);
+
+// Course Categories routes
+router.get(
+  "/course-categories",
+  authenticate,
+  authorize("MANAGE_ACADEMICS"),
+  getCourseCategories,
+);
+router.get(
+  "/course-categories/:id",
+  authenticate,
+  authorize("MANAGE_ACADEMICS"),
+  getCourseCategoryById,
+);
+router.post(
+  "/course-categories",
+  authenticate,
+  authorize("MANAGE_ACADEMICS"),
+  createCourseCategory,
+);
+router.put(
+  "/course-categories/:id",
+  authenticate,
+  authorize("MANAGE_ACADEMICS"),
+  updateCourseCategory,
+);
+router.delete(
+  "/course-categories/:id",
+  authenticate,
+  authorize("MANAGE_ACADEMICS"),
+  deleteCourseCategory,
 );
 
 // Grade-Subject Assignment routes

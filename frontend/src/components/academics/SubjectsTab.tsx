@@ -2,8 +2,10 @@ import React, { useState, useMemo } from "react";
 import {
   Subject,
   Grade,
+  CourseCategory,
   gradeSubjectsApi,
   gradesApi,
+  courseCategoriesApi,
   teacherSubjectAssignmentsApi,
   SubjectTeacherAssignment,
 } from "../../api/academics";
@@ -11,6 +13,7 @@ import Button from "../ui/Button";
 import Modal from "../ui/Modal";
 import ConfirmModal from "../ui/ConfirmModal";
 import Input from "../ui/Input";
+import Select from "../ui/Select";
 import { Eye, Users, BookOpen, Calendar, User as UserIcon } from "lucide-react";
 
 interface SubjectsTabProps {
@@ -20,7 +23,7 @@ interface SubjectsTabProps {
   onCreate: (data: Omit<Subject, "subject_id">) => Promise<void>;
   onUpdate: (
     id: number,
-    data: Partial<Omit<Subject, "subject_id">>
+    data: Partial<Omit<Subject, "subject_id">>,
   ) => Promise<void>;
   onDelete: (id: number) => Promise<void>;
 }
@@ -29,6 +32,8 @@ interface SubjectFormData {
   name: string;
   code: string;
   description: string;
+  course_category_id: number | null;
+  max_marks: number | null;
 }
 
 interface GradeAssignment {
@@ -61,17 +66,21 @@ const SubjectsTab: React.FC<SubjectsTabProps> = ({
     name: "",
     code: "",
     description: "",
+    course_category_id: null,
+    max_marks: null,
   });
-  const [formErrors, setFormErrors] = useState<Partial<SubjectFormData>>({});
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
 
   // Two-step process states
   const [currentStep, setCurrentStep] = useState<1 | 2>(1);
   const [grades, setGrades] = useState<Grade[]>([]);
+  const [categories, setCategories] = useState<CourseCategory[]>([]);
   const [gradeAssignments, setGradeAssignments] = useState<GradeAssignment[]>(
-    []
+    [],
   );
   const [loadingGrades, setLoadingGrades] = useState(false);
+  const [loadingCategories, setLoadingCategories] = useState(false);
 
   // Memoized form validity check
   const isFormValid = useMemo(() => {
@@ -83,10 +92,24 @@ const SubjectsTab: React.FC<SubjectsTabProps> = ({
       name: "",
       code: "",
       description: "",
+      course_category_id: null,
+      max_marks: null,
     });
     setFormErrors({});
     setCurrentStep(1);
     setGradeAssignments([]);
+  };
+
+  const loadCategories = async () => {
+    setLoadingCategories(true);
+    try {
+      const response = await courseCategoriesApi.getAll();
+      setCategories(response.data.data);
+    } catch (error) {
+      console.error("Failed to load categories:", error);
+    } finally {
+      setLoadingCategories(false);
+    }
   };
 
   const loadGrades = async () => {
@@ -114,7 +137,7 @@ const SubjectsTab: React.FC<SubjectsTabProps> = ({
 
         const assignments = grades.map((grade) => {
           const isCurrentlyAssigned = currentAssignments.some(
-            (ca) => ca.grade_id === grade.grade_id
+            (ca) => ca.grade_id === grade.grade_id,
           );
           return {
             grade_id: grade.grade_id,
@@ -156,16 +179,29 @@ const SubjectsTab: React.FC<SubjectsTabProps> = ({
               is_selected: !assignment.is_selected,
               is_assigned: !assignment.is_selected,
             }
-          : assignment
-      )
+          : assignment,
+      ),
     );
   };
 
   const validateForm = (): boolean => {
-    const errors: Partial<SubjectFormData> = {};
+    const errors: Record<string, string> = {};
 
     if (!formData.name.trim()) {
       errors.name = "Subject name is required";
+    }
+
+    if (formData.code && formData.code.trim().length > 50) {
+      errors.code = "Code must be 50 characters or less";
+    }
+
+    if (formData.max_marks !== null && formData.max_marks !== undefined) {
+      if (formData.max_marks < 0) {
+        errors.max_marks = "Max marks must be a positive number";
+      }
+      if (formData.max_marks > 1000) {
+        errors.max_marks = "Max marks cannot exceed 1000";
+      }
     }
 
     setFormErrors(errors);
@@ -186,7 +222,7 @@ const SubjectsTab: React.FC<SubjectsTabProps> = ({
           is_assigned: false,
           is_selected: false,
           is_currently_assigned: false,
-        }))
+        })),
       );
     } else {
       // Step 2: Assign to grades
@@ -197,6 +233,10 @@ const SubjectsTab: React.FC<SubjectsTabProps> = ({
           name: formData.name.trim(),
           code: formData.code.trim() || null,
           description: formData.description.trim() || null,
+          course_category_id: formData.course_category_id,
+          max_marks: formData.max_marks,
+          grades: undefined,
+          category_name: undefined,
         });
 
         // Then assign to selected grades
@@ -206,7 +246,7 @@ const SubjectsTab: React.FC<SubjectsTabProps> = ({
             gradeSubjectsApi.assign({
               grade_id: assignment.grade_id,
               subject_id: (newSubject as any).subject_id,
-            })
+            }),
           );
 
         await Promise.all(assignmentPromises);
@@ -228,9 +268,12 @@ const SubjectsTab: React.FC<SubjectsTabProps> = ({
       name: subject.name,
       code: subject.code || "",
       description: subject.description || "",
+      course_category_id: subject.course_category_id,
+      max_marks: subject.max_marks,
     });
     setCurrentStep(1);
     setShowEditModal(true);
+    loadCategories();
   };
 
   const handleUpdate = async () => {
@@ -250,6 +293,8 @@ const SubjectsTab: React.FC<SubjectsTabProps> = ({
           name: formData.name.trim(),
           code: formData.code.trim() || null,
           description: formData.description.trim() || null,
+          course_category_id: formData.course_category_id,
+          max_marks: formData.max_marks,
         });
 
         // Handle grade assignment - assign/remove based on selections
@@ -267,14 +312,14 @@ const SubjectsTab: React.FC<SubjectsTabProps> = ({
                   grade_id: assignment.grade_id,
                   subject_id: selectedSubject.subject_id,
                 })
-                .catch(() => {}) // Ignore if already assigned
+                .catch(() => {}), // Ignore if already assigned
             );
           } else if (!shouldBeAssigned && isCurrentlyAssigned) {
             // Remove from grade
             assignmentPromises.push(
               gradeSubjectsApi
                 .remove(assignment.grade_id, selectedSubject.subject_id)
-                .catch(() => {}) // Ignore if not assigned
+                .catch(() => {}), // Ignore if not assigned
             );
           }
         });
@@ -305,7 +350,7 @@ const SubjectsTab: React.FC<SubjectsTabProps> = ({
 
     try {
       const response = await teacherSubjectAssignmentsApi.getBySubject(
-        subject.subject_id
+        subject.subject_id,
       );
       setSubjectTeachers(response.data?.data || []);
     } catch (error) {
@@ -350,6 +395,7 @@ const SubjectsTab: React.FC<SubjectsTabProps> = ({
             onClick={() => {
               setCurrentStep(1);
               setShowCreateModal(true);
+              loadCategories();
             }}
           >
             Add Subject
@@ -375,6 +421,12 @@ const SubjectsTab: React.FC<SubjectsTabProps> = ({
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary-light dark:text-text-secondary-dark/70 uppercase tracking-wider">
                     Description
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary-light dark:text-text-secondary-dark/70 uppercase tracking-wider">
+                    Category
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary-light dark:text-text-secondary-dark/70 uppercase tracking-wider">
+                    Max Marks
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary-light dark:text-text-secondary-dark/70 uppercase tracking-wider">
                     Grades
@@ -413,6 +465,12 @@ const SubjectsTab: React.FC<SubjectsTabProps> = ({
                         {item.description || "No description"}
                       </td>
                       <td className="px-4 py-3 text-sm text-text-secondary-light dark:text-text-secondary-dark/70">
+                        {item.category_name || "—"}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-text-secondary-light dark:text-text-secondary-dark/70">
+                        {item.max_marks || "—"}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-text-secondary-light dark:text-text-secondary-dark/70">
                         {item.grades && item.grades.length > 0
                           ? item.grades.map((g) => g.grade_name).join(", ")
                           : "No grades assigned"}
@@ -421,7 +479,7 @@ const SubjectsTab: React.FC<SubjectsTabProps> = ({
                         {item.grades && item.grades.length > 0
                           ? [
                               ...new Set(
-                                item.grades.map((g) => g.program_name)
+                                item.grades.map((g) => g.program_name),
                               ),
                             ].join(", ")
                           : "No programs"}
@@ -544,6 +602,44 @@ const SubjectsTab: React.FC<SubjectsTabProps> = ({
               }
               placeholder="Optional description"
             />
+
+            <Select
+              label="Course Category"
+              value={formData.course_category_id?.toString() || ""}
+              onChange={(e) =>
+                setFormData((prev) => ({
+                  ...prev,
+                  course_category_id: e.target.value
+                    ? parseInt(e.target.value)
+                    : null,
+                }))
+              }
+              disabled={loadingCategories}
+              options={
+                loadingCategories
+                  ? [{ value: "", label: "Loading categories..." }]
+                  : [
+                      { value: "", label: "No category" },
+                      ...categories.map((category) => ({
+                        value: category.category_id,
+                        label: category.name,
+                      })),
+                    ]
+              }
+            />
+
+            <Input
+              label="Max Marks"
+              type="number"
+              value={formData.max_marks?.toString() || ""}
+              onChange={(e) =>
+                setFormData((prev) => ({
+                  ...prev,
+                  max_marks: e.target.value ? parseInt(e.target.value) : null,
+                }))
+              }
+              placeholder="e.g., 100"
+            />
           </div>
         ) : (
           <div className="space-y-6">
@@ -589,7 +685,7 @@ const SubjectsTab: React.FC<SubjectsTabProps> = ({
                       {Math.round(
                         (gradeAssignments.filter((a) => a.is_assigned).length /
                           gradeAssignments.length) *
-                          100
+                          100,
                       )}
                       %
                     </div>
@@ -693,7 +789,7 @@ const SubjectsTab: React.FC<SubjectsTabProps> = ({
                           ...a,
                           is_selected: false,
                           is_assigned: false,
-                        }))
+                        })),
                       );
                     }}
                     className="px-4 py-2 text-sm font-medium text-gray-600 bg-gray-50 hover:bg-gray-100 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600 rounded-full transition-all duration-200 hover:shadow-md"
@@ -708,7 +804,7 @@ const SubjectsTab: React.FC<SubjectsTabProps> = ({
                           ...a,
                           is_selected: true,
                           is_assigned: true,
-                        }))
+                        })),
                       );
                     }}
                     className="px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:text-blue-400 dark:hover:bg-blue-900/30 rounded-full transition-all duration-200 hover:shadow-md"
@@ -720,7 +816,7 @@ const SubjectsTab: React.FC<SubjectsTabProps> = ({
                     onClick={() => {
                       // Select only grades from the same program as the first selected grade
                       const selectedAssignments = gradeAssignments.filter(
-                        (a) => a.is_selected
+                        (a) => a.is_selected,
                       );
                       if (selectedAssignments.length > 0) {
                         const targetProgram =
@@ -730,7 +826,7 @@ const SubjectsTab: React.FC<SubjectsTabProps> = ({
                             ...a,
                             is_selected: a.program_name === targetProgram,
                             is_assigned: a.program_name === targetProgram,
-                          }))
+                          })),
                         );
                       }
                     }}
@@ -766,8 +862,8 @@ const SubjectsTab: React.FC<SubjectsTabProps> = ({
             {currentStep === 1
               ? "Next: Assign Grades"
               : submitting
-              ? "Creating..."
-              : "Create Subject"}
+                ? "Creating..."
+                : "Create Subject"}
           </Button>
         </div>
       </Modal>
@@ -861,6 +957,44 @@ const SubjectsTab: React.FC<SubjectsTabProps> = ({
               }
               placeholder="Optional description"
             />
+
+            <Select
+              label="Course Category"
+              value={formData.course_category_id?.toString() || ""}
+              onChange={(e) =>
+                setFormData((prev) => ({
+                  ...prev,
+                  course_category_id: e.target.value
+                    ? parseInt(e.target.value)
+                    : null,
+                }))
+              }
+              disabled={loadingCategories}
+              options={
+                loadingCategories
+                  ? [{ value: "", label: "Loading categories..." }]
+                  : [
+                      { value: "", label: "No category" },
+                      ...categories.map((category) => ({
+                        value: category.category_id,
+                        label: category.name,
+                      })),
+                    ]
+              }
+            />
+
+            <Input
+              label="Max Marks"
+              type="number"
+              value={formData.max_marks?.toString() || ""}
+              onChange={(e) =>
+                setFormData((prev) => ({
+                  ...prev,
+                  max_marks: e.target.value ? parseInt(e.target.value) : null,
+                }))
+              }
+              placeholder="e.g., 100"
+            />
           </div>
         ) : (
           <div className="space-y-6">
@@ -905,7 +1039,7 @@ const SubjectsTab: React.FC<SubjectsTabProps> = ({
                       {Math.round(
                         (gradeAssignments.filter((a) => a.is_assigned).length /
                           gradeAssignments.length) *
-                          100
+                          100,
                       )}
                       %
                     </div>
@@ -1009,7 +1143,7 @@ const SubjectsTab: React.FC<SubjectsTabProps> = ({
                           ...a,
                           is_selected: a.is_currently_assigned,
                           is_assigned: a.is_currently_assigned,
-                        }))
+                        })),
                       );
                     }}
                     className="px-4 py-2 text-sm font-medium text-orange-600 bg-orange-50 hover:bg-orange-100 dark:bg-orange-900/20 dark:text-orange-400 dark:hover:bg-orange-900/30 rounded-full transition-all duration-200 hover:shadow-md"
@@ -1024,7 +1158,7 @@ const SubjectsTab: React.FC<SubjectsTabProps> = ({
                           ...a,
                           is_selected: false,
                           is_assigned: false,
-                        }))
+                        })),
                       );
                     }}
                     className="px-4 py-2 text-sm font-medium text-gray-600 bg-gray-50 hover:bg-gray-100 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600 rounded-full transition-all duration-200 hover:shadow-md"
@@ -1039,7 +1173,7 @@ const SubjectsTab: React.FC<SubjectsTabProps> = ({
                           ...a,
                           is_selected: true,
                           is_assigned: true,
-                        }))
+                        })),
                       );
                     }}
                     className="px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:text-blue-400 dark:hover:bg-blue-900/30 rounded-full transition-all duration-200 hover:shadow-md"
@@ -1051,7 +1185,7 @@ const SubjectsTab: React.FC<SubjectsTabProps> = ({
                     onClick={() => {
                       // Select only grades from the same program as the first selected grade
                       const selectedAssignments = gradeAssignments.filter(
-                        (a) => a.is_selected
+                        (a) => a.is_selected,
                       );
                       if (selectedAssignments.length > 0) {
                         const targetProgram =
@@ -1061,7 +1195,7 @@ const SubjectsTab: React.FC<SubjectsTabProps> = ({
                             ...a,
                             is_selected: a.program_name === targetProgram,
                             is_assigned: a.program_name === targetProgram,
-                          }))
+                          })),
                         );
                       }
                     }}
@@ -1098,8 +1232,8 @@ const SubjectsTab: React.FC<SubjectsTabProps> = ({
             {currentStep === 1
               ? "Next: Manage Assignments"
               : submitting
-              ? "Updating..."
-              : "Update Subject"}
+                ? "Updating..."
+                : "Update Subject"}
           </Button>
         </div>
       </Modal>

@@ -16,7 +16,6 @@ interface ProgramsTabProps {
 }
 
 const ProgramsTab: React.FC<ProgramsTabProps> = ({
-  user,
   loadingPrograms,
   userPrograms,
   hasPermission,
