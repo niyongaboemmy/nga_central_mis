@@ -3,6 +3,7 @@ import { db } from "../db";
 import { Parenting, User, UserProfile } from "../db/schema";
 import { eq, and, sql } from "drizzle-orm";
 import { AppError } from "../middleware/errorHandler";
+import { recordActivity } from "../utils/activityLogger";
 
 export const getParents = async (req: Request, res: Response) => {
   const { studentId } = req.params;
@@ -102,6 +103,28 @@ export const assignParent = async (req: Request, res: Response) => {
       parent_id,
       relationship: relationship || "PARENT",
     });
+
+    // Record activity for student
+    await recordActivity(
+      student_id,
+      "FAMILY_LINK",
+      `Linked to parent (ID: ${parent_id})`,
+      "Parenting",
+      undefined,
+      { parent_id, relationship, assigned_by: (req as any).user?.userId },
+      (req as any).user?.userId,
+    );
+
+    // Record activity for parent
+    await recordActivity(
+      parent_id,
+      "FAMILY_LINK",
+      `Linked to student (ID: ${student_id})`,
+      "Parenting",
+      undefined,
+      { student_id, relationship, assigned_by: (req as any).user?.userId },
+      (req as any).user?.userId,
+    );
 
     res.json({ success: true, message: "Parent assigned successfully" });
   } catch (error) {

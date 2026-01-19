@@ -8,6 +8,7 @@ import {
 } from "../errors/CustomError";
 import { successResponse } from "../utils/response";
 import { asyncHandler } from "../middleware/asyncHandler";
+import { recordActivity } from "../utils/activityLogger";
 import { sanitizeString } from "../utils/sanitization";
 import logger from "../utils/logger";
 
@@ -100,6 +101,19 @@ export const createRole = asyncHandler(async (req: any, res: any) => {
     .where(eq(Role.name, sanitizedName))
     .limit(1);
 
+  // Record activity
+  if (req.user?.userId) {
+    await recordActivity(
+      req.user.userId,
+      "ROLE_CREATE",
+      `Role created: ${sanitizedName}`,
+      "Role",
+      createdRole[0].role_id,
+      { name: sanitizedName, description },
+      req.user.userId,
+    );
+  }
+
   successResponse(res, "Role created successfully", createdRole[0], 201);
 });
 
@@ -159,6 +173,19 @@ export const updateRole = asyncHandler(async (req: any, res: any) => {
     .from(Role)
     .where(eq(Role.role_id, roleId))
     .limit(1);
+
+  // Record activity
+  if (req.user?.userId) {
+    await recordActivity(
+      req.user.userId,
+      "ROLE_UPDATE",
+      `Role updated: ${updatedRole[0].name}`,
+      "Role",
+      roleId,
+      { ...req.body },
+      req.user.userId,
+    );
+  }
 
   successResponse(res, "Role updated successfully", updatedRole[0]);
 });
@@ -310,7 +337,7 @@ export const createPermission = asyncHandler(async (req: any, res: any) => {
     res,
     "Permission created successfully",
     createdPermission[0],
-    201
+    201,
   );
 });
 
@@ -344,7 +371,7 @@ export const updatePermission = asyncHandler(async (req: any, res: any) => {
       .select()
       .from(Permission)
       .where(
-        and(eq(Permission.name, sanitizedName), eq(Permission.perm_id, permId))
+        and(eq(Permission.name, sanitizedName), eq(Permission.perm_id, permId)),
       )
       .limit(1);
 
@@ -480,8 +507,21 @@ export const assignPermissionsToRole = asyncHandler(
 
     logger.info(`Permissions assigned to role: ${role[0].name}`);
 
+    // Record activity
+    if (req.user?.userId) {
+      await recordActivity(
+        req.user.userId,
+        "ROLE_PERMISSIONS_ASSIGN",
+        `Permissions assigned to role: ${role[0].name}`,
+        "Role",
+        parseInt(roleId),
+        { permissionIds },
+        req.user.userId,
+      );
+    }
+
     successResponse(res, "Permissions assigned successfully");
-  }
+  },
 );
 
 export const getRolePermissions = asyncHandler(async (req: any, res: any) => {
@@ -588,8 +628,8 @@ export const removeRoleFromUser = asyncHandler(async (req: any, res: any) => {
     .where(
       and(
         eq(UserRole.user_id, parseInt(userId)),
-        eq(UserRole.role_id, parseInt(roleId))
-      )
+        eq(UserRole.role_id, parseInt(roleId)),
+      ),
     );
 
   successResponse(res, "Role removed from user successfully");

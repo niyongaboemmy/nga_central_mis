@@ -414,6 +414,7 @@ const Users: React.FC = () => {
                   if (!loading) {
                     setSelectedStatus("ACTIVE");
                     setPagination((prev) => ({ ...prev, page: 1 }));
+                    loadUsers(selectedRole, "ACTIVE");
                   }
                 }}
                 className={`px-4 py-2 ${loading ? "cursor-not-allowed" : ""} text-sm font-medium transition-all whitespace-nowrap ${
@@ -430,6 +431,7 @@ const Users: React.FC = () => {
                   if (!loading) {
                     setSelectedStatus("INACTIVE");
                     setPagination((prev) => ({ ...prev, page: 1 }));
+                    loadUsers(selectedRole, "INACTIVE");
                   }
                 }}
                 className={`px-4 py-2 ${loading ? "cursor-not-allowed" : ""} text-sm font-medium transition-all whitespace-nowrap ${

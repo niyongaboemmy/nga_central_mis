@@ -47,6 +47,7 @@ import emailService from "../utils/email";
 import * as XLSX from "xlsx";
 import * as fs from "fs";
 import * as path from "path";
+import { recordActivity } from "../utils/activityLogger";
 
 // Helper function to convert date to MySQL DATE format
 const formatDateForMySQL = (dateStr: string | undefined) => {
@@ -160,6 +161,17 @@ export const updateCurrentUserProfile = asyncHandler(
       .where(eq(UserProfile.user_id, userId))
       .limit(1);
 
+    // Record activity
+    await recordActivity(
+      userId,
+      "PROFILE_UPDATE",
+      "User updated their personal profile information",
+      "UserProfile",
+      userId,
+      { ...req.body },
+      userId,
+    );
+
     successResponse(
       res,
       "Profile updated successfully",
@@ -265,6 +277,17 @@ export const updateUserProfile = asyncHandler(async (req: any, res: any) => {
     .from(UserProfile)
     .where(eq(UserProfile.user_id, userId))
     .limit(1);
+
+  // Record activity
+  await recordActivity(
+    userId,
+    "PROFILE_UPDATE",
+    "Administrator updated the user profile",
+    "UserProfile",
+    userId,
+    { ...req.body, updatedBy: req.user?.userId },
+    req.user?.userId,
+  );
 
   successResponse(
     res,
@@ -810,6 +833,19 @@ export const createUser = asyncHandler(async (req: any, res: any) => {
     await db.insert(UserRole).values(roleInserts);
   }
 
+  // Record activity
+  if (req.user?.userId) {
+    await recordActivity(
+      newUserId,
+      "USER_CREATE",
+      `Created user: ${sanitizedUsername}`,
+      "User",
+      newUserId,
+      { username: sanitizedUsername, email: sanitizedEmail, roles },
+      req.user.userId,
+    );
+  }
+
   successResponse(res, "User created successfully", null, 201);
 });
 
@@ -884,6 +920,19 @@ export const updateUser = asyncHandler(async (req: any, res: any) => {
 
   await db.update(User).set(updateData).where(eq(User.user_id, userId));
 
+  // Record activity
+  if (req.user?.userId) {
+    await recordActivity(
+      userId,
+      "USER_UPDATE",
+      `Updated user: ${sanitizedUsername || "ID " + userId}`,
+      "User",
+      userId,
+      updateData,
+      req.user.userId,
+    );
+  }
+
   successResponse(res, "User updated successfully");
 });
 
@@ -917,6 +966,19 @@ export const deleteUser = asyncHandler(async (req: any, res: any) => {
   });
 
   await db.delete(User).where(eq(User.user_id, userId));
+
+  // Record activity
+  if (req.user?.userId) {
+    await recordActivity(
+      userId,
+      "USER_DELETE",
+      `Deleted user ID: ${userId}`,
+      "User",
+      userId,
+      undefined,
+      req.user.userId,
+    );
+  }
 
   successResponse(res, "User deleted successfully");
 });
@@ -1131,6 +1193,19 @@ export const bulkCreateUsers = asyncHandler(async (req: any, res: any) => {
     uploadedBy: req.user?.userId,
     roleId: role_id,
   });
+
+  // Record activity
+  if (req.user?.userId && successCount > 0) {
+    await recordActivity(
+      req.user.userId,
+      "USER_BULK_CREATE",
+      `Bulk created ${successCount} users via Excel upload`,
+      "User",
+      undefined,
+      { successCount, failedCount, totalRows: data.length, roleId: role_id },
+      req.user.userId,
+    );
+  }
 
   successResponse(
     res,
@@ -1351,6 +1426,19 @@ export const assignRoleToUser = asyncHandler(async (req: any, res: any) => {
     role_id: roleId,
   });
 
+  // Record activity
+  if (req.user?.userId) {
+    await recordActivity(
+      userId,
+      "ROLE_ASSIGN",
+      `User assigned to role: ${role[0].name}`,
+      "UserRole",
+      userId,
+      { role_id: roleId, role_name: role[0].name },
+      req.user.userId,
+    );
+  }
+
   successResponse(res, "Role assigned to user successfully");
 });
 
@@ -1408,6 +1496,19 @@ export const removeRoleFromUser = asyncHandler(async (req: any, res: any) => {
     .delete(UserRole)
     .where(and(eq(UserRole.user_id, userId), eq(UserRole.role_id, roleIdNum)));
 
+  // Record activity
+  if (req.user?.userId) {
+    await recordActivity(
+      userId,
+      "ROLE_REMOVE",
+      `Role ${role[0]?.name || "ID " + roleIdNum} removed from user`,
+      "UserRole",
+      userId,
+      { role_id: roleIdNum, role_name: role[0]?.name },
+      req.user.userId,
+    );
+  }
+
   successResponse(res, "Role removed from user successfully");
 });
 
@@ -1447,6 +1548,19 @@ export const disableUser = asyncHandler(async (req: any, res: any) => {
     .set({ status: "INACTIVE" })
     .where(eq(User.user_id, userId));
 
+  // Record activity
+  if (req.user?.userId) {
+    await recordActivity(
+      userId,
+      "ACCOUNT_DISABLE",
+      "User account was disabled by administrator",
+      "User",
+      userId,
+      { disabled_by: req.user.userId },
+      req.user.userId,
+    );
+  }
+
   successResponse(res, "User disabled successfully");
 });
 
@@ -1480,6 +1594,19 @@ export const enableUser = asyncHandler(async (req: any, res: any) => {
     .update(User)
     .set({ status: "ACTIVE" })
     .where(eq(User.user_id, userId));
+
+  // Record activity
+  if (req.user?.userId) {
+    await recordActivity(
+      userId,
+      "ACCOUNT_ENABLE",
+      "User account was enabled by administrator",
+      "User",
+      userId,
+      { enabled_by: req.user.userId },
+      req.user.userId,
+    );
+  }
 
   successResponse(res, "User enabled successfully");
 });
@@ -2166,6 +2293,19 @@ export const assignGradeToUser = asyncHandler(async (req: any, res: any) => {
     grade_id: gradeId,
   });
 
+  // Record activity
+  if (req.user?.userId) {
+    await recordActivity(
+      userId,
+      "GRADE_ASSIGN_TO_TEACHER",
+      `Grade assigned to teacher`,
+      "UserGrade",
+      gradeId,
+      { teacher_id: userId, grade_id: gradeId },
+      req.user.userId,
+    );
+  }
+
   successResponse(res, "Grade assigned to user successfully");
 });
 
@@ -2204,6 +2344,19 @@ export const removeGradeFromUser = asyncHandler(async (req: any, res: any) => {
     .where(
       and(eq(UserGrade.user_id, userId), eq(UserGrade.grade_id, gradeIdNum)),
     );
+
+  // Record activity
+  if (req.user?.userId) {
+    await recordActivity(
+      userId,
+      "GRADE_REMOVE_FROM_TEACHER",
+      `Grade removed from teacher`,
+      "UserGrade",
+      gradeIdNum,
+      { teacher_id: userId, grade_id: gradeIdNum },
+      req.user.userId,
+    );
+  }
 
   successResponse(res, "Grade removed from user successfully");
 });

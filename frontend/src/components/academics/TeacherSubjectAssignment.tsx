@@ -165,7 +165,7 @@ const TeacherSubjectAssignment: React.FC<TeacherSubjectAssignmentProps> = ({
         selectedAssignment.user_id,
         selectedAssignment.subject_id,
         selectedAssignment.class_group_id,
-        selectedAssignment.academic_term_id
+        selectedAssignment.academic_term_id,
       );
 
       setShowDeleteModal(false);
@@ -207,7 +207,7 @@ const TeacherSubjectAssignment: React.FC<TeacherSubjectAssignmentProps> = ({
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
                 Subject Assignments
               </h3>
-              <p className="text-sm text-gray-500 dark:text-gray-400">
+              <p className="text-sm text-gray-500 dark:text-gray-400/50">
                 {assignments.length} active assignment
                 {assignments.length !== 1 ? "s" : ""}
               </p>
@@ -235,7 +235,7 @@ const TeacherSubjectAssignment: React.FC<TeacherSubjectAssignmentProps> = ({
             <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
               No subject assignments
             </h3>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
+            <p className="text-sm text-gray-500 dark:text-gray-400/50 mb-6">
               This teacher hasn't been assigned to any subjects yet.
             </p>
             {hasPermission(Permissions.ASSIGN_TEACHER_SUBJECTS) && (
@@ -250,7 +250,7 @@ const TeacherSubjectAssignment: React.FC<TeacherSubjectAssignmentProps> = ({
               ([termKey, termAssignments]) => (
                 <div key={termKey} className="space-y-3">
                   <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
-                    <Calendar className="w-4 h-4" />
+                    <Calendar className="w-4 h-4 text-blue-500 dark:text-blue-500" />
                     {termKey}
                   </h4>
                   <div className="grid gap-3">
@@ -273,7 +273,7 @@ const TeacherSubjectAssignment: React.FC<TeacherSubjectAssignmentProps> = ({
                                   </span>
                                 )}
                               </h5>
-                              <div className="flex items-center gap-4 text-sm text-gray-500 dark:text-gray-400">
+                              <div className="flex items-center gap-4 text-sm text-gray-500 dark:text-gray-400/50">
                                 <span className="flex items-center gap-1">
                                   <Users className="w-3 h-3" />
                                   {assignment.class_group_name}
@@ -290,11 +290,11 @@ const TeacherSubjectAssignment: React.FC<TeacherSubjectAssignmentProps> = ({
                             <span className="text-xs text-gray-400">
                               Assigned{" "}
                               {new Date(
-                                assignment.assigned_at
+                                assignment.assigned_at,
                               ).toLocaleDateString()}
                             </span>
                             {hasPermission(
-                              Permissions.ASSIGN_TEACHER_SUBJECTS
+                              Permissions.ASSIGN_TEACHER_SUBJECTS,
                             ) && (
                               <button
                                 onClick={() => handleDelete(assignment)}
@@ -309,7 +309,7 @@ const TeacherSubjectAssignment: React.FC<TeacherSubjectAssignmentProps> = ({
                     ))}
                   </div>
                 </div>
-              )
+              ),
             )}
           </div>
         )}

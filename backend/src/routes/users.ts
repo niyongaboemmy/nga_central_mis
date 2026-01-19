@@ -27,6 +27,7 @@ import {
   getUsersByGrade,
   getSubjectsByGrade,
 } from "../controllers/userController";
+import { getUserActivities } from "../controllers/activityController";
 import { authenticate, authorize } from "../middleware/auth";
 
 const router = express.Router();
@@ -63,6 +64,7 @@ router.get(
 router.get("/search", authenticate, searchUsers);
 router.get("/:id", authenticate, getUser);
 router.get("/:id/programs", authenticate, getUserPrograms);
+router.get("/:userId/activities", authenticate, getUserActivities);
 router.put(
   "/:id/profile",
   authenticate,

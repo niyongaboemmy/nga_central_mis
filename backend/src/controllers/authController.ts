@@ -29,6 +29,7 @@ import { successResponse } from "../utils/response";
 import { asyncHandler } from "../middleware/asyncHandler";
 import config from "../config";
 import logger from "../utils/logger";
+import { recordActivity } from "../utils/activityLogger";
 
 export const login = asyncHandler(async (req: any, res: any) => {
   const { username, password } = req.body;
@@ -271,6 +272,17 @@ export const verifyOTP = asyncHandler(async (req: any, res: any) => {
 
   logger.info(`OTP verified, login completed for user: ${user[0].username}`);
 
+  // Record activity
+  await recordActivity(
+    userId,
+    "LOGIN_SUCCESS",
+    "User successfully logged in via 2FA",
+    "User",
+    userId,
+    { method: "OTP_EMAIL", timestamp: new Date().toISOString() },
+    userId,
+  );
+
   successResponse(res, "Login successful", {
     token,
     user: user[0],
@@ -413,6 +425,17 @@ export const resetPassword = asyncHandler(async (req: any, res: any) => {
 
   logger.info(`Password reset completed for userId: ${userId}`);
 
+  // Record activity
+  await recordActivity(
+    userId,
+    "PASSWORD_RESET",
+    "User successfully reset their password",
+    "AuthCredential",
+    userId,
+    undefined,
+    userId,
+  );
+
   successResponse(
     res,
     "Password has been reset successfully. You can now login with your new password.",
@@ -469,6 +492,17 @@ export const changePassword = asyncHandler(async (req: any, res: any) => {
     .where(eq(AuthCredential.user_id, userId));
 
   logger.info(`Password changed for userId: ${userId}`);
+
+  // Record activity
+  await recordActivity(
+    userId,
+    "PASSWORD_CHANGE",
+    "User successfully changed their password",
+    "AuthCredential",
+    userId,
+    undefined,
+    userId,
+  );
 
   successResponse(res, "Password changed successfully");
 });

@@ -24,6 +24,7 @@ import {
 } from "../errors/CustomError";
 import { successResponse } from "../utils/response";
 import { asyncHandler } from "../middleware/asyncHandler";
+import { recordActivity } from "../utils/activityLogger";
 import logger from "../utils/logger";
 
 // Helper function to format date for MySQL
@@ -113,6 +114,20 @@ export const createAcademicYear = asyncHandler(async (req: any, res: any) => {
   });
 
   logger.info("Academic year created", { name: sanitizedName });
+  const academicYearId = (result as any).insertId;
+
+  // Record activity
+  if (req.user?.userId) {
+    await recordActivity(
+      req.user.userId,
+      "ACADEMIC_YEAR_CREATE",
+      `Created academic year: ${sanitizedName}`,
+      "AcademicYear",
+      academicYearId,
+      { name: sanitizedName, start_date, end_date, is_current },
+      req.user.userId,
+    );
+  }
 
   successResponse(res, "Academic year created successfully", null, 201);
 });
@@ -192,6 +207,19 @@ export const updateAcademicYear = asyncHandler(async (req: any, res: any) => {
 
   logger.info("Academic year updated", { academicYearId });
 
+  // Record activity
+  if (req.user?.userId) {
+    await recordActivity(
+      req.user.userId,
+      "ACADEMIC_YEAR_UPDATE",
+      `Updated academic year: ${updateData.name || "ID " + academicYearId}`,
+      "AcademicYear",
+      academicYearId,
+      updateData,
+      req.user.userId,
+    );
+  }
+
   successResponse(res, "Academic year updated successfully");
 });
 
@@ -230,6 +258,19 @@ export const deleteAcademicYear = asyncHandler(async (req: any, res: any) => {
     .where(eq(AcademicYear.academic_year_id, academicYearId));
 
   logger.info("Academic year deleted", { academicYearId });
+
+  // Record activity
+  if (req.user?.userId) {
+    await recordActivity(
+      req.user.userId,
+      "ACADEMIC_YEAR_DELETE",
+      `Deleted academic year ID: ${academicYearId}`,
+      "AcademicYear",
+      academicYearId,
+      undefined,
+      req.user.userId,
+    );
+  }
 
   successResponse(res, "Academic year deleted successfully");
 });
@@ -331,6 +372,27 @@ export const createAcademicTerm = asyncHandler(async (req: any, res: any) => {
     academicYearId: yearId,
   });
 
+  const academicTermId = (result as any).insertId;
+
+  // Record activity
+  if (req.user?.userId) {
+    await recordActivity(
+      req.user.userId,
+      "ACADEMIC_TERM_CREATE",
+      `Created academic term: ${sanitizedName}`,
+      "AcademicTerm",
+      academicTermId,
+      {
+        name: sanitizedName,
+        academic_year_id: yearId,
+        start_date,
+        end_date,
+        is_current,
+      },
+      req.user.userId,
+    );
+  }
+
   successResponse(res, "Academic term created successfully", null, 201);
 });
 
@@ -413,6 +475,19 @@ export const updateAcademicTerm = asyncHandler(async (req: any, res: any) => {
 
   logger.info("Academic term updated", { academicTermId });
 
+  // Record activity
+  if (req.user?.userId) {
+    await recordActivity(
+      req.user.userId,
+      "ACADEMIC_TERM_UPDATE",
+      `Updated academic term ID: ${academicTermId}`,
+      "AcademicTerm",
+      academicTermId,
+      { ...req.body },
+      req.user.userId,
+    );
+  }
+
   successResponse(res, "Academic term updated successfully");
 });
 
@@ -439,6 +514,19 @@ export const deleteAcademicTerm = asyncHandler(async (req: any, res: any) => {
     .where(eq(AcademicTerm.academic_term_id, academicTermId));
 
   logger.info("Academic term deleted", { academicTermId });
+
+  // Record activity
+  if (req.user?.userId) {
+    await recordActivity(
+      req.user.userId,
+      "ACADEMIC_TERM_DELETE",
+      `Deleted academic term ID: ${academicTermId}`,
+      "AcademicTerm",
+      academicTermId,
+      undefined,
+      req.user.userId,
+    );
+  }
 
   successResponse(res, "Academic term deleted successfully");
 });
@@ -501,7 +589,22 @@ export const createProgram = asyncHandler(async (req: any, res: any) => {
     description: sanitizedDescription || null,
   });
 
+  const programId = (result as any).insertId;
+
   logger.info("Program created", { name: sanitizedName });
+
+  // Record activity
+  if (req.user?.userId) {
+    await recordActivity(
+      req.user.userId,
+      "PROGRAM_CREATE",
+      `Created program: ${sanitizedName}`,
+      "Program",
+      programId,
+      { name: sanitizedName, description },
+      req.user.userId,
+    );
+  }
 
   successResponse(res, "Program created successfully", null, 201);
 });
@@ -558,6 +661,19 @@ export const updateProgram = asyncHandler(async (req: any, res: any) => {
 
   logger.info("Program updated", { programId });
 
+  // Record activity
+  if (req.user?.userId) {
+    await recordActivity(
+      req.user.userId,
+      "PROGRAM_UPDATE",
+      `Updated program: ${updateData.name || "ID " + programId}`,
+      "Program",
+      programId,
+      updateData,
+      req.user.userId,
+    );
+  }
+
   successResponse(res, "Program updated successfully");
 });
 
@@ -592,6 +708,19 @@ export const deleteProgram = asyncHandler(async (req: any, res: any) => {
   await db.delete(Program).where(eq(Program.program_id, programId));
 
   logger.info("Program deleted", { programId });
+
+  // Record activity
+  if (req.user?.userId) {
+    await recordActivity(
+      req.user.userId,
+      "PROGRAM_DELETE",
+      `Deleted program ID: ${programId}`,
+      "Program",
+      programId,
+      undefined,
+      req.user.userId,
+    );
+  }
 
   successResponse(res, "Program deleted successfully");
 });
@@ -709,7 +838,22 @@ export const createGrade = asyncHandler(async (req: any, res: any) => {
     level_order: levelOrderNum,
   });
 
+  const gradeId = (result as any).insertId;
+
   logger.info("Grade created", { name: sanitizedName, programId: progId });
+
+  // Record activity
+  if (req.user?.userId) {
+    await recordActivity(
+      req.user.userId,
+      "GRADE_CREATE",
+      `Created grade: ${sanitizedName} in program ID ${progId}`,
+      "Grade",
+      gradeId,
+      { name: sanitizedName, program_id: progId, level_order: levelOrderNum },
+      req.user.userId,
+    );
+  }
 
   successResponse(res, "Grade created successfully", null, 201);
 });
@@ -771,6 +915,19 @@ export const updateGrade = asyncHandler(async (req: any, res: any) => {
 
   logger.info("Grade updated", { gradeId });
 
+  // Record activity
+  if (req.user?.userId) {
+    await recordActivity(
+      req.user.userId,
+      "GRADE_UPDATE",
+      `Updated grade ID: ${gradeId}`,
+      "Grade",
+      gradeId,
+      { ...req.body },
+      req.user.userId,
+    );
+  }
+
   successResponse(res, "Grade updated successfully");
 });
 
@@ -805,6 +962,19 @@ export const deleteGrade = asyncHandler(async (req: any, res: any) => {
   await db.delete(Grade).where(eq(Grade.grade_id, gradeId));
 
   logger.info("Grade deleted", { gradeId });
+
+  // Record activity
+  if (req.user?.userId) {
+    await recordActivity(
+      req.user.userId,
+      "GRADE_DELETE",
+      `Deleted grade ID: ${gradeId}`,
+      "Grade",
+      gradeId,
+      undefined,
+      req.user.userId,
+    );
+  }
 
   successResponse(res, "Grade deleted successfully");
 });
@@ -963,7 +1133,21 @@ export const createSubject = asyncHandler(async (req: any, res: any) => {
     description: sanitizedDescription || null,
   });
 
+  const subjectId = (result as any).insertId;
   logger.info("Subject created", { name: sanitizedName });
+
+  // Record activity
+  if (req.user?.userId) {
+    await recordActivity(
+      req.user.userId,
+      "SUBJECT_CREATE",
+      `Created subject: ${sanitizedName}`,
+      "Subject",
+      subjectId,
+      { name: sanitizedName, description, code },
+      req.user.userId,
+    );
+  }
 
   successResponse(res, "Subject created successfully", null, 201);
 });
@@ -1026,6 +1210,19 @@ export const updateSubject = asyncHandler(async (req: any, res: any) => {
 
   logger.info("Subject updated", { subjectId });
 
+  // Record activity
+  if (req.user?.userId) {
+    await recordActivity(
+      req.user.userId,
+      "SUBJECT_UPDATE",
+      `Updated subject: ${updateData.name || "ID " + subjectId}`,
+      "Subject",
+      subjectId,
+      updateData,
+      req.user.userId,
+    );
+  }
+
   successResponse(res, "Subject updated successfully");
 });
 
@@ -1054,6 +1251,19 @@ export const deleteSubject = asyncHandler(async (req: any, res: any) => {
     .where(eq(Subject.subject_id, subjectId));
 
   logger.info("Subject disabled", { subjectId });
+
+  // Record activity
+  if (req.user?.userId) {
+    await recordActivity(
+      req.user.userId,
+      "SUBJECT_DELETE",
+      `Disabled subject ID: ${subjectId}`,
+      "Subject",
+      subjectId,
+      undefined,
+      req.user.userId,
+    );
+  }
 
   successResponse(res, "Subject disabled successfully");
 });
@@ -1182,6 +1392,19 @@ export const assignSubjectToGrade = asyncHandler(async (req: any, res: any) => {
 
   logger.info("Subject assigned to grade", { gradeId, subjectId });
 
+  // Record activity
+  if (req.user?.userId) {
+    await recordActivity(
+      req.user.userId,
+      "GRADE_SUBJECT_ASSIGN",
+      `Assigned subject ID ${subjectId} to grade ID ${gradeId}`,
+      "GradeSubject",
+      undefined,
+      { grade_id: gradeId, subject_id: subjectId },
+      req.user.userId,
+    );
+  }
+
   successResponse(res, "Subject assigned to grade successfully", null, 201);
 });
 
@@ -1222,6 +1445,19 @@ export const removeSubjectFromGrade = asyncHandler(
       );
 
     logger.info("Subject removed from grade", { gradeId, subjectId });
+
+    // Record activity
+    if (req.user?.userId) {
+      await recordActivity(
+        req.user.userId,
+        "GRADE_SUBJECT_REMOVE",
+        `Removed subject ID ${subjectId} from grade ID ${gradeId}`,
+        "GradeSubject",
+        undefined,
+        { grade_id: gradeId, subject_id: subjectId },
+        req.user.userId,
+      );
+    }
 
     successResponse(res, "Subject removed from grade successfully");
   },
@@ -1458,12 +1694,35 @@ export const assignTeacherToSubject = asyncHandler(
       academic_term_id: academicTermId,
     });
 
-    logger.info("Teacher assigned to subject", {
+    logger.info(`Teacher ID: ${teacherId} assigned to subject ID: ${subjId}`);
+
+    // Record activity for teacher
+    await recordActivity(
       teacherId,
-      subjId,
-      classGroupId,
-      academicTermId,
-    });
+      "SUBJECT_ASSIGN",
+      `You have been assigned to subject ID: ${subjId}`,
+      "TeacherSubjectAssignment",
+      undefined,
+      {
+        subject_id: subjId,
+        academic_term_id: academicTermId,
+        assigning_user_id: req.user?.userId,
+      },
+      req.user?.userId,
+    );
+
+    // Record activity for admin
+    if (req.user?.userId && req.user.userId !== teacherId) {
+      await recordActivity(
+        req.user.userId,
+        "SUBJECT_ASSIGN_ADMIN",
+        `Assigned teacher ID: ${teacherId} to subject ID: ${subjId}`,
+        "TeacherSubjectAssignment",
+        undefined,
+        { teacherId, subjectId: subjId, academic_term_id: academicTermId },
+        req.user.userId,
+      );
+    }
 
     successResponse(res, "Teacher assigned to subject successfully", null, 201);
   },
@@ -1523,6 +1782,34 @@ export const removeTeacherFromSubject = asyncHandler(
       classGroupId,
       academicTermId,
     });
+
+    // Record activity for teacher
+    await recordActivity(
+      teacherId,
+      "SUBJECT_UNASSIGN",
+      `You have been removed from subject ID: ${subjId}`,
+      "TeacherSubjectAssignment",
+      undefined,
+      {
+        subject_id: subjId,
+        academic_term_id: academicTermId,
+        removing_user_id: req.user?.userId,
+      },
+      req.user?.userId,
+    );
+
+    // Record activity for admin
+    if (req.user?.userId && req.user.userId !== teacherId) {
+      await recordActivity(
+        req.user.userId,
+        "SUBJECT_UNASSIGN_ADMIN",
+        `Removed teacher ID: ${teacherId} from subject ID: ${subjId}`,
+        "TeacherSubjectAssignment",
+        undefined,
+        { teacherId, subjectId: subjId, academic_term_id: academicTermId },
+        req.user.userId,
+      );
+    }
 
     successResponse(res, "Teacher removed from subject successfully");
   },
@@ -1672,11 +1959,26 @@ export const createClassGroup = asyncHandler(async (req: any, res: any) => {
     name: sanitizedName,
   });
 
+  const classGroupId = (result as any).insertId;
+
   logger.info("Class group created", {
     name: sanitizedName,
     academicYearId: yearId,
     gradeId: grdId,
   });
+
+  // Record activity
+  if (req.user?.userId) {
+    await recordActivity(
+      req.user.userId,
+      "CLASS_GROUP_CREATE",
+      `Created class group: ${sanitizedName}`,
+      "ClassGroup",
+      classGroupId,
+      { name: sanitizedName, academic_year_id: yearId, grade_id: grdId },
+      req.user.userId,
+    );
+  }
 
   successResponse(res, "Class group created successfully", null, 201);
 });
@@ -1753,6 +2055,19 @@ export const updateClassGroup = asyncHandler(async (req: any, res: any) => {
 
   logger.info("Class group updated", { classGroupId });
 
+  // Record activity
+  if (req.user?.userId) {
+    await recordActivity(
+      req.user.userId,
+      "CLASS_GROUP_UPDATE",
+      `Updated class group: ${updateData.name || "ID " + classGroupId}`,
+      "ClassGroup",
+      classGroupId,
+      updateData,
+      req.user.userId,
+    );
+  }
+
   successResponse(res, "Class group updated successfully");
 });
 
@@ -1779,6 +2094,19 @@ export const deleteClassGroup = asyncHandler(async (req: any, res: any) => {
     .where(eq(ClassGroup.class_group_id, classGroupId));
 
   logger.info("Class group deleted", { classGroupId });
+
+  // Record activity
+  if (req.user?.userId) {
+    await recordActivity(
+      req.user.userId,
+      "CLASS_GROUP_DELETE",
+      `Deleted class group ID: ${classGroupId}`,
+      "ClassGroup",
+      classGroupId,
+      undefined,
+      req.user.userId,
+    );
+  }
 
   successResponse(res, "Class group deleted successfully");
 });
@@ -2232,7 +2560,35 @@ export const enrollStudentInSubject = asyncHandler(
       academic_term_id: termId,
     });
 
-    logger.info("Student enrolled in subject", { studentId, subjId, termId });
+    logger.info(`Student ID: ${studentId} enrolled in subject ID: ${subjId}`);
+
+    // Record activity for student
+    await recordActivity(
+      studentId,
+      "SUBJECT_ENROLL",
+      `You have been enrolled in subject ID: ${subjId}`,
+      "StudentSubjectEnrollment",
+      undefined,
+      {
+        subject_id: subjId,
+        academic_term_id: termId,
+        enrolling_user_id: req.user?.userId,
+      },
+      req.user?.userId,
+    );
+
+    // Record activity for admin
+    if (req.user?.userId && req.user.userId !== studentId) {
+      await recordActivity(
+        req.user.userId,
+        "SUBJECT_ENROLL_ADMIN",
+        `Enrolled student ID: ${studentId} in subject ID: ${subjId}`,
+        "StudentSubjectEnrollment",
+        undefined,
+        { studentId, subjectId: subjId, academic_term_id: termId },
+        req.user.userId,
+      );
+    }
 
     successResponse(res, "Student enrolled in subject successfully", null, 201);
   },
@@ -2284,6 +2640,34 @@ export const unenrollStudentFromSubject = asyncHandler(
       subjId,
       termId,
     });
+
+    // Record activity for student
+    await recordActivity(
+      studentId,
+      "SUBJECT_UNENROLL",
+      `You have been unenrolled from subject ID: ${subjId}`,
+      "StudentSubjectEnrollment",
+      undefined,
+      {
+        subject_id: subjId,
+        academic_term_id: termId,
+        unenrolling_user_id: req.user?.userId,
+      },
+      req.user?.userId,
+    );
+
+    // Record activity for admin
+    if (req.user?.userId && req.user.userId !== studentId) {
+      await recordActivity(
+        req.user.userId,
+        "SUBJECT_UNENROLL_ADMIN",
+        `Unenrolled student ID: ${studentId} from subject ID: ${subjId}`,
+        "StudentSubjectEnrollment",
+        undefined,
+        { studentId, subjectId: subjId, academic_term_id: termId },
+        req.user.userId,
+      );
+    }
 
     successResponse(res, "Student unenrolled from subject successfully");
   },
@@ -2459,6 +2843,30 @@ export const assignStudentToClassGroup = asyncHandler(
 
     logger.info("Student assigned to class group", { studentId, classGroupId });
 
+    // Record activity for student
+    await recordActivity(
+      studentId,
+      "CLASS_GROUP_ASSIGN",
+      `You have been assigned to class group ID: ${classGroupId}`,
+      "StudentClassGroup",
+      undefined,
+      { class_group_id: classGroupId, assigning_user_id: req.user?.userId },
+      req.user?.userId,
+    );
+
+    // Record activity for admin
+    if (req.user?.userId && req.user.userId !== studentId) {
+      await recordActivity(
+        req.user.userId,
+        "CLASS_GROUP_ASSIGN_ADMIN",
+        `Assigned student ID: ${studentId} to class group ID: ${classGroupId}`,
+        "StudentClassGroup",
+        undefined,
+        { studentId, classGroupId },
+        req.user.userId,
+      );
+    }
+
     successResponse(
       res,
       "Student assigned to class group successfully",
@@ -2517,6 +2925,30 @@ export const removeStudentFromClassGroup = asyncHandler(
       studentId,
       classGroupId,
     });
+
+    // Record activity for student
+    await recordActivity(
+      studentId,
+      "CLASS_GROUP_REMOVE",
+      `You have been removed from class group ID: ${classGroupId}`,
+      "StudentClassGroup",
+      undefined,
+      { class_group_id: classGroupId, removing_user_id: req.user?.userId },
+      req.user?.userId,
+    );
+
+    // Record activity for admin
+    if (req.user?.userId && req.user.userId !== studentId) {
+      await recordActivity(
+        req.user.userId,
+        "CLASS_GROUP_REMOVE_ADMIN",
+        `Removed student ID: ${studentId} from class group ID: ${classGroupId}`,
+        "StudentClassGroup",
+        undefined,
+        { studentId, classGroupId },
+        req.user.userId,
+      );
+    }
 
     successResponse(
       res,
@@ -2690,6 +3122,19 @@ export const assignUserToProgram = asyncHandler(async (req: any, res: any) => {
 
   logger.info("User assigned to program as lead", { userId, programId });
 
+  // Record activity
+  if (req.user?.userId) {
+    await recordActivity(
+      userId,
+      "PROGRAM_LEAD_ASSIGN",
+      `You have been assigned as lead for program ID: ${programId}`,
+      "UserProgramLead",
+      undefined,
+      { program_id: programId, assigned_by: req.user.userId },
+      req.user.userId,
+    );
+  }
+
   successResponse(res, "User assigned to program successfully", null, 201);
 });
 
@@ -2731,6 +3176,19 @@ export const removeUserFromProgram = asyncHandler(
       );
 
     logger.info("User removed from program lead", { userId, programId });
+
+    // Record activity
+    if (req.user?.userId) {
+      await recordActivity(
+        userId,
+        "PROGRAM_LEAD_REMOVE",
+        `You have been removed as lead for program ID: ${programId}`,
+        "UserProgramLead",
+        undefined,
+        { program_id: programId, removed_by: req.user.userId },
+        req.user.userId,
+      );
+    }
 
     successResponse(res, "User removed from program successfully");
   },

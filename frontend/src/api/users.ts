@@ -211,6 +211,60 @@ export const getUsersWithPagination = async (
   }
 };
 
+// ==================== User Activity API ====================
+
+export interface Activity {
+  id: number;
+  user_id: number;
+  action_type: string;
+  description: string;
+  entity_type?: string;
+  entity_id?: number;
+  metadata?: string;
+  actor_first_name?: string;
+  actor_last_name?: string;
+  actor_role?: string;
+  created_at: string;
+}
+
+export interface ActivityResponse {
+  activities: Activity[];
+  pagination: {
+    total: number;
+    totalPages: number;
+    currentPage: number;
+    limit: number;
+  };
+}
+
+export const getUserActivities = async (
+  userId: number,
+  params?: {
+    startDate?: string;
+    endDate?: string;
+    page?: number;
+    limit?: number;
+  },
+  onSuccess?: (data: ActivityResponse) => void,
+  onError?: (error: any) => void,
+): Promise<ActivityResponse | void> => {
+  try {
+    const response = await api.get<BackendResponse<ActivityResponse>>(
+      `/users/${userId}/activities`,
+      { params },
+    );
+    if (onSuccess && response.data.data) {
+      onSuccess(response.data.data);
+    }
+    return response.data.data;
+  } catch (error) {
+    if (onError) {
+      onError(error);
+    }
+    throw error;
+  }
+};
+
 // ==================== Grade Assignment for Class Teachers ====================
 
 export interface UserGrade {

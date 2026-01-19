@@ -29,6 +29,7 @@ import {
 } from "../errors/CustomError";
 import { successResponse, paginatedResponse } from "../utils/response";
 import { asyncHandler } from "../middleware/asyncHandler";
+import { recordActivity } from "../utils/activityLogger";
 import { sanitizeString } from "../utils/sanitization";
 import logger from "../utils/logger";
 import ftpService from "../utils/ftp";
@@ -121,8 +122,8 @@ export const createFolder = asyncHandler(async (req: any, res: any) => {
       .where(
         and(
           eq(DocumentFolder.folder_id, parentFolderId),
-          eq(DocumentFolder.user_id, userId)
-        )
+          eq(DocumentFolder.user_id, userId),
+        ),
       )
       .limit(1);
 
@@ -148,6 +149,17 @@ export const createFolder = asyncHandler(async (req: any, res: any) => {
     .limit(1);
 
   logger.info(`Folder created: ${folderId} by user ${userId}`);
+
+  // Record activity
+  await recordActivity(
+    userId,
+    "FOLDER_CREATE",
+    `Folder created: ${name}`,
+    "DocumentFolder",
+    folderId,
+    { name, parentFolderId, color },
+    userId,
+  );
 
   successResponse(res, "Folder created successfully", folder[0]);
 });
@@ -203,8 +215,8 @@ export const getFolders = asyncHandler(async (req: any, res: any) => {
         eq(DocumentFolder.user_id, userId),
         parentId === null
           ? isNull(DocumentFolder.parent_folder_id)
-          : eq(DocumentFolder.parent_folder_id, parentId)
-      )
+          : eq(DocumentFolder.parent_folder_id, parentId),
+      ),
     );
 
   // Get folders shared with the user
@@ -226,7 +238,7 @@ export const getFolders = asyncHandler(async (req: any, res: any) => {
       .from(FolderPermission)
       .innerJoin(
         DocumentFolder,
-        eq(FolderPermission.folder_id, DocumentFolder.folder_id)
+        eq(FolderPermission.folder_id, DocumentFolder.folder_id),
       )
       .innerJoin(User, eq(DocumentFolder.user_id, User.user_id))
       .leftJoin(UserProfile, eq(User.user_id, UserProfile.user_id))
@@ -236,9 +248,9 @@ export const getFolders = asyncHandler(async (req: any, res: any) => {
           isNull(DocumentFolder.parent_folder_id),
           or(
             isNull(FolderPermission.expires_at),
-            gt(FolderPermission.expires_at, new Date())
-          )
-        )
+            gt(FolderPermission.expires_at, new Date()),
+          ),
+        ),
       );
   } else {
     // Check if the parent folder is shared with the user
@@ -251,9 +263,9 @@ export const getFolders = asyncHandler(async (req: any, res: any) => {
           eq(FolderPermission.user_id, userId),
           or(
             isNull(FolderPermission.expires_at),
-            gt(FolderPermission.expires_at, new Date())
-          )
-        )
+            gt(FolderPermission.expires_at, new Date()),
+          ),
+        ),
       )
       .limit(1);
 
@@ -283,8 +295,8 @@ export const getFolders = asyncHandler(async (req: any, res: any) => {
           .where(
             and(
               eq(DocumentFolder.parent_folder_id, parentId),
-              eq(DocumentFolder.user_id, parentFolder[0].user_id)
-            )
+              eq(DocumentFolder.user_id, parentFolder[0].user_id),
+            ),
           );
 
         // Mark these as accessible due to parent permission
@@ -336,8 +348,8 @@ export const getFolderById = asyncHandler(async (req: any, res: any) => {
     .where(
       and(
         eq(DocumentFolder.folder_id, parseInt(folderId)),
-        eq(DocumentFolder.user_id, userId)
-      )
+        eq(DocumentFolder.user_id, userId),
+      ),
     )
     .limit(1);
 
@@ -351,7 +363,7 @@ export const getFolderById = asyncHandler(async (req: any, res: any) => {
       .from(FolderPermission)
       .innerJoin(
         DocumentFolder,
-        eq(FolderPermission.folder_id, DocumentFolder.folder_id)
+        eq(FolderPermission.folder_id, DocumentFolder.folder_id),
       )
       .where(
         and(
@@ -359,9 +371,9 @@ export const getFolderById = asyncHandler(async (req: any, res: any) => {
           eq(FolderPermission.user_id, userId),
           or(
             isNull(FolderPermission.expires_at),
-            gt(FolderPermission.expires_at, new Date())
-          )
-        )
+            gt(FolderPermission.expires_at, new Date()),
+          ),
+        ),
       )
       .limit(1);
 
@@ -395,8 +407,8 @@ export const updateFolder = asyncHandler(async (req: any, res: any) => {
     .where(
       and(
         eq(DocumentFolder.folder_id, parseInt(folderId)),
-        eq(DocumentFolder.user_id, userId)
-      )
+        eq(DocumentFolder.user_id, userId),
+      ),
     )
     .limit(1);
 
@@ -431,12 +443,24 @@ export const updateFolder = asyncHandler(async (req: any, res: any) => {
 
   logger.info(`Folder updated: ${folderId} by user ${userId}`);
 
+  // Record activity
+  await recordActivity(
+    userId,
+    "FOLDER_UPDATE",
+    `Folder updated: ${name || updated[0].name}`,
+    "DocumentFolder",
+    parseInt(folderId),
+    { name, description, color },
+    userId,
+  );
+
   successResponse(res, "Folder updated successfully", updated[0]);
 });
 
 export const deleteFolder = asyncHandler(async (req: any, res: any) => {
   const userId = req.user.userId;
   const { folderId } = req.params;
+  const folderIdNum = parseInt(folderId);
 
   // Check if folder exists and belongs to user
   const folder = await db
@@ -444,9 +468,9 @@ export const deleteFolder = asyncHandler(async (req: any, res: any) => {
     .from(DocumentFolder)
     .where(
       and(
-        eq(DocumentFolder.folder_id, parseInt(folderId)),
-        eq(DocumentFolder.user_id, userId)
-      )
+        eq(DocumentFolder.folder_id, folderIdNum),
+        eq(DocumentFolder.user_id, userId),
+      ),
     )
     .limit(1);
 
@@ -458,7 +482,7 @@ export const deleteFolder = asyncHandler(async (req: any, res: any) => {
   const documents = await db
     .select()
     .from(Document)
-    .where(eq(Document.folder_id, parseInt(folderId)));
+    .where(eq(Document.folder_id, folderIdNum));
 
   // Delete physical files from FTP
   for (const doc of documents) {
@@ -470,14 +494,23 @@ export const deleteFolder = asyncHandler(async (req: any, res: any) => {
   }
 
   // Delete documents and their versions
-  await db.delete(Document).where(eq(Document.folder_id, parseInt(folderId)));
+  await db.delete(Document).where(eq(Document.folder_id, folderIdNum));
   await db
     .delete(DocumentFolder)
-    .where(eq(DocumentFolder.folder_id, parseInt(folderId)));
+    .where(eq(DocumentFolder.folder_id, folderIdNum));
 
-  logger.info(`Folder deleted: ${folderId} by user ${userId}`);
+  // Record activity
+  await recordActivity(
+    userId,
+    "FOLDER_DELETE",
+    `Folder deleted: ${folder[0].name}`,
+    "DocumentFolder",
+    folderIdNum,
+    undefined,
+    userId,
+  );
 
-  successResponse(res, "Folder deleted successfully", null);
+  successResponse(res, "Folder deleted successfully");
 });
 
 // ======================
@@ -496,8 +529,8 @@ export const getFolderPermissions = asyncHandler(async (req: any, res: any) => {
     .where(
       and(
         eq(DocumentFolder.folder_id, parseInt(folderId)),
-        eq(DocumentFolder.user_id, userId)
-      )
+        eq(DocumentFolder.user_id, userId),
+      ),
     )
     .limit(1);
 
@@ -530,7 +563,7 @@ export const getFolderPermissions = asyncHandler(async (req: any, res: any) => {
   successResponse(
     res,
     "Folder permissions retrieved successfully",
-    userPermissions
+    userPermissions,
   );
 });
 
@@ -554,8 +587,8 @@ export const shareFolder = asyncHandler(async (req: any, res: any) => {
     .where(
       and(
         eq(DocumentFolder.folder_id, parseInt(folderId)),
-        eq(DocumentFolder.user_id, userId)
-      )
+        eq(DocumentFolder.user_id, userId),
+      ),
     )
     .limit(1);
 
@@ -575,8 +608,8 @@ export const shareFolder = asyncHandler(async (req: any, res: any) => {
         .where(
           and(
             eq(FolderPermission.folder_id, parseInt(folderId)),
-            eq(FolderPermission.user_id, targetUserId)
-          )
+            eq(FolderPermission.user_id, targetUserId),
+          ),
         )
         .limit(1);
 
@@ -617,8 +650,8 @@ export const shareFolder = asyncHandler(async (req: any, res: any) => {
       .where(
         inArray(
           UserRole.role_id,
-          roleIds.map((id: string) => parseInt(id))
-        )
+          roleIds.map((id: string) => parseInt(id)),
+        ),
       );
 
     // Get unique user IDs
@@ -632,8 +665,8 @@ export const shareFolder = asyncHandler(async (req: any, res: any) => {
         .where(
           and(
             eq(FolderPermission.folder_id, parseInt(folderId)),
-            eq(FolderPermission.user_id, targetUserId)
-          )
+            eq(FolderPermission.user_id, targetUserId),
+          ),
         )
         .limit(1);
 
@@ -700,7 +733,7 @@ export const revokeFolderAccess = asyncHandler(async (req: any, res: any) => {
 
   if (permission.length === 0) {
     throw new NotFoundError(
-      "Permission not found or you don't have permission to revoke it"
+      "Permission not found or you don't have permission to revoke it",
     );
   }
 
@@ -732,7 +765,7 @@ export const getSharedFolders = asyncHandler(async (req: any, res: any) => {
     .from(FolderPermission)
     .innerJoin(
       DocumentFolder,
-      eq(FolderPermission.folder_id, DocumentFolder.folder_id)
+      eq(FolderPermission.folder_id, DocumentFolder.folder_id),
     )
     .innerJoin(User, eq(FolderPermission.shared_by, User.user_id))
     .leftJoin(UserProfile, eq(User.user_id, UserProfile.user_id))
@@ -741,9 +774,9 @@ export const getSharedFolders = asyncHandler(async (req: any, res: any) => {
         eq(FolderPermission.user_id, userId),
         or(
           isNull(FolderPermission.expires_at),
-          gt(FolderPermission.expires_at, new Date())
-        )
-      )
+          gt(FolderPermission.expires_at, new Date()),
+        ),
+      ),
     );
 
   // Add folder owner information
@@ -766,7 +799,7 @@ export const getSharedFolders = asyncHandler(async (req: any, res: any) => {
         ...item,
         folder_owner: owner[0] || null,
       };
-    })
+    }),
   );
 
   // Add content counts for each folder
@@ -780,8 +813,8 @@ export const getSharedFolders = asyncHandler(async (req: any, res: any) => {
           .where(
             and(
               eq(DocumentFolder.parent_folder_id, item.folder.folder_id),
-              eq(DocumentFolder.user_id, item.folder.user_id) // Only count owner's subfolders
-            )
+              eq(DocumentFolder.user_id, item.folder.user_id), // Only count owner's subfolders
+            ),
           ),
         // Count documents
         db
@@ -798,13 +831,13 @@ export const getSharedFolders = asyncHandler(async (req: any, res: any) => {
           total: subFoldersCount[0].count + documentsCount[0].count,
         },
       };
-    })
+    }),
   );
 
   successResponse(
     res,
     "Shared folders retrieved successfully",
-    sharedWithCounts
+    sharedWithCounts,
   );
 });
 
@@ -835,8 +868,8 @@ export const uploadDocument = asyncHandler(async (req: any, res: any) => {
       .where(
         and(
           eq(DocumentFolder.folder_id, parseInt(folderId)),
-          eq(DocumentFolder.user_id, userId)
-        )
+          eq(DocumentFolder.user_id, userId),
+        ),
       )
       .limit(1);
 
@@ -879,6 +912,22 @@ export const uploadDocument = asyncHandler(async (req: any, res: any) => {
 
     logger.info(`Document uploaded: ${documentId} by user ${userId}`);
 
+    // Record activity
+    await recordActivity(
+      userId,
+      "DOCUMENT_UPLOAD",
+      `Document uploaded: ${file.originalname}`,
+      "Document",
+      documentId,
+      {
+        file_name: fileName,
+        original_name: file.originalname,
+        mime_type: file.mimetype,
+        file_size: file.size,
+      },
+      userId,
+    );
+
     successResponse(res, "Document uploaded successfully", document[0]);
   } catch (error) {
     logger.error("Document upload failed:", error);
@@ -918,9 +967,9 @@ export const getDocuments = asyncHandler(async (req: any, res: any) => {
           eq(FolderPermission.user_id, userId),
           or(
             isNull(FolderPermission.expires_at),
-            gt(FolderPermission.expires_at, new Date())
-          )
-        )
+            gt(FolderPermission.expires_at, new Date()),
+          ),
+        ),
       )
       .limit(1);
 
@@ -1027,7 +1076,10 @@ export const getDocumentById = asyncHandler(async (req: any, res: any) => {
     .select()
     .from(Document)
     .where(
-      and(eq(Document.document_id, documentIdNum), eq(Document.user_id, userId))
+      and(
+        eq(Document.document_id, documentIdNum),
+        eq(Document.user_id, userId),
+      ),
     )
     .limit(1);
 
@@ -1038,7 +1090,7 @@ export const getDocumentById = asyncHandler(async (req: any, res: any) => {
       .from(DocumentPermission)
       .innerJoin(
         Document,
-        eq(DocumentPermission.document_id, Document.document_id)
+        eq(DocumentPermission.document_id, Document.document_id),
       )
       .where(
         and(
@@ -1046,9 +1098,9 @@ export const getDocumentById = asyncHandler(async (req: any, res: any) => {
           eq(DocumentPermission.user_id, userId),
           or(
             isNull(DocumentPermission.expires_at),
-            gt(DocumentPermission.expires_at, new Date())
-          )
-        )
+            gt(DocumentPermission.expires_at, new Date()),
+          ),
+        ),
       )
       .limit(1);
 
@@ -1068,6 +1120,7 @@ export const updateDocument = asyncHandler(async (req: any, res: any) => {
   const userId = req.user.userId;
   const { documentId } = req.params;
   const { description, tags, is_public, original_name } = req.body;
+  const documentIdNum = parseInt(documentId);
 
   // Check if document exists and belongs to user
   const existingDoc = await db
@@ -1075,9 +1128,9 @@ export const updateDocument = asyncHandler(async (req: any, res: any) => {
     .from(Document)
     .where(
       and(
-        eq(Document.document_id, parseInt(documentId)),
-        eq(Document.user_id, userId)
-      )
+        eq(Document.document_id, documentIdNum),
+        eq(Document.user_id, userId),
+      ),
     )
     .limit(1);
 
@@ -1105,15 +1158,26 @@ export const updateDocument = asyncHandler(async (req: any, res: any) => {
   await db
     .update(Document)
     .set(updateData)
-    .where(eq(Document.document_id, parseInt(documentId)));
+    .where(eq(Document.document_id, documentIdNum));
 
   const updated = await db
     .select()
     .from(Document)
-    .where(eq(Document.document_id, parseInt(documentId)))
+    .where(eq(Document.document_id, documentIdNum))
     .limit(1);
 
   logger.info(`Document updated: ${documentId} by user ${userId}`);
+
+  // Record activity
+  await recordActivity(
+    userId,
+    "DOCUMENT_UPDATE",
+    `Document updated: ${original_name || updated[0].original_name}`,
+    "Document",
+    documentIdNum,
+    { description, tags, is_public, original_name },
+    userId,
+  );
 
   successResponse(res, "Document updated successfully", updated[0]);
 });
@@ -1121,6 +1185,7 @@ export const updateDocument = asyncHandler(async (req: any, res: any) => {
 export const deleteDocument = asyncHandler(async (req: any, res: any) => {
   const userId = req.user.userId;
   const { documentId } = req.params;
+  const documentIdNum = parseInt(documentId);
 
   // Check if document exists and belongs to user
   const document = await db
@@ -1128,9 +1193,9 @@ export const deleteDocument = asyncHandler(async (req: any, res: any) => {
     .from(Document)
     .where(
       and(
-        eq(Document.document_id, parseInt(documentId)),
-        eq(Document.user_id, userId)
-      )
+        eq(Document.document_id, documentIdNum),
+        eq(Document.user_id, userId),
+      ),
     )
     .limit(1);
 
@@ -1148,21 +1213,28 @@ export const deleteDocument = asyncHandler(async (req: any, res: any) => {
   // Delete document versions
   await db
     .delete(DocumentVersion)
-    .where(eq(DocumentVersion.document_id, parseInt(documentId)));
+    .where(eq(DocumentVersion.document_id, documentIdNum));
 
   // Delete document permissions
   await db
     .delete(DocumentPermission)
-    .where(eq(DocumentPermission.document_id, parseInt(documentId)));
+    .where(eq(DocumentPermission.document_id, documentIdNum));
 
   // Delete document
-  await db
-    .delete(Document)
-    .where(eq(Document.document_id, parseInt(documentId)));
+  await db.delete(Document).where(eq(Document.document_id, documentIdNum));
 
-  logger.info(`Document deleted: ${documentId} by user ${userId}`);
+  // Record activity
+  await recordActivity(
+    userId,
+    "DOCUMENT_DELETE",
+    `Document deleted: ${document[0].original_name}`,
+    "Document",
+    documentIdNum,
+    undefined,
+    userId,
+  );
 
-  successResponse(res, "Document deleted successfully", null);
+  successResponse(res, "Document deleted successfully");
 });
 
 export const downloadDocument = asyncHandler(async (req: any, res: any) => {
@@ -1203,7 +1275,7 @@ export const downloadDocument = asyncHandler(async (req: any, res: any) => {
   res.setHeader("Content-Type", mime);
   res.setHeader(
     "Content-Disposition",
-    `inline; filename="${doc.original_name}"`
+    `inline; filename="${doc.original_name}"`,
   );
   res.setHeader("Content-Length", buffer.length);
 
@@ -1231,8 +1303,8 @@ export const uploadNewVersion = asyncHandler(async (req: any, res: any) => {
     .where(
       and(
         eq(Document.document_id, parseInt(documentId)),
-        eq(Document.user_id, userId)
-      )
+        eq(Document.user_id, userId),
+      ),
     )
     .limit(1);
 
@@ -1260,7 +1332,7 @@ export const uploadNewVersion = asyncHandler(async (req: any, res: any) => {
     userId.toString(),
     "versions",
     documentId.toString(),
-    fileName
+    fileName,
   );
 
   try {
@@ -1289,7 +1361,7 @@ export const uploadNewVersion = asyncHandler(async (req: any, res: any) => {
       .limit(1);
 
     logger.info(
-      `New version uploaded: ${documentId} v${newVersionNumber} by user ${userId}`
+      `New version uploaded: ${documentId} v${newVersionNumber} by user ${userId}`,
     );
 
     successResponse(res, "New version uploaded successfully", version[0]);
@@ -1322,7 +1394,7 @@ export const getDocumentVersions = asyncHandler(async (req: any, res: any) => {
 
   if (document[0].user_id !== userId) {
     throw new AuthenticationError(
-      "You don't have permission to view this document's versions"
+      "You don't have permission to view this document's versions",
     );
   }
 
@@ -1348,8 +1420,8 @@ export const getDocumentPermissions = asyncHandler(
       .where(
         and(
           eq(Document.document_id, parseInt(documentId)),
-          eq(Document.user_id, userId)
-        )
+          eq(Document.user_id, userId),
+        ),
       )
       .limit(1);
 
@@ -1411,8 +1483,8 @@ export const getDocumentPermissions = asyncHandler(
       .where(
         and(
           eq(DocumentPermission.document_id, parseInt(documentId)),
-          eq(DocumentPermission.shared_with, "role")
-        )
+          eq(DocumentPermission.shared_with, "role"),
+        ),
       );
 
     // Group role permissions by role
@@ -1435,7 +1507,7 @@ export const getDocumentPermissions = asyncHandler(
       userPermissions,
       rolePermissions: rolePermissionsList,
     });
-  }
+  },
 );
 
 // ======================
@@ -1461,8 +1533,8 @@ export const shareDocument = asyncHandler(async (req: any, res: any) => {
     .where(
       and(
         eq(Document.document_id, parseInt(documentId)),
-        eq(Document.user_id, userId)
-      )
+        eq(Document.user_id, userId),
+      ),
     )
     .limit(1);
 
@@ -1511,8 +1583,8 @@ export const shareDocument = asyncHandler(async (req: any, res: any) => {
       .where(
         inArray(
           UserRole.role_id,
-          roleIds.map((id: string) => parseInt(id))
-        )
+          roleIds.map((id: string) => parseInt(id)),
+        ),
       );
 
     // Get unique user IDs
@@ -1526,8 +1598,8 @@ export const shareDocument = asyncHandler(async (req: any, res: any) => {
         .where(
           and(
             eq(DocumentPermission.document_id, parseInt(documentId)),
-            eq(DocumentPermission.user_id, targetUserId)
-          )
+            eq(DocumentPermission.user_id, targetUserId),
+          ),
         )
         .limit(1);
 
@@ -1564,7 +1636,7 @@ export const shareDocument = asyncHandler(async (req: any, res: any) => {
   }
 
   logger.info(
-    `Document ${documentId} shared with users/roles by user ${userId}`
+    `Document ${documentId} shared with users/roles by user ${userId}`,
   );
 
   successResponse(res, "Document shared successfully", permissions);
@@ -1588,7 +1660,7 @@ export const getSharedDocuments = asyncHandler(async (req: any, res: any) => {
     .from(DocumentPermission)
     .innerJoin(
       Document,
-      eq(DocumentPermission.document_id, Document.document_id)
+      eq(DocumentPermission.document_id, Document.document_id),
     )
     .innerJoin(User, eq(DocumentPermission.shared_by, User.user_id))
     .leftJoin(UserProfile, eq(User.user_id, UserProfile.user_id))
@@ -1597,9 +1669,9 @@ export const getSharedDocuments = asyncHandler(async (req: any, res: any) => {
         eq(DocumentPermission.user_id, userId),
         or(
           isNull(DocumentPermission.expires_at),
-          gt(DocumentPermission.expires_at, new Date())
-        )
-      )
+          gt(DocumentPermission.expires_at, new Date()),
+        ),
+      ),
     );
 
   successResponse(res, "Shared documents retrieved successfully", shared);
@@ -1637,7 +1709,7 @@ export const revokeDocumentAccess = asyncHandler(async (req: any, res: any) => {
 
   if (permission.length === 0) {
     throw new NotFoundError(
-      "Permission not found or you don't have permission to revoke it"
+      "Permission not found or you don't have permission to revoke it",
     );
   }
 
@@ -1713,7 +1785,7 @@ export const getFolderTree = asyncHandler(async (req: any, res: any) => {
       error.message.includes("Unknown column")
     ) {
       throw new ValidationError(
-        "Invalid query parameters or database schema issue"
+        "Invalid query parameters or database schema issue",
       );
     }
 
@@ -1734,7 +1806,7 @@ export const getFolderTree = asyncHandler(async (req: any, res: any) => {
 async function checkDocumentPermission(
   documentId: number,
   userId: number,
-  requiredPermission: "VIEW" | "EDIT" | "DOWNLOAD" | "SHARE"
+  requiredPermission: "VIEW" | "EDIT" | "DOWNLOAD" | "SHARE",
 ): Promise<boolean> {
   const permission = await db
     .select()
@@ -1743,8 +1815,8 @@ async function checkDocumentPermission(
       and(
         eq(DocumentPermission.document_id, documentId),
         eq(DocumentPermission.user_id, userId),
-        eq(DocumentPermission.permission_type, requiredPermission)
-      )
+        eq(DocumentPermission.permission_type, requiredPermission),
+      ),
     )
     .limit(1);
 

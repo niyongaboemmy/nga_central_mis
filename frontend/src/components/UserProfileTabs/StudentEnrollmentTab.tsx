@@ -380,7 +380,7 @@ const StudentEnrollmentTab: React.FC<StudentEnrollmentTabProps> = ({
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
               Student Enrollment Wizard
             </h3>
-            <p className="text-sm text-gray-500 dark:text-gray-400">
+            <p className="text-sm text-gray-500 dark:text-gray-400/40">
               Complete enrollment setup for {studentName}
             </p>
           </div>

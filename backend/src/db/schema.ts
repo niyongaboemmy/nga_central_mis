@@ -7,6 +7,7 @@ import {
   date,
   tinyint,
   int,
+  text,
   primaryKey,
   uniqueIndex,
 } from "drizzle-orm/mysql-core";
@@ -458,3 +459,22 @@ export const Parenting = mysqlTable(
     ),
   }),
 );
+
+// ActivityLog table for centralizing generic events
+export const ActivityLog = mysqlTable("ActivityLog", {
+  activity_id: bigint("activity_id", { mode: "number" })
+    .primaryKey()
+    .autoincrement(),
+  user_id: bigint("user_id", { mode: "number" })
+    .notNull()
+    .references(() => User.user_id),
+  actor_id: bigint("actor_id", { mode: "number" }).references(
+    () => User.user_id,
+  ),
+  action_type: varchar("action_type", { length: 50 }).notNull(),
+  description: varchar("description", { length: 500 }).notNull(),
+  entity_type: varchar("entity_type", { length: 50 }),
+  entity_id: bigint("entity_id", { mode: "number" }),
+  metadata: text("metadata"),
+  created_at: datetime("created_at").default(sql`CURRENT_TIMESTAMP`),
+});

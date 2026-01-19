@@ -68,7 +68,7 @@ export const InfoItem = ({
   highlight?: boolean;
 }) => (
   <div
-    className={`flex items-start gap-3 p-3 rounded-xl transition-all hover:shadow-md cursor-pointer ${
+    className={`flex items-start gap-3 p-3 rounded-2xl transition-all hover:shadow-md cursor-pointer ${
       highlight
         ? "bg-blue-50 dark:bg-blue-900/20"
         : "bg-gray-50/50 dark:bg-slate-800/50"
