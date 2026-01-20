@@ -5,10 +5,11 @@ import { X } from "lucide-react";
 interface ModalProps {
   isOpen: boolean;
   onClose: () => void;
-  title: string;
+  title: React.ReactNode;
   children: React.ReactNode;
   size?: "sm" | "md" | "lg" | "xl" | "2xl";
   showCloseButton?: boolean;
+  contentClassName?: string;
 }
 
 const Modal: React.FC<ModalProps> = ({
@@ -18,6 +19,7 @@ const Modal: React.FC<ModalProps> = ({
   children,
   size = "md",
   showCloseButton = true,
+  contentClassName = "p-6",
 }) => {
   const sizeClasses = {
     sm: "max-w-sm",
@@ -35,7 +37,7 @@ const Modal: React.FC<ModalProps> = ({
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.2 }}
-          className="fixed inset-0 bg-black/50 dark:bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center"
+          className="fixed inset-0 bg-black/50 dark:bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4"
           onClick={onClose}
         >
           {/* Modal */}
@@ -52,15 +54,15 @@ const Modal: React.FC<ModalProps> = ({
           >
             {/* Header */}
             <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-slate-700/50 flex-shrink-0">
-              <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+              <div className="text-xl font-bold text-gray-900 dark:text-white w-full">
                 {title}
-              </h2>
+              </div>
               {showCloseButton && (
                 <motion.button
                   whileHover={{ scale: 1.1, rotate: 90 }}
                   whileTap={{ scale: 0.9 }}
                   onClick={onClose}
-                  className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 text-gray-500 dark:text-gray-400 transition-colors"
+                  className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 text-gray-500 dark:text-gray-400 transition-colors ml-4 flex-shrink-0"
                 >
                   <X className="w-5 h-5" />
                 </motion.button>
@@ -68,7 +70,9 @@ const Modal: React.FC<ModalProps> = ({
             </div>
 
             {/* Content */}
-            <div className="flex-1 overflow-y-auto p-6">{children}</div>
+            <div className={`flex-1 overflow-y-auto ${contentClassName}`}>
+              {children}
+            </div>
           </motion.div>
         </motion.div>
       )}

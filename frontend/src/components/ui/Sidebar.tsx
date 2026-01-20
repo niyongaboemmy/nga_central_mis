@@ -1,4 +1,5 @@
 import React from "react";
+import { School, Server } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useUser } from "../../contexts/UserContext";
 import { Permissions } from "../../constants/permissions";
@@ -30,7 +31,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   const hasPermission = (perm?: string) => {
     if (!perm) return true;
     return user?.roles?.some((role) =>
-      role.permissions?.some((permission) => permission.name === perm)
+      role.permissions?.some((permission) => permission.name === perm),
     );
   };
 
@@ -299,6 +300,18 @@ const Sidebar: React.FC<SidebarProps> = ({
       ),
       requiredPermission: Permissions.MANAGE_SETTINGS,
     },
+    {
+      label: "Schools",
+      path: "/schools",
+      icon: <School className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
+      requiredPermission: Permissions.MANAGE_SCHOOLS,
+    },
+    {
+      label: "Systems",
+      path: "/systems",
+      icon: <Server className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
+      requiredPermission: Permissions.MANAGE_SYSTEMS,
+    },
   ];
 
   const isActive = (path?: string) =>
@@ -359,7 +372,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                       const token = getToken();
                       const url = item.externalUrl.replace(
                         "xxxxxxx",
-                        token || ""
+                        token || "",
                       );
                       window.open(url, "_blank");
                     } else if (item.path) {

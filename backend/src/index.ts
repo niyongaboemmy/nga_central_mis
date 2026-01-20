@@ -13,6 +13,8 @@ import documentRoutes from "./routes/documents";
 import academicRoutes from "./routes/academics";
 import dashboardRoutes from "./routes/dashboard";
 import parentingRoutes from "./routes/parenting";
+import schoolRoutes from "./routes/schoolRoutes";
+import systemRoutes from "./routes/systemRoutes";
 
 dotenv.config();
 
@@ -52,6 +54,8 @@ app.use("/documents", documentRoutes);
 app.use("/academics", academicRoutes);
 app.use("/dashboard", dashboardRoutes);
 app.use("/parenting", parentingRoutes);
+app.use("/schools", schoolRoutes);
+app.use("/systems", systemRoutes);
 
 // Error handling middleware (must be last)
 app.use(errorHandler);

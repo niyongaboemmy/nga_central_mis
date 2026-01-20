@@ -492,3 +492,77 @@ export const ActivityLog = mysqlTable("ActivityLog", {
   metadata: text("metadata"),
   created_at: datetime("created_at").default(sql`CURRENT_TIMESTAMP`),
 });
+
+// School table (Tenant)
+export const School = mysqlTable("School", {
+  school_id: bigint("school_id", { mode: "number" })
+    .primaryKey()
+    .autoincrement(),
+  name: varchar("name", { length: 150 }).notNull().unique(),
+  address: varchar("address", { length: 255 }),
+  contact_email: varchar("contact_email", { length: 150 }),
+  contact_phone: varchar("contact_phone", { length: 50 }),
+  logo: varchar("logo", { length: 500 }),
+  status: mysqlEnum("status", ["ACTIVE", "INACTIVE", "SUSPENDED"]).default(
+    "ACTIVE",
+  ),
+  created_at: datetime("created_at").default(sql`CURRENT_TIMESTAMP`),
+  updated_at: datetime("updated_at").default(
+    sql`CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP`,
+  ),
+});
+
+// System table (Module)
+export const System = mysqlTable("System", {
+  system_id: bigint("system_id", { mode: "number" })
+    .primaryKey()
+    .autoincrement(),
+  name: varchar("name", { length: 100 }).notNull().unique(),
+  description: varchar("description", { length: 255 }),
+  status: mysqlEnum("status", ["ACTIVE", "DISABLED"]).default("ACTIVE"),
+});
+
+// SchoolSystemAssignment table (School <-> System)
+export const SchoolSystemAssignment = mysqlTable(
+  "SchoolSystemAssignment",
+  {
+    school_id: bigint("school_id", { mode: "number" })
+      .notNull()
+      .references(() => School.school_id),
+    system_id: bigint("system_id", { mode: "number" })
+      .notNull()
+      .references(() => System.system_id),
+    assigned_at: datetime("assigned_at").default(sql`CURRENT_TIMESTAMP`),
+    status: mysqlEnum("status", ["ACTIVE", "DISABLED"]).default("ACTIVE"),
+  },
+  (table) => ({
+    pk: primaryKey(table.school_id, table.system_id),
+  }),
+);
+
+// RoleSystemFragment table (System <-> Role in a School context)
+export const RoleSystemFragment = mysqlTable(
+  "RoleSystemFragment",
+  {
+    fragment_id: bigint("fragment_id", { mode: "number" })
+      .primaryKey()
+      .autoincrement(),
+    school_id: bigint("school_id", { mode: "number" })
+      .notNull()
+      .references(() => School.school_id),
+    role_id: bigint("role_id", { mode: "number" })
+      .notNull()
+      .references(() => Role.role_id),
+    system_id: bigint("system_id", { mode: "number" })
+      .notNull()
+      .references(() => System.system_id),
+    assigned_at: datetime("assigned_at").default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => ({
+    unique_assignment: uniqueIndex("unique_role_system_school").on(
+      table.school_id,
+      table.role_id,
+      table.system_id,
+    ),
+  }),
+);

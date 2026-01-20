@@ -58,6 +58,11 @@ export const Permissions = {
   // System settings
   MANAGE_SETTINGS: "MANAGE_SETTINGS",
 
+  // Multi-Tenancy
+  MANAGE_SCHOOLS: "MANAGE_SCHOOLS",
+  MANAGE_SYSTEMS: "MANAGE_SYSTEMS",
+  ASSIGN_SCHOOL_SYSTEMS: "ASSIGN_SCHOOL_SYSTEMS",
+
   // Admin
   ADMIN: "ADMIN",
 

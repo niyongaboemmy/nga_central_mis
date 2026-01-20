@@ -31,6 +31,8 @@ import ProgramUsersPage from "./components/ProgramUsersPage";
 import ProgramAcademicPage from "./components/ProgramAcademicPage";
 import ClassTeacherUsersPage from "./components/ClassTeacherUsersPage";
 import ClassTeacherSubjectsPage from "./components/ClassTeacherSubjectsPage";
+import Schools from "./components/Schools";
+import Systems from "./components/Systems";
 
 // Wrapper components for pages that need the Navbar
 const LandingPage: React.FC = () => {
@@ -170,13 +172,13 @@ const DashboardPage: React.FC = () => {
   // Check if user has any role with SUPER_ADMIN_DASHBOARD permission
   const hasSuperAdminDashboard =
     user?.roles?.some((role) =>
-      role.permissions?.some((perm) => perm.name === "SUPER_ADMIN_DASHBOARD")
+      role.permissions?.some((perm) => perm.name === "SUPER_ADMIN_DASHBOARD"),
     ) || false;
 
   // Check if user has any role with TEACHER_DASHBOARD permission
   const hasTeacherDashboard =
     user?.roles?.some((role) =>
-      role.permissions?.some((perm) => perm.name === "TEACHER_DASHBOARD")
+      role.permissions?.some((perm) => perm.name === "TEACHER_DASHBOARD"),
     ) || false;
 
   if (hasSuperAdminDashboard) {
@@ -466,6 +468,30 @@ function App() {
                   <ProtectedRoute>
                     <SystemLayoutWrapper>
                       <PermissionsPage />
+                    </SystemLayoutWrapper>
+                  </ProtectedRoute>
+                }
+              />
+
+              {/* Systems page - protected with sidebar */}
+              <Route
+                path="/systems"
+                element={
+                  <ProtectedRoute>
+                    <SystemLayoutWrapper>
+                      <Systems />
+                    </SystemLayoutWrapper>
+                  </ProtectedRoute>
+                }
+              />
+
+              {/* Assign System to School page - protected with sidebar */}
+              <Route
+                path="/schools"
+                element={
+                  <ProtectedRoute>
+                    <SystemLayoutWrapper>
+                      <Schools />
                     </SystemLayoutWrapper>
                   </ProtectedRoute>
                 }
