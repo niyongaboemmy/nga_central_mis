@@ -41,6 +41,7 @@ interface Config {
     origin: string | string[];
     credentials: boolean;
   };
+  cookieDomain: string;
   logLevel: string;
   email: EmailConfig;
   otp: {
@@ -89,6 +90,7 @@ const developmentConfig: Config = {
         ],
     credentials: process.env.CORS_CREDENTIALS === "true",
   },
+  cookieDomain: process.env.COOKIE_DOMAIN || "localhost",
   logLevel: process.env.LOG_LEVEL || "debug",
   email: {
     smtp: {
@@ -130,6 +132,7 @@ const productionConfig: Config = {
         ],
     credentials: true,
   },
+  cookieDomain: process.env.COOKIE_DOMAIN || ".nga.ac.rw",
   logLevel: process.env.LOG_LEVEL || "info",
   email: {
     smtp: {
@@ -166,14 +169,14 @@ const missingEnvVars = requiredEnvVars.filter((envVar) => !process.env[envVar]);
 
 if (missingEnvVars.length > 0) {
   throw new Error(
-    `Missing required environment variables: ${missingEnvVars.join(", ")}`
+    `Missing required environment variables: ${missingEnvVars.join(", ")}`,
   );
 }
 
 // Log environment info
 console.log(`🚀 Running in ${config.envType} mode`);
 console.log(
-  `📦 Database: ${config.database.host}:${config.database.port}/${config.database.name} (${dbConnection} connection)`
+  `📦 Database: ${config.database.host}:${config.database.port}/${config.database.name} (${dbConnection} connection)`,
 );
 console.log(`📧 Email: ${config.email.smtp.host}:${config.email.smtp.port}`);
 

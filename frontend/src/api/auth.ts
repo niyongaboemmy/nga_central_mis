@@ -89,21 +89,49 @@ export const verifyOTP = async (
   }
 };
 
-export const logout = (
+export const logout = async (
   onSuccess?: () => void,
   onError?: (error: any) => void,
-): void => {
+): Promise<void> => {
   try {
-    // Clear token from storage
+    await api.post("/auth/logout");
     removeToken();
 
     if (onSuccess) {
       onSuccess();
     }
   } catch (error) {
+    removeToken();
     if (onError) {
       onError(error);
     }
+  }
+};
+
+export const checkSession = async (): Promise<VerifyOTPResponse | void> => {
+  try {
+    const response: AxiosResponse<BackendResponse<VerifyOTPResponse>> =
+      await api.get("/auth/session");
+
+    return response.data.data;
+  } catch (error) {
+    throw error;
+  }
+};
+
+export const authorizeSSO = async (
+  clientId: string,
+  redirectUri: string,
+): Promise<{ code: string } | void> => {
+  try {
+    const response: AxiosResponse<BackendResponse<{ code: string }>> =
+      await api.get(
+        `/sso/authorize?client_id=${clientId}&redirect_uri=${redirectUri}`,
+      );
+
+    return response.data.data;
+  } catch (error) {
+    throw error;
   }
 };
 

@@ -9,13 +9,18 @@ The API base URL depends on the environment:
 - Development: `http://localhost:3000`
 - Production: As configured in deployment
 
-## Authentication
+Most protected endpoints require authentication via JWT token. This can be provided in two ways:
 
-Most endpoints require authentication via JWT token. Include the token in the Authorization header:
+1.  **Authorization Header**:
+    ```
+    Authorization: Bearer <your_jwt_token>
+    ```
 
-```
-Authorization: Bearer <your_jwt_token>
-```
+2.  **Centralized Auth Cookie (SSO)**:
+    Include the `nga_auth_token` cookie in your request. This is handled automatically by browsers when `withCredentials` is enabled in your HTTP client.
+
+    > [!IMPORTANT]
+    > The Centralized Auth cookie is HTTP-only and cannot be read via JavaScript. Use the `/auth/session` endpoint to verify the current session.
 
 ## Response Format
 
@@ -109,7 +114,7 @@ User login.
 
 ### POST /auth/verify-otp
 
-Verify OTP for login.
+Verify OTP for login. Upon success, this endpoint sets a `nga_auth_token` cookie on the root domain for SSO.
 
 **Authentication:** Required (temporary token from login)
 
@@ -121,11 +126,93 @@ Verify OTP for login.
 }
 ```
 
+### GET /auth/session
+
+Retrieve the current session and user profile. This is the primary endpoint for integrated systems to check if a user is already logged in via SSO.
+
+**Authentication:** Required (via `nga_auth_token` cookie or Bearer token)
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "message": "Session retrieved",
+  "data": {
+    "user": { ... },
+    "profile": { ... },
+    "permissions": [...],
+    "roles": [...]
+  }
+}
+```
+
+### POST /auth/logout
+
+Log out the current user and clear the SSO cookie `nga_auth_token`.
+
+**Authentication:** Required
+
 ### POST /auth/forgot-password
 
 Request password reset.
 
 **Authentication:** None required
+
+---
+
+## 🌐 SSO (Single Sign-On) Endpoints
+
+These endpoints are used for cross-domain authentication (OAuth2-style).
+
+### GET /sso/authorize
+
+Generate a short-lived authorization code for a logged-in user.
+
+**Authentication:** Required (via `nga_auth_token` cookie or Bearer token)
+
+**Query Parameters:**
+- `client_id`: Registered client ID.
+- `redirect_uri`: One of the pre-registered redirect URIs.
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "code": "32_character_random_string"
+  }
+}
+```
+
+### POST /sso/token
+
+Exchange an authorization code for a full JWT and user profile.
+
+**Authentication:** None (requires `client_id` and `client_secret`)
+
+**Request Body:**
+```json
+{
+  "code": "AUTHORIZATION_CODE",
+  "client_id": "YOUR_CLIENT_ID",
+  "client_secret": "YOUR_CLIENT_SECRET"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "token": "JWT_TOKEN",
+    "user": { ... },
+    "permissions": [...]
+  }
+}
+```
+
+---
 
 **Request Body:**
 

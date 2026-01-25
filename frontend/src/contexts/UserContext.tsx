@@ -7,7 +7,7 @@ import React, {
   useRef,
 } from "react";
 import { getCurrentUser, UserWithProfile, UserRole } from "../api/users";
-import { logout as apiLogout } from "../api/auth";
+import { logout as apiLogout, checkSession } from "../api/auth";
 import { removeToken, getToken } from "../utils/auth";
 
 interface UserContextType {
@@ -48,7 +48,21 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({
 
     isRefreshingRef.current = true;
     try {
-      const userData = await getCurrentUser();
+      let userData;
+      const token = getToken();
+
+      if (token) {
+        userData = await getCurrentUser();
+      } else {
+        // No local token, check for global session cookie
+        const sessionData = await checkSession();
+        if (sessionData) {
+          userData = sessionData.user;
+          // Note: If session data contains token, we could also store it locally
+          // but relying on the cookie is safer for SSO.
+        }
+      }
+
       setUser(userData || null);
     } catch (error) {
       console.error("Failed to fetch user:", error);

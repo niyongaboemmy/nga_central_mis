@@ -20,7 +20,13 @@ const getUserRoles = async (userId: number): Promise<string[]> => {
 };
 
 export const authenticate = async (req: any, res: any, next: any) => {
-  const token = req.header("Authorization")?.replace("Bearer ", "");
+  let token = req.header("Authorization")?.replace("Bearer ", "");
+
+  // If no token in header, check cookies
+  if (!token && req.cookies) {
+    token = req.cookies.nga_auth_token;
+  }
+
   if (!token) {
     return res.status(401).json({ message: "Access denied" });
   }

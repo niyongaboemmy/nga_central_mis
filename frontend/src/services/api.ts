@@ -27,6 +27,7 @@ const api: AxiosInstance = axios.create({
   headers: {
     "Content-Type": "application/json",
   },
+  withCredentials: true,
 });
 
 // Request interceptor to add auth token
@@ -40,7 +41,7 @@ api.interceptors.request.use(
   },
   (error: AxiosError): Promise<AxiosError> => {
     return Promise.reject(error);
-  }
+  },
 );
 
 // Response interceptor for error handling
@@ -70,7 +71,7 @@ api.interceptors.response.use(
       }
     }
     return Promise.reject(error);
-  }
+  },
 );
 
 // Export toast store for use in App.tsx
@@ -83,19 +84,19 @@ export const apiService = {
   post: <T = any>(
     url: string,
     data?: any,
-    config?: any
+    config?: any,
   ): Promise<AxiosResponse<T>> => api.post(url, data, config),
   put: <T = any>(
     url: string,
     data?: any,
-    config?: any
+    config?: any,
   ): Promise<AxiosResponse<T>> => api.put(url, data, config),
   delete: <T = any>(url: string, config?: any): Promise<AxiosResponse<T>> =>
     api.delete(url, config),
   patch: <T = any>(
     url: string,
     data?: any,
-    config?: any
+    config?: any,
   ): Promise<AxiosResponse<T>> => api.patch(url, data, config),
 };
 

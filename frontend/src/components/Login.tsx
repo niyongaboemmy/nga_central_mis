@@ -1,9 +1,10 @@
 import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Alert, VerificationCode } from "./ui";
-import { login, verifyOTP } from "../api/auth";
+import { login, verifyOTP, authorizeSSO } from "../api/auth";
 import { useUser } from "../contexts/UserContext";
 import { usePermissions } from "../hooks/usePermissions";
+import { useSearchParams } from "react-router-dom";
 import {
   Star,
   Lock,
@@ -99,12 +100,13 @@ const Login: React.FC<LoginProps> = ({
 }) => {
   const { refreshUser } = useUser();
   const { getUserPermissions } = usePermissions();
+  const [searchParams] = useSearchParams();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [otp, setOtp] = useState("");
   const [tempToken, setTempToken] = useState("");
   const [step, setStep] = useState<"credentials" | "otp" | "success">(
-    "credentials"
+    "credentials",
   );
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -122,7 +124,7 @@ const Login: React.FC<LoginProps> = ({
       }
     } catch (error: any) {
       setError(
-        error.response?.data?.message || "Login failed. Please try again."
+        error.response?.data?.message || "Login failed. Please try again.",
       );
     } finally {
       setLoading(false);
@@ -139,6 +141,29 @@ const Login: React.FC<LoginProps> = ({
       await verifyOTP(otp, tempToken);
       await refreshUser();
 
+      // Check for SSO parameters
+      const clientId = searchParams.get("client_id");
+      const redirectUri = searchParams.get("redirect_uri");
+
+      if (clientId && redirectUri) {
+        try {
+          const ssoData = await authorizeSSO(clientId, redirectUri);
+          if (ssoData?.code) {
+            setStep("success");
+            setTimeout(() => {
+              // Redirect back to integrated system with auth code
+              const finalUrl = new URL(redirectUri);
+              finalUrl.searchParams.set("code", ssoData.code);
+              window.location.href = finalUrl.toString();
+            }, 2000);
+            return;
+          }
+        } catch (ssoError) {
+          console.error("SSO Authorization failed:", ssoError);
+          // Fallback to normal login flow if SSO fails
+        }
+      }
+
       setStep("success");
       setTimeout(() => {
         if (onLoginSuccess) {
@@ -147,7 +172,7 @@ const Login: React.FC<LoginProps> = ({
       }, 2000);
     } catch (error: any) {
       setError(
-        error.response?.data?.message || "Invalid OTP code. Please try again."
+        error.response?.data?.message || "Invalid OTP code. Please try again.",
       );
     } finally {
       setLoading(false);
@@ -181,14 +206,14 @@ const Login: React.FC<LoginProps> = ({
                 ? "bg-gradient-to-r from-blue-500 to-blue-600"
                 : "bg-gray-300 dark:bg-gray-600"
               : i === 1
-              ? step === "otp"
-                ? "bg-gradient-to-r from-blue-500 to-blue-600"
+                ? step === "otp"
+                  ? "bg-gradient-to-r from-blue-500 to-blue-600"
+                  : step === "success"
+                    ? "bg-green-500"
+                    : "bg-gray-300 dark:bg-gray-600"
                 : step === "success"
-                ? "bg-green-500"
-                : "bg-gray-300 dark:bg-gray-600"
-              : step === "success"
-              ? "bg-gradient-to-r from-green-500 to-green-600"
-              : "bg-gray-300 dark:bg-gray-600"
+                  ? "bg-gradient-to-r from-green-500 to-green-600"
+                  : "bg-gray-300 dark:bg-gray-600"
           }`}
           initial={{ scale: 0 }}
           animate={{ scale: 1 }}
@@ -294,7 +319,7 @@ const Login: React.FC<LoginProps> = ({
                                 >
                                   {perm}
                                 </motion.span>
-                              )
+                              ),
                             )}
                           </div>
                         ) : (

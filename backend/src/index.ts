@@ -1,6 +1,7 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
+import cookieParser from "cookie-parser";
 import config from "./config";
 import logger from "./utils/logger";
 import { requestLogger } from "./middleware/requestLogger";
@@ -15,6 +16,7 @@ import dashboardRoutes from "./routes/dashboard";
 import parentingRoutes from "./routes/parenting";
 import schoolRoutes from "./routes/schoolRoutes";
 import systemRoutes from "./routes/systemRoutes";
+import ssoRoutes from "./routes/ssoRoutes";
 
 dotenv.config();
 
@@ -31,6 +33,7 @@ app.use(
 // Body parsing middleware
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
+app.use(cookieParser());
 
 // Request logging
 app.use(requestLogger);
@@ -56,6 +59,7 @@ app.use("/dashboard", dashboardRoutes);
 app.use("/parenting", parentingRoutes);
 app.use("/schools", schoolRoutes);
 app.use("/systems", systemRoutes);
+app.use("/sso", ssoRoutes);
 
 // Error handling middleware (must be last)
 app.use(errorHandler);

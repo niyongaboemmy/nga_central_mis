@@ -270,6 +270,15 @@ export const verifyOTP = asyncHandler(async (req: any, res: any) => {
     { expiresIn: "24h" },
   );
 
+  // Set HTTP-only cookie
+  res.cookie("nga_auth_token", token, {
+    httpOnly: true,
+    secure: config.nodeEnv === "production",
+    sameSite: "lax",
+    domain: config.cookieDomain,
+    maxAge: 24 * 60 * 60 * 1000, // 24 hours
+  });
+
   logger.info(`OTP verified, login completed for user: ${user[0].username}`);
 
   // Record activity
@@ -297,6 +306,82 @@ export const verifyOTP = asyncHandler(async (req: any, res: any) => {
     allPrograms,
     allGrades,
   });
+});
+
+export const getSession = asyncHandler(async (req: any, res: any) => {
+  const userId = req.user.userId;
+
+  // Get user data
+  const user = await db
+    .select()
+    .from(User)
+    .where(eq(User.user_id, userId))
+    .limit(1);
+
+  if (user.length === 0) {
+    throw new NotFoundError("User not found");
+  }
+
+  const profile = await db
+    .select()
+    .from(UserProfile)
+    .where(eq(UserProfile.user_id, userId))
+    .limit(1);
+
+  const permissions = await getUserPermissions(userId);
+
+  // Get user roles with permissions
+  const userRoleIds = await db
+    .select({ role_id: UserRole.role_id })
+    .from(UserRole)
+    .where(eq(UserRole.user_id, userId));
+
+  const roles = [];
+  for (const { role_id } of userRoleIds) {
+    const role = await db
+      .select({
+        role_id: Role.role_id,
+        name: Role.name,
+        description: Role.description,
+        status: Role.status,
+      })
+      .from(Role)
+      .where(eq(Role.role_id, role_id))
+      .limit(1);
+
+    if (role.length > 0) {
+      const perms = await db
+        .select({
+          perm_id: Permission.perm_id,
+          name: Permission.name,
+          description: Permission.description,
+          status: Permission.status,
+        })
+        .from(RolePermission)
+        .innerJoin(Permission, eq(RolePermission.perm_id, Permission.perm_id))
+        .where(eq(RolePermission.role_id, role_id));
+
+      roles.push({
+        ...role[0],
+        permissions: perms,
+      });
+    }
+  }
+
+  successResponse(res, "Session retrieved", {
+    user: user[0],
+    profile: profile[0] || null,
+    permissions,
+    roles,
+  });
+});
+
+export const logout = asyncHandler(async (req: any, res: any) => {
+  res.clearCookie("nga_auth_token", {
+    domain: config.cookieDomain,
+    path: "/",
+  });
+  successResponse(res, "Logged out successfully");
 });
 
 export const forgotPassword = asyncHandler(async (req: any, res: any) => {

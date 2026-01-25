@@ -566,3 +566,27 @@ export const RoleSystemFragment = mysqlTable(
     ),
   }),
 );
+// SSOClient table for cross-domain authentication
+export const SSOClient = mysqlTable("SSOClient", {
+  client_id: varchar("client_id", { length: 100 }).primaryKey(),
+  client_secret: varchar("client_secret", { length: 255 }).notNull(),
+  name: varchar("name", { length: 150 }).notNull(),
+  allowed_redirect_uris: text("allowed_redirect_uris").notNull(), // JSON array or comma-separated
+  status: mysqlEnum("status", ["ACTIVE", "DISABLED"]).default("ACTIVE"),
+  created_at: datetime("created_at").default(sql`CURRENT_TIMESTAMP`),
+});
+
+// SSOCode table for authorization code flow
+export const SSOCode = mysqlTable("SSOCode", {
+  code_id: bigint("code_id", { mode: "number" }).primaryKey().autoincrement(),
+  code: varchar("code", { length: 100 }).notNull().unique(),
+  user_id: bigint("user_id", { mode: "number" })
+    .notNull()
+    .references(() => User.user_id),
+  client_id: varchar("client_id", { length: 100 })
+    .notNull()
+    .references(() => SSOClient.client_id),
+  expires_at: datetime("expires_at").notNull(),
+  is_used: tinyint("is_used").default(0),
+  created_at: datetime("created_at").default(sql`CURRENT_TIMESTAMP`),
+});
