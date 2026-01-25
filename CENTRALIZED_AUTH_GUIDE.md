@@ -8,8 +8,12 @@ This guide provides technical instructions for integrating external platforms wi
 
 NGA Central MIS supports two types of Single Sign-On (SSO):
 
-1.  **Implicit SSO (Shared Domain)**: Uses HTTP-only cookies shared across subdomains (e.g., `app1.nga.ac.rw` and `api.nga.ac.rw`).
+1.  **Implicit SSO (Shared Domain)**: Uses HTTP-only cookies shared across subdomains (e.g., `app1.example.com` and `api.example.com`).
 2.  **Explicit SSO (Cross-Domain)**: Uses a redirection-based flow similar to OAuth2 for systems on entirely different domains (e.g., `mysystem.com`).
+
+> [!NOTE]
+> **Who needs the Database Tables?**
+> Only the **NGA Central MIS (The Provider)** needs the `SSOClient` and `SSOCode` tables. Your integrated platforms do **NOT** need these models; they only need to store their `client_id` and `client_secret` securely.
 
 ---
 
@@ -31,7 +35,7 @@ Ensure your HTTP client (e.g., Axios) is configured to send credentials:
 import axios from 'axios';
 
 const api = axios.create({
-  baseURL: 'https://api.nga.ac.rw',
+  baseURL: 'https://nga-central-mis.vercel.app',
   withCredentials: true // 👈 CRITICAL: Enables cookie sharing
 });
 
@@ -72,7 +76,7 @@ Use this if your system is on a completely different domain. This flow uses secu
 
 ### Token Exchange (Server-Side)
 
-**Endpoint**: `POST https://api.nga.ac.rw/sso/token`
+**Endpoint**: `POST https://nga-central-mis.vercel.app/sso/token`
 
 **Payload**:
 ```json
@@ -99,4 +103,4 @@ To ensure this system works in production, the following is **MANDATORY**:
 
 1.  **Local Dev**: Add `127.0.0.1 app1.local` and `127.0.0.1 api.local` to your `hosts` file to simulate subdomains.
 2.  **Verify Cookie**: Open DevTools > Application > Cookies and ensure `nga_auth_token` is present after login.
-3.  **Check Session**: Use `curl -b cookies.txt https://api.nga.ac.rw/auth/session` to verify the API recognizes your session.
+3.  **Check Session**: Use `curl -b cookies.txt https://nga-central-mis.vercel.app/auth/session` to verify the API recognizes your session.

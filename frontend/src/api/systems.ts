@@ -4,7 +4,11 @@ export interface System {
   system_id: number;
   name: string;
   description?: string;
+  client_id?: string;
+  client_secret?: string;
+  allowed_redirect_uris?: string;
   status: "ACTIVE" | "DISABLED";
+  created_at?: string;
 }
 
 export const getSystems = async (
@@ -26,10 +30,11 @@ export const createSystem = async (
   systemData: Partial<System>,
   onSuccess?: () => void,
   onError?: (error: any) => void,
-): Promise<void> => {
+): Promise<any> => {
   try {
-    await api.post("/systems", systemData);
+    const response = await api.post("/systems", systemData);
     if (onSuccess) onSuccess();
+    return response.data;
   } catch (error) {
     if (onError) onError(error);
     throw error;

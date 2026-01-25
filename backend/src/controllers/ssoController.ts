@@ -3,7 +3,7 @@ import crypto from "crypto";
 import { db } from "../db";
 import { eq, and } from "drizzle-orm";
 import {
-  SSOClient,
+  System,
   SSOCode,
   User,
   UserProfile,
@@ -35,25 +35,25 @@ export const authorizeSSO = asyncHandler(async (req: any, res: any) => {
     throw new ValidationError("client_id and redirect_uri are required");
   }
 
-  // Verify SSO client
+  // Verify SSO client (via System table)
   const client = await db
     .select()
-    .from(SSOClient)
-    .where(eq(SSOClient.client_id, client_id))
+    .from(System)
+    .where(eq(System.client_id, client_id))
     .limit(1);
 
   if (client.length === 0) {
-    throw new NotFoundError("SSO Client not found");
+    throw new NotFoundError("SSO System not found");
   }
 
   if (client[0].status !== "ACTIVE") {
-    throw new AuthenticationError("SSO Client is disabled");
+    throw new AuthenticationError("System is disabled");
   }
 
   // Verify redirect URI
-  const allowedUris = client[0].allowed_redirect_uris
-    .split(",")
-    .map((u) => u.trim());
+  const allowedUris =
+    client[0].allowed_redirect_uris?.split(",").map((u: string) => u.trim()) ||
+    [];
   if (!allowedUris.includes(redirect_uri)) {
     throw new ValidationError("Redirect URI not allowed");
   }
@@ -65,7 +65,7 @@ export const authorizeSSO = asyncHandler(async (req: any, res: any) => {
   await db.insert(SSOCode).values({
     code,
     user_id: userId,
-    client_id,
+    system_id: client[0].system_id,
     expires_at: expiresAt,
   });
 
@@ -88,14 +88,14 @@ export const getSSOToken = asyncHandler(async (req: any, res: any) => {
     );
   }
 
-  // Verify client
+  // Verify client (via System table)
   const client = await db
     .select()
-    .from(SSOClient)
+    .from(System)
     .where(
       and(
-        eq(SSOClient.client_id, client_id),
-        eq(SSOClient.client_secret, client_secret),
+        eq(System.client_id, client_id),
+        eq(System.client_secret, client_secret),
       ),
     )
     .limit(1);
@@ -111,7 +111,7 @@ export const getSSOToken = asyncHandler(async (req: any, res: any) => {
     .where(
       and(
         eq(SSOCode.code, code),
-        eq(SSOCode.client_id, client_id),
+        eq(SSOCode.system_id, client[0].system_id),
         eq(SSOCode.is_used, 0),
       ),
     )
@@ -191,5 +191,50 @@ export const getSSOToken = asyncHandler(async (req: any, res: any) => {
     token,
     user: user[0],
     permissions,
+  });
+});
+
+/**
+ * Register a new SSO System (Admin Only)
+ */
+export const registerSSOClient = asyncHandler(async (req: any, res: any) => {
+  const { client_id, name, allowed_redirect_uris, description } = req.body;
+
+  if (!client_id || !name || !allowed_redirect_uris) {
+    throw new ValidationError(
+      "client_id, name, and allowed_redirect_uris are required",
+    );
+  }
+
+  // Check if system with this client_id already exists
+  const existing = await db
+    .select()
+    .from(System)
+    .where(eq(System.client_id, client_id))
+    .limit(1);
+
+  if (existing.length > 0) {
+    throw new ValidationError("SSO client_id already exists");
+  }
+
+  // Generate a random client secret
+  const client_secret = crypto.randomBytes(32).toString("hex");
+
+  await db.insert(System).values({
+    name,
+    description,
+    client_id,
+    client_secret,
+    allowed_redirect_uris,
+    status: "ACTIVE",
+  });
+
+  logger.info(`Registered new SSO system: ${name} (${client_id})`);
+
+  successResponse(res, "SSO system registered successfully", {
+    client_id,
+    client_secret,
+    name,
+    allowed_redirect_uris,
   });
 });

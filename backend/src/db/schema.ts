@@ -519,7 +519,12 @@ export const System = mysqlTable("System", {
     .autoincrement(),
   name: varchar("name", { length: 100 }).notNull().unique(),
   description: varchar("description", { length: 255 }),
+  // SSO Fields
+  client_id: varchar("client_id", { length: 100 }).unique(),
+  client_secret: varchar("client_secret", { length: 255 }),
+  allowed_redirect_uris: text("allowed_redirect_uris"),
   status: mysqlEnum("status", ["ACTIVE", "DISABLED"]).default("ACTIVE"),
+  created_at: datetime("created_at").default(sql`CURRENT_TIMESTAMP`),
 });
 
 // SchoolSystemAssignment table (School <-> System)
@@ -566,16 +571,6 @@ export const RoleSystemFragment = mysqlTable(
     ),
   }),
 );
-// SSOClient table for cross-domain authentication
-export const SSOClient = mysqlTable("SSOClient", {
-  client_id: varchar("client_id", { length: 100 }).primaryKey(),
-  client_secret: varchar("client_secret", { length: 255 }).notNull(),
-  name: varchar("name", { length: 150 }).notNull(),
-  allowed_redirect_uris: text("allowed_redirect_uris").notNull(), // JSON array or comma-separated
-  status: mysqlEnum("status", ["ACTIVE", "DISABLED"]).default("ACTIVE"),
-  created_at: datetime("created_at").default(sql`CURRENT_TIMESTAMP`),
-});
-
 // SSOCode table for authorization code flow
 export const SSOCode = mysqlTable("SSOCode", {
   code_id: bigint("code_id", { mode: "number" }).primaryKey().autoincrement(),
@@ -583,9 +578,9 @@ export const SSOCode = mysqlTable("SSOCode", {
   user_id: bigint("user_id", { mode: "number" })
     .notNull()
     .references(() => User.user_id),
-  client_id: varchar("client_id", { length: 100 })
+  system_id: bigint("system_id", { mode: "number" })
     .notNull()
-    .references(() => SSOClient.client_id),
+    .references(() => System.system_id),
   expires_at: datetime("expires_at").notNull(),
   is_used: tinyint("is_used").default(0),
   created_at: datetime("created_at").default(sql`CURRENT_TIMESTAMP`),

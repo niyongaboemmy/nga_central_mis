@@ -8,10 +8,11 @@ import {
   Role,
 } from "../db/schema";
 import { eq, and } from "drizzle-orm";
+import crypto from "crypto";
 
 export const createSystem = async (req: Request, res: Response) => {
   try {
-    const { name, description } = req.body;
+    const { name, description, client_id, allowed_redirect_uris } = req.body;
 
     const existingSystem = await db
       .select()
@@ -24,12 +25,24 @@ export const createSystem = async (req: Request, res: Response) => {
         .json({ message: "System with this name already exists" });
     }
 
+    // Generate client_secret if client_id is provided
+    let client_secret: string | undefined;
+    if (client_id) {
+      client_secret = crypto.randomBytes(32).toString("hex");
+    }
+
     await db.insert(System).values({
       name,
       description,
+      client_id,
+      client_secret,
+      allowed_redirect_uris,
     });
 
-    res.status(201).json({ message: "System created successfully" });
+    res.status(201).json({
+      message: "System created successfully",
+      data: { client_id, client_secret }, // Return credentials if created
+    });
   } catch (error) {
     console.error("Error creating system:", error);
     res.status(500).json({ message: "Internal server error" });
@@ -68,7 +81,8 @@ export const getSystemById = async (req: Request, res: Response) => {
 export const updateSystem = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { name, description, status } = req.body;
+    const { name, description, status, client_id, allowed_redirect_uris } =
+      req.body;
 
     const existingSystem = await db
       .select()
@@ -91,16 +105,28 @@ export const updateSystem = async (req: Request, res: Response) => {
       }
     }
 
+    // Generate new secret if client_id is being set for the first time
+    let client_secret = existingSystem[0].client_secret;
+    if (client_id && !existingSystem[0].client_id) {
+      client_secret = crypto.randomBytes(32).toString("hex");
+    }
+
     await db
       .update(System)
       .set({
         name,
         description,
         status,
+        client_id,
+        client_secret,
+        allowed_redirect_uris,
       })
       .where(eq(System.system_id, Number(id)));
 
-    res.status(200).json({ message: "System updated successfully" });
+    res.status(200).json({
+      message: "System updated successfully",
+      data: { client_id, client_secret },
+    });
   } catch (error) {
     console.error("Error updating system:", error);
     res.status(500).json({ message: "Internal server error" });

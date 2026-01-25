@@ -703,3 +703,33 @@
 {"duration":9,"level":"info","message":"GET /dashboard/stats 304 - 9ms","service":"nga-central-mis","statusCode":304,"timestamp":"2026-01-25T09:50:14.881Z"}
 {"body":{},"ip":"::1","level":"info","message":"POST /auth/logout","service":"nga-central-mis","timestamp":"2026-01-25T09:50:17.328Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36"}
 {"duration":7,"level":"info","message":"POST /auth/logout 200 - 7ms","service":"nga-central-mis","statusCode":200,"timestamp":"2026-01-25T09:50:17.335Z"}
+{"level":"info","message":"SIGINT received, shutting down gracefully","service":"nga-central-mis","timestamp":"2026-01-25T09:52:36.430Z"}
+{"level":"info","message":"Server running on port 5001 in development mode","service":"nga-central-mis","timestamp":"2026-01-25T11:22:25.071Z"}
+{"host":"mail.hackflix.net","level":"info","message":"Email service connected successfully","port":465,"service":"nga-central-mis","timestamp":"2026-01-25T11:22:26.650Z"}
+{"body":{"password":"Ngb155155!","username":"emmanuelniyongabo44@gmail.com"},"ip":"::1","level":"info","message":"POST /auth/login","service":"nga-central-mis","timestamp":"2026-01-25T11:23:05.116Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36"}
+{"level":"info","message":"Login attempt for: emmanuelniyongabo44@gmail.com","service":"nga-central-mis","timestamp":"2026-01-25T11:23:05.117Z"}
+{"level":"info","message":"OTP saved","service":"nga-central-mis","timestamp":"2026-01-25T11:23:05.418Z","type":"LOGIN_2FA","userId":1}
+{"level":"info","message":"Email sent successfully","messageId":"<59e36509-f1cb-cc13-b2dc-e5b4123df7d1@nga.ac.rw>","service":"nga-central-mis","timestamp":"2026-01-25T11:23:08.942Z","to":"emmanuelniyongabo44@gmail.com"}
+{"level":"info","message":"Password verified, OTP sent for user: superadmin","service":"nga-central-mis","timestamp":"2026-01-25T11:23:08.948Z"}
+{"duration":3835,"level":"info","message":"POST /auth/login 200 - 3835ms","service":"nga-central-mis","statusCode":200,"timestamp":"2026-01-25T11:23:08.951Z"}
+{"body":{"otp":"488601"},"ip":"::1","level":"info","message":"POST /auth/verify-otp","service":"nga-central-mis","timestamp":"2026-01-25T11:23:23.262Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36"}
+{"level":"info","message":"OTP verified successfully","service":"nga-central-mis","timestamp":"2026-01-25T11:23:23.267Z","type":"LOGIN_2FA","userId":1}
+{"level":"info","message":"OTP verified, login completed for user: superadmin","service":"nga-central-mis","timestamp":"2026-01-25T11:23:23.277Z"}
+{"level":"debug","message":"[ActivityLog] Recorded: LOGIN_SUCCESS for user 1 by actor 1","service":"nga-central-mis","timestamp":"2026-01-25T11:23:23.278Z"}
+{"duration":17,"level":"info","message":"POST /auth/verify-otp 200 - 17ms","service":"nga-central-mis","statusCode":200,"timestamp":"2026-01-25T11:23:23.279Z"}
+{"ip":"::1","level":"info","message":"GET /users/me","service":"nga-central-mis","timestamp":"2026-01-25T11:23:23.284Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36"}
+{"level":"info","message":"Fetching current user","service":"nga-central-mis","timestamp":"2026-01-25T11:23:23.285Z","userId":1}
+{"duration":7,"level":"info","message":"GET /users/me 200 - 7ms","service":"nga-central-mis","statusCode":200,"timestamp":"2026-01-25T11:23:23.291Z"}
+{"ip":"::1","level":"info","message":"GET /dashboard/stats","service":"nga-central-mis","timestamp":"2026-01-25T11:23:23.314Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36"}
+{"duration":7,"level":"info","message":"GET /dashboard/stats 304 - 7ms","service":"nga-central-mis","statusCode":304,"timestamp":"2026-01-25T11:23:23.321Z"}
+{"ip":"::1","level":"info","message":"GET /systems","service":"nga-central-mis","timestamp":"2026-01-25T11:23:35.020Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36"}
+{"duration":8,"level":"info","message":"GET /systems 200 - 8ms","service":"nga-central-mis","statusCode":200,"timestamp":"2026-01-25T11:23:35.028Z"}
+{"ip":"::1","level":"info","message":"GET /systems","service":"nga-central-mis","timestamp":"2026-01-25T11:23:35.031Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36"}
+{"duration":5,"level":"info","message":"GET /systems 304 - 5ms","service":"nga-central-mis","statusCode":304,"timestamp":"2026-01-25T11:23:35.036Z"}
+{"body":{"allowed_redirect_uris":"http://localhost:5173/taskmentor/sso/callback,https://nga.ac.rw/taskmentor/sso/callback","client_id":"taskmentor_app","description":"Assessments Taking Management System","name":"TaskMentor","status":"ACTIVE"},"ip":"::1","level":"info","message":"POST /systems","service":"nga-central-mis","timestamp":"2026-01-25T11:49:29.108Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36"}
+{"duration":9,"level":"info","message":"POST /systems 201 - 9ms","service":"nga-central-mis","statusCode":201,"timestamp":"2026-01-25T11:49:29.117Z"}
+{"ip":"::1","level":"info","message":"GET /systems","service":"nga-central-mis","timestamp":"2026-01-25T11:49:29.120Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36"}
+{"duration":6,"level":"info","message":"GET /systems 200 - 6ms","service":"nga-central-mis","statusCode":200,"timestamp":"2026-01-25T11:49:29.126Z"}
+{"body":{"allowed_redirect_uris":"http://localhost:5173/taskmentor/sso/callback,https://nga.ac.rw/taskmentor/sso/callback","client_id":"taskmentor_app","description":"Assessments Taking Management System","name":"TaskMentor","status":"ACTIVE"},"ip":"::1","level":"info","message":"POST /systems","service":"nga-central-mis","timestamp":"2026-01-25T11:49:38.450Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36"}
+{"duration":3,"level":"info","message":"POST /systems 400 - 3ms","service":"nga-central-mis","statusCode":400,"timestamp":"2026-01-25T11:49:38.453Z"}
+{"level":"info","message":"SIGINT received, shutting down gracefully","service":"nga-central-mis","timestamp":"2026-01-25T11:50:12.604Z"}

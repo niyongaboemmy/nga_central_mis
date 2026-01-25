@@ -13,6 +13,8 @@ import {
   ChevronRight,
   User,
   Building,
+  Link,
+  Copy,
 } from "lucide-react";
 import Modal from "./ui/Modal";
 import { useToast } from "../contexts/ToastContext";
@@ -114,19 +116,26 @@ const SystemModal = ({
     name: "",
     description: "",
     status: "ACTIVE",
+    client_id: "",
+    allowed_redirect_uris: "",
   });
   const [loading, setLoading] = useState(false);
+  const [createdSecret, setCreatedSecret] = useState<string | null>(null);
   const { showToast } = useToast();
 
   useEffect(() => {
     if (system) {
       setFormData(system);
+      setCreatedSecret(null);
     } else {
       setFormData({
         name: "",
         description: "",
         status: "ACTIVE",
+        client_id: "",
+        allowed_redirect_uris: "",
       });
+      setCreatedSecret(null);
     }
   }, [system, isOpen]);
 
@@ -137,12 +146,24 @@ const SystemModal = ({
       if (system) {
         await updateSystem(system.system_id, formData);
         showToast("System updated successfully", "success");
+        onSuccess();
+        onClose();
       } else {
-        await createSystem(formData);
-        showToast("System created successfully", "success");
+        const response: any = await createSystem(formData);
+        // If the backend returned a client_secret, display it
+        if (response?.data?.client_secret) {
+          setCreatedSecret(response.data.client_secret);
+          showToast(
+            "System created! Copy your Client Secret below.",
+            "success",
+          );
+          onSuccess();
+        } else {
+          showToast("System created successfully", "success");
+          onSuccess();
+          onClose();
+        }
       }
-      onSuccess();
-      onClose();
     } catch (error: any) {
       showToast(
         error.response?.data?.message || "Failed to save system",
@@ -151,6 +172,11 @@ const SystemModal = ({
     } finally {
       setLoading(false);
     }
+  };
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+    showToast("Copied to clipboard!", "success");
   };
 
   return (
@@ -233,6 +259,73 @@ const SystemModal = ({
             ))}
           </div>
         </div>
+
+        {/* SSO Configuration Section */}
+        <div className="border-t border-gray-100 dark:border-slate-700/30 pt-5 mt-2">
+          <div className="flex items-center gap-2 mb-4">
+            <Link className="w-4 h-4 text-blue-500" />
+            <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+              SSO Configuration (Optional)
+            </span>
+          </div>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 ml-1">
+                Client ID
+              </label>
+              <input
+                type="text"
+                value={formData.client_id || ""}
+                onChange={(e) =>
+                  setFormData({ ...formData, client_id: e.target.value })
+                }
+                className="w-full px-4 py-3 bg-gray-50 dark:bg-slate-900/50 border border-gray-200 dark:border-slate-700/30 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all dark:text-white placeholder:text-gray-400"
+                placeholder="e.g. my_portal_app"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 ml-1">
+                Allowed Redirect URIs (comma-separated)
+              </label>
+              <textarea
+                value={formData.allowed_redirect_uris || ""}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    allowed_redirect_uris: e.target.value,
+                  })
+                }
+                rows={2}
+                className="w-full px-4 py-3 bg-gray-50 dark:bg-slate-900/50 border border-gray-200 dark:border-slate-700/30 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all dark:text-white placeholder:text-gray-400 resize-none"
+                placeholder="https://app.example.com/callback, http://localhost:3000/callback"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Display generated secret after creation */}
+        {createdSecret && (
+          <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 rounded-xl p-4">
+            <p className="text-sm font-semibold text-yellow-800 dark:text-yellow-200 mb-2">
+              ⚠️ Copy your Client Secret now!
+            </p>
+            <div className="flex items-center gap-2">
+              <code className="flex-1 bg-white dark:bg-gray-800 px-3 py-2 rounded-lg text-sm font-mono text-gray-800 dark:text-gray-200 overflow-x-auto">
+                {createdSecret}
+              </code>
+              <button
+                type="button"
+                onClick={() => copyToClipboard(createdSecret)}
+                className="p-2 bg-yellow-100 dark:bg-yellow-800 text-yellow-700 dark:text-yellow-200 rounded-lg hover:bg-yellow-200 dark:hover:bg-yellow-700"
+              >
+                <Copy className="w-4 h-4" />
+              </button>
+            </div>
+            <p className="text-xs text-yellow-600 dark:text-yellow-400 mt-2">
+              This secret will not be shown again.
+            </p>
+          </div>
+        )}
         <div className="flex justify-end gap-3 pt-4">
           <button
             type="button"
