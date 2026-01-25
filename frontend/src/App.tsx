@@ -5,6 +5,7 @@ import {
   Route,
   useNavigate,
   Navigate,
+  useLocation,
 } from "react-router-dom";
 import Landing from "./components/Landing";
 import AboutUs from "./components/AboutUs";
@@ -94,9 +95,13 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({
   return <>{children}</>;
 };
 
-// Public Route wrapper (redirects to dashboard if already logged in)
+// Public Route wrapper (redirects to dashboard if already logged in, unless explicit SSO request)
 const PublicRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { isAuthenticated, isLoading } = useUser();
+  const location = useLocation();
+  const searchParams = new URLSearchParams(location.search);
+  const isSSORequest =
+    searchParams.has("client_id") && searchParams.has("redirect_uri");
 
   if (isLoading) {
     return (
@@ -106,7 +111,9 @@ const PublicRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     );
   }
 
-  if (isAuthenticated) {
+  // If logged in and NOT an SSO request, redirect to dashboard
+  // If it IS an SSO request, let them through to the Login page which handles the consent UI
+  if (isAuthenticated && !isSSORequest) {
     return <Navigate to="/dashboard" replace />;
   }
 

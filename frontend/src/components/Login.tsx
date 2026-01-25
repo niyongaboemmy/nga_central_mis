@@ -1,7 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Alert, VerificationCode } from "./ui";
-import { login, verifyOTP, authorizeSSO } from "../api/auth";
+import { login, verifyOTP, authorizeSSO, checkSession } from "../api/auth";
 import { useUser } from "../contexts/UserContext";
 import { usePermissions } from "../hooks/usePermissions";
 import { useSearchParams } from "react-router-dom";
@@ -105,16 +105,17 @@ const Login: React.FC<LoginProps> = ({
   const [password, setPassword] = useState("");
   const [otp, setOtp] = useState("");
   const [tempToken, setTempToken] = useState("");
-  const [step, setStep] = useState<"credentials" | "otp" | "success">(
-    "credentials",
-  );
-  const [error, setError] = useState("");
+  const [step, setStep] = useState<
+    "credentials" | "otp" | "success" | "sso-consent"
+  >("credentials");
+  const [authError, setAuthError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [initializing, setInitializing] = useState(true);
 
   const handleCredentialsSubmit = async (e: any) => {
     e.preventDefault();
     setLoading(true);
-    setError("");
+    setAuthError("");
 
     try {
       const response = await login({ username, password });
@@ -123,7 +124,7 @@ const Login: React.FC<LoginProps> = ({
         setStep("otp");
       }
     } catch (error: any) {
-      setError(
+      setAuthError(
         error.response?.data?.message || "Login failed. Please try again.",
       );
     } finally {
@@ -135,7 +136,7 @@ const Login: React.FC<LoginProps> = ({
     e.preventDefault();
     if (loading) return; // Prevent multiple submissions
     setLoading(true);
-    setError("");
+    setAuthError("");
 
     try {
       await verifyOTP(otp, tempToken);
@@ -171,12 +172,74 @@ const Login: React.FC<LoginProps> = ({
         }
       }, 2000);
     } catch (error: any) {
-      setError(
+      setAuthError(
         error.response?.data?.message || "Invalid OTP code. Please try again.",
       );
     } finally {
       setLoading(false);
     }
+  };
+
+  // Check for auto-login/SSO redirect on mount
+  useEffect(() => {
+    const handleAutoRedirect = async () => {
+      const clientId = searchParams.get("client_id");
+      const redirectUri = searchParams.get("redirect_uri");
+
+      // Verify if user is already logged in
+      try {
+        await checkSession();
+        // If session is valid and we have SSO params, redirect immediately
+        if (clientId && redirectUri) {
+          console.log("User already logged in, requesting SSO consent...");
+          setStep("sso-consent");
+        } else {
+          // If logged in but no SSO params, let parent handle navigation (e.g. to dashboard)
+          if (onLoginSuccess) onLoginSuccess();
+        }
+      } catch (err) {
+        // Not logged in, stay on login page
+      } finally {
+        setInitializing(false);
+      }
+    };
+
+    handleAutoRedirect();
+  }, [searchParams, onLoginSuccess]);
+
+  const handleSSOContinue = async () => {
+    setLoading(true);
+    const clientId = searchParams.get("client_id");
+    const redirectUri = searchParams.get("redirect_uri");
+
+    if (clientId && redirectUri) {
+      try {
+        const ssoData = await authorizeSSO(clientId, redirectUri);
+        if (ssoData?.code) {
+          setStep("success");
+          setTimeout(() => {
+            const finalUrl = new URL(redirectUri);
+            finalUrl.searchParams.set("code", ssoData.code);
+            window.location.href = finalUrl.toString();
+          }, 1500);
+        }
+      } catch (ssoError) {
+        console.error("SSO Authorization failed:", ssoError);
+        setAuthError("Failed to authorize application. Please try again.");
+        setStep("credentials"); // Fallback
+      } finally {
+        setLoading(false);
+      }
+    }
+  };
+
+  const handleSSOLogout = async () => {
+    // Perform logout logic (clear local storage/cookies) but keep params
+    // Assuming logout API or context function exists, otherwise just clear local state
+    // Ideally use logout() from context if available
+    localStorage.removeItem("token"); // Simple clear for now or use context
+    // Refresh page to clear memory state and re-mount login
+    window.location.reload();
   };
 
   const formVariants = {
@@ -202,7 +265,7 @@ const Login: React.FC<LoginProps> = ({
           key={i}
           className={`w-3 h-3 rounded-full ${
             i === 0
-              ? step === "credentials"
+              ? step === "credentials" || step === "sso-consent"
                 ? "bg-gradient-to-r from-blue-500 to-blue-600"
                 : "bg-gray-300 dark:bg-gray-600"
               : i === 1
@@ -237,7 +300,87 @@ const Login: React.FC<LoginProps> = ({
       <div className="relative z-10 pt-0 pb-8 px-4">
         <div className="w-full max-w-md mx-auto">
           <AnimatePresence mode="wait">
-            {step === "success" ? (
+            {initializing ? (
+              <motion.div
+                key="initializing"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="flex flex-col items-center justify-center p-12 bg-white/80 dark:bg-slate-800/60 backdrop-blur-xl rounded-3xl border border-white dark:border-slate-700/50 shadow-2xl"
+              >
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
+                <p className="text-gray-600 dark:text-gray-300 font-medium">
+                  Checking session...
+                </p>
+              </motion.div>
+            ) : step === "sso-consent" ? (
+              <motion.div
+                key="sso-consent"
+                variants={formVariants}
+                initial="initial"
+                animate="animate"
+                exit="exit"
+                transition={{ duration: 0.3 }}
+              >
+                <motion.div
+                  className="bg-white/80 dark:bg-slate-800/60 backdrop-blur-xl rounded-3xl p-8 border border-white dark:border-slate-700/50 shadow-2xl text-center"
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                >
+                  <motion.div className="flex justify-center mb-6">
+                    <div className="relative">
+                      <div className="w-24 h-24 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 p-1">
+                        <div className="w-full h-full rounded-full bg-white dark:bg-slate-800 flex items-center justify-center overflow-hidden">
+                          <User className="w-12 h-12 text-gray-400" />
+                        </div>
+                      </div>
+                      <div className="absolute bottom-0 right-0 p-2 bg-green-500 rounded-full border-4 border-white dark:border-slate-800"></div>
+                    </div>
+                  </motion.div>
+
+                  <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
+                    Signed in as {localStorage.getItem("user_name") || "User"}
+                  </h2>
+                  <p className="text-gray-500 dark:text-gray-400 text-sm mb-8">
+                    {localStorage.getItem("user_role") || "Authenticated User"}{" "}
+                    • NGA Central MIS
+                  </p>
+
+                  <div className="space-y-4">
+                    <button
+                      onClick={handleSSOContinue}
+                      disabled={loading}
+                      className="w-full py-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold rounded-2xl shadow-lg shadow-blue-500/25 transition-all flex items-center justify-center gap-2"
+                    >
+                      {loading ? (
+                        "Redirecting..."
+                      ) : (
+                        <>
+                          Continue to App <ArrowRight className="w-5 h-5" />
+                        </>
+                      )}
+                    </button>
+
+                    <button
+                      onClick={handleSSOLogout}
+                      className="w-full py-4 bg-white dark:bg-slate-700 hover:bg-gray-50 dark:hover:bg-slate-600 text-red-500 font-semibold rounded-2xl border border-gray-200 dark:border-slate-600 transition-all"
+                    >
+                      Logout & Switch Account
+                    </button>
+                  </div>
+
+                  <div className="mt-6 pt-6 border-t border-gray-100 dark:border-slate-700/50">
+                    <p className="text-xs text-gray-400">
+                      You are about to share your identity details with{" "}
+                      <span className="font-medium text-gray-600 dark:text-gray-300">
+                        {searchParams.get("client_id")}
+                      </span>
+                      .
+                    </p>
+                  </div>
+                </motion.div>
+              </motion.div>
+            ) : step === "success" ? (
               <motion.div
                 key="success"
                 variants={formVariants}
@@ -418,7 +561,7 @@ const Login: React.FC<LoginProps> = ({
                           //   } as any);
                           // }
                         }}
-                        error={!!error}
+                        error={!!authError}
                       />
                     </motion.div>
 
@@ -469,7 +612,7 @@ const Login: React.FC<LoginProps> = ({
                       type="button"
                       onClick={() => {
                         setStep("credentials");
-                        setError("");
+                        setAuthError("");
                         setOtp("");
                       }}
                       className="w-full text-sm text-gray-600 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 font-medium transition-colors duration-200 flex items-center justify-center gap-2 py-2 px-4 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800"
@@ -577,7 +720,7 @@ const Login: React.FC<LoginProps> = ({
                     </motion.div>
 
                     <AnimatePresence>
-                      {error && (
+                      {authError && (
                         <motion.div
                           initial={{ opacity: 0, height: 0 }}
                           animate={{ opacity: 1, height: "auto" }}
@@ -586,7 +729,7 @@ const Login: React.FC<LoginProps> = ({
                         >
                           <Alert
                             type="error"
-                            message={error}
+                            message={authError}
                             className="mt-4"
                           />
                         </motion.div>

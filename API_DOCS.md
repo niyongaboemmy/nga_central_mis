@@ -165,6 +165,9 @@ Request password reset.
 
 These endpoints are used for cross-domain authentication (OAuth2-style).
 
+> [!TIP]
+> **Integration Guide**: For a complete step-by-step tutorial on implementing SSO in your application (including backend code examples), please refer to the **[Client SSO Integration Guide](./SSO_CLIENT_INTEGRATION.md)**.
+
 ### GET /sso/authorize
 
 Generate a short-lived authorization code for a logged-in user.
@@ -795,6 +798,204 @@ Get documents (with optional filters).
 - `limit`: Items per page
 
 ### GET /documents/folder/:folderId
+Get documents in specific folder.
+
+---
+
+## Academic Management Endpoints
+
+### GET /academics/years
+Get all academic years.
+**Authentication:** Required (MANAGE_ACADEMICS)
+
+### POST /academics/years
+Create academic year.
+**Authentication:** Required (MANAGE_ACADEMICS)
+**Request Body:**
+```json
+{
+  "name": "2023-2024",
+  "start_date": "2023-09-01",
+  "end_date": "2024-06-30",
+  "is_current": true
+}
+```
+
+### PUT /academics/years/:id
+Update academic year.
+**Authentication:** Required (MANAGE_ACADEMICS)
+
+### DELETE /academics/years/:id
+Delete academic year.
+**Authentication:** Required (MANAGE_ACADEMICS)
+
+### GET /academics/terms
+Get all academic terms.
+**Authentication:** Required
+
+### POST /academics/terms
+Create academic term.
+**Authentication:** Required (MANAGE_ACADEMICS)
+**Request Body:**
+```json
+{
+  "name": "Term 1",
+  "academic_year_id": 1,
+  "start_date": "2023-09-01",
+  "end_date": "2023-12-15"
+}
+```
+
+### PUT /academics/terms/:id
+Update academic term.
+**Authentication:** Required (MANAGE_ACADEMICS)
+
+### DELETE /academics/terms/:id
+Delete academic term.
+**Authentication:** Required (MANAGE_ACADEMICS)
+
+### GET /academics/programs
+Get all programs (e.g. Nursery, Primary).
+**Authentication:** Required (MANAGE_ACADEMICS)
+
+### POST /academics/programs
+Create program.
+**Authentication:** Required (MANAGE_ACADEMICS)
+**Request Body:**
+```json
+{
+  "name": "Primary Section",
+  "description": "Primary Level Education"
+}
+```
+
+### PUT /academics/programs/:id
+Update program.
+**Authentication:** Required (MANAGE_ACADEMICS)
+
+### DELETE /academics/programs/:id
+Delete program.
+**Authentication:** Required (MANAGE_ACADEMICS)
+
+### GET /academics/grades
+Get all grades (e.g. P1, P2).
+**Authentication:** Required (MANAGE_ACADEMICS or VIEW_PROGRAM_ACADEMICS)
+
+### POST /academics/grades
+Create grade.
+**Authentication:** Required (MANAGE_ACADEMICS)
+**Request Body:**
+```json
+{
+  "name": "Primary 1",
+  "program_id": 1,
+  "level_order": 1
+}
+```
+
+### PUT /academics/grades/:id
+Update grade.
+**Authentication:** Required (MANAGE_ACADEMICS)
+
+### DELETE /academics/grades/:id
+Delete grade.
+**Authentication:** Required (MANAGE_ACADEMICS)
+
+### GET /academics/subjects
+Get all subjects.
+**Authentication:** Required
+
+### POST /academics/subjects
+Create subject.
+**Authentication:** Required (MANAGE_ACADEMICS)
+**Request Body:**
+```json
+{
+  "name": "Mathematics",
+  "code": "MATH",
+  "course_category_id": 1
+}
+```
+
+### PUT /academics/subjects/:id
+Update subject.
+**Authentication:** Required (MANAGE_ACADEMICS)
+
+### DELETE /academics/subjects/:id
+Delete subject.
+**Authentication:** Required (MANAGE_ACADEMICS)
+
+### GET /academics/grades/:grade_id/subjects
+Get subjects assigned to a grade.
+**Authentication:** Required
+
+### POST /academics/grades/assign-subject
+Assign subject to a grade.
+**Authentication:** Required (MANAGE_ACADEMICS)
+**Request Body:**
+```json
+{
+  "grade_id": 1,
+  "subject_id": 2,
+  "max_marks": 100
+}
+```
+
+### DELETE /academics/grades/:grade_id/subjects/:subject_id
+Remove subject from grade.
+**Authentication:** Required (MANAGE_ACADEMICS)
+
+### GET /academics/teachers/:teacherId/subjects
+Get subjects assigned to a teacher.
+**Authentication:** Required
+
+### POST /academics/teachers/assign-subject
+Assign teacher to a subject for a specific class/term.
+**Authentication:** Required (MANAGE_ACADEMICS)
+**Request Body:**
+```json
+{
+  "user_id": 10,
+  "subject_id": 2,
+  "class_group_id": 5,
+  "academic_term_id": 3
+}
+```
+
+### GET /academics/my-assigned-subjects
+Get subjects assigned to the currently logged-in teacher.
+**Authentication:** Required (VIEW_MY_ASSIGNED_SUBJECTS)
+
+### GET /academics/course-categories
+Get course categories (e.g. Core, Elective).
+**Authentication:** Required (MANAGE_ACADEMICS)
+
+### POST /academics/course-categories
+Create course category.
+**Authentication:** Required (MANAGE_ACADEMICS)
+
+### GET /academics/class-groups
+Get class groups (e.g. P1 A, P1 B).
+**Authentication:** Required
+
+### POST /academics/class-groups
+Create class group.
+**Authentication:** Required (MANAGE_ACADEMICS)
+**Request Body:**
+```json
+{
+  "name": "Stream A",
+  "grade_id": 1
+}
+```
+
+### POST /academics/students/enroll-subject
+Enroll student in an elective subject.
+**Authentication:** Required (MANAGE_USERS)
+
+### POST /academics/students/assign-class-group
+Assign student to a class group (Stream).
+**Authentication:** Required (MANAGE_USERS)
 
 Get documents in specific folder.
 
@@ -1385,3 +1586,129 @@ Pagination metadata is included in the response:
   }
 }
 ```
+
+---
+
+## System Management Endpoints (SSO Clients)
+
+### GET /systems/
+Get all registered systems.
+**Authentication:** Required (MANAGE_SYSTEMS)
+
+### POST /systems/
+Register new system (SSO Client).
+**Authentication:** Required (MANAGE_SYSTEMS)
+**Request Body:**
+```json
+{
+  "name": "My App",
+  "client_id": "my_app_id",
+  "allowed_redirect_uris": "https://myapp.com/callback",
+  "description": "My external application"
+}
+```
+
+### GET /systems/:id
+Get system details.
+**Authentication:** Required (MANAGE_SYSTEMS)
+
+### PUT /systems/:id
+Update system.
+**Authentication:** Required (MANAGE_SYSTEMS)
+
+### DELETE /systems/:id
+Delete system.
+**Authentication:** Required (MANAGE_SYSTEMS)
+
+### POST /systems/assign/school
+Assign system to a school.
+**Authentication:** Required (ASSIGN_SCHOOL_SYSTEMS)
+**Request Body:**
+```json
+{
+  "system_id": 1,
+  "school_id": 1
+}
+```
+
+### POST /systems/assign/role
+Assign system access to a role within a school.
+**Authentication:** Required (ASSIGN_SCHOOL_SYSTEMS)
+**Request Body:**
+```json
+{
+  "system_id": 1,
+  "school_id": 1,
+  "role_id": 2
+}
+```
+
+---
+
+## School Management Endpoints
+
+### GET /schools/
+Get all schools.
+**Authentication:** Required (MANAGE_SCHOOLS)
+
+### POST /schools/
+Create new school.
+**Authentication:** Required (MANAGE_SCHOOLS)
+**Request Body:**
+```json
+{
+  "name": "Kigali International School",
+  "address": "Kigali, Rwanda",
+  "contact_email": "info@kis.rw"
+}
+```
+
+### GET /schools/:id
+Get school details.
+**Authentication:** Required (MANAGE_SCHOOLS)
+
+### PUT /schools/:id
+Update school.
+**Authentication:** Required (MANAGE_SCHOOLS)
+
+### DELETE /schools/:id
+Delete school.
+**Authentication:** Required (MANAGE_SCHOOLS)
+
+---
+
+## Parenting Endpoints
+
+### GET /parenting/student/:studentId/parents
+Get parents of a student.
+**Authentication:** Required
+
+### GET /parenting/parent/:parentId/students
+Get students (children) of a parent.
+**Authentication:** Required
+
+### POST /parenting/assign
+Assign a parent to a student.
+**Authentication:** Required
+**Request Body:**
+```json
+{
+  "student_id": 1,
+  "parent_id": 2
+}
+```
+
+### POST /parenting/remove
+Remove a parent-student relationship.
+**Authentication:** Required
+**Request Body:**
+```json
+{
+  "student_id": 1,
+  "parent_id": 2
+}
+```
+
+### GET /parenting/search
+Search for potential relations.
+**Authentication:** Required
