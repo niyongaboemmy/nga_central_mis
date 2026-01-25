@@ -8,7 +8,7 @@ ADD COLUMN `client_secret` VARCHAR(255) AFTER `client_id`,
 ADD COLUMN `allowed_redirect_uris` TEXT AFTER `client_secret`,
 ADD COLUMN `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP AFTER `status`;
 
--- Create SSOCode table for authorization code flow
+-- Create SSOCode table for authorization code flow.
 CREATE TABLE IF NOT EXISTS `SSOCode` (
   `code_id` BIGINT AUTO_INCREMENT NOT NULL,
   `code` VARCHAR(100) NOT NULL,
