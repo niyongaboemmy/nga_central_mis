@@ -7,6 +7,8 @@ export interface System {
   client_id?: string;
   client_secret?: string;
   allowed_redirect_uris?: string;
+  icon_url: string;
+  home_url: string;
   status: "ACTIVE" | "DISABLED";
   created_at?: string;
 }

@@ -1,4 +1,5 @@
 import api from "../services/api";
+import { System } from "./systems";
 
 // Backend response wrapper
 interface BackendResponse<T> {
@@ -70,6 +71,7 @@ export interface UserWithProfile {
   currentAcademicTerms?: AcademicTerm[];
   allPrograms?: Program[];
   allGrades?: Grade[];
+  systems?: System[];
 }
 
 export interface Program {

@@ -17,7 +17,8 @@ Before you begin, ensure you have the following:
 
 1.  **Registered Application**: Your app must be registered in the NGA MIS Admin Dashboard (System Modules).
 2.  **Credentials**: Obtain your `Client ID` and `Client Secret`.
-3.  **Redirect URI**: Whitelist your callback URL (e.g., `http://localhost:5173/taskmentor/sso/callback`).
+3.  **Redirect URI**: Whitelist your callback URL (e.g., `http://localhost:3000/sso/callback`).
+    *   **Note**: Use a different port than the MIS (5173) to avoid conflicts during local development.
 
 ---
 

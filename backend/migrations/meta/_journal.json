@@ -8,6 +8,13 @@
       "when": 1768846246930,
       "tag": "0000_solid_lake",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "5",
+      "when": 1769420105467,
+      "tag": "0001_dizzy_kate_bishop",
+      "breakpoints": true
     }
   ]
 }

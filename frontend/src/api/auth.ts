@@ -122,12 +122,17 @@ export const checkSession = async (): Promise<VerifyOTPResponse | void> => {
 export const authorizeSSO = async (
   clientId: string,
   redirectUri: string,
-): Promise<{ code: string } | void> => {
+  responseType: string = "code",
+  state?: string,
+): Promise<{ code: string; state?: string } | void> => {
   try {
-    const response: AxiosResponse<BackendResponse<{ code: string }>> =
-      await api.get(
-        `/sso/authorize?client_id=${clientId}&redirect_uri=${redirectUri}`,
-      );
+    let url = `/sso/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(
+      redirectUri,
+    )}&response_type=${responseType}`;
+    if (state) url += `&state=${encodeURIComponent(state)}`;
+    const response: AxiosResponse<
+      BackendResponse<{ code: string; state?: string }>
+    > = await api.get(url);
 
     return response.data.data;
   } catch (error) {

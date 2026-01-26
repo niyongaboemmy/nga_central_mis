@@ -523,6 +523,8 @@ export const System = mysqlTable("System", {
   client_id: varchar("client_id", { length: 100 }).unique(),
   client_secret: varchar("client_secret", { length: 255 }),
   allowed_redirect_uris: text("allowed_redirect_uris"),
+  icon_url: varchar("icon_url", { length: 255 }).notNull(),
+  home_url: varchar("home_url", { length: 255 }).notNull(),
   status: mysqlEnum("status", ["ACTIVE", "DISABLED"]).default("ACTIVE"),
   created_at: datetime("created_at").default(sql`CURRENT_TIMESTAMP`),
 });

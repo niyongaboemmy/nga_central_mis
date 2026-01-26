@@ -33,6 +33,7 @@ import {
   UserGrade,
   AcademicYear,
   AcademicTerm,
+  System,
 } from "../db/schema";
 import { sanitizeString, validateEmail } from "../utils/sanitization";
 import {
@@ -450,6 +451,12 @@ export const getCurrentUser = asyncHandler(async (req: any, res: any) => {
     .innerJoin(Program, eq(Grade.program_id, Program.program_id))
     .orderBy(Grade.level_order);
 
+  // Get all active systems
+  const systems = await db
+    .select()
+    .from(System)
+    .where(eq(System.status, "ACTIVE"));
+
   successResponse(res, "User profile retrieved successfully", {
     user: user[0],
     profile: profile[0] || null,
@@ -463,6 +470,7 @@ export const getCurrentUser = asyncHandler(async (req: any, res: any) => {
     currentAcademicTerms,
     allPrograms,
     allGrades,
+    systems,
   });
 });
 

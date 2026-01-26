@@ -28,11 +28,15 @@ import logger from "../utils/logger";
  * Generates an authorization code for a logged-in user
  */
 export const authorizeSSO = asyncHandler(async (req: any, res: any) => {
-  const { client_id, redirect_uri } = req.query;
+  const { client_id, redirect_uri, response_type, state } = req.query;
   const userId = req.user.userId;
 
   if (!client_id || !redirect_uri) {
     throw new ValidationError("client_id and redirect_uri are required");
+  }
+
+  if (response_type !== "code") {
+    throw new ValidationError("Only response_type='code' is supported");
   }
 
   // Verify SSO client (via System table)
@@ -51,11 +55,19 @@ export const authorizeSSO = asyncHandler(async (req: any, res: any) => {
   }
 
   // Verify redirect URI
+  const normalizedRedirectUri = redirect_uri.replace(/\/$/, "").trim();
+
   const allowedUris =
-    client[0].allowed_redirect_uris?.split(",").map((u: string) => u.trim()) ||
-    [];
-  if (!allowedUris.includes(redirect_uri)) {
-    throw new ValidationError("Redirect URI not allowed");
+    client[0].allowed_redirect_uris
+      ?.split(",")
+      .map((u: string) => u.replace(/\/$/, "").trim()) || [];
+  if (!allowedUris.includes(normalizedRedirectUri)) {
+    logger.warn(
+      `SSO Reject: ${normalizedRedirectUri} not in [${allowedUris.join(", ")}]`,
+    );
+    throw new ValidationError(
+      `Redirect URI not allowed. Received: ${redirect_uri}`,
+    );
   }
 
   // Generate auth code
@@ -73,7 +85,7 @@ export const authorizeSSO = asyncHandler(async (req: any, res: any) => {
     `Generated SSO auth code for user ${userId} and client ${client_id}`,
   );
 
-  successResponse(res, "Authorization code generated", { code });
+  successResponse(res, "Authorization code generated", { code, state });
 });
 
 /**
@@ -169,6 +181,12 @@ export const getSSOToken = asyncHandler(async (req: any, res: any) => {
   const allPrograms = await db.select().from(Program).orderBy(Program.name);
   const allGrades = await db.select().from(Grade).orderBy(Grade.level_order);
 
+  // Get all active systems
+  const systems = await db
+    .select()
+    .from(System)
+    .where(eq(System.status, "ACTIVE"));
+
   // Generate JWT
   const token = jwt.sign(
     {
@@ -180,6 +198,7 @@ export const getSSOToken = asyncHandler(async (req: any, res: any) => {
       currentAcademicTerms,
       allPrograms,
       allGrades,
+      systems,
     },
     config.jwtSecret,
     { expiresIn: "24h" },
@@ -198,11 +217,18 @@ export const getSSOToken = asyncHandler(async (req: any, res: any) => {
  * Register a new SSO System (Admin Only)
  */
 export const registerSSOClient = asyncHandler(async (req: any, res: any) => {
-  const { client_id, name, allowed_redirect_uris, description } = req.body;
+  const {
+    client_id,
+    name,
+    allowed_redirect_uris,
+    description,
+    icon_url,
+    home_url,
+  } = req.body;
 
-  if (!client_id || !name || !allowed_redirect_uris) {
+  if (!client_id || !name || !allowed_redirect_uris || !icon_url || !home_url) {
     throw new ValidationError(
-      "client_id, name, and allowed_redirect_uris are required",
+      "client_id, name, allowed_redirect_uris, icon_url, and home_url are required",
     );
   }
 
@@ -226,6 +252,8 @@ export const registerSSOClient = asyncHandler(async (req: any, res: any) => {
     client_id,
     client_secret,
     allowed_redirect_uris,
+    icon_url,
+    home_url,
     status: "ACTIVE",
   });
 

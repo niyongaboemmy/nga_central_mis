@@ -3,6 +3,7 @@ import { Link, useLocation } from "react-router-dom";
 import ThemeToggle from "./ThemeToggle";
 import LOGO from "../../assets/logo.png";
 import { useUser } from "../../contexts/UserContext";
+import SystemsMenu from "./SystemsMenu";
 
 interface NavbarProps {
   onNavigateToLogin?: () => void;
@@ -33,7 +34,9 @@ const Navbar: React.FC<NavbarProps> = ({
   const { user, logout } = useUser();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isUserDropdownOpen, setIsUserDropdownOpen] = useState(false);
+  const [isSystemsMenuOpen, setIsSystemsMenuOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const systemsMenuRef = useRef<HTMLDivElement>(null);
 
   const currentPath = location.pathname;
   const isActive = (path: string) => currentPath === path;
@@ -110,8 +113,37 @@ const Navbar: React.FC<NavbarProps> = ({
       <nav className="fixed top-0 left-0 right-0 z-50 bg-white/80 dark:bg-gray-800/50 backdrop-blur-md border-b border-border-light/50 dark:border-gray-800/50">
         <div className={`${user ? "px-1.5 sm:pl-3" : "max-w-7xl mx-auto"}`}>
           <div className="flex items-center justify-between h-16">
-            {/* Logo */}
-            <div className="flex items-center space-x-3">
+            {/* Logo and Systems Waffle */}
+            <div className="flex items-center space-x-1 sm:space-x-4">
+              {user && (
+                <div className="relative" ref={systemsMenuRef}>
+                  <button
+                    onClick={() => setIsSystemsMenuOpen(!isSystemsMenuOpen)}
+                    className="p-2 mr-1 rounded-xl text-text-secondary-light dark:text-text-secondary-dark/70 hover:bg-surface-light dark:hover:bg-surface-dark transition-all duration-200"
+                    title="Systems"
+                  >
+                    <svg
+                      className="w-6 h-6"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M4 6h4v4H4V6zm12 0h4v4h-4V6zm-6 0h4v4h-4V6zM4 14h4v4H4v-4zm12 0h4v4h-4v-4zm-6 0h4v4h-4v-4z"
+                      />
+                    </svg>
+                  </button>
+                  <SystemsMenu
+                    isOpen={isSystemsMenuOpen}
+                    onClose={() => setIsSystemsMenuOpen(false)}
+                    systems={user.systems || []}
+                  />
+                </div>
+              )}
+
               {onNavigateBack ? (
                 <button
                   onClick={onNavigateBack}

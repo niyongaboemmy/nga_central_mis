@@ -12,7 +12,20 @@ import crypto from "crypto";
 
 export const createSystem = async (req: Request, res: Response) => {
   try {
-    const { name, description, client_id, allowed_redirect_uris } = req.body;
+    const {
+      name,
+      description,
+      client_id,
+      allowed_redirect_uris,
+      icon_url,
+      home_url,
+    } = req.body;
+
+    if (!icon_url || !home_url) {
+      return res
+        .status(400)
+        .json({ message: "icon_url and home_url are mandatory" });
+    }
 
     const existingSystem = await db
       .select()
@@ -37,6 +50,8 @@ export const createSystem = async (req: Request, res: Response) => {
       client_id,
       client_secret,
       allowed_redirect_uris,
+      icon_url,
+      home_url,
     });
 
     res.status(201).json({
@@ -81,8 +96,15 @@ export const getSystemById = async (req: Request, res: Response) => {
 export const updateSystem = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { name, description, status, client_id, allowed_redirect_uris } =
-      req.body;
+    const {
+      name,
+      description,
+      status,
+      client_id,
+      allowed_redirect_uris,
+      icon_url,
+      home_url,
+    } = req.body;
 
     const existingSystem = await db
       .select()
@@ -120,6 +142,8 @@ export const updateSystem = async (req: Request, res: Response) => {
         client_id,
         client_secret,
         allowed_redirect_uris,
+        icon_url,
+        home_url,
       })
       .where(eq(System.system_id, Number(id)));
 

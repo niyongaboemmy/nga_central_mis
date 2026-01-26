@@ -51,8 +51,16 @@ const SystemCard = ({
       className="group relative bg-white dark:bg-gray-900/60 rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-slate-700/30 hover:shadow-xl hover:-translate-y-1 transition-all duration-300"
     >
       <div className="flex items-start justify-between mb-4">
-        <div className="w-12 h-12 rounded-xl bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 flex items-center justify-center">
-          <Layers className="w-6 h-6" />
+        <div className="w-12 h-12 rounded-xl bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 flex items-center justify-center overflow-hidden">
+          {system.icon_url ? (
+            <img
+              src={system.icon_url}
+              alt={system.name}
+              className="w-8 h-8 object-contain"
+            />
+          ) : (
+            <Layers className="w-6 h-6" />
+          )}
         </div>
         <div className="flex gap-2">
           <span
@@ -118,6 +126,8 @@ const SystemModal = ({
     status: "ACTIVE",
     client_id: "",
     allowed_redirect_uris: "",
+    icon_url: "",
+    home_url: "",
   });
   const [loading, setLoading] = useState(false);
   const [createdSecret, setCreatedSecret] = useState<string | null>(null);
@@ -134,6 +144,8 @@ const SystemModal = ({
         status: "ACTIVE",
         client_id: "",
         allowed_redirect_uris: "",
+        icon_url: "",
+        home_url: "",
       });
       setCreatedSecret(null);
     }
@@ -228,6 +240,38 @@ const SystemModal = ({
             className="w-full px-4 py-3 bg-gray-50 dark:bg-slate-900/50 border border-gray-200 dark:border-slate-700/30 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all dark:text-white placeholder:text-gray-400 resize-none"
             placeholder="Describe what this module does..."
           />
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 ml-1">
+              Icon URL <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              required
+              value={formData.icon_url || ""}
+              onChange={(e) =>
+                setFormData({ ...formData, icon_url: e.target.value })
+              }
+              className="w-full px-4 py-3 bg-gray-50 dark:bg-slate-900/50 border border-gray-200 dark:border-slate-700/30 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all dark:text-white placeholder:text-gray-400"
+              placeholder="https://example.com/icon.png"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 ml-1">
+              Home URL <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              required
+              value={formData.home_url || ""}
+              onChange={(e) =>
+                setFormData({ ...formData, home_url: e.target.value })
+              }
+              className="w-full px-4 py-3 bg-gray-50 dark:bg-slate-900/50 border border-gray-200 dark:border-slate-700/30 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all dark:text-white placeholder:text-gray-400"
+              placeholder="https://app.example.com"
+            />
+          </div>
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 ml-1">

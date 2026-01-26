@@ -148,13 +148,23 @@ const Login: React.FC<LoginProps> = ({
 
       if (clientId && redirectUri) {
         try {
-          const ssoData = await authorizeSSO(clientId, redirectUri);
+          const responseType = searchParams.get("response_type") || "code";
+          const state = searchParams.get("state");
+          const ssoData = await authorizeSSO(
+            clientId,
+            redirectUri,
+            responseType,
+            state || undefined,
+          );
           if (ssoData?.code) {
             setStep("success");
             setTimeout(() => {
-              // Redirect back to integrated system with auth code
+              // Redirect back to integrated system with auth code and state
               const finalUrl = new URL(redirectUri);
               finalUrl.searchParams.set("code", ssoData.code);
+              if (ssoData.state) {
+                finalUrl.searchParams.set("state", ssoData.state);
+              }
               window.location.href = finalUrl.toString();
             }, 2000);
             return;
@@ -189,10 +199,14 @@ const Login: React.FC<LoginProps> = ({
       // Verify if user is already logged in
       try {
         await checkSession();
-        // If session is valid and we have SSO params, redirect immediately
+        // If session is valid and we have SSO params, redirect automatically
         if (clientId && redirectUri) {
-          console.log("User already logged in, requesting SSO consent...");
+          console.log("User already logged in, processing automatic SSO...");
           setStep("sso-consent");
+          // Small delay before auto-continuing for visual feedback
+          setTimeout(() => {
+            handleSSOContinue();
+          }, 1000);
         } else {
           // If logged in but no SSO params, let parent handle navigation (e.g. to dashboard)
           if (onLoginSuccess) onLoginSuccess();
@@ -214,12 +228,22 @@ const Login: React.FC<LoginProps> = ({
 
     if (clientId && redirectUri) {
       try {
-        const ssoData = await authorizeSSO(clientId, redirectUri);
+        const responseType = searchParams.get("response_type") || "code";
+        const state = searchParams.get("state");
+        const ssoData = await authorizeSSO(
+          clientId,
+          redirectUri,
+          responseType,
+          state || undefined,
+        );
         if (ssoData?.code) {
           setStep("success");
           setTimeout(() => {
             const finalUrl = new URL(redirectUri);
             finalUrl.searchParams.set("code", ssoData.code);
+            if (ssoData.state) {
+              finalUrl.searchParams.set("state", ssoData.state);
+            }
             window.location.href = finalUrl.toString();
           }, 1500);
         }

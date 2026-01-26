@@ -16,6 +16,7 @@ import {
   AcademicYear,
   AcademicTerm,
   Grade,
+  System,
 } from "../db/schema";
 import { getUserPermissions } from "../utils/auth";
 import { sanitizeString, validateEmail } from "../utils/sanitization";
@@ -253,6 +254,12 @@ export const verifyOTP = asyncHandler(async (req: any, res: any) => {
     .innerJoin(Program, eq(Grade.program_id, Program.program_id))
     .orderBy(Grade.level_order);
 
+  // Get all active systems
+  const systems = await db
+    .select()
+    .from(System)
+    .where(eq(System.status, "ACTIVE"));
+
   // Generate final JWT token
   const token = jwt.sign(
     {
@@ -265,6 +272,7 @@ export const verifyOTP = asyncHandler(async (req: any, res: any) => {
       currentAcademicTerms,
       allPrograms,
       allGrades,
+      systems,
     },
     config.jwtSecret,
     { expiresIn: "24h" },
