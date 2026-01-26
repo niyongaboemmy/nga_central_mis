@@ -918,3 +918,15 @@
 {"ip":"::1","level":"info","message":"GET /users/me","service":"nga-central-mis","timestamp":"2026-01-26T10:57:02.123Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36"}
 {"level":"info","message":"Fetching current user","service":"nga-central-mis","timestamp":"2026-01-26T10:57:02.125Z","userId":1}
 {"duration":7,"level":"info","message":"GET /users/me 304 - 7ms","service":"nga-central-mis","statusCode":304,"timestamp":"2026-01-26T10:57:02.130Z"}
+{"level":"info","message":"SIGINT received, shutting down gracefully","service":"nga-central-mis","timestamp":"2026-01-26T16:21:45.576Z"}
+{"level":"info","message":"Server running on port 5001 in development mode","service":"nga-central-mis","timestamp":"2026-01-26T16:21:54.150Z"}
+{"host":"mail.hackflix.net","level":"info","message":"Email service connected successfully","port":465,"service":"nga-central-mis","timestamp":"2026-01-26T16:21:56.485Z"}
+{"ip":"::1","level":"info","message":"GET /users/me","service":"nga-central-mis","timestamp":"2026-01-26T16:22:02.525Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36"}
+{"level":"info","message":"Fetching current user","service":"nga-central-mis","timestamp":"2026-01-26T16:22:02.567Z","userId":1}
+{"duration":70,"level":"info","message":"GET /users/me 304 - 70ms","service":"nga-central-mis","statusCode":304,"timestamp":"2026-01-26T16:22:02.596Z"}
+{"ip":"::1","level":"info","message":"GET /sso/authorize?client_id=taskmentor_app&redirect_uri=http%3A%2F%2Flocalhost%3A5173%2Ftaskmentor%2Fsso%2Fcallback&response_type=code&state=2kordknfe2z","service":"nga-central-mis","timestamp":"2026-01-26T16:25:24.422Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36"}
+{"level":"info","message":"Generated SSO auth code for user 1 and client taskmentor_app","service":"nga-central-mis","timestamp":"2026-01-26T16:25:24.457Z"}
+{"duration":41,"level":"info","message":"GET /sso/authorize?client_id=taskmentor_app&redirect_uri=http%3A%2F%2Flocalhost%3A5173%2Ftaskmentor%2Fsso%2Fcallback&response_type=code&state=2kordknfe2z 200 - 41ms","service":"nga-central-mis","statusCode":200,"timestamp":"2026-01-26T16:25:24.464Z"}
+{"body":{"theme":"light"},"ip":"::1","level":"info","message":"PATCH /users/me/theme","service":"nga-central-mis","timestamp":"2026-01-26T16:30:51.984Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36"}
+{"level":"info","message":"Updated user theme preference","service":"nga-central-mis","theme":"light","timestamp":"2026-01-26T16:30:51.993Z","userId":1}
+{"duration":10,"level":"info","message":"PATCH /users/me/theme 200 - 10ms","service":"nga-central-mis","statusCode":200,"timestamp":"2026-01-26T16:30:51.994Z"}
