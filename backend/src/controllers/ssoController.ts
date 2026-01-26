@@ -35,7 +35,7 @@ export const authorizeSSO = asyncHandler(async (req: any, res: any) => {
     throw new ValidationError("client_id and redirect_uri are required");
   }
 
-  if (response_type !== "code") {
+  if (response_type && response_type !== "code") {
     throw new ValidationError("Only response_type='code' is supported");
   }
 
