@@ -314,6 +314,7 @@ export const verifyOTP = asyncHandler(async (req: any, res: any) => {
     currentAcademicTerms,
     allPrograms,
     allGrades,
+    systems,
   });
 });
 
@@ -377,11 +378,18 @@ export const getSession = asyncHandler(async (req: any, res: any) => {
     }
   }
 
+  // Get all active systems
+  const systems = await db
+    .select()
+    .from(System)
+    .where(eq(System.status, "ACTIVE"));
+
   successResponse(res, "Session retrieved", {
     user: user[0],
     profile: profile[0] || null,
     permissions,
     roles,
+    systems,
   });
 });
 

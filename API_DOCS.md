@@ -126,6 +126,30 @@ Verify OTP for login. Upon success, this endpoint sets a `nga_auth_token` cookie
 }
 ```
 
+**Response:**
+
+```json
+{
+  "success": true,
+  "message": "Login successful",
+  "data": {
+    "token": "...",
+    "user": { ... },
+    "profile": { ... },
+    "permissions": [...],
+    "assignedPrograms": [...],
+    "roles": [...],
+    "forcePasswordChange": false,
+    "academicYears": [...],
+    "currentAcademicYear": { ... },
+    "currentAcademicTerms": [...],
+    "allPrograms": [...],
+    "allGrades": [...],
+    "systems": [...]
+  }
+}
+```
+
 ### GET /auth/session
 
 Retrieve the current session and user profile. This is the primary endpoint for integrated systems to check if a user is already logged in via SSO.
@@ -142,7 +166,8 @@ Retrieve the current session and user profile. This is the primary endpoint for 
     "user": { ... },
     "profile": { ... },
     "permissions": [...],
-    "roles": [...]
+    "roles": [...],
+    "systems": [...]
   }
 }
 ```
@@ -280,6 +305,49 @@ Get current user profile.
 
 **Authentication:** Required
 
+**Response:**
+
+```json
+{
+  "success": true,
+  "message": "User profile retrieved successfully",
+  "data": {
+    "user": {
+      "user_id": 1,
+      "username": "admin",
+      "email": "admin@example.com",
+      "phone_number": "123456789",
+      "status": "ACTIVE",
+      "preferred_theme": "light",
+      "created_at": "...",
+      "updated_at": "..."
+    },
+    "profile": {
+      "profile_id": 1,
+      "user_id": 1,
+      "first_name": "Admin",
+      "last_name": "User",
+      "gender": "MALE",
+      "date_of_birth": "...",
+      "address": "...",
+      "user_type": "ADMIN",
+      "external_id": "..."
+    },
+    "roles": [...],
+    "permissions": [...],
+    "assignedPrograms": [...],
+    "assignedGrades": [...],
+    "forcePasswordChange": false,
+    "academicYears": [...],
+    "currentAcademicYear": { ... },
+    "currentAcademicTerms": [...],
+    "allPrograms": [...],
+    "allGrades": [...],
+    "systems": [...]
+  }
+}
+```
+
 ### PUT /users/me/profile
 
 Update current user profile.
@@ -296,6 +364,29 @@ Update current user profile.
   "date_of_birth": "1990-01-01",
   "address": "Address",
   "external_id": "external_id"
+}
+```
+
+### PATCH /users/me/theme
+
+Update current user preferred theme.
+
+**Authentication:** Required
+
+**Request Body:**
+
+```json
+{
+  "theme": "dark"
+}
+```
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "message": "Theme preference updated successfully"
 }
 ```
 

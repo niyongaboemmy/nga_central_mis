@@ -930,3 +930,4 @@
 {"body":{"theme":"light"},"ip":"::1","level":"info","message":"PATCH /users/me/theme","service":"nga-central-mis","timestamp":"2026-01-26T16:30:51.984Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36"}
 {"level":"info","message":"Updated user theme preference","service":"nga-central-mis","theme":"light","timestamp":"2026-01-26T16:30:51.993Z","userId":1}
 {"duration":10,"level":"info","message":"PATCH /users/me/theme 200 - 10ms","service":"nga-central-mis","statusCode":200,"timestamp":"2026-01-26T16:30:51.994Z"}
+{"level":"info","message":"SIGINT received, shutting down gracefully","service":"nga-central-mis","timestamp":"2026-01-26T16:56:52.226Z"}
