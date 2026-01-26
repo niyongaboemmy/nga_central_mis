@@ -22,6 +22,9 @@ export const User = mysqlTable("User", {
   status: mysqlEnum("status", ["ACTIVE", "INACTIVE", "SUSPENDED"]).default(
     "ACTIVE",
   ),
+  preferred_theme: mysqlEnum("preferred_theme", ["light", "dark"]).default(
+    "light",
+  ),
   created_at: datetime("created_at").default(sql`CURRENT_TIMESTAMP`),
   updated_at: datetime("updated_at").default(
     sql`CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP`,

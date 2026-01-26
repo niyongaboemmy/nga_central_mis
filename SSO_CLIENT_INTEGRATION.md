@@ -118,7 +118,7 @@ async function exchangeToken(authCode) {
 
 ### Step 4: Verify & Access Data
 
-Once authenticated, you can use the returned `token` to access protected NGA MIS APIs on behalf of the user.
+Once authenticated, you can use the returned `token` to access protected NGA MIS APIs on behalf of the user. The token also contains the user's `preferred_theme` (light/dark), allowing your app to automatically match the user's appearance settings.
 
 **Authorization Header:**
 ```http

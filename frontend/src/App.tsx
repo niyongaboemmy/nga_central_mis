@@ -21,7 +21,7 @@ import Users from "./components/Users";
 import SystemLayout from "./components/SystemLayout";
 import Footer from "./components/ui/Footer";
 import Navbar from "./components/ui/Navbar";
-import { UserProvider, useUser } from "./contexts/UserContext";
+import { useUser } from "./contexts/UserContext";
 import { ToastProvider, useToast } from "./contexts/ToastContext";
 import { ToastStore } from "./services/api";
 import "./App.css";
@@ -264,253 +264,251 @@ const ToastInitializer: React.FC<{ children: React.ReactNode }> = ({
 
 function App() {
   return (
-    <UserProvider>
-      <ToastProvider>
-        <ToastInitializer>
-          <Router basename="/mis">
-            <Routes>
-              {/* Landing page with full navbar */}
-              <Route
-                path="/"
-                element={
-                  <PublicRoute>
-                    <PublicLayout>
-                      <LandingPage />
-                    </PublicLayout>
-                  </PublicRoute>
-                }
-              />
+    <ToastProvider>
+      <ToastInitializer>
+        <Router basename="/mis">
+          <Routes>
+            {/* Landing page with full navbar */}
+            <Route
+              path="/"
+              element={
+                <PublicRoute>
+                  <PublicLayout>
+                    <LandingPage />
+                  </PublicLayout>
+                </PublicRoute>
+              }
+            />
 
-              {/* About page with full navbar */}
-              <Route
-                path="/about"
-                element={
-                  <PublicRoute>
-                    <PublicLayout>
-                      <AboutPage />
-                    </PublicLayout>
-                  </PublicRoute>
-                }
-              />
+            {/* About page with full navbar */}
+            <Route
+              path="/about"
+              element={
+                <PublicRoute>
+                  <PublicLayout>
+                    <AboutPage />
+                  </PublicLayout>
+                </PublicRoute>
+              }
+            />
 
-              {/* Contact page with full navbar */}
-              <Route
-                path="/contact"
-                element={
-                  <PublicRoute>
-                    <PublicLayout>
-                      <ContactPage />
-                    </PublicLayout>
-                  </PublicRoute>
-                }
-              />
+            {/* Contact page with full navbar */}
+            <Route
+              path="/contact"
+              element={
+                <PublicRoute>
+                  <PublicLayout>
+                    <ContactPage />
+                  </PublicLayout>
+                </PublicRoute>
+              }
+            />
 
-              {/* Login page with full navbar */}
-              <Route
-                path="/login"
-                element={
-                  <PublicRoute>
-                    <PublicLayout>
-                      <LoginPage />
-                    </PublicLayout>
-                  </PublicRoute>
-                }
-              />
+            {/* Login page with full navbar */}
+            <Route
+              path="/login"
+              element={
+                <PublicRoute>
+                  <PublicLayout>
+                    <LoginPage />
+                  </PublicLayout>
+                </PublicRoute>
+              }
+            />
 
-              {/* Password recovery with back button navbar */}
-              <Route
-                path="/password-recovery"
-                element={
-                  <PublicRoute>
-                    <BackButtonLayout>
-                      <PasswordRecoveryPage />
-                    </BackButtonLayout>
-                  </PublicRoute>
-                }
-              />
+            {/* Password recovery with back button navbar */}
+            <Route
+              path="/password-recovery"
+              element={
+                <PublicRoute>
+                  <BackButtonLayout>
+                    <PasswordRecoveryPage />
+                  </BackButtonLayout>
+                </PublicRoute>
+              }
+            />
 
-              {/* Dashboard - protected with sidebar */}
-              <Route
-                path="/dashboard"
-                element={
-                  <ProtectedRoute>
-                    <SystemLayoutWrapper>
-                      <DashboardPage />
-                    </SystemLayoutWrapper>
-                  </ProtectedRoute>
-                }
-              />
+            {/* Dashboard - protected with sidebar */}
+            <Route
+              path="/dashboard"
+              element={
+                <ProtectedRoute>
+                  <SystemLayoutWrapper>
+                    <DashboardPage />
+                  </SystemLayoutWrapper>
+                </ProtectedRoute>
+              }
+            />
 
-              {/* Profile - protected with sidebar */}
-              <Route
-                path="/profile"
-                element={
-                  <ProtectedRoute>
-                    <SystemLayoutWrapper>
-                      <ProfilePage />
-                    </SystemLayoutWrapper>
-                  </ProtectedRoute>
-                }
-              />
+            {/* Profile - protected with sidebar */}
+            <Route
+              path="/profile"
+              element={
+                <ProtectedRoute>
+                  <SystemLayoutWrapper>
+                    <ProfilePage />
+                  </SystemLayoutWrapper>
+                </ProtectedRoute>
+              }
+            />
 
-              {/* Documents - protected with sidebar */}
-              <Route
-                path="/documents"
-                element={
-                  <ProtectedRoute>
-                    <SystemLayoutWrapper>
-                      <DocumentsPage />
-                    </SystemLayoutWrapper>
-                  </ProtectedRoute>
-                }
-              />
+            {/* Documents - protected with sidebar */}
+            <Route
+              path="/documents"
+              element={
+                <ProtectedRoute>
+                  <SystemLayoutWrapper>
+                    <DocumentsPage />
+                  </SystemLayoutWrapper>
+                </ProtectedRoute>
+              }
+            />
 
-              {/* Academics - protected with sidebar */}
-              <Route
-                path="/academics"
-                element={
-                  <ProtectedRoute>
-                    <SystemLayoutWrapper>
-                      <AcademicsPage />
-                    </SystemLayoutWrapper>
-                  </ProtectedRoute>
-                }
-              />
+            {/* Academics - protected with sidebar */}
+            <Route
+              path="/academics"
+              element={
+                <ProtectedRoute>
+                  <SystemLayoutWrapper>
+                    <AcademicsPage />
+                  </SystemLayoutWrapper>
+                </ProtectedRoute>
+              }
+            />
 
-              {/* Teacher Assigned Subjects - protected with sidebar */}
-              <Route
-                path="/my-subjects"
-                element={
-                  <ProtectedRoute>
-                    <SystemLayoutWrapper>
-                      <TeacherAssignedSubjectsPage />
-                    </SystemLayoutWrapper>
-                  </ProtectedRoute>
-                }
-              />
+            {/* Teacher Assigned Subjects - protected with sidebar */}
+            <Route
+              path="/my-subjects"
+              element={
+                <ProtectedRoute>
+                  <SystemLayoutWrapper>
+                    <TeacherAssignedSubjectsPage />
+                  </SystemLayoutWrapper>
+                </ProtectedRoute>
+              }
+            />
 
-              {/* Users page - protected with sidebar */}
-              <Route
-                path="/users"
-                element={
-                  <ProtectedRoute>
-                    <SystemLayoutWrapper>
-                      <UsersPage />
-                    </SystemLayoutWrapper>
-                  </ProtectedRoute>
-                }
-              />
+            {/* Users page - protected with sidebar */}
+            <Route
+              path="/users"
+              element={
+                <ProtectedRoute>
+                  <SystemLayoutWrapper>
+                    <UsersPage />
+                  </SystemLayoutWrapper>
+                </ProtectedRoute>
+              }
+            />
 
-              {/* Program Users page - protected with sidebar */}
-              <Route
-                path="/program-users"
-                element={
-                  <ProtectedRoute>
-                    <SystemLayoutWrapper>
-                      <ProgramUsersPageWrapper />
-                    </SystemLayoutWrapper>
-                  </ProtectedRoute>
-                }
-              />
+            {/* Program Users page - protected with sidebar */}
+            <Route
+              path="/program-users"
+              element={
+                <ProtectedRoute>
+                  <SystemLayoutWrapper>
+                    <ProgramUsersPageWrapper />
+                  </SystemLayoutWrapper>
+                </ProtectedRoute>
+              }
+            />
 
-              {/* Program Academic page - protected with sidebar */}
-              <Route
-                path="/program-academics"
-                element={
-                  <ProtectedRoute>
-                    <SystemLayoutWrapper>
-                      <ProgramAcademicPageWrapper />
-                    </SystemLayoutWrapper>
-                  </ProtectedRoute>
-                }
-              />
+            {/* Program Academic page - protected with sidebar */}
+            <Route
+              path="/program-academics"
+              element={
+                <ProtectedRoute>
+                  <SystemLayoutWrapper>
+                    <ProgramAcademicPageWrapper />
+                  </SystemLayoutWrapper>
+                </ProtectedRoute>
+              }
+            />
 
-              {/* Class Teacher Users page - protected with sidebar */}
-              <Route
-                path="/class-users"
-                element={
-                  <ProtectedRoute>
-                    <SystemLayoutWrapper>
-                      <ClassTeacherUsersPageWrapper />
-                    </SystemLayoutWrapper>
-                  </ProtectedRoute>
-                }
-              />
+            {/* Class Teacher Users page - protected with sidebar */}
+            <Route
+              path="/class-users"
+              element={
+                <ProtectedRoute>
+                  <SystemLayoutWrapper>
+                    <ClassTeacherUsersPageWrapper />
+                  </SystemLayoutWrapper>
+                </ProtectedRoute>
+              }
+            />
 
-              {/* Class Teacher Subjects page - protected with sidebar */}
-              <Route
-                path="/class-subjects"
-                element={
-                  <ProtectedRoute>
-                    <SystemLayoutWrapper>
-                      <ClassTeacherSubjectsPageWrapper />
-                    </SystemLayoutWrapper>
-                  </ProtectedRoute>
-                }
-              />
+            {/* Class Teacher Subjects page - protected with sidebar */}
+            <Route
+              path="/class-subjects"
+              element={
+                <ProtectedRoute>
+                  <SystemLayoutWrapper>
+                    <ClassTeacherSubjectsPageWrapper />
+                  </SystemLayoutWrapper>
+                </ProtectedRoute>
+              }
+            />
 
-              {/* Settings page - protected with sidebar */}
-              <Route
-                path="/settings"
-                element={
-                  <ProtectedRoute>
-                    <SystemLayoutWrapper>
-                      <div className="text-center py-12">
-                        <h2 className="text-2xl font-bold text-text-primary-light dark:text-text-primary-dark">
-                          Settings
-                        </h2>
-                        <p className="mt-2 text-text-secondary-light dark:text-text-secondary-dark/70">
-                          This page is under construction
-                        </p>
-                      </div>
-                    </SystemLayoutWrapper>
-                  </ProtectedRoute>
-                }
-              />
+            {/* Settings page - protected with sidebar */}
+            <Route
+              path="/settings"
+              element={
+                <ProtectedRoute>
+                  <SystemLayoutWrapper>
+                    <div className="text-center py-12">
+                      <h2 className="text-2xl font-bold text-text-primary-light dark:text-text-primary-dark">
+                        Settings
+                      </h2>
+                      <p className="mt-2 text-text-secondary-light dark:text-text-secondary-dark/70">
+                        This page is under construction
+                      </p>
+                    </div>
+                  </SystemLayoutWrapper>
+                </ProtectedRoute>
+              }
+            />
 
-              {/* Permissions page - protected with sidebar */}
-              <Route
-                path="/permissions"
-                element={
-                  <ProtectedRoute>
-                    <SystemLayoutWrapper>
-                      <PermissionsPage />
-                    </SystemLayoutWrapper>
-                  </ProtectedRoute>
-                }
-              />
+            {/* Permissions page - protected with sidebar */}
+            <Route
+              path="/permissions"
+              element={
+                <ProtectedRoute>
+                  <SystemLayoutWrapper>
+                    <PermissionsPage />
+                  </SystemLayoutWrapper>
+                </ProtectedRoute>
+              }
+            />
 
-              {/* Systems page - protected with sidebar */}
-              <Route
-                path="/systems"
-                element={
-                  <ProtectedRoute>
-                    <SystemLayoutWrapper>
-                      <Systems />
-                    </SystemLayoutWrapper>
-                  </ProtectedRoute>
-                }
-              />
+            {/* Systems page - protected with sidebar */}
+            <Route
+              path="/systems"
+              element={
+                <ProtectedRoute>
+                  <SystemLayoutWrapper>
+                    <Systems />
+                  </SystemLayoutWrapper>
+                </ProtectedRoute>
+              }
+            />
 
-              {/* Assign System to School page - protected with sidebar */}
-              <Route
-                path="/schools"
-                element={
-                  <ProtectedRoute>
-                    <SystemLayoutWrapper>
-                      <Schools />
-                    </SystemLayoutWrapper>
-                  </ProtectedRoute>
-                }
-              />
+            {/* Assign System to School page - protected with sidebar */}
+            <Route
+              path="/schools"
+              element={
+                <ProtectedRoute>
+                  <SystemLayoutWrapper>
+                    <Schools />
+                  </SystemLayoutWrapper>
+                </ProtectedRoute>
+              }
+            />
 
-              {/* Fallback route */}
-              <Route path="*" element={<Navigate to="/" replace />} />
-            </Routes>
-          </Router>
-        </ToastInitializer>
-      </ToastProvider>
-    </UserProvider>
+            {/* Fallback route */}
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </Router>
+      </ToastInitializer>
+    </ToastProvider>
   );
 }
 

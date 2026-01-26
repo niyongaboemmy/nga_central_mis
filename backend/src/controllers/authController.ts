@@ -273,6 +273,7 @@ export const verifyOTP = asyncHandler(async (req: any, res: any) => {
       allPrograms,
       allGrades,
       systems,
+      preferred_theme: user[0].preferred_theme,
     },
     config.jwtSecret,
     { expiresIn: "24h" },

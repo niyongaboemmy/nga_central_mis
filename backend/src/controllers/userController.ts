@@ -181,6 +181,31 @@ export const updateCurrentUserProfile = asyncHandler(
   },
 );
 
+export const updateThemePreference = asyncHandler(
+  async (req: any, res: any) => {
+    const userId = req.user?.userId;
+
+    if (!userId) {
+      throw new ValidationError("User not authenticated");
+    }
+
+    const { theme } = req.body;
+
+    if (!["light", "dark"].includes(theme)) {
+      throw new ValidationError("Invalid theme preference");
+    }
+
+    await db
+      .update(User)
+      .set({ preferred_theme: theme })
+      .where(eq(User.user_id, userId));
+
+    logger.info("Updated user theme preference", { userId, theme });
+
+    successResponse(res, "Theme preference updated successfully");
+  },
+);
+
 export const updateUserProfile = asyncHandler(async (req: any, res: any) => {
   const { id } = req.params;
   const userId = parseInt(id);

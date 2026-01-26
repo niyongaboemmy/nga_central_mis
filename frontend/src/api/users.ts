@@ -17,6 +17,7 @@ export interface User {
   created_at: string;
   updated_at: string;
   roles?: number[];
+  preferred_theme?: "light" | "dark";
 }
 
 export interface UserProfile {
@@ -1279,4 +1280,11 @@ export const parentingApi = {
     );
     return response.data;
   },
+};
+
+export const updateUserTheme = async (theme: "light" | "dark") => {
+  const response = await api.patch<BackendResponse<void>>("/users/me/theme", {
+    theme,
+  });
+  return response.data;
 };
