@@ -10,6 +10,7 @@ import {
   text,
   primaryKey,
   uniqueIndex,
+  index,
 } from "drizzle-orm/mysql-core";
 import { sql } from "drizzle-orm";
 
@@ -589,4 +590,160 @@ export const SSOCode = mysqlTable("SSOCode", {
   expires_at: datetime("expires_at").notNull(),
   is_used: tinyint("is_used").default(0),
   created_at: datetime("created_at").default(sql`CURRENT_TIMESTAMP`),
+});
+
+// SchemeOfWork table
+export const SchemeOfWork = mysqlTable("SchemeOfWork", {
+  scheme_id: bigint("scheme_id", { mode: "number" })
+    .primaryKey()
+    .autoincrement(),
+  user_id: bigint("user_id", { mode: "number" })
+    .notNull()
+    .references(() => User.user_id),
+  subject_id: bigint("subject_id", { mode: "number" })
+    .notNull()
+    .references(() => Subject.subject_id),
+  class_group_id: bigint("class_group_id", { mode: "number" })
+    .notNull()
+    .references(() => ClassGroup.class_group_id),
+  academic_term_id: bigint("academic_term_id", { mode: "number" })
+    .notNull()
+    .references(() => AcademicTerm.academic_term_id),
+  created_at: datetime("created_at").default(sql`CURRENT_TIMESTAMP`),
+  updated_at: datetime("updated_at").default(
+    sql`CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP`,
+  ),
+});
+
+// SchemeOfWorkEntry table
+export const SchemeOfWorkEntry = mysqlTable("SchemeOfWorkEntry", {
+  entry_id: bigint("entry_id", { mode: "number" }).primaryKey().autoincrement(),
+  scheme_id: bigint("scheme_id", { mode: "number" })
+    .notNull()
+    .references(() => SchemeOfWork.scheme_id),
+  week_number: varchar("week_number", { length: 50 }),
+  start_date: date("start_date"),
+  end_date: date("end_date"),
+  topic: text("topic"),
+  sub_topic: text("sub_topic"),
+  objective: text("objective"),
+  methodology: text("methodology"),
+  resources: text("resources"),
+  evaluation: text("evaluation"),
+  is_completed: tinyint("is_completed").default(0),
+  created_at: datetime("created_at").default(sql`CURRENT_TIMESTAMP`),
+});
+// LO_Lesson table (Master record for structured lesson plans)
+export const LO_Lesson = mysqlTable("LO_Lesson", {
+  id: int("id").primaryKey().autoincrement(),
+  entry_id: bigint("entry_id", { mode: "number" }).references(
+    () => SchemeOfWorkEntry.entry_id,
+    { onDelete: "cascade" },
+  ),
+  user_id: bigint("user_id", { mode: "number" })
+    .notNull()
+    .references(() => User.user_id),
+  session_code: varchar("session_code", { length: 50 }),
+  sector: varchar("sector", { length: 100 }),
+  trade: varchar("trade", { length: 100 }),
+  level: varchar("level", { length: 50 }),
+  module_code: varchar("module_code", { length: 50 }),
+  module_name: varchar("module_name", { length: 255 }),
+  week: int("week"),
+  term: varchar("term", { length: 20 }),
+  school_year: varchar("school_year", { length: 20 }),
+  class_name: varchar("class_name", { length: 100 }),
+  number_of_trainees: int("number_of_trainees"),
+  lesson_date: date("lesson_date"),
+  start_time: varchar("start_time", { length: 50 }), // Using varchar for flexibility or time("start_time")
+  end_time: varchar("end_time", { length: 50 }),
+  instructor_name: varchar("instructor_name", { length: 255 }),
+  big_question: text("big_question"),
+  total_duration_minutes: int("total_duration_minutes"),
+  created_at: datetime("created_at").default(sql`CURRENT_TIMESTAMP`),
+});
+
+// LO_LearningOutcome table
+export const LO_LearningOutcome = mysqlTable("LO_LearningOutcome", {
+  id: int("id").primaryKey().autoincrement(),
+  lesson_id: int("lesson_id")
+    .notNull()
+    .references(() => LO_Lesson.id, { onDelete: "cascade" }),
+  code: varchar("code", { length: 10 }), // LO1, LO2, LO3
+  title: varchar("title", { length: 255 }),
+  description: text("description"),
+  duration_minutes: int("duration_minutes"),
+});
+
+// LO_LearningOutcomeActivity table
+export const LO_LearningOutcomeActivity = mysqlTable(
+  "LO_LearningOutcomeActivity",
+  {
+    id: int("id").primaryKey().autoincrement(),
+    learning_outcome_id: int("learning_outcome_id")
+      .notNull()
+      .references(() => LO_LearningOutcome.id, { onDelete: "cascade" }),
+    trainer_activities: text("trainer_activities"),
+    learner_activities: text("learner_activities"),
+  },
+);
+
+// LO_LearningOutcomeResource table
+export const LO_LearningOutcomeResource = mysqlTable(
+  "LO_LearningOutcomeResource",
+  {
+    id: int("id").primaryKey().autoincrement(),
+    learning_outcome_id: int("learning_outcome_id")
+      .notNull()
+      .references(() => LO_LearningOutcome.id, { onDelete: "cascade" }),
+    resource_name: varchar("resource_name", { length: 255 }),
+  },
+);
+
+// LO_LessonSection table (Introduction & Conclusion)
+export const LO_LessonSection = mysqlTable("LO_LessonSection", {
+  id: int("id").primaryKey().autoincrement(),
+  lesson_id: int("lesson_id")
+    .notNull()
+    .references(() => LO_Lesson.id, { onDelete: "cascade" }),
+  section_type: mysqlEnum("section_type", [
+    "Introduction",
+    "Development",
+    "Conclusion",
+  ]),
+  trainer_activities: text("trainer_activities"),
+  learner_activities: text("learner_activities"),
+  resources: text("resources"),
+  duration_minutes: int("duration_minutes"),
+});
+
+// LO_IndicativeContent table
+export const LO_IndicativeContent = mysqlTable("LO_IndicativeContent", {
+  id: int("id").primaryKey().autoincrement(),
+  lesson_id: int("lesson_id")
+    .notNull()
+    .references(() => LO_Lesson.id, { onDelete: "cascade" }),
+  category: varchar("category", { length: 100 }),
+  content: text("content"),
+});
+
+// LO_LessonAssignment table
+export const LO_LessonAssignment = mysqlTable("LO_LessonAssignment", {
+  id: int("id").primaryKey().autoincrement(),
+  lesson_id: int("lesson_id")
+    .notNull()
+    .references(() => LO_Lesson.id, { onDelete: "cascade" }),
+  description: text("description"),
+});
+
+// LO_LessonEvaluation table
+export const LO_LessonEvaluation = mysqlTable("LO_LessonEvaluation", {
+  id: int("id").primaryKey().autoincrement(),
+  lesson_id: int("lesson_id")
+    .notNull()
+    .references(() => LO_Lesson.id, { onDelete: "cascade" }),
+  teacher_notes: text("teacher_notes"),
+  references: text("references"),
+  prepared_by: varchar("prepared_by", { length: 255 }),
+  verified_by: varchar("verified_by", { length: 255 }),
 });

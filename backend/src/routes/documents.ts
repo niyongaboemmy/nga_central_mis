@@ -26,6 +26,7 @@ import {
   shareFolder,
   revokeFolderAccess,
   getSharedFolders,
+  previewSchemeOfWork,
 } from "../controllers/documentController";
 
 const router = Router();
@@ -94,6 +95,13 @@ router.get("/shared/folders", getSharedFolders);
 // ======================
 // DOCUMENT ROUTES
 // ======================
+
+// Scheme of Work Preview
+router.post(
+  "/scheme-of-work/preview",
+  upload.single("file"),
+  previewSchemeOfWork,
+);
 
 // Upload a new document
 router.post("/upload", upload.single("file"), uploadDocument);

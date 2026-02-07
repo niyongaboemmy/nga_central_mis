@@ -17,6 +17,8 @@ import parentingRoutes from "./routes/parenting";
 import schoolRoutes from "./routes/schoolRoutes";
 import systemRoutes from "./routes/systemRoutes";
 import ssoRoutes from "./routes/ssoRoutes";
+import schemeOfWorkRoutes from "./routes/schemeOfWork";
+import lessonPlanRoutes from "./routes/lessonPlan";
 
 dotenv.config();
 
@@ -60,6 +62,14 @@ app.use("/parenting", parentingRoutes);
 app.use("/schools", schoolRoutes);
 app.use("/systems", systemRoutes);
 app.use("/sso", ssoRoutes);
+app.use("/scheme-of-work", schemeOfWorkRoutes);
+console.log("DEBUG: lessonPlanRoutes type:", typeof lessonPlanRoutes);
+console.log("DEBUG: Mounting /lesson-plans routes...");
+app.use("/lesson-plans", lessonPlanRoutes);
+
+app.post("/test-post", (req, res) =>
+  res.json({ success: true, message: "Root POST test works" }),
+);
 
 // Error handling middleware (must be last)
 app.use(errorHandler);

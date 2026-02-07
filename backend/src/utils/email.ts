@@ -11,6 +11,7 @@ interface EmailOptions {
 
 class EmailService {
   private transporter: nodemailer.Transporter;
+  private isConnected: boolean = false;
 
   constructor() {
     const smtpConfig = config.email.smtp;
@@ -34,24 +35,59 @@ class EmailService {
       socketTimeout: 15000, // 15 seconds
     });
 
-    // Verify connection on startup
+    // Verify connection on startup (non-blocking)
     this.verifyConnection();
   }
 
   private async verifyConnection(): Promise<void> {
     try {
       await this.transporter.verify();
+      this.isConnected = true;
       logger.info("Email service connected successfully", {
         host: config.email.smtp.host,
         port: config.email.smtp.port,
       });
     } catch (error) {
-      logger.warn("Email service connection failed", { error });
+      this.isConnected = false;
+      logger.warn("Email service connection failed - emails will not be sent", {
+        error,
+        host: config.email.smtp.host,
+        port: config.email.smtp.port,
+      });
     }
   }
 
-  async sendEmail(options: EmailOptions): Promise<void> {
+  /**
+   * Check if email service is available
+   */
+  isAvailable(): boolean {
+    return this.isConnected;
+  }
+
+  /**
+   * Send email with error handling
+   * @param options Email options
+   * @param throwOnError If true, throws error on failure. If false, logs error and continues
+   */
+  async sendEmail(
+    options: EmailOptions,
+    throwOnError: boolean = true,
+  ): Promise<boolean> {
     try {
+      // Check if service is available
+      if (!this.isConnected) {
+        const errorMsg = "Email service is not connected. Skipping email send.";
+        logger.warn(errorMsg, {
+          to: options.to,
+          subject: options.subject,
+        });
+
+        if (throwOnError) {
+          throw new Error(errorMsg);
+        }
+        return false;
+      }
+
       const mailOptions = {
         from: `"${config.email.fromName}" <${config.email.from}>`,
         to: options.to,
@@ -65,6 +101,7 @@ class EmailService {
         messageId: info.messageId,
         to: options.to,
       });
+      return true;
     } catch (error: any) {
       logger.error("Failed to send email", {
         error: error.message,
@@ -72,14 +109,18 @@ class EmailService {
         command: error.command,
         to: options.to,
       });
-      throw new Error(`Failed to send email: ${error.message}`);
+
+      if (throwOnError) {
+        throw new Error(`Failed to send email: ${error.message}`);
+      }
+      return false;
     }
   }
 
   async sendOTP(
     email: string,
     otp: string,
-    type: "LOGIN_2FA" | "PASSWORD_RESET" | "EMAIL_VERIFICATION" = "LOGIN_2FA"
+    type: "LOGIN_2FA" | "PASSWORD_RESET" | "EMAIL_VERIFICATION" = "LOGIN_2FA",
   ): Promise<void> {
     const subjectMap = {
       LOGIN_2FA: "Your 2FA Verification Code",
@@ -124,11 +165,14 @@ class EmailService {
     });
   }
 
+  /**
+   * Send account creation email (non-blocking - won't fail if email service is down)
+   */
   async sendAccountCreation(
     email: string,
     username: string,
-    password: string
-  ): Promise<void> {
+    password: string,
+  ): Promise<boolean> {
     const html = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <h2 style="color: #333;">Welcome to NGA Central MIS</h2>
@@ -165,12 +209,16 @@ class EmailService {
       ${config.email.fromName} Team
     `;
 
-    await this.sendEmail({
-      to: email,
-      subject: "Your NGA Central MIS Account Credentials",
-      html,
-      text,
-    });
+    // Don't throw error if email fails - just log and continue
+    return await this.sendEmail(
+      {
+        to: email,
+        subject: "Your NGA Central MIS Account Credentials",
+        html,
+        text,
+      },
+      false,
+    ); // throwOnError = false
   }
 }
 

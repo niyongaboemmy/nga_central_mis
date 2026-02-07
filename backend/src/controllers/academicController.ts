@@ -115,7 +115,8 @@ export const createAcademicYear = asyncHandler(async (req: any, res: any) => {
   });
 
   logger.info("Academic year created", { name: sanitizedName });
-  const academicYearId = (result as any).insertId;
+  const resultHeader = Array.isArray(result) ? result[0] : result;
+  const academicYearId = (resultHeader as any).insertId;
 
   // Record activity
   if (req.user?.userId) {
@@ -373,7 +374,8 @@ export const createAcademicTerm = asyncHandler(async (req: any, res: any) => {
     academicYearId: yearId,
   });
 
-  const academicTermId = (result as any).insertId;
+  const resultHeader = Array.isArray(result) ? result[0] : result;
+  const academicTermId = (resultHeader as any).insertId;
 
   // Record activity
   if (req.user?.userId) {
@@ -590,7 +592,8 @@ export const createProgram = asyncHandler(async (req: any, res: any) => {
     description: sanitizedDescription || null,
   });
 
-  const programId = (result as any).insertId;
+  const resultHeader = Array.isArray(result) ? result[0] : result;
+  const programId = (resultHeader as any).insertId;
 
   logger.info("Program created", { name: sanitizedName });
 

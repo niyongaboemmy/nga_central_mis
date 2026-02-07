@@ -204,9 +204,9 @@ const Login: React.FC<LoginProps> = ({
           console.log("User already logged in, processing automatic SSO...");
           setStep("sso-consent");
           // Small delay before auto-continuing for visual feedback
-          setTimeout(() => {
-            handleSSOContinue();
-          }, 1000);
+          // setTimeout(() => {
+          //   handleSSOContinue();
+          // }, 1000);
         } else {
           // If logged in but no SSO params, let parent handle navigation (e.g. to dashboard)
           if (onLoginSuccess) onLoginSuccess();

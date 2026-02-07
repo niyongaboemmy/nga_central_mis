@@ -34,6 +34,8 @@ import ClassTeacherUsersPage from "./components/ClassTeacherUsersPage";
 import ClassTeacherSubjectsPage from "./components/ClassTeacherSubjectsPage";
 import Schools from "./components/Schools";
 import Systems from "./components/Systems";
+import SchemeOfWorkList from "./components/SchemeOfWorkList";
+import SchemeOfWorkCalendar from "./components/SchemeOfWorkCalendar";
 
 // Wrapper components for pages that need the Navbar
 const LandingPage: React.FC = () => {
@@ -498,6 +500,28 @@ function App() {
                 <ProtectedRoute>
                   <SystemLayoutWrapper>
                     <Schools />
+                  </SystemLayoutWrapper>
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Scheme of Work - protected with sidebar */}
+            <Route
+              path="/scheme-of-work"
+              element={
+                <ProtectedRoute>
+                  <SystemLayoutWrapper>
+                    <SchemeOfWorkList />
+                  </SystemLayoutWrapper>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/scheme-of-work/calendar"
+              element={
+                <ProtectedRoute>
+                  <SystemLayoutWrapper>
+                    <SchemeOfWorkCalendar />
                   </SystemLayoutWrapper>
                 </ProtectedRoute>
               }

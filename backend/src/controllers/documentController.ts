@@ -35,6 +35,7 @@ import logger from "../utils/logger";
 import ftpService from "../utils/ftp";
 import fs from "fs";
 import path from "path";
+const mammoth = require("mammoth");
 
 // ======================
 // ROLE OPERATIONS
@@ -839,6 +840,43 @@ export const getSharedFolders = asyncHandler(async (req: any, res: any) => {
     "Shared folders retrieved successfully",
     sharedWithCounts,
   );
+});
+
+// ======================
+// SCHEME OF WORK
+// ======================
+
+export const previewSchemeOfWork = asyncHandler(async (req: any, res: any) => {
+  const file = req.file;
+
+  if (!file) {
+    throw new ValidationError("No file uploaded");
+  }
+
+  // Check file extension
+  const extension = path.extname(file.originalname).toLowerCase();
+  if (extension !== ".docx") {
+    throw new ValidationError("Only .docx files are supported");
+  }
+
+  try {
+    const result = await mammoth.convertToHtml({ buffer: file.buffer });
+    const html = result.value; // The generated HTML
+    const messages = result.messages; // Any messages, such as warnings during conversion
+
+    if (messages.length > 0) {
+      logger.warn(
+        `Mammoth messages for uploaded file: ${JSON.stringify(messages)}`,
+      );
+    }
+
+    successResponse(res, "Scheme of work preview generated successfully", {
+      html,
+    });
+  } catch (error: any) {
+    logger.error("Error converting DOCX to HTML:", error);
+    throw new ValidationError("Failed to convert DOCX file to HTML");
+  }
 });
 
 // ======================
