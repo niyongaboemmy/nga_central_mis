@@ -48,6 +48,12 @@ export class ConflictError extends CustomError {
   }
 }
 
+export class ServiceUnavailableError extends CustomError {
+  constructor(message: string = "Service temporarily unavailable") {
+    super(message, 503);
+  }
+}
+
 export class DatabaseError extends CustomError {
   constructor(message: string = "Database operation failed") {
     super(message, 500);

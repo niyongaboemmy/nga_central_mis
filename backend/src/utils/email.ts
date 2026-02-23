@@ -1,6 +1,7 @@
 import nodemailer from "nodemailer";
 import config from "../config";
 import logger from "./logger";
+import { ServiceUnavailableError } from "../errors/CustomError";
 
 interface EmailOptions {
   to: string;
@@ -83,7 +84,9 @@ class EmailService {
         });
 
         if (throwOnError) {
-          throw new Error(errorMsg);
+          throw new ServiceUnavailableError(
+            "Email service is temporarily unavailable. Please try again later.",
+          );
         }
         return false;
       }
@@ -111,7 +114,9 @@ class EmailService {
       });
 
       if (throwOnError) {
-        throw new Error(`Failed to send email: ${error.message}`);
+        throw new ServiceUnavailableError(
+          "Email service is temporarily unavailable. Please try again later.",
+        );
       }
       return false;
     }
