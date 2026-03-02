@@ -13,6 +13,10 @@ interface EmailOptions {
 class EmailService {
   private transporter: nodemailer.Transporter;
   private isConnected: boolean = false;
+  private lastConnectionCheck: number = 0;
+  private readonly CONNECTION_CHECK_INTERVAL = 60000; // Check connection at most once per minute
+  private readonly RECONNECT_MAX_RETRIES = 3;
+  private readonly RECONNECT_DELAY = 2000; // 2 seconds between retries
 
   constructor() {
     const smtpConfig = config.email.smtp;
@@ -34,6 +38,10 @@ class EmailService {
       connectionTimeout: 10000, // 10 seconds
       greetingTimeout: 10000, // 10 seconds
       socketTimeout: 15000, // 15 seconds
+      // Pool connections for better reliability
+      pool: true,
+      maxConnections: 1,
+      maxMessages: 100,
     });
 
     // Verify connection on startup (non-blocking)
@@ -41,6 +49,17 @@ class EmailService {
   }
 
   private async verifyConnection(): Promise<void> {
+    const now = Date.now();
+    // Throttle connection checks
+    if (
+      now - this.lastConnectionCheck < this.CONNECTION_CHECK_INTERVAL &&
+      this.isConnected
+    ) {
+      return;
+    }
+
+    this.lastConnectionCheck = now;
+
     try {
       await this.transporter.verify();
       this.isConnected = true;
@@ -50,12 +69,45 @@ class EmailService {
       });
     } catch (error) {
       this.isConnected = false;
-      logger.warn("Email service connection failed - emails will not be sent", {
+      logger.warn("Email service connection failed - will retry on next send", {
         error,
         host: config.email.smtp.host,
         port: config.email.smtp.port,
       });
     }
+  }
+
+  /**
+   * Attempt to reconnect to the email service
+   */
+  private async attemptReconnection(): Promise<boolean> {
+    logger.info("Attempting to reconnect to email service...");
+
+    for (let attempt = 1; attempt <= this.RECONNECT_MAX_RETRIES; attempt++) {
+      try {
+        await this.transporter.verify();
+        this.isConnected = true;
+        logger.info("Email service reconnected successfully", {
+          attempt,
+          host: config.email.smtp.host,
+        });
+        return true;
+      } catch (error) {
+        logger.warn(`Email service reconnection attempt ${attempt} failed`, {
+          error,
+        });
+
+        if (attempt < this.RECONNECT_MAX_RETRIES) {
+          await new Promise((resolve) =>
+            setTimeout(resolve, this.RECONNECT_DELAY),
+          );
+        }
+      }
+    }
+
+    this.isConnected = false;
+    logger.error("Email service reconnection failed after all retries");
+    return false;
   }
 
   /**
@@ -66,7 +118,7 @@ class EmailService {
   }
 
   /**
-   * Send email with error handling
+   * Send email with error handling and automatic reconnection
    * @param options Email options
    * @param throwOnError If true, throws error on failure. If false, logs error and continues
    */
@@ -75,20 +127,25 @@ class EmailService {
     throwOnError: boolean = true,
   ): Promise<boolean> {
     try {
-      // Check if service is available
+      // Try to reconnect if not connected
       if (!this.isConnected) {
-        const errorMsg = "Email service is not connected. Skipping email send.";
-        logger.warn(errorMsg, {
-          to: options.to,
-          subject: options.subject,
-        });
+        logger.info("Email service not connected, attempting reconnection...");
+        const reconnected = await this.attemptReconnection();
+        if (!reconnected) {
+          const errorMsg =
+            "Email service is not connected. Skipping email send.";
+          logger.warn(errorMsg, {
+            to: options.to,
+            subject: options.subject,
+          });
 
-        if (throwOnError) {
-          throw new ServiceUnavailableError(
-            "Email service is temporarily unavailable. Please try again later.",
-          );
+          if (throwOnError) {
+            throw new ServiceUnavailableError(
+              "Email service is temporarily unavailable. Please try again later.",
+            );
+          }
+          return false;
         }
-        return false;
       }
 
       const mailOptions = {
@@ -106,6 +163,9 @@ class EmailService {
       });
       return true;
     } catch (error: any) {
+      // Mark as disconnected on error to trigger reconnection on next attempt
+      this.isConnected = false;
+
       logger.error("Failed to send email", {
         error: error.message,
         code: error.code,
