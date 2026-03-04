@@ -8,4 +8,6 @@ export { default as Navbar } from "./Navbar";
 export { default as Footer } from "./Footer";
 export { default as VerificationCode } from "./VerificationCode";
 export { default as Sidebar } from "./Sidebar";
+export { default as SubjectSelect } from "./SubjectSelect";
 export type { AlertType } from "./Alert";
+export type { SubjectOption } from "./SubjectSelect";

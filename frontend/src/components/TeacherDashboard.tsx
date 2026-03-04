@@ -3,6 +3,7 @@ import {
   getTeacherDashboardStats,
   TeacherDashboardStats,
 } from "../api/dashboard";
+import DashboardCalendarWidget from "./calendar/DashboardCalendarWidget";
 
 interface TeacherDashboardProps {
   onLogout?: () => void;
@@ -164,7 +165,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({}) => {
         </div>
 
         {/* Quick Actions */}
-        <div className="bg-card-light dark:bg-card-dark/30 rounded-3xl shadow-sm border border-white dark:border-border-dark/30 p-6">
+        <div className="bg-card-light dark:bg-card-dark/30 rounded-3xl shadow-sm border border-white dark:border-border-dark/30 p-6 mb-8">
           <h3 className="text-lg font-semibold text-text-primary-light dark:text-text-primary-dark mb-4">
             Quick Actions
           </h3>
@@ -248,6 +249,9 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({}) => {
             </button>
           </div>
         </div>
+
+        {/* Dashboard Calendar Widget */}
+        <DashboardCalendarWidget />
       </main>
     </div>
   );

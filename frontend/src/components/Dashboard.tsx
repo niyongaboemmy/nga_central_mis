@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef } from "react";
 import { motion } from "framer-motion";
 import { FiCalendar, FiClock, FiUser } from "react-icons/fi";
 import { getBasicDashboardStats, BasicDashboardStats } from "../api/dashboard";
+import DashboardCalendarWidget from "./calendar/DashboardCalendarWidget";
 
 interface DashboardProps {
   onLogout?: () => void;
@@ -154,14 +155,14 @@ const Dashboard: React.FC<DashboardProps> = ({}) => {
         {stats && (
           <motion.div
             variants={itemVariants}
-            className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-8"
+            className="px-4 sm:px-6 lg:px-8 mb-8"
           >
             <div className="grid grid-cols-1 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {/* Academic Year Card */}
               <motion.div
                 variants={cardVariants}
                 whileHover="hover"
-                className="group bg-white dark:bg-gray-900/70 backdrop-blur-md rounded-3xl p-5 lg:p-7 shadow-sm border border-white dark:border-gray-800/60 transition-all duration-300"
+                className="group bg-white dark:bg-gray-900/70 backdrop-blur-md rounded-3xl p-3 lg:p-5 2xl:p-8 lg:py-4 transition-all duration-300"
               >
                 <div className="flex items-center gap-3 mb-4">
                   <div className="p-2 bg-blue-100 dark:bg-blue-900/60 rounded-xl group-hover:scale-110 transition-transform duration-300">
@@ -171,7 +172,7 @@ const Dashboard: React.FC<DashboardProps> = ({}) => {
                     Academic Year
                   </span>
                 </div>
-                <p className="text-xl font-bold text-gray-900 dark:text-white">
+                <p className="text-base font-bold text-gray-900 dark:text-white">
                   {stats.currentAcademicYear}
                 </p>
               </motion.div>
@@ -180,7 +181,7 @@ const Dashboard: React.FC<DashboardProps> = ({}) => {
               <motion.div
                 variants={cardVariants}
                 whileHover="hover"
-                className="group bg-white dark:bg-gray-900/70 backdrop-blur-md rounded-3xl p-5 lg:p-7 shadow-sm 2xl:p-10 bordewhiteay-200/60 dark:border-gray-800/60 transition-all duration-300"
+                className="group bg-white dark:bg-gray-900/70 backdrop-blur-md rounded-3xl p-3 lg:p-5 2xl:p-8 lg:py-4 bordewhiteay-200/60 dark:border-gray-800/60 transition-all duration-300"
               >
                 <div className="flex items-center gap-3 mb-4">
                   <div className="p-2 bg-blue-100 dark:bg-blue-900/60 rounded-xl group-hover:scale-110 transition-transform duration-300">
@@ -190,7 +191,7 @@ const Dashboard: React.FC<DashboardProps> = ({}) => {
                     Current Term
                   </span>
                 </div>
-                <p className="text-xl font-bold text-gray-900 dark:text-white">
+                <p className="text-base font-bold text-gray-900 dark:text-white">
                   {stats.currentAcademicTerm}
                 </p>
               </motion.div>
@@ -200,7 +201,7 @@ const Dashboard: React.FC<DashboardProps> = ({}) => {
                 <motion.div
                   variants={cardVariants}
                   whileHover="hover"
-                  className="group bg-white dark:bg-gray-900/70 backdrop-blur-md rounded-3xl p-5 lg:p-7 shadow-sm 2xl:p-10 bordewhiteay-200/60 dark:border-gray-800/60 transition-all duration-300"
+                  className="group bg-white dark:bg-gray-900/70 backdrop-blur-md rounded-3xl p-3 lg:p-5 2xl:p-8 lg:py-4 bordewhiteay-200/60 dark:border-gray-800/60 transition-all duration-300"
                 >
                   <div className="flex items-center gap-3 mb-4">
                     <div className="p-2 bg-blue-100 dark:bg-blue-900/60 rounded-xl group-hover:scale-110 transition-transform duration-300">
@@ -210,7 +211,7 @@ const Dashboard: React.FC<DashboardProps> = ({}) => {
                       Your Role
                     </span>
                   </div>
-                  <p className="text-xl font-bold text-gray-900 dark:text-white">
+                  <p className="text-base font-bold text-gray-900 dark:text-white">
                     {stats.currentUserRole}
                   </p>
                 </motion.div>
@@ -219,24 +220,12 @@ const Dashboard: React.FC<DashboardProps> = ({}) => {
           </motion.div>
         )}
 
-        {/* Motivational Message */}
+        {/* Dashboard Calendar Widget */}
         <motion.div
           variants={itemVariants}
-          className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-12"
+          className="px-4 sm:px-6 lg:px-8 mb-12"
         >
-          <motion.div
-            animate={{ y: [0, -6, 0] }}
-            transition={{ duration: 4, repeat: Infinity }}
-            className="bg-gradient-to-r from-blue-100 to-blue-100 dark:from-blue-900/10 dark:to-blue-900/10 rounded-3xl p-6 border border-blue-200/40 dark:border-blue-800/40 text-center"
-          >
-            <p className="text-sm text-gray-700 dark:text-gray-300 italic mb-2">
-              "Education is the most powerful weapon which you can use to change
-              the world."
-            </p>
-            <p className="text-xs text-gray-600 dark:text-gray-400">
-              — Nelson Mandela
-            </p>
-          </motion.div>
+          <DashboardCalendarWidget />
         </motion.div>
       </motion.div>
     </div>

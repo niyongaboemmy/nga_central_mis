@@ -1,0 +1,785 @@
+import React, { useState, useEffect, useMemo } from "react";
+import { useUser } from "../contexts/UserContext";
+import { useToast } from "../contexts/ToastContext";
+import { Permissions } from "../constants/permissions";
+import {
+  academicYearsApi,
+  academicTermsApi,
+  AcademicTerm,
+} from "../api/academics";
+import {
+  CalendarSlot,
+  CalendarActivity,
+  CalendarNotification,
+  UpcomingLesson,
+  getCalendarSlots,
+  createCalendarSlot,
+  updateCalendarSlot,
+  deleteCalendarSlot,
+  getCalendarActivities,
+  getMyCalendar,
+  getStudentCalendar,
+  getNotificationSettings,
+  updateNotificationSettings,
+  checkUpcomingLessons,
+  getCalendarSetupData,
+  getLessonPlanForSlot,
+  CalendarSetupData,
+  createAcademicCalendar,
+  getAcademicCalendars,
+  getCalendarClassGroups,
+} from "../api/calendar";
+import type { AcademicCalendar } from "../api/calendar";
+
+// Import calendar components
+import {
+  CalendarHeader,
+  WeekNavigator,
+  UpcomingLessons,
+  CalendarLegend,
+  CalendarGrid,
+  CalendarSlotModal,
+  AcademicCalendarModal,
+  LessonPlanModal,
+  NotificationSettingsModal,
+  getStartOfWeek,
+  getWeekDates,
+  getDateRangeString,
+  displayDayToBackend,
+  backendDayToDisplay,
+} from "./calendar";
+
+interface AcademicCalendarProps {
+  isAdminView?: boolean;
+}
+
+const AcademicCalendar: React.FC<AcademicCalendarProps> = ({
+  isAdminView = false,
+}) => {
+  const { user } = useUser();
+  const { showToast } = useToast();
+
+  // Check permissions
+  const canManageCalendar = user?.roles?.some((role) =>
+    role.permissions?.some(
+      (perm) => perm.name === Permissions.MANAGE_ACADEMIC_CALENDAR,
+    ),
+  );
+
+  const isStudent = user?.roles?.some((role) =>
+    role.permissions?.some(
+      (perm) => perm.name === Permissions.VIEW_STUDENT_CALENDAR,
+    ),
+  );
+
+  const hasViewCalendar = user?.roles?.some((role) =>
+    role.permissions?.some(
+      (perm) => perm.name === Permissions.VIEW_ACADEMIC_CALENDAR,
+    ),
+  );
+
+  const canManage = isAdminView || canManageCalendar;
+  const canViewAll = canManage || hasViewCalendar;
+  const canEdit = canManage;
+  const isBroadView = canViewAll;
+
+  // State
+  const [loading, setLoading] = useState(true);
+  const [academicYears, setAcademicYears] = useState<any[]>([]);
+  const [academicTerms, setAcademicTerms] = useState<AcademicTerm[]>([]);
+  const [selectedYear, setSelectedYear] = useState<number | null>(null);
+  const [selectedTerm, setSelectedTerm] = useState<number | null>(null);
+  const [slots, setSlots] = useState<CalendarSlot[]>([]);
+  const [activities, setActivities] = useState<CalendarActivity[]>([]);
+  const [upcomingLessons, setUpcomingLessons] = useState<UpcomingLesson[]>([]);
+  const [setupData, setSetupData] = useState<CalendarSetupData | null>(null);
+  const [notifications, setNotifications] = useState<CalendarNotification[]>(
+    [],
+  );
+  const [selectedSlot, setSelectedSlot] = useState<CalendarSlot | null>(null);
+  const [showModal, setShowModal] = useState(false);
+  const [showLessonPlan, setShowLessonPlan] = useState(false);
+  const [lessonPlan, setLessonPlan] = useState<any>(null);
+  const [showNotificationSettings, setShowNotificationSettings] =
+    useState(false);
+  const [modalMode, setModalMode] = useState<"details" | "form">("details");
+  const [currentWeekStart, setCurrentWeekStart] = useState<Date | null>(null);
+
+  // Academic Calendar (year + term + class group) state
+  const [calendars, setCalendars] = useState<AcademicCalendar[]>([]);
+  const [selectedCalendar, setSelectedCalendar] =
+    useState<AcademicCalendar | null>(null);
+  const [showCalendarModal, setShowCalendarModal] = useState(false);
+  const [availableClassGroups, setAvailableClassGroups] = useState<any[]>([]);
+  const [calendarFormData, setCalendarFormData] = useState({
+    academic_year_id: "",
+    academic_term_id: "",
+    class_group_id: "",
+    name: "",
+    description: "",
+  });
+
+  // Filter slots based on selected calendar
+  useMemo(() => {
+    if (!selectedCalendar) return slots;
+    return slots.filter((s) => s.calendar_id === selectedCalendar.calendar_id);
+  }, [slots, selectedCalendar]);
+
+  // Filter activities based on selected calendar
+  const filteredActivities = useMemo(() => {
+    if (!selectedCalendar) return activities;
+    return activities.filter(
+      (a) => a.class_group_id === selectedCalendar.class_group_id,
+    );
+  }, [activities, selectedCalendar]);
+
+  // Get calendars to display (filtered by year/term, or single selected calendar)
+  const calendarsToDisplay = useMemo(() => {
+    if (!selectedYear || !selectedTerm) return [];
+    const filtered = calendars.filter(
+      (c) =>
+        c.academic_year_id === selectedYear &&
+        c.academic_term_id === selectedTerm,
+    );
+    if (selectedCalendar) {
+      return [selectedCalendar];
+    }
+    return filtered;
+  }, [calendars, selectedYear, selectedTerm, selectedCalendar]);
+
+  // Form state for creating/editing slots
+  const [formData, setFormData] = useState({
+    calendar_id: "", // set by handleEmptyCellClick / handleSlotClick
+    class_group_id: "",
+    subject_id: "",
+    user_id: "",
+    day_of_week: "",
+    start_time: "",
+    end_time: "",
+    location: "room 1",
+    color: "#3B82F6",
+  });
+
+  // Derive the effective class group ID purely from formData (a param, not global state).
+  // Both handleEmptyCellClick and handleSlotClick write class_group_id into formData
+  // explicitly, so no global-state fallback is needed.
+  // When resetSlotModal() clears formData.class_group_id → "", this returns null
+  // immediately — no stale value leaks from selectedCalendar or selectedSlot.
+  const effectiveClassGroupId = useMemo(
+    () => (formData.class_group_id ? Number(formData.class_group_id) : null),
+    [formData.class_group_id],
+  );
+
+  // Form validation errors
+  const [formErrors, setFormErrors] = useState<{
+    subject_id?: string;
+    day_of_week?: string;
+    start_time?: string;
+    end_time?: string;
+  }>({});
+
+  // Week dates
+  const weekDates = useMemo(() => {
+    if (!currentWeekStart) return [];
+    return getWeekDates(currentWeekStart);
+  }, [currentWeekStart]);
+
+  // Date range string
+  const dateRangeString = useMemo(() => {
+    return getDateRangeString(weekDates);
+  }, [weekDates]);
+
+  // Load data
+  useEffect(() => {
+    loadAcademicYears();
+    const interval = setInterval(checkUpcoming, 60000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Load data when term changes
+  useEffect(() => {
+    if (selectedTerm) {
+      loadData();
+    }
+  }, [selectedTerm]);
+
+  // Reload setupData when the modal opens or the class group changes.
+  // Reads ONLY from formData.class_group_id (a scoped param, not global state)
+  // so it resets cleanly whenever resetSlotModal() clears class_group_id.
+  useEffect(() => {
+    if (isBroadView && selectedTerm && showModal) {
+      const classGroupId = formData.class_group_id
+        ? parseInt(formData.class_group_id)
+        : undefined;
+      const loadSetupData = async () => {
+        try {
+          const setupDataRes = await getCalendarSetupData(
+            selectedTerm,
+            classGroupId,
+          );
+          setSetupData(setupDataRes);
+        } catch (error) {
+          console.error("Failed to load setup data:", error);
+        }
+      };
+      loadSetupData();
+    }
+  }, [formData.class_group_id, selectedTerm, showModal]);
+
+  // Load academic terms for a year
+  const loadTerms = async (yearId: number) => {
+    try {
+      const termsRes = await academicTermsApi.getAll(yearId);
+      const responseData = (termsRes as any).data;
+      const terms = (responseData as any).data || responseData;
+      setAcademicTerms(terms);
+
+      // Find current term
+      const currentTerm = terms.find((t: AcademicTerm) => t.is_current === 1);
+      if (currentTerm) {
+        setSelectedTerm(currentTerm.academic_term_id);
+      }
+    } catch (error) {
+      console.error("Failed to load academic terms:", error);
+    }
+  };
+
+  // Load academic years and terms
+  const loadAcademicYears = async () => {
+    try {
+      const yearsRes = await academicYearsApi.getAll();
+      const responseData = (yearsRes as any).data;
+      const years = (responseData as any).data || responseData;
+      setAcademicYears(years);
+
+      // Find current year or first available
+      const currentYear =
+        years.find((y: any) => y.is_current === 1) || years[0];
+      if (currentYear) {
+        setSelectedYear(currentYear.academic_year_id);
+        loadTerms(currentYear.academic_year_id);
+        // Set current week start to today (Monday of current week)
+        const today = new Date();
+        const startOfWeek = getStartOfWeek(today);
+        setCurrentWeekStart(startOfWeek);
+      }
+    } catch (error) {
+      console.error("Failed to load academic years:", error);
+    }
+  };
+
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const params: any = {};
+      if (selectedTerm) {
+        params.academic_term_id = selectedTerm;
+      }
+
+      if (isBroadView) {
+        // Load calendars for the selected year and term
+        let calendarParams: any = {};
+        if (selectedYear) {
+          calendarParams.academic_year_id = selectedYear;
+        }
+        if (selectedTerm) {
+          calendarParams.academic_term_id = selectedTerm;
+        }
+
+        const [slotsData, activitiesData, setupDataRes, calendarsData] =
+          await Promise.all([
+            getCalendarSlots(params),
+            getCalendarActivities(params),
+            getCalendarSetupData(
+              selectedTerm || undefined,
+              selectedCalendar?.class_group_id
+                ? selectedCalendar.class_group_id
+                : undefined,
+            ),
+            getAcademicCalendars(calendarParams),
+          ]);
+        setSlots(slotsData);
+        setActivities(activitiesData);
+        setSetupData(setupDataRes);
+        setCalendars(calendarsData);
+      } else if (isStudent) {
+        // Student view
+        const calendarData = await getStudentCalendar(params);
+        setSlots(calendarData.slots);
+      } else {
+        // Instructor view
+        const [calendarData, notificationsData, upcomingData] =
+          await Promise.all([
+            getMyCalendar(params),
+            getNotificationSettings(),
+            checkUpcomingLessons(),
+          ]);
+        setSlots(calendarData.slots);
+        setUpcomingLessons(upcomingData);
+        setNotifications(notificationsData);
+      }
+    } catch (error: any) {
+      showToast(error.message || "Failed to load calendar data", "error");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const checkUpcoming = async () => {
+    if (!isBroadView) {
+      try {
+        const upcoming = await checkUpcomingLessons();
+        setUpcomingLessons(upcoming);
+      } catch (error) {
+        console.error("Failed to check upcoming lessons:", error);
+      }
+    }
+  };
+
+  // Handle clicking on empty calendar cell to add new slot
+  const handleEmptyCellClick = (
+    dayIndex: number,
+    scheduleSlot: { start: string; end: string; type: string },
+    calendarId: number,
+  ) => {
+    if (!canEdit) return;
+
+    setModalMode("form");
+
+    // Find the calendar by ID to get full details (like class_group_id)
+    const calendar = calendars.find((c) => c.calendar_id === calendarId);
+
+    setSelectedSlot(null);
+    setFormData({
+      calendar_id: calendar?.calendar_id?.toString() || "",
+      class_group_id: calendar?.class_group_id?.toString() || "",
+      subject_id: "",
+      user_id: "",
+      day_of_week: dayIndex.toString(),
+      start_time: scheduleSlot.start,
+      end_time: scheduleSlot.end,
+      location: "room 1",
+      color: "#3B82F6",
+    });
+
+    setShowModal(true);
+  };
+
+  // Handle slot click to view details (then potentially edit)
+  const handleSlotClick = (slot: CalendarSlot) => {
+    setModalMode("details");
+    setSelectedSlot(slot);
+    setFormData({
+      calendar_id: slot.calendar_id?.toString() || "",
+      class_group_id: slot.class_group_id?.toString() || "",
+      subject_id: `${slot.subject_id}_${slot.user_id}_${slot.class_group_id || ""}`,
+      user_id: slot.user_id.toString(),
+      day_of_week: slot.day_of_week.toString(),
+      start_time: slot.start_time,
+      end_time: slot.end_time,
+      location: slot.location || "room 1",
+      color: slot.color || "#3B82F6",
+    });
+    setShowModal(true);
+  };
+
+  // Handle viewing lesson plan
+  const handleViewLessonPlan = async (slot: CalendarSlot) => {
+    try {
+      // Calculate the specific date for this slot if we have week dates
+      let slotDateString: string | undefined;
+
+      if (weekDates.length > 0 && slot.day_of_week !== undefined) {
+        // Map backend day (0=Sun, 1=Mon...) to weekDates index (0=Mon, 1=Tue... 6=Sun)
+        const displayDay = backendDayToDisplay(slot.day_of_week);
+        const slotDate = weekDates[displayDay];
+
+        if (slotDate) {
+          const year = slotDate.getFullYear();
+          const month = String(slotDate.getMonth() + 1).padStart(2, "0");
+          const day = String(slotDate.getDate()).padStart(2, "0");
+          slotDateString = `${year}-${month}-${day}`;
+        }
+      }
+
+      const lessonPlanData = await getLessonPlanForSlot(
+        slot.slot_id,
+        slotDateString,
+      );
+      setLessonPlan(lessonPlanData);
+      setShowLessonPlan(true);
+    } catch (error: any) {
+      showToast(error.message || "No lesson plan found for this slot", "info");
+    }
+  };
+
+  // Handle creating/updating slot
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    // Validate form
+    const errors: typeof formErrors = {};
+    if (!formData.subject_id) {
+      errors.subject_id = "Please select a subject with instructor";
+    }
+    if (!formData.day_of_week) {
+      errors.day_of_week = "Please select a day";
+    }
+    if (!formData.start_time) {
+      errors.start_time = "Please select start time";
+    }
+    if (!formData.end_time) {
+      errors.end_time = "Please select end time";
+    }
+
+    if (formData.start_time && formData.end_time) {
+      if (formData.start_time >= formData.end_time) {
+        errors.end_time = "End time must be after start time";
+      }
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors);
+      return;
+    }
+
+    setFormErrors({});
+
+    // Parse subject_id
+    const [subjectIdStr, userIdStr] = formData.subject_id.split("_");
+    const subjectId = subjectIdStr || formData.subject_id;
+    const userId = userIdStr || formData.user_id;
+
+    const classGroupId = formData.class_group_id
+      ? parseInt(formData.class_group_id)
+      : selectedSlot?.class_group_id || 1;
+
+    try {
+      if (selectedSlot) {
+        await updateCalendarSlot(selectedSlot.slot_id, {
+          class_group_id: classGroupId,
+          subject_id: parseInt(subjectId),
+          user_id: parseInt(userId) || 0,
+          day_of_week: displayDayToBackend(parseInt(formData.day_of_week)),
+          start_time: formData.start_time,
+          end_time: formData.end_time,
+        });
+        showToast("Calendar slot updated successfully", "success");
+      } else {
+        const calendarId = formData.calendar_id
+          ? parseInt(formData.calendar_id)
+          : selectedCalendar?.calendar_id || 0;
+        const termId = formData.calendar_id
+          ? calendars.find((c) => c.calendar_id === calendarId)
+              ?.academic_term_id ||
+            setupData?.academic_term_id ||
+            1
+          : selectedCalendar?.academic_term_id ||
+            setupData?.academic_term_id ||
+            1;
+        await createCalendarSlot({
+          calendar_id: calendarId,
+          academic_term_id: termId,
+          class_group_id: classGroupId,
+          subject_id: parseInt(subjectId),
+          user_id: parseInt(userId) || 0,
+          day_of_week: displayDayToBackend(parseInt(formData.day_of_week)),
+          start_time: formData.start_time,
+          end_time: formData.end_time,
+          location: formData.location,
+          color: formData.color,
+        });
+        showToast("Calendar slot created successfully", "success");
+      }
+      resetSlotModal();
+      loadData();
+    } catch (error: any) {
+      showToast(error.message || "Failed to save calendar slot", "error");
+    }
+  };
+
+  // ── Centralised slot-modal teardown ────────────────────────────────────────
+  const resetSlotModal = () => {
+    setFormData({
+      calendar_id: "",
+      class_group_id: "",
+      subject_id: "",
+      user_id: "",
+      day_of_week: "",
+      start_time: "",
+      end_time: "",
+      location: "room 1",
+      color: "#3B82F6",
+    });
+    setFormErrors({});
+    setSelectedSlot(null);
+    setSetupData(null); // clear stale subjects so next open starts fresh
+    setShowModal(false);
+  };
+  // ─────────────────────────────────────────────────────────────────────────
+
+  // Handle deleting slot
+  const handleDelete = async (id: number) => {
+    if (!confirm("Are you sure you want to delete this slot?")) return;
+    try {
+      await deleteCalendarSlot(id);
+      showToast("Calendar slot deleted successfully", "success");
+      resetSlotModal();
+      loadData();
+    } catch (error: any) {
+      showToast(error.message || "Failed to delete slot", "error");
+    }
+  };
+
+  // Handle notification settings
+  const handleSaveNotifications = async () => {
+    try {
+      await updateNotificationSettings({ notifications });
+      showToast("Notification settings saved", "success");
+      setShowNotificationSettings(false);
+    } catch (error: any) {
+      showToast(
+        error.message || "Failed to save notification settings",
+        "error",
+      );
+    }
+  };
+
+  // Week navigation handlers
+  const goToPreviousWeek = () => {
+    if (!currentWeekStart) return;
+    const newStart = new Date(currentWeekStart);
+    newStart.setDate(currentWeekStart.getDate() - 7);
+    setCurrentWeekStart(newStart);
+  };
+
+  const goToNextWeek = () => {
+    if (!currentWeekStart) return;
+    const newStart = new Date(currentWeekStart);
+    newStart.setDate(currentWeekStart.getDate() + 7);
+    setCurrentWeekStart(newStart);
+  };
+
+  const goToToday = () => {
+    const today = new Date();
+    const startOfWeek = getStartOfWeek(today);
+    setCurrentWeekStart(startOfWeek);
+  };
+
+  // Handle create calendar button click
+  const handleCreateCalendarClick = async () => {
+    if (selectedYear && selectedTerm) {
+      try {
+        const classGroups = await getCalendarClassGroups({
+          academic_year_id: selectedYear,
+          academic_term_id: selectedTerm,
+        });
+        if (classGroups.length === 0) {
+          showToast("No class groups available for this term", "info");
+          return;
+        }
+        setAvailableClassGroups(classGroups);
+        setCalendarFormData({
+          academic_year_id: selectedYear.toString(),
+          academic_term_id: selectedTerm.toString(),
+          class_group_id: "",
+          name: "",
+          description: "",
+        });
+        setShowCalendarModal(true);
+      } catch (error: any) {
+        showToast(error.message || "Failed to load class groups", "error");
+      }
+    } else {
+      showToast("Please select an academic year and term first", "warning");
+    }
+  };
+
+  // Handle add slot button click
+  const handleAddSlotClick = () => {
+    const firstSubject = setupData?.subjects[0];
+    const firstTeacher = firstSubject?.teachers?.[0];
+    setSelectedSlot(null);
+    setFormData({
+      calendar_id: selectedCalendar?.calendar_id?.toString() || "",
+      class_group_id: selectedCalendar?.class_group_id?.toString() || "",
+      subject_id: firstSubject?.subject_id?.toString() || "",
+      user_id: firstTeacher?.user_id?.toString() || "",
+      day_of_week: "0",
+      start_time: "09:00",
+      end_time: "09:50",
+      location: "",
+      color: "#3B82F6",
+    });
+    setShowModal(true);
+  };
+
+  // Handle academic calendar form submit
+  const handleCalendarSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await createAcademicCalendar({
+        academic_year_id: parseInt(calendarFormData.academic_year_id),
+        academic_term_id: parseInt(calendarFormData.academic_term_id),
+        class_group_id: parseInt(calendarFormData.class_group_id),
+        name: calendarFormData.name || undefined,
+        description: calendarFormData.description || undefined,
+      });
+      showToast("Calendar created successfully", "success");
+      setShowCalendarModal(false);
+      loadData();
+    } catch (error: any) {
+      showToast(error.message || "Failed to create calendar", "error");
+    }
+  };
+
+  // Handle modal close
+  const handleModalClose = () => {
+    resetSlotModal();
+  };
+
+  // Wrapper for form data change
+  const handleFormDataChange = (data: Partial<typeof formData>) => {
+    setFormData((prev) => ({ ...prev, ...data }));
+  };
+
+  // Handle calendar modal close
+  const handleCalendarModalClose = () => {
+    setShowCalendarModal(false);
+    setCalendarFormData({
+      academic_year_id: "",
+      academic_term_id: "",
+      class_group_id: "",
+      name: "",
+      description: "",
+    });
+  };
+
+  // Wrapper for calendar form data change
+  const handleCalendarFormDataChange = (
+    data: Partial<typeof calendarFormData>,
+  ) => {
+    setCalendarFormData((prev) => ({ ...prev, ...data }));
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white dark:bg-gray-900/50 rounded-3xl p-6 m-3 md:m-6">
+      {/* Header with Year/Term Selector and Week Navigator */}
+      <div className="flex items-center justify-between mb-6">
+        <CalendarHeader
+          isAdmin={isBroadView}
+          canEdit={canEdit}
+          isStudent={isStudent}
+          academicYears={academicYears}
+          academicTerms={academicTerms}
+          calendars={calendars}
+          selectedYear={selectedYear}
+          selectedTerm={selectedTerm}
+          selectedCalendar={selectedCalendar}
+          dateRangeString={dateRangeString}
+          onYearChange={(yearId) => {
+            setSelectedYear(yearId);
+            loadTerms(yearId);
+          }}
+          onTermChange={setSelectedTerm}
+          onCalendarChange={setSelectedCalendar}
+          onCreateCalendarClick={handleCreateCalendarClick}
+          onAddSlotClick={handleAddSlotClick}
+          onNotificationsClick={() => setShowNotificationSettings(true)}
+        />
+      </div>
+
+      {/* Week Navigator */}
+      <div className="hidden">
+        <WeekNavigator
+          onPreviousWeek={goToPreviousWeek}
+          onNextWeek={goToNextWeek}
+          onToday={goToToday}
+        />
+      </div>
+
+      {/* Upcoming Lessons Alert (for instructors) */}
+      <UpcomingLessons lessons={upcomingLessons} />
+
+      {/* Calendar Grids */}
+      {(!isBroadView ||
+        (selectedYear && selectedTerm && calendarsToDisplay.length > 0)) && (
+        <div className="space-y-8">
+          {calendarsToDisplay.map((calendar) => (
+            <CalendarGrid
+              key={calendar.calendar_id}
+              calendarId={calendar.calendar_id}
+              classGroupName={calendar.class_group_name}
+              slots={slots}
+              activities={filteredActivities}
+              weekDates={weekDates}
+              canEdit={canEdit}
+              onSlotClick={handleSlotClick}
+              onEmptyCellClick={handleEmptyCellClick}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Legend */}
+      <CalendarLegend showActivityLegend={filteredActivities.length > 0} />
+
+      {/* Modals */}
+      <CalendarSlotModal
+        showModal={showModal}
+        selectedSlot={selectedSlot}
+        formData={formData}
+        formErrors={formErrors}
+        effectiveClassGroupId={effectiveClassGroupId}
+        setupData={setupData}
+        onClose={handleModalClose}
+        onSubmit={handleSubmit}
+        onFormDataChange={handleFormDataChange}
+        onErrorsChange={setFormErrors}
+        onDelete={handleDelete}
+        mode={modalMode}
+        canEdit={Boolean(canEdit)}
+        onEditClick={() => setModalMode("form")}
+        onViewLessonPlan={handleViewLessonPlan}
+      />
+
+      <AcademicCalendarModal
+        showModal={showCalendarModal}
+        academicYears={academicYears}
+        academicTerms={academicTerms}
+        availableClassGroups={availableClassGroups}
+        formData={calendarFormData}
+        onClose={handleCalendarModalClose}
+        onSubmit={handleCalendarSubmit}
+        onFormDataChange={handleCalendarFormDataChange}
+      />
+
+      <LessonPlanModal
+        showModal={showLessonPlan}
+        lessonPlan={lessonPlan}
+        onClose={() => {
+          setShowLessonPlan(false);
+          setLessonPlan(null);
+        }}
+      />
+
+      <NotificationSettingsModal
+        showModal={showNotificationSettings}
+        notifications={notifications}
+        onClose={() => setShowNotificationSettings(false)}
+        onSave={handleSaveNotifications}
+        onNotificationsChange={setNotifications}
+      />
+    </div>
+  );
+};
+
+export default AcademicCalendar;

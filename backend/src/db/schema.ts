@@ -747,3 +747,104 @@ export const LO_LessonEvaluation = mysqlTable("LO_LessonEvaluation", {
   prepared_by: varchar("prepared_by", { length: 255 }),
   verified_by: varchar("verified_by", { length: 255 }),
 });
+
+// AcademicCalendar table: Stores calendar configuration for a specific academic year, term, and class group
+export const AcademicCalendar = mysqlTable("AcademicCalendar", {
+  calendar_id: bigint("calendar_id", { mode: "number" })
+    .primaryKey()
+    .autoincrement(),
+  academic_year_id: bigint("academic_year_id", { mode: "number" })
+    .notNull()
+    .references(() => AcademicYear.academic_year_id),
+  academic_term_id: bigint("academic_term_id", { mode: "number" })
+    .notNull()
+    .references(() => AcademicTerm.academic_term_id),
+  class_group_id: bigint("class_group_id", { mode: "number" })
+    .notNull()
+    .references(() => ClassGroup.class_group_id),
+  name: varchar("name", { length: 150 }),
+  description: text("description"),
+  is_active: tinyint("is_active").default(1),
+  created_at: datetime("created_at").default(sql`CURRENT_TIMESTAMP`),
+  updated_at: datetime("updated_at").default(
+    sql`CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP`,
+  ),
+});
+
+// CalendarSlot table: Stores individual time slots for subjects in the weekly calendar
+export const CalendarSlot = mysqlTable("CalendarSlot", {
+  slot_id: bigint("slot_id", { mode: "number" }).primaryKey().autoincrement(),
+  calendar_id: bigint("calendar_id", { mode: "number" }).references(
+    () => AcademicCalendar.calendar_id,
+  ),
+  academic_term_id: bigint("academic_term_id", { mode: "number" }).references(
+    () => AcademicTerm.academic_term_id,
+  ),
+  class_group_id: bigint("class_group_id", { mode: "number" }),
+  subject_id: bigint("subject_id", { mode: "number" })
+    .notNull()
+    .references(() => Subject.subject_id),
+  user_id: bigint("user_id", { mode: "number" })
+    .notNull()
+    .references(() => User.user_id),
+  day_of_week: tinyint("day_of_week").notNull(),
+  start_time: varchar("start_time", { length: 10 }).notNull(),
+  end_time: varchar("end_time", { length: 10 }).notNull(),
+  location: varchar("location", { length: 100 }),
+  color: varchar("color", { length: 7 }).default("#3B82F6"),
+  notes: text("notes"),
+  is_active: tinyint("is_active").default(1),
+  created_at: datetime("created_at").default(sql`CURRENT_TIMESTAMP`),
+  updated_at: datetime("updated_at").default(
+    sql`CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP`,
+  ),
+});
+
+// CalendarNotification table: Stores notification preferences for instructors
+export const CalendarNotification = mysqlTable("CalendarNotification", {
+  notification_id: bigint("notification_id", { mode: "number" })
+    .primaryKey()
+    .autoincrement(),
+  user_id: bigint("user_id", { mode: "number" })
+    .notNull()
+    .references(() => User.user_id),
+  notification_type: varchar("notification_type", { length: 50 })
+    .notNull()
+    .default("LESSON_STARTING"),
+  minutes_before: int("minutes_before").notNull().default(30),
+  is_enabled: tinyint("is_enabled").default(1),
+  notification_method: varchar("notification_method", { length: 20 }).default(
+    "IN_APP",
+  ),
+  created_at: datetime("created_at").default(sql`CURRENT_TIMESTAMP`),
+  updated_at: datetime("updated_at").default(
+    sql`CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP`,
+  ),
+});
+
+// CalendarActivity table: Stores non-subject activities
+export const CalendarActivity = mysqlTable("CalendarActivity", {
+  activity_id: bigint("activity_id", { mode: "number" })
+    .primaryKey()
+    .autoincrement(),
+  academic_term_id: bigint("academic_term_id", { mode: "number" })
+    .notNull()
+    .references(() => AcademicTerm.academic_term_id),
+  class_group_id: bigint("class_group_id", { mode: "number" }),
+  activity_name: varchar("activity_name", { length: 150 }).notNull(),
+  activity_type: varchar("activity_type", { length: 50 }).notNull(),
+  day_of_week: tinyint("day_of_week"),
+  start_date: date("start_date"),
+  end_date: date("end_date"),
+  start_time: varchar("start_time", { length: 10 }).notNull(),
+  end_time: varchar("end_time", { length: 10 }).notNull(),
+  location: varchar("location", { length: 100 }),
+  description: text("description"),
+  color: varchar("color", { length: 7 }).default("#10B981"),
+  is_recurring: tinyint("is_recurring").default(1),
+  is_active: tinyint("is_active").default(1),
+  created_at: datetime("created_at").default(sql`CURRENT_TIMESTAMP`),
+  updated_at: datetime("updated_at").default(
+    sql`CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP`,
+  ),
+});

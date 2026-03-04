@@ -78,7 +78,11 @@ export interface StudentClassGroup {
 
 // Academic Years API
 export const academicYearsApi = {
-  getAll: () => api.get<{ data: AcademicYear[] }>("/academics/years"),
+  getAll: () =>
+    api.get<
+      | { success: boolean; message: string; data: AcademicYear[] }
+      | { data: AcademicYear[] }
+    >("/academics/years"),
   getById: (id: number) => api.get<AcademicYear>(`/academics/years/${id}`),
   create: (data: Omit<AcademicYear, "academic_year_id">) =>
     api.post<AcademicYear>("/academics/years", data),
@@ -90,7 +94,10 @@ export const academicYearsApi = {
 // Academic Terms API
 export const academicTermsApi = {
   getAll: (academicYearId?: number) =>
-    api.get<{ data: AcademicTerm[] }>("/academics/terms", {
+    api.get<
+      | { success: boolean; message: string; data: AcademicTerm[] }
+      | { data: AcademicTerm[] }
+    >("/academics/terms", {
       params: academicYearId ? { academic_year_id: academicYearId } : undefined,
     }),
   getById: (id: number) => api.get<AcademicTerm>(`/academics/terms/${id}`),
