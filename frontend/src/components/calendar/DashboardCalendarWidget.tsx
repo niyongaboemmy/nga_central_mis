@@ -20,7 +20,6 @@ import {
   getDateRangeString,
   formatDateShort,
 } from "./calendarConstants";
-import UpcomingLessons from "./UpcomingLessons";
 import CalendarSlotModal from "./CalendarSlotModal";
 import LessonPlanModal from "./LessonPlanModal";
 
@@ -42,7 +41,7 @@ const DashboardCalendarWidget: React.FC = () => {
 
   // State
   const [slots, setSlots] = useState<CalendarSlot[]>([]);
-  const [upcomingLessons, setUpcomingLessons] = useState<any[]>([]);
+  const [_upcomingLessons, setUpcomingLessons] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [termName, setTermName] = useState<string>("");
   const [currentWeekStart, setCurrentWeekStart] = useState<Date>(() =>
@@ -253,11 +252,6 @@ const DashboardCalendarWidget: React.FC = () => {
           </button>
         </div>
       </div>
-
-      {/* Upcoming Lessons Alert */}
-      {!loading && upcomingLessons.length > 0 && !isStudent && (
-        <UpcomingLessons lessons={upcomingLessons} />
-      )}
 
       {/* Loading */}
       {loading && (
