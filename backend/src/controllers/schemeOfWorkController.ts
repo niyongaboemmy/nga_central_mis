@@ -17,6 +17,8 @@ import mammoth = require("mammoth");
 /**
  * Parses DOCX and extracts entries based on date ranges
  */
+import * as cheerio from "cheerio";
+
 export const uploadAndExtractScheme = asyncHandler(
   async (req: any, res: any) => {
     const { subject_id, class_group_id, academic_term_id } = req.body;
@@ -39,53 +41,53 @@ export const uploadAndExtractScheme = asyncHandler(
     const result = await mammoth.convertToHtml({ buffer: req.file.buffer });
     const html = result.value;
 
-    // Extraction logic
-    // Looking for rows that contain "Week X:" and a date range
     const entries: any[] = [];
+    const $ = cheerio.load(html);
 
-    // Basic regex to find Week and Date Range in table cells
-    // Example: Week 1: 05-09/1/2026
-    const weekRegex =
-      /Week\s+(\d+):?\s*<p>\s*(\d{1,2}-\d{1,2}\/\d{1,2}\/\d{4})\s*<\/p>/gi;
+    // Clean text utility
+    const cleanText = (str: string) =>
+      str ? str.replace(/\s+/g, " ").trim() : "";
 
-    // We need to parse the HTML table properly.
-    // For now, let's use a simpler approach of splitting by <tr> if possible,
-    // but mammoth output might be complex.
+    // Parse DOCX table rows directly
+    $("tr").each((i, tr) => {
+      const tds = $(tr).find("td, th").toArray();
+      if (tds.length === 0) return;
 
-    const rows = html.split("<tr>");
+      // Extract text for each cell in this row, separated by newlines
+      const cells = tds.map((td) => {
+        let cellHtml = $(td).html() || "";
+        cellHtml = cellHtml
+          .replace(/<br\s*\/?>/gi, "\n")
+          .replace(/<\/p><p>/gi, "\n");
+        return cheerio.load(cellHtml).text().trim();
+      });
 
-    for (const row of rows) {
-      // 1. Try to find "Week X" and a date range in the row
-      // We'll strip tags temporarily for matching but keep the row for cell splitting
-      const cleanRow = row.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ");
+      // Usually Week is in the first column for SOW standard format
+      const firstColumn = cells[0] || "";
 
       // Look for "Week X"
-      const weekMatch = /Week\s+(\d+)/i.exec(cleanRow);
-      if (!weekMatch) continue;
+      const weekMatch = /Week\s+(\d+)/i.exec(firstColumn);
+      if (!weekMatch) return; // Skip rows that aren't week entries
 
       const weekNum = weekMatch[1];
 
-      // Look for a date range in the same row
       // Format A: 05-09/1/2026 or 5-9/1/2026
       // Format B: 30/3/2026 - 03/04/2026
-
       let startDate: string | null = null;
       let endDate: string | null = null;
 
-      // Try Format B first (Full dates): (\d{1,2})/(\d{1,2})/(\d{4}) - (\d{1,2})/(\d{1,2})/(\d{4})
       const formatBMatch =
         /(\d{1,2})\/(\d{1,2})\/(\d{4})\s*-\s*(\d{1,2})\/(\d{1,2})\/(\d{4})/.exec(
-          cleanRow,
+          firstColumn,
         );
-
       if (formatBMatch) {
         startDate = `${formatBMatch[3]}-${formatBMatch[2].padStart(2, "0")}-${formatBMatch[1].padStart(2, "0")}`;
         endDate = `${formatBMatch[6]}-${formatBMatch[5].padStart(2, "0")}-${formatBMatch[4].padStart(2, "0")}`;
       } else {
-        // Try Format A (Day range): (\d{1,2})-(\d{1,2})/(\d{1,2})/(\d{4})
-        // Ensure it's not preceded by a digit to avoid matching end of years (e.g. 2026 - 03/04/2026)
         const formatAMatch =
-          /(?<!\d)(\d{1,2})\s*-\s*(\d{1,2})\/(\d{1,2})\/(\d{4})/.exec(cleanRow);
+          /(?<!\d)(\d{1,2})\s*-\s*(\d{1,2})\/(\d{1,2})\/(\d{4})/.exec(
+            firstColumn,
+          );
         if (formatAMatch) {
           const dayStart = formatAMatch[1].padStart(2, "0");
           const dayEnd = formatAMatch[2].padStart(2, "0");
@@ -97,44 +99,34 @@ export const uploadAndExtractScheme = asyncHandler(
       }
 
       if (startDate && endDate) {
-        // Extract other columns
-        const cells = row.split(/<(?:td|th)[^>]*>/).slice(1);
-        const clean = (str: string) =>
-          str
-            ? str
-                .replace(/<[^>]*>/g, " ")
-                .replace(/\s+/g, " ")
-                .trim()
-            : "";
-
-        // Based on the observed structure:
         // cells[0] is the Week/Date
         // cells[1] is Learning Outcome (LO)
         // cells[2] is Duration
-        // cells[3] is Indicative Content (IC)
-        // cells[4] is Learning Activities
+        // cells[3] is Indicative Content (IC) (Topic)
+        // cells[4] is Learning Activities / Methodology
         // cells[5] is Resources
-        // cells[6] is Evidences
+        // cells[6] is Evidences / Evaluation
         // cells[7] is Learning Place
 
-        let topic = clean(cells[3] || "");
-        if (!topic && cleanRow.toLowerCase().includes("midterm")) {
+        let topic = cleanText(cells[3] || "");
+        if (!topic && firstColumn.toLowerCase().includes("midterm")) {
           topic = "Midterm / Holidays";
         }
 
+        // Only add if it actually matched something substantive
         entries.push({
           week_number: `Week ${weekNum}`,
           start_date: startDate,
           end_date: endDate,
           topic: topic,
           sub_topic: "",
-          objective: clean(cells[1] || ""),
-          methodology: clean(cells[4] || ""),
-          resources: clean(cells[5] || ""),
-          evaluation: clean(cells[6] || ""),
+          objective: cleanText(cells[1] || ""),
+          methodology: cleanText(cells[4] || ""),
+          resources: cleanText(cells[5] || ""),
+          evaluation: cleanText(cells[6] || ""),
         });
       }
-    }
+    });
 
     if (entries.length === 0) {
       throw new ValidationError(

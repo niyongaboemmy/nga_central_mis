@@ -287,6 +287,8 @@ export const deleteLessonPlan = async (req: Request, res: Response) => {
   }
 };
 
+import * as cheerio from "cheerio";
+
 export const extractLessonPlan = asyncHandler(async (req: any, res: any) => {
   if (!req.file) {
     throw new ValidationError("No file uploaded");
@@ -337,7 +339,7 @@ export const extractLessonPlan = asyncHandler(async (req: any, res: any) => {
               ],
               "sections": [
                 {
-                  "section_type": "Introduction" | "Conclusion",
+                  "section_type": "Introduction" | "Conclusion" | "Development",
                   "trainer_activities": string,
                   "learner_activities": string,
                   "resources": string,
@@ -373,59 +375,361 @@ export const extractLessonPlan = asyncHandler(async (req: any, res: any) => {
         extracted,
       );
     } catch (err) {
-      console.error("OpenAI Error, falling back to basic extraction:", err);
+      console.error(
+        "OpenAI Error, falling back to deterministic extraction:",
+        err,
+      );
     }
   }
 
-  // Fallback basic extraction logic (Simplified for new structure)
-  const clean = (str: string) =>
-    str
-      ? str
-          .replace(/<[^>]*>/g, " ")
-          .replace(/\s+/g, " ")
-          .trim()
-      : "";
+  // Fallback deterministic extraction logic using Cheerio
+  const $ = cheerio.load(html);
 
-  const extractAfter = (str: string, label: string) => {
-    const idx = str.toLowerCase().indexOf(label.toLowerCase());
-    if (idx === -1) return "";
-    return str.substring(idx + label.length).trim();
-  };
+  const cleanText = (text: string) => text.trim().replace(/\s+/g, " ");
 
-  const rows = html.split("<tr>");
   const extracted: any = {
     outcomes: [],
     sections: [],
     indicativeContent: [],
     assignments: [],
+    evaluation: {
+      teacher_notes: "",
+      references: "",
+      prepared_by: "",
+      verified_by: "",
+    },
   };
 
-  for (let i = 0; i < rows.length; i++) {
-    const row = rows[i];
-    const cleanRow = clean(row);
-    if (cleanRow.toLowerCase().includes("sector:")) {
-      extracted.sector = extractAfter(
-        cleanRow.split(/trade:/i)[0],
-        "Sector:",
-      ).trim();
-      extracted.trade = extractAfter(
-        cleanRow.split(/level:/i)[0],
-        "Trade:",
-      ).trim();
-      const dateMatch = cleanRow.match(
-        /(\d{1,2})[\/\.-](\d{1,2})[\/\.-](\d{4})/,
+  /**
+   * Get clean text from a cheerio element, converting <br> and </p> to newlines.
+   */
+  const getInnerText = (el: any): string => {
+    let h = $(el).html() || "";
+    h = h.replace(/<br\s*\/?>/gi, "\n").replace(/<\/p>/gi, "\n");
+    return cheerio.load(h).text().trim();
+  };
+
+  // ── Inline header scan ─────────────────────────────────────────────────────
+  // The top header rows contain "Sector: ICT  Trade: SPEs  Level: 3  Date: …"
+  // all packed into merged cells. We scan every cell for "Label: Value" tokens.
+  const inlineFind = (label: string): string => {
+    let found = "";
+    $("th, td").each((_i, el) => {
+      if (found) return;
+      const text = getInnerText(el);
+      // Escape label for regex, but allow '&' literal (mammoth decodes HTML entities)
+      const escaped = label
+        .replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+        .replace(/&amp;/gi, "&");
+      // Value may be on same line OR next line (when label/<p> and value/<p> are separate)
+      const re = new RegExp(
+        escaped + "[^:\\n]*[:\\uff1a]\\s*([^\\n]*)(?:\\n([^\\n]+))?",
+        "i",
       );
-      if (dateMatch)
-        extracted.lesson_date = `${dateMatch[3]}-${dateMatch[2].padStart(2, "0")}-${dateMatch[1].padStart(2, "0")}`;
-    }
-    // Minimal fallback: populate some headers
-    if (cleanRow.includes("Learning Outcomes"))
-      extracted.big_question = cleanRow;
+      const m = text.match(re);
+      if (m) {
+        const sameLine = (m[1] || "").trim();
+        const nextLine = (m[2] || "").trim();
+        found = cleanText(sameLine || nextLine);
+      }
+    });
+    return found;
+  };
+
+  extracted.sector = inlineFind("Sector") || inlineFind("Department");
+  extracted.trade = inlineFind("Trade");
+  extracted.level = inlineFind("Level");
+  extracted.term = inlineFind("Term");
+  extracted.school_year = inlineFind("School year")
+    .replace(/Term.*/i, "")
+    .trim();
+  extracted.class_name = inlineFind("Class(es)") || inlineFind("Class");
+  extracted.instructor_name =
+    inlineFind("Instructor name") || inlineFind("Instructor");
+  extracted.module_name = inlineFind("Module (Code") || inlineFind("Module");
+
+  // Language focus, facilitation, specific knowledge — each lives in a single merged cell
+  extracted.language_focus = inlineFind("Language focus");
+  extracted.facilitation_techniques = inlineFind("Facilitation technique");
+  extracted.specific_subject_knowledge = inlineFind(
+    "Specific subject knowledge",
+  );
+
+  const weekStr = inlineFind("Week");
+  if (weekStr) {
+    const wm = weekStr.match(/\d+/);
+    if (wm) extracted.week = parseInt(wm[0]);
   }
+
+  const traineesStr = inlineFind("No. Trainees") || inlineFind("Trainees");
+  if (traineesStr) {
+    const tm = traineesStr.match(/\d+/);
+    if (tm) extracted.number_of_trainees = parseInt(tm[0]);
+  }
+
+  const dateStr = inlineFind("Date");
+  if (dateStr) {
+    const dm = dateStr.match(/(\d{1,2})[\/\.-](\d{1,2})[\/\.-](\d{4})/);
+    if (dm)
+      extracted.lesson_date = `${dm[3]}-${dm[2].padStart(2, "0")}-${dm[1].padStart(2, "0")}`;
+  }
+
+  const timeStr = inlineFind("Time");
+  if (timeStr) {
+    const tm = timeStr.match(/(\d{1,2}:\d{2})\s*[-\u2013]\s*(\d{1,2}:\d{2})/);
+    if (tm) {
+      extracted.start_time = tm[1];
+      extracted.end_time = tm[2];
+    }
+  }
+
+  // ── Row-by-row extraction ──────────────────────────────────────────────────
+  // For each table row, identifies the label in the first <th/td> and the value
+  // from the remaining cells. This prevents one field bleeding into another.
+  $("tr").each((_i, tr) => {
+    const tds = $(tr).find("th, td").toArray();
+    if (tds.length === 0) return;
+
+    const labelCell = getInnerText(tds[0]).toLowerCase().trim();
+    const valueAll = tds
+      .slice(1)
+      .map((td) => getInnerText(td))
+      .join("\n")
+      .trim();
+    const allCellsText = tds.map((td) => getInnerText(td)).join(" ");
+
+    // ── Learning Outcomes ─────────────────────────────────────────────────
+    if (
+      labelCell === "learning outcomes" ||
+      labelCell.startsWith("learning outcome")
+    ) {
+      // Value cell contains "At the end of the lesson…\nOutcome1\nOutcome2…"
+      const lines = valueAll
+        .replace(/^at the end of the lesson[^\n]*\n?/i, "")
+        .split("\n")
+        .map((l) => cleanText(l))
+        .filter((l) => l.length > 5);
+      lines.forEach((line) => {
+        extracted.outcomes.push({
+          code: `LO${extracted.outcomes.length + 1}`,
+          title: line,
+          description: line,
+          duration_minutes: 0,
+          activities: [],
+          resources: [],
+        });
+      });
+    }
+
+    // ── Indicative Content ────────────────────────────────────────────────
+    else if (labelCell === "indicative content") {
+      valueAll
+        .split("\n")
+        .map((l) => cleanText(l))
+        .filter((l) => l.length > 3)
+        .forEach((l) =>
+          extracted.indicativeContent.push({ category: "General", content: l }),
+        );
+    }
+
+    // ── Big Question / Topic ──────────────────────────────────────────────
+    else if (
+      allCellsText.toLowerCase().includes("topic of the session") ||
+      allCellsText.toLowerCase().includes("big question")
+    ) {
+      const stripped = allCellsText
+        .replace(/topic of the session[^:]*:/i, "")
+        .replace(/big question[^:]*:/i, "")
+        .trim();
+      if (stripped) extracted.big_question = cleanText(stripped);
+    }
+
+    // ── Range / Total duration ────────────────────────────────────────────
+    else if (labelCell.startsWith("range")) {
+      const minMatch = valueAll.match(/(\d+)\s*minutes?/i);
+      if (minMatch) extracted.total_duration_minutes = parseInt(minMatch[1]);
+    }
+
+    // ── Objectives / Learning Intentions ─────────────────────────────────
+    else if (
+      labelCell.includes("objectives") ||
+      labelCell.includes("learning intentions")
+    ) {
+      extracted.session_objectives = cleanText(
+        allCellsText
+          .replace(/objectives\/learning intentions[^:]*:/i, "")
+          .trim(),
+      );
+    }
+
+    // ── Language Focus ────────────────────────────────────────────────────
+    else if (labelCell.includes("language focus")) {
+      extracted.language_focus =
+        extracted.language_focus || cleanText(valueAll);
+    }
+
+    // ── Facilitation Techniques ───────────────────────────────────────────
+    else if (labelCell.includes("facilitation technique")) {
+      extracted.facilitation_techniques =
+        extracted.facilitation_techniques || cleanText(valueAll);
+    }
+
+    // ── Specific Subject Knowledge ────────────────────────────────────────
+    else if (labelCell.includes("specific subject knowledge")) {
+      extracted.specific_subject_knowledge =
+        extracted.specific_subject_knowledge || cleanText(valueAll);
+    }
+
+    // ── Assignment / Homework ─────────────────────────────────────────────
+    else if (
+      labelCell.includes("assignment") ||
+      labelCell.includes("homework")
+    ) {
+      extracted.assignments.push({ description: cleanText(allCellsText) });
+    }
+
+    // ── Evaluation / Teacher Notes ────────────────────────────────────────
+    else if (
+      labelCell.includes("evaluation of the session") ||
+      labelCell.includes("teacher")
+    ) {
+      extracted.evaluation.teacher_notes = cleanText(allCellsText);
+    }
+
+    // ── References ────────────────────────────────────────────────────────
+    else if (labelCell.startsWith("reference")) {
+      extracted.evaluation.references = cleanText(valueAll);
+    }
+  });
+
+  // ── Prepared by / Verified by (appear as standalone <p> tags) ─────────────
+  $("p").each((_i, p) => {
+    const t = getInnerText(p);
+    const prepM = t.match(/prepared\s+(?:and\s+signed\s+)?by[:\s]+(.+)/i);
+    if (prepM) extracted.evaluation.prepared_by = cleanText(prepM[1]);
+    const veriM = t.match(/verified\s+by[:\s]+(.+)/i);
+    if (veriM) extracted.evaluation.verified_by = cleanText(veriM[1]);
+  });
+
+  // ── Sections: Introduction / Development / Conclusion ─────────────────────
+  let activeSection: any = null;
+  $("tr").each((_i, tr) => {
+    const tds = $(tr).find("th, td").toArray();
+    if (tds.length === 0) return;
+    const rowText = tds
+      .map((td) => getInnerText(td))
+      .join(" ")
+      .toLowerCase();
+
+    // Skip evaluation text rows so they don't get misidentified as learner activities simply because they say "Did trainees understand..."
+    if (rowText.includes("evaluation of the session")) return;
+
+    // Check if row marks a section transition
+    let newSectionType: string | null = null;
+    const firstCellText = getInnerText(tds[0]).toLowerCase();
+
+    if (
+      firstCellText === "introduction" ||
+      firstCellText.startsWith("introduction ")
+    )
+      newSectionType = "Introduction";
+    else if (
+      firstCellText === "development/body" ||
+      firstCellText === "development" ||
+      firstCellText.startsWith("development ")
+    )
+      newSectionType = "Development";
+    else if (
+      firstCellText === "conclusion" ||
+      firstCellText.startsWith("conclusion/plenary")
+    )
+      newSectionType = "Conclusion";
+
+    if (
+      newSectionType &&
+      (!activeSection || activeSection.section_type !== newSectionType)
+    ) {
+      activeSection = {
+        section_type: newSectionType,
+        trainer_activities: "",
+        learner_activities: "",
+        resources: "",
+        duration_minutes: 0,
+      };
+      extracted.sections.push(activeSection);
+      // If this row is ONLY the header (small text), skip parsing activities from it to avoid junk.
+      if (
+        rowText.length < 50 &&
+        !rowText.includes("trainer") &&
+        !rowText.includes("trainee")
+      )
+        return;
+    }
+
+    if (!activeSection) return;
+
+    const cell0Text = getInnerText(tds[0]);
+    const c0Lower = cell0Text.toLowerCase();
+
+    // Has Trainer activities?
+    if (c0Lower.includes("trainer")) {
+      const m = cell0Text.match(
+        /trainer.*?activities[:\s]*([\s\S]+?)(?=(?:learner|trainee).*?activities|$)/i,
+      );
+      let content = m ? cleanText(m[1]) : cleanText(cell0Text);
+      // Remove any leading "LO1: ... LO2: ..."
+      content = content.replace(/^(?:LO\d+.*?\n)+/gi, "").trim();
+      if (content && !content.match(/^trainer.*?activities$/i)) {
+        activeSection.trainer_activities +=
+          (activeSection.trainer_activities ? "\n" : "") + content;
+      }
+    }
+
+    // Has Learner/Trainee activities?
+    if (c0Lower.includes("trainee") || c0Lower.includes("learner")) {
+      const m = cell0Text.match(
+        /(?:learner|trainee).*?activities[:\s]*([\s\S]+)/i,
+      );
+      let content = m ? cleanText(m[1]) : "";
+      if (!m && !c0Lower.includes("trainer")) {
+        content = cleanText(cell0Text).replace(
+          /^(?:learner|trainee).*?activities[:\s]*/i,
+          "",
+        );
+      }
+      if (content) {
+        activeSection.learner_activities +=
+          (activeSection.learner_activities ? "\n" : "") + content;
+      }
+    }
+
+    // Has Resources?
+    if (tds.length >= 2) {
+      const resText = getInnerText(
+        tds.length >= 3 ? tds[tds.length - 2] : tds[1],
+      );
+      if (
+        resText &&
+        !resText.toLowerCase().includes("minutes") &&
+        !resText.match(/^\d+$/)
+      ) {
+        activeSection.resources +=
+          (activeSection.resources ? " " : "") + cleanText(resText);
+      }
+    }
+
+    // Has Duration? (Aggregate all "X minutes" matches)
+    const allMins = [...rowText.matchAll(/(\d+)\s*min(?:utes?)?/gi)];
+    let sumMins = 0;
+    allMins.forEach((m) => (sumMins += parseInt(m[1] || "0")));
+    if (sumMins > 0) {
+      activeSection.duration_minutes += sumMins;
+    }
+  });
 
   successResponse(
     res,
-    "Lesson plan extracted successfully (Basic fallback)",
+    "Lesson plan extracted successfully (Deterministic parser)",
     extracted,
   );
 });
