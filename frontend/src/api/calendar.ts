@@ -76,6 +76,7 @@ export interface CalendarSetupData {
     subject_id: string;
     name: string;
     code: string;
+    color?: string;
     teachers: {
       user_id: string;
       first_name: string;

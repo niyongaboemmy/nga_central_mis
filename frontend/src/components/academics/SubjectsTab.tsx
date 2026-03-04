@@ -34,6 +34,7 @@ interface SubjectFormData {
   description: string;
   course_category_id: number | null;
   max_marks: number | null;
+  color: string;
 }
 
 interface GradeAssignment {
@@ -68,6 +69,7 @@ const SubjectsTab: React.FC<SubjectsTabProps> = ({
     description: "",
     course_category_id: null,
     max_marks: null,
+    color: "#3B82F6",
   });
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
@@ -94,6 +96,7 @@ const SubjectsTab: React.FC<SubjectsTabProps> = ({
       description: "",
       course_category_id: null,
       max_marks: null,
+      color: "#3B82F6",
     });
     setFormErrors({});
     setCurrentStep(1);
@@ -235,6 +238,7 @@ const SubjectsTab: React.FC<SubjectsTabProps> = ({
           description: formData.description.trim() || null,
           course_category_id: formData.course_category_id,
           max_marks: formData.max_marks,
+          color: formData.color,
           grades: undefined,
           category_name: undefined,
         });
@@ -270,6 +274,7 @@ const SubjectsTab: React.FC<SubjectsTabProps> = ({
       description: subject.description || "",
       course_category_id: subject.course_category_id,
       max_marks: subject.max_marks,
+      color: subject.color || "#3B82F6",
     });
     setCurrentStep(1);
     setShowEditModal(true);
@@ -295,6 +300,7 @@ const SubjectsTab: React.FC<SubjectsTabProps> = ({
           description: formData.description.trim() || null,
           course_category_id: formData.course_category_id,
           max_marks: formData.max_marks,
+          color: formData.color,
         });
 
         // Handle grade assignment - assign/remove based on selections
@@ -434,6 +440,9 @@ const SubjectsTab: React.FC<SubjectsTabProps> = ({
                   <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary-light dark:text-text-secondary-dark/70 uppercase tracking-wider">
                     Programs
                   </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary-light dark:text-text-secondary-dark/70 uppercase tracking-wider">
+                    Color
+                  </th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-text-secondary-light dark:text-text-secondary-dark/70 uppercase tracking-wider">
                     Actions
                   </th>
@@ -483,6 +492,18 @@ const SubjectsTab: React.FC<SubjectsTabProps> = ({
                               ),
                             ].join(", ")
                           : "No programs"}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-sm">
+                        <div className="flex items-center space-x-2">
+                          <div
+                            className="w-4 h-4 rounded-full shadow-sm"
+                            style={{ backgroundColor: item.color || "#3B82F6" }}
+                            title={item.color || "#3B82F6"}
+                          />
+                          <span className="text-xs text-text-secondary-light dark:text-text-secondary-dark/70 font-mono">
+                            {item.color || "#3B82F6"}
+                          </span>
+                        </div>
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-right text-sm font-medium">
                         <div className="flex items-center justify-end space-x-2">
@@ -640,6 +661,40 @@ const SubjectsTab: React.FC<SubjectsTabProps> = ({
               }
               placeholder="e.g., 100"
             />
+
+            <div className="space-y-1.5">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Subject Color
+              </label>
+              <div className="flex items-center space-x-3">
+                <input
+                  type="color"
+                  value={formData.color}
+                  onChange={(e) =>
+                    setFormData((prev) => ({ ...prev, color: e.target.value }))
+                  }
+                  className="w-12 h-12 rounded-xl border-2 border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 cursor-pointer p-1"
+                />
+                <div className="flex-1">
+                  <Input
+                    value={formData.color.toUpperCase()}
+                    onChange={(e) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        color: e.target.value.startsWith("#")
+                          ? e.target.value
+                          : "#" + e.target.value,
+                      }))
+                    }
+                    placeholder="#3B82F6"
+                    className="font-mono"
+                  />
+                </div>
+              </div>
+              <p className="text-xs text-gray-400 dark:text-gray-500">
+                This color will identify the subject in the academic calendar
+              </p>
+            </div>
           </div>
         ) : (
           <div className="space-y-6">
@@ -995,6 +1050,40 @@ const SubjectsTab: React.FC<SubjectsTabProps> = ({
               }
               placeholder="e.g., 100"
             />
+
+            <div className="space-y-1.5">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Subject Color
+              </label>
+              <div className="flex items-center space-x-3">
+                <input
+                  type="color"
+                  value={formData.color}
+                  onChange={(e) =>
+                    setFormData((prev) => ({ ...prev, color: e.target.value }))
+                  }
+                  className="w-12 h-12 rounded-xl border-2 border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 cursor-pointer p-1"
+                />
+                <div className="flex-1">
+                  <Input
+                    value={formData.color.toUpperCase()}
+                    onChange={(e) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        color: e.target.value.startsWith("#")
+                          ? e.target.value
+                          : "#" + e.target.value,
+                      }))
+                    }
+                    placeholder="#3B82F6"
+                    className="font-mono"
+                  />
+                </div>
+              </div>
+              <p className="text-xs text-gray-400 dark:text-gray-500">
+                This color will identify the subject in the academic calendar
+              </p>
+            </div>
           </div>
         ) : (
           <div className="space-y-6">

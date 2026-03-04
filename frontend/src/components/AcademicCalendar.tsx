@@ -83,6 +83,21 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({
   const canEdit = canManage;
   const isBroadView = canViewAll;
 
+  const canViewFullLessonPlan =
+    canEdit ||
+    user?.roles?.some((role) =>
+      role.permissions?.some(
+        (perm) => perm.name === Permissions.VIEW_CALENDAR_SUBJECT_LESSON_PLAN,
+      ),
+    );
+  const canViewSummaryLessonPlan =
+    canViewFullLessonPlan ||
+    user?.roles?.some((role) =>
+      role.permissions?.some(
+        (perm) => perm.name === Permissions.STUDENT_VIEW_LESSON_PLAN_SUMMARY,
+      ),
+    );
+
   // State
   const [loading, setLoading] = useState(true);
   const [academicYears, setAcademicYears] = useState<any[]>([]);
@@ -97,6 +112,7 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({
     [],
   );
   const [selectedSlot, setSelectedSlot] = useState<CalendarSlot | null>(null);
+  const [selectedSlotDate, setSelectedSlotDate] = useState<Date | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [showLessonPlan, setShowLessonPlan] = useState(false);
   const [lessonPlan, setLessonPlan] = useState<any>(null);
@@ -157,7 +173,6 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({
     start_time: "",
     end_time: "",
     location: "room 1",
-    color: "#3B82F6",
   });
 
   // Derive the effective class group ID purely from formData (a param, not global state).
@@ -359,16 +374,16 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({
       start_time: scheduleSlot.start,
       end_time: scheduleSlot.end,
       location: "room 1",
-      color: "#3B82F6",
     });
 
     setShowModal(true);
   };
 
   // Handle slot click to view details (then potentially edit)
-  const handleSlotClick = (slot: CalendarSlot) => {
+  const handleSlotClick = (slot: CalendarSlot, date: Date) => {
     setModalMode("details");
     setSelectedSlot(slot);
+    setSelectedSlotDate(date);
     setFormData({
       calendar_id: slot.calendar_id?.toString() || "",
       class_group_id: slot.class_group_id?.toString() || "",
@@ -378,7 +393,6 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({
       start_time: slot.start_time,
       end_time: slot.end_time,
       location: slot.location || "room 1",
-      color: slot.color || "#3B82F6",
     });
     setShowModal(true);
   };
@@ -386,14 +400,18 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({
   // Handle viewing lesson plan
   const handleViewLessonPlan = async (slot: CalendarSlot) => {
     try {
-      // Calculate the specific date for this slot if we have week dates
+      // Use the precisely captured date from the grid if available
       let slotDateString: string | undefined;
 
-      if (weekDates.length > 0 && slot.day_of_week !== undefined) {
-        // Map backend day (0=Sun, 1=Mon...) to weekDates index (0=Mon, 1=Tue... 6=Sun)
+      if (selectedSlotDate) {
+        const year = selectedSlotDate.getFullYear();
+        const month = String(selectedSlotDate.getMonth() + 1).padStart(2, "0");
+        const day = String(selectedSlotDate.getDate()).padStart(2, "0");
+        slotDateString = `${year}-${month}-${day}`;
+      } else if (weekDates.length > 0 && slot.day_of_week !== undefined) {
+        // Fallback to calculation if selectedSlotDate is missing (shouldn't happen with new grid logic)
         const displayDay = backendDayToDisplay(slot.day_of_week);
         const slotDate = weekDates[displayDay];
-
         if (slotDate) {
           const year = slotDate.getFullYear();
           const month = String(slotDate.getMonth() + 1).padStart(2, "0");
@@ -487,7 +505,6 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({
           start_time: formData.start_time,
           end_time: formData.end_time,
           location: formData.location,
-          color: formData.color,
         });
         showToast("Calendar slot created successfully", "success");
       }
@@ -509,7 +526,6 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({
       start_time: "",
       end_time: "",
       location: "room 1",
-      color: "#3B82F6",
     });
     setFormErrors({});
     setSelectedSlot(null);
@@ -609,7 +625,6 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({
       start_time: "09:00",
       end_time: "09:50",
       location: "",
-      color: "#3B82F6",
     });
     setShowModal(true);
   };
@@ -747,6 +762,7 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({
         onDelete={handleDelete}
         mode={modalMode}
         canEdit={Boolean(canEdit)}
+        canViewLessonPlan={Boolean(canViewSummaryLessonPlan)}
         onEditClick={() => setModalMode("form")}
         onViewLessonPlan={handleViewLessonPlan}
       />

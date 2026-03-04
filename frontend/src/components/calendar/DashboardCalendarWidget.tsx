@@ -7,6 +7,7 @@ import {
   CalendarSlot,
   getMyCalendar,
   getStudentCalendar,
+  getLessonPlanForSlot,
 } from "../../api/calendar";
 import {
   DAYS,
@@ -19,6 +20,8 @@ import {
   formatDateShort,
 } from "./calendarConstants";
 import UpcomingLessons from "./UpcomingLessons";
+import CalendarSlotModal from "./CalendarSlotModal";
+import LessonPlanModal from "./LessonPlanModal";
 
 // ─── DashboardCalendarWidget ───────────────────────────────────────────────
 // A compact, read-only weekly schedule grid shown on every user's dashboard.
@@ -43,6 +46,40 @@ const DashboardCalendarWidget: React.FC = () => {
   const [currentWeekStart, setCurrentWeekStart] = useState<Date>(() =>
     getStartOfWeek(new Date()),
   );
+
+  // Modal State
+  const [selectedSlot, setSelectedSlot] = useState<CalendarSlot | null>(null);
+  const [selectedSlotDate, setSelectedSlotDate] = useState<Date | null>(null);
+  const [showModal, setShowModal] = useState(false);
+  const [showLessonPlan, setShowLessonPlan] = useState(false);
+  const [lessonPlan, setLessonPlan] = useState<any>(null);
+  const [modalMode, setModalMode] = useState<"details" | "form">("details");
+  const [formData, setFormData] = useState({
+    calendar_id: "",
+    class_group_id: "",
+    subject_id: "",
+    user_id: "",
+    day_of_week: "",
+    start_time: "",
+    end_time: "",
+    location: "room 1",
+  });
+
+  // Permissions for dashboard view
+  const canViewFullLessonPlan =
+    user?.roles?.some((role) =>
+      role.permissions?.some(
+        (perm) => perm.name === Permissions.VIEW_CALENDAR_SUBJECT_LESSON_PLAN,
+      ),
+    ) || !isStudent; // Staff/Teachers get full view by default if not student
+
+  const canViewSummaryLessonPlan =
+    canViewFullLessonPlan ||
+    user?.roles?.some((role) =>
+      role.permissions?.some(
+        (perm) => perm.name === Permissions.STUDENT_VIEW_LESSON_PLAN_SUMMARY,
+      ),
+    );
 
   // Week dates (Sun offset -1, Mon..Sun)
   const weekDates = useMemo(
@@ -100,6 +137,43 @@ const DashboardCalendarWidget: React.FC = () => {
 
     load();
   }, [isStudent]);
+
+  // Handle slot click
+  const handleSlotClick = (slot: CalendarSlot, date: Date) => {
+    setModalMode("details");
+    setSelectedSlot(slot);
+    setSelectedSlotDate(date);
+    setFormData({
+      calendar_id: slot.calendar_id?.toString() || "",
+      class_group_id: slot.class_group_id?.toString() || "",
+      subject_id: `${slot.subject_id}_${slot.user_id}_${slot.class_group_id || ""}`,
+      user_id: slot.user_id.toString(),
+      day_of_week: slot.day_of_week.toString(),
+      start_time: slot.start_time,
+      end_time: slot.end_time,
+      location: slot.location || "room 1",
+    });
+    setShowModal(true);
+  };
+
+  // Handle viewing lesson plan
+  const handleViewLessonPlan = async (slot: CalendarSlot) => {
+    if (!canViewSummaryLessonPlan) {
+      console.warn("User does not have permission to view lesson plans.");
+      return;
+    }
+
+    try {
+      const formattedDate = selectedSlotDate
+        ? selectedSlotDate.toISOString().split("T")[0]
+        : undefined;
+      const data = await getLessonPlanForSlot(slot.slot_id, formattedDate);
+      setLessonPlan(data);
+      setShowLessonPlan(true);
+    } catch (error) {
+      console.error("Failed to load lesson plan:", error);
+    }
+  };
 
   // Week navigation
   const goToPreviousWeek = () => {
@@ -170,7 +244,7 @@ const DashboardCalendarWidget: React.FC = () => {
       </div>
 
       {/* Upcoming Lessons Alert */}
-      {!loading && upcomingLessons.length > 0 && (
+      {!loading && upcomingLessons.length > 0 && !isStudent && (
         <UpcomingLessons lessons={upcomingLessons} />
       )}
 
@@ -196,8 +270,40 @@ const DashboardCalendarWidget: React.FC = () => {
 
       {/* Calendar Grid */}
       {!loading && slots.length > 0 && (
-        <ReadOnlyCalendarGrid slots={slots} weekDates={weekDates} />
+        <ReadOnlyCalendarGrid
+          slots={slots}
+          weekDates={weekDates}
+          onSlotClick={handleSlotClick}
+        />
       )}
+
+      {/* Detail Modals */}
+      <CalendarSlotModal
+        showModal={showModal}
+        selectedSlot={selectedSlot}
+        formData={formData}
+        formErrors={{}}
+        effectiveClassGroupId={
+          formData.class_group_id ? parseInt(formData.class_group_id) : null
+        }
+        setupData={null}
+        onClose={() => setShowModal(false)}
+        onSubmit={() => {}}
+        onFormDataChange={setFormData as any}
+        onErrorsChange={() => {}}
+        onDelete={() => {}}
+        mode={modalMode}
+        canEdit={false}
+        onEditClick={() => {}}
+        onViewLessonPlan={handleViewLessonPlan}
+        canViewLessonPlan={Boolean(canViewSummaryLessonPlan)}
+      />
+
+      <LessonPlanModal
+        showModal={showLessonPlan}
+        onClose={() => setShowLessonPlan(false)}
+        lessonPlan={lessonPlan}
+      />
     </div>
   );
 };
@@ -209,11 +315,13 @@ const DashboardCalendarWidget: React.FC = () => {
 interface ReadOnlyCalendarGridProps {
   slots: CalendarSlot[];
   weekDates: Date[];
+  onSlotClick: (slot: CalendarSlot, date: Date) => void;
 }
 
 const ReadOnlyCalendarGrid: React.FC<ReadOnlyCalendarGridProps> = ({
   slots,
   weekDates,
+  onSlotClick,
 }) => {
   return (
     <div className="overflow-x-auto -mx-6 border-4 border-white dark:border-gray-800/20">
@@ -225,7 +333,7 @@ const ReadOnlyCalendarGrid: React.FC<ReadOnlyCalendarGridProps> = ({
               Time
             </th>
             {DAYS.map((day, idx) => {
-              const weekDate = weekDates[idx + 1];
+              const weekDate = weekDates[idx];
               const isToday =
                 weekDate &&
                 new Date().toDateString() === weekDate.toDateString();
@@ -291,7 +399,7 @@ const ReadOnlyCalendarGrid: React.FC<ReadOnlyCalendarGridProps> = ({
 
                   {/* Day cells */}
                   {DAYS.map((_, dayIdx) => {
-                    const weekDate = weekDates[dayIdx + 1];
+                    const weekDate = weekDates[dayIdx];
                     const isToday =
                       weekDate &&
                       new Date().toDateString() === weekDate.toDateString();
@@ -329,9 +437,12 @@ const ReadOnlyCalendarGrid: React.FC<ReadOnlyCalendarGridProps> = ({
                         <td
                           key={dayIdx}
                           rowSpan={rowSpan}
-                          className={`p-0 border-l border-gray-100 dark:border-gray-700/20 relative ${
+                          className={`p-0 border-l border-gray-100 dark:border-gray-700/20 relative cursor-pointer ${
                             isToday ? "bg-blue-50/50 dark:bg-blue-900/10" : ""
                           }`}
+                          onClick={() =>
+                            onSlotClick(courseStartingHere, weekDate!)
+                          }
                         >
                           <div
                             className="absolute inset-0.5 overflow-hidden rounded-sm"
@@ -341,7 +452,7 @@ const ReadOnlyCalendarGrid: React.FC<ReadOnlyCalendarGridProps> = ({
                             }}
                           >
                             <div
-                              className={`h-full p-1.5 text-xs flex flex-col justify-start ${
+                              className={`h-full p-1.5 text-xs flex flex-col justify-start hover:brightness-110 transition-all duration-200 ${
                                 isToday
                                   ? "ring-2 ring-white dark:ring-gray-600 shadow-lg"
                                   : ""

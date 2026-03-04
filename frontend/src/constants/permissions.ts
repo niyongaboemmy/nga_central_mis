@@ -83,6 +83,8 @@ export const Permissions = {
   VIEW_MY_CALENDAR: "VIEW_MY_CALENDAR",
   VIEW_LESSON_PLANS: "VIEW_LESSON_PLANS",
   VIEW_STUDENT_CALENDAR: "VIEW_STUDENT_CALENDAR",
+  VIEW_CALENDAR_SUBJECT_LESSON_PLAN: "VIEW_CALENDAR_SUBJECT_LESSON_PLAN",
+  STUDENT_VIEW_LESSON_PLAN_SUMMARY: "STUDENT_VIEW_LESSON_PLAN_SUMMARY",
 } as const;
 
 export type PermissionKey = keyof typeof Permissions;
@@ -192,6 +194,8 @@ export const permissionGroups = {
     Permissions.VIEW_CALENDAR_NOTIFICATIONS,
     Permissions.VIEW_MY_CALENDAR,
     Permissions.VIEW_LESSON_PLANS,
+    Permissions.VIEW_CALENDAR_SUBJECT_LESSON_PLAN,
+    Permissions.STUDENT_VIEW_LESSON_PLAN_SUMMARY,
   ],
 } as const;
 

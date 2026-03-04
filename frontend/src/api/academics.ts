@@ -40,6 +40,7 @@ export interface Subject {
   course_category_id: number | null;
   category_name?: string;
   max_marks: number | null;
+  color?: string;
   grades?: Array<{
     grade_id: number;
     grade_name: string;

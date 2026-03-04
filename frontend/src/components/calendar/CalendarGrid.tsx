@@ -15,7 +15,7 @@ interface CalendarGridProps {
   slots: CalendarSlot[];
   activities: CalendarActivity[];
   weekDates: Date[];
-  onSlotClick: (slot: CalendarSlot) => void;
+  onSlotClick: (slot: CalendarSlot, date: Date) => void;
   onEmptyCellClick: (
     dayIndex: number,
     scheduleSlot: { start: string; end: string; type: string },
@@ -102,7 +102,7 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
 
                     {/* DAY CELLS */}
                     {DAYS.map((_, dayIdx) => {
-                      const weekDate = weekDates[dayIdx + 1];
+                      const weekDate = weekDates[dayIdx];
                       const isToday =
                         weekDate &&
                         new Date().toDateString() === weekDate.toDateString();
@@ -151,15 +151,18 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
                             onClick={() => {
                               // Construct the proper format for SubjectSelect
                               const subjectValue = `${courseStartingHere.subject_id}_${courseStartingHere.user_id}_${courseStartingHere.class_group_id || ""}`;
-                              onSlotClick({
-                                ...courseStartingHere,
-                                subject_id: parseInt(
-                                  subjectValue.split("_")[0],
-                                ),
-                                day_of_week: backendDayToDisplay(
-                                  courseStartingHere.day_of_week,
-                                ),
-                              } as CalendarSlot);
+                              onSlotClick(
+                                {
+                                  ...courseStartingHere,
+                                  subject_id: parseInt(
+                                    subjectValue.split("_")[0],
+                                  ),
+                                  day_of_week: backendDayToDisplay(
+                                    courseStartingHere.day_of_week,
+                                  ),
+                                } as CalendarSlot,
+                                weekDate!,
+                              );
                             }}
                           >
                             <div

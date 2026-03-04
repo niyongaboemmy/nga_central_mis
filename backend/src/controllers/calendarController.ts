@@ -96,7 +96,7 @@ export const getCalendarSlots = asyncHandler(async (req: any, res: any) => {
       start_time: CalendarSlot.start_time,
       end_time: CalendarSlot.end_time,
       location: CalendarSlot.location,
-      color: CalendarSlot.color,
+      color: Subject.color,
       notes: CalendarSlot.notes,
       // Related data
       subject_name: Subject.name,
@@ -202,7 +202,6 @@ export const createCalendarSlot = asyncHandler(async (req: any, res: any) => {
     start_time,
     end_time,
     location: location || null,
-    color: color || "#3B82F6",
     notes: notes || null,
   });
 
@@ -376,7 +375,7 @@ export const getMyCalendar = asyncHandler(async (req: any, res: any) => {
       start_time: CalendarSlot.start_time,
       end_time: CalendarSlot.end_time,
       location: CalendarSlot.location,
-      color: CalendarSlot.color,
+      color: Subject.color,
       notes: CalendarSlot.notes,
       // Related data
       subject_name: Subject.name,
@@ -922,13 +921,31 @@ export const getLessonPlanForSlot = asyncHandler(async (req: any, res: any) => {
     throw new NotFoundError("Calendar slot not found");
   }
 
-  // Check if user has access (either admin or the assigned instructor)
-  const hasAccess =
-    slot[0].user_id === userId ||
-    req.user.permissions?.includes("MANAGE_ACADEMIC_CALENDAR") ||
-    req.user.permissions?.includes("VIEW_ACADEMIC_CALENDAR");
+  // Check if user has access
+  const isInstructor = slot[0].user_id === userId;
+  const isSysAdmin = req.user.permissions?.includes("ADMIN");
+  const hasManagePermission = req.user.permissions?.includes(
+    "MANAGE_ACADEMIC_CALENDAR",
+  );
+  const hasViewPermission = req.user.permissions?.includes(
+    "VIEW_ACADEMIC_CALENDAR",
+  );
+  const hasFullLessonPlanPermission = req.user.permissions?.includes(
+    "VIEW_CALENDAR_SUBJECT_LESSON_PLAN",
+  );
+  const hasSummaryPermission = req.user.permissions?.includes(
+    "STUDENT_VIEW_LESSON_PLAN_SUMMARY",
+  );
 
-  if (!hasAccess) {
+  const hasFullAccess =
+    isInstructor ||
+    isSysAdmin ||
+    hasManagePermission ||
+    hasViewPermission ||
+    hasFullLessonPlanPermission;
+  const hasAnyAccess = hasFullAccess || hasSummaryPermission;
+
+  if (!hasAnyAccess) {
     throw new ValidationError("You don't have access to this lesson plan");
   }
 
@@ -969,6 +986,24 @@ export const getLessonPlanForSlot = asyncHandler(async (req: any, res: any) => {
         const fullDetails = await getFullLessonDetails(
           specificLesson[0].lesson,
         );
+
+        if (!hasFullAccess && hasSummaryPermission) {
+          return successResponse(
+            res,
+            "Lesson plan summary retrieved successfully",
+            {
+              is_summary: true,
+              module_name: fullDetails.module_name,
+              big_question: fullDetails.big_question,
+              lesson_date: fullDetails.lesson_date,
+              start_time: fullDetails.start_time,
+              end_time: fullDetails.end_time,
+              sector: fullDetails.sector,
+              trade: fullDetails.trade,
+            },
+          );
+        }
+
         return successResponse(
           res,
           "Specific lesson plan for date retrieved successfully",
@@ -1049,6 +1084,19 @@ export const getLessonPlanForSlot = asyncHandler(async (req: any, res: any) => {
 
   const fullDetails =
     lessonPlan.length > 0 ? await getFullLessonDetails(lessonPlan[0]) : null;
+
+  if (fullDetails && !hasFullAccess && hasSummaryPermission) {
+    return successResponse(res, "Lesson plan summary retrieved successfully", {
+      is_summary: true,
+      module_name: fullDetails.module_name,
+      big_question: fullDetails.big_question,
+      lesson_date: fullDetails.lesson_date,
+      start_time: fullDetails.start_time,
+      end_time: fullDetails.end_time,
+      sector: fullDetails.sector,
+      trade: fullDetails.trade,
+    });
+  }
 
   successResponse(res, "Lesson plan retrieved successfully", fullDetails);
 });
@@ -1150,7 +1198,7 @@ export const getStudentCalendar = asyncHandler(async (req: any, res: any) => {
       start_time: CalendarSlot.start_time,
       end_time: CalendarSlot.end_time,
       location: CalendarSlot.location,
-      color: CalendarSlot.color,
+      color: Subject.color,
       notes: CalendarSlot.notes,
       // Related data
       subject_name: Subject.name,

@@ -133,7 +133,7 @@ const Dashboard: React.FC<DashboardProps> = ({}) => {
         variants={containerVariants}
         initial="hidden"
         animate="visible"
-        className="relative z-10"
+        className="relative"
       >
         {/* Header Section */}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 sm:pt-8 pb-6">

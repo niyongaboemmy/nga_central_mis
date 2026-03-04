@@ -191,6 +191,7 @@ export const Subject = mysqlTable("Subject", {
     mode: "number",
   }).references(() => CourseCategory.category_id),
   max_marks: int("max_marks"),
+  color: varchar("color", { length: 7 }).default("#3B82F6"),
   status: mysqlEnum("status", ["ACTIVE", "DISABLED"]).default("ACTIVE"),
 });
 

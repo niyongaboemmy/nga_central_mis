@@ -1237,6 +1237,7 @@ export const getSubjects = asyncHandler(async (req: any, res: any) => {
       course_category_id: Subject.course_category_id,
       category_name: CourseCategory.name,
       max_marks: Subject.max_marks,
+      color: Subject.color,
       grade_id: GradeFromClass.grade_id,
       grade_name: GradeFromClass.name,
       program_id: ProgramFromClass.program_id,
@@ -1280,6 +1281,7 @@ export const getSubjects = asyncHandler(async (req: any, res: any) => {
         course_category_id: row.course_category_id,
         category_name: row.category_name,
         max_marks: row.max_marks,
+        color: row.color,
         grades: [],
       });
     }
@@ -1321,7 +1323,8 @@ export const getSubject = asyncHandler(async (req: any, res: any) => {
 });
 
 export const createSubject = asyncHandler(async (req: any, res: any) => {
-  const { code, name, description, course_category_id, max_marks } = req.body;
+  const { code, name, description, course_category_id, max_marks, color } =
+    req.body;
 
   if (!name) {
     throw new ValidationError("Subject name is required");
@@ -1332,6 +1335,7 @@ export const createSubject = asyncHandler(async (req: any, res: any) => {
   const sanitizedDescription = description
     ? sanitizeString(description)
     : undefined;
+  const sanitizedColor = color ? sanitizeString(color) : undefined;
 
   // Validate course_category_id if provided
   if (course_category_id !== undefined && course_category_id !== null) {
@@ -1378,6 +1382,7 @@ export const createSubject = asyncHandler(async (req: any, res: any) => {
     description: sanitizedDescription || null,
     course_category_id: course_category_id || null,
     max_marks: max_marks || null,
+    color: sanitizedColor || "#3B82F6",
   });
 
   const subjectId = (result as any).insertId;
@@ -1391,7 +1396,7 @@ export const createSubject = asyncHandler(async (req: any, res: any) => {
       `Created subject: ${sanitizedName}`,
       "Subject",
       subjectId,
-      { name: sanitizedName, description, code },
+      { name: sanitizedName, description, code, color: sanitizedColor },
       req.user.userId,
     );
   }
@@ -1402,7 +1407,8 @@ export const createSubject = asyncHandler(async (req: any, res: any) => {
 export const updateSubject = asyncHandler(async (req: any, res: any) => {
   const { id } = req.params;
   const subjectId = parseInt(id);
-  const { code, name, description, course_category_id, max_marks } = req.body;
+  const { code, name, description, course_category_id, max_marks, color } =
+    req.body;
 
   if (isNaN(subjectId)) {
     throw new ValidationError("Invalid subject ID");
@@ -1482,6 +1488,10 @@ export const updateSubject = asyncHandler(async (req: any, res: any) => {
     } else {
       updateData.max_marks = null;
     }
+  }
+
+  if (color !== undefined) {
+    updateData.color = color ? sanitizeString(color) : "#3B82F6";
   }
 
   await db
