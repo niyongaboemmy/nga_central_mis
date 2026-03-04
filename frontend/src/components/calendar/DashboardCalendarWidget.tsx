@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { Calendar, ChevronLeft, ChevronRight } from "lucide-react";
 import { useUser } from "../../contexts/UserContext";
+import { useToast } from "../../contexts/ToastContext";
 import { Permissions } from "../../constants/permissions";
 import { academicTermsApi } from "../../api/academics";
 import {
@@ -30,6 +31,7 @@ import LessonPlanModal from "./LessonPlanModal";
 
 const DashboardCalendarWidget: React.FC = () => {
   const { user } = useUser();
+  const { showToast } = useToast();
 
   // Role detection
   const isStudent = user?.roles?.some((role) =>
@@ -53,6 +55,7 @@ const DashboardCalendarWidget: React.FC = () => {
   const [showModal, setShowModal] = useState(false);
   const [showLessonPlan, setShowLessonPlan] = useState(false);
   const [lessonPlan, setLessonPlan] = useState<any>(null);
+  const [isLoadingLessonPlan, setIsLoadingLessonPlan] = useState(false);
   const [modalMode, setModalMode] = useState<"details" | "form">("details");
   const [formData, setFormData] = useState({
     calendar_id: "",
@@ -128,8 +131,12 @@ const DashboardCalendarWidget: React.FC = () => {
           setSlots(calendarData.slots || []);
           setUpcomingLessons(calendarData.upcoming || []);
         }
-      } catch (err) {
+      } catch (err: any) {
         console.error("Dashboard calendar widget failed to load:", err);
+        showToast(
+          err.message || "Failed to load dashboard calendar data",
+          "error",
+        );
       } finally {
         setLoading(false);
       }
@@ -164,14 +171,18 @@ const DashboardCalendarWidget: React.FC = () => {
     }
 
     try {
+      setIsLoadingLessonPlan(true);
       const formattedDate = selectedSlotDate
         ? selectedSlotDate.toISOString().split("T")[0]
         : undefined;
       const data = await getLessonPlanForSlot(slot.slot_id, formattedDate);
       setLessonPlan(data);
       setShowLessonPlan(true);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to load lesson plan:", error);
+      showToast(error.message || "Failed to load lesson plan", "error");
+    } finally {
+      setIsLoadingLessonPlan(false);
     }
   };
 
@@ -297,6 +308,7 @@ const DashboardCalendarWidget: React.FC = () => {
         onEditClick={() => {}}
         onViewLessonPlan={handleViewLessonPlan}
         canViewLessonPlan={Boolean(canViewSummaryLessonPlan)}
+        isLoadingLessonPlan={isLoadingLessonPlan}
       />
 
       <LessonPlanModal

@@ -121,6 +121,14 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({
   const [modalMode, setModalMode] = useState<"details" | "form">("details");
   const [currentWeekStart, setCurrentWeekStart] = useState<Date | null>(null);
 
+  // Loading states for actions
+  const [isSubmittingSlot, setIsSubmittingSlot] = useState(false);
+  const [isDeletingSlot, setIsDeletingSlot] = useState(false);
+  const [isSubmittingCalendar, setIsSubmittingCalendar] = useState(false);
+  const [isSavingNotifications, setIsSavingNotifications] = useState(false);
+  const [isLoadingLessonPlan, setIsLoadingLessonPlan] = useState(false);
+  const [isLoadingClassGroups, setIsLoadingClassGroups] = useState(false);
+
   // Academic Calendar (year + term + class group) state
   const [calendars, setCalendars] = useState<AcademicCalendar[]>([]);
   const [selectedCalendar, setSelectedCalendar] =
@@ -420,6 +428,7 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({
         }
       }
 
+      setIsLoadingLessonPlan(true);
       const lessonPlanData = await getLessonPlanForSlot(
         slot.slot_id,
         slotDateString,
@@ -427,7 +436,9 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({
       setLessonPlan(lessonPlanData);
       setShowLessonPlan(true);
     } catch (error: any) {
-      showToast(error.message || "No lesson plan found for this slot", "info");
+      showToast(error.message || "No lesson plan found for this slot", "error");
+    } finally {
+      setIsLoadingLessonPlan(false);
     }
   };
 
@@ -473,6 +484,7 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({
       : selectedSlot?.class_group_id || 1;
 
     try {
+      setIsSubmittingSlot(true);
       if (selectedSlot) {
         await updateCalendarSlot(selectedSlot.slot_id, {
           class_group_id: classGroupId,
@@ -512,6 +524,8 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({
       loadData();
     } catch (error: any) {
       showToast(error.message || "Failed to save calendar slot", "error");
+    } finally {
+      setIsSubmittingSlot(false);
     }
   };
 
@@ -538,18 +552,22 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({
   const handleDelete = async (id: number) => {
     if (!confirm("Are you sure you want to delete this slot?")) return;
     try {
+      setIsDeletingSlot(true);
       await deleteCalendarSlot(id);
       showToast("Calendar slot deleted successfully", "success");
       resetSlotModal();
       loadData();
     } catch (error: any) {
       showToast(error.message || "Failed to delete slot", "error");
+    } finally {
+      setIsDeletingSlot(false);
     }
   };
 
   // Handle notification settings
   const handleSaveNotifications = async () => {
     try {
+      setIsSavingNotifications(true);
       await updateNotificationSettings({ notifications });
       showToast("Notification settings saved", "success");
       setShowNotificationSettings(false);
@@ -558,6 +576,8 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({
         error.message || "Failed to save notification settings",
         "error",
       );
+    } finally {
+      setIsSavingNotifications(false);
     }
   };
 
@@ -586,6 +606,7 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({
   const handleCreateCalendarClick = async () => {
     if (selectedYear && selectedTerm) {
       try {
+        setIsLoadingClassGroups(true);
         const classGroups = await getCalendarClassGroups({
           academic_year_id: selectedYear,
           academic_term_id: selectedTerm,
@@ -605,6 +626,8 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({
         setShowCalendarModal(true);
       } catch (error: any) {
         showToast(error.message || "Failed to load class groups", "error");
+      } finally {
+        setIsLoadingClassGroups(false);
       }
     } else {
       showToast("Please select an academic year and term first", "warning");
@@ -633,6 +656,7 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({
   const handleCalendarSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      setIsSubmittingCalendar(true);
       await createAcademicCalendar({
         academic_year_id: parseInt(calendarFormData.academic_year_id),
         academic_term_id: parseInt(calendarFormData.academic_term_id),
@@ -645,6 +669,8 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({
       loadData();
     } catch (error: any) {
       showToast(error.message || "Failed to create calendar", "error");
+    } finally {
+      setIsSubmittingCalendar(false);
     }
   };
 
@@ -709,6 +735,7 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({
           onCreateCalendarClick={handleCreateCalendarClick}
           onAddSlotClick={handleAddSlotClick}
           onNotificationsClick={() => setShowNotificationSettings(true)}
+          isCreatingCalendar={isLoadingClassGroups}
         />
       </div>
 
@@ -765,6 +792,9 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({
         canViewLessonPlan={Boolean(canViewSummaryLessonPlan)}
         onEditClick={() => setModalMode("form")}
         onViewLessonPlan={handleViewLessonPlan}
+        isSubmitting={isSubmittingSlot}
+        isDeleting={isDeletingSlot}
+        isLoadingLessonPlan={isLoadingLessonPlan}
       />
 
       <AcademicCalendarModal
@@ -776,6 +806,7 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({
         onClose={handleCalendarModalClose}
         onSubmit={handleCalendarSubmit}
         onFormDataChange={handleCalendarFormDataChange}
+        isSubmitting={isSubmittingCalendar}
       />
 
       <LessonPlanModal
@@ -793,6 +824,7 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({
         onClose={() => setShowNotificationSettings(false)}
         onSave={handleSaveNotifications}
         onNotificationsChange={setNotifications}
+        isSubmitting={isSavingNotifications}
       />
     </div>
   );

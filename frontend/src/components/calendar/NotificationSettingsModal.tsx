@@ -8,6 +8,7 @@ interface NotificationSettingsModalProps {
   onClose: () => void;
   onSave: () => void;
   onNotificationsChange: (notifications: CalendarNotification[]) => void;
+  isSubmitting?: boolean;
 }
 
 const NotificationSettingsModal: React.FC<NotificationSettingsModalProps> = ({
@@ -16,6 +17,7 @@ const NotificationSettingsModal: React.FC<NotificationSettingsModalProps> = ({
   onClose,
   onSave,
   onNotificationsChange,
+  isSubmitting,
 }) => {
   if (!showModal) return null;
 
@@ -95,9 +97,13 @@ const NotificationSettingsModal: React.FC<NotificationSettingsModalProps> = ({
         <div className="flex justify-end mt-6">
           <button
             onClick={onSave}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            disabled={isSubmitting}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
           >
-            Save Settings
+            {isSubmitting && (
+              <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+            )}
+            {isSubmitting ? "Saving..." : "Save Settings"}
           </button>
         </div>
       </div>

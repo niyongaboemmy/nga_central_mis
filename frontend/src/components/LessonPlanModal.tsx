@@ -1237,14 +1237,21 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
             </div>
 
             <div className="flex items-center gap-3">
-              <label className="cursor-pointer flex items-center gap-2 px-4 py-2 bg-gray-50 hover:bg-gray-100 dark:bg-gray-900 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-400 rounded-full text-xs font-bold border border-gray-100 dark:border-gray-800 transition-all">
-                <UploadCloud className="w-3.5 h-3.5" />
-                Import DOCX
+              <label
+                className={`cursor-pointer flex items-center gap-2 px-4 py-2 bg-gray-50 hover:bg-gray-100 dark:bg-gray-900 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-400 rounded-full text-xs font-bold border border-gray-100 dark:border-gray-800 transition-all ${loading ? "opacity-50 cursor-not-allowed" : ""}`}
+              >
+                {loading ? (
+                  <div className="w-3.5 h-3.5 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <UploadCloud className="w-3.5 h-3.5" />
+                )}
+                {loading ? "Importing..." : "Import DOCX"}
                 <input
                   type="file"
                   accept=".docx"
                   className="hidden"
                   onChange={handleFileSelect}
+                  disabled={loading}
                 />
               </label>
               <button
@@ -1288,7 +1295,11 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
                   ) : (
                     <Save className="w-4 h-4" />
                   )}
-                  {initialData ? "Update Plan" : "Finalize Draft"}
+                  {loading
+                    ? "Saving..."
+                    : initialData
+                      ? "Update Plan"
+                      : "Finalize Draft"}
                 </button>
 
                 {initialData && (
@@ -1297,8 +1308,11 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
                     disabled={loading}
                     className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-red-50 hover:bg-red-100 dark:bg-red-950/20 dark:hover:bg-red-950/40 text-red-600 dark:text-red-400 rounded-full text-xs font-black uppercase tracking-widest transition-all active:scale-95 disabled:opacity-50 mt-2"
                   >
-                    <Trash2 className="w-4 h-4" />
-                    Delete Plan
+                    {!loading && <Trash2 className="w-4 h-4" />}
+                    {loading && (
+                      <div className="w-4 h-4 border-2 border-red-600 dark:border-red-400 border-t-transparent rounded-full animate-spin" />
+                    )}
+                    {loading ? "Deleting..." : "Delete Plan"}
                   </button>
                 )}
               </div>

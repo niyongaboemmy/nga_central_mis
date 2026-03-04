@@ -20,6 +20,7 @@ interface CalendarHeaderProps {
   onAddSlotClick: () => void;
   onNotificationsClick: () => void;
   canEdit?: boolean;
+  isCreatingCalendar?: boolean;
 }
 
 const CalendarHeader: React.FC<CalendarHeaderProps> = ({
@@ -38,6 +39,7 @@ const CalendarHeader: React.FC<CalendarHeaderProps> = ({
   onCreateCalendarClick,
   onNotificationsClick,
   canEdit = false,
+  isCreatingCalendar,
 }) => {
   const getTitle = () => {
     if (isAdmin) return "Academic Calendar";
@@ -140,10 +142,17 @@ const CalendarHeader: React.FC<CalendarHeaderProps> = ({
           <>
             <button
               onClick={onCreateCalendarClick}
-              className="flex items-center px-5 py-2.5 text-sm bg-gradient-to-r from-blue-600 to-blue-600 text-white rounded-full hover:from-blue-700 hover:to-blue-700 transition-all duration-200"
+              disabled={isCreatingCalendar}
+              className="flex items-center px-5 py-2.5 text-sm bg-gradient-to-r from-blue-600 to-blue-600 text-white rounded-full hover:from-blue-700 hover:to-blue-700 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <Calendar className="w-4 h-4 mr-2" />
-              <span className="hidden sm:inline">Create Calendar</span>
+              {isCreatingCalendar ? (
+                <div className="w-4 h-4 mr-2 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+              ) : (
+                <Calendar className="w-4 h-4 mr-2" />
+              )}
+              <span className="hidden sm:inline">
+                {isCreatingCalendar ? "Loading..." : "Create Calendar"}
+              </span>
             </button>
           </>
         )}

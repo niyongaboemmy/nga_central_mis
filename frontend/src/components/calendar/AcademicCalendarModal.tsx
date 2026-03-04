@@ -19,6 +19,7 @@ interface AcademicCalendarModalProps {
   onClose: () => void;
   onSubmit: (e: React.FormEvent) => void;
   onFormDataChange: (data: Partial<CalendarFormData>) => void;
+  isSubmitting?: boolean;
 }
 
 const AcademicCalendarModal: React.FC<AcademicCalendarModalProps> = ({
@@ -30,6 +31,7 @@ const AcademicCalendarModal: React.FC<AcademicCalendarModalProps> = ({
   onClose,
   onSubmit,
   onFormDataChange,
+  isSubmitting,
 }) => {
   if (!showModal) return null;
 
@@ -156,10 +158,13 @@ const AcademicCalendarModal: React.FC<AcademicCalendarModalProps> = ({
             </button>
             <button
               type="submit"
-              disabled={availableClassGroups.length === 0}
-              className="px-4 py-2 text-sm bg-gradient-to-r from-green-600 to-green-700 text-white rounded-lg hover:from-green-700 hover:to-green-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={availableClassGroups.length === 0 || isSubmitting}
+              className="px-4 py-2 text-sm bg-gradient-to-r from-green-600 to-green-700 text-white rounded-lg hover:from-green-700 hover:to-green-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             >
-              Create Calendar
+              {isSubmitting && (
+                <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+              )}
+              {isSubmitting ? "Creating..." : "Create Calendar"}
             </button>
           </div>
         </form>
