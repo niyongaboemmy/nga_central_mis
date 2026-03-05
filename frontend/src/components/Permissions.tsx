@@ -177,6 +177,8 @@ const Permissions: React.FC = () => {
   const [togglingRoleId, setTogglingRoleId] = useState<number | null>(null);
   const [togglingPermId, setTogglingPermId] = useState<number | null>(null);
   const [assigningPermissions, setAssigningPermissions] = useState(false);
+  const [loadingAssignModal, setLoadingAssignModal] = useState(false);
+  const [assignSearchTerm, setAssignSearchTerm] = useState("");
 
   // Check if user has admin permissions using role-based checking
   const canManage =
@@ -321,25 +323,29 @@ const Permissions: React.FC = () => {
 
   const openAssignModal = async (role: Role) => {
     setSelectedRole(role);
+    setLoadingAssignModal(true);
     try {
       const perms = await getRolePermissions(role.role_id);
       setSelectedPerms((perms || []).map((p) => p.perm_id));
     } catch (error) {
       console.error("Failed to load role permissions:", error);
+    } finally {
+      setLoadingAssignModal(false);
     }
+    setAssignSearchTerm("");
     setAssignModalOpen(true);
   };
 
   const filteredRoles = roles.filter(
     (role) =>
       role.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      role.description?.toLowerCase().includes(searchTerm.toLowerCase())
+      role.description?.toLowerCase().includes(searchTerm.toLowerCase()),
   );
 
   const filteredPermissions = permissionsList.filter(
     (perm) =>
       perm.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      perm.description?.toLowerCase().includes(searchTerm.toLowerCase())
+      perm.description?.toLowerCase().includes(searchTerm.toLowerCase()),
   );
 
   if (!canManage) {
@@ -537,8 +543,8 @@ const Permissions: React.FC = () => {
                                 togglingRoleId === role.role_id
                                   ? "opacity-50 cursor-not-allowed"
                                   : role.status === "ACTIVE"
-                                  ? "text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
-                                  : "text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700"
+                                    ? "text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
+                                    : "text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700"
                               }`}
                             >
                               {togglingRoleId === role.role_id ? (
@@ -554,10 +560,18 @@ const Permissions: React.FC = () => {
                         <div className="col-span-2 text-right">
                           <button
                             onClick={() => openAssignModal(role)}
-                            className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium inline-flex items-center gap-0.5"
+                            disabled={loadingAssignModal}
+                            className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium inline-flex items-center gap-0.5 disabled:opacity-50 disabled:cursor-not-allowed"
                           >
-                            Permissions
-                            <ChevronRight className="w-3.5 h-3.5" />
+                            {loadingAssignModal &&
+                            selectedRole?.role_id === role.role_id ? (
+                              <div className="animate-spin rounded-full h-3.5 w-3.5 border-b-2 border-current" />
+                            ) : (
+                              <>
+                                Permissions
+                                <ChevronRight className="w-3.5 h-3.5" />
+                              </>
+                            )}
                           </button>
                         </div>
                       </div>
@@ -607,8 +621,8 @@ const Permissions: React.FC = () => {
                             togglingPermId === perm.perm_id
                               ? "opacity-50 cursor-not-allowed"
                               : perm.status === "ACTIVE"
-                              ? "text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
-                              : "text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700"
+                                ? "text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
+                                : "text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700"
                           }`}
                         >
                           {togglingPermId === perm.perm_id ? (
@@ -663,7 +677,7 @@ const Permissions: React.FC = () => {
               const existingRole = roles.find(
                 (r) =>
                   r.name === roleForm.name &&
-                  r.role_id !== selectedRole?.role_id
+                  r.role_id !== selectedRole?.role_id,
               );
               if (existingRole) {
                 alert("A role with this name already exists");
@@ -712,7 +726,7 @@ const Permissions: React.FC = () => {
               const existingPerm = permissionsList.find(
                 (p) =>
                   p.name === permForm.name &&
-                  p.perm_id !== selectedPermission?.perm_id
+                  p.perm_id !== selectedPermission?.perm_id,
               );
               if (existingPerm) {
                 alert("A permission with this name already exists");
@@ -734,43 +748,67 @@ const Permissions: React.FC = () => {
       {/* Assign Permissions Modal */}
       <Modal
         isOpen={assignModalOpen}
-        onClose={() => setAssignModalOpen(false)}
+        onClose={() => {
+          setAssignModalOpen(false);
+          setAssignSearchTerm("");
+        }}
         title={`Assign Permissions - ${selectedRole?.name}`}
       >
+        <div className="relative mb-3">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <input
+            type="text"
+            value={assignSearchTerm}
+            onChange={(e) => setAssignSearchTerm(e.target.value)}
+            placeholder="Search permissions..."
+            className="w-full pl-10 pr-3 py-2 bg-gray-50 dark:bg-slate-900/50 border border-gray-200 dark:border-slate-600 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 text-sm text-gray-900 dark:text-white placeholder-gray-400"
+          />
+        </div>
         <div className="max-h-56 overflow-y-auto space-y-1.5 mb-3">
-          {permissionsList.map((perm) => (
-            <label
-              key={perm.perm_id}
-              className="flex items-center gap-2.5 p-2 bg-gray-50 dark:bg-slate-900/50 rounded-lg cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors"
-            >
-              <input
-                type="checkbox"
-                checked={selectedPerms.includes(perm.perm_id)}
-                onChange={(e) => {
-                  if (e.target.checked) {
-                    setSelectedPerms([...selectedPerms, perm.perm_id]);
-                  } else {
-                    setSelectedPerms(
-                      selectedPerms.filter((id) => id !== perm.perm_id)
-                    );
-                  }
-                }}
-                className="w-4 h-4 text-blue-500 rounded focus:ring-blue-500"
-              />
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
-                  {perm.name}
-                </p>
-                <p className="text-xs text-gray-400 truncate">
-                  {perm.description}
-                </p>
-              </div>
-            </label>
-          ))}
+          {permissionsList
+            .filter(
+              (p) =>
+                p.name.toLowerCase().includes(assignSearchTerm.toLowerCase()) ||
+                (p.description || "")
+                  .toLowerCase()
+                  .includes(assignSearchTerm.toLowerCase()),
+            )
+            .map((perm) => (
+              <label
+                key={perm.perm_id}
+                className="flex items-center gap-2.5 p-2 bg-gray-50 dark:bg-slate-900/50 rounded-lg cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors"
+              >
+                <input
+                  type="checkbox"
+                  checked={selectedPerms.includes(perm.perm_id)}
+                  onChange={(e) => {
+                    if (e.target.checked) {
+                      setSelectedPerms([...selectedPerms, perm.perm_id]);
+                    } else {
+                      setSelectedPerms(
+                        selectedPerms.filter((id) => id !== perm.perm_id),
+                      );
+                    }
+                  }}
+                  className="w-4 h-4 text-blue-500 rounded focus:ring-blue-500"
+                />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                    {perm.name}
+                  </p>
+                  <p className="text-xs text-gray-400 truncate">
+                    {perm.description}
+                  </p>
+                </div>
+              </label>
+            ))}
         </div>
         <div className="flex gap-2 mt-3">
           <button
-            onClick={() => setAssignModalOpen(false)}
+            onClick={() => {
+              setAssignModalOpen(false);
+              setAssignSearchTerm("");
+            }}
             className="flex-1 px-3 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 text-sm font-medium rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
           >
             Cancel

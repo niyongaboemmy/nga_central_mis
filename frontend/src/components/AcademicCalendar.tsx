@@ -93,8 +93,8 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({
   const canManage = isAdminView || canManageCalendar;
   const canViewAll =
     canManage || hasViewCalendar || canCreateCalendar || canUpdateSlot;
-  const canEdit = canManage || canUpdateSlot;
-  const canCreate = canManage || canCreateCalendar;
+  const canEdit = canUpdateSlot;
+  const canCreate = canCreateCalendar;
   const isBroadView = canViewAll;
 
   const canViewFullLessonPlan =
