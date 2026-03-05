@@ -401,7 +401,7 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
         <div className="p-6 border-t border-gray-100 dark:border-gray-800 flex justify-end bg-gray-50/30 dark:bg-gray-900/30">
           <button
             onClick={onClose}
-            className="px-6 py-2.5 bg-gray-900 text-white dark:text-white dark:bg-gray-800 rounded-2xl font-bold text-sm shadow-lg hover:shadow-xl transition-all active:scale-95"
+            className="px-6 py-2.5 bg-gray-200/50 text-black dark:text-white dark:bg-gray-800 rounded-2xl font-bold text-sm transition-all active:scale-95"
           >
             Close Document
           </button>
