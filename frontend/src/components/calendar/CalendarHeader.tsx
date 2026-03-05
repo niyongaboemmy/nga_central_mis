@@ -20,6 +20,7 @@ interface CalendarHeaderProps {
   onAddSlotClick: () => void;
   onNotificationsClick: () => void;
   canEdit?: boolean;
+  canCreate?: boolean;
   isCreatingCalendar?: boolean;
 }
 
@@ -39,6 +40,7 @@ const CalendarHeader: React.FC<CalendarHeaderProps> = ({
   onCreateCalendarClick,
   onNotificationsClick,
   canEdit = false,
+  canCreate = false,
   isCreatingCalendar,
 }) => {
   const getTitle = () => {
@@ -138,7 +140,7 @@ const CalendarHeader: React.FC<CalendarHeaderProps> = ({
         </div>
 
         {/* Admin Action Buttons */}
-        {isAdmin && canEdit && (
+        {(isAdmin || canCreate) && (canEdit || canCreate) && (
           <>
             <button
               onClick={onCreateCalendarClick}

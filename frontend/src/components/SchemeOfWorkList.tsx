@@ -123,7 +123,7 @@ const SchemeOfWorkList: React.FC = () => {
             placeholder="Search subjects..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-12 pr-4 py-3 rounded-2xl border-none bg-gray-100 dark:bg-gray-800/80 text-gray-900 dark:text-white placeholder-gray-500 focus:ring-2 focus:ring-blue-500 transition-all shadow-inner"
+            className="w-full pl-12 pr-4 py-3 rounded-2xl border-none bg-white dark:bg-gray-800/80 text-gray-900 dark:text-white placeholder-gray-500 focus:ring-2 focus:ring-blue-500 transition-all"
           />
         </div>
       </motion.div>

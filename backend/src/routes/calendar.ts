@@ -33,19 +33,23 @@ const router = Router();
 router.get(
   "/slots",
   authenticate,
-  authorize(["MANAGE_ACADEMIC_CALENDAR", "VIEW_ACADEMIC_CALENDAR"]),
+  authorize([
+    "MANAGE_ACADEMIC_CALENDAR",
+    "VIEW_ACADEMIC_CALENDAR",
+    "UPDATE_CALENDAR_SLOT",
+  ]),
   asyncHandler(getCalendarSlots),
 );
 router.post(
   "/slots",
   authenticate,
-  authorize("MANAGE_ACADEMIC_CALENDAR"),
+  authorize(["MANAGE_ACADEMIC_CALENDAR", "UPDATE_CALENDAR_SLOT"]),
   asyncHandler(createCalendarSlot),
 );
 router.put(
   "/slots/:id",
   authenticate,
-  authorize("MANAGE_ACADEMIC_CALENDAR"),
+  authorize(["MANAGE_ACADEMIC_CALENDAR", "UPDATE_CALENDAR_SLOT"]),
   asyncHandler(updateCalendarSlot),
 );
 router.delete(
@@ -55,11 +59,15 @@ router.delete(
   asyncHandler(deleteCalendarSlot),
 );
 
-// Calendar Setup Data (for admin)
+// Calendar Setup Data (for admin and users with create/update permissions)
 router.get(
   "/setup-data",
   authenticate,
-  authorize("MANAGE_ACADEMIC_CALENDAR"),
+  authorize([
+    "MANAGE_ACADEMIC_CALENDAR",
+    "CREATE_ACADEMIC_CALENDAR",
+    "UPDATE_CALENDAR_SLOT",
+  ]),
   asyncHandler(getCalendarSetupData),
 );
 
@@ -142,26 +150,40 @@ router.get(
 router.get(
   "/calendars/class-groups",
   authenticate,
-  authorize(["MANAGE_ACADEMIC_CALENDAR", "VIEW_ACADEMIC_CALENDAR"]),
+  authorize([
+    "MANAGE_ACADEMIC_CALENDAR",
+    "VIEW_ACADEMIC_CALENDAR",
+    "CREATE_ACADEMIC_CALENDAR",
+  ]),
   asyncHandler(getCalendarClassGroups),
 );
 
 router.post(
   "/calendars",
   authenticate,
-  authorize("MANAGE_ACADEMIC_CALENDAR"),
+  authorize(["MANAGE_ACADEMIC_CALENDAR", "CREATE_ACADEMIC_CALENDAR"]),
   asyncHandler(createAcademicCalendar),
 );
 router.get(
   "/calendars",
   authenticate,
-  authorize(["MANAGE_ACADEMIC_CALENDAR", "VIEW_ACADEMIC_CALENDAR"]),
+  authorize([
+    "MANAGE_ACADEMIC_CALENDAR",
+    "VIEW_ACADEMIC_CALENDAR",
+    "CREATE_ACADEMIC_CALENDAR",
+    "UPDATE_CALENDAR_SLOT",
+  ]),
   asyncHandler(getAcademicCalendars),
 );
 router.get(
   "/calendars/:id",
   authenticate,
-  authorize(["MANAGE_ACADEMIC_CALENDAR", "VIEW_ACADEMIC_CALENDAR"]),
+  authorize([
+    "MANAGE_ACADEMIC_CALENDAR",
+    "VIEW_ACADEMIC_CALENDAR",
+    "CREATE_ACADEMIC_CALENDAR",
+    "UPDATE_CALENDAR_SLOT",
+  ]),
   asyncHandler(getAcademicCalendar),
 );
 router.put(

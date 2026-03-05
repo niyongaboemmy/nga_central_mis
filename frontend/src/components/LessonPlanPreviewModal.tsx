@@ -68,7 +68,7 @@ const LessonPlanPreviewModal: React.FC<LessonPlanPreviewModalProps> = ({
                 onClick={(e) => e.stopPropagation()}
               >
                 {/* Header */}
-                <div className="relative bg-gradient-to-r from-blue-600 to-blue-700 dark:from-blue-600 dark:to-blue-700 px-8 py-6 text-white">
+                <div className="relative bg-gradient-to-r from-blue-600 to-blue-700 dark:from-blue-600 dark:to-blue-700 px-8 py-5 text-white">
                   <div className="absolute top-6 right-6 flex items-center gap-2">
                     <button
                       onClick={() => window.print()}
@@ -102,41 +102,46 @@ const LessonPlanPreviewModal: React.FC<LessonPlanPreviewModalProps> = ({
                           mins
                         </span>
                       </div>
-                      <h2 className="text-2xl font-bold mb-2">
-                        {plan.module_name ||
-                          plan.session_code ||
-                          "Lesson Plan Details"}
-                      </h2>
-                      <div className="flex flex-wrap items-center gap-4 text-sm text-white/80">
-                        <div className="flex items-center gap-2">
-                          <Calendar className="w-4 h-4" />
-                          <span>
-                            {new Date(plan.lesson_date).toLocaleDateString(
-                              undefined,
-                              {
-                                weekday: "long",
-                                month: "long",
-                                day: "numeric",
-                                year: "numeric",
-                              },
-                            )}
-                          </span>
-                        </div>
-                        {plan.start_time && plan.end_time && (
+                      <div className="flex flex-row items-center gap-2">
+                        <h2 className="text-2xl font-bold">
+                          {plan.module_name ||
+                            plan.session_code ||
+                            "Lesson Plan Details"}
+                        </h2>
+                        <div className="flex flex-wrap items-center gap-4 text-sm text-white/80">
                           <div className="flex items-center gap-2">
-                            <Clock className="w-4 h-4" />
+                            <Calendar className="w-4 h-4" />
                             <span>
-                              {plan.start_time} - {plan.end_time}
+                              {new Date(plan.lesson_date).toLocaleDateString(
+                                undefined,
+                                {
+                                  weekday: "long",
+                                  month: "long",
+                                  day: "numeric",
+                                  year: "numeric",
+                                },
+                              )}
                             </span>
                           </div>
-                        )}
+                          {plan.start_time && plan.end_time && (
+                            <div className="flex items-center gap-2">
+                              <Clock className="w-4 h-4" />
+                              <span>
+                                {plan.start_time} - {plan.end_time}
+                              </span>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>
                 </div>
 
                 {/* Content */}
-                <div className="p-8 space-y-8 max-h-[65vh] overflow-y-auto">
+                <div
+                  className="p-8 space-y-8 overflow-y-auto"
+                  style={{ height: "calc(100vh - 210px)" }}
+                >
                   {/* Overview Grid */}
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <div className="p-4 rounded-xl bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50">

@@ -66,6 +66,18 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({
     ),
   );
 
+  const canCreateCalendar = user?.roles?.some((role) =>
+    role.permissions?.some(
+      (perm) => perm.name === Permissions.CREATE_ACADEMIC_CALENDAR,
+    ),
+  );
+
+  const canUpdateSlot = user?.roles?.some((role) =>
+    role.permissions?.some(
+      (perm) => perm.name === Permissions.UPDATE_CALENDAR_SLOT,
+    ),
+  );
+
   const isStudent = user?.roles?.some((role) =>
     role.permissions?.some(
       (perm) => perm.name === Permissions.VIEW_STUDENT_CALENDAR,
@@ -79,8 +91,10 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({
   );
 
   const canManage = isAdminView || canManageCalendar;
-  const canViewAll = canManage || hasViewCalendar;
-  const canEdit = canManage;
+  const canViewAll =
+    canManage || hasViewCalendar || canCreateCalendar || canUpdateSlot;
+  const canEdit = canManage || canUpdateSlot;
+  const canCreate = canManage || canCreateCalendar;
   const isBroadView = canViewAll;
 
   const canViewFullLessonPlan =
@@ -615,7 +629,20 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({
           showToast("No class groups available for this term", "info");
           return;
         }
-        setAvailableClassGroups(classGroups);
+
+        // Filter class groups to only those within the user's assigned grades
+        const userGradeNames = user?.assignedGrades?.map((g) => g.name) ?? [];
+        const filteredClassGroups =
+          userGradeNames.length > 0
+            ? classGroups.filter((cg: any) =>
+                userGradeNames.includes(cg.grade_name ?? ""),
+              )
+            : classGroups;
+
+        setAvailableClassGroups(
+          filteredClassGroups.length > 0 ? filteredClassGroups : classGroups,
+        );
+
         setCalendarFormData({
           academic_year_id: selectedYear.toString(),
           academic_term_id: selectedTerm.toString(),
@@ -718,6 +745,7 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({
         <CalendarHeader
           isAdmin={isBroadView}
           canEdit={canEdit}
+          canCreate={canCreate}
           isStudent={isStudent}
           academicYears={academicYears}
           academicTerms={academicTerms}
