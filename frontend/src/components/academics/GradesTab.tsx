@@ -195,7 +195,7 @@ const GradesTab: React.FC<GradesTabProps> = ({
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, delay: 0.2 }}
-        className="bg-white dark:bg-slate-800/70 rounded-3xl border border-white dark:border-slate-700/40 overflow-hidden"
+        className="bg-white dark:bg-slate-900 rounded-3xl border border-white dark:border-slate-700/40 overflow-hidden"
       >
         {loading ? (
           <div className="flex items-center justify-center py-16">
@@ -208,7 +208,7 @@ const GradesTab: React.FC<GradesTabProps> = ({
         ) : (
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200 dark:divide-slate-700/50">
-              <thead className="bg-gradient-to-r from-gray-50 to-gray-100 dark:from-slate-700/50 dark:to-slate-600/50">
+              <thead className="bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800/50 dark:to-gray-800/50">
                 <tr>
                   <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider">
                     Grade Name
@@ -224,7 +224,7 @@ const GradesTab: React.FC<GradesTabProps> = ({
                   </th>
                 </tr>
               </thead>
-              <tbody className="bg-white dark:bg-slate-800/30 divide-y divide-gray-200 dark:divide-slate-700/30">
+              <tbody className="bg-white dark:bg-gray-900/80 divide-y divide-gray-200 dark:divide-gray-700/50">
                 {data.length === 0 ? (
                   <tr>
                     <td

@@ -15935,3 +15935,29 @@
 {"ip":"::1","level":"info","message":"GET /calendar/lesson-plan/33?lesson_date=2026-03-04","service":"nga-central-mis","timestamp":"2026-03-05T12:59:46.646Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36"}
 {"duration":69,"level":"info","message":"GET /calendar/lesson-plan/33?lesson_date=2026-03-04 304 - 69ms","service":"nga-central-mis","statusCode":304,"timestamp":"2026-03-05T12:59:46.714Z"}
 {"level":"info","message":"SIGINT received, shutting down gracefully","service":"nga-central-mis","timestamp":"2026-03-05T12:59:56.015Z"}
+{"level":"info","message":"Server running on port 5001 in development mode","service":"nga-central-mis","timestamp":"2026-03-05T13:19:21.069Z"}
+{"host":"mail.hackflix.net","level":"info","message":"Email service connected successfully","port":465,"service":"nga-central-mis","timestamp":"2026-03-05T13:19:22.916Z"}
+{"ip":"::1","level":"info","message":"GET /users/me","service":"nga-central-mis","timestamp":"2026-03-05T13:19:24.261Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36"}
+{"level":"info","message":"Fetching current user","service":"nga-central-mis","timestamp":"2026-03-05T13:19:24.295Z","userId":15}
+{"duration":131,"level":"info","message":"GET /users/me 304 - 131ms","service":"nga-central-mis","statusCode":304,"timestamp":"2026-03-05T13:19:24.392Z"}
+{"ip":"::1","level":"info","message":"GET /dashboard/basic-stats","service":"nga-central-mis","timestamp":"2026-03-05T13:19:24.471Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36"}
+{"duration":6,"level":"info","message":"GET /dashboard/basic-stats 304 - 6ms","service":"nga-central-mis","statusCode":304,"timestamp":"2026-03-05T13:19:24.477Z"}
+{"ip":"::1","level":"info","message":"GET /academics/terms","service":"nga-central-mis","timestamp":"2026-03-05T13:19:24.502Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36"}
+{"duration":7,"level":"info","message":"GET /academics/terms 304 - 7ms","service":"nga-central-mis","statusCode":304,"timestamp":"2026-03-05T13:19:24.509Z"}
+{"ip":"::1","level":"info","message":"GET /calendar/my-calendar?academic_term_id=4","service":"nga-central-mis","timestamp":"2026-03-05T13:19:24.521Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36"}
+{"academic_term_id":"4","level":"info","message":"Fetching instructor calendar","service":"nga-central-mis","timestamp":"2026-03-05T13:19:24.524Z","userId":15}
+{"duration":7,"level":"info","message":"GET /calendar/my-calendar?academic_term_id=4 304 - 7ms","service":"nga-central-mis","statusCode":304,"timestamp":"2026-03-05T13:19:24.528Z"}
+{"level":"info","message":"SIGINT received, shutting down gracefully","service":"nga-central-mis","timestamp":"2026-03-05T13:28:07.250Z"}
+{"level":"info","message":"Server running on port 5001 in development mode","service":"nga-central-mis","timestamp":"2026-03-05T13:29:09.777Z"}
+{"host":"mail.hackflix.net","level":"info","message":"Email service connected successfully","port":465,"service":"nga-central-mis","timestamp":"2026-03-05T13:29:11.718Z"}
+{"ip":"::1","level":"info","message":"GET /users/me","service":"nga-central-mis","timestamp":"2026-03-05T13:33:11.497Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36"}
+{"level":"info","message":"Fetching current user","service":"nga-central-mis","timestamp":"2026-03-05T13:33:11.595Z","userId":15}
+{"duration":131,"level":"info","message":"GET /users/me 304 - 131ms","service":"nga-central-mis","statusCode":304,"timestamp":"2026-03-05T13:33:11.627Z"}
+{"ip":"::1","level":"info","message":"GET /dashboard/basic-stats","service":"nga-central-mis","timestamp":"2026-03-05T13:33:11.687Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36"}
+{"duration":8,"level":"info","message":"GET /dashboard/basic-stats 304 - 8ms","service":"nga-central-mis","statusCode":304,"timestamp":"2026-03-05T13:33:11.695Z"}
+{"ip":"::1","level":"info","message":"GET /academics/terms","service":"nga-central-mis","timestamp":"2026-03-05T13:33:11.713Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36"}
+{"duration":5,"level":"info","message":"GET /academics/terms 304 - 5ms","service":"nga-central-mis","statusCode":304,"timestamp":"2026-03-05T13:33:11.718Z"}
+{"ip":"::1","level":"info","message":"GET /calendar/my-calendar?academic_term_id=4","service":"nga-central-mis","timestamp":"2026-03-05T13:33:11.730Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36"}
+{"academic_term_id":"4","level":"info","message":"Fetching instructor calendar","service":"nga-central-mis","timestamp":"2026-03-05T13:33:11.733Z","userId":15}
+{"duration":5,"level":"info","message":"GET /calendar/my-calendar?academic_term_id=4 304 - 5ms","service":"nga-central-mis","statusCode":304,"timestamp":"2026-03-05T13:33:11.735Z"}
+{"level":"info","message":"SIGINT received, shutting down gracefully","service":"nga-central-mis","timestamp":"2026-03-05T13:33:58.486Z"}

@@ -130,15 +130,19 @@ const SubjectsTab: React.FC<SubjectsTabProps> = ({
     }
   };
 
-  const loadGradeAssignments = async (subjectId?: number) => {
+  const loadGradeAssignments = async (
+    subjectId?: number,
+    gradesData?: Grade[],
+  ) => {
     setLoadingGrades(true);
+    const gradesSource = gradesData ?? grades;
     try {
       if (subjectId && data) {
         // Load current assignments for editing
         const subject = data.find((s) => s.subject_id === subjectId);
         const currentAssignments = subject?.grades || [];
 
-        const assignments = grades.map((grade) => {
+        const assignments = gradesSource.map((grade) => {
           const isCurrentlyAssigned = currentAssignments.some(
             (ca) => ca.grade_id === grade.grade_id,
           );
@@ -155,7 +159,7 @@ const SubjectsTab: React.FC<SubjectsTabProps> = ({
         setGradeAssignments(assignments);
       } else {
         // For creating new subject
-        const assignments = grades.map((grade) => ({
+        const assignments = gradesSource.map((grade) => ({
           grade_id: grade.grade_id,
           name: grade.name,
           program_name: undefined,
@@ -287,8 +291,8 @@ const SubjectsTab: React.FC<SubjectsTabProps> = ({
     if (currentStep === 1) {
       if (!validateForm()) return;
       setCurrentStep(2);
-      await loadGrades();
-      await loadGradeAssignments(selectedSubject.subject_id);
+      const loadedGrades = await loadGrades();
+      await loadGradeAssignments(selectedSubject.subject_id, loadedGrades);
     } else {
       // Step 2: Update assignments
       setSubmitting(true);
@@ -932,7 +936,7 @@ const SubjectsTab: React.FC<SubjectsTabProps> = ({
           setSelectedSubject(null);
         }}
         title={`Edit Subject - Step ${currentStep} of 2`}
-        size="xl"
+        size="2xl"
       >
         {/* Enhanced Step Indicator */}
         <div className="flex items-center mb-8">
