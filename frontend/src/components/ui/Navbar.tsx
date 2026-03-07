@@ -90,25 +90,25 @@ const Navbar: React.FC<NavbarProps> = ({
     window.location.href = "/mis/login";
   };
 
-  const NavLink: React.FC<{
-    isActive: boolean;
-    onClick?: () => void;
-    children: React.ReactNode;
-  }> = ({ isActive, onClick, children }) => (
-    <button
-      onClick={onClick}
-      className={`px-3 py-1.5 text-sm rounded-lg transition-all duration-200 font-medium flex items-center space-x-2 relative ${
-        isActive
-          ? "text-blue-600 dark:text-blue-400"
-          : "text-text-secondary-light dark:text-text-secondary-dark/70 hover:text-blue-600 dark:hover:text-blue-400"
-      }`}
-    >
-      {children}
-      {isActive && (
-        <span className="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-1 h-1 bg-blue-600 dark:bg-blue-400 rounded-full" />
-      )}
-    </button>
-  );
+  // const NavLink: React.FC<{
+  //   isActive: boolean;
+  //   onClick?: () => void;
+  //   children: React.ReactNode;
+  // }> = ({ isActive, onClick, children }) => (
+  //   <button
+  //     onClick={onClick}
+  //     className={`px-3 py-1.5 text-sm rounded-lg transition-all duration-200 font-medium flex items-center space-x-2 relative ${
+  //       isActive
+  //         ? "text-blue-600 dark:text-blue-400"
+  //         : "text-text-secondary-light dark:text-text-secondary-dark/70 hover:text-blue-600 dark:hover:text-blue-400"
+  //     }`}
+  //   >
+  //     {children}
+  //     {isActive && (
+  //       <span className="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-1 h-1 bg-blue-600 dark:bg-blue-400 rounded-full" />
+  //     )}
+  //   </button>
+  // );
 
   return (
     <>
@@ -165,11 +165,11 @@ const Navbar: React.FC<NavbarProps> = ({
             {/* Desktop Navigation - Always visible */}
             {showNavigation && (
               <div className="hidden md:flex items-center space-x-2">
-                {onNavigateToHome && (
+                {/* {onNavigateToHome && (
                   <NavLink isActive={isActive("/")} onClick={onNavigateToHome}>
                     <span>Home</span>
                   </NavLink>
-                )}
+                )} */}
                 {/* {onNavigateToAbout && (
                   <NavLink
                     isActive={isActive("/about")}
