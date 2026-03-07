@@ -9,6 +9,17 @@ import {
   UserProfile,
   Role,
   UserRole,
+  Subject,
+  Program,
+  Grade,
+  GradeSubject,
+  TeacherSubjectAssignment,
+  StudentSubjectEnrollment,
+  UserGrade,
+  UserProgramLead,
+  AcademicTerm,
+  ClassGroup,
+  StudentClassGroup,
 } from "../db/schema";
 import {
   eq,
@@ -56,6 +67,157 @@ export const getAllRoles = asyncHandler(async (req: any, res: any) => {
   successResponse(res, "Roles retrieved successfully", roles);
 });
 
+// Get filter options for role-based sharing
+export const getDocumentShareFilterOptions = asyncHandler(
+  async (req: any, res: any) => {
+    const userId = req.user.userId;
+
+    // Get the current academic term
+    const currentTerm = await db
+      .select()
+      .from(AcademicTerm)
+      .where(eq(AcademicTerm.is_current, 1))
+      .limit(1);
+
+    const currentTermId =
+      currentTerm.length > 0 ? currentTerm[0].academic_term_id : null;
+
+    // Get user's role-based access
+    const userRoles = await db
+      .select({
+        role_id: UserRole.role_id,
+      })
+      .from(UserRole)
+      .where(eq(UserRole.user_id, userId));
+
+    const roleIds = userRoles.map((r) => r.role_id);
+
+    // Get assigned subjects (for teachers)
+    let assignedSubjects: any[] = [];
+    if (currentTermId) {
+      assignedSubjects = await db
+        .select({
+          subject_id: TeacherSubjectAssignment.subject_id,
+          subject_name: Subject.name,
+          subject_code: Subject.code,
+        })
+        .from(TeacherSubjectAssignment)
+        .innerJoin(
+          Subject,
+          eq(TeacherSubjectAssignment.subject_id, Subject.subject_id),
+        )
+        .where(
+          and(
+            eq(TeacherSubjectAssignment.user_id, userId),
+            eq(TeacherSubjectAssignment.academic_term_id, currentTermId),
+          ),
+        );
+    }
+
+    // Get enrolled subjects (for students)
+    let enrolledSubjects: any[] = [];
+    if (currentTermId) {
+      enrolledSubjects = await db
+        .select({
+          subject_id: StudentSubjectEnrollment.subject_id,
+          subject_name: Subject.name,
+          subject_code: Subject.code,
+        })
+        .from(StudentSubjectEnrollment)
+        .innerJoin(
+          Subject,
+          eq(StudentSubjectEnrollment.subject_id, Subject.subject_id),
+        )
+        .where(
+          and(
+            eq(StudentSubjectEnrollment.user_id, userId),
+            eq(StudentSubjectEnrollment.academic_term_id, currentTermId),
+          ),
+        );
+    }
+
+    // Get user's program leads
+    const programLeads = await db
+      .select({
+        program_id: UserProgramLead.program_id,
+        program_name: Program.name,
+      })
+      .from(UserProgramLead)
+      .innerJoin(Program, eq(UserProgramLead.program_id, Program.program_id))
+      .where(eq(UserProgramLead.user_id, userId));
+
+    // Get user's grade assignments (class teacher)
+    const gradeAssignments = await db
+      .select({
+        grade_id: UserGrade.grade_id,
+        grade_name: Grade.name,
+      })
+      .from(UserGrade)
+      .innerJoin(Grade, eq(UserGrade.grade_id, Grade.grade_id))
+      .where(eq(UserGrade.user_id, userId));
+
+    // Get all subjects (for SUPER_ADMIN or users with proper permissions)
+    const allSubjects = await db
+      .select({
+        subject_id: Subject.subject_id,
+        name: Subject.name,
+        code: Subject.code,
+      })
+      .from(Subject)
+      .where(eq(Subject.status, "ACTIVE"))
+      .orderBy(asc(Subject.name));
+
+    // Get all programs
+    const allPrograms = await db
+      .select({
+        program_id: Program.program_id,
+        name: Program.name,
+      })
+      .from(Program)
+      .orderBy(asc(Program.name));
+
+    // Get all grades
+    const allGrades = await db
+      .select({
+        grade_id: Grade.grade_id,
+        name: Grade.name,
+        level_order: Grade.level_order,
+      })
+      .from(Grade)
+      .orderBy(asc(Grade.level_order));
+
+    // Get all academic terms
+    const allTerms = await db
+      .select({
+        academic_term_id: AcademicTerm.academic_term_id,
+        name: AcademicTerm.name,
+        is_current: AcademicTerm.is_current,
+      })
+      .from(AcademicTerm)
+      .orderBy(desc(AcademicTerm.is_current), asc(AcademicTerm.name));
+
+    const result = {
+      // Current user's associations (for filter display)
+      myAssignments: {
+        assignedSubjects,
+        enrolledSubjects,
+        programLeads,
+        gradeAssignments,
+      },
+      // All available options (for SUPER_ADMIN or admins)
+      options: {
+        subjects: allSubjects,
+        programs: allPrograms,
+        grades: allGrades,
+        academicTerms: allTerms,
+      },
+      currentTermId,
+    };
+
+    successResponse(res, "Filter options retrieved successfully", result);
+  },
+);
+
 export const getRoleById = asyncHandler(async (req: any, res: any) => {
   const { roleId } = req.params;
 
@@ -77,28 +239,192 @@ export const getRoleById = asyncHandler(async (req: any, res: any) => {
   successResponse(res, "Role retrieved successfully", role[0]);
 });
 
-// Get users in a specific role
+// Get users in a specific role with pagination and optional grade/subject filtering
 export const getUsersByRole = asyncHandler(async (req: any, res: any) => {
   const { roleId } = req.params;
+  const { page = 1, limit = 20, gradeId, classGroupId } = req.query;
 
-  const users = await db
-    .select({
-      user_id: User.user_id,
-      username: User.username,
-      email: User.email,
-      status: User.status,
-      first_name: UserProfile.first_name,
-      last_name: UserProfile.last_name,
-    })
-    .from(UserRole)
-    .innerJoin(User, eq(UserRole.user_id, User.user_id))
-    .leftJoin(UserProfile, eq(User.user_id, UserProfile.user_id))
-    .where(eq(UserRole.role_id, parseInt(roleId)));
+  const parsedRoleId = Number(roleId);
+  const parsedGradeId = gradeId ? Number(gradeId as string) : null;
+  const parsedClassGroupId = classGroupId
+    ? Number(classGroupId as string)
+    : null;
 
-  successResponse(res, "Users retrieved successfully", users);
+  const offset = (parseInt(page as string) - 1) * parseInt(limit as string);
+  const parsedLimit = Math.min(parseInt(limit as string), 100); // Cap at 100
+  const parsedOffset = offset;
+
+  // Build query based on filters
+  let users: any[];
+  let totalCount: number;
+
+  if (parsedGradeId) {
+    // Filter by grade - check users who have subjects in that grade
+    // This includes teachers assigned to subjects in that grade AND students enrolled in subjects in that grade
+    const targetGradeId = parsedGradeId;
+
+    // Get users who have subjects assigned to this grade (teachers)
+    // Join through TeacherSubjectAssignment -> ClassGroup to get the grade
+    const teacherUsers = await db
+      .select({
+        user_id: User.user_id,
+        username: User.username,
+        email: User.email,
+        status: User.status,
+        first_name: UserProfile.first_name,
+        last_name: UserProfile.last_name,
+      })
+      .from(UserRole)
+      .innerJoin(User, eq(UserRole.user_id, User.user_id))
+      .leftJoin(UserProfile, eq(User.user_id, UserProfile.user_id))
+      .innerJoin(
+        TeacherSubjectAssignment,
+        eq(User.user_id, TeacherSubjectAssignment.user_id),
+      )
+      .innerJoin(
+        ClassGroup,
+        eq(TeacherSubjectAssignment.class_group_id, ClassGroup.class_group_id),
+      )
+      .where(
+        and(
+          eq(UserRole.role_id, parsedRoleId),
+          eq(ClassGroup.grade_id, targetGradeId),
+        ),
+      );
+
+    // Get users who are enrolled in subjects in this grade (students)
+    // Join through StudentSubjectEnrollment -> StudentClassGroup -> ClassGroup to get the grade
+    const studentUsers = await db
+      .select({
+        user_id: User.user_id,
+        username: User.username,
+        email: User.email,
+        status: User.status,
+        first_name: UserProfile.first_name,
+        last_name: UserProfile.last_name,
+      })
+      .from(UserRole)
+      .innerJoin(User, eq(UserRole.user_id, User.user_id))
+      .leftJoin(UserProfile, eq(User.user_id, UserProfile.user_id))
+      .innerJoin(
+        StudentSubjectEnrollment,
+        eq(User.user_id, StudentSubjectEnrollment.user_id),
+      )
+      .innerJoin(StudentClassGroup, eq(User.user_id, StudentClassGroup.user_id))
+      .innerJoin(
+        ClassGroup,
+        eq(StudentClassGroup.class_group_id, ClassGroup.class_group_id),
+      )
+      .where(
+        and(
+          eq(UserRole.role_id, parsedRoleId),
+          eq(ClassGroup.grade_id, targetGradeId),
+        ),
+      );
+
+    // Combine and deduplicate users
+    const userMap = new Map();
+    [...teacherUsers, ...studentUsers].forEach((user) => {
+      userMap.set(user.user_id, user);
+    });
+    const allFilteredUsers = Array.from(userMap.values());
+    totalCount = allFilteredUsers.length;
+
+    // Apply pagination
+    users = allFilteredUsers.slice(parsedOffset, parsedOffset + parsedLimit);
+  } else if (parsedClassGroupId) {
+    // Filter by classgroup - check users who have subjects in that classgroup
+    const targetClassGroupId = parsedClassGroupId;
+
+    // Get teachers assigned to subjects in this classgroup
+    const teacherUsers = await db
+      .select({
+        user_id: User.user_id,
+        username: User.username,
+        email: User.email,
+        status: User.status,
+        first_name: UserProfile.first_name,
+        last_name: UserProfile.last_name,
+      })
+      .from(UserRole)
+      .innerJoin(User, eq(UserRole.user_id, User.user_id))
+      .leftJoin(UserProfile, eq(User.user_id, UserProfile.user_id))
+      .innerJoin(
+        TeacherSubjectAssignment,
+        eq(User.user_id, TeacherSubjectAssignment.user_id),
+      )
+      .where(
+        and(
+          eq(UserRole.role_id, parsedRoleId),
+          eq(TeacherSubjectAssignment.class_group_id, targetClassGroupId),
+        ),
+      );
+
+    // Get students in this classgroup
+    const studentUsers = await db
+      .select({
+        user_id: User.user_id,
+        username: User.username,
+        email: User.email,
+        status: User.status,
+        first_name: UserProfile.first_name,
+        last_name: UserProfile.last_name,
+      })
+      .from(UserRole)
+      .innerJoin(User, eq(UserRole.user_id, User.user_id))
+      .leftJoin(UserProfile, eq(User.user_id, UserProfile.user_id))
+      .innerJoin(StudentClassGroup, eq(User.user_id, StudentClassGroup.user_id))
+      .where(
+        and(
+          eq(UserRole.role_id, parsedRoleId),
+          eq(StudentClassGroup.class_group_id, targetClassGroupId),
+        ),
+      );
+
+    // Combine and deduplicate users
+    const userMap = new Map();
+    [...teacherUsers, ...studentUsers].forEach((user) => {
+      userMap.set(user.user_id, user);
+    });
+    const allFilteredUsers = Array.from(userMap.values());
+    totalCount = allFilteredUsers.length;
+
+    // Apply pagination
+    users = allFilteredUsers.slice(parsedOffset, parsedOffset + parsedLimit);
+  } else {
+    // No filters - simple query
+    const baseQuery = db
+      .select({
+        user_id: User.user_id,
+        username: User.username,
+        email: User.email,
+        status: User.status,
+        first_name: UserProfile.first_name,
+        last_name: UserProfile.last_name,
+      })
+      .from(UserRole)
+      .innerJoin(User, eq(UserRole.user_id, User.user_id))
+      .leftJoin(UserProfile, eq(User.user_id, UserProfile.user_id))
+      .where(eq(UserRole.role_id, parsedRoleId));
+
+    // Get total count
+    const countResult = await baseQuery;
+    totalCount = countResult.length;
+
+    // Get paginated results
+    users = await baseQuery.limit(parsedLimit).offset(parsedOffset);
+  }
+
+  successResponse(res, "Users retrieved successfully", {
+    users,
+    pagination: {
+      page: parseInt(page),
+      limit: parsedLimit,
+      total: totalCount,
+      totalPages: Math.ceil(totalCount / parsedLimit),
+    },
+  });
 });
-
-// ======================
 // FOLDER OPERATIONS
 // ======================
 
@@ -572,13 +898,41 @@ export const getFolderPermissions = asyncHandler(async (req: any, res: any) => {
 export const shareFolder = asyncHandler(async (req: any, res: any) => {
   const userId = req.user.userId;
   const { folderId } = req.params;
-  const { userIds, roleIds, permissionType, expiresAt } = req.body;
+  const {
+    userIds,
+    roleIds,
+    permissionType,
+    expiresAt,
+    filterType,
+    filterIds,
+    academicTermId,
+  } = req.body;
 
   if (
     (!userIds || !Array.isArray(userIds) || userIds.length === 0) &&
     (!roleIds || !Array.isArray(roleIds) || roleIds.length === 0)
   ) {
     throw new ValidationError("At least one user ID or role ID is required");
+  }
+
+  // Validate filter options
+  const validFilterTypes = [
+    "subject_assigned",
+    "subject_enrolled",
+    "program_assigned",
+    "grade_assigned",
+  ];
+  if (filterType && !validFilterTypes.includes(filterType)) {
+    throw new ValidationError(
+      "Invalid filter type. Must be one of: subject_assigned, subject_enrolled, program_assigned, grade_assigned",
+    );
+  }
+
+  // filterType and filterIds must be provided together
+  if ((filterType && !filterIds) || (!filterType && filterIds)) {
+    throw new ValidationError(
+      "Both filterType and filterIds must be provided together",
+    );
   }
 
   // Check if folder exists and belongs to user
@@ -598,12 +952,13 @@ export const shareFolder = asyncHandler(async (req: any, res: any) => {
   }
 
   const permissions = [];
+  const alreadySharedUserIds: number[] = [];
 
   // Share with users
   if (userIds && userIds.length > 0) {
     for (const targetUserId of userIds) {
-      // Check if permission already exists
-      const existingPerm = await db
+      // Check if permission already exists with same filter
+      const existingPermQuery = db
         .select()
         .from(FolderPermission)
         .where(
@@ -611,30 +966,39 @@ export const shareFolder = asyncHandler(async (req: any, res: any) => {
             eq(FolderPermission.folder_id, parseInt(folderId)),
             eq(FolderPermission.user_id, targetUserId),
           ),
-        )
-        .limit(1);
+        );
+
+      const existingPerm = await existingPermQuery.limit(1);
 
       if (existingPerm.length === 0) {
-        const result = await db.insert(FolderPermission).values({
-          folder_id: parseInt(folderId),
-          user_id: targetUserId,
-          permission_type: permissionType || "VIEW",
-          shared_by: userId,
-          expires_at: expiresAt ? new Date(expiresAt) : null,
-        });
+        // Use raw SQL to ensure AUTO_INCREMENT works properly
+        await db.execute(
+          sql`INSERT INTO FolderPermission (folder_id, user_id, permission_type, shared_by, filter_type, filter_ids, academic_term_id, expires_at) VALUES (${parseInt(folderId)}, ${targetUserId}, ${permissionType || "VIEW"}, ${userId}, ${filterType || null}, ${filterIds ? JSON.stringify(filterIds) : null}, ${academicTermId ? parseInt(academicTermId) : null}, ${expiresAt ? new Date(expiresAt) : null})`,
+        );
 
-        const permId = result[0].insertId;
+        // Get the most recent permission for this folder and user
         const perm = await db
           .select()
           .from(FolderPermission)
-          .where(eq(FolderPermission.permission_id, permId))
+          .where(
+            and(
+              eq(FolderPermission.folder_id, parseInt(folderId)),
+              eq(FolderPermission.user_id, targetUserId),
+            ),
+          )
+          .orderBy(desc(FolderPermission.permission_id))
           .limit(1);
 
-        permissions.push({
-          ...perm[0],
-          shared_with: "user",
-          target_id: targetUserId,
-        });
+        if (perm.length > 0) {
+          permissions.push({
+            ...perm[0],
+            shared_with: "user",
+            target_id: targetUserId,
+          });
+        }
+      } else {
+        // User is already shared
+        alreadySharedUserIds.push(targetUserId);
       }
     }
   }
@@ -659,7 +1023,7 @@ export const shareFolder = asyncHandler(async (req: any, res: any) => {
     const uniqueUserIds = [...new Set(usersInRoles.map((ur) => ur.user_id))];
 
     for (const targetUserId of uniqueUserIds) {
-      // Check if permission already exists
+      // Check if permission already exists with same filter
       const existingPerm = await db
         .select()
         .from(FolderPermission)
@@ -667,6 +1031,12 @@ export const shareFolder = asyncHandler(async (req: any, res: any) => {
           and(
             eq(FolderPermission.folder_id, parseInt(folderId)),
             eq(FolderPermission.user_id, targetUserId),
+            filterType
+              ? and(
+                  eq(FolderPermission.filter_type, filterType),
+                  eq(FolderPermission.filter_ids, filterIds),
+                )
+              : undefined,
           ),
         )
         .limit(1);
@@ -677,6 +1047,9 @@ export const shareFolder = asyncHandler(async (req: any, res: any) => {
           user_id: targetUserId,
           permission_type: permissionType || "VIEW",
           shared_by: userId,
+          filter_type: filterType || null,
+          filter_ids: filterIds || null,
+          academic_term_id: academicTermId ? parseInt(academicTermId) : null,
           expires_at: expiresAt ? new Date(expiresAt) : null,
         });
 
@@ -698,7 +1071,33 @@ export const shareFolder = asyncHandler(async (req: any, res: any) => {
 
   logger.info(`Folder ${folderId} shared with users/roles by user ${userId}`);
 
-  successResponse(res, "Folder shared successfully", permissions);
+  // Build response with warning if some users were already shared
+  const response: any = {
+    permissions,
+  };
+
+  if (alreadySharedUserIds.length > 0) {
+    // Get user details for the already shared users
+    const alreadySharedUsers = await db
+      .select({
+        user_id: User.user_id,
+        username: User.username,
+        email: User.email,
+      })
+      .from(User)
+      .where(inArray(User.user_id, alreadySharedUserIds));
+
+    response.alreadyShared = alreadySharedUsers;
+    response.message = `Some users were already shared. ${alreadySharedUsers.map((u: any) => u.username || u.email || u.user_id).join(", ")} already have access.`;
+  }
+
+  successResponse(
+    res,
+    alreadySharedUserIds.length > 0
+      ? "Some users were already shared"
+      : "Folder shared successfully",
+    response,
+  );
 });
 
 // Revoke folder access
@@ -718,26 +1117,39 @@ export const revokeFolderAccess = asyncHandler(async (req: any, res: any) => {
 
   const isSuperAdmin = userRoles.some((r) => r.name === "SUPER_ADMIN");
 
-  // Check if permission exists and was created by the user (or user is SUPER_ADMIN)
-  const conditions = [
-    eq(FolderPermission.permission_id, parseInt(permissionId)),
-  ];
-  if (!isSuperAdmin) {
-    conditions.push(eq(FolderPermission.shared_by, userId));
-  }
-
-  const permission = await db
+  // Get the permission first to check folder ownership
+  const existingPerm = await db
     .select()
     .from(FolderPermission)
-    .where(and(...conditions))
+    .where(eq(FolderPermission.permission_id, parseInt(permissionId)))
     .limit(1);
 
-  if (permission.length === 0) {
+  if (existingPerm.length === 0) {
     throw new NotFoundError(
-      "Permission not found or you don't have permission to revoke it",
+      "Permission not found. It may have already been removed.",
     );
   }
 
+  // Get the folder to check ownership
+  const folder = await db
+    .select()
+    .from(DocumentFolder)
+    .where(eq(DocumentFolder.folder_id, existingPerm[0].folder_id))
+    .limit(1);
+
+  const isFolderOwner = folder.length > 0 && folder[0].user_id === userId;
+
+  // Check if user can delete: SUPER_ADMIN, folder owner, or original sharer
+  if (!isSuperAdmin && !isFolderOwner) {
+    // Must be the one who shared it
+    if (existingPerm[0].shared_by !== userId) {
+      throw new NotFoundError(
+        "Permission not found or you don't have permission to revoke it",
+      );
+    }
+  }
+
+  // Delete the permission
   await db
     .delete(FolderPermission)
     .where(eq(FolderPermission.permission_id, parseInt(permissionId)));
@@ -1555,13 +1967,44 @@ export const getDocumentPermissions = asyncHandler(
 export const shareDocument = asyncHandler(async (req: any, res: any) => {
   const userId = req.user.userId;
   const { documentId } = req.params;
-  const { userIds, roleIds, permissionType, expiresAt } = req.body;
+  const {
+    userIds,
+    roleIds,
+    permissionType,
+    expiresAt,
+    filterType,
+    filterIds,
+    academicTermId,
+  } = req.body;
 
   if (
     (!userIds || !Array.isArray(userIds) || userIds.length === 0) &&
     (!roleIds || !Array.isArray(roleIds) || roleIds.length === 0)
   ) {
     throw new ValidationError("At least one user ID or role ID is required");
+  }
+
+  // Validate filter options
+  const validFilterTypes = [
+    "subject_assigned",
+    "subject_enrolled",
+    "program_assigned",
+    "grade_assigned",
+  ];
+  if (filterType && !validFilterTypes.includes(filterType)) {
+    throw new ValidationError(
+      "Invalid filter type. Must be one of: subject_assigned, subject_enrolled, program_assigned, grade_assigned",
+    );
+  }
+
+  // filterType and filterIds must be provided together
+  if (
+    (filterType && (!filterIds || !Array.isArray(filterIds))) ||
+    (!filterType && filterIds)
+  ) {
+    throw new ValidationError(
+      "Both filterType and filterIds (array) must be provided together",
+    );
   }
 
   // Check if document exists and belongs to user
@@ -1581,31 +2024,54 @@ export const shareDocument = asyncHandler(async (req: any, res: any) => {
   }
 
   const permissions = [];
+  const alreadySharedUserIds: number[] = [];
 
   // Share with users
   if (userIds && userIds.length > 0) {
     for (const targetUserId of userIds) {
-      const result = await db.insert(DocumentPermission).values({
-        document_id: parseInt(documentId),
-        user_id: targetUserId,
-        permission_type: permissionType || "VIEW",
-        shared_by: userId,
-        shared_with: "user",
-        expires_at: expiresAt ? new Date(expiresAt) : null,
-      });
-
-      const permId = result[0].insertId;
-      const perm = await db
+      // Check if permission already exists
+      const existingPerm = await db
         .select()
         .from(DocumentPermission)
-        .where(eq(DocumentPermission.permission_id, permId))
+        .where(
+          and(
+            eq(DocumentPermission.document_id, parseInt(documentId)),
+            eq(DocumentPermission.user_id, targetUserId),
+          ),
+        )
         .limit(1);
 
-      permissions.push({
-        ...perm[0],
-        shared_with: "user",
-        target_id: targetUserId,
-      });
+      if (existingPerm.length === 0) {
+        const result = await db.insert(DocumentPermission).values({
+          document_id: parseInt(documentId),
+          user_id: targetUserId,
+          permission_type: permissionType || "VIEW",
+          shared_by: userId,
+          shared_with: "user",
+          filter_type: filterType || null,
+          filter_ids: filterIds || null,
+          academic_term_id: academicTermId ? parseInt(academicTermId) : null,
+          expires_at: expiresAt ? new Date(expiresAt) : null,
+        });
+
+        const permId = result[0].insertId;
+        const perm = await db
+          .select()
+          .from(DocumentPermission)
+          .where(eq(DocumentPermission.permission_id, permId))
+          .limit(1);
+
+        if (perm.length > 0) {
+          permissions.push({
+            ...perm[0],
+            shared_with: "user",
+            target_id: targetUserId,
+          });
+        }
+      } else {
+        // User is already shared
+        alreadySharedUserIds.push(targetUserId);
+      }
     }
   }
 
@@ -1629,7 +2095,7 @@ export const shareDocument = asyncHandler(async (req: any, res: any) => {
     const uniqueUserIds = [...new Set(usersInRoles.map((ur) => ur.user_id))];
 
     for (const targetUserId of uniqueUserIds) {
-      // Check if permission already exists
+      // Check if permission already exists with same filter
       const existingPerm = await db
         .select()
         .from(DocumentPermission)
@@ -1637,6 +2103,12 @@ export const shareDocument = asyncHandler(async (req: any, res: any) => {
           and(
             eq(DocumentPermission.document_id, parseInt(documentId)),
             eq(DocumentPermission.user_id, targetUserId),
+            filterType
+              ? and(
+                  eq(DocumentPermission.filter_type, filterType),
+                  eq(DocumentPermission.filter_ids, filterIds),
+                )
+              : undefined,
           ),
         )
         .limit(1);
@@ -1648,6 +2120,9 @@ export const shareDocument = asyncHandler(async (req: any, res: any) => {
           permission_type: permissionType || "VIEW",
           shared_by: userId,
           shared_with: "role",
+          filter_type: filterType || null,
+          filter_ids: filterIds || null,
+          academic_term_id: academicTermId ? parseInt(academicTermId) : null,
           expires_at: expiresAt ? new Date(expiresAt) : null,
         });
 
@@ -1677,13 +2152,40 @@ export const shareDocument = asyncHandler(async (req: any, res: any) => {
     `Document ${documentId} shared with users/roles by user ${userId}`,
   );
 
-  successResponse(res, "Document shared successfully", permissions);
+  // Build response with warning if some users were already shared
+  const response: any = {
+    permissions,
+  };
+
+  if (alreadySharedUserIds.length > 0) {
+    // Get user details for the already shared users
+    const alreadySharedUsers = await db
+      .select({
+        user_id: User.user_id,
+        username: User.username,
+        email: User.email,
+      })
+      .from(User)
+      .where(inArray(User.user_id, alreadySharedUserIds));
+
+    response.alreadyShared = alreadySharedUsers;
+    response.message = `Some users were already shared. ${alreadySharedUsers.map((u: any) => u.username || u.email || u.user_id).join(", ")} already have access.`;
+  }
+
+  successResponse(
+    res,
+    alreadySharedUserIds.length > 0
+      ? "Some users were already shared"
+      : "Document shared successfully",
+    response,
+  );
 });
 
 export const getSharedDocuments = asyncHandler(async (req: any, res: any) => {
   const userId = req.user.userId;
 
-  const shared = await db
+  // First get all documents shared directly with the user
+  const directShared = await db
     .select({
       document: Document,
       permission: DocumentPermission,
@@ -1712,6 +2214,169 @@ export const getSharedDocuments = asyncHandler(async (req: any, res: any) => {
       ),
     );
 
+  // Get the current academic term
+  const currentTerm = await db
+    .select()
+    .from(AcademicTerm)
+    .where(eq(AcademicTerm.is_current, 1))
+    .limit(1);
+
+  const currentTermId =
+    currentTerm.length > 0 ? currentTerm[0].academic_term_id : null;
+
+  // Get user's role-based access with filters
+  const userRoles = await db
+    .select({
+      role_id: UserRole.role_id,
+    })
+    .from(UserRole)
+    .where(eq(UserRole.user_id, userId));
+
+  const roleIds = userRoles.map((r) => r.role_id);
+
+  // Get user's subject assignments (for teachers)
+  let assignedSubjects: any[] = [];
+  if (currentTermId) {
+    assignedSubjects = await db
+      .select({
+        subject_id: TeacherSubjectAssignment.subject_id,
+      })
+      .from(TeacherSubjectAssignment)
+      .where(
+        and(
+          eq(TeacherSubjectAssignment.user_id, userId),
+          eq(TeacherSubjectAssignment.academic_term_id, currentTermId),
+        ),
+      );
+  }
+
+  // Get user's subject enrollments (for students)
+  let enrolledSubjects: any[] = [];
+  if (currentTermId) {
+    enrolledSubjects = await db
+      .select({
+        subject_id: StudentSubjectEnrollment.subject_id,
+      })
+      .from(StudentSubjectEnrollment)
+      .where(
+        and(
+          eq(StudentSubjectEnrollment.user_id, userId),
+          eq(StudentSubjectEnrollment.academic_term_id, currentTermId),
+        ),
+      );
+  }
+
+  // Get user's program leads
+  const programLeads = await db
+    .select({
+      program_id: UserProgramLead.program_id,
+    })
+    .from(UserProgramLead)
+    .where(eq(UserProgramLead.user_id, userId));
+
+  // Get user's grade assignments (class teacher)
+  const gradeAssignments = await db
+    .select({
+      grade_id: UserGrade.grade_id,
+    })
+    .from(UserGrade)
+    .where(eq(UserGrade.user_id, userId));
+
+  // Get role-based permissions with matching filters
+  let roleBasedShared: any[] = [];
+  if (roleIds.length > 0) {
+    // Build conditions for role-based access based on user's associations
+    const conditions = [
+      eq(DocumentPermission.shared_with, "role"),
+      inArray(
+        DocumentPermission.user_id,
+        db
+          .select({ user_id: UserRole.user_id })
+          .from(UserRole)
+          .where(inArray(UserRole.role_id, roleIds)),
+      ),
+      or(
+        isNull(DocumentPermission.expires_at),
+        gt(DocumentPermission.expires_at, new Date()),
+      ),
+    ];
+
+    // Get all role-based permissions first
+    const rolePerms = await db
+      .select({
+        document: Document,
+        permission: DocumentPermission,
+        shared_by_user: {
+          user_id: User.user_id,
+          username: User.username,
+          email: User.email,
+          first_name: UserProfile.first_name,
+          last_name: UserProfile.last_name,
+        },
+      })
+      .from(DocumentPermission)
+      .innerJoin(
+        Document,
+        eq(DocumentPermission.document_id, Document.document_id),
+      )
+      .innerJoin(User, eq(DocumentPermission.shared_by, User.user_id))
+      .leftJoin(UserProfile, eq(User.user_id, UserProfile.user_id))
+      .innerJoin(UserRole, eq(DocumentPermission.user_id, UserRole.user_id))
+      .where(
+        and(
+          eq(DocumentPermission.shared_with, "role"),
+          inArray(UserRole.role_id, roleIds),
+          or(
+            isNull(DocumentPermission.expires_at),
+            gt(DocumentPermission.expires_at, new Date()),
+          ),
+        ),
+      );
+
+    // Filter role permissions based on filter_type and user's associations
+    const assignedSubjectIds = assignedSubjects.map((s) => s.subject_id);
+    const enrolledSubjectIds = enrolledSubjects.map((s) => s.subject_id);
+    const programIds = programLeads.map((p) => p.program_id);
+    const gradeIds = gradeAssignments.map((g) => g.grade_id);
+
+    roleBasedShared = rolePerms.filter((perm) => {
+      const filterType = perm.permission.filter_type;
+      const filterIds = perm.permission.filter_ids as number[] | null;
+
+      // If no filter, grant access to all users with that role
+      if (!filterType || !filterIds || !Array.isArray(filterIds)) {
+        return true;
+      }
+
+      // Check if user matches any of the filter IDs
+      switch (filterType) {
+        case "subject_assigned":
+          return filterIds.some((id) => assignedSubjectIds.includes(id));
+        case "subject_enrolled":
+          return filterIds.some((id) => enrolledSubjectIds.includes(id));
+        case "program_assigned":
+          return filterIds.some((id) => programIds.includes(id));
+        case "grade_assigned":
+          return filterIds.some((id) => gradeIds.includes(id));
+        default:
+          return true;
+      }
+    });
+  }
+
+  // Combine direct and role-based access
+  const allShared = [...directShared, ...roleBasedShared];
+
+  // Remove duplicates based on document_id
+  const uniqueDocs = new Map();
+  for (const item of allShared) {
+    if (!uniqueDocs.has(item.document.document_id)) {
+      uniqueDocs.set(item.document.document_id, item);
+    }
+  }
+
+  const shared = Array.from(uniqueDocs.values());
+
   successResponse(res, "Shared documents retrieved successfully", shared);
 });
 
@@ -1719,7 +2384,18 @@ export const revokeDocumentAccess = asyncHandler(async (req: any, res: any) => {
   const userId = req.user.userId;
   const { permissionId } = req.params;
 
-  // Check if user is SUPER_ADMIN
+  // Check if permission exists first
+  const existingPerm = await db
+    .select()
+    .from(DocumentPermission)
+    .where(eq(DocumentPermission.permission_id, parseInt(permissionId)))
+    .limit(1);
+
+  if (existingPerm.length === 0) {
+    throw new NotFoundError("Permission not found");
+  }
+
+  // Check if user is SUPER_ADMIN or the document owner
   const userRoles = await db
     .select({
       role_id: Role.role_id,
@@ -1731,11 +2407,21 @@ export const revokeDocumentAccess = asyncHandler(async (req: any, res: any) => {
 
   const isSuperAdmin = userRoles.some((r) => r.name === "SUPER_ADMIN");
 
-  // Check if permission exists and was created by the user (or user is SUPER_ADMIN)
+  // Get the document to check ownership
+  const document = await db
+    .select()
+    .from(Document)
+    .where(eq(Document.document_id, existingPerm[0].document_id))
+    .limit(1);
+
+  const isDocumentOwner = document.length > 0 && document[0].user_id === userId;
+
+  // Check if user is the one who shared it, SUPER_ADMIN, or document owner
   const conditions = [
     eq(DocumentPermission.permission_id, parseInt(permissionId)),
   ];
-  if (!isSuperAdmin) {
+
+  if (!isSuperAdmin && !isDocumentOwner) {
     conditions.push(eq(DocumentPermission.shared_by, userId));
   }
 

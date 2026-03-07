@@ -17,6 +17,7 @@ interface NavbarProps {
   showNavigation?: boolean;
   showAuthButtons?: boolean;
   showUserCard?: boolean;
+  websiteUrl?: string;
 }
 
 const Navbar: React.FC<NavbarProps> = ({
@@ -169,7 +170,7 @@ const Navbar: React.FC<NavbarProps> = ({
                     <span>Home</span>
                   </NavLink>
                 )}
-                {onNavigateToAbout && (
+                {/* {onNavigateToAbout && (
                   <NavLink
                     isActive={isActive("/about")}
                     onClick={onNavigateToAbout}
@@ -184,13 +185,32 @@ const Navbar: React.FC<NavbarProps> = ({
                   >
                     <span>Contact Us</span>
                   </NavLink>
-                )}
+                )} */}
               </div>
             )}
 
             {/* Desktop Auth & Theme Toggle */}
             <div className="hidden md:flex items-center space-x-4">
               <ThemeToggle />
+              <a
+                href={"https://nga.ac.rw/"}
+                className="px-4 py-2 text-sm rounded-full transition-all bg-blue-500 text-white duration-200 font-medium flex items-center space-x-2 hover:bg-blue-600 dark:hover:bg-blue-700"
+              >
+                <span>Website</span>
+                <svg
+                  className="w-3 h-3"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
+                  />
+                </svg>
+              </a>
 
               {showUserCard && user ? (
                 /* User Card Dropdown */

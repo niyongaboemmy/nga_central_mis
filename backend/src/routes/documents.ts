@@ -27,6 +27,7 @@ import {
   revokeFolderAccess,
   getSharedFolders,
   previewSchemeOfWork,
+  getDocumentShareFilterOptions,
 } from "../controllers/documentController";
 
 const router = Router();
@@ -53,6 +54,9 @@ router.get("/roles", getAllRoles);
 
 // Get users by role ID
 router.get("/roles/:roleId/users", getUsersByRole);
+
+// Get filter options for role-based sharing
+router.get("/share/filter-options", getDocumentShareFilterOptions);
 
 // ======================
 // FOLDER ROUTES

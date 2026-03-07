@@ -10,6 +10,7 @@ import {
   type SharedDocument,
   type UserSearchResult,
   type Role,
+  type FilterOptions,
 } from "../../api/documents";
 import { roleApi, folderPermissionApi } from "../../api/documents";
 import FolderTree from "./FolderTree";
@@ -71,7 +72,7 @@ const Documents: React.FC = () => {
   >([]);
   const [currentFolderId, setCurrentFolderId] = useState<number | null>(null);
   const [currentSharedFolder, setCurrentSharedFolder] = useState<any | null>(
-    null
+    null,
   );
   const [breadcrumbs, setBreadcrumbs] = useState<BreadcrumbItem[]>([
     { id: null, name: "My Documents" },
@@ -82,7 +83,7 @@ const Documents: React.FC = () => {
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
   const [isUploading, setIsUploading] = useState(false);
   const [_selectedItems, setSelectedItems] = useState<(Folder | Document)[]>(
-    []
+    [],
   );
   const [contextMenu, setContextMenu] = useState<{
     x: number;
@@ -111,7 +112,7 @@ const Documents: React.FC = () => {
   const [isLoadingShared, setIsLoadingShared] = useState(false);
   const [folderTree, setFolderTree] = useState<any[]>([]);
   const [showFolderTree, setShowFolderTree] = useState(
-    window.innerWidth >= 700
+    window.innerWidth >= 700,
   ); // tablet breakpoint
   const [uploadProgress, setUploadProgress] = useState<{
     [key: string]: number;
@@ -125,7 +126,7 @@ const Documents: React.FC = () => {
   const [isLoadingFolderTree, setIsLoadingFolderTree] = useState(false);
   const [isNavigating, setIsNavigating] = useState(false);
   const [deletingItem, setDeletingItem] = useState<Folder | Document | null>(
-    null
+    null,
   );
 
   // Share modal state
@@ -140,6 +141,17 @@ const Documents: React.FC = () => {
   const [roles, setRoles] = useState<Role[]>([]);
   const [selectedShareRoles, setSelectedShareRoles] = useState<Role[]>([]);
   const [sharePermission, setSharePermission] = useState<string>("VIEW");
+
+  // Filter options state
+  const [filterOptions, setFilterOptions] = useState<FilterOptions | null>(
+    null,
+  );
+  const [isLoadingFilterOptions, setIsLoadingFilterOptions] = useState(false);
+  const [selectedFilterType, setSelectedFilterType] = useState<string>("");
+  const [selectedFilterIds, setSelectedFilterIds] = useState<number[]>([]);
+  const [selectedAcademicTermId, setSelectedAcademicTermId] = useState<
+    number | null
+  >(null);
   const [isSearchingUsers, setIsSearchingUsers] = useState(false);
   const [isSharing, setIsSharing] = useState(false);
   const [isLoadingRoles, setIsLoadingRoles] = useState(false);
@@ -192,7 +204,7 @@ const Documents: React.FC = () => {
       ongoingRequestsRef.current.set(key, request);
       return request;
     },
-    []
+    [],
   );
 
   // Fetch folders and documents
@@ -338,13 +350,34 @@ const Documents: React.FC = () => {
     }
   };
 
+  // Fetch filter options for role-based sharing
+  const fetchFilterOptions = async () => {
+    setIsLoadingFilterOptions(true);
+    try {
+      const response = await documentApi.getShareFilterOptions();
+      const data = response.data.data;
+      if (data) {
+        setFilterOptions(data);
+        // Set current term as default if available
+        if (data.currentTermId) {
+          setSelectedAcademicTermId(data.currentTermId);
+        }
+      }
+    } catch (error) {
+      console.error("Failed to fetch filter options:", error);
+      setFilterOptions(null);
+    } finally {
+      setIsLoadingFilterOptions(false);
+    }
+  };
+
   // Fetch existing permissions for a document or folder
   const fetchPermissions = async (item: Folder | Document) => {
     setIsLoadingPermissions(true);
     try {
       if ((item as Document).document_id !== undefined) {
         const response = await documentApi.getPermissions(
-          (item as Document).document_id
+          (item as Document).document_id,
         );
         const permissionsData = response.data.data;
         if (permissionsData && Array.isArray(permissionsData)) {
@@ -359,7 +392,7 @@ const Documents: React.FC = () => {
         }
       } else {
         const response = await folderPermissionApi.getPermissions(
-          (item as Folder).folder_id
+          (item as Folder).folder_id,
         );
         setExistingPermissions(response.data.data || []);
       }
@@ -428,7 +461,7 @@ const Documents: React.FC = () => {
         doc.original_name.toLowerCase().includes(query) ||
         doc.file_extension.toLowerCase().includes(query) ||
         (doc.description && doc.description.toLowerCase().includes(query)) ||
-        (doc.tags && doc.tags.toLowerCase().includes(query))
+        (doc.tags && doc.tags.toLowerCase().includes(query)),
     );
     setFilteredDocuments(filteredDocs);
 
@@ -448,7 +481,9 @@ const Documents: React.FC = () => {
         )
           .toLowerCase()
           .includes(query) ||
-        sharedDoc.permission.shared_by_user?.email.toLowerCase().includes(query)
+        sharedDoc.permission.shared_by_user?.email
+          .toLowerCase()
+          .includes(query),
     );
     setFilteredSharedDocuments(filteredShared);
     // Filter shared folders
@@ -466,7 +501,7 @@ const Documents: React.FC = () => {
           .includes(query) ||
         sharedFolder.permission?.shared_by_user?.email
           .toLowerCase()
-          .includes(query)
+          .includes(query),
     );
     setFilteredSharedFolders(filteredSharedF);
   }, [searchQuery, documents, sharedDocuments, sharedFolders]);
@@ -586,13 +621,13 @@ const Documents: React.FC = () => {
         foldersRes.data.data?.map((item: any) => ({
           ...item.folder,
           owner: item.owner,
-        })) || []
+        })) || [],
       );
       setDocuments(
         documentsRes.data.data?.map((item: any) => ({
           ...item.document,
           owner: item.owner,
-        })) || []
+        })) || [],
       );
       setSelectedItems([]);
     } catch (error: any) {
@@ -653,13 +688,13 @@ const Documents: React.FC = () => {
         foldersRes.data.data?.map((item: any) => ({
           ...item.folder,
           owner: item.owner,
-        })) || []
+        })) || [],
       );
       setDocuments(
         documentsRes.data.data?.map((item: any) => ({
           ...item.document,
           owner: item.owner,
-        })) || []
+        })) || [],
       );
       setSelectedItems([]);
     } catch (error: any) {
@@ -685,7 +720,7 @@ const Documents: React.FC = () => {
       setCurrentFolderId(targetBreadcrumb.id);
       // Find the shared folder object - it might be a subfolder
       const sharedFolder = sharedFolders.find(
-        (f) => parseInt(f.folder_id) === targetBreadcrumb.id
+        (f) => parseInt(f.folder_id) === targetBreadcrumb.id,
       );
       if (sharedFolder) {
         setCurrentSharedFolder(sharedFolder);
@@ -715,7 +750,7 @@ const Documents: React.FC = () => {
         setCurrentFolderId(targetBreadcrumb.id);
         // Keep currentSharedFolder if it's a subfolder
         const sharedFolder = sharedFolders.find(
-          (f) => parseInt(f.folder_id) === targetBreadcrumb.id
+          (f) => parseInt(f.folder_id) === targetBreadcrumb.id,
         );
         if (sharedFolder) {
           setCurrentSharedFolder(sharedFolder);
@@ -777,7 +812,7 @@ const Documents: React.FC = () => {
     } catch (error: any) {
       showToast(
         error.response?.data?.message || "Failed to upload files",
-        "error"
+        "error",
       );
     } finally {
       setIsUploading(false);
@@ -809,7 +844,7 @@ const Documents: React.FC = () => {
     } catch (error: any) {
       showToast(
         error.response?.data?.message || "Failed to create folder",
-        "error"
+        "error",
       );
     } finally {
       setIsCreatingFolder(false);
@@ -920,7 +955,7 @@ const Documents: React.FC = () => {
       }
       showToast(
         `${isDocument ? "File" : "Folder"} deleted successfully`,
-        "success"
+        "success",
       );
       setSelectedItems((prev) => prev.filter((i) => i !== item));
       fetchData();
@@ -947,7 +982,7 @@ const Documents: React.FC = () => {
     } catch (error: any) {
       showToast(
         error.response?.data?.message || "Failed to remove access",
-        "error"
+        "error",
       );
     } finally {
       setIsRemovingAccess(false);
@@ -963,14 +998,14 @@ const Documents: React.FC = () => {
     setIsRemovingPermission(true);
     try {
       await folderPermissionApi.revokeAccess(
-        sharedFolder.permission?.permission_id
+        sharedFolder.permission?.permission_id,
       );
       showToast("Access removed successfully", "success");
       fetchSharedDocuments();
     } catch (error: any) {
       showToast(
         error.response?.data?.message || "Failed to remove access",
-        "error"
+        "error",
       );
     } finally {
       setIsRemovingPermission(false);
@@ -994,7 +1029,7 @@ const Documents: React.FC = () => {
     } catch (error: any) {
       showToast(
         error.response?.data?.message || "Failed to remove access",
-        "error"
+        "error",
       );
     } finally {
       setIsRemovingPermission(false);
@@ -1034,8 +1069,11 @@ const Documents: React.FC = () => {
     setSelectedShareUsers([]);
     setSelectedShareRoles([]);
     setExpirationDate("");
+    setSelectedFilterType("");
+    setSelectedFilterIds([]);
     fetchRoles();
     fetchPermissions(item);
+    fetchFilterOptions();
     setContextMenu(null);
   };
 
@@ -1051,7 +1089,7 @@ const Documents: React.FC = () => {
   // Remove user from share list
   const removeUserFromShare = (userId: number) => {
     setSelectedShareUsers(
-      selectedShareUsers.filter((u) => u.user_id !== userId)
+      selectedShareUsers.filter((u) => u.user_id !== userId),
     );
   };
 
@@ -1059,7 +1097,7 @@ const Documents: React.FC = () => {
   const toggleRoleSelection = (role: Role) => {
     if (selectedShareRoles.find((r) => r.role_id === role.role_id)) {
       setSelectedShareRoles(
-        selectedShareRoles.filter((r) => r.role_id !== role.role_id)
+        selectedShareRoles.filter((r) => r.role_id !== role.role_id),
       );
     } else {
       setSelectedShareRoles([...selectedShareRoles, role]);
@@ -1069,7 +1107,7 @@ const Documents: React.FC = () => {
   // Remove role from share list
   const removeRoleFromShare = (roleId: number) => {
     setSelectedShareRoles(
-      selectedShareRoles.filter((r) => r.role_id !== roleId)
+      selectedShareRoles.filter((r) => r.role_id !== roleId),
     );
   };
 
@@ -1096,7 +1134,7 @@ const Documents: React.FC = () => {
     if (selectedShareUsers.length === 0 && selectedShareRoles.length === 0) {
       showToast(
         "Please select at least one user or role to share with",
-        "error"
+        "error",
       );
       return;
     }
@@ -1106,30 +1144,68 @@ const Documents: React.FC = () => {
       ? (shareItem as Document).document_id
       : (shareItem as Folder).folder_id;
 
+    // Include filter options when sharing with roles ONLY (not when specific users are selected)
+    const hasRolesOnly =
+      selectedShareRoles.length > 0 && selectedShareUsers.length === 0;
+    const filterType =
+      hasRolesOnly && selectedFilterType ? selectedFilterType : undefined;
+    const filterIds =
+      hasRolesOnly && selectedFilterIds.length > 0
+        ? selectedFilterIds
+        : undefined;
+    const academicTermId =
+      hasRolesOnly && selectedAcademicTermId
+        ? selectedAcademicTermId
+        : undefined;
+
+    // When selected users exist, only share with those users (don't share with role members)
+    const roleIds = hasRolesOnly
+      ? selectedShareRoles.map((r) => r.role_id.toString())
+      : [];
+
     setIsSharing(true);
     try {
+      let response: any;
       if (isDocument) {
-        await documentApi.share(itemId, {
+        response = await documentApi.share(itemId, {
           userIds: selectedShareUsers.map((u) => u.user_id),
-          roleIds: selectedShareRoles.map((r) => r.role_id.toString()),
+          roleIds,
           permissionType: sharePermission,
           expiresAt: expirationDate || undefined,
+          filterType,
+          filterIds,
+          academicTermId,
         });
         showToast("Document shared successfully", "success");
         fetchPermissions(shareItem);
       } else {
-        await folderPermissionApi.share(itemId, {
+        response = await folderPermissionApi.share(itemId, {
           userIds: selectedShareUsers.map((u) => u.user_id),
-          roleIds: selectedShareRoles.map((r) => r.role_id.toString()),
+          roleIds,
           permissionType: sharePermission,
           expiresAt: expirationDate || undefined,
+          filterType,
+          filterIds,
+          academicTermId,
         });
         showToast("Folder shared successfully", "success");
         fetchFolderPermissions(itemId);
       }
+      // Show warning if some users were already shared (from success response)
+      if (response.data?.alreadyShared) {
+        const alreadyShared = response.data.alreadyShared;
+        const names = alreadyShared
+          .map((u: any) => u.username || u.email)
+          .join(", ");
+        showToast(`Some users were already shared: ${names}`, "warning");
+      } else if (response.data?.message) {
+        showToast(response.data.message, "warning");
+      }
       setSelectedShareUsers([]);
       setSelectedShareRoles([]);
       setUserSearchQuery("");
+      setIsShareModalOpen(false);
+      setShareItem(null);
     } catch (error: any) {
       showToast(error.response?.data?.message || "Failed to share", "error");
     } finally {
@@ -1146,7 +1222,7 @@ const Documents: React.FC = () => {
       | "document"
       | "shared-document"
       | "shared-folder"
-      | "background"
+      | "background",
   ) => {
     setContextMenu({
       x: e.clientX,
@@ -1423,6 +1499,12 @@ const Documents: React.FC = () => {
         expirationDate={expirationDate}
         copySuccess={copySuccess}
         searchError={searchError}
+        // Filter options
+        filterOptions={filterOptions}
+        isLoadingFilterOptions={isLoadingFilterOptions}
+        selectedFilterType={selectedFilterType}
+        selectedFilterIds={selectedFilterIds}
+        selectedAcademicTermId={selectedAcademicTermId}
         onShareTabChange={setShareTab}
         onUserSearchQueryChange={setUserSearchQuery}
         onSearchUsers={() => searchUsers(userSearchQuery)}
@@ -1435,6 +1517,9 @@ const Documents: React.FC = () => {
         onCopyLink={copyShareLink}
         onShare={handleShare}
         onRemovePermission={handleRemovePermission}
+        onFilterTypeChange={setSelectedFilterType}
+        onFilterIdsChange={setSelectedFilterIds}
+        onAcademicTermIdChange={setSelectedAcademicTermId}
         onClose={() => {
           setIsShareModalOpen(false);
           setShareItem(null);
@@ -1442,6 +1527,9 @@ const Documents: React.FC = () => {
           setSelectedShareRoles([]);
           setUserSearchQuery("");
           setSearchError(null);
+          setSelectedFilterType("");
+          setSelectedFilterIds([]);
+          setSelectedAcademicTermId(null);
         }}
       />
 

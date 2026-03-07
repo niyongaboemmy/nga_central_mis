@@ -26,6 +26,7 @@ import {
   type Document,
   type UserSearchResult,
   type Role,
+  type FilterOptions,
 } from "../../api/documents";
 import {
   modalVariants,
@@ -44,6 +45,7 @@ import {
   FiCode,
   FiFilePlus,
 } from "react-icons/fi";
+import RoleShareComponent from "./RoleShareComponent";
 
 // Get file icon component helper
 const getFileIconComponent = (doc: Document, size: number = 48) => {
@@ -71,7 +73,7 @@ const getFileIconComponent = (doc: Document, size: number = 48) => {
     case ["zip", "rar", "7z", "tar", "gz"].includes(ext):
       return <FiArchive {...iconProps} />;
     case ["js", "ts", "html", "css", "json", "py", "java", "c", "cpp"].includes(
-      ext
+      ext,
     ):
       return <FiCode {...iconProps} />;
     default:
@@ -98,6 +100,12 @@ interface ShareModalProps {
   expirationDate: string;
   copySuccess: boolean;
   searchError: string | null;
+  // Filter options
+  filterOptions: FilterOptions | null;
+  isLoadingFilterOptions: boolean;
+  selectedFilterType: string;
+  selectedFilterIds: number[];
+  selectedAcademicTermId: number | null;
   onShareTabChange: (tab: ShareTabType) => void;
   onUserSearchQueryChange: (query: string) => void;
   onSearchUsers: () => void;
@@ -110,6 +118,9 @@ interface ShareModalProps {
   onCopyLink: () => void;
   onShare: () => void;
   onRemovePermission: (permissionId: number) => void;
+  onFilterTypeChange: (filterType: string) => void;
+  onFilterIdsChange: (filterIds: number[]) => void;
+  onAcademicTermIdChange: (termId: number | null) => void;
   onClose: () => void;
 }
 
@@ -176,31 +187,29 @@ const ShareModal: React.FC<ShareModalProps> = ({
         initial="hidden"
         animate="visible"
         exit="exit"
-        className="bg-white dark:bg-gray-800 rounded-3xl shadow-2xl w-full max-w-lg sm:max-w-2xl md:max-w-4xl min-h-[70vh] max-h-[100vh] overflow-hidden flex flex-col"
+        className="bg-white dark:bg-gray-800 fixed inset-0 z-50 flex flex-col"
       >
         {/* Header */}
-        <div className="relative bg-gradient-to-r from-blue-500 via-blue-500 to-blue-500 p-3 sm:p-4 text-white">
-          <div className="absolute inset-0 bg-black/10" />
-          <div className="relative flex items-start justify-between">
-            <div className="flex items-center gap-3 sm:gap-4">
-              <div className="w-14 h-14 bg-white/20 backdrop-blur-lg rounded-2xl flex items-center justify-center">
+        <div className="relative bg-gradient-to-r from-blue-500 to-blue-600 p-3 sm:p-4 text-white flex-shrink-0">
+          <div className="absolute inset-0 bg-black/5" />
+          <div className="relative flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 bg-white/20 backdrop-blur-lg rounded-xl flex items-center justify-center">
                 {isFolderItem ? (
-                  <FiFolder className="w-8 h-8 text-white" />
+                  <FiFolder className="w-6 h-6 text-white" />
                 ) : (
                   <div className="transform hover:scale-110 transition-transform">
-                    {getFileIconComponent(shareItem as Document, 48)}
+                    {getFileIconComponent(shareItem as Document, 36)}
                   </div>
                 )}
               </div>
               <div>
-                <h2 className="text-xl font-bold">
-                  Share "
+                <h2 className="text-lg font-bold truncate max-w-[200px] sm:max-w-md">
                   {isFolderItem
                     ? (shareItem as Folder).name
                     : (shareItem as Document).original_name}
-                  "
                 </h2>
-                <p className="text-white/80 text-sm mt-1">
+                <p className="text-white/80 text-xs">
                   {existingPermissions.length} people have access
                 </p>
               </div>
@@ -217,7 +226,7 @@ const ShareModal: React.FC<ShareModalProps> = ({
         </div>
 
         {/* Tabs */}
-        <div className="flex border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
+        <div className="flex border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 flex-shrink-0">
           {[
             { id: "people" as ShareTabType, icon: FiUser, label: "People" },
             { id: "roles" as ShareTabType, icon: FiShield, label: "Roles" },
@@ -247,7 +256,7 @@ const ShareModal: React.FC<ShareModalProps> = ({
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto p-3 sm:p-4 md:p-8">
+        <div className="flex-1 overflow-y-auto p-3 sm:p-4">
           {shareTab === "people" && (
             <div className={"space-y-3"}>
               {/* Existing permissions */}
@@ -273,13 +282,13 @@ const ShareModal: React.FC<ShareModalProps> = ({
                         <div className="flex items-center gap-3">
                           <div
                             className={`w-10 h-10 rounded-xl flex items-center justify-center text-white font-semibold ${getAvatarColor(
-                              perm.user.username
+                              perm.user.username,
                             )}`}
                           >
                             {getInitials(
                               perm.user.first_name,
                               perm.user.last_name,
-                              perm.user.username
+                              perm.user.username,
                             )}
                           </div>
                           <div>
@@ -296,7 +305,7 @@ const ShareModal: React.FC<ShareModalProps> = ({
                         <div className="flex items-center gap-3">
                           <span
                             className={`px-3 py-1 rounded-full text-xs font-medium ${getPermissionBadgeColor(
-                              perm.permission_type
+                              perm.permission_type,
                             )}`}
                           >
                             {perm.permission_type}
@@ -403,13 +412,13 @@ const ShareModal: React.FC<ShareModalProps> = ({
                         >
                           <div
                             className={`w-10 h-10 rounded-xl flex items-center justify-center text-white font-semibold ${getAvatarColor(
-                              user.username
+                              user.username,
                             )}`}
                           >
                             {getInitials(
                               user.first_name,
                               user.last_name,
-                              user.username
+                              user.username,
                             )}
                           </div>
                           <div className="flex-1 min-w-0">
@@ -455,13 +464,13 @@ const ShareModal: React.FC<ShareModalProps> = ({
                           <div className="flex items-center gap-3">
                             <div
                               className={`w-10 h-10 rounded-xl flex items-center justify-center text-white font-semibold ${getAvatarColor(
-                                user.username
+                                user.username,
                               )}`}
                             >
                               {getInitials(
                                 user.first_name,
                                 user.last_name,
-                                user.username
+                                user.username,
                               )}
                             </div>
                             <span className="font-medium text-gray-700 dark:text-gray-200">
@@ -490,108 +499,19 @@ const ShareModal: React.FC<ShareModalProps> = ({
           )}
 
           {shareTab === "roles" && (
-            <div className="space-y-4">
-              <div>
-                <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-400 uppercase tracking-wider mb-3">
-                  Select Roles
-                </h3>
-                {isLoadingRoles ? (
-                  <div className="flex items-center justify-center py-8">
-                    <div className="w-8 h-8 border-2 border-blue-200 border-t-blue-600 rounded-full animate-spin" />
-                  </div>
-                ) : roles.length === 0 ? (
-                  <p className="text-sm text-gray-500 text-center py-4">
-                    No roles available
-                  </p>
-                ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {roles.map((role) => (
-                      <motion.button
-                        key={role.role_id}
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
-                        onClick={() => onToggleRole(role)}
-                        className={`p-1.5 rounded-2xl border-2 transition-all text-left ${
-                          selectedShareRoles.find(
-                            (r) => r.role_id === role.role_id
-                          )
-                            ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20"
-                            : "border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500"
-                        }`}
-                      >
-                        <div className="flex items-center gap-3">
-                          <div
-                            className={`w-8 h-8 rounded-xl flex items-center justify-center ${
-                              selectedShareRoles.find(
-                                (r) => r.role_id === role.role_id
-                              )
-                                ? "bg-blue-500 text-white"
-                                : "bg-gray-100 dark:bg-gray-700 text-gray-500"
-                            }`}
-                          >
-                            <FiShield className="w-4 h-4" />
-                          </div>
-                          <div className="flex-1">
-                            <p className="font-medium text-sm text-black dark:text-gray-200">
-                              {role.name}
-                            </p>
-                            {role.description && (
-                              <p className="text-xs text-gray-500 truncate">
-                                {role.description}
-                              </p>
-                            )}
-                          </div>
-                          {selectedShareRoles.find(
-                            (r) => r.role_id === role.role_id
-                          ) && (
-                            <FiCheckCircle className="w-5 h-5 text-blue-500" />
-                          )}
-                        </div>
-                      </motion.button>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Selected roles */}
-              <AnimatePresence>
-                {selectedShareRoles.length > 0 && (
-                  <motion.div
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: "auto" }}
-                    exit={{ opacity: 0, height: 0 }}
-                  >
-                    <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-400 uppercase tracking-wider mb-3">
-                      Selected roles ({selectedShareRoles.length})
-                    </h3>
-                    <div className="flex flex-wrap gap-2">
-                      {selectedShareRoles.map((role) => (
-                        <motion.div
-                          key={role.role_id}
-                          initial={{ opacity: 0, scale: 0.8 }}
-                          animate={{ opacity: 1, scale: 1 }}
-                          exit={{ opacity: 0, scale: 0.8 }}
-                          className="flex items-center gap-2 px-4 py-2 bg-blue-100/70 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full"
-                        >
-                          <FiShield className="w-4 h-4" />
-                          <span className="text-sm font-medium">
-                            {role.name}
-                          </span>
-                          <motion.button
-                            whileHover={{ scale: 1.1 }}
-                            whileTap={{ scale: 0.9 }}
-                            onClick={() => onRemoveRole(role.role_id)}
-                            className="p-0.5 hover:bg-blue-200 dark:hover:bg-blue-800 rounded-full"
-                          >
-                            <FiX className="w-3 h-3" />
-                          </motion.button>
-                        </motion.div>
-                      ))}
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
+            <RoleShareComponent
+              roles={roles}
+              selectedRoles={selectedShareRoles}
+              selectedUsers={selectedShareUsers}
+              onToggleRole={onToggleRole}
+              onRemoveRole={onRemoveRole}
+              onUserSelect={onAddUser}
+              onUserRemove={onRemoveUser}
+              onClearAllUsers={() => {
+                selectedShareUsers.forEach((u) => onRemoveUser(u.user_id));
+              }}
+              isLoadingRoles={isLoadingRoles}
+            />
           )}
 
           {shareTab === "links" && (
@@ -709,7 +629,7 @@ const ShareModal: React.FC<ShareModalProps> = ({
         </div>
 
         {/* Footer Actions */}
-        <div className="p-3 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
+        <div className="p-3 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 flex-shrink-0">
           <div className="flex justify-between items-center">
             <motion.button
               whileHover={{ scale: 1.02 }}

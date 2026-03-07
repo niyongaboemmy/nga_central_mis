@@ -7,9 +7,6 @@ import {
   Navigate,
   useLocation,
 } from "react-router-dom";
-import Landing from "./components/Landing";
-import AboutUs from "./components/AboutUs";
-import ContactUs from "./components/ContactUs";
 import PasswordRecovery from "./components/PasswordRecovery";
 import Login from "./components/Login";
 import Profile from "./components/Profile";
@@ -37,28 +34,6 @@ import Systems from "./components/Systems";
 import SchemeOfWorkList from "./components/SchemeOfWorkList";
 import SchemeOfWorkCalendar from "./components/SchemeOfWorkCalendar";
 import AcademicCalendar from "./components/AcademicCalendar";
-
-// Wrapper components for pages that need the Navbar
-const LandingPage: React.FC = () => {
-  const navigate = useNavigate();
-  return (
-    <Landing
-      onNavigateToLogin={() => navigate("/login")}
-      onNavigateToAbout={() => navigate("/about")}
-      onNavigateToContact={() => navigate("/contact")}
-    />
-  );
-};
-
-const AboutPage: React.FC = () => {
-  const navigate = useNavigate();
-  return <AboutUs onNavigateBack={() => navigate("/")} />;
-};
-
-const ContactPage: React.FC = () => {
-  const navigate = useNavigate();
-  return <ContactUs onNavigateBack={() => navigate("/")} />;
-};
 
 const LoginPage: React.FC = () => {
   const navigate = useNavigate();
@@ -128,6 +103,7 @@ const PublicLayout: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
   const navigate = useNavigate();
+  const websiteUrl = import.meta.env.VITE_WEBSITE_URL as string | undefined;
   return (
     <>
       <Navbar
@@ -137,6 +113,7 @@ const PublicLayout: React.FC<{ children: React.ReactNode }> = ({
         onNavigateToContact={() => navigate("/contact")}
         showNavigation={true}
         showAuthButtons={true}
+        websiteUrl={websiteUrl}
       />
       <div className="pt-16">{children}</div>
       <Footer />
@@ -277,7 +254,8 @@ function App() {
               element={
                 <PublicRoute>
                   <PublicLayout>
-                    <LandingPage />
+                    {/* <LandingPage /> */}
+                    <LoginPage />
                   </PublicLayout>
                 </PublicRoute>
               }
@@ -289,7 +267,8 @@ function App() {
               element={
                 <PublicRoute>
                   <PublicLayout>
-                    <AboutPage />
+                    {/* <AboutPage /> */}
+                    <LoginPage />
                   </PublicLayout>
                 </PublicRoute>
               }
@@ -301,7 +280,8 @@ function App() {
               element={
                 <PublicRoute>
                   <PublicLayout>
-                    <ContactPage />
+                    {/* <ContactPage /> */}
+                    <LoginPage />
                   </PublicLayout>
                 </PublicRoute>
               }

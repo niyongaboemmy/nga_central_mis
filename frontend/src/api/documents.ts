@@ -92,6 +92,53 @@ export interface Role {
   status: string;
 }
 
+// Filter option interfaces
+export interface Subject {
+  subject_id: number;
+  name: string;
+  code: string | null;
+  // Extended fields for myAssignments
+  subject_name?: string;
+  subject_code?: string;
+}
+
+export interface Program {
+  program_id: number;
+  name: string;
+  // Extended fields for myAssignments
+  program_name?: string;
+}
+
+export interface Grade {
+  grade_id: number;
+  name: string;
+  level_order: number;
+  // Extended fields for myAssignments
+  grade_name?: string;
+}
+
+export interface AcademicTerm {
+  academic_term_id: number;
+  name: string;
+  is_current: number;
+}
+
+export interface FilterOptions {
+  myAssignments: {
+    assignedSubjects: Subject[];
+    enrolledSubjects: Subject[];
+    programLeads: Program[];
+    gradeAssignments: Grade[];
+  };
+  options: {
+    subjects: Subject[];
+    programs: Program[];
+    grades: Grade[];
+    academicTerms: AcademicTerm[];
+  };
+  currentTermId: number | null;
+}
+
 // API functions for folders
 export const folderApi = {
   create: (data: {
@@ -124,7 +171,7 @@ export const folderApi = {
 
   update: (
     folderId: number,
-    data: { name?: string; description?: string; color?: string }
+    data: { name?: string; description?: string; color?: string },
   ) => apiService.put(`/documents/folders/${folderId}`, data),
 
   delete: (folderId: number) =>
@@ -159,7 +206,7 @@ export const documentApi = {
       tags?: string;
       is_public?: boolean;
       original_name?: string;
-    }
+    },
   ) => apiService.put(`/documents/${documentId}`, data),
 
   delete: (documentId: number) => apiService.delete(`/documents/${documentId}`),
@@ -187,8 +234,14 @@ export const documentApi = {
       roleIds?: string[];
       permissionType?: string;
       expiresAt?: string;
-    }
+      filterType?: string;
+      filterIds?: number[];
+      academicTermId?: number;
+    },
   ) => apiService.post(`/documents/${documentId}/share`, data),
+
+  getShareFilterOptions: () =>
+    apiService.get("/documents/share/filter-options"),
 
   getSharedWithMe: () => apiService.get("/documents/shared/with-me"),
 
@@ -207,7 +260,7 @@ export const formatFileSize = (bytes: number): string => {
 
 export const getFileIcon = (
   mimeType: string,
-  fileExtension: string
+  fileExtension: string,
 ): string => {
   const ext = fileExtension.toLowerCase();
 
@@ -264,7 +317,7 @@ export const getFileIcon = (
 
 export const getFileTypeColor = (
   mimeType: string,
-  fileExtension: string
+  fileExtension: string,
 ): string => {
   const ext = fileExtension.toLowerCase();
 
@@ -292,8 +345,15 @@ export const roleApi = {
 
   getById: (roleId: number) => apiService.get(`/documents/roles/${roleId}`),
 
-  getUsersByRole: (roleId: number) =>
-    apiService.get(`/documents/roles/${roleId}/users`),
+  getUsersByRole: (
+    roleId: number,
+    params?: {
+      page?: number;
+      limit?: number;
+      gradeId?: number;
+      classGroupId?: number;
+    },
+  ) => apiService.get(`/documents/roles/${roleId}/users`, { params }),
 };
 
 // Folder permissions API
@@ -308,7 +368,10 @@ export const folderPermissionApi = {
       roleIds?: string[];
       permissionType?: string;
       expiresAt?: string;
-    }
+      filterType?: string;
+      filterIds?: number[];
+      academicTermId?: number;
+    },
   ) => apiService.post(`/documents/folders/${folderId}/share`, data),
 
   revokeAccess: (permissionId: number) =>

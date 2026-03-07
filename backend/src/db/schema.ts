@@ -8,6 +8,7 @@ import {
   tinyint,
   int,
   text,
+  json,
   primaryKey,
   uniqueIndex,
   index,
@@ -418,6 +419,17 @@ export const DocumentPermission = mysqlTable(
       .notNull()
       .references(() => User.user_id),
     shared_with: mysqlEnum("shared_with", ["user", "role"]).default("user"),
+    // Filter fields for granular role-based sharing (array of IDs)
+    filter_type: mysqlEnum("filter_type", [
+      "subject_assigned",
+      "subject_enrolled",
+      "program_assigned",
+      "grade_assigned",
+    ]),
+    filter_ids: json("filter_ids"),
+    academic_term_id: bigint("academic_term_id", { mode: "number" }).references(
+      () => AcademicTerm.academic_term_id,
+    ),
     expires_at: datetime("expires_at"),
     created_at: datetime("created_at").default(sql`CURRENT_TIMESTAMP`),
   },
@@ -447,6 +459,17 @@ export const FolderPermission = mysqlTable(
     shared_by: bigint("shared_by", { mode: "number" })
       .notNull()
       .references(() => User.user_id),
+    // Filter fields for granular role-based sharing (array of IDs)
+    filter_type: mysqlEnum("filter_type", [
+      "subject_assigned",
+      "subject_enrolled",
+      "program_assigned",
+      "grade_assigned",
+    ]),
+    filter_ids: json("filter_ids"),
+    academic_term_id: bigint("academic_term_id", { mode: "number" }).references(
+      () => AcademicTerm.academic_term_id,
+    ),
     expires_at: datetime("expires_at"),
     created_at: datetime("created_at").default(sql`CURRENT_TIMESTAMP`),
   },
