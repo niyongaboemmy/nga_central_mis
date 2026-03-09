@@ -12,6 +12,15 @@ import {
   FiSearch,
   FiUser,
 } from "react-icons/fi";
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+} from "recharts";
 import { getLogsHistory, ActivityLog, LogsResponse } from "../api/systems";
 
 // Modern Card Component (no shadows, border only)
@@ -298,31 +307,42 @@ const LogsDashboardTab: React.FC<{
     .sort((a, b) => b[1] - a[1])
     .slice(0, 5);
 
-  // Activity by date in range
-  const dateDistribution = logs.reduce(
+  // Activity by date and hour in range (6-hour intervals)
+  const dateHourDistribution = logs.reduce(
     (acc, log) => {
-      const date = new Date(log.created_at).toISOString().split("T")[0];
-      acc[date] = (acc[date] || 0) + 1;
+      const date = new Date(log.created_at);
+      // Round to nearest 6-hour interval
+      const hour = Math.floor(date.getHours() / 6) * 6;
+      date.setHours(hour, 0, 0, 0);
+      const key = date.toISOString();
+      acc[key] = (acc[key] || 0) + 1;
       return acc;
     },
     {} as Record<string, number>,
   );
 
-  const maxDate = Math.max(...Object.values(dateDistribution), 1);
-
-  // Generate all dates in range
-  const generateDateRange = (start: string, end: string) => {
-    const dates: string[] = [];
-    const current = new Date(start);
-    const endDate = new Date(end);
+  // Generate all date-hour combinations in range (6-hour intervals)
+  const generateDateHourRange = (start: string, end: string) => {
+    const result: { label: string; date: Date }[] = [];
+    const current = new Date(start + "T00:00:00");
+    const endDate = new Date(end + "T23:59:59");
     while (current <= endDate) {
-      dates.push(current.toISOString().split("T")[0]);
-      current.setDate(current.getDate() + 1);
+      result.push({
+        label: current.toISOString(),
+        date: new Date(current),
+      });
+      current.setHours(current.getHours() + 6);
     }
-    return dates;
+    return result;
   };
 
-  const allDates = generateDateRange(startDate, endDate);
+  const allDateHours = generateDateHourRange(startDate, endDate);
+
+  // Calculate data points for line chart
+  const chartData = allDateHours.map((item) => ({
+    ...item,
+    count: dateHourDistribution[item.label] || 0,
+  }));
 
   // Calculate user activity
   const userActivityCounts = logs.reduce(
@@ -343,31 +363,64 @@ const LogsDashboardTab: React.FC<{
 
   return (
     <div className="space-y-6 overflow-x-auto">
-      {/* Activity by Date */}
+      {/* Activity by Date - Line Chart */}
       <ModernCard className="p-6 min-w-0">
         <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
           <FiCalendar className="w-5 h-5" />
           Activity by Date ({startDate} - {endDate})
         </h3>
-        <div className="flex items-end gap-1 h-40 min-w-[400px] overflow-x-auto pb-2">
-          {allDates.map((date) => (
-            <div key={date} className="flex-1 flex flex-col items-center">
-              <div
-                className="w-full bg-gradient-to-t from-blue-600 to-blue-400 rounded-t-md"
-                style={{
-                  height: `${((dateDistribution[date] || 0) / maxDate) * 100}%`,
-                  minHeight: dateDistribution[date] ? "8px" : "0",
-                }}
-                title={`${date}: ${dateDistribution[date] || 0} activities`}
+        <div className="h-64 w-full">
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart
+              data={chartData}
+              margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
+            >
+              <CartesianGrid
+                strokeDasharray="3 3"
+                stroke="#374151"
+                opacity={0.3}
               />
-              <span className="text-xs text-gray-500 dark:text-gray-400 mt-2 truncate w-full text-center">
-                {new Date(date).toLocaleDateString("en-US", {
-                  month: "short",
-                  day: "numeric",
-                })}
-              </span>
-            </div>
-          ))}
+              <XAxis
+                dataKey="label"
+                tickFormatter={(value) =>
+                  new Date(value).toLocaleString("en-US", {
+                    month: "short",
+                    day: "numeric",
+                    hour: "2-digit",
+                    hour12: false,
+                  })
+                }
+                tick={{ fontSize: 11, fill: "#6b7280" }}
+                interval={3}
+              />
+              <YAxis tick={{ fontSize: 12, fill: "#6b7280" }} />
+              <Tooltip
+                contentStyle={{
+                  backgroundColor: "#fff",
+                  border: "1px solid #e5e7eb",
+                  borderRadius: "8px",
+                }}
+                labelFormatter={(value) =>
+                  new Date(value).toLocaleString("en-US", {
+                    weekday: "short",
+                    month: "short",
+                    day: "numeric",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                    hour12: false,
+                  })
+                }
+              />
+              <Line
+                type="monotone"
+                dataKey="count"
+                stroke="#3b82f6"
+                strokeWidth={2}
+                dot={{ fill: "#3b82f6", strokeWidth: 2 }}
+                activeDot={{ r: 6, fill: "#3b82f6" }}
+              />
+            </LineChart>
+          </ResponsiveContainer>
         </div>
       </ModernCard>
 
@@ -454,7 +507,7 @@ const LogsDashboardTab: React.FC<{
                     </span>
                   </div>
                   <span className="text-sm font-semibold text-gray-900 dark:text-white flex-shrink-0">
-                    {count}
+                    {count as number}
                   </span>
                 </div>
               ))
@@ -621,7 +674,7 @@ const LogsHistory: React.FC = () => {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5 }}
-      className="overflow-x-scroll py-4 md:py-6"
+      className="overflow-x-scroll p-4 md:p-6"
     >
       {/* Header */}
       <div className="mb-8">
@@ -655,7 +708,7 @@ const LogsHistory: React.FC = () => {
                   type="date"
                   value={startDate}
                   onChange={(e) => setStartDate(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2.5 border border-gray-300 dark:border-gray-600/50 rounded-2xl bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full pl-10 pr-4 py-2.5 border-gray-300 dark:border-gray-600/50 rounded-2xl bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
               </div>
             </div>
@@ -669,7 +722,7 @@ const LogsHistory: React.FC = () => {
                   type="date"
                   value={endDate}
                   onChange={(e) => setEndDate(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2.5 border border-gray-300 dark:border-gray-600/50 rounded-2xl bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full pl-10 pr-4 py-2.5 border-gray-300 dark:border-gray-600/50 rounded-2xl bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
               </div>
             </div>
