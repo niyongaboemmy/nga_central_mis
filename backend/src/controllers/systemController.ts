@@ -6,8 +6,9 @@ import {
   RoleSystemFragment,
   School,
   Role,
+  ActivityLog,
 } from "../db/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, desc, gte, lte } from "drizzle-orm";
 import crypto from "crypto";
 
 export const createSystem = async (req: Request, res: Response) => {
@@ -365,6 +366,77 @@ export const removeSystemFromRoleInSchool = async (
       .json({ message: "System removed from role in school successfully" });
   } catch (error) {
     console.error("Error removing system from role:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+// Get Logs History with date range filtering
+// Default date range is 2 days
+// start_date and end_date should be in ISO format (YYYY-MM-DD)
+export const getLogsHistory = async (req: Request, res: Response) => {
+  try {
+    const { start_date, end_date, limit = 100, offset = 0 } = req.query;
+
+    // Calculate default date range (last 2 days)
+    const now = new Date();
+    const twoDaysAgo = new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000);
+
+    let startDate: Date;
+    let endDate: Date;
+
+    if (start_date && end_date) {
+      startDate = new Date(String(start_date));
+      endDate = new Date(String(end_date));
+      // Set end date to end of day
+      endDate.setHours(23, 59, 59, 999);
+    } else {
+      // Default to last 2 days
+      startDate = twoDaysAgo;
+      endDate = now;
+    }
+
+    // Query logs with date range filter
+    const logs = await db
+      .select()
+      .from(ActivityLog)
+      .where(
+        and(
+          gte(ActivityLog.created_at, startDate),
+          lte(ActivityLog.created_at, endDate),
+        ),
+      )
+      .orderBy(desc(ActivityLog.created_at))
+      .limit(Number(limit))
+      .offset(Number(offset));
+
+    // Get total count for pagination
+    const countResult = await db
+      .select({ count: ActivityLog.activity_id })
+      .from(ActivityLog)
+      .where(
+        and(
+          gte(ActivityLog.created_at, startDate),
+          lte(ActivityLog.created_at, endDate),
+        ),
+      );
+
+    const total = countResult[0]?.count || 0;
+
+    res.status(200).json({
+      logs,
+      pagination: {
+        total,
+        limit: Number(limit),
+        offset: Number(offset),
+        hasMore: Number(offset) + logs.length < total,
+      },
+      dateRange: {
+        start_date: startDate.toISOString().split("T")[0],
+        end_date: endDate.toISOString().split("T")[0],
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching logs history:", error);
     res.status(500).json({ message: "Internal server error" });
   }
 };

@@ -192,3 +192,51 @@ export const removeSystemFromRoleInSchool = async (
     throw error;
   }
 };
+
+// Logs History Types
+export interface ActivityLog {
+  activity_id: number;
+  user_id: number;
+  actor_id: number | null;
+  action_type: string;
+  description: string;
+  entity_type: string | null;
+  entity_id: number | null;
+  metadata: string | null;
+  created_at: string;
+}
+
+export interface LogsResponse {
+  logs: ActivityLog[];
+  pagination: {
+    total: number;
+    limit: number;
+    offset: number;
+    hasMore: boolean;
+  };
+  dateRange: {
+    start_date: string;
+    end_date: string;
+  };
+}
+
+export const getLogsHistory = async (
+  params?: {
+    start_date?: string;
+    end_date?: string;
+    limit?: number;
+    offset?: number;
+  },
+  onSuccess?: (data: LogsResponse) => void,
+  onError?: (error: any) => void,
+): Promise<LogsResponse | void> => {
+  try {
+    const response = await api.get<LogsResponse>("/systems/logs", { params });
+    const data = response.data;
+    if (onSuccess) onSuccess(data);
+    return data;
+  } catch (error) {
+    if (onError) onError(error);
+    throw error;
+  }
+};

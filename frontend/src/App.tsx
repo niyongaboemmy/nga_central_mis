@@ -34,6 +34,7 @@ import Systems from "./components/Systems";
 import SchemeOfWorkList from "./components/SchemeOfWorkList";
 import SchemeOfWorkCalendar from "./components/SchemeOfWorkCalendar";
 import AcademicCalendar from "./components/AcademicCalendar";
+import LogsHistory from "./components/LogsHistory";
 
 const LoginPage: React.FC = () => {
   const navigate = useNavigate();
@@ -515,6 +516,18 @@ function App() {
                 <ProtectedRoute>
                   <SystemLayoutWrapper>
                     <AcademicCalendar />
+                  </SystemLayoutWrapper>
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Logs History - protected with sidebar */}
+            <Route
+              path="/logs-history"
+              element={
+                <ProtectedRoute>
+                  <SystemLayoutWrapper>
+                    <LogsHistory />
                   </SystemLayoutWrapper>
                 </ProtectedRoute>
               }

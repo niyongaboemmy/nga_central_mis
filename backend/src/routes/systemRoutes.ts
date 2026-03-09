@@ -11,11 +11,20 @@ import {
   deleteSystem,
   getSchoolRoleAssignments,
   removeSystemFromRoleInSchool,
+  getLogsHistory,
 } from "../controllers/systemController";
 import { authenticate, authorize } from "../middleware/auth";
 import { Permissions } from "../utils/permissions";
 
 const router = Router();
+
+// Logs History - View all system activity logs
+router.get(
+  "/logs",
+  authenticate,
+  authorize([Permissions.VIEW_ALL_LOGS_HISTORY]),
+  getLogsHistory,
+);
 
 // System Management
 router.post(
