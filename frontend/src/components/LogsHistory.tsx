@@ -9,6 +9,8 @@ import {
   FiTrendingUp,
   FiTarget,
   FiClock,
+  FiSearch,
+  FiUser,
 } from "react-icons/fi";
 import { getLogsHistory, ActivityLog, LogsResponse } from "../api/systems";
 
@@ -38,7 +40,7 @@ const StatsCard: React.FC<{
       </div>
       <div>
         <p className="text-sm text-gray-500 dark:text-gray-400">{label}</p>
-        <p className="text-2xl font-bold text-gray-900 dark:text-white">
+        <p className="text-xl font-bold text-gray-900 dark:text-white">
           {value}
         </p>
       </div>
@@ -53,8 +55,7 @@ const ActionTypeBadge: React.FC<{ actionType: string }> = ({ actionType }) => {
       "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
     UPDATE: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400",
     DELETE: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",
-    LOGIN:
-      "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400",
+    LOGIN: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400",
     LOGOUT: "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400",
     ROLE_PERMISSIONS_ASSIGN:
       "bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-400",
@@ -106,7 +107,7 @@ const LogsTableTab: React.FC<{
   return (
     <ModernCard className="overflow-hidden">
       <div className="overflow-x-auto">
-        <table className="w-full">
+        <table className="w-full text-sm">
           <thead className="bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700/40">
             <tr>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
@@ -152,7 +153,18 @@ const LogsTableTab: React.FC<{
                     {log.description}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">
-                    {log.user_id}
+                    {log.user_first_name || log.user_username ? (
+                      <div className="flex flex-col">
+                        <span className="font-medium text-gray-900 dark:text-white">
+                          {log.user_first_name} {log.user_last_name}
+                        </span>
+                        <span className="text-xs text-gray-500">
+                          @{log.user_username}
+                        </span>
+                      </div>
+                    ) : (
+                      <span className="text-gray-400">User #{log.user_id}</span>
+                    )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">
                     {log.entity_type ? (
@@ -312,6 +324,23 @@ const LogsDashboardTab: React.FC<{
 
   const allDates = generateDateRange(startDate, endDate);
 
+  // Calculate user activity
+  const userActivityCounts = logs.reduce(
+    (acc, log) => {
+      const userName = log.user_username
+        ? `${log.user_first_name || ""} ${log.user_last_name || ""}`.trim() ||
+          log.user_username
+        : `User #${log.user_id}`;
+      acc[userName] = (acc[userName] || 0) + 1;
+      return acc;
+    },
+    {} as Record<string, number>,
+  );
+
+  const topUsers = Object.entries(userActivityCounts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5);
+
   return (
     <div className="space-y-6 overflow-x-auto">
       {/* Activity by Date */}
@@ -342,7 +371,7 @@ const LogsDashboardTab: React.FC<{
         </div>
       </ModernCard>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {/* Action Types Stats */}
         <ModernCard className="p-6">
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
@@ -402,6 +431,38 @@ const LogsDashboardTab: React.FC<{
             )}
           </div>
         </ModernCard>
+
+        {/* Top Users */}
+        <ModernCard className="p-6">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+            <FiUser className="w-5 h-5" />
+            Top Users
+          </h3>
+          <div className="space-y-3">
+            {topUsers.length > 0 ? (
+              topUsers.map(([userName, count], index) => (
+                <div
+                  key={userName}
+                  className="flex items-center justify-between"
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white text-xs font-medium flex-shrink-0">
+                      {index + 1}
+                    </div>
+                    <span className="text-sm text-gray-600 dark:text-gray-300 truncate">
+                      {userName}
+                    </span>
+                  </div>
+                  <span className="text-sm font-semibold text-gray-900 dark:text-white flex-shrink-0">
+                    {count}
+                  </span>
+                </div>
+              ))
+            ) : (
+              <p className="text-sm text-gray-500">No user data</p>
+            )}
+          </div>
+        </ModernCard>
       </div>
     </div>
   );
@@ -414,6 +475,7 @@ const LogsHistory: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [startDate, setStartDate] = useState<string>("");
   const [endDate, setEndDate] = useState<string>("");
+  const [userSearch, setUserSearch] = useState<string>("");
   const [activeTab, setActiveTab] = useState<"table" | "dashboard">(
     "dashboard",
   );
@@ -477,6 +539,7 @@ const LogsHistory: React.FC = () => {
     const defaultRange = getDefaultDateRange();
     setStartDate(defaultRange.start);
     setEndDate(defaultRange.end);
+    setUserSearch("");
     setOffset(0);
     fetchLogs(defaultRange.start, defaultRange.end, 0);
   };
@@ -650,10 +713,10 @@ const LogsHistory: React.FC = () => {
             color="bg-green-100 dark:bg-green-900/30"
           />
           <StatsCard
-            icon={<FiTable className="w-5 h-5 text-purple-600" />}
+            icon={<FiTable className="w-5 h-5 text-blue-600" />}
             label="Showing"
             value={`${logsData.logs.length.toLocaleString()} of ${logsData.pagination.total.toLocaleString()}`}
-            color="bg-purple-100 dark:bg-purple-900/30"
+            color="bg-blue-100 dark:bg-blue-900/30"
           />
         </motion.div>
       )}
@@ -688,6 +751,20 @@ const LogsHistory: React.FC = () => {
             <FiGrid className="w-4 h-4" />
             Dashboard
           </button>
+          {activeTab === "table" && (
+            <div className="relative max-w-md">
+              <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Search by user name..."
+                value={userSearch}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                  setUserSearch(e.target.value)
+                }
+                className="min-w-[300px] w-full pl-10 pr-4 py-2.5 border border-gray-300 dark:border-gray-600/50 rounded-full bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+          )}
         </div>
       </motion.div>
 
@@ -699,13 +776,27 @@ const LogsHistory: React.FC = () => {
         transition={{ duration: 0.3 }}
       >
         {activeTab === "table" ? (
-          <LogsTableTab
-            logs={logsData?.logs || []}
-            pagination={logsData?.pagination}
-            onPrevPage={handlePrevPage}
-            onNextPage={handleNextPage}
-            loading={loading}
-          />
+          <>
+            <LogsTableTab
+              logs={
+                userSearch
+                  ? (logsData?.logs || []).filter(
+                      (log) =>
+                        log.user_name
+                          ?.toLowerCase()
+                          .includes(userSearch.toLowerCase()) ||
+                        log.actor_name
+                          ?.toLowerCase()
+                          .includes(userSearch.toLowerCase()),
+                    )
+                  : logsData?.logs || []
+              }
+              pagination={logsData?.pagination}
+              onPrevPage={handlePrevPage}
+              onNextPage={handleNextPage}
+              loading={loading}
+            />
+          </>
         ) : (
           <LogsDashboardTab
             logs={logsData?.logs || []}

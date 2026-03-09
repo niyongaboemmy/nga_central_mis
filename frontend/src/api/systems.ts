@@ -204,6 +204,16 @@ export interface ActivityLog {
   entity_id: number | null;
   metadata: string | null;
   created_at: string;
+  // User info (enriched from users table)
+  user_username: string | null;
+  user_first_name: string | null;
+  user_last_name: string | null;
+  actor_username: string | null;
+  actor_first_name: string | null;
+  actor_last_name: string | null;
+  // Computed full names for easier filtering
+  user_name?: string;
+  actor_name?: string;
 }
 
 export interface LogsResponse {
@@ -226,6 +236,7 @@ export const getLogsHistory = async (
     end_date?: string;
     limit?: number;
     offset?: number;
+    user_id?: number;
   },
   onSuccess?: (data: LogsResponse) => void,
   onError?: (error: any) => void,

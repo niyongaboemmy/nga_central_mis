@@ -7,8 +7,10 @@ import {
   School,
   Role,
   ActivityLog,
+  User,
+  UserProfile,
 } from "../db/schema";
-import { eq, and, desc, gte, lte } from "drizzle-orm";
+import { eq, and, desc, gte, lte, like } from "drizzle-orm";
 import crypto from "crypto";
 
 export const createSystem = async (req: Request, res: Response) => {
@@ -375,7 +377,13 @@ export const removeSystemFromRoleInSchool = async (
 // start_date and end_date should be in ISO format (YYYY-MM-DD)
 export const getLogsHistory = async (req: Request, res: Response) => {
   try {
-    const { start_date, end_date, limit = 100, offset = 0 } = req.query;
+    const {
+      start_date,
+      end_date,
+      limit = 100,
+      offset = 0,
+      user_id,
+    } = req.query;
 
     // Calculate default date range (last 2 days)
     const now = new Date();
@@ -395,16 +403,22 @@ export const getLogsHistory = async (req: Request, res: Response) => {
       endDate = now;
     }
 
+    // Build query conditions
+    const conditions = [
+      gte(ActivityLog.created_at, startDate),
+      lte(ActivityLog.created_at, endDate),
+    ];
+
+    // Add user filter if provided
+    if (user_id) {
+      conditions.push(eq(ActivityLog.user_id, Number(user_id)));
+    }
+
     // Query logs with date range filter
     const logs = await db
       .select()
       .from(ActivityLog)
-      .where(
-        and(
-          gte(ActivityLog.created_at, startDate),
-          lte(ActivityLog.created_at, endDate),
-        ),
-      )
+      .where(and(...conditions))
       .orderBy(desc(ActivityLog.created_at))
       .limit(Number(limit))
       .offset(Number(offset));
@@ -413,17 +427,93 @@ export const getLogsHistory = async (req: Request, res: Response) => {
     const countResult = await db
       .select({ count: ActivityLog.activity_id })
       .from(ActivityLog)
-      .where(
-        and(
-          gte(ActivityLog.created_at, startDate),
-          lte(ActivityLog.created_at, endDate),
-        ),
-      );
+      .where(and(...conditions));
 
     const total = countResult[0]?.count || 0;
 
+    // Enrich logs with user and actor information
+    // Get unique user IDs from logs
+    const userIds = [
+      ...new Set(
+        logs.map((l) => l.user_id).filter((id): id is number => id !== null),
+      ),
+    ];
+    const actorIds = [
+      ...new Set(
+        logs.map((l) => l.actor_id).filter((id): id is number => id !== null),
+      ),
+    ];
+    const allIds = [...new Set([...userIds, ...actorIds])];
+
+    // Fetch user info for all relevant IDs - fetch all users and filter in memory
+    let userMap = new Map<
+      number,
+      {
+        username: string | null;
+        first_name: string | null;
+        last_name: string | null;
+      }
+    >();
+
+    if (allIds.length > 0) {
+      const allUsers = await db
+        .select({
+          user_id: User.user_id,
+          username: User.username,
+          first_name: UserProfile.first_name,
+          last_name: UserProfile.last_name,
+        })
+        .from(User)
+        .leftJoin(UserProfile, eq(User.user_id, UserProfile.user_id));
+
+      // Filter to only relevant users
+      const relevantUsers = allUsers.filter((u) =>
+        allIds.includes(Number(u.user_id)),
+      );
+      userMap = new Map(
+        relevantUsers.map((u) => [
+          Number(u.user_id),
+          {
+            username: u.username,
+            first_name: u.first_name,
+            last_name: u.last_name,
+          },
+        ]),
+      );
+    }
+
+    // Transform logs with user info
+    const enrichedLogs = logs.map((log) => {
+      const user = userMap.get(Number(log.user_id));
+      const actor = log.actor_id ? userMap.get(Number(log.actor_id)) : null;
+
+      // Compute full names
+      const userName = user
+        ? [user.first_name, user.last_name].filter(Boolean).join(" ") ||
+          user.username ||
+          null
+        : null;
+      const actorName = actor
+        ? [actor.first_name, actor.last_name].filter(Boolean).join(" ") ||
+          actor.username ||
+          null
+        : null;
+
+      return {
+        ...log,
+        user_username: user?.username || null,
+        user_first_name: user?.first_name || null,
+        user_last_name: user?.last_name || null,
+        user_name: userName,
+        actor_username: actor?.username || null,
+        actor_first_name: actor?.first_name || null,
+        actor_last_name: actor?.last_name || null,
+        actor_name: actorName,
+      };
+    });
+
     res.status(200).json({
-      logs,
+      logs: enrichedLogs,
       pagination: {
         total,
         limit: Number(limit),
