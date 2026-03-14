@@ -35,6 +35,9 @@ import SchemeOfWorkList from "./components/SchemeOfWorkList";
 import SchemeOfWorkCalendar from "./components/SchemeOfWorkCalendar";
 import AcademicCalendar from "./components/AcademicCalendar";
 import LogsHistory from "./components/LogsHistory";
+import AllTeachersSchemeOfWork from "./components/AllTeachersSchemeOfWork";
+import SchemeDetails from "./components/SchemeDetails";
+import { MetadataProvider } from "./contexts/MetadataContext";
 
 const LoginPage: React.FC = () => {
   const navigate = useNavigate();
@@ -247,8 +250,10 @@ function App() {
   return (
     <ToastProvider>
       <ToastInitializer>
-        <Router basename="/mis">
-          <Routes>
+        <MetadataProvider>
+          <Router basename="/mis">
+            <Routes>
+
             {/* Landing page with full navbar */}
             <Route
               path="/"
@@ -432,6 +437,21 @@ function App() {
               }
             />
 
+            {/* All Teachers SOW (Admin View) */}
+            <Route
+              path="/all-teachers-sow/*"
+              element={
+                <ProtectedRoute>
+                  <SystemLayoutWrapper>
+                    <Routes>
+                      <Route path="/" element={<AllTeachersSchemeOfWork />} />
+                      <Route path="/details" element={<SchemeDetails />} />
+                    </Routes>
+                  </SystemLayoutWrapper>
+                </ProtectedRoute>
+              }
+            />
+
             {/* Settings page - protected with sidebar */}
             <Route
               path="/settings"
@@ -537,9 +557,10 @@ function App() {
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </Router>
-      </ToastInitializer>
-    </ToastProvider>
-  );
+      </MetadataProvider>
+    </ToastInitializer>
+  </ToastProvider>
+);
 }
 
 export default App;

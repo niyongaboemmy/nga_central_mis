@@ -16,6 +16,7 @@ import {
   User,
   UserProfile,
   UserProgramLead,
+  SchemeOfWork,
 } from "../db/schema";
 import { sanitizeString } from "../utils/sanitization";
 import {
@@ -2432,6 +2433,9 @@ export const getMyAssignedSubjects = asyncHandler(
         academic_term_name: AcademicTerm.name,
         academic_year_name: AcademicYear.name,
         assigned_at: TeacherSubjectAssignment.assigned_at,
+        validation_status: SchemeOfWork.validation_status,
+        validation_comment: SchemeOfWork.validation_comment,
+        scheme_id: SchemeOfWork.scheme_id,
       })
       .from(TeacherSubjectAssignment)
       .innerJoin(
@@ -2454,6 +2458,15 @@ export const getMyAssignedSubjects = asyncHandler(
       .innerJoin(
         AcademicYear,
         eq(AcademicTerm.academic_year_id, AcademicYear.academic_year_id),
+      )
+      .leftJoin(
+        SchemeOfWork,
+        and(
+          eq(TeacherSubjectAssignment.user_id, SchemeOfWork.user_id),
+          eq(TeacherSubjectAssignment.subject_id, SchemeOfWork.subject_id),
+          eq(TeacherSubjectAssignment.class_group_id, SchemeOfWork.class_group_id),
+          eq(TeacherSubjectAssignment.academic_term_id, SchemeOfWork.academic_term_id),
+        ),
       )
       .where(eq(TeacherSubjectAssignment.user_id, teacherIdNum))
       .orderBy(Subject.name);
@@ -2483,6 +2496,9 @@ export const getMyAssignedSubjects = asyncHandler(
         academic_term_name: assignment.academic_term_name,
         academic_year_name: assignment.academic_year_name,
         assigned_at: assignment.assigned_at,
+        validation_status: assignment.validation_status || "PENDING",
+        validation_comment: assignment.validation_comment,
+        scheme_id: assignment.scheme_id,
       };
 
       subjectMap.get(subjectId).grades.push(grade);

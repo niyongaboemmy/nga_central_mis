@@ -63,7 +63,7 @@ const RealCalendarView: React.FC<RealCalendarViewProps> = ({
   // Find the FIRST lesson plan across ALL entries, then expect lessons every 7 days
   // This works across all scheme weeks, not just within a single entry
   const expectedDates = useMemo(() => {
-    const allPlans = Object.values(lessonPlans).flat();
+    const allPlans = Object.values(lessonPlans || {}).flat();
 
     if (allPlans.length === 0) return new Set<string>();
 

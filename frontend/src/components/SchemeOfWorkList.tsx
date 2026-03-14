@@ -9,6 +9,9 @@ import {
   FileText,
   TrendingUp,
   GraduationCap,
+  Info,
+  AlertCircle,
+  MessageSquare,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -17,6 +20,11 @@ const SchemeOfWorkList: React.FC = () => {
   const [subjects, setSubjects] = useState<MyAssignedSubject[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedValidation, setSelectedValidation] = useState<{
+    status: string;
+    comment: string | null;
+    subjectName: string;
+  } | null>(null);
 
   useEffect(() => {
     loadAssignedSubjects();
@@ -131,6 +139,7 @@ const SchemeOfWorkList: React.FC = () => {
       <AnimatePresence mode="wait">
         {filteredSubjects.length === 0 ? (
           <motion.div
+            key="empty"
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.95 }}
@@ -148,6 +157,7 @@ const SchemeOfWorkList: React.FC = () => {
           </motion.div>
         ) : (
           <motion.div
+            key="list"
             variants={containerVariants}
             initial="hidden"
             animate="visible"
@@ -176,49 +186,182 @@ const SchemeOfWorkList: React.FC = () => {
                   </div>
 
                   <div className="space-y-3">
-                    {subject.grades.map((grade, idx) => (
-                      <button
-                        key={idx}
-                        onClick={() =>
-                          handleSelectSubject(
-                            subject.subject_id,
-                            grade.class_group_id,
-                            grade.academic_term_id,
-                          )
-                        }
-                        className="w-full bg-gray-50 dark:bg-gray-900/50 p-4 rounded-2xl border border-transparent hover:border-blue-500/30 hover:bg-blue-50/50 dark:hover:bg-blue-900/10 transition-all text-left flex items-center justify-between group/btn"
-                      >
-                        <div className="flex items-center gap-4">
-                          <div className="w-10 h-10 rounded-xl bg-white dark:bg-gray-800 flex items-center justify-center border border-gray-100 dark:border-gray-700 shadow-sm group-hover/btn:scale-110 transition-transform">
-                            <GraduationCap className="w-5 h-5 text-gray-400 group-hover/btn:text-blue-500" />
-                          </div>
-                          <div>
-                            <div className="font-bold text-gray-900 dark:text-white text-base">
-                              {grade.grade_name}
-                              <span className="mx-2 text-gray-300 dark:text-gray-700 font-light">
-                                |
-                              </span>
-                              <span className="text-sm font-medium text-gray-500">
-                                {grade.class_group_name}
-                              </span>
+                    {subject.grades.map((grade, idx) => {
+                      const isApproved = grade.validation_status === "APPROVED";
+                      const isRejected = grade.validation_status === "REJECTED";
+
+                      return (
+                        <div key={idx} className="space-y-2">
+                          <button
+                            onClick={() =>
+                              handleSelectSubject(
+                                subject.subject_id,
+                                grade.class_group_id,
+                                grade.academic_term_id,
+                              )
+                            }
+                            className="w-full bg-gray-50 dark:bg-gray-900/50 p-4 rounded-2xl border border-transparent hover:border-blue-500/30 hover:bg-blue-50/50 dark:hover:bg-blue-900/10 transition-all text-left flex items-center justify-between group/btn"
+                          >
+                            <div className="flex items-center gap-4">
+                              <div className="w-10 h-10 rounded-xl bg-white dark:bg-gray-800 flex items-center justify-center border border-gray-100 dark:border-gray-700 shadow-sm group-hover/btn:scale-110 transition-transform">
+                                <GraduationCap className="w-5 h-5 text-gray-400 group-hover/btn:text-blue-500" />
+                              </div>
+                              <div>
+                                <div className="font-bold text-gray-900 dark:text-white text-base flex flex-wrap items-center gap-2">
+                                  {grade.grade_name}
+                                  <span className="mx-2 text-gray-300 dark:text-gray-700 font-light">
+                                    |
+                                  </span>
+                                  <span className="text-sm font-medium text-gray-500">
+                                    {grade.class_group_name}
+                                  </span>
+                                  {grade.validation_status !== "PENDING" && (
+                                    <span
+                                      className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md uppercase tracking-tighter border ${
+                                        isApproved
+                                          ? "bg-emerald-50 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400 border-emerald-100 dark:border-emerald-800"
+                                          : "bg-rose-50 dark:bg-rose-900/40 text-rose-600 dark:text-rose-400 border-rose-100 dark:border-rose-800"
+                                      }`}
+                                    >
+                                      {grade.validation_status}
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="text-[11px] text-gray-400 dark:text-gray-500 flex items-center gap-1 mt-1 font-semibold uppercase tracking-tighter">
+                                  <Calendar className="w-3 h-3" />
+                                  {grade.academic_term_name} •{" "}
+                                  {grade.academic_year_name}
+                                </div>
+                              </div>
                             </div>
-                            <div className="text-[11px] text-gray-400 dark:text-gray-500 flex items-center gap-1 mt-1 font-semibold uppercase tracking-tighter">
-                              <Calendar className="w-3 h-3" />
-                              {grade.academic_term_name} •{" "}
-                              {grade.academic_year_name}
+                            <div className="flex items-center gap-2">
+                              {grade.validation_status !== "PENDING" && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSelectedValidation({
+                                      status: grade.validation_status,
+                                      comment: grade.validation_comment,
+                                      subjectName: subject.subject_name,
+                                    });
+                                  }}
+                                  className="p-1.5 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-500 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                                  title="View Status Details"
+                                >
+                                  <Info className="w-4 h-4" />
+                                </button>
+                              )}
+                              <div className="p-1 rounded-full bg-transparent group-hover/btn:bg-blue-100 dark:group-hover/btn:bg-blue-900/30 transition-colors">
+                                <ChevronRight className="w-5 h-5 text-gray-300 group-hover/btn:text-blue-600" />
+                              </div>
                             </div>
-                          </div>
+                          </button>
+
+                          {isRejected && (
+                            <div className="mx-2 p-3 bg-rose-50/50 dark:bg-rose-900/10 border border-rose-100 dark:border-rose-800/50 rounded-xl flex items-center gap-2 text-rose-600 dark:text-rose-400 text-xs font-medium animate-pulse">
+                              <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                              A scheme of work of that subject has rejected.
+                            </div>
+                          )}
                         </div>
-                        <div className="p-1 rounded-full bg-transparent group-hover/btn:bg-blue-100 dark:group-hover/btn:bg-blue-900/30 transition-colors">
-                          <ChevronRight className="w-5 h-5 text-gray-300 group-hover/btn:text-blue-600" />
-                        </div>
-                      </button>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               </motion.div>
             ))}
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Validation Status Details Modal */}
+      <AnimatePresence>
+        {selectedValidation && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="w-full max-w-md bg-white dark:bg-gray-900 rounded-[2.5rem] shadow-2xl overflow-hidden"
+            >
+              <div
+                className={`p-6 flex items-center justify-between ${
+                  selectedValidation.status === "APPROVED"
+                    ? "bg-emerald-600"
+                    : "bg-rose-600"
+                } text-white`}
+              >
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-white/20 rounded-xl">
+                    <Info className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold leading-tight">
+                      Validation Status
+                    </h3>
+                    <p className="text-xs text-white/80">
+                      {selectedValidation.subjectName}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setSelectedValidation(null)}
+                  className="p-2 hover:bg-white/20 rounded-full transition-colors"
+                >
+                  <ChevronRight className="w-5 h-5 rotate-90" />
+                </button>
+              </div>
+
+              <div className="p-8 space-y-6">
+                <div className="flex flex-col items-center text-center">
+                  <div
+                    className={`w-16 h-16 rounded-full flex items-center justify-center mb-4 ${
+                      selectedValidation.status === "APPROVED"
+                        ? "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600"
+                        : "bg-rose-100 dark:bg-rose-900/30 text-rose-600"
+                    }`}
+                  >
+                    {selectedValidation.status === "APPROVED" ? (
+                      <TrendingUp className="w-8 h-8" />
+                    ) : (
+                      <AlertCircle className="w-8 h-8" />
+                    )}
+                  </div>
+                  <h4
+                    className={`text-2xl font-black uppercase tracking-tighter ${
+                      selectedValidation.status === "APPROVED"
+                        ? "text-emerald-600 dark:text-emerald-400"
+                        : "text-rose-600 dark:text-rose-400"
+                    }`}
+                  >
+                    {selectedValidation.status}
+                  </h4>
+                  <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">
+                    Your scheme of work has been reviewed.
+                  </p>
+                </div>
+
+                {selectedValidation.comment && (
+                  <div className="p-5 bg-gray-50 dark:bg-gray-800 rounded-3xl border border-gray-100 dark:border-gray-700">
+                    <div className="flex items-center gap-2 mb-3 text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">
+                      <MessageSquare className="w-3.5 h-3.5" />
+                      Feedback Comment
+                    </div>
+                    <p className="text-gray-700 dark:text-gray-300 italic text-sm leading-relaxed">
+                      "{selectedValidation.comment}"
+                    </p>
+                  </div>
+                )}
+
+                <button
+                  onClick={() => setSelectedValidation(null)}
+                  className="w-full py-4 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-2xl font-bold transition-transform active:scale-95 shadow-lg"
+                >
+                  Close Details
+                </button>
+              </div>
+            </motion.div>
+          </div>
         )}
       </AnimatePresence>
     </div>

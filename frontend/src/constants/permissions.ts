@@ -65,6 +65,7 @@ export const Permissions = {
 
   // Admin
   ADMIN: "ADMIN",
+  VIEW_ALL_TEACHERS_SCHEME_OF_WORK_LIST: "VIEW_ALL_TEACHERS_SCHEME_OF_WORK_LIST",
 
   // Program Management
   VIEW_PROGRAM_USERS: "VIEW_PROGRAM_USERS",
@@ -181,6 +182,7 @@ export const permissionGroups = {
     Permissions.ASSIGN_GRADE_TO_CLASS_TEACHER,
     Permissions.VIEW_USERS_BY_CLASS_TEACHER_GRADE,
     Permissions.VIEW_SUBJECTS_BY_CLASS_TEACHER_GRADE,
+    Permissions.VIEW_ALL_TEACHERS_SCHEME_OF_WORK_LIST,
   ],
   parents: [Permissions.MANAGE_PARENTS, Permissions.VIEW_PARENTS],
   grades: [Permissions.MANAGE_GRADES, Permissions.VIEW_GRADES],

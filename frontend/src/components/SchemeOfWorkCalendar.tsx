@@ -9,6 +9,12 @@ import SchemeOfWorkEntryModal from "./SchemeOfWorkEntryModal";
 import LessonPlanModal from "./LessonPlanModal";
 import LessonPlanPreviewModal from "./LessonPlanPreviewModal";
 import SchemeOfWorkPreviewModal from "./SchemeOfWorkPreviewModal";
+import SchemeReportPreviewModal from "./SchemeReportPreviewModal";
+import { SchemeReportService, ReportMetadata } from "../services/SchemeReportService";
+import { useUser } from "../contexts/UserContext";
+import { useMetadata } from "../contexts/MetadataContext";
+import reportLogo1 from "../assets/report_image1.png";
+import reportLogo2 from "../assets/report_image2.png";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Plus,
@@ -34,12 +40,18 @@ import {
   AlertCircle,
   AlertTriangle,
   ArrowRight,
+  Download,
 } from "lucide-react";
 
 const SchemeOfWorkCalendar: React.FC = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { showToast } = useToast();
+  const { user } = useUser();
+  const { years } = useMetadata();
+
+  const [isPreviewReportOpen, setIsPreviewReportOpen] = useState(false);
+  const [reportPdfUrl, setReportPdfUrl] = useState<string | null>(null);
 
   const subjectId = parseInt(searchParams.get("subject_id") || "0");
   const classGroupId = parseInt(searchParams.get("class_group_id") || "0");
@@ -58,6 +70,11 @@ const SchemeOfWorkCalendar: React.FC = () => {
     code: string;
     classGroupName: string;
     termName: string;
+  } | null>(null);
+  const [schemeMetadata, setSchemeMetadata] = useState<{
+    validation_status: "PENDING" | "APPROVED" | "REJECTED";
+    validation_comment: string | null;
+    scheme_id: number;
   } | null>(null);
 
   const [activeTab, setActiveTab] = useState<"timeline" | "calendar">(
@@ -108,8 +125,12 @@ const SchemeOfWorkCalendar: React.FC = () => {
         classGroupId,
         academicTermId,
       );
-      const entryList = resp.data.data || [];
+      const { entries: entryList, scheme } = (resp.data as any).data || {
+        entries: [],
+        scheme: null,
+      };
       setEntries(entryList);
+      setSchemeMetadata(scheme);
 
       // Load subject info from assigned subjects
       try {
@@ -182,6 +203,48 @@ const SchemeOfWorkCalendar: React.FC = () => {
     } finally {
       setIsUploading(false);
     }
+  };
+
+  const buildReportMetadata = (): ReportMetadata => {
+    const currentYear = years.find((y: any) => y.is_current)?.name || "N/A";
+
+    return {
+      teacherName: user?.profile?.first_name 
+        ? `${user.profile.first_name} ${user.profile.last_name || ""}` 
+        : user?.user?.username || "Instructor",
+      subjectName: subjectInfo?.name || "Subject",
+      subjectCode: subjectInfo?.code,
+      classGroupName: subjectInfo?.classGroupName || `Class #${classGroupId}`,
+      academicYear: currentYear,
+      academicTerm: subjectInfo?.termName || `Term #${academicTermId}`,
+      sector: "ICT",
+      trade: "Software Programming and Embedded Systems (SPEs)",
+      qualificationTitle: "Software Programming and Embedded Systems (SPE)",
+      rqfLevel: "Level 3",
+      learningHours: "Total: 130",
+      className: "Year One",
+      schoolName: "NIYONGABO ACADEMY",
+      moduleCode: subjectInfo?.code || "",
+      logo1: reportLogo1,
+      logo2: reportLogo2,
+    };
+  };
+
+  const handlePreviewReport = () => {
+    if (entries.length === 0) {
+      showToast("No data to export", "warning");
+      return;
+    }
+    const pdfUrl = SchemeReportService.generateSOWReportBlobUrl(entries, buildReportMetadata());
+    setReportPdfUrl(pdfUrl);
+    setIsPreviewReportOpen(true);
+  };
+
+  const handleActualDownload = () => {
+    if (entries.length === 0) return;
+    SchemeReportService.generateSOWReport(entries, buildReportMetadata());
+    showToast("PDF Report downloaded", "success");
+    setIsPreviewReportOpen(false);
   };
 
   const handleSaveEntry = async (data: Partial<SchemeEntry>) => {
@@ -351,7 +414,7 @@ const SchemeOfWorkCalendar: React.FC = () => {
   }, [entries, lessonPlans]);
 
   const MissingPlansBanner = () => {
-    if (stats.missing === 0) return null;
+    if (stats.missing === 0 || schemeMetadata?.validation_status === "APPROVED") return null;
 
     return (
       <motion.div
@@ -390,6 +453,49 @@ const SchemeOfWorkCalendar: React.FC = () => {
               <ArrowRight className="w-4 h-4" />
             </button>
           </div>
+        </div>
+      </motion.div>
+    );
+  };
+
+  const ValidationBanner = () => {
+    if (!schemeMetadata || schemeMetadata.validation_status === "PENDING") return null;
+
+    const isApproved = schemeMetadata.validation_status === "APPROVED";
+    const Icon = isApproved ? CheckCircle2 : AlertCircle;
+
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className={`mb-6 p-5 rounded-2xl border flex flex-col md:flex-row items-center gap-4 ${
+          isApproved
+            ? "bg-emerald-50 border-emerald-200 dark:bg-emerald-900/20 dark:border-emerald-800"
+            : "bg-rose-50 border-rose-200 dark:bg-rose-900/20 dark:border-rose-800"
+        }`}
+      >
+        <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${
+          isApproved ? "bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600" : "bg-rose-100 dark:bg-rose-900/40 text-rose-600"
+        }`}>
+          <Icon className="w-6 h-6" />
+        </div>
+        
+        <div className="flex-1">
+          <h3 className={`text-lg font-bold ${isApproved ? "text-emerald-900 dark:text-emerald-400" : "text-rose-900 dark:text-rose-400"}`}>
+            Scheme {isApproved ? "Approved" : "Rejected"}
+          </h3>
+          <p className={`text-sm ${isApproved ? "text-emerald-600 dark:text-emerald-500" : "text-rose-600 dark:text-rose-500"}`}>
+            {isApproved 
+              ? "This scheme of work has been approved and is now locked for editing." 
+              : "This scheme of work has been rejected. Please review the comments and update accordingly."}
+          </p>
+          {schemeMetadata.validation_comment && (
+            <div className={`mt-2 p-3 rounded-lg text-sm italic ${
+              isApproved ? "bg-emerald-100/50 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-300" : "bg-rose-100/50 dark:bg-rose-900/30 text-rose-800 dark:text-rose-300"
+            }`}>
+              "{schemeMetadata.validation_comment}"
+            </div>
+          )}
         </div>
       </motion.div>
     );
@@ -694,32 +800,40 @@ const SchemeOfWorkCalendar: React.FC = () => {
 
                         {/* Actions Column */}
                         <div className="flex-shrink-0 flex md:flex-col gap-2 border-t md:border-t-0 md:border-l border-gray-100 dark:border-gray-700 pt-3 md:pt-0 md:pl-4">
-                          <button
-                            onClick={() => {
-                              setEditingEntry(entry);
-                              setIsModalOpen(true);
-                            }}
-                            className="text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 p-1.5 rounded-full hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all"
-                            title="Edit Entry"
-                          >
-                            <Edit className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() =>
-                              handleDayClick(new Date(), entry.entry_id)
-                            }
-                            className="text-gray-400 hover:text-green-600 dark:hover:text-green-400 p-1.5 rounded-full hover:bg-green-50 dark:hover:bg-green-900/20 transition-all"
-                            title="Add Lesson"
-                          >
-                            <Plus className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => handleRemoveEntry(entry.entry_id)}
-                            className="text-gray-400 hover:text-red-500 dark:hover:text-red-400 p-1.5 rounded-full hover:bg-red-50 dark:hover:bg-red-900/20 transition-all"
-                            title="Delete Entry"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+                          {schemeMetadata?.validation_status !== "APPROVED" && (
+                            <button
+                              onClick={() => {
+                                setEditingEntry(entry);
+                                setIsModalOpen(true);
+                              }}
+                              className="text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 p-1.5 rounded-full hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all font-bold"
+                              title="Edit Entry"
+                            >
+                              <Edit className="w-4 h-4" />
+                            </button>
+                          )}
+                          {schemeMetadata?.validation_status !== "APPROVED" &&
+                            schemeMetadata?.validation_status !==
+                              "REJECTED" && (
+                              <button
+                                onClick={() =>
+                                  handleDayClick(new Date(), entry.entry_id)
+                                }
+                                className="text-gray-400 hover:text-green-600 dark:hover:text-green-400 p-1.5 rounded-full hover:bg-green-50 dark:hover:bg-green-900/20 transition-all font-bold"
+                                title="Add Lesson"
+                              >
+                                <Plus className="w-4 h-4" />
+                              </button>
+                            )}
+                          {schemeMetadata?.validation_status !== "APPROVED" && (
+                            <button
+                              onClick={() => handleRemoveEntry(entry.entry_id)}
+                              className="text-gray-400 hover:text-red-500 dark:hover:text-red-400 p-1.5 rounded-full hover:bg-red-50 dark:hover:bg-red-900/20 transition-all font-bold"
+                              title="Delete Entry"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -860,8 +974,8 @@ const SchemeOfWorkCalendar: React.FC = () => {
                 onClick={() =>
                   document.getElementById("header-upload")?.click()
                 }
-                disabled={isUploading}
-                className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 bg-white dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-full hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-blue-500 transition-all shadow-sm"
+                disabled={isUploading || schemeMetadata?.validation_status === "APPROVED"}
+                className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 bg-white dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-full hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-blue-500 transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isUploading ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
@@ -869,6 +983,15 @@ const SchemeOfWorkCalendar: React.FC = () => {
                   <CloudUpload className="w-4 h-4" />
                 )}
                 <span>Update Scheme</span>
+              </button>
+
+              {/* Download PDF Action */}
+              <button
+                onClick={handlePreviewReport}
+                className="hidden sm:flex items-center gap-2 px-3 py-2 text-sm font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800/50 rounded-full hover:bg-blue-100 dark:hover:bg-blue-800/40 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-blue-500 transition-all shadow-sm"
+              >
+                <Download className="w-4 h-4" />
+                <span>Download PDF</span>
               </button>
 
               {/* View Switcher */}
@@ -926,8 +1049,8 @@ const SchemeOfWorkCalendar: React.FC = () => {
             ) : (
               <button
                 onClick={handleUpload}
-                disabled={isUploading}
-                className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-full transition-colors shadow-sm"
+                disabled={isUploading || schemeMetadata?.validation_status === "APPROVED"}
+                className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-full transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isUploading ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
@@ -940,6 +1063,7 @@ const SchemeOfWorkCalendar: React.FC = () => {
           </div>
         ) : (
           <div className="animate-in fade-in duration-300">
+            <ValidationBanner />
             <MissingPlansBanner />
             {activeTab === "timeline" ? (
               renderTimelineUI()
@@ -997,6 +1121,13 @@ const SchemeOfWorkCalendar: React.FC = () => {
             setIsPreviewModalOpen(false);
             handleRemoveEntry(id);
           }}
+        />
+
+        <SchemeReportPreviewModal
+          isOpen={isPreviewReportOpen}
+          onClose={() => setIsPreviewReportOpen(false)}
+          pdfUrl={reportPdfUrl}
+          onDownload={handleActualDownload}
         />
       </div>
     </div>

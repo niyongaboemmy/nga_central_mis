@@ -85,11 +85,11 @@ const SchemeOfWorkPreviewModal: React.FC<SchemeOfWorkPreviewModalProps> = ({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50"
+            className="fixed -top-8 inset-0 bg-black/50 backdrop-blur-sm z-50"
           />
 
           {/* Modal */}
-          <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="fixed -top-8 inset-0 z-50 overflow-y-auto">
             <div className="flex min-h-full items-center justify-center p-4">
               <motion.div
                 initial={{ opacity: 0, scale: 0.95, y: 20 }}
@@ -152,7 +152,7 @@ const SchemeOfWorkPreviewModal: React.FC<SchemeOfWorkPreviewModalProps> = ({
                 </div>
 
                 {/* Content */}
-                <div className="p-8 space-y-8 max-h-[65vh] overflow-y-auto">
+                <div className="p-8 space-y-8 max-h-[calc(100vh-22rem)] overflow-y-auto">
                   {/* Main Objective */}
                   {entry.objective && (
                     <div className="bg-blue-50 dark:bg-blue-900/20 rounded-2xl p-6 border border-blue-100 dark:border-blue-800/30">

@@ -633,6 +633,12 @@ export const SchemeOfWork = mysqlTable("SchemeOfWork", {
   academic_term_id: bigint("academic_term_id", { mode: "number" })
     .notNull()
     .references(() => AcademicTerm.academic_term_id),
+  validation_status: mysqlEnum("validation_status", [
+    "PENDING",
+    "APPROVED",
+    "REJECTED",
+  ]).default("PENDING"),
+  validation_comment: text("validation_comment"),
   created_at: datetime("created_at").default(sql`CURRENT_TIMESTAMP`),
   updated_at: datetime("updated_at").default(
     sql`CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP`,
@@ -654,7 +660,16 @@ export const SchemeOfWorkEntry = mysqlTable("SchemeOfWorkEntry", {
   methodology: text("methodology"),
   resources: text("resources"),
   evaluation: text("evaluation"),
+  duration: varchar("duration", { length: 50 }).default(sql`NULL`),
+  learning_place: varchar("learning_place", { length: 100 }).default(sql`NULL`),
+  observation: text("observation").default(sql`NULL`),
   is_completed: tinyint("is_completed").default(0),
+  validation_status: mysqlEnum("validation_status", [
+    "PENDING",
+    "APPROVED",
+    "REJECTED",
+  ]).default("PENDING"),
+  validation_comment: text("validation_comment"),
   created_at: datetime("created_at").default(sql`CURRENT_TIMESTAMP`),
 });
 // LO_Lesson table (Master record for structured lesson plans)

@@ -95,6 +95,10 @@ export const Permissions = {
 
   // Logs Management
   VIEW_ALL_LOGS_HISTORY: "VIEW_ALL_LOGS_HISTORY",
+
+  // Scheme of Work Management
+  VIEW_ALL_TEACHERS_SCHEME_OF_WORK_LIST: "VIEW_ALL_TEACHERS_SCHEME_OF_WORK_LIST",
+  VALIDATE_SCHEME_OF_WORK: "VALIDATE_SCHEME_OF_WORK",
 } as const;
 
 /**

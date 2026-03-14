@@ -271,6 +271,9 @@ export interface MyAssignedSubject {
     academic_term_name: string;
     academic_year_name: string;
     assigned_at: string;
+    validation_status: "PENDING" | "APPROVED" | "REJECTED";
+    validation_comment: string | null;
+    scheme_id: number | null;
   }>;
 }
 

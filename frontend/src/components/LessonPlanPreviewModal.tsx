@@ -53,7 +53,7 @@ const LessonPlanPreviewModal: React.FC<LessonPlanPreviewModalProps> = ({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50"
+            className="fixed -top-8 inset-0 bg-black/50 backdrop-blur-sm z-50"
           />
 
           {/* Modal */}
@@ -140,7 +140,7 @@ const LessonPlanPreviewModal: React.FC<LessonPlanPreviewModalProps> = ({
                 {/* Content */}
                 <div
                   className="p-8 space-y-8 overflow-y-auto"
-                  style={{ height: "calc(100vh - 210px)" }}
+                  style={{ height: "calc(100vh - 240px)" }}
                 >
                   {/* Overview Grid */}
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

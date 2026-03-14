@@ -1,11 +1,18 @@
 import { db } from "../db";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and, sql, inArray, asc } from "drizzle-orm";
 import {
   SchemeOfWork,
   SchemeOfWorkEntry,
   Subject,
   ClassGroup,
   AcademicTerm,
+  TeacherSubjectAssignment,
+  UserProfile,
+  User,
+  Grade,
+  Program,
+  AcademicYear,
+  LO_Lesson,
 } from "../db/schema";
 import { asyncHandler } from "../middleware/asyncHandler";
 import { successResponse } from "../utils/response";
@@ -107,6 +114,7 @@ export const uploadAndExtractScheme = asyncHandler(
         // cells[5] is Resources
         // cells[6] is Evidences / Evaluation
         // cells[7] is Learning Place
+        // cells[8] is Observation
 
         let topic = cleanText(cells[3] || "");
         if (!topic && firstColumn.toLowerCase().includes("midterm")) {
@@ -121,9 +129,12 @@ export const uploadAndExtractScheme = asyncHandler(
           topic: topic,
           sub_topic: "",
           objective: cleanText(cells[1] || ""),
+          duration: cleanText(cells[2] || ""),
           methodology: cleanText(cells[4] || ""),
           resources: cleanText(cells[5] || ""),
           evaluation: cleanText(cells[6] || ""),
+          learning_place: cleanText(cells[7] || ""),
+          observation: cleanText(cells[8] || ""),
         });
       }
     });
@@ -220,9 +231,30 @@ export const getSchemeEntries = asyncHandler(async (req: any, res: any) => {
     throw new ValidationError("Missing required parameters");
   }
 
-  const scheme = await db
-    .select()
+  // Get scheme along with all related names via JOIN
+  const schemeWithNames = await db
+    .select({
+      scheme_id: SchemeOfWork.scheme_id,
+      subject_id: SchemeOfWork.subject_id,
+      class_group_id: SchemeOfWork.class_group_id,
+      academic_term_id: SchemeOfWork.academic_term_id,
+      user_id: SchemeOfWork.user_id,
+      created_at: SchemeOfWork.created_at,
+      validation_status: SchemeOfWork.validation_status,
+      // Joined names
+      subject_name: Subject.name,
+      subject_code: Subject.code,
+      class_group_name: ClassGroup.name,
+      academic_term_name: AcademicTerm.name,
+      academic_year_name: AcademicYear.name,
+      teacher_name: sql<string>`CONCAT(${UserProfile.first_name}, ' ', ${UserProfile.last_name})`,
+    })
     .from(SchemeOfWork)
+    .leftJoin(Subject, eq(SchemeOfWork.subject_id, Subject.subject_id))
+    .leftJoin(ClassGroup, eq(SchemeOfWork.class_group_id, ClassGroup.class_group_id))
+    .leftJoin(AcademicTerm, eq(SchemeOfWork.academic_term_id, AcademicTerm.academic_term_id))
+    .leftJoin(AcademicYear, eq(AcademicTerm.academic_year_id, AcademicYear.academic_year_id))
+    .leftJoin(UserProfile, eq(SchemeOfWork.user_id, UserProfile.user_id))
     .where(
       and(
         eq(SchemeOfWork.subject_id, parseInt(subject_id)),
@@ -232,17 +264,20 @@ export const getSchemeEntries = asyncHandler(async (req: any, res: any) => {
     )
     .limit(1);
 
-  if (scheme.length === 0) {
+  if (schemeWithNames.length === 0) {
     return successResponse(res, "No scheme of work found", [], 200);
   }
 
   const entries = await db
     .select()
     .from(SchemeOfWorkEntry)
-    .where(eq(SchemeOfWorkEntry.scheme_id, scheme[0].scheme_id))
+    .where(eq(SchemeOfWorkEntry.scheme_id, schemeWithNames[0].scheme_id))
     .orderBy(SchemeOfWorkEntry.start_date);
 
-  successResponse(res, "Scheme entries retrieved successfully", entries);
+  successResponse(res, "Scheme entries retrieved successfully", {
+    scheme: schemeWithNames[0],
+    entries: entries,
+  });
 });
 
 /**
@@ -262,6 +297,9 @@ export const addSchemeEntry = asyncHandler(async (req: any, res: any) => {
     methodology,
     resources,
     evaluation,
+    duration,
+    learning_place,
+    observation,
   } = req.body;
   const userId = req.user.userId;
 
@@ -314,6 +352,9 @@ export const addSchemeEntry = asyncHandler(async (req: any, res: any) => {
     methodology,
     resources,
     evaluation,
+    duration: duration || null,
+    learning_place: learning_place || null,
+    observation: observation || null,
   });
 
   const resultHeader = Array.isArray(result) ? result[0] : result;
@@ -364,6 +405,9 @@ export const updateSchemeEntry = asyncHandler(async (req: any, res: any) => {
     methodology,
     resources,
     evaluation,
+    duration,
+    learning_place,
+    observation,
     is_completed,
   } = req.body;
 
@@ -394,9 +438,315 @@ export const updateSchemeEntry = asyncHandler(async (req: any, res: any) => {
       methodology: methodology ?? existingEntry[0].methodology,
       resources: resources ?? existingEntry[0].resources,
       evaluation: evaluation ?? existingEntry[0].evaluation,
+      duration: duration !== undefined ? duration : existingEntry[0].duration,
+      learning_place: learning_place !== undefined ? learning_place : existingEntry[0].learning_place,
+      observation: observation !== undefined ? observation : existingEntry[0].observation,
       is_completed: is_completed ?? existingEntry[0].is_completed,
     })
     .where(eq(SchemeOfWorkEntry.entry_id, entryId));
 
   successResponse(res, "Scheme entry updated successfully");
+});
+
+/**
+ * Get all teachers with their scheme of work status
+ * Grouped by: academic_year, academic_term, program, grade
+ */
+export const getAllTeachersSchemeOfWork = asyncHandler(
+  async (req: any, res: any) => {
+    const { academic_year_id, academic_term_id, program_id, grade_id, role } =
+      req.query;
+
+    if (!academic_year_id || !academic_term_id || !program_id || !grade_id) {
+      throw new ValidationError(
+        "academic_year_id, academic_term_id, program_id, grade_id are required",
+      );
+    }
+
+    const termId = parseInt(academic_term_id);
+    const gradeId = parseInt(grade_id);
+    const userType = role || "TEACHER";
+
+    // Get all grades in this program
+    const gradesInProgram = await db
+      .select({ grade_id: Grade.grade_id })
+      .from(Grade)
+      .where(
+        and(
+          eq(Grade.program_id, parseInt(program_id)),
+          eq(Grade.grade_id, gradeId),
+        ),
+      );
+
+    if (gradesInProgram.length === 0) {
+      return successResponse(res, "No grades found for this program", [], 200);
+    }
+
+    // Get class groups for this grade and academic year
+    const classGroups = await db
+      .select()
+      .from(ClassGroup)
+      .where(
+        and(
+          eq(ClassGroup.grade_id, gradeId),
+          eq(ClassGroup.academic_year_id, parseInt(academic_year_id)),
+        ),
+      );
+
+    if (classGroups.length === 0) {
+      return successResponse(
+        res,
+        "No class groups found for this grade",
+        [],
+        200,
+      );
+    }
+
+    const classGroupIds = classGroups.map((cg) => cg.class_group_id);
+
+    // Get all teacher-subject assignments for these class groups and term
+    const assignments = await db
+      .select({
+        user_id: TeacherSubjectAssignment.user_id,
+        subject_id: TeacherSubjectAssignment.subject_id,
+        class_group_id: TeacherSubjectAssignment.class_group_id,
+        academic_term_id: TeacherSubjectAssignment.academic_term_id,
+        assigned_at: TeacherSubjectAssignment.assigned_at,
+        subject_name: Subject.name,
+        subject_code: Subject.code,
+        subject_color: Subject.color,
+        class_group_name: ClassGroup.name,
+        term_name: AcademicTerm.name,
+        year_name: AcademicYear.name,
+      })
+      .from(TeacherSubjectAssignment)
+      .innerJoin(
+        Subject,
+        eq(TeacherSubjectAssignment.subject_id, Subject.subject_id),
+      )
+      .innerJoin(
+        ClassGroup,
+        eq(TeacherSubjectAssignment.class_group_id, ClassGroup.class_group_id),
+      )
+      .innerJoin(
+        AcademicTerm,
+        eq(
+          TeacherSubjectAssignment.academic_term_id,
+          AcademicTerm.academic_term_id,
+        ),
+      )
+      .innerJoin(
+        AcademicYear,
+        eq(AcademicTerm.academic_year_id, AcademicYear.academic_year_id),
+      )
+      .where(
+        and(
+          eq(TeacherSubjectAssignment.academic_term_id, termId),
+          inArray(TeacherSubjectAssignment.class_group_id, classGroupIds),
+        ),
+      );
+
+    if (assignments.length === 0) {
+      return successResponse(res, "No assignments found", [], 200);
+    }
+
+    // Unique teacher IDs
+    const teacherIds = [...new Set(assignments.map((a) => a.user_id))];
+
+    // Get teacher profiles filtered by user_type
+    const teacherProfiles = await db
+      .select({
+        user_id: User.user_id,
+        username: User.username,
+        email: User.email,
+        first_name: UserProfile.first_name,
+        last_name: UserProfile.last_name,
+        user_type: UserProfile.user_type,
+      })
+      .from(User)
+      .innerJoin(UserProfile, eq(User.user_id, UserProfile.user_id))
+      .where(
+        and(
+          inArray(User.user_id, teacherIds),
+          eq(UserProfile.user_type, userType as any),
+        ),
+      );
+
+    // Get all existing SchemeOfWork records for these assignments
+    const existingSchemes = await db
+      .select({
+        scheme_id: SchemeOfWork.scheme_id,
+        user_id: SchemeOfWork.user_id,
+        subject_id: SchemeOfWork.subject_id,
+        class_group_id: SchemeOfWork.class_group_id,
+        academic_term_id: SchemeOfWork.academic_term_id,
+        validation_status: SchemeOfWork.validation_status,
+        validation_comment: SchemeOfWork.validation_comment,
+        created_at: SchemeOfWork.created_at,
+        updated_at: SchemeOfWork.updated_at,
+      })
+      .from(SchemeOfWork)
+      .where(
+        and(
+          eq(SchemeOfWork.academic_term_id, termId),
+          inArray(SchemeOfWork.class_group_id, classGroupIds),
+        ),
+      );
+
+    // Get entry counts per scheme
+    const schemesWithCounts = await Promise.all(
+      existingSchemes.map(async (scheme) => {
+        const entriesCount = await db
+          .select({ count: sql<number>`count(*)` })
+          .from(SchemeOfWorkEntry)
+          .where(eq(SchemeOfWorkEntry.scheme_id, scheme.scheme_id));
+          
+        const firstEntry = await db
+          .select({
+             validation_status: SchemeOfWorkEntry.validation_status,
+             validation_comment: SchemeOfWorkEntry.validation_comment,
+          })
+          .from(SchemeOfWorkEntry)
+          .where(eq(SchemeOfWorkEntry.scheme_id, scheme.scheme_id))
+          .orderBy(asc(SchemeOfWorkEntry.entry_id))
+          .limit(1);
+
+        return {
+          ...scheme,
+          entries_count: Number(entriesCount[0]?.count ?? 0),
+          validation_status: firstEntry.length > 0 && firstEntry[0].validation_status ? firstEntry[0].validation_status : "PENDING",
+          validation_comment: firstEntry.length > 0 ? firstEntry[0].validation_comment : null,
+        };
+      }),
+    );
+
+    // Build scheme lookup: key = `userId-subjectId-classGroupId-termId`
+    const schemeMap = new Map<string, (typeof schemesWithCounts)[0]>();
+    schemesWithCounts.forEach((s) => {
+      const key = `${s.user_id}-${s.subject_id}-${s.class_group_id}-${s.academic_term_id}`;
+      schemeMap.set(key, s);
+    });
+
+    // Build result grouped by teacher
+    const teacherMap = new Map<number, any>();
+
+    for (const assignment of assignments) {
+      const profile = teacherProfiles.find(
+        (p) => p.user_id === assignment.user_id,
+      );
+      if (!profile) continue; // skip if not matching user_type filter
+
+      const key = `${assignment.user_id}-${assignment.subject_id}-${assignment.class_group_id}-${assignment.academic_term_id}`;
+      const scheme = schemeMap.get(key) || null;
+
+      const schemeRecord = {
+        subject_id: assignment.subject_id,
+        subject_name: assignment.subject_name,
+        subject_code: assignment.subject_code,
+        subject_color: assignment.subject_color,
+        class_group_id: assignment.class_group_id,
+        class_group_name: assignment.class_group_name,
+        academic_term_id: assignment.academic_term_id,
+        academic_term_name: assignment.term_name,
+        academic_year_name: assignment.year_name,
+        scheme_id: scheme?.scheme_id ?? null,
+        status: scheme ? "submitted" : "pending",
+        entries_count: scheme?.entries_count ?? 0,
+        validation_status: scheme?.validation_status ?? "PENDING",
+        validation_comment: scheme?.validation_comment ?? null,
+        submitted_at: scheme?.created_at ?? null,
+        updated_at: scheme?.updated_at ?? null,
+      };
+
+      if (!teacherMap.has(assignment.user_id)) {
+        teacherMap.set(assignment.user_id, {
+          user_id: profile.user_id,
+          username: profile.username,
+          email: profile.email,
+          first_name: profile.first_name,
+          last_name: profile.last_name,
+          user_type: profile.user_type,
+          full_name:
+            [profile.first_name, profile.last_name]
+              .filter(Boolean)
+              .join(" ") || profile.username,
+          schemes: [],
+        });
+      }
+
+      teacherMap.get(assignment.user_id).schemes.push(schemeRecord);
+    }
+
+    const result = Array.from(teacherMap.values()).map((teacher) => ({
+      ...teacher,
+      total_subjects: teacher.schemes.length,
+      submitted_count: teacher.schemes.filter(
+        (s: any) => s.status === "submitted",
+      ).length,
+      pending_count: teacher.schemes.filter((s: any) => s.status === "pending")
+        .length,
+      overall_status:
+        teacher.schemes.every((s: any) => s.status === "submitted")
+          ? "submitted"
+          : teacher.schemes.some((s: any) => s.status === "submitted")
+            ? "partial"
+            : "pending",
+    }));
+
+    successResponse(
+      res,
+      "Teachers scheme of work list retrieved successfully",
+      result,
+    );
+  },
+);
+
+/**
+ * Validates multiple scheme entries (Approve/Reject)
+ */
+export const validateScheme = asyncHandler(async (req: any, res: any) => {
+  const { entry_ids, status, comment } = req.body;
+  const actorId = req.user.userId;
+
+  if (!entry_ids || !Array.isArray(entry_ids) || entry_ids.length === 0 || !status) {
+    throw new ValidationError("Entry IDs array and status are required");
+  }
+
+  // Update validation status for the specified entries
+  await db
+    .update(SchemeOfWorkEntry)
+    .set({
+      validation_status: status,
+      validation_comment: comment || null,
+    })
+    .where(inArray(SchemeOfWorkEntry.entry_id, entry_ids));
+
+  // Get one of the entries to find the owner for activity logging
+  const sampleEntry = await db
+    .select({ scheme_id: SchemeOfWorkEntry.scheme_id })
+    .from(SchemeOfWorkEntry)
+    .where(eq(SchemeOfWorkEntry.entry_id, entry_ids[0]))
+    .limit(1);
+
+  if (sampleEntry.length > 0) {
+    const scheme = await db
+      .select({ user_id: SchemeOfWork.user_id })
+      .from(SchemeOfWork)
+      .where(eq(SchemeOfWork.scheme_id, sampleEntry[0].scheme_id))
+      .limit(1);
+
+    if (scheme.length > 0) {
+      await recordActivity(
+        actorId,
+        "SCHEME_ENTRIES_VALIDATION",
+        `Validated ${entry_ids.length} scheme entries as ${status}`,
+        "SchemeOfWork",
+        sampleEntry[0].scheme_id,
+        { entry_ids, status, comment },
+        scheme[0].user_id,
+      );
+    }
+  }
+
+  successResponse(res, `Selected scheme entries ${status.toLowerCase()} successfully`);
 });
