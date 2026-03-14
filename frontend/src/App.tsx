@@ -38,6 +38,7 @@ import LogsHistory from "./components/LogsHistory";
 import AllTeachersSchemeOfWork from "./components/AllTeachersSchemeOfWork";
 import SchemeDetails from "./components/SchemeDetails";
 import ReportingModule from "./components/reporting/ReportingModule";
+import AdminReporting from "./components/reporting/AdminReporting";
 import { MetadataProvider } from "./contexts/MetadataContext";
 
 const LoginPage: React.FC = () => {
@@ -561,6 +562,18 @@ function App() {
                 <ProtectedRoute>
                   <SystemLayoutWrapper>
                     <LogsHistory />
+                  </SystemLayoutWrapper>
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Admin Reporting - protected with sidebar */}
+            <Route
+              path="/admin/reports"
+              element={
+                <ProtectedRoute>
+                  <SystemLayoutWrapper>
+                    <AdminReporting />
                   </SystemLayoutWrapper>
                 </ProtectedRoute>
               }

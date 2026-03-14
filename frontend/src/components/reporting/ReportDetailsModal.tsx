@@ -18,13 +18,15 @@ import Modal from "../ui/Modal";
 interface ReportDetailsModalProps {
   reportId: number;
   onClose: () => void;
-  onEdit: () => void;
+  onEdit?: () => void;
+  isAdminView?: boolean;
 }
 
 const ReportDetailsModal: React.FC<ReportDetailsModalProps> = ({
   reportId,
   onClose,
   onEdit,
+  isAdminView = false,
 }) => {
   const [report, setReport] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -114,13 +116,15 @@ const ReportDetailsModal: React.FC<ReportDetailsModalProps> = ({
               </p>
             </div>
           </div>
-          <button
-            onClick={onEdit}
-            className="flex items-center space-x-2 bg-white dark:bg-slate-800 hover:bg-gray-50 text-gray-700 dark:text-gray-200 px-4 py-2 rounded-xl text-sm font-bold border border-gray-100 dark:border-slate-700 transition-all"
-          >
-            <Edit3 className="w-4 h-4 text-blue-600" />
-            <span>Edit</span>
-          </button>
+          {!isAdminView && onEdit && (
+            <button
+              onClick={onEdit}
+              className="flex items-center space-x-2 bg-white dark:bg-slate-800 hover:bg-gray-50 text-gray-700 dark:text-gray-200 px-4 py-2 rounded-xl text-sm font-bold border border-gray-100 dark:border-slate-700 transition-all"
+            >
+              <Edit3 className="w-4 h-4 text-blue-600" />
+              <span>Edit</span>
+            </button>
+          )}
         </div>
       }
       showCloseButton={true}
@@ -460,16 +464,18 @@ const ReportDetailsModal: React.FC<ReportDetailsModalProps> = ({
           </div>
 
           {/* Footer Action */}
-          <div className="pt-6 border-t border-gray-50 dark:border-gray-800 flex justify-end">
-            <button
-              onClick={onEdit}
-              className="flex items-center space-x-2.5 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-full font-black text-sm shadow-blue-200 dark:shadow-none hover:scale-[1.02] transition-all"
-            >
-              <Edit3 className="w-4 h-4" />
-              <span>CONTINUE TO EDITING</span>
-              <ArrowRight className="w-4 h-4" />
-            </button>
-          </div>
+          {!isAdminView && onEdit && (
+            <div className="pt-6 border-t border-gray-50 dark:border-gray-800 flex justify-end">
+              <button
+                onClick={onEdit}
+                className="flex items-center space-x-2.5 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-full font-black text-sm shadow-blue-200 dark:shadow-none hover:scale-[1.02] transition-all"
+              >
+                <Edit3 className="w-4 h-4" />
+                <span>CONTINUE TO EDITING</span>
+                <ArrowRight className="w-4 h-4" />
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </Modal>

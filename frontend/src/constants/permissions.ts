@@ -94,6 +94,7 @@ export const Permissions = {
 
   // Reporting Module
   SUBMIT_REPORTING: "SUBMIT_REPORTING",
+  ALL_SUBMITTED_REPORTS: "ALL_SUBMITTED_REPORTS",
 } as const;
 
 export type PermissionKey = keyof typeof Permissions;
@@ -195,6 +196,7 @@ export const permissionGroups = {
     Permissions.GENERATE_REPORTS,
     Permissions.ACCESS_REPORT_CARD_MODULE,
     Permissions.SUBMIT_REPORTING,
+    Permissions.ALL_SUBMITTED_REPORTS,
   ],
   settings: [Permissions.MANAGE_SETTINGS],
   admin: [Permissions.ADMIN],

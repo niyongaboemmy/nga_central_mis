@@ -102,6 +102,7 @@ export const Permissions = {
 
   // Reporting
   SUBMIT_REPORTING: "SUBMIT_REPORTING",
+  ALL_SUBMITTED_REPORTS: "ALL_SUBMITTED_REPORTS",
 } as const;
 
 /**

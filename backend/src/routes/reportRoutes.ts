@@ -8,6 +8,7 @@ import {
   getDashboardStats,
   getReportByDate,
   updateReport,
+  getAllAdminReports,
 } from "../controllers/reportController";
 import { Permissions } from "../utils/permissions";
 
@@ -24,6 +25,13 @@ router.get("/autofill", getAutoFillData);
 
 // List reports (instructors see their own, admins see all)
 router.get("/", getReports);
+
+// Admin: View all submitted reports
+router.get(
+  "/admin/all",
+  authorize(Permissions.ALL_SUBMITTED_REPORTS),
+  getAllAdminReports,
+);
 
 // Get dashboard statistics
 router.get("/dashboard-stats", getDashboardStats);

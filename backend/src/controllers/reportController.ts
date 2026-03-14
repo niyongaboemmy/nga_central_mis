@@ -14,8 +14,11 @@ import {
   LO_LearningOutcome,
   User,
   UserProfile,
+  AcademicYear,
   AcademicTerm,
   ClassGroup,
+  Grade,
+  Program,
   TeacherSubjectAssignment,
 } from "../db/schema";
 import { asyncHandler } from "../middleware/asyncHandler";
@@ -456,9 +459,11 @@ export const getReports = asyncHandler(async (req: any, res: any) => {
           ? eq(InstructorReport.user_id, parseInt(user_id))
           : eq(InstructorReport.user_id, userId),
         start_date
-          ? sql`${InstructorReport.start_date} >= ${start_date}`
+          ? sql`DATE_FORMAT(${InstructorReport.start_date}, '%Y-%m-%d') >= ${start_date}`
           : sql`1=1`,
-        end_date ? sql`${InstructorReport.end_date} <= ${end_date}` : sql`1=1`,
+        end_date
+          ? sql`DATE_FORMAT(${InstructorReport.end_date}, '%Y-%m-%d') <= ${end_date}`
+          : sql`1=1`,
         class_group_id
           ? eq(InstructorReport.class_group_id, parseInt(class_group_id))
           : sql`1=1`,
@@ -805,4 +810,87 @@ export const updateReport = asyncHandler(async (req: any, res: any) => {
   );
 
   successResponse(res, "Report updated successfully", { reportId }, 200);
+});
+
+/**
+ * Admin: View all submitted reports with filtering
+ */
+export const getAllAdminReports = asyncHandler(async (req: any, res: any) => {
+  const {
+    start_date,
+    end_date,
+    academic_year_id,
+    academic_term_id,
+    program_id,
+    grade_id,
+  } = req.query;
+  
+  logger.info(`Admin Reports Query Params: ${JSON.stringify(req.query)}`);
+
+  const query = db
+    .select({
+      report_id: InstructorReport.report_id,
+      user_id: InstructorReport.user_id,
+      instructor_name: sql<string>`CONCAT(${UserProfile.first_name}, ' ', ${UserProfile.last_name})`,
+      academic_year_name: AcademicYear.name,
+      academic_term_name: AcademicTerm.name,
+      program_name: Program.name,
+      grade_name: Grade.name,
+      class_group_id: InstructorReport.class_group_id,
+      week_number: InstructorReport.week_number,
+      start_date: InstructorReport.start_date,
+      end_date: InstructorReport.end_date,
+      submission_date: InstructorReport.submission_date,
+      progress_status: InstructorReport.progress_status,
+      lessons_delivered_count: InstructorReport.lessons_delivered_count,
+      mentorship_sessions_count: InstructorReport.mentorship_sessions_count,
+    })
+    .from(InstructorReport)
+    .leftJoin(UserProfile, eq(InstructorReport.user_id, UserProfile.user_id))
+    .leftJoin(
+      AcademicTerm,
+      eq(InstructorReport.academic_term_id, AcademicTerm.academic_term_id),
+    )
+    .leftJoin(
+      AcademicYear,
+      eq(AcademicTerm.academic_year_id, AcademicYear.academic_year_id),
+    )
+    .leftJoin(
+      ClassGroup,
+      eq(InstructorReport.class_group_id, ClassGroup.class_group_id),
+    )
+    .leftJoin(Grade, eq(ClassGroup.grade_id, Grade.grade_id))
+    .leftJoin(Program, eq(Grade.program_id, Program.program_id))
+    .where(
+      and(
+        start_date
+          ? sql`DATE_FORMAT(${InstructorReport.start_date}, '%Y-%m-%d') >= ${start_date}`
+          : sql`1=1`,
+        end_date
+          ? sql`DATE_FORMAT(${InstructorReport.end_date}, '%Y-%m-%d') <= ${end_date}`
+          : sql`1=1`,
+        academic_year_id
+          ? eq(AcademicYear.academic_year_id, parseInt(academic_year_id))
+          : sql`1=1`,
+        academic_term_id
+          ? eq(AcademicTerm.academic_term_id, parseInt(academic_term_id))
+          : sql`1=1`,
+        program_id ? eq(Program.program_id, parseInt(program_id)) : sql`1=1`,
+        grade_id ? eq(Grade.grade_id, parseInt(grade_id)) : sql`1=1`,
+      ),
+    )
+    .orderBy(desc(InstructorReport.submission_date));
+
+  const reports = await query;
+  const formattedReports = reports.map((r) => ({
+    ...r,
+    start_date: formatDbDate(r.start_date),
+    end_date: formatDbDate(r.end_date),
+  }));
+
+  successResponse(
+    res,
+    "All submitted reports retrieved successfully",
+    formattedReports,
+  );
 });
