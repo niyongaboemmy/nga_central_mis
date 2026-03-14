@@ -10,7 +10,10 @@ import LessonPlanModal from "./LessonPlanModal";
 import LessonPlanPreviewModal from "./LessonPlanPreviewModal";
 import SchemeOfWorkPreviewModal from "./SchemeOfWorkPreviewModal";
 import SchemeReportPreviewModal from "./SchemeReportPreviewModal";
-import { SchemeReportService, ReportMetadata } from "../services/SchemeReportService";
+import {
+  SchemeReportService,
+  ReportMetadata,
+} from "../services/SchemeReportService";
 import { useUser } from "../contexts/UserContext";
 import { useMetadata } from "../contexts/MetadataContext";
 import reportLogo1 from "../assets/report_image1.png";
@@ -125,10 +128,15 @@ const SchemeOfWorkCalendar: React.FC = () => {
         classGroupId,
         academicTermId,
       );
-      const { entries: entryList, scheme } = (resp.data as any).data || {
+      const { scheme } = (resp.data as any).data || {
         entries: [],
         scheme: null,
       };
+      const rawData = (resp.data as any).data;
+      const entryList = Array.isArray(rawData)
+        ? rawData
+        : rawData?.entries || [];
+
       setEntries(entryList);
       setSchemeMetadata(scheme);
 
@@ -209,8 +217,8 @@ const SchemeOfWorkCalendar: React.FC = () => {
     const currentYear = years.find((y: any) => y.is_current)?.name || "N/A";
 
     return {
-      teacherName: user?.profile?.first_name 
-        ? `${user.profile.first_name} ${user.profile.last_name || ""}` 
+      teacherName: user?.profile?.first_name
+        ? `${user.profile.first_name} ${user.profile.last_name || ""}`
         : user?.user?.username || "Instructor",
       subjectName: subjectInfo?.name || "Subject",
       subjectCode: subjectInfo?.code,
@@ -235,7 +243,10 @@ const SchemeOfWorkCalendar: React.FC = () => {
       showToast("No data to export", "warning");
       return;
     }
-    const pdfUrl = SchemeReportService.generateSOWReportBlobUrl(entries, buildReportMetadata());
+    const pdfUrl = SchemeReportService.generateSOWReportBlobUrl(
+      entries,
+      buildReportMetadata(),
+    );
     setReportPdfUrl(pdfUrl);
     setIsPreviewReportOpen(true);
   };
@@ -414,7 +425,8 @@ const SchemeOfWorkCalendar: React.FC = () => {
   }, [entries, lessonPlans]);
 
   const MissingPlansBanner = () => {
-    if (stats.missing === 0 || schemeMetadata?.validation_status === "APPROVED") return null;
+    if (stats.missing === 0 || schemeMetadata?.validation_status === "APPROVED")
+      return null;
 
     return (
       <motion.div
@@ -459,7 +471,8 @@ const SchemeOfWorkCalendar: React.FC = () => {
   };
 
   const ValidationBanner = () => {
-    if (!schemeMetadata || schemeMetadata.validation_status === "PENDING") return null;
+    if (!schemeMetadata || schemeMetadata.validation_status === "PENDING")
+      return null;
 
     const isApproved = schemeMetadata.validation_status === "APPROVED";
     const Icon = isApproved ? CheckCircle2 : AlertCircle;
@@ -474,25 +487,37 @@ const SchemeOfWorkCalendar: React.FC = () => {
             : "bg-rose-50 border-rose-200 dark:bg-rose-900/20 dark:border-rose-800"
         }`}
       >
-        <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${
-          isApproved ? "bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600" : "bg-rose-100 dark:bg-rose-900/40 text-rose-600"
-        }`}>
+        <div
+          className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${
+            isApproved
+              ? "bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600"
+              : "bg-rose-100 dark:bg-rose-900/40 text-rose-600"
+          }`}
+        >
           <Icon className="w-6 h-6" />
         </div>
-        
+
         <div className="flex-1">
-          <h3 className={`text-lg font-bold ${isApproved ? "text-emerald-900 dark:text-emerald-400" : "text-rose-900 dark:text-rose-400"}`}>
+          <h3
+            className={`text-lg font-bold ${isApproved ? "text-emerald-900 dark:text-emerald-400" : "text-rose-900 dark:text-rose-400"}`}
+          >
             Scheme {isApproved ? "Approved" : "Rejected"}
           </h3>
-          <p className={`text-sm ${isApproved ? "text-emerald-600 dark:text-emerald-500" : "text-rose-600 dark:text-rose-500"}`}>
-            {isApproved 
-              ? "This scheme of work has been approved and is now locked for editing." 
+          <p
+            className={`text-sm ${isApproved ? "text-emerald-600 dark:text-emerald-500" : "text-rose-600 dark:text-rose-500"}`}
+          >
+            {isApproved
+              ? "This scheme of work has been approved and is now locked for editing."
               : "This scheme of work has been rejected. Please review the comments and update accordingly."}
           </p>
           {schemeMetadata.validation_comment && (
-            <div className={`mt-2 p-3 rounded-lg text-sm italic ${
-              isApproved ? "bg-emerald-100/50 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-300" : "bg-rose-100/50 dark:bg-rose-900/30 text-rose-800 dark:text-rose-300"
-            }`}>
+            <div
+              className={`mt-2 p-3 rounded-lg text-sm italic ${
+                isApproved
+                  ? "bg-emerald-100/50 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-300"
+                  : "bg-rose-100/50 dark:bg-rose-900/30 text-rose-800 dark:text-rose-300"
+              }`}
+            >
               "{schemeMetadata.validation_comment}"
             </div>
           )}
@@ -935,7 +960,7 @@ const SchemeOfWorkCalendar: React.FC = () => {
         </div>
 
         {/* Header Section */}
-        <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 mb-8">
+        <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 mb-3">
           <div>
             <h1 className="text-2xl font-black tracking-tight text-gray-900 dark:text-white mb-2 flex flex-col md:flex-row md:items-center gap-2">
               <span className="bg-blue-600 text-white px-3 py-1 rounded-xl text-sm font-bold uppercase tracking-wider">
@@ -956,7 +981,8 @@ const SchemeOfWorkCalendar: React.FC = () => {
               weekly topics and daily lesson plans.
             </p>
           </div>
-
+        </div>
+        <div className="flex flex-row items-center gap-2 mb-4">
           {entries.length > 0 && (
             <div className="flex items-center gap-3">
               {/* Upload Action */}
@@ -974,7 +1000,10 @@ const SchemeOfWorkCalendar: React.FC = () => {
                 onClick={() =>
                   document.getElementById("header-upload")?.click()
                 }
-                disabled={isUploading || schemeMetadata?.validation_status === "APPROVED"}
+                disabled={
+                  isUploading ||
+                  schemeMetadata?.validation_status === "APPROVED"
+                }
                 className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 bg-white dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-full hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-blue-500 transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isUploading ? (
@@ -1049,7 +1078,10 @@ const SchemeOfWorkCalendar: React.FC = () => {
             ) : (
               <button
                 onClick={handleUpload}
-                disabled={isUploading || schemeMetadata?.validation_status === "APPROVED"}
+                disabled={
+                  isUploading ||
+                  schemeMetadata?.validation_status === "APPROVED"
+                }
                 className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-full transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isUploading ? (

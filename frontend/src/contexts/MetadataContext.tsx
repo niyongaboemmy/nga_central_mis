@@ -44,6 +44,9 @@ export const MetadataProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     grades: {} as Record<number, boolean>,
   });
 
+  const fetchingYearsRef = React.useRef(false);
+  const fetchingProgramsRef = React.useRef(false);
+
   const [state, setState] = useState<MetadataState>(() => {
     const saved = sessionStorage.getItem("metadata_cache");
     if (saved) {
@@ -79,6 +82,8 @@ export const MetadataProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   }, []);
 
   const refreshYears = useCallback(async () => {
+    if (fetchingYearsRef.current) return;
+    fetchingYearsRef.current = true;
     setLoading((prev) => ({ ...prev, years: true }));
     try {
       const res = await academicYearsApi.getAll();
@@ -89,10 +94,13 @@ export const MetadataProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       console.error("Failed to fetch years", e);
     } finally {
       setLoading((prev) => ({ ...prev, years: false }));
+      fetchingYearsRef.current = false;
     }
   }, [saveToSession]);
 
   const refreshPrograms = useCallback(async () => {
+    if (fetchingProgramsRef.current) return;
+    fetchingProgramsRef.current = true;
     setLoading((prev) => ({ ...prev, programs: true }));
     try {
       const res = await programsApi.getAll();
@@ -102,6 +110,7 @@ export const MetadataProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       console.error("Failed to fetch programs", e);
     } finally {
       setLoading((prev) => ({ ...prev, programs: false }));
+      fetchingProgramsRef.current = false;
     }
   }, [saveToSession]);
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Alert, VerificationCode } from "./ui";
 import { login, verifyOTP, authorizeSSO, checkSession } from "../api/auth";
@@ -111,6 +111,7 @@ const Login: React.FC<LoginProps> = ({
   const [authError, setAuthError] = useState("");
   const [loading, setLoading] = useState(false);
   const [initializing, setInitializing] = useState(true);
+  const hasCheckedRef = useRef(false);
 
   const handleCredentialsSubmit = async (e: any) => {
     e.preventDefault();
@@ -192,6 +193,9 @@ const Login: React.FC<LoginProps> = ({
 
   // Check for auto-login/SSO redirect on mount
   useEffect(() => {
+    if (hasCheckedRef.current) return;
+    hasCheckedRef.current = true;
+
     const handleAutoRedirect = async () => {
       const clientId = searchParams.get("client_id");
       const redirectUri = searchParams.get("redirect_uri");

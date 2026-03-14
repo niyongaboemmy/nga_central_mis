@@ -887,3 +887,121 @@ export const CalendarActivity = mysqlTable("CalendarActivity", {
     sql`CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP`,
   ),
 });
+
+// --- Reporting Module Tables ---
+
+// InstructorReport table: Central record for a weekly or daily report
+export const InstructorReport = mysqlTable("InstructorReport", {
+  report_id: bigint("report_id", { mode: "number" }).primaryKey().autoincrement(),
+  user_id: bigint("user_id", { mode: "number" })
+    .notNull()
+    .references(() => User.user_id),
+  academic_term_id: bigint("academic_term_id", { mode: "number" })
+    .references(() => AcademicTerm.academic_term_id),
+  class_group_id: bigint("class_group_id", { mode: "number" })
+    .references(() => ClassGroup.class_group_id),
+  week_number: int("week_number"),
+  start_date: date("start_date"),
+  end_date: date("end_date"),
+  submission_date: datetime("submission_date").default(sql`CURRENT_TIMESTAMP`),
+  progress_status: mysqlEnum("progress_status", [
+    "ON_TRACK",
+    "SLIGHTLY_BEHIND",
+    "AHEAD",
+  ]).default("ON_TRACK"),
+  key_highlights: text("key_highlights"),
+  challenges_encountered: text("challenges_encountered"),
+  // Snapshot metrics
+  lessons_delivered_count: int("lessons_delivered_count").default(0),
+  mentorship_sessions_count: int("mentorship_sessions_count").default(0),
+  active_students_count: int("active_students_count").default(0),
+  struggling_students_count: int("struggling_students_count").default(0),
+  created_at: datetime("created_at").default(sql`CURRENT_TIMESTAMP`),
+  updated_at: datetime("updated_at").default(
+    sql`CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP`,
+  ),
+});
+
+// ReportLesson table: Individual lessons linked to a report
+export const ReportLesson = mysqlTable("ReportLesson", {
+  lesson_report_id: bigint("lesson_report_id", { mode: "number" })
+    .primaryKey()
+    .autoincrement(),
+  report_id: bigint("report_id", { mode: "number" })
+    .notNull()
+    .references(() => InstructorReport.report_id, { onDelete: "cascade" }),
+  lesson_title: varchar("lesson_title", { length: 255 }),
+  planned: tinyint("planned").default(1),
+  delivered: tinyint("delivered").default(1),
+  notes: text("notes"),
+});
+
+// MentorshipSession table: Records of mentorship meetings
+export const MentorshipSession = mysqlTable("MentorshipSession", {
+  mentorship_id: bigint("mentorship_id", { mode: "number" })
+    .primaryKey()
+    .autoincrement(),
+  report_id: bigint("report_id", { mode: "number" })
+    .references(() => InstructorReport.report_id, { onDelete: "cascade" }),
+  user_id: bigint("user_id", { mode: "number" }) // Mentor/Instructor
+    .notNull()
+    .references(() => User.user_id),
+  student_id: bigint("student_id", { mode: "number" })
+    .references(() => User.user_id),
+  student_name: text("student_name"),
+  session_date: date("session_date"),
+  duration_minutes: int("duration_minutes"),
+  assignment_completion: varchar("assignment_completion", { length: 255 }),
+  punctuality_attendance: varchar("punctuality_attendance", { length: 255 }),
+  academic_planning: text("academic_planning"),
+  next_steps: text("next_steps"),
+  challenges_identified: text("challenges_identified"),
+  wellbeing_status: text("wellbeing_status"),
+  follow_up_required: tinyint("follow_up_required").default(0),
+  notes: text("notes"),
+  created_at: datetime("created_at").default(sql`CURRENT_TIMESTAMP`),
+});
+
+// ReportProjectUpdate table: Delivery Studio project work status
+export const ReportProjectUpdate = mysqlTable("ReportProjectUpdate", {
+  project_update_id: bigint("project_update_id", { mode: "number" })
+    .primaryKey()
+    .autoincrement(),
+  report_id: bigint("report_id", { mode: "number" })
+    .notNull()
+    .references(() => InstructorReport.report_id, { onDelete: "cascade" }),
+  project_name: varchar("project_name", { length: 255 }),
+  role: varchar("role", { length: 100 }),
+  work_completed: text("work_completed"),
+  status: mysqlEnum("status", ["ON_TRACK", "AT_RISK"]).default("ON_TRACK"),
+  key_outputs: text("key_outputs"),
+  challenges: text("challenges"),
+});
+
+// ReportReflection table: Qualitative reflections and support needs
+export const ReportReflection = mysqlTable("ReportReflection", {
+  reflection_id: bigint("reflection_id", { mode: "number" })
+    .primaryKey()
+    .autoincrement(),
+  report_id: bigint("report_id", { mode: "number" })
+    .notNull()
+    .references(() => InstructorReport.report_id, { onDelete: "cascade" }),
+  what_worked_well: text("what_worked_well"),
+  improvement_areas: text("improvement_areas"),
+  academic_support_needed: text("academic_support_needed"),
+  technical_support_needed: text("technical_support_needed"),
+  infrastructure_support_needed: text("infrastructure_support_needed"),
+  coordination_support_needed: text("coordination_support_needed"),
+});
+
+// ReportTopic table: Topics covered or planned
+export const ReportTopic = mysqlTable("ReportTopic", {
+  topic_report_id: bigint("topic_report_id", { mode: "number" })
+    .primaryKey()
+    .autoincrement(),
+  report_id: bigint("report_id", { mode: "number" })
+    .notNull()
+    .references(() => InstructorReport.report_id, { onDelete: "cascade" }),
+  topic_name: text("topic_name"),
+  is_planned_for_next_week: tinyint("is_planned_for_next_week").default(0),
+});

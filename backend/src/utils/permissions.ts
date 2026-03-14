@@ -99,6 +99,9 @@ export const Permissions = {
   // Scheme of Work Management
   VIEW_ALL_TEACHERS_SCHEME_OF_WORK_LIST: "VIEW_ALL_TEACHERS_SCHEME_OF_WORK_LIST",
   VALIDATE_SCHEME_OF_WORK: "VALIDATE_SCHEME_OF_WORK",
+
+  // Reporting
+  SUBMIT_REPORTING: "SUBMIT_REPORTING",
 } as const;
 
 /**

@@ -155,6 +155,26 @@ const Sidebar: React.FC<SidebarProps> = ({
       requiredPermission: Permissions.VIEW_ACADEMIC_CALENDAR,
     },
     {
+      label: "Reporting",
+      path: "/reporting",
+      icon: (
+        <svg
+          className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`}
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M9 17v-2a4 4 0 00-4-4H5m14 0h-2a4 4 0 00-4 4v2m-3-3l3-3m0 0l3 3m-3-3v8"
+          />
+        </svg>
+      ),
+      requiredPermission: Permissions.SUBMIT_REPORTING,
+    },
+    {
       label: "Documents",
       path: "/documents",
       icon: (

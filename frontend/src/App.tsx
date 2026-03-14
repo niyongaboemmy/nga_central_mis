@@ -37,6 +37,7 @@ import AcademicCalendar from "./components/AcademicCalendar";
 import LogsHistory from "./components/LogsHistory";
 import AllTeachersSchemeOfWork from "./components/AllTeachersSchemeOfWork";
 import SchemeDetails from "./components/SchemeDetails";
+import ReportingModule from "./components/reporting/ReportingModule";
 import { MetadataProvider } from "./contexts/MetadataContext";
 
 const LoginPage: React.FC = () => {
@@ -536,6 +537,18 @@ function App() {
                 <ProtectedRoute>
                   <SystemLayoutWrapper>
                     <AcademicCalendar />
+                  </SystemLayoutWrapper>
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Reporting - protected with sidebar */}
+            <Route
+              path="/reporting"
+              element={
+                <ProtectedRoute>
+                  <SystemLayoutWrapper>
+                    <ReportingModule />
                   </SystemLayoutWrapper>
                 </ProtectedRoute>
               }

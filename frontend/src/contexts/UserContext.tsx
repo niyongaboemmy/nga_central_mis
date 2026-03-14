@@ -35,13 +35,6 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({
   const roles = user?.roles || [];
 
   const refreshUser = useCallback(async () => {
-    const token = getToken();
-    if (!token) {
-      setUser(null);
-      setIsLoading(false);
-      return;
-    }
-
     if (isRefreshingRef.current) {
       return; // Prevent concurrent calls
     }
@@ -58,8 +51,6 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({
         const sessionData = await checkSession();
         if (sessionData) {
           userData = sessionData.user;
-          // Note: If session data contains token, we could also store it locally
-          // but relying on the cookie is safer for SSO.
         }
       }
 

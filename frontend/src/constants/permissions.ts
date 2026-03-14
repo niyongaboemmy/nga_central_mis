@@ -91,6 +91,9 @@ export const Permissions = {
 
   // Logs Management
   VIEW_ALL_LOGS_HISTORY: "VIEW_ALL_LOGS_HISTORY",
+
+  // Reporting Module
+  SUBMIT_REPORTING: "SUBMIT_REPORTING",
 } as const;
 
 export type PermissionKey = keyof typeof Permissions;
@@ -191,6 +194,7 @@ export const permissionGroups = {
     Permissions.VIEW_REPORTS,
     Permissions.GENERATE_REPORTS,
     Permissions.ACCESS_REPORT_CARD_MODULE,
+    Permissions.SUBMIT_REPORTING,
   ],
   settings: [Permissions.MANAGE_SETTINGS],
   admin: [Permissions.ADMIN],

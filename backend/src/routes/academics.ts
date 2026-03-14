@@ -83,18 +83,8 @@ import { authenticate, authorize } from "../middleware/auth";
 const router = express.Router();
 
 // Academic Years routes
-router.get(
-  "/years",
-  authenticate,
-  authorize("MANAGE_ACADEMICS"),
-  getAcademicYears,
-);
-router.get(
-  "/years/:id",
-  authenticate,
-  authorize("MANAGE_ACADEMICS"),
-  getAcademicYear,
-);
+router.get("/years", authenticate, getAcademicYears);
+router.get("/years/:id", authenticate, getAcademicYear);
 router.post(
   "/years",
   authenticate,
@@ -142,18 +132,8 @@ router.delete(
 );
 
 // Programs routes
-router.get(
-  "/programs",
-  authenticate,
-  authorize("MANAGE_ACADEMICS"),
-  getPrograms,
-);
-router.get(
-  "/programs/:id",
-  authenticate,
-  authorize("MANAGE_ACADEMICS"),
-  getProgram,
-);
+router.get("/programs", authenticate, getPrograms);
+router.get("/programs/:id", authenticate, getProgram);
 router.post(
   "/programs",
   authenticate,
@@ -174,12 +154,7 @@ router.delete(
 );
 
 // Program Users routes
-router.get(
-  "/programs/:programId/users",
-  authenticate,
-  authorize("VIEW_PROGRAM_USERS"),
-  getUsersByProgram,
-);
+router.get("/programs/:programId/users", authenticate, getUsersByProgram);
 router.post(
   "/programs/assign-lead",
   authenticate,
@@ -194,18 +169,8 @@ router.delete(
 );
 
 // Grades routes
-router.get(
-  "/grades",
-  authenticate,
-  authorize(["MANAGE_ACADEMICS", "VIEW_PROGRAM_ACADEMICS"]),
-  getGrades,
-);
-router.get(
-  "/grades/:id",
-  authenticate,
-  authorize("MANAGE_ACADEMICS"),
-  getGrade,
-);
+router.get("/grades", authenticate, getGrades);
+router.get("/grades/:id", authenticate, getGrade);
 router.post(
   "/grades",
   authenticate,
@@ -226,18 +191,8 @@ router.delete(
 );
 
 // Course Categories routes
-router.get(
-  "/course-categories",
-  authenticate,
-  authorize("MANAGE_ACADEMICS"),
-  getCourseCategories,
-);
-router.get(
-  "/course-categories/:id",
-  authenticate,
-  authorize("MANAGE_ACADEMICS"),
-  getCourseCategoryById,
-);
+router.get("/course-categories", authenticate, getCourseCategories);
+router.get("/course-categories/:id", authenticate, getCourseCategoryById);
 router.post(
   "/course-categories",
   authenticate,
@@ -259,12 +214,7 @@ router.delete(
 
 // Grade-Subject Assignment routes
 router.get("/grades/:grade_id/subjects", authenticate, getGradeSubjects);
-router.post(
-  "/grades/assign-subject",
-  authenticate,
-  authorize("MANAGE_ACADEMICS"),
-  assignSubjectToGrade,
-);
+router.post("/grades/assign-subject", authenticate, assignSubjectToGrade);
 router.delete(
   "/grades/:grade_id/subjects/:subject_id",
   authenticate,
@@ -381,7 +331,6 @@ router.delete(
 router.get(
   "/students/:studentId/class-group",
   authenticate,
-  authorize("MANAGE_USERS"),
   getStudentClassGroup,
 );
 router.post(
