@@ -16,9 +16,15 @@ import {
   ArrowUpRight,
   CalendarCheck,
   Calendar as CalendarIcon,
-  X,
 } from "lucide-react";
-import { format } from "date-fns";
+import {
+  format,
+  startOfMonth,
+  endOfMonth,
+  startOfDay,
+  endOfDay,
+  subDays,
+} from "date-fns";
 
 const parseLocalNoShift = (dateStr: string) => {
   if (!dateStr) return null;
@@ -32,29 +38,58 @@ interface ReportingDashboardProps {
   onLoad: (params?: { start_date?: string; end_date?: string }) => void;
 }
 
+type PresetType = "today" | "week" | "month" | "custom";
+
 const ReportingDashboard: React.FC<ReportingDashboardProps> = ({
   stats,
   loading,
   onLoad,
 }) => {
+  const [activePreset, setActivePreset] = useState<PresetType>("week");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
 
+  const getPresetRange = (preset: PresetType) => {
+    const now = new Date();
+    switch (preset) {
+      case "today":
+        return {
+          start: format(startOfDay(now), "yyyy-MM-dd"),
+          end: format(endOfDay(now), "yyyy-MM-dd"),
+        };
+      case "week":
+        // Default to last 7 days as requested "a week" usually implies trailing
+        return {
+          start: format(subDays(now, 7), "yyyy-MM-dd"),
+          end: format(now, "yyyy-MM-dd"),
+        };
+      case "month":
+        return {
+          start: format(startOfMonth(now), "yyyy-MM-dd"),
+          end: format(endOfMonth(now), "yyyy-MM-dd"),
+        };
+      default:
+        return null;
+    }
+  };
+
+  // On mount or when preset changes (non-custom)
   useEffect(() => {
-    onLoad();
-  }, [onLoad]);
+    if (activePreset !== "custom") {
+      const range = getPresetRange(activePreset);
+      if (range) {
+        onLoad({ start_date: range.start, end_date: range.end });
+      } else {
+        onLoad();
+      }
+    }
+  }, [activePreset, onLoad]);
 
   const handleFilter = () => {
     onLoad({
       start_date: startDate || undefined,
       end_date: endDate || undefined,
     });
-  };
-
-  const clearFilter = () => {
-    setStartDate("");
-    setEndDate("");
-    onLoad();
   };
 
   const trend = stats?.trend || [];
@@ -75,45 +110,87 @@ const ReportingDashboard: React.FC<ReportingDashboardProps> = ({
       })()
     : "N/A";
 
+  if (loading && !stats) {
+    return (
+      <div className="space-y-6 animate-pulse p-1">
+        <div className="h-16 bg-white dark:bg-gray-900 rounded-3xl border border-gray-100 dark:border-gray-800"></div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {[...Array(4)].map((_, i) => (
+            <div
+              key={i}
+              className="h-32 bg-white dark:bg-gray-900 rounded-3xl border border-gray-100 dark:border-gray-800"
+            ></div>
+          ))}
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2 h-80 bg-white dark:bg-gray-900 rounded-3xl border border-gray-100 dark:border-gray-800"></div>
+          <div className="h-80 bg-blue-600/20 rounded-3xl border border-blue-500/20"></div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6 animate-in fade-in duration-700">
       {/* Date Filter Bar */}
-      <div className="bg-white dark:bg-gray-900 p-4 rounded-3xl border border-gray-100 dark:border-gray-800 flex flex-wrap items-center gap-4">
-        <div className="flex items-center gap-2">
-          <CalendarIcon className="w-4 h-4 text-gray-400" />
-          <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">
-            Filter Trend:
-          </span>
+      <div className="bg-white dark:bg-gray-900 px-6 py-4 rounded-3xl border border-gray-100 dark:border-gray-800 flex flex-wrap items-center justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            <CalendarIcon className="w-4 h-4 text-blue-500" />
+            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+              Range:
+            </span>
+          </div>
+
+          <div className="flex p-1 bg-gray-50 dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700/50">
+            {(["today", "week", "month", "custom"] as const).map((preset) => (
+              <button
+                key={preset}
+                onClick={() => setActivePreset(preset)}
+                className={`px-4 py-1.5 rounded-xl text-[10px] font-bold uppercase transition-all ${
+                  activePreset === preset
+                    ? "bg-white dark:bg-gray-700 text-blue-600 shadow-sm"
+                    : "text-gray-400 hover:text-gray-600"
+                }`}
+              >
+                {preset}
+              </button>
+            ))}
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          <input
-            type="date"
-            value={startDate}
-            onChange={(e) => setStartDate(e.target.value)}
-            className="bg-gray-50 dark:bg-gray-800 border-none rounded-xl px-3 py-1.5 text-xs text-gray-600 dark:text-gray-300 focus:ring-2 focus:ring-blue-500 outline-none"
-          />
-          <span className="text-gray-300">→</span>
-          <input
-            type="date"
-            value={endDate}
-            onChange={(e) => setEndDate(e.target.value)}
-            className="bg-gray-50 dark:bg-gray-800 border-none rounded-xl px-3 py-1.5 text-xs text-gray-600 dark:text-gray-300 focus:ring-2 focus:ring-blue-500 outline-none"
-          />
-        </div>
-        <button
-          onClick={handleFilter}
-          disabled={loading}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-1.5 rounded-xl text-xs font-bold transition-all disabled:opacity-50"
-        >
-          {loading ? "Loading..." : "Apply Filter"}
-        </button>
-        {(startDate || endDate) && (
-          <button
-            onClick={clearFilter}
-            className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full text-gray-400 transition-all"
-          >
-            <X className="w-4 h-4" />
-          </button>
+
+        {activePreset === "custom" && (
+          <div className="flex items-center gap-3 animate-in fade-in zoom-in duration-300">
+            <div className="flex items-center gap-2">
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="bg-gray-50 dark:bg-gray-800 border-none rounded-xl px-3 py-1.5 text-[10px] font-bold text-gray-600 dark:text-gray-300 focus:ring-2 focus:ring-blue-500 outline-none"
+              />
+              <span className="text-gray-300 text-xs">→</span>
+              <input
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                className="bg-gray-50 dark:bg-gray-800 border-none rounded-xl px-3 py-1.5 text-[10px] font-bold text-gray-600 dark:text-gray-300 focus:ring-2 focus:ring-blue-500 outline-none"
+              />
+            </div>
+            <button
+              onClick={handleFilter}
+              disabled={loading}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-1.5 rounded-xl text-[10px] font-black uppercase transition-all disabled:opacity-50 shadow-lg shadow-blue-500/20"
+            >
+              Apply
+            </button>
+          </div>
+        )}
+
+        {loading && (
+          <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-xl text-[10px] font-black uppercase tracking-widest animate-pulse">
+            <span className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-ping"></span>
+            Updating Results
+          </div>
         )}
       </div>
 

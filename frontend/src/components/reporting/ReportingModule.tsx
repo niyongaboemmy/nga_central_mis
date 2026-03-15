@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Calendar, FileText, BarChart2 } from "lucide-react";
 import ReportingCalendar from "./ReportingCalendar";
 import SubmittedReports from "./SubmittedReports";
@@ -33,7 +33,7 @@ const ReportingModule: React.FC = () => {
   // Lifted states for Dashboard
   const [dashboardStats, setDashboardStats] = useState<any>(null);
   const [statsLoading, setStatsLoading] = useState(false);
-  const statsHasFetched = useRef(false);
+  const lastDashboardKey = useRef<string | null>(null);
 
   useEffect(() => {
     fetchMonthReports();
@@ -66,46 +66,51 @@ const ReportingModule: React.FC = () => {
     }
   };
 
-  const loadSubmittedReports = async (params?: {
-    start_date?: string;
-    end_date?: string;
-    key: string;
-  }) => {
-    if (params?.key && lastReportsKey.current === params.key) return;
+  const loadSubmittedReports = useCallback(
+    async (params?: { start_date?: string; end_date?: string; key: string }) => {
+      if (params?.key && lastReportsKey.current === params.key) return;
 
-    setReportsLoading(true);
-    if (params?.key) lastReportsKey.current = params.key;
+      setReportsLoading(true);
+      if (params?.key) lastReportsKey.current = params.key;
 
-    try {
-      const res = await reportsApi.getAll(
-        params?.start_date && params?.end_date
-          ? { start_date: params.start_date, end_date: params.end_date }
-          : undefined,
-      );
-      const data = (res as any).data?.data || (res as any).data || [];
-      setSubmittedReports(data);
-    } catch (error) {
-      console.error("Failed to load submitted reports", error);
-      lastReportsKey.current = null;
-    } finally {
-      setReportsLoading(false);
-    }
-  };
+      try {
+        const res = await reportsApi.getAll(
+          params?.start_date && params?.end_date
+            ? { start_date: params.start_date, end_date: params.end_date }
+            : undefined,
+        );
+        const data = (res as any).data?.data || (res as any).data || [];
+        setSubmittedReports(data);
+      } catch (error) {
+        console.error("Failed to load submitted reports", error);
+        lastReportsKey.current = null;
+      } finally {
+        setReportsLoading(false);
+      }
+    },
+    [],
+  );
 
-  const loadDashboardStats = async (params?: { start_date?: string; end_date?: string }) => {
-    setStatsLoading(true);
-    statsHasFetched.current = true;
+  const loadDashboardStats = useCallback(
+    async (params?: { start_date?: string; end_date?: string }) => {
+      const paramKey = JSON.stringify(params || "default");
+      if (lastDashboardKey.current === paramKey) return;
 
-    try {
-      const res = await reportsApi.getDashboardStats(params);
-      setDashboardStats((res as any).data?.data || (res as any).data);
-    } catch (error) {
-      console.error("Failed to load dashboard stats", error);
-      statsHasFetched.current = false;
-    } finally {
-      setStatsLoading(false);
-    }
-  };
+      setStatsLoading(true);
+      lastDashboardKey.current = paramKey;
+
+      try {
+        const res = await reportsApi.getDashboardStats(params);
+        setDashboardStats((res as any).data?.data || (res as any).data);
+      } catch (error) {
+        console.error("Failed to load dashboard stats", error);
+        lastDashboardKey.current = null;
+      } finally {
+        setStatsLoading(false);
+      }
+    },
+    [],
+  );
 
   const handleDateClick = (
     start: string,
@@ -216,7 +221,7 @@ const ReportingModule: React.FC = () => {
                 fetchMonthReports(true);
                 // Also force refresh for lists and dashboard
                 lastReportsKey.current = null;
-                statsHasFetched.current = false;
+                lastDashboardKey.current = null;
               }}
               initialRange={selectedDateRange}
               existingReport={selectedReport}

@@ -6,7 +6,14 @@ import {
   Filter,
   RefreshCw,
 } from "lucide-react";
-import { format } from "date-fns";
+import {
+  format,
+  subDays,
+  startOfMonth,
+  endOfMonth,
+  startOfDay,
+  endOfDay,
+} from "date-fns";
 import { reportsApi, InstructorReport } from "../../api/reports";
 import { useMetadata } from "../../contexts/MetadataContext";
 import { useUser } from "../../contexts/UserContext";
@@ -26,16 +33,13 @@ const AdminReporting: React.FC = () => {
   const [availableTerms, setAvailableTerms] = useState<AcademicTerm[]>([]);
   const [availableGrades, setAvailableGrades] = useState<Grade[]>([]);
 
+  type PresetType = "today" | "week" | "month" | "custom";
+  const [activePreset, setActivePreset] = useState<PresetType>("week");
+
   // Filters
   const [dateRange, setDateRange] = useState({
-    start: format(
-      new Date(new Date().getFullYear(), new Date().getMonth(), 1),
-      "yyyy-MM-dd",
-    ),
-    end: format(
-      new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0),
-      "yyyy-MM-dd",
-    ),
+    start: "",
+    end: "",
   });
 
   const [filters, setFilters] = useState({
@@ -48,6 +52,35 @@ const AdminReporting: React.FC = () => {
   const { user } = useUser();
   const { years, programs, getTerms, getGrades } = useMetadata();
   const initializedRef = useRef(false);
+  const lastFetchKey = useRef<string | null>(null);
+
+  // Handle Preset Changes
+  useEffect(() => {
+    if (activePreset !== "custom") {
+      const now = new Date();
+      let start = "";
+      let end = "";
+
+      switch (activePreset) {
+        case "today":
+          start = format(startOfDay(now), "yyyy-MM-dd");
+          end = format(endOfDay(now), "yyyy-MM-dd");
+          break;
+        case "week":
+          start = format(subDays(now, 7), "yyyy-MM-dd");
+          end = format(now, "yyyy-MM-dd");
+          break;
+        case "month":
+          start = format(startOfMonth(now), "yyyy-MM-dd");
+          end = format(endOfMonth(now), "yyyy-MM-dd");
+          break;
+      }
+
+      if (start && end) {
+        setDateRange({ start, end });
+      }
+    }
+  }, [activePreset]);
 
   // Set default filters based on user profile
   useEffect(() => {
@@ -80,28 +113,34 @@ const AdminReporting: React.FC = () => {
   }, [user, years, programs]);
 
   const loadReports = useCallback(async () => {
-    setLoading(true);
-    try {
-      const params = {
-        start_date: dateRange.start || undefined,
-        end_date: dateRange.end || undefined,
-        academic_year_id: filters.academic_year_id
-          ? parseInt(filters.academic_year_id)
-          : undefined,
-        academic_term_id: filters.academic_term_id
-          ? parseInt(filters.academic_term_id)
-          : undefined,
-        program_id: filters.program_id
-          ? parseInt(filters.program_id)
-          : undefined,
-        grade_id: filters.grade_id ? parseInt(filters.grade_id) : undefined,
-      };
+    const params = {
+      start_date: dateRange.start || undefined,
+      end_date: dateRange.end || undefined,
+      academic_year_id: filters.academic_year_id
+        ? parseInt(filters.academic_year_id)
+        : undefined,
+      academic_term_id: filters.academic_term_id
+        ? parseInt(filters.academic_term_id)
+        : undefined,
+      program_id: filters.program_id
+        ? parseInt(filters.program_id)
+        : undefined,
+      grade_id: filters.grade_id ? parseInt(filters.grade_id) : undefined,
+    };
 
+    const fetchKey = JSON.stringify(params);
+    if (lastFetchKey.current === fetchKey) return;
+
+    setLoading(true);
+    lastFetchKey.current = fetchKey;
+
+    try {
       const res = await reportsApi.getAllAdminReports(params);
       const data = (res as any).data?.data || (res as any).data || [];
       setReports(data);
     } catch (error) {
       console.error("Failed to load admin reports", error);
+      lastFetchKey.current = null;
     } finally {
       setLoading(false);
     }
@@ -202,40 +241,65 @@ const AdminReporting: React.FC = () => {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-6">
-          {/* Date Range */}
-          <div className="space-y-2">
+          {/* Range Presets */}
+          <div className="lg:col-span-2 space-y-2">
             <label className="text-[10px] font-black text-gray-400 dark:text-gray-600 uppercase tracking-tighter block ml-1">
-              Start Date
+              Date Range Preset
             </label>
-            <div className="relative group">
-              <CalendarIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 group-hover:text-blue-500 transition-colors" />
-              <input
-                type="date"
-                value={dateRange.start}
-                onChange={(e) =>
-                  setDateRange((prev) => ({ ...prev, start: e.target.value }))
-                }
-                className="w-full bg-gray-50 dark:bg-gray-800/30 border border-gray-100 dark:border-gray-700/30 rounded-2xl pl-10 pr-4 py-2.5 text-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none transition-all dark:text-gray-200"
-              />
+            <div className="flex p-1 bg-gray-50 dark:bg-gray-800/30 rounded-2xl border border-gray-100 dark:border-gray-700/30 w-full overflow-x-auto no-scrollbar">
+              {(["today", "week", "month", "custom"] as const).map((preset) => (
+                <button
+                  key={preset}
+                  onClick={() => setActivePreset(preset)}
+                  className={`flex-1 min-w-[70px] px-3 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${
+                    activePreset === preset
+                      ? "bg-white dark:bg-gray-700 text-blue-600 shadow-sm"
+                      : "text-gray-400 hover:text-gray-600"
+                  }`}
+                >
+                  {preset}
+                </button>
+              ))}
             </div>
           </div>
 
-          <div className="space-y-2">
-            <label className="text-[10px] font-black text-gray-400 dark:text-gray-600 uppercase tracking-tighter block ml-1">
-              End Date
-            </label>
-            <div className="relative group">
-              <CalendarIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 group-hover:text-blue-500 transition-colors" />
-              <input
-                type="date"
-                value={dateRange.end}
-                onChange={(e) =>
-                  setDateRange((prev) => ({ ...prev, end: e.target.value }))
-                }
-                className="w-full bg-gray-50 dark:bg-gray-800/30 border border-gray-100 dark:border-gray-700/30 rounded-2xl pl-10 pr-4 py-2.5 text-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none transition-all dark:text-gray-200"
-              />
-            </div>
-          </div>
+          {activePreset === "custom" && (
+            <>
+              <div className="space-y-2 animate-in fade-in slide-in-from-left-2 duration-300">
+                <label className="text-[10px] font-black text-gray-400 dark:text-gray-600 uppercase tracking-tighter block ml-1">
+                  Start Date
+                </label>
+                <div className="relative group">
+                  <CalendarIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 group-hover:text-blue-500 transition-colors" />
+                  <input
+                    type="date"
+                    value={dateRange.start}
+                    onChange={(e) =>
+                      setDateRange((prev) => ({ ...prev, start: e.target.value }))
+                    }
+                    className="w-full bg-gray-50 dark:bg-gray-800/30 border border-gray-100 dark:border-gray-700/30 rounded-2xl pl-10 pr-4 py-2.5 text-xs font-bold focus:ring-2 focus:ring-blue-500 outline-none transition-all dark:text-gray-200"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2 animate-in fade-in slide-in-from-left-2 duration-300">
+                <label className="text-[10px] font-black text-gray-400 dark:text-gray-600 uppercase tracking-tighter block ml-1">
+                  End Date
+                </label>
+                <div className="relative group">
+                  <CalendarIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 group-hover:text-blue-500 transition-colors" />
+                  <input
+                    type="date"
+                    value={dateRange.end}
+                    onChange={(e) =>
+                      setDateRange((prev) => ({ ...prev, end: e.target.value }))
+                    }
+                    className="w-full bg-gray-50 dark:bg-gray-800/30 border border-gray-100 dark:border-gray-700/30 rounded-2xl pl-10 pr-4 py-2.5 text-xs font-bold focus:ring-2 focus:ring-blue-500 outline-none transition-all dark:text-gray-200"
+                  />
+                </div>
+              </div>
+            </>
+          )}
 
           {/* Academic Year */}
           <div className="space-y-2">
@@ -333,9 +397,13 @@ const AdminReporting: React.FC = () => {
             </button>
           </div>
 
-          <div className="flex items-center gap-2 px-4 py-2 bg-gray-50 dark:bg-gray-800/40 rounded-xl border border-gray-100 dark:border-gray-700/30 text-[10px] font-black text-gray-400 dark:text-gray-600 uppercase tracking-tighter">
-            <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
-            Live Data Source
+          <div className={`flex items-center gap-2 px-4 py-2 rounded-xl border text-[10px] font-black uppercase tracking-tighter transition-all duration-500 ${
+            loading 
+              ? "bg-blue-50 dark:bg-blue-900/20 border-blue-100 dark:border-blue-800/30 text-blue-600 dark:text-blue-400" 
+              : "bg-gray-50 dark:bg-gray-800/40 border-gray-100 dark:border-gray-700/30 text-gray-400 dark:text-gray-600"
+          }`}>
+            <span className={`w-2 h-2 rounded-full ${loading ? "bg-blue-500 animate-pulse" : "bg-emerald-500"}`}></span>
+            {loading ? "Updating Data..." : "Live Data Source"}
           </div>
         </div>
       </div>

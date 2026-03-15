@@ -148,11 +148,17 @@ const ReportForm: React.FC<ReportFormProps> = ({
             notes: l.notes,
           })),
           mentorship_sessions: (data.mentorship || []).map((m: any) => ({
-            student_id: m.student_id ? m.student_id.toString() : (m.student_name || ""),
+            student_id: m.student_id
+              ? m.student_id.toString()
+              : m.student_name || "",
             session_date: m.session_date,
             notes: m.notes,
           })),
-          project_updates: (data.project_updates || data.projectUpdates || []).map((p: any) => ({
+          project_updates: (
+            data.project_updates ||
+            data.projectUpdates ||
+            []
+          ).map((p: any) => ({
             project_name: p.project_name,
             role: p.role,
             status: p.status,
@@ -437,7 +443,15 @@ const ReportForm: React.FC<ReportFormProps> = ({
               className="flex items-center space-x-2 bg-green-600 text-white px-8 py-2 rounded-full font-bold hover:bg-green-700 transition-all shadow-ful shadow-green-200 dark:shadow-green-900/20 disabled:opacity-50"
             >
               <Save className="w-4 h-4" />
-              <span>{loading ? (existingReport ? "Updating..." : "Submitting...") : (existingReport ? "Update Report" : "Submit Report")}</span>
+              <span>
+                {loading
+                  ? existingReport
+                    ? "Updating..."
+                    : "Submitting..."
+                  : existingReport
+                    ? "Update Report"
+                    : "Submit Report"}
+              </span>
             </button>
           )}
         </div>
@@ -449,7 +463,7 @@ const ReportForm: React.FC<ReportFormProps> = ({
           {/* STEP 1: BASICS */}
           {step === 1 && (
             <div className="space-y-8 animate-in fade-in slide-in-from-right duration-500">
-              <div className="bg-white dark:bg-gray-900 rounded-3xl p-8 shadow-sm border border-gray-100 dark:border-gray-800">
+              <div className="bg-white dark:bg-gray-900 rounded-3xl p-8 pb-0 shadow-sm border border-gray-100 dark:border-gray-800">
                 <div className="flex items-center space-x-3 mb-6">
                   <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-2xl">
                     <Zap className="w-6 h-6 text-blue-600" />

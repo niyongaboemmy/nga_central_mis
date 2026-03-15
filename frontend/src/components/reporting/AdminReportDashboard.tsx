@@ -77,15 +77,27 @@ export const AdminReportDashboard: React.FC<AdminReportDashboardProps> = ({
     };
   }, [reports]);
 
-  if (loading) {
+  if (loading && (!reports || reports.length === 0)) {
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 animate-pulse">
-        {[...Array(4)].map((_, i) => (
-          <div
-            key={i}
-            className="h-32 bg-gray-100 dark:bg-gray-800 rounded-3xl border border-gray-100 dark:border-gray-700"
-          ></div>
-        ))}
+      <div className="space-y-6 animate-pulse p-1">
+        {/* Stats Grid Skeleton */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {[...Array(4)].map((_, i) => (
+            <div
+              key={i}
+              className="h-32 bg-gray-100 dark:bg-gray-800 rounded-3xl border border-gray-100 dark:border-gray-700"
+            ></div>
+          ))}
+        </div>
+
+        {/* Charts Row Skeleton */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2 h-80 bg-gray-100 dark:bg-gray-800 rounded-3xl border border-gray-100 dark:border-gray-700"></div>
+          <div className="h-80 bg-gray-100 dark:bg-gray-800 rounded-3xl border border-gray-100 dark:border-gray-700"></div>
+        </div>
+
+        {/* Insights Skeleton */}
+        <div className="h-40 bg-gray-100 dark:bg-gray-800 rounded-3xl border border-gray-100 dark:border-gray-700"></div>
       </div>
     );
   }

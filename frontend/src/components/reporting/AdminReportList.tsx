@@ -19,13 +19,15 @@ const AdminReportList: React.FC<AdminReportListProps> = ({
   loading,
   onViewDetails,
 }) => {
-  if (loading) {
+  if (loading && (!reports || reports.length === 0)) {
     return (
-      <div className="flex flex-col items-center justify-center h-64 space-y-4">
-        <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-        <p className="text-gray-500 dark:text-gray-400 font-medium animate-pulse">
-          Loading reports...
-        </p>
+      <div className="space-y-4 animate-pulse">
+        {[...Array(5)].map((_, i) => (
+          <div
+            key={i}
+            className="bg-white dark:bg-gray-900/40 rounded-2xl border border-gray-100 dark:border-gray-800/50 p-6 h-24"
+          ></div>
+        ))}
       </div>
     );
   }
