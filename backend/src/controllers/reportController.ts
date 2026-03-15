@@ -507,9 +507,27 @@ export const getReportById = asyncHandler(async (req: any, res: any) => {
       struggling_students_count: InstructorReport.struggling_students_count,
       first_name: UserProfile.first_name,
       last_name: UserProfile.last_name,
+      academic_year_name: AcademicYear.name,
+      academic_term_name: AcademicTerm.name,
+      program_name: Program.name,
+      grade_name: Grade.name,
     })
     .from(InstructorReport)
     .innerJoin(UserProfile, eq(InstructorReport.user_id, UserProfile.user_id))
+    .leftJoin(
+      AcademicTerm,
+      eq(InstructorReport.academic_term_id, AcademicTerm.academic_term_id),
+    )
+    .leftJoin(
+      AcademicYear,
+      eq(AcademicTerm.academic_year_id, AcademicYear.academic_year_id),
+    )
+    .leftJoin(
+      ClassGroup,
+      eq(InstructorReport.class_group_id, ClassGroup.class_group_id),
+    )
+    .leftJoin(Grade, eq(ClassGroup.grade_id, Grade.grade_id))
+    .leftJoin(Program, eq(Grade.program_id, Program.program_id))
     .where(eq(InstructorReport.report_id, reportId))
     .limit(1);
 
@@ -570,24 +588,35 @@ export const getReportById = asyncHandler(async (req: any, res: any) => {
  */
 export const getDashboardStats = asyncHandler(async (req: any, res: any) => {
   const userId = req.user.userId;
+  const { start_date, end_date } = req.query;
+
+  const dateFilter = and(
+    eq(InstructorReport.user_id, userId),
+    start_date
+      ? sql`DATE_FORMAT(${InstructorReport.start_date}, '%Y-%m-%d') >= ${start_date}`
+      : sql`1=1`,
+    end_date
+      ? sql`DATE_FORMAT(${InstructorReport.end_date}, '%Y-%m-%d') <= ${end_date}`
+      : sql`1=1`,
+  );
 
   // Total reports submitted
   const totalReportsCount = await db
     .select({ count: count() })
     .from(InstructorReport)
-    .where(eq(InstructorReport.user_id, userId));
+    .where(dateFilter);
 
   // Total lessons delivered across all reports
   const totalLessons = await db
     .select({ total: sql<number>`SUM(${InstructorReport.lessons_delivered_count})` })
     .from(InstructorReport)
-    .where(eq(InstructorReport.user_id, userId));
+    .where(dateFilter);
 
   // Total mentorship sessions across all reports
   const totalMentorship = await db
     .select({ total: sql<number>`SUM(${InstructorReport.mentorship_sessions_count})` })
     .from(InstructorReport)
-    .where(eq(InstructorReport.user_id, userId));
+    .where(dateFilter);
 
   // Most recent report date
   const lastReport = await db
@@ -597,7 +626,7 @@ export const getDashboardStats = asyncHandler(async (req: any, res: any) => {
     .orderBy(desc(InstructorReport.end_date))
     .limit(1);
 
-  // Recent activity trend (last 8 reports, oldest first for charting)
+  // Recent activity trend
   const trendRaw = await db
     .select({
       date: InstructorReport.end_date,
@@ -605,9 +634,9 @@ export const getDashboardStats = asyncHandler(async (req: any, res: any) => {
       mentorship: InstructorReport.mentorship_sessions_count,
     })
     .from(InstructorReport)
-    .where(eq(InstructorReport.user_id, userId))
+    .where(dateFilter)
     .orderBy(desc(InstructorReport.end_date))
-    .limit(8);
+    .limit(start_date || end_date ? 50 : 15);
 
   const trend = trendRaw.reverse().map((r) => ({
     name: formatDbDate(r.date) || '',

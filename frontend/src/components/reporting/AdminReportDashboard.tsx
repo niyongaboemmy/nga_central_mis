@@ -9,13 +9,22 @@ import {
   FileText,
   Activity,
 } from "lucide-react";
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+} from "recharts";
 
 interface AdminReportDashboardProps {
   reports: any[];
   loading: boolean;
 }
 
-const AdminReportDashboard: React.FC<AdminReportDashboardProps> = ({
+export const AdminReportDashboard: React.FC<AdminReportDashboardProps> = ({
   reports,
   loading,
 }) => {
@@ -36,12 +45,35 @@ const AdminReportDashboard: React.FC<AdminReportDashboardProps> = ({
     ).length;
     const behindCount = totalReports - onTrackCount;
 
+    // Process Trend Data - group by date
+    const trendMap = new Map();
+    reports.forEach((r) => {
+      const date = r.start_date;
+      const current = trendMap.get(date) || { lessons: 0, mentorship: 0 };
+      trendMap.set(date, {
+        lessons: current.lessons + (r.lessons_delivered_count || 0),
+        mentorship: current.mentorship + (r.mentorship_sessions_count || 0),
+      });
+    });
+
+    const trendData = Array.from(trendMap.entries())
+      .map(([date, vals]) => ({
+        name: date,
+        ...vals,
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .map((d) => ({
+        ...d,
+        name: format(new Date(d.name), "dd/MM"),
+      }));
+
     return {
       totalReports,
       totalLessons,
       totalMentorship,
       onTrackRate: Math.round((onTrackCount / totalReports) * 100),
       behindCount,
+      trendData,
     };
   }, [reports]);
 
@@ -103,12 +135,83 @@ const AdminReportDashboard: React.FC<AdminReportDashboardProps> = ({
         />
       </div>
 
-      {/* Charts Placeholder/Simple Visualization */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* Main Charts Row */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Trend Chart */}
+        <div className="lg:col-span-2 bg-white dark:bg-gray-800/40 p-6 rounded-3xl border border-gray-100 dark:border-gray-800/50 shadow-sm">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-lg font-bold text-gray-800 dark:text-white flex items-center gap-2">
+              <TrendingUp className="w-5 h-5 text-blue-500" />
+              Reporting Trend
+            </h3>
+            <div className="flex items-center gap-4 text-[10px] font-bold uppercase tracking-widest text-gray-400">
+              <div className="flex items-center gap-1.5">
+                <div className="w-2 h-2 rounded-full bg-blue-500"></div>
+                <span>Lessons</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
+                <span>Mentorship</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={stats.trendData}>
+                <CartesianGrid
+                  strokeDasharray="3 3"
+                  vertical={false}
+                  strokeOpacity={0.1}
+                />
+                <XAxis
+                  dataKey="name"
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fontSize: 10, fill: "#9ca3af" }}
+                  dy={8}
+                />
+                <YAxis
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fontSize: 10, fill: "#9ca3af" }}
+                />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: "#1f2937",
+                    border: "none",
+                    borderRadius: "12px",
+                    color: "#fff",
+                    fontSize: "12px",
+                  }}
+                  itemStyle={{ color: "#fff" }}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="lessons"
+                  stroke="#3B82F6"
+                  strokeWidth={3}
+                  dot={{ r: 4, fill: "#3B82F6", strokeWidth: 2, stroke: "#fff" }}
+                  activeDot={{ r: 6 }}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="mentorship"
+                  stroke="#10B981"
+                  strokeWidth={3}
+                  dot={{ r: 4, fill: "#10B981", strokeWidth: 2, stroke: "#fff" }}
+                  activeDot={{ r: 6 }}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* Distribution Circle */}
         <div className="bg-white dark:bg-gray-800/40 p-6 rounded-3xl border border-gray-100 dark:border-gray-800/50 shadow-sm">
           <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-6 flex items-center gap-2">
             <Activity className="w-5 h-5 text-blue-500" />
-            Performance Distribution
+            Performance
           </h3>
           <div className="flex items-center justify-center h-48">
             <div className="relative w-40 h-40">
@@ -141,59 +244,54 @@ const AdminReportDashboard: React.FC<AdminReportDashboardProps> = ({
               </div>
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-4 mt-4">
-            <div className="flex items-center gap-2 p-3 bg-emerald-50/50 dark:bg-emerald-900/20 rounded-2xl border border-emerald-100/50 dark:border-emerald-800/30">
-              <div className="w-3 h-3 bg-emerald-500 rounded-full"></div>
-              <span className="text-xs font-bold text-emerald-700 dark:text-emerald-400">
-                On Track / Ahead
-              </span>
+          <div className="space-y-2 mt-4">
+            <div className="flex items-center justify-between p-2.5 bg-emerald-50/50 dark:bg-emerald-900/10 rounded-xl border border-emerald-100/30">
+              <span className="text-[10px] font-bold text-emerald-600 uppercase">On Track</span>
+              <span className="text-xs font-black text-emerald-700">{stats.onTrackRate}%</span>
             </div>
-            <div className="flex items-center gap-2 p-3 bg-amber-50/50 dark:bg-amber-900/20 rounded-2xl border border-amber-100/50 dark:border-amber-800/30">
-              <div className="w-3 h-3 bg-amber-500 rounded-full"></div>
-              <span className="text-xs font-bold text-amber-700 dark:text-amber-400">
-                Behind / Critical
-              </span>
+            <div className="flex items-center justify-between p-2.5 bg-amber-50/50 dark:bg-amber-900/10 rounded-xl border border-amber-100/30">
+              <span className="text-[10px] font-bold text-amber-600 uppercase">Behind</span>
+              <span className="text-xs font-black text-amber-700">{100 - stats.onTrackRate}%</span>
             </div>
           </div>
         </div>
+      </div>
 
-        <div className="bg-white dark:bg-gray-800/40 p-6 rounded-3xl border border-gray-100 dark:border-gray-800/50 shadow-sm">
-          <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-6 flex items-center gap-2">
-            <Clock className="w-5 h-5 text-indigo-500" />
-            Recent Activity Insights
-          </h3>
-          <div className="space-y-4">
-            {reports.slice(0, 4).map((r, idx) => (
-              <div
-                key={idx}
-                className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800/50 rounded-2xl border border-gray-100 dark:border-gray-700/50"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 bg-white dark:bg-gray-800 dark:text-white rounded-full flex items-center justify-center text-[16px] font-black shadow-sm">
-                    {r.instructor_name?.charAt(0)}
-                  </div>
-                  <div>
-                    <div className="text-xs font-bold text-gray-800 dark:text-white">
-                      {r.instructor_name}
-                    </div>
-                    <div className="text-[10px] text-gray-500 dark:text-gray-400 font-medium">
-                      Submitted{" "}
-                      {format(new Date(r.submission_date), "MMM dd, HH:mm")}
-                    </div>
-                  </div>
+      <div className="bg-white dark:bg-gray-800/40 p-6 rounded-3xl border border-gray-100 dark:border-gray-800/50 shadow-sm">
+        <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-6 flex items-center gap-2">
+          <Clock className="w-5 h-5 text-indigo-500" />
+          Recent Activity Insights
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {reports.slice(0, 4).map((r, idx) => (
+            <div
+              key={idx}
+              className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800/50 rounded-2xl border border-gray-100 dark:border-gray-700/50"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 bg-white dark:bg-gray-800 dark:text-white rounded-full flex items-center justify-center text-[16px] font-black shadow-sm">
+                  {r.instructor_name?.charAt(0)}
                 </div>
-                <div
-                  className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-widest ${
-                    r.progress_status === "ON_TRACK"
-                      ? "bg-emerald-100 text-emerald-700"
-                      : "bg-amber-100 text-amber-700"
-                  }`}
-                >
-                  {r.progress_status}
+                <div>
+                  <div className="text-xs font-bold text-gray-800 dark:text-white">
+                    {r.instructor_name}
+                  </div>
+                  <div className="text-[10px] text-gray-500 dark:text-gray-400 font-medium">
+                    {format(new Date(r.submission_date), "MMM dd, HH:mm")}
+                  </div>
                 </div>
               </div>
-            ))}
-          </div>
+              <div
+                className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-widest ${
+                  r.progress_status === "ON_TRACK" || r.progress_status === "AHEAD"
+                    ? "bg-emerald-100 text-emerald-700"
+                    : "bg-amber-100 text-amber-700"
+                }`}
+              >
+                {r.progress_status}
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     </div>

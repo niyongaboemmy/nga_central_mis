@@ -97,7 +97,7 @@ const ReportingCalendar: React.FC<ReportingCalendarProps> = ({
               key={j}
               className={`relative p-2 transition-all duration-200 
                 ${day ? "hover:bg-blue-50/50 dark:hover:bg-blue-900/10 cursor-pointer" : ""} 
-                ${isToday ? "bg-blue-50/80 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800" : "border-transparent"}
+                ${isToday ? "bg-blue-100/40 hover:bg-blue-100/90 dark:bg-blue-900/20 dark:hover:bg-blue-900/40 border-blue-200 dark:border-blue-800" : "border-transparent"}
                 ${hasReport ? "bg-green-50/30 dark:bg-green-900/5 border-l-4 border-l-green-400/50" : ""}
                 ${!hasReport && isPast ? "bg-rose-50/80 dark:bg-rose-900/20 border-l-4 border-l-rose-500" : ""}
               `}
@@ -125,6 +125,10 @@ const ReportingCalendar: React.FC<ReportingCalendarProps> = ({
                     <div className="flex items-center space-x-1.5 bg-rose-600 text-white px-2.5 py-1 rounded-xl text-[10px] w-fit shadow-rose-200 dark:shadow-none font-bold animate-pulse duration-[2000ms]">
                       <AlertCircle className="w-3 h-3" />
                       <span>Action Due</span>
+                    </div>
+                  ) : isToday ? (
+                    <div className="flex items-center space-x-1 bg-blue-100 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 px-2 py-0.5 rounded-xl text-[10px] w-fit border border-blue-200 dark:border-blue-800">
+                      <span>Today</span>
                     </div>
                   ) : (
                     <div className="flex items-center space-x-1 bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-300 px-2 py-0.5 rounded-xl text-[10px] w-fit border border-gray-200 dark:border-gray-700">

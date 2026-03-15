@@ -112,7 +112,8 @@ const ReportDetailsModal: React.FC<ReportDetailsModalProps> = ({
                 Report Details
               </h2>
               <p className="text-xs text-gray-500 font-medium">
-                Submitted on {format(new Date(report.submission_date), "PPP")}
+                Week {report.week_number} • Submitted on{" "}
+                {format(new Date(report.submission_date), "PPP")}
               </p>
             </div>
           </div>
@@ -134,32 +135,43 @@ const ReportDetailsModal: React.FC<ReportDetailsModalProps> = ({
         {/* Scrollable Content */}
         <div className="p-8 space-y-8">
           {/* Summary Section */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-            <div className="bg-blue-50/50 dark:bg-blue-900/10 p-5 rounded-2xl border border-blue-100 dark:border-blue-900/30">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="bg-blue-50/50 dark:bg-blue-900/10 p-4 rounded-2xl border border-blue-100 dark:border-blue-900/30">
               <p className="text-[10px] font-bold text-blue-600/60 uppercase tracking-widest mb-1">
                 Period
               </p>
-              <div className="flex items-center space-x-2 text-gray-800 dark:text-gray-200 text-sm font-bold">
+              <div className="flex items-center space-x-2 text-gray-800 dark:text-gray-200 text-xs font-bold">
                 <Calendar className="w-3.5 h-3.5 text-blue-500" />
                 <span>
-                  {format(parseLocalNoShift(report.start_date), "dd/MM/yyyy")}
-                  {/* {format(parseLocalNoShift(report.end_date), "dd/MM/yyyy")} */}
+                  {format(parseLocalNoShift(report.start_date), "dd MMM")} -{" "}
+                  {format(parseLocalNoShift(report.end_date), "dd MMM, yyyy")}
                 </span>
               </div>
             </div>
-            <div className="bg-purple-50/50 dark:bg-purple-900/10 p-5 rounded-2xl border border-purple-100 dark:border-purple-900/30">
+            <div className="bg-purple-50/50 dark:bg-purple-900/10 p-4 rounded-2xl border border-purple-100 dark:border-purple-900/30">
               <p className="text-[10px] font-bold text-purple-600/60 uppercase tracking-widest mb-1">
                 Status
               </p>
               {getStatusBadge(report.progress_status)}
             </div>
-            <div className="bg-gray-50 dark:bg-gray-800 p-5 rounded-2xl border border-gray-100 dark:border-gray-700">
+            <div className="bg-emerald-50/50 dark:bg-emerald-900/10 p-4 rounded-2xl border border-emerald-100 dark:border-emerald-900/30">
+              <p className="text-[10px] font-bold text-emerald-600/60 uppercase tracking-widest mb-1">
+                Context
+              </p>
+              <div className="flex flex-col text-gray-800 dark:text-gray-200 text-[11px] font-bold">
+                <span className="truncate">{report.program_name}</span>
+                <span className="text-emerald-600 text-[9px] uppercase">
+                  {report.grade_name}
+                </span>
+              </div>
+            </div>
+            <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-2xl border border-gray-100 dark:border-gray-700">
               <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">
                 Instructor
               </p>
-              <div className="flex items-center space-x-2 text-gray-800 dark:text-gray-200 text-sm font-bold">
+              <div className="flex items-center space-x-2 text-gray-800 dark:text-gray-200 text-xs font-bold">
                 <Users className="w-3.5 h-3.5 text-gray-400" />
-                <span>
+                <span className="truncate">
                   {report.first_name} {report.last_name}
                 </span>
               </div>
@@ -391,13 +403,33 @@ const ReportDetailsModal: React.FC<ReportDetailsModalProps> = ({
                     </div>
                     <div className="space-y-2">
                       <div className="text-xs">
-                        <span className="font-bold text-gray-600 dark:text-gray-400">
+                        <span className="font-bold text-gray-600 dark:text-gray-400 uppercase text-[9px] tracking-wider">
                           Work Completed:
                         </span>
-                        <p className="text-gray-800 dark:text-gray-200 font-medium mt-0.5">
+                        <p className="text-gray-800 dark:text-gray-200 font-medium mt-1 leading-relaxed">
                           {p.work_completed}
                         </p>
                       </div>
+                      {p.key_outputs && (
+                        <div className="text-xs border-t border-emerald-100/30 dark:border-emerald-900/10 pt-2">
+                          <span className="font-bold text-gray-600 dark:text-gray-400 uppercase text-[9px] tracking-wider">
+                            Key Outputs:
+                          </span>
+                          <p className="text-gray-800 dark:text-gray-200 font-medium mt-1">
+                            {p.key_outputs}
+                          </p>
+                        </div>
+                      )}
+                      {p.challenges && (
+                        <div className="text-xs border-t border-emerald-100/30 dark:border-emerald-900/10 pt-2">
+                          <span className="font-bold text-red-500/70 uppercase text-[9px] tracking-wider">
+                            Project Challenges:
+                          </span>
+                          <p className="text-gray-800 dark:text-gray-200 font-medium mt-1">
+                            {p.challenges}
+                          </p>
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}

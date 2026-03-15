@@ -26309,3 +26309,6 @@
 {"level":"info","message":"Updated user theme preference","service":"nga-central-mis","theme":"light","timestamp":"2026-03-14T19:46:58.618Z","userId":1}
 {"duration":18,"level":"info","message":"PATCH /users/me/theme 200 - 18ms","service":"nga-central-mis","statusCode":200,"timestamp":"2026-03-14T19:46:58.619Z"}
 {"level":"info","message":"SIGINT received, shutting down gracefully","service":"nga-central-mis","timestamp":"2026-03-14T19:47:09.724Z"}
+{"level":"info","message":"Server running on port 5001 in development mode","service":"nga-central-mis","timestamp":"2026-03-15T16:49:11.279Z"}
+{"host":"mail.hackflix.net","level":"info","message":"Email service connected successfully","port":465,"service":"nga-central-mis","timestamp":"2026-03-15T16:49:13.947Z"}
+{"level":"info","message":"SIGINT received, shutting down gracefully","service":"nga-central-mis","timestamp":"2026-03-15T16:49:26.762Z"}

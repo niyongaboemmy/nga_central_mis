@@ -35,12 +35,14 @@ interface SubmittedReportsProps {
     end_date?: string;
     key: string;
   }) => void;
+  onViewDetails?: (report: InstructorReport) => void;
 }
 
 const SubmittedReports: React.FC<SubmittedReportsProps> = ({
   reports,
   loading,
   onLoad,
+  onViewDetails,
 }) => {
   const [search, setSearch] = useState("");
   const [preset, setPreset] = useState<FilterPreset>("month");
@@ -210,10 +212,11 @@ const SubmittedReports: React.FC<SubmittedReportsProps> = ({
       ) : (
         <div className="space-y-3 overflow-y-auto pr-1">
           {filteredReports.map((report) => (
-            <div
-              key={report.report_id}
-              className="bg-white dark:bg-gray-900 p-3 rounded-2xl border border-gray-100 dark:border-gray-800 hover:border-blue-200 dark:hover:border-blue-900 transition-all group cursor-pointer text-sm"
-            >
+              <div
+                key={report.report_id}
+                onClick={() => onViewDetails?.(report)}
+                className="bg-white dark:bg-gray-900 p-3 rounded-2xl border border-gray-100 dark:border-gray-800 hover:border-blue-200 dark:hover:border-blue-900 transition-all group cursor-pointer text-sm"
+              >
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div className="flex items-start space-x-3">
                   <div className="p-2.5 bg-gray-50 dark:bg-gray-800 rounded-xl group-hover:bg-blue-50 dark:group-hover:bg-blue-900/20 transition-all">

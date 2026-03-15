@@ -1,12 +1,12 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import {
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  AreaChart,
-  Area,
+  LineChart,
+  Line,
 } from "recharts";
 import {
   TrendingUp,
@@ -15,6 +15,8 @@ import {
   FileText,
   ArrowUpRight,
   CalendarCheck,
+  Calendar as CalendarIcon,
+  X,
 } from "lucide-react";
 import { format } from "date-fns";
 
@@ -27,7 +29,7 @@ const parseLocalNoShift = (dateStr: string) => {
 interface ReportingDashboardProps {
   stats: any;
   loading: boolean;
-  onLoad: () => void;
+  onLoad: (params?: { start_date?: string; end_date?: string }) => void;
 }
 
 const ReportingDashboard: React.FC<ReportingDashboardProps> = ({
@@ -35,16 +37,25 @@ const ReportingDashboard: React.FC<ReportingDashboardProps> = ({
   loading,
   onLoad,
 }) => {
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+
   useEffect(() => {
     onLoad();
   }, [onLoad]);
 
-  if (loading)
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600" />
-      </div>
-    );
+  const handleFilter = () => {
+    onLoad({
+      start_date: startDate || undefined,
+      end_date: endDate || undefined,
+    });
+  };
+
+  const clearFilter = () => {
+    setStartDate("");
+    setEndDate("");
+    onLoad();
+  };
 
   const trend = stats?.trend || [];
 
@@ -66,6 +77,46 @@ const ReportingDashboard: React.FC<ReportingDashboardProps> = ({
 
   return (
     <div className="space-y-6 animate-in fade-in duration-700">
+      {/* Date Filter Bar */}
+      <div className="bg-white dark:bg-gray-900 p-4 rounded-3xl border border-gray-100 dark:border-gray-800 flex flex-wrap items-center gap-4">
+        <div className="flex items-center gap-2">
+          <CalendarIcon className="w-4 h-4 text-gray-400" />
+          <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">
+            Filter Trend:
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          <input
+            type="date"
+            value={startDate}
+            onChange={(e) => setStartDate(e.target.value)}
+            className="bg-gray-50 dark:bg-gray-800 border-none rounded-xl px-3 py-1.5 text-xs text-gray-600 dark:text-gray-300 focus:ring-2 focus:ring-blue-500 outline-none"
+          />
+          <span className="text-gray-300">→</span>
+          <input
+            type="date"
+            value={endDate}
+            onChange={(e) => setEndDate(e.target.value)}
+            className="bg-gray-50 dark:bg-gray-800 border-none rounded-xl px-3 py-1.5 text-xs text-gray-600 dark:text-gray-300 focus:ring-2 focus:ring-blue-500 outline-none"
+          />
+        </div>
+        <button
+          onClick={handleFilter}
+          disabled={loading}
+          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-1.5 rounded-xl text-xs font-bold transition-all disabled:opacity-50"
+        >
+          {loading ? "Loading..." : "Apply Filter"}
+        </button>
+        {(startDate || endDate) && (
+          <button
+            onClick={clearFilter}
+            className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full text-gray-400 transition-all"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        )}
+      </div>
+
       {/* Top Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <StatCard
@@ -121,18 +172,12 @@ const ReportingDashboard: React.FC<ReportingDashboardProps> = ({
           {chartData.length > 0 ? (
             <div className="h-[260px]">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={chartData}>
-                  <defs>
-                    <linearGradient id="colorLessons" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.15} />
-                      <stop offset="95%" stopColor="#3B82F6" stopOpacity={0} />
-                    </linearGradient>
-                    <linearGradient id="colorMentorship" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#8B5CF6" stopOpacity={0.15} />
-                      <stop offset="95%" stopColor="#8B5CF6" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+                <LineChart data={chartData}>
+                  <CartesianGrid
+                    strokeDasharray="3 3"
+                    vertical={false}
+                    stroke="#f0f0f0"
+                  />
                   <XAxis
                     dataKey="name"
                     axisLine={false}
@@ -155,23 +200,23 @@ const ReportingDashboard: React.FC<ReportingDashboardProps> = ({
                       fontSize: 12,
                     }}
                   />
-                  <Area
+                  <Line
                     type="monotone"
                     dataKey="lessons"
                     stroke="#3B82F6"
-                    strokeWidth={2.5}
-                    fillOpacity={1}
-                    fill="url(#colorLessons)"
+                    strokeWidth={3}
+                    dot={{ r: 4, fill: "#3B82F6", strokeWidth: 2, stroke: "#fff" }}
+                    activeDot={{ r: 6, strokeWidth: 0 }}
                   />
-                  <Area
+                  <Line
                     type="monotone"
                     dataKey="mentorship"
                     stroke="#8B5CF6"
-                    strokeWidth={2.5}
-                    fillOpacity={1}
-                    fill="url(#colorMentorship)"
+                    strokeWidth={3}
+                    dot={{ r: 4, fill: "#8B5CF6", strokeWidth: 2, stroke: "#fff" }}
+                    activeDot={{ r: 6, strokeWidth: 0 }}
                   />
-                </AreaChart>
+                </LineChart>
               </ResponsiveContainer>
             </div>
           ) : (

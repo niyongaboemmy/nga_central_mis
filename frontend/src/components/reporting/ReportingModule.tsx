@@ -92,14 +92,12 @@ const ReportingModule: React.FC = () => {
     }
   };
 
-  const loadDashboardStats = async () => {
-    if (statsHasFetched.current) return;
-
+  const loadDashboardStats = async (params?: { start_date?: string; end_date?: string }) => {
     setStatsLoading(true);
     statsHasFetched.current = true;
 
     try {
-      const res = await reportsApi.getDashboardStats();
+      const res = await reportsApi.getDashboardStats(params);
       setDashboardStats((res as any).data?.data || (res as any).data);
     } catch (error) {
       console.error("Failed to load dashboard stats", error);
@@ -189,6 +187,10 @@ const ReportingModule: React.FC = () => {
                 reports={submittedReports}
                 loading={reportsLoading}
                 onLoad={loadSubmittedReports}
+                onViewDetails={(report) => {
+                  setSelectedReport(report);
+                  setShowDetails(true);
+                }}
               />
             </div>
           )}

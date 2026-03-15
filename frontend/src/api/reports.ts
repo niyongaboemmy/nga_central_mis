@@ -35,7 +35,7 @@ export const reportsApi = {
   getAll: (params?: any) => api.get("/reports", { params }),
   getById: (id: number) => api.get(`/reports/${id}`),
   getByDate: (date: string) => api.get("/reports/by-date", { params: { date } }),
-  getDashboardStats: () => api.get("/reports/dashboard-stats"),
+  getDashboardStats: (params?: any) => api.get("/reports/dashboard-stats", { params }),
   update: (id: number, data: any) => api.put(`/reports/${id}`, data),
   getAllAdminReports: (params: {
     start_date?: string;
