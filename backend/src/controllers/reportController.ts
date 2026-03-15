@@ -1,5 +1,15 @@
 import { db } from "../db";
-import { eq, and, or, sql, between, desc, count, inArray, notInArray } from "drizzle-orm";
+import {
+  eq,
+  and,
+  or,
+  sql,
+  between,
+  desc,
+  count,
+  inArray,
+  notInArray,
+} from "drizzle-orm";
 import {
   InstructorReport,
   ReportTopic,
@@ -127,7 +137,9 @@ export const submitReport = asyncHandler(async (req: any, res: any) => {
         user_id: Number(userId),
         student_id: isNumericalId ? studentIdNum : null,
         student_name: isNumericalId ? null : session.student_id,
-        session_date: session.session_date ? sql`${formatDbDate(session.session_date)}` as any : null,
+        session_date: session.session_date
+          ? (sql`${formatDbDate(session.session_date)}` as any)
+          : null,
         duration_minutes: session.duration_minutes
           ? parseInt(session.duration_minutes)
           : null,
@@ -556,7 +568,10 @@ export const getReportById = asyncHandler(async (req: any, res: any) => {
         wellbeing_status: MentorshipSession.wellbeing_status,
       })
       .from(MentorshipSession)
-      .leftJoin(UserProfile, eq(MentorshipSession.student_id, UserProfile.user_id))
+      .leftJoin(
+        UserProfile,
+        eq(MentorshipSession.student_id, UserProfile.user_id),
+      )
       .where(eq(MentorshipSession.report_id, reportId))
   ).map((m) => ({
     ...m,
@@ -610,13 +625,17 @@ export const getDashboardStats = asyncHandler(async (req: any, res: any) => {
 
   // Total lessons delivered across all reports
   const totalLessons = await db
-    .select({ total: sql<number>`SUM(${InstructorReport.lessons_delivered_count})` })
+    .select({
+      total: sql<number>`SUM(${InstructorReport.lessons_delivered_count})`,
+    })
     .from(InstructorReport)
     .where(dateFilter);
 
   // Total mentorship sessions across all reports
   const totalMentorship = await db
-    .select({ total: sql<number>`SUM(${InstructorReport.mentorship_sessions_count})` })
+    .select({
+      total: sql<number>`SUM(${InstructorReport.mentorship_sessions_count})`,
+    })
     .from(InstructorReport)
     .where(dateFilter);
 
@@ -641,7 +660,7 @@ export const getDashboardStats = asyncHandler(async (req: any, res: any) => {
     .limit(start_date || end_date ? 50 : 15);
 
   const trend = trendRaw.reverse().map((r) => ({
-    name: formatDbDate(r.date) || '',
+    name: formatDbDate(r.date) || "",
     lessons: r.lessons,
     mentorship: r.mentorship,
   }));
@@ -650,7 +669,8 @@ export const getDashboardStats = asyncHandler(async (req: any, res: any) => {
     totalReports: totalReportsCount[0].count,
     totalLessons: totalLessons[0].total || 0,
     totalMentorship: totalMentorship[0].total || 0,
-    lastReportDate: lastReport.length > 0 ? formatDbDate(lastReport[0].end_date) : null,
+    lastReportDate:
+      lastReport.length > 0 ? formatDbDate(lastReport[0].end_date) : null,
     trend,
   });
 });
@@ -793,7 +813,9 @@ export const updateReport = asyncHandler(async (req: any, res: any) => {
         user_id: Number(userId),
         student_id: isNumericalId ? studentIdNum : null,
         student_name: isNumericalId ? null : session.student_id,
-        session_date: session.session_date ? sql`${formatDbDate(session.session_date)}` as any : null,
+        session_date: session.session_date
+          ? (sql`${formatDbDate(session.session_date)}` as any)
+          : null,
         duration_minutes: session.duration_minutes
           ? parseInt(session.duration_minutes)
           : null,
@@ -819,7 +841,9 @@ export const updateReport = asyncHandler(async (req: any, res: any) => {
   }
 
   // 7. Replace Reflections
-  await db.delete(ReportReflection).where(eq(ReportReflection.report_id, reportId));
+  await db
+    .delete(ReportReflection)
+    .where(eq(ReportReflection.report_id, reportId));
   if (reflections) {
     await db.insert(ReportReflection).values({
       report_id: reportId,
@@ -855,7 +879,7 @@ export const getAllAdminReports = asyncHandler(async (req: any, res: any) => {
     program_id,
     grade_id,
   } = req.query;
-  
+
   logger.info(`Admin Reports Query Params: ${JSON.stringify(req.query)}`);
 
   const query = db
@@ -973,20 +997,23 @@ export const getMissingReports = asyncHandler(async (req: any, res: any) => {
     .innerJoin(UserProfile, eq(User.user_id, UserProfile.user_id))
     .innerJoin(UserRole, eq(User.user_id, UserRole.user_id))
     .innerJoin(Role, eq(UserRole.role_id, Role.role_id))
-    .innerJoin(
+    .leftJoin(
       TeacherSubjectAssignment,
       eq(User.user_id, TeacherSubjectAssignment.user_id),
     )
-    .innerJoin(
+    .leftJoin(
       AcademicTerm,
-      eq(TeacherSubjectAssignment.academic_term_id, AcademicTerm.academic_term_id),
+      eq(
+        TeacherSubjectAssignment.academic_term_id,
+        AcademicTerm.academic_term_id,
+      ),
     )
-    .innerJoin(
+    .leftJoin(
       ClassGroup,
       eq(TeacherSubjectAssignment.class_group_id, ClassGroup.class_group_id),
     )
-    .innerJoin(Grade, eq(ClassGroup.grade_id, Grade.grade_id))
-    .innerJoin(Program, eq(Grade.program_id, Program.program_id))
+    .leftJoin(Grade, eq(ClassGroup.grade_id, Grade.grade_id))
+    .leftJoin(Program, eq(Grade.program_id, Program.program_id))
     .where(
       and(
         eq(Role.name, "instructor"),
