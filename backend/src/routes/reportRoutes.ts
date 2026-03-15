@@ -8,7 +8,6 @@ import {
   getDashboardStats,
   getReportByDate,
   updateReport,
-  updateReport,
   getAllAdminReports,
   getMissingReports,
 } from "../controllers/reportController";
