@@ -152,7 +152,7 @@ const ReportForm: React.FC<ReportFormProps> = ({
             session_date: m.session_date,
             notes: m.notes,
           })),
-          project_updates: (data.projectUpdates || []).map((p: any) => ({
+          project_updates: (data.project_updates || data.projectUpdates || []).map((p: any) => ({
             project_name: p.project_name,
             role: p.role,
             status: p.status,
@@ -1007,8 +1007,8 @@ const ReportForm: React.FC<ReportFormProps> = ({
                         }
                         className="w-full bg-white dark:bg-gray-900 border-none rounded-xl p-3"
                       />
-                      <input
-                        placeholder="Work Completed"
+                      <textarea
+                        placeholder="Work Completed (Detailed description of progress, features built, etc.)"
                         value={proj.work_completed}
                         onChange={(e) =>
                           updateArrayItem(
@@ -1018,7 +1018,7 @@ const ReportForm: React.FC<ReportFormProps> = ({
                             e.target.value,
                           )
                         }
-                        className="w-full bg-white dark:bg-gray-900 border-none rounded-xl p-3 md:col-span-2"
+                        className="w-full bg-white dark:bg-gray-900 border-none rounded-xl p-3 md:col-span-2 min-h-[80px]"
                       />
                       <select
                         value={proj.status}

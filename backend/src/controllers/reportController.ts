@@ -560,7 +560,7 @@ export const getReportById = asyncHandler(async (req: any, res: any) => {
     topics,
     lessons,
     mentorship,
-    projectUpdates,
+    project_updates: projectUpdates,
     reflections: reflections[0] || null,
   });
 });

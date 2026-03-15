@@ -973,7 +973,7 @@ export const ReportProjectUpdate = mysqlTable("ReportProjectUpdate", {
   project_name: varchar("project_name", { length: 255 }),
   role: varchar("role", { length: 100 }),
   work_completed: text("work_completed"),
-  status: mysqlEnum("status", ["ON_TRACK", "AT_RISK"]).default("ON_TRACK"),
+  status: mysqlEnum("status", ["ON_TRACK", "AT_RISK", "DELAYED", "COMPLETE"]).default("ON_TRACK"),
   key_outputs: text("key_outputs"),
   challenges: text("challenges"),
 });

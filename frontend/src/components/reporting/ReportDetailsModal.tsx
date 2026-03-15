@@ -379,7 +379,11 @@ const ReportDetailsModal: React.FC<ReportDetailsModalProps> = ({
                         className={`text-[9px] font-bold px-2 py-0.5 rounded-md ${
                           p.status === "ON_TRACK"
                             ? "bg-green-100 text-green-600"
-                            : "bg-amber-100 text-amber-600"
+                            : p.status === "DELAYED" || p.status === "AT_RISK"
+                              ? "bg-amber-100 text-amber-600"
+                              : p.status === "COMPLETE"
+                                ? "bg-blue-100 text-blue-600"
+                                : "bg-gray-100 text-gray-600"
                         }`}
                       >
                         {p.status?.replace("_", " ")}
