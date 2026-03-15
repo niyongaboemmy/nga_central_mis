@@ -1,5 +1,5 @@
 import React from "react";
-import { UserX, Mail, Bell } from "lucide-react";
+import { UserX } from "lucide-react";
 
 interface AdminMissingReportsProps {
   missing: any[];
@@ -45,11 +45,11 @@ const AdminMissingReports: React.FC<AdminMissingReportsProps> = ({
       {missing.map((instructor, idx) => (
         <div
           key={instructor.user_id || idx}
-          className="bg-white dark:bg-gray-900/40 rounded-2xl border border-gray-100 dark:border-gray-800/50 p-5 shadow-sm hover:shadow-md transition-all group"
+          className="bg-white dark:bg-gray-900/40 rounded-2xl border border-gray-100 dark:border-gray-800/50 p-5 transition-all group"
         >
           <div className="flex items-start justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-full flex items-center justify-center text-xl font-black shadow-sm">
+              <div className="w-12 h-12 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-full flex items-center justify-center text-xl font-black">
                 {instructor.instructor_name?.charAt(0)}
               </div>
               <div className="flex-1 min-w-0">
@@ -58,12 +58,12 @@ const AdminMissingReports: React.FC<AdminMissingReportsProps> = ({
                 </h4>
                 <div className="flex flex-wrap gap-1 mt-1">
                   {instructor.program_name && (
-                    <span className="px-2 py-0.5 bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 text-[9px] font-black rounded uppercase tracking-wider">
+                    <span className="px-2 py-0.5 bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 text-[9px] font-black rounded uppercase">
                       {instructor.program_name}
                     </span>
                   )}
                   {instructor.grade_name && (
-                    <span className="px-2 py-0.5 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-500 text-[9px] font-black rounded uppercase tracking-wider">
+                    <span className="px-2 py-0.5 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-500 text-[9px] font-black rounded uppercase">
                       {instructor.grade_name}
                     </span>
                   )}
@@ -72,7 +72,7 @@ const AdminMissingReports: React.FC<AdminMissingReportsProps> = ({
             </div>
           </div>
 
-          <div className="mt-6 flex items-center gap-2">
+          {/* <div className="mt-6 flex items-center gap-2">
             <button className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all active:scale-95 shadow-lg shadow-blue-500/20">
               <Bell className="w-3.5 h-3.5" />
               Send Reminder
@@ -80,7 +80,7 @@ const AdminMissingReports: React.FC<AdminMissingReportsProps> = ({
             <button className="p-2.5 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400 rounded-xl transition-all border border-gray-100 dark:border-gray-700 group-hover:border-blue-200">
               <Mail className="w-4 h-4" />
             </button>
-          </div>
+          </div> */}
         </div>
       ))}
     </div>

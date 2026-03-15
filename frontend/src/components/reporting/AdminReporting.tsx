@@ -8,11 +8,12 @@ import {
 } from "lucide-react";
 import {
   format,
-  subDays,
   startOfMonth,
   endOfMonth,
   startOfDay,
   endOfDay,
+  startOfWeek,
+  endOfWeek,
 } from "date-fns";
 import { reportsApi, InstructorReport } from "../../api/reports";
 import { useMetadata } from "../../contexts/MetadataContext";
@@ -38,8 +39,8 @@ const AdminReporting: React.FC = () => {
   const [availableTerms, setAvailableTerms] = useState<AcademicTerm[]>([]);
   const [availableGrades, setAvailableGrades] = useState<Grade[]>([]);
 
-  type PresetType = "today" | "week" | "month" | "custom";
-  const [activePreset, setActivePreset] = useState<PresetType>("week");
+  type PresetType = "today" | "week" | "month" | "all" | "custom";
+  const [activePreset, setActivePreset] = useState<PresetType>("month");
 
   // Filters
   const [dateRange, setDateRange] = useState({
@@ -72,18 +73,20 @@ const AdminReporting: React.FC = () => {
           end = format(endOfDay(now), "yyyy-MM-dd");
           break;
         case "week":
-          start = format(subDays(now, 7), "yyyy-MM-dd");
-          end = format(now, "yyyy-MM-dd");
+          start = format(startOfWeek(now, { weekStartsOn: 1 }), "yyyy-MM-dd");
+          end = format(endOfWeek(now, { weekStartsOn: 1 }), "yyyy-MM-dd");
           break;
         case "month":
           start = format(startOfMonth(now), "yyyy-MM-dd");
           end = format(endOfMonth(now), "yyyy-MM-dd");
           break;
+        case "all":
+          start = "";
+          end = "";
+          break;
       }
 
-      if (start && end) {
-        setDateRange({ start, end });
-      }
+      setDateRange({ start, end });
     }
   }, [activePreset]);
 
@@ -127,9 +130,7 @@ const AdminReporting: React.FC = () => {
       academic_term_id: filters.academic_term_id
         ? parseInt(filters.academic_term_id)
         : undefined,
-      program_id: filters.program_id
-        ? parseInt(filters.program_id)
-        : undefined,
+      program_id: filters.program_id ? parseInt(filters.program_id) : undefined,
       grade_id: filters.grade_id ? parseInt(filters.grade_id) : undefined,
     };
 
@@ -295,7 +296,10 @@ const AdminReporting: React.FC = () => {
                     type="date"
                     value={dateRange.start}
                     onChange={(e) =>
-                      setDateRange((prev) => ({ ...prev, start: e.target.value }))
+                      setDateRange((prev) => ({
+                        ...prev,
+                        start: e.target.value,
+                      }))
                     }
                     className="w-full bg-gray-50 dark:bg-gray-800/30 border border-gray-100 dark:border-gray-700/30 rounded-2xl pl-10 pr-4 py-2.5 text-xs font-bold focus:ring-2 focus:ring-blue-500 outline-none transition-all dark:text-gray-200"
                   />
@@ -417,12 +421,16 @@ const AdminReporting: React.FC = () => {
             </button>
           </div>
 
-          <div className={`flex items-center gap-2 px-4 py-2 rounded-xl border text-[10px] font-black uppercase tracking-tighter transition-all duration-500 ${
-            loading 
-              ? "bg-blue-50 dark:bg-blue-900/20 border-blue-100 dark:border-blue-800/30 text-blue-600 dark:text-blue-400" 
-              : "bg-gray-50 dark:bg-gray-800/40 border-gray-100 dark:border-gray-700/30 text-gray-400 dark:text-gray-600"
-          }`}>
-            <span className={`w-2 h-2 rounded-full ${loading ? "bg-blue-500 animate-pulse" : "bg-emerald-500"}`}></span>
+          <div
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl border text-[10px] font-black uppercase tracking-tighter transition-all duration-500 ${
+              loading
+                ? "bg-blue-50 dark:bg-blue-900/20 border-blue-100 dark:border-blue-800/30 text-blue-600 dark:text-blue-400"
+                : "bg-gray-50 dark:bg-gray-800/40 border-gray-100 dark:border-gray-700/30 text-gray-400 dark:text-gray-600"
+            }`}
+          >
+            <span
+              className={`w-2 h-2 rounded-full ${loading ? "bg-blue-500 animate-pulse" : "bg-emerald-500"}`}
+            ></span>
             {loading ? "Updating Data..." : "Live Data Source"}
           </div>
         </div>
