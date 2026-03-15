@@ -63,7 +63,7 @@ const AdminMissingReports: React.FC<AdminMissingReportsProps> = ({
                     </span>
                   )}
                   {instructor.grade_name && (
-                    <span className="px-2 py-0.5 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-500 text-[9px] font-black rounded uppercase">
+                    <span className="px-2 py-0.5 bg-blue-50 dark:bg-blue-900/20 text-blue-500 text-[9px] font-black rounded uppercase">
                       {instructor.grade_name}
                     </span>
                   )}
