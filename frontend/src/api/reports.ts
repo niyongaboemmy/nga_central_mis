@@ -45,4 +45,12 @@ export const reportsApi = {
     program_id?: number;
     grade_id?: number;
   }) => api.get("/reports/admin/all", { params }),
+  getMissingAdminReports: (params: {
+    start_date: string;
+    end_date: string;
+    academic_year_id?: number;
+    academic_term_id?: number;
+    program_id?: number;
+    grade_id?: number;
+  }) => api.get("/reports/admin/missing", { params }),
 };

@@ -8,7 +8,9 @@ import {
   getDashboardStats,
   getReportByDate,
   updateReport,
+  updateReport,
   getAllAdminReports,
+  getMissingReports,
 } from "../controllers/reportController";
 import { Permissions } from "../utils/permissions";
 
@@ -31,6 +33,13 @@ router.get(
   "/admin/all",
   authorize(Permissions.ALL_SUBMITTED_REPORTS),
   getAllAdminReports,
+);
+
+// Admin: View instructors who haven't submitted reports
+router.get(
+  "/admin/missing",
+  authorize(Permissions.ALL_SUBMITTED_REPORTS),
+  getMissingReports,
 );
 
 // Get dashboard statistics

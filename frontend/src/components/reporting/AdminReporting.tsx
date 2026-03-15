@@ -20,11 +20,16 @@ import { useUser } from "../../contexts/UserContext";
 import { AcademicTerm, Grade } from "../../api/academics";
 import AdminReportList from "./AdminReportList";
 import AdminReportDashboard from "./AdminReportDashboard";
+import AdminMissingReports from "./AdminMissingReports";
 import ReportDetailsModal from "./ReportDetailsModal";
+import { UserX } from "lucide-react";
 
 const AdminReporting: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<"list" | "dashboard">("list");
+  const [activeTab, setActiveTab] = useState<"list" | "dashboard" | "missing">(
+    "list",
+  );
   const [reports, setReports] = useState<InstructorReport[]>([]);
+  const [missingReports, setMissingReports] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
   const [selectedReport, setSelectedReport] = useState<any | null>(null);
@@ -128,23 +133,33 @@ const AdminReporting: React.FC = () => {
       grade_id: filters.grade_id ? parseInt(filters.grade_id) : undefined,
     };
 
-    const fetchKey = JSON.stringify(params);
+    const fetchKey = JSON.stringify({ ...params, activeTab });
     if (lastFetchKey.current === fetchKey) return;
 
     setLoading(true);
     lastFetchKey.current = fetchKey;
 
     try {
-      const res = await reportsApi.getAllAdminReports(params);
-      const data = (res as any).data?.data || (res as any).data || [];
-      setReports(data);
+      if (activeTab === "missing") {
+        if (!params.start_date || !params.end_date) {
+          setMissingReports([]);
+          return;
+        }
+        const res = await reportsApi.getMissingAdminReports(params as any);
+        const data = (res as any).data?.data || (res as any).data || [];
+        setMissingReports(data);
+      } else {
+        const res = await reportsApi.getAllAdminReports(params);
+        const data = (res as any).data?.data || (res as any).data || [];
+        setReports(data);
+      }
     } catch (error) {
-      console.error("Failed to load admin reports", error);
+      console.error("Failed to load admin data", error);
       lastFetchKey.current = null;
     } finally {
       setLoading(false);
     }
-  }, [dateRange, filters]);
+  }, [dateRange, filters, activeTab]);
 
   useEffect(() => {
     loadReports();
@@ -194,6 +209,11 @@ const AdminReporting: React.FC = () => {
       id: "dashboard",
       label: "Dashboard View",
       icon: <BarChart2 className="w-4 h-4" />,
+    },
+    {
+      id: "missing",
+      label: "Missing Submissions",
+      icon: <UserX className="w-4 h-4" />,
     },
   ];
 
@@ -408,16 +428,19 @@ const AdminReporting: React.FC = () => {
         </div>
       </div>
 
-      {/* Main Content */}
       <div className="flex-1 min-h-[500px] overflow-y-auto pr-1 custom-scrollbar">
-        {activeTab === "list" ? (
+        {activeTab === "list" && (
           <AdminReportList
             reports={reports}
             loading={loading}
             onViewDetails={handleViewDetails}
           />
-        ) : (
+        )}
+        {activeTab === "dashboard" && (
           <AdminReportDashboard reports={reports} loading={loading} />
+        )}
+        {activeTab === "missing" && (
+          <AdminMissingReports missing={missingReports} loading={loading} />
         )}
       </div>
 

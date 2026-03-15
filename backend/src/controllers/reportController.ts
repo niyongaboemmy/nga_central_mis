@@ -20,6 +20,8 @@ import {
   Grade,
   Program,
   TeacherSubjectAssignment,
+  Role,
+  UserRole,
 } from "../db/schema";
 import { asyncHandler } from "../middleware/asyncHandler";
 import { successResponse } from "../utils/response";
@@ -921,5 +923,79 @@ export const getAllAdminReports = asyncHandler(async (req: any, res: any) => {
     res,
     "All submitted reports retrieved successfully",
     formattedReports,
+  );
+});
+
+/**
+ * Admin: View instructors who haven't submitted reports for a range
+ */
+export const getMissingReports = asyncHandler(async (req: any, res: any) => {
+  const {
+    start_date,
+    end_date,
+    academic_year_id,
+    academic_term_id,
+    program_id,
+    grade_id,
+  } = req.query;
+
+  if (!start_date || !end_date) {
+    throw new ValidationError("Start date and end date are required");
+  }
+
+  // 1. Get IDs of instructors who HAVE submitted reports for this period
+  const submittedSubQuery = db
+    .select({ user_id: InstructorReport.user_id })
+    .from(InstructorReport)
+    .where(
+      and(
+        sql`DATE_FORMAT(${InstructorReport.start_date}, '%Y-%m-%d') <= ${end_date}`,
+        sql`DATE_FORMAT(${InstructorReport.end_date}, '%Y-%m-%d') >= ${start_date}`,
+      ),
+    );
+
+  const submittedInstructorIds = (await submittedSubQuery).map(
+    (r) => r.user_id,
+  );
+
+  // 2. Query for missing instructors
+  const query = db
+    .selectDistinct({
+      user_id: User.user_id,
+      instructor_name: sql<string>`CONCAT(${UserProfile.first_name}, ' ', ${UserProfile.last_name})`,
+      program_name: Program.name,
+      grade_name: Grade.name,
+    })
+    .from(User)
+    .innerJoin(UserProfile, eq(User.user_id, UserProfile.user_id))
+    .innerJoin(UserRole, eq(User.user_id, UserRole.user_id))
+    .innerJoin(Role, eq(UserRole.role_id, Role.role_id))
+    .leftJoin(
+      TeacherSubjectAssignment,
+      eq(User.user_id, TeacherSubjectAssignment.user_id),
+    )
+    .leftJoin(
+      ClassGroup,
+      eq(TeacherSubjectAssignment.class_group_id, ClassGroup.class_group_id),
+    )
+    .leftJoin(Grade, eq(ClassGroup.grade_id, Grade.grade_id))
+    .leftJoin(Program, eq(Grade.program_id, Program.program_id))
+    .where(
+      and(
+        eq(Role.name, "instructor"),
+        submittedInstructorIds.length > 0
+          ? sql`${User.user_id} NOT IN (${submittedInstructorIds})`
+          : sql`1=1`,
+        program_id ? eq(Program.program_id, parseInt(program_id)) : sql`1=1`,
+        grade_id ? eq(Grade.grade_id, parseInt(grade_id)) : sql`1=1`,
+      ),
+    );
+
+  const missingInstructors = await query;
+
+  successResponse(
+    res,
+    "Missing reports retrieved successfully",
+    missingInstructors,
   );
 });
