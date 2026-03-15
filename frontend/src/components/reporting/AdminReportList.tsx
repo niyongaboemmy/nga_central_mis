@@ -82,12 +82,6 @@ const AdminReportList: React.FC<AdminReportListProps> = ({
               {/* Academic Context Section */}
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-                  <span className="px-2.5 py-1 bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-xl text-[10px] font-black uppercase tracking-tight border border-gray-100 dark:border-gray-700">
-                    {report.program_name}
-                  </span>
-                  <span className="text-gray-300 dark:text-gray-700 font-light">
-                    •
-                  </span>
                   <span className="px-2.5 py-1 bg-blue-50/50 dark:bg-blue-900/10 text-blue-600 dark:text-blue-400 rounded-xl text-[10px] font-black uppercase tracking-tight border border-blue-100/30 dark:border-blue-800/20">
                     {report.grade_name}
                   </span>

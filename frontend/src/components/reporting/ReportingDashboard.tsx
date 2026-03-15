@@ -96,10 +96,10 @@ const ReportingDashboard: React.FC<ReportingDashboardProps> = ({
 
   // Format trend data labels: show just dd/MM for chart readability
   const chartData = trend.map((t: any) => {
-    const date = parseLocalNoShift(t.name);
+    const date = t.name ? parseLocalNoShift(t.name) : null;
     return {
       ...t,
-      name: date ? format(date, "dd/MM") : t.name,
+      name: date ? format(date, "dd/MM") : (t.name || "N/A"),
     };
   });
 

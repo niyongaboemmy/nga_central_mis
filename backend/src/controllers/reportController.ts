@@ -1,5 +1,5 @@
 import { db } from "../db";
-import { eq, and, or, sql, between, desc, count, inArray } from "drizzle-orm";
+import { eq, and, or, sql, between, desc, count, inArray, notInArray } from "drizzle-orm";
 import {
   InstructorReport,
   ReportTopic,
@@ -984,7 +984,7 @@ export const getMissingReports = asyncHandler(async (req: any, res: any) => {
       and(
         eq(Role.name, "instructor"),
         submittedInstructorIds.length > 0
-          ? sql`${User.user_id} NOT IN (${submittedInstructorIds})`
+          ? notInArray(User.user_id, submittedInstructorIds)
           : sql`1=1`,
         program_id ? eq(Program.program_id, parseInt(program_id)) : sql`1=1`,
         grade_id ? eq(Grade.grade_id, parseInt(grade_id)) : sql`1=1`,

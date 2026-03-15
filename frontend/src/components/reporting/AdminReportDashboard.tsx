@@ -24,6 +24,12 @@ interface AdminReportDashboardProps {
   loading: boolean;
 }
 
+const parseLocalNoShift = (dateStr: string) => {
+  if (!dateStr) return null;
+  const [y, m, d] = dateStr.split("T")[0].split("-").map(Number);
+  return new Date(y, m - 1, d);
+};
+
 export const AdminReportDashboard: React.FC<AdminReportDashboardProps> = ({
   reports,
   loading,
@@ -48,7 +54,10 @@ export const AdminReportDashboard: React.FC<AdminReportDashboardProps> = ({
     // Process Trend Data - group by date
     const trendMap = new Map();
     reports.forEach((r) => {
-      const date = r.start_date;
+      // Use start_date or submission_date as fallback
+      const date = r.start_date || (r.submission_date ? r.submission_date.split("T")[0] : null);
+      if (!date) return;
+      
       const current = trendMap.get(date) || { lessons: 0, mentorship: 0 };
       trendMap.set(date, {
         lessons: current.lessons + (r.lessons_delivered_count || 0),
@@ -58,14 +67,17 @@ export const AdminReportDashboard: React.FC<AdminReportDashboardProps> = ({
 
     const trendData = Array.from(trendMap.entries())
       .map(([date, vals]) => ({
-        name: date,
+        rawDate: date,
         ...vals,
       }))
-      .sort((a, b) => a.name.localeCompare(b.name))
-      .map((d) => ({
-        ...d,
-        name: format(new Date(d.name), "dd/MM"),
-      }));
+      .sort((a, b) => (a.rawDate || "").localeCompare(b.rawDate || ""))
+      .map((d) => {
+        const parsed = parseLocalNoShift(d.rawDate);
+        return {
+          ...d,
+          name: parsed ? format(parsed, "dd/MM") : (d.rawDate || "N/A"),
+        };
+      });
 
     return {
       totalReports,
