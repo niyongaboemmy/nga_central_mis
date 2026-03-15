@@ -1016,7 +1016,7 @@ export const getMissingReports = asyncHandler(async (req: any, res: any) => {
     .leftJoin(Program, eq(Grade.program_id, Program.program_id))
     .where(
       and(
-        eq(Role.name, "instructor"),
+        inArray(Role.name, ["TEACHER", "CLASS_TEACHER"]),
         submittedInstructorIds.length > 0
           ? notInArray(User.user_id, submittedInstructorIds)
           : sql`1=1`,
