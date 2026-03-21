@@ -32,7 +32,7 @@ jobs:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USERNAME }}
           key: ${{ secrets.EC2_SSH_KEY }}
-          source: "backend/*" 
+          source: "backend/dist/,backend/package.json,backend/package-lock.json" 
           target: "/var/www" 
           strip_components: 1
 
