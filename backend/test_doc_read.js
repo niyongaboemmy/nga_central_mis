@@ -2,6 +2,8 @@ const fs = require("fs");
 const path = require("path");
 const mammoth = require("mammoth");
 
+// this is a comment added for deployment
+
 async function testRead() {
   const filePath = path.join(__dirname, "../docs/reporting_form_required_fields.docx");
   try {
