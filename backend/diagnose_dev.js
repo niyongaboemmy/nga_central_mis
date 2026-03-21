@@ -13,7 +13,7 @@ async function run() {
     h = h.replace(/<br\s*\/?>/gi, "\n").replace(/<\/p>/gi, "\n");
     return cheerio.load(h).text().trim();
   };
-
+// Testing deployment
   $("tr").each((i, tr) => {
     const tds = $(tr).find("th, td").toArray();
     const rt = tds
