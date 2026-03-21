@@ -1,6 +1,8 @@
+import dotenv from "dotenv";
+dotenv.config();
+
 import express from "express";
 import cors from "cors";
-import dotenv from "dotenv";
 import cookieParser from "cookie-parser";
 import config from "./config";
 import logger from "./utils/logger";
@@ -21,8 +23,6 @@ import schemeOfWorkRoutes from "./routes/schemeOfWork";
 import lessonPlanRoutes from "./routes/lessonPlan";
 import calendarRoutes from "./routes/calendar";
 import reportRoutes from "./routes/reportRoutes";
-
-dotenv.config();
 
 const app = express();
 
