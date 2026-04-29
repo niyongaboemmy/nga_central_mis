@@ -72,7 +72,7 @@ export const authorizeSSO = asyncHandler(async (req: any, res: any) => {
 
   // Generate auth code
   const code = crypto.randomBytes(32).toString("hex");
-  const expiresAt = new Date(Date.now() + 1 * 60 * 1000); // 1 minute expiration
+  const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minute expiration
 
   await db.insert(SSOCode).values({
     code,

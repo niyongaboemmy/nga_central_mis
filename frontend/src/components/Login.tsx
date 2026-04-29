@@ -98,7 +98,7 @@ const Login: React.FC<LoginProps> = ({
   onLoginSuccess,
   onNavigateToPasswordRecovery,
 }) => {
-  const { refreshUser } = useUser();
+  const { refreshUser, user: currentUser } = useUser();
   const { getUserPermissions } = usePermissions();
   const [searchParams] = useSearchParams();
   const [username, setUsername] = useState("");
@@ -167,7 +167,7 @@ const Login: React.FC<LoginProps> = ({
                 finalUrl.searchParams.set("state", ssoData.state);
               }
               window.location.href = finalUrl.toString();
-            }, 2000);
+            }, 500);
             return;
           }
         } catch (ssoError) {
@@ -181,7 +181,7 @@ const Login: React.FC<LoginProps> = ({
         if (onLoginSuccess) {
           onLoginSuccess();
         }
-      }, 2000);
+      }, 800);
     } catch (error: any) {
       setAuthError(
         error.response?.data?.message || "Invalid OTP code. Please try again.",
@@ -203,14 +203,14 @@ const Login: React.FC<LoginProps> = ({
       // Verify if user is already logged in
       try {
         await checkSession();
-        // If session is valid and we have SSO params, redirect automatically
+        // If session is valid and we have SSO params, auto-continue after brief pause
         if (clientId && redirectUri) {
-          console.log("User already logged in, processing automatic SSO...");
+          console.log("User already logged in, auto-continuing SSO...");
           setStep("sso-consent");
-          // Small delay before auto-continuing for visual feedback
-          // setTimeout(() => {
-          //   handleSSOContinue();
-          // }, 1000);
+          // 1.5s pause so user can see the consent screen before automatic redirect
+          setTimeout(() => {
+            handleSSOContinue();
+          }, 1500);
         } else {
           // If logged in but no SSO params, let parent handle navigation (e.g. to dashboard)
           if (onLoginSuccess) onLoginSuccess();
@@ -249,7 +249,7 @@ const Login: React.FC<LoginProps> = ({
               finalUrl.searchParams.set("state", ssoData.state);
             }
             window.location.href = finalUrl.toString();
-          }, 1500);
+          }, 500);
         }
       } catch (ssoError) {
         console.error("SSO Authorization failed:", ssoError);
@@ -262,11 +262,17 @@ const Login: React.FC<LoginProps> = ({
   };
 
   const handleSSOLogout = async () => {
-    // Perform logout logic (clear local storage/cookies) but keep params
-    // Assuming logout API or context function exists, otherwise just clear local state
-    // Ideally use logout() from context if available
-    localStorage.removeItem("token"); // Simple clear for now or use context
-    // Refresh page to clear memory state and re-mount login
+    // Clear all MIS session tokens and reload to re-present the login form
+    localStorage.removeItem("token");
+    localStorage.removeItem("nga_auth_token");
+    localStorage.removeItem("misToken");
+    try {
+      // Best-effort server-side logout to clear the HttpOnly cookie
+      const { logout } = await import("../api/auth");
+      await logout();
+    } catch {
+      // ignore — cookie will expire naturally
+    }
     window.location.reload();
   };
 
@@ -355,51 +361,85 @@ const Login: React.FC<LoginProps> = ({
                   initial={{ opacity: 0, scale: 0.95 }}
                   animate={{ opacity: 1, scale: 1 }}
                 >
-                  <motion.div className="flex justify-center mb-6">
+                  {/* User avatar */}
+                  <motion.div className="flex justify-center mb-4">
                     <div className="relative">
-                      <div className="w-24 h-24 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 p-1">
+                      <div className="w-20 h-20 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 p-1">
                         <div className="w-full h-full rounded-full bg-white dark:bg-slate-800 flex items-center justify-center overflow-hidden">
-                          <User className="w-12 h-12 text-gray-400" />
+                          <User className="w-10 h-10 text-gray-400" />
                         </div>
                       </div>
-                      <div className="absolute bottom-0 right-0 p-2 bg-green-500 rounded-full border-4 border-white dark:border-slate-800"></div>
+                      <div className="absolute bottom-0 right-0 p-1.5 bg-green-500 rounded-full border-2 border-white dark:border-slate-800">
+                        <CheckCircle className="w-3 h-3 text-white" />
+                      </div>
                     </div>
                   </motion.div>
 
-                  <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
-                    Signed in as {localStorage.getItem("user_name") || "User"}
+                  <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-1">
+                    {[
+                      currentUser?.profile?.first_name,
+                      currentUser?.profile?.last_name,
+                    ]
+                      .filter(Boolean)
+                      .join(" ") ||
+                      currentUser?.user?.username ||
+                      "Signed In"}
                   </h2>
-                  <p className="text-gray-500 dark:text-gray-400 text-sm mb-8">
-                    {localStorage.getItem("user_role") || "Authenticated User"}{" "}
-                    • NGA Central MIS
+                  <p className="text-gray-500 dark:text-gray-400 text-sm mb-1">
+                    {currentUser?.roles?.[0]?.name || "NGA User"}{" "}
+                    · NGA Central MIS
+                  </p>
+                  <p className="text-xs text-gray-400 dark:text-gray-500 mb-6">
+                    Redirecting you to{" "}
+                    <span className="font-medium text-gray-600 dark:text-gray-300">
+                      {searchParams.get("client_id") || "the app"}
+                    </span>{" "}
+                    automatically…
                   </p>
 
-                  <div className="space-y-4">
+                  {/* Auto-redirect progress bar */}
+                  {!loading && (
+                    <div className="mb-6">
+                      <div className="h-1.5 w-full bg-gray-100 dark:bg-slate-700 rounded-full overflow-hidden">
+                        <motion.div
+                          className="h-full bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full"
+                          initial={{ width: 0 }}
+                          animate={{ width: "100%" }}
+                          transition={{ duration: 1.4, ease: "easeInOut" }}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="space-y-3">
                     <button
                       onClick={handleSSOContinue}
                       disabled={loading}
-                      className="w-full py-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold rounded-2xl shadow-lg shadow-blue-500/25 transition-all flex items-center justify-center gap-2"
+                      className="w-full py-3.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 disabled:opacity-60 text-white font-semibold rounded-2xl shadow-lg shadow-blue-500/25 transition-all flex items-center justify-center gap-2"
                     >
                       {loading ? (
-                        "Redirecting..."
+                        <>
+                          <div className="h-4 w-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
+                          Redirecting…
+                        </>
                       ) : (
                         <>
-                          Continue to App <ArrowRight className="w-5 h-5" />
+                          Continue now <ArrowRight className="w-4 h-4" />
                         </>
                       )}
                     </button>
 
                     <button
                       onClick={handleSSOLogout}
-                      className="w-full py-4 bg-white dark:bg-slate-700 hover:bg-gray-50 dark:hover:bg-slate-600 text-red-500 font-semibold rounded-2xl border border-gray-200 dark:border-slate-600 transition-all"
+                      className="w-full py-3 bg-transparent hover:bg-gray-50 dark:hover:bg-slate-700/50 text-gray-500 dark:text-gray-400 hover:text-red-500 dark:hover:text-red-400 text-sm font-medium rounded-2xl border border-gray-200 dark:border-slate-700 transition-all"
                     >
-                      Logout & Switch Account
+                      Not you? Switch account
                     </button>
                   </div>
 
-                  <div className="mt-6 pt-6 border-t border-gray-100 dark:border-slate-700/50">
+                  <div className="mt-5 pt-5 border-t border-gray-100 dark:border-slate-700/50">
                     <p className="text-xs text-gray-400">
-                      You are about to share your identity details with{" "}
+                      Your identity is securely shared with{" "}
                       <span className="font-medium text-gray-600 dark:text-gray-300">
                         {searchParams.get("client_id")}
                       </span>
