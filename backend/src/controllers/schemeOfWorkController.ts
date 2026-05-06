@@ -504,19 +504,25 @@ export const getAllTeachersSchemeOfWork = asyncHandler(
 
     const classGroupIds = classGroups.map((cg) => cg.class_group_id);
 
-    // Get all teacher-subject assignments for these class groups and term
+    // Fetch term name for use in response
+    const termRecord = await db
+      .select({ name: AcademicTerm.name })
+      .from(AcademicTerm)
+      .where(eq(AcademicTerm.academic_term_id, termId))
+      .limit(1);
+    const termName = termRecord[0]?.name ?? null;
+
+    // Get all teacher-subject assignments for these class groups (year-wide)
     const assignments = await db
       .select({
         user_id: TeacherSubjectAssignment.user_id,
         subject_id: TeacherSubjectAssignment.subject_id,
         class_group_id: TeacherSubjectAssignment.class_group_id,
-        academic_term_id: TeacherSubjectAssignment.academic_term_id,
         assigned_at: TeacherSubjectAssignment.assigned_at,
         subject_name: Subject.name,
         subject_code: Subject.code,
         subject_color: Subject.color,
         class_group_name: ClassGroup.name,
-        term_name: AcademicTerm.name,
         year_name: AcademicYear.name,
       })
       .from(TeacherSubjectAssignment)
@@ -529,22 +535,10 @@ export const getAllTeachersSchemeOfWork = asyncHandler(
         eq(TeacherSubjectAssignment.class_group_id, ClassGroup.class_group_id),
       )
       .innerJoin(
-        AcademicTerm,
-        eq(
-          TeacherSubjectAssignment.academic_term_id,
-          AcademicTerm.academic_term_id,
-        ),
-      )
-      .innerJoin(
         AcademicYear,
-        eq(AcademicTerm.academic_year_id, AcademicYear.academic_year_id),
+        eq(ClassGroup.academic_year_id, AcademicYear.academic_year_id),
       )
-      .where(
-        and(
-          eq(TeacherSubjectAssignment.academic_term_id, termId),
-          inArray(TeacherSubjectAssignment.class_group_id, classGroupIds),
-        ),
-      );
+      .where(inArray(TeacherSubjectAssignment.class_group_id, classGroupIds));
 
     if (assignments.length === 0) {
       return successResponse(res, "No assignments found", [], 200);
@@ -636,7 +630,7 @@ export const getAllTeachersSchemeOfWork = asyncHandler(
       );
       if (!profile) continue; // skip if not matching user_type filter
 
-      const key = `${assignment.user_id}-${assignment.subject_id}-${assignment.class_group_id}-${assignment.academic_term_id}`;
+      const key = `${assignment.user_id}-${assignment.subject_id}-${assignment.class_group_id}-${termId}`;
       const scheme = schemeMap.get(key) || null;
 
       const schemeRecord = {
@@ -646,8 +640,8 @@ export const getAllTeachersSchemeOfWork = asyncHandler(
         subject_color: assignment.subject_color,
         class_group_id: assignment.class_group_id,
         class_group_name: assignment.class_group_name,
-        academic_term_id: assignment.academic_term_id,
-        academic_term_name: assignment.term_name,
+        academic_term_id: termId,
+        academic_term_name: termName,
         academic_year_name: assignment.year_name,
         scheme_id: scheme?.scheme_id ?? null,
         status: scheme ? "submitted" : "pending",

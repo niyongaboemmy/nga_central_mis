@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { MyAssignedSubject, myAssignedSubjectsApi } from "../api/academics";
 import Button from "./ui/Button";
 import EnrolledStudents from "./EnrolledStudents";
@@ -11,19 +12,21 @@ import {
   Filter,
   Search,
   BarChart3,
+  ArrowRight,
 } from "lucide-react";
 
 const TeacherAssignedSubjects: React.FC = () => {
+  const navigate = useNavigate();
   const [subjects, setSubjects] = useState<MyAssignedSubject[]>([]);
   const [loading, setLoading] = useState(true);
   const [showStudentsModal, setShowStudentsModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [filterTerm, setFilterTerm] = useState<string>("all");
+  const [filterYear, setFilterYear] = useState<string>("all");
   const [selectedSubjectData, setSelectedSubjectData] = useState<{
     subjectId: number;
     subjectName: string;
-    academicTermId: number;
-    academicTermName: string;
+    academicYearId: number;
+    academicYearName: string;
   } | null>(null);
 
   useEffect(() => {
@@ -45,8 +48,8 @@ const TeacherAssignedSubjects: React.FC = () => {
     setSelectedSubjectData({
       subjectId: subject.subject_id,
       subjectName: subject.subject_name,
-      academicTermId: grade.academic_term_id,
-      academicTermName: grade.academic_term_name,
+      academicYearId: grade.academic_year_id,
+      academicYearName: grade.academic_year_name,
     });
     setShowStudentsModal(true);
   };
@@ -71,30 +74,32 @@ const TeacherAssignedSubjects: React.FC = () => {
     return classGroupSet.size;
   };
 
-  const getUniqueTerm = () => {
-    const termSet = new Set<string>();
+  const getUniqueYears = () => {
+    const yearSet = new Set<string>();
     subjects.forEach((subject) => {
       subject.grades.forEach((grade) => {
-        termSet.add(grade.academic_term_name);
+        yearSet.add(grade.academic_year_name);
       });
     });
-    return Array.from(termSet);
+    return Array.from(yearSet);
   };
 
   const filteredSubjects = subjects
     .map((subject) => ({
       ...subject,
       grades:
-        filterTerm === "all"
+        filterYear === "all"
           ? subject.grades
-          : subject.grades.filter((g) => g.academic_term_name === filterTerm),
+          : subject.grades.filter(
+              (g) => g.academic_year_name === filterYear,
+            ),
     }))
     .filter(
       (subject) =>
         subject.subject_name
           .toLowerCase()
           .includes(searchQuery.toLowerCase()) ||
-        subject.subject_code?.toLowerCase().includes(searchQuery.toLowerCase())
+        subject.subject_code?.toLowerCase().includes(searchQuery.toLowerCase()),
     )
     .filter((subject) => subject.grades.length > 0);
 
@@ -111,7 +116,7 @@ const TeacherAssignedSubjects: React.FC = () => {
     );
   }
 
-  const uniqueTerms = getUniqueTerm();
+  const uniqueYears = getUniqueYears();
 
   return (
     <>
@@ -177,14 +182,14 @@ const TeacherAssignedSubjects: React.FC = () => {
           <div className="flex items-center gap-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700/40 rounded-2xl px-4 py-3">
             <Filter className="w-5 h-5 text-gray-600 dark:text-gray-400" />
             <select
-              value={filterTerm}
-              onChange={(e) => setFilterTerm(e.target.value)}
+              value={filterYear}
+              onChange={(e) => setFilterYear(e.target.value)}
               className="bg-transparent text-gray-900 dark:text-white focus:outline-none text-sm"
             >
-              <option value="all">All Terms</option>
-              {uniqueTerms.map((term) => (
-                <option key={term} value={term}>
-                  {term}
+              <option value="all">All Years</option>
+              {uniqueYears.map((year) => (
+                <option key={year} value={year}>
+                  {year}
                 </option>
               ))}
             </select>
@@ -215,17 +220,23 @@ const TeacherAssignedSubjects: React.FC = () => {
                 key={subject.subject_id}
                 className="group bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700/40 overflow-hidden shadow-sm hover:shadow-lg hover:scale-105 transition-all duration-300 hover:border-blue-300 dark:hover:border-blue-600"
               >
-                {/* Subject Header */}
-                <div className="bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-900 p-4 border-b border-gray-200 dark:border-gray-700/60">
+                {/* Subject Header — click to open subject detail */}
+                <button
+                  onClick={() => navigate(`/subjects/${subject.subject_id}`)}
+                  className="w-full text-left bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-900 p-4 border-b border-gray-200 dark:border-gray-700/60 hover:from-blue-50 hover:to-blue-100 dark:hover:from-blue-950/30 dark:hover:to-blue-900/20 transition-all duration-200"
+                >
                   <div className="flex items-start justify-between">
                     <div className="flex items-start gap-3">
                       <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900 rounded-xl flex items-center justify-center group-hover:bg-blue-200 dark:group-hover:bg-blue-800/50 transition-colors">
                         <BookOpen className="w-5 h-5 text-blue-600 dark:text-blue-400" />
                       </div>
                       <div className="flex-1">
-                        <h3 className="text-sm font-bold text-gray-900 dark:text-white">
-                          {subject.subject_name}
-                        </h3>
+                        <div className="flex items-center gap-1.5">
+                          <h3 className="text-sm font-bold text-gray-900 dark:text-white group-hover:text-blue-700 dark:group-hover:text-blue-400 transition-colors">
+                            {subject.subject_name}
+                          </h3>
+                          <ArrowRight className="w-3.5 h-3.5 text-gray-400 group-hover:text-blue-500 dark:group-hover:text-blue-400 opacity-0 group-hover:opacity-100 transition-all -translate-x-1 group-hover:translate-x-0" />
+                        </div>
                         {subject.subject_code && (
                           <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
                             {subject.subject_code}
@@ -240,7 +251,7 @@ const TeacherAssignedSubjects: React.FC = () => {
                       </div>
                     </div>
                   </div>
-                </div>
+                </button>
 
                 {/* Assignments */}
                 <div className="p-4 space-y-2">
@@ -265,8 +276,7 @@ const TeacherAssignedSubjects: React.FC = () => {
                             </span>
                             <span className="flex items-center gap-1 bg-white dark:bg-gray-800 px-2 py-0.5 rounded-md">
                               <Calendar className="w-3 h-3" />
-                              {grade.academic_term_name} (
-                              {grade.academic_year_name})
+                              {grade.academic_year_name}
                             </span>
                           </div>
                         </div>
@@ -292,8 +302,8 @@ const TeacherAssignedSubjects: React.FC = () => {
         <EnrolledStudents
           subjectId={selectedSubjectData.subjectId}
           subjectName={selectedSubjectData.subjectName}
-          academicTermId={selectedSubjectData.academicTermId}
-          academicTermName={selectedSubjectData.academicTermName}
+          academicYearId={selectedSubjectData.academicYearId}
+          academicYearName={selectedSubjectData.academicYearName}
           isOpen={showStudentsModal}
           onClose={() => {
             setShowStudentsModal(false);

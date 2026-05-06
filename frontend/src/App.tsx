@@ -40,6 +40,7 @@ import SchemeDetails from "./components/SchemeDetails";
 import ReportingModule from "./components/reporting/ReportingModule";
 import AdminReporting from "./components/reporting/AdminReporting";
 import { MetadataProvider } from "./contexts/MetadataContext";
+import SubjectDetailPage from "./components/curriculum/SubjectDetailPage";
 
 const LoginPage: React.FC = () => {
   const navigate = useNavigate();
@@ -374,6 +375,18 @@ function App() {
                 <ProtectedRoute>
                   <SystemLayoutWrapper>
                     <TeacherAssignedSubjectsPage />
+                  </SystemLayoutWrapper>
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Subject Detail page - curriculum & materials */}
+            <Route
+              path="/subjects/:subjectId"
+              element={
+                <ProtectedRoute>
+                  <SystemLayoutWrapper>
+                    <SubjectDetailPage />
                   </SystemLayoutWrapper>
                 </ProtectedRoute>
               }

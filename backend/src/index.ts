@@ -23,6 +23,8 @@ import schemeOfWorkRoutes from "./routes/schemeOfWork";
 import lessonPlanRoutes from "./routes/lessonPlan";
 import calendarRoutes from "./routes/calendar";
 import reportRoutes from "./routes/reportRoutes";
+import curriculumRoutes from "./routes/curriculum";
+import mentorshipRoutes from "./routes/mentorship";
 
 const app = express();
 
@@ -70,6 +72,8 @@ console.log("DEBUG: Mounting /lesson-plans routes...");
 app.use("/lesson-plans", lessonPlanRoutes);
 app.use("/calendar", calendarRoutes);
 app.use("/reports", reportRoutes);
+app.use("/curriculum", curriculumRoutes);
+app.use("/mentorship", mentorshipRoutes);
 
 app.post("/test-post", (req, res) =>
   res.json({ success: true, message: "Root POST test works" }),

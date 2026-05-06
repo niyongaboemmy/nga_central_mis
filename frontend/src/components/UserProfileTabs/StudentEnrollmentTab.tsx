@@ -16,8 +16,8 @@ import {
   studentEnrollmentApi,
   StudentEnrolledSubject,
   AvailableSubject,
-  academicTermsApi,
-  AcademicTerm,
+  academicYearsApi,
+  AcademicYear,
   studentClassGroupApi,
   StudentClassGroup,
   classGroupsApi,
@@ -50,8 +50,8 @@ const StudentEnrollmentTab: React.FC<StudentEnrollmentTabProps> = ({
   const [availableSubjects, setAvailableSubjects] = useState<
     AvailableSubject[]
   >([]);
-  const [academicTerms, setAcademicTerms] = useState<AcademicTerm[]>([]);
-  const [selectedTerm, setSelectedTerm] = useState<AcademicTerm | null>(null);
+  const [academicYears, setAcademicYears] = useState<AcademicYear[]>([]);
+  const [selectedYearId, setSelectedYearId] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [enrolling, setEnrolling] = useState<number | null>(null);
   const [unenrolling, setUnenrolling] = useState<string | null>(null);
@@ -69,40 +69,46 @@ const StudentEnrollmentTab: React.FC<StudentEnrollmentTabProps> = ({
   const loadingInitialRef = useRef(false);
   const lastFetchedEnrolled = useRef<{
     studentId: number;
-    termId: number;
+    yearId: number;
   } | null>(null);
   const lastFetchedAvailable = useRef<{
     studentId: number;
-    termId: number;
+    yearId: number;
   } | null>(null);
   const fetchingEnrolledRef = useRef(false);
   const fetchingAvailableRef = useRef(false);
 
-  // Load academic terms and student class group
+  // Load academic years and student class group
   useEffect(() => {
     const loadInitialData = async () => {
       if (loadingInitialRef.current) return;
       loadingInitialRef.current = true;
 
       try {
-        // Load academic terms
-        const termsResponse = await academicTermsApi.getAll();
-        const terms = termsResponse.data.data;
-        setAcademicTerms(terms);
-
-        // Set current term as default
-        const currentTerm = terms.find((term) => term.is_current === 1);
-        if (currentTerm) {
-          setSelectedTerm(currentTerm);
-        } else if (terms.length > 0) {
-          setSelectedTerm(terms[0]);
-        }
+        // Load academic years for the year selector
+        const yearsResponse = await academicYearsApi.getAll();
+        const yearsData = yearsResponse.data;
+        const years = "data" in yearsData ? yearsData.data : yearsData;
+        setAcademicYears(years as AcademicYear[]);
 
         // Load student class group
         const classGroupResponse =
           await studentClassGroupApi.getByStudent(studentId);
         const classGroup = classGroupResponse.data.data;
         setStudentClassGroup(classGroup);
+
+        // Set year from class group if available, otherwise use current year
+        if (classGroup?.academic_year_id) {
+          setSelectedYearId(classGroup.academic_year_id);
+        } else {
+          const currentYear = (years as AcademicYear[]).find(
+            (y) => y.is_current === 1,
+          );
+          if (currentYear) setSelectedYearId(currentYear.academic_year_id);
+          else if ((years as AcademicYear[]).length > 0)
+            setSelectedYearId((years as AcademicYear[])[0].academic_year_id);
+        }
+
         setCurrentStep(classGroup ? 2 : 1);
       } catch (error) {
         console.error("Failed to load initial data:", error);
@@ -119,20 +125,20 @@ const StudentEnrollmentTab: React.FC<StudentEnrollmentTabProps> = ({
 
   // Unified data loading effect (Strictly Enrolled Subjects)
   useEffect(() => {
-    if (selectedTerm && isOpen) {
+    if (selectedYearId && isOpen) {
       loadEnrolledSubjects();
     }
-  }, [selectedTerm?.academic_term_id, isOpen, currentStep, studentId]);
+  }, [selectedYearId, isOpen, currentStep, studentId]);
 
   const loadEnrolledSubjects = async (force = false) => {
-    if (!selectedTerm) return;
+    if (!selectedYearId) return;
 
     // Prevent redundant calls and race conditions
     if (
       fetchingEnrolledRef.current ||
       (!force &&
         lastFetchedEnrolled.current?.studentId === studentId &&
-        lastFetchedEnrolled.current?.termId === selectedTerm.academic_term_id)
+        lastFetchedEnrolled.current?.yearId === selectedYearId)
     ) {
       return;
     }
@@ -142,12 +148,12 @@ const StudentEnrollmentTab: React.FC<StudentEnrollmentTabProps> = ({
     try {
       const response = await studentEnrollmentApi.getEnrolledSubjects(
         studentId,
-        selectedTerm.academic_term_id,
+        selectedYearId,
       );
       setEnrolledSubjects(response.data.data);
       lastFetchedEnrolled.current = {
         studentId,
-        termId: selectedTerm.academic_term_id,
+        yearId: selectedYearId,
       };
     } catch (error) {
       console.error("Failed to load enrolled subjects:", error);
@@ -159,14 +165,14 @@ const StudentEnrollmentTab: React.FC<StudentEnrollmentTabProps> = ({
   };
 
   const loadAvailableSubjects = async (force = false) => {
-    if (!selectedTerm) return;
+    if (!selectedYearId) return;
 
     // Prevent redundant calls and race conditions
     if (
       fetchingAvailableRef.current ||
       (!force &&
         lastFetchedAvailable.current?.studentId === studentId &&
-        lastFetchedAvailable.current?.termId === selectedTerm.academic_term_id)
+        lastFetchedAvailable.current?.yearId === selectedYearId)
     ) {
       return;
     }
@@ -176,12 +182,12 @@ const StudentEnrollmentTab: React.FC<StudentEnrollmentTabProps> = ({
     try {
       const response = await studentEnrollmentApi.getAvailableSubjects(
         studentId,
-        selectedTerm.academic_term_id,
+        selectedYearId,
       );
       setAvailableSubjects(response.data.data);
       lastFetchedAvailable.current = {
         studentId,
-        termId: selectedTerm.academic_term_id,
+        yearId: selectedYearId,
       };
     } catch (error) {
       console.error("Failed to load available subjects:", error);
@@ -193,14 +199,14 @@ const StudentEnrollmentTab: React.FC<StudentEnrollmentTabProps> = ({
   };
 
   const handleEnroll = async (subjectId: number) => {
-    if (!selectedTerm) return;
+    if (!selectedYearId) return;
 
     setEnrolling(subjectId);
     try {
       await studentEnrollmentApi.enroll({
         user_id: studentId,
         subject_id: subjectId,
-        academic_term_id: selectedTerm.academic_term_id,
+        academic_year_id: selectedYearId,
       });
       showToast("Student enrolled successfully", "success");
       loadEnrolledSubjects(true);
@@ -214,15 +220,15 @@ const StudentEnrollmentTab: React.FC<StudentEnrollmentTabProps> = ({
   };
 
   const handleUnenroll = async (subjectId: number) => {
-    if (!selectedTerm) return;
+    if (!selectedYearId) return;
 
-    const enrollmentId = `${studentId}-${subjectId}-${selectedTerm.academic_term_id}`;
+    const enrollmentId = `${studentId}-${subjectId}-${selectedYearId}`;
     setUnenrolling(enrollmentId);
     try {
       await studentEnrollmentApi.unenroll(
         studentId,
         subjectId,
-        selectedTerm.academic_term_id,
+        selectedYearId,
       );
       showToast("Student unenrolled successfully", "success");
       loadEnrolledSubjects(true);
@@ -246,8 +252,9 @@ const StudentEnrollmentTab: React.FC<StudentEnrollmentTabProps> = ({
         setLoadingClassGroups(true);
         try {
           const currentYear =
-            academicTerms.find((term) => term.is_current === 1)
-              ?.academic_year_id || academicTerms[0]?.academic_year_id;
+            selectedYearId ||
+            academicYears.find((y) => y.is_current === 1)?.academic_year_id ||
+            academicYears[0]?.academic_year_id;
           if (currentYear) {
             const response = await classGroupsApi.getAll(currentYear);
             setAvailableClassGroups(response.data.data);
@@ -261,13 +268,13 @@ const StudentEnrollmentTab: React.FC<StudentEnrollmentTabProps> = ({
       };
       loadClassGroups();
     }
-  }, [isOpen, currentStep, academicTerms, availableClassGroups.length]);
+  }, [isOpen, currentStep, selectedYearId, availableClassGroups.length]);
 
   const handleAssignClassGroup = async (classGroupId: number) => {
     setAssigningClassGroup(true);
     try {
       // If student already has a class group, remove it and unenroll from subjects
-      if (studentClassGroup && selectedTerm) {
+      if (studentClassGroup && selectedYearId) {
         // Unenroll from all subjects first
         if (enrolledSubjects.length > 0) {
           await Promise.all(
@@ -275,7 +282,7 @@ const StudentEnrollmentTab: React.FC<StudentEnrollmentTabProps> = ({
               studentEnrollmentApi.unenroll(
                 studentId,
                 subject.subject_id,
-                selectedTerm.academic_term_id,
+                selectedYearId,
               ),
             ),
           );
@@ -320,13 +327,13 @@ const StudentEnrollmentTab: React.FC<StudentEnrollmentTabProps> = ({
     setRemovingClassGroup(true);
     try {
       // First, unenroll from all subjects if any are enrolled
-      if (enrolledSubjects.length > 0 && selectedTerm) {
+      if (enrolledSubjects.length > 0 && selectedYearId) {
         await Promise.all(
           enrolledSubjects.map((subject) =>
             studentEnrollmentApi.unenroll(
               studentId,
               subject.subject_id,
-              selectedTerm.academic_term_id,
+              selectedYearId,
             ),
           ),
         );
@@ -361,7 +368,7 @@ const StudentEnrollmentTab: React.FC<StudentEnrollmentTabProps> = ({
 
   if (!isOpen) return null;
 
-  if (academicTerms.length === 0 && isOpen) {
+  if (!selectedYearId && isOpen) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[400px]">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
@@ -640,29 +647,27 @@ const StudentEnrollmentTab: React.FC<StudentEnrollmentTabProps> = ({
                 </div>
               </div>
 
-              {/* Academic Term Selector */}
+              {/* Academic Year Selector */}
               <div className="flex items-center gap-3">
                 <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Academic Term:
+                  Academic Year:
                 </label>
                 <div className="relative">
                   <select
-                    value={selectedTerm?.academic_term_id || ""}
+                    value={selectedYearId || ""}
                     onChange={(e) => {
-                      const termId = parseInt(e.target.value);
-                      const term = academicTerms.find(
-                        (t) => t.academic_term_id === termId,
-                      );
-                      setSelectedTerm(term || null);
+                      setSelectedYearId(parseInt(e.target.value));
+                      lastFetchedEnrolled.current = null;
+                      lastFetchedAvailable.current = null;
                     }}
                     className="appearance-none bg-white dark:bg-gray-900 border-2 border-blue-400 dark:border-blue-600 dark:text-white rounded-xl px-3 py-2 pr-8 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent font-bold"
                   >
-                    {academicTerms.map((term) => (
+                    {academicYears.map((year) => (
                       <option
-                        key={term.academic_term_id}
-                        value={term.academic_term_id}
+                        key={year.academic_year_id}
+                        value={year.academic_year_id}
                       >
-                        {term.name} ({term.is_current ? "Current" : "Past"})
+                        {year.name} ({year.is_current ? "Current" : "Past"})
                       </option>
                     ))}
                   </select>
@@ -695,7 +700,7 @@ const StudentEnrollmentTab: React.FC<StudentEnrollmentTabProps> = ({
                   <div className="text-center py-8">
                     <GraduationCap className="w-12 h-12 text-gray-300 dark:text-gray-600 mx-auto mb-3" />
                     <p className="text-sm text-gray-500 dark:text-gray-400">
-                      No subjects enrolled for this term
+                      No subjects enrolled for this academic year
                     </p>
                   </div>
                 ) : (

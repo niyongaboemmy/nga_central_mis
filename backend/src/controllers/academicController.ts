@@ -1783,7 +1783,7 @@ export const getTeacherSubjectAssignments = asyncHandler(
 
     const assignments = await db
       .select({
-        assignment_id: sql`${TeacherSubjectAssignment.user_id} || '-' || ${TeacherSubjectAssignment.subject_id} || '-' || ${TeacherSubjectAssignment.class_group_id} || '-' || ${TeacherSubjectAssignment.academic_term_id}`,
+        assignment_id: sql`${TeacherSubjectAssignment.user_id} || '-' || ${TeacherSubjectAssignment.subject_id} || '-' || ${TeacherSubjectAssignment.class_group_id}`,
         user_id: TeacherSubjectAssignment.user_id,
         subject_id: TeacherSubjectAssignment.subject_id,
         subject_name: Subject.name,
@@ -1792,8 +1792,6 @@ export const getTeacherSubjectAssignments = asyncHandler(
         class_group_name: ClassGroup.name,
         grade_name: Grade.name,
         program_name: Program.name,
-        academic_term_id: TeacherSubjectAssignment.academic_term_id,
-        academic_term_name: AcademicTerm.name,
         academic_year_name: AcademicYear.name,
         assigned_at: TeacherSubjectAssignment.assigned_at,
       })
@@ -1809,15 +1807,8 @@ export const getTeacherSubjectAssignments = asyncHandler(
       .innerJoin(Grade, eq(ClassGroup.grade_id, Grade.grade_id))
       .innerJoin(Program, eq(Grade.program_id, Program.program_id))
       .innerJoin(
-        AcademicTerm,
-        eq(
-          TeacherSubjectAssignment.academic_term_id,
-          AcademicTerm.academic_term_id,
-        ),
-      )
-      .innerJoin(
         AcademicYear,
-        eq(AcademicTerm.academic_year_id, AcademicYear.academic_year_id),
+        eq(ClassGroup.academic_year_id, AcademicYear.academic_year_id),
       )
       .where(eq(TeacherSubjectAssignment.user_id, teacherIdNum))
       .orderBy(Subject.name);
@@ -1845,7 +1836,7 @@ export const getSubjectTeacherAssignments = asyncHandler(
 
     const assignments = await db
       .select({
-        assignment_id: sql`${TeacherSubjectAssignment.user_id} || '-' || ${TeacherSubjectAssignment.subject_id} || '-' || ${TeacherSubjectAssignment.class_group_id} || '-' || ${TeacherSubjectAssignment.academic_term_id}`,
+        assignment_id: sql`${TeacherSubjectAssignment.user_id} || '-' || ${TeacherSubjectAssignment.subject_id} || '-' || ${TeacherSubjectAssignment.class_group_id}`,
         user_id: TeacherSubjectAssignment.user_id,
         teacher_name: sql`CONCAT(${UserProfile.first_name}, ' ', ${UserProfile.last_name})`,
         teacher_username: User.username,
@@ -1854,8 +1845,6 @@ export const getSubjectTeacherAssignments = asyncHandler(
         class_group_name: ClassGroup.name,
         grade_name: Grade.name,
         program_name: Program.name,
-        academic_term_id: TeacherSubjectAssignment.academic_term_id,
-        academic_term_name: AcademicTerm.name,
         academic_year_name: AcademicYear.name,
         assigned_at: TeacherSubjectAssignment.assigned_at,
       })
@@ -1869,15 +1858,8 @@ export const getSubjectTeacherAssignments = asyncHandler(
       .innerJoin(Grade, eq(ClassGroup.grade_id, Grade.grade_id))
       .innerJoin(Program, eq(Grade.program_id, Program.program_id))
       .innerJoin(
-        AcademicTerm,
-        eq(
-          TeacherSubjectAssignment.academic_term_id,
-          AcademicTerm.academic_term_id,
-        ),
-      )
-      .innerJoin(
         AcademicYear,
-        eq(AcademicTerm.academic_year_id, AcademicYear.academic_year_id),
+        eq(ClassGroup.academic_year_id, AcademicYear.academic_year_id),
       )
       .where(eq(TeacherSubjectAssignment.subject_id, subjId))
       .orderBy(UserProfile.first_name, UserProfile.last_name);
@@ -1892,25 +1874,19 @@ export const getSubjectTeacherAssignments = asyncHandler(
 
 export const assignTeacherToSubject = asyncHandler(
   async (req: any, res: any) => {
-    const { user_id, subject_id, class_group_id, academic_term_id } = req.body;
+    const { user_id, subject_id, class_group_id } = req.body;
 
-    if (!user_id || !subject_id || !class_group_id || !academic_term_id) {
+    if (!user_id || !subject_id || !class_group_id) {
       throw new ValidationError(
-        "User ID, Subject ID, Class Group ID, and Academic Term ID are required",
+        "User ID, Subject ID, and Class Group ID are required",
       );
     }
 
     const teacherId = parseInt(user_id);
     const subjId = parseInt(subject_id);
     const classGroupId = parseInt(class_group_id);
-    const academicTermId = parseInt(academic_term_id);
 
-    if (
-      isNaN(teacherId) ||
-      isNaN(subjId) ||
-      isNaN(classGroupId) ||
-      isNaN(academicTermId)
-    ) {
+    if (isNaN(teacherId) || isNaN(subjId) || isNaN(classGroupId)) {
       throw new ValidationError("Invalid IDs provided");
     }
 
@@ -1948,17 +1924,6 @@ export const assignTeacherToSubject = asyncHandler(
       throw new NotFoundError("Class group not found");
     }
 
-    // Verify academic term exists
-    const academicTerm = await db
-      .select()
-      .from(AcademicTerm)
-      .where(eq(AcademicTerm.academic_term_id, academicTermId))
-      .limit(1);
-
-    if (academicTerm.length === 0) {
-      throw new NotFoundError("Academic term not found");
-    }
-
     // Check if assignment already exists
     const existingAssignment = await db
       .select()
@@ -1968,14 +1933,13 @@ export const assignTeacherToSubject = asyncHandler(
           eq(TeacherSubjectAssignment.user_id, teacherId),
           eq(TeacherSubjectAssignment.subject_id, subjId),
           eq(TeacherSubjectAssignment.class_group_id, classGroupId),
-          eq(TeacherSubjectAssignment.academic_term_id, academicTermId),
         ),
       )
       .limit(1);
 
     if (existingAssignment.length > 0) {
       throw new ConflictError(
-        "Teacher is already assigned to this subject for the specified class group and term",
+        "Teacher is already assigned to this subject for the specified class group",
       );
     }
 
@@ -1983,7 +1947,6 @@ export const assignTeacherToSubject = asyncHandler(
       user_id: teacherId,
       subject_id: subjId,
       class_group_id: classGroupId,
-      academic_term_id: academicTermId,
     });
 
     logger.info(`Teacher ID: ${teacherId} assigned to subject ID: ${subjId}`);
@@ -1997,7 +1960,6 @@ export const assignTeacherToSubject = asyncHandler(
       undefined,
       {
         subject_id: subjId,
-        academic_term_id: academicTermId,
         assigning_user_id: req.user?.userId,
       },
       req.user?.userId,
@@ -2011,7 +1973,7 @@ export const assignTeacherToSubject = asyncHandler(
         `Assigned teacher ID: ${teacherId} to subject ID: ${subjId}`,
         "TeacherSubjectAssignment",
         undefined,
-        { teacherId, subjectId: subjId, academic_term_id: academicTermId },
+        { teacherId, subjectId: subjId },
         req.user.userId,
       );
     }
@@ -2022,20 +1984,13 @@ export const assignTeacherToSubject = asyncHandler(
 
 export const removeTeacherFromSubject = asyncHandler(
   async (req: any, res: any) => {
-    const { user_id, subject_id, class_group_id, academic_term_id } =
-      req.params;
+    const { user_id, subject_id, class_group_id } = req.params;
 
     const teacherId = parseInt(user_id);
     const subjId = parseInt(subject_id);
     const classGroupId = parseInt(class_group_id);
-    const academicTermId = parseInt(academic_term_id);
 
-    if (
-      isNaN(teacherId) ||
-      isNaN(subjId) ||
-      isNaN(classGroupId) ||
-      isNaN(academicTermId)
-    ) {
+    if (isNaN(teacherId) || isNaN(subjId) || isNaN(classGroupId)) {
       throw new ValidationError("Invalid IDs provided");
     }
 
@@ -2048,7 +2003,6 @@ export const removeTeacherFromSubject = asyncHandler(
           eq(TeacherSubjectAssignment.user_id, teacherId),
           eq(TeacherSubjectAssignment.subject_id, subjId),
           eq(TeacherSubjectAssignment.class_group_id, classGroupId),
-          eq(TeacherSubjectAssignment.academic_term_id, academicTermId),
         ),
       )
       .limit(1);
@@ -2064,7 +2018,6 @@ export const removeTeacherFromSubject = asyncHandler(
           eq(TeacherSubjectAssignment.user_id, teacherId),
           eq(TeacherSubjectAssignment.subject_id, subjId),
           eq(TeacherSubjectAssignment.class_group_id, classGroupId),
-          eq(TeacherSubjectAssignment.academic_term_id, academicTermId),
         ),
       );
 
@@ -2072,7 +2025,6 @@ export const removeTeacherFromSubject = asyncHandler(
       teacherId,
       subjId,
       classGroupId,
-      academicTermId,
     });
 
     // Record activity for teacher
@@ -2084,7 +2036,6 @@ export const removeTeacherFromSubject = asyncHandler(
       undefined,
       {
         subject_id: subjId,
-        academic_term_id: academicTermId,
         removing_user_id: req.user?.userId,
       },
       req.user?.userId,
@@ -2098,7 +2049,7 @@ export const removeTeacherFromSubject = asyncHandler(
         `Removed teacher ID: ${teacherId} from subject ID: ${subjId}`,
         "TeacherSubjectAssignment",
         undefined,
-        { teacherId, subjectId: subjId, academic_term_id: academicTermId },
+        { teacherId, subjectId: subjId },
         req.user.userId,
       );
     }
@@ -2419,7 +2370,7 @@ export const getMyAssignedSubjects = asyncHandler(
     // Get all assignments for the teacher
     const assignments = await db
       .select({
-        assignment_id: sql`${TeacherSubjectAssignment.user_id} || '-' || ${TeacherSubjectAssignment.subject_id} || '-' || ${TeacherSubjectAssignment.class_group_id} || '-' || ${TeacherSubjectAssignment.academic_term_id}`,
+        assignment_id: sql`${TeacherSubjectAssignment.user_id} || '-' || ${TeacherSubjectAssignment.subject_id} || '-' || ${TeacherSubjectAssignment.class_group_id}`,
         subject_id: TeacherSubjectAssignment.subject_id,
         subject_name: Subject.name,
         subject_code: Subject.code,
@@ -2429,8 +2380,7 @@ export const getMyAssignedSubjects = asyncHandler(
         grade_name: Grade.name,
         program_id: Program.program_id,
         program_name: Program.name,
-        academic_term_id: TeacherSubjectAssignment.academic_term_id,
-        academic_term_name: AcademicTerm.name,
+        academic_year_id: AcademicYear.academic_year_id,
         academic_year_name: AcademicYear.name,
         assigned_at: TeacherSubjectAssignment.assigned_at,
         validation_status: SchemeOfWork.validation_status,
@@ -2449,15 +2399,8 @@ export const getMyAssignedSubjects = asyncHandler(
       .innerJoin(Grade, eq(ClassGroup.grade_id, Grade.grade_id))
       .innerJoin(Program, eq(Grade.program_id, Program.program_id))
       .innerJoin(
-        AcademicTerm,
-        eq(
-          TeacherSubjectAssignment.academic_term_id,
-          AcademicTerm.academic_term_id,
-        ),
-      )
-      .innerJoin(
         AcademicYear,
-        eq(AcademicTerm.academic_year_id, AcademicYear.academic_year_id),
+        eq(ClassGroup.academic_year_id, AcademicYear.academic_year_id),
       )
       .leftJoin(
         SchemeOfWork,
@@ -2465,7 +2408,6 @@ export const getMyAssignedSubjects = asyncHandler(
           eq(TeacherSubjectAssignment.user_id, SchemeOfWork.user_id),
           eq(TeacherSubjectAssignment.subject_id, SchemeOfWork.subject_id),
           eq(TeacherSubjectAssignment.class_group_id, SchemeOfWork.class_group_id),
-          eq(TeacherSubjectAssignment.academic_term_id, SchemeOfWork.academic_term_id),
         ),
       )
       .where(eq(TeacherSubjectAssignment.user_id, teacherIdNum))
@@ -2492,8 +2434,7 @@ export const getMyAssignedSubjects = asyncHandler(
         program_name: assignment.program_name,
         class_group_id: assignment.class_group_id,
         class_group_name: assignment.class_group_name,
-        academic_term_id: assignment.academic_term_id,
-        academic_term_name: assignment.academic_term_name,
+        academic_year_id: assignment.academic_year_id,
         academic_year_name: assignment.academic_year_name,
         assigned_at: assignment.assigned_at,
         validation_status: assignment.validation_status || "PENDING",
@@ -2522,13 +2463,13 @@ export const getSubjectEnrolledStudents = asyncHandler(
     if (isNaN(teacherIdNum)) {
       throw new ValidationError("Invalid user ID");
     }
-    const { subject_id, academic_term_id } = req.params;
+    const { subject_id, academic_year_id } = req.params;
 
     const subjId = parseInt(subject_id);
-    const termId = parseInt(academic_term_id);
+    const yearId = parseInt(academic_year_id);
 
-    if (isNaN(subjId) || isNaN(termId)) {
-      throw new ValidationError("Invalid subject ID or academic term ID");
+    if (isNaN(subjId) || isNaN(yearId)) {
+      throw new ValidationError("Invalid subject ID or academic year ID");
     }
 
     // Verify the teacher is assigned to this subject
@@ -2574,7 +2515,7 @@ export const getSubjectEnrolledStudents = asyncHandler(
       .where(
         and(
           eq(StudentSubjectEnrollment.subject_id, subjId),
-          eq(StudentSubjectEnrollment.academic_term_id, termId),
+          eq(StudentSubjectEnrollment.academic_year_id, yearId),
         ),
       )
       .orderBy(UserProfile.first_name, UserProfile.last_name);
@@ -2587,7 +2528,7 @@ export const getSubjectEnrolledStudents = asyncHandler(
 export const getStudentEnrolledSubjects = asyncHandler(
   async (req: any, res: any) => {
     const { studentId } = req.params;
-    const { academic_term_id } = req.query;
+    const { academic_year_id } = req.query;
 
     const studentIdNum = parseInt(studentId);
     if (isNaN(studentIdNum)) {
@@ -2616,26 +2557,25 @@ export const getStudentEnrolledSubjects = asyncHandler(
       studentIdNum,
     );
 
-    if (academic_term_id) {
-      const termId = Number(academic_term_id);
-      if (!Number.isNaN(termId)) {
+    if (academic_year_id) {
+      const yearIdNum = Number(academic_year_id);
+      if (!Number.isNaN(yearIdNum)) {
         whereCondition =
           and(
             whereCondition,
-            eq(StudentSubjectEnrollment.academic_term_id, termId),
+            eq(StudentSubjectEnrollment.academic_year_id, yearIdNum),
           ) ?? whereCondition;
       }
     }
 
     const enrolledSubjects = await db
       .select({
-        enrollment_id: sql`${StudentSubjectEnrollment.user_id} || '-' || ${StudentSubjectEnrollment.subject_id} || '-' || ${StudentSubjectEnrollment.academic_term_id}`,
+        enrollment_id: sql`${StudentSubjectEnrollment.user_id} || '-' || ${StudentSubjectEnrollment.subject_id} || '-' || ${StudentSubjectEnrollment.academic_year_id}`,
         subject_id: StudentSubjectEnrollment.subject_id,
         subject_name: Subject.name,
         subject_code: Subject.code,
         subject_description: Subject.description,
-        academic_term_id: StudentSubjectEnrollment.academic_term_id,
-        academic_term_name: AcademicTerm.name,
+        academic_year_id: StudentSubjectEnrollment.academic_year_id,
         academic_year_name: AcademicYear.name,
         enrolled_at: StudentSubjectEnrollment.enrolled_at,
       })
@@ -2645,15 +2585,8 @@ export const getStudentEnrolledSubjects = asyncHandler(
         eq(StudentSubjectEnrollment.subject_id, Subject.subject_id),
       )
       .innerJoin(
-        AcademicTerm,
-        eq(
-          StudentSubjectEnrollment.academic_term_id,
-          AcademicTerm.academic_term_id,
-        ),
-      )
-      .innerJoin(
         AcademicYear,
-        eq(AcademicTerm.academic_year_id, AcademicYear.academic_year_id),
+        eq(StudentSubjectEnrollment.academic_year_id, AcademicYear.academic_year_id),
       )
       .where(
         whereCondition
@@ -2673,21 +2606,15 @@ export const getStudentEnrolledSubjects = asyncHandler(
 export const getAvailableSubjectsForStudent = asyncHandler(
   async (req: any, res: any) => {
     const { studentId } = req.params;
-    const { academic_term_id } = req.query;
+    const { academic_year_id } = req.query;
 
     const studentIdNum = Number(studentId);
-    const termId = Number(academic_term_id);
 
     if (isNaN(studentIdNum)) {
       throw new ValidationError("Invalid student ID");
     }
 
-    if (isNaN(termId)) {
-      throw new ValidationError("Invalid academic term ID");
-    }
-
-    // 1. Get student's current active class group and its grade info
-    // We use leftJoin for Grade and Program to avoid missing subjects if metadata is disconnected
+    // 1. Get student's current active class group and its grade/year info
     const studentClassGroup = await db
       .select({
         grade_id: ClassGroup.grade_id,
@@ -2695,6 +2622,7 @@ export const getAvailableSubjectsForStudent = asyncHandler(
         program_id: Grade.program_id,
         program_name: Program.name,
         class_group_id: ClassGroup.class_group_id,
+        academic_year_id: ClassGroup.academic_year_id,
       })
       .from(StudentClassGroup)
       .innerJoin(
@@ -2713,7 +2641,6 @@ export const getAvailableSubjectsForStudent = asyncHandler(
       .limit(1);
 
     if (studentClassGroup.length === 0) {
-      // If no active class group found, return success with empty array and a clear message
       return successResponse(
         res,
         "No active class group found for student",
@@ -2721,13 +2648,20 @@ export const getAvailableSubjectsForStudent = asyncHandler(
       );
     }
 
-    const { grade_id, grade_name, program_id, program_name, class_group_id } =
+    const { grade_id, grade_name, program_id, program_name } =
       studentClassGroup[0];
     const gradeIdNum = Number(grade_id);
-    const classGroupIdNum = Number(class_group_id);
 
-    // 2. Get subjects associated with this grade ID AND assigned to this class group for this term
-    // We join with TeacherSubjectAssignment to ensure the subject is actually "active" for this group/term
+    // Resolve academic year: use query param if provided, otherwise fall back to student's class group year
+    const yearId = academic_year_id
+      ? Number(academic_year_id)
+      : Number(studentClassGroup[0].academic_year_id);
+
+    if (isNaN(yearId)) {
+      throw new ValidationError("Invalid academic year ID");
+    }
+
+    // 2. Get all active subjects linked to this student's grade via GradeSubject
     const subjects = await db
       .select({
         subject_id: Subject.subject_id,
@@ -2735,29 +2669,24 @@ export const getAvailableSubjectsForStudent = asyncHandler(
         name: Subject.name,
         description: Subject.description,
       })
-      .from(TeacherSubjectAssignment)
-      .innerJoin(
-        Subject,
-        eq(TeacherSubjectAssignment.subject_id, Subject.subject_id),
-      )
+      .from(GradeSubject)
+      .innerJoin(Subject, eq(GradeSubject.subject_id, Subject.subject_id))
       .where(
         and(
-          eq(TeacherSubjectAssignment.class_group_id, classGroupIdNum),
-          eq(TeacherSubjectAssignment.academic_term_id, termId),
+          eq(GradeSubject.grade_id, gradeIdNum),
+          eq(Subject.status, "ACTIVE"),
         ),
       )
       .orderBy(Subject.name);
 
-    // 3. Get active enrollments for this student and term to filter out
-    const enrolledEntries = isNaN(termId)
-      ? []
-      : await db
+    // 3. Get active enrollments for this student and year to filter out
+    const enrolledEntries = await db
           .select({ subject_id: StudentSubjectEnrollment.subject_id })
           .from(StudentSubjectEnrollment)
           .where(
             and(
               eq(StudentSubjectEnrollment.user_id, studentIdNum),
-              eq(StudentSubjectEnrollment.academic_term_id, termId),
+              eq(StudentSubjectEnrollment.academic_year_id, yearId),
               eq(StudentSubjectEnrollment.status, "ACTIVE"),
             ),
           );
@@ -2790,19 +2719,19 @@ export const getAvailableSubjectsForStudent = asyncHandler(
 
 export const enrollStudentInSubject = asyncHandler(
   async (req: any, res: any) => {
-    const { user_id, subject_id, academic_term_id } = req.body;
+    const { user_id, subject_id, academic_year_id } = req.body;
 
-    if (!user_id || !subject_id || !academic_term_id) {
+    if (!user_id || !subject_id || !academic_year_id) {
       throw new ValidationError(
-        "User ID, Subject ID, and Academic Term ID are required",
+        "User ID, Subject ID, and Academic Year ID are required",
       );
     }
 
     const studentId = parseInt(user_id);
     const subjId = parseInt(subject_id);
-    const termId = parseInt(academic_term_id);
+    const yearId = parseInt(academic_year_id);
 
-    if (isNaN(studentId) || isNaN(subjId) || isNaN(termId)) {
+    if (isNaN(studentId) || isNaN(subjId) || isNaN(yearId)) {
       throw new ValidationError("Invalid IDs provided");
     }
 
@@ -2831,15 +2760,15 @@ export const enrollStudentInSubject = asyncHandler(
       throw new NotFoundError("Subject not found");
     }
 
-    // Verify academic term exists
-    const academicTerm = await db
+    // Verify academic year exists
+    const academicYear = await db
       .select()
-      .from(AcademicTerm)
-      .where(eq(AcademicTerm.academic_term_id, termId))
+      .from(AcademicYear)
+      .where(eq(AcademicYear.academic_year_id, yearId))
       .limit(1);
 
-    if (academicTerm.length === 0) {
-      throw new NotFoundError("Academic term not found");
+    if (academicYear.length === 0) {
+      throw new NotFoundError("Academic year not found");
     }
 
     // Check if enrollment already exists
@@ -2850,21 +2779,21 @@ export const enrollStudentInSubject = asyncHandler(
         and(
           eq(StudentSubjectEnrollment.user_id, studentId),
           eq(StudentSubjectEnrollment.subject_id, subjId),
-          eq(StudentSubjectEnrollment.academic_term_id, termId),
+          eq(StudentSubjectEnrollment.academic_year_id, yearId),
         ),
       )
       .limit(1);
 
     if (existingEnrollment.length > 0) {
       throw new ConflictError(
-        "Student is already enrolled in this subject for the specified term",
+        "Student is already enrolled in this subject for the specified academic year",
       );
     }
 
     await db.insert(StudentSubjectEnrollment).values({
       user_id: studentId,
       subject_id: subjId,
-      academic_term_id: termId,
+      academic_year_id: yearId,
     });
 
     logger.info(`Student ID: ${studentId} enrolled in subject ID: ${subjId}`);
@@ -2878,7 +2807,7 @@ export const enrollStudentInSubject = asyncHandler(
       undefined,
       {
         subject_id: subjId,
-        academic_term_id: termId,
+        academic_year_id: yearId,
         enrolling_user_id: req.user?.userId,
       },
       req.user?.userId,
@@ -2892,7 +2821,7 @@ export const enrollStudentInSubject = asyncHandler(
         `Enrolled student ID: ${studentId} in subject ID: ${subjId}`,
         "StudentSubjectEnrollment",
         undefined,
-        { studentId, subjectId: subjId, academic_term_id: termId },
+        { studentId, subjectId: subjId, academic_year_id: yearId },
         req.user.userId,
       );
     }
@@ -2903,13 +2832,13 @@ export const enrollStudentInSubject = asyncHandler(
 
 export const unenrollStudentFromSubject = asyncHandler(
   async (req: any, res: any) => {
-    const { user_id, subject_id, academic_term_id } = req.params;
+    const { user_id, subject_id, academic_year_id } = req.params;
 
     const studentId = parseInt(user_id);
     const subjId = parseInt(subject_id);
-    const termId = parseInt(academic_term_id);
+    const yearId = parseInt(academic_year_id);
 
-    if (isNaN(studentId) || isNaN(subjId) || isNaN(termId)) {
+    if (isNaN(studentId) || isNaN(subjId) || isNaN(yearId)) {
       throw new ValidationError("Invalid IDs provided");
     }
 
@@ -2921,7 +2850,7 @@ export const unenrollStudentFromSubject = asyncHandler(
         and(
           eq(StudentSubjectEnrollment.user_id, studentId),
           eq(StudentSubjectEnrollment.subject_id, subjId),
-          eq(StudentSubjectEnrollment.academic_term_id, termId),
+          eq(StudentSubjectEnrollment.academic_year_id, yearId),
           eq(StudentSubjectEnrollment.status, "ACTIVE"),
         ),
       )
@@ -2938,14 +2867,14 @@ export const unenrollStudentFromSubject = asyncHandler(
         and(
           eq(StudentSubjectEnrollment.user_id, studentId),
           eq(StudentSubjectEnrollment.subject_id, subjId),
-          eq(StudentSubjectEnrollment.academic_term_id, termId),
+          eq(StudentSubjectEnrollment.academic_year_id, yearId),
         ),
       );
 
     logger.info("Student unenrolled from subject", {
       studentId,
       subjId,
-      termId,
+      yearId,
     });
 
     // Record activity for student
@@ -2957,7 +2886,7 @@ export const unenrollStudentFromSubject = asyncHandler(
       undefined,
       {
         subject_id: subjId,
-        academic_term_id: termId,
+        academic_year_id: yearId,
         unenrolling_user_id: req.user?.userId,
       },
       req.user?.userId,
@@ -2971,7 +2900,7 @@ export const unenrollStudentFromSubject = asyncHandler(
         `Unenrolled student ID: ${studentId} from subject ID: ${subjId}`,
         "StudentSubjectEnrollment",
         undefined,
-        { studentId, subjectId: subjId, academic_term_id: termId },
+        { studentId, subjectId: subjId, academic_year_id: yearId },
         req.user.userId,
       );
     }

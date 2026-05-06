@@ -375,7 +375,6 @@ export const deleteAcademicCalendar = async (id: number): Promise<void> => {
 // Get class groups available for calendar creation
 export const getCalendarClassGroups = async (params: {
   academic_year_id: number;
-  academic_term_id: number;
 }): Promise<
   {
     class_group_id: number;

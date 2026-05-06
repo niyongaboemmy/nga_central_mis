@@ -207,8 +207,6 @@ export interface TeacherSubjectAssignment {
   class_group_name: string;
   grade_name: string;
   program_name: string;
-  academic_term_id: number;
-  academic_term_name: string;
   academic_year_name: string;
   assigned_at: string;
 }
@@ -223,8 +221,6 @@ export interface SubjectTeacherAssignment {
   class_group_name: string;
   grade_name: string;
   program_name: string;
-  academic_term_id: number;
-  academic_term_name: string;
   academic_year_name: string;
   assigned_at: string;
 }
@@ -242,16 +238,10 @@ export const teacherSubjectAssignmentsApi = {
     user_id: number;
     subject_id: number;
     class_group_id: number;
-    academic_term_id: number;
   }) => api.post("/academics/teachers/assign-subject", data),
-  remove: (
-    teacherId: number,
-    subjectId: number,
-    classGroupId: number,
-    academicTermId: number,
-  ) =>
+  remove: (teacherId: number, subjectId: number, classGroupId: number) =>
     api.delete(
-      `/academics/teachers/${teacherId}/subjects/${subjectId}/class-groups/${classGroupId}/terms/${academicTermId}`,
+      `/academics/teachers/${teacherId}/subjects/${subjectId}/class-groups/${classGroupId}`,
     ),
 };
 
@@ -267,8 +257,7 @@ export interface MyAssignedSubject {
     program_name: string;
     class_group_id: number;
     class_group_name: string;
-    academic_term_id: number;
-    academic_term_name: string;
+    academic_year_id: number;
     academic_year_name: string;
     assigned_at: string;
     validation_status: "PENDING" | "APPROVED" | "REJECTED";
@@ -292,9 +281,9 @@ export interface EnrolledStudent {
 export const myAssignedSubjectsApi = {
   getAll: () =>
     api.get<{ data: MyAssignedSubject[] }>("/academics/my-assigned-subjects"),
-  getEnrolledStudents: (subjectId: number, academicTermId: number) =>
+  getEnrolledStudents: (subjectId: number, academicYearId: number) =>
     api.get<{ data: EnrolledStudent[] }>(
-      `/academics/subjects/${subjectId}/terms/${academicTermId}/students`,
+      `/academics/subjects/${subjectId}/years/${academicYearId}/students`,
     ),
 };
 
@@ -305,8 +294,7 @@ export interface StudentEnrolledSubject {
   subject_name: string;
   subject_code: string | null;
   subject_description: string | null;
-  academic_term_id: number;
-  academic_term_name: string;
+  academic_year_id: number;
   academic_year_name: string;
   enrolled_at: string;
 }
@@ -325,28 +313,28 @@ export interface AvailableSubject {
 }
 
 export const studentEnrollmentApi = {
-  getEnrolledSubjects: (studentId: number, academicTermId?: number) =>
+  getEnrolledSubjects: (studentId: number, academicYearId?: number) =>
     api.get<{ data: StudentEnrolledSubject[] }>(
       `/academics/students/${studentId}/enrolled-subjects`,
       {
-        params: academicTermId
-          ? { academic_term_id: academicTermId }
+        params: academicYearId
+          ? { academic_year_id: academicYearId }
           : undefined,
       },
     ),
-  getAvailableSubjects: (studentId: number, academicTermId: number) =>
+  getAvailableSubjects: (studentId: number, academicYearId: number) =>
     api.get<{ data: AvailableSubject[] }>(
       `/academics/students/${studentId}/available-subjects`,
-      { params: { academic_term_id: academicTermId } },
+      { params: { academic_year_id: academicYearId } },
     ),
   enroll: (data: {
     user_id: number;
     subject_id: number;
-    academic_term_id: number;
+    academic_year_id: number;
   }) => api.post("/academics/students/enroll-subject", data),
-  unenroll: (studentId: number, subjectId: number, academicTermId: number) =>
+  unenroll: (studentId: number, subjectId: number, academicYearId: number) =>
     api.delete(
-      `/academics/students/${studentId}/subjects/${subjectId}/terms/${academicTermId}`,
+      `/academics/students/${studentId}/subjects/${subjectId}/years/${academicYearId}`,
     ),
 };
 

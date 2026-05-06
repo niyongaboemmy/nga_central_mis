@@ -1118,16 +1118,30 @@ export const getStudentCalendar = asyncHandler(async (req: any, res: any) => {
 
   // Get the current or specified academic term
   let termId = academic_term_id ? parseInt(academic_term_id) : null;
+  let yearId: number | null = null;
 
   if (!termId) {
     const currentTerm = await db
-      .select()
+      .select({
+        academic_term_id: AcademicTerm.academic_term_id,
+        academic_year_id: AcademicTerm.academic_year_id,
+      })
       .from(AcademicTerm)
       .where(eq(AcademicTerm.is_current, 1))
       .limit(1);
 
     if (currentTerm.length > 0) {
       termId = currentTerm[0].academic_term_id;
+      yearId = currentTerm[0].academic_year_id;
+    }
+  } else {
+    const termRecord = await db
+      .select({ academic_year_id: AcademicTerm.academic_year_id })
+      .from(AcademicTerm)
+      .where(eq(AcademicTerm.academic_term_id, termId))
+      .limit(1);
+    if (termRecord.length > 0) {
+      yearId = termRecord[0].academic_year_id;
     }
   }
 
@@ -1135,7 +1149,11 @@ export const getStudentCalendar = asyncHandler(async (req: any, res: any) => {
     throw new ValidationError("No academic term specified or found");
   }
 
-  // Get student's enrolled subjects for this term
+  if (!yearId) {
+    throw new ValidationError("Could not resolve academic year for the specified term");
+  }
+
+  // Get student's enrolled subjects for this academic year
   const enrollments = await db
     .select({
       subject_id: StudentSubjectEnrollment.subject_id,
@@ -1144,7 +1162,7 @@ export const getStudentCalendar = asyncHandler(async (req: any, res: any) => {
     .where(
       and(
         eq(StudentSubjectEnrollment.user_id, userId),
-        eq(StudentSubjectEnrollment.academic_term_id, termId),
+        eq(StudentSubjectEnrollment.academic_year_id, yearId),
         eq(StudentSubjectEnrollment.status, "ACTIVE"),
       ),
     );
@@ -1336,12 +1354,7 @@ export const getCalendarSetupData = asyncHandler(async (req: any, res: any) => {
         UserProfile,
         eq(TeacherSubjectAssignment.user_id, UserProfile.user_id),
       )
-      .where(
-        and(
-          eq(TeacherSubjectAssignment.academic_term_id, termId),
-          eq(TeacherSubjectAssignment.class_group_id, classGroupId),
-        ),
-      );
+      .where(eq(TeacherSubjectAssignment.class_group_id, classGroupId));
 
     // Get unique subject IDs
     const subjectIds = [
@@ -1383,11 +1396,15 @@ export const getCalendarSetupData = asyncHandler(async (req: any, res: any) => {
         last_name: UserProfile.last_name,
       })
       .from(TeacherSubjectAssignment)
+      .innerJoin(
+        ClassGroup,
+        eq(TeacherSubjectAssignment.class_group_id, ClassGroup.class_group_id),
+      )
       .leftJoin(
         UserProfile,
         eq(TeacherSubjectAssignment.user_id, UserProfile.user_id),
       )
-      .where(eq(TeacherSubjectAssignment.academic_term_id, termId));
+      .where(eq(ClassGroup.academic_year_id, yearId));
 
     // Get all active subjects
     subjects = await db
@@ -1691,14 +1708,12 @@ export const deleteAcademicCalendar = asyncHandler(
 // Get class groups for calendar creation (grouped by academic year and term)
 export const getCalendarClassGroups = asyncHandler(
   async (req: any, res: any) => {
-    const { academic_year_id, academic_term_id } = req.query;
+    const { academic_year_id } = req.query;
 
-    // Parse the values - handle both string and number types
     const yearId = Number(academic_year_id);
-    const termId = Number(academic_term_id);
 
-    if (!yearId || !termId || isNaN(yearId) || isNaN(termId)) {
-      throw new ValidationError("Academic year and term are required");
+    if (!yearId || isNaN(yearId)) {
+      throw new ValidationError("Academic year is required");
     }
 
     // Get all class groups for this academic year

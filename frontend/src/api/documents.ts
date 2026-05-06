@@ -214,6 +214,7 @@ export const documentApi = {
   download: (documentId: number) =>
     apiService.get(`/documents/${documentId}/download`, {
       responseType: "blob",
+      timeout: 60000,
     }),
 
   uploadVersion: (documentId: number, data: FormData) =>

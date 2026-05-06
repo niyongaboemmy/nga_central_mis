@@ -240,7 +240,7 @@ router.post(
   assignTeacherToSubject,
 );
 router.delete(
-  "/teachers/:user_id/subjects/:subject_id/class-groups/:class_group_id/terms/:academic_term_id",
+  "/teachers/:user_id/subjects/:subject_id/class-groups/:class_group_id",
   authenticate,
   authorize("MANAGE_ACADEMICS"),
   removeTeacherFromSubject,
@@ -298,7 +298,7 @@ router.get(
   getMyAssignedSubjects,
 );
 router.get(
-  "/subjects/:subject_id/terms/:academic_term_id/students",
+  "/subjects/:subject_id/years/:academic_year_id/students",
   authenticate,
   getSubjectEnrolledStudents,
 );
@@ -321,7 +321,7 @@ router.post(
   enrollStudentInSubject,
 );
 router.delete(
-  "/students/:user_id/subjects/:subject_id/terms/:academic_term_id",
+  "/students/:user_id/subjects/:subject_id/years/:academic_year_id",
   authenticate,
   authorize("MANAGE_USERS"),
   unenrollStudentFromSubject,

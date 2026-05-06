@@ -6,8 +6,6 @@ import {
   subjectsApi,
   ClassGroup,
   classGroupsApi,
-  AcademicTerm,
-  academicTermsApi,
 } from "../../api/academics";
 import Button from "../ui/Button";
 import Modal from "../ui/Modal";
@@ -34,7 +32,6 @@ interface TeacherSubjectAssignmentProps {
 interface AssignmentFormData {
   subject_id: number;
   class_group_id: number;
-  academic_term_id: number;
 }
 
 const TeacherSubjectAssignment: React.FC<TeacherSubjectAssignmentProps> = ({
@@ -50,7 +47,6 @@ const TeacherSubjectAssignment: React.FC<TeacherSubjectAssignmentProps> = ({
   >([]);
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [classGroups, setClassGroups] = useState<ClassGroup[]>([]);
-  const [academicTerms, setAcademicTerms] = useState<AcademicTerm[]>([]);
   const [loading, setLoading] = useState(false);
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -59,7 +55,6 @@ const TeacherSubjectAssignment: React.FC<TeacherSubjectAssignmentProps> = ({
   const [formData, setFormData] = useState<AssignmentFormData>({
     subject_id: 0,
     class_group_id: 0,
-    academic_term_id: 0,
   });
   const [formErrors, setFormErrors] = useState<Partial<AssignmentFormData>>({});
   const [submitting, setSubmitting] = useState(false);
@@ -83,18 +78,15 @@ const TeacherSubjectAssignment: React.FC<TeacherSubjectAssignmentProps> = ({
   const loadData = async () => {
     setLoading(true);
     try {
-      const [assignmentsRes, subjectsRes, classGroupsRes, termsRes] =
-        await Promise.all([
-          teacherSubjectAssignmentsApi.getByTeacher(teacherId),
-          subjectsApi.getAll(),
-          classGroupsApi.getAll(),
-          academicTermsApi.getAll(),
-        ]);
+      const [assignmentsRes, subjectsRes, classGroupsRes] = await Promise.all([
+        teacherSubjectAssignmentsApi.getByTeacher(teacherId),
+        subjectsApi.getAll(),
+        classGroupsApi.getAll(),
+      ]);
 
       setAssignments(assignmentsRes.data.data || []);
       setSubjects(subjectsRes.data.data || []);
       setClassGroups(classGroupsRes.data.data || []);
-      setAcademicTerms(termsRes.data.data || []);
     } catch (error) {
       console.error("Failed to load data:", error);
     } finally {
@@ -106,7 +98,6 @@ const TeacherSubjectAssignment: React.FC<TeacherSubjectAssignmentProps> = ({
     setFormData({
       subject_id: 0,
       class_group_id: 0,
-      academic_term_id: 0,
     });
     setFormErrors({});
   };
@@ -119,9 +110,6 @@ const TeacherSubjectAssignment: React.FC<TeacherSubjectAssignmentProps> = ({
     }
     if (!formData.class_group_id) {
       errors.class_group_id = 1;
-    }
-    if (!formData.academic_term_id) {
-      errors.academic_term_id = 1;
     }
 
     setFormErrors(errors);
@@ -137,7 +125,6 @@ const TeacherSubjectAssignment: React.FC<TeacherSubjectAssignmentProps> = ({
         user_id: teacherId,
         subject_id: formData.subject_id,
         class_group_id: formData.class_group_id,
-        academic_term_id: formData.academic_term_id,
       });
 
       setShowAssignModal(false);
@@ -165,7 +152,6 @@ const TeacherSubjectAssignment: React.FC<TeacherSubjectAssignmentProps> = ({
         selectedAssignment.user_id,
         selectedAssignment.subject_id,
         selectedAssignment.class_group_id,
-        selectedAssignment.academic_term_id,
       );
 
       setShowDeleteModal(false);
@@ -179,11 +165,11 @@ const TeacherSubjectAssignment: React.FC<TeacherSubjectAssignmentProps> = ({
     }
   };
 
-  // Group assignments by academic term for better organization
+  // Group assignments by academic year
   const groupedAssignments = useMemo(() => {
     const groups: Record<string, TeacherSubjectAssignmentType[]> = {};
     assignments.forEach((assignment) => {
-      const key = `${assignment.academic_year_name} - ${assignment.academic_term_name}`;
+      const key = assignment.academic_year_name;
       if (!groups[key]) {
         groups[key] = [];
       }
@@ -331,8 +317,7 @@ const TeacherSubjectAssignment: React.FC<TeacherSubjectAssignmentProps> = ({
               Assign New Subject
             </h3>
             <p className="text-sm text-gray-600 dark:text-gray-300">
-              Select a subject, class group, and academic term for this
-              assignment.
+              Select a subject and class group for this assignment.
             </p>
           </div>
 
@@ -394,35 +379,6 @@ const TeacherSubjectAssignment: React.FC<TeacherSubjectAssignmentProps> = ({
               </select>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Academic Term
-              </label>
-              <select
-                value={formData.academic_term_id}
-                onChange={(e) =>
-                  setFormData((prev) => ({
-                    ...prev,
-                    academic_term_id: parseInt(e.target.value),
-                  }))
-                }
-                className={`w-full px-3 py-2 border rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-400 ${
-                  formErrors.academic_term_id
-                    ? "border-red-500"
-                    : "border-gray-300 dark:border-gray-600"
-                }`}
-              >
-                <option value={0}>Select an academic term...</option>
-                {academicTerms.map((term) => (
-                  <option
-                    key={term.academic_term_id}
-                    value={term.academic_term_id}
-                  >
-                    {term.name}
-                  </option>
-                ))}
-              </select>
-            </div>
           </div>
         </div>
 

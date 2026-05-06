@@ -95,6 +95,10 @@ export const Permissions = {
   // Reporting Module
   SUBMIT_REPORTING: "SUBMIT_REPORTING",
   ALL_SUBMITTED_REPORTS: "ALL_SUBMITTED_REPORTS",
+
+  // Curriculum & Subject Materials
+  MANAGE_CURRICULUM: "MANAGE_CURRICULUM",
+  UPLOAD_SUBJECT_DOCUMENTS: "UPLOAD_SUBJECT_DOCUMENTS",
 } as const;
 
 export type PermissionKey = keyof typeof Permissions;

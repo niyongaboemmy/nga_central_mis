@@ -14,8 +14,8 @@ import {
 interface EnrolledStudentsProps {
   subjectId: number;
   subjectName: string;
-  academicTermId: number;
-  academicTermName: string;
+  academicYearId: number;
+  academicYearName: string;
   isOpen: boolean;
   onClose: () => void;
 }
@@ -32,8 +32,8 @@ type SortOrder = "asc" | "desc";
 const EnrolledStudents: React.FC<EnrolledStudentsProps> = ({
   subjectId,
   subjectName,
-  academicTermId,
-  academicTermName,
+  academicYearId,
+  academicYearName,
   isOpen,
   onClose,
 }) => {
@@ -52,7 +52,7 @@ const EnrolledStudents: React.FC<EnrolledStudentsProps> = ({
     if (isOpen) {
       loadEnrolledStudents();
     }
-  }, [isOpen, subjectId, academicTermId]);
+  }, [isOpen, subjectId, academicYearId]);
 
   useEffect(() => {
     filterAndSortStudents();
@@ -70,7 +70,7 @@ const EnrolledStudents: React.FC<EnrolledStudentsProps> = ({
     try {
       const response = await myAssignedSubjectsApi.getEnrolledStudents(
         subjectId,
-        academicTermId
+        academicYearId
       );
       setStudents(response.data.data || []);
     } catch (error) {
@@ -244,7 +244,7 @@ const EnrolledStudents: React.FC<EnrolledStudentsProps> = ({
           </div>
           <div className="text-right">
             <p className="text-xs text-gray-500 dark:text-gray-400">
-              {academicTermName}
+              {academicYearName}
             </p>
             <p className="text-sm font-semibold text-gray-900 dark:text-white mt-1">
               {subjectName}

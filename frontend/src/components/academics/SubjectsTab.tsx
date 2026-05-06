@@ -14,7 +14,9 @@ import Modal from "../ui/Modal";
 import ConfirmModal from "../ui/ConfirmModal";
 import Input from "../ui/Input";
 import Select from "../ui/Select";
-import { Eye, Users, BookOpen, Calendar, User as UserIcon } from "lucide-react";
+import { Eye, Users, BookOpen, Calendar, User as UserIcon, FolderOpen } from "lucide-react";
+import CurriculumTab from "../curriculum/CurriculumTab";
+import SubjectMaterialsTab from "../curriculum/SubjectMaterialsTab";
 
 interface SubjectsTabProps {
   data: Subject[];
@@ -63,6 +65,7 @@ const SubjectsTab: React.FC<SubjectsTabProps> = ({
     SubjectTeacherAssignment[]
   >([]);
   const [loadingTeachers, setLoadingTeachers] = useState(false);
+  const [detailsTab, setDetailsTab] = useState<"overview" | "curriculum" | "materials">("overview");
   const [formData, setFormData] = useState<SubjectFormData>({
     name: "",
     code: "",
@@ -356,6 +359,7 @@ const SubjectsTab: React.FC<SubjectsTabProps> = ({
   const handleViewDetails = async (subject: Subject) => {
     setSelectedSubject(subject);
     setShowDetailsModal(true);
+    setDetailsTab("overview");
     setLoadingTeachers(true);
 
     try {
@@ -1351,141 +1355,151 @@ const SubjectsTab: React.FC<SubjectsTabProps> = ({
           setShowDetailsModal(false);
           setSelectedSubject(null);
           setSubjectTeachers([]);
+          setDetailsTab("overview");
         }}
         title={`Subject Details - ${selectedSubject?.name}`}
-        size="xl"
+        size="2xl"
       >
         {selectedSubject && (
-          <div className="space-y-6">
-            {/* Subject Info */}
-            <div className="bg-white dark:bg-gray-800/40 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
-              <div className="flex items-center gap-4 mb-4">
-                <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/30 rounded-xl flex items-center justify-center">
-                  <BookOpen className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+          <div className="space-y-4">
+            {/* Subject header */}
+            <div className="flex items-center gap-4">
+              <div
+                className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0"
+                style={{ backgroundColor: `${selectedSubject.color || "#3B82F6"}20` }}
+              >
+                <BookOpen className="w-6 h-6" style={{ color: selectedSubject.color || "#3B82F6" }} />
+              </div>
+              <div className="min-w-0">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white truncate">
+                  {selectedSubject.name}
+                </h3>
+                {selectedSubject.code && (
+                  <p className="text-sm text-gray-500 dark:text-gray-400">Code: {selectedSubject.code}</p>
+                )}
+              </div>
+              <div className="ml-auto flex items-center gap-4 text-center flex-shrink-0">
+                <div>
+                  <p className="text-xl font-bold text-gray-900 dark:text-white">{selectedSubject.grades?.length || 0}</p>
+                  <p className="text-xs text-gray-500">Grades</p>
                 </div>
                 <div>
-                  <h3 className="text-xl font-semibold text-gray-900 dark:text-white">
-                    {selectedSubject.name}
-                  </h3>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">
-                    {selectedSubject.code && `Code: ${selectedSubject.code}`}
-                  </p>
-                </div>
-              </div>
-
-              {selectedSubject.description && (
-                <div className="mt-4">
-                  <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Description
-                  </h4>
-                  <p className="text-sm text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-800/50 rounded-lg p-3">
-                    {selectedSubject.description}
-                  </p>
-                </div>
-              )}
-
-              {/* Grades Info */}
-              <div className="mt-4 grid grid-cols-2 gap-4">
-                <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-3">
-                  <div className="flex items-center gap-2 mb-1">
-                    <Users className="w-4 h-4 text-gray-500" />
-                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                      Grades Assigned
-                    </span>
-                  </div>
-                  <p className="text-lg font-bold text-gray-900 dark:text-white">
-                    {selectedSubject.grades?.length || 0}
-                  </p>
-                </div>
-
-                <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-3">
-                  <div className="flex items-center gap-2 mb-1">
-                    <UserIcon className="w-4 h-4 text-gray-500" />
-                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                      Teachers Assigned
-                    </span>
-                  </div>
-                  <p className="text-lg font-bold text-gray-900 dark:text-white">
-                    {subjectTeachers.length}
-                  </p>
+                  <p className="text-xl font-bold text-gray-900 dark:text-white">{subjectTeachers.length}</p>
+                  <p className="text-xs text-gray-500">Teachers</p>
                 </div>
               </div>
             </div>
 
-            {/* Assigned Teachers */}
-            <div>
-              <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
-                <Users className="w-5 h-5" />
-                Assigned Teachers
-              </h4>
+            {/* Tabs */}
+            <div className="flex border-b border-gray-200 dark:border-gray-700">
+              {(
+                [
+                  { id: "overview", label: "Overview", icon: <UserIcon className="w-3.5 h-3.5" /> },
+                  { id: "curriculum", label: "Curriculum", icon: <BookOpen className="w-3.5 h-3.5" /> },
+                  { id: "materials", label: "Materials", icon: <FolderOpen className="w-3.5 h-3.5" /> },
+                ] as const
+              ).map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setDetailsTab(tab.id)}
+                  className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+                    detailsTab === tab.id
+                      ? "border-blue-600 text-blue-600 dark:text-blue-400 dark:border-blue-400"
+                      : "border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
+                  }`}
+                >
+                  {tab.icon}
+                  {tab.label}
+                </button>
+              ))}
+            </div>
 
-              {loadingTeachers ? (
-                <div className="flex items-center justify-center py-8">
-                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
-                  <span className="ml-2 text-sm text-gray-500">
-                    Loading teachers...
-                  </span>
-                </div>
-              ) : subjectTeachers.length === 0 ? (
-                <div className="text-center py-8">
-                  <UserIcon className="w-12 h-12 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
-                  <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-                    No teachers assigned
-                  </h3>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">
-                    This subject hasn't been assigned to any teachers yet.
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {subjectTeachers.map((assignment) => (
-                    <div
-                      key={assignment.assignment_id}
-                      className="bg-white dark:bg-gray-800/40 rounded-xl border border-gray-200 dark:border-gray-700 p-4 hover:shadow-sm transition-shadow"
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 bg-green-100 dark:bg-green-900/30 rounded-lg flex items-center justify-center">
-                            <UserIcon className="w-5 h-5 text-green-600 dark:text-green-400" />
-                          </div>
-                          <div>
-                            <h5 className="font-medium text-gray-900 dark:text-white">
-                              {assignment.teacher_name}
-                            </h5>
-                            <p className="text-sm text-gray-500 dark:text-gray-400">
-                              @{assignment.teacher_username}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="text-right text-sm text-gray-500 dark:text-gray-400">
-                          <div className="flex items-center gap-1 mb-1">
-                            <Users className="w-3 h-3" />
-                            {assignment.class_group_name}
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <Calendar className="w-3 h-3" />
-                            {assignment.academic_term_name}
-                          </div>
-                          <div className="text-xs mt-1">
-                            {assignment.grade_name} • {assignment.program_name}
-                          </div>
-                        </div>
-                      </div>
+            {/* Tab content */}
+            <div className="min-h-[280px]">
+              {detailsTab === "overview" && (
+                <div className="space-y-4">
+                  {selectedSubject.description && (
+                    <p className="text-sm text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-800/50 rounded-lg p-3">
+                      {selectedSubject.description}
+                    </p>
+                  )}
+
+                  <h4 className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                    <Users className="w-4 h-4" />
+                    Assigned Teachers
+                  </h4>
+
+                  {loadingTeachers ? (
+                    <div className="flex items-center justify-center py-8">
+                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                      <span className="ml-2 text-sm text-gray-500">Loading teachers...</span>
                     </div>
-                  ))}
+                  ) : subjectTeachers.length === 0 ? (
+                    <div className="text-center py-8">
+                      <UserIcon className="w-10 h-10 text-gray-300 dark:text-gray-600 mx-auto mb-2" />
+                      <p className="text-sm text-gray-500 dark:text-gray-400">No teachers assigned yet.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {subjectTeachers.map((assignment) => (
+                        <div
+                          key={assignment.assignment_id}
+                          className="bg-white dark:bg-gray-800/40 rounded-xl border border-gray-200 dark:border-gray-700 p-4 hover:shadow-sm transition-shadow"
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <div className="w-9 h-9 bg-green-100 dark:bg-green-900/30 rounded-lg flex items-center justify-center">
+                                <UserIcon className="w-4 h-4 text-green-600 dark:text-green-400" />
+                              </div>
+                              <div>
+                                <h5 className="font-medium text-gray-900 dark:text-white text-sm">
+                                  {assignment.teacher_name}
+                                </h5>
+                                <p className="text-xs text-gray-500 dark:text-gray-400">
+                                  @{assignment.teacher_username}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="text-right text-xs text-gray-500 dark:text-gray-400">
+                              <div className="flex items-center gap-1 mb-0.5 justify-end">
+                                <Users className="w-3 h-3" />
+                                {assignment.class_group_name}
+                              </div>
+                              <div className="flex items-center gap-1 justify-end">
+                                <Calendar className="w-3 h-3" />
+                                {assignment.academic_year_name}
+                              </div>
+                              <div className="mt-0.5">
+                                {assignment.grade_name} • {assignment.program_name}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
+              )}
+
+              {detailsTab === "curriculum" && (
+                <CurriculumTab subjectId={selectedSubject.subject_id} />
+              )}
+
+              {detailsTab === "materials" && (
+                <SubjectMaterialsTab subjectId={selectedSubject.subject_id} />
               )}
             </div>
           </div>
         )}
 
-        <div className="flex justify-end mt-6">
+        <div className="flex justify-end mt-4">
           <Button
             variant="secondary"
             onClick={() => {
               setShowDetailsModal(false);
               setSelectedSubject(null);
               setSubjectTeachers([]);
+              setDetailsTab("overview");
             }}
           >
             Close

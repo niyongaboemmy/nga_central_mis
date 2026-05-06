@@ -1,17 +1,22 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { Calendar, FileText, BarChart2 } from "lucide-react";
+import { Calendar, FileText, BarChart2, BookCheck, Users } from "lucide-react";
 import ReportingCalendar from "./ReportingCalendar";
 import SubmittedReports from "./SubmittedReports";
 import ReportingDashboard from "./ReportingDashboard";
 import ReportForm from "./ReportForm";
 import ReportDetailsModal from "./ReportDetailsModal";
+import LessonReportingCalendar from "./LessonReportingCalendar";
+import MentoringHub from "./MentoringHub";
 import { reportsApi } from "../../api/reports";
+import { academicTermsApi } from "../../api/academics";
 import { format, startOfMonth, endOfMonth } from "date-fns";
 
 const ReportingModule: React.FC = () => {
   const [activeTab, setActiveTab] = useState<
-    "calendar" | "submitted" | "dashboard"
+    "calendar" | "lesson-reports" | "mentoring" | "submitted" | "dashboard"
   >("calendar");
+
+  const [currentTermId, setCurrentTermId] = useState<number | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
   const [selectedDateRange, setSelectedDateRange] = useState<{
@@ -34,6 +39,15 @@ const ReportingModule: React.FC = () => {
   const [dashboardStats, setDashboardStats] = useState<any>(null);
   const [statsLoading, setStatsLoading] = useState(false);
   const lastDashboardKey = useRef<string | null>(null);
+
+  // Resolve current academic term once on mount
+  useEffect(() => {
+    academicTermsApi.getAll().then((res: any) => {
+      const terms: any[] = (res as any).data?.data ?? (res as any).data ?? [];
+      const current = Array.isArray(terms) ? terms.find((t: any) => t.is_current) : null;
+      if (current) setCurrentTermId(current.academic_term_id);
+    }).catch(() => {});
+  }, []);
 
   useEffect(() => {
     fetchMonthReports();
@@ -138,6 +152,16 @@ const ReportingModule: React.FC = () => {
       icon: <Calendar className="w-4 h-4" />,
     },
     {
+      id: "lesson-reports",
+      label: "Lesson Reports",
+      icon: <BookCheck className="w-4 h-4" />,
+    },
+    {
+      id: "mentoring",
+      label: "Mentoring",
+      icon: <Users className="w-4 h-4" />,
+    },
+    {
       id: "submitted",
       label: "Submitted Reports",
       icon: <FileText className="w-4 h-4" />,
@@ -183,6 +207,18 @@ const ReportingModule: React.FC = () => {
                 reportedDates={reportedDates}
                 loading={calendarLoading}
               />
+            </div>
+          )}
+
+          {activeTab === "lesson-reports" && (
+            <div className="bg-white dark:bg-gray-900/80 rounded-3xl p-6 border-gray-100 dark:border-gray-700 h-full">
+              <LessonReportingCalendar academicTermId={currentTermId} />
+            </div>
+          )}
+
+          {activeTab === "mentoring" && (
+            <div className="bg-white dark:bg-gray-900/80 rounded-3xl p-6 border-gray-100 dark:border-gray-700 h-full">
+              <MentoringHub academicTermId={currentTermId} />
             </div>
           )}
 

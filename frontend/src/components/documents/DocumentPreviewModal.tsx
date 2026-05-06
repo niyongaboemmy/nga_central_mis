@@ -15,19 +15,30 @@ import {
   FiZoomOut,
   FiRotateCcw,
 } from "react-icons/fi";
-import { documentApi, type Document } from "../../api/documents";
+import { documentApi } from "../../api/documents";
 import { modalVariants } from "./types";
+
+export interface PreviewableDoc {
+  document_id: number;
+  original_name: string;
+  file_name: string;
+  file_size: number;
+  mime_type: string;
+  file_extension: string;
+}
 
 interface DocumentPreviewModalProps {
   isOpen: boolean;
-  document: Document | null;
+  document: PreviewableDoc | null;
   onClose: () => void;
+  downloadFn?: (documentId: number) => Promise<{ data: Blob }>;
 }
 
 const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
   isOpen,
   document: doc,
   onClose,
+  downloadFn,
 }) => {
   const [previewContent, setPreviewContent] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -78,7 +89,9 @@ const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
           "rs",
         ].includes(fileExtension)
       ) {
-        const response = await documentApi.download(doc.document_id);
+        const response = await (downloadFn
+          ? downloadFn(doc.document_id)
+          : documentApi.download(doc.document_id));
         const blob = new Blob([response.data], { type: mimeType });
 
         if (mimeType.startsWith("image/")) {
@@ -110,7 +123,9 @@ const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
     if (!doc) return;
 
     try {
-      const response = await documentApi.download(doc.document_id);
+      const response = await (downloadFn
+        ? downloadFn(doc.document_id)
+        : documentApi.download(doc.document_id));
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = window.document.createElement("a");
       link.href = url;

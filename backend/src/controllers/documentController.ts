@@ -74,13 +74,18 @@ export const getDocumentShareFilterOptions = asyncHandler(
 
     // Get the current academic term
     const currentTerm = await db
-      .select()
+      .select({
+        academic_term_id: AcademicTerm.academic_term_id,
+        academic_year_id: AcademicTerm.academic_year_id,
+      })
       .from(AcademicTerm)
       .where(eq(AcademicTerm.is_current, 1))
       .limit(1);
 
     const currentTermId =
       currentTerm.length > 0 ? currentTerm[0].academic_term_id : null;
+    const currentYearId =
+      currentTerm.length > 0 ? currentTerm[0].academic_year_id : null;
 
     // Get user's role-based access
     const userRoles = await db
@@ -93,30 +98,22 @@ export const getDocumentShareFilterOptions = asyncHandler(
     const roleIds = userRoles.map((r) => r.role_id);
 
     // Get assigned subjects (for teachers)
-    let assignedSubjects: any[] = [];
-    if (currentTermId) {
-      assignedSubjects = await db
-        .select({
-          subject_id: TeacherSubjectAssignment.subject_id,
-          subject_name: Subject.name,
-          subject_code: Subject.code,
-        })
-        .from(TeacherSubjectAssignment)
-        .innerJoin(
-          Subject,
-          eq(TeacherSubjectAssignment.subject_id, Subject.subject_id),
-        )
-        .where(
-          and(
-            eq(TeacherSubjectAssignment.user_id, userId),
-            eq(TeacherSubjectAssignment.academic_term_id, currentTermId),
-          ),
-        );
-    }
+    const assignedSubjects = await db
+      .select({
+        subject_id: TeacherSubjectAssignment.subject_id,
+        subject_name: Subject.name,
+        subject_code: Subject.code,
+      })
+      .from(TeacherSubjectAssignment)
+      .innerJoin(
+        Subject,
+        eq(TeacherSubjectAssignment.subject_id, Subject.subject_id),
+      )
+      .where(eq(TeacherSubjectAssignment.user_id, userId));
 
     // Get enrolled subjects (for students)
     let enrolledSubjects: any[] = [];
-    if (currentTermId) {
+    if (currentYearId) {
       enrolledSubjects = await db
         .select({
           subject_id: StudentSubjectEnrollment.subject_id,
@@ -131,7 +128,7 @@ export const getDocumentShareFilterOptions = asyncHandler(
         .where(
           and(
             eq(StudentSubjectEnrollment.user_id, userId),
-            eq(StudentSubjectEnrollment.academic_term_id, currentTermId),
+            eq(StudentSubjectEnrollment.academic_year_id, currentYearId),
           ),
         );
     }
@@ -2216,13 +2213,18 @@ export const getSharedDocuments = asyncHandler(async (req: any, res: any) => {
 
   // Get the current academic term
   const currentTerm = await db
-    .select()
+    .select({
+      academic_term_id: AcademicTerm.academic_term_id,
+      academic_year_id: AcademicTerm.academic_year_id,
+    })
     .from(AcademicTerm)
     .where(eq(AcademicTerm.is_current, 1))
     .limit(1);
 
   const currentTermId =
     currentTerm.length > 0 ? currentTerm[0].academic_term_id : null;
+  const currentYearId =
+    currentTerm.length > 0 ? currentTerm[0].academic_year_id : null;
 
   // Get user's role-based access with filters
   const userRoles = await db
@@ -2235,24 +2237,16 @@ export const getSharedDocuments = asyncHandler(async (req: any, res: any) => {
   const roleIds = userRoles.map((r) => r.role_id);
 
   // Get user's subject assignments (for teachers)
-  let assignedSubjects: any[] = [];
-  if (currentTermId) {
-    assignedSubjects = await db
-      .select({
-        subject_id: TeacherSubjectAssignment.subject_id,
-      })
-      .from(TeacherSubjectAssignment)
-      .where(
-        and(
-          eq(TeacherSubjectAssignment.user_id, userId),
-          eq(TeacherSubjectAssignment.academic_term_id, currentTermId),
-        ),
-      );
-  }
+  const assignedSubjects = await db
+    .select({
+      subject_id: TeacherSubjectAssignment.subject_id,
+    })
+    .from(TeacherSubjectAssignment)
+    .where(eq(TeacherSubjectAssignment.user_id, userId));
 
   // Get user's subject enrollments (for students)
   let enrolledSubjects: any[] = [];
-  if (currentTermId) {
+  if (currentYearId) {
     enrolledSubjects = await db
       .select({
         subject_id: StudentSubjectEnrollment.subject_id,
@@ -2261,7 +2255,7 @@ export const getSharedDocuments = asyncHandler(async (req: any, res: any) => {
       .where(
         and(
           eq(StudentSubjectEnrollment.user_id, userId),
-          eq(StudentSubjectEnrollment.academic_term_id, currentTermId),
+          eq(StudentSubjectEnrollment.academic_year_id, currentYearId),
         ),
       );
   }

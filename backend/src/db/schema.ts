@@ -9,6 +9,7 @@ import {
   int,
   text,
   json,
+  decimal,
   primaryKey,
   uniqueIndex,
   index,
@@ -279,14 +280,14 @@ export const StudentSubjectEnrollment = mysqlTable(
     subject_id: bigint("subject_id", { mode: "number" })
       .notNull()
       .references(() => Subject.subject_id),
-    academic_term_id: bigint("academic_term_id", { mode: "number" })
+    academic_year_id: bigint("academic_year_id", { mode: "number" })
       .notNull()
-      .references(() => AcademicTerm.academic_term_id),
+      .references(() => AcademicYear.academic_year_id),
     enrolled_at: datetime("enrolled_at").default(sql`CURRENT_TIMESTAMP`),
     status: mysqlEnum("status", ["ACTIVE", "DISABLED"]).default("ACTIVE"),
   },
   (table) => ({
-    pk: primaryKey(table.user_id, table.subject_id, table.academic_term_id),
+    pk: primaryKey(table.user_id, table.subject_id, table.academic_year_id),
   }),
 );
 
@@ -303,18 +304,10 @@ export const TeacherSubjectAssignment = mysqlTable(
     class_group_id: bigint("class_group_id", { mode: "number" })
       .notNull()
       .references(() => ClassGroup.class_group_id),
-    academic_term_id: bigint("academic_term_id", { mode: "number" })
-      .notNull()
-      .references(() => AcademicTerm.academic_term_id),
     assigned_at: datetime("assigned_at").default(sql`CURRENT_TIMESTAMP`),
   },
   (table) => ({
-    pk: primaryKey(
-      table.user_id,
-      table.subject_id,
-      table.class_group_id,
-      table.academic_term_id,
-    ),
+    pk: primaryKey(table.user_id, table.subject_id, table.class_group_id),
   }),
 );
 
@@ -947,17 +940,34 @@ export const MentorshipSession = mysqlTable("MentorshipSession", {
     .notNull()
     .references(() => User.user_id),
   student_id: bigint("student_id", { mode: "number" })
-    .references(() => User.user_id),
+    .references(() => User.user_id, { onDelete: "cascade" }),
   student_name: text("student_name"),
+  topic: varchar("topic", { length: 255 }),
+  // Intelligence-layer additions (migration 039)
+  subject_id: bigint("subject_id", { mode: "number" })
+    .references(() => Subject.subject_id, { onDelete: "set null" }),
+  previous_session_id: bigint("previous_session_id", { mode: "number" }),
   session_date: date("session_date"),
   duration_minutes: int("duration_minutes"),
   assignment_completion: varchar("assignment_completion", { length: 255 }),
+  assignment_notes: text("assignment_notes"),
   punctuality_attendance: varchar("punctuality_attendance", { length: 255 }),
+  discipline_notes: text("discipline_notes"),
+  discipline_progress: mysqlEnum("discipline_progress", ["IMPROVED", "CONSISTENT", "DECLINED"]),
   academic_planning: text("academic_planning"),
+  academic_personal_notes: text("academic_personal_notes"),
+  dishonesty_flagged: tinyint("dishonesty_flagged").default(0),
+  stress_flag: tinyint("stress_flag").default(0),
   next_steps: text("next_steps"),
+  action_items: text("action_items"),
   challenges_identified: text("challenges_identified"),
+  guidance_notes: text("guidance_notes"),
   wellbeing_status: text("wellbeing_status"),
+  wellbeing_score: tinyint("wellbeing_score"),
+  wellbeing_notes: text("wellbeing_notes"),
   follow_up_required: tinyint("follow_up_required").default(0),
+  is_completed: tinyint("is_completed").default(0),
+  session_status: mysqlEnum("session_status", ["OPEN", "IN_PROGRESS", "RESOLVED"]).default("OPEN"),
   notes: text("notes"),
   created_at: datetime("created_at").default(sql`CURRENT_TIMESTAMP`),
 });
@@ -967,9 +977,14 @@ export const ReportProjectUpdate = mysqlTable("ReportProjectUpdate", {
   project_update_id: bigint("project_update_id", { mode: "number" })
     .primaryKey()
     .autoincrement(),
-  report_id: bigint("report_id", { mode: "number" })
-    .notNull()
-    .references(() => InstructorReport.report_id, { onDelete: "cascade" }),
+  report_id: bigint("report_id", { mode: "number" }).references(
+    () => InstructorReport.report_id,
+    { onDelete: "cascade" },
+  ),
+  user_id: bigint("user_id", { mode: "number" }).references(
+    () => User.user_id,
+    { onDelete: "cascade" },
+  ),
   project_name: varchar("project_name", { length: 255 }),
   role: varchar("role", { length: 100 }),
   work_completed: text("work_completed"),
@@ -1004,4 +1019,144 @@ export const ReportTopic = mysqlTable("ReportTopic", {
     .references(() => InstructorReport.report_id, { onDelete: "cascade" }),
   topic_name: text("topic_name"),
   is_planned_for_next_week: tinyint("is_planned_for_next_week").default(0),
+});
+
+// LessonReport — decoupled per-lesson delivery record
+export const LessonReport = mysqlTable("LessonReport", {
+  lesson_report_id: bigint("lesson_report_id", { mode: "number" })
+    .primaryKey()
+    .autoincrement(),
+  lesson_id: int("lesson_id").references(() => LO_Lesson.id, {
+    onDelete: "set null",
+  }),
+  entry_id: bigint("entry_id", { mode: "number" }).references(
+    () => SchemeOfWorkEntry.entry_id,
+    { onDelete: "set null" },
+  ),
+  reported_by: bigint("reported_by", { mode: "number" })
+    .notNull()
+    .references(() => User.user_id, { onDelete: "cascade" }),
+  delivery_date: date("delivery_date").notNull(),
+  status: mysqlEnum("status", ["DELIVERED", "PARTIAL", "MISSED"])
+    .notNull()
+    .default("DELIVERED"),
+  attendance_count: int("attendance_count"),
+  completion_rate: int("completion_rate"),
+  reflection_notes: text("reflection_notes"),
+  evidence_url: varchar("evidence_url", { length: 500 }),
+  schedule_flag: mysqlEnum("schedule_flag", ["ON_TIME", "AHEAD", "BEHIND"])
+    .notNull()
+    .default("ON_TIME"),
+  created_at: datetime("created_at").default(sql`CURRENT_TIMESTAMP`),
+});
+
+// Curriculum — SubjectCompetency
+export const SubjectCompetency = mysqlTable("SubjectCompetency", {
+  competency_id: bigint("competency_id", { mode: "number" })
+    .primaryKey()
+    .autoincrement(),
+  subject_id: bigint("subject_id", { mode: "number" })
+    .notNull()
+    .references(() => Subject.subject_id, { onDelete: "cascade" }),
+  user_id: bigint("user_id", { mode: "number" })
+    .notNull()
+    .references(() => User.user_id),
+  element_number: int("element_number").notNull().default(1),
+  title: varchar("title", { length: 255 }).notNull(),
+  description: text("description"),
+  sort_order: int("sort_order").notNull().default(0),
+  created_at: datetime("created_at").default(sql`CURRENT_TIMESTAMP`),
+  updated_at: datetime("updated_at").default(
+    sql`CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP`,
+  ),
+});
+
+// Curriculum — CompetencyPerformanceCriteria
+export const CompetencyPerformanceCriteria = mysqlTable(
+  "CompetencyPerformanceCriteria",
+  {
+    criteria_id: bigint("criteria_id", { mode: "number" })
+      .primaryKey()
+      .autoincrement(),
+    competency_id: bigint("competency_id", { mode: "number" })
+      .notNull()
+      .references(() => SubjectCompetency.competency_id, { onDelete: "cascade" }),
+    criteria_number: varchar("criteria_number", { length: 20 }).notNull(),
+    description: text("description").notNull(),
+    sort_order: int("sort_order").notNull().default(0),
+    created_at: datetime("created_at").default(sql`CURRENT_TIMESTAMP`),
+    updated_at: datetime("updated_at").default(
+      sql`CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP`,
+    ),
+  },
+);
+
+// Curriculum — SubjectDocumentCategory
+export const SubjectDocumentCategory = mysqlTable("SubjectDocumentCategory", {
+  category_id: bigint("category_id", { mode: "number" })
+    .primaryKey()
+    .autoincrement(),
+  subject_id: bigint("subject_id", { mode: "number" })
+    .notNull()
+    .references(() => Subject.subject_id, { onDelete: "cascade" }),
+  user_id: bigint("user_id", { mode: "number" })
+    .notNull()
+    .references(() => User.user_id),
+  name: varchar("name", { length: 150 }).notNull(),
+  description: varchar("description", { length: 500 }),
+  color: varchar("color", { length: 7 }).default("#3B82F6"),
+  sort_order: int("sort_order").notNull().default(0),
+  created_at: datetime("created_at").default(sql`CURRENT_TIMESTAMP`),
+  updated_at: datetime("updated_at").default(
+    sql`CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP`,
+  ),
+});
+
+// Curriculum — SubjectDocument (competency_id omits .references() — SET NULL FK is in raw SQL migration)
+export const SubjectDocument = mysqlTable("SubjectDocument", {
+  document_id: bigint("document_id", { mode: "number" })
+    .primaryKey()
+    .autoincrement(),
+  category_id: bigint("category_id", { mode: "number" })
+    .notNull()
+    .references(() => SubjectDocumentCategory.category_id, { onDelete: "cascade" }),
+  subject_id: bigint("subject_id", { mode: "number" })
+    .notNull()
+    .references(() => Subject.subject_id, { onDelete: "cascade" }),
+  user_id: bigint("user_id", { mode: "number" })
+    .notNull()
+    .references(() => User.user_id),
+  competency_id: bigint("competency_id", { mode: "number" }),
+  file_name: varchar("file_name", { length: 255 }).notNull(),
+  original_name: varchar("original_name", { length: 255 }).notNull(),
+  file_path: varchar("file_path", { length: 500 }).notNull(),
+  file_size: bigint("file_size", { mode: "number" }).notNull(),
+  mime_type: varchar("mime_type", { length: 100 }).notNull(),
+  file_extension: varchar("file_extension", { length: 20 }).notNull(),
+  description: varchar("description", { length: 500 }),
+  created_at: datetime("created_at").default(sql`CURRENT_TIMESTAMP`),
+  updated_at: datetime("updated_at").default(
+    sql`CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP`,
+  ),
+});
+
+// AssessmentScore — student grade records pulled into mentorship context (migration 039)
+export const AssessmentScore = mysqlTable("AssessmentScore", {
+  score_id: bigint("score_id", { mode: "number" }).primaryKey().autoincrement(),
+  student_id: bigint("student_id", { mode: "number" })
+    .notNull()
+    .references(() => User.user_id, { onDelete: "cascade" }),
+  subject_id: bigint("subject_id", { mode: "number" })
+    .notNull()
+    .references(() => Subject.subject_id, { onDelete: "cascade" }),
+  academic_year_id: int("academic_year_id"),
+  term: varchar("term", { length: 20 }),
+  assessment_type: varchar("assessment_type", { length: 50 }).notNull().default("EXAM"),
+  title: varchar("title", { length: 150 }),
+  score: decimal("score", { precision: 5, scale: 2 }).notNull(),
+  max_score: decimal("max_score", { precision: 5, scale: 2 }).notNull().default("100"),
+  assessed_at: date("assessed_at").notNull(),
+  recorded_by: bigint("recorded_by", { mode: "number" })
+    .references(() => User.user_id, { onDelete: "set null" }),
+  created_at: datetime("created_at").default(sql`CURRENT_TIMESTAMP`),
 });

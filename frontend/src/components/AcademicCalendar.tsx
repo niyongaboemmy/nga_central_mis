@@ -623,10 +623,9 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({
         setIsLoadingClassGroups(true);
         const classGroups = await getCalendarClassGroups({
           academic_year_id: selectedYear,
-          academic_term_id: selectedTerm,
         });
         if (classGroups.length === 0) {
-          showToast("No class groups available for this term", "info");
+          showToast("No class groups available for this year", "info");
           return;
         }
 
@@ -796,6 +795,19 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({
               onEmptyCellClick={handleEmptyCellClick}
             />
           ))}
+        </div>
+      )}
+
+      {/* Empty state for broad view when no calendars exist for selected term */}
+      {isBroadView && selectedYear && selectedTerm && calendarsToDisplay.length === 0 && (
+        <div className="flex flex-col items-center justify-center py-16 text-gray-400 dark:text-gray-500">
+          <svg className="w-12 h-12 mb-4 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          </svg>
+          <p className="text-sm font-medium mb-1">No calendar configured for this term</p>
+          {canCreate && (
+            <p className="text-xs">Use the <span className="font-semibold">Create Calendar</span> button above to set one up.</p>
+          )}
         </div>
       )}
 
