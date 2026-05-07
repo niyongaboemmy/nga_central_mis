@@ -281,7 +281,8 @@ const StudentSupportProfile: React.FC<Props> = ({ student, onBack }) => {
                     dot={{ r: 3, fill: "#3b82f6" }}
                   />
                   <Tooltip
-                    formatter={(val: number | string) => {
+                    formatter={(val: string | number | undefined) => {
+                      if (val === undefined) return ["—", "Wellbeing"];
                       const n = Number(val);
                       const label = Object.keys(WELLBEING_SCALE).find(
                         (k) => WELLBEING_SCALE[k] === n,

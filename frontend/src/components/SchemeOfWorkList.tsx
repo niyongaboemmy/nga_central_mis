@@ -197,7 +197,7 @@ const SchemeOfWorkList: React.FC = () => {
                               handleSelectSubject(
                                 subject.subject_id,
                                 grade.class_group_id,
-                                grade.academic_term_id,
+                                grade.academic_year_id,
                               )
                             }
                             className="w-full bg-gray-50 dark:bg-gray-900/50 p-4 rounded-2xl border border-transparent hover:border-blue-500/30 hover:bg-blue-50/50 dark:hover:bg-blue-900/10 transition-all text-left flex items-center justify-between group/btn"
@@ -229,7 +229,6 @@ const SchemeOfWorkList: React.FC = () => {
                                 </div>
                                 <div className="text-[11px] text-gray-400 dark:text-gray-500 flex items-center gap-1 mt-1 font-semibold uppercase tracking-tighter">
                                   <Calendar className="w-3 h-3" />
-                                  {grade.academic_term_name} •{" "}
                                   {grade.academic_year_name}
                                 </div>
                               </div>
@@ -259,8 +258,8 @@ const SchemeOfWorkList: React.FC = () => {
 
                           {isRejected && (
                             <div className="mx-2 p-3 bg-rose-50/50 dark:bg-rose-900/10 border border-rose-100 dark:border-rose-800/50 rounded-xl flex items-center gap-2 text-rose-600 dark:text-rose-400 text-xs font-medium animate-pulse">
-                              <AlertCircle className="w-4 h-4 flex-shrink-0" />
-                              A scheme of work of that subject has rejected.
+                              <AlertCircle className="w-4 h-4 flex-shrink-0" />A
+                              scheme of work of that subject has rejected.
                             </div>
                           )}
                         </div>

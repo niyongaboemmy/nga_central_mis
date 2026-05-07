@@ -8,10 +8,6 @@ import {
   Plus,
   Trash2,
   ArrowRight,
-  Shield,
-  Smile,
-  AlertTriangle,
-  Users,
   BookOpen,
   MessageSquare,
   Zap,
@@ -52,30 +48,19 @@ const ReportForm: React.FC<ReportFormProps> = ({
   const [hasAutoFilled, setHasAutoFilled] = useState(false);
   const initialized = useRef(false);
 
-  // Lookup data
   const [terms, setTerms] = useState<any[]>([]);
   const [classGroups, setClassGroups] = useState<any[]>([]);
 
-  // Form State
   const [formData, setFormData] = useState({
     academic_term_id: "",
     class_group_id: "",
     week_number: "",
     start_date: initialRange?.start ? initialRange.start : "",
     end_date: initialRange?.end ? initialRange.end : "",
-    progress_status: "ON_TRACK",
     key_highlights: "",
     challenges_encountered: "",
-    metrics: {
-      lessons_delivered_count: 0,
-      mentorship_sessions_count: 0,
-      active_students_count: 0,
-      struggling_students_count: 0,
-    },
     topics: [] as any[],
     lessons: [] as any[],
-    mentorship_sessions: [] as any[],
-    project_updates: [] as any[],
     reflections: {
       what_worked_well: "",
       improvement_areas: "",
@@ -95,7 +80,6 @@ const ReportForm: React.FC<ReportFormProps> = ({
     }
   }, [existingReport]);
 
-  // Automatic Auto-Fill trigger
   useEffect(() => {
     const { start_date, end_date, class_group_id } = formData;
     if (
@@ -128,15 +112,8 @@ const ReportForm: React.FC<ReportFormProps> = ({
           week_number: data.week_number?.toString() || "",
           start_date: data.start_date,
           end_date: data.end_date,
-          progress_status: data.progress_status,
           key_highlights: data.key_highlights || "",
           challenges_encountered: data.challenges_encountered || "",
-          metrics: {
-            lessons_delivered_count: data.lessons_delivered_count || 0,
-            mentorship_sessions_count: data.mentorship_sessions_count || 0,
-            active_students_count: data.active_students_count || 0,
-            struggling_students_count: data.struggling_students_count || 0,
-          },
           topics: (data.topics || []).map((t: any) => ({
             topic_name: t.topic_name,
             is_planned_for_next_week: !!t.is_planned_for_next_week,
@@ -146,23 +123,6 @@ const ReportForm: React.FC<ReportFormProps> = ({
             planned: !!l.planned,
             delivered: !!l.delivered,
             notes: l.notes,
-          })),
-          mentorship_sessions: (data.mentorship || []).map((m: any) => ({
-            student_id: m.student_id
-              ? m.student_id.toString()
-              : m.student_name || "",
-            session_date: m.session_date,
-            notes: m.notes,
-          })),
-          project_updates: (
-            data.project_updates ||
-            data.projectUpdates ||
-            []
-          ).map((p: any) => ({
-            project_name: p.project_name,
-            role: p.role,
-            status: p.status,
-            work_completed: p.work_completed,
           })),
           reflections: data.reflections
             ? {
@@ -208,7 +168,6 @@ const ReportForm: React.FC<ReportFormProps> = ({
       setTerms(Array.isArray(termsData) ? termsData : []);
       setClassGroups(Array.isArray(groupsData) ? groupsData : []);
 
-      // Select current term by default
       if (Array.isArray(termsData)) {
         const currentTerm = termsData.find((t: any) => t.is_current);
         if (currentTerm) {
@@ -219,7 +178,6 @@ const ReportForm: React.FC<ReportFormProps> = ({
         }
       }
 
-      // Auto-select Class Group if user is a teacher
       if (user?.user?.user_id) {
         try {
           const assignmentsRes =
@@ -273,16 +231,6 @@ const ReportForm: React.FC<ReportFormProps> = ({
         class_group_id: data.class_group_id
           ? data.class_group_id.toString()
           : prev.class_group_id,
-        progress_status: data.suggestedStatus || prev.progress_status,
-        metrics: {
-          ...prev.metrics,
-          lessons_delivered_count:
-            data.metrics?.lessons_delivered_count ??
-            prev.metrics.lessons_delivered_count,
-          mentorship_sessions_count:
-            data.metrics?.mentorship_sessions_count ??
-            prev.metrics.mentorship_sessions_count,
-        },
         topics: (data.topics || []).map((t: any) => ({
           topic_name: typeof t === "string" ? t : `${t.subject}: ${t.name}`,
           is_planned_for_next_week: false,
@@ -334,32 +282,13 @@ const ReportForm: React.FC<ReportFormProps> = ({
         { topic_name: "", is_planned_for_next_week: false },
       ],
     }));
+
   const addLesson = () =>
     setFormData((p) => ({
       ...p,
       lessons: [
         ...p.lessons,
         { lesson_title: "", planned: true, delivered: true, notes: "" },
-      ],
-    }));
-  const addMentorship = () =>
-    setFormData((p) => ({
-      ...p,
-      mentorship_sessions: [
-        ...p.mentorship_sessions,
-        {
-          student_id: "",
-          session_date: p.start_date, // Use master report date
-          notes: "",
-        },
-      ],
-    }));
-  const addProject = () =>
-    setFormData((p) => ({
-      ...p,
-      project_updates: [
-        ...p.project_updates,
-        { project_name: "", role: "", status: "ON_TRACK", work_completed: "" },
       ],
     }));
 
@@ -384,6 +313,8 @@ const ReportForm: React.FC<ReportFormProps> = ({
     });
   };
 
+  const TOTAL_STEPS = 3;
+
   return (
     <div className="flex flex-col h-screen overflow-hidden dark:text-white">
       {/* Navbar */}
@@ -397,22 +328,16 @@ const ReportForm: React.FC<ReportFormProps> = ({
           </button>
           <div className="h-6 w-px bg-gray-200 dark:bg-gray-700" />
           <h1 className="text-xl font-bold text-gray-800 dark:text-white">
-            Daily Instructor Report
+            Lesson Report
           </h1>
-          {existingReport && (
-            <div className="bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 px-3 py-1 rounded-full text-xs font-bold border border-green-100 dark:border-green-800 flex items-center space-x-1">
-              <Shield className="w-3 h-3" />
-              <span>Reported</span>
-            </div>
-          )}
         </div>
 
         <div className="flex items-center space-x-4">
           <div className="hidden md:flex items-center space-x-2 mr-8">
-            {[1, 2, 3, 4, 5].map((i) => (
+            {[1, 2, 3].map((i) => (
               <div
                 key={i}
-                className={`h-2 w-12 rounded-full transition-all duration-300 ${step >= i ? "bg-blue-600" : "bg-gray-200 dark:bg-gray-700"}`}
+                className={`h-2 w-16 rounded-full transition-all duration-300 ${step >= i ? "bg-blue-600" : "bg-gray-200 dark:bg-gray-700"}`}
               />
             ))}
           </div>
@@ -428,7 +353,7 @@ const ReportForm: React.FC<ReportFormProps> = ({
             <span>{autoFilling ? "Filling..." : "Auto-Fill"}</span>
           </button>
 
-          {step < 5 ? (
+          {step < TOTAL_STEPS ? (
             <button
               onClick={() => setStep((s) => s + 1)}
               className="flex items-center space-x-2 bg-blue-600 text-white px-6 py-2 rounded-full font-bold hover:bg-blue-700 transition-all shadow-blue-200 dark:shadow-blue-900/20"
@@ -460,6 +385,7 @@ const ReportForm: React.FC<ReportFormProps> = ({
       {/* Form Content */}
       <div className="flex-1 overflow-y-auto bg-gray-50 dark:bg-black p-8">
         <div className="max-w-4xl mx-auto pb-20">
+
           {/* STEP 1: BASICS */}
           {step === 1 && (
             <div className="space-y-8 animate-in fade-in slide-in-from-right duration-500">
@@ -569,9 +495,6 @@ const ReportForm: React.FC<ReportFormProps> = ({
                             ...p,
                             start_date: e.target.value,
                             end_date: e.target.value,
-                            mentorship_sessions: p.mentorship_sessions.map(
-                              (s) => ({ ...s, session_date: e.target.value }),
-                            ),
                           }))
                         }
                         className="w-full bg-transparent border-none p-0 focus:ring-0 text-sm font-bold"
@@ -625,115 +548,8 @@ const ReportForm: React.FC<ReportFormProps> = ({
             </div>
           )}
 
-          {/* STEP 2: METRICS */}
+          {/* STEP 2: CURRICULUM DELIVERY */}
           {step === 2 && (
-            <div className="space-y-8 animate-in fade-in slide-in-from-right duration-500">
-              <div className="bg-white dark:bg-gray-900 rounded-3xl p-8 shadow-sm border border-gray-100 dark:border-gray-800">
-                <div className="flex items-center space-x-3 mb-8">
-                  <div className="p-3 bg-purple-50 dark:bg-purple-900/20 rounded-2xl">
-                    <Users className="w-6 h-6 text-purple-600" />
-                  </div>
-                  <h2 className="text-2xl font-bold text-gray-800 dark:text-white">
-                    Quantitative Metrics
-                  </h2>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                  <Counter
-                    label="Lessons Delivered"
-                    value={formData.metrics.lessons_delivered_count}
-                    onChange={(v) =>
-                      setFormData((p) => ({
-                        ...p,
-                        metrics: { ...p.metrics, lessons_delivered_count: v },
-                      }))
-                    }
-                    readOnly={formData.lessons.length > 0}
-                  />
-                  <Counter
-                    label="Mentorship Sessions"
-                    value={formData.metrics.mentorship_sessions_count}
-                    onChange={(v) =>
-                      setFormData((p) => ({
-                        ...p,
-                        metrics: { ...p.metrics, mentorship_sessions_count: v },
-                      }))
-                    }
-                    readOnly={formData.mentorship_sessions.length > 0}
-                  />
-                  <Counter
-                    label="Active Students"
-                    value={formData.metrics.active_students_count}
-                    onChange={(v) =>
-                      setFormData((p) => ({
-                        ...p,
-                        metrics: { ...p.metrics, active_students_count: v },
-                      }))
-                    }
-                  />
-                  <Counter
-                    label="Struggling Students"
-                    value={formData.metrics.struggling_students_count}
-                    onChange={(v) =>
-                      setFormData((p) => ({
-                        ...p,
-                        metrics: { ...p.metrics, struggling_students_count: v },
-                      }))
-                    }
-                  />
-                </div>
-              </div>
-
-              <div className="bg-white dark:bg-gray-900 rounded-3xl p-8 shadow-sm border border-gray-100 dark:border-gray-800">
-                <h3 className="text-lg font-bold mb-6">
-                  Overall Progress Status
-                </h3>
-                <div className="flex flex-wrap gap-4">
-                  {[
-                    {
-                      id: "ON_TRACK",
-                      label: "On Track",
-                      color: "green",
-                      icon: <Smile className="w-5 h-5" />,
-                    },
-                    {
-                      id: "SLIGHTLY_BEHIND",
-                      label: "Slightly Behind",
-                      color: "amber",
-                      icon: <AlertTriangle className="w-5 h-5" />,
-                    },
-                    {
-                      id: "AHEAD",
-                      label: "Ahead of Schedule",
-                      color: "blue",
-                      icon: <Zap className="w-5 h-5" />,
-                    },
-                  ].map((status) => (
-                    <button
-                      key={status.id}
-                      onClick={() =>
-                        setFormData((p) => ({
-                          ...p,
-                          progress_status: status.id,
-                        }))
-                      }
-                      className={`flex items-center space-x-3 px-6 py-4 rounded-2xl border-2 transition-all ${
-                        formData.progress_status === status.id
-                          ? `bg-${status.color}-50 dark:bg-${status.color}-900/20 border-${status.color}-500 text-${status.color}-700 dark:text-${status.color}-300`
-                          : "bg-gray-50 dark:bg-gray-800 border-transparent text-gray-500"
-                      }`}
-                    >
-                      {status.icon}
-                      <span className="font-bold">{status.label}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* STEP 3: CONTENT */}
-          {step === 3 && (
             <div className="space-y-8 animate-in fade-in slide-in-from-right duration-500">
               <div className="bg-white dark:bg-gray-900 rounded-3xl p-8 shadow-sm border border-gray-100 dark:border-gray-800">
                 <div className="flex items-center justify-between mb-8">
@@ -747,7 +563,7 @@ const ReportForm: React.FC<ReportFormProps> = ({
                   </div>
                   <button
                     onClick={addTopic}
-                    className="bg-blue-600 text-white p-2 rounded-xl hover:bg-blue-700 transition-all  shadow-blue-200 dark:shadow-blue-900/20"
+                    className="bg-blue-600 text-white p-2 rounded-xl hover:bg-blue-700 transition-all shadow-blue-200 dark:shadow-blue-900/20"
                   >
                     <Plus className="w-4 h-4" />
                   </button>
@@ -900,171 +716,18 @@ const ReportForm: React.FC<ReportFormProps> = ({
                       </div>
                     </div>
                   ))}
+                  {formData.lessons.length === 0 && (
+                    <p className="text-center py-8 text-gray-400 italic">
+                      No lessons added. Use Auto-Fill or click above.
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
           )}
 
-          {/* STEP 4: MENTORSHIP & PROJECTS */}
-          {step === 4 && (
-            <div className="space-y-8 animate-in fade-in slide-in-from-right duration-500">
-              <div className="bg-white dark:bg-gray-900 rounded-3xl p-8 shadow-sm border border-gray-100 dark:border-gray-800">
-                <div className="flex items-center justify-between mb-8">
-                  <div className="flex items-center space-x-3">
-                    <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-2xl">
-                      <Shield className="w-6 h-6 text-green-600" />
-                    </div>
-                    <h2 className="text-2xl font-bold text-gray-800 dark:text-white">
-                      Mentorship & Projects
-                    </h2>
-                  </div>
-                  <button
-                    onClick={addMentorship}
-                    className="bg-green-600 text-white px-4 py-2 rounded-xl hover:bg-green-700 transition-all  shadow-green-200 dark:shadow-green-900/20 text-sm font-bold flex items-center space-x-2"
-                  >
-                    <Plus className="w-4 h-4" />
-                    <span>Log Mentorship</span>
-                  </button>
-                </div>
-
-                <div className="space-y-4">
-                  {formData.mentorship_sessions.map((session, idx) => (
-                    <div
-                      key={idx}
-                      className="bg-gray-50 dark:bg-gray-800 p-6 rounded-2xl border border-gray-100 dark:border-gray-700 space-y-4"
-                    >
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <input
-                          placeholder="Student Name / ID"
-                          value={session.student_id}
-                          onChange={(e) =>
-                            updateArrayItem(
-                              "mentorship_sessions",
-                              idx,
-                              "student_id",
-                              e.target.value,
-                            )
-                          }
-                          className="w-full bg-white dark:bg-gray-900 border-none rounded-xl p-3 focus:ring-2 focus:ring-blue-500"
-                        />
-                        <div className="relative group/date">
-                          <label className="text-[10px] absolute -top-2 left-3 bg-gray-50 dark:bg-gray-800 px-1 font-bold text-blue-500 uppercase tracking-widest z-10">
-                            Session Date
-                          </label>
-                          <div className="w-full bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-xl p-3 text-gray-500 font-bold flex items-center justify-between">
-                            <span>
-                              {format(
-                                parseLocalNoShift(session.session_date),
-                                "dd/MM/yyyy",
-                              )}
-                            </span>
-                            <Shield className="w-4 h-4 text-blue-400 opacity-50" />
-                          </div>
-                        </div>
-                      </div>
-                      <textarea
-                        placeholder="Session focus & outcomes..."
-                        value={session.notes}
-                        onChange={(e) =>
-                          updateArrayItem(
-                            "mentorship_sessions",
-                            idx,
-                            "notes",
-                            e.target.value,
-                          )
-                        }
-                        className="w-full bg-white dark:bg-gray-900 border-none rounded-xl p-3 text-sm focus:ring-2 focus:ring-blue-500"
-                      />
-                      <button
-                        onClick={() =>
-                          removeArrayItem("mentorship_sessions", idx)
-                        }
-                        className="text-red-500 text-sm font-bold flex items-center space-x-1 hover:underline"
-                      >
-                        <Trash2 className="w-4 h-4" /> <span>Remove</span>
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="bg-white dark:bg-gray-900 rounded-3xl p-8 shadow-sm border border-gray-100 dark:border-gray-800">
-                <div className="flex items-center justify-between mb-8">
-                  <h3 className="text-lg font-bold">
-                    Curriculum / Capstone Projects
-                  </h3>
-                  <button
-                    onClick={addProject}
-                    className="text-blue-600 font-bold hover:underline flex items-center space-x-2"
-                  >
-                    <Plus className="w-4 h-4" />
-                    <span>Add Project Update</span>
-                  </button>
-                </div>
-
-                <div className="space-y-4">
-                  {formData.project_updates.map((proj, idx) => (
-                    <div
-                      key={idx}
-                      className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-gray-50 dark:bg-gray-800 p-6 rounded-2xl"
-                    >
-                      <input
-                        placeholder="Project Name"
-                        value={proj.project_name}
-                        onChange={(e) =>
-                          updateArrayItem(
-                            "project_updates",
-                            idx,
-                            "project_name",
-                            e.target.value,
-                          )
-                        }
-                        className="w-full bg-white dark:bg-gray-900 border-none rounded-xl p-3"
-                      />
-                      <textarea
-                        placeholder="Work Completed (Detailed description of progress, features built, etc.)"
-                        value={proj.work_completed}
-                        onChange={(e) =>
-                          updateArrayItem(
-                            "project_updates",
-                            idx,
-                            "work_completed",
-                            e.target.value,
-                          )
-                        }
-                        className="w-full bg-white dark:bg-gray-900 border-none rounded-xl p-3 md:col-span-2 min-h-[80px]"
-                      />
-                      <select
-                        value={proj.status}
-                        onChange={(e) =>
-                          updateArrayItem(
-                            "project_updates",
-                            idx,
-                            "status",
-                            e.target.value,
-                          )
-                        }
-                        className="w-full bg-white dark:bg-gray-900 border-none rounded-xl p-3"
-                      >
-                        <option value="ON_TRACK">On Track</option>
-                        <option value="DELAYED">Delayed</option>
-                        <option value="COMPLETE">Complete</option>
-                      </select>
-                      <button
-                        onClick={() => removeArrayItem("project_updates", idx)}
-                        className="text-red-500 md:col-start-3 justify-self-end"
-                      >
-                        <Trash2 className="w-5 h-5" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* STEP 5: REFLECTIONS */}
-          {step === 5 && (
+          {/* STEP 3: REFLECTIONS */}
+          {step === 3 && (
             <div className="space-y-8 animate-in fade-in slide-in-from-right duration-500">
               <div className="bg-white dark:bg-gray-900 rounded-3xl p-8 shadow-sm border border-gray-100 dark:border-gray-800">
                 <div className="flex items-center space-x-3 mb-8">
@@ -1178,7 +841,7 @@ const ReportForm: React.FC<ReportFormProps> = ({
                 <h3 className="text-2xl font-bold mb-4">Ready to Submit?</h3>
                 <p className="opacity-80 mb-8 max-w-md mx-auto">
                   Please review your entries. Once submitted, your program
-                  manager will be notified of your weekly progress.
+                  manager will be notified of your daily progress.
                 </p>
                 <button
                   disabled={loading}
@@ -1204,9 +867,11 @@ const ReportForm: React.FC<ReportFormProps> = ({
           <span>Previous</span>
         </button>
 
-        <div className="text-sm font-bold text-gray-400">Step {step} of 5</div>
+        <div className="text-sm font-bold text-gray-400">
+          Step {step} of {TOTAL_STEPS}
+        </div>
 
-        {step < 5 ? (
+        {step < TOTAL_STEPS ? (
           <button
             onClick={() => setStep((s) => s + 1)}
             className="flex items-center space-x-2 text-blue-600 font-bold"
@@ -1221,53 +886,6 @@ const ReportForm: React.FC<ReportFormProps> = ({
     </div>
   );
 };
-
-// Helper Components
-const Counter: React.FC<{
-  label: string;
-  value: number;
-  onChange: (v: number) => void;
-  readOnly?: boolean;
-}> = ({ label, value, onChange, readOnly }) => (
-  <div
-    className={`flex flex-col space-y-3 p-6 rounded-2xl border transition-all ${readOnly ? "bg-gray-100 dark:bg-gray-800/80 border-gray-200 dark:border-gray-700" : "bg-gray-50 dark:bg-gray-800/50 border-gray-100 dark:border-gray-700/50"}`}
-  >
-    <div className="flex items-center justify-between">
-      <label className="text-sm font-bold text-gray-600 dark:text-gray-400">
-        {label}
-      </label>
-      {readOnly && <Shield className="w-4 h-4 text-blue-500" />}
-    </div>
-    <div className="flex items-center space-x-6">
-      {!readOnly && (
-        <button
-          onClick={() => onChange(Math.max(0, value - 1))}
-          className="w-10 h-10 flex items-center justify-center bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 text-xl font-bold hover:bg-gray-50 transition-colors"
-        >
-          -
-        </button>
-      )}
-      <span
-        className={`text-3xl font-black tabular-nums ${readOnly ? "text-gray-500" : "text-gray-800 dark:text-white"}`}
-      >
-        {value}
-      </span>
-      {!readOnly && (
-        <button
-          onClick={() => onChange(value + 1)}
-          className="w-10 h-10 flex items-center justify-center bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 text-xl font-bold hover:bg-gray-50 transition-colors"
-        >
-          +
-        </button>
-      )}
-      {readOnly && (
-        <div className="text-[10px] font-bold text-blue-500 uppercase tracking-wider bg-blue-50 dark:bg-blue-900/20 px-2 py-1 rounded-md">
-          Locked
-        </div>
-      )}
-    </div>
-  </div>
-);
 
 const ReflectField: React.FC<{
   label: string;

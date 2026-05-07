@@ -904,10 +904,13 @@ export const InstructorReport = mysqlTable("InstructorReport", {
   ]).default("ON_TRACK"),
   key_highlights: text("key_highlights"),
   challenges_encountered: text("challenges_encountered"),
-  // Snapshot metrics
+  // Snapshot metrics — lessons_delivered_count is auto-derived from lessons array
   lessons_delivered_count: int("lessons_delivered_count").default(0),
+  /** @deprecated Use MentorshipSession table counts instead */
   mentorship_sessions_count: int("mentorship_sessions_count").default(0),
+  /** @deprecated Subjective snapshot removed from lesson reporting flow */
   active_students_count: int("active_students_count").default(0),
+  /** @deprecated Subjective snapshot removed from lesson reporting flow */
   struggling_students_count: int("struggling_students_count").default(0),
   created_at: datetime("created_at").default(sql`CURRENT_TIMESTAMP`),
   updated_at: datetime("updated_at").default(

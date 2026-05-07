@@ -17,6 +17,7 @@ import {
   MentorshipSession,
   ReportProjectUpdate,
   ReportReflection,
+  LessonReport,
   Subject,
   SchemeOfWork,
   SchemeOfWorkEntry,
@@ -65,20 +66,24 @@ export const submitReport = asyncHandler(async (req: any, res: any) => {
     week_number,
     start_date,
     end_date,
-    progress_status,
     key_highlights,
     challenges_encountered,
-    metrics,
     topics,
     lessons,
-    mentorship_sessions,
-    project_updates,
     reflections,
   } = req.body;
 
   if (!start_date || !end_date) {
     throw new ValidationError("Start date and end date are required");
   }
+
+  const deliveredCount = Array.isArray(lessons)
+    ? lessons.filter((l: any) => l.delivered).length
+    : 0;
+  const plannedCount = Array.isArray(lessons) ? lessons.length : 0;
+  const derivedStatus = deliveredCount < plannedCount && plannedCount > 0
+    ? "SLIGHTLY_BEHIND"
+    : "ON_TRACK";
 
   // 1. Create the main report record
   const reportResult = await db.insert(InstructorReport).values({
@@ -88,13 +93,13 @@ export const submitReport = asyncHandler(async (req: any, res: any) => {
     week_number: week_number ? parseInt(week_number) : null,
     start_date,
     end_date,
-    progress_status: progress_status || "ON_TRACK",
+    progress_status: derivedStatus,
     key_highlights,
     challenges_encountered,
-    lessons_delivered_count: metrics?.lessons_delivered_count || 0,
-    mentorship_sessions_count: metrics?.mentorship_sessions_count || 0,
-    active_students_count: metrics?.active_students_count || 0,
-    struggling_students_count: metrics?.struggling_students_count || 0,
+    lessons_delivered_count: deliveredCount,
+    mentorship_sessions_count: 0,
+    active_students_count: 0,
+    struggling_students_count: 0,
   });
 
   const resultHeader = Array.isArray(reportResult)
@@ -126,51 +131,7 @@ export const submitReport = asyncHandler(async (req: any, res: any) => {
     }
   }
 
-  // 4. Insert Mentorship Sessions
-  if (mentorship_sessions && Array.isArray(mentorship_sessions)) {
-    for (const session of mentorship_sessions) {
-      const studentIdNum = parseInt(session.student_id);
-      const isNumericalId = !isNaN(studentIdNum) && studentIdNum > 0;
-
-      await db.insert(MentorshipSession).values({
-        report_id: Number(reportId),
-        user_id: Number(userId),
-        student_id: isNumericalId ? studentIdNum : null,
-        student_name: isNumericalId ? null : session.student_id,
-        session_date: session.session_date
-          ? (sql`${formatDbDate(session.session_date)}` as any)
-          : null,
-        duration_minutes: session.duration_minutes
-          ? parseInt(session.duration_minutes)
-          : null,
-        assignment_completion: session.assignment_completion,
-        punctuality_attendance: session.punctuality_attendance,
-        academic_planning: session.academic_planning,
-        next_steps: session.next_steps,
-        challenges_identified: session.challenges_identified,
-        wellbeing_status: session.wellbeing_status,
-        follow_up_required: session.follow_up_required ? 1 : 0,
-        notes: session.notes,
-      });
-    }
-  }
-
-  // 5. Insert Project Updates
-  if (project_updates && Array.isArray(project_updates)) {
-    for (const project of project_updates) {
-      await db.insert(ReportProjectUpdate).values({
-        report_id: reportId,
-        project_name: project.project_name,
-        role: project.role,
-        work_completed: project.work_completed,
-        status: project.status || "ON_TRACK",
-        key_outputs: project.key_outputs,
-        challenges: project.challenges,
-      });
-    }
-  }
-
-  // 6. Insert Reflections
+  // 4. Insert Reflections
   if (reflections) {
     await db.insert(ReportReflection).values({
       report_id: reportId,
@@ -607,7 +568,7 @@ export const getDashboardStats = asyncHandler(async (req: any, res: any) => {
   const userId = req.user.userId;
   const { start_date, end_date } = req.query;
 
-  const dateFilter = and(
+  const reportDateFilter = and(
     eq(InstructorReport.user_id, userId),
     start_date
       ? sql`DATE_FORMAT(${InstructorReport.start_date}, '%Y-%m-%d') >= ${start_date}`
@@ -617,60 +578,119 @@ export const getDashboardStats = asyncHandler(async (req: any, res: any) => {
       : sql`1=1`,
   );
 
-  // Total reports submitted
+  // Total unified reports submitted
   const totalReportsCount = await db
     .select({ count: count() })
     .from(InstructorReport)
-    .where(dateFilter);
+    .where(reportDateFilter);
 
-  // Total lessons delivered across all reports
+  // Total lessons delivered from decoupled LessonReport table (authoritative)
   const totalLessons = await db
-    .select({
-      total: sql<number>`SUM(${InstructorReport.lessons_delivered_count})`,
-    })
-    .from(InstructorReport)
-    .where(dateFilter);
+    .select({ total: count() })
+    .from(LessonReport)
+    .where(
+      and(
+        eq(LessonReport.reported_by, userId),
+        sql`${LessonReport.status} IN ('DELIVERED', 'PARTIAL')`,
+        start_date
+          ? sql`DATE_FORMAT(${LessonReport.delivery_date}, '%Y-%m-%d') >= ${start_date}`
+          : sql`1=1`,
+        end_date
+          ? sql`DATE_FORMAT(${LessonReport.delivery_date}, '%Y-%m-%d') <= ${end_date}`
+          : sql`1=1`,
+      ),
+    );
 
-  // Total mentorship sessions across all reports
+  // Total mentorship sessions from MentorshipSession table (authoritative)
   const totalMentorship = await db
-    .select({
-      total: sql<number>`SUM(${InstructorReport.mentorship_sessions_count})`,
-    })
-    .from(InstructorReport)
-    .where(dateFilter);
+    .select({ total: count() })
+    .from(MentorshipSession)
+    .where(
+      and(
+        eq(MentorshipSession.user_id, userId),
+        start_date
+          ? sql`DATE_FORMAT(${MentorshipSession.session_date}, '%Y-%m-%d') >= ${start_date}`
+          : sql`1=1`,
+        end_date
+          ? sql`DATE_FORMAT(${MentorshipSession.session_date}, '%Y-%m-%d') <= ${end_date}`
+          : sql`1=1`,
+      ),
+    );
 
-  // Most recent report date
+  // Most recent lesson report date
   const lastReport = await db
-    .select({ end_date: InstructorReport.end_date })
-    .from(InstructorReport)
-    .where(eq(InstructorReport.user_id, userId))
-    .orderBy(desc(InstructorReport.end_date))
+    .select({ delivery_date: LessonReport.delivery_date })
+    .from(LessonReport)
+    .where(eq(LessonReport.reported_by, userId))
+    .orderBy(desc(LessonReport.delivery_date))
     .limit(1);
 
-  // Recent activity trend
-  const trendRaw = await db
+  // Lesson trend: group by delivery_date
+  const lessonTrend = await db
     .select({
-      date: InstructorReport.end_date,
-      lessons: InstructorReport.lessons_delivered_count,
-      mentorship: InstructorReport.mentorship_sessions_count,
+      date: LessonReport.delivery_date,
+      lessons: sql<number>`COUNT(*)`,
     })
-    .from(InstructorReport)
-    .where(dateFilter)
-    .orderBy(desc(InstructorReport.end_date))
+    .from(LessonReport)
+    .where(
+      and(
+        eq(LessonReport.reported_by, userId),
+        sql`${LessonReport.status} IN ('DELIVERED', 'PARTIAL')`,
+        start_date
+          ? sql`DATE_FORMAT(${LessonReport.delivery_date}, '%Y-%m-%d') >= ${start_date}`
+          : sql`1=1`,
+        end_date
+          ? sql`DATE_FORMAT(${LessonReport.delivery_date}, '%Y-%m-%d') <= ${end_date}`
+          : sql`1=1`,
+      ),
+    )
+    .groupBy(LessonReport.delivery_date)
+    .orderBy(desc(LessonReport.delivery_date))
     .limit(start_date || end_date ? 50 : 15);
 
-  const trend = trendRaw.reverse().map((r) => ({
-    name: formatDbDate(r.date) || "",
-    lessons: r.lessons,
-    mentorship: r.mentorship,
-  }));
+  // Mentorship trend: group by session_date
+  const mentorshipTrend = await db
+    .select({
+      date: MentorshipSession.session_date,
+      mentorship: sql<number>`COUNT(*)`,
+    })
+    .from(MentorshipSession)
+    .where(
+      and(
+        eq(MentorshipSession.user_id, userId),
+        start_date
+          ? sql`DATE_FORMAT(${MentorshipSession.session_date}, '%Y-%m-%d') >= ${start_date}`
+          : sql`1=1`,
+        end_date
+          ? sql`DATE_FORMAT(${MentorshipSession.session_date}, '%Y-%m-%d') <= ${end_date}`
+          : sql`1=1`,
+      ),
+    )
+    .groupBy(MentorshipSession.session_date)
+    .orderBy(desc(MentorshipSession.session_date))
+    .limit(start_date || end_date ? 50 : 15);
+
+  // Merge lesson and mentorship trends by date
+  const trendMap = new Map<string, { lessons: number; mentorship: number }>();
+  lessonTrend.forEach((l) => {
+    const d = formatDbDate(l.date) || "";
+    trendMap.set(d, { lessons: Number(l.lessons), mentorship: 0 });
+  });
+  mentorshipTrend.forEach((m) => {
+    const d = formatDbDate(m.date) || "";
+    const existing = trendMap.get(d) || { lessons: 0, mentorship: 0 };
+    trendMap.set(d, { ...existing, mentorship: Number(m.mentorship) });
+  });
+  const trend = Array.from(trendMap.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([name, data]) => ({ name, ...data }));
 
   successResponse(res, "Dashboard stats retrieved successfully", {
     totalReports: totalReportsCount[0].count,
     totalLessons: totalLessons[0].total || 0,
     totalMentorship: totalMentorship[0].total || 0,
     lastReportDate:
-      lastReport.length > 0 ? formatDbDate(lastReport[0].end_date) : null,
+      lastReport.length > 0 ? formatDbDate(lastReport[0].delivery_date) : null,
     trend,
   });
 });
@@ -729,14 +749,10 @@ export const updateReport = asyncHandler(async (req: any, res: any) => {
     week_number,
     start_date,
     end_date,
-    progress_status,
     key_highlights,
     challenges_encountered,
-    metrics,
     topics,
     lessons,
-    mentorship_sessions,
-    project_updates,
     reflections,
   } = req.body;
 
@@ -756,6 +772,14 @@ export const updateReport = asyncHandler(async (req: any, res: any) => {
     throw new NotFoundError("Report not found or access denied");
   }
 
+  const deliveredCount = Array.isArray(lessons)
+    ? lessons.filter((l: any) => l.delivered).length
+    : 0;
+  const plannedCount = Array.isArray(lessons) ? lessons.length : 0;
+  const derivedStatus = deliveredCount < plannedCount && plannedCount > 0
+    ? "SLIGHTLY_BEHIND"
+    : "ON_TRACK";
+
   // 2. Update the main report record
   await db
     .update(InstructorReport)
@@ -763,13 +787,13 @@ export const updateReport = asyncHandler(async (req: any, res: any) => {
       academic_term_id: academic_term_id ? parseInt(academic_term_id) : null,
       class_group_id: class_group_id ? parseInt(class_group_id) : null,
       week_number: week_number ? parseInt(week_number) : null,
-      progress_status: progress_status || "ON_TRACK",
+      progress_status: derivedStatus,
       key_highlights,
       challenges_encountered,
-      lessons_delivered_count: metrics?.lessons_delivered_count || 0,
-      mentorship_sessions_count: metrics?.mentorship_sessions_count || 0,
-      active_students_count: metrics?.active_students_count || 0,
-      struggling_students_count: metrics?.struggling_students_count || 0,
+      lessons_delivered_count: deliveredCount,
+      mentorship_sessions_count: 0,
+      active_students_count: 0,
+      struggling_students_count: 0,
     })
     .where(eq(InstructorReport.report_id, reportId));
 
@@ -799,48 +823,7 @@ export const updateReport = asyncHandler(async (req: any, res: any) => {
     }
   }
 
-  // 5. Replace Mentorship Sessions
-  await db
-    .delete(MentorshipSession)
-    .where(eq(MentorshipSession.report_id, reportId));
-  if (mentorship_sessions && Array.isArray(mentorship_sessions)) {
-    for (const session of mentorship_sessions) {
-      const studentIdNum = parseInt(session.student_id);
-      const isNumericalId = !isNaN(studentIdNum) && studentIdNum > 0;
-
-      await db.insert(MentorshipSession).values({
-        report_id: Number(reportId),
-        user_id: Number(userId),
-        student_id: isNumericalId ? studentIdNum : null,
-        student_name: isNumericalId ? null : session.student_id,
-        session_date: session.session_date
-          ? (sql`${formatDbDate(session.session_date)}` as any)
-          : null,
-        duration_minutes: session.duration_minutes
-          ? parseInt(session.duration_minutes)
-          : null,
-        notes: session.notes,
-      });
-    }
-  }
-
-  // 6. Replace Project Updates
-  await db
-    .delete(ReportProjectUpdate)
-    .where(eq(ReportProjectUpdate.report_id, reportId));
-  if (project_updates && Array.isArray(project_updates)) {
-    for (const project of project_updates) {
-      await db.insert(ReportProjectUpdate).values({
-        report_id: reportId,
-        project_name: project.project_name,
-        role: project.role,
-        work_completed: project.work_completed,
-        status: project.status || "ON_TRACK",
-      });
-    }
-  }
-
-  // 7. Replace Reflections
+  // 5. Replace Reflections
   await db
     .delete(ReportReflection)
     .where(eq(ReportReflection.report_id, reportId));

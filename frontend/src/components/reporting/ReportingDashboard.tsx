@@ -194,32 +194,47 @@ const ReportingDashboard: React.FC<ReportingDashboardProps> = ({
         )}
       </div>
 
-      {/* Top Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <StatCard
-          title="Total Reports"
-          value={stats?.totalReports ?? 0}
-          icon={<FileText className="w-5 h-5" />}
-          color="blue"
-        />
-        <StatCard
-          title="Lessons Delivered"
-          value={stats?.totalLessons ?? 0}
-          icon={<BookOpen className="w-5 h-5" />}
-          color="green"
-        />
-        <StatCard
-          title="Mentorship Sessions"
-          value={stats?.totalMentorship ?? 0}
-          icon={<Users className="w-5 h-5" />}
-          color="purple"
-        />
-        <StatCard
-          title="Last Report"
-          value={lastReportDate}
-          icon={<CalendarCheck className="w-5 h-5" />}
-          color="amber"
-        />
+      {/* Top Stats — split by domain */}
+      <div className="space-y-3">
+        <div>
+          <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest mb-2 px-1">
+            Curriculum Delivery
+          </p>
+          <div className="grid grid-cols-2 gap-4">
+            <StatCard
+              title="Total Reports"
+              value={stats?.totalReports ?? 0}
+              icon={<FileText className="w-5 h-5" />}
+              color="blue"
+            />
+            <StatCard
+              title="Lessons Delivered"
+              value={stats?.totalLessons ?? 0}
+              icon={<BookOpen className="w-5 h-5" />}
+              color="green"
+            />
+          </div>
+        </div>
+
+        <div>
+          <p className="text-[10px] font-black text-purple-500 uppercase tracking-widest mb-2 px-1">
+            Student Support
+          </p>
+          <div className="grid grid-cols-2 gap-4">
+            <StatCard
+              title="Mentorship Sessions"
+              value={stats?.totalMentorship ?? 0}
+              icon={<Users className="w-5 h-5" />}
+              color="purple"
+            />
+            <StatCard
+              title="Last Lesson Report"
+              value={lastReportDate}
+              icon={<CalendarCheck className="w-5 h-5" />}
+              color="amber"
+            />
+          </div>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -231,7 +246,7 @@ const ReportingDashboard: React.FC<ReportingDashboardProps> = ({
                 Reporting Trend
               </h3>
               <p className="text-gray-400 text-xs mt-0.5">
-                Lessons delivered & mentorship sessions per report
+                Lessons delivered & mentorship sessions per day
               </p>
             </div>
             <div className="flex items-center gap-3 text-xs">

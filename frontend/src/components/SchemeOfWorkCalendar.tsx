@@ -3,7 +3,7 @@ import { useSearchParams, useNavigate } from "react-router-dom";
 import { schemeOfWorkApi, SchemeEntry } from "../api/schemeOfWork";
 import { useToast } from "../contexts/ToastContext";
 import { lessonPlanApi, LessonPlan } from "../api/lessonPlan";
-import { myAssignedSubjectsApi } from "../api/academics";
+import { myAssignedSubjectsApi, MyAssignedSubject } from "../api/academics";
 import RealCalendarView from "./RealCalendarView";
 import SchemeOfWorkEntryModal from "./SchemeOfWorkEntryModal";
 import LessonPlanModal from "./LessonPlanModal";
@@ -148,15 +148,14 @@ const SchemeOfWorkCalendar: React.FC = () => {
         );
         if (subject) {
           const gradeInfo = subject.grades.find(
-            (g: any) =>
-              g.class_group_id === classGroupId &&
-              g.academic_term_id === academicTermId,
+            (g: MyAssignedSubject["grades"][number]) =>
+              g.class_group_id === classGroupId,
           );
           setSubjectInfo({
             name: subject.subject_name,
             code: subject.subject_code || "",
             classGroupName: gradeInfo?.class_group_name || "",
-            termName: gradeInfo?.academic_term_name || "",
+            termName: `Term ${academicTermId}`,
           });
         }
       } catch (err) {
