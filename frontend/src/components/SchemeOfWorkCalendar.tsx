@@ -44,7 +44,9 @@ import {
   AlertTriangle,
   ArrowRight,
   Download,
+  PenLine,
 } from "lucide-react";
+import SchemeManualEntry from "./SchemeManualEntry";
 
 const SchemeOfWorkCalendar: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -107,6 +109,9 @@ const SchemeOfWorkCalendar: React.FC = () => {
   // Preview modal state
   const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
   const [previewEntry, setPreviewEntry] = useState<SchemeEntry | null>(null);
+
+  // Entry mode for empty state
+  const [entryMode, setEntryMode] = useState<"choose" | "manual" | "upload">("choose");
 
   useEffect(() => {
     if (
@@ -1052,46 +1057,156 @@ const SchemeOfWorkCalendar: React.FC = () => {
         </div>
 
         {entries.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 bg-white dark:bg-gray-900/60 border border-gray-200 dark:border-gray-700 rounded-3xl border-dashed">
-            <div className="w-16 h-16 bg-blue-50 dark:bg-blue-900/20 rounded-full flex items-center justify-center mb-6">
-              <CloudUpload className="w-8 h-8 text-blue-600" />
-            </div>
-            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">
-              No Scheme Found
-            </h3>
-            <p className="text-sm text-gray-500 max-w-sm text-center mb-8">
-              Upload a DOCX scheme of work file to get started. We'll extract
-              the weeks and topics automatically.
-            </p>
-            {!file ? (
-              <label className="cursor-pointer inline-flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-full transition-colors shadow-sm">
-                <FileText className="w-4 h-4" />
-                Select DOCX File
-                <input
-                  type="file"
-                  accept=".docx"
-                  className="hidden"
-                  onChange={handleFileChange}
-                />
-              </label>
-            ) : (
-              <button
-                onClick={handleUpload}
-                disabled={
-                  isUploading ||
-                  schemeMetadata?.validation_status === "APPROVED"
-                }
-                className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-full transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+          <AnimatePresence mode="wait">
+            {entryMode === "choose" && (
+              <motion.div
+                key="choose"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.2 }}
               >
-                {isUploading ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <CloudUpload className="w-4 h-4" />
-                )}
-                {isUploading ? "Uploading..." : "Start Import"}
-              </button>
+                {/* Hero prompt */}
+                <div className="text-center mb-8">
+                  <div className="w-14 h-14 mx-auto rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center mb-4 shadow-lg shadow-blue-500/20">
+                    <BookOpen className="w-7 h-7 text-white" />
+                  </div>
+                  <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-1">
+                    No Scheme of Work Yet
+                  </h3>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 max-w-sm mx-auto">
+                    Choose how you'd like to create your scheme — manually is easier and faster.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl mx-auto">
+                  {/* Manual entry — featured */}
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.99 }}
+                    onClick={() => setEntryMode("manual")}
+                    className="relative group text-left p-6 rounded-3xl bg-gradient-to-br from-blue-600 to-indigo-700 text-white shadow-xl shadow-blue-600/25 hover:shadow-blue-600/40 transition-all overflow-hidden"
+                  >
+                    {/* Glow */}
+                    <div className="absolute inset-0 bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity rounded-3xl" />
+                    <div className="absolute top-3 right-3 bg-white/20 text-white text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
+                      Recommended
+                    </div>
+                    <div className="w-12 h-12 rounded-2xl bg-white/20 flex items-center justify-center mb-4">
+                      <PenLine className="w-6 h-6 text-white" />
+                    </div>
+                    <h4 className="text-lg font-bold mb-1">Build Manually</h4>
+                    <p className="text-sm text-white/80 leading-relaxed mb-4">
+                      Use our spreadsheet-style editor. Add weeks, dates, and topics row by row. Auto-fill dates from a start date.
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {["No file needed", "Auto-date fill", "Instant save"].map((tag) => (
+                        <span key={tag} className="text-xs bg-white/20 text-white px-2.5 py-0.5 rounded-full font-medium">
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                    <div className="mt-5 flex items-center gap-2 text-sm font-semibold">
+                      Open Editor <ArrowRight className="w-4 h-4" />
+                    </div>
+                  </motion.button>
+
+                  {/* Upload DOCX */}
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.99 }}
+                    onClick={() => setEntryMode("upload")}
+                    className="group text-left p-6 rounded-3xl bg-white dark:bg-slate-900 border-2 border-gray-200 dark:border-slate-700 hover:border-blue-300 dark:hover:border-blue-600 hover:shadow-lg transition-all"
+                  >
+                    <div className="w-12 h-12 rounded-2xl bg-gray-100 dark:bg-slate-800 group-hover:bg-blue-50 dark:group-hover:bg-blue-900/20 flex items-center justify-center mb-4 transition-colors">
+                      <CloudUpload className="w-6 h-6 text-gray-500 dark:text-gray-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors" />
+                    </div>
+                    <h4 className="text-lg font-bold text-gray-900 dark:text-white mb-1">
+                      Import from DOCX
+                    </h4>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed mb-4">
+                      Already have a DOCX scheme file? Upload it and we'll extract weeks and topics automatically.
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {["Requires .docx file", "Auto-parsed"].map((tag) => (
+                        <span key={tag} className="text-xs bg-gray-100 dark:bg-slate-800 text-gray-500 dark:text-gray-400 px-2.5 py-0.5 rounded-full font-medium">
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                    <div className="mt-5 flex items-center gap-2 text-sm font-semibold text-gray-600 dark:text-gray-300">
+                      Upload File <ArrowRight className="w-4 h-4" />
+                    </div>
+                  </motion.button>
+                </div>
+              </motion.div>
             )}
-          </div>
+
+            {entryMode === "manual" && (
+              <SchemeManualEntry
+                key="manual"
+                subjectId={subjectId}
+                classGroupId={classGroupId}
+                academicTermId={academicTermId}
+                subjectName={subjectInfo?.name}
+                classGroupName={subjectInfo?.classGroupName}
+                termName={subjectInfo?.termName}
+                onComplete={() => { setEntryMode("choose"); loadData(); }}
+                onCancel={() => setEntryMode("choose")}
+              />
+            )}
+
+            {entryMode === "upload" && (
+              <motion.div
+                key="upload"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.2 }}
+                className="max-w-md mx-auto"
+              >
+                <div className="flex flex-col items-center justify-center py-16 bg-white dark:bg-slate-900 border-2 border-dashed border-gray-200 dark:border-slate-700 rounded-3xl">
+                  <div className="w-16 h-16 bg-blue-50 dark:bg-blue-900/20 rounded-2xl flex items-center justify-center mb-5">
+                    <CloudUpload className="w-8 h-8 text-blue-600 dark:text-blue-400" />
+                  </div>
+                  <h3 className="text-base font-bold text-gray-900 dark:text-white mb-1">
+                    Upload DOCX Scheme
+                  </h3>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 text-center max-w-xs mb-6">
+                    We'll extract weeks and topics from your file automatically.
+                  </p>
+                  {!file ? (
+                    <label className="cursor-pointer inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-full transition-colors shadow-sm">
+                      <FileText className="w-4 h-4" />
+                      Select DOCX File
+                      <input type="file" accept=".docx" className="hidden" onChange={handleFileChange} />
+                    </label>
+                  ) : (
+                    <div className="flex flex-col items-center gap-3 w-full px-6">
+                      <div className="w-full flex items-center gap-3 px-4 py-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800/50 rounded-xl">
+                        <FileText className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0" />
+                        <span className="text-sm text-blue-700 dark:text-blue-300 font-medium truncate">{file.name}</span>
+                      </div>
+                      <button
+                        onClick={handleUpload}
+                        disabled={isUploading}
+                        className="w-full flex items-center justify-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-full transition-colors shadow-sm disabled:opacity-50"
+                      >
+                        {isUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <CloudUpload className="w-4 h-4" />}
+                        {isUploading ? "Uploading..." : "Start Import"}
+                      </button>
+                    </div>
+                  )}
+                  <button
+                    onClick={() => setEntryMode("choose")}
+                    className="mt-4 text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                  >
+                    ← Back to options
+                  </button>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         ) : (
           <div className="animate-in fade-in duration-300">
             <ValidationBanner />

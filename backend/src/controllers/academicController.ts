@@ -2524,6 +2524,64 @@ export const getSubjectEnrolledStudents = asyncHandler(
   },
 );
 
+// GET /subjects/:subject_id/terms/:term_id/students
+// Resolves term → academic_year then returns the same enrollment data
+export const getSubjectEnrolledStudentsByTerm = asyncHandler(
+  async (req: any, res: any) => {
+    const { subject_id, term_id } = req.params;
+
+    const subjId = parseInt(subject_id);
+    const termId = parseInt(term_id);
+
+    if (isNaN(subjId) || isNaN(termId)) {
+      throw new ValidationError("Invalid subject ID or term ID");
+    }
+
+    // Resolve term → academic_year_id
+    const [term] = await db
+      .select({ academic_year_id: AcademicTerm.academic_year_id })
+      .from(AcademicTerm)
+      .where(eq(AcademicTerm.academic_term_id, termId))
+      .limit(1);
+
+    if (!term) {
+      return successResponse(res, "Enrolled students retrieved successfully", []);
+    }
+
+    const students = await db
+      .select({
+        user_id: User.user_id,
+        username: User.username,
+        first_name: UserProfile.first_name,
+        last_name: UserProfile.last_name,
+        gender: UserProfile.gender,
+        class_group_name: ClassGroup.name,
+        grade_name: Grade.name,
+        program_name: Program.name,
+        enrolled_at: StudentSubjectEnrollment.enrolled_at,
+      })
+      .from(StudentSubjectEnrollment)
+      .innerJoin(User, eq(StudentSubjectEnrollment.user_id, User.user_id))
+      .innerJoin(UserProfile, eq(User.user_id, UserProfile.user_id))
+      .leftJoin(StudentClassGroup, eq(User.user_id, StudentClassGroup.user_id))
+      .leftJoin(
+        ClassGroup,
+        eq(StudentClassGroup.class_group_id, ClassGroup.class_group_id),
+      )
+      .leftJoin(Grade, eq(ClassGroup.grade_id, Grade.grade_id))
+      .leftJoin(Program, eq(Grade.program_id, Program.program_id))
+      .where(
+        and(
+          eq(StudentSubjectEnrollment.subject_id, subjId),
+          eq(StudentSubjectEnrollment.academic_year_id, term.academic_year_id),
+        ),
+      )
+      .orderBy(UserProfile.first_name, UserProfile.last_name);
+
+    successResponse(res, "Enrolled students retrieved successfully", students);
+  },
+);
+
 // Student Subject Enrollment Management
 export const getStudentEnrolledSubjects = asyncHandler(
   async (req: any, res: any) => {

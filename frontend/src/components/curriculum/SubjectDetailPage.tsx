@@ -8,18 +8,21 @@ import {
   LayoutGrid,
   FileText,
   Loader2,
+  Users,
 } from "lucide-react";
 import { subjectDetailApi, SubjectDetail } from "../../api/curriculum";
 import { useToast } from "../../contexts/ToastContext";
 import CurriculumTab from "./CurriculumTab";
 import SubjectMaterialsTab from "./SubjectMaterialsTab";
+import EnrolledStudentsTab from "./EnrolledStudentsTab";
 
-type Tab = "overview" | "curriculum" | "materials";
+type Tab = "overview" | "curriculum" | "materials" | "students";
 
 const tabs: { id: Tab; label: string; icon: React.ElementType }[] = [
   { id: "overview", label: "Overview", icon: LayoutGrid },
   { id: "curriculum", label: "Curriculum", icon: BookOpen },
   { id: "materials", label: "Materials", icon: FolderOpen },
+  { id: "students", label: "Students", icon: Users },
 ];
 
 const SubjectDetailPage: React.FC = () => {
@@ -192,6 +195,9 @@ const SubjectDetailPage: React.FC = () => {
             )}
             {activeTab === "curriculum" && <CurriculumTab subjectId={id} />}
             {activeTab === "materials" && <SubjectMaterialsTab subjectId={id} />}
+            {activeTab === "students" && (
+              <EnrolledStudentsTab subjectId={id} subjectName={subject.name} />
+            )}
           </motion.div>
         </AnimatePresence>
       </div>

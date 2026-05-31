@@ -54,6 +54,7 @@ import {
   removeTeacherFromSubject,
   getMyAssignedSubjects,
   getSubjectEnrolledStudents,
+  getSubjectEnrolledStudentsByTerm,
 
   // Student Subject Enrollment
   getStudentEnrolledSubjects,
@@ -301,6 +302,11 @@ router.get(
   "/subjects/:subject_id/years/:academic_year_id/students",
   authenticate,
   getSubjectEnrolledStudents,
+);
+router.get(
+  "/subjects/:subject_id/terms/:term_id/students",
+  authenticate,
+  getSubjectEnrolledStudentsByTerm,
 );
 
 // Student Subject Enrollment routes
