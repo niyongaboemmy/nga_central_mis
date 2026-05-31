@@ -5,7 +5,7 @@ import {
   myAssignedSubjectsApi,
   studentEnrollmentApi,
 } from "../api/academics";
-import { documentsApi } from "../api/documents";
+import { userApi as documentsApi } from "../api/documents";
 import Button from "./ui/Button";
 import Modal from "./ui/Modal";
 import CurriculumTab from "./curriculum/CurriculumTab";

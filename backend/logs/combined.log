@@ -28661,3 +28661,23 @@
 {"level":"info","message":"Server running on port 5001 in development mode","service":"nga-central-mis","timestamp":"2026-05-31T12:41:08.457Z"}
 {"host":"mail.hackflix.net","level":"info","message":"Email service connected successfully","port":465,"service":"nga-central-mis","timestamp":"2026-05-31T12:41:14.565Z"}
 {"level":"info","message":"SIGINT received, shutting down gracefully","service":"nga-central-mis","timestamp":"2026-05-31T13:00:54.444Z"}
+{"level":"info","message":"Server running on port 5001 in development mode","service":"nga-central-mis","timestamp":"2026-05-31T13:12:36.294Z"}
+{"host":"mail.hackflix.net","level":"info","message":"Email service connected successfully","port":465,"service":"nga-central-mis","timestamp":"2026-05-31T13:12:40.482Z"}
+{"ip":"::1","level":"info","message":"GET /academics/years","service":"nga-central-mis","timestamp":"2026-05-31T13:18:47.150Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36"}
+{"duration":8,"level":"info","message":"GET /academics/years 401 - 8ms","service":"nga-central-mis","statusCode":401,"timestamp":"2026-05-31T13:18:47.157Z"}
+{"ip":"::1","level":"info","message":"GET /academics/programs","service":"nga-central-mis","timestamp":"2026-05-31T13:18:47.158Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36"}
+{"duration":1,"level":"info","message":"GET /academics/programs 401 - 1ms","service":"nga-central-mis","statusCode":401,"timestamp":"2026-05-31T13:18:47.159Z"}
+{"ip":"::1","level":"info","message":"GET /users/me","service":"nga-central-mis","timestamp":"2026-05-31T13:18:47.160Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36"}
+{"duration":1,"level":"info","message":"GET /users/me 401 - 1ms","service":"nga-central-mis","statusCode":401,"timestamp":"2026-05-31T13:18:47.161Z"}
+{"ip":"::1","level":"info","message":"GET /auth/session","service":"nga-central-mis","timestamp":"2026-05-31T13:18:47.732Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36"}
+{"duration":2,"level":"info","message":"GET /auth/session 401 - 2ms","service":"nga-central-mis","statusCode":401,"timestamp":"2026-05-31T13:18:47.734Z"}
+{"ip":"::1","level":"info","message":"GET /academics/years","service":"nga-central-mis","timestamp":"2026-05-31T13:18:47.735Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36"}
+{"duration":0,"level":"info","message":"GET /academics/years 401 - 0ms","service":"nga-central-mis","statusCode":401,"timestamp":"2026-05-31T13:18:47.735Z"}
+{"ip":"::1","level":"info","message":"GET /academics/programs","service":"nga-central-mis","timestamp":"2026-05-31T13:18:47.736Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36"}
+{"duration":1,"level":"info","message":"GET /academics/programs 401 - 1ms","service":"nga-central-mis","statusCode":401,"timestamp":"2026-05-31T13:18:47.737Z"}
+{"ip":"::1","level":"info","message":"GET /auth/session","service":"nga-central-mis","timestamp":"2026-05-31T13:18:47.810Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36"}
+{"duration":28,"level":"info","message":"GET /auth/session 401 - 28ms","service":"nga-central-mis","statusCode":401,"timestamp":"2026-05-31T13:18:47.838Z"}
+{"ip":"::1","level":"info","message":"GET /auth/session","service":"nga-central-mis","timestamp":"2026-05-31T13:18:50.264Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36"}
+{"duration":1,"level":"info","message":"GET /auth/session 401 - 1ms","service":"nga-central-mis","statusCode":401,"timestamp":"2026-05-31T13:18:50.265Z"}
+{"ip":"::1","level":"info","message":"GET /auth/session","service":"nga-central-mis","timestamp":"2026-05-31T13:18:50.401Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36"}
+{"duration":1,"level":"info","message":"GET /auth/session 401 - 1ms","service":"nga-central-mis","statusCode":401,"timestamp":"2026-05-31T13:18:50.402Z"}
