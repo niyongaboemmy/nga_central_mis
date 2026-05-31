@@ -2719,42 +2719,37 @@ export const getAvailableSubjectsForStudent = asyncHandler(
       throw new ValidationError("Invalid academic year ID");
     }
 
-    // 2. Get all active subjects linked to this student's grade via GradeSubject
-    const subjects = await db
+    // 2. Get ALL active subjects (not restricted to GradeSubject so nothing is
+    //    missed when that junction table is incomplete)
+    const allSubjects = await db
       .select({
         subject_id: Subject.subject_id,
         code: Subject.code,
         name: Subject.name,
         description: Subject.description,
       })
-      .from(GradeSubject)
-      .innerJoin(Subject, eq(GradeSubject.subject_id, Subject.subject_id))
-      .where(
-        and(
-          eq(GradeSubject.grade_id, gradeIdNum),
-          eq(Subject.status, "ACTIVE"),
-        ),
-      )
+      .from(Subject)
+      .where(eq(Subject.status, "ACTIVE"))
       .orderBy(Subject.name);
 
-    // 3. Get active enrollments for this student and year to filter out
+    // 3. Get active enrollments for this student and year to exclude them
     const enrolledEntries = await db
-          .select({ subject_id: StudentSubjectEnrollment.subject_id })
-          .from(StudentSubjectEnrollment)
-          .where(
-            and(
-              eq(StudentSubjectEnrollment.user_id, studentIdNum),
-              eq(StudentSubjectEnrollment.academic_year_id, yearId),
-              eq(StudentSubjectEnrollment.status, "ACTIVE"),
-            ),
-          );
+      .select({ subject_id: StudentSubjectEnrollment.subject_id })
+      .from(StudentSubjectEnrollment)
+      .where(
+        and(
+          eq(StudentSubjectEnrollment.user_id, studentIdNum),
+          eq(StudentSubjectEnrollment.academic_year_id, yearId),
+          eq(StudentSubjectEnrollment.status, "ACTIVE"),
+        ),
+      );
 
     const enrolledIds = new Set(
       enrolledEntries.map((e) => Number(e.subject_id)),
     );
 
-    // 4. Transform results into the requested format, filtering out already enrolled subjects
-    const result = subjects
+    // 4. Filter out already-enrolled subjects and attach grade context
+    const result = allSubjects
       .filter((s) => !enrolledIds.has(Number(s.subject_id)))
       .map((s) => ({
         subject_id: s.subject_id,
