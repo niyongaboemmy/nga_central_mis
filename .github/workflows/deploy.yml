@@ -46,7 +46,6 @@ jobs:
             **/src/**
             **/*.ts
             **/*.test.*
-            **/logs/**
             **/uploads/**
             **/*.sql
             **/*.db
@@ -70,6 +69,8 @@ jobs:
           port: 21098
           script: |
             cd ~/ngamis-api
+            mkdir -p logs
             npm install --omit=dev
+            which pm2 || npm install -g pm2
             pm2 restart ecosystem.config.js --env production || pm2 start ecosystem.config.js --env production
             pm2 save
