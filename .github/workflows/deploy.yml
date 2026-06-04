@@ -1,48 +1,75 @@
-name: Deploy Backend to EC2
+name: Deploy Backend to cPanel
 
 on:
   push:
     branches:
-      - main 
-    paths:
-      - 'backend/**' # Only runs if you make changes to the backend
+      - main
+  workflow_dispatch:
 
 jobs:
-  build-and-deploy-backend:
+  deploy-backend:
+    name: Build & Deploy Backend
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v3
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
       - name: Setup Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: 20
 
-      - name: Install and Build TypeScript
-        working-directory: ./backend 
-        run: |
-          npm install
-          npm run build # ACTIVE: This compiles your .ts files into .js files
+      - name: Install backend dependencies
+        working-directory: backend
+        run: rm -f package-lock.json && npm install --legacy-peer-deps
 
-      - name: Copy Files to EC2
-        uses: appleboy/scp-action@v0.1.4
+      - name: Build backend (TypeScript → dist/)
+        working-directory: backend
+        run: npm run build
+
+      - name: Deploy backend files via FTP
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USERNAME }}
-          key: ${{ secrets.EC2_SSH_KEY }}
-          source: "backend/dist/,backend/package.json,backend/package-lock.json" 
-          target: "/var/www" 
-          strip_components: 1
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          protocol: ftps
+          port: 21
+          local-dir: ./backend/
+          server-dir: ngamis-api/
+          dangerous-clean-slate: false
+          exclude: |
+            **/.git*
+            **/.git*/**
+            **/node_modules/**
+            **/src/**
+            **/*.ts
+            **/*.test.*
+            **/logs/**
+            **/uploads/**
+            **/*.sql
+            **/*.db
+            **/*.sqlite
+            **/drizzle/**
+            **/temp/**
+            **/test_*.js
+            **/check_*.js
+            **/diagnose*.js
+            **/inspect*.js
+            **/migrate_*.js
+            **/full_extract.js
 
-      - name: Restart PM2 on EC2
-        uses: appleboy/ssh-action@v1.0.0
+      - name: Install production deps & restart app via SSH
+        uses: appleboy/ssh-action@v1.0.3
         with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USERNAME }}
-          key: ${{ secrets.EC2_SSH_KEY }}
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          passphrase: ${{ secrets.SSH_PASSWORD }}
+          port: 21098
           script: |
-            cd /var/www
-            npm install --production
-            pm2 restart mis
+            cd ~/ngamis-api
+            npm install --omit=dev
+            pm2 restart ecosystem.config.js --env production || pm2 start ecosystem.config.js --env production
+            pm2 save
