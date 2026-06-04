@@ -29177,3 +29177,6 @@
 {"ip":"::1","level":"info","message":"GET /academics/my-assigned-subjects","service":"nga-central-mis","timestamp":"2026-05-31T14:07:09.184Z","userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36"}
 {"duration":6,"level":"info","message":"GET /academics/my-assigned-subjects 304 - 6ms","service":"nga-central-mis","statusCode":304,"timestamp":"2026-05-31T14:07:09.190Z"}
 {"level":"info","message":"SIGINT received, shutting down gracefully","service":"nga-central-mis","timestamp":"2026-05-31T14:07:13.227Z"}
+{"level":"info","message":"Server running on port 5001 in development mode","service":"nga-central-mis","timestamp":"2026-06-04T14:32:39.598Z"}
+{"host":"mail.hackflix.net","level":"info","message":"Email service connected successfully","port":465,"service":"nga-central-mis","timestamp":"2026-06-04T14:32:42.314Z"}
+{"level":"info","message":"SIGINT received, shutting down gracefully","service":"nga-central-mis","timestamp":"2026-06-04T14:32:58.682Z"}
