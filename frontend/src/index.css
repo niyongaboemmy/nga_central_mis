@@ -4,6 +4,27 @@
 @tailwind components;
 @tailwind utilities;
 
+html {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+}
+
+body {
+  line-height: 1.6;
+}
+
+* {
+  font-optical-sizing: auto;
+}
+
+table td,
+table th,
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
 /* Custom animations */
 @keyframes shrink {
     from {
