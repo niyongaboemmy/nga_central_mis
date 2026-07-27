@@ -466,8 +466,8 @@ const Sidebar: React.FC<SidebarProps> = ({
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 py-4 overflow-y-auto text-sm">
-        <ul className="space-y-1 px-3">
+      <nav className="flex-1 py-3 overflow-y-auto text-sm">
+        <ul className="space-y-0.5 px-2.5">
           {navItems
             .filter((item) => hasPermission(item.requiredPermission))
             .map((item, index) => (
@@ -488,7 +488,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                   }}
                   className={`w-full flex items-center ${
                     isCollapsed ? "justify-center" : ""
-                  } space-x-3 px-3 py-3 rounded-xl transition-all duration-200 ${
+                  } space-x-3 px-3 py-2.5 rounded-xl transition-all duration-200 ${
                     isActive(item.path)
                       ? "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"
                       : "font-light text-text-secondary-light dark:text-text-secondary-dark/70 hover:bg-surface-light dark:hover:bg-surface-dark hover:text-text-primary-light dark:hover:text-text-primary-dark"

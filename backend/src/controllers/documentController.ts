@@ -49,6 +49,205 @@ import path from "path";
 const mammoth = require("mammoth");
 
 // ======================
+// ACCESS RESOLUTION HELPERS
+//
+// Shared by every read path (direct fetch, download, folder listing, and the
+// "shared with me" list) so that filter-scoped role shares are enforced
+// consistently everywhere instead of only in the list endpoints.
+// ======================
+
+interface UserFilterAssociations {
+  assignedSubjectIds: number[];
+  enrolledSubjectIds: number[];
+  programIds: number[];
+  gradeIds: number[];
+}
+
+async function getUserFilterAssociations(
+  userId: number,
+): Promise<UserFilterAssociations> {
+  const assignedSubjects = await db
+    .select({ subject_id: TeacherSubjectAssignment.subject_id })
+    .from(TeacherSubjectAssignment)
+    .where(eq(TeacherSubjectAssignment.user_id, userId));
+
+  const currentTerm = await db
+    .select({ academic_year_id: AcademicTerm.academic_year_id })
+    .from(AcademicTerm)
+    .where(eq(AcademicTerm.is_current, 1))
+    .limit(1);
+  const currentYearId =
+    currentTerm.length > 0 ? currentTerm[0].academic_year_id : null;
+
+  let enrolledSubjects: { subject_id: number }[] = [];
+  if (currentYearId) {
+    enrolledSubjects = await db
+      .select({ subject_id: StudentSubjectEnrollment.subject_id })
+      .from(StudentSubjectEnrollment)
+      .where(
+        and(
+          eq(StudentSubjectEnrollment.user_id, userId),
+          eq(StudentSubjectEnrollment.academic_year_id, currentYearId),
+        ),
+      );
+  }
+
+  const programLeads = await db
+    .select({ program_id: UserProgramLead.program_id })
+    .from(UserProgramLead)
+    .where(eq(UserProgramLead.user_id, userId));
+
+  const gradeAssignments = await db
+    .select({ grade_id: UserGrade.grade_id })
+    .from(UserGrade)
+    .where(eq(UserGrade.user_id, userId));
+
+  return {
+    assignedSubjectIds: assignedSubjects.map((s) => s.subject_id),
+    enrolledSubjectIds: enrolledSubjects.map((s) => s.subject_id),
+    programIds: programLeads.map((p) => p.program_id),
+    gradeIds: gradeAssignments.map((g) => g.grade_id),
+  };
+}
+
+function permissionMatchesFilter(
+  filterType: string | null | undefined,
+  filterIds: unknown,
+  associations: UserFilterAssociations,
+): boolean {
+  if (!filterType || !filterIds || !Array.isArray(filterIds)) {
+    return true;
+  }
+  const ids = filterIds as number[];
+  switch (filterType) {
+    case "subject_assigned":
+      return ids.some((id) => associations.assignedSubjectIds.includes(id));
+    case "subject_enrolled":
+      return ids.some((id) => associations.enrolledSubjectIds.includes(id));
+    case "program_assigned":
+      return ids.some((id) => associations.programIds.includes(id));
+    case "grade_assigned":
+      return ids.some((id) => associations.gradeIds.includes(id));
+    default:
+      return true;
+  }
+}
+
+async function resolveDocumentAccess(
+  userId: number,
+  documentId: number,
+): Promise<{ document: any; permissionType: string } | null> {
+  const [doc] = await db
+    .select()
+    .from(Document)
+    .where(eq(Document.document_id, documentId))
+    .limit(1);
+
+  if (!doc) return null;
+
+  if (doc.user_id === userId) {
+    return { document: doc, permissionType: "OWNER" };
+  }
+
+  const [perm] = await db
+    .select()
+    .from(DocumentPermission)
+    .where(
+      and(
+        eq(DocumentPermission.document_id, documentId),
+        eq(DocumentPermission.user_id, userId),
+        or(
+          isNull(DocumentPermission.expires_at),
+          gt(DocumentPermission.expires_at, new Date()),
+        ),
+      ),
+    )
+    .limit(1);
+
+  if (perm) {
+    const associations = await getUserFilterAssociations(userId);
+    if (
+      permissionMatchesFilter(perm.filter_type, perm.filter_ids, associations)
+    ) {
+      return { document: doc, permissionType: perm.permission_type || "VIEW" };
+    }
+  }
+
+  if (doc.folder_id) {
+    const folderAccess = await resolveFolderAccess(userId, doc.folder_id);
+    if (folderAccess) {
+      return { document: doc, permissionType: folderAccess.permissionType };
+    }
+  }
+
+  return null;
+}
+
+async function resolveFolderAccess(
+  userId: number,
+  folderId: number,
+): Promise<{ folder: any; permissionType: string } | null> {
+  const [targetFolder] = await db
+    .select()
+    .from(DocumentFolder)
+    .where(eq(DocumentFolder.folder_id, folderId))
+    .limit(1);
+
+  if (!targetFolder) return null;
+
+  if (targetFolder.user_id === userId) {
+    return { folder: targetFolder, permissionType: "OWNER" };
+  }
+
+  const associations = await getUserFilterAssociations(userId);
+
+  // Walk up the parent chain: a share on any ancestor folder grants access
+  // to every descendant, not just its direct children.
+  let currentFolderId: number | null = folderId;
+  let depth = 0;
+  while (currentFolderId !== null && depth < 50) {
+    const [perm] = await db
+      .select()
+      .from(FolderPermission)
+      .where(
+        and(
+          eq(FolderPermission.folder_id, currentFolderId),
+          eq(FolderPermission.user_id, userId),
+          or(
+            isNull(FolderPermission.expires_at),
+            gt(FolderPermission.expires_at, new Date()),
+          ),
+        ),
+      )
+      .limit(1);
+
+    if (
+      perm &&
+      permissionMatchesFilter(perm.filter_type, perm.filter_ids, associations)
+    ) {
+      return {
+        folder: targetFolder,
+        permissionType: perm.permission_type || "VIEW",
+      };
+    }
+
+    if (currentFolderId === folderId) {
+      currentFolderId = targetFolder.parent_folder_id;
+    } else {
+      const [ancestor] = await db
+        .select({ parent_folder_id: DocumentFolder.parent_folder_id })
+        .from(DocumentFolder)
+        .where(eq(DocumentFolder.folder_id, currentFolderId))
+        .limit(1);
+      currentFolderId = ancestor ? ancestor.parent_folder_id : null;
+    }
+    depth++;
+  }
+
+  return null;
+}
+
+// ======================
 // ROLE OPERATIONS
 // ======================
 
@@ -569,7 +768,6 @@ export const getFolders = asyncHandler(async (req: any, res: any) => {
       .where(
         and(
           eq(FolderPermission.user_id, userId),
-          isNull(DocumentFolder.parent_folder_id),
           or(
             isNull(FolderPermission.expires_at),
             gt(FolderPermission.expires_at, new Date()),
@@ -577,58 +775,38 @@ export const getFolders = asyncHandler(async (req: any, res: any) => {
         ),
       );
   } else {
-    // Check if the parent folder is shared with the user
-    const parentSharedCheck = await db
-      .select()
-      .from(FolderPermission)
-      .where(
-        and(
-          eq(FolderPermission.folder_id, parentId),
-          eq(FolderPermission.user_id, userId),
-          or(
-            isNull(FolderPermission.expires_at),
-            gt(FolderPermission.expires_at, new Date()),
-          ),
-        ),
-      )
-      .limit(1);
+    // Check if the parent folder (or any of its ancestors) is shared with the
+    // user, so multi-level nested folders cascade correctly, not just direct
+    // children of an explicitly-shared folder.
+    const parentAccess = await resolveFolderAccess(userId, parentId);
 
-    if (parentSharedCheck.length > 0) {
-      // Parent is shared, get all subfolders (owned by the original owner)
-      const parentFolder = await db
-        .select()
+    if (parentAccess && parentAccess.folder.user_id !== userId) {
+      const subFolders = await db
+        .select({
+          folder: DocumentFolder,
+          owner: {
+            user_id: User.user_id,
+            username: User.username,
+            email: User.email,
+            first_name: UserProfile.first_name,
+            last_name: UserProfile.last_name,
+          },
+        })
         .from(DocumentFolder)
-        .where(eq(DocumentFolder.folder_id, parentId))
-        .limit(1);
+        .innerJoin(User, eq(DocumentFolder.user_id, User.user_id))
+        .leftJoin(UserProfile, eq(User.user_id, UserProfile.user_id))
+        .where(
+          and(
+            eq(DocumentFolder.parent_folder_id, parentId),
+            eq(DocumentFolder.user_id, parentAccess.folder.user_id),
+          ),
+        );
 
-      if (parentFolder.length > 0) {
-        const subFolders = await db
-          .select({
-            folder: DocumentFolder,
-            owner: {
-              user_id: User.user_id,
-              username: User.username,
-              email: User.email,
-              first_name: UserProfile.first_name,
-              last_name: UserProfile.last_name,
-            },
-          })
-          .from(DocumentFolder)
-          .innerJoin(User, eq(DocumentFolder.user_id, User.user_id))
-          .leftJoin(UserProfile, eq(User.user_id, UserProfile.user_id))
-          .where(
-            and(
-              eq(DocumentFolder.parent_folder_id, parentId),
-              eq(DocumentFolder.user_id, parentFolder[0].user_id),
-            ),
-          );
-
-        // Mark these as accessible due to parent permission
-        sharedFolders = subFolders.map((item) => ({
-          ...item,
-          permission: parentSharedCheck[0], // Use parent permission
-        }));
-      }
+      // Mark these as accessible due to the (possibly ancestor) permission
+      sharedFolders = subFolders.map((item) => ({
+        ...item,
+        permission: { permission_type: parentAccess.permissionType },
+      }));
     }
   }
 
@@ -665,58 +843,21 @@ export const getFolderById = asyncHandler(async (req: any, res: any) => {
     throw new ValidationError("Invalid folder ID");
   }
 
-  // First try to get owned folder
-  let folder = await db
-    .select()
-    .from(DocumentFolder)
-    .where(
-      and(
-        eq(DocumentFolder.folder_id, parseInt(folderId)),
-        eq(DocumentFolder.user_id, userId),
-      ),
-    )
-    .limit(1);
-
-  // If not found, check if it's a shared folder
-  if (folder.length === 0) {
-    const sharedFolder = await db
-      .select({
-        folder: DocumentFolder,
-        permission: FolderPermission,
-      })
-      .from(FolderPermission)
-      .innerJoin(
-        DocumentFolder,
-        eq(FolderPermission.folder_id, DocumentFolder.folder_id),
-      )
-      .where(
-        and(
-          eq(FolderPermission.folder_id, parseInt(folderId)),
-          eq(FolderPermission.user_id, userId),
-          or(
-            isNull(FolderPermission.expires_at),
-            gt(FolderPermission.expires_at, new Date()),
-          ),
-        ),
-      )
-      .limit(1);
-
-    if (sharedFolder.length > 0) {
-      folder = [
-        {
-          ...sharedFolder[0].folder,
-          is_shared: true,
-          permission_type: sharedFolder[0].permission.permission_type,
-        } as any,
-      ];
-    }
-  }
-
-  if (folder.length === 0) {
+  const access = await resolveFolderAccess(userId, folderIdNum);
+  if (!access) {
     throw new NotFoundError("Folder not found");
   }
 
-  successResponse(res, "Folder retrieved successfully", folder[0]);
+  const folder =
+    access.permissionType === "OWNER"
+      ? access.folder
+      : {
+          ...access.folder,
+          is_shared: true,
+          permission_type: access.permissionType,
+        };
+
+  successResponse(res, "Folder retrieved successfully", folder);
 });
 
 export const updateFolder = asyncHandler(async (req: any, res: any) => {
@@ -1140,8 +1281,10 @@ export const revokeFolderAccess = asyncHandler(async (req: any, res: any) => {
   if (!isSuperAdmin && !isFolderOwner) {
     // Must be the one who shared it
     if (existingPerm[0].shared_by !== userId) {
+      // Same message as the "doesn't exist" case above — don't let the
+      // response distinguish "not yours" from "doesn't exist".
       throw new NotFoundError(
-        "Permission not found or you don't have permission to revoke it",
+        "Permission not found. It may have already been removed.",
       );
     }
   }
@@ -1189,9 +1332,21 @@ export const getSharedFolders = asyncHandler(async (req: any, res: any) => {
       ),
     );
 
+  // Apply the same filter-scoping (grade/subject/program) enforced
+  // everywhere else — a filter-scoped role share should only appear for
+  // users who still match that filter, not every member of the role.
+  const associations = await getUserFilterAssociations(userId);
+  const matchingShared = shared.filter((item) =>
+    permissionMatchesFilter(
+      item.permission.filter_type,
+      item.permission.filter_ids,
+      associations,
+    ),
+  );
+
   // Add folder owner information
   const sharedWithOwners = await Promise.all(
-    shared.map(async (item) => {
+    matchingShared.map(async (item) => {
       const owner = await db
         .select({
           user_id: User.user_id,
@@ -1404,29 +1559,19 @@ export const getDocuments = asyncHandler(async (req: any, res: any) => {
   if (folderId) {
     const folderIdNum = parseInt(folderId as string);
 
-    // Check if this is a shared folder
-    const sharedFolderCheck = await db
-      .select()
-      .from(FolderPermission)
-      .where(
-        and(
-          eq(FolderPermission.folder_id, folderIdNum),
-          eq(FolderPermission.user_id, userId),
-          or(
-            isNull(FolderPermission.expires_at),
-            gt(FolderPermission.expires_at, new Date()),
-          ),
-        ),
-      )
-      .limit(1);
+    // Resolve access (ownership, direct share, or a shared ancestor folder)
+    const folderAccess = await resolveFolderAccess(userId, folderIdNum);
+    if (!folderAccess) {
+      throw new NotFoundError("Folder not found");
+    }
 
-    if (sharedFolderCheck.length > 0) {
-      // This is a shared folder, get documents from it
+    if (folderAccess.permissionType === "OWNER") {
+      conditions.push(eq(Document.folder_id, folderIdNum));
+    } else {
+      // Shared folder (directly or via an ancestor) — list its documents
+      // regardless of who uploaded them, not just the caller's own.
       conditions = [eq(Document.folder_id, folderIdNum)];
       isSharedFolder = true;
-    } else {
-      // Regular owned folder
-      conditions.push(eq(Document.folder_id, folderIdNum));
     }
   } else {
     conditions.push(isNull(Document.folder_id));
@@ -1518,49 +1663,12 @@ export const getDocumentById = asyncHandler(async (req: any, res: any) => {
     throw new ValidationError("Invalid document ID");
   }
 
-  // First try to get owned document
-  let document = await db
-    .select()
-    .from(Document)
-    .where(
-      and(
-        eq(Document.document_id, documentIdNum),
-        eq(Document.user_id, userId),
-      ),
-    )
-    .limit(1);
-
-  // If not found, check if it's a shared document
-  if (document.length === 0) {
-    const sharedDocument = await db
-      .select()
-      .from(DocumentPermission)
-      .innerJoin(
-        Document,
-        eq(DocumentPermission.document_id, Document.document_id),
-      )
-      .where(
-        and(
-          eq(DocumentPermission.document_id, documentIdNum),
-          eq(DocumentPermission.user_id, userId),
-          or(
-            isNull(DocumentPermission.expires_at),
-            gt(DocumentPermission.expires_at, new Date()),
-          ),
-        ),
-      )
-      .limit(1);
-
-    if (sharedDocument.length > 0) {
-      document = [sharedDocument[0].Document];
-    }
-  }
-
-  if (document.length === 0) {
+  const access = await resolveDocumentAccess(userId, documentIdNum);
+  if (!access) {
     throw new NotFoundError("Document not found");
   }
 
-  successResponse(res, "Document retrieved successfully", document[0]);
+  successResponse(res, "Document retrieved successfully", access.document);
 });
 
 export const updateDocument = asyncHandler(async (req: any, res: any) => {
@@ -1688,17 +1796,11 @@ export const downloadDocument = asyncHandler(async (req: any, res: any) => {
   const userId = req.user.userId;
   const { documentId } = req.params;
 
-  const [doc] = await db
-    .select()
-    .from(Document)
-    .where(eq(Document.document_id, Number(documentId)));
-
-  if (!doc) {
+  const access = await resolveDocumentAccess(userId, Number(documentId));
+  if (!access) {
     throw new NotFoundError("Document not found");
   }
-
-  // Allow access to any document (for testing purposes)
-  // TODO: Restore proper permission checks
+  const doc = access.document;
 
   // Check FTP file exists
   const exists = await ftpService.fileExists(doc.file_path);
@@ -2181,8 +2283,12 @@ export const shareDocument = asyncHandler(async (req: any, res: any) => {
 export const getSharedDocuments = asyncHandler(async (req: any, res: any) => {
   const userId = req.user.userId;
 
-  // First get all documents shared directly with the user
-  const directShared = await db
+  // Every DocumentPermission row for this user — both direct "user" shares
+  // and expanded "role" shares (one row per role member, created at share
+  // time). Filter matching below applies uniformly to all of them: rows with
+  // no filter_type/filter_ids always pass, so this doesn't change behavior
+  // for direct user shares, only for filter-scoped role shares.
+  const allPerms = await db
     .select({
       document: Document,
       permission: DocumentPermission,
@@ -2211,159 +2317,18 @@ export const getSharedDocuments = asyncHandler(async (req: any, res: any) => {
       ),
     );
 
-  // Get the current academic term
-  const currentTerm = await db
-    .select({
-      academic_term_id: AcademicTerm.academic_term_id,
-      academic_year_id: AcademicTerm.academic_year_id,
-    })
-    .from(AcademicTerm)
-    .where(eq(AcademicTerm.is_current, 1))
-    .limit(1);
-
-  const currentTermId =
-    currentTerm.length > 0 ? currentTerm[0].academic_term_id : null;
-  const currentYearId =
-    currentTerm.length > 0 ? currentTerm[0].academic_year_id : null;
-
-  // Get user's role-based access with filters
-  const userRoles = await db
-    .select({
-      role_id: UserRole.role_id,
-    })
-    .from(UserRole)
-    .where(eq(UserRole.user_id, userId));
-
-  const roleIds = userRoles.map((r) => r.role_id);
-
-  // Get user's subject assignments (for teachers)
-  const assignedSubjects = await db
-    .select({
-      subject_id: TeacherSubjectAssignment.subject_id,
-    })
-    .from(TeacherSubjectAssignment)
-    .where(eq(TeacherSubjectAssignment.user_id, userId));
-
-  // Get user's subject enrollments (for students)
-  let enrolledSubjects: any[] = [];
-  if (currentYearId) {
-    enrolledSubjects = await db
-      .select({
-        subject_id: StudentSubjectEnrollment.subject_id,
-      })
-      .from(StudentSubjectEnrollment)
-      .where(
-        and(
-          eq(StudentSubjectEnrollment.user_id, userId),
-          eq(StudentSubjectEnrollment.academic_year_id, currentYearId),
-        ),
-      );
-  }
-
-  // Get user's program leads
-  const programLeads = await db
-    .select({
-      program_id: UserProgramLead.program_id,
-    })
-    .from(UserProgramLead)
-    .where(eq(UserProgramLead.user_id, userId));
-
-  // Get user's grade assignments (class teacher)
-  const gradeAssignments = await db
-    .select({
-      grade_id: UserGrade.grade_id,
-    })
-    .from(UserGrade)
-    .where(eq(UserGrade.user_id, userId));
-
-  // Get role-based permissions with matching filters
-  let roleBasedShared: any[] = [];
-  if (roleIds.length > 0) {
-    // Build conditions for role-based access based on user's associations
-    const conditions = [
-      eq(DocumentPermission.shared_with, "role"),
-      inArray(
-        DocumentPermission.user_id,
-        db
-          .select({ user_id: UserRole.user_id })
-          .from(UserRole)
-          .where(inArray(UserRole.role_id, roleIds)),
-      ),
-      or(
-        isNull(DocumentPermission.expires_at),
-        gt(DocumentPermission.expires_at, new Date()),
-      ),
-    ];
-
-    // Get all role-based permissions first
-    const rolePerms = await db
-      .select({
-        document: Document,
-        permission: DocumentPermission,
-        shared_by_user: {
-          user_id: User.user_id,
-          username: User.username,
-          email: User.email,
-          first_name: UserProfile.first_name,
-          last_name: UserProfile.last_name,
-        },
-      })
-      .from(DocumentPermission)
-      .innerJoin(
-        Document,
-        eq(DocumentPermission.document_id, Document.document_id),
-      )
-      .innerJoin(User, eq(DocumentPermission.shared_by, User.user_id))
-      .leftJoin(UserProfile, eq(User.user_id, UserProfile.user_id))
-      .innerJoin(UserRole, eq(DocumentPermission.user_id, UserRole.user_id))
-      .where(
-        and(
-          eq(DocumentPermission.shared_with, "role"),
-          inArray(UserRole.role_id, roleIds),
-          or(
-            isNull(DocumentPermission.expires_at),
-            gt(DocumentPermission.expires_at, new Date()),
-          ),
-        ),
-      );
-
-    // Filter role permissions based on filter_type and user's associations
-    const assignedSubjectIds = assignedSubjects.map((s) => s.subject_id);
-    const enrolledSubjectIds = enrolledSubjects.map((s) => s.subject_id);
-    const programIds = programLeads.map((p) => p.program_id);
-    const gradeIds = gradeAssignments.map((g) => g.grade_id);
-
-    roleBasedShared = rolePerms.filter((perm) => {
-      const filterType = perm.permission.filter_type;
-      const filterIds = perm.permission.filter_ids as number[] | null;
-
-      // If no filter, grant access to all users with that role
-      if (!filterType || !filterIds || !Array.isArray(filterIds)) {
-        return true;
-      }
-
-      // Check if user matches any of the filter IDs
-      switch (filterType) {
-        case "subject_assigned":
-          return filterIds.some((id) => assignedSubjectIds.includes(id));
-        case "subject_enrolled":
-          return filterIds.some((id) => enrolledSubjectIds.includes(id));
-        case "program_assigned":
-          return filterIds.some((id) => programIds.includes(id));
-        case "grade_assigned":
-          return filterIds.some((id) => gradeIds.includes(id));
-        default:
-          return true;
-      }
-    });
-  }
-
-  // Combine direct and role-based access
-  const allShared = [...directShared, ...roleBasedShared];
+  const associations = await getUserFilterAssociations(userId);
+  const matchingPerms = allPerms.filter((perm) =>
+    permissionMatchesFilter(
+      perm.permission.filter_type,
+      perm.permission.filter_ids,
+      associations,
+    ),
+  );
 
   // Remove duplicates based on document_id
   const uniqueDocs = new Map();
-  for (const item of allShared) {
+  for (const item of matchingPerms) {
     if (!uniqueDocs.has(item.document.document_id)) {
       uniqueDocs.set(item.document.document_id, item);
     }
@@ -2426,9 +2391,9 @@ export const revokeDocumentAccess = asyncHandler(async (req: any, res: any) => {
     .limit(1);
 
   if (permission.length === 0) {
-    throw new NotFoundError(
-      "Permission not found or you don't have permission to revoke it",
-    );
+    // Same message as the "doesn't exist" case above — don't let the response
+    // distinguish "not yours" from "doesn't exist" to an ID-guessing caller.
+    throw new NotFoundError("Permission not found");
   }
 
   await db

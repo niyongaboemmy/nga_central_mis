@@ -10,7 +10,7 @@ import {
 } from "./calendarConstants";
 
 interface CalendarGridProps {
-  calendarId: number;
+  calendarId?: number;
   classGroupName: string | undefined;
   slots: CalendarSlot[];
   activities: CalendarActivity[];
@@ -34,8 +34,11 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
   onEmptyCellClick,
   canEdit = false,
 }) => {
-  // Filter slots for this calendar
-  const calendarSlots = slots.filter((s) => s.calendar_id === calendarId);
+  // Filter slots for this calendar (skip filtering for personal/teacher & student
+  // views, which have no calendar_id — slots are already scoped server-side)
+  const calendarSlots = calendarId
+    ? slots.filter((s) => s.calendar_id === calendarId)
+    : slots;
 
   return (
     <div>
@@ -203,7 +206,7 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
                               : ""
                           } ${isToday ? "bg-blue-100 dark:bg-blue-900/10" : ""}`}
                           onClick={() => {
-                            if (canEdit) {
+                            if (canEdit && calendarId) {
                               onEmptyCellClick(
                                 dayIdx,
                                 scheduleSlot,

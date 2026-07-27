@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, X, Grid, ExternalLink, ArrowRight } from "lucide-react";
+import { Search, X, Grid } from "lucide-react";
 import { authorizeSSO } from "../../api/auth";
 import { useToast } from "../../contexts/ToastContext";
 import { System } from "../../api/systems";
@@ -117,104 +117,98 @@ const SystemsMenu: React.FC<SystemsMenuProps> = ({
       {isOpen && (
         <motion.div
           ref={menuRef}
-          initial={{ opacity: 0, scale: 0.95, y: -20, x: -20 }}
-          animate={{ opacity: 1, scale: 1, y: 0, x: 0 }}
-          exit={{ opacity: 0, scale: 0.95, y: -20, x: -20 }}
-          transition={{ type: "spring", damping: 25, stiffness: 300 }}
-          className="absolute left-0 mt-3 w-[400px] md:w-[550px] bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl rounded-[1.5rem] shadow-[0_20px_50px_rgba(0,0,0,0.2)] dark:shadow-[0_20px_50px_rgba(0,0,0,0.5)] border border-white/20 dark:border-slate-700/50 overflow-hidden z-[100]"
+          initial={{ opacity: 0, scale: 0.97, y: -8 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.97, y: -8 }}
+          transition={{ type: "spring", damping: 28, stiffness: 380 }}
+          className="absolute left-0 mt-2 w-[340px] bg-white dark:bg-[#202226] rounded-[20px] shadow-[0_20px_44px_rgba(0,0,0,0.16),0_2px_10px_rgba(0,0,0,0.08)] dark:shadow-[0_20px_44px_rgba(0,0,0,0.55)] ring-1 ring-black/5 dark:ring-white/10 overflow-hidden z-[100]"
         >
-          {/* Header Section */}
-          <div className="p-6 pb-0">
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center space-x-3">
-                <div className="p-2.5 bg-blue-600 rounded-2xl shadow-blue-600/20">
-                  <Grid className="w-6 h-6 text-white" />
-                </div>
-                <div>
-                  <h3 className="text-xl font-bold text-slate-900 dark:text-white leading-tight mb-1">
-                    Apps
-                  </h3>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
-                    NGA Central MIS Ecosystem
-                  </p>
-                </div>
-              </div>
+          {/* Search */}
+          <div className="px-3.5 pt-3.5 pb-2.5">
+            <div className="flex items-center justify-between mb-2.5 px-0.5">
+              <span className="text-[11px] font-semibold tracking-wide text-slate-500 dark:text-slate-400 uppercase">
+                Apps
+              </span>
               <button
                 onClick={onClose}
-                className="p-2.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-all duration-200 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                className="p-1 rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
               >
-                <X className="w-5 h-5" />
+                <X className="w-3.5 h-3.5" />
               </button>
             </div>
-
-            {/* Search Bar */}
-            <div className="relative group mb-6">
-              <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
+            <div className="relative group">
+              <div className="absolute inset-y-0 left-3.5 flex items-center pointer-events-none">
                 <Search className="w-4 h-4 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
               </div>
               <input
                 type="text"
-                placeholder="Search for apps..."
+                placeholder="Search for apps"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 autoFocus
-                className="w-full pl-11 pr-4 py-3.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/50 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500"
+                className="w-full pl-10 pr-3 py-2.5 bg-black/[0.045] dark:bg-white/[0.07] border border-black/5 dark:border-white/10 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:bg-white dark:focus:bg-white/[0.09] transition-all text-[13px] text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500"
               />
             </div>
           </div>
 
+          {/* Pinned label */}
+          {filteredSystems.length > 0 && (
+            <div className="px-4 mb-1">
+              <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+                Pinned
+              </span>
+            </div>
+          )}
+
           {/* Grid Section */}
-          <div className="px-6 pb-6 max-h-[500px] overflow-y-auto scrollbar-thin scrollbar-thumb-slate-200 dark:scrollbar-thumb-slate-700">
+          <div className="px-2.5 pb-2 max-h-80 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-200 dark:scrollbar-thumb-slate-700">
             {filteredSystems.length === 0 ? (
-              <div className="text-center py-12">
-                <div className="w-16 h-16 bg-slate-50 dark:bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Search className="w-8 h-8 text-slate-300 dark:text-slate-600" />
+              <div className="text-center py-8">
+                <div className="w-11 h-11 bg-black/[0.03] dark:bg-white/[0.06] rounded-full flex items-center justify-center mx-auto mb-3">
+                  <Search className="w-5 h-5 text-slate-300 dark:text-slate-600" />
                 </div>
-                <p className="text-sm text-slate-500 dark:text-slate-400 font-medium">
+                <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
                   No systems found matching "{searchQuery}"
                 </p>
               </div>
             ) : (
-              <div className="grid grid-cols-4 gap-0">
+              <div className="grid grid-cols-4 gap-0.5">
                 {filteredSystems.map((system, idx) => (
                   <motion.button
                     key={system.system_id}
-                    initial={{ opacity: 0, y: 10 }}
+                    initial={{ opacity: 0, y: 6 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: idx * 0.03 }}
+                    transition={{ delay: idx * 0.02 }}
                     onClick={() => handleSystemClick(system)}
-                    className="group relative flex flex-col items-center p-3 pt-6 rounded-[1.5rem] hover:bg-blue-50 dark:hover:bg-blue-600/10 transition-all duration-300 text-center"
+                    className="group flex flex-col items-center justify-start gap-1.5 py-2.5 px-1 rounded-xl hover:bg-black/[0.05] dark:hover:bg-white/[0.08] active:bg-black/[0.08] dark:active:bg-white/[0.12] transition-colors duration-150 text-center"
                   >
-                    <div className="relative mb-3">
-                      <div className="w-16 h-16 rounded-[1.25rem] bg-white dark:bg-slate-800 shadow-[0_8px_20px_rgba(0,0,0,0.06)] dark:shadow-[0_8px_30px_rgba(0,0,0,0.3)] group-hover:shadow-[0_12px_30px_rgba(37,99,235,0.15)] dark:group-hover:shadow-[0_12px_30px_rgba(37,99,235,0.2)] group-hover:-translate-y-1 group-hover:scale-105 flex items-center justify-center border border-slate-100 dark:border-slate-700/50 group-hover:border-blue-200 dark:group-hover:border-blue-500/30 transition-all duration-300 overflow-hidden">
-                        {system.icon_url ? (
-                          <img
-                            src={system.icon_url}
-                            alt={system.name}
-                            className="w-10 h-10 object-contain rounded-xl"
-                          />
-                        ) : (
-                          <Grid className="w-8 h-8 text-blue-500 opacity-80" />
-                        )}
-                      </div>
-                      {/* Hover Arrow Indicator */}
-                      <div className="absolute -top-1 -right-1 bg-blue-600 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity duration-300 shadow-lg">
-                        <ArrowRight className="w-2.5 h-2.5" />
-                      </div>
+                    <div className="w-9 h-9 rounded-lg flex items-center justify-center overflow-hidden">
+                      {system.icon_url ? (
+                        <img
+                          src={system.icon_url}
+                          alt={system.name}
+                          className="w-9 h-9 object-contain rounded-lg"
+                        />
+                      ) : (
+                        <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center">
+                          <Grid className="w-4 h-4 text-white" />
+                        </div>
+                      )}
                     </div>
-                    <span className="text-[13px] font-bold text-slate-700 dark:text-slate-300 group-hover:text-blue-600 dark:group-hover:text-blue-400 truncate w-full px-1">
+                    <span className="text-[10.5px] font-medium text-slate-700 dark:text-slate-300 leading-tight line-clamp-2 px-0.5 w-full">
                       {system.name}
                     </span>
-                    <div className="mt-1 flex items-center justify-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                      <span className="text-[10px] text-blue-500/80 font-bold uppercase tracking-wider">
-                        Open
-                      </span>
-                      <ExternalLink className="w-2.5 h-2.5 text-blue-500/80" />
-                    </div>
                   </motion.button>
                 ))}
               </div>
             )}
+          </div>
+
+          {/* Footer */}
+          <div className="border-t border-black/5 dark:border-white/10 px-4 py-2.5 flex items-center justify-center">
+            <span className="text-[10px] text-slate-400 dark:text-slate-500 font-medium">
+              NGA Central MIS Ecosystem
+            </span>
           </div>
         </motion.div>
       )}

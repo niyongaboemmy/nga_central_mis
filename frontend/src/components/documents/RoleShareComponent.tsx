@@ -212,6 +212,13 @@ const RoleShareComponent: React.FC<RoleShareComponentProps> = ({
     searchQuery
   );
 
+  // Whether the role currently being browsed has been explicitly marked as a
+  // share target (distinct from merely being browsed — see the toggle below).
+  const isSelectedRoleSharedWhole = !!(
+    selectedRole &&
+    selectedRoles.some((r) => r.role_id === selectedRole.role_id)
+  );
+
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (
@@ -322,8 +329,11 @@ const RoleShareComponent: React.FC<RoleShareComponentProps> = ({
                               whileHover={{ x: 3 }}
                               type="button"
                               onClick={() => {
+                                // Only changes which role's members are being
+                                // browsed — does NOT share with this role.
+                                // Sharing with the whole role is a separate,
+                                // explicit action (the toggle in the panel).
                                 setSelectedRole(role);
-                                onToggleRole(role);
                                 onClearAllUsers();
                                 setIsRoleDropdownOpen(false);
                                 setRoleSearchQuery("");
@@ -587,6 +597,32 @@ const RoleShareComponent: React.FC<RoleShareComponentProps> = ({
                   </motion.button>
                 )}
               </div>
+
+              {/* Explicit "share with entire role" toggle — browsing this
+                  role's members above does NOT by itself share with the
+                  role; this is the only action that does. */}
+              <button
+                type="button"
+                onClick={() => onToggleRole(selectedRole)}
+                className={`flex items-center gap-2 px-4 py-2 border-b border-gray-100 dark:border-gray-700 text-xs font-medium transition-colors flex-shrink-0 ${
+                  isSelectedRoleSharedWhole
+                    ? "bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300"
+                    : "text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700/40"
+                }`}
+              >
+                <span
+                  className={`w-4 h-4 rounded flex items-center justify-center border-2 flex-shrink-0 ${
+                    isSelectedRoleSharedWhole
+                      ? "bg-blue-500 border-blue-500"
+                      : "border-gray-300 dark:border-gray-600"
+                  }`}
+                >
+                  {isSelectedRoleSharedWhole && (
+                    <FiCheck className="w-2.5 h-2.5 text-white" />
+                  )}
+                </span>
+                Share with entire {selectedRole.name} role
+              </button>
 
               {/* Scrollable list */}
               <div className="flex-1 overflow-y-auto">

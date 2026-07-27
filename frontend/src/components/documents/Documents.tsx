@@ -1144,24 +1144,18 @@ const Documents: React.FC = () => {
       ? (shareItem as Document).document_id
       : (shareItem as Folder).folder_id;
 
-    // Include filter options when sharing with roles ONLY (not when specific users are selected)
-    const hasRolesOnly =
-      selectedShareRoles.length > 0 && selectedShareUsers.length === 0;
+    // A role only ends up in selectedShareRoles when the admin explicitly
+    // toggled "share with entire role" (see RoleShareComponent), so users and
+    // roles are independent, additive share targets — not mutually exclusive.
+    const hasRoles = selectedShareRoles.length > 0;
     const filterType =
-      hasRolesOnly && selectedFilterType ? selectedFilterType : undefined;
+      hasRoles && selectedFilterType ? selectedFilterType : undefined;
     const filterIds =
-      hasRolesOnly && selectedFilterIds.length > 0
-        ? selectedFilterIds
-        : undefined;
+      hasRoles && selectedFilterIds.length > 0 ? selectedFilterIds : undefined;
     const academicTermId =
-      hasRolesOnly && selectedAcademicTermId
-        ? selectedAcademicTermId
-        : undefined;
+      hasRoles && selectedAcademicTermId ? selectedAcademicTermId : undefined;
 
-    // When selected users exist, only share with those users (don't share with role members)
-    const roleIds = hasRolesOnly
-      ? selectedShareRoles.map((r) => r.role_id.toString())
-      : [];
+    const roleIds = selectedShareRoles.map((r) => r.role_id.toString());
 
     setIsSharing(true);
     try {

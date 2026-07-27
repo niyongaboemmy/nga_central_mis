@@ -127,14 +127,14 @@ const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({}) => {
       className="min-h-screen"
     >
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <motion.div
           initial={{ y: -20, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           transition={{ delay: 0.1 }}
-          className="mb-8"
+          className="mb-6"
         >
-          <h2 className="text-2xl font-bold text-text-primary-light dark:text-text-primary-dark mb-1">
+          <h2 className="text-xl font-bold text-text-primary-light dark:text-text-primary-dark mb-1">
             Super Admin Dashboard
           </h2>
           <p className="text-text-secondary-light dark:text-text-secondary-dark/70 text-sm">
@@ -147,33 +147,33 @@ const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({}) => {
           initial={{ y: 20, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           transition={{ delay: 0.2 }}
-          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8"
+          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6"
         >
           <motion.div
             whileHover={{ scale: 1.02 }}
-            className="bg-card-light dark:bg-card-dark/30 rounded-3xl shadow-sm border border-white dark:border-border-dark/30 p-6"
+            className="bg-card-light dark:bg-card-dark/30 rounded-2xl shadow-sm border border-white dark:border-border-dark/30 p-4"
           >
             <div className="flex items-center">
               <motion.div
-                className="p-2 rounded-2xl"
+                className="p-2 rounded-xl"
                 style={{ backgroundColor: `${systemHealthColor}20` }}
               >
                 <Activity
-                  className="w-6 h-6"
+                  className="w-5 h-5"
                   style={{ color: systemHealthColor }}
                 />
               </motion.div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-text-secondary-light dark:text-text-secondary-dark/70">
+              <div className="ml-3">
+                <p className="text-xs font-medium text-text-secondary-light dark:text-text-secondary-dark/70">
                   System Health
                 </p>
                 <p
-                  className="text-2xl font-bold"
+                  className="text-xl font-bold"
                   style={{ color: systemHealthColor }}
                 >
                   {stats!.systemHealth}%
                 </p>
-                <p className="text-xs text-text-secondary-light dark:text-text-secondary-dark/70 mt-1">
+                <p className="text-[11px] text-text-secondary-light dark:text-text-secondary-dark/70 mt-0.5">
                   DB: {stats!.databaseStatus}
                 </p>
               </div>
@@ -182,17 +182,17 @@ const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({}) => {
 
           <motion.div
             whileHover={{ scale: 1.02 }}
-            className="bg-card-light dark:bg-card-dark/30 rounded-3xl shadow-sm border border-white dark:border-border-dark/30 p-6"
+            className="bg-card-light dark:bg-card-dark/30 rounded-2xl shadow-sm border border-white dark:border-border-dark/30 p-4"
           >
             <div className="flex items-center">
-              <div className="p-2 bg-blue-100 dark:bg-blue-900/20 rounded-2xl">
-                <Users className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+              <div className="p-2 bg-blue-100 dark:bg-blue-900/20 rounded-xl">
+                <Users className="w-5 h-5 text-blue-600 dark:text-blue-400" />
               </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-text-secondary-light dark:text-text-secondary-dark/70">
+              <div className="ml-3">
+                <p className="text-xs font-medium text-text-secondary-light dark:text-text-secondary-dark/70">
                   Total Users
                 </p>
-                <p className="text-2xl font-bold text-text-primary-light dark:text-text-primary-dark">
+                <p className="text-xl font-bold text-text-primary-light dark:text-text-primary-dark">
                   {(
                     stats!.totalStudents +
                     stats!.totalTeachers +
@@ -206,17 +206,17 @@ const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({}) => {
 
           <motion.div
             whileHover={{ scale: 1.02 }}
-            className="bg-card-light dark:bg-card-dark/30 rounded-3xl shadow-sm border border-white dark:border-border-dark/30 p-6"
+            className="bg-card-light dark:bg-card-dark/30 rounded-2xl shadow-sm border border-white dark:border-border-dark/30 p-4"
           >
             <div className="flex items-center">
-              <div className="p-2 bg-green-100 dark:bg-green-900/20 rounded-2xl">
-                <BookOpen className="w-6 h-6 text-green-600 dark:text-green-400" />
+              <div className="p-2 bg-green-100 dark:bg-green-900/20 rounded-xl">
+                <BookOpen className="w-5 h-5 text-green-600 dark:text-green-400" />
               </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-text-secondary-light dark:text-text-secondary-dark/70">
+              <div className="ml-3">
+                <p className="text-xs font-medium text-text-secondary-light dark:text-text-secondary-dark/70">
                   Academic Programs
                 </p>
-                <p className="text-2xl font-bold text-text-primary-light dark:text-text-primary-dark">
+                <p className="text-xl font-bold text-text-primary-light dark:text-text-primary-dark">
                   {stats!.totalPrograms.toLocaleString()}
                 </p>
               </div>
@@ -225,21 +225,21 @@ const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({}) => {
 
           <motion.div
             whileHover={{ scale: 1.02 }}
-            className="bg-card-light dark:bg-card-dark/30 rounded-3xl shadow-sm border border-white dark:border-border-dark/30 p-6"
+            className="bg-card-light dark:bg-card-dark/30 rounded-2xl shadow-sm border border-white dark:border-border-dark/30 p-4"
           >
             <div className="flex items-center">
-              <div className="p-2 bg-purple-100 dark:bg-purple-900/20 rounded-2xl">
-                <HardDrive className="w-6 h-6 text-purple-600 dark:text-purple-400" />
+              <div className="p-2 bg-purple-100 dark:bg-purple-900/20 rounded-xl">
+                <HardDrive className="w-5 h-5 text-purple-600 dark:text-purple-400" />
               </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-text-secondary-light dark:text-text-secondary-dark/70">
+              <div className="ml-3">
+                <p className="text-xs font-medium text-text-secondary-light dark:text-text-secondary-dark/70">
                   Storage Used
                 </p>
-                <p className="text-2xl font-bold text-text-primary-light dark:text-text-primary-dark">
+                <p className="text-xl font-bold text-text-primary-light dark:text-text-primary-dark">
                   {(stats!.totalStorageUsed / (1024 * 1024 * 1024)).toFixed(2)}{" "}
                   GB
                 </p>
-                <p className="text-xs text-text-secondary-light dark:text-text-secondary-dark/70 mt-1">
+                <p className="text-[11px] text-text-secondary-light dark:text-text-secondary-dark/70 mt-0.5">
                   {stats!.totalDocuments} files
                 </p>
               </div>
@@ -252,24 +252,24 @@ const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({}) => {
           initial={{ y: 20, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           transition={{ delay: 0.3 }}
-          className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8"
+          className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6"
         >
           {/* User Distribution Pie Chart */}
           <motion.div
             whileHover={{ scale: 1.01 }}
-            className="bg-card-light dark:bg-card-dark/30 rounded-3xl shadow-sm border border-white dark:border-border-dark/30 p-6"
+            className="bg-card-light dark:bg-card-dark/30 rounded-2xl shadow-sm border border-white dark:border-border-dark/30 p-4"
           >
-            <h3 className="text-lg font-semibold text-text-primary-light dark:text-text-primary-dark mb-4">
+            <h3 className="text-base font-semibold text-text-primary-light dark:text-text-primary-dark mb-3">
               User Distribution
             </h3>
-            <ResponsiveContainer width="100%" height={300}>
+            <ResponsiveContainer width="100%" height={240}>
               <PieChart>
                 <Pie
                   data={userDistributionData}
                   cx="50%"
                   cy="50%"
-                  innerRadius={60}
-                  outerRadius={100}
+                  innerRadius={48}
+                  outerRadius={80}
                   paddingAngle={5}
                   dataKey="value"
                 >
@@ -298,12 +298,12 @@ const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({}) => {
           {/* Academic Data Bar Chart */}
           <motion.div
             whileHover={{ scale: 1.01 }}
-            className="bg-card-light dark:bg-card-dark/30 rounded-3xl shadow-sm border border-white dark:border-border-dark/30 p-6"
+            className="bg-card-light dark:bg-card-dark/30 rounded-2xl shadow-sm border border-white dark:border-border-dark/30 p-4"
           >
-            <h3 className="text-lg font-semibold text-text-primary-light dark:text-text-primary-dark mb-4">
+            <h3 className="text-base font-semibold text-text-primary-light dark:text-text-primary-dark mb-3">
               Academic Overview
             </h3>
-            <ResponsiveContainer width="100%" height={300}>
+            <ResponsiveContainer width="100%" height={240}>
               <BarChart data={academicData}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="name" />
@@ -320,12 +320,12 @@ const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({}) => {
           initial={{ y: 20, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           transition={{ delay: 0.4 }}
-          className="bg-card-light dark:bg-card-dark/30 rounded-3xl shadow-sm border border-white dark:border-border-dark/30 p-6 mb-8"
+          className="bg-card-light dark:bg-card-dark/30 rounded-2xl shadow-sm border border-white dark:border-border-dark/30 p-4 mb-8"
         >
-          <h3 className="text-lg font-semibold text-text-primary-light dark:text-text-primary-dark mb-4">
+          <h3 className="text-base font-semibold text-text-primary-light dark:text-text-primary-dark mb-3">
             Document Upload Trends
           </h3>
-          <ResponsiveContainer width="100%" height={200}>
+          <ResponsiveContainer width="100%" height={160}>
             <AreaChart data={documentData}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="name" />
@@ -347,9 +347,9 @@ const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({}) => {
           initial={{ y: 20, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           transition={{ delay: 0.5 }}
-          className="bg-card-light dark:bg-card-dark/30 rounded-3xl shadow-sm border border-white dark:border-border-dark/30 p-6 mb-8"
+          className="bg-card-light dark:bg-card-dark/30 rounded-2xl shadow-sm border border-white dark:border-border-dark/30 p-4 mb-8"
         >
-          <h3 className="text-lg font-semibold text-text-primary-light dark:text-text-primary-dark mb-4">
+          <h3 className="text-base font-semibold text-text-primary-light dark:text-text-primary-dark mb-3">
             User Roles Distribution
           </h3>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
@@ -367,7 +367,7 @@ const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({}) => {
                     className="w-4 h-4 rounded-full"
                     style={{ backgroundColor: role.color }}
                   />
-                  <span className="text-2xl font-bold text-text-primary-light dark:text-text-primary-dark">
+                  <span className="text-xl font-bold text-text-primary-light dark:text-text-primary-dark">
                     {role.count}
                   </span>
                 </div>
@@ -384,9 +384,9 @@ const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({}) => {
           initial={{ y: 20, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           transition={{ delay: 0.7 }}
-          className="bg-card-light dark:bg-card-dark/30 rounded-3xl shadow-sm border border-white dark:border-border-dark/30 p-6"
+          className="bg-card-light dark:bg-card-dark/30 rounded-2xl shadow-sm border border-white dark:border-border-dark/30 p-4"
         >
-          <h3 className="text-lg font-semibold text-text-primary-light dark:text-text-primary-dark mb-4">
+          <h3 className="text-base font-semibold text-text-primary-light dark:text-text-primary-dark mb-3">
             System Administration
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

@@ -142,7 +142,7 @@ const Navbar: React.FC<NavbarProps> = ({
                   <img
                     src={LOGO}
                     alt="NGA Central MIS"
-                    className="w-10 h-10 rounded-full group-hover:shadow-lg transition-shadow"
+                    className="w-9 h-9 rounded-full group-hover:shadow-lg transition-shadow"
                   />
                   <span className="text-xl font-bold text-text-primary-light dark:text-text-primary-dark">
                     NGA MIS

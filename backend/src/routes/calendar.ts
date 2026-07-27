@@ -22,6 +22,7 @@ import {
   updateAcademicCalendar,
   deleteAcademicCalendar,
   getCalendarClassGroups,
+  getMyClassGroups,
 } from "../controllers/calendarController";
 import { authenticate, authorize } from "../middleware/auth";
 
@@ -126,6 +127,12 @@ router.get(
   authorize(["VIEW_MY_CALENDAR", "TEACHER_DASHBOARD"]),
   asyncHandler(checkUpcomingLessons),
 );
+router.get(
+  "/my-class-groups",
+  authenticate,
+  authorize(["VIEW_MY_CALENDAR", "TEACHER_DASHBOARD"]),
+  asyncHandler(getMyClassGroups),
+);
 
 // Lesson Plan Integration
 router.get(
@@ -197,13 +204,6 @@ router.delete(
   authenticate,
   authorize("MANAGE_ACADEMIC_CALENDAR"),
   asyncHandler(deleteAcademicCalendar),
-);
-
-router.get(
-  "/calendars/class-groups",
-  authenticate,
-  authorize("MANAGE_ACADEMIC_CALENDAR"),
-  asyncHandler(getCalendarClassGroups),
 );
 
 export default router;

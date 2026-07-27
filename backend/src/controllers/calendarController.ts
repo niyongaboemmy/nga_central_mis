@@ -330,12 +330,13 @@ export const deleteCalendarSlot = asyncHandler(async (req: any, res: any) => {
 
 // Get instructor's calendar (only their assigned subjects)
 export const getMyCalendar = asyncHandler(async (req: any, res: any) => {
-  const { academic_term_id } = req.query;
+  const { academic_term_id, class_group_id } = req.query;
   const userId = req.user?.userId || req.user?.user_id || req.user?.id;
 
   logger.info("Fetching instructor calendar", {
     userId,
     academic_term_id,
+    class_group_id,
   });
 
   // Get the current or specified academic term
@@ -363,6 +364,10 @@ export const getMyCalendar = asyncHandler(async (req: any, res: any) => {
     eq(CalendarSlot.is_active, 1),
     eq(CalendarSlot.academic_term_id, termId),
   ];
+
+  if (class_group_id) {
+    filters.push(eq(CalendarSlot.class_group_id, parseInt(class_group_id)));
+  }
 
   const slots = await db
     .select({
@@ -1732,3 +1737,50 @@ export const getCalendarClassGroups = asyncHandler(
     successResponse(res, "Class groups retrieved successfully", classGroups);
   },
 );
+
+// Get the class groups the current teacher is assigned to teach in
+export const getMyClassGroups = asyncHandler(async (req: any, res: any) => {
+  const userId = req.user?.userId || req.user?.user_id || req.user?.id;
+  const { academic_year_id } = req.query;
+
+  let yearId = academic_year_id ? parseInt(academic_year_id) : null;
+
+  if (!yearId) {
+    const currentYear = await db
+      .select({ academic_year_id: AcademicYear.academic_year_id })
+      .from(AcademicYear)
+      .where(eq(AcademicYear.is_current, 1))
+      .limit(1);
+
+    if (currentYear.length > 0) {
+      yearId = currentYear[0].academic_year_id;
+    }
+  }
+
+  if (!yearId) {
+    throw new ValidationError("No academic year specified or found");
+  }
+
+  const classGroups = await db
+    .selectDistinct({
+      class_group_id: ClassGroup.class_group_id,
+      name: ClassGroup.name,
+      grade_name: Grade.name,
+      grade_level: Grade.level_order,
+    })
+    .from(TeacherSubjectAssignment)
+    .innerJoin(
+      ClassGroup,
+      eq(TeacherSubjectAssignment.class_group_id, ClassGroup.class_group_id),
+    )
+    .leftJoin(Grade, eq(ClassGroup.grade_id, Grade.grade_id))
+    .where(
+      and(
+        eq(TeacherSubjectAssignment.user_id, userId),
+        eq(ClassGroup.academic_year_id, yearId),
+      ),
+    )
+    .orderBy(Grade.level_order, ClassGroup.name);
+
+  successResponse(res, "Class groups retrieved successfully", classGroups);
+});

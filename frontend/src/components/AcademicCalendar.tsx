@@ -28,6 +28,7 @@ import {
   createAcademicCalendar,
   getAcademicCalendars,
   getCalendarClassGroups,
+  getMyClassGroups,
 } from "../api/calendar";
 import type { AcademicCalendar } from "../api/calendar";
 
@@ -157,11 +158,11 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({
     description: "",
   });
 
-  // Filter slots based on selected calendar
-  useMemo(() => {
-    if (!selectedCalendar) return slots;
-    return slots.filter((s) => s.calendar_id === selectedCalendar.calendar_id);
-  }, [slots, selectedCalendar]);
+  // Teacher's own class groups (a teacher must pick one before a calendar loads,
+  // unless they only teach a single class group)
+  const [myClassGroups, setMyClassGroups] = useState<any[]>([]);
+  const [selectedTeacherClassGroupId, setSelectedTeacherClassGroupId] =
+    useState<number | null>(null);
 
   // Filter activities based on selected calendar
   const filteredActivities = useMemo(() => {
@@ -171,19 +172,11 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({
     );
   }, [activities, selectedCalendar]);
 
-  // Get calendars to display (filtered by year/term, or single selected calendar)
+  // There is no "all class groups" combined view — a calendar only ever
+  // renders for the one specific class group currently selected.
   const calendarsToDisplay = useMemo(() => {
-    if (!selectedYear || !selectedTerm) return [];
-    const filtered = calendars.filter(
-      (c) =>
-        c.academic_year_id === selectedYear &&
-        c.academic_term_id === selectedTerm,
-    );
-    if (selectedCalendar) {
-      return [selectedCalendar];
-    }
-    return filtered;
-  }, [calendars, selectedYear, selectedTerm, selectedCalendar]);
+    return selectedCalendar ? [selectedCalendar] : [];
+  }, [selectedCalendar]);
 
   // Form state for creating/editing slots
   const [formData, setFormData] = useState({
@@ -239,6 +232,18 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({
       loadData();
     }
   }, [selectedTerm]);
+
+  // Reload the instructor's schedule when they switch their own class group
+  useEffect(() => {
+    if (
+      !isBroadView &&
+      !isStudent &&
+      selectedTerm &&
+      selectedTeacherClassGroupId
+    ) {
+      loadData();
+    }
+  }, [selectedTeacherClassGroupId]);
 
   // Reload setupData when the modal opens or the class group changes.
   // Reads ONLY from formData.class_group_id (a scoped param, not global state)
@@ -340,14 +345,36 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({
         setSetupData(setupDataRes);
         setCalendars(calendarsData);
       } else if (isStudent) {
-        // Student view
+        // Student view — the backend already scopes this to the student's own
+        // class group and enrolled subjects, so no group selector is needed.
         const calendarData = await getStudentCalendar(params);
         setSlots(calendarData.slots);
       } else {
-        // Instructor view
+        // Instructor view — a teacher may teach in more than one class group,
+        // so a specific one must be selected before a schedule loads (unless
+        // they only teach in a single class group, which is auto-selected).
+        const groupsParams: any = {};
+        if (selectedYear) {
+          groupsParams.academic_year_id = selectedYear;
+        }
+        const groups = await getMyClassGroups(groupsParams);
+        setMyClassGroups(groups);
+
+        let effectiveGroupId = selectedTeacherClassGroupId;
+        if (!effectiveGroupId && groups.length === 1) {
+          effectiveGroupId = groups[0].class_group_id;
+          setSelectedTeacherClassGroupId(effectiveGroupId);
+        }
+
+        if (!effectiveGroupId) {
+          setSlots([]);
+          setUpcomingLessons([]);
+          return;
+        }
+
         const [calendarData, notificationsData, upcomingData] =
           await Promise.all([
-            getMyCalendar(params),
+            getMyCalendar({ ...params, class_group_id: effectiveGroupId }),
             getNotificationSettings(),
             checkUpcomingLessons(),
           ]);
@@ -752,6 +779,8 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({
           selectedYear={selectedYear}
           selectedTerm={selectedTerm}
           selectedCalendar={selectedCalendar}
+          myClassGroups={myClassGroups}
+          selectedTeacherClassGroupId={selectedTeacherClassGroupId}
           dateRangeString={dateRangeString}
           onYearChange={(yearId) => {
             setSelectedYear(yearId);
@@ -759,6 +788,7 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({
           }}
           onTermChange={setSelectedTerm}
           onCalendarChange={setSelectedCalendar}
+          onTeacherClassGroupChange={setSelectedTeacherClassGroupId}
           onCreateCalendarClick={handleCreateCalendarClick}
           onAddSlotClick={handleAddSlotClick}
           onNotificationsClick={() => setShowNotificationSettings(true)}
@@ -778,9 +808,56 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({
       {/* Upcoming Lessons Alert (for instructors) */}
       <UpcomingLessons lessons={upcomingLessons} />
 
-      {/* Calendar Grids */}
-      {(!isBroadView ||
-        (selectedYear && selectedTerm && calendarsToDisplay.length > 0)) && (
+      {/* Student view: single personal grid, no class-group selection needed */}
+      {isStudent && (
+        <div className="space-y-8">
+          <CalendarGrid
+            classGroupName={slots[0]?.class_group_name}
+            slots={slots}
+            activities={filteredActivities}
+            weekDates={weekDates}
+            canEdit={false}
+            onSlotClick={handleSlotClick}
+            onEmptyCellClick={handleEmptyCellClick}
+          />
+        </div>
+      )}
+
+      {/* Instructor view: single personal grid for the selected class group */}
+      {!isBroadView && !isStudent && selectedTeacherClassGroupId && (
+        <div className="space-y-8">
+          <CalendarGrid
+            classGroupName={
+              myClassGroups.find(
+                (g) => g.class_group_id === selectedTeacherClassGroupId,
+              )?.name
+            }
+            slots={slots}
+            activities={filteredActivities}
+            weekDates={weekDates}
+            canEdit={canEdit}
+            onSlotClick={handleSlotClick}
+            onEmptyCellClick={handleEmptyCellClick}
+          />
+        </div>
+      )}
+
+      {/* Instructor view: prompt to pick a class group (or notice none assigned) */}
+      {!isBroadView && !isStudent && !selectedTeacherClassGroupId && (
+        <div className="flex flex-col items-center justify-center py-16 text-gray-400 dark:text-gray-500">
+          <svg className="w-12 h-12 mb-4 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          </svg>
+          <p className="text-sm font-medium mb-1">
+            {myClassGroups.length === 0
+              ? "No class group assignments found for this term"
+              : "Select a class group to view your teaching schedule"}
+          </p>
+        </div>
+      )}
+
+      {/* Admin/manager view: exactly one class group's calendar at a time — there is no combined "all class groups" view */}
+      {isBroadView && selectedCalendar && (
         <div className="space-y-8">
           {calendarsToDisplay.map((calendar) => (
             <CalendarGrid
@@ -798,15 +875,15 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({
         </div>
       )}
 
-      {/* Empty state for broad view when no calendars exist for selected term */}
-      {isBroadView && selectedYear && selectedTerm && calendarsToDisplay.length === 0 && (
+      {/* Admin/manager view: prompt to select a class group */}
+      {isBroadView && !selectedCalendar && selectedYear && selectedTerm && (
         <div className="flex flex-col items-center justify-center py-16 text-gray-400 dark:text-gray-500">
           <svg className="w-12 h-12 mb-4 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
           </svg>
-          <p className="text-sm font-medium mb-1">No calendar configured for this term</p>
+          <p className="text-sm font-medium mb-1">Select a class group to view its calendar</p>
           {canCreate && (
-            <p className="text-xs">Use the <span className="font-semibold">Create Calendar</span> button above to set one up.</p>
+            <p className="text-xs">No calendar yet for this class group? Use the <span className="font-semibold">Create Calendar</span> button above to set one up.</p>
           )}
         </div>
       )}

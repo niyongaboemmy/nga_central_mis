@@ -9,6 +9,17 @@ html {
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
   font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  /* Slightly denser base scale — Windows browsers (no automatic Retina
+     downscaling) render the default 16px rem scale noticeably larger than
+     macOS at the same resolution. Every Tailwind rem-based size (spacing,
+     text, icons) shrinks proportionally with this. */
+  font-size: 15px;
+}
+
+@media (min-width: 1920px) {
+  html {
+    font-size: 14.5px;
+  }
 }
 
 body {

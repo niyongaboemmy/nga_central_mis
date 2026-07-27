@@ -12,10 +12,17 @@ interface CalendarHeaderProps {
   selectedYear: number | null;
   selectedTerm: number | null;
   selectedCalendar: AcademicCalendar | null;
+  myClassGroups?: {
+    class_group_id: number;
+    name: string;
+    grade_name?: string;
+  }[];
+  selectedTeacherClassGroupId?: number | null;
   dateRangeString: string;
   onYearChange: (yearId: number) => void;
   onTermChange: (termId: number) => void;
   onCalendarChange: (calendar: AcademicCalendar | null) => void;
+  onTeacherClassGroupChange?: (classGroupId: number | null) => void;
   onCreateCalendarClick: () => void;
   onAddSlotClick: () => void;
   onNotificationsClick: () => void;
@@ -33,10 +40,13 @@ const CalendarHeader: React.FC<CalendarHeaderProps> = ({
   selectedYear,
   selectedTerm,
   selectedCalendar,
+  myClassGroups = [],
+  selectedTeacherClassGroupId,
   dateRangeString,
   onYearChange,
   onTermChange,
   onCalendarChange,
+  onTeacherClassGroupChange,
   onCreateCalendarClick,
   onNotificationsClick,
   canEdit = false,
@@ -119,7 +129,7 @@ const CalendarHeader: React.FC<CalendarHeaderProps> = ({
                 }}
                 className="px-4 py-2 text-sm bg-transparent border-0 rounded-full focus:ring-2 focus:ring-blue-500 dark:text-white"
               >
-                <option value="">All Class Groups</option>
+                <option value="">Select a class group</option>
                 {calendars
                   .filter(
                     (c) =>
@@ -134,6 +144,28 @@ const CalendarHeader: React.FC<CalendarHeaderProps> = ({
                       {calendar.class_group_name}
                     </option>
                   ))}
+              </select>
+            </>
+          )}
+          {!isAdmin && !isStudent && myClassGroups.length > 1 && (
+            <>
+              <span className="text-gray-400">|</span>
+              <select
+                value={selectedTeacherClassGroupId || ""}
+                onChange={(e) => {
+                  const classGroupId = e.target.value
+                    ? parseInt(e.target.value)
+                    : null;
+                  onTeacherClassGroupChange?.(classGroupId);
+                }}
+                className="px-4 py-2 text-sm bg-transparent border-0 rounded-full focus:ring-2 focus:ring-blue-500 dark:text-white"
+              >
+                <option value="">Select a class group</option>
+                {myClassGroups.map((group) => (
+                  <option key={group.class_group_id} value={group.class_group_id}>
+                    {group.name}
+                  </option>
+                ))}
               </select>
             </>
           )}

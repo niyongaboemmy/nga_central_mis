@@ -218,6 +218,7 @@ export const deleteCalendarActivity = async (id: number): Promise<void> => {
 export const getMyCalendar = async (params?: {
   academic_term_id?: number;
   day_of_week?: number;
+  class_group_id?: number;
 }): Promise<MyCalendarResponse> => {
   const response = await api.get<
     | { success: boolean; message: string; data: MyCalendarResponse }
@@ -403,6 +404,41 @@ export const getCalendarClassGroups = async (params: {
         }[];
       }
   >("/calendar/calendars/class-groups", { params });
+  const responseData = (response as any).data;
+  return (responseData as any).data || responseData;
+};
+
+// Get the class groups the current teacher is assigned to teach in
+export const getMyClassGroups = async (params?: {
+  academic_year_id?: number;
+}): Promise<
+  {
+    class_group_id: number;
+    name: string;
+    grade_name?: string;
+    grade_level?: number;
+  }[]
+> => {
+  const response = await api.get<
+    | {
+        success: boolean;
+        message: string;
+        data: {
+          class_group_id: number;
+          name: string;
+          grade_name?: string;
+          grade_level?: number;
+        }[];
+      }
+    | {
+        data: {
+          class_group_id: number;
+          name: string;
+          grade_name?: string;
+          grade_level?: number;
+        }[];
+      }
+  >("/calendar/my-class-groups", { params });
   const responseData = (response as any).data;
   return (responseData as any).data || responseData;
 };

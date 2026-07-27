@@ -1,6 +1,6 @@
 import { Router } from "express";
 import multer from "multer";
-import { authenticate } from "../middleware/auth";
+import { authenticate, authorize } from "../middleware/auth";
 import {
   createFolder,
   getFolders,
@@ -52,8 +52,13 @@ router.use(authenticate);
 // Get all roles
 router.get("/roles", getAllRoles);
 
-// Get users by role ID
-router.get("/roles/:roleId/users", getUsersByRole);
+// Get users by role ID — gated to users who can actually create documents/folders
+// to share, so this can't be used as a general org-wide PII directory lookup.
+router.get(
+  "/roles/:roleId/users",
+  authorize(["UPLOAD_DOCUMENTS"]),
+  getUsersByRole,
+);
 
 // Get filter options for role-based sharing
 router.get("/share/filter-options", getDocumentShareFilterOptions);

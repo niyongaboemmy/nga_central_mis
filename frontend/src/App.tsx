@@ -7,7 +7,6 @@ import {
   Navigate,
   useLocation,
 } from "react-router-dom";
-import PasswordRecovery from "./components/PasswordRecovery";
 import Login from "./components/Login";
 import Profile from "./components/Profile";
 import Dashboard from "./components/Dashboard";
@@ -16,8 +15,6 @@ import TeacherDashboard from "./components/TeacherDashboard";
 import Permissions from "./components/Permissions";
 import Users from "./components/Users";
 import SystemLayout from "./components/SystemLayout";
-import Footer from "./components/ui/Footer";
-import Navbar from "./components/ui/Navbar";
 import { useUser } from "./contexts/UserContext";
 import { ToastProvider, useToast } from "./contexts/ToastContext";
 import { ToastStore } from "./services/api";
@@ -49,14 +46,8 @@ const LoginPage: React.FC = () => {
       onLoginSuccess={() => {
         navigate("/dashboard");
       }}
-      onNavigateToPasswordRecovery={() => navigate("/password-recovery")}
     />
   );
-};
-
-const PasswordRecoveryPage: React.FC = () => {
-  const navigate = useNavigate();
-  return <PasswordRecovery onNavigateBackToLogin={() => navigate("/login")} />;
 };
 
 // Protected Route wrapper
@@ -103,47 +94,6 @@ const PublicRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   }
 
   return <>{children}</>;
-};
-
-// Simple public layout with just Navbar and Footer (no SystemLayout)
-const PublicLayout: React.FC<{ children: React.ReactNode }> = ({
-  children,
-}) => {
-  const navigate = useNavigate();
-  const websiteUrl = import.meta.env.VITE_WEBSITE_URL as string | undefined;
-  return (
-    <>
-      <Navbar
-        onNavigateToHome={() => navigate("/")}
-        onNavigateToLogin={() => navigate("/login")}
-        onNavigateToAbout={() => navigate("/about")}
-        onNavigateToContact={() => navigate("/contact")}
-        showNavigation={true}
-        showAuthButtons={true}
-        websiteUrl={websiteUrl}
-      />
-      <div className="pt-16">{children}</div>
-      <Footer />
-    </>
-  );
-};
-
-// Inner pages with back button navbar
-const BackButtonLayout: React.FC<{ children: React.ReactNode }> = ({
-  children,
-}) => {
-  const navigate = useNavigate();
-  return (
-    <>
-      <Navbar
-        onNavigateBack={() => navigate("/")}
-        showNavigation={false}
-        showAuthButtons={false}
-      />
-      <div className="pt-16">{children}</div>
-      <Footer />
-    </>
-  );
 };
 
 // System layout with sidebar for authenticated users
@@ -257,67 +207,50 @@ function App() {
           <Router basename="/mis">
             <Routes>
 
-            {/* Landing page with full navbar */}
+            {/* Landing page */}
             <Route
               path="/"
               element={
                 <PublicRoute>
-                  <PublicLayout>
-                    {/* <LandingPage /> */}
-                    <LoginPage />
-                  </PublicLayout>
+                  <LoginPage />
                 </PublicRoute>
               }
             />
 
-            {/* About page with full navbar */}
+            {/* About page */}
             <Route
               path="/about"
               element={
                 <PublicRoute>
-                  <PublicLayout>
-                    {/* <AboutPage /> */}
-                    <LoginPage />
-                  </PublicLayout>
+                  <LoginPage />
                 </PublicRoute>
               }
             />
 
-            {/* Contact page with full navbar */}
+            {/* Contact page */}
             <Route
               path="/contact"
               element={
                 <PublicRoute>
-                  <PublicLayout>
-                    {/* <ContactPage /> */}
-                    <LoginPage />
-                  </PublicLayout>
+                  <LoginPage />
                 </PublicRoute>
               }
             />
 
-            {/* Login page with full navbar */}
+            {/* Login page — no public navbar/footer, fixed full-viewport layout */}
             <Route
               path="/login"
               element={
                 <PublicRoute>
-                  <PublicLayout>
-                    <LoginPage />
-                  </PublicLayout>
+                  <LoginPage />
                 </PublicRoute>
               }
             />
 
-            {/* Password recovery with back button navbar */}
+            {/* Password recovery now lives inline inside the Login split-screen shell */}
             <Route
               path="/password-recovery"
-              element={
-                <PublicRoute>
-                  <BackButtonLayout>
-                    <PasswordRecoveryPage />
-                  </BackButtonLayout>
-                </PublicRoute>
-              }
+              element={<Navigate to="/login" replace />}
             />
 
             {/* Dashboard - protected with sidebar */}
