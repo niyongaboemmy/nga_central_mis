@@ -48,6 +48,9 @@ interface Config {
     length: number;
     expiryMinutes: number;
   };
+  google: {
+    clientId: string;
+  };
 }
 
 // Database configuration - supports local and remote switching
@@ -106,6 +109,9 @@ const developmentConfig: Config = {
     length: parseInt(process.env.OTP_LENGTH || "6"),
     expiryMinutes: parseInt(process.env.OTP_EXPIRY_MINUTES || "10"),
   },
+  google: {
+    clientId: process.env.GOOGLE_CLIENT_ID || "",
+  },
 };
 
 // Production configuration - uses remote database and mail server
@@ -155,6 +161,9 @@ const productionConfig: Config = {
   otp: {
     length: parseInt(process.env.OTP_LENGTH || "6"),
     expiryMinutes: parseInt(process.env.OTP_EXPIRY_MINUTES || "10"),
+  },
+  google: {
+    clientId: process.env.GOOGLE_CLIENT_ID || "",
   },
 };
 

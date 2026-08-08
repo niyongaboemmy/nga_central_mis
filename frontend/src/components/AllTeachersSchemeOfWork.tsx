@@ -10,11 +10,12 @@ import {
   Users,
   Lock,
 } from "lucide-react";
-import { AcademicYear, AcademicTerm, Grade } from "../api/academics";
+import { Grade } from "../api/academics";
 import { schemeOfWorkApi, TeacherWithSchemes } from "../api/schemeOfWork";
 import { useUser } from "../contexts/UserContext";
 import { useToast } from "../contexts/ToastContext";
 import { useMetadata } from "../contexts/MetadataContext";
+import { useAcademicPeriod } from "../contexts/AcademicPeriodContext";
 import AllTeachersSOW_Dashboard from "./AllTeachersSOW_Dashboard";
 import AllTeachersSOW_List from "./AllTeachersSOW_List";
 
@@ -40,8 +41,9 @@ const AllTeachersSchemeOfWork: React.FC = () => {
 
   // Selectors state
   // Metadata from context
-  const { years: academicYears, programs, getTerms, getGrades } = useMetadata();
-  const [terms, setTerms] = useState<AcademicTerm[]>([]);
+  const { programs, getGrades } = useMetadata();
+  const { selectedYearId, selectedTermId, selectedYear, selectedTerm } =
+    useAcademicPeriod();
   const [grades, setGrades] = useState<Grade[]>([]);
 
   // Helpers for extracting auth constraints
@@ -76,12 +78,6 @@ const AllTeachersSchemeOfWork: React.FC = () => {
     }
   };
 
-  const [selectedYear, setSelectedYear] = useState<number | "">(
-    getInitialValue("year", ""),
-  );
-  const [selectedTerm, setSelectedTerm] = useState<number | "">(
-    getInitialValue("term", ""),
-  );
   const [selectedProgram, setSelectedProgram] = useState<number | "">(
     authProgramId || getInitialValue("program", ""),
   );
@@ -106,28 +102,6 @@ const AllTeachersSchemeOfWork: React.FC = () => {
     getInitialValue("status", "all"),
   );
 
-  // Auto-select current year if nothing was persisted
-  useEffect(() => {
-    if (academicYears.length > 0 && !selectedYear) {
-      const currentYear = academicYears.find((y: AcademicYear) => y.is_current);
-      if (currentYear) setSelectedYear(currentYear.academic_year_id);
-    }
-  }, [academicYears, selectedYear]);
-
-  // Load terms when year changes
-  useEffect(() => {
-    if (!selectedYear) {
-      setTerms([]);
-      setSelectedTerm("");
-      return;
-    }
-    getTerms(selectedYear as number).then((data) => {
-      setTerms(data);
-      const current = data.find((t: AcademicTerm) => t.is_current);
-      if (current && !selectedTerm) setSelectedTerm(current.academic_term_id);
-    });
-  }, [selectedYear, getTerms]);
-
   // Load grades when program changes
   useEffect(() => {
     if (!selectedProgram) {
@@ -141,7 +115,7 @@ const AllTeachersSchemeOfWork: React.FC = () => {
   }, [selectedProgram, getGrades]);
 
   const canLoad = Boolean(
-    selectedYear && selectedTerm && selectedProgram && selectedGrade,
+    selectedYearId && selectedTermId && selectedProgram && selectedGrade,
   );
 
   const loadTeachers = useCallback(
@@ -150,7 +124,7 @@ const AllTeachersSchemeOfWork: React.FC = () => {
       setLoading(true);
       setError(null);
       try {
-        const cacheKey = `allTeachers_${selectedYear}_${selectedTerm}_${selectedProgram}_${selectedGrade}_${selectedRole}`;
+        const cacheKey = `allTeachers_${selectedYearId}_${selectedTermId}_${selectedProgram}_${selectedGrade}_${selectedRole}`;
         const cached = sessionStorage.getItem(cacheKey);
 
         if (cached && !force) {
@@ -169,8 +143,8 @@ const AllTeachersSchemeOfWork: React.FC = () => {
         }
 
         const res = await schemeOfWorkApi.getAllTeachers({
-          academic_year_id: selectedYear as number,
-          academic_term_id: selectedTerm as number,
+          academic_year_id: selectedYearId as number,
+          academic_term_id: selectedTermId as number,
           program_id: selectedProgram as number,
           grade_id: selectedGrade as number,
           role: selectedRole,
@@ -193,8 +167,8 @@ const AllTeachersSchemeOfWork: React.FC = () => {
     },
     [
       canLoad,
-      selectedYear,
-      selectedTerm,
+      selectedYearId,
+      selectedTermId,
       selectedProgram,
       selectedGrade,
       selectedRole,
@@ -225,12 +199,8 @@ const AllTeachersSchemeOfWork: React.FC = () => {
     }
   }, [canLoad, loadTeachers]);
 
-  // Persist selections
+  // Persist selections (year/term are governed by the global academic period)
   useEffect(() => {
-    if (selectedYear)
-      sessionStorage.setItem("allTeachersSow_year", JSON.stringify(selectedYear));
-    if (selectedTerm)
-      sessionStorage.setItem("allTeachersSow_term", JSON.stringify(selectedTerm));
     if (selectedProgram)
       sessionStorage.setItem(
         "allTeachersSow_program",
@@ -246,7 +216,7 @@ const AllTeachersSchemeOfWork: React.FC = () => {
         "allTeachersSow_role",
         JSON.stringify(selectedRole),
       );
-  }, [selectedYear, selectedTerm, selectedProgram, selectedGrade, selectedRole]);
+  }, [selectedProgram, selectedGrade, selectedRole]);
 
   // Persist tab and status filter
   useEffect(() => {
@@ -332,49 +302,19 @@ const AllTeachersSchemeOfWork: React.FC = () => {
         transition={{ delay: 0.08 }}
         className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-5"
       >
-        <p className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-4">
-          Filter by Context
-        </p>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
-          {/* Academic Year */}
-          <div className="col-span-2 md:col-span-1">
-            <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1">
-              Academic Year
-            </label>
-            <select
-              value={selectedYear}
-              onChange={(e) => setSelectedYear(Number(e.target.value) || "")}
-              className="w-full px-3 py-2 text-sm bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 dark:text-white"
-            >
-              <option value="">Select Year</option>
-              {academicYears.map((y) => (
-                <option key={y.academic_year_id} value={y.academic_year_id}>
-                  {y.name} {y.is_current ? "★" : ""}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Term */}
-          <div>
-            <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1">
-              Term
-            </label>
-            <select
-              value={selectedTerm}
-              onChange={(e) => setSelectedTerm(Number(e.target.value) || "")}
-              disabled={!selectedYear}
-              className="w-full px-3 py-2 text-sm bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 dark:text-white disabled:opacity-50"
-            >
-              <option value="">Select Term</option>
-              {terms.map((t) => (
-                <option key={t.academic_term_id} value={t.academic_term_id}>
-                  {t.name} {t.is_current ? "★" : ""}
-                </option>
-              ))}
-            </select>
-          </div>
-
+        <div className="flex items-center justify-between mb-4">
+          <p className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest">
+            Filter by Context
+          </p>
+          <p className="text-xs font-medium text-gray-500 dark:text-gray-400">
+            Academic Period:{" "}
+            <span className="text-blue-600 dark:text-blue-400 font-bold">
+              {selectedYear?.name || "—"} / {selectedTerm?.name || "—"}
+            </span>{" "}
+            <span className="text-gray-400">(change in the top bar)</span>
+          </p>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
           {/* Program */}
           <div>
             <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1">

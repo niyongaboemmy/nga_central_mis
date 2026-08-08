@@ -1,4 +1,5 @@
 import React from "react";
+import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { X } from "lucide-react";
 
@@ -29,7 +30,10 @@ const Modal: React.FC<ModalProps> = ({
     "2xl": "max-w-5xl",
   };
 
-  return (
+  // Portaled to document.body so the modal always sits above page-level
+  // stacking contexts (e.g. a page wrapper's `relative z-10`) rather than
+  // being trapped behind the fixed Navbar/Sidebar chrome (both z-50).
+  return createPortal(
     <AnimatePresence>
       {isOpen && (
         <motion.div
@@ -37,7 +41,7 @@ const Modal: React.FC<ModalProps> = ({
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.2 }}
-          className="fixed inset-0 bg-black/50 dark:bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          className="fixed inset-0 bg-black/50 dark:bg-black/70 backdrop-blur-sm z-[100] flex items-center justify-center p-4"
           onClick={onClose}
         >
           {/* Modal */}
@@ -49,11 +53,11 @@ const Modal: React.FC<ModalProps> = ({
               duration: 0.3,
               ease: [0.16, 1, 0.3, 1],
             }}
-            className={`relative w-full ${sizeClasses[size]} max-h-[90vh] bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-white/20 dark:border-slate-700/50 overflow-hidden flex flex-col`}
+            className={`relative w-full ${sizeClasses[size]} max-h-[90vh] bg-white dark:bg-gray-800/30 dark:backdrop-blur-xl rounded-3xl shadow-2xl border border-white/20 dark:border-gray-700/20 overflow-hidden flex flex-col`}
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
-            <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-slate-700/50 flex-shrink-0">
+            <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700/20 flex-shrink-0">
               <div className="text-xl font-bold text-gray-900 dark:text-white w-full">
                 {title}
               </div>
@@ -62,7 +66,7 @@ const Modal: React.FC<ModalProps> = ({
                   whileHover={{ scale: 1.1, rotate: 90 }}
                   whileTap={{ scale: 0.9 }}
                   onClick={onClose}
-                  className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 text-gray-500 dark:text-gray-400 transition-colors ml-4 flex-shrink-0"
+                  className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 dark:bg-gray-800/60 hover:bg-gray-200 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400 transition-colors ml-4 flex-shrink-0"
                 >
                   <X className="w-5 h-5" />
                 </motion.button>
@@ -76,7 +80,8 @@ const Modal: React.FC<ModalProps> = ({
           </motion.div>
         </motion.div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body,
   );
 };
 

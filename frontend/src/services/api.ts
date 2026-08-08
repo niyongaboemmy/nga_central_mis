@@ -20,9 +20,12 @@ class ToastStore {
   }
 }
 
+export const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL || "https://ngamisapi.vms.rw";
+
 // Create axios instance with default config
 const api: AxiosInstance = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || "https://ngamisapi.vms.rw",
+  baseURL: API_BASE_URL,
   timeout: 10000,
   headers: {
     "Content-Type": "application/json",

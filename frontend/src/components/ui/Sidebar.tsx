@@ -16,7 +16,7 @@ interface NavItem {
   path?: string;
   externalUrl?: string;
   icon: React.ReactNode;
-  requiredPermission?: string;
+  requiredPermission?: string | string[];
 }
 
 const Sidebar: React.FC<SidebarProps> = ({
@@ -28,10 +28,11 @@ const Sidebar: React.FC<SidebarProps> = ({
   const navigate = useNavigate();
   const { user } = useUser();
 
-  const hasPermission = (perm?: string) => {
+  const hasPermission = (perm?: string | string[]) => {
     if (!perm) return true;
+    const required = Array.isArray(perm) ? perm : [perm];
     return user?.roles?.some((role) =>
-      role.permissions?.some((permission) => permission.name === perm),
+      role.permissions?.some((permission) => required.includes(permission.name)),
     );
   };
 
@@ -95,6 +96,26 @@ const Sidebar: React.FC<SidebarProps> = ({
       requiredPermission: Permissions.VIEW_MY_ASSIGNED_SUBJECTS,
     },
     {
+      label: "My Subjects",
+      path: "/my-enrolled-subjects",
+      icon: (
+        <svg
+          className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`}
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
+          />
+        </svg>
+      ),
+      requiredPermission: Permissions.VIEW_MY_ENROLLED_SUBJECTS,
+    },
+    {
       label: "Scheme Of Work",
       path: "/scheme-of-work",
       icon: (
@@ -113,6 +134,46 @@ const Sidebar: React.FC<SidebarProps> = ({
         </svg>
       ),
       requiredPermission: Permissions.VIEW_MY_ASSIGNED_SUBJECTS,
+    },
+    {
+      label: "Lesson Notes",
+      path: "/lesson-notes",
+      icon: (
+        <svg
+          className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`}
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+          />
+        </svg>
+      ),
+      requiredPermission: Permissions.MANAGE_LESSON_NOTES,
+    },
+    {
+      label: "Shared Notes",
+      path: "/shared-lesson-notes",
+      icon: (
+        <svg
+          className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`}
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+          />
+        </svg>
+      ),
+      requiredPermission: Permissions.VIEW_SHARED_LESSON_NOTES,
     },
     {
       label: "All Teachers SOW",
@@ -175,6 +236,26 @@ const Sidebar: React.FC<SidebarProps> = ({
       requiredPermission: Permissions.SUBMIT_REPORTING,
     },
     {
+      label: "My Mentor",
+      path: "/my-mentor",
+      icon: (
+        <svg
+          className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`}
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
+          />
+        </svg>
+      ),
+      requiredPermission: Permissions.SUBMIT_MENTEE_CHECKIN,
+    },
+    {
       label: "Admin Reports",
       path: "/admin/reports",
       icon: (
@@ -192,7 +273,7 @@ const Sidebar: React.FC<SidebarProps> = ({
           />
         </svg>
       ),
-      requiredPermission: Permissions.ALL_SUBMITTED_REPORTS,
+      requiredPermission: [Permissions.VIEW_REPORTS, Permissions.ALL_SUBMITTED_REPORTS],
     },
     {
       label: "Documents",

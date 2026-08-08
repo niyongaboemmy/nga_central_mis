@@ -5,15 +5,41 @@ import {
   uploadAndExtractScheme,
   getSchemeEntries,
   addSchemeEntry,
+  insertSchemeEntry,
   updateSchemeEntry,
   deleteSchemeEntry,
   getAllTeachersSchemeOfWork,
   validateScheme,
 } from "../controllers/schemeOfWorkController";
+import {
+  startAIGeneration,
+  getAIGenerationStatus,
+  suggestEntryContent,
+  getCurriculumStructure,
+} from "../controllers/schemeAIController";
+import {
+  replaceEntryCriteria,
+  suggestEntryCriteria,
+  linkSchemeCriteria,
+  bulkSuggestCriteria,
+} from "../controllers/schemeEntryCriteriaController";
 import { Permissions } from "../utils/permissions";
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage() });
+
+const uploadCurriculum = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 15 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    const allowed = /\.(docx|pdf|txt)$/i;
+    if (allowed.test(file.originalname)) {
+      cb(null, true);
+    } else {
+      cb(new Error("Only .docx, .pdf, and .txt files are supported"));
+    }
+  },
+});
 
 // All routes are protected
 router.use(authenticate);
@@ -21,11 +47,48 @@ router.use(authenticate);
 // Upload and extract scheme from DOCX
 router.post("/upload", upload.single("file"), uploadAndExtractScheme);
 
+// Detect Learning Outcome sections in an uploaded curriculum document (fast, no AI call) so the
+// UI can confirm which content applies to the selected term before generating
+router.post(
+  "/ai-generate/structure",
+  uploadCurriculum.single("file"),
+  getCurriculumStructure,
+);
+
+// AI-generate scheme of work from an uploaded curriculum document
+router.post(
+  "/ai-generate",
+  uploadCurriculum.single("file"),
+  startAIGeneration,
+);
+router.get("/ai-generate/:jobId/status", getAIGenerationStatus);
+
 // Get scheme entries by subject/group/term
 router.get("/entries", getSchemeEntries);
 
-// Add a single scheme entry
+// Add a single scheme entry (appended, uses caller-supplied week/dates)
 router.post("/entries", addSchemeEntry);
+
+// Insert a new entry at any position, auto-renumbering/rescheduling the rest
+router.post("/entries/insert", insertSchemeEntry);
+
+// Generate a single entry's content from a custom AI prompt (for review, not auto-saved)
+router.post("/entries/ai-suggest", suggestEntryContent);
+
+// AI-powered Performance Criteria matching for a scheme entry's free-text content (stateless —
+// not auto-saved; register before the parameterized /entries/:id below)
+router.post("/entries/suggest-criteria", suggestEntryCriteria);
+
+// Replace the full set of Performance Criteria linked to a scheme entry
+router.put("/entries/:id/criteria", replaceEntryCriteria);
+
+// Bulk-resolve criteria_numbers proposed at AI-generation time into real links, once the
+// subject's Curriculum has been confirmed/saved
+router.post("/schemes/:schemeId/link-criteria", linkSchemeCriteria);
+
+// On-demand bulk AI matching for an already-existing scheme (content and/or curriculum that
+// predates this feature, or entries not covered by generation-time auto-tagging)
+router.post("/schemes/:schemeId/bulk-suggest-criteria", bulkSuggestCriteria);
 
 // Update a single scheme entry
 router.patch("/entries/:id", updateSchemeEntry);

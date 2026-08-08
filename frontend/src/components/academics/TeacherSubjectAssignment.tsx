@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   TeacherSubjectAssignment as TeacherSubjectAssignmentType,
   teacherSubjectAssignmentsApi,
@@ -6,12 +7,16 @@ import {
   subjectsApi,
   ClassGroup,
   classGroupsApi,
+  AcademicYear,
+  academicYearsApi,
 } from "../../api/academics";
 import Button from "../ui/Button";
 import Modal from "../ui/Modal";
 import ConfirmModal from "../ui/ConfirmModal";
+import RichSelect from "../ui/RichSelect";
 import { usePermissions } from "../../hooks/usePermissions";
 import { Permissions } from "../../constants/permissions";
+import { useToast } from "../../contexts/ToastContext";
 import {
   BookOpen,
   Users,
@@ -19,6 +24,7 @@ import {
   Plus,
   Trash2,
   CheckCircle,
+  Sparkles,
 } from "lucide-react";
 
 interface TeacherSubjectAssignmentProps {
@@ -30,6 +36,7 @@ interface TeacherSubjectAssignmentProps {
 }
 
 interface AssignmentFormData {
+  academic_year_id: number;
   subject_id: number;
   class_group_id: number;
 }
@@ -42,22 +49,27 @@ const TeacherSubjectAssignment: React.FC<TeacherSubjectAssignmentProps> = ({
   onSuccess,
 }) => {
   const { hasPermission } = usePermissions();
+  const { showToast } = useToast();
   const [assignments, setAssignments] = useState<
     TeacherSubjectAssignmentType[]
   >([]);
   const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [academicYears, setAcademicYears] = useState<AcademicYear[]>([]);
   const [classGroups, setClassGroups] = useState<ClassGroup[]>([]);
+  const [loadingClassGroups, setLoadingClassGroups] = useState(false);
   const [loading, setLoading] = useState(false);
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedAssignment, setSelectedAssignment] =
     useState<TeacherSubjectAssignmentType | null>(null);
   const [formData, setFormData] = useState<AssignmentFormData>({
+    academic_year_id: 0,
     subject_id: 0,
     class_group_id: 0,
   });
   const [formErrors, setFormErrors] = useState<Partial<AssignmentFormData>>({});
   const [submitting, setSubmitting] = useState(false);
+  const [viewYearFilter, setViewYearFilter] = useState<number>(0); // 0 = all years
   const loadedTeacherIdRef = useRef<number | null>(null);
 
   // Load data when modal opens
@@ -78,24 +90,61 @@ const TeacherSubjectAssignment: React.FC<TeacherSubjectAssignmentProps> = ({
   const loadData = async () => {
     setLoading(true);
     try {
-      const [assignmentsRes, subjectsRes, classGroupsRes] = await Promise.all([
-        teacherSubjectAssignmentsApi.getByTeacher(teacherId),
-        subjectsApi.getAll(),
-        classGroupsApi.getAll(),
-      ]);
+      const [assignmentsRes, subjectsRes, academicYearsRes] =
+        await Promise.all([
+          teacherSubjectAssignmentsApi.getByTeacher(teacherId),
+          subjectsApi.getAll(),
+          academicYearsApi.getAll(),
+        ]);
 
       setAssignments(assignmentsRes.data.data || []);
       setSubjects(subjectsRes.data.data || []);
-      setClassGroups(classGroupsRes.data.data || []);
+
+      const years = academicYearsRes.data.data || [];
+      setAcademicYears(years);
+
+      const currentYear = years.find((y) => y.is_current === 1) || years[0];
+      if (currentYear) {
+        setFormData((prev) => ({
+          ...prev,
+          academic_year_id: currentYear.academic_year_id,
+        }));
+      }
     } catch (error) {
       console.error("Failed to load data:", error);
+      showToast("Failed to load subject assignment data", "error");
     } finally {
       setLoading(false);
     }
   };
 
+  // Load all class groups once — they're no longer scoped to a year
+  useEffect(() => {
+    if (!isOpen) return;
+    let cancelled = false;
+    setLoadingClassGroups(true);
+    classGroupsApi
+      .getAll()
+      .then((res) => {
+        if (!cancelled) setClassGroups(res.data.data || []);
+      })
+      .catch((error) => {
+        console.error("Failed to load class groups:", error);
+        showToast("Failed to load class groups", "error");
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingClassGroups(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen]);
+
   const resetForm = () => {
+    const currentYear =
+      academicYears.find((y) => y.is_current === 1) || academicYears[0];
     setFormData({
+      academic_year_id: currentYear?.academic_year_id || 0,
       subject_id: 0,
       class_group_id: 0,
     });
@@ -105,6 +154,9 @@ const TeacherSubjectAssignment: React.FC<TeacherSubjectAssignmentProps> = ({
   const validateForm = (): boolean => {
     const errors: Partial<AssignmentFormData> = {};
 
+    if (!formData.academic_year_id) {
+      errors.academic_year_id = 1;
+    }
     if (!formData.subject_id) {
       errors.subject_id = 1; // Using number to indicate error
     }
@@ -125,14 +177,20 @@ const TeacherSubjectAssignment: React.FC<TeacherSubjectAssignmentProps> = ({
         user_id: teacherId,
         subject_id: formData.subject_id,
         class_group_id: formData.class_group_id,
+        academic_year_id: formData.academic_year_id || undefined,
       });
 
       setShowAssignModal(false);
       resetForm();
       await loadData();
       onSuccess?.();
-    } catch (error) {
+      showToast("Subject assigned successfully", "success");
+    } catch (error: any) {
       console.error("Failed to assign subject:", error);
+      showToast(
+        error?.response?.data?.message || "Failed to assign subject",
+        "error",
+      );
     } finally {
       setSubmitting(false);
     }
@@ -152,31 +210,70 @@ const TeacherSubjectAssignment: React.FC<TeacherSubjectAssignmentProps> = ({
         selectedAssignment.user_id,
         selectedAssignment.subject_id,
         selectedAssignment.class_group_id,
+        selectedAssignment.academic_year_id,
       );
 
       setShowDeleteModal(false);
       setSelectedAssignment(null);
       await loadData();
       onSuccess?.();
-    } catch (error) {
+      showToast("Assignment removed successfully", "success");
+    } catch (error: any) {
       console.error("Failed to remove assignment:", error);
+      showToast(
+        error?.response?.data?.message || "Failed to remove assignment",
+        "error",
+      );
     } finally {
       setSubmitting(false);
     }
   };
 
-  // Group assignments by academic year
-  const groupedAssignments = useMemo(() => {
-    const groups: Record<string, TeacherSubjectAssignmentType[]> = {};
-    assignments.forEach((assignment) => {
-      const key = assignment.academic_year_name;
-      if (!groups[key]) {
-        groups[key] = [];
+  // Years that actually have assignments, most recent first — powers the view filter
+  const assignmentYearOptions = useMemo(() => {
+    const map = new Map<number, { name: string; isCurrent: boolean }>();
+    assignments.forEach((a) => {
+      if (!map.has(a.academic_year_id)) {
+        map.set(a.academic_year_id, {
+          name: a.academic_year_name,
+          isCurrent: a.academic_year_is_current === 1,
+        });
       }
-      groups[key].push(assignment);
     });
-    return groups;
+    return Array.from(map.entries()).sort(([a], [b]) => b - a);
   }, [assignments]);
+
+  // Group assignments by academic year, most recent year first, honoring the view filter
+  const groupedAssignments = useMemo(() => {
+    const groups = new Map<
+      number,
+      { name: string; isCurrent: boolean; items: TeacherSubjectAssignmentType[] }
+    >();
+    assignments
+      .filter(
+        (assignment) =>
+          !viewYearFilter || assignment.academic_year_id === viewYearFilter,
+      )
+      .forEach((assignment) => {
+        const key = assignment.academic_year_id;
+        if (!groups.has(key)) {
+          groups.set(key, {
+            name: assignment.academic_year_name,
+            isCurrent: assignment.academic_year_is_current === 1,
+            items: [],
+          });
+        }
+        groups.get(key)!.items.push(assignment);
+      });
+    return Array.from(groups.entries()).sort(
+      ([yearA], [yearB]) => yearB - yearA,
+    );
+  }, [assignments, viewYearFilter]);
+
+  const visibleAssignmentCount = useMemo(
+    () => groupedAssignments.reduce((sum, [, g]) => sum + g.items.length, 0),
+    [groupedAssignments],
+  );
 
   if (!isOpen) return null;
 
@@ -194,20 +291,37 @@ const TeacherSubjectAssignment: React.FC<TeacherSubjectAssignmentProps> = ({
                 Subject Assignments
               </h3>
               <p className="text-sm text-gray-500 dark:text-gray-400/50">
-                {assignments.length} active assignment
-                {assignments.length !== 1 ? "s" : ""}
+                {visibleAssignmentCount} active assignment
+                {visibleAssignmentCount !== 1 ? "s" : ""}
               </p>
             </div>
           </div>
-          {hasPermission(Permissions.ASSIGN_TEACHER_SUBJECTS) && (
-            <Button
-              onClick={() => setShowAssignModal(true)}
-              className="flex items-center gap-2"
-            >
-              <Plus className="w-4 h-4" />
-              Assign Subject
-            </Button>
-          )}
+          <div className="flex items-center gap-3">
+            {assignmentYearOptions.length > 1 && (
+              <select
+                value={viewYearFilter}
+                onChange={(e) => setViewYearFilter(parseInt(e.target.value))}
+                className="px-3 py-2 text-sm border rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-400 transition-colors"
+              >
+                <option value={0}>All Academic Years</option>
+                {assignmentYearOptions.map(([yearId, { name, isCurrent }]) => (
+                  <option key={yearId} value={yearId}>
+                    {name}
+                    {isCurrent ? " (Current)" : ""}
+                  </option>
+                ))}
+              </select>
+            )}
+            {hasPermission(Permissions.ASSIGN_TEACHER_SUBJECTS) && (
+              <Button
+                onClick={() => setShowAssignModal(true)}
+                className="flex items-center gap-2"
+              >
+                <Plus className="w-4 h-4" />
+                Assign Subject
+              </Button>
+            )}
+          </div>
         </div>
 
         {/* Assignments list */}
@@ -231,16 +345,24 @@ const TeacherSubjectAssignment: React.FC<TeacherSubjectAssignmentProps> = ({
             )}
           </div>
         ) : (
-          <div className="space-y-6">
-            {Object.entries(groupedAssignments).map(
-              ([termKey, termAssignments]) => (
-                <div key={termKey} className="space-y-3">
+          <div
+            key={viewYearFilter}
+            className="space-y-6 animate-in fade-in duration-200"
+          >
+            {groupedAssignments.map(
+              ([academicYearId, { name, isCurrent, items }]) => (
+                <div key={academicYearId} className="space-y-3">
                   <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
                     <Calendar className="w-4 h-4 text-blue-500 dark:text-blue-500" />
-                    {termKey}
+                    {name}
+                    {isCurrent && (
+                      <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                        Current
+                      </span>
+                    )}
                   </h4>
                   <div className="grid gap-3">
-                    {termAssignments.map((assignment) => (
+                    {items.map((assignment) => (
                       <div
                         key={assignment.assignment_id}
                         className="bg-white dark:bg-gray-800/40 rounded-2xl border border-gray-200 dark:border-gray-700/40 p-3 hover:shadow-sm transition-shadow"
@@ -309,77 +431,144 @@ const TeacherSubjectAssignment: React.FC<TeacherSubjectAssignmentProps> = ({
           resetForm();
         }}
         title="Assign Subject to Teacher"
-        size="md"
+        size="xl"
       >
-        <div className="space-y-4">
-          <div className="text-center mb-6">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-              Assign New Subject
-            </h3>
-            <p className="text-sm text-gray-600 dark:text-gray-300">
-              Select a subject and class group for this assignment.
-            </p>
+        <div className="space-y-6">
+          <div className="flex items-center gap-4 pb-5 border-b border-gray-100 dark:border-gray-700/40">
+            <div className="w-14 h-14 flex-shrink-0 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-500/20">
+              <Sparkles className="w-7 h-7 text-white" />
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                Assign New Subject
+              </h3>
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                Choose an academic year, subject, and class group for{" "}
+                <span className="font-medium text-gray-700 dark:text-gray-300">
+                  {teacherName}
+                </span>
+                .
+              </p>
+            </div>
           </div>
 
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Subject
-              </label>
-              <select
-                value={formData.subject_id}
-                onChange={(e) =>
-                  setFormData((prev) => ({
-                    ...prev,
-                    subject_id: parseInt(e.target.value),
-                  }))
-                }
-                className={`w-full px-3 py-2 border rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-400 ${
-                  formErrors.subject_id
-                    ? "border-red-500"
-                    : "border-gray-300 dark:border-gray-600"
-                }`}
-              >
-                <option value={0}>Select a subject...</option>
-                {subjects.map((subject) => (
-                  <option key={subject.subject_id} value={subject.subject_id}>
-                    {subject.name} {subject.code && `(${subject.code})`}
-                  </option>
-                ))}
-              </select>
-            </div>
+          <div className="space-y-5">
+            <RichSelect
+              label="Academic Year"
+              icon={Calendar}
+              required
+              value={formData.academic_year_id || null}
+              onChange={(val) =>
+                setFormData((prev) => ({
+                  ...prev,
+                  academic_year_id: (val as number) || 0,
+                  class_group_id: 0,
+                }))
+              }
+              placeholder="Select an academic year..."
+              error={formErrors.academic_year_id ? "Academic year is required" : undefined}
+              options={academicYears.map((year) => ({
+                value: year.academic_year_id,
+                label: year.name,
+                badge: year.is_current === 1 ? "Current" : undefined,
+              }))}
+            />
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Class Group
-              </label>
-              <select
-                value={formData.class_group_id}
-                onChange={(e) =>
-                  setFormData((prev) => ({
-                    ...prev,
-                    class_group_id: parseInt(e.target.value),
-                  }))
-                }
-                className={`w-full px-3 py-2 border rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-400 ${
-                  formErrors.class_group_id
-                    ? "border-red-500"
-                    : "border-gray-300 dark:border-gray-600"
-                }`}
-              >
-                <option value={0}>Select a class group...</option>
-                {classGroups.map((group) => (
-                  <option
-                    key={group.class_group_id}
-                    value={group.class_group_id}
-                  >
-                    {group.name}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <RichSelect
+              label="Subject"
+              icon={BookOpen}
+              required
+              value={formData.subject_id || null}
+              onChange={(val) =>
+                setFormData((prev) => ({
+                  ...prev,
+                  subject_id: (val as number) || 0,
+                }))
+              }
+              placeholder="Search subjects by name or code..."
+              error={formErrors.subject_id ? "Subject is required" : undefined}
+              options={subjects.map((subject) => ({
+                value: subject.subject_id,
+                label: subject.name,
+                description: subject.code || undefined,
+              }))}
+            />
 
+            <RichSelect
+              label="Class Group"
+              icon={Users}
+              required
+              value={formData.class_group_id || null}
+              onChange={(val) =>
+                setFormData((prev) => ({
+                  ...prev,
+                  class_group_id: (val as number) || 0,
+                }))
+              }
+              placeholder="Search class groups..."
+              isLoading={loadingClassGroups}
+              isDisabled={loadingClassGroups}
+              error={
+                formErrors.class_group_id
+                  ? "Class group is required"
+                  : undefined
+              }
+              noOptionsMessage="No class groups exist yet"
+              options={classGroups.map((group) => ({
+                value: group.class_group_id,
+                label: group.name,
+                description: [group.grade_name, group.program_name]
+                  .filter(Boolean)
+                  .join(" • "),
+              }))}
+            />
           </div>
+
+          {/* Live preview once every field is chosen */}
+          <AnimatePresence>
+            {formData.academic_year_id &&
+              formData.subject_id &&
+              formData.class_group_id && (
+                <motion.div
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 8 }}
+                  transition={{ duration: 0.2 }}
+                  className="flex items-center gap-3 p-4 rounded-2xl bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border border-blue-100 dark:border-blue-800/30"
+                >
+                  <CheckCircle className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0" />
+                  <p className="text-sm text-blue-800 dark:text-blue-300">
+                    <span className="font-semibold">{teacherName}</span> will
+                    teach{" "}
+                    <span className="font-semibold">
+                      {
+                        subjects.find(
+                          (s) => s.subject_id === formData.subject_id,
+                        )?.name
+                      }
+                    </span>{" "}
+                    to{" "}
+                    <span className="font-semibold">
+                      {
+                        classGroups.find(
+                          (g) => g.class_group_id === formData.class_group_id,
+                        )?.name
+                      }
+                    </span>{" "}
+                    in{" "}
+                    <span className="font-semibold">
+                      {
+                        academicYears.find(
+                          (y) =>
+                            y.academic_year_id === formData.academic_year_id,
+                        )?.name
+                      }
+                    </span>
+                    .
+                  </p>
+                </motion.div>
+              )}
+          </AnimatePresence>
         </div>
 
         <div className="flex justify-end gap-3 mt-6">
@@ -394,7 +583,12 @@ const TeacherSubjectAssignment: React.FC<TeacherSubjectAssignmentProps> = ({
           </Button>
           <Button
             onClick={handleAssign}
-            disabled={submitting}
+            disabled={
+              submitting ||
+              !formData.academic_year_id ||
+              !formData.subject_id ||
+              !formData.class_group_id
+            }
             isLoading={submitting}
           >
             Assign Subject

@@ -1,7 +1,8 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { FiCalendar, FiClock, FiUser } from "react-icons/fi";
 import { getBasicDashboardStats, BasicDashboardStats } from "../api/dashboard";
+import { useAcademicPeriod } from "../contexts/AcademicPeriodContext";
 import DashboardCalendarWidget from "./calendar/DashboardCalendarWidget";
 
 interface DashboardProps {
@@ -9,19 +10,23 @@ interface DashboardProps {
 }
 
 const Dashboard: React.FC<DashboardProps> = ({}) => {
+  const { selectedYearId, selectedTermId } = useAcademicPeriod();
   const [stats, setStats] = useState<BasicDashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const hasFetchedRef = useRef(false);
 
   useEffect(() => {
-    if (hasFetchedRef.current) return;
-    hasFetchedRef.current = true;
+    if (!selectedYearId) return;
 
     const fetchStats = async () => {
+      setLoading(true);
       try {
-        const data = await getBasicDashboardStats();
+        const data = await getBasicDashboardStats({
+          academic_year_id: selectedYearId,
+          academic_term_id: selectedTermId ?? undefined,
+        });
         setStats(data);
+        setError(null);
       } catch (err) {
         console.error("Failed to fetch dashboard stats:", err);
         setError("Failed to load dashboard data");
@@ -31,7 +36,7 @@ const Dashboard: React.FC<DashboardProps> = ({}) => {
     };
 
     fetchStats();
-  }, []);
+  }, [selectedYearId, selectedTermId]);
 
   const containerVariants = {
     hidden: { opacity: 0 },

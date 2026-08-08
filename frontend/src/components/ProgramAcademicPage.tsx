@@ -204,7 +204,7 @@ const ProgramAcademicPage: React.FC = () => {
     try {
       const allClassGroups: ClassGroup[] = [];
       for (const grade of grades) {
-        const result = await classGroupsApi.getAll(undefined, grade.grade_id);
+        const result = await classGroupsApi.getAll(grade.grade_id);
         allClassGroups.push(...result.data.data);
       }
       setClassGroups(allClassGroups);

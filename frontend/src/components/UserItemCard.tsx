@@ -78,11 +78,16 @@ const UserItemCard: React.FC<UserItemCardProps> = ({
       className="group"
     >
       <div
-        className="flex items-center gap-3 p-3 bg-white/90 dark:bg-slate-800/40 backdrop-blur-sm rounded-2xl border border-white/50 dark:border-slate-700/20 hover:bg-white/80 dark:hover:bg-slate-800/80 hover:shadow-sm transition-all cursor-pointer"
-        onClick={(e) => {
-          e.stopPropagation();
-          onToggleExpand();
-          onView();
+        role="button"
+        tabIndex={0}
+        aria-expanded={isExpanded}
+        className="flex items-center gap-3 p-3 bg-white/90 dark:bg-slate-800/40 backdrop-blur-sm rounded-2xl border border-white/50 dark:border-slate-700/20 hover:bg-white/80 dark:hover:bg-slate-800/80 hover:shadow-sm focus-visible:ring-2 focus-visible:ring-blue-500 outline-none transition-all cursor-pointer"
+        onClick={onView}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            onView();
+          }
         }}
       >
         {/* Avatar */}
@@ -120,13 +125,20 @@ const UserItemCard: React.FC<UserItemCardProps> = ({
           <StatusBadge status={user.user.status} />
         </div>
 
-        {/* Expand Icon */}
-        <motion.div
-          animate={{ rotate: isExpanded ? 180 : 0 }}
-          className="text-gray-400"
+        {/* Expand toggle — separate control from the row's primary "view profile" click */}
+        <button
+          type="button"
+          aria-label={isExpanded ? "Collapse details" : "Expand details"}
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggleExpand();
+          }}
+          className="p-1 rounded-full text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-slate-700 focus-visible:ring-2 focus-visible:ring-blue-500 outline-none transition-colors"
         >
-          <ChevronDown className="w-4 h-4" />
-        </motion.div>
+          <motion.div animate={{ rotate: isExpanded ? 180 : 0 }}>
+            <ChevronDown className="w-4 h-4" />
+          </motion.div>
+        </button>
       </div>
 
       {/* Expanded Content */}

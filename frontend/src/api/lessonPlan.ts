@@ -85,9 +85,29 @@ export interface LessonPlan {
   created_at?: string;
 }
 
+export interface AILessonGenerationStatus {
+  status: "loading" | "analyzing" | "structuring" | "saving" | "done" | "error";
+  stepIndex: number;
+  totalSteps: number;
+  message: string;
+  lessonId?: number;
+  error?: string;
+}
+
 export const lessonPlanApi = {
   getByEntry: (entryId: number) =>
     apiService.get<LessonPlan[]>(`/lesson-plans/entry/${entryId}`),
+
+  startAIGenerate: (entryId: number, sessionHours: number, lessonId?: number) =>
+    apiService.post<{ success: boolean; data: { jobId: string } }>(
+      "/lesson-plans/ai-generate",
+      { entry_id: entryId, lesson_id: lessonId, session_hours: sessionHours },
+    ),
+
+  getAIGenerateStatus: (jobId: string) =>
+    apiService.get<{ success: boolean; data: AILessonGenerationStatus }>(
+      `/lesson-plans/ai-generate/${jobId}/status`,
+    ),
 
   save: (data: Partial<LessonPlan>) => apiService.post("/lesson-plans", data),
 

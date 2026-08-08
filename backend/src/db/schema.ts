@@ -68,6 +68,7 @@ export const AuthCredential = mysqlTable("AuthCredential", {
   mfa_enabled: tinyint("mfa_enabled").default(0),
   failed_attempts: int("failed_attempts").default(0),
   locked_until: datetime("locked_until"),
+  google_id: varchar("google_id", { length: 255 }).unique(),
 });
 
 // OTP table for 2FA
@@ -154,10 +155,13 @@ export const UserProgramLead = mysqlTable(
     program_id: bigint("program_id", { mode: "number" })
       .notNull()
       .references(() => Program.program_id),
+    academic_year_id: bigint("academic_year_id", { mode: "number" })
+      .notNull()
+      .references(() => AcademicYear.academic_year_id),
     assigned_at: datetime("assigned_at").default(sql`CURRENT_TIMESTAMP`),
   },
   (table) => ({
-    pk: primaryKey(table.user_id, table.program_id),
+    pk: primaryKey(table.user_id, table.program_id, table.academic_year_id),
   }),
 );
 
@@ -238,14 +242,15 @@ export const AcademicTerm = mysqlTable("AcademicTerm", {
   is_current: tinyint("is_current").default(0),
 });
 
-// ClassGroup table
+// ClassGroup table -- a permanent label for a cohort within a grade (e.g.
+// "Coding A", "G1"), like Grade/Subject/Program. Not year-scoped: the same
+// row is reused every academic year. Which students/teachers are in it for
+// a given year is tracked on StudentClassGroup/TeacherSubjectAssignment via
+// their own academic_year_id column, not by recreating this row per year.
 export const ClassGroup = mysqlTable("ClassGroup", {
   class_group_id: bigint("class_group_id", { mode: "number" })
     .primaryKey()
     .autoincrement(),
-  academic_year_id: bigint("academic_year_id", { mode: "number" })
-    .notNull()
-    .references(() => AcademicYear.academic_year_id),
   grade_id: bigint("grade_id", { mode: "number" })
     .notNull()
     .references(() => Grade.grade_id),
@@ -262,11 +267,14 @@ export const StudentClassGroup = mysqlTable(
     class_group_id: bigint("class_group_id", { mode: "number" })
       .notNull()
       .references(() => ClassGroup.class_group_id),
+    academic_year_id: bigint("academic_year_id", { mode: "number" })
+      .notNull()
+      .references(() => AcademicYear.academic_year_id),
     assigned_at: datetime("assigned_at").default(sql`CURRENT_TIMESTAMP`),
     status: mysqlEnum("status", ["ACTIVE", "DISABLED"]).default("ACTIVE"),
   },
   (table) => ({
-    pk: primaryKey(table.user_id, table.class_group_id),
+    pk: primaryKey(table.user_id, table.class_group_id, table.academic_year_id),
   }),
 );
 
@@ -304,10 +312,18 @@ export const TeacherSubjectAssignment = mysqlTable(
     class_group_id: bigint("class_group_id", { mode: "number" })
       .notNull()
       .references(() => ClassGroup.class_group_id),
+    academic_year_id: bigint("academic_year_id", { mode: "number" })
+      .notNull()
+      .references(() => AcademicYear.academic_year_id),
     assigned_at: datetime("assigned_at").default(sql`CURRENT_TIMESTAMP`),
   },
   (table) => ({
-    pk: primaryKey(table.user_id, table.subject_id, table.class_group_id),
+    pk: primaryKey(
+      table.user_id,
+      table.subject_id,
+      table.class_group_id,
+      table.academic_year_id,
+    ),
   }),
 );
 
@@ -321,10 +337,13 @@ export const UserGrade = mysqlTable(
     grade_id: bigint("grade_id", { mode: "number" })
       .notNull()
       .references(() => Grade.grade_id),
+    academic_year_id: bigint("academic_year_id", { mode: "number" })
+      .notNull()
+      .references(() => AcademicYear.academic_year_id),
     assigned_at: datetime("assigned_at").default(sql`CURRENT_TIMESTAMP`),
   },
   (table) => ({
-    pk: primaryKey(table.user_id, table.grade_id),
+    pk: primaryKey(table.user_id, table.grade_id, table.academic_year_id),
   }),
 );
 
@@ -337,6 +356,9 @@ export const DocumentFolder = mysqlTable("DocumentFolder", {
     .notNull()
     .references(() => User.user_id),
   parent_folder_id: bigint("parent_folder_id", { mode: "number" }),
+  academic_year_id: bigint("academic_year_id", { mode: "number" }).references(
+    () => AcademicYear.academic_year_id,
+  ),
   name: varchar("name", { length: 255 }).notNull(),
   description: varchar("description", { length: 500 }),
   color: varchar("color", { length: 7 }).default("#008d3b"),
@@ -355,6 +377,9 @@ export const Document = mysqlTable("Document", {
     .notNull()
     .references(() => User.user_id),
   folder_id: bigint("folder_id", { mode: "number" }),
+  academic_year_id: bigint("academic_year_id", { mode: "number" }).references(
+    () => AcademicYear.academic_year_id,
+  ),
   file_name: varchar("file_name", { length: 255 }).notNull(),
   original_name: varchar("original_name", { length: 255 }).notNull(),
   file_path: varchar("file_path", { length: 500 }).notNull(),
@@ -632,6 +657,10 @@ export const SchemeOfWork = mysqlTable("SchemeOfWork", {
     "REJECTED",
   ]).default("PENDING"),
   validation_comment: text("validation_comment"),
+  source: mysqlEnum("source", ["MANUAL", "DOCX_IMPORT", "AI_GENERATED"]).default(
+    "MANUAL",
+  ),
+  ai_source_filename: varchar("ai_source_filename", { length: 255 }),
   created_at: datetime("created_at").default(sql`CURRENT_TIMESTAMP`),
   updated_at: datetime("updated_at").default(
     sql`CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP`,
@@ -946,6 +975,12 @@ export const MentorshipSession = mysqlTable("MentorshipSession", {
     .references(() => User.user_id, { onDelete: "cascade" }),
   student_name: text("student_name"),
   topic: varchar("topic", { length: 255 }),
+  academic_year_id: bigint("academic_year_id", { mode: "number" }).references(
+    () => AcademicYear.academic_year_id,
+  ),
+  academic_term_id: bigint("academic_term_id", { mode: "number" }).references(
+    () => AcademicTerm.academic_term_id,
+  ),
   // Intelligence-layer additions (migration 039)
   subject_id: bigint("subject_id", { mode: "number" })
     .references(() => Subject.subject_id, { onDelete: "set null" }),
@@ -971,8 +1006,89 @@ export const MentorshipSession = mysqlTable("MentorshipSession", {
   follow_up_required: tinyint("follow_up_required").default(0),
   is_completed: tinyint("is_completed").default(0),
   session_status: mysqlEnum("session_status", ["OPEN", "IN_PROGRESS", "RESOLVED"]).default("OPEN"),
+  // Admin approval workflow (migration 049) — mirrors MenteeCheckIn's
+  // validation_status convention.
+  validation_status: mysqlEnum("validation_status", ["PENDING", "APPROVED", "REJECTED"])
+    .notNull()
+    .default("PENDING"),
+  validation_comment: text("validation_comment"),
+  validated_by: bigint("validated_by", { mode: "number" }),
+  validated_at: datetime("validated_at"),
   notes: text("notes"),
   created_at: datetime("created_at").default(sql`CURRENT_TIMESTAMP`),
+});
+
+// MentorAssignment table: explicit "who mentors whom, this academic year"
+// relationship (migration 047). Deliberately decoupled from
+// TeacherSubjectAssignment/ClassGroup — a mentor may be responsible for
+// mentees across multiple class groups/years.
+export const MentorAssignment = mysqlTable("MentorAssignment", {
+  assignment_id: bigint("assignment_id", { mode: "number" })
+    .primaryKey()
+    .autoincrement(),
+  mentor_id: bigint("mentor_id", { mode: "number" })
+    .notNull()
+    .references(() => User.user_id),
+  student_id: bigint("student_id", { mode: "number" })
+    .notNull()
+    .references(() => User.user_id),
+  academic_year_id: bigint("academic_year_id", { mode: "number" })
+    .notNull()
+    .references(() => AcademicYear.academic_year_id),
+  status: mysqlEnum("status", ["ACTIVE", "ENDED"]).default("ACTIVE"),
+  assigned_by: bigint("assigned_by", { mode: "number" })
+    .notNull()
+    .references(() => User.user_id),
+  assigned_at: datetime("assigned_at").default(sql`CURRENT_TIMESTAMP`),
+  ended_at: datetime("ended_at"),
+  notes: text("notes"),
+});
+
+// MenteeCheckIn table: student-authored check-ins/comments to their assigned
+// mentor (migration 047) — the first student-facing surface in this module.
+export const MenteeCheckIn = mysqlTable("MenteeCheckIn", {
+  checkin_id: bigint("checkin_id", { mode: "number" })
+    .primaryKey()
+    .autoincrement(),
+  student_id: bigint("student_id", { mode: "number" })
+    .notNull()
+    .references(() => User.user_id),
+  mentor_id: bigint("mentor_id", { mode: "number" })
+    .notNull()
+    .references(() => User.user_id),
+  academic_year_id: bigint("academic_year_id", { mode: "number" })
+    .notNull()
+    .references(() => AcademicYear.academic_year_id),
+  submitted_at: datetime("submitted_at").default(sql`CURRENT_TIMESTAMP`),
+  // Expanded from the original 4 values in migration 050 to cover the
+  // realistic range of student reports (academic/behavioral/attendance/
+  // wellbeing/other), not just appreciation/concern/meeting/general.
+  category: mysqlEnum("category", [
+    "GENERAL",
+    "APPRECIATION",
+    "ACADEMIC",
+    "BEHAVIORAL",
+    "ATTENDANCE",
+    "WELLBEING",
+    "CONCERN",
+    "REQUEST_MEETING",
+    "OTHER",
+  ]).default("GENERAL"),
+  title: varchar("title", { length: 150 }),
+  // Optional link to one of the student's enrolled subjects (migration 050) —
+  // lets a report be scoped to a specific class without requiring one.
+  subject_id: bigint("subject_id", { mode: "number" }).references(() => Subject.subject_id),
+  message: text("message").notNull(),
+  linked_session_id: bigint("linked_session_id", { mode: "number" }).references(
+    () => MentorshipSession.mentorship_id,
+  ),
+  status: mysqlEnum("status", ["NEW", "ACKNOWLEDGED", "ADDRESSED"]).default("NEW"),
+  // Approval workflow (migration 048) — mirrors SchemeOfWork/SchemeOfWorkEntry's
+  // validation_status convention. mentor_response doubles as the approval
+  // comment when validation_status is set alongside it.
+  validation_status: mysqlEnum("validation_status", ["PENDING", "APPROVED", "REJECTED"]).default("PENDING"),
+  mentor_response: text("mentor_response"),
+  responded_at: datetime("responded_at"),
 });
 
 // ReportProjectUpdate table: Delivery Studio project work status
@@ -1025,32 +1141,119 @@ export const ReportTopic = mysqlTable("ReportTopic", {
 });
 
 // LessonReport — decoupled per-lesson delivery record
-export const LessonReport = mysqlTable("LessonReport", {
-  lesson_report_id: bigint("lesson_report_id", { mode: "number" })
+export const LessonReport = mysqlTable(
+  "LessonReport",
+  {
+    lesson_report_id: bigint("lesson_report_id", { mode: "number" })
+      .primaryKey()
+      .autoincrement(),
+    lesson_id: int("lesson_id").references(() => LO_Lesson.id, {
+      onDelete: "set null",
+    }),
+    entry_id: bigint("entry_id", { mode: "number" }).references(
+      () => SchemeOfWorkEntry.entry_id,
+      { onDelete: "set null" },
+    ),
+    reported_by: bigint("reported_by", { mode: "number" })
+      .notNull()
+      .references(() => User.user_id, { onDelete: "cascade" }),
+    academic_year_id: bigint("academic_year_id", { mode: "number" }).references(
+      () => AcademicYear.academic_year_id,
+    ),
+    academic_term_id: bigint("academic_term_id", { mode: "number" }).references(
+      () => AcademicTerm.academic_term_id,
+    ),
+    // Denormalized at write time from lesson_id/entry_id (scheduled reports)
+    // or supplied directly (ad-hoc reports, Phase 2) — kept even if the
+    // source lesson/entry is later deleted, unlike the nullable FKs above.
+    subject_id: bigint("subject_id", { mode: "number" }).references(
+      () => Subject.subject_id,
+      { onDelete: "set null" },
+    ),
+    class_group_id: bigint("class_group_id", { mode: "number" }).references(
+      () => ClassGroup.class_group_id,
+      { onDelete: "set null" },
+    ),
+    delivery_date: date("delivery_date").notNull(),
+    status: mysqlEnum("status", ["DELIVERED", "PARTIAL", "MISSED", "UNPLANNED"])
+      .notNull()
+      .default("DELIVERED"),
+    attendance_count: int("attendance_count"),
+    completion_rate: int("completion_rate"),
+    reflection_notes: text("reflection_notes"),
+    evidence_url: varchar("evidence_url", { length: 500 }),
+    schedule_flag: mysqlEnum("schedule_flag", ["ON_TIME", "AHEAD", "BEHIND"])
+      .notNull()
+      .default("ON_TIME"),
+    // Admin approval workflow (migration 049) — mirrors MenteeCheckIn's
+    // validation_status convention.
+    validation_status: mysqlEnum("validation_status", ["PENDING", "APPROVED", "REJECTED"])
+      .notNull()
+      .default("PENDING"),
+    validation_comment: text("validation_comment"),
+    validated_by: bigint("validated_by", { mode: "number" }),
+    validated_at: datetime("validated_at"),
+    created_at: datetime("created_at").default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => ({
+    // Nullable lesson_id means this only dedupes scheduled reports — ad-hoc
+    // reports (lesson_id NULL) are allowed to repeat on the same date.
+    uniqueReportedLessonDate: uniqueIndex("uq_lesson_report_reporter_lesson_date").on(
+      table.reported_by,
+      table.lesson_id,
+      table.delivery_date,
+    ),
+    subjectIdx: index("idx_lesson_report_subject").on(table.subject_id),
+    classGroupIdx: index("idx_lesson_report_class_group").on(table.class_group_id),
+    validationStatusIdx: index("idx_lr_validation_status").on(table.validation_status),
+  }),
+);
+
+// SupportRequestCategory — admin-managed lookup for the "Support Needed"
+// multi-select (replaces free-text-only Academic/Technical/Infrastructure/
+// Coordination fields so admins can GROUP BY category and rank requests).
+export const SupportRequestCategory = mysqlTable("SupportRequestCategory", {
+  category_id: bigint("category_id", { mode: "number" })
     .primaryKey()
     .autoincrement(),
-  lesson_id: int("lesson_id").references(() => LO_Lesson.id, {
-    onDelete: "set null",
-  }),
-  entry_id: bigint("entry_id", { mode: "number" }).references(
-    () => SchemeOfWorkEntry.entry_id,
-    { onDelete: "set null" },
-  ),
-  reported_by: bigint("reported_by", { mode: "number" })
+  label: varchar("label", { length: 150 }).notNull().unique(),
+  is_active: tinyint("is_active").default(1),
+});
+
+// ChallengeCategory — admin-managed lookup for tagging recurring challenges
+// (e.g. "Electricity/Power") so they can be ranked by frequency across
+// subjects/teachers instead of only readable one report at a time.
+export const ChallengeCategory = mysqlTable("ChallengeCategory", {
+  category_id: bigint("category_id", { mode: "number" })
+    .primaryKey()
+    .autoincrement(),
+  label: varchar("label", { length: 150 }).notNull().unique(),
+  is_active: tinyint("is_active").default(1),
+});
+
+// LessonReportSupportRequest — join table: which support categories a given
+// lesson report flagged, with an optional free-text note per selection.
+export const LessonReportSupportRequest = mysqlTable("LessonReportSupportRequest", {
+  id: bigint("id", { mode: "number" }).primaryKey().autoincrement(),
+  lesson_report_id: bigint("lesson_report_id", { mode: "number" })
     .notNull()
-    .references(() => User.user_id, { onDelete: "cascade" }),
-  delivery_date: date("delivery_date").notNull(),
-  status: mysqlEnum("status", ["DELIVERED", "PARTIAL", "MISSED"])
+    .references(() => LessonReport.lesson_report_id, { onDelete: "cascade" }),
+  category_id: bigint("category_id", { mode: "number" })
     .notNull()
-    .default("DELIVERED"),
-  attendance_count: int("attendance_count"),
-  completion_rate: int("completion_rate"),
-  reflection_notes: text("reflection_notes"),
-  evidence_url: varchar("evidence_url", { length: 500 }),
-  schedule_flag: mysqlEnum("schedule_flag", ["ON_TIME", "AHEAD", "BEHIND"])
+    .references(() => SupportRequestCategory.category_id),
+  note: text("note"),
+});
+
+// LessonReportChallengeTag — join table: which challenge categories a given
+// lesson report was tagged with (additive to the free-text reflection_notes).
+export const LessonReportChallengeTag = mysqlTable("LessonReportChallengeTag", {
+  id: bigint("id", { mode: "number" }).primaryKey().autoincrement(),
+  lesson_report_id: bigint("lesson_report_id", { mode: "number" })
     .notNull()
-    .default("ON_TIME"),
-  created_at: datetime("created_at").default(sql`CURRENT_TIMESTAMP`),
+    .references(() => LessonReport.lesson_report_id, { onDelete: "cascade" }),
+  category_id: bigint("category_id", { mode: "number" })
+    .notNull()
+    .references(() => ChallengeCategory.category_id),
 });
 
 // Curriculum — SubjectCompetency
@@ -1065,8 +1268,13 @@ export const SubjectCompetency = mysqlTable("SubjectCompetency", {
     .notNull()
     .references(() => User.user_id),
   element_number: int("element_number").notNull().default(1),
+  // Hours budgeted to this Learning Outcome/Element in the official curriculum (e.g. "Learning
+  // hours: 40"), and the bullet "Indicative content" listed under it — both absent from the
+  // original schema, added for "Import from Curriculum" AI extraction to populate.
+  learning_hours: int("learning_hours"),
   title: varchar("title", { length: 255 }).notNull(),
   description: text("description"),
+  indicative_content: text("indicative_content"),
   sort_order: int("sort_order").notNull().default(0),
   created_at: datetime("created_at").default(sql`CURRENT_TIMESTAMP`),
   updated_at: datetime("updated_at").default(
@@ -1092,6 +1300,27 @@ export const CompetencyPerformanceCriteria = mysqlTable(
       sql`CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP`,
     ),
   },
+);
+
+// SchemeEntryCriteria — links a Scheme of Work entry (a taught week) to the Curriculum Performance
+// Criteria it addresses. Many-to-many, populated primarily by AI matching (see
+// CURRICULUM_SCHEME_OF_WORK_INTEGRATION_IMPLEMENTATION_PLAN.md).
+export const SchemeEntryCriteria = mysqlTable(
+  "SchemeEntryCriteria",
+  {
+    entry_id: bigint("entry_id", { mode: "number" })
+      .notNull()
+      .references(() => SchemeOfWorkEntry.entry_id, { onDelete: "cascade" }),
+    criteria_id: bigint("criteria_id", { mode: "number" })
+      .notNull()
+      .references(() => CompetencyPerformanceCriteria.criteria_id, {
+        onDelete: "cascade",
+      }),
+    created_at: datetime("created_at").default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => ({
+    pk: primaryKey(table.entry_id, table.criteria_id),
+  }),
 );
 
 // Curriculum — SubjectDocumentCategory
@@ -1161,5 +1390,100 @@ export const AssessmentScore = mysqlTable("AssessmentScore", {
   assessed_at: date("assessed_at").notNull(),
   recorded_by: bigint("recorded_by", { mode: "number" })
     .references(() => User.user_id, { onDelete: "set null" }),
+  created_at: datetime("created_at").default(sql`CURRENT_TIMESTAMP`),
+});
+
+// LessonNote — teacher-authored, AI-assisted rich text notes (Tiptap JSON), optionally
+// anchored to a Scheme of Work week so generation/editing can be grounded in curriculum context.
+export const LessonNote = mysqlTable("LessonNote", {
+  note_id: bigint("note_id", { mode: "number" }).primaryKey().autoincrement(),
+  user_id: bigint("user_id", { mode: "number" })
+    .notNull()
+    .references(() => User.user_id),
+  subject_id: bigint("subject_id", { mode: "number" })
+    .notNull()
+    .references(() => Subject.subject_id, { onDelete: "cascade" }),
+  class_group_id: bigint("class_group_id", { mode: "number" }).references(
+    () => ClassGroup.class_group_id,
+  ),
+  scheme_entry_id: bigint("scheme_entry_id", { mode: "number" }).references(
+    () => SchemeOfWorkEntry.entry_id,
+    { onDelete: "set null" },
+  ),
+  academic_term_id: bigint("academic_term_id", { mode: "number" }).references(
+    () => AcademicTerm.academic_term_id,
+  ),
+  title: varchar("title", { length: 255 }).notNull(),
+  content_json: json("content_json"),
+  content_html: text("content_html"),
+  status: mysqlEnum("status", ["DRAFT", "PUBLISHED"]).default("DRAFT"),
+  source: mysqlEnum("source", ["MANUAL", "AI_GENERATED", "AI_ASSISTED"]).default(
+    "MANUAL",
+  ),
+  created_at: datetime("created_at").default(sql`CURRENT_TIMESTAMP`),
+  updated_at: datetime("updated_at").default(
+    sql`CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP`,
+  ),
+});
+
+// LessonNoteVersion — snapshot written before every AI-applied edit (and on publish),
+// so a teacher can always step back from an AI change.
+export const LessonNoteVersion = mysqlTable("LessonNoteVersion", {
+  version_id: bigint("version_id", { mode: "number" }).primaryKey().autoincrement(),
+  note_id: bigint("note_id", { mode: "number" })
+    .notNull()
+    .references(() => LessonNote.note_id, { onDelete: "cascade" }),
+  content_json: json("content_json").notNull(),
+  created_by: mysqlEnum("created_by", ["USER", "AI"]).notNull().default("USER"),
+  prompt_text: text("prompt_text"),
+  created_at: datetime("created_at").default(sql`CURRENT_TIMESTAMP`),
+});
+
+// LessonNoteShare — mirrors DocumentPermission's filter-based sharing so a note can be
+// shared with a whole class, everyone enrolled in the subject, or hand-picked students.
+export const LessonNoteShare = mysqlTable("LessonNoteShare", {
+  share_id: bigint("share_id", { mode: "number" }).primaryKey().autoincrement(),
+  note_id: bigint("note_id", { mode: "number" })
+    .notNull()
+    .references(() => LessonNote.note_id, { onDelete: "cascade" }),
+  shared_by: bigint("shared_by", { mode: "number" })
+    .notNull()
+    .references(() => User.user_id),
+  filter_type: mysqlEnum("filter_type", [
+    "class_group",
+    "subject_enrolled",
+    "specific_students",
+  ]).notNull(),
+  filter_ids: json("filter_ids").notNull(),
+  permission: mysqlEnum("permission", ["VIEW"]).default("VIEW"),
+  expires_at: datetime("expires_at"),
+  created_at: datetime("created_at").default(sql`CURRENT_TIMESTAMP`),
+});
+
+// LessonNoteImage — images embedded in a note's Tiptap content, stored via the same
+// FTP-backed flow as SubjectDocument, served through an authenticated streaming endpoint.
+export const LessonNoteImage = mysqlTable("LessonNoteImage", {
+  image_id: bigint("image_id", { mode: "number" }).primaryKey().autoincrement(),
+  note_id: bigint("note_id", { mode: "number" })
+    .notNull()
+    .references(() => LessonNote.note_id, { onDelete: "cascade" }),
+  user_id: bigint("user_id", { mode: "number" })
+    .notNull()
+    .references(() => User.user_id),
+  file_path: varchar("file_path", { length: 500 }).notNull(),
+  mime_type: varchar("mime_type", { length: 100 }).notNull(),
+  original_name: varchar("original_name", { length: 255 }).notNull(),
+  created_at: datetime("created_at").default(sql`CURRENT_TIMESTAMP`),
+});
+
+// LessonNotePromptPreset — a teacher's own saved "Ask AI" instructions (e.g. phrasing they
+// reuse across notes), shown alongside the built-in quick prompts in the editor.
+export const LessonNotePromptPreset = mysqlTable("LessonNotePromptPreset", {
+  preset_id: bigint("preset_id", { mode: "number" }).primaryKey().autoincrement(),
+  user_id: bigint("user_id", { mode: "number" })
+    .notNull()
+    .references(() => User.user_id),
+  label: varchar("label", { length: 80 }).notNull(),
+  prompt_text: text("prompt_text").notNull(),
   created_at: datetime("created_at").default(sql`CURRENT_TIMESTAMP`),
 });

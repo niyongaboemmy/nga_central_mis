@@ -276,6 +276,9 @@ export interface UserGrade {
   level_order: number;
   program_id: number;
   program_name: string;
+  academic_year_id: number;
+  academic_year_name: string;
+  academic_year_is_current: number;
   assigned_at: string;
 }
 
@@ -303,11 +306,15 @@ export const getUserGrades = async (
 export const assignGradeToUser = async (
   userId: number,
   gradeId: number,
+  academicYearId: number,
   onSuccess?: () => void,
   onError?: (error: any) => void,
 ): Promise<void> => {
   try {
-    await api.post(`/users/${userId}/grades`, { grade_id: gradeId });
+    await api.post(`/users/${userId}/grades`, {
+      grade_id: gradeId,
+      academic_year_id: academicYearId,
+    });
     if (onSuccess) {
       onSuccess();
     }
@@ -322,11 +329,14 @@ export const assignGradeToUser = async (
 export const removeGradeFromUser = async (
   userId: number,
   gradeId: number,
+  academicYearId: number,
   onSuccess?: () => void,
   onError?: (error: any) => void,
 ): Promise<void> => {
   try {
-    await api.delete(`/users/${userId}/grades/${gradeId}`);
+    await api.delete(
+      `/users/${userId}/grades/${gradeId}/years/${academicYearId}`,
+    );
     if (onSuccess) {
       onSuccess();
     }
@@ -336,6 +346,59 @@ export const removeGradeFromUser = async (
     }
     throw error;
   }
+};
+
+export interface AllGradeAssignment {
+  grade_assignment_id: string;
+  user_id: number;
+  user_name: string;
+  username: string;
+  grade_id: number;
+  grade_name: string;
+  program_name: string;
+  academic_year_id: number;
+  academic_year_name: string;
+  academic_year_is_current: number;
+  assigned_at: string;
+}
+
+export const getAllGradeAssignments = async (
+  academicYearId?: number,
+  onSuccess?: (assignments: AllGradeAssignment[]) => void,
+  onError?: (error: any) => void,
+): Promise<AllGradeAssignment[] | void> => {
+  try {
+    const response = await api.get<BackendResponse<AllGradeAssignment[]>>(
+      "/users/grade-assignments",
+      { params: academicYearId ? { academic_year_id: academicYearId } : undefined },
+    );
+    if (onSuccess && response.data.data) {
+      onSuccess(response.data.data);
+    }
+    return response.data.data;
+  } catch (error) {
+    if (onError) {
+      onError(error);
+    }
+    throw error;
+  }
+};
+
+export const copyGradeAssignments = async (
+  sourceAcademicYearId: number,
+  targetAcademicYearId: number,
+): Promise<{ copied: number; skipped: number; total: number }> => {
+  const response = await api.post<
+    BackendResponse<{ copied: number; skipped: number; total: number }>
+  >("/users/grade-assignments/copy", {
+    source_academic_year_id: sourceAcademicYearId,
+    target_academic_year_id: targetAcademicYearId,
+  });
+  return response.data.data as {
+    copied: number;
+    skipped: number;
+    total: number;
+  };
 };
 
 export interface GradeUser {
@@ -505,6 +568,9 @@ export interface UserProgram {
   name: string;
   description?: string;
   relationship: string;
+  academic_year_id: number;
+  academic_year_name: string;
+  academic_year_is_current: number;
 }
 
 export const getUserPrograms = async (

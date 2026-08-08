@@ -63,10 +63,14 @@ export interface PendingFollowUp {
   notes: string | null;
 }
 
-export interface SubmitSessionPayload {
-  student_id: number;
+// Fields shared between creating and editing a session — session_date is
+// the only always-required field once a student is already known (create
+// needs student_id too; edit resolves it from the existing row).
+export interface SessionFieldsPayload {
   session_date: string;
   topic?: string;
+  academic_year_id?: number;
+  academic_term_id?: number;
   subject_id?: number;
   previous_session_id?: number;
   duration_minutes?: number;
@@ -89,6 +93,10 @@ export interface SubmitSessionPayload {
   is_completed?: boolean;
   session_status?: SessionStatus;
   notes?: string;
+}
+
+export interface SubmitSessionPayload extends SessionFieldsPayload {
+  student_id: number;
 }
 
 // Intelligence layer (G-01, G-02)
@@ -133,6 +141,7 @@ export interface AdminLogEntry {
   student_id: number | null;
   student_name: string | null;
   mentor_id: number;
+  mentor_name: string | null;
   session_date: string | null;
   topic: string | null;
   subject_name: string | null;
@@ -159,9 +168,178 @@ export interface AdminLogEntry {
   notes: string | null;
 }
 
+// Mentor assignments (Phase 1)
+export type AssignmentStatus = "ACTIVE" | "ENDED";
+
+export interface MentorAssignmentRecord {
+  assignment_id: number;
+  mentor_id: number;
+  mentor_name: string | null;
+  student_id: number;
+  student_name: string | null;
+  academic_year_id: number;
+  academic_year_name: string | null;
+  status: AssignmentStatus;
+  assigned_at: string | null;
+  ended_at: string | null;
+  notes: string | null;
+}
+
+// Mentee check-ins (Phase 2) / mentee reports with approval workflow (Phase 4)
+export type CheckInCategory =
+  | "GENERAL"
+  | "APPRECIATION"
+  | "ACADEMIC"
+  | "BEHAVIORAL"
+  | "ATTENDANCE"
+  | "WELLBEING"
+  | "CONCERN"
+  | "REQUEST_MEETING"
+  | "OTHER";
+export type CheckInStatus = "NEW" | "ACKNOWLEDGED" | "ADDRESSED";
+export type ValidationStatus = "PENDING" | "APPROVED" | "REJECTED";
+
+export interface MenteeCheckInRecord {
+  checkin_id: number;
+  student_id: number;
+  student_name?: string | null;
+  mentor_id: number;
+  academic_year_id: number;
+  submitted_at: string | null;
+  category: CheckInCategory;
+  title: string | null;
+  subject_id?: number | null;
+  subject_name?: string | null;
+  message: string;
+  linked_session_id: number | null;
+  status: CheckInStatus;
+  validation_status: ValidationStatus;
+  mentor_response: string | null;
+  responded_at: string | null;
+}
+
+// My mentor (student-facing)
+export interface MyMentorInfo {
+  mentor_id: number;
+  mentor_name: string | null;
+  mentor_email: string;
+  assigned_at: string | null;
+}
+
+// Consolidated periodic report (Phase 3)
+export interface ConsolidatedMenteeSection {
+  student_id: number;
+  name: string;
+  date_of_birth: string | null;
+  scores: {
+    subject_name: string | null;
+    score: string | number;
+    max_score: string | number;
+    assessment_type: string;
+  }[];
+  sessions: {
+    mentorship_id: number;
+    session_date: string | null;
+    topic: string | null;
+    next_steps: string | null;
+    guidance_notes: string | null;
+    notes: string | null;
+    follow_up_required: boolean;
+    dishonesty_flagged: boolean;
+    stress_flag: boolean;
+  }[];
+  comments: {
+    checkin_id: number;
+    category: CheckInCategory;
+    message: string;
+    submitted_at: string | null;
+  }[];
+  recommend_follow_up: boolean;
+}
+
+export interface ConsolidatedReport {
+  mentor_name: string;
+  academic_year_id: number;
+  mentees: ConsolidatedMenteeSection[];
+}
+
+// Mentor-wide period report ("view all reports by selected period range")
+export interface MySessionsReportSession {
+  mentorship_id: number;
+  student_id: number | null;
+  student_name: string | null;
+  session_date: string | null;
+  topic: string | null;
+  subject_name: string | null;
+  duration_minutes: number | null;
+  wellbeing_status: string | null;
+  follow_up_required: boolean;
+  dishonesty_flagged: boolean;
+  stress_flag: boolean;
+  session_status: SessionStatus;
+  notes: string | null;
+}
+
+export interface MySessionsReportCheckin {
+  checkin_id: number;
+  student_id: number | null;
+  student_name: string | null;
+  submitted_at: string | null;
+  category: CheckInCategory;
+  title: string | null;
+  message: string;
+  status: CheckInStatus;
+  validation_status: ValidationStatus;
+}
+
+export interface MySessionsReport {
+  period: { start_date: string | null; end_date: string | null };
+  sessions: MySessionsReportSession[];
+  checkins: MySessionsReportCheckin[];
+  summary: {
+    total_sessions: number;
+    total_checkins: number;
+    pending_checkins: number;
+    flagged_sessions: number;
+  };
+}
+
+// School-wide mentorship dashboard (admin)
+export interface AdminMentorshipDashboardData {
+  period: { start_date: string | null; end_date: string | null };
+  totals: {
+    total_mentees: number;
+    total_mentors: number;
+    total_sessions: number;
+    flagged_sessions: number;
+    follow_ups_open: number;
+    overdue_mentees: number;
+    total_checkins: number;
+    pending_checkins: number;
+    approved_checkins: number;
+    rejected_checkins: number;
+  };
+  wellbeing_distribution: { status: string | null; count: number }[];
+  top_mentors: { mentor_id: number; mentor_name: string | null; session_count: number }[];
+}
+
+// AI-generated mentee insights
+export interface MenteeAIInsights {
+  student_id: number;
+  generated_at: string;
+  summary: string;
+  strengths: string[];
+  concerns: string[];
+  recommended_focus: string | null;
+  based_on_sessions: number;
+}
+
 export const mentorshipApi = {
-  getAssignedStudents: () =>
-    api.get<{ success: boolean; data: AssignedStudent[] }>("/mentorship/students"),
+  getAssignedStudents: (academicYearId?: number) =>
+    api.get<{ success: boolean; data: AssignedStudent[] }>(
+      "/mentorship/students",
+      { params: academicYearId ? { academic_year_id: academicYearId } : undefined },
+    ),
 
   getStudentHistory: (studentId: number) =>
     api.get<{ success: boolean; data: MentorshipSessionRecord[] }>(
@@ -179,6 +357,17 @@ export const mentorshipApi = {
       data,
     ),
 
+  getSessionById: (sessionId: number) =>
+    api.get<{ success: boolean; data: MentorshipSessionRecord }>(
+      `/mentorship/sessions/${sessionId}`,
+    ),
+
+  updateSession: (sessionId: number, data: SessionFieldsPayload) =>
+    api.put<{ success: boolean; data: { mentorship_id: number } }>(
+      `/mentorship/sessions/${sessionId}`,
+      data,
+    ),
+
   updateStatus: (sessionId: number, status: SessionStatus) =>
     api.patch<{ success: boolean; data: { mentorship_id: number; status: SessionStatus } }>(
       `/mentorship/sessions/${sessionId}/status`,
@@ -188,8 +377,159 @@ export const mentorshipApi = {
   getPendingFollowUps: () =>
     api.get<{ success: boolean; data: PendingFollowUp[] }>("/mentorship/follow-ups"),
 
-  getAdminLog: (params?: { student_id?: number; limit?: number }) =>
+  getAdminLog: (params?: {
+    student_id?: number;
+    mentor_id?: number;
+    academic_year_id?: number;
+    limit?: number;
+  }) =>
     api.get<{ success: boolean; data: AdminLogEntry[] }>("/mentorship/admin/log", {
       params,
     }),
+
+  getAdminCheckIns: (params?: {
+    mentor_id?: number;
+    student_id?: number;
+    academic_year_id?: number;
+    status?: CheckInStatus;
+    limit?: number;
+  }) =>
+    api.get<{ success: boolean; data: (MenteeCheckInRecord & { mentor_name: string | null })[] }>(
+      "/mentorship/admin/checkins",
+      { params },
+    ),
+
+  // Mentor assignments (admin)
+  listAssignments: (params?: {
+    academic_year_id?: number;
+    mentor_id?: number;
+    student_id?: number;
+    status?: AssignmentStatus;
+  }) =>
+    api.get<{ success: boolean; data: MentorAssignmentRecord[] }>(
+      "/mentorship/admin/assignments",
+      { params },
+    ),
+
+  getUnassignedStudents: (academicYearId?: number) =>
+    api.get<{
+      success: boolean;
+      data: { student_id: number; student_name: string | null; class_group_name: string | null }[];
+    }>("/mentorship/admin/unassigned-students", {
+      params: academicYearId ? { academic_year_id: academicYearId } : undefined,
+    }),
+
+  createAssignment: (data: {
+    mentor_id: number;
+    student_id: number;
+    academic_year_id?: number;
+    notes?: string;
+    reassign?: boolean;
+  }) =>
+    api.post<{ success: boolean; data: { assignment_id: number } }>(
+      "/mentorship/assignments",
+      data,
+    ),
+
+  bulkAssignMentor: (data: {
+    mentor_id: number;
+    student_ids: number[];
+    academic_year_id?: number;
+    reassign?: boolean;
+    notes?: string;
+  }) =>
+    api.post<{ success: boolean; data: { assigned: number } }>(
+      "/mentorship/assignments/bulk",
+      data,
+    ),
+
+  endAssignment: (assignmentId: number) =>
+    api.delete<{ success: boolean; data: { assignment_id: number } }>(
+      `/mentorship/assignments/${assignmentId}`,
+    ),
+
+  // Mentee check-ins — student side
+  submitCheckIn: (data: { category: CheckInCategory; title?: string; subject_id?: number; academic_year_id?: number; message: string }) =>
+    api.post<{ success: boolean; data: { checkin_id: number } }>(
+      "/mentorship/checkins",
+      data,
+    ),
+
+  getMyCheckIns: () =>
+    api.get<{ success: boolean; data: MenteeCheckInRecord[] }>("/mentorship/checkins/mine"),
+
+  getMyMentor: (academicYearId?: number) =>
+    api.get<{ success: boolean; data: MyMentorInfo | null }>("/mentorship/my-mentor", {
+      params: academicYearId ? { academic_year_id: academicYearId } : undefined,
+    }),
+
+  // Mentee check-ins — mentor side
+  getCheckInInbox: (status?: CheckInStatus) =>
+    api.get<{ success: boolean; data: MenteeCheckInRecord[] }>("/mentorship/checkins/inbox", {
+      params: status ? { status } : undefined,
+    }),
+
+  getCheckInDetail: (checkinId: number) =>
+    api.get<{ success: boolean; data: MenteeCheckInRecord }>(`/mentorship/checkins/${checkinId}`),
+
+  updateCheckIn: (
+    checkinId: number,
+    data: {
+      status?: CheckInStatus;
+      validation_status?: ValidationStatus;
+      mentor_response?: string;
+      linked_session_id?: number | null;
+    },
+  ) =>
+    api.patch<{ success: boolean; data: { checkin_id: number } }>(
+      `/mentorship/checkins/${checkinId}`,
+      data,
+    ),
+
+  // Consolidated periodic report
+  getConsolidatedReport: (params?: {
+    mentor_id?: number;
+    academic_year_id?: number;
+    start_date?: string;
+    end_date?: string;
+  }) =>
+    api.get<{ success: boolean; data: ConsolidatedReport }>(
+      "/mentorship/reports/consolidated",
+      { params },
+    ),
+
+  // Mentor-wide, period-scoped report (all mentees, not just one)
+  getMySessionsReport: (params?: { start_date?: string; end_date?: string }) =>
+    api.get<{ success: boolean; data: MySessionsReport }>(
+      "/mentorship/reports/my-sessions",
+      { params },
+    ),
+
+  // Admin-level approval (acts on any mentor's check-in)
+  adminUpdateCheckIn: (
+    checkinId: number,
+    data: { validation_status?: ValidationStatus; status?: CheckInStatus; mentor_response?: string },
+  ) =>
+    api.patch<{ success: boolean; data: { checkin_id: number } }>(
+      `/mentorship/admin/checkins/${checkinId}`,
+      data,
+    ),
+
+  // School-wide mentorship dashboard (admin)
+  getAdminMentorshipDashboard: (params?: {
+    academic_year_id?: number;
+    start_date?: string;
+    end_date?: string;
+  }) =>
+    api.get<{ success: boolean; data: AdminMentorshipDashboardData }>(
+      "/mentorship/admin/dashboard",
+      { params },
+    ),
+
+  // AI-generated insights for a single mentee
+  generateMenteeAIInsights: (studentId: number) =>
+    api.post<{ success: boolean; data: MenteeAIInsights }>(
+      `/mentorship/students/${studentId}/ai-insights`,
+      {},
+    ),
 };

@@ -21,6 +21,7 @@ import {
 } from "../../api/academics";
 import { useToast } from "../../contexts/ToastContext";
 import { useUser } from "../../contexts/UserContext";
+import { useAcademicPeriod } from "../../contexts/AcademicPeriodContext";
 import { format } from "date-fns";
 
 const parseLocalNoShift = (dateStr: string) => {
@@ -42,6 +43,7 @@ const ReportForm: React.FC<ReportFormProps> = ({
 }) => {
   const { showToast } = useToast();
   const { user } = useUser();
+  const { selectedTermId } = useAcademicPeriod();
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [autoFilling, setAutoFilling] = useState(false);
@@ -168,12 +170,18 @@ const ReportForm: React.FC<ReportFormProps> = ({
       setTerms(Array.isArray(termsData) ? termsData : []);
       setClassGroups(Array.isArray(groupsData) ? groupsData : []);
 
-      if (Array.isArray(termsData)) {
-        const currentTerm = termsData.find((t: any) => t.is_current);
-        if (currentTerm) {
+      if (Array.isArray(termsData) && !existingReport) {
+        // Default to the globally selected term, falling back to whichever
+        // term is marked current if nothing is selected globally.
+        const defaultTerm = selectedTermId
+          ? termsData.find(
+              (t: any) => t.academic_term_id === selectedTermId,
+            )
+          : termsData.find((t: any) => t.is_current);
+        if (defaultTerm) {
           setFormData((prev) => ({
             ...prev,
-            academic_term_id: currentTerm.academic_term_id.toString(),
+            academic_term_id: defaultTerm.academic_term_id.toString(),
           }));
         }
       }

@@ -1,9 +1,12 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { ClassGroup, AcademicYear, Grade } from "../../api/academics";
 import Button from "../ui/Button";
 import Modal from "../ui/Modal";
 import ConfirmModal from "../ui/ConfirmModal";
 import Input from "../ui/Input";
+import PromoteStudentsModal from "./PromoteStudentsModal";
+import { usePermissions } from "../../hooks/usePermissions";
+import { Permissions } from "../../constants/permissions";
 
 interface ClassGroupsTabProps {
   data: ClassGroup[];
@@ -17,11 +20,16 @@ interface ClassGroupsTabProps {
     data: Partial<Omit<ClassGroup, "class_group_id">>
   ) => Promise<void>;
   onDelete: (id: number) => Promise<void>;
+  onPromote: (
+    sourceClassGroupId: number,
+    sourceAcademicYearId: number,
+    targetClassGroupId: number,
+    targetAcademicYearId: number,
+  ) => Promise<{ promoted: number; skipped: number; total: number }>;
 }
 
 interface ClassGroupFormData {
   name: string;
-  academic_year_id: number;
   grade_id: number;
 }
 
@@ -34,7 +42,87 @@ const ClassGroupsTab: React.FC<ClassGroupsTabProps> = ({
   onCreate,
   onUpdate,
   onDelete,
+  onPromote,
 }) => {
+  const { hasPermission } = usePermissions();
+  const canPromoteStudents = hasPermission(
+    Permissions.ASSIGN_STUDENT_CLASS_GROUPS,
+  );
+
+  const currentYearId = useMemo(
+    () => academicYears.find((y) => y.is_current === 1)?.academic_year_id || 0,
+    [academicYears],
+  );
+
+  const [showPromoteModal, setShowPromoteModal] = useState(false);
+  const [showPromoteByGradeModal, setShowPromoteByGradeModal] =
+    useState(false);
+  const [promoteSourceId, setPromoteSourceId] = useState<number>(0);
+  const [promoteSourceYearId, setPromoteSourceYearId] = useState<number>(0);
+  const [promoteTargetId, setPromoteTargetId] = useState<number>(0);
+  const [promoteTargetYearId, setPromoteTargetYearId] = useState<number>(0);
+  const [promoteSubmitting, setPromoteSubmitting] = useState(false);
+  const [promoteError, setPromoteError] = useState("");
+  const [promoteResultMessage, setPromoteResultMessage] = useState("");
+
+  const openPromoteModal = () => {
+    setPromoteSourceId(0);
+    setPromoteTargetId(0);
+    const sortedYears = [...academicYears].sort(
+      (a, b) => b.academic_year_id - a.academic_year_id,
+    );
+    const previousYear = sortedYears.find(
+      (y) => y.academic_year_id !== currentYearId,
+    );
+    setPromoteTargetYearId(currentYearId || sortedYears[0]?.academic_year_id || 0);
+    setPromoteSourceYearId(previousYear?.academic_year_id || 0);
+    setPromoteError("");
+    setPromoteResultMessage("");
+    setShowPromoteModal(true);
+  };
+
+  const handlePromote = async () => {
+    if (
+      !promoteSourceId ||
+      !promoteSourceYearId ||
+      !promoteTargetId ||
+      !promoteTargetYearId
+    ) {
+      setPromoteError(
+        "Select a source year/class group and a target year/class group",
+      );
+      return;
+    }
+    if (
+      promoteSourceId === promoteTargetId &&
+      promoteSourceYearId === promoteTargetYearId
+    ) {
+      setPromoteError("Source and target must be different");
+      return;
+    }
+    setPromoteSubmitting(true);
+    setPromoteError("");
+    try {
+      const result = await onPromote(
+        promoteSourceId,
+        promoteSourceYearId,
+        promoteTargetId,
+        promoteTargetYearId,
+      );
+      setPromoteResultMessage(
+        result.skipped > 0
+          ? `Promoted ${result.promoted} student(s); ${result.skipped} were already in the target class group`
+          : `Promoted ${result.promoted} student(s) successfully`,
+      );
+    } catch (error: any) {
+      setPromoteError(
+        error?.response?.data?.message || "Failed to promote students",
+      );
+    } finally {
+      setPromoteSubmitting(false);
+    }
+  };
+
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -42,7 +130,6 @@ const ClassGroupsTab: React.FC<ClassGroupsTabProps> = ({
     useState<ClassGroup | null>(null);
   const [formData, setFormData] = useState<ClassGroupFormData>({
     name: "",
-    academic_year_id: 0,
     grade_id: 0,
   });
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
@@ -51,7 +138,6 @@ const ClassGroupsTab: React.FC<ClassGroupsTabProps> = ({
   const resetForm = () => {
     setFormData({
       name: "",
-      academic_year_id: 0,
       grade_id: 0,
     });
     setFormErrors({});
@@ -62,10 +148,6 @@ const ClassGroupsTab: React.FC<ClassGroupsTabProps> = ({
 
     if (!formData.name.trim()) {
       errors.name = "Class group name is required";
-    }
-
-    if (!formData.academic_year_id || formData.academic_year_id === 0) {
-      errors.academic_year_id = "Academic year selection is required";
     }
 
     if (!formData.grade_id || formData.grade_id === 0) {
@@ -96,7 +178,6 @@ const ClassGroupsTab: React.FC<ClassGroupsTabProps> = ({
     setSelectedClassGroup(classGroup);
     setFormData({
       name: classGroup.name,
-      academic_year_id: classGroup.academic_year_id,
       grade_id: classGroup.grade_id,
     });
     setShowEditModal(true);
@@ -139,32 +220,63 @@ const ClassGroupsTab: React.FC<ClassGroupsTabProps> = ({
       setSubmitting(false);
     }
   };
-  const getAcademicYearName = (yearId: number) => {
-    const year = academicYears.find((y) => y.academic_year_id === yearId);
-    return year?.name || "Unknown";
-  };
-
   const getGradeName = (gradeId: number) => {
     const grade = grades.find((g) => g.grade_id === gradeId);
     return grade?.name || "Unknown";
   };
+  const getGradeLevelOrder = (gradeId: number) =>
+    grades.find((g) => g.grade_id === gradeId)?.level_order;
+
+  const promoteSourceLevelOrder = useMemo(() => {
+    const sourceGroup = data.find((cg) => cg.class_group_id === promoteSourceId);
+    return sourceGroup ? getGradeLevelOrder(sourceGroup.grade_id) : undefined;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [promoteSourceId, data, grades]);
 
   return (
     <div className="">
-      <div className="flex items-center justify-between mb-6">
-        <div>
+      <div className="flex flex-col gap-4 mb-6 lg:flex-row lg:items-center lg:justify-between">
+        <div className="min-w-0">
           <h2 className="text-xl font-semibold text-black dark:text-text-primary-dark">
             Class Groups
           </h2>
           <p className="text-sm text-text-secondary-light dark:text-text-secondary-dark/70 mt-1">
-            Manage class groups combining academic years and grades
+            Manage class groups by grade
           </p>
         </div>
-        <div className="flex space-x-3">
-          <Button variant="secondary" onClick={onRefresh} disabled={loading}>
+        <div className="flex flex-wrap items-center gap-2.5">
+          <Button
+            variant="secondary"
+            onClick={onRefresh}
+            disabled={loading}
+            className="whitespace-nowrap"
+          >
             Refresh
           </Button>
-          <Button onClick={() => setShowCreateModal(true)}>
+          {canPromoteStudents && (
+            <Button
+              variant="secondary"
+              onClick={openPromoteModal}
+              disabled={loading || data.length === 0}
+              className="whitespace-nowrap"
+            >
+              Promote a Class
+            </Button>
+          )}
+          {canPromoteStudents && (
+            <Button
+              variant="secondary"
+              onClick={() => setShowPromoteByGradeModal(true)}
+              disabled={loading || data.length === 0}
+              className="whitespace-nowrap"
+            >
+              Promote Students by Grade
+            </Button>
+          )}
+          <Button
+            onClick={() => setShowCreateModal(true)}
+            className="whitespace-nowrap"
+          >
             Add Class Group
           </Button>
         </div>
@@ -184,9 +296,6 @@ const ClassGroupsTab: React.FC<ClassGroupsTabProps> = ({
                     Name
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary-light dark:text-text-secondary-dark/70 uppercase tracking-wider">
-                    Academic Year
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary-light dark:text-text-secondary-dark/70 uppercase tracking-wider">
                     Grade
                   </th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-text-secondary-light dark:text-text-secondary-dark/70 uppercase tracking-wider">
@@ -198,10 +307,10 @@ const ClassGroupsTab: React.FC<ClassGroupsTabProps> = ({
                 {data.length === 0 ? (
                   <tr>
                     <td
-                      colSpan={4}
+                      colSpan={3}
                       className="px-6 py-12 text-center text-text-secondary-light dark:text-text-secondary-dark/70"
                     >
-                      No class groups found
+                      No class groups found. Use "Add Class Group" to create one.
                     </td>
                   </tr>
                 ) : (
@@ -212,9 +321,6 @@ const ClassGroupsTab: React.FC<ClassGroupsTabProps> = ({
                     >
                       <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-text-primary-light dark:text-text-primary-dark">
                         {item.name}
-                      </td>
-                      <td className="px-4 py-3 whitespace-nowrap text-sm text-text-secondary-light dark:text-text-secondary-dark/70">
-                        {getAcademicYearName(item.academic_year_id)}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-sm text-text-secondary-light dark:text-text-secondary-dark/70">
                         {getGradeName(item.grade_id)}
@@ -244,6 +350,171 @@ const ClassGroupsTab: React.FC<ClassGroupsTabProps> = ({
         )}
       </div>
 
+      {/* Promote a Class Modal (manual, single class-group pair) */}
+      <Modal
+        isOpen={showPromoteModal}
+        onClose={() => {
+          setShowPromoteModal(false);
+          setPromoteError("");
+          setPromoteResultMessage("");
+        }}
+        title="Promote a Class"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-text-secondary-light dark:text-text-secondary-dark/70">
+            Move every active student from one class group into another --
+            e.g. promoting last year's Grade 5 class into this year's Grade 6
+            class. Pick the source year/class group students are currently in
+            and the target year/class group to move them into. Students keep
+            their prior class group as history; they aren't removed from it.
+          </p>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-medium text-text-primary-light dark:text-text-primary-dark mb-2">
+                Source Year
+              </label>
+              <select
+                value={promoteSourceYearId}
+                onChange={(e) =>
+                  setPromoteSourceYearId(parseInt(e.target.value))
+                }
+                className="w-full px-4 py-3 border-2 border-border-light dark:border-border-dark/30 rounded-2xl focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/20 transition-all duration-200 bg-surface-light dark:bg-surface-dark/30 text-text-primary-light dark:text-text-primary-dark"
+              >
+                <option value={0}>Select source year</option>
+                {academicYears.map((year) => (
+                  <option
+                    key={year.academic_year_id}
+                    value={year.academic_year_id}
+                  >
+                    {year.name}
+                    {year.is_current === 1 ? " (Current)" : ""}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-text-primary-light dark:text-text-primary-dark mb-2">
+                Target Year
+              </label>
+              <select
+                value={promoteTargetYearId}
+                onChange={(e) =>
+                  setPromoteTargetYearId(parseInt(e.target.value))
+                }
+                className="w-full px-4 py-3 border-2 border-border-light dark:border-border-dark/30 rounded-2xl focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/20 transition-all duration-200 bg-surface-light dark:bg-surface-dark/30 text-text-primary-light dark:text-text-primary-dark"
+              >
+                <option value={0}>Select target year</option>
+                {academicYears.map((year) => (
+                  <option
+                    key={year.academic_year_id}
+                    value={year.academic_year_id}
+                  >
+                    {year.name}
+                    {year.is_current === 1 ? " (Current)" : ""}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-text-primary-light dark:text-text-primary-dark mb-2">
+              Promote from
+            </label>
+            <select
+              value={promoteSourceId}
+              onChange={(e) => setPromoteSourceId(parseInt(e.target.value))}
+              className="w-full px-4 py-3 border-2 border-border-light dark:border-border-dark/30 rounded-2xl focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/20 transition-all duration-200 bg-surface-light dark:bg-surface-dark/30 text-text-primary-light dark:text-text-primary-dark"
+            >
+              <option value={0}>Select source class group</option>
+              {data.map((cg) => (
+                <option key={cg.class_group_id} value={cg.class_group_id}>
+                  {cg.name} ({getGradeName(cg.grade_id)})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-text-primary-light dark:text-text-primary-dark mb-2">
+              Promote to
+            </label>
+            <select
+              value={promoteTargetId}
+              onChange={(e) => setPromoteTargetId(parseInt(e.target.value))}
+              className="w-full px-4 py-3 border-2 border-border-light dark:border-border-dark/30 rounded-2xl focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/20 transition-all duration-200 bg-surface-light dark:bg-surface-dark/30 text-text-primary-light dark:text-text-primary-dark"
+            >
+              <option value={0}>Select target class group</option>
+              {data.map((cg) => {
+                const targetLevelOrder = getGradeLevelOrder(cg.grade_id);
+                const isBackward =
+                  promoteSourceLevelOrder !== undefined &&
+                  targetLevelOrder !== undefined &&
+                  targetLevelOrder <= promoteSourceLevelOrder;
+                return (
+                  <option key={cg.class_group_id} value={cg.class_group_id}>
+                    {cg.name} ({getGradeName(cg.grade_id)})
+                    {isBackward ? " -- not a later grade" : ""}
+                  </option>
+                );
+              })}
+            </select>
+            {promoteSourceLevelOrder !== undefined &&
+              promoteTargetId !== 0 &&
+              (() => {
+                const targetGroup = data.find(
+                  (cg) => cg.class_group_id === promoteTargetId,
+                );
+                const targetLevelOrder = targetGroup
+                  ? getGradeLevelOrder(targetGroup.grade_id)
+                  : undefined;
+                return targetLevelOrder !== undefined &&
+                  targetLevelOrder <= promoteSourceLevelOrder ? (
+                  <p className="mt-2 text-sm text-amber-600 dark:text-amber-400">
+                    This target grade isn't ordered after the source grade
+                    (by Level Order in Grade Management). Double check this
+                    is the class group you meant to promote into.
+                  </p>
+                ) : null;
+              })()}
+          </div>
+
+          {promoteResultMessage && (
+            <p className="text-sm text-green-600 dark:text-green-400 font-medium">
+              {promoteResultMessage}
+            </p>
+          )}
+
+          {promoteError && (
+            <p className="text-sm text-red-600 dark:text-red-400 font-medium">
+              {promoteError}
+            </p>
+          )}
+        </div>
+
+        <div className="flex justify-end space-x-3 mt-6">
+          <Button
+            variant="secondary"
+            onClick={() => {
+              setShowPromoteModal(false);
+              setPromoteError("");
+              setPromoteResultMessage("");
+            }}
+          >
+            Close
+          </Button>
+          <Button
+            onClick={handlePromote}
+            disabled={promoteSubmitting}
+            isLoading={promoteSubmitting}
+          >
+            {promoteSubmitting ? "Promoting..." : "Promote Class"}
+          </Button>
+        </div>
+      </Modal>
+
       {/* Create Modal */}
       <Modal
         isOpen={showCreateModal}
@@ -264,41 +535,6 @@ const ClassGroupsTab: React.FC<ClassGroupsTabProps> = ({
             placeholder="e.g., Class A"
             required
           />
-
-          <div>
-            <label className="block text-sm font-medium text-text-primary-light dark:text-text-primary-dark mb-2">
-              Academic Year
-            </label>
-            <select
-              value={formData.academic_year_id}
-              onChange={(e) =>
-                setFormData((prev) => ({
-                  ...prev,
-                  academic_year_id: parseInt(e.target.value),
-                }))
-              }
-              className={`w-full px-4 py-3 border-2 border-border-light dark:border-border-dark/30 rounded-2xl focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/20 transition-all duration-200 bg-surface-light dark:bg-surface-dark/30 focus:bg-surface-light dark:focus:bg-surface-dark/40 text-text-primary-light dark:text-text-primary-dark ${
-                formErrors.academic_year_id
-                  ? "border-red-500 focus:border-red-500 focus:ring-red-500/20"
-                  : ""
-              }`}
-            >
-              <option value={0}>Select Academic Year</option>
-              {academicYears.map((year) => (
-                <option
-                  key={year.academic_year_id}
-                  value={year.academic_year_id}
-                >
-                  {year.name}
-                </option>
-              ))}
-            </select>
-            {formErrors.academic_year_id && (
-              <p className="text-sm text-red-600 dark:text-red-400 font-medium mt-1">
-                {formErrors.academic_year_id}
-              </p>
-            )}
-          </div>
 
           <div>
             <label className="block text-sm font-medium text-text-primary-light dark:text-text-primary-dark mb-2">
@@ -377,41 +613,6 @@ const ClassGroupsTab: React.FC<ClassGroupsTabProps> = ({
 
           <div>
             <label className="block text-sm font-medium text-text-primary-light dark:text-text-primary-dark mb-2">
-              Academic Year
-            </label>
-            <select
-              value={formData.academic_year_id}
-              onChange={(e) =>
-                setFormData((prev) => ({
-                  ...prev,
-                  academic_year_id: parseInt(e.target.value),
-                }))
-              }
-              className={`w-full px-4 py-3 border-2 border-border-light dark:border-border-dark/30 rounded-2xl focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/20 transition-all duration-200 bg-surface-light dark:bg-surface-dark/30 focus:bg-surface-light dark:focus:bg-surface-dark/40 text-text-primary-light dark:text-text-primary-dark ${
-                formErrors.academic_year_id
-                  ? "border-red-500 focus:border-red-500 focus:ring-red-500/20"
-                  : ""
-              }`}
-            >
-              <option value={0}>Select Academic Year</option>
-              {academicYears.map((year) => (
-                <option
-                  key={year.academic_year_id}
-                  value={year.academic_year_id}
-                >
-                  {year.name}
-                </option>
-              ))}
-            </select>
-            {formErrors.academic_year_id && (
-              <p className="text-sm text-red-600 dark:text-red-400 font-medium mt-1">
-                {formErrors.academic_year_id}
-              </p>
-            )}
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-text-primary-light dark:text-text-primary-dark mb-2">
               Grade
             </label>
             <select
@@ -475,6 +676,15 @@ const ClassGroupsTab: React.FC<ClassGroupsTabProps> = ({
         title="Delete Class Group"
         message={`Are you sure you want to delete "${selectedClassGroup?.name}"? This action cannot be undone.`}
         isLoading={submitting}
+      />
+
+      {/* Promote Students by Grade Modal (automatic, whole-year rollover) */}
+      <PromoteStudentsModal
+        isOpen={showPromoteByGradeModal}
+        onClose={() => setShowPromoteByGradeModal(false)}
+        academicYears={academicYears}
+        classGroups={data}
+        onPromoted={onRefresh}
       />
     </div>
   );

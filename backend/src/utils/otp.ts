@@ -81,8 +81,17 @@ export const sendOTPByEmail = async (
   // Save OTP to database
   await saveOTP(userId, otp, type);
 
-  // Send email
-  await emailService.sendOTP(email, otp, type);
+  // Outside production, skip the real email and let the caller surface the
+  // OTP directly (e.g. auto-filled in the UI) so local/dev testing doesn't
+  // depend on a working mail transport.
+  if (config.envType === "production") {
+    await emailService.sendOTP(email, otp, type);
+  } else {
+    logger.info("Dev mode: skipping OTP email, returning code directly", {
+      userId,
+      type,
+    });
+  }
 
   return otp; // Return for testing purposes, don't return in production
 };

@@ -9,6 +9,10 @@ interface CalendarHeaderProps {
   academicYears: any[];
   academicTerms: AcademicTerm[];
   calendars: AcademicCalendar[];
+  // Every class group in the selected year, regardless of whether it
+  // already has a calendar for the current term — lets the selector list
+  // groups that still need a first calendar, not just ones that have one.
+  allClassGroupsForYear?: { class_group_id: number; name: string }[];
   selectedYear: number | null;
   selectedTerm: number | null;
   selectedCalendar: AcademicCalendar | null;
@@ -19,8 +23,6 @@ interface CalendarHeaderProps {
   }[];
   selectedTeacherClassGroupId?: number | null;
   dateRangeString: string;
-  onYearChange: (yearId: number) => void;
-  onTermChange: (termId: number) => void;
   onCalendarChange: (calendar: AcademicCalendar | null) => void;
   onTeacherClassGroupChange?: (classGroupId: number | null) => void;
   onCreateCalendarClick: () => void;
@@ -37,14 +39,13 @@ const CalendarHeader: React.FC<CalendarHeaderProps> = ({
   academicYears,
   academicTerms,
   calendars,
+  allClassGroupsForYear = [],
   selectedYear,
   selectedTerm,
   selectedCalendar,
   myClassGroups = [],
   selectedTeacherClassGroupId,
   dateRangeString,
-  onYearChange,
-  onTermChange,
   onCalendarChange,
   onTeacherClassGroupChange,
   onCreateCalendarClick,
@@ -62,6 +63,13 @@ const CalendarHeader: React.FC<CalendarHeaderProps> = ({
   const getTermName = () => {
     const term = academicTerms.find((t) => t.academic_term_id === selectedTerm);
     return term?.name || "Select a term";
+  };
+
+  const getYearName = () => {
+    const year = academicYears.find(
+      (y: any) => y.academic_year_id === selectedYear,
+    );
+    return year?.name || "Select a year";
   };
 
   return (
@@ -85,65 +93,68 @@ const CalendarHeader: React.FC<CalendarHeaderProps> = ({
         </div>
       </div>
       <div className="flex items-center space-x-4">
-        {/* Academic Year/Term Selector */}
+        {/* Academic Year/Term — read-only; switch it from the top navigation bar */}
         <div className="flex items-center space-x-2 bg-gray-100 dark:bg-gray-700/20 p-1.5 rounded-full">
-          <select
-            value={selectedYear || ""}
-            onChange={(e) => {
-              const yearId = parseInt(e.target.value);
-              onYearChange(yearId);
-            }}
-            className="px-4 py-2 text-sm bg-transparent border-0 rounded-full focus:ring-2 focus:ring-blue-500 dark:text-white"
+          <span
+            className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200"
+            title="Change the academic year and term from the top navigation bar"
           >
-            <option value="">Year</option>
-            {academicYears.map((year: any) => (
-              <option key={year.academic_year_id} value={year.academic_year_id}>
-                {year.name}
-              </option>
-            ))}
-          </select>
-          <span className="text-gray-400">|</span>
-          <select
-            value={selectedTerm || ""}
-            onChange={(e) => onTermChange(parseInt(e.target.value))}
-            className="px-4 py-2 text-sm bg-transparent border-0 rounded-full focus:ring-2 focus:ring-blue-500 dark:text-white"
-          >
-            <option value="">Term</option>
-            {academicTerms.map((term: AcademicTerm) => (
-              <option key={term.academic_term_id} value={term.academic_term_id}>
-                {term.name}
-              </option>
-            ))}
-          </select>
+            {getYearName()} / {getTermName()}
+          </span>
           {isAdmin && (
             <>
               <span className="text-gray-400">|</span>
               <select
-                value={selectedCalendar?.calendar_id || ""}
+                value={selectedCalendar?.class_group_id ?? ""}
                 onChange={(e) => {
-                  const calendarId = parseInt(e.target.value);
-                  const calendar = calendars.find(
-                    (c) => c.calendar_id === calendarId,
+                  const classGroupId = parseInt(e.target.value);
+                  if (!classGroupId) {
+                    onCalendarChange(null);
+                    return;
+                  }
+                  const existingCalendar = calendars.find(
+                    (c) =>
+                      c.class_group_id === classGroupId &&
+                      c.academic_year_id === selectedYear &&
+                      c.academic_term_id === selectedTerm,
                   );
-                  onCalendarChange(calendar || null);
+                  if (existingCalendar) {
+                    onCalendarChange(existingCalendar);
+                    return;
+                  }
+                  // No calendar exists yet for this class group/term — pass
+                  // a placeholder (calendar_id: 0) so the page can show a
+                  // "create a calendar for this group" prompt instead of
+                  // nothing selectable at all.
+                  const group = allClassGroupsForYear.find(
+                    (g) => g.class_group_id === classGroupId,
+                  );
+                  onCalendarChange({
+                    calendar_id: 0,
+                    academic_year_id: selectedYear ?? 0,
+                    academic_term_id: selectedTerm ?? 0,
+                    class_group_id: classGroupId,
+                    class_group_name: group?.name,
+                    is_active: 0,
+                  });
                 }}
                 className="px-4 py-2 text-sm bg-transparent border-0 rounded-full focus:ring-2 focus:ring-blue-500 dark:text-white"
               >
                 <option value="">Select a class group</option>
-                {calendars
-                  .filter(
+                {allClassGroupsForYear.map((group) => {
+                  const hasCalendar = calendars.some(
                     (c) =>
+                      c.class_group_id === group.class_group_id &&
                       c.academic_year_id === selectedYear &&
                       c.academic_term_id === selectedTerm,
-                  )
-                  .map((calendar) => (
-                    <option
-                      key={calendar.calendar_id}
-                      value={calendar.calendar_id}
-                    >
-                      {calendar.class_group_name}
+                  );
+                  return (
+                    <option key={group.class_group_id} value={group.class_group_id}>
+                      {group.name}
+                      {!hasCalendar ? " (no calendar yet)" : ""}
                     </option>
-                  ))}
+                  );
+                })}
               </select>
             </>
           )}

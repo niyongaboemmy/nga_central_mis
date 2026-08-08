@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { Tag, AlignLeft, Palette, Check, Loader2, FolderOpen } from "lucide-react";
 import Modal from "../ui/Modal";
 import { subjectDocCategoriesApi, SubjectDocCategory } from "../../api/curriculum";
 import { useToast } from "../../contexts/ToastContext";
@@ -21,6 +22,12 @@ const PRESET_COLORS = [
   { color: "#06B6D4", label: "Cyan" },
   { color: "#6B7280", label: "Gray" },
 ];
+
+const fieldClass =
+  "w-full px-3.5 py-2.5 text-sm bg-gray-50 dark:bg-gray-800/40 border border-gray-200 dark:border-gray-700/50 rounded-xl text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-600 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 dark:focus:border-blue-500/60 outline-none transition-all";
+
+const labelClass =
+  "flex items-center gap-1.5 text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1.5";
 
 const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
   isOpen,
@@ -92,12 +99,20 @@ const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={editingCategory ? "Edit Category" : "New Document Category"}
-      size="sm"
+      title={
+        <div className="flex items-center gap-2.5">
+          <div className="w-9 h-9 rounded-xl bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center flex-shrink-0">
+            <FolderOpen className="w-4.5 h-4.5 text-blue-600 dark:text-blue-400" />
+          </div>
+          <span>{editingCategory ? "Edit Category" : "New Document Category"}</span>
+        </div>
+      }
+      size="md"
     >
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+          <label className={labelClass}>
+            <Tag className="w-3.5 h-3.5" />
             Name <span className="text-red-500">*</span>
           </label>
           <input
@@ -106,7 +121,7 @@ const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
             onChange={(e) => setFormData({ ...formData, name: e.target.value })}
             placeholder="e.g. Notes, Exercises, Books"
             maxLength={150}
-            className="w-full px-3 py-2 rounded-xl border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+            className={fieldClass}
           />
           {errors.name && (
             <p className="text-xs text-red-500 mt-1">{errors.name}</p>
@@ -114,9 +129,10 @@ const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+          <label className={labelClass}>
+            <AlignLeft className="w-3.5 h-3.5" />
             Description
-            <span className="text-gray-400 font-normal ml-1">(optional)</span>
+            <span className="text-gray-400 font-normal">(optional)</span>
           </label>
           <input
             type="text"
@@ -125,12 +141,13 @@ const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
               setFormData({ ...formData, description: e.target.value })
             }
             placeholder="Short description..."
-            className="w-full px-3 py-2 rounded-xl border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+            className={fieldClass}
           />
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+          <label className={labelClass}>
+            <Palette className="w-3.5 h-3.5" />
             Color
           </label>
           <div className="flex flex-wrap gap-2">
@@ -140,24 +157,14 @@ const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
                 type="button"
                 title={label}
                 onClick={() => setFormData({ ...formData, color })}
-                className="w-8 h-8 rounded-full transition-transform hover:scale-110 focus:outline-none"
+                className={`w-8 h-8 rounded-full transition-transform hover:scale-110 focus:outline-none ring-offset-2 ring-offset-white dark:ring-offset-gray-900 ${
+                  formData.color === color ? "ring-2 ring-gray-400 dark:ring-gray-500" : ""
+                }`}
                 style={{ backgroundColor: color }}
               >
                 {formData.color === color && (
                   <span className="flex items-center justify-center h-full w-full">
-                    <svg
-                      className="w-4 h-4 text-white"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      strokeWidth={3}
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M5 13l4 4L19 7"
-                      />
-                    </svg>
+                    <Check className="w-4 h-4 text-white" strokeWidth={3} />
                   </span>
                 )}
               </button>
@@ -165,19 +172,24 @@ const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
           </div>
         </div>
 
-        <div className="flex justify-end gap-3 pt-2">
+        <div className="flex justify-end gap-3 pt-2 border-t border-gray-100 dark:border-gray-800/60 mt-2">
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 rounded-xl transition-colors"
+            className="mt-4 px-4 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-800/60 hover:bg-gray-200 dark:hover:bg-gray-800 rounded-full transition-colors"
           >
             Cancel
           </button>
           <button
             type="submit"
             disabled={saving}
-            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-60 rounded-xl transition-colors"
+            className="mt-4 flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-60 rounded-full transition-colors shadow-sm shadow-blue-600/20"
           >
+            {saving ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Check className="w-4 h-4" />
+            )}
             {saving ? "Saving..." : editingCategory ? "Save Changes" : "Create Category"}
           </button>
         </div>

@@ -10,6 +10,9 @@ export interface LoginData {
 export interface LoginResponse {
   tempToken: string;
   requiresOTP: boolean;
+  // Only present outside production, where the backend skips sending the
+  // OTP email and returns the code directly for the UI to auto-fill.
+  devOtp?: string;
 }
 
 import { AcademicYear, AcademicTerm, Grade, Program } from "./users";
@@ -73,6 +76,32 @@ export const verifyOTP = async (
           },
         },
       );
+
+    setToken(response.data.data!.token);
+
+    if (onSuccess) {
+      onSuccess(response.data.data!);
+    }
+
+    return response.data.data;
+  } catch (error) {
+    if (onError) {
+      onError(error);
+    }
+    throw error;
+  }
+};
+
+export interface GoogleLoginResponse extends VerifyOTPResponse {}
+
+export const googleLogin = async (
+  credential: string,
+  onSuccess?: (response: GoogleLoginResponse) => void,
+  onError?: (error: any) => void,
+): Promise<GoogleLoginResponse | void> => {
+  try {
+    const response: AxiosResponse<BackendResponse<GoogleLoginResponse>> =
+      await api.post("/auth/google", { credential });
 
     setToken(response.data.data!.token);
 

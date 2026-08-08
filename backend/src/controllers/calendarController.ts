@@ -1328,16 +1328,25 @@ export const getCalendarSetupData = asyncHandler(async (req: any, res: any) => {
     throw new ValidationError("No academic term specified or found");
   }
 
-  // Get class groups filtered by academic year
+  // Get class groups that actually have a teacher assignment in this
+  // academic year -- ClassGroup itself is a permanent label (no year), so
+  // "relevant to this year" is now determined via TeacherSubjectAssignment.
   const classGroups = await db
-    .select({
+    .selectDistinct({
       class_group_id: ClassGroup.class_group_id,
       name: ClassGroup.name,
       grade_name: Grade.name,
+      level_order: Grade.level_order,
     })
     .from(ClassGroup)
     .leftJoin(Grade, eq(ClassGroup.grade_id, Grade.grade_id))
-    .where(eq(ClassGroup.academic_year_id, yearId))
+    .innerJoin(
+      TeacherSubjectAssignment,
+      and(
+        eq(TeacherSubjectAssignment.class_group_id, ClassGroup.class_group_id),
+        eq(TeacherSubjectAssignment.academic_year_id, yearId),
+      ),
+    )
     .orderBy(Grade.level_order, ClassGroup.name);
 
   // Get subjects - if class_group_id is provided, filter by that class group
@@ -1409,7 +1418,7 @@ export const getCalendarSetupData = asyncHandler(async (req: any, res: any) => {
         UserProfile,
         eq(TeacherSubjectAssignment.user_id, UserProfile.user_id),
       )
-      .where(eq(ClassGroup.academic_year_id, yearId));
+      .where(eq(TeacherSubjectAssignment.academic_year_id, yearId));
 
     // Get all active subjects
     subjects = await db
@@ -1721,9 +1730,11 @@ export const getCalendarClassGroups = asyncHandler(
       throw new ValidationError("Academic year is required");
     }
 
-    // Get all class groups for this academic year
+    // Get class groups that have a teacher assignment in this academic
+    // year -- ClassGroup itself is a permanent label with no year of its
+    // own, so "for this academic year" is derived via TeacherSubjectAssignment.
     const classGroups = await db
-      .select({
+      .selectDistinct({
         class_group_id: ClassGroup.class_group_id,
         name: ClassGroup.name,
         grade_name: Grade.name,
@@ -1731,7 +1742,13 @@ export const getCalendarClassGroups = asyncHandler(
       })
       .from(ClassGroup)
       .leftJoin(Grade, eq(ClassGroup.grade_id, Grade.grade_id))
-      .where(eq(ClassGroup.academic_year_id, yearId))
+      .innerJoin(
+        TeacherSubjectAssignment,
+        and(
+          eq(TeacherSubjectAssignment.class_group_id, ClassGroup.class_group_id),
+          eq(TeacherSubjectAssignment.academic_year_id, yearId),
+        ),
+      )
       .orderBy(Grade.level_order, ClassGroup.name);
 
     successResponse(res, "Class groups retrieved successfully", classGroups);
@@ -1777,7 +1794,7 @@ export const getMyClassGroups = asyncHandler(async (req: any, res: any) => {
     .where(
       and(
         eq(TeacherSubjectAssignment.user_id, userId),
-        eq(ClassGroup.academic_year_id, yearId),
+        eq(TeacherSubjectAssignment.academic_year_id, yearId),
       ),
     )
     .orderBy(Grade.level_order, ClassGroup.name);

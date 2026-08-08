@@ -3,6 +3,8 @@ import { eq, and, sql, inArray, asc } from "drizzle-orm";
 import {
   SchemeOfWork,
   SchemeOfWorkEntry,
+  SchemeEntryCriteria,
+  CompetencyPerformanceCriteria,
   Subject,
   ClassGroup,
   AcademicTerm,
@@ -20,6 +22,8 @@ import { ValidationError, NotFoundError } from "../errors/CustomError";
 import { recordActivity } from "../utils/activityLogger";
 import logger from "../utils/logger";
 import mammoth = require("mammoth");
+import { computeWeekDates } from "../utils/weekDates";
+import { assertTeacherOwnsScheme } from "../utils/schemeAuthorization";
 
 /**
  * Parses DOCX and extracts entries based on date ranges
@@ -44,6 +48,13 @@ export const uploadAndExtractScheme = asyncHandler(
         "Subject, Class Group, and Academic Term are required",
       );
     }
+
+    await assertTeacherOwnsScheme(
+      userId,
+      subjectId,
+      classGroupId,
+      academicTermId,
+    );
 
     const result = await mammoth.convertToHtml({ buffer: req.file.buffer });
     const html = result.value;
@@ -173,6 +184,7 @@ export const uploadAndExtractScheme = asyncHandler(
         subject_id: subjectId,
         class_group_id: classGroupId,
         academic_term_id: academicTermId,
+        source: "DOCX_IMPORT",
       });
 
       // Fix: Drizzle with mysql2 returns [ResultSetHeader, undefined] or the header itself
@@ -274,9 +286,39 @@ export const getSchemeEntries = asyncHandler(async (req: any, res: any) => {
     .where(eq(SchemeOfWorkEntry.scheme_id, schemeWithNames[0].scheme_id))
     .orderBy(SchemeOfWorkEntry.start_date);
 
+  // Attach each entry's linked Curriculum Performance Criteria (if any) in one extra query rather
+  // than N+1 — most schemes have no links yet, so this is cheap in the common case too.
+  const entryIds = entries.map((e) => e.entry_id);
+  const links = entryIds.length
+    ? await db
+        .select({
+          entry_id: SchemeEntryCriteria.entry_id,
+          criteria_id: CompetencyPerformanceCriteria.criteria_id,
+          criteria_number: CompetencyPerformanceCriteria.criteria_number,
+          description: CompetencyPerformanceCriteria.description,
+        })
+        .from(SchemeEntryCriteria)
+        .innerJoin(
+          CompetencyPerformanceCriteria,
+          eq(SchemeEntryCriteria.criteria_id, CompetencyPerformanceCriteria.criteria_id),
+        )
+        .where(inArray(SchemeEntryCriteria.entry_id, entryIds))
+    : [];
+
+  const entriesWithCriteria = entries.map((entry) => ({
+    ...entry,
+    criteria: links
+      .filter((l) => l.entry_id === entry.entry_id)
+      .map((l) => ({
+        criteria_id: l.criteria_id,
+        criteria_number: l.criteria_number,
+        description: l.description,
+      })),
+  }));
+
   successResponse(res, "Scheme entries retrieved successfully", {
     scheme: schemeWithNames[0],
-    entries: entries,
+    entries: entriesWithCriteria,
   });
 });
 
@@ -313,6 +355,13 @@ export const addSchemeEntry = asyncHandler(async (req: any, res: any) => {
   ) {
     throw new ValidationError("Required fields missing");
   }
+
+  await assertTeacherOwnsScheme(
+    userId,
+    parseInt(subject_id),
+    parseInt(class_group_id),
+    parseInt(academic_term_id),
+  );
 
   // Ensure SchemeOfWork exists
   let scheme = await db
@@ -364,6 +413,164 @@ export const addSchemeEntry = asyncHandler(async (req: any, res: any) => {
     res,
     "Scheme entry added successfully",
     { entry_id: entryId },
+    201,
+  );
+});
+
+/**
+ * Inserts a new entry at any position in the timeline (after a given entry, or
+ * at the very start if `after_entry_id` is omitted), then automatically
+ * renumbers and reschedules every entry from that point onward so the whole
+ * scheme stays sequential (Week 1, Week 2, ... with a continuous Mon-Fri
+ * date cadence).
+ */
+export const insertSchemeEntry = asyncHandler(async (req: any, res: any) => {
+  const {
+    subject_id,
+    class_group_id,
+    academic_term_id,
+    after_entry_id,
+    topic,
+    sub_topic,
+    objective,
+    methodology,
+    resources,
+    evaluation,
+    duration,
+    learning_place,
+    observation,
+  } = req.body;
+  const userId = req.user.userId;
+
+  if (!subject_id || !class_group_id || !academic_term_id) {
+    throw new ValidationError(
+      "Subject, Class Group, and Academic Term are required",
+    );
+  }
+  if (!topic) {
+    throw new ValidationError("Topic is required");
+  }
+
+  await assertTeacherOwnsScheme(
+    userId,
+    parseInt(subject_id),
+    parseInt(class_group_id),
+    parseInt(academic_term_id),
+  );
+
+  let scheme = await db
+    .select()
+    .from(SchemeOfWork)
+    .where(
+      and(
+        eq(SchemeOfWork.subject_id, subject_id),
+        eq(SchemeOfWork.class_group_id, class_group_id),
+        eq(SchemeOfWork.academic_term_id, academic_term_id),
+      ),
+    )
+    .limit(1);
+
+  let schemeId: number;
+  if (scheme.length === 0) {
+    const result = await db.insert(SchemeOfWork).values({
+      user_id: userId,
+      subject_id,
+      class_group_id,
+      academic_term_id,
+    });
+    const resultHeader = Array.isArray(result) ? result[0] : result;
+    schemeId = (resultHeader as any).insertId;
+  } else {
+    schemeId = scheme[0].scheme_id;
+  }
+
+  const existingEntries = await db
+    .select()
+    .from(SchemeOfWorkEntry)
+    .where(eq(SchemeOfWorkEntry.scheme_id, schemeId))
+    .orderBy(SchemeOfWorkEntry.start_date);
+
+  let insertIndex = 0;
+  if (after_entry_id) {
+    const idx = existingEntries.findIndex(
+      (e) => e.entry_id === parseInt(after_entry_id),
+    );
+    if (idx === -1) {
+      throw new ValidationError("Reference entry not found");
+    }
+    insertIndex = idx + 1;
+  }
+
+  // Anchor the whole recomputed sequence to the scheme's existing start date
+  // (or the academic term's start date for a brand-new scheme) so unrelated
+  // entries don't drift every time something is inserted.
+  let anchor: Date;
+  if (existingEntries.length > 0 && existingEntries[0].start_date) {
+    anchor = new Date(existingEntries[0].start_date);
+  } else {
+    const term = await db
+      .select()
+      .from(AcademicTerm)
+      .where(eq(AcademicTerm.academic_term_id, academic_term_id))
+      .limit(1);
+    anchor = term[0]?.start_date ? new Date(term[0].start_date) : new Date();
+  }
+
+  const weekDates = computeWeekDates(anchor, existingEntries.length + 1);
+
+  const newEntryId = await db.transaction(async (tx) => {
+    let insertedId: number | null = null;
+
+    for (let i = 0; i < existingEntries.length + 1; i++) {
+      const { start_date, end_date } = weekDates[i];
+      const week_number = `Week ${i + 1}`;
+
+      if (i === insertIndex) {
+        const newEntry: any = {
+          scheme_id: schemeId,
+          week_number,
+          start_date,
+          end_date,
+          topic,
+          sub_topic: sub_topic || "",
+          objective: objective || "",
+          methodology: methodology || "",
+          resources: resources || "",
+          evaluation: evaluation || "",
+          duration: duration || null,
+          learning_place: learning_place || null,
+          observation: observation || null,
+        };
+        const result = await tx.insert(SchemeOfWorkEntry).values(newEntry);
+        const resultHeader = Array.isArray(result) ? result[0] : result;
+        insertedId = (resultHeader as any).insertId;
+      } else {
+        const existing = existingEntries[i < insertIndex ? i : i - 1];
+        const shifted: any = { week_number, start_date, end_date };
+        await tx
+          .update(SchemeOfWorkEntry)
+          .set(shifted)
+          .where(eq(SchemeOfWorkEntry.entry_id, existing.entry_id));
+      }
+    }
+
+    return insertedId;
+  });
+
+  await recordActivity(
+    userId,
+    "SCHEME_ENTRY_INSERT",
+    `Inserted a new week into the scheme of work (subject ID ${subject_id}), rescheduling ${existingEntries.length} following weeks`,
+    "SchemeOfWork",
+    schemeId,
+    { subject_id, entries_count: existingEntries.length + 1 },
+    userId,
+  );
+
+  successResponse(
+    res,
+    "Entry inserted and schedule updated",
+    { entry_id: newEntryId, entries_count: existingEntries.length + 1 },
     201,
   );
 });
@@ -482,16 +689,12 @@ export const getAllTeachersSchemeOfWork = asyncHandler(
       return successResponse(res, "No grades found for this program", [], 200);
     }
 
-    // Get class groups for this grade and academic year
+    // Get class groups for this grade (a permanent label, not year-scoped --
+    // the academic year is applied below when filtering assignments)
     const classGroups = await db
       .select()
       .from(ClassGroup)
-      .where(
-        and(
-          eq(ClassGroup.grade_id, gradeId),
-          eq(ClassGroup.academic_year_id, parseInt(academic_year_id)),
-        ),
-      );
+      .where(eq(ClassGroup.grade_id, gradeId));
 
     if (classGroups.length === 0) {
       return successResponse(
@@ -536,9 +739,14 @@ export const getAllTeachersSchemeOfWork = asyncHandler(
       )
       .innerJoin(
         AcademicYear,
-        eq(ClassGroup.academic_year_id, AcademicYear.academic_year_id),
+        eq(TeacherSubjectAssignment.academic_year_id, AcademicYear.academic_year_id),
       )
-      .where(inArray(TeacherSubjectAssignment.class_group_id, classGroupIds));
+      .where(
+        and(
+          inArray(TeacherSubjectAssignment.class_group_id, classGroupIds),
+          eq(TeacherSubjectAssignment.academic_year_id, parseInt(academic_year_id)),
+        ),
+      );
 
     if (assignments.length === 0) {
       return successResponse(res, "No assignments found", [], 200);

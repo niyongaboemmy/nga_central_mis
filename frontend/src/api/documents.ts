@@ -5,6 +5,7 @@ export interface Folder {
   folder_id: number;
   user_id: number;
   parent_folder_id: number | null;
+  academic_year_id: number | null;
   name: string;
   description: string | null;
   color: string;
@@ -23,6 +24,7 @@ export interface Document {
   document_id: number;
   user_id: number;
   folder_id: number | null;
+  academic_year_id: number | null;
   file_name: string;
   original_name: string;
   file_path: string;
@@ -146,9 +148,10 @@ export const folderApi = {
     description?: string;
     parentFolderId?: number;
     color?: string;
+    academicYearId?: number;
   }) => apiService.post("/documents/folders", data),
 
-  getAll: (parentFolderId?: number) => {
+  getAll: (parentFolderId?: number, academicYearId?: number) => {
     const params: any = {};
     if (
       parentFolderId &&
@@ -157,10 +160,20 @@ export const folderApi = {
     ) {
       params.parentFolderId = parentFolderId;
     }
+    if (
+      academicYearId &&
+      typeof academicYearId === "number" &&
+      academicYearId > 0
+    ) {
+      params.academicYearId = academicYearId;
+    }
     return apiService.get("/documents/folders", { params });
   },
 
-  getTree: () => apiService.get("/documents/folders/tree"),
+  getTree: (academicYearId?: number) =>
+    apiService.get("/documents/folders/tree", {
+      params: academicYearId ? { academicYearId } : undefined,
+    }),
 
   getById: (folderId: number) => {
     if (typeof folderId !== "number" || isNaN(folderId) || folderId <= 0) {
@@ -187,6 +200,7 @@ export const documentApi = {
 
   getAll: (params?: {
     folderId?: number;
+    academicYearId?: number;
     search?: string;
     page?: number;
     limit?: number;
@@ -244,7 +258,10 @@ export const documentApi = {
   getShareFilterOptions: () =>
     apiService.get("/documents/share/filter-options"),
 
-  getSharedWithMe: () => apiService.get("/documents/shared/with-me"),
+  getSharedWithMe: (academicYearId?: number) =>
+    apiService.get("/documents/shared/with-me", {
+      params: academicYearId ? { academicYearId } : undefined,
+    }),
 
   revokeAccess: (permissionId: number) =>
     apiService.delete(`/documents/permissions/${permissionId}`),
@@ -378,7 +395,7 @@ export const folderPermissionApi = {
   revokeAccess: (permissionId: number) =>
     apiService.delete(`/documents/folders/permissions/${permissionId}`),
 
-  getSharedWithMe: () =>
+  getSharedWithMe: (academicYearId?: number) =>
     apiService.get<{
       data: {
         folder_id: string;
@@ -390,5 +407,7 @@ export const folderPermissionApi = {
         created_at: string;
         updated_at: string;
       }[];
-    }>("/documents/shared/folders"),
+    }>("/documents/shared/folders", {
+      params: academicYearId ? { academicYearId } : undefined,
+    }),
 };

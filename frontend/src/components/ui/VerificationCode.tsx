@@ -6,6 +6,9 @@ interface VerificationCodeProps {
   onComplete?: (code: string) => void;
   onChange?: (code: string) => void;
   error?: boolean;
+  // Externally supplied code (e.g. a dev-mode OTP echoed back by the login
+  // response) to auto-fill the boxes with. Only applied when it changes.
+  value?: string;
 }
 
 const VerificationCode: React.FC<VerificationCodeProps> = ({
@@ -13,6 +16,7 @@ const VerificationCode: React.FC<VerificationCodeProps> = ({
   onComplete,
   onChange,
   error = false,
+  value,
 }) => {
   const [values, setValues] = useState<string[]>(Array(length).fill(""));
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
@@ -21,6 +25,24 @@ const VerificationCode: React.FC<VerificationCodeProps> = ({
   useEffect(() => {
     inputRefs.current[0]?.focus();
   }, []);
+
+  // Auto-fill from an externally supplied code (e.g. dev-mode OTP)
+  useEffect(() => {
+    if (!value) return;
+    const digits = value.replace(/\D/g, "").slice(0, length);
+    if (!digits || digits === values.join("")) return;
+
+    const newValues = Array(length).fill("");
+    digits.split("").forEach((digit, i) => {
+      newValues[i] = digit;
+    });
+    setValues(newValues);
+    onChange?.(digits);
+    if (digits.length === length) {
+      onComplete?.(digits);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value, length]);
 
   // Handle input change for a single field
   const handleChange = useCallback(

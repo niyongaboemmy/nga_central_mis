@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   X,
@@ -13,8 +13,14 @@ import {
   Printer,
   List,
   Trash2,
+  Download,
+  FileDown,
+  Loader2,
+  ChevronDown,
 } from "lucide-react";
 import { LessonPlan } from "../api/lessonPlan";
+import { LessonPlanDocumentService } from "../services/LessonPlanDocumentService";
+import { useToast } from "../contexts/ToastContext";
 
 interface LessonPlanPreviewModalProps {
   isOpen: boolean;
@@ -31,7 +37,39 @@ const LessonPlanPreviewModal: React.FC<LessonPlanPreviewModalProps> = ({
   onEdit,
   onDelete,
 }) => {
+  const { showToast } = useToast();
+  const [isDownloadMenuOpen, setIsDownloadMenuOpen] = useState(false);
+  const [downloadingFormat, setDownloadingFormat] = useState<"pdf" | "docx" | null>(null);
+
   if (!plan) return null;
+
+  const handleDownloadPDF = () => {
+    setIsDownloadMenuOpen(false);
+    setDownloadingFormat("pdf");
+    try {
+      LessonPlanDocumentService.downloadPDF(plan);
+      showToast("Lesson plan PDF downloaded", "success");
+    } catch (error) {
+      console.error("Failed to generate PDF:", error);
+      showToast("Failed to generate PDF", "error");
+    } finally {
+      setDownloadingFormat(null);
+    }
+  };
+
+  const handleDownloadDocx = async () => {
+    setIsDownloadMenuOpen(false);
+    setDownloadingFormat("docx");
+    try {
+      await LessonPlanDocumentService.downloadDocx(plan);
+      showToast("Lesson plan Word document downloaded", "success");
+    } catch (error) {
+      console.error("Failed to generate Word document:", error);
+      showToast("Failed to generate Word document", "error");
+    } finally {
+      setDownloadingFormat(null);
+    }
+  };
 
   const getTotalDuration = () => {
     const outcomesDuration =
@@ -70,6 +108,69 @@ const LessonPlanPreviewModal: React.FC<LessonPlanPreviewModalProps> = ({
                 {/* Header */}
                 <div className="relative bg-gradient-to-r from-blue-600 to-blue-700 dark:from-blue-600 dark:to-blue-700 px-8 py-5 text-white">
                   <div className="absolute top-6 right-6 flex items-center gap-2">
+                    <div className="relative">
+                      <button
+                        onClick={() => setIsDownloadMenuOpen((v) => !v)}
+                        disabled={!!downloadingFormat}
+                        className="flex items-center gap-1.5 px-3 py-2 hover:bg-white/20 rounded-full transition-colors text-sm font-semibold disabled:opacity-60"
+                        title="Download"
+                      >
+                        {downloadingFormat ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Download className="w-4 h-4" />
+                        )}
+                        Download
+                        <ChevronDown
+                          className={`w-3.5 h-3.5 transition-transform ${isDownloadMenuOpen ? "rotate-180" : ""}`}
+                        />
+                      </button>
+                      <AnimatePresence>
+                        {isDownloadMenuOpen && (
+                          <>
+                            <div
+                              className="fixed inset-0 z-10"
+                              onClick={() => setIsDownloadMenuOpen(false)}
+                            />
+                            <motion.div
+                              initial={{ opacity: 0, y: -8 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              exit={{ opacity: 0, y: -8 }}
+                              className="absolute right-0 mt-2 w-56 bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-100 dark:border-gray-800 overflow-hidden z-20 text-gray-900 dark:text-white"
+                            >
+                              <button
+                                onClick={handleDownloadPDF}
+                                className="w-full flex items-center gap-3 px-4 py-3 text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-left"
+                              >
+                                <div className="w-8 h-8 rounded-lg bg-red-50 dark:bg-red-900/20 flex items-center justify-center flex-shrink-0">
+                                  <FileDown className="w-4 h-4 text-red-500" />
+                                </div>
+                                <div>
+                                  <div>Download PDF</div>
+                                  <div className="text-xs text-gray-400 font-normal">
+                                    Print-ready, well formatted
+                                  </div>
+                                </div>
+                              </button>
+                              <button
+                                onClick={handleDownloadDocx}
+                                className="w-full flex items-center gap-3 px-4 py-3 text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-left border-t border-gray-50 dark:border-gray-800"
+                              >
+                                <div className="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center flex-shrink-0">
+                                  <FileText className="w-4 h-4 text-blue-500" />
+                                </div>
+                                <div>
+                                  <div>Download Word (.docx)</div>
+                                  <div className="text-xs text-gray-400 font-normal">
+                                    Editable document
+                                  </div>
+                                </div>
+                              </button>
+                            </motion.div>
+                          </>
+                        )}
+                      </AnimatePresence>
+                    </div>
                     <button
                       onClick={() => window.print()}
                       className="p-2 hover:bg-white/20 rounded-full transition-colors"

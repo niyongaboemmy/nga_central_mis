@@ -27,6 +27,7 @@ import {
   AdminDashboardStats,
   InstructorCompliance,
   SubjectCoverageItem,
+  CategorySummaryItem,
 } from "../../api/reports";
 
 interface AdminReportDashboardProps {
@@ -35,6 +36,8 @@ interface AdminReportDashboardProps {
   adminStats?: AdminDashboardStats | null;
   complianceData?: InstructorCompliance[];
   subjectCoverage?: SubjectCoverageItem[];
+  supportRequestSummary?: CategorySummaryItem[];
+  challengeSummary?: CategorySummaryItem[];
 }
 
 const parseLocalNoShift = (dateStr: string) => {
@@ -49,6 +52,8 @@ export const AdminReportDashboard: React.FC<AdminReportDashboardProps> = ({
   adminStats,
   complianceData = [],
   subjectCoverage = [],
+  supportRequestSummary = [],
+  challengeSummary = [],
 }) => {
   // Derive legacy stats from InstructorReport array when adminStats not yet loaded
   const legacyStats = useMemo(() => {
@@ -421,6 +426,28 @@ export const AdminReportDashboard: React.FC<AdminReportDashboardProps> = ({
         </div>
       )}
 
+      {/* Top Support Requests / Top Challenges — categorized ranking (Phase 4) */}
+      {(supportRequestSummary.length > 0 || challengeSummary.length > 0) && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {supportRequestSummary.length > 0 && (
+            <RankedCategoryList
+              title="Top Support Requests"
+              icon={<AlertCircle className="w-5 h-5 text-blue-500" />}
+              items={supportRequestSummary}
+              barColor="bg-blue-500"
+            />
+          )}
+          {challengeSummary.length > 0 && (
+            <RankedCategoryList
+              title="Top Challenges"
+              icon={<AlertCircle className="w-5 h-5 text-red-500" />}
+              items={challengeSummary}
+              barColor="bg-red-500"
+            />
+          )}
+        </div>
+      )}
+
       {/* Compliance Leaderboard */}
       {complianceData.length > 0 && (
         <div className="bg-white dark:bg-gray-800/40 p-6 rounded-3xl border border-gray-100 dark:border-gray-800/50 shadow-sm">
@@ -498,6 +525,41 @@ export const AdminReportDashboard: React.FC<AdminReportDashboardProps> = ({
           </div>
         </div>
       )}
+    </div>
+  );
+};
+
+const RankedCategoryList: React.FC<{
+  title: string;
+  icon: React.ReactNode;
+  items: CategorySummaryItem[];
+  barColor: string;
+}> = ({ title, icon, items, barColor }) => {
+  const maxTotal = Math.max(...items.map((i) => Number(i.total)), 1);
+  return (
+    <div className="bg-white dark:bg-gray-800/40 p-6 rounded-3xl border border-gray-100 dark:border-gray-800/50 shadow-sm">
+      <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-6 flex items-center gap-2">
+        {icon}
+        {title}
+      </h3>
+      <div className="space-y-3">
+        {items.slice(0, 8).map((item) => (
+          <div key={item.category_id} className="flex items-center gap-3">
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-xs font-bold text-gray-700 dark:text-gray-200 truncate">{item.label}</span>
+                <span className="text-[10px] font-black text-gray-400 ml-2 flex-shrink-0">{item.total}</span>
+              </div>
+              <div className="w-full h-2 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all duration-700 ${barColor}`}
+                  style={{ width: `${(Number(item.total) / maxTotal) * 100}%` }}
+                />
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 };

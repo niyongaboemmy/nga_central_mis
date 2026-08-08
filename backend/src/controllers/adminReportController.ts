@@ -10,10 +10,20 @@ import {
   LO_Lesson,
   CalendarSlot,
   Subject,
+  ClassGroup,
+  Grade,
+  Program,
+  StudentClassGroup,
+  AcademicTerm,
+  SupportRequestCategory,
+  ChallengeCategory,
+  LessonReportSupportRequest,
+  LessonReportChallengeTag,
 } from "../db/schema";
 import { asyncHandler } from "../middleware/asyncHandler";
 import { successResponse } from "../utils/response";
-import { ValidationError } from "../errors/CustomError";
+import { ValidationError, NotFoundError } from "../errors/CustomError";
+import { buildLessonReportRollup } from "../services/lessonReportRollupService";
 
 const formatDbDate = (d: any): string | null => {
   if (!d) return null;
@@ -29,11 +39,13 @@ const formatDbDate = (d: any): string | null => {
 // GET /api/reports/admin/dashboard
 // ─────────────────────────────────────────────────────────────────────────────
 export const getAdminDashboardStats = asyncHandler(async (req: any, res: any) => {
-  const { start_date, end_date, academic_term_id, instructor_id } = req.query;
+  const { start_date, end_date, academic_term_id, instructor_id, subject_id, class_group_id } = req.query;
 
   const lrDateFilter = and(
     start_date ? sql`DATE_FORMAT(${LessonReport.delivery_date}, '%Y-%m-%d') >= ${start_date}` : sql`1=1`,
     end_date   ? sql`DATE_FORMAT(${LessonReport.delivery_date}, '%Y-%m-%d') <= ${end_date}`   : sql`1=1`,
+    subject_id     ? eq(LessonReport.subject_id,     parseInt(subject_id as string))     : sql`1=1`,
+    class_group_id ? eq(LessonReport.class_group_id, parseInt(class_group_id as string)) : sql`1=1`,
   );
   const msDateFilter = and(
     start_date ? sql`DATE_FORMAT(${MentorshipSession.session_date}, '%Y-%m-%d') >= ${start_date}` : sql`1=1`,
@@ -68,9 +80,11 @@ export const getAdminDashboardStats = asyncHandler(async (req: any, res: any) =>
     .from(MentorshipSession)
     .where(and(msInstFilter, msDateFilter));
 
-  const termCondition = academic_term_id
-    ? eq(SchemeOfWork.academic_term_id, parseInt(academic_term_id as string))
-    : sql`1=1`;
+  const termCondition = and(
+    academic_term_id ? eq(SchemeOfWork.academic_term_id, parseInt(academic_term_id as string)) : sql`1=1`,
+    subject_id       ? eq(SchemeOfWork.subject_id,       parseInt(subject_id as string))       : sql`1=1`,
+    class_group_id   ? eq(SchemeOfWork.class_group_id,   parseInt(class_group_id as string))   : sql`1=1`,
+  );
 
   const [totalEntries] = await db
     .select({ total: count() })
@@ -122,7 +136,7 @@ export const getAdminDashboardStats = asyncHandler(async (req: any, res: any) =>
 // GET /api/reports/admin/compliance
 // ─────────────────────────────────────────────────────────────────────────────
 export const getComplianceReport = asyncHandler(async (req: any, res: any) => {
-  const { start_date, end_date, academic_term_id } = req.query;
+  const { start_date, end_date, academic_term_id, subject_id, class_group_id } = req.query;
 
   if (!start_date || !end_date) {
     throw new ValidationError("start_date and end_date are required");
@@ -146,6 +160,8 @@ export const getComplianceReport = asyncHandler(async (req: any, res: any) => {
       and(
         eq(CalendarSlot.is_active, 1),
         termId ? eq(CalendarSlot.academic_term_id, termId) : sql`1=1`,
+        subject_id     ? eq(CalendarSlot.subject_id,     parseInt(subject_id as string))     : sql`1=1`,
+        class_group_id ? eq(CalendarSlot.class_group_id, parseInt(class_group_id as string)) : sql`1=1`,
       ),
     )
     .groupBy(CalendarSlot.user_id, UserProfile.first_name, UserProfile.last_name);
@@ -168,6 +184,8 @@ export const getComplianceReport = asyncHandler(async (req: any, res: any) => {
         inArray(LessonReport.reported_by, userIds),
         sql`DATE_FORMAT(${LessonReport.delivery_date}, '%Y-%m-%d') >= ${start_date}`,
         sql`DATE_FORMAT(${LessonReport.delivery_date}, '%Y-%m-%d') <= ${end_date}`,
+        subject_id     ? eq(LessonReport.subject_id,     parseInt(subject_id as string))     : sql`1=1`,
+        class_group_id ? eq(LessonReport.class_group_id, parseInt(class_group_id as string)) : sql`1=1`,
       ),
     )
     .groupBy(LessonReport.reported_by);
@@ -201,11 +219,13 @@ export const getComplianceReport = asyncHandler(async (req: any, res: any) => {
 // Per-subject SOW (expected) vs LessonReport (actual) compliance heatmap.
 // ─────────────────────────────────────────────────────────────────────────────
 export const getSubjectCoverageStats = asyncHandler(async (req: any, res: any) => {
-  const { academic_term_id, start_date, end_date } = req.query;
+  const { academic_term_id, start_date, end_date, subject_id, class_group_id } = req.query;
 
-  const termCondition = academic_term_id
-    ? eq(SchemeOfWork.academic_term_id, parseInt(academic_term_id as string))
-    : sql`1=1`;
+  const termCondition = and(
+    academic_term_id ? eq(SchemeOfWork.academic_term_id, parseInt(academic_term_id as string)) : sql`1=1`,
+    subject_id       ? eq(SchemeOfWork.subject_id,       parseInt(subject_id as string))       : sql`1=1`,
+    class_group_id   ? eq(SchemeOfWork.class_group_id,   parseInt(class_group_id as string))   : sql`1=1`,
+  );
 
   const sowRows = await db
     .select({
@@ -239,6 +259,7 @@ export const getSubjectCoverageStats = asyncHandler(async (req: any, res: any) =
         eq(LessonReport.status, "DELIVERED"),
         sql`${LessonReport.entry_id} IS NOT NULL`,
         inArray(SchemeOfWork.subject_id, subjectIds),
+        class_group_id ? eq(SchemeOfWork.class_group_id, parseInt(class_group_id as string)) : sql`1=1`,
         start_date ? sql`DATE_FORMAT(${LessonReport.delivery_date}, '%Y-%m-%d') >= ${start_date}` : sql`1=1`,
         end_date   ? sql`DATE_FORMAT(${LessonReport.delivery_date}, '%Y-%m-%d') <= ${end_date}`   : sql`1=1`,
       ),
@@ -271,7 +292,7 @@ export const getSubjectCoverageStats = asyncHandler(async (req: any, res: any) =
 // GET /api/reports/admin/lesson-reports
 // ─────────────────────────────────────────────────────────────────────────────
 export const getAdminLessonReports = asyncHandler(async (req: any, res: any) => {
-  const { start_date, end_date, instructor_id, schedule_flag, status, subject_id } = req.query;
+  const { start_date, end_date, instructor_id, schedule_flag, status, subject_id, class_group_id, program_id, grade_id } = req.query;
 
   const rows = await db
     .select({
@@ -281,6 +302,8 @@ export const getAdminLessonReports = asyncHandler(async (req: any, res: any) => 
       delivery_date:    LessonReport.delivery_date,
       status:           LessonReport.status,
       schedule_flag:    LessonReport.schedule_flag,
+      validation_status:  LessonReport.validation_status,
+      validation_comment: LessonReport.validation_comment,
       attendance_count: LessonReport.attendance_count,
       completion_rate:  LessonReport.completion_rate,
       reflection_notes: LessonReport.reflection_notes,
@@ -290,21 +313,36 @@ export const getAdminLessonReports = asyncHandler(async (req: any, res: any) => 
       topic:            SchemeOfWorkEntry.topic,
       sub_topic:        SchemeOfWorkEntry.sub_topic,
       objective:        SchemeOfWorkEntry.objective,
-      subject_id:       SchemeOfWork.subject_id,
+      // Denormalized directly on LessonReport (Phase 1) — works for both
+      // scheduled AND ad-hoc reports, unlike the old SchemeOfWork-join path
+      // which was always null for ad-hoc rows (no entry_id to join through).
+      subject_id:       LessonReport.subject_id,
       subject_name:     Subject.name,
+      class_group_id:   LessonReport.class_group_id,
+      class_group_name: ClassGroup.name,
     })
     .from(LessonReport)
     .innerJoin(UserProfile, eq(LessonReport.reported_by, UserProfile.user_id))
     .leftJoin(LO_Lesson, eq(LessonReport.lesson_id, LO_Lesson.id))
     .leftJoin(SchemeOfWorkEntry, eq(LessonReport.entry_id, SchemeOfWorkEntry.entry_id))
-    .leftJoin(SchemeOfWork, eq(SchemeOfWorkEntry.scheme_id, SchemeOfWork.scheme_id))
-    .leftJoin(Subject, eq(SchemeOfWork.subject_id, Subject.subject_id))
+    .leftJoin(Subject, eq(LessonReport.subject_id, Subject.subject_id))
+    .leftJoin(ClassGroup, eq(LessonReport.class_group_id, ClassGroup.class_group_id))
+    // Program/Grade aren't columns on LessonReport itself — resolved via the
+    // report's class group, same join chain getAllAdminReports uses for the
+    // weekly-summary list, so the "Program"/"Grade" filters in the Admin
+    // Reporting UI actually narrow this list instead of being silently
+    // ignored (they were previously accepted by the frontend but dropped here).
+    .leftJoin(Grade, eq(ClassGroup.grade_id, Grade.grade_id))
+    .leftJoin(Program, eq(Grade.program_id, Program.program_id))
     .where(
       and(
         instructor_id ? eq(LessonReport.reported_by, parseInt(instructor_id as string)) : sql`1=1`,
         schedule_flag ? eq(LessonReport.schedule_flag, schedule_flag as any) : sql`1=1`,
         status        ? eq(LessonReport.status, status as any) : sql`1=1`,
-        subject_id    ? eq(SchemeOfWork.subject_id, parseInt(subject_id as string)) : sql`1=1`,
+        subject_id     ? eq(LessonReport.subject_id,     parseInt(subject_id as string))     : sql`1=1`,
+        class_group_id ? eq(LessonReport.class_group_id, parseInt(class_group_id as string)) : sql`1=1`,
+        grade_id      ? eq(Grade.grade_id, parseInt(grade_id as string))     : sql`1=1`,
+        program_id    ? eq(Program.program_id, parseInt(program_id as string)) : sql`1=1`,
         start_date    ? sql`DATE_FORMAT(${LessonReport.delivery_date}, '%Y-%m-%d') >= ${start_date}` : sql`1=1`,
         end_date      ? sql`DATE_FORMAT(${LessonReport.delivery_date}, '%Y-%m-%d') <= ${end_date}`   : sql`1=1`,
       ),
@@ -319,10 +357,143 @@ export const getAdminLessonReports = asyncHandler(async (req: any, res: any) => 
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// GET /api/reports/admin/lessons-rollup
+// Groups LessonReport rows by Subject -> Class Group -> Week within a date
+// range, matching the reviewed reference document's structure (Analysis
+// §5.4). Investigated getWeeklyStitchedReport first (Phase 3 task 1): it
+// combines lessons/mentorship/projects into one per-instructor, ungrouped
+// list — no subject/class-group/week grouping at all, so it isn't reusable
+// for this shape without pulling mentorship/project data into scope (out of
+// bounds for this restructure). Built as a new, lesson-only endpoint instead,
+// alongside the existing unified view rather than replacing it.
+// ─────────────────────────────────────────────────────────────────────────────
+export const getAdminLessonReportsRollup = asyncHandler(async (req: any, res: any) => {
+  const { start_date, end_date, academic_term_id, subject_id, class_group_id } = req.query;
+
+  if (!start_date || !end_date || !academic_term_id) {
+    throw new ValidationError("start_date, end_date, and academic_term_id are required");
+  }
+
+  const rollup = await buildLessonReportRollup({
+    start_date,
+    end_date,
+    academic_term_id: parseInt(academic_term_id as string),
+    subject_id: subject_id ? parseInt(subject_id as string) : undefined,
+    class_group_id: class_group_id ? parseInt(class_group_id as string) : undefined,
+  });
+
+  return successResponse(res, "Lesson reports rollup retrieved", rollup);
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PATCH /api/reports/admin/lesson-reports/:id/approval
+// Mirrors adminUpdateCheckIn's approve/reject pattern (mentorshipController.ts).
+// ─────────────────────────────────────────────────────────────────────────────
+export const adminUpdateLessonReportApproval = asyncHandler(async (req: any, res: any) => {
+  const id = parseInt(req.params.id, 10);
+  if (!id || isNaN(id)) throw new ValidationError("Invalid lesson report ID");
+
+  const { validation_status, validation_comment } = req.body;
+  if (!["PENDING", "APPROVED", "REJECTED"].includes(validation_status)) {
+    throw new ValidationError("validation_status must be PENDING, APPROVED, or REJECTED");
+  }
+  if (validation_status === "REJECTED" && !validation_comment?.trim()) {
+    throw new ValidationError("A comment is required when rejecting a report");
+  }
+
+  const [existing] = await db
+    .select({ lesson_report_id: LessonReport.lesson_report_id })
+    .from(LessonReport)
+    .where(eq(LessonReport.lesson_report_id, id))
+    .limit(1);
+
+  if (!existing) throw new NotFoundError("Lesson report not found");
+
+  await db
+    .update(LessonReport)
+    .set({
+      validation_status,
+      validation_comment: validation_comment ?? null,
+      validated_by: req.user.userId,
+      validated_at: sql`CURRENT_TIMESTAMP`,
+    })
+    .where(eq(LessonReport.lesson_report_id, id));
+
+  return successResponse(res, "Lesson report approval updated", { lesson_report_id: id, validation_status });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /api/reports/admin/support-requests/summary
+// GROUP BY category, COUNT(*), ordered descending — turns the categorized
+// "Support Needed" selections (Phase 4) into a rankable list instead of only
+// readable one report's free text at a time (Analysis §5.1).
+// ─────────────────────────────────────────────────────────────────────────────
+export const getSupportRequestSummary = asyncHandler(async (req: any, res: any) => {
+  const { start_date, end_date, subject_id, class_group_id } = req.query;
+
+  const rows = await db
+    .select({
+      category_id: SupportRequestCategory.category_id,
+      label: SupportRequestCategory.label,
+      total: count(),
+    })
+    .from(LessonReportSupportRequest)
+    .innerJoin(
+      SupportRequestCategory,
+      eq(LessonReportSupportRequest.category_id, SupportRequestCategory.category_id),
+    )
+    .innerJoin(LessonReport, eq(LessonReportSupportRequest.lesson_report_id, LessonReport.lesson_report_id))
+    .where(
+      and(
+        start_date ? sql`DATE_FORMAT(${LessonReport.delivery_date}, '%Y-%m-%d') >= ${start_date}` : sql`1=1`,
+        end_date   ? sql`DATE_FORMAT(${LessonReport.delivery_date}, '%Y-%m-%d') <= ${end_date}`   : sql`1=1`,
+        subject_id     ? eq(LessonReport.subject_id,     parseInt(subject_id as string))     : sql`1=1`,
+        class_group_id ? eq(LessonReport.class_group_id, parseInt(class_group_id as string)) : sql`1=1`,
+      ),
+    )
+    .groupBy(SupportRequestCategory.category_id, SupportRequestCategory.label)
+    .orderBy(desc(count()));
+
+  return successResponse(res, "Support request summary retrieved", rows);
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /api/reports/admin/challenges/summary
+// Same shape as above, for the "Challenges Encountered" tags (Analysis §5.3)
+// — surfaces a recurring challenge (e.g. "Electricity/Power") as a ranked,
+// counted pattern across subjects/teachers instead of buried in free text.
+// ─────────────────────────────────────────────────────────────────────────────
+export const getChallengeSummary = asyncHandler(async (req: any, res: any) => {
+  const { start_date, end_date, subject_id, class_group_id } = req.query;
+
+  const rows = await db
+    .select({
+      category_id: ChallengeCategory.category_id,
+      label: ChallengeCategory.label,
+      total: count(),
+    })
+    .from(LessonReportChallengeTag)
+    .innerJoin(ChallengeCategory, eq(LessonReportChallengeTag.category_id, ChallengeCategory.category_id))
+    .innerJoin(LessonReport, eq(LessonReportChallengeTag.lesson_report_id, LessonReport.lesson_report_id))
+    .where(
+      and(
+        start_date ? sql`DATE_FORMAT(${LessonReport.delivery_date}, '%Y-%m-%d') >= ${start_date}` : sql`1=1`,
+        end_date   ? sql`DATE_FORMAT(${LessonReport.delivery_date}, '%Y-%m-%d') <= ${end_date}`   : sql`1=1`,
+        subject_id     ? eq(LessonReport.subject_id,     parseInt(subject_id as string))     : sql`1=1`,
+        class_group_id ? eq(LessonReport.class_group_id, parseInt(class_group_id as string)) : sql`1=1`,
+      ),
+    )
+    .groupBy(ChallengeCategory.category_id, ChallengeCategory.label)
+    .orderBy(desc(count()));
+
+  return successResponse(res, "Challenge summary retrieved", rows);
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // GET /api/reports/admin/mentorship-logs
 // ─────────────────────────────────────────────────────────────────────────────
 export const getAdminMentorshipLogs = asyncHandler(async (req: any, res: any) => {
-  const { start_date, end_date, instructor_id } = req.query;
+  const { start_date, end_date, instructor_id, subject_id, class_group_id, program_id, grade_id } = req.query;
 
   // Alias for instructor and student profiles
   const InstructorProfile = UserProfile;
@@ -339,6 +510,8 @@ export const getAdminMentorshipLogs = asyncHandler(async (req: any, res: any) =>
       duration_minutes: MentorshipSession.duration_minutes,
       wellbeing_status: MentorshipSession.wellbeing_status,
       session_status:   MentorshipSession.session_status,
+      validation_status:  MentorshipSession.validation_status,
+      validation_comment: MentorshipSession.validation_comment,
       notes:            MentorshipSession.notes,
       action_items:     MentorshipSession.action_items,
       follow_up_required: MentorshipSession.follow_up_required,
@@ -352,9 +525,29 @@ export const getAdminMentorshipLogs = asyncHandler(async (req: any, res: any) =>
       sql`UserProfile sp`,
       sql`${MentorshipSession.student_id} = sp.user_id`,
     )
+    // Subject/Class Group/Grade/Program aren't columns on MentorshipSession
+    // (subject_id is, the rest resolve via the mentee's class group) — same
+    // filters the Admin Reporting UI already collects for the Lesson tab,
+    // previously accepted by the frontend but dropped entirely for this
+    // endpoint. A student who has moved between class groups mid-year can
+    // have more than one ACTIVE StudentClassGroup row, so this join can
+    // occasionally fan out a session into more than one row when a
+    // class-group/grade/program filter is applied — acceptable for this
+    // low-frequency admin filtering view.
+    .leftJoin(
+      StudentClassGroup,
+      and(eq(MentorshipSession.student_id, StudentClassGroup.user_id), eq(StudentClassGroup.status, "ACTIVE")),
+    )
+    .leftJoin(ClassGroup, eq(StudentClassGroup.class_group_id, ClassGroup.class_group_id))
+    .leftJoin(Grade, eq(ClassGroup.grade_id, Grade.grade_id))
+    .leftJoin(Program, eq(Grade.program_id, Program.program_id))
     .where(
       and(
         instructor_id ? eq(MentorshipSession.user_id, parseInt(instructor_id as string)) : sql`1=1`,
+        subject_id     ? eq(MentorshipSession.subject_id, parseInt(subject_id as string))     : sql`1=1`,
+        class_group_id ? eq(ClassGroup.class_group_id,    parseInt(class_group_id as string)) : sql`1=1`,
+        grade_id       ? eq(Grade.grade_id,                parseInt(grade_id as string))       : sql`1=1`,
+        program_id     ? eq(Program.program_id,            parseInt(program_id as string))     : sql`1=1`,
         start_date    ? sql`DATE_FORMAT(${MentorshipSession.session_date}, '%Y-%m-%d') >= ${start_date}` : sql`1=1`,
         end_date      ? sql`DATE_FORMAT(${MentorshipSession.session_date}, '%Y-%m-%d') <= ${end_date}`   : sql`1=1`,
       ),
@@ -370,6 +563,45 @@ export const getAdminMentorshipLogs = asyncHandler(async (req: any, res: any) =>
       student_name: r.student_name?.trim() || null,
     })),
   );
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PATCH /api/reports/admin/mentorship-logs/:id/approval
+// Mirrors adminUpdateCheckIn's approve/reject pattern (mentorshipController.ts).
+// Distinct from MenteeCheckIn's approval workflow — this validates
+// MentorshipSession rows (the "Mentorship" reporting log), not check-ins.
+// ─────────────────────────────────────────────────────────────────────────────
+export const adminUpdateMentorshipSessionApproval = asyncHandler(async (req: any, res: any) => {
+  const id = parseInt(req.params.id, 10);
+  if (!id || isNaN(id)) throw new ValidationError("Invalid mentorship session ID");
+
+  const { validation_status, validation_comment } = req.body;
+  if (!["PENDING", "APPROVED", "REJECTED"].includes(validation_status)) {
+    throw new ValidationError("validation_status must be PENDING, APPROVED, or REJECTED");
+  }
+  if (validation_status === "REJECTED" && !validation_comment?.trim()) {
+    throw new ValidationError("A comment is required when rejecting a report");
+  }
+
+  const [existing] = await db
+    .select({ mentorship_id: MentorshipSession.mentorship_id })
+    .from(MentorshipSession)
+    .where(eq(MentorshipSession.mentorship_id, id))
+    .limit(1);
+
+  if (!existing) throw new NotFoundError("Mentorship session not found");
+
+  await db
+    .update(MentorshipSession)
+    .set({
+      validation_status,
+      validation_comment: validation_comment ?? null,
+      validated_by: req.user.userId,
+      validated_at: sql`CURRENT_TIMESTAMP`,
+    })
+    .where(eq(MentorshipSession.mentorship_id, id));
+
+  return successResponse(res, "Mentorship session approval updated", { mentorship_id: id, validation_status });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────

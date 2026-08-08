@@ -11,6 +11,7 @@ import {
   count,
   inArray,
   sql as drizzleSql,
+  SQL,
 } from "drizzle-orm";
 import { ALL_PERMISSIONS } from "../utils/permissions";
 import {
@@ -49,6 +50,7 @@ import * as XLSX from "xlsx";
 import * as fs from "fs";
 import * as path from "path";
 import { recordActivity } from "../utils/activityLogger";
+import { getCurrentAcademicYearId } from "../utils/academicYear";
 
 // Helper function to convert date to MySQL DATE format
 const formatDateForMySQL = (dateStr: string | undefined) => {
@@ -405,32 +407,56 @@ export const getCurrentUser = asyncHandler(async (req: any, res: any) => {
     );
   }
 
+  // Program-lead and class-teacher-of-grade roles are year-scoped; only the
+  // current year's assignments should be reflected on the profile.
+  const currentYearIdForAssignments = await getCurrentAcademicYearId();
+
   // Get assigned programs for program leads
-  const assignedPrograms = await db
-    .select({
-      program_id: Program.program_id,
-      name: Program.name,
-      description: Program.description,
-    })
-    .from(UserProgramLead)
-    .innerJoin(Program, eq(UserProgramLead.program_id, Program.program_id))
-    .where(eq(UserProgramLead.user_id, userId));
+  const assignedPrograms = currentYearIdForAssignments
+    ? await db
+        .select({
+          program_id: Program.program_id,
+          name: Program.name,
+          description: Program.description,
+        })
+        .from(UserProgramLead)
+        .innerJoin(
+          Program,
+          eq(UserProgramLead.program_id, Program.program_id),
+        )
+        .where(
+          and(
+            eq(UserProgramLead.user_id, userId),
+            eq(
+              UserProgramLead.academic_year_id,
+              currentYearIdForAssignments,
+            ),
+          ),
+        )
+    : [];
 
   // Get assigned grades for class teachers
-  const assignedGrades = await db
-    .select({
-      grade_id: Grade.grade_id,
-      name: Grade.name,
-      level_order: Grade.level_order,
-      program_id: Grade.program_id,
-      program_name: Program.name,
-      assigned_at: UserGrade.assigned_at,
-    })
-    .from(UserGrade)
-    .innerJoin(Grade, eq(UserGrade.grade_id, Grade.grade_id))
-    .innerJoin(Program, eq(Grade.program_id, Program.program_id))
-    .where(eq(UserGrade.user_id, userId))
-    .orderBy(Grade.level_order);
+  const assignedGrades = currentYearIdForAssignments
+    ? await db
+        .select({
+          grade_id: Grade.grade_id,
+          name: Grade.name,
+          level_order: Grade.level_order,
+          program_id: Grade.program_id,
+          program_name: Program.name,
+          assigned_at: UserGrade.assigned_at,
+        })
+        .from(UserGrade)
+        .innerJoin(Grade, eq(UserGrade.grade_id, Grade.grade_id))
+        .innerJoin(Program, eq(Grade.program_id, Program.program_id))
+        .where(
+          and(
+            eq(UserGrade.user_id, userId),
+            eq(UserGrade.academic_year_id, currentYearIdForAssignments),
+          ),
+        )
+        .orderBy(Grade.level_order)
+    : [];
 
   // Get all academic years
   const academicYears = await db
@@ -530,6 +556,24 @@ export const getUsers = asyncHandler(async (req: any, res: any) => {
     whereConditions.push(eq(User.status, status.toUpperCase()));
   }
 
+  if (userRole && userRole !== "all") {
+    const userRoleId = parseInt(userRole as string, 10);
+    if (!isNaN(userRoleId)) {
+      const roleUserIds = await db
+        .select({ user_id: UserRole.user_id })
+        .from(UserRole)
+        .where(eq(UserRole.role_id, userRoleId));
+      const matchingUserIds = roleUserIds.map((r) => r.user_id);
+      // No user holds this role — short-circuit to an empty result set
+      // rather than falling through to an unfiltered query.
+      whereConditions.push(
+        matchingUserIds.length > 0
+          ? inArray(User.user_id, matchingUserIds)
+          : sql`1 = 0`,
+      );
+    }
+  }
+
   const totalCountResult = await db
     .select({ count: sql<number>`count(*)` })
     .from(User)
@@ -590,7 +634,7 @@ export const getUsers = asyncHandler(async (req: any, res: any) => {
         .where(eq(UserProfile.user_id, user.user_id))
         .limit(1);
 
-      const userWithProfile = {
+      return {
         user,
         profile: profile[0] || null,
         roles: rolesWithPermissions,
@@ -598,24 +642,8 @@ export const getUsers = asyncHandler(async (req: any, res: any) => {
           r.permissions.map((p) => p.name),
         ),
       };
-
-      if (userRole && userRole !== "all") {
-        const userRoleId = parseInt(userRole as string, 10);
-        if (!isNaN(userRoleId)) {
-          const hasRole = userRoles.some(
-            (role) => role.role_id.toString() === userRoleId.toString(),
-          );
-          if (!hasRole) {
-            return null;
-          }
-        }
-      }
-
-      return userWithProfile;
     }),
   );
-
-  const filteredUsers = usersWithRoles.filter((user) => user !== null);
 
   const totalPages = Math.ceil(totalCount / limitNum);
   res.setHeader("X-Total-Count", totalCount.toString());
@@ -623,7 +651,7 @@ export const getUsers = asyncHandler(async (req: any, res: any) => {
   res.setHeader("X-Current-Page", pageNum.toString());
   res.setHeader("X-Per-Page", limitNum.toString());
 
-  successResponse(res, "Users retrieved successfully", filteredUsers);
+  successResponse(res, "Users retrieved successfully", usersWithRoles);
 });
 
 export const getUser = asyncHandler(async (req: any, res: any) => {
@@ -1735,7 +1763,12 @@ export const getProgramRoles = asyncHandler(async (req: any, res: any) => {
     throw new NotFoundError("Program not found");
   }
 
-  // Check if user is a lead of this program
+  // Program leadership is year-scoped; only the current year's leadership
+  // grants access here and counts toward the "leads" roster below.
+  const currentYearIdForProgram = await getCurrentAcademicYearId();
+  if (!currentYearIdForProgram) {
+    throw new ValidationError("No current academic year is set");
+  }
   const userLead = await db
     .select()
     .from(UserProgramLead)
@@ -1743,6 +1776,7 @@ export const getProgramRoles = asyncHandler(async (req: any, res: any) => {
       and(
         eq(UserProgramLead.user_id, userId),
         eq(UserProgramLead.program_id, programIdNum),
+        eq(UserProgramLead.academic_year_id, currentYearIdForProgram),
       ),
     )
     .limit(1);
@@ -1781,12 +1815,17 @@ export const getProgramRoles = asyncHandler(async (req: any, res: any) => {
     .innerJoin(Grade, eq(ClassGroup.grade_id, Grade.grade_id))
     .where(eq(Grade.program_id, programIdNum));
 
-  // Program leads: via UserProgramLead
+  // Program leads: via UserProgramLead, current academic year only
   const leadUsers = await db
     .select({ user_id: User.user_id })
     .from(User)
     .innerJoin(UserProgramLead, eq(User.user_id, UserProgramLead.user_id))
-    .where(eq(UserProgramLead.program_id, programIdNum));
+    .where(
+      and(
+        eq(UserProgramLead.program_id, programIdNum),
+        eq(UserProgramLead.academic_year_id, currentYearIdForProgram),
+      ),
+    );
 
   // Combine all user IDs
   const allUserIds = [
@@ -1866,7 +1905,12 @@ export const getProgramUsersByRole = asyncHandler(
       throw new NotFoundError("Role not found or inactive");
     }
 
-    // Check if user is a lead of this program
+    // Program leadership is year-scoped; only the current year's leadership
+    // grants access here.
+    const currentYearIdForProgram = await getCurrentAcademicYearId();
+    if (!currentYearIdForProgram) {
+      throw new ValidationError("No current academic year is set");
+    }
     const userLead = await db
       .select()
       .from(UserProgramLead)
@@ -1874,6 +1918,7 @@ export const getProgramUsersByRole = asyncHandler(
         and(
           eq(UserProgramLead.user_id, userId),
           eq(UserProgramLead.program_id, programIdNum),
+          eq(UserProgramLead.academic_year_id, currentYearIdForProgram),
         ),
       )
       .limit(1);
@@ -1965,6 +2010,7 @@ export const getProgramUsersByRole = asyncHandler(
         and(
           eq(UserProgramLead.program_id, programIdNum),
           eq(UserRole.role_id, roleIdNum),
+          eq(UserProgramLead.academic_year_id, currentYearIdForProgram),
         ),
       );
 
@@ -2038,7 +2084,12 @@ export const getProgramUsers = asyncHandler(async (req: any, res: any) => {
     throw new NotFoundError("Program not found");
   }
 
-  // Check if user is a lead of this program
+  // Program leadership is year-scoped; only the current year's leadership
+  // grants access here and counts toward the "leads" roster below.
+  const currentYearIdForProgram = await getCurrentAcademicYearId();
+  if (!currentYearIdForProgram) {
+    throw new ValidationError("No current academic year is set");
+  }
   const userLead = await db
     .select()
     .from(UserProgramLead)
@@ -2046,6 +2097,7 @@ export const getProgramUsers = asyncHandler(async (req: any, res: any) => {
       and(
         eq(UserProgramLead.user_id, userId),
         eq(UserProgramLead.program_id, programIdNum),
+        eq(UserProgramLead.academic_year_id, currentYearIdForProgram),
       ),
     )
     .limit(1);
@@ -2133,7 +2185,12 @@ export const getProgramUsers = asyncHandler(async (req: any, res: any) => {
     .innerJoin(UserProgramLead, eq(User.user_id, UserProgramLead.user_id))
     .innerJoin(UserRole, eq(User.user_id, UserRole.user_id))
     .innerJoin(Role, eq(UserRole.role_id, Role.role_id))
-    .where(eq(UserProgramLead.program_id, programIdNum));
+    .where(
+      and(
+        eq(UserProgramLead.program_id, programIdNum),
+        eq(UserProgramLead.academic_year_id, currentYearIdForProgram),
+      ),
+    );
 
   // Combine all users
   const allUsers = [...studentUsers, ...teacherUsers, ...leadUsers];
@@ -2197,15 +2254,22 @@ export const getUserPrograms = asyncHandler(async (req: any, res: any) => {
     throw new NotFoundError("User not found");
   }
 
-  // Get programs where user is a lead
+  // Get programs where user is a lead, per academic year
   const leadProgramsRaw = await db
     .select({
       program_id: Program.program_id,
       name: Program.name,
       description: Program.description,
+      academic_year_id: UserProgramLead.academic_year_id,
+      academic_year_name: AcademicYear.name,
+      academic_year_is_current: AcademicYear.is_current,
     })
     .from(UserProgramLead)
     .innerJoin(Program, eq(UserProgramLead.program_id, Program.program_id))
+    .innerJoin(
+      AcademicYear,
+      eq(UserProgramLead.academic_year_id, AcademicYear.academic_year_id),
+    )
     .where(eq(UserProgramLead.user_id, userId));
 
   const leadPrograms = leadProgramsRaw.map((p) => ({
@@ -2213,12 +2277,15 @@ export const getUserPrograms = asyncHandler(async (req: any, res: any) => {
     relationship: "LEAD",
   }));
 
-  // Get programs where user is a student
+  // Get programs where user is a student, per academic year
   const studentProgramsRaw = await db
     .select({
       program_id: Program.program_id,
       name: Program.name,
       description: Program.description,
+      academic_year_id: StudentClassGroup.academic_year_id,
+      academic_year_name: AcademicYear.name,
+      academic_year_is_current: AcademicYear.is_current,
     })
     .from(StudentClassGroup)
     .innerJoin(
@@ -2227,6 +2294,10 @@ export const getUserPrograms = asyncHandler(async (req: any, res: any) => {
     )
     .innerJoin(Grade, eq(ClassGroup.grade_id, Grade.grade_id))
     .innerJoin(Program, eq(Grade.program_id, Program.program_id))
+    .innerJoin(
+      AcademicYear,
+      eq(StudentClassGroup.academic_year_id, AcademicYear.academic_year_id),
+    )
     .where(
       and(
         eq(StudentClassGroup.user_id, userId),
@@ -2239,12 +2310,15 @@ export const getUserPrograms = asyncHandler(async (req: any, res: any) => {
     relationship: "STUDENT",
   }));
 
-  // Get programs where user is a teacher
+  // Get programs where user is a teacher, per academic year
   const teacherProgramsRaw = await db
     .select({
       program_id: Program.program_id,
       name: Program.name,
       description: Program.description,
+      academic_year_id: TeacherSubjectAssignment.academic_year_id,
+      academic_year_name: AcademicYear.name,
+      academic_year_is_current: AcademicYear.is_current,
     })
     .from(TeacherSubjectAssignment)
     .innerJoin(
@@ -2253,6 +2327,10 @@ export const getUserPrograms = asyncHandler(async (req: any, res: any) => {
     )
     .innerJoin(Grade, eq(ClassGroup.grade_id, Grade.grade_id))
     .innerJoin(Program, eq(Grade.program_id, Program.program_id))
+    .innerJoin(
+      AcademicYear,
+      eq(TeacherSubjectAssignment.academic_year_id, AcademicYear.academic_year_id),
+    )
     .where(eq(TeacherSubjectAssignment.user_id, userId));
 
   const teacherPrograms = teacherProgramsRaw.map((p) => ({
@@ -2260,12 +2338,21 @@ export const getUserPrograms = asyncHandler(async (req: any, res: any) => {
     relationship: "TEACHER",
   }));
 
-  // Combine all programs and remove duplicates, keeping the highest priority relationship
+  // Combine all programs and remove duplicates, keeping the highest priority
+  // relationship per program+academic year (a user can hold a given program
+  // relationship in more than one year, so year is part of the dedup key).
   const allPrograms = [...leadPrograms, ...studentPrograms, ...teacherPrograms];
-  const uniquePrograms = allPrograms.filter(
-    (program, index, self) =>
-      index === self.findIndex((p) => p.program_id === program.program_id),
-  );
+  const uniquePrograms = allPrograms
+    .filter(
+      (program, index, self) =>
+        index ===
+        self.findIndex(
+          (p) =>
+            p.program_id === program.program_id &&
+            p.academic_year_id === program.academic_year_id,
+        ),
+    )
+    .sort((a, b) => b.academic_year_id - a.academic_year_id);
 
   successResponse(res, "User programs retrieved successfully", uniquePrograms);
 });
@@ -2273,7 +2360,7 @@ export const getUserPrograms = asyncHandler(async (req: any, res: any) => {
 // Assign grade to class teacher
 export const assignGradeToUser = asyncHandler(async (req: any, res: any) => {
   const { id } = req.params;
-  const { grade_id } = req.body;
+  const { grade_id, academic_year_id } = req.body;
   const userId = parseInt(id);
   const gradeId = parseInt(grade_id);
 
@@ -2281,9 +2368,20 @@ export const assignGradeToUser = asyncHandler(async (req: any, res: any) => {
     throw new ValidationError("Invalid user ID or grade ID");
   }
 
+  const yearId = academic_year_id
+    ? parseInt(academic_year_id)
+    : await getCurrentAcademicYearId();
+
+  if (!yearId || isNaN(yearId)) {
+    throw new ValidationError(
+      "Academic year ID is required (no current academic year set)",
+    );
+  }
+
   logger.info("Assigning grade to user", {
     userId,
     gradeId,
+    academicYearId: yearId,
     assignedBy: req.user?.userId,
   });
 
@@ -2309,21 +2407,41 @@ export const assignGradeToUser = asyncHandler(async (req: any, res: any) => {
     throw new NotFoundError("Grade not found");
   }
 
-  // Check if user already has this grade
+  // Check if academic year exists
+  const academicYear = await db
+    .select()
+    .from(AcademicYear)
+    .where(eq(AcademicYear.academic_year_id, yearId))
+    .limit(1);
+
+  if (academicYear.length === 0) {
+    throw new NotFoundError("Academic year not found");
+  }
+
+  // Check if user already has this grade for this academic year
   const existingAssignment = await db
     .select()
     .from(UserGrade)
-    .where(and(eq(UserGrade.user_id, userId), eq(UserGrade.grade_id, gradeId)))
+    .where(
+      and(
+        eq(UserGrade.user_id, userId),
+        eq(UserGrade.grade_id, gradeId),
+        eq(UserGrade.academic_year_id, yearId),
+      ),
+    )
     .limit(1);
 
   if (existingAssignment.length > 0) {
-    throw new ConflictError("User already has this grade assigned");
+    throw new ConflictError(
+      "User already has this grade assigned for the selected academic year",
+    );
   }
 
   // Assign grade
   await db.insert(UserGrade).values({
     user_id: userId,
     grade_id: gradeId,
+    academic_year_id: yearId,
   });
 
   // Record activity
@@ -2334,7 +2452,7 @@ export const assignGradeToUser = asyncHandler(async (req: any, res: any) => {
       `Grade assigned to teacher`,
       "UserGrade",
       gradeId,
-      { teacher_id: userId, grade_id: gradeId },
+      { teacher_id: userId, grade_id: gradeId, academic_year_id: yearId },
       req.user.userId,
     );
   }
@@ -2344,17 +2462,21 @@ export const assignGradeToUser = asyncHandler(async (req: any, res: any) => {
 
 // Remove grade from class teacher
 export const removeGradeFromUser = asyncHandler(async (req: any, res: any) => {
-  const { id, gradeId } = req.params;
+  const { id, gradeId, academicYearId } = req.params;
   const userId = parseInt(id);
   const gradeIdNum = parseInt(gradeId);
+  const yearIdNum = parseInt(academicYearId);
 
-  if (isNaN(userId) || isNaN(gradeIdNum)) {
-    throw new ValidationError("Invalid user ID or grade ID");
+  if (isNaN(userId) || isNaN(gradeIdNum) || isNaN(yearIdNum)) {
+    throw new ValidationError(
+      "Invalid user ID, grade ID, or academic year ID",
+    );
   }
 
   logger.info("Removing grade from user", {
     userId,
     gradeId: gradeIdNum,
+    academicYearId: yearIdNum,
     removedBy: req.user?.userId,
   });
 
@@ -2363,19 +2485,29 @@ export const removeGradeFromUser = asyncHandler(async (req: any, res: any) => {
     .select()
     .from(UserGrade)
     .where(
-      and(eq(UserGrade.user_id, userId), eq(UserGrade.grade_id, gradeIdNum)),
+      and(
+        eq(UserGrade.user_id, userId),
+        eq(UserGrade.grade_id, gradeIdNum),
+        eq(UserGrade.academic_year_id, yearIdNum),
+      ),
     )
     .limit(1);
 
   if (existingAssignment.length === 0) {
-    throw new NotFoundError("User does not have this grade assigned");
+    throw new NotFoundError(
+      "User does not have this grade assigned for the selected academic year",
+    );
   }
 
   // Remove assignment
   await db
     .delete(UserGrade)
     .where(
-      and(eq(UserGrade.user_id, userId), eq(UserGrade.grade_id, gradeIdNum)),
+      and(
+        eq(UserGrade.user_id, userId),
+        eq(UserGrade.grade_id, gradeIdNum),
+        eq(UserGrade.academic_year_id, yearIdNum),
+      ),
     );
 
   // Record activity
@@ -2386,12 +2518,176 @@ export const removeGradeFromUser = asyncHandler(async (req: any, res: any) => {
       `Grade removed from teacher`,
       "UserGrade",
       gradeIdNum,
-      { teacher_id: userId, grade_id: gradeIdNum },
+      {
+        teacher_id: userId,
+        grade_id: gradeIdNum,
+        academic_year_id: yearIdNum,
+      },
       req.user.userId,
     );
   }
 
   successResponse(res, "Grade removed from user successfully");
+});
+
+// All class-teacher grade assignments across every user, optionally scoped
+// to one academic year -- powers the admin "Class Teachers" overview tab,
+// which previously had no cross-user view (only per-user, via each user's
+// profile).
+export const getAllGradeAssignments = asyncHandler(
+  async (req: any, res: any) => {
+    const { academic_year_id } = req.query;
+
+    let whereCondition: SQL<unknown> | undefined;
+    if (academic_year_id) {
+      const yearIdNum = Number(academic_year_id);
+      if (isNaN(yearIdNum)) {
+        throw new ValidationError("Invalid academic year ID");
+      }
+      whereCondition = eq(UserGrade.academic_year_id, yearIdNum);
+    }
+
+    const assignments = await db
+      .select({
+        grade_assignment_id: sql`CONCAT(${UserGrade.user_id}, '-', ${UserGrade.grade_id}, '-', ${UserGrade.academic_year_id})`,
+        user_id: UserGrade.user_id,
+        user_name: sql`CONCAT(${UserProfile.first_name}, ' ', ${UserProfile.last_name})`,
+        username: User.username,
+        grade_id: UserGrade.grade_id,
+        grade_name: Grade.name,
+        program_name: Program.name,
+        academic_year_id: UserGrade.academic_year_id,
+        academic_year_name: AcademicYear.name,
+        academic_year_is_current: AcademicYear.is_current,
+        assigned_at: UserGrade.assigned_at,
+      })
+      .from(UserGrade)
+      .innerJoin(User, eq(UserGrade.user_id, User.user_id))
+      .innerJoin(UserProfile, eq(User.user_id, UserProfile.user_id))
+      .innerJoin(Grade, eq(UserGrade.grade_id, Grade.grade_id))
+      .innerJoin(Program, eq(Grade.program_id, Program.program_id))
+      .innerJoin(
+        AcademicYear,
+        eq(UserGrade.academic_year_id, AcademicYear.academic_year_id),
+      )
+      .where(whereCondition)
+      .orderBy(
+        desc(AcademicYear.academic_year_id),
+        UserProfile.first_name,
+        UserProfile.last_name,
+      );
+
+    successResponse(
+      res,
+      "Grade assignments retrieved successfully",
+      assignments,
+    );
+  },
+);
+
+// Copy every class-teacher grade assignment from one academic year into
+// another. Like UserProgramLead, UserGrade points directly at Grade (not at
+// a per-year row), so this is a straight (user_id, grade_id) copy with no
+// re-matching step needed -- skip pairs that already exist in the target
+// year.
+export const copyGradeAssignments = asyncHandler(async (req: any, res: any) => {
+  const { source_academic_year_id, target_academic_year_id } = req.body;
+
+  if (!source_academic_year_id || !target_academic_year_id) {
+    throw new ValidationError(
+      "Source and target academic year IDs are required",
+    );
+  }
+
+  const sourceYearId = parseInt(source_academic_year_id);
+  const targetYearId = parseInt(target_academic_year_id);
+
+  if (isNaN(sourceYearId) || isNaN(targetYearId)) {
+    throw new ValidationError("Invalid academic year ID");
+  }
+
+  if (sourceYearId === targetYearId) {
+    throw new ValidationError(
+      "Source and target academic years must be different",
+    );
+  }
+
+  const [sourceYear, targetYear] = await Promise.all([
+    db
+      .select()
+      .from(AcademicYear)
+      .where(eq(AcademicYear.academic_year_id, sourceYearId))
+      .limit(1),
+    db
+      .select()
+      .from(AcademicYear)
+      .where(eq(AcademicYear.academic_year_id, targetYearId))
+      .limit(1),
+  ]);
+
+  if (sourceYear.length === 0 || targetYear.length === 0) {
+    throw new NotFoundError("Academic year not found");
+  }
+
+  const [sourceAssignments, targetAssignments] = await Promise.all([
+    db
+      .select({ user_id: UserGrade.user_id, grade_id: UserGrade.grade_id })
+      .from(UserGrade)
+      .where(eq(UserGrade.academic_year_id, sourceYearId)),
+    db
+      .select({ user_id: UserGrade.user_id, grade_id: UserGrade.grade_id })
+      .from(UserGrade)
+      .where(eq(UserGrade.academic_year_id, targetYearId)),
+  ]);
+
+  if (sourceAssignments.length === 0) {
+    throw new ValidationError(
+      `${sourceYear[0].name} has no grade assignments to copy`,
+    );
+  }
+
+  const existingKeys = new Set(
+    targetAssignments.map((a) => `${a.user_id}::${a.grade_id}`),
+  );
+
+  const toInsert = sourceAssignments.filter(
+    (a) => !existingKeys.has(`${a.user_id}::${a.grade_id}`),
+  );
+
+  if (toInsert.length > 0) {
+    await db.insert(UserGrade).values(
+      toInsert.map((a) => ({
+        user_id: a.user_id,
+        grade_id: a.grade_id,
+        academic_year_id: targetYearId,
+      })),
+    );
+  }
+
+  logger.info("Grade assignments copied", {
+    sourceYearId,
+    targetYearId,
+    copied: toInsert.length,
+    skipped: sourceAssignments.length - toInsert.length,
+  });
+
+  if (req.user?.userId) {
+    await recordActivity(
+      req.user.userId,
+      "GRADE_ASSIGNMENTS_COPY",
+      `Copied ${toInsert.length} grade assignment(s) from ${sourceYear[0].name} to ${targetYear[0].name}`,
+      "UserGrade",
+      undefined,
+      { sourceYearId, targetYearId, copied: toInsert.length },
+      req.user.userId,
+    );
+  }
+
+  successResponse(res, "Grade assignments copied successfully", {
+    copied: toInsert.length,
+    skipped: sourceAssignments.length - toInsert.length,
+    total: sourceAssignments.length,
+  });
 });
 
 // Get grades assigned to a user
@@ -2427,13 +2723,20 @@ export const getUserGrades = asyncHandler(async (req: any, res: any) => {
       level_order: Grade.level_order,
       program_id: Grade.program_id,
       program_name: Program.name,
+      academic_year_id: UserGrade.academic_year_id,
+      academic_year_name: AcademicYear.name,
+      academic_year_is_current: AcademicYear.is_current,
       assigned_at: UserGrade.assigned_at,
     })
     .from(UserGrade)
     .innerJoin(Grade, eq(UserGrade.grade_id, Grade.grade_id))
     .innerJoin(Program, eq(Grade.program_id, Program.program_id))
+    .innerJoin(
+      AcademicYear,
+      eq(UserGrade.academic_year_id, AcademicYear.academic_year_id),
+    )
     .where(eq(UserGrade.user_id, userId))
-    .orderBy(Grade.level_order);
+    .orderBy(desc(AcademicYear.academic_year_id), Grade.level_order);
 
   successResponse(res, "User grades retrieved successfully", grades);
 });

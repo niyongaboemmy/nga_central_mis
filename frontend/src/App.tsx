@@ -22,6 +22,7 @@ import "./App.css";
 import Documents from "./components/documents/Documents";
 import Academics from "./components/Academics";
 import TeacherAssignedSubjects from "./components/TeacherAssignedSubjects";
+import MyEnrolledSubjects from "./components/MyEnrolledSubjects";
 import ProgramUsersPage from "./components/ProgramUsersPage";
 import ProgramAcademicPage from "./components/ProgramAcademicPage";
 import ClassTeacherUsersPage from "./components/ClassTeacherUsersPage";
@@ -36,8 +37,15 @@ import AllTeachersSchemeOfWork from "./components/AllTeachersSchemeOfWork";
 import SchemeDetails from "./components/SchemeDetails";
 import ReportingModule from "./components/reporting/ReportingModule";
 import AdminReporting from "./components/reporting/AdminReporting";
+import MyMentor from "./components/reporting/MyMentor";
 import { MetadataProvider } from "./contexts/MetadataContext";
+import { AcademicPeriodProvider } from "./contexts/AcademicPeriodContext";
 import SubjectDetailPage from "./components/curriculum/SubjectDetailPage";
+import LessonNotesListPage from "./components/lessonNotes/LessonNotesListPage";
+import LessonNoteEditorPage from "./components/lessonNotes/LessonNoteEditorPage";
+import SharedLessonNotesPage from "./components/lessonNotes/SharedLessonNotesPage";
+import SharedLessonNoteViewPage from "./components/lessonNotes/SharedLessonNoteViewPage";
+import CombinedLessonNotesPage from "./components/lessonNotes/CombinedLessonNotesPage";
 
 const LoginPage: React.FC = () => {
   const navigate = useNavigate();
@@ -156,6 +164,11 @@ const TeacherAssignedSubjectsPage: React.FC = () => {
   return <TeacherAssignedSubjects />;
 };
 
+// Student's Enrolled Subjects page with sidebar
+const MyEnrolledSubjectsPage: React.FC = () => {
+  return <MyEnrolledSubjects />;
+};
+
 // Permissions page with sidebar
 const PermissionsPage: React.FC = () => {
   return <Permissions />;
@@ -204,6 +217,7 @@ function App() {
     <ToastProvider>
       <ToastInitializer>
         <MetadataProvider>
+          <AcademicPeriodProvider>
           <Router basename="/mis">
             <Routes>
 
@@ -313,6 +327,18 @@ function App() {
               }
             />
 
+            {/* Student's Enrolled Subjects - protected with sidebar */}
+            <Route
+              path="/my-enrolled-subjects"
+              element={
+                <ProtectedRoute>
+                  <SystemLayoutWrapper>
+                    <MyEnrolledSubjectsPage />
+                  </SystemLayoutWrapper>
+                </ProtectedRoute>
+              }
+            />
+
             {/* Subject Detail page - curriculum & materials */}
             <Route
               path="/subjects/:subjectId"
@@ -320,6 +346,70 @@ function App() {
                 <ProtectedRoute>
                   <SystemLayoutWrapper>
                     <SubjectDetailPage />
+                  </SystemLayoutWrapper>
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Lesson Notes - teacher authoring */}
+            <Route
+              path="/lesson-notes"
+              element={
+                <ProtectedRoute>
+                  <SystemLayoutWrapper>
+                    <LessonNotesListPage />
+                  </SystemLayoutWrapper>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/lesson-notes/combined"
+              element={
+                <ProtectedRoute>
+                  <SystemLayoutWrapper>
+                    <CombinedLessonNotesPage mode="mine" />
+                  </SystemLayoutWrapper>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/lesson-notes/:id"
+              element={
+                <ProtectedRoute>
+                  <SystemLayoutWrapper>
+                    <LessonNoteEditorPage />
+                  </SystemLayoutWrapper>
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Lesson Notes - student read-only view */}
+            <Route
+              path="/shared-lesson-notes"
+              element={
+                <ProtectedRoute>
+                  <SystemLayoutWrapper>
+                    <SharedLessonNotesPage />
+                  </SystemLayoutWrapper>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/shared-lesson-notes/combined"
+              element={
+                <ProtectedRoute>
+                  <SystemLayoutWrapper>
+                    <CombinedLessonNotesPage mode="shared" />
+                  </SystemLayoutWrapper>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/shared-lesson-notes/:id"
+              element={
+                <ProtectedRoute>
+                  <SystemLayoutWrapper>
+                    <SharedLessonNoteViewPage />
                   </SystemLayoutWrapper>
                 </ProtectedRoute>
               }
@@ -501,6 +591,18 @@ function App() {
               }
             />
 
+            {/* My Mentor (student-facing) - protected with sidebar */}
+            <Route
+              path="/my-mentor"
+              element={
+                <ProtectedRoute>
+                  <SystemLayoutWrapper>
+                    <MyMentor />
+                  </SystemLayoutWrapper>
+                </ProtectedRoute>
+              }
+            />
+
             {/* Logs History - protected with sidebar */}
             <Route
               path="/logs-history"
@@ -529,6 +631,7 @@ function App() {
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </Router>
+        </AcademicPeriodProvider>
       </MetadataProvider>
     </ToastInitializer>
   </ToastProvider>

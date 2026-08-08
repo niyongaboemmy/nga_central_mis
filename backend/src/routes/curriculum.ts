@@ -1,15 +1,19 @@
 import { Router } from "express";
 import multer from "multer";
 import { authenticate, authorize } from "../middleware/auth";
+import { Permissions } from "../utils/permissions";
 import {
   getSubjectDetail,
+  getMyEnrolledSubjects,
   getSubjectCompetencies,
   createCompetency,
+  reorderCompetencies,
   updateCompetency,
   deleteCompetency,
   createCriteria,
   updateCriteria,
   deleteCriteria,
+  getCriteriaSchemeUsage,
   getDocumentCategories,
   createDocumentCategory,
   updateDocumentCategory,
@@ -19,6 +23,11 @@ import {
   deleteSubjectDocument,
   downloadSubjectDocument,
 } from "../controllers/curriculumController";
+import {
+  startCurriculumImport,
+  getCurriculumImportStatus,
+  confirmCurriculumImport,
+} from "../controllers/curriculumImportAIController";
 
 const router = Router();
 
@@ -27,9 +36,27 @@ const upload = multer({
   limits: { fileSize: 50 * 1024 * 1024 },
 });
 
+const uploadCurriculumDoc = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 15 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    const allowed = /\.(docx|pdf|txt)$/i;
+    if (allowed.test(file.originalname)) {
+      cb(null, true);
+    } else {
+      cb(new Error("Only .docx, .pdf, and .txt files are supported"));
+    }
+  },
+});
+
 router.use(authenticate);
 
 // Subject overview
+router.get(
+  "/my-enrolled-subjects",
+  authorize(Permissions.VIEW_MY_ENROLLED_SUBJECTS),
+  getMyEnrolledSubjects,
+);
 router.get("/subjects/:subjectId/detail", getSubjectDetail);
 
 // Competencies
@@ -38,6 +65,12 @@ router.post(
   "/subjects/:subjectId/competencies",
   authorize("MANAGE_CURRICULUM"),
   createCompetency,
+);
+// Register before the parameterized :competencyId route below, or "reorder" would be matched as an ID
+router.put(
+  "/subjects/:subjectId/competencies/reorder",
+  authorize("MANAGE_CURRICULUM"),
+  reorderCompetencies,
 );
 router.put(
   "/subjects/:subjectId/competencies/:competencyId",
@@ -61,6 +94,25 @@ router.delete(
   "/criteria/:criteriaId",
   authorize("MANAGE_CURRICULUM"),
   deleteCriteria,
+);
+router.get("/criteria/:criteriaId/scheme-entries", getCriteriaSchemeUsage);
+
+// AI import from an uploaded curriculum document (PDF/DOCX/TXT)
+router.post(
+  "/subjects/:subjectId/import/ai-generate",
+  authorize("MANAGE_CURRICULUM"),
+  uploadCurriculumDoc.single("file"),
+  startCurriculumImport,
+);
+router.get(
+  "/subjects/:subjectId/import/ai-generate/:jobId/status",
+  authorize("MANAGE_CURRICULUM"),
+  getCurriculumImportStatus,
+);
+router.post(
+  "/subjects/:subjectId/import/confirm",
+  authorize("MANAGE_CURRICULUM"),
+  confirmCurriculumImport,
 );
 
 // Document categories

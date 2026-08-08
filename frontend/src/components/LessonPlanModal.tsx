@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   X,
   Save,
@@ -12,9 +12,14 @@ import {
   Layout,
   LayoutDashboard,
   Trash2,
+  PenLine,
+  Sparkles,
+  CloudUpload,
+  ArrowRight,
 } from "lucide-react";
 import { LessonPlan, lessonPlanApi } from "../api/lessonPlan";
 import { useToast } from "../contexts/ToastContext";
+import LessonPlanAIGenerate from "./LessonPlanAIGenerate";
 
 interface LessonPlanModalProps {
   isOpen: boolean;
@@ -22,7 +27,11 @@ interface LessonPlanModalProps {
   entryId: number;
   onSaved: () => void;
   initialData?: LessonPlan | null;
+  entryTopic?: string;
+  entryWeekLabel?: string;
 }
+
+type ModalMode = "choose" | "manual" | "ai";
 
 type TabType =
   | "Header"
@@ -39,10 +48,14 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
   entryId,
   onSaved,
   initialData,
+  entryTopic,
+  entryWeekLabel,
 }) => {
   const { showToast } = useToast();
   const [activeTab, setActiveTab] = useState<TabType>("Header");
   const [loading, setLoading] = useState(false);
+  const [mode, setMode] = useState<ModalMode>(initialData ? "manual" : "choose");
+  const chooseFileInputRef = useRef<HTMLInputElement>(null);
 
   const defaultFormData: Partial<LessonPlan> = {
     entry_id: entryId,
@@ -100,8 +113,10 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
     if (initialData) {
       // Merge initialData with defaultFormData to ensure all required fields exist
       setFormData({ ...defaultFormData, ...initialData, entry_id: entryId });
+      setMode("manual");
     } else {
       setFormData({ ...defaultFormData, entry_id: entryId });
+      setMode("choose");
     }
     setActiveTab("Header");
   }, [initialData, entryId, isOpen]);
@@ -261,6 +276,7 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
           ...resp.data.data,
         }));
         showToast("Content extracted successfully!", "success");
+        setMode("manual");
         setActiveTab("Preview");
       }
     } catch (error: any) {
@@ -1228,32 +1244,49 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
               </div>
               <div>
                 <h2 className="text-xl font-black text-gray-900 dark:text-white uppercase tracking-tight">
-                  {initialData ? "Refine Lesson Plan" : "Draft New Lesson Plan"}
+                  {initialData
+                    ? "Refine Lesson Plan"
+                    : mode === "ai"
+                      ? "Generate Lesson Plan with AI"
+                      : mode === "choose"
+                        ? "New Lesson Plan"
+                        : "Draft New Lesson Plan"}
                 </h2>
                 <p className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest mt-1">
-                  Step-by-step curriculum planning
+                  {entryWeekLabel ? `${entryWeekLabel} · ` : ""}Step-by-step curriculum planning
                 </p>
               </div>
             </div>
 
             <div className="flex items-center gap-3">
-              <label
-                className={`cursor-pointer flex items-center gap-2 px-4 py-2 bg-gray-50 hover:bg-gray-100 dark:bg-gray-900 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-400 rounded-full text-xs font-bold border border-gray-100 dark:border-gray-800 transition-all ${loading ? "opacity-50 cursor-not-allowed" : ""}`}
-              >
-                {loading ? (
-                  <div className="w-3.5 h-3.5 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
-                ) : (
-                  <UploadCloud className="w-3.5 h-3.5" />
-                )}
-                {loading ? "Importing..." : "Import DOCX"}
-                <input
-                  type="file"
-                  accept=".docx"
-                  className="hidden"
-                  onChange={handleFileSelect}
-                  disabled={loading}
-                />
-              </label>
+              {mode === "manual" && (
+                <button
+                  onClick={() => setMode("ai")}
+                  className="flex items-center gap-2 px-4 py-2 bg-violet-50 hover:bg-violet-100 dark:bg-violet-900/20 dark:hover:bg-violet-900/40 text-violet-600 dark:text-violet-400 rounded-full text-xs font-bold border border-violet-100 dark:border-violet-900/40 transition-all"
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  Generate with AI
+                </button>
+              )}
+              {mode === "manual" && (
+                <label
+                  className={`cursor-pointer flex items-center gap-2 px-4 py-2 bg-gray-50 hover:bg-gray-100 dark:bg-gray-900 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-400 rounded-full text-xs font-bold border border-gray-100 dark:border-gray-800 transition-all ${loading ? "opacity-50 cursor-not-allowed" : ""}`}
+                >
+                  {loading ? (
+                    <div className="w-3.5 h-3.5 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <UploadCloud className="w-3.5 h-3.5" />
+                  )}
+                  {loading ? "Importing..." : "Import DOCX"}
+                  <input
+                    type="file"
+                    accept=".docx"
+                    className="hidden"
+                    onChange={handleFileSelect}
+                    disabled={loading}
+                  />
+                </label>
+              )}
               <button
                 onClick={onClose}
                 className="p-2 hover:bg-red-50 dark:hover:bg-red-950/30 text-gray-400 hover:text-red-500 rounded-full transition-all"
@@ -1263,6 +1296,91 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
             </div>
           </div>
 
+          {mode === "choose" && (
+            <div className="h-[75vh] overflow-y-auto flex items-center justify-center p-8">
+              <div className="w-full max-w-3xl">
+                <input
+                  ref={chooseFileInputRef}
+                  type="file"
+                  accept=".docx"
+                  className="hidden"
+                  onChange={handleFileSelect}
+                />
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <button
+                    onClick={() => setMode("manual")}
+                    className="relative group text-left p-6 rounded-3xl bg-gradient-to-br from-blue-600 to-indigo-700 text-white shadow-xl shadow-blue-600/25 hover:shadow-blue-600/40 transition-all overflow-hidden"
+                  >
+                    <div className="w-12 h-12 rounded-2xl bg-white/20 flex items-center justify-center mb-4">
+                      <PenLine className="w-6 h-6 text-white" />
+                    </div>
+                    <h4 className="text-lg font-bold mb-1">Build Manually</h4>
+                    <p className="text-sm text-white/80 leading-relaxed mb-4">
+                      Fill out the full lesson plan yourself, section by section.
+                    </p>
+                    <div className="flex items-center gap-2 text-sm font-semibold">
+                      Open Editor <ArrowRight className="w-4 h-4" />
+                    </div>
+                  </button>
+
+                  <button
+                    onClick={() => setMode("ai")}
+                    className="relative group text-left p-6 rounded-3xl bg-gradient-to-br from-violet-600 to-purple-700 text-white shadow-xl shadow-violet-600/25 hover:shadow-violet-600/40 transition-all overflow-hidden"
+                  >
+                    <div className="absolute top-3 right-3 bg-white/20 text-white text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
+                      New
+                    </div>
+                    <div className="w-12 h-12 rounded-2xl bg-white/20 flex items-center justify-center mb-4">
+                      <Sparkles className="w-6 h-6 text-white" />
+                    </div>
+                    <h4 className="text-lg font-bold mb-1">Generate with AI</h4>
+                    <p className="text-sm text-white/80 leading-relaxed mb-4">
+                      AI acts as your subject teacher and builds the full lesson plan from this week's scheme entry.
+                    </p>
+                    <div className="flex items-center gap-2 text-sm font-semibold">
+                      Generate Now <ArrowRight className="w-4 h-4" />
+                    </div>
+                  </button>
+
+                  <button
+                    onClick={() => chooseFileInputRef.current?.click()}
+                    className="group text-left p-6 rounded-3xl bg-white dark:bg-slate-900 border-2 border-gray-200 dark:border-slate-700 hover:border-blue-300 dark:hover:border-blue-600 hover:shadow-lg transition-all"
+                  >
+                    <div className="w-12 h-12 rounded-2xl bg-gray-100 dark:bg-slate-800 group-hover:bg-blue-50 dark:group-hover:bg-blue-900/20 flex items-center justify-center mb-4 transition-colors">
+                      <CloudUpload className="w-6 h-6 text-gray-500 dark:text-gray-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors" />
+                    </div>
+                    <h4 className="text-lg font-bold text-gray-900 dark:text-white mb-1">
+                      Import from DOCX
+                    </h4>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed mb-4">
+                      Already have a lesson plan file? Upload it and we'll extract the content.
+                    </p>
+                    <div className="flex items-center gap-2 text-sm font-semibold text-gray-600 dark:text-gray-300">
+                      Upload File <ArrowRight className="w-4 h-4" />
+                    </div>
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {mode === "ai" && (
+            <div className="h-[75vh] overflow-y-auto flex items-center justify-center p-8">
+              <LessonPlanAIGenerate
+                entryId={entryId}
+                lessonId={initialData?.id}
+                weekLabel={entryWeekLabel}
+                topic={entryTopic}
+                onComplete={() => {
+                  onSaved();
+                  onClose();
+                }}
+                onCancel={() => setMode(initialData ? "manual" : "choose")}
+              />
+            </div>
+          )}
+
+          {mode === "manual" && (
           <div className="flex flex-col lg:flex-row h-[75vh]">
             {/* Sidebar Navigation */}
             <div className="w-full lg:w-64 bg-gray-50/50 dark:bg-gray-900/10 border-r border-gray-50 dark:border-gray-900 p-6 space-y-1 overflow-y-auto">
@@ -1323,6 +1441,7 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
               <div className="max-w-4xl mx-auto">{renderTabContent()}</div>
             </div>
           </div>
+          )}
         </div>
       </div>
     </div>

@@ -153,3 +153,149 @@ table th,
 .dark *:hover::-webkit-scrollbar-thumb:active {
     background-color: rgba(59, 130, 246, 0.97);
 }
+/* --- Lesson note editor: task lists & tables (Tiptap output, not covered by @tailwindcss/typography defaults) ---
+   Applied to both the live editor (.ProseMirror) and the read-only AI-diff preview panels
+   (.lesson-note-preview), so formatting looks identical whether editing or reviewing a change. */
+.ProseMirror ul[data-type="taskList"] {
+    list-style: none;
+    padding-left: 0;
+}
+
+.ProseMirror ul[data-type="taskList"] li {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+}
+
+.ProseMirror ul[data-type="taskList"] li > label {
+    margin-top: 0.3rem;
+    user-select: none;
+}
+
+.ProseMirror ul[data-type="taskList"] li > div {
+    flex: 1;
+}
+
+.ProseMirror table,
+.lesson-note-preview table {
+    border-collapse: collapse;
+    width: 100%;
+    table-layout: fixed;
+}
+
+.ProseMirror table td,
+.ProseMirror table th,
+.lesson-note-preview table td,
+.lesson-note-preview table th {
+    border: 1px solid rgba(148, 163, 184, 0.4);
+    padding: 0.5rem 0.75rem;
+    font-size: 0.875rem;
+    position: relative;
+    vertical-align: top;
+}
+
+.ProseMirror table th,
+.lesson-note-preview table th {
+    font-weight: 600;
+    background-color: rgba(148, 163, 184, 0.12);
+}
+
+.dark .ProseMirror table td,
+.dark .ProseMirror table th,
+.dark .lesson-note-preview table td,
+.dark .lesson-note-preview table th {
+    border-color: rgba(100, 116, 139, 0.5);
+}
+
+/* contentEditable elements get a default browser focus ring that isn't suppressed by
+   Tailwind's focus utilities (those target form controls, not arbitrary editable divs) —
+   left alone, this renders as a stray blue outline around the whole editor on focus. */
+.ProseMirror:focus,
+.ProseMirror:focus-visible {
+    outline: none;
+}
+
+/* Typography: match the platform's own text-sm / text-gray-700 convention instead of
+   @tailwindcss/typography's unmodified prose-base scale, which was the direct cause of
+   headings/body text/tables rendering noticeably larger and more loosely spaced than the
+   rest of the app (tailwind.config.js registers the typography plugin with no overrides). */
+.ProseMirror,
+.lesson-note-preview {
+    font-size: 0.875rem;
+    line-height: 1.6;
+    color: #374151;
+}
+
+.dark .ProseMirror,
+.dark .lesson-note-preview {
+    color: #d1d5db;
+}
+
+.ProseMirror h1,
+.lesson-note-preview h1 {
+    font-size: 1.375rem;
+    margin-top: 1.25em;
+    margin-bottom: 0.5em;
+}
+
+.ProseMirror h2,
+.lesson-note-preview h2 {
+    font-size: 1.125rem;
+    margin-top: 1.25em;
+    margin-bottom: 0.5em;
+}
+
+.ProseMirror h3,
+.lesson-note-preview h3 {
+    font-size: 1rem;
+    margin-top: 1em;
+    margin-bottom: 0.4em;
+}
+
+.ProseMirror h4,
+.lesson-note-preview h4 {
+    font-size: 0.9375rem;
+    margin-top: 1em;
+    margin-bottom: 0.4em;
+}
+
+.ProseMirror p,
+.lesson-note-preview p {
+    margin-top: 0.5em;
+    margin-bottom: 0.5em;
+}
+
+.ProseMirror h1,
+.ProseMirror h2,
+.ProseMirror h3,
+.ProseMirror h4,
+.lesson-note-preview h1,
+.lesson-note-preview h2,
+.lesson-note-preview h3,
+.lesson-note-preview h4 {
+    color: #111827;
+}
+
+.dark .ProseMirror h1,
+.dark .ProseMirror h2,
+.dark .ProseMirror h3,
+.dark .ProseMirror h4,
+.dark .lesson-note-preview h1,
+.dark .lesson-note-preview h2,
+.dark .lesson-note-preview h3,
+.dark .lesson-note-preview h4 {
+    color: #f3f4f6;
+}
+
+/* Tiptap's Table extension emits a .column-resize-handle element when resizable:true is
+   set, but ships no default appearance — without this it's an invisible 4px hit-target,
+   so a teacher has no visual cue that columns are draggable. */
+.ProseMirror .column-resize-handle {
+    background-color: rgba(59, 130, 246, 0.5);
+    width: 3px;
+}
+
+.ProseMirror.resize-cursor {
+    cursor: col-resize;
+}
+

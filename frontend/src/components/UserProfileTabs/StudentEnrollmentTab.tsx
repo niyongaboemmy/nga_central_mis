@@ -251,14 +251,8 @@ const StudentEnrollmentTab: React.FC<StudentEnrollmentTabProps> = ({
       const loadClassGroups = async () => {
         setLoadingClassGroups(true);
         try {
-          const currentYear =
-            selectedYearId ||
-            academicYears.find((y) => y.is_current === 1)?.academic_year_id ||
-            academicYears[0]?.academic_year_id;
-          if (currentYear) {
-            const response = await classGroupsApi.getAll(currentYear);
-            setAvailableClassGroups(response.data.data);
-          }
+          const response = await classGroupsApi.getAll();
+          setAvailableClassGroups(response.data.data);
         } catch (error) {
           console.error("Failed to load class groups:", error);
           showToast("Failed to load class groups", "error");
@@ -292,6 +286,7 @@ const StudentEnrollmentTab: React.FC<StudentEnrollmentTabProps> = ({
         await studentClassGroupApi.remove(
           studentId,
           studentClassGroup.class_group_id,
+          studentClassGroup.academic_year_id,
         );
       }
 
@@ -299,6 +294,7 @@ const StudentEnrollmentTab: React.FC<StudentEnrollmentTabProps> = ({
       await studentClassGroupApi.assign({
         user_id: studentId,
         class_group_id: classGroupId,
+        academic_year_id: selectedYearId || undefined,
       });
 
       showToast("Student assigned to class group successfully", "success");
@@ -343,6 +339,7 @@ const StudentEnrollmentTab: React.FC<StudentEnrollmentTabProps> = ({
       await studentClassGroupApi.remove(
         studentId,
         studentClassGroup.class_group_id,
+        studentClassGroup.academic_year_id,
       );
 
       showToast(
@@ -842,53 +839,73 @@ const StudentEnrollmentTab: React.FC<StudentEnrollmentTabProps> = ({
                       </p>
                     </div>
                   ) : (
-                    availableSubjects.map((subject) => (
-                      <div
-                        key={subject.subject_id}
-                        className="flex items-center justify-between p-3 bg-gray-50 dark:bg-slate-800 rounded-2xl"
-                      >
-                        <div>
-                          <h5 className="font-medium text-gray-900 dark:text-white">
-                            {subject.name}
-                          </h5>
-                          {(subject.code ||
-                            (subject.grades && subject.grades.length > 0)) && (
-                            <div className="flex flex-wrap gap-2 mt-1">
-                              {subject.code && (
-                                <span className="text-xs px-2 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 rounded-md">
-                                  {subject.code}
-                                </span>
-                              )}
-                              {subject.grades &&
-                                subject.grades.map((g) => (
-                                  <span
-                                    key={g.grade_id}
-                                    className="text-xs px-2 py-0.5 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-md border border-blue-100 dark:border-blue-800/20"
-                                  >
-                                    {g.grade_name}
-                                  </span>
-                                ))}
-                            </div>
+                    availableSubjects.map((subject, index) => {
+                      // Backend sorts grade-curriculum subjects first; show a
+                      // divider the first time we cross into "other" subjects
+                      // rather than filtering them out (grade-subject mapping
+                      // can be incomplete, so nothing should be hidden).
+                      const prev = availableSubjects[index - 1];
+                      const showOtherDivider =
+                        index > 0 &&
+                        prev?.in_grade_curriculum &&
+                        !subject.in_grade_curriculum;
+                      return (
+                        <React.Fragment key={subject.subject_id}>
+                          {showOtherDivider && (
+                            <p className="text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wide pt-2">
+                              Other subjects
+                            </p>
                           )}
-                        </div>
-                        {hasPermission(
-                          Permissions.MANAGE_STUDENT_ENROLLMENTS,
-                        ) && (
-                          <button
-                            onClick={() => handleEnroll(subject.subject_id)}
-                            disabled={enrolling === subject.subject_id}
-                            className="flex items-center gap-2 px-3 py-1.5 pr-5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-full transition-colors disabled:opacity-50"
-                          >
-                            {enrolling === subject.subject_id ? (
-                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                            ) : (
-                              <Plus className="w-4 h-4" />
+                          <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-slate-800 rounded-2xl">
+                            <div>
+                              <h5 className="font-medium text-gray-900 dark:text-white flex items-center gap-2">
+                                {subject.name}
+                                {subject.in_grade_curriculum && (
+                                  <span className="text-xs px-2 py-0.5 bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 rounded-md border border-green-100 dark:border-green-800/20">
+                                    This grade
+                                  </span>
+                                )}
+                              </h5>
+                              {(subject.code ||
+                                (subject.grades && subject.grades.length > 0)) && (
+                                <div className="flex flex-wrap gap-2 mt-1">
+                                  {subject.code && (
+                                    <span className="text-xs px-2 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 rounded-md">
+                                      {subject.code}
+                                    </span>
+                                  )}
+                                  {subject.grades &&
+                                    subject.grades.map((g) => (
+                                      <span
+                                        key={g.grade_id}
+                                        className="text-xs px-2 py-0.5 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-md border border-blue-100 dark:border-blue-800/20"
+                                      >
+                                        {g.grade_name}
+                                      </span>
+                                    ))}
+                                </div>
+                              )}
+                            </div>
+                            {hasPermission(
+                              Permissions.MANAGE_STUDENT_ENROLLMENTS,
+                            ) && (
+                              <button
+                                onClick={() => handleEnroll(subject.subject_id)}
+                                disabled={enrolling === subject.subject_id}
+                                className="flex items-center gap-2 px-3 py-1.5 pr-5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-full transition-colors disabled:opacity-50"
+                              >
+                                {enrolling === subject.subject_id ? (
+                                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                                ) : (
+                                  <Plus className="w-4 h-4" />
+                                )}
+                                Add
+                              </button>
                             )}
-                            Add
-                          </button>
-                        )}
-                      </div>
-                    ))
+                          </div>
+                        </React.Fragment>
+                      );
+                    })
                   )}
                 </div>
               </div>

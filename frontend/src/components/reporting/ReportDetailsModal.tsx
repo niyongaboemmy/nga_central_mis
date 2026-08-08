@@ -59,7 +59,7 @@ const ReportDetailsModal: React.FC<ReportDetailsModalProps> = ({
   if (loading) {
     return (
       <div className="fixed inset-0 z-[110] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-        <div className="bg-white dark:bg-gray-900 rounded-2xl p-10 flex flex-col items-center">
+        <div className="bg-white dark:bg-gray-800/30 rounded-2xl p-10 flex flex-col items-center">
           <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600 mb-4"></div>
           <p className="text-gray-500 text-sm font-medium">
             Loading report details...
@@ -120,7 +120,7 @@ const ReportDetailsModal: React.FC<ReportDetailsModalProps> = ({
           {!isAdminView && onEdit && (
             <button
               onClick={onEdit}
-              className="flex items-center space-x-2 bg-white dark:bg-slate-800 hover:bg-gray-50 text-gray-700 dark:text-gray-200 px-4 py-2 rounded-xl text-sm font-bold border border-gray-100 dark:border-slate-700 transition-all"
+              className="flex items-center space-x-2 bg-white dark:bg-slate-800 hover:bg-gray-50 text-gray-700 dark:text-gray-200 px-4 py-2 rounded-full text-sm font-bold border border-gray-100 dark:border-slate-700 transition-all"
             >
               <Edit3 className="w-4 h-4 text-blue-600" />
               <span>Edit</span>
@@ -185,7 +185,7 @@ const ReportDetailsModal: React.FC<ReportDetailsModalProps> = ({
                 <Zap className="w-4 h-4 text-blue-600" />
                 <span>Key Highlights</span>
               </h3>
-              <div className="bg-white dark:bg-gray-800/50 p-5 rounded-2xl border border-gray-100 dark:border-gray-800 text-sm text-gray-600 dark:text-gray-400 leading-relaxed font-medium">
+              <div className="bg-white dark:bg-gray-800/50 p-5 rounded-2xl border border-gray-100 dark:border-gray-700/20 text-sm text-gray-600 dark:text-gray-400 leading-relaxed font-medium">
                 {report.key_highlights ||
                   "No highlights recorded for this period."}
               </div>
@@ -197,7 +197,7 @@ const ReportDetailsModal: React.FC<ReportDetailsModalProps> = ({
                 <AlertTriangle className="w-4 h-4 text-red-600" />
                 <span>Challenges</span>
               </h3>
-              <div className="bg-white dark:bg-gray-800/50 p-5 rounded-2xl border border-gray-100 dark:border-gray-800 text-sm text-gray-600 dark:text-gray-400 leading-relaxed font-medium">
+              <div className="bg-white dark:bg-gray-800/50 p-5 rounded-2xl border border-gray-100 dark:border-gray-700/20 text-sm text-gray-600 dark:text-gray-400 leading-relaxed font-medium">
                 {report.challenges_encountered || "No challenges reported."}
               </div>
             </div>
@@ -501,7 +501,7 @@ const ReportDetailsModal: React.FC<ReportDetailsModalProps> = ({
 
           {/* Footer Action */}
           {!isAdminView && onEdit && (
-            <div className="pt-6 border-t border-gray-50 dark:border-gray-800 flex justify-end">
+            <div className="pt-6 border-t border-gray-50 dark:border-gray-700/20 flex justify-end">
               <button
                 onClick={onEdit}
                 className="flex items-center space-x-2.5 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-full font-black text-sm shadow-blue-200 dark:shadow-none hover:scale-[1.02] transition-all"

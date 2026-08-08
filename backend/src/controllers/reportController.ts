@@ -36,9 +36,10 @@ import {
 } from "../db/schema";
 import { asyncHandler } from "../middleware/asyncHandler";
 import { successResponse } from "../utils/response";
-import { ValidationError, NotFoundError } from "../errors/CustomError";
+import { ValidationError, NotFoundError, AuthorizationError } from "../errors/CustomError";
 import { recordActivity } from "../utils/activityLogger";
 import logger from "../utils/logger";
+import { Permissions } from "../utils/permissions";
 
 /**
  * Helper to format DB dates to yyyy-MM-dd without timezone shifts
@@ -412,7 +413,14 @@ export const getAutoFillData = asyncHandler(async (req: any, res: any) => {
  */
 export const getReports = asyncHandler(async (req: any, res: any) => {
   const userId = req.user.userId;
-  const { start_date, end_date, user_id, class_group_id } = req.query;
+  const {
+    start_date,
+    end_date,
+    user_id,
+    class_group_id,
+    academic_year_id,
+    academic_term_id,
+  } = req.query;
 
   // Logic: Instructors see only their reports, Admins see all (simplification for now)
   const query = db
@@ -428,6 +436,10 @@ export const getReports = asyncHandler(async (req: any, res: any) => {
     })
     .from(InstructorReport)
     .innerJoin(UserProfile, eq(InstructorReport.user_id, UserProfile.user_id))
+    .leftJoin(
+      AcademicTerm,
+      eq(InstructorReport.academic_term_id, AcademicTerm.academic_term_id),
+    )
     .where(
       and(
         user_id
@@ -441,6 +453,12 @@ export const getReports = asyncHandler(async (req: any, res: any) => {
           : sql`1=1`,
         class_group_id
           ? eq(InstructorReport.class_group_id, parseInt(class_group_id))
+          : sql`1=1`,
+        academic_term_id
+          ? eq(InstructorReport.academic_term_id, parseInt(academic_term_id))
+          : sql`1=1`,
+        academic_year_id
+          ? eq(AcademicTerm.academic_year_id, parseInt(academic_year_id))
           : sql`1=1`,
       ),
     )
@@ -462,6 +480,7 @@ export const getReports = asyncHandler(async (req: any, res: any) => {
 export const getReportById = asyncHandler(async (req: any, res: any) => {
   const { id } = req.params;
   const reportId = parseInt(id);
+  const userId = req.user.userId;
 
   const report = await db
     .select({
@@ -508,6 +527,14 @@ export const getReportById = asyncHandler(async (req: any, res: any) => {
 
   if (report.length === 0) {
     throw new NotFoundError("Report not found");
+  }
+
+  const isOwner = report[0].user_id === userId;
+  const canViewAny = (req.user.permissions ?? []).includes(
+    Permissions.ALL_SUBMITTED_REPORTS,
+  );
+  if (!isOwner && !canViewAny) {
+    throw new AuthorizationError("You do not have access to this report");
   }
 
   const topics = await db
@@ -566,7 +593,8 @@ export const getReportById = asyncHandler(async (req: any, res: any) => {
  */
 export const getDashboardStats = asyncHandler(async (req: any, res: any) => {
   const userId = req.user.userId;
-  const { start_date, end_date } = req.query;
+  const { start_date, end_date, academic_year_id, academic_term_id } =
+    req.query;
 
   const reportDateFilter = and(
     eq(InstructorReport.user_id, userId),
@@ -576,13 +604,27 @@ export const getDashboardStats = asyncHandler(async (req: any, res: any) => {
     end_date
       ? sql`DATE_FORMAT(${InstructorReport.end_date}, '%Y-%m-%d') <= ${end_date}`
       : sql`1=1`,
+    academic_term_id
+      ? eq(InstructorReport.academic_term_id, parseInt(academic_term_id))
+      : sql`1=1`,
   );
 
   // Total unified reports submitted
   const totalReportsCount = await db
     .select({ count: count() })
     .from(InstructorReport)
-    .where(reportDateFilter);
+    .leftJoin(
+      AcademicTerm,
+      eq(InstructorReport.academic_term_id, AcademicTerm.academic_term_id),
+    )
+    .where(
+      and(
+        reportDateFilter,
+        academic_year_id
+          ? eq(AcademicTerm.academic_year_id, parseInt(academic_year_id))
+          : sql`1=1`,
+      ),
+    );
 
   // Total lessons delivered from decoupled LessonReport table (authoritative)
   const totalLessons = await db
@@ -598,21 +640,11 @@ export const getDashboardStats = asyncHandler(async (req: any, res: any) => {
         end_date
           ? sql`DATE_FORMAT(${LessonReport.delivery_date}, '%Y-%m-%d') <= ${end_date}`
           : sql`1=1`,
-      ),
-    );
-
-  // Total mentorship sessions from MentorshipSession table (authoritative)
-  const totalMentorship = await db
-    .select({ total: count() })
-    .from(MentorshipSession)
-    .where(
-      and(
-        eq(MentorshipSession.user_id, userId),
-        start_date
-          ? sql`DATE_FORMAT(${MentorshipSession.session_date}, '%Y-%m-%d') >= ${start_date}`
+        academic_year_id
+          ? eq(LessonReport.academic_year_id, parseInt(academic_year_id))
           : sql`1=1`,
-        end_date
-          ? sql`DATE_FORMAT(${MentorshipSession.session_date}, '%Y-%m-%d') <= ${end_date}`
+        academic_term_id
+          ? eq(LessonReport.academic_term_id, parseInt(academic_term_id))
           : sql`1=1`,
       ),
     );
@@ -621,11 +653,24 @@ export const getDashboardStats = asyncHandler(async (req: any, res: any) => {
   const lastReport = await db
     .select({ delivery_date: LessonReport.delivery_date })
     .from(LessonReport)
-    .where(eq(LessonReport.reported_by, userId))
+    .where(
+      and(
+        eq(LessonReport.reported_by, userId),
+        academic_year_id
+          ? eq(LessonReport.academic_year_id, parseInt(academic_year_id))
+          : sql`1=1`,
+        academic_term_id
+          ? eq(LessonReport.academic_term_id, parseInt(academic_term_id))
+          : sql`1=1`,
+      ),
+    )
     .orderBy(desc(LessonReport.delivery_date))
     .limit(1);
 
-  // Lesson trend: group by delivery_date
+  // Lesson trend: group by delivery_date. Counts every submitted report
+  // regardless of status, so the trend matches the "Submitted Reports" list
+  // below it (which also shows MISSED/UNPLANNED entries) — narrowing to
+  // DELIVERED/PARTIAL here silently dropped days that had real activity.
   const lessonTrend = await db
     .select({
       date: LessonReport.delivery_date,
@@ -635,12 +680,17 @@ export const getDashboardStats = asyncHandler(async (req: any, res: any) => {
     .where(
       and(
         eq(LessonReport.reported_by, userId),
-        sql`${LessonReport.status} IN ('DELIVERED', 'PARTIAL')`,
         start_date
           ? sql`DATE_FORMAT(${LessonReport.delivery_date}, '%Y-%m-%d') >= ${start_date}`
           : sql`1=1`,
         end_date
           ? sql`DATE_FORMAT(${LessonReport.delivery_date}, '%Y-%m-%d') <= ${end_date}`
+          : sql`1=1`,
+        academic_year_id
+          ? eq(LessonReport.academic_year_id, parseInt(academic_year_id))
+          : sql`1=1`,
+        academic_term_id
+          ? eq(LessonReport.academic_term_id, parseInt(academic_term_id))
           : sql`1=1`,
       ),
     )
@@ -648,47 +698,13 @@ export const getDashboardStats = asyncHandler(async (req: any, res: any) => {
     .orderBy(desc(LessonReport.delivery_date))
     .limit(start_date || end_date ? 50 : 15);
 
-  // Mentorship trend: group by session_date
-  const mentorshipTrend = await db
-    .select({
-      date: MentorshipSession.session_date,
-      mentorship: sql<number>`COUNT(*)`,
-    })
-    .from(MentorshipSession)
-    .where(
-      and(
-        eq(MentorshipSession.user_id, userId),
-        start_date
-          ? sql`DATE_FORMAT(${MentorshipSession.session_date}, '%Y-%m-%d') >= ${start_date}`
-          : sql`1=1`,
-        end_date
-          ? sql`DATE_FORMAT(${MentorshipSession.session_date}, '%Y-%m-%d') <= ${end_date}`
-          : sql`1=1`,
-      ),
-    )
-    .groupBy(MentorshipSession.session_date)
-    .orderBy(desc(MentorshipSession.session_date))
-    .limit(start_date || end_date ? 50 : 15);
-
-  // Merge lesson and mentorship trends by date
-  const trendMap = new Map<string, { lessons: number; mentorship: number }>();
-  lessonTrend.forEach((l) => {
-    const d = formatDbDate(l.date) || "";
-    trendMap.set(d, { lessons: Number(l.lessons), mentorship: 0 });
-  });
-  mentorshipTrend.forEach((m) => {
-    const d = formatDbDate(m.date) || "";
-    const existing = trendMap.get(d) || { lessons: 0, mentorship: 0 };
-    trendMap.set(d, { ...existing, mentorship: Number(m.mentorship) });
-  });
-  const trend = Array.from(trendMap.entries())
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([name, data]) => ({ name, ...data }));
+  const trend = lessonTrend
+    .map((l) => ({ name: formatDbDate(l.date) || "", lessons: Number(l.lessons) }))
+    .sort((a, b) => a.name.localeCompare(b.name));
 
   successResponse(res, "Dashboard stats retrieved successfully", {
     totalReports: totalReportsCount[0].count,
     totalLessons: totalLessons[0].total || 0,
-    totalMentorship: totalMentorship[0].total || 0,
     lastReportDate:
       lastReport.length > 0 ? formatDbDate(lastReport[0].delivery_date) : null,
     trend,
@@ -990,7 +1006,7 @@ export const getMissingReports = asyncHandler(async (req: any, res: any) => {
     )
     .leftJoin(
       AcademicTerm,
-      eq(ClassGroup.academic_year_id, AcademicTerm.academic_year_id),
+      eq(TeacherSubjectAssignment.academic_year_id, AcademicTerm.academic_year_id),
     )
     .leftJoin(Grade, eq(ClassGroup.grade_id, Grade.grade_id))
     .leftJoin(Program, eq(Grade.program_id, Program.program_id))
@@ -1001,7 +1017,7 @@ export const getMissingReports = asyncHandler(async (req: any, res: any) => {
           ? notInArray(User.user_id, submittedInstructorIds)
           : sql`1=1`,
         academic_year_id
-          ? eq(ClassGroup.academic_year_id, parseInt(academic_year_id))
+          ? eq(TeacherSubjectAssignment.academic_year_id, parseInt(academic_year_id))
           : sql`1=1`,
         academic_term_id
           ? eq(AcademicTerm.academic_term_id, parseInt(academic_term_id))

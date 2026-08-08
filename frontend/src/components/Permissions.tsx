@@ -1,18 +1,15 @@
-import React, { useState, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import React, { useState, useEffect, useRef, useCallback } from "react";
+import { motion } from "framer-motion";
 import {
   Shield,
-  Key,
   Users,
+  Key,
+  LayoutDashboard,
   Plus,
-  Edit2,
-  X,
-  ChevronRight,
-  Search,
-  ToggleLeft,
-  ToggleRight,
 } from "lucide-react";
 import { usePermissions } from "../hooks/usePermissions";
+import { useToast } from "../contexts/ToastContext";
+import { getAllPermissions } from "../constants/permissions";
 import {
   getRoles,
   getPermissions,
@@ -29,324 +26,320 @@ import {
   Role,
   Permission,
 } from "../api/users";
+import RolesTab from "./permissions/RolesTab";
+import PermissionsListTab from "./permissions/PermissionsListTab";
+import RolesPermissionsDashboard from "./permissions/RolesPermissionsDashboard";
+import NameDescriptionModal from "./permissions/NameDescriptionModal";
+import PermissionFormModal from "./permissions/PermissionFormModal";
+import AssignPermissionsModal from "./permissions/AssignPermissionsModal";
+import ConfirmModal from "./ui/ConfirmModal";
 
-// Animated floating particles
+type Tab = "roles" | "permissions" | "dashboard";
+
 const FloatingParticles = () => (
-  <div className="absolute inset-0 overflow-hidden pointer-events-none">
+  <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
     {[...Array(6)].map((_, i) => (
       <motion.div
         key={i}
-        initial={{
-          opacity: 0,
-          x: `${Math.random() * 100}%`,
-          y: "100%",
-        }}
-        animate={{
-          opacity: [0, 0.4, 0],
-          y: "-10%",
-        }}
+        initial={{ opacity: 0, x: `${Math.random() * 100}%`, y: "100%" }}
+        animate={{ opacity: [0, 0.3, 0], y: "-10%" }}
         transition={{
           repeat: Infinity,
-          duration: 10 + Math.random() * 10,
-          delay: Math.random() * 10,
+          duration: 20 + Math.random() * 20,
+          delay: Math.random() * 20,
           ease: "linear",
         }}
         className="absolute"
-        style={{
-          left: `${Math.random() * 100}%`,
-        }}
+        style={{ left: `${Math.random() * 100}%` }}
       >
-        <div className="w-1.5 h-1.5 bg-blue-400/40 rounded-full" />
+        <div className="w-2 h-2 bg-blue-300/30 rounded-full" />
       </motion.div>
     ))}
   </div>
 );
 
-// Status badge component
-const StatusBadge = ({ status }: { status: string }) => {
-  const colors: Record<string, string> = {
-    ACTIVE:
-      "bg-green-100/50 text-green-600 dark:bg-green-900/30 dark:text-green-400",
-    DISABLED:
-      "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400",
-  };
-  return (
-    <span
-      className={`px-2.5 py-0.5 rounded-full text-xs font-normal ${
-        colors[status] || colors.ACTIVE
-      }`}
-    >
-      {status}
-    </span>
-  );
-};
-
-// Modal component
-const Modal = ({
-  isOpen,
-  onClose,
-  title,
-  children,
-}: {
-  isOpen: boolean;
-  onClose: () => void;
-  title: string;
-  children: React.ReactNode;
-}) => (
-  <AnimatePresence>
-    {isOpen && (
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
-        onClick={onClose}
-      >
-        <motion.div
-          initial={{ scale: 0.95, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          exit={{ scale: 0.95, opacity: 0 }}
-          className="bg-white dark:bg-slate-800 rounded-2xl p-5 w-full max-w-md shadow-xl"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-              {title}
-            </h3>
-            <button
-              onClick={onClose}
-              className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-          {children}
-        </motion.div>
-      </motion.div>
-    )}
-  </AnimatePresence>
-);
-
-// Form input component
-const FormInput = ({
-  label,
-  value,
-  onChange,
-  placeholder,
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  placeholder?: string;
-}) => (
-  <div className="mb-3">
-    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-      {label}
-    </label>
-    <input
-      type="text"
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      placeholder={placeholder}
-      className="w-full px-3 py-2.5 bg-gray-50 dark:bg-slate-900/50 border border-gray-200 dark:border-slate-600 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all text-sm text-gray-900 dark:text-white placeholder-gray-400"
-    />
-  </div>
-);
-
-// Permissions Management Page
 const Permissions: React.FC = () => {
   const { hasPermission } = usePermissions();
-  const [activeTab, setActiveTab] = useState<"roles" | "permissions">("roles");
+  const { showToast } = useToast();
+
+  const [activeTab, setActiveTab] = useState<Tab>("roles");
   const [roles, setRoles] = useState<Role[]>([]);
   const [permissionsList, setPermissionsList] = useState<Permission[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState("");
 
-  // Modal states
+  // roleId -> permission ids currently assigned. Lets both list tabs and the
+  // dashboard derive "N permissions" / "used by N roles" without re-fetching.
+  const [roleAssignments, setRoleAssignments] = useState<
+    Record<number, number[]>
+  >({});
+  const [assignmentsLoading, setAssignmentsLoading] = useState(true);
+  const loadInitRef = useRef(false);
+
+  // Modal state
   const [roleModalOpen, setRoleModalOpen] = useState(false);
   const [permModalOpen, setPermModalOpen] = useState(false);
   const [assignModalOpen, setAssignModalOpen] = useState(false);
   const [selectedRole, setSelectedRole] = useState<Role | null>(null);
   const [selectedPermission, setSelectedPermission] =
     useState<Permission | null>(null);
-
-  // Form states
-  const [roleForm, setRoleForm] = useState({ name: "", description: "" });
-  const [permForm, setPermForm] = useState({ name: "", description: "" });
-  const [selectedPerms, setSelectedPerms] = useState<number[]>([]);
+  const [assignSelected, setAssignSelected] = useState<number[]>([]);
   const [togglingRoleId, setTogglingRoleId] = useState<number | null>(null);
   const [togglingPermId, setTogglingPermId] = useState<number | null>(null);
-  const [assigningPermissions, setAssigningPermissions] = useState(false);
+  const [assigningRoleId, setAssigningRoleId] = useState<number | null>(null);
+  const [savingRole, setSavingRole] = useState(false);
+  const [savingPermission, setSavingPermission] = useState(false);
+  const [savingAssignment, setSavingAssignment] = useState(false);
   const [loadingAssignModal, setLoadingAssignModal] = useState(false);
-  const [assignSearchTerm, setAssignSearchTerm] = useState("");
+  const [roleToggleConfirm, setRoleToggleConfirm] = useState<Role | null>(
+    null,
+  );
+  const [permToggleConfirm, setPermToggleConfirm] =
+    useState<Permission | null>(null);
+  const [roleFormError, setRoleFormError] = useState<string | null>(null);
+  const [permFormError, setPermFormError] = useState<string | null>(null);
 
-  // Check if user has admin permissions using role-based checking
   const canManage =
     hasPermission("MANAGE_ROLES") ||
     hasPermission("MANAGE_PERMISSIONS") ||
     hasPermission("ADMIN");
 
-  useEffect(() => {
-    loadData();
+  const loadRoleAssignments = useCallback(async (roleList: Role[]) => {
+    setAssignmentsLoading(true);
+    try {
+      const entries = await Promise.all(
+        roleList.map(async (role) => {
+          const perms = await getRolePermissions(role.role_id);
+          return [role.role_id, (perms || []).map((p) => p.perm_id)] as const;
+        }),
+      );
+      setRoleAssignments(Object.fromEntries(entries));
+    } catch (error) {
+      console.error("Failed to load role permission assignments:", error);
+    } finally {
+      setAssignmentsLoading(false);
+    }
   }, []);
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true);
     try {
       const [rolesData, permsData] = await Promise.all([
         getRoles(),
         getPermissions(),
       ]);
-      setRoles(rolesData || []);
+      const loadedRoles = rolesData || [];
+      setRoles(loadedRoles);
       setPermissionsList(permsData || []);
+      loadRoleAssignments(loadedRoles);
     } catch (error) {
-      console.error("Failed to load data:", error);
+      console.error("Failed to load roles/permissions:", error);
+      showToast("Failed to load roles and permissions", "error");
     } finally {
       setLoading(false);
     }
+  }, [loadRoleAssignments, showToast]);
+
+  // Guard against React StrictMode's dev-only double effect invocation.
+  useEffect(() => {
+    if (loadInitRef.current) return;
+    loadInitRef.current = true;
+    loadData();
+  }, [loadData]);
+
+  const permissionCounts: Record<number, number> = Object.fromEntries(
+    Object.entries(roleAssignments).map(([roleId, permIds]) => [
+      roleId,
+      permIds.length,
+    ]),
+  );
+
+  const roleUsageCounts: Record<number, number> = {};
+  Object.values(roleAssignments).forEach((permIds) => {
+    permIds.forEach((permId) => {
+      roleUsageCounts[permId] = (roleUsageCounts[permId] || 0) + 1;
+    });
+  });
+
+  // ---- Role CRUD ----
+  const openRoleModal = (role?: Role) => {
+    setSelectedRole(role || null);
+    setRoleFormError(null);
+    setRoleModalOpen(true);
   };
 
-  const handleCreateRole = async () => {
-    if (!roleForm.name) return;
+  const handleSubmitRole = async (data: {
+    name: string;
+    description: string;
+  }) => {
+    const duplicate = roles.find(
+      (r) =>
+        r.name.toLowerCase() === data.name.toLowerCase() &&
+        r.role_id !== selectedRole?.role_id,
+    );
+    if (duplicate) {
+      setRoleFormError("A role with this name already exists");
+      return;
+    }
+    setRoleFormError(null);
+    setSavingRole(true);
     try {
-      await createRole(roleForm);
-      setRoleForm({ name: "", description: "" });
+      if (selectedRole) {
+        await updateRole(selectedRole.role_id, data);
+        showToast("Role updated successfully", "success");
+      } else {
+        await createRole(data);
+        showToast("Role created successfully", "success");
+      }
       setRoleModalOpen(false);
       loadData();
-    } catch (error) {
-      console.error("Failed to create role:", error);
+    } catch (error: any) {
+      setRoleFormError(error.response?.data?.message || "Failed to save role");
+    } finally {
+      setSavingRole(false);
     }
   };
 
-  const handleUpdateRole = async (roleId: number) => {
-    try {
-      await updateRole(roleId, roleForm);
-      setRoleForm({ name: "", description: "" });
-      setRoleModalOpen(false);
-      loadData();
-    } catch (error) {
-      console.error("Failed to update role:", error);
-    }
+  const requestToggleRoleStatus = (role: Role) => {
+    setRoleToggleConfirm(role);
   };
 
-  const handleToggleRoleStatus = async (role: Role) => {
+  const confirmToggleRoleStatus = async () => {
+    const role = roleToggleConfirm;
+    if (!role) return;
     setTogglingRoleId(role.role_id);
     try {
       if (role.status === "ACTIVE") {
         await disableRole(role.role_id);
+        showToast("Role disabled", "success");
       } else {
         await enableRole(role.role_id);
+        showToast("Role enabled", "success");
       }
-      loadData();
-    } catch (error) {
-      console.error("Failed to toggle role status:", error);
+      await loadData();
+    } catch (error: any) {
+      showToast(
+        error.response?.data?.message || "Failed to update role status",
+        "error",
+      );
     } finally {
       setTogglingRoleId(null);
+      setRoleToggleConfirm(null);
     }
   };
 
-  const handleCreatePermission = async () => {
-    if (!permForm.name) return;
+  // ---- Permission CRUD ----
+  const openPermModal = (perm?: Permission) => {
+    setSelectedPermission(perm || null);
+    setPermFormError(null);
+    setPermModalOpen(true);
+  };
+
+  const availablePermissionNames = getAllPermissions().filter(
+    (name) => !permissionsList.some((p) => p.name === name),
+  );
+
+  const handleSubmitPermission = async (data: {
+    name: string;
+    description: string;
+  }) => {
+    const duplicate = permissionsList.find(
+      (p) =>
+        p.name.toLowerCase() === data.name.toLowerCase() &&
+        p.perm_id !== selectedPermission?.perm_id,
+    );
+    if (duplicate) {
+      setPermFormError("A permission with this name already exists");
+      return;
+    }
+    setPermFormError(null);
+    setSavingPermission(true);
     try {
-      await createPermission(permForm);
-      setPermForm({ name: "", description: "" });
+      if (selectedPermission) {
+        await updatePermission(selectedPermission.perm_id, data);
+        showToast("Permission updated successfully", "success");
+      } else {
+        await createPermission(data);
+        showToast("Permission created successfully", "success");
+      }
       setPermModalOpen(false);
       loadData();
-    } catch (error) {
-      console.error("Failed to create permission:", error);
+    } catch (error: any) {
+      setPermFormError(
+        error.response?.data?.message || "Failed to save permission",
+      );
+    } finally {
+      setSavingPermission(false);
     }
   };
 
-  const handleUpdatePermission = async (permId: number) => {
-    try {
-      await updatePermission(permId, permForm);
-      setPermForm({ name: "", description: "" });
-      setPermModalOpen(false);
-      loadData();
-    } catch (error) {
-      console.error("Failed to update permission:", error);
-    }
+  const requestTogglePermissionStatus = (perm: Permission) => {
+    setPermToggleConfirm(perm);
   };
 
-  const handleTogglePermissionStatus = async (perm: Permission) => {
+  const confirmTogglePermissionStatus = async () => {
+    const perm = permToggleConfirm;
+    if (!perm) return;
     setTogglingPermId(perm.perm_id);
     try {
       if (perm.status === "ACTIVE") {
         await disablePermission(perm.perm_id);
+        showToast("Permission disabled", "success");
       } else {
         await enablePermission(perm.perm_id);
+        showToast("Permission enabled", "success");
       }
-      loadData();
-    } catch (error) {
-      console.error("Failed to toggle permission status:", error);
+      await loadData();
+    } catch (error: any) {
+      showToast(
+        error.response?.data?.message ||
+          "Failed to update permission status",
+        "error",
+      );
     } finally {
       setTogglingPermId(null);
+      setPermToggleConfirm(null);
     }
   };
 
-  const handleAssignPermissions = async () => {
-    if (!selectedRole) return;
-    setAssigningPermissions(true);
-    try {
-      await assignPermissionsToRole(selectedRole.role_id, selectedPerms);
-      setAssignModalOpen(false);
-      setSelectedPerms([]);
-      loadData();
-    } catch (error) {
-      console.error("Failed to assign permissions:", error);
-    } finally {
-      setAssigningPermissions(false);
-    }
-  };
-
-  const openRoleModal = (role?: Role) => {
-    if (role) {
-      setSelectedRole(role);
-      setRoleForm({ name: role.name, description: role.description || "" });
-    } else {
-      setSelectedRole(null);
-      setRoleForm({ name: "", description: "" });
-    }
-    setRoleModalOpen(true);
-  };
-
-  const openPermModal = (perm?: Permission) => {
-    if (perm) {
-      setSelectedPermission(perm);
-      setPermForm({ name: perm.name, description: perm.description || "" });
-    } else {
-      setSelectedPermission(null);
-      setPermForm({ name: "", description: "" });
-    }
-    setPermModalOpen(true);
-  };
-
+  // ---- Role <-> Permission assignment ----
   const openAssignModal = async (role: Role) => {
     setSelectedRole(role);
+    setAssigningRoleId(role.role_id);
     setLoadingAssignModal(true);
+    setAssignModalOpen(true);
     try {
       const perms = await getRolePermissions(role.role_id);
-      setSelectedPerms((perms || []).map((p) => p.perm_id));
+      setAssignSelected((perms || []).map((p) => p.perm_id));
     } catch (error) {
       console.error("Failed to load role permissions:", error);
+      showToast("Failed to load current permissions", "error");
+      setAssignSelected(roleAssignments[role.role_id] || []);
     } finally {
       setLoadingAssignModal(false);
+      setAssigningRoleId(null);
     }
-    setAssignSearchTerm("");
-    setAssignModalOpen(true);
   };
 
-  const filteredRoles = roles.filter(
-    (role) =>
-      role.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      role.description?.toLowerCase().includes(searchTerm.toLowerCase()),
-  );
-
-  const filteredPermissions = permissionsList.filter(
-    (perm) =>
-      perm.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      perm.description?.toLowerCase().includes(searchTerm.toLowerCase()),
-  );
+  const handleSaveAssignment = async (permissionIds: number[]) => {
+    if (!selectedRole) return;
+    setSavingAssignment(true);
+    try {
+      await assignPermissionsToRole(selectedRole.role_id, permissionIds);
+      setRoleAssignments((prev) => ({
+        ...prev,
+        [selectedRole.role_id]: permissionIds,
+      }));
+      showToast("Permissions updated successfully", "success");
+      setAssignModalOpen(false);
+    } catch (error: any) {
+      showToast(
+        error.response?.data?.message || "Failed to assign permissions",
+        "error",
+      );
+    } finally {
+      setSavingAssignment(false);
+    }
+  };
 
   if (!canManage) {
     return (
@@ -373,6 +366,10 @@ const Permissions: React.FC = () => {
     );
   }
 
+  const activePermissionsCount = permissionsList.filter(
+    (p) => p.status === "ACTIVE",
+  ).length;
+
   return (
     <div className="min-h-screen overflow-hidden relative">
       <FloatingParticles />
@@ -381,451 +378,204 @@ const Permissions: React.FC = () => {
         <div className="max-w-7xl mx-auto">
           {/* Header */}
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="flex items-center justify-between mb-5"
+            className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4"
           >
             <div>
-              <motion.h1
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="text-2xl font-bold text-gray-800 dark:text-white"
-              >
-                Roles & Permissions
-              </motion.h1>
-              <motion.p
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.1 }}
-                className="text-sm text-gray-500 mt-0.5"
-              >
+              <h1 className="text-2xl font-bold text-gray-800 dark:text-white">
+                Roles &amp; Permissions
+              </h1>
+              <p className="text-sm text-gray-500 mt-0.5">
                 Manage roles, permissions, and access control
-              </motion.p>
+              </p>
             </div>
-            <button
-              onClick={() =>
-                activeTab === "roles" ? openRoleModal() : openPermModal()
-              }
-              className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white text-sm font-medium rounded-full shadow-blue-500/25 transition-all flex items-center gap-1.5"
-            >
-              <Plus className="w-4 h-4" />
-              New {activeTab === "roles" ? "Role" : "Permission"}
-            </button>
+            {activeTab !== "dashboard" && (
+              <button
+                onClick={() =>
+                  activeTab === "roles" ? openRoleModal() : openPermModal()
+                }
+                className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white text-sm font-medium rounded-full transition-colors flex items-center gap-1.5 w-fit"
+              >
+                <Plus className="w-4 h-4" />
+                New {activeTab === "roles" ? "Role" : "Permission"}
+              </button>
+            )}
           </motion.div>
 
           {/* Tabs */}
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-            className="flex gap-1.5 mb-4"
+            transition={{ delay: 0.03 }}
+            role="tablist"
+            aria-label="Roles & permissions view"
+            className="flex gap-1 mb-4 bg-white/60 dark:bg-slate-800/60 backdrop-blur-sm border border-white/50 dark:border-slate-700/30 rounded-full p-1 w-fit"
           >
             <button
+              role="tab"
+              aria-selected={activeTab === "roles"}
               onClick={() => setActiveTab("roles")}
-              className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all ${
+              className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all flex items-center gap-1.5 ${
                 activeTab === "roles"
-                  ? "bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-sm"
-                  : "text-gray-600 dark:text-gray-400 hover:bg-white/50 dark:hover:bg-slate-800/50"
+                  ? "bg-blue-500 text-white"
+                  : "text-gray-600 dark:text-gray-300 hover:bg-white/60 dark:hover:bg-slate-700/60"
               }`}
             >
-              <div className="flex items-center gap-1.5">
-                <Users className="w-4 h-4" />
-                Roles
-              </div>
+              <Users className="w-4 h-4" />
+              Roles
             </button>
             <button
+              role="tab"
+              aria-selected={activeTab === "permissions"}
               onClick={() => setActiveTab("permissions")}
-              className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all ${
+              className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all flex items-center gap-1.5 ${
                 activeTab === "permissions"
-                  ? "bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-sm"
-                  : "text-gray-600 dark:text-gray-400 hover:bg-white/50 dark:hover:bg-slate-800/50"
+                  ? "bg-blue-500 text-white"
+                  : "text-gray-600 dark:text-gray-300 hover:bg-white/60 dark:hover:bg-slate-700/60"
               }`}
             >
-              <div className="flex items-center gap-1.5">
-                <Key className="w-4 h-4" />
-                Permissions
-              </div>
+              <Key className="w-4 h-4" />
+              Permissions
+            </button>
+            <button
+              role="tab"
+              aria-selected={activeTab === "dashboard"}
+              onClick={() => setActiveTab("dashboard")}
+              className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all flex items-center gap-1.5 ${
+                activeTab === "dashboard"
+                  ? "bg-blue-500 text-white"
+                  : "text-gray-600 dark:text-gray-300 hover:bg-white/60 dark:hover:bg-slate-700/60"
+              }`}
+            >
+              <LayoutDashboard className="w-4 h-4" />
+              Dashboard
             </button>
           </motion.div>
 
-          {/* Search */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.15 }}
-            className="relative mb-3"
-          >
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Search..."
-              className="w-full pl-10 pr-3 py-2.5 bg-white dark:bg-gray-950 border border-gray-200 dark:border-slate-800 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 text-sm text-gray-900 dark:text-white placeholder-gray-400"
+          {/* Tabs stay mounted permanently so switching never loses search
+              text, scroll position, or re-fetches already-loaded data. */}
+          <div className={activeTab === "roles" ? "" : "hidden"}>
+            <RolesTab
+              roles={roles}
+              permissionCounts={permissionCounts}
+              loading={loading || assignmentsLoading}
+              togglingRoleId={togglingRoleId}
+              assigningRoleId={assigningRoleId}
+              onEdit={openRoleModal}
+              onToggleStatus={requestToggleRoleStatus}
+              onAssign={openAssignModal}
             />
-          </motion.div>
-
-          {/* Content - List Format */}
-          {loading ? (
-            <div className="flex items-center justify-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
-            </div>
-          ) : (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.2 }}
-              className="bg-white dark:bg-gray-950 rounded-xl shadow-sm border border-gray-100 dark:border-slate-700/50 overflow-hidden"
-            >
-              {/* Table Header */}
-              <div className="grid grid-cols-12 gap-4 px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border-b border-gray-100 dark:border-slate-700/40">
-                <div className="col-span-6">
-                  <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                    {activeTab === "roles" ? "Role" : "Permission"}
-                  </span>
-                </div>
-                <div className="col-span-2">
-                  <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                    Status
-                  </span>
-                </div>
-                <div className="col-span-2">
-                  <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                    Actions
-                  </span>
-                </div>
-                <div className="col-span-2 text-right">
-                  <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                    Manage
-                  </span>
-                </div>
-              </div>
-
-              {/* Table Body */}
-              {activeTab === "roles" ? (
-                filteredRoles.length > 0 ? (
-                  <div className="divide-y divide-gray-100 dark:divide-slate-700/30">
-                    {filteredRoles.map((role, index) => (
-                      <div
-                        key={index + 1}
-                        className="grid grid-cols-12 gap-4 px-4 py-2.5 items-center hover:bg-gray-50/50 dark:hover:bg-slate-800/30 transition-colors"
-                      >
-                        <div className="col-span-6">
-                          <div className="flex items-center gap-2.5">
-                            <div className="w-7 h-7 bg-gradient-to-br from-blue-500 to-blue-500 dark:from-blue-500 dark:to-blue-600 rounded-full flex items-center justify-center flex-shrink-0">
-                              <Users className="w-3.5 h-3.5 text-white" />
-                            </div>
-                            <div className="min-w-0">
-                              <p className="font-medium text-gray-900 dark:text-white text-sm truncate">
-                                {role.name}
-                              </p>
-                              <p className="text-xs text-gray-400 truncate">
-                                {role.description || "No description"}
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-                        <div className="col-span-2 flex items-center">
-                          <StatusBadge status={role.status} />
-                        </div>
-                        <div className="col-span-2">
-                          <div className="flex items-center gap-0.5">
-                            <button
-                              onClick={() => openRoleModal(role)}
-                              className="p-1.5 text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
-                            >
-                              <Edit2 className="w-3.5 h-3.5" />
-                            </button>
-                            <button
-                              onClick={() => handleToggleRoleStatus(role)}
-                              disabled={togglingRoleId === role.role_id}
-                              className={`p-1.5 rounded-lg transition-colors ${
-                                togglingRoleId === role.role_id
-                                  ? "opacity-50 cursor-not-allowed"
-                                  : role.status === "ACTIVE"
-                                    ? "text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
-                                    : "text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700"
-                              }`}
-                            >
-                              {togglingRoleId === role.role_id ? (
-                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current mx-auto" />
-                              ) : role.status === "ACTIVE" ? (
-                                <ToggleRight className="w-5 h-5" />
-                              ) : (
-                                <ToggleLeft className="w-5 h-5" />
-                              )}
-                            </button>
-                          </div>
-                        </div>
-                        <div className="col-span-2 text-right">
-                          <button
-                            onClick={() => openAssignModal(role)}
-                            disabled={loadingAssignModal}
-                            className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium inline-flex items-center gap-0.5 disabled:opacity-50 disabled:cursor-not-allowed"
-                          >
-                            {loadingAssignModal &&
-                            selectedRole?.role_id === role.role_id ? (
-                              <div className="animate-spin rounded-full h-3.5 w-3.5 border-b-2 border-current" />
-                            ) : (
-                              <>
-                                Permissions
-                                <ChevronRight className="w-3.5 h-3.5" />
-                              </>
-                            )}
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="py-8 text-center text-sm text-gray-500 dark:text-gray-400">
-                    No roles found
-                  </div>
-                )
-              ) : filteredPermissions.length > 0 ? (
-                <div className="divide-y divide-gray-100 dark:divide-slate-700/30">
-                  {filteredPermissions.map((perm, index) => (
-                    <div
-                      key={index + 1}
-                      className="grid grid-cols-12 gap-4 px-4 py-2.5 items-center hover:bg-gray-50/50 dark:hover:bg-slate-800/30 transition-colors"
-                    >
-                      <div className="col-span-6">
-                        <div className="flex items-center gap-2.5">
-                          <div className="w-7 h-7 bg-gradient-to-br from-orange-500 to-orange-600 rounded-full flex items-center justify-center flex-shrink-0">
-                            <Key className="w-3.5 h-3.5 text-white" />
-                          </div>
-                          <div className="min-w-0">
-                            <p className="font-medium text-gray-900 dark:text-white text-sm truncate">
-                              {perm.name}
-                            </p>
-                            <p className="text-xs text-gray-400 truncate">
-                              {perm.description || "No description"}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="col-span-2 flex items-center">
-                        <StatusBadge status={perm.status} />
-                      </div>
-                      <div className="col-span-4 flex items-center justify-end gap-0.5">
-                        <button
-                          onClick={() => openPermModal(perm)}
-                          className="p-1.5 text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
-                        >
-                          <Edit2 className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          onClick={() => handleTogglePermissionStatus(perm)}
-                          disabled={togglingPermId === perm.perm_id}
-                          className={`p-1.5 rounded-lg transition-colors ${
-                            togglingPermId === perm.perm_id
-                              ? "opacity-50 cursor-not-allowed"
-                              : perm.status === "ACTIVE"
-                                ? "text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
-                                : "text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700"
-                          }`}
-                        >
-                          {togglingPermId === perm.perm_id ? (
-                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current mx-auto" />
-                          ) : perm.status === "ACTIVE" ? (
-                            <ToggleRight className="w-5 h-5" />
-                          ) : (
-                            <ToggleLeft className="w-5 h-5" />
-                          )}
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="py-8 text-center text-sm text-gray-500 dark:text-gray-400">
-                  No permissions found
-                </div>
-              )}
-            </motion.div>
-          )}
+          </div>
+          <div className={activeTab === "permissions" ? "" : "hidden"}>
+            <PermissionsListTab
+              permissions={permissionsList}
+              roleUsageCounts={roleUsageCounts}
+              loading={loading || assignmentsLoading}
+              togglingPermId={togglingPermId}
+              onEdit={openPermModal}
+              onToggleStatus={requestTogglePermissionStatus}
+            />
+          </div>
+          <div className={activeTab === "dashboard" ? "" : "hidden"}>
+            <RolesPermissionsDashboard
+              roles={roles}
+              totalPermissions={permissionsList.length}
+              activePermissions={activePermissionsCount}
+              permissionCounts={permissionCounts}
+              loading={loading || assignmentsLoading}
+              onSelectRole={openAssignModal}
+            />
+          </div>
         </div>
       </div>
 
-      {/* Role Modal */}
-      <Modal
+      <NameDescriptionModal
         isOpen={roleModalOpen}
         onClose={() => setRoleModalOpen(false)}
         title={selectedRole ? "Edit Role" : "New Role"}
-      >
-        <FormInput
-          label="Name"
-          value={roleForm.name}
-          onChange={(value) => setRoleForm({ ...roleForm, name: value })}
-          placeholder="Enter role name"
-        />
-        <FormInput
-          label="Description"
-          value={roleForm.description}
-          onChange={(value) => setRoleForm({ ...roleForm, description: value })}
-          placeholder="Enter description"
-        />
-        <div className="flex gap-2 mt-4">
-          <button
-            onClick={() => setRoleModalOpen(false)}
-            className="flex-1 px-3 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 text-sm font-medium rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={() => {
-              const existingRole = roles.find(
-                (r) =>
-                  r.name === roleForm.name &&
-                  r.role_id !== selectedRole?.role_id,
-              );
-              if (existingRole) {
-                alert("A role with this name already exists");
-                return;
-              }
-              if (selectedRole) {
-                handleUpdateRole(selectedRole.role_id);
-              } else {
-                handleCreateRole();
-              }
-            }}
-            className="flex-1 px-3 py-2 bg-blue-500 text-white text-sm font-medium rounded-lg hover:bg-blue-600 transition-colors"
-          >
-            {selectedRole ? "Update" : "Create"}
-          </button>
-        </div>
-      </Modal>
+        subtitle={
+          selectedRole
+            ? "Update this role's name and description."
+            : "Define a new role that can be assigned to users."
+        }
+        icon={Users}
+        iconAccent="bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400"
+        namePlaceholder="Enter role name"
+        initialName={selectedRole?.name}
+        initialDescription={selectedRole?.description || ""}
+        submitLabel={selectedRole ? "Update" : "Create"}
+        saving={savingRole}
+        errorMessage={roleFormError}
+        onSubmit={handleSubmitRole}
+      />
 
-      {/* Permission Modal */}
-      <Modal
+      <PermissionFormModal
         isOpen={permModalOpen}
         onClose={() => setPermModalOpen(false)}
-        title={selectedPermission ? "Edit Permission" : "New Permission"}
-      >
-        <FormInput
-          label="Name"
-          value={permForm.name}
-          onChange={(value) => setPermForm({ ...permForm, name: value })}
-          placeholder="Enter permission name"
-        />
-        <FormInput
-          label="Description"
-          value={permForm.description}
-          onChange={(value) => setPermForm({ ...permForm, description: value })}
-          placeholder="Enter description"
-        />
-        <div className="flex gap-2 mt-4">
-          <button
-            onClick={() => setPermModalOpen(false)}
-            className="flex-1 px-3 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 text-sm font-medium rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={() => {
-              const existingPerm = permissionsList.find(
-                (p) =>
-                  p.name === permForm.name &&
-                  p.perm_id !== selectedPermission?.perm_id,
-              );
-              if (existingPerm) {
-                alert("A permission with this name already exists");
-                return;
-              }
-              if (selectedPermission) {
-                handleUpdatePermission(selectedPermission.perm_id);
-              } else {
-                handleCreatePermission();
-              }
-            }}
-            className="flex-1 px-3 py-2 bg-blue-500 text-white text-sm font-medium rounded-lg hover:bg-blue-600 transition-colors"
-          >
-            {selectedPermission ? "Update" : "Create"}
-          </button>
-        </div>
-      </Modal>
+        mode={selectedPermission ? "edit" : "create"}
+        availableNames={availablePermissionNames}
+        initialName={selectedPermission?.name}
+        initialDescription={selectedPermission?.description || ""}
+        saving={savingPermission}
+        errorMessage={permFormError}
+        onSubmit={handleSubmitPermission}
+      />
 
-      {/* Assign Permissions Modal */}
-      <Modal
+      <AssignPermissionsModal
         isOpen={assignModalOpen}
-        onClose={() => {
-          setAssignModalOpen(false);
-          setAssignSearchTerm("");
-        }}
-        title={`Assign Permissions - ${selectedRole?.name}`}
-      >
-        <div className="relative mb-3">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <input
-            type="text"
-            value={assignSearchTerm}
-            onChange={(e) => setAssignSearchTerm(e.target.value)}
-            placeholder="Search permissions..."
-            className="w-full pl-10 pr-3 py-2 bg-gray-50 dark:bg-slate-900/50 border border-gray-200 dark:border-slate-600 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 text-sm text-gray-900 dark:text-white placeholder-gray-400"
-          />
-        </div>
-        <div className="max-h-56 overflow-y-auto space-y-1.5 mb-3">
-          {permissionsList
-            .filter(
-              (p) =>
-                p.name.toLowerCase().includes(assignSearchTerm.toLowerCase()) ||
-                (p.description || "")
-                  .toLowerCase()
-                  .includes(assignSearchTerm.toLowerCase()),
-            )
-            .map((perm) => (
-              <label
-                key={perm.perm_id}
-                className="flex items-center gap-2.5 p-2 bg-gray-50 dark:bg-slate-900/50 rounded-lg cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors"
-              >
-                <input
-                  type="checkbox"
-                  checked={selectedPerms.includes(perm.perm_id)}
-                  onChange={(e) => {
-                    if (e.target.checked) {
-                      setSelectedPerms([...selectedPerms, perm.perm_id]);
-                    } else {
-                      setSelectedPerms(
-                        selectedPerms.filter((id) => id !== perm.perm_id),
-                      );
-                    }
-                  }}
-                  className="w-4 h-4 text-blue-500 rounded focus:ring-blue-500"
-                />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
-                    {perm.name}
-                  </p>
-                  <p className="text-xs text-gray-400 truncate">
-                    {perm.description}
-                  </p>
-                </div>
-              </label>
-            ))}
-        </div>
-        <div className="flex gap-2 mt-3">
-          <button
-            onClick={() => {
-              setAssignModalOpen(false);
-              setAssignSearchTerm("");
-            }}
-            className="flex-1 px-3 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 text-sm font-medium rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleAssignPermissions}
-            disabled={assigningPermissions}
-            className="flex-1 px-3 py-2 bg-blue-500 text-white text-sm font-medium rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {assigningPermissions ? (
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mx-auto" />
-            ) : (
-              "Save"
-            )}
-          </button>
-        </div>
-      </Modal>
+        onClose={() => setAssignModalOpen(false)}
+        role={selectedRole}
+        permissions={permissionsList}
+        initialSelected={assignSelected}
+        saving={savingAssignment}
+        loadingCurrent={loadingAssignModal}
+        onSave={handleSaveAssignment}
+      />
+
+      <ConfirmModal
+        isOpen={roleToggleConfirm !== null}
+        onClose={() => setRoleToggleConfirm(null)}
+        onConfirm={confirmToggleRoleStatus}
+        title={
+          roleToggleConfirm?.status === "ACTIVE" ? "Disable role?" : "Enable role?"
+        }
+        message={
+          roleToggleConfirm?.status === "ACTIVE"
+            ? `"${roleToggleConfirm?.name}" will no longer be assignable, and existing users with this role may lose the access it grants.`
+            : `"${roleToggleConfirm?.name}" will become assignable again and existing users with this role will regain the access it grants.`
+        }
+        confirmText={
+          roleToggleConfirm?.status === "ACTIVE" ? "Disable" : "Enable"
+        }
+        isLoading={
+          roleToggleConfirm !== null &&
+          togglingRoleId === roleToggleConfirm.role_id
+        }
+      />
+
+      <ConfirmModal
+        isOpen={permToggleConfirm !== null}
+        onClose={() => setPermToggleConfirm(null)}
+        onConfirm={confirmTogglePermissionStatus}
+        title={
+          permToggleConfirm?.status === "ACTIVE"
+            ? "Disable permission?"
+            : "Enable permission?"
+        }
+        message={
+          permToggleConfirm?.status === "ACTIVE"
+            ? `"${permToggleConfirm?.name}" will be revoked from every role that currently has it.`
+            : `"${permToggleConfirm?.name}" will become available to assign to roles again.`
+        }
+        confirmText={
+          permToggleConfirm?.status === "ACTIVE" ? "Disable" : "Enable"
+        }
+        isLoading={
+          permToggleConfirm !== null &&
+          togglingPermId === permToggleConfirm.perm_id
+        }
+      />
     </div>
   );
 };

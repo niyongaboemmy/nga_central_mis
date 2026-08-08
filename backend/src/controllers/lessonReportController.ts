@@ -5,17 +5,22 @@ import {
   LO_Lesson,
   LO_LearningOutcome,
   SchemeOfWorkEntry,
+  SchemeOfWork,
   CalendarSlot,
   AcademicTerm,
   Subject,
   MentorshipSession,
   ReportProjectUpdate,
   User,
+  TeacherSubjectAssignment,
+  LessonReportSupportRequest,
+  LessonReportChallengeTag,
 } from "../db/schema";
 import { asyncHandler } from "../middleware/asyncHandler";
 import { successResponse } from "../utils/response";
-import { ValidationError, NotFoundError } from "../errors/CustomError";
+import { ValidationError, NotFoundError, ConflictError, AuthorizationError } from "../errors/CustomError";
 import { recordActivity } from "../utils/activityLogger";
+import { buildLessonReportRollup } from "../services/lessonReportRollupService";
 
 // Identical to the helper in reportController — formats DB date values to yyyy-MM-dd
 // using UTC methods to avoid timezone off-by-one shifts.
@@ -113,9 +118,9 @@ export const getReportableLessons = asyncHandler(async (req: any, res: any) => {
       ),
     );
 
-  if (slots.length === 0) {
-    return successResponse(res, "Reportable lessons retrieved", []);
-  }
+  // Note: no early-return when slots.length === 0 — an instructor with zero
+  // CalendarSlots can still have ad-hoc reports in this window (see step 8b
+  // below), which must still be checked and surfaced.
 
   // 4. Expand recurring slots into individual dates within the window
   // CalendarSlot.day_of_week: 0=Sun … 6=Sat — matches JS Date.getDay()
@@ -160,9 +165,8 @@ export const getReportableLessons = asyncHandler(async (req: any, res: any) => {
     }
   }
 
-  if (occurrences.length === 0) {
-    return successResponse(res, "Reportable lessons retrieved", []);
-  }
+  // Same note as above — do not early-return here either; ad-hoc reports
+  // (step 8b) must still be checked even when there are no slot occurrences.
 
   // 5. Batch-fetch LO_Lessons for this user within the date window
   const lessons = await db
@@ -170,6 +174,7 @@ export const getReportableLessons = asyncHandler(async (req: any, res: any) => {
       id:          LO_Lesson.id,
       entry_id:    LO_Lesson.entry_id,
       lesson_date: LO_Lesson.lesson_date,
+      start_time:  LO_Lesson.start_time,
       module_code: LO_Lesson.module_code,
       module_name: LO_Lesson.module_name,
       big_question: LO_Lesson.big_question,
@@ -183,14 +188,9 @@ export const getReportableLessons = asyncHandler(async (req: any, res: any) => {
       ),
     );
 
-  // Map: "yyyy-MM-dd" → first matching LO_Lesson
-  const lessonByDate = new Map<string, typeof lessons[0]>();
-  for (const l of lessons) {
-    const key = formatDbDate(l.lesson_date);
-    if (key && !lessonByDate.has(key)) lessonByDate.set(key, l);
-  }
-
-  // 6. Batch-fetch SchemeOfWorkEntries for the entry_ids found above
+  // 6. Batch-fetch SchemeOfWorkEntries for the entry_ids found above, joined
+  // through to SchemeOfWork to recover each entry's subject_id — needed so
+  // lessons/reports can be keyed by (date, subject) below, not date alone.
   const entryIds = lessons
     .map((l) => l.entry_id)
     .filter((e): e is number => e !== null && e !== undefined);
@@ -204,12 +204,47 @@ export const getReportableLessons = asyncHandler(async (req: any, res: any) => {
             topic:       SchemeOfWorkEntry.topic,
             sub_topic:   SchemeOfWorkEntry.sub_topic,
             objective:   SchemeOfWorkEntry.objective,
+            subject_id:  SchemeOfWork.subject_id,
           })
           .from(SchemeOfWorkEntry)
+          .innerJoin(SchemeOfWork, eq(SchemeOfWorkEntry.scheme_id, SchemeOfWork.scheme_id))
           .where(inArray(SchemeOfWorkEntry.entry_id, entryIds))
       : [];
 
   const entryMap = new Map(entries.map((e) => [e.entry_id, e]));
+
+  // "date:subjectId" (subjectId "none" for lessons with no resolvable subject)
+  // — keeps same-day, multi-subject occurrences from colliding (see below).
+  const dateSubjectKey = (date: string, subjectId: number | null | undefined) =>
+    `${date}:${subjectId ?? "none"}`;
+
+  // Same as above but also keyed on start_time — a subject taught in two
+  // separate CalendarSlot periods on the same day (e.g. 11:00-12:40 and
+  // 13:40-14:30) needs each period matched to its own LO_Lesson, not the
+  // first one found for that date+subject. Falls back to the coarser
+  // dateSubjectKey lookup (see `lessonByDateSubject` below) only when a
+  // lesson has no recorded start_time at all.
+  const dateSubjectTimeKey = (
+    date: string,
+    subjectId: number | null | undefined,
+    startTime: string | null | undefined,
+  ) => `${date}:${subjectId ?? "none"}:${startTime ?? "none"}`;
+
+  // Map: "yyyy-MM-dd:subjectId" → LO_Lesson (coarse fallback), and
+  // "yyyy-MM-dd:subjectId:startTime" → LO_Lesson (precise per-period match).
+  const lessonByDateSubject = new Map<string, typeof lessons[0]>();
+  const lessonByDateSubjectTime = new Map<string, typeof lessons[0]>();
+  const entryIdByLessonId = new Map<number, number | null>();
+  for (const l of lessons) {
+    const key = formatDbDate(l.lesson_date);
+    entryIdByLessonId.set(l.id, l.entry_id ?? null);
+    if (!key) continue;
+    const subjectId = l.entry_id ? entryMap.get(l.entry_id)?.subject_id ?? null : null;
+    const compositeKey = dateSubjectKey(key, subjectId);
+    if (!lessonByDateSubject.has(compositeKey)) lessonByDateSubject.set(compositeKey, l);
+    const timeKey = dateSubjectTimeKey(key, subjectId, l.start_time);
+    if (!lessonByDateSubjectTime.has(timeKey)) lessonByDateSubjectTime.set(timeKey, l);
+  }
 
   // 7. Batch-fetch Learning Outcomes for those lessons
   const lessonIds = lessons.map((l) => l.id);
@@ -233,7 +268,11 @@ export const getReportableLessons = asyncHandler(async (req: any, res: any) => {
     losByLesson.set(lo.lesson_id, arr);
   }
 
-  // 8. Fetch existing LessonReports for this user within the window
+  // 8. Fetch existing LessonReports for this user within the window. Uses
+  // the denormalized subject_id/class_group_id columns (Phase 1) directly —
+  // populated for both scheduled AND ad-hoc reports at submission time — so
+  // this correctly keys ad-hoc reports too, which have no lesson_id/entry_id
+  // chain to derive a subject from.
   const existingReports = await db
     .select({
       lesson_report_id: LessonReport.lesson_report_id,
@@ -243,6 +282,8 @@ export const getReportableLessons = asyncHandler(async (req: any, res: any) => {
       attendance_count: LessonReport.attendance_count,
       completion_rate:  LessonReport.completion_rate,
       schedule_flag:    LessonReport.schedule_flag,
+      subject_id:       LessonReport.subject_id,
+      class_group_id:   LessonReport.class_group_id,
     })
     .from(LessonReport)
     .where(
@@ -252,18 +293,90 @@ export const getReportableLessons = asyncHandler(async (req: any, res: any) => {
       ),
     );
 
-  // Map: "yyyy-MM-dd" → LessonReport
-  const reportByDate = new Map<string, typeof existingReports[0]>();
+  // Map: "yyyy-MM-dd:subjectId" → LessonReport (coarse fallback, used only
+  // when an occurrence has no specific LO_Lesson to match against — e.g. a
+  // scheduled slot with no plan yet, or a true ad-hoc report). LessonReport
+  // has no time column of its own, so this is inherently unable to
+  // distinguish two same-subject periods on the same day; `reportByLessonId`
+  // below is the precise path and is preferred whenever a lesson is resolved.
+  const reportByDateSubject = new Map<string, typeof existingReports[0]>();
+  // Map: lesson_id → LessonReport — precise match for a specific scheduled
+  // period, since each period now resolves to its own distinct LO_Lesson
+  // (see `lessonByDateSubjectTime` above).
+  const reportByLessonId = new Map<number, typeof existingReports[0]>();
   for (const r of existingReports) {
     const key = formatDbDate(r.delivery_date);
-    if (key) reportByDate.set(key, r);
+    if (!key) continue;
+    reportByDateSubject.set(dateSubjectKey(key, r.subject_id), r);
+    if (r.lesson_id) reportByLessonId.set(r.lesson_id, r);
+  }
+
+  // 8b. Ad-hoc reports (no lesson_id) have no CalendarSlot behind them, so
+  // they never appear in `occurrences` above — without this, a submitted
+  // ad-hoc report would be invisible on the calendar and impossible to
+  // revisit/edit. Synthesize an occurrence for each one, pulling in the
+  // subject name/color for display.
+  const adHocReports = existingReports.filter((r) => !r.lesson_id);
+  const adHocSubjectIds = Array.from(
+    new Set(adHocReports.map((r) => r.subject_id).filter((id): id is number => id != null)),
+  );
+  const adHocSubjects =
+    adHocSubjectIds.length > 0
+      ? await db
+          .select({ subject_id: Subject.subject_id, name: Subject.name, code: Subject.code, color: Subject.color })
+          .from(Subject)
+          .where(inArray(Subject.subject_id, adHocSubjectIds))
+      : [];
+  const adHocSubjectMap = new Map(adHocSubjects.map((s) => [s.subject_id, s]));
+
+  interface ReportableLessonItem {
+    slot_id: number;
+    date: string;
+    start_time: string | null;
+    end_time: string | null;
+    subject_name: string | null;
+    subject_code: string | null;
+    subject_color: string | null;
+    module_code: string | null;
+    module_name: string | null;
+    big_question: string | null;
+    topic: string | null;
+    sub_topic: string | null;
+    objective: string | null;
+    learning_outcomes: any[];
+    lesson_id: number | null;
+    entry_id: number | null;
+    subject_id: number | null;
+    class_group_id: number | null;
+    is_ad_hoc: boolean;
+    reporting_status: "REPORTED" | "PENDING" | "UPCOMING";
+    lesson_report: {
+      lesson_report_id: number;
+      status: string;
+      attendance_count: number | null;
+      completion_rate: number | null;
+      schedule_flag: string;
+    } | null;
   }
 
   // 9. Assemble output
-  const result = occurrences.map((occ) => {
-    const lesson = lessonByDate.get(occ.date) ?? null;
+  const result: ReportableLessonItem[] = occurrences.map((occ) => {
+    const compositeKey = dateSubjectKey(occ.date, occ.subject_id);
+    const timeKey = dateSubjectTimeKey(occ.date, occ.subject_id, occ.start_time);
+    // Prefer the period-specific (time-aware) lesson match; fall back to the
+    // coarser date+subject one only if this exact period has no lesson of
+    // its own (e.g. a lesson recorded with a blank/mismatched start_time).
+    const lesson = lessonByDateSubjectTime.get(timeKey) ?? lessonByDateSubject.get(compositeKey) ?? null;
     const entry  = lesson?.entry_id ? entryMap.get(lesson.entry_id) ?? null : null;
-    const report = reportByDate.get(occ.date) ?? null;
+    // When this period resolved a specific lesson, ONLY trust a report tied
+    // to that exact lesson_id — falling back to the coarse date+subject map
+    // here would risk re-attaching a sibling period's report (the same
+    // collision this fix exists to avoid). The coarse map is only used when
+    // no lesson could be resolved for this period at all (scheduled without
+    // a plan yet, or ad-hoc).
+    const report = lesson
+      ? reportByLessonId.get(lesson.id) ?? null
+      : reportByDateSubject.get(compositeKey) ?? null;
     const los    = lesson ? (losByLesson.get(lesson.id) ?? []) : [];
 
     let reporting_status: "REPORTED" | "PENDING" | "UPCOMING";
@@ -292,6 +405,9 @@ export const getReportableLessons = asyncHandler(async (req: any, res: any) => {
       learning_outcomes: los,
       lesson_id:        lesson?.id     ?? null,
       entry_id:         lesson?.entry_id ?? null,
+      subject_id:       occ.subject_id,
+      class_group_id:   occ.class_group_id,
+      is_ad_hoc:        false,
       reporting_status,
       lesson_report: report
         ? {
@@ -304,6 +420,43 @@ export const getReportableLessons = asyncHandler(async (req: any, res: any) => {
         : null,
     };
   });
+
+  // Synthetic occurrences for ad-hoc reports (see step 8b) — these have no
+  // CalendarSlot, so they'd otherwise never appear on the calendar at all.
+  for (const r of adHocReports) {
+    const key = formatDbDate(r.delivery_date);
+    if (!key) continue;
+    const subject = r.subject_id ? adHocSubjectMap.get(r.subject_id) : null;
+    result.push({
+      slot_id: -r.lesson_report_id, // negative sentinel — no real CalendarSlot
+      date: key,
+      start_time: null,
+      end_time: null,
+      subject_name: subject?.name ?? null,
+      subject_code: subject?.code ?? null,
+      subject_color: subject?.color ?? null,
+      module_code: null,
+      module_name: null,
+      big_question: null,
+      topic: null,
+      sub_topic: null,
+      objective: null,
+      learning_outcomes: [],
+      lesson_id: null,
+      entry_id: null,
+      subject_id: r.subject_id,
+      class_group_id: r.class_group_id,
+      is_ad_hoc: true,
+      reporting_status: "REPORTED",
+      lesson_report: {
+        lesson_report_id: r.lesson_report_id,
+        status: r.status,
+        attendance_count: r.attendance_count,
+        completion_rate: r.completion_rate,
+        schedule_flag: r.schedule_flag,
+      },
+    });
+  }
 
   // Sort ascending by date so the calendar gets chronological order
   result.sort((a, b) => (a.date < b.date ? -1 : 1));
@@ -327,79 +480,203 @@ export const submitLessonReport = asyncHandler(async (req: any, res: any) => {
     reflection_notes,
     evidence_url,
     academic_term_id,
+    subject_id,
+    class_group_id,
+    is_scheduled_slot,
+    support_request_category_ids,
+    challenge_category_ids,
   } = req.body;
 
   if (!delivery_date) throw new ValidationError("delivery_date is required");
-  if (!status || !["DELIVERED", "PARTIAL", "MISSED"].includes(status))
-    throw new ValidationError("status must be DELIVERED, PARTIAL, or MISSED");
 
-  // 1. Validate lesson ownership if lesson_id provided
-  if (lesson_id) {
-    const lesson = await db
-      .select({ id: LO_Lesson.id })
-      .from(LO_Lesson)
-      .where(and(eq(LO_Lesson.id, Number(lesson_id)), eq(LO_Lesson.user_id, userId)))
-      .limit(1);
-    if (lesson.length === 0) throw new NotFoundError("Lesson not found or access denied");
-  }
+  // An "ad-hoc" report is unplanned subject activity with no scheduled
+  // lesson/entry behind it — the instructor picks the subject/class-group
+  // directly instead of inheriting them from a CalendarSlot occurrence.
+  const isAdHoc = !lesson_id && !entry_id;
 
-  // 2. Compute schedule_flag using UTC midnight arithmetic to avoid off-by-one
-  let schedule_flag: "ON_TIME" | "AHEAD" | "BEHIND" = "ON_TIME";
+  let resolvedEntryId: number | null = entry_id ? Number(entry_id) : null;
+  let resolvedSubjectId: number | null = null;
+  let resolvedClassGroupId: number | null = null;
+  let resolvedStatus: "DELIVERED" | "PARTIAL" | "MISSED" | "UNPLANNED";
 
-  if (entry_id && academic_term_id) {
-    const [entryRows, termRows] = await Promise.all([
-      db
-        .select({ week_number: SchemeOfWorkEntry.week_number })
-        .from(SchemeOfWorkEntry)
-        .where(eq(SchemeOfWorkEntry.entry_id, Number(entry_id)))
-        .limit(1),
-      db
-        .select({ start_date: AcademicTerm.start_date })
-        .from(AcademicTerm)
-        .where(eq(AcademicTerm.academic_term_id, Number(academic_term_id)))
-        .limit(1),
-    ]);
-
-    if (entryRows.length > 0 && termRows.length > 0) {
-      // "Week 5" → 5
-      const sowWeek = parseInt(
-        (entryRows[0].week_number ?? "").replace(/[^0-9]/g, ""),
-        10,
+  if (isAdHoc) {
+    if (!subject_id || !class_group_id) {
+      throw new ValidationError(
+        "subject_id and class_group_id are required for an unscheduled/ad-hoc report",
       );
+    }
 
-      const termStartStr = formatDbDate(termRows[0].start_date)!;
-      const termStartMs  = utcDate(termStartStr).getTime();
-      const deliveryMs   = utcDate(delivery_date as string).getTime();
-      const daysDiff     = Math.floor((deliveryMs - termStartMs) / 86400000);
-      const deliveryWeek = Math.floor(daysDiff / 7) + 1;
+    // Only allow logging activity for a subject/class-group the instructor
+    // is actually assigned to teach — prevents reporting against any subject.
+    const assignment = await db
+      .select({ user_id: TeacherSubjectAssignment.user_id })
+      .from(TeacherSubjectAssignment)
+      .where(
+        and(
+          eq(TeacherSubjectAssignment.user_id, userId),
+          eq(TeacherSubjectAssignment.subject_id, Number(subject_id)),
+          eq(TeacherSubjectAssignment.class_group_id, Number(class_group_id)),
+        ),
+      )
+      .limit(1);
+    if (assignment.length === 0) {
+      throw new AuthorizationError(
+        "You are not assigned to teach this subject for this class group",
+      );
+    }
 
-      if (!isNaN(sowWeek) && !isNaN(deliveryWeek)) {
-        if (deliveryWeek < sowWeek) schedule_flag = "AHEAD";
-        else if (deliveryWeek > sowWeek) schedule_flag = "BEHIND";
+    resolvedSubjectId = Number(subject_id);
+    resolvedClassGroupId = Number(class_group_id);
+    // True ad-hoc submissions (the unscheduled-activity picker) never send
+    // `is_scheduled_slot` or a status — those default to UNPLANNED. A
+    // scheduled CalendarSlot occurrence with no LO_Lesson plan entry yet for
+    // this date also lands here (no lesson_id/entry_id to key off), but it
+    // explicitly flags itself via `is_scheduled_slot` and carries a real
+    // DELIVERED/PARTIAL/MISSED choice from the Delivery Status picker that
+    // must be preserved — gated on the explicit flag (not just "a status was
+    // sent") so an ad-hoc submission can't accidentally bypass the
+    // UNPLANNED-only invariant by sending a status value.
+    resolvedStatus =
+      is_scheduled_slot && status && ["DELIVERED", "PARTIAL", "MISSED"].includes(status)
+        ? (status as "DELIVERED" | "PARTIAL" | "MISSED")
+        : "UNPLANNED";
+  } else {
+    if (!status || !["DELIVERED", "PARTIAL", "MISSED"].includes(status))
+      throw new ValidationError("status must be DELIVERED, PARTIAL, or MISSED");
+    resolvedStatus = status;
+
+    // 1. Validate lesson ownership if lesson_id provided, and recover its
+    // entry_id (used below to derive subject_id/class_group_id) if the
+    // caller didn't already send one.
+    if (lesson_id) {
+      const lesson = await db
+        .select({ id: LO_Lesson.id, entry_id: LO_Lesson.entry_id })
+        .from(LO_Lesson)
+        .where(and(eq(LO_Lesson.id, Number(lesson_id)), eq(LO_Lesson.user_id, userId)))
+        .limit(1);
+      if (lesson.length === 0) throw new NotFoundError("Lesson not found or access denied");
+      if (!resolvedEntryId && lesson[0].entry_id) resolvedEntryId = lesson[0].entry_id;
+    }
+
+    // 1b. Denormalize subject_id/class_group_id at write time from the scheme
+    // chain (entry_id -> SchemeOfWorkEntry -> SchemeOfWork), so they survive
+    // even if the source lesson/entry is later deleted (Analysis §6 item 2).
+    if (resolvedEntryId) {
+      const schemeRows = await db
+        .select({
+          subject_id: SchemeOfWork.subject_id,
+          class_group_id: SchemeOfWork.class_group_id,
+        })
+        .from(SchemeOfWorkEntry)
+        .innerJoin(SchemeOfWork, eq(SchemeOfWorkEntry.scheme_id, SchemeOfWork.scheme_id))
+        .where(eq(SchemeOfWorkEntry.entry_id, resolvedEntryId))
+        .limit(1);
+      if (schemeRows.length > 0) {
+        resolvedSubjectId = schemeRows[0].subject_id;
+        resolvedClassGroupId = schemeRows[0].class_group_id;
       }
     }
   }
 
-  // 3. Insert the LessonReport
-  const insertResult = await db.insert(LessonReport).values({
-    lesson_id:        lesson_id        ? Number(lesson_id)        : null,
-    entry_id:         entry_id         ? Number(entry_id)         : null,
-    reported_by:      userId,
-    delivery_date:    utcDate(delivery_date as string),
-    status:           status as "DELIVERED" | "PARTIAL" | "MISSED",
-    attendance_count: attendance_count ? Number(attendance_count) : null,
-    completion_rate:  completion_rate  ? Number(completion_rate)  : null,
-    reflection_notes: reflection_notes ?? null,
-    evidence_url:     evidence_url     ?? null,
-    schedule_flag,
-  });
+  // 2. Resolve the term (for schedule_flag computation and period tagging)
+  let schedule_flag: "ON_TIME" | "AHEAD" | "BEHIND" = "ON_TIME";
+  let resolvedAcademicYearId: number | null = null;
+
+  if (academic_term_id) {
+    const termRows = await db
+      .select({
+        start_date: AcademicTerm.start_date,
+        academic_year_id: AcademicTerm.academic_year_id,
+      })
+      .from(AcademicTerm)
+      .where(eq(AcademicTerm.academic_term_id, Number(academic_term_id)))
+      .limit(1);
+
+    if (termRows.length > 0) {
+      resolvedAcademicYearId = termRows[0].academic_year_id;
+
+      if (entry_id) {
+        const entryRows = await db
+          .select({ week_number: SchemeOfWorkEntry.week_number })
+          .from(SchemeOfWorkEntry)
+          .where(eq(SchemeOfWorkEntry.entry_id, Number(entry_id)))
+          .limit(1);
+
+        if (entryRows.length > 0) {
+          // "Week 5" → 5
+          const sowWeek = parseInt(
+            (entryRows[0].week_number ?? "").replace(/[^0-9]/g, ""),
+            10,
+          );
+
+          const termStartStr = formatDbDate(termRows[0].start_date)!;
+          const termStartMs  = utcDate(termStartStr).getTime();
+          const deliveryMs   = utcDate(delivery_date as string).getTime();
+          const daysDiff     = Math.floor((deliveryMs - termStartMs) / 86400000);
+          const deliveryWeek = Math.floor(daysDiff / 7) + 1;
+
+          if (!isNaN(sowWeek) && !isNaN(deliveryWeek)) {
+            if (deliveryWeek < sowWeek) schedule_flag = "AHEAD";
+            else if (deliveryWeek > sowWeek) schedule_flag = "BEHIND";
+          }
+        }
+      }
+    }
+  }
+
+  // 3. Insert the LessonReport. A duplicate (reported_by, lesson_id,
+  // delivery_date) is a real, expected case now that the unique constraint
+  // exists (Phase 1) — surface it as a clear 409, not a raw DB error.
+  let insertResult: any;
+  try {
+    insertResult = await db.insert(LessonReport).values({
+      lesson_id:        lesson_id        ? Number(lesson_id)        : null,
+      entry_id:         resolvedEntryId,
+      reported_by:      userId,
+      academic_year_id: resolvedAcademicYearId,
+      academic_term_id: academic_term_id ? Number(academic_term_id) : null,
+      subject_id:       resolvedSubjectId,
+      class_group_id:   resolvedClassGroupId,
+      delivery_date:    utcDate(delivery_date as string),
+      status:           resolvedStatus,
+      attendance_count: attendance_count ? Number(attendance_count) : null,
+      completion_rate:  completion_rate  ? Number(completion_rate)  : null,
+      reflection_notes: reflection_notes ?? null,
+      evidence_url:     evidence_url     ?? null,
+      schedule_flag,
+    });
+  } catch (err: any) {
+    if (err?.code === "ER_DUP_ENTRY") {
+      throw new ConflictError("A report for this lesson and date has already been submitted");
+    }
+    throw err;
+  }
 
   const newId = (insertResult as any)[0].insertId as number;
+
+  // Categorized Support Needed / Challenges (Phase 4) — additive alongside
+  // the free-text reflection_notes field, not a replacement for it.
+  if (Array.isArray(support_request_category_ids) && support_request_category_ids.length > 0) {
+    await db.insert(LessonReportSupportRequest).values(
+      support_request_category_ids.map((categoryId: number) => ({
+        lesson_report_id: newId,
+        category_id: Number(categoryId),
+      })),
+    );
+  }
+  if (Array.isArray(challenge_category_ids) && challenge_category_ids.length > 0) {
+    await db.insert(LessonReportChallengeTag).values(
+      challenge_category_ids.map((categoryId: number) => ({
+        lesson_report_id: newId,
+        category_id: Number(categoryId),
+      })),
+    );
+  }
 
   await recordActivity(
     userId,
     "LESSON_REPORT_SUBMIT",
-    `Lesson delivery reported for ${delivery_date} (status: ${status}, schedule: ${schedule_flag})`,
+    `Lesson delivery reported for ${delivery_date} (status: ${resolvedStatus}, schedule: ${schedule_flag})`,
     "LessonReport",
     newId,
   );
@@ -410,6 +687,151 @@ export const submitLessonReport = asyncHandler(async (req: any, res: any) => {
     { lesson_report_id: newId },
     201,
   );
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /api/reports/lessons/:id
+// Full detail of a single LessonReport, including its categorized tags — used
+// to prefill the edit form for an already-submitted report (scheduled or
+// ad-hoc). Self-scoped: only the reporting instructor may view it.
+// ─────────────────────────────────────────────────────────────────────────────
+export const getLessonReportById = asyncHandler(async (req: any, res: any) => {
+  const userId = req.user.userId as number;
+  const id = Number(req.params.id);
+
+  const rows = await db
+    .select()
+    .from(LessonReport)
+    .where(eq(LessonReport.lesson_report_id, id))
+    .limit(1);
+
+  if (rows.length === 0) throw new NotFoundError("Lesson report not found");
+  const report = rows[0];
+  if (report.reported_by !== userId) {
+    throw new AuthorizationError("You do not have access to this report");
+  }
+
+  const supportRows = await db
+    .select({ category_id: LessonReportSupportRequest.category_id })
+    .from(LessonReportSupportRequest)
+    .where(eq(LessonReportSupportRequest.lesson_report_id, id));
+  const challengeRows = await db
+    .select({ category_id: LessonReportChallengeTag.category_id })
+    .from(LessonReportChallengeTag)
+    .where(eq(LessonReportChallengeTag.lesson_report_id, id));
+
+  return successResponse(res, "Lesson report retrieved", {
+    lesson_report_id: report.lesson_report_id,
+    lesson_id: report.lesson_id,
+    entry_id: report.entry_id,
+    subject_id: report.subject_id,
+    class_group_id: report.class_group_id,
+    delivery_date: formatDbDate(report.delivery_date),
+    status: report.status,
+    attendance_count: report.attendance_count,
+    completion_rate: report.completion_rate,
+    reflection_notes: report.reflection_notes,
+    evidence_url: report.evidence_url,
+    schedule_flag: report.schedule_flag,
+    is_ad_hoc: !report.lesson_id,
+    support_request_category_ids: supportRows.map((r) => r.category_id),
+    challenge_category_ids: challengeRows.map((r) => r.category_id),
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PUT /api/reports/lessons/:id
+// Edits an already-submitted lesson report. The report's identity — which
+// lesson/subject/class-group/date it's for — is immutable once created;
+// only the "what actually happened" fields can change. Self-scoped: only the
+// reporting instructor may edit it.
+// ─────────────────────────────────────────────────────────────────────────────
+export const updateLessonReport = asyncHandler(async (req: any, res: any) => {
+  const userId = req.user.userId as number;
+  const id = Number(req.params.id);
+  const {
+    status,
+    attendance_count,
+    completion_rate,
+    reflection_notes,
+    evidence_url,
+    support_request_category_ids,
+    challenge_category_ids,
+  } = req.body;
+
+  const existing = await db
+    .select({ reported_by: LessonReport.reported_by, lesson_id: LessonReport.lesson_id })
+    .from(LessonReport)
+    .where(eq(LessonReport.lesson_report_id, id))
+    .limit(1);
+
+  if (existing.length === 0) throw new NotFoundError("Lesson report not found");
+  if (existing[0].reported_by !== userId) {
+    throw new AuthorizationError("You do not have access to this report");
+  }
+
+  const isAdHoc = !existing[0].lesson_id;
+  let resolvedStatus: "DELIVERED" | "PARTIAL" | "MISSED" | "UNPLANNED";
+  if (isAdHoc) {
+    // `lesson_id IS NULL` also covers a scheduled CalendarSlot occurrence
+    // that had no LO_Lesson plan entry yet when it was first reported (see
+    // submitLessonReport) — that report carries a real DELIVERED/PARTIAL/
+    // MISSED status and must keep it on edit, not just true ad-hoc/
+    // unscheduled-activity reports which never send a status at all.
+    resolvedStatus =
+      status && ["DELIVERED", "PARTIAL", "MISSED"].includes(status)
+        ? (status as "DELIVERED" | "PARTIAL" | "MISSED")
+        : "UNPLANNED";
+  } else {
+    if (!status || !["DELIVERED", "PARTIAL", "MISSED"].includes(status)) {
+      throw new ValidationError("status must be DELIVERED, PARTIAL, or MISSED");
+    }
+    resolvedStatus = status;
+  }
+
+  await db
+    .update(LessonReport)
+    .set({
+      status: resolvedStatus,
+      attendance_count: attendance_count !== undefined ? Number(attendance_count) : null,
+      completion_rate: completion_rate !== undefined ? Number(completion_rate) : null,
+      reflection_notes: reflection_notes ?? null,
+      evidence_url: evidence_url ?? null,
+    })
+    .where(eq(LessonReport.lesson_report_id, id));
+
+  if (Array.isArray(support_request_category_ids)) {
+    await db.delete(LessonReportSupportRequest).where(eq(LessonReportSupportRequest.lesson_report_id, id));
+    if (support_request_category_ids.length > 0) {
+      await db.insert(LessonReportSupportRequest).values(
+        support_request_category_ids.map((categoryId: number) => ({
+          lesson_report_id: id,
+          category_id: Number(categoryId),
+        })),
+      );
+    }
+  }
+  if (Array.isArray(challenge_category_ids)) {
+    await db.delete(LessonReportChallengeTag).where(eq(LessonReportChallengeTag.lesson_report_id, id));
+    if (challenge_category_ids.length > 0) {
+      await db.insert(LessonReportChallengeTag).values(
+        challenge_category_ids.map((categoryId: number) => ({
+          lesson_report_id: id,
+          category_id: Number(categoryId),
+        })),
+      );
+    }
+  }
+
+  await recordActivity(
+    userId,
+    "LESSON_REPORT_UPDATE",
+    `Lesson report ${id} updated (status: ${resolvedStatus})`,
+    "LessonReport",
+    id,
+  );
+
+  return successResponse(res, "Lesson report updated", { lesson_report_id: id });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -513,4 +935,32 @@ export const getWeeklySummary = asyncHandler(async (req: any, res: any) => {
     })),
     project_details: projectDetails,
   });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /api/reports/lessons/rollup
+// Self-scoped version of admin's getAdminLessonReportsRollup — same Subject ->
+// Class Group -> Week grouping (buildLessonReportRollup), restricted to the
+// authenticated instructor's own reports so it needs no admin permission.
+// reported_by is hard-set from the session and never read from req.query, so
+// an instructor can never pull another teacher's data through this route.
+// ─────────────────────────────────────────────────────────────────────────────
+export const getMyLessonReportsRollup = asyncHandler(async (req: any, res: any) => {
+  const userId = req.user.userId as number;
+  const { start_date, end_date, academic_term_id, subject_id, class_group_id } = req.query;
+
+  if (!start_date || !end_date || !academic_term_id) {
+    throw new ValidationError("start_date, end_date, and academic_term_id are required");
+  }
+
+  const rollup = await buildLessonReportRollup({
+    start_date,
+    end_date,
+    academic_term_id: parseInt(academic_term_id as string),
+    subject_id: subject_id ? parseInt(subject_id as string) : undefined,
+    class_group_id: class_group_id ? parseInt(class_group_id as string) : undefined,
+    reported_by: userId,
+  });
+
+  return successResponse(res, "Lesson reports rollup retrieved", rollup);
 });

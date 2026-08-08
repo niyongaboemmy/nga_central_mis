@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "../../contexts/ToastContext";
+import { useAcademicPeriod } from "../../contexts/AcademicPeriodContext";
 import {
   folderApi,
   documentApi,
@@ -36,6 +37,7 @@ import type {
 
 const Documents: React.FC = () => {
   const { showToast } = useToast();
+  const { selectedYearId } = useAcademicPeriod();
 
   // State
   const [activeTab, setActiveTab] = useState<TabType>("my-documents");
@@ -211,7 +213,7 @@ const Documents: React.FC = () => {
   const fetchData = useCallback(async () => {
     const requestKey = `fetchData-${currentFolderId || "root"}-${
       currentSharedFolder ? "shared" : "owned"
-    }-${sortBy}-${sortOrder}`;
+    }-${sortBy}-${sortOrder}-${selectedYearId ?? "all"}`;
 
     setIsLoading(true);
     try {
@@ -219,9 +221,13 @@ const Documents: React.FC = () => {
         if (currentSharedFolder) {
           // We're in a shared folder, fetch its contents
           const [foldersRes, documentsRes] = await Promise.all([
-            folderApi.getAll(currentFolderId || undefined),
+            folderApi.getAll(
+              currentFolderId || undefined,
+              selectedYearId ?? undefined,
+            ),
             documentApi.getAll({
               folderId: currentFolderId || undefined,
+              academicYearId: selectedYearId ?? undefined,
               sortBy: sortBy,
               sortOrder: sortOrder,
             }),
@@ -242,9 +248,13 @@ const Documents: React.FC = () => {
         } else {
           // Regular owned folder navigation
           const [foldersRes, documentsRes] = await Promise.all([
-            folderApi.getAll(currentFolderId || undefined),
+            folderApi.getAll(
+              currentFolderId || undefined,
+              selectedYearId ?? undefined,
+            ),
             documentApi.getAll({
               folderId: currentFolderId || undefined,
+              academicYearId: selectedYearId ?? undefined,
               sortBy: sortBy,
               sortOrder: sortOrder,
             }),
@@ -277,13 +287,14 @@ const Documents: React.FC = () => {
     currentSharedFolder,
     sortBy,
     sortOrder,
+    selectedYearId,
     showToast,
     deduplicateRequest,
   ]);
 
   // Fetch shared documents
   const fetchSharedDocuments = useCallback(async () => {
-    const requestKey = "fetchSharedDocuments";
+    const requestKey = `fetchSharedDocuments-${selectedYearId ?? "all"}`;
 
     if (ongoingRequestsRef.current.has(requestKey)) {
       return ongoingRequestsRef.current.get(requestKey);
@@ -292,8 +303,8 @@ const Documents: React.FC = () => {
     setIsLoadingShared(true);
     try {
       const request = Promise.all([
-        documentApi.getSharedWithMe(),
-        folderPermissionApi.getSharedWithMe(),
+        documentApi.getSharedWithMe(selectedYearId ?? undefined),
+        folderPermissionApi.getSharedWithMe(selectedYearId ?? undefined),
       ]).then(([docsResponse, foldersResponse]) => {
         setSharedDocuments(docsResponse.data.data || []);
         setSharedFolders(foldersResponse.data.data || []);
@@ -309,11 +320,11 @@ const Documents: React.FC = () => {
       setIsLoadingShared(false);
       ongoingRequestsRef.current.delete(requestKey);
     }
-  }, [showToast]);
+  }, [showToast, selectedYearId]);
 
   // Fetch folder tree (for sidebar)
   const fetchFolderTree = useCallback(async () => {
-    const requestKey = "fetchFolderTree";
+    const requestKey = `fetchFolderTree-${selectedYearId ?? "all"}`;
 
     if (ongoingRequestsRef.current.has(requestKey)) {
       return ongoingRequestsRef.current.get(requestKey);
@@ -321,10 +332,12 @@ const Documents: React.FC = () => {
 
     setIsLoadingFolderTree(true);
     try {
-      const request = folderApi.getTree().then((response) => {
-        setFolderTree(response.data.data || []);
-        return response;
-      });
+      const request = folderApi
+        .getTree(selectedYearId ?? undefined)
+        .then((response) => {
+          setFolderTree(response.data.data || []);
+          return response;
+        });
 
       ongoingRequestsRef.current.set(requestKey, request);
 
@@ -335,7 +348,7 @@ const Documents: React.FC = () => {
       setIsLoadingFolderTree(false);
       ongoingRequestsRef.current.delete(requestKey);
     }
-  }, []);
+  }, [selectedYearId]);
 
   // Fetch roles for sharing
   const fetchRoles = async () => {
@@ -443,6 +456,21 @@ const Documents: React.FC = () => {
       setCurrentSharedFolder(null);
     }
   }, [activeTab]);
+
+  // Navigating into a folder before switching the global academic year would
+  // leave stale, year-mismatched contents on screen — jump back to root.
+  useEffect(() => {
+    setBreadcrumbs([
+      {
+        id: null,
+        name: activeTab === "my-documents" ? "My Documents" : "Shared with Me",
+      },
+    ]);
+    setCurrentFolderId(null);
+    setCurrentSharedFolder(null);
+    setSelectedItems([]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedYearId]);
 
   // Filter documents and shared documents based on search query
   const filterItems = useCallback(() => {
@@ -782,6 +810,8 @@ const Documents: React.FC = () => {
       formData.append("file", file);
       if (currentFolderId) {
         formData.append("folderId", currentFolderId.toString());
+      } else if (selectedYearId) {
+        formData.append("academicYearId", selectedYearId.toString());
       }
 
       const progressInterval = setInterval(() => {
@@ -835,6 +865,8 @@ const Documents: React.FC = () => {
       await folderApi.create({
         name: newFolderName,
         parentFolderId: currentFolderId || undefined,
+        academicYearId:
+          currentFolderId || !selectedYearId ? undefined : selectedYearId,
       });
       showToast("Folder created successfully", "success");
       setIsCreateFolderModalOpen(false);

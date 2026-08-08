@@ -12,6 +12,7 @@ import {
   TrendingDown,
   Minus,
   BarChart2,
+  Pencil,
 } from "lucide-react";
 import { LineChart, Line, Tooltip, ResponsiveContainer } from "recharts";
 import {
@@ -23,6 +24,7 @@ import {
 } from "../../api/mentorship";
 import { useToast } from "../../contexts/ToastContext";
 import MentoringSessionModal from "./MentoringSessionModal";
+import AIInsightsCard from "./AIInsightsCard";
 
 const WELLBEING_SCALE: Record<string, number> = {
   STRUGGLING: 1,
@@ -40,8 +42,11 @@ const WELLBEING_EMOJI: Record<string, string> = {
   EXCELLENT: "😄",
 };
 
+// Harmonized on amber for "open/pending" (matches the convention used
+// elsewhere in the reporting area, e.g. SubmittedReports.tsx), replacing the
+// one-off yellow this used to use for the OPEN status.
 const STATUS_STYLE: Record<SessionStatus, string> = {
-  OPEN: "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300",
+  OPEN: "bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300",
   IN_PROGRESS: "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300",
   RESOLVED: "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300",
 };
@@ -75,6 +80,7 @@ const StudentSupportProfile: React.FC<Props> = ({ student, onBack }) => {
   const [intelligence, setIntelligence] = useState<MenteeIntelligence | null>(null);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
+  const [editingSession, setEditingSession] = useState<MentorshipSessionRecord | null>(null);
   const [updatingId, setUpdatingId] = useState<number | null>(null);
 
   const hasFetched = useRef(false);
@@ -112,6 +118,7 @@ const StudentSupportProfile: React.FC<Props> = ({ student, onBack }) => {
           s.mentorship_id === sessionId ? { ...s, session_status: status } : s,
         ),
       );
+      showToast(`Follow-up status set to ${status.replace("_", " ")}`, "success");
     } catch {
       showToast("Failed to update status", "error");
     } finally {
@@ -194,7 +201,7 @@ const StudentSupportProfile: React.FC<Props> = ({ student, onBack }) => {
         {/* Left column: status cards */}
         <div className="md:col-span-1 space-y-4 overflow-y-auto">
           {/* Current Status card */}
-          <div className="bg-white dark:bg-gray-800 rounded-2xl p-5 border border-gray-100 dark:border-gray-700">
+          <div className="bg-white dark:bg-gray-800/30 rounded-2xl p-5 border border-gray-100 dark:border-gray-700/20">
             <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">
               Current Status
             </p>
@@ -234,9 +241,12 @@ const StudentSupportProfile: React.FC<Props> = ({ student, onBack }) => {
             </div>
           </div>
 
+          {/* AI Insights card */}
+          <AIInsightsCard studentId={student.user_id} />
+
           {/* Grade snapshot card */}
           {intelligence && intelligence.recent_scores.length > 0 && (
-            <div className="bg-white dark:bg-gray-800 rounded-2xl p-5 border border-gray-100 dark:border-gray-700">
+            <div className="bg-white dark:bg-gray-800/30 rounded-2xl p-5 border border-gray-100 dark:border-gray-700/20">
               <div className="flex items-center gap-2 mb-3">
                 <BarChart2 className="w-3.5 h-3.5 text-indigo-500" />
                 <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
@@ -267,7 +277,7 @@ const StudentSupportProfile: React.FC<Props> = ({ student, onBack }) => {
 
           {/* Wellbeing trend sparkline */}
           {chartData.length >= 2 && (
-            <div className="bg-white dark:bg-gray-800 rounded-2xl p-5 border border-gray-100 dark:border-gray-700">
+            <div className="bg-white dark:bg-gray-800/30 rounded-2xl p-5 border border-gray-100 dark:border-gray-700/20">
               <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">
                 Wellbeing Trend
               </p>
@@ -345,7 +355,7 @@ const StudentSupportProfile: React.FC<Props> = ({ student, onBack }) => {
                     </div>
 
                     <div
-                      className={`bg-white dark:bg-gray-800 rounded-2xl p-4 border shadow-sm ${
+                      className={`bg-white dark:bg-gray-800/30 rounded-2xl p-4 border shadow-sm ${
                         session.dishonesty_flagged
                           ? "border-red-300 dark:border-red-700"
                           : session.stress_flag
@@ -422,6 +432,15 @@ const StudentSupportProfile: React.FC<Props> = ({ student, onBack }) => {
                                 Resolved
                               </span>
                             )}
+                          <button
+                            type="button"
+                            onClick={() => setEditingSession(session)}
+                            title="Edit this session"
+                            className="flex items-center gap-1 text-xs px-2 py-0.5 text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-full transition-colors"
+                          >
+                            <Pencil className="w-3 h-3" />
+                            Edit
+                          </button>
                         </div>
                       </div>
 
@@ -521,12 +540,16 @@ const StudentSupportProfile: React.FC<Props> = ({ student, onBack }) => {
         </div>
       </div>
 
-      {showModal && (
+      {(showModal || editingSession) && (
         <MentoringSessionModal
           student={student}
           lastSession={sessions[0] ?? null}
           sessionHistory={sessions}
-          onClose={() => setShowModal(false)}
+          editSession={editingSession}
+          onClose={() => {
+            setShowModal(false);
+            setEditingSession(null);
+          }}
           onSubmitted={handleSessionSubmitted}
         />
       )}

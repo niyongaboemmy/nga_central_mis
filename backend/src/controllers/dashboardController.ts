@@ -192,47 +192,87 @@ export const getDashboardStats = asyncHandler(async (req: any, res: any) => {
 export const getTeacherDashboardStats = asyncHandler(
   async (req: any, res: any) => {
     const teacherId = req.user.userId;
+    const queryYearId = req.query.academic_year_id
+      ? parseInt(req.query.academic_year_id)
+      : undefined;
+    const queryTermId = req.query.academic_term_id
+      ? parseInt(req.query.academic_term_id)
+      : undefined;
 
-    // Get current academic term
-    const [currentTermResult] = await db
-      .select({
-        academic_term_id: AcademicTerm.academic_term_id,
-        name: AcademicTerm.name,
-      })
-      .from(AcademicTerm)
-      .where(eq(AcademicTerm.is_current, 1))
-      .limit(1);
+    // Resolve the academic term to display — the one the caller selected
+    // (via the top-nav year/term switcher), falling back to "current".
+    const [termResult] = queryTermId
+      ? await db
+          .select({
+            academic_term_id: AcademicTerm.academic_term_id,
+            name: AcademicTerm.name,
+          })
+          .from(AcademicTerm)
+          .where(eq(AcademicTerm.academic_term_id, queryTermId))
+          .limit(1)
+      : await db
+          .select({
+            academic_term_id: AcademicTerm.academic_term_id,
+            name: AcademicTerm.name,
+          })
+          .from(AcademicTerm)
+          .where(eq(AcademicTerm.is_current, 1))
+          .limit(1);
 
-    // Get assigned subjects count (all assignments, not filtered by term)
-    const assignedSubjectsResult = await db
-      .select()
-      .from(TeacherSubjectAssignment)
-      .where(eq(TeacherSubjectAssignment.user_id, teacherId));
-    const assignedSubjects = assignedSubjectsResult.length;
+    // Resolve the academic year to scope the counts to — falls back to
+    // "current" when the caller hasn't switched years yet.
+    let yearId = queryYearId;
+    if (!yearId) {
+      const [currentYearResult] = await db
+        .select({ academic_year_id: AcademicYear.academic_year_id })
+        .from(AcademicYear)
+        .where(eq(AcademicYear.is_current, 1))
+        .limit(1);
+      yearId = currentYearResult?.academic_year_id;
+    }
 
-    // Get unique class groups assigned to teacher
-    const assignedClassGroupsResult = await db
-      .select({ class_group_id: TeacherSubjectAssignment.class_group_id })
-      .from(TeacherSubjectAssignment)
-      .where(eq(TeacherSubjectAssignment.user_id, teacherId));
+    // Get assigned subjects for the teacher, scoped to the selected year
+    // (a teacher may be assigned different subjects/class groups per year).
+    const assignedSubjectsResult = yearId
+      ? await db
+          .select({
+            subject_id: TeacherSubjectAssignment.subject_id,
+            class_group_id: TeacherSubjectAssignment.class_group_id,
+          })
+          .from(TeacherSubjectAssignment)
+          .where(
+            and(
+              eq(TeacherSubjectAssignment.user_id, teacherId),
+              eq(TeacherSubjectAssignment.academic_year_id, yearId)
+            )
+          )
+      : [];
+    const assignedSubjects = new Set(
+      assignedSubjectsResult.map((r) => r.subject_id)
+    ).size;
+
+    // Get unique class groups assigned to teacher for the selected year
     const uniqueClassGroups = [
-      ...new Set(assignedClassGroupsResult.map((r) => r.class_group_id)),
+      ...new Set(assignedSubjectsResult.map((r) => r.class_group_id)),
     ];
     const assignedClassGroups = uniqueClassGroups.length;
 
-    // Get total students in teacher's assigned subjects
+    // Get total students in teacher's assigned subjects for the selected year
     let totalStudents = 0;
-    if (assignedSubjectsResult.length > 0) {
-      // Get all subject IDs assigned to this teacher
+    if (assignedSubjectsResult.length > 0 && yearId) {
       const subjectIds = [
         ...new Set(assignedSubjectsResult.map((r) => r.subject_id)),
       ];
 
-      // Count students enrolled in these subjects (all terms)
       const [studentsResult] = await db
         .select({ count: count(StudentSubjectEnrollment.user_id) })
         .from(StudentSubjectEnrollment)
-        .where(inArray(StudentSubjectEnrollment.subject_id, subjectIds));
+        .where(
+          and(
+            inArray(StudentSubjectEnrollment.subject_id, subjectIds),
+            eq(StudentSubjectEnrollment.academic_year_id, yearId)
+          )
+        );
       totalStudents = studentsResult?.count || 0;
     }
 
@@ -240,7 +280,7 @@ export const getTeacherDashboardStats = asyncHandler(
       assignedSubjects,
       totalStudents,
       assignedClassGroups,
-      currentAcademicTerm: currentTermResult?.name || null,
+      currentAcademicTerm: termResult?.name || null,
     };
 
     successResponse(
@@ -255,20 +295,38 @@ export const getTeacherDashboardStats = asyncHandler(
 export const getBasicDashboardStats = asyncHandler(
   async (req: any, res: any) => {
     const userId = req.user.userId;
+    const queryYearId = req.query.academic_year_id
+      ? parseInt(req.query.academic_year_id)
+      : undefined;
+    const queryTermId = req.query.academic_term_id
+      ? parseInt(req.query.academic_term_id)
+      : undefined;
 
-    // Get current academic year
-    const [currentYearResult] = await db
-      .select({ name: AcademicYear.name })
-      .from(AcademicYear)
-      .where(eq(AcademicYear.is_current, 1))
-      .limit(1);
+    // Get the selected academic year (falls back to "current")
+    const [currentYearResult] = queryYearId
+      ? await db
+          .select({ name: AcademicYear.name })
+          .from(AcademicYear)
+          .where(eq(AcademicYear.academic_year_id, queryYearId))
+          .limit(1)
+      : await db
+          .select({ name: AcademicYear.name })
+          .from(AcademicYear)
+          .where(eq(AcademicYear.is_current, 1))
+          .limit(1);
 
-    // Get current academic term
-    const [currentTermResult] = await db
-      .select({ name: AcademicTerm.name })
-      .from(AcademicTerm)
-      .where(eq(AcademicTerm.is_current, 1))
-      .limit(1);
+    // Get the selected academic term (falls back to "current")
+    const [currentTermResult] = queryTermId
+      ? await db
+          .select({ name: AcademicTerm.name })
+          .from(AcademicTerm)
+          .where(eq(AcademicTerm.academic_term_id, queryTermId))
+          .limit(1)
+      : await db
+          .select({ name: AcademicTerm.name })
+          .from(AcademicTerm)
+          .where(eq(AcademicTerm.is_current, 1))
+          .limit(1);
 
     // Get current user role
     const [userRoleResult] = await db

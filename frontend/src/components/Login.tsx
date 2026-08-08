@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
+import { GoogleLogin, CredentialResponse } from "@react-oauth/google";
 import { Alert, VerificationCode } from "./ui";
 import ThemeToggle from "./ui/ThemeToggle";
 import {
   login,
   verifyOTP,
+  googleLogin,
   authorizeSSO,
   checkSession,
   forgotPassword,
@@ -12,7 +14,6 @@ import {
   resetPassword,
 } from "../api/auth";
 import { useUser } from "../contexts/UserContext";
-import { useToast } from "../contexts/ToastContext";
 import { usePermissions } from "../hooks/usePermissions";
 import { useSearchParams } from "react-router-dom";
 import {
@@ -604,27 +605,6 @@ const FeatureCarousel = () => {
   );
 };
 
-const GoogleIcon = ({ className = "w-5 h-5" }: { className?: string }) => (
-  <svg className={className} viewBox="0 0 24 24">
-    <path
-      fill="#4285F4"
-      d="M23.49 12.27c0-.85-.08-1.67-.22-2.45H12v4.64h6.44a5.5 5.5 0 0 1-2.39 3.6v3h3.86c2.26-2.08 3.58-5.15 3.58-8.79Z"
-    />
-    <path
-      fill="#34A853"
-      d="M12 24c3.24 0 5.96-1.07 7.95-2.9l-3.86-3c-1.08.72-2.45 1.15-4.09 1.15-3.14 0-5.8-2.12-6.75-4.96H1.27v3.1A12 12 0 0 0 12 24Z"
-    />
-    <path
-      fill="#FBBC05"
-      d="M5.25 14.29a7.2 7.2 0 0 1 0-4.58v-3.1H1.27a12 12 0 0 0 0 10.78l3.98-3.1Z"
-    />
-    <path
-      fill="#EA4335"
-      d="M12 4.75c1.76 0 3.34.61 4.59 1.8l3.44-3.44C17.95 1.19 15.24 0 12 0A12 12 0 0 0 1.27 6.61l3.98 3.1C6.2 6.87 8.86 4.75 12 4.75Z"
-    />
-  </svg>
-);
-
 // Branded left panel — desktop split-screen; compact banner on mobile
 const LoginBrandPanel = () => {
   return (
@@ -729,12 +709,12 @@ const LoginBrandPanel = () => {
 
 const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
   const { refreshUser, user: currentUser } = useUser();
-  const { showToast } = useToast();
   const { getUserPermissions } = usePermissions();
   const [searchParams] = useSearchParams();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [otp, setOtp] = useState("");
+  const [devOtp, setDevOtp] = useState("");
   const [tempToken, setTempToken] = useState("");
   const [step, setStep] = useState<
     | "credentials"
@@ -756,6 +736,22 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
   const [initializing, setInitializing] = useState(true);
   const hasCheckedRef = useRef(false);
   const [showPassword, setShowPassword] = useState(false);
+  const googleButtonRef = useRef<HTMLDivElement>(null);
+  const [googleButtonWidth, setGoogleButtonWidth] = useState(320);
+
+  // Google's rendered button needs an explicit pixel width, so measure the
+  // wrapper to keep it visually full-width like the rest of the form.
+  useEffect(() => {
+    const updateGoogleButtonWidth = () => {
+      if (googleButtonRef.current) {
+        setGoogleButtonWidth(googleButtonRef.current.offsetWidth);
+      }
+    };
+    updateGoogleButtonWidth();
+    window.addEventListener("resize", updateGoogleButtonWidth);
+    return () =>
+      window.removeEventListener("resize", updateGoogleButtonWidth);
+  }, []);
 
   const handleCredentialsSubmit = async (e: any) => {
     e.preventDefault();
@@ -766,6 +762,7 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
       const response = await login({ username, password });
       if (response?.requiresOTP) {
         setTempToken(response.tempToken);
+        setDevOtp(response.devOtp || "");
         setStep("otp");
       }
     } catch (error: any) {
@@ -858,11 +855,76 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
     setAuthError("");
   };
 
-  const handleGoogleLogin = () => {
-    showToast(
-      "Google sign-in isn't connected yet — ask your admin to enable it.",
-      "info",
-    );
+  // Shared tail end of any successful login (password+OTP or Google): pick
+  // up the fresh session, then either hand off to an in-flight SSO redirect
+  // or finish on the success screen.
+  const completeSuccessfulLogin = async () => {
+    await refreshUser();
+
+    const clientId = searchParams.get("client_id");
+    const redirectUri = searchParams.get("redirect_uri");
+
+    if (clientId && redirectUri) {
+      try {
+        const responseType = searchParams.get("response_type") || "code";
+        const state = searchParams.get("state");
+        const ssoData = await authorizeSSO(
+          clientId,
+          redirectUri,
+          responseType,
+          state || undefined,
+        );
+        if (ssoData?.code) {
+          setStep("success");
+          setTimeout(() => {
+            // Redirect back to integrated system with auth code and state
+            const finalUrl = new URL(redirectUri);
+            finalUrl.searchParams.set("code", ssoData.code);
+            if (ssoData.state) {
+              finalUrl.searchParams.set("state", ssoData.state);
+            }
+            window.location.href = finalUrl.toString();
+          }, 500);
+          return;
+        }
+      } catch (ssoError) {
+        console.error("SSO Authorization failed:", ssoError);
+        // Fallback to normal login flow if SSO fails
+      }
+    }
+
+    setStep("success");
+    setTimeout(() => {
+      if (onLoginSuccess) {
+        onLoginSuccess();
+      }
+    }, 800);
+  };
+
+  const handleGoogleSuccess = async (
+    credentialResponse: CredentialResponse,
+  ) => {
+    if (!credentialResponse.credential) {
+      setAuthError("Google sign-in did not return a credential.");
+      return;
+    }
+    setLoading(true);
+    setAuthError("");
+    try {
+      await googleLogin(credentialResponse.credential);
+      await completeSuccessfulLogin();
+    } catch (error: any) {
+      setAuthError(
+        error.response?.data?.message ||
+          "Google sign-in failed. Please try again.",
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleError = () => {
+    setAuthError("Google sign-in was cancelled or failed. Please try again.");
   };
 
   const handleOTPSubmit = async (e: any) => {
@@ -873,47 +935,7 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
 
     try {
       await verifyOTP(otp, tempToken);
-      await refreshUser();
-
-      // Check for SSO parameters
-      const clientId = searchParams.get("client_id");
-      const redirectUri = searchParams.get("redirect_uri");
-
-      if (clientId && redirectUri) {
-        try {
-          const responseType = searchParams.get("response_type") || "code";
-          const state = searchParams.get("state");
-          const ssoData = await authorizeSSO(
-            clientId,
-            redirectUri,
-            responseType,
-            state || undefined,
-          );
-          if (ssoData?.code) {
-            setStep("success");
-            setTimeout(() => {
-              // Redirect back to integrated system with auth code and state
-              const finalUrl = new URL(redirectUri);
-              finalUrl.searchParams.set("code", ssoData.code);
-              if (ssoData.state) {
-                finalUrl.searchParams.set("state", ssoData.state);
-              }
-              window.location.href = finalUrl.toString();
-            }, 500);
-            return;
-          }
-        } catch (ssoError) {
-          console.error("SSO Authorization failed:", ssoError);
-          // Fallback to normal login flow if SSO fails
-        }
-      }
-
-      setStep("success");
-      setTimeout(() => {
-        if (onLoginSuccess) {
-          onLoginSuccess();
-        }
-      }, 800);
+      await completeSuccessfulLogin();
     } catch (error: any) {
       setAuthError(
         error.response?.data?.message || "Invalid OTP code. Please try again.",
@@ -1362,6 +1384,7 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                     >
                       <VerificationCode
                         length={6}
+                        value={devOtp}
                         onChange={setOtp}
                         onComplete={(code) => {
                           setOtp(code);
@@ -1424,6 +1447,7 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                         setStep("credentials");
                         setAuthError("");
                         setOtp("");
+                        setDevOtp("");
                       }}
                       className="w-full text-sm text-gray-600 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 font-medium transition-colors duration-200 flex items-center justify-center gap-2 py-2 px-4 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800"
                       initial={{ opacity: 0 }}
@@ -2050,16 +2074,20 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                     transition={{ delay: 0.15 }}
                     className="mb-5"
                   >
-                    <motion.button
-                      type="button"
-                      onClick={handleGoogleLogin}
-                      whileHover={{ scale: 1.01 }}
-                      whileTap={{ scale: 0.98 }}
-                      className="w-full flex items-center justify-center gap-3 py-2.5 px-6 text-sm rounded-xl border-2 border-gray-200 dark:border-slate-700 text-gray-700 dark:text-gray-200 font-medium hover:bg-gray-50 hover:border-gray-300 dark:hover:bg-slate-700/40 dark:hover:border-slate-600 hover:shadow-sm transition-all"
+                    <div
+                      ref={googleButtonRef}
+                      className="w-full flex justify-center [&>div]:w-full"
                     >
-                      <GoogleIcon />
-                      Continue with Google
-                    </motion.button>
+                      <GoogleLogin
+                        onSuccess={handleGoogleSuccess}
+                        onError={handleGoogleError}
+                        theme="outline"
+                        size="large"
+                        shape="pill"
+                        text="continue_with"
+                        width={googleButtonWidth}
+                      />
+                    </div>
                     <div className="flex items-center gap-3 mt-5">
                       <div className="flex-1 h-px bg-gray-200 dark:bg-slate-700" />
                       <span className="text-xs text-gray-400 dark:text-gray-500">

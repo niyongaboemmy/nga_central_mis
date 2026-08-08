@@ -16,7 +16,7 @@ const AdminMissingReports: React.FC<AdminMissingReportsProps> = ({
         {[...Array(5)].map((_, i) => (
           <div
             key={i}
-            className="bg-white dark:bg-gray-900/40 rounded-2xl border border-gray-100 dark:border-gray-800/50 p-6 h-24"
+            className="bg-white dark:bg-gray-800/40 rounded-2xl border border-gray-100 dark:border-gray-700/50 p-6 h-24"
           ></div>
         ))}
       </div>
@@ -25,7 +25,7 @@ const AdminMissingReports: React.FC<AdminMissingReportsProps> = ({
 
   if (!missing || missing.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[400px] bg-white dark:bg-gray-900/40 rounded-3xl border border-dashed border-gray-200 dark:border-gray-800 p-8 text-center animate-in fade-in zoom-in duration-500">
+      <div className="flex flex-col items-center justify-center min-h-[400px] bg-white dark:bg-gray-800/40 rounded-3xl border border-dashed border-gray-200 dark:border-gray-700/20 p-8 text-center animate-in fade-in zoom-in duration-500">
         <div className="w-16 h-16 bg-emerald-50 dark:bg-emerald-900/20 rounded-full flex items-center justify-center mb-4">
           <UserX className="w-8 h-8 text-emerald-500" />
         </div>
@@ -45,7 +45,7 @@ const AdminMissingReports: React.FC<AdminMissingReportsProps> = ({
       {missing.map((instructor, idx) => (
         <div
           key={instructor.user_id || idx}
-          className="bg-white dark:bg-gray-900/40 rounded-2xl border border-gray-100 dark:border-gray-800/50 p-5 transition-all group"
+          className="bg-white dark:bg-gray-800/40 rounded-2xl border border-gray-100 dark:border-gray-700/50 p-5 transition-all group"
         >
           <div className="flex items-start justify-between">
             <div className="flex items-center gap-3">
@@ -73,11 +73,11 @@ const AdminMissingReports: React.FC<AdminMissingReportsProps> = ({
           </div>
 
           {/* <div className="mt-6 flex items-center gap-2">
-            <button className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all active:scale-95 shadow-lg shadow-blue-500/20">
+            <button className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-full text-xs font-bold transition-all active:scale-95 shadow-lg shadow-blue-500/20">
               <Bell className="w-3.5 h-3.5" />
               Send Reminder
             </button>
-            <button className="p-2.5 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400 rounded-xl transition-all border border-gray-100 dark:border-gray-700 group-hover:border-blue-200">
+            <button className="p-2.5 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400 rounded-full transition-all border border-gray-100 dark:border-gray-700 group-hover:border-blue-200">
               <Mail className="w-4 h-4" />
             </button>
           </div> */}

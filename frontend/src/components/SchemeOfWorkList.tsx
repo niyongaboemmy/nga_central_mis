@@ -1,6 +1,12 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { MyAssignedSubject, myAssignedSubjectsApi } from "../api/academics";
+import {
+  MyAssignedSubject,
+  myAssignedSubjectsApi,
+  academicTermsApi,
+} from "../api/academics";
+import { useToast } from "../contexts/ToastContext";
+import { useAcademicPeriod } from "../contexts/AcademicPeriodContext";
 import {
   BookOpen,
   Calendar,
@@ -8,15 +14,18 @@ import {
   Search,
   FileText,
   TrendingUp,
-  GraduationCap,
   Info,
   AlertCircle,
   MessageSquare,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import SubjectItemCard from "./subjects/SubjectItemCard";
 
 const SchemeOfWorkList: React.FC = () => {
   const navigate = useNavigate();
+  const { showToast } = useToast();
+  const { selectedYearId, selectedTermId, selectedYear, selectedTerm } =
+    useAcademicPeriod();
   const [subjects, setSubjects] = useState<MyAssignedSubject[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -25,14 +34,18 @@ const SchemeOfWorkList: React.FC = () => {
     comment: string | null;
     subjectName: string;
   } | null>(null);
+  const [navigatingKey, setNavigatingKey] = useState<string | null>(null);
 
   useEffect(() => {
     loadAssignedSubjects();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedTermId]);
 
   const loadAssignedSubjects = async () => {
     try {
-      const response = await myAssignedSubjectsApi.getAll();
+      const response = await myAssignedSubjectsApi.getAll(
+        selectedTermId ?? undefined,
+      );
       setSubjects(response.data.data || []);
     } catch (error) {
       console.error("Failed to load assigned subjects:", error);
@@ -41,20 +54,61 @@ const SchemeOfWorkList: React.FC = () => {
     }
   };
 
-  const filteredSubjects = subjects.filter(
+  // Only show assignments for the globally selected academic year
+  const yearFilteredSubjects = subjects
+    .map((subject) => ({
+      ...subject,
+      grades: selectedYearId
+        ? subject.grades.filter((g) => g.academic_year_id === selectedYearId)
+        : subject.grades,
+    }))
+    .filter((subject) => subject.grades.length > 0);
+
+  const filteredSubjects = yearFilteredSubjects.filter(
     (subject) =>
       subject.subject_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       subject.subject_code?.toLowerCase().includes(searchQuery.toLowerCase()),
   );
 
-  const handleSelectSubject = (
+  const handleSelectSubject = async (
     subjectId: number,
     classGroupId: number,
-    termId: number,
+    academicYearId: number,
   ) => {
-    navigate(
-      `/scheme-of-work/calendar?subject_id=${subjectId}&class_group_id=${classGroupId}&academic_term_id=${termId}`,
-    );
+    const key = `${subjectId}-${classGroupId}`;
+    setNavigatingKey(key);
+    try {
+      let termId: number | undefined;
+
+      // Prefer the globally selected term when it belongs to this assignment's year
+      if (selectedYearId === academicYearId && selectedTermId) {
+        termId = selectedTermId;
+      } else {
+        const resp = await academicTermsApi.getAll(academicYearId);
+        const raw = resp.data as any;
+        const terms = Array.isArray(raw) ? raw : raw?.data || [];
+        const currentTerm =
+          terms.find((t: any) => t.is_current === 1) || terms[0];
+        termId = currentTerm?.academic_term_id;
+      }
+
+      if (!termId) {
+        showToast(
+          "No academic term is configured for this academic year yet.",
+          "error",
+        );
+        return;
+      }
+
+      navigate(
+        `/scheme-of-work/calendar?subject_id=${subjectId}&class_group_id=${classGroupId}&academic_term_id=${termId}`,
+      );
+    } catch (error) {
+      console.error("Failed to resolve academic term:", error);
+      showToast("Could not load the academic term for this subject.", "error");
+    } finally {
+      setNavigatingKey(null);
+    }
   };
 
   const containerVariants = {
@@ -106,9 +160,18 @@ const SchemeOfWorkList: React.FC = () => {
         className="flex flex-col md:flex-row md:items-end justify-between gap-6"
       >
         <div className="space-y-2">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-xs font-bold uppercase tracking-wider mb-2">
-            <TrendingUp className="w-3 h-3" />
-            Curriculum Management
+          <div className="flex flex-wrap items-center gap-2 mb-2">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-xs font-bold uppercase tracking-wider">
+              <TrendingUp className="w-3 h-3" />
+              Curriculum Management
+            </div>
+            {(selectedYear || selectedTerm) && (
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 text-xs font-bold uppercase tracking-wider">
+                <Calendar className="w-3 h-3" />
+                {selectedYear?.name}
+                {selectedTerm ? ` · ${selectedTerm.name}` : ""}
+              </div>
+            )}
           </div>
           <h1 className="text-2xl font-extrabold text-gray-900 dark:text-white tracking-tight flex items-center gap-3">
             <div className="p-2 bg-blue-600 rounded-xl">
@@ -161,114 +224,85 @@ const SchemeOfWorkList: React.FC = () => {
             variants={containerVariants}
             initial="hidden"
             animate="visible"
-            className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-2 gap-4"
+            className="space-y-3"
           >
-            {filteredSubjects.map((subject) => (
-              <motion.div
-                key={subject.subject_id}
-                variants={itemVariants}
-                className="group relative"
-              >
-                {/* Subject Header (Card-like Top) */}
-                <div className="bg-white dark:bg-gray-950 p-6 rounded-3xl border border-gray-100 dark:border-gray-700/50 group-hover:border-blue-500/30 transition-all duration-500">
-                  <div className="flex justify-between items-start mb-6">
-                    <div className="space-y-1">
-                      <div className="text-xs font-bold text-blue-600 dark:text-blue-400 uppercase tracking-widest">
-                        {subject.subject_code || "GEN-SC"}
-                      </div>
-                      <h2 className="text-base text-gray-900 dark:text-white font-bold">
-                        {subject.subject_name}
-                      </h2>
+            {filteredSubjects.map((subject) => {
+              // A subject with exactly one class assignment (the common case) is
+              // navigable by clicking anywhere on its row, not just its grade chip.
+              const singleGrade =
+                subject.grades.length === 1 ? subject.grades[0] : null;
+              const keyFor = (classGroupId: number) =>
+                `${subject.subject_id}-${classGroupId}`;
+
+              return (
+                <SubjectItemCard
+                  key={subject.subject_id}
+                  subjectName={subject.subject_name}
+                  subjectCode={subject.subject_code}
+                  animationVariants={itemVariants}
+                  isCardNavigating={
+                    !!singleGrade &&
+                    navigatingKey === keyFor(singleGrade.class_group_id)
+                  }
+                  onCardClick={
+                    singleGrade
+                      ? () =>
+                          handleSelectSubject(
+                            subject.subject_id,
+                            singleGrade.class_group_id,
+                            singleGrade.academic_year_id,
+                          )
+                      : undefined
+                  }
+                  rightMeta={
+                    <div className="flex items-center gap-1 text-xs text-gray-400 dark:text-gray-500">
+                      <Calendar className="w-3.5 h-3.5" />
+                      {subject.grades[0]?.academic_year_name}
                     </div>
-                    <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-2xl group-hover:bg-blue-600 transition-colors">
-                      <BookOpen className="w-4 h-4 text-blue-600 dark:text-blue-400 group-hover:text-white" />
-                    </div>
-                  </div>
-
-                  <div className="space-y-3">
-                    {subject.grades.map((grade, idx) => {
-                      const isApproved = grade.validation_status === "APPROVED";
-                      const isRejected = grade.validation_status === "REJECTED";
-
-                      return (
-                        <div key={idx} className="space-y-2">
-                          <button
-                            onClick={() =>
-                              handleSelectSubject(
-                                subject.subject_id,
-                                grade.class_group_id,
-                                grade.academic_year_id,
-                              )
-                            }
-                            className="w-full bg-gray-50 dark:bg-gray-900/50 p-4 rounded-2xl border border-transparent hover:border-blue-500/30 hover:bg-blue-50/50 dark:hover:bg-blue-900/10 transition-all text-left flex items-center justify-between group/btn"
-                          >
-                            <div className="flex items-center gap-4">
-                              <div className="w-10 h-10 rounded-xl bg-white dark:bg-gray-800 flex items-center justify-center border border-gray-100 dark:border-gray-700 shadow-sm group-hover/btn:scale-110 transition-transform">
-                                <GraduationCap className="w-5 h-5 text-gray-400 group-hover/btn:text-blue-500" />
-                              </div>
-                              <div>
-                                <div className="font-bold text-gray-900 dark:text-white text-base flex flex-wrap items-center gap-2">
-                                  {grade.grade_name}
-                                  <span className="mx-2 text-gray-300 dark:text-gray-700 font-light">
-                                    |
-                                  </span>
-                                  <span className="text-sm font-medium text-gray-500">
-                                    {grade.class_group_name}
-                                  </span>
-                                  {grade.validation_status !== "PENDING" && (
-                                    <span
-                                      className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md uppercase tracking-tighter border ${
-                                        isApproved
-                                          ? "bg-emerald-50 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400 border-emerald-100 dark:border-emerald-800"
-                                          : "bg-rose-50 dark:bg-rose-900/40 text-rose-600 dark:text-rose-400 border-rose-100 dark:border-rose-800"
-                                      }`}
-                                    >
-                                      {grade.validation_status}
-                                    </span>
-                                  )}
-                                </div>
-                                <div className="text-[11px] text-gray-400 dark:text-gray-500 flex items-center gap-1 mt-1 font-semibold uppercase tracking-tighter">
-                                  <Calendar className="w-3 h-3" />
-                                  {grade.academic_year_name}
-                                </div>
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              {grade.validation_status !== "PENDING" && (
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setSelectedValidation({
-                                      status: grade.validation_status,
-                                      comment: grade.validation_comment,
-                                      subjectName: subject.subject_name,
-                                    });
-                                  }}
-                                  className="p-1.5 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-500 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-                                  title="View Status Details"
-                                >
-                                  <Info className="w-4 h-4" />
-                                </button>
-                              )}
-                              <div className="p-1 rounded-full bg-transparent group-hover/btn:bg-blue-100 dark:group-hover/btn:bg-blue-900/30 transition-colors">
-                                <ChevronRight className="w-5 h-5 text-gray-300 group-hover/btn:text-blue-600" />
-                              </div>
-                            </div>
-                          </button>
-
-                          {isRejected && (
-                            <div className="mx-2 p-3 bg-rose-50/50 dark:bg-rose-900/10 border border-rose-100 dark:border-rose-800/50 rounded-xl flex items-center gap-2 text-rose-600 dark:text-rose-400 text-xs font-medium animate-pulse">
-                              <AlertCircle className="w-4 h-4 flex-shrink-0" />A
-                              scheme of work of that subject has rejected.
-                            </div>
-                          )}
+                  }
+                  grades={subject.grades.map((grade) => ({
+                    key: keyFor(grade.class_group_id),
+                    grade_name: grade.grade_name,
+                    class_group_name: grade.class_group_name,
+                    isNavigating: navigatingKey === keyFor(grade.class_group_id),
+                    onClick: singleGrade
+                      ? undefined
+                      : () =>
+                          handleSelectSubject(
+                            subject.subject_id,
+                            grade.class_group_id,
+                            grade.academic_year_id,
+                          ),
+                    badge:
+                      grade.validation_status !== "PENDING"
+                        ? {
+                            label: grade.validation_status,
+                            tone:
+                              grade.validation_status === "APPROVED"
+                                ? "success"
+                                : "danger",
+                          }
+                        : null,
+                    onInfoClick:
+                      grade.validation_status !== "PENDING"
+                        ? () =>
+                            setSelectedValidation({
+                              status: grade.validation_status,
+                              comment: grade.validation_comment,
+                              subjectName: subject.subject_name,
+                            })
+                        : undefined,
+                    belowContent:
+                      grade.validation_status === "REJECTED" ? (
+                        <div className="mx-1 p-2.5 bg-rose-50/50 dark:bg-rose-900/10 border border-rose-100 dark:border-rose-800/50 rounded-xl flex items-center gap-2 text-rose-600 dark:text-rose-400 text-xs font-medium">
+                          <AlertCircle className="w-4 h-4 flex-shrink-0" />A
+                          scheme of work of that subject has rejected.
                         </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              </motion.div>
-            ))}
+                      ) : undefined,
+                  }))}
+                />
+              );
+            })}
           </motion.div>
         )}
       </AnimatePresence>

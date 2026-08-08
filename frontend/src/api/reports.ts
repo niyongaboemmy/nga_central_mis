@@ -61,20 +61,104 @@ export interface ReportableLesson {
   learning_outcomes: LearningOutcomeSummary[];
   lesson_id: number | null;
   entry_id: number | null;
+  subject_id?: number | null;
+  class_group_id?: number | null;
+  is_ad_hoc?: boolean;
   reporting_status: "REPORTED" | "PENDING" | "UPCOMING";
   lesson_report: LessonReportSummary | null;
 }
+
+export interface LessonReportDetail {
+  lesson_report_id: number;
+  lesson_id: number | null;
+  entry_id: number | null;
+  subject_id: number | null;
+  class_group_id: number | null;
+  delivery_date: string;
+  status: "DELIVERED" | "PARTIAL" | "MISSED" | "UNPLANNED";
+  attendance_count: number | null;
+  completion_rate: number | null;
+  reflection_notes: string | null;
+  evidence_url: string | null;
+  schedule_flag: "ON_TIME" | "AHEAD" | "BEHIND";
+  is_ad_hoc: boolean;
+  support_request_category_ids: number[];
+  challenge_category_ids: number[];
+}
+
+export interface UpdateLessonReportPayload {
+  status?: "DELIVERED" | "PARTIAL" | "MISSED";
+  attendance_count?: number;
+  completion_rate?: number;
+  reflection_notes?: string;
+  evidence_url?: string;
+  support_request_category_ids?: number[];
+  challenge_category_ids?: number[];
+}
+
+// A synthetic "occurrence" used to open LessonReportModal in ad-hoc mode for
+// a day with no scheduled lesson — same shape as ReportableLesson so the
+// modal doesn't need a second, parallel prop type, but every scheme-derived
+// field is null and lesson_id/entry_id stay null on submit.
+export const buildAdHocOccurrence = (date: string): ReportableLesson => ({
+  slot_id: -1,
+  date,
+  start_time: null,
+  end_time: null,
+  subject_name: null,
+  subject_code: null,
+  subject_color: null,
+  module_code: null,
+  module_name: null,
+  big_question: null,
+  topic: null,
+  sub_topic: null,
+  objective: null,
+  learning_outcomes: [],
+  lesson_id: null,
+  entry_id: null,
+  reporting_status: "PENDING",
+  lesson_report: null,
+});
 
 export interface SubmitLessonReportPayload {
   lesson_id?: number | null;
   entry_id?: number | null;
   delivery_date: string;
-  status: "DELIVERED" | "PARTIAL" | "MISSED";
+  status?: "DELIVERED" | "PARTIAL" | "MISSED";
   attendance_count?: number;
   completion_rate?: number;
   reflection_notes?: string;
   evidence_url?: string;
   academic_term_id?: number;
+  // Ad-hoc/unscheduled reporting (Phase 2) — required together when
+  // lesson_id/entry_id are omitted; ignored (and status forced to
+  // UNPLANNED) by the backend otherwise.
+  subject_id?: number;
+  class_group_id?: number;
+  // True when this occurrence is a real scheduled CalendarSlot that simply
+  // has no LO_Lesson plan entry yet for this date (so lesson_id/entry_id
+  // are both omitted, same as a true ad-hoc submission) — distinguishes it
+  // from an actual unscheduled-activity report so the backend knows to
+  // honor `status` instead of forcing UNPLANNED. Never set by the ad-hoc
+  // picker flow.
+  is_scheduled_slot?: boolean;
+  // Categorized Support Needed / Challenges (Phase 4) — additive alongside
+  // reflection_notes, not a replacement for it.
+  support_request_category_ids?: number[];
+  challenge_category_ids?: number[];
+}
+
+export interface ReportCategory {
+  category_id: number;
+  label: string;
+  is_active: number;
+}
+
+export interface CategorySummaryItem {
+  category_id: number;
+  label: string;
+  total: number;
 }
 
 export interface WeeklySummary {
@@ -111,13 +195,17 @@ export interface InstructorCompliance {
   compliance_pct:   number;
 }
 
+export type ValidationStatus = "PENDING" | "APPROVED" | "REJECTED";
+
 export interface AdminLessonReport {
   lesson_report_id: number;
   reported_by:      number;
   instructor_name:  string;
   delivery_date:    string;
-  status:           "DELIVERED" | "PARTIAL" | "MISSED";
+  status:           "DELIVERED" | "PARTIAL" | "MISSED" | "UNPLANNED";
   schedule_flag:    "ON_TIME" | "AHEAD" | "BEHIND";
+  validation_status:  ValidationStatus;
+  validation_comment: string | null;
   attendance_count: number | null;
   completion_rate:  number | null;
   reflection_notes: string | null;
@@ -129,6 +217,45 @@ export interface AdminLessonReport {
   objective:        string | null;
   subject_id:       number | null;
   subject_name:     string | null;
+  class_group_id:   number | null;
+  class_group_name: string | null;
+}
+
+// ─── Subject × Class Group × Week rollup (Phase 3) ───────────────────────────
+
+export interface LessonRollupEntry {
+  lesson_report_id: number;
+  delivery_date:    string;
+  status:           "DELIVERED" | "PARTIAL" | "MISSED" | "UNPLANNED";
+  schedule_flag:    "ON_TIME" | "AHEAD" | "BEHIND";
+  attendance_count: number | null;
+  completion_rate:  number | null;
+  reflection_notes: string | null;
+  instructor_name:  string;
+  topic:            string | null;
+}
+
+export interface LessonRollupWeek {
+  week_number: number;
+  entries: LessonRollupEntry[];
+}
+
+export interface LessonRollupClassGroup {
+  class_group_id: number;
+  class_group_name: string;
+  weeks: LessonRollupWeek[];
+}
+
+export interface LessonRollupSubject {
+  subject_id: number;
+  subject_name: string;
+  subject_code: string | null;
+  class_groups: LessonRollupClassGroup[];
+}
+
+export interface LessonReportsRollup {
+  period: { start_date: string; end_date: string; academic_term_id: number };
+  subjects: LessonRollupSubject[];
 }
 
 export interface SubjectCoverageItem {
@@ -152,6 +279,8 @@ export interface AdminMentorshipLog {
   duration_minutes: number | null;
   wellbeing_status: string | null;
   session_status:   string | null;
+  validation_status:  ValidationStatus;
+  validation_comment: string | null;
   notes:            string | null;
   action_items:     string | null;
   follow_up_required: number;
@@ -199,6 +328,11 @@ export interface AdminProjectUpdate {
 export type ExportCategory = "lessons" | "mentorship" | "projects" | "unified";
 export type ExportFormat   = "csv" | "html";
 
+export interface UpdateApprovalPayload {
+  validation_status: ValidationStatus;
+  validation_comment?: string;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const reportsApi = {
@@ -243,6 +377,15 @@ export const reportsApi = {
       data,
     ),
 
+  getLessonReportById: (id: number) =>
+    api.get<{ success: boolean; data: LessonReportDetail }>(`/reports/lessons/${id}`),
+
+  updateLessonReport: (id: number, data: UpdateLessonReportPayload) =>
+    api.put<{ success: boolean; data: { lesson_report_id: number } }>(
+      `/reports/lessons/${id}`,
+      data,
+    ),
+
   getWeeklySummary: (params: {
     week_number: number;
     academic_term_id: number;
@@ -251,6 +394,21 @@ export const reportsApi = {
     { params },
   ),
 
+  // Self-scoped Subject x Class Group x Week rollup for the "Download Report"
+  // button on the instructor's own Dashboard tab (reuses the admin rollup's
+  // shape/grouping, restricted server-side to the authenticated instructor).
+  getMyLessonReportsRollup: (params: {
+    start_date: string;
+    end_date: string;
+    academic_term_id: number;
+    subject_id?: number;
+    class_group_id?: number;
+  }) =>
+    api.get<{ success: boolean; data: LessonReportsRollup }>(
+      "/reports/lessons/rollup",
+      { params },
+    ),
+
   // ─── Admin aggregated analytics ────────────────────────────────────────────
 
   getAdminDashboardStats: (params?: {
@@ -258,6 +416,8 @@ export const reportsApi = {
     end_date?: string;
     academic_term_id?: number;
     instructor_id?: number;
+    subject_id?: number;
+    class_group_id?: number;
   }) =>
     api.get<{ success: boolean; data: AdminDashboardStats }>(
       "/reports/admin/dashboard",
@@ -268,6 +428,8 @@ export const reportsApi = {
     start_date: string;
     end_date: string;
     academic_term_id?: number;
+    subject_id?: number;
+    class_group_id?: number;
   }) =>
     api.get<{ success: boolean; data: InstructorCompliance[] }>(
       "/reports/admin/compliance",
@@ -281,9 +443,24 @@ export const reportsApi = {
     schedule_flag?: string;
     status?: string;
     subject_id?: number;
+    class_group_id?: number;
+    program_id?: number;
+    grade_id?: number;
   }) =>
     api.get<{ success: boolean; data: AdminLessonReport[] }>(
       "/reports/admin/lesson-reports",
+      { params },
+    ),
+
+  getLessonReportsRollup: (params: {
+    start_date: string;
+    end_date: string;
+    academic_term_id: number;
+    subject_id?: number;
+    class_group_id?: number;
+  }) =>
+    api.get<{ success: boolean; data: LessonReportsRollup }>(
+      "/reports/admin/lesson-reports/rollup",
       { params },
     ),
 
@@ -291,9 +468,41 @@ export const reportsApi = {
     academic_term_id?: number;
     start_date?: string;
     end_date?: string;
+    subject_id?: number;
+    class_group_id?: number;
   }) =>
     api.get<{ success: boolean; data: SubjectCoverageItem[] }>(
       "/reports/admin/coverage",
+      { params },
+    ),
+
+  // ─── Support Needed / Challenges categorization (Phase 4) ─────────────────
+
+  getSupportRequestCategories: () =>
+    api.get<{ success: boolean; data: ReportCategory[] }>("/reports/categories/support-request"),
+
+  getChallengeCategories: () =>
+    api.get<{ success: boolean; data: ReportCategory[] }>("/reports/categories/challenge"),
+
+  getSupportRequestSummary: (params?: {
+    start_date?: string;
+    end_date?: string;
+    subject_id?: number;
+    class_group_id?: number;
+  }) =>
+    api.get<{ success: boolean; data: CategorySummaryItem[] }>(
+      "/reports/admin/support-requests/summary",
+      { params },
+    ),
+
+  getChallengeSummary: (params?: {
+    start_date?: string;
+    end_date?: string;
+    subject_id?: number;
+    class_group_id?: number;
+  }) =>
+    api.get<{ success: boolean; data: CategorySummaryItem[] }>(
+      "/reports/admin/challenges/summary",
       { params },
     ),
 
@@ -301,6 +510,10 @@ export const reportsApi = {
     start_date?: string;
     end_date?: string;
     instructor_id?: number;
+    subject_id?: number;
+    class_group_id?: number;
+    program_id?: number;
+    grade_id?: number;
   }) =>
     api.get<{ success: boolean; data: AdminMentorshipLog[] }>(
       "/reports/admin/mentorship-logs",
@@ -318,19 +531,33 @@ export const reportsApi = {
       `/reports/admin/student-timeline/${studentId}`,
     ),
 
-  /** Returns the base URL string for export — use with <a href> or window.open */
-  getExportUrl: (params: {
+  adminUpdateLessonReportApproval: (id: number, data: UpdateApprovalPayload) =>
+    api.patch<{ success: boolean; data: { lesson_report_id: number; validation_status: ValidationStatus } }>(
+      `/reports/admin/lesson-reports/${id}/approval`,
+      data,
+    ),
+
+  adminUpdateMentorshipSessionApproval: (id: number, data: UpdateApprovalPayload) =>
+    api.patch<{ success: boolean; data: { mentorship_id: number; validation_status: ValidationStatus } }>(
+      `/reports/admin/mentorship-logs/${id}/approval`,
+      data,
+    ),
+
+  /**
+   * Fetches the export file as a blob through the authenticated axios
+   * instance — plain <a href>/window.open navigation can't attach the
+   * Bearer token (it lives in localStorage, not a cookie), so the backend
+   * would reject it with 401/"Access denied".
+   */
+  exportBlob: (params: {
     category: ExportCategory;
     format?: ExportFormat;
     start_date?: string;
     end_date?: string;
     instructor_id?: number;
-  }): string => {
-    const qs = new URLSearchParams(
-      Object.entries(params)
-        .filter(([, v]) => v !== undefined && v !== "")
-        .map(([k, v]) => [k, String(v)]),
-    ).toString();
-    return `/api/reports/admin/export${qs ? `?${qs}` : ""}`;
-  },
+  }) =>
+    api.get<Blob>("/reports/admin/export", {
+      params,
+      responseType: "blob",
+    }),
 };

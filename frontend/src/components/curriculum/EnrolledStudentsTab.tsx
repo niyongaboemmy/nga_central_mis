@@ -16,16 +16,16 @@ import {
   GraduationCap,
 } from "lucide-react";
 import {
-  AcademicYear,
   EnrolledStudent,
-  academicYearsApi,
   myAssignedSubjectsApi,
   studentEnrollmentApi,
 } from "../../api/academics";
 import { userApi } from "../../api/documents";
 import { usePermissions } from "../../hooks/usePermissions";
 import { useToast } from "../../contexts/ToastContext";
+import { useAcademicPeriod } from "../../contexts/AcademicPeriodContext";
 import { Permissions } from "../../constants/permissions";
+import StudentDetailsModal from "./StudentDetailsModal";
 
 interface SearchUser {
   user_id: number;
@@ -48,10 +48,11 @@ const EnrolledStudentsTab: React.FC<Props> = ({ subjectId, subjectName }) => {
   const { showToast } = useToast();
   const canManage = hasPermission(Permissions.MANAGE_STUDENT_ENROLLMENTS);
 
-  // Academic year
-  const [years, setYears] = useState<AcademicYear[]>([]);
-  const [selectedYearId, setSelectedYearId] = useState<number | null>(null);
-  const [yearsLoading, setYearsLoading] = useState(true);
+  // Academic year — always follows the app-wide academic period selector
+  // (top navbar), so the roster shown here never drifts from what the rest
+  // of the app is scoped to.
+  const { years, selectedYearId, setSelectedYearId, loading: yearsLoading } =
+    useAcademicPeriod();
 
   // Students
   const [students, setStudents] = useState<EnrolledStudent[]>([]);
@@ -71,20 +72,8 @@ const EnrolledStudentsTab: React.FC<Props> = ({ subjectId, subjectName }) => {
   const [removingId, setRemovingId] = useState<number | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Load years on mount
-  useEffect(() => {
-    (async () => {
-      try {
-        const res = await academicYearsApi.getAll();
-        const data: AcademicYear[] = (res.data as any)?.data ?? res.data ?? [];
-        setYears(data);
-        const current = data.find((y) => y.is_current) ?? data[0];
-        if (current) setSelectedYearId(current.academic_year_id);
-      } finally {
-        setYearsLoading(false);
-      }
-    })();
-  }, []);
+  // Student details modal
+  const [selectedStudent, setSelectedStudent] = useState<EnrolledStudent | null>(null);
 
   // Load students when year changes
   useEffect(() => {
@@ -237,6 +226,7 @@ const EnrolledStudentsTab: React.FC<Props> = ({ subjectId, subjectName }) => {
     try {
       await studentEnrollmentApi.unenroll(s.user_id, subjectId, selectedYearId);
       setStudents((prev) => prev.filter((x) => x.user_id !== s.user_id));
+      setSelectedStudent((prev) => (prev?.user_id === s.user_id ? null : prev));
       showToast(`${s.first_name} ${s.last_name} removed`, "success");
     } catch {
       showToast("Failed to remove student", "error");
@@ -264,7 +254,7 @@ const EnrolledStudentsTab: React.FC<Props> = ({ subjectId, subjectName }) => {
           <select
             value={selectedYearId ?? ""}
             onChange={(e) => setSelectedYearId(Number(e.target.value))}
-            className="appearance-none pl-9 pr-8 py-2.5 text-sm font-medium border border-gray-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer shadow-sm"
+            className="appearance-none pl-9 pr-8 py-2.5 text-sm font-medium border border-gray-200 dark:border-gray-700/30 rounded-xl bg-white dark:bg-gray-800/40 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer shadow-sm"
           >
             {years.map((y) => (
               <option key={y.academic_year_id} value={y.academic_year_id}>
@@ -305,7 +295,7 @@ const EnrolledStudentsTab: React.FC<Props> = ({ subjectId, subjectName }) => {
               }}
               className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-xl transition-all shadow-sm ${
                 showAddPanel
-                  ? "bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-slate-700"
+                  ? "bg-gray-100 dark:bg-gray-700/50 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700/30"
                   : "bg-blue-600 hover:bg-blue-700 text-white border border-blue-600"
               }`}
             >
@@ -342,7 +332,7 @@ const EnrolledStudentsTab: React.FC<Props> = ({ subjectId, subjectName }) => {
                   placeholder="Type a name or username…"
                   value={addQuery}
                   onChange={(e) => handleAddQuery(e.target.value)}
-                  className="w-full pl-10 pr-10 py-2.5 text-sm border border-gray-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full pl-10 pr-10 py-2.5 text-sm border border-gray-200 dark:border-gray-700/30 rounded-xl bg-white dark:bg-gray-800/40 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
               <AnimatePresence>
@@ -371,7 +361,7 @@ const EnrolledStudentsTab: React.FC<Props> = ({ subjectId, subjectName }) => {
                             className={`flex items-center justify-between px-3 py-2.5 rounded-xl border transition-colors ${
                               already
                                 ? "bg-green-50 dark:bg-green-900/10 border-green-200 dark:border-green-800/40 opacity-70"
-                                : "bg-white dark:bg-slate-900 border-gray-200 dark:border-slate-700"
+                                : "bg-white dark:bg-gray-800/40 border-gray-200 dark:border-gray-700/30"
                             }`}
                           >
                             <div className="flex items-center gap-3">
@@ -383,7 +373,7 @@ const EnrolledStudentsTab: React.FC<Props> = ({ subjectId, subjectName }) => {
                                 <p className="text-xs text-gray-500 dark:text-gray-400">
                                   @{u.username}
                                   {u.user_type && (
-                                    <span className="ml-2 px-1.5 py-0.5 bg-gray-100 dark:bg-slate-800 rounded text-gray-500">
+                                    <span className="ml-2 px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700/50 rounded text-gray-500">
                                       {u.user_type}
                                     </span>
                                   )}
@@ -426,7 +416,7 @@ const EnrolledStudentsTab: React.FC<Props> = ({ subjectId, subjectName }) => {
             placeholder="Search by name or username…"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2.5 text-sm border border-gray-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full pl-10 pr-4 py-2.5 text-sm border border-gray-200 dark:border-gray-700/30 rounded-xl bg-white dark:bg-gray-800/40 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
         <div className="flex gap-2">
@@ -435,7 +425,7 @@ const EnrolledStudentsTab: React.FC<Props> = ({ subjectId, subjectName }) => {
             <select
               value={selectedGrade}
               onChange={(e) => setSelectedGrade(e.target.value)}
-              className="appearance-none pl-8 pr-7 py-2.5 text-sm border border-gray-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+              className="appearance-none pl-8 pr-7 py-2.5 text-sm border border-gray-200 dark:border-gray-700/30 rounded-xl bg-white dark:bg-gray-800/40 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
             >
               <option value="all">All Grades</option>
               {uniqueGrades.map((g) => <option key={g} value={g}>{g}</option>)}
@@ -447,7 +437,7 @@ const EnrolledStudentsTab: React.FC<Props> = ({ subjectId, subjectName }) => {
             <select
               value={selectedProgram}
               onChange={(e) => setSelectedProgram(e.target.value)}
-              className="appearance-none pl-8 pr-7 py-2.5 text-sm border border-gray-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+              className="appearance-none pl-8 pr-7 py-2.5 text-sm border border-gray-200 dark:border-gray-700/30 rounded-xl bg-white dark:bg-gray-800/40 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
             >
               <option value="all">All Programs</option>
               {uniquePrograms.map((p) => <option key={p} value={p}>{p}</option>)}
@@ -464,8 +454,8 @@ const EnrolledStudentsTab: React.FC<Props> = ({ subjectId, subjectName }) => {
           <p className="text-sm text-gray-500 dark:text-gray-400 animate-pulse">Loading students…</p>
         </div>
       ) : filteredStudents.length === 0 ? (
-        <div className="text-center py-20 bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-700/50">
-          <div className="w-14 h-14 rounded-2xl bg-gray-100 dark:bg-slate-800 flex items-center justify-center mx-auto mb-4">
+        <div className="text-center py-20 bg-white dark:bg-gray-800/30 dark:backdrop-blur-sm rounded-2xl border border-gray-200 dark:border-gray-700/20">
+          <div className="w-14 h-14 rounded-2xl bg-gray-100 dark:bg-gray-700/40 flex items-center justify-center mx-auto mb-4">
             <Users className="w-7 h-7 text-gray-400 dark:text-gray-500" />
           </div>
           <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-1">
@@ -480,11 +470,11 @@ const EnrolledStudentsTab: React.FC<Props> = ({ subjectId, subjectName }) => {
           </p>
         </div>
       ) : (
-        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-700/50 overflow-hidden shadow-sm">
+        <div className="bg-white dark:bg-gray-800/30 dark:backdrop-blur-sm rounded-2xl border border-gray-200 dark:border-gray-700/20 overflow-hidden shadow-sm">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-gray-200 dark:border-slate-700/60">
+                <tr className="border-b border-gray-200 dark:border-gray-700/30">
                   <th className="px-4 py-3 text-left w-10">
                     <span className="text-xs font-semibold text-gray-400 dark:text-slate-500">#</span>
                   </th>
@@ -521,7 +511,8 @@ const EnrolledStudentsTab: React.FC<Props> = ({ subjectId, subjectName }) => {
                       animate={{ opacity: 1 }}
                       exit={{ opacity: 0, x: 30 }}
                       transition={{ duration: 0.15 }}
-                      className="group border-b border-gray-100 dark:border-slate-800 hover:bg-blue-50/40 dark:hover:bg-blue-900/10 transition-colors"
+                      onClick={() => setSelectedStudent(s)}
+                      className="group border-b border-gray-100 dark:border-gray-700/20 hover:bg-blue-50/40 dark:hover:bg-blue-900/10 transition-colors cursor-pointer"
                     >
                       <td className="px-4 py-3 text-xs text-gray-400 dark:text-slate-500 font-mono">
                         {idx + 1}
@@ -577,7 +568,10 @@ const EnrolledStudentsTab: React.FC<Props> = ({ subjectId, subjectName }) => {
                       {canManage && (
                         <td className="px-3 py-3">
                           <button
-                            onClick={() => handleRemove(s)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleRemove(s);
+                            }}
                             disabled={removingId === s.user_id}
                             title="Remove from subject"
                             className="opacity-0 group-hover:opacity-100 flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-full transition-all disabled:opacity-50"
@@ -599,7 +593,7 @@ const EnrolledStudentsTab: React.FC<Props> = ({ subjectId, subjectName }) => {
           </div>
 
           {/* Table footer */}
-          <div className="px-4 py-3 border-t border-gray-100 dark:border-slate-800 flex items-center justify-between">
+          <div className="px-4 py-3 border-t border-gray-100 dark:border-gray-700/20 flex items-center justify-between">
             <p className="text-xs text-gray-400 dark:text-slate-500">
               Showing {filteredStudents.length} of {students.length} students
             </p>
@@ -614,6 +608,14 @@ const EnrolledStudentsTab: React.FC<Props> = ({ subjectId, subjectName }) => {
           </div>
         </div>
       )}
+
+      <StudentDetailsModal
+        student={selectedStudent}
+        onClose={() => setSelectedStudent(null)}
+        canManage={canManage}
+        onRemove={handleRemove}
+        removing={removingId === selectedStudent?.user_id}
+      />
     </div>
   );
 };

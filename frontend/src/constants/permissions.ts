@@ -30,6 +30,7 @@ export const Permissions = {
   VIEW_STUDENTS: "VIEW_STUDENTS",
   MANAGE_STUDENT_ENROLLMENTS: "MANAGE_STUDENT_ENROLLMENTS",
   ASSIGN_STUDENT_CLASS_GROUPS: "ASSIGN_STUDENT_CLASS_GROUPS",
+  VIEW_SUBJECT_ENROLLED_STUDENTS: "VIEW_SUBJECT_ENROLLED_STUDENTS",
 
   // Teacher management
   MANAGE_TEACHERS: "MANAGE_TEACHERS",
@@ -94,11 +95,25 @@ export const Permissions = {
 
   // Reporting Module
   SUBMIT_REPORTING: "SUBMIT_REPORTING",
+  /** @deprecated use VIEW_REPORTS / EXPORT_REPORTS / MANAGE_REPORTS instead (Phase 6) */
   ALL_SUBMITTED_REPORTS: "ALL_SUBMITTED_REPORTS",
+  EXPORT_REPORTS: "EXPORT_REPORTS",
+  MANAGE_REPORTS: "MANAGE_REPORTS",
+
+  // Mentorship
+  MANAGE_MENTOR_ASSIGNMENTS: "MANAGE_MENTOR_ASSIGNMENTS",
+  SUBMIT_MENTEE_CHECKIN: "SUBMIT_MENTEE_CHECKIN",
 
   // Curriculum & Subject Materials
   MANAGE_CURRICULUM: "MANAGE_CURRICULUM",
   UPLOAD_SUBJECT_DOCUMENTS: "UPLOAD_SUBJECT_DOCUMENTS",
+  VIEW_SUBJECT_DOCUMENTS: "VIEW_SUBJECT_DOCUMENTS",
+  DOWNLOAD_SUBJECT_DOCUMENTS: "DOWNLOAD_SUBJECT_DOCUMENTS",
+  VIEW_MY_ENROLLED_SUBJECTS: "VIEW_MY_ENROLLED_SUBJECTS",
+
+  // Lesson Notes
+  MANAGE_LESSON_NOTES: "MANAGE_LESSON_NOTES",
+  VIEW_SHARED_LESSON_NOTES: "VIEW_SHARED_LESSON_NOTES",
 } as const;
 
 export type PermissionKey = keyof typeof Permissions;
@@ -180,6 +195,7 @@ export const permissionGroups = {
     Permissions.VIEW_STUDENTS,
     Permissions.MANAGE_STUDENT_ENROLLMENTS,
     Permissions.ASSIGN_STUDENT_CLASS_GROUPS,
+    Permissions.VIEW_SUBJECT_ENROLLED_STUDENTS,
   ],
   teachers: [
     Permissions.MANAGE_TEACHERS,
@@ -197,10 +213,27 @@ export const permissionGroups = {
   attendance: [Permissions.MANAGE_ATTENDANCE, Permissions.VIEW_ATTENDANCE],
   reports: [
     Permissions.VIEW_REPORTS,
+    Permissions.EXPORT_REPORTS,
+    Permissions.MANAGE_REPORTS,
     Permissions.GENERATE_REPORTS,
     Permissions.ACCESS_REPORT_CARD_MODULE,
     Permissions.SUBMIT_REPORTING,
     Permissions.ALL_SUBMITTED_REPORTS,
+  ],
+  mentorship: [
+    Permissions.MANAGE_MENTOR_ASSIGNMENTS,
+    Permissions.SUBMIT_MENTEE_CHECKIN,
+  ],
+  curriculum: [
+    Permissions.MANAGE_CURRICULUM,
+    Permissions.UPLOAD_SUBJECT_DOCUMENTS,
+    Permissions.VIEW_SUBJECT_DOCUMENTS,
+    Permissions.DOWNLOAD_SUBJECT_DOCUMENTS,
+    Permissions.VIEW_MY_ENROLLED_SUBJECTS,
+  ],
+  lessonNotes: [
+    Permissions.MANAGE_LESSON_NOTES,
+    Permissions.VIEW_SHARED_LESSON_NOTES,
   ],
   settings: [Permissions.MANAGE_SETTINGS],
   admin: [Permissions.ADMIN],

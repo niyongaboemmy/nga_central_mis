@@ -24,6 +24,8 @@ import {
   assignGradeToUser,
   removeGradeFromUser,
   getUserGrades,
+  getAllGradeAssignments,
+  copyGradeAssignments,
   getUsersByGrade,
   getSubjectsByGrade,
   updateThemePreference,
@@ -64,6 +66,18 @@ router.get(
 );
 // Search users (for document sharing) - available to all authenticated users
 router.get("/search", authenticate, searchUsers);
+
+// Grade assignment for class teachers -- must be registered before the
+// bare "/:id" route below, otherwise Express matches "/grade-assignments"
+// as :id="grade-assignments" and calls getUser instead.
+router.get("/grade-assignments", authenticate, getAllGradeAssignments);
+router.post(
+  "/grade-assignments/copy",
+  authenticate,
+  authorize("ASSIGN_GRADE_TO_CLASS_TEACHER"),
+  copyGradeAssignments,
+);
+
 router.get("/:id", authenticate, getUser);
 router.get("/:id/programs", authenticate, getUserPrograms);
 router.get("/:userId/activities", authenticate, getUserActivities);
@@ -137,7 +151,7 @@ router.post(
   assignGradeToUser,
 );
 router.delete(
-  "/:id/grades/:gradeId",
+  "/:id/grades/:gradeId/years/:academicYearId",
   authenticate,
   authorize("ASSIGN_GRADE_TO_CLASS_TEACHER"),
   removeGradeFromUser,

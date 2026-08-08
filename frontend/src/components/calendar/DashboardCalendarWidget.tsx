@@ -1,14 +1,15 @@
-import React, { useState, useEffect, useMemo, useRef } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { Calendar, ChevronLeft, ChevronRight } from "lucide-react";
 import { useUser } from "../../contexts/UserContext";
 import { useToast } from "../../contexts/ToastContext";
+import { useAcademicPeriod } from "../../contexts/AcademicPeriodContext";
 import { Permissions } from "../../constants/permissions";
-import { academicTermsApi } from "../../api/academics";
 import {
   CalendarSlot,
   getMyCalendar,
   getStudentCalendar,
   getLessonPlanForSlot,
+  getMyClassGroups,
 } from "../../api/calendar";
 import {
   DAYS,
@@ -31,6 +32,8 @@ import LessonPlanModal from "./LessonPlanModal";
 const DashboardCalendarWidget: React.FC = () => {
   const { user } = useUser();
   const { showToast } = useToast();
+  const { selectedTermId, selectedTerm, selectedYearId } =
+    useAcademicPeriod();
 
   // Role detection
   const isStudent = user?.roles?.some((role) =>
@@ -43,10 +46,19 @@ const DashboardCalendarWidget: React.FC = () => {
   const [slots, setSlots] = useState<CalendarSlot[]>([]);
   const [_upcomingLessons, setUpcomingLessons] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [termName, setTermName] = useState<string>("");
   const [currentWeekStart, setCurrentWeekStart] = useState<Date>(() =>
     getStartOfWeek(new Date()),
   );
+
+  // Class-group filter (teachers only) — "ALL" shows every class group the
+  // teacher is assigned to teach; a specific selection narrows the grid to
+  // just that group.
+  const [classGroups, setClassGroups] = useState<
+    { class_group_id: number; name: string; grade_name?: string }[]
+  >([]);
+  const [selectedClassGroupId, setSelectedClassGroupId] = useState<
+    number | "all"
+  >("all");
 
   // Modal State
   const [selectedSlot, setSelectedSlot] = useState<CalendarSlot | null>(null);
@@ -94,31 +106,49 @@ const DashboardCalendarWidget: React.FC = () => {
     [weekDates],
   );
 
-  // Load slots
-  const hasFetchedRef = useRef(false);
-
+  // Load the class groups the teacher is assigned to, for the filter
+  // dropdown. Not applicable to students (they only ever have one group).
   useEffect(() => {
-    if (hasFetchedRef.current) return;
-    hasFetchedRef.current = true;
+    if (isStudent) {
+      setClassGroups([]);
+      return;
+    }
+    let cancelled = false;
+    getMyClassGroups(
+      selectedYearId ? { academic_year_id: selectedYearId } : undefined,
+    )
+      .then((groups) => {
+        if (!cancelled) setClassGroups(groups || []);
+      })
+      .catch((err) => {
+        console.error("Failed to load class groups for filter:", err);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isStudent, selectedYearId]);
+
+  // Reset the class-group filter whenever the teacher switches academic year
+  // so a stale group from a different year isn't silently applied.
+  useEffect(() => {
+    setSelectedClassGroupId("all");
+  }, [selectedYearId]);
+
+  // Load slots for the globally selected academic term — reloads whenever
+  // the term is switched from the top nav or the class-group filter changes.
+  useEffect(() => {
+    if (!selectedTermId) return;
 
     const load = async () => {
       setLoading(true);
       try {
-        // Find current academic term explicitly
-        // (Bypass year fetch to avoid MANAGE_ACADEMICS permission issue)
-        const termsRes = await academicTermsApi.getAll();
-        const terms = ((termsRes as any).data?.data ||
-          (termsRes as any).data) as any[];
-        const currentTerm = terms?.find((t: any) => t.is_current === 1);
-
-        if (!currentTerm) {
-          setLoading(false);
-          return;
+        const params: { academic_term_id: number; class_group_id?: number } =
+          {
+            academic_term_id: selectedTermId,
+          };
+        if (!isStudent && selectedClassGroupId !== "all") {
+          params.class_group_id = selectedClassGroupId;
         }
-
-        setTermName(currentTerm.name || "");
-
-        const params = { academic_term_id: currentTerm.academic_term_id };
 
         if (isStudent) {
           const calendarData = await getStudentCalendar(params);
@@ -142,7 +172,7 @@ const DashboardCalendarWidget: React.FC = () => {
     };
 
     load();
-  }, [isStudent]);
+  }, [isStudent, selectedTermId, selectedClassGroupId]);
 
   // Handle slot click
   const handleSlotClick = (slot: CalendarSlot, date: Date) => {
@@ -220,7 +250,7 @@ const DashboardCalendarWidget: React.FC = () => {
               {title}
             </h3>
             <p className="text-xs text-gray-500 dark:text-gray-400">
-              {termName && <span>{termName} • </span>}
+              {selectedTerm?.name && <span>{selectedTerm.name} • </span>}
               <span className="text-blue-600 dark:text-blue-400 font-medium">
                 {dateRangeString}
               </span>
@@ -228,8 +258,31 @@ const DashboardCalendarWidget: React.FC = () => {
           </div>
         </div>
 
-        {/* Week navigator */}
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-2">
+          {/* Class group filter (teachers with more than one group) */}
+          {!isStudent && classGroups.length > 1 && (
+            <select
+              aria-label="Filter by class group"
+              value={selectedClassGroupId}
+              onChange={(e) =>
+                setSelectedClassGroupId(
+                  e.target.value === "all" ? "all" : Number(e.target.value),
+                )
+              }
+              className="text-xs font-medium bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/40 rounded-lg px-2 py-1.5 text-gray-700 dark:text-gray-200 focus:outline-none cursor-pointer"
+            >
+              <option value="all">All Class Groups</option>
+              {classGroups.map((cg) => (
+                <option key={cg.class_group_id} value={cg.class_group_id}>
+                  {cg.name}
+                  {cg.grade_name ? ` (${cg.grade_name})` : ""}
+                </option>
+              ))}
+            </select>
+          )}
+
+          {/* Week navigator */}
+          <div className="flex items-center gap-1">
           <button
             onClick={goToPreviousWeek}
             className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-gray-500 dark:text-gray-400"
@@ -250,6 +303,7 @@ const DashboardCalendarWidget: React.FC = () => {
           >
             <ChevronRight className="w-4 h-4" />
           </button>
+          </div>
         </div>
       </div>
 
@@ -279,6 +333,7 @@ const DashboardCalendarWidget: React.FC = () => {
           slots={slots}
           weekDates={weekDates}
           onSlotClick={handleSlotClick}
+          showClassGroup={!isStudent && selectedClassGroupId === "all"}
         />
       )}
 
@@ -322,12 +377,14 @@ interface ReadOnlyCalendarGridProps {
   slots: CalendarSlot[];
   weekDates: Date[];
   onSlotClick: (slot: CalendarSlot, date: Date) => void;
+  showClassGroup?: boolean;
 }
 
 const ReadOnlyCalendarGrid: React.FC<ReadOnlyCalendarGridProps> = ({
   slots,
   weekDates,
   onSlotClick,
+  showClassGroup = false,
 }) => {
   return (
     <div className="overflow-x-auto -mx-6 border-4 border-white dark:border-gray-800/20">
@@ -468,6 +525,12 @@ const ReadOnlyCalendarGrid: React.FC<ReadOnlyCalendarGridProps> = ({
                               <div className="font-normal text-white truncate text-[12px]">
                                 {courseStartingHere.subject_name}
                               </div>
+                              {showClassGroup &&
+                                courseStartingHere.class_group_name && (
+                                  <div className="text-white/80 truncate text-[10px]">
+                                    {courseStartingHere.class_group_name}
+                                  </div>
+                                )}
                               <div className="text-white/70 text-[10px] mt-auto">
                                 {courseStartingHere.start_time} -{" "}
                                 {courseStartingHere.end_time}

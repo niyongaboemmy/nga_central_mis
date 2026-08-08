@@ -1,9 +1,14 @@
-import React, { useState, useEffect, useRef, useMemo } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { schemeOfWorkApi, SchemeEntry } from "../api/schemeOfWork";
 import { useToast } from "../contexts/ToastContext";
 import { lessonPlanApi, LessonPlan } from "../api/lessonPlan";
-import { myAssignedSubjectsApi, MyAssignedSubject } from "../api/academics";
+import {
+  myAssignedSubjectsApi,
+  MyAssignedSubject,
+  academicTermsApi,
+} from "../api/academics";
+import { useAcademicPeriod } from "../contexts/AcademicPeriodContext";
 import RealCalendarView from "./RealCalendarView";
 import SchemeOfWorkEntryModal from "./SchemeOfWorkEntryModal";
 import LessonPlanModal from "./LessonPlanModal";
@@ -15,7 +20,6 @@ import {
   ReportMetadata,
 } from "../services/SchemeReportService";
 import { useUser } from "../contexts/UserContext";
-import { useMetadata } from "../contexts/MetadataContext";
 import reportLogo1 from "../assets/report_image1.png";
 import reportLogo2 from "../assets/report_image2.png";
 import { motion, AnimatePresence } from "framer-motion";
@@ -45,16 +49,18 @@ import {
   ArrowRight,
   Download,
   PenLine,
+  Sparkles,
+  ListChecks,
 } from "lucide-react";
 import SchemeManualEntry from "./SchemeManualEntry";
+import SchemeAIGenerate from "./SchemeAIGenerate";
 
 const SchemeOfWorkCalendar: React.FC = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { showToast } = useToast();
   const { user } = useUser();
-  const { years } = useMetadata();
-
+  const { selectedYearId, selectedTermId } = useAcademicPeriod();
   const [isPreviewReportOpen, setIsPreviewReportOpen] = useState(false);
   const [reportPdfUrl, setReportPdfUrl] = useState<string | null>(null);
 
@@ -68,13 +74,15 @@ const SchemeOfWorkCalendar: React.FC = () => {
   );
   const [loading, setLoading] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
+  const [isMatchingCriteria, setIsMatchingCriteria] = useState(false);
   const [file, setFile] = useState<File | null>(null);
-  const initializedRef = useRef(false);
   const [subjectInfo, setSubjectInfo] = useState<{
     name: string;
     code: string;
     classGroupName: string;
     termName: string;
+    academicYearName: string;
+    academicYearId: number | null;
   } | null>(null);
   const [schemeMetadata, setSchemeMetadata] = useState<{
     validation_status: "PENDING" | "APPROVED" | "REJECTED";
@@ -96,6 +104,9 @@ const SchemeOfWorkCalendar: React.FC = () => {
   // Modal states for weekly entries
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingEntry, setEditingEntry] = useState<SchemeEntry | null>(null);
+  const [insertAfterEntryId, setInsertAfterEntryId] = useState<
+    number | "start" | null
+  >(null);
 
   // Timeline features
   const [searchQuery, setSearchQuery] = useState("");
@@ -111,19 +122,39 @@ const SchemeOfWorkCalendar: React.FC = () => {
   const [previewEntry, setPreviewEntry] = useState<SchemeEntry | null>(null);
 
   // Entry mode for empty state
-  const [entryMode, setEntryMode] = useState<"choose" | "manual" | "upload">("choose");
+  const [entryMode, setEntryMode] = useState<"choose" | "manual" | "upload" | "ai">("choose");
 
   useEffect(() => {
-    if (
-      subjectId &&
-      classGroupId &&
-      academicTermId &&
-      !initializedRef.current
-    ) {
+    if (subjectId && classGroupId && academicTermId) {
       loadData();
-      initializedRef.current = true;
     }
   }, [subjectId, classGroupId, academicTermId]);
+
+  // Keep this page in sync with the global Academic Year/Term selector: if the
+  // user switches term while viewing this page, reload it for the new term; if
+  // they switch to a year this class group doesn't belong to, return to the list.
+  useEffect(() => {
+    if (!subjectId || !classGroupId || selectedYearId == null) return;
+
+    if (
+      subjectInfo?.academicYearId != null &&
+      selectedYearId !== subjectInfo.academicYearId
+    ) {
+      showToast(
+        "Switched academic year — returning to your subject list.",
+        "info",
+      );
+      navigate("/scheme-of-work");
+      return;
+    }
+
+    if (selectedTermId && selectedTermId !== academicTermId) {
+      navigate(
+        `/scheme-of-work/calendar?subject_id=${subjectId}&class_group_id=${classGroupId}&academic_term_id=${selectedTermId}`,
+        { replace: true },
+      );
+    }
+  }, [selectedYearId, selectedTermId, subjectInfo?.academicYearId]);
 
   const loadData = async () => {
     setLoading(true);
@@ -147,9 +178,17 @@ const SchemeOfWorkCalendar: React.FC = () => {
 
       // Load subject info from assigned subjects
       try {
-        const subjectsResp = await myAssignedSubjectsApi.getAll();
+        const [subjectsResp, termResp] = await Promise.all([
+          myAssignedSubjectsApi.getAll(),
+          academicTermsApi.getAll().catch(() => null),
+        ]);
         const subject = subjectsResp.data.data?.find(
           (s) => s.subject_id === subjectId,
+        );
+        const termRaw = termResp?.data as any;
+        const allTerms = Array.isArray(termRaw) ? termRaw : termRaw?.data || [];
+        const matchedTerm = allTerms.find(
+          (t: any) => t.academic_term_id === academicTermId,
         );
         if (subject) {
           const gradeInfo = subject.grades.find(
@@ -160,7 +199,9 @@ const SchemeOfWorkCalendar: React.FC = () => {
             name: subject.subject_name,
             code: subject.subject_code || "",
             classGroupName: gradeInfo?.class_group_name || "",
-            termName: `Term ${academicTermId}`,
+            termName: matchedTerm?.name || `Term ${academicTermId}`,
+            academicYearName: gradeInfo?.academic_year_name || "",
+            academicYearId: gradeInfo?.academic_year_id ?? null,
           });
         }
       } catch (err) {
@@ -218,7 +259,10 @@ const SchemeOfWorkCalendar: React.FC = () => {
   };
 
   const buildReportMetadata = (): ReportMetadata => {
-    const currentYear = years.find((y: any) => y.is_current)?.name || "N/A";
+    // Use the year the scheme's own class group belongs to, not whichever
+    // year happens to be flagged "current" — a teacher can view/download a
+    // report for a past term, and it must not be mislabeled with this year.
+    const schemeYear = subjectInfo?.academicYearName || "N/A";
 
     return {
       teacherName: user?.profile?.first_name
@@ -227,7 +271,7 @@ const SchemeOfWorkCalendar: React.FC = () => {
       subjectName: subjectInfo?.name || "Subject",
       subjectCode: subjectInfo?.code,
       classGroupName: subjectInfo?.classGroupName || `Class #${classGroupId}`,
-      academicYear: currentYear,
+      academicYear: schemeYear,
       academicTerm: subjectInfo?.termName || `Term #${academicTermId}`,
       sector: "ICT",
       trade: "Software Programming and Embedded Systems (SPEs)",
@@ -262,24 +306,52 @@ const SchemeOfWorkCalendar: React.FC = () => {
     setIsPreviewReportOpen(false);
   };
 
-  const handleSaveEntry = async (data: Partial<SchemeEntry>) => {
+  const handleSaveEntry = async (
+    data: Partial<SchemeEntry> & { criteria_ids?: number[] },
+  ) => {
+    const { criteria_ids, ...entryData } = data;
     try {
+      let entryId: number | undefined = editingEntry?.entry_id;
+
       if (editingEntry) {
-        await schemeOfWorkApi.updateEntry(editingEntry.entry_id, data);
+        await schemeOfWorkApi.updateEntry(editingEntry.entry_id, entryData);
         showToast("Entry updated", "success");
+      } else if (insertAfterEntryId !== null) {
+        const res = await schemeOfWorkApi.insertEntry({
+          ...entryData,
+          subject_id: subjectId,
+          class_group_id: classGroupId,
+          academic_term_id: academicTermId,
+          after_entry_id:
+            insertAfterEntryId === "start" ? null : insertAfterEntryId,
+        });
+        entryId = res.data.data.entry_id;
+        showToast("Week inserted — following weeks rescheduled", "success");
       } else {
-        await schemeOfWorkApi.addEntry({
-          ...data,
+        const res = await schemeOfWorkApi.addEntry({
+          ...entryData,
           subject_id: subjectId,
           class_group_id: classGroupId,
           academic_term_id: academicTermId,
         });
+        entryId = res.data.data.entry_id;
         showToast("Entry added", "success");
       }
+
+      if (entryId && criteria_ids) {
+        await schemeOfWorkApi.updateEntryCriteria(entryId, criteria_ids);
+      }
+
       loadData();
     } catch (error: any) {
       showToast(error.response?.data?.message || "Save failed", "error");
     }
+  };
+
+  const openInsertModal = (afterEntryId: number | "start") => {
+    setEditingEntry(null);
+    setInsertAfterEntryId(afterEntryId);
+    setIsModalOpen(true);
   };
 
   const handleHeaderUpload = async (f: File) => {
@@ -298,6 +370,31 @@ const SchemeOfWorkCalendar: React.FC = () => {
       showToast(error.response?.data?.message || "Upload failed", "error");
     } finally {
       setIsUploading(false);
+    }
+  };
+
+  const handleBulkMatchCriteria = async () => {
+    if (!schemeMetadata?.scheme_id) return;
+    setIsMatchingCriteria(true);
+    try {
+      const res = await schemeOfWorkApi.bulkSuggestCriteria(schemeMetadata.scheme_id);
+      const { taggedCount, entriesProcessed } = res.data.data;
+      if (entriesProcessed === 0) {
+        showToast("Every entry already has performance criteria linked", "info");
+      } else {
+        showToast(
+          `Matched ${taggedCount} performance criteria across ${entriesProcessed} entr${entriesProcessed === 1 ? "y" : "ies"}`,
+          "success",
+        );
+        loadData();
+      }
+    } catch (error: any) {
+      showToast(
+        error.response?.data?.message || "Could not match criteria",
+        "error",
+      );
+    } finally {
+      setIsMatchingCriteria(false);
     }
   };
 
@@ -677,10 +774,32 @@ const SchemeOfWorkCalendar: React.FC = () => {
               const status = getEntryStatus(entry);
               const plans = lessonPlans[entry.entry_id] || [];
               const isExpanded = expandedEntries.has(entry.entry_id);
+              const canEditSchedule =
+                schemeMetadata?.validation_status !== "APPROVED";
+
+              const InsertDivider = ({
+                afterEntryId,
+              }: {
+                afterEntryId: number | "start";
+              }) => (
+                <div className="relative h-6 md:ml-12 group/divider flex items-center">
+                  <div className="w-full h-px bg-transparent group-hover/divider:bg-blue-200 dark:group-hover/divider:bg-blue-900 transition-colors" />
+                  <button
+                    onClick={() => openInsertModal(afterEntryId)}
+                    className="absolute left-1/2 -translate-x-1/2 flex items-center gap-1.5 px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-bold uppercase tracking-wider rounded-full shadow-lg opacity-0 group-hover/divider:opacity-100 transition-opacity z-10"
+                  >
+                    <Plus className="w-3 h-3" />
+                    Insert Week Here
+                  </button>
+                </div>
+              );
 
               return (
-                <motion.div
-                  key={entry.entry_id}
+                <React.Fragment key={entry.entry_id}>
+                  {index === 0 && canEditSchedule && (
+                    <InsertDivider afterEntryId="start" />
+                  )}
+                  <motion.div
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: 20 }}
@@ -781,6 +900,24 @@ const SchemeOfWorkCalendar: React.FC = () => {
                             </p>
                           )}
 
+                          {/* Linked Curriculum Performance Criteria */}
+                          {entry.criteria && entry.criteria.length > 0 && (
+                            <div className="flex flex-wrap items-center gap-1.5 mb-3">
+                              <span className="flex items-center gap-1 text-xs text-gray-400 dark:text-gray-500">
+                                <ListChecks className="w-3 h-3" />
+                              </span>
+                              {entry.criteria.map((c) => (
+                                <span
+                                  key={c.criteria_id}
+                                  title={c.description}
+                                  className="text-xs font-mono font-semibold bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 px-2 py-0.5 rounded-full"
+                                >
+                                  {c.criteria_number}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+
                           {/* Lesson Plans List */}
                           <div className="flex flex-wrap gap-2 mb-3">
                             {plans.map((plan) => (
@@ -833,6 +970,7 @@ const SchemeOfWorkCalendar: React.FC = () => {
                             <button
                               onClick={() => {
                                 setEditingEntry(entry);
+                                setInsertAfterEntryId(null);
                                 setIsModalOpen(true);
                               }}
                               className="text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 p-1.5 rounded-full hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all font-bold"
@@ -927,7 +1065,11 @@ const SchemeOfWorkCalendar: React.FC = () => {
                       )}
                     </AnimatePresence>
                   </div>
-                </motion.div>
+                  </motion.div>
+                  {canEditSchedule && (
+                    <InsertDivider afterEntryId={entry.entry_id} />
+                  )}
+                </React.Fragment>
               );
             })
           )}
@@ -1027,6 +1169,22 @@ const SchemeOfWorkCalendar: React.FC = () => {
                 <span>Download PDF</span>
               </button>
 
+              {/* Bulk AI Criteria Matching — for schemes/curricula that already existed before
+                  generation-time auto-tagging shipped, or entries that were never covered */}
+              <button
+                onClick={handleBulkMatchCriteria}
+                disabled={isMatchingCriteria}
+                title="Match every entry against this subject's Curriculum Performance Criteria using AI"
+                className="hidden sm:flex items-center gap-2 px-3 py-2 text-sm font-medium text-white bg-gradient-to-r from-violet-600 to-blue-600 hover:from-violet-700 hover:to-blue-700 rounded-full focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-violet-500 transition-all shadow-sm disabled:opacity-50"
+              >
+                {isMatchingCriteria ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Sparkles className="w-4 h-4" />
+                )}
+                <span>{isMatchingCriteria ? "Matching..." : "Match with AI"}</span>
+              </button>
+
               {/* View Switcher */}
               <div className="flex items-center p-1 bg-gray-100 dark:bg-gray-900 rounded-full border border-gray-200 dark:border-gray-700">
                 <button
@@ -1079,7 +1237,7 @@ const SchemeOfWorkCalendar: React.FC = () => {
                   </p>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl mx-auto">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-4xl mx-auto">
                   {/* Manual entry — featured */}
                   <motion.button
                     whileHover={{ scale: 1.02 }}
@@ -1108,6 +1266,36 @@ const SchemeOfWorkCalendar: React.FC = () => {
                     </div>
                     <div className="mt-5 flex items-center gap-2 text-sm font-semibold">
                       Open Editor <ArrowRight className="w-4 h-4" />
+                    </div>
+                  </motion.button>
+
+                  {/* AI generate */}
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.99 }}
+                    onClick={() => setEntryMode("ai")}
+                    className="relative group text-left p-6 rounded-3xl bg-gradient-to-br from-violet-600 to-purple-700 text-white shadow-xl shadow-violet-600/25 hover:shadow-violet-600/40 transition-all overflow-hidden"
+                  >
+                    <div className="absolute inset-0 bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity rounded-3xl" />
+                    <div className="absolute top-3 right-3 bg-white/20 text-white text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
+                      New
+                    </div>
+                    <div className="w-12 h-12 rounded-2xl bg-white/20 flex items-center justify-center mb-4">
+                      <Sparkles className="w-6 h-6 text-white" />
+                    </div>
+                    <h4 className="text-lg font-bold mb-1">Generate with AI</h4>
+                    <p className="text-sm text-white/80 leading-relaxed mb-4">
+                      Upload your curriculum and AI will analyze it and build the full weekly scheme for you.
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {["DOCX / PDF / TXT", "Auto-saved"].map((tag) => (
+                        <span key={tag} className="text-xs bg-white/20 text-white px-2.5 py-0.5 rounded-full font-medium">
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                    <div className="mt-5 flex items-center gap-2 text-sm font-semibold">
+                      Generate Now <ArrowRight className="w-4 h-4" />
                     </div>
                   </motion.button>
 
@@ -1152,6 +1340,20 @@ const SchemeOfWorkCalendar: React.FC = () => {
                 classGroupName={subjectInfo?.classGroupName}
                 termName={subjectInfo?.termName}
                 onComplete={() => { setEntryMode("choose"); loadData(); }}
+                onCancel={() => setEntryMode("choose")}
+              />
+            )}
+
+            {entryMode === "ai" && (
+              <SchemeAIGenerate
+                key="ai"
+                subjectId={subjectId}
+                classGroupId={classGroupId}
+                academicTermId={academicTermId}
+                subjectName={subjectInfo?.name}
+                classGroupName={subjectInfo?.classGroupName}
+                termName={subjectInfo?.termName}
+                onComplete={() => { loadData(); }}
                 onCancel={() => setEntryMode("choose")}
               />
             )}
@@ -1228,10 +1430,22 @@ const SchemeOfWorkCalendar: React.FC = () => {
         {/* Modals */}
         <SchemeOfWorkEntryModal
           isOpen={isModalOpen}
-          onClose={() => setIsModalOpen(false)}
+          onClose={() => {
+            setIsModalOpen(false);
+            setInsertAfterEntryId(null);
+          }}
           onSave={handleSaveEntry}
           initialData={editingEntry}
-          title={editingEntry ? "Edit Week" : "Add Week"}
+          title={
+            editingEntry
+              ? "Edit Week"
+              : insertAfterEntryId !== null
+                ? "Insert Week"
+                : "Add Week"
+          }
+          isInsertMode={!editingEntry && insertAfterEntryId !== null}
+          subjectId={subjectId}
+          subjectName={subjectInfo?.name}
         />
 
         {selectedEntryId && (
@@ -1241,6 +1455,8 @@ const SchemeOfWorkCalendar: React.FC = () => {
             entryId={selectedEntryId || 0}
             onSaved={loadData}
             initialData={editingLesson}
+            entryTopic={entries.find((e) => e.entry_id === selectedEntryId)?.topic}
+            entryWeekLabel={entries.find((e) => e.entry_id === selectedEntryId)?.week_number}
           />
         )}
 
@@ -1261,6 +1477,7 @@ const SchemeOfWorkCalendar: React.FC = () => {
           onEdit={(entry) => {
             setIsPreviewModalOpen(false);
             setEditingEntry(entry);
+            setInsertAfterEntryId(null);
             setIsModalOpen(true);
           }}
           onDelete={(id) => {

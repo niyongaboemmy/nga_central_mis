@@ -58,7 +58,6 @@ export interface CourseCategory {
 
 export interface ClassGroup {
   class_group_id: number;
-  academic_year_id: number;
   grade_id: number;
   name: string;
   grade_name?: string;
@@ -160,12 +159,12 @@ export const courseCategoriesApi = {
   delete: (id: number) => api.delete(`/academics/course-categories/${id}`),
 };
 
-// Class Groups API
+// Class Groups API -- ClassGroup is a permanent label per grade, not
+// year-scoped, so there's no "copy class groups to a new year" action.
 export const classGroupsApi = {
-  getAll: (academicYearId?: number, gradeId?: number) =>
+  getAll: (gradeId?: number) =>
     api.get<{ data: ClassGroup[] }>("/academics/class-groups", {
       params: {
-        ...(academicYearId && { academic_year_id: academicYearId }),
         ...(gradeId && { grade_id: gradeId }),
       },
     }),
@@ -207,7 +206,9 @@ export interface TeacherSubjectAssignment {
   class_group_name: string;
   grade_name: string;
   program_name: string;
+  academic_year_id: number;
   academic_year_name: string;
+  academic_year_is_current: number;
   assigned_at: string;
 }
 
@@ -221,7 +222,27 @@ export interface SubjectTeacherAssignment {
   class_group_name: string;
   grade_name: string;
   program_name: string;
+  academic_year_id: number;
   academic_year_name: string;
+  academic_year_is_current: number;
+  assigned_at: string;
+}
+
+export interface AllTeacherSubjectAssignment {
+  assignment_id: string;
+  user_id: number;
+  teacher_name: string;
+  teacher_username: string;
+  subject_id: number;
+  subject_name: string;
+  subject_code: string | null;
+  class_group_id: number;
+  class_group_name: string;
+  grade_name: string;
+  program_name: string;
+  academic_year_id: number;
+  academic_year_name: string;
+  academic_year_is_current: number;
   assigned_at: string;
 }
 
@@ -234,15 +255,40 @@ export const teacherSubjectAssignmentsApi = {
     api.get<{ data: SubjectTeacherAssignment[] }>(
       `/academics/subjects/${subjectId}/teachers`,
     ),
+  getAll: (academicYearId?: number) =>
+    api.get<{ data: AllTeacherSubjectAssignment[] }>(
+      "/academics/teacher-assignments",
+      {
+        params: academicYearId
+          ? { academic_year_id: academicYearId }
+          : undefined,
+      },
+    ),
   assign: (data: {
     user_id: number;
     subject_id: number;
     class_group_id: number;
+    academic_year_id?: number;
   }) => api.post("/academics/teachers/assign-subject", data),
-  remove: (teacherId: number, subjectId: number, classGroupId: number) =>
+  remove: (
+    teacherId: number,
+    subjectId: number,
+    classGroupId: number,
+    academicYearId: number,
+  ) =>
     api.delete(
-      `/academics/teachers/${teacherId}/subjects/${subjectId}/class-groups/${classGroupId}`,
+      `/academics/teachers/${teacherId}/subjects/${subjectId}/class-groups/${classGroupId}/years/${academicYearId}`,
     ),
+  copy: (data: {
+    source_academic_year_id: number;
+    target_academic_year_id: number;
+  }) =>
+    api.post<{
+      data: {
+        copied: number;
+        skipped: number;
+      };
+    }>("/academics/teachers/copy-assignments", data),
 };
 
 // My Assigned Subjects API (for teachers)
@@ -279,8 +325,10 @@ export interface EnrolledStudent {
 }
 
 export const myAssignedSubjectsApi = {
-  getAll: () =>
-    api.get<{ data: MyAssignedSubject[] }>("/academics/my-assigned-subjects"),
+  getAll: (academicTermId?: number) =>
+    api.get<{ data: MyAssignedSubject[] }>("/academics/my-assigned-subjects", {
+      params: academicTermId ? { academic_term_id: academicTermId } : undefined,
+    }),
   getEnrolledStudents: (subjectId: number, academicYearId: number) =>
     api.get<{ data: EnrolledStudent[] }>(
       `/academics/subjects/${subjectId}/years/${academicYearId}/students`,
@@ -296,6 +344,7 @@ export interface StudentEnrolledSubject {
   subject_description: string | null;
   academic_year_id: number;
   academic_year_name: string;
+  academic_year_is_current: number;
   enrolled_at: string;
 }
 
@@ -304,6 +353,7 @@ export interface AvailableSubject {
   code: string | null;
   name: string;
   description: string | null;
+  in_grade_curriculum?: boolean;
   grades?: Array<{
     grade_id: number;
     grade_name: string;
@@ -344,10 +394,83 @@ export const studentClassGroupApi = {
     api.get<{ data: StudentClassGroup | null }>(
       `/academics/students/${studentId}/class-group`,
     ),
-  assign: (data: { user_id: number; class_group_id: number }) =>
-    api.post("/academics/students/assign-class-group", data),
-  remove: (studentId: number, classGroupId: number) =>
-    api.delete(`/academics/students/${studentId}/class-groups/${classGroupId}`),
+  assign: (data: {
+    user_id: number;
+    class_group_id: number;
+    academic_year_id?: number;
+  }) => api.post("/academics/students/assign-class-group", data),
+  remove: (studentId: number, classGroupId: number, academicYearId: number) =>
+    api.delete(
+      `/academics/students/${studentId}/class-groups/${classGroupId}/years/${academicYearId}`,
+    ),
+  /** Bulk-move every active student from one class group into another (e.g.
+   * promoting a whole class to next year's grade), rather than moving
+   * students one at a time. The source class group's students keep their
+   * prior enrollment as history -- they aren't removed from it. */
+  promote: (data: {
+    source_class_group_id: number;
+    source_academic_year_id: number;
+    target_class_group_id: number;
+    target_academic_year_id: number;
+  }) =>
+    api.post<{
+      data: { promoted: number; skipped: number; total: number };
+    }>("/academics/students/promote-class", data),
+};
+
+export interface PromotionGradePlan {
+  source_grade_id: number;
+  source_grade_name: string;
+  program_id: number;
+  program_name: string;
+  student_count: number;
+  target_grade_id: number | null;
+  target_grade_name: string | null;
+  target_class_group_id: number | null;
+  target_class_group_name: string | null;
+  status: "ready" | "no_next_grade" | "no_class_group" | "ambiguous";
+}
+
+export interface PromotionResult {
+  totalPromoted: number;
+  totalSkippedExisting: number;
+  promotedGrades: {
+    source_grade_name: string;
+    target_class_group_name: string;
+    promoted: number;
+    skipped: number;
+  }[];
+  skippedGrades: {
+    source_grade_name: string;
+    reason: string;
+    student_count: number;
+  }[];
+}
+
+export const promotionApi = {
+  /** Preview an automatic whole-year promotion (every grade's active
+   * students moved into the next grade's class group) before running it --
+   * each grade's suggested target can be reviewed/overridden client-side. */
+  getPreview: (sourceAcademicYearId: number, targetAcademicYearId: number) =>
+    api.get<{ data: PromotionGradePlan[] }>(
+      "/academics/students/promotion-preview",
+      {
+        params: {
+          source_academic_year_id: sourceAcademicYearId,
+          target_academic_year_id: targetAcademicYearId,
+        },
+      },
+    ),
+  execute: (data: {
+    source_academic_year_id: number;
+    target_academic_year_id: number;
+    grade_overrides?: Record<string, number>;
+    excluded_grade_ids?: number[];
+  }) =>
+    api.post<{ data: PromotionResult }>(
+      "/academics/students/promote-year",
+      data,
+    ),
 };
 
 // Program Users API
@@ -380,9 +503,39 @@ export const programUsersApi = {
 };
 
 // Program Leads API
+export interface AllProgramLead {
+  lead_id: string;
+  user_id: number;
+  user_name: string;
+  username: string;
+  program_id: number;
+  program_name: string;
+  academic_year_id: number;
+  academic_year_name: string;
+  academic_year_is_current: number;
+  assigned_at: string;
+}
+
 export const programLeadsApi = {
-  assign: (data: { user_id: number; program_id: number }) =>
-    api.post("/academics/programs/assign-lead", data),
-  remove: (programId: number, userId: number) =>
-    api.delete(`/academics/programs/${programId}/leads/${userId}`),
+  getAll: (academicYearId?: number) =>
+    api.get<{ data: AllProgramLead[] }>("/academics/program-leads", {
+      params: academicYearId ? { academic_year_id: academicYearId } : undefined,
+    }),
+  assign: (data: {
+    user_id: number;
+    program_id: number;
+    academic_year_id: number;
+  }) => api.post("/academics/programs/assign-lead", data),
+  remove: (programId: number, userId: number, academicYearId: number) =>
+    api.delete(
+      `/academics/programs/${programId}/leads/${userId}/years/${academicYearId}`,
+    ),
+  copy: (data: {
+    source_academic_year_id: number;
+    target_academic_year_id: number;
+  }) =>
+    api.post<{ data: { copied: number; skipped: number; total: number } }>(
+      "/academics/programs/copy-leads",
+      data,
+    ),
 };

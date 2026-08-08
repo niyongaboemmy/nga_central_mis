@@ -4,6 +4,8 @@ import ThemeToggle from "./ThemeToggle";
 import LOGO from "../../assets/logo.png";
 import { useUser } from "../../contexts/UserContext";
 import SystemsMenu from "./SystemsMenu";
+import AcademicPeriodSelector from "./AcademicPeriodSelector";
+import NavSearch from "./NavSearch";
 import { LayoutGrid } from "lucide-react";
 
 interface NavbarProps {
@@ -190,61 +192,23 @@ const Navbar: React.FC<NavbarProps> = ({
             )}
 
             {/* Desktop Auth & Theme Toggle */}
-            <div className="hidden md:flex items-center space-x-4">
+            <div className="hidden md:flex items-center space-x-3">
+              {user && <AcademicPeriodSelector />}
+              {user && <NavSearch />}
               <ThemeToggle />
-              <a
-                href={"https://nga.ac.rw/"}
-                className="px-4 py-2 text-sm rounded-full transition-all bg-blue-500 text-white duration-200 font-medium flex items-center space-x-2 hover:bg-blue-600 dark:hover:bg-blue-700"
-              >
-                <span>Website</span>
-                <svg
-                  className="w-3 h-3"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
-                  />
-                </svg>
-              </a>
 
               {showUserCard && user ? (
                 /* User Card Dropdown */
                 <div className="relative" ref={dropdownRef}>
                   <button
                     onClick={() => setIsUserDropdownOpen(!isUserDropdownOpen)}
-                    className="flex items-center space-x-3 px-3 py-2 rounded-xl bg-surface-light dark:bg-surface-dark/50 hover:bg-gray-100 dark:hover:bg-gray-700/40 transition-all duration-200"
+                    className="flex items-center justify-center w-10 h-10 rounded-full bg-surface-light dark:bg-surface-dark/50 hover:bg-gray-100 dark:hover:bg-gray-700/40 transition-all duration-200"
+                    aria-label="Account menu"
+                    title={getUserDisplayName()}
                   >
                     <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white text-sm font-semibold">
                       {getUserInitials()}
                     </div>
-                    <div className="text-left hidden lg:block">
-                      <p className="text-sm font-medium text-text-primary-light dark:text-text-primary-dark">
-                        {getUserDisplayName()}
-                      </p>
-                      <p className="text-xs text-text-secondary-light dark:text-text-secondary-dark/70">
-                        {user.user?.email}
-                      </p>
-                    </div>
-                    <svg
-                      className={`w-4 h-4 text-text-secondary-light dark:text-text-secondary-dark/70 transition-transform ${
-                        isUserDropdownOpen ? "rotate-180" : ""
-                      }`}
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M19 9l-7 7-7-7"
-                      />
-                    </svg>
                   </button>
 
                   {/* Dropdown Menu */}
@@ -372,7 +336,8 @@ const Navbar: React.FC<NavbarProps> = ({
             </div>
 
             {/* Mobile Menu Button */}
-            <div className="flex md:hidden items-center space-x-3">
+            <div className="flex md:hidden items-center space-x-2">
+              {user && <NavSearch />}
               <ThemeToggle />
               <button
                 onClick={onToggleSidebar || toggleMobileMenu}
@@ -450,6 +415,13 @@ const Navbar: React.FC<NavbarProps> = ({
                     </p>
                   </div>
                 </div>
+              </div>
+            )}
+
+            {/* Academic Period Selector for Mobile */}
+            {user && (
+              <div className="mb-2">
+                <AcademicPeriodSelector compact />
               </div>
             )}
 

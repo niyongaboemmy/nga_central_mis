@@ -1,8 +1,9 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState } from "react";
 import {
   getTeacherDashboardStats,
   TeacherDashboardStats,
 } from "../api/dashboard";
+import { useAcademicPeriod } from "../contexts/AcademicPeriodContext";
 import DashboardCalendarWidget from "./calendar/DashboardCalendarWidget";
 
 interface TeacherDashboardProps {
@@ -10,19 +11,23 @@ interface TeacherDashboardProps {
 }
 
 const TeacherDashboard: React.FC<TeacherDashboardProps> = ({}) => {
+  const { selectedYearId, selectedTermId } = useAcademicPeriod();
   const [stats, setStats] = useState<TeacherDashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const hasFetchedRef = useRef(false);
 
   useEffect(() => {
-    if (hasFetchedRef.current) return;
-    hasFetchedRef.current = true;
+    if (!selectedYearId) return;
 
     const fetchStats = async () => {
+      setLoading(true);
       try {
-        const data = await getTeacherDashboardStats();
+        const data = await getTeacherDashboardStats({
+          academic_year_id: selectedYearId,
+          academic_term_id: selectedTermId ?? undefined,
+        });
         setStats(data);
+        setError(null);
       } catch (err) {
         console.error("Failed to fetch teacher dashboard stats:", err);
         setError("Failed to load dashboard data");
@@ -32,7 +37,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({}) => {
     };
 
     fetchStats();
-  }, []);
+  }, [selectedYearId, selectedTermId]);
 
   if (loading) {
     return (

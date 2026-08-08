@@ -1,7 +1,8 @@
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
+import { OAuth2Client } from "google-auth-library";
 import { db } from "../db";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import {
   User,
   AuthCredential,
@@ -31,6 +32,7 @@ import { asyncHandler } from "../middleware/asyncHandler";
 import config from "../config";
 import logger from "../utils/logger";
 import { recordActivity } from "../utils/activityLogger";
+import { getCurrentAcademicYearId } from "../utils/academicYear";
 
 export const login = asyncHandler(async (req: any, res: any) => {
   const { username, password } = req.body;
@@ -103,7 +105,7 @@ export const login = asyncHandler(async (req: any, res: any) => {
   }
 
   // Send OTP for 2FA
-  await sendOTPByEmail(user[0].user_id, user[0].email, "LOGIN_2FA");
+  const otp = await sendOTPByEmail(user[0].user_id, user[0].email, "LOGIN_2FA");
 
   // Generate temporary session token (short-lived)
   const tempToken = jwt.sign(
@@ -120,24 +122,23 @@ export const login = asyncHandler(async (req: any, res: any) => {
     {
       tempToken,
       requiresOTP: true,
+      // Only present outside production, where the OTP email is skipped so
+      // the frontend can auto-fill the code instead of hitting a real inbox.
+      ...(config.envType !== "production" && { devOtp: otp }),
     },
   );
 });
 
-export const verifyOTP = asyncHandler(async (req: any, res: any) => {
-  const { otp } = req.body;
-  const userId = req.user.userId;
+const googleClient = new OAuth2Client(config.google.clientId);
 
-  if (!otp) {
-    throw new ValidationError("OTP is required");
-  }
-
-  // Verify OTP
-  const isValidOTP = await verifyOTPUtil(userId, otp, "LOGIN_2FA");
-  if (!isValidOTP) {
-    throw new AuthenticationError("Invalid or expired OTP");
-  }
-
+// Builds and sends the final session (JWT + cookie + full user context) for
+// any login method that has already verified the user's identity (password
+// + OTP, or a verified Google ID token).
+const completeLogin = async (
+  userId: number,
+  res: any,
+  loginMethod: "OTP_EMAIL" | "GOOGLE_OAUTH",
+) => {
   // Get user permissions
   const permissions = await getUserPermissions(userId);
 
@@ -161,16 +162,29 @@ export const verifyOTP = asyncHandler(async (req: any, res: any) => {
     .where(eq(AuthCredential.user_id, userId))
     .limit(1);
 
-  // Get assigned programs for program leads
-  const assignedPrograms = await db
-    .select({
-      program_id: Program.program_id,
-      name: Program.name,
-      description: Program.description,
-    })
-    .from(UserProgramLead)
-    .innerJoin(Program, eq(UserProgramLead.program_id, Program.program_id))
-    .where(eq(UserProgramLead.user_id, userId));
+  // Get assigned programs for program leads, scoped to the current academic
+  // year -- program leadership is a per-year assignment, so a stale lead
+  // from a past year that hasn't been re-assigned should not keep access.
+  const currentYearIdForLead = await getCurrentAcademicYearId();
+  const assignedPrograms = currentYearIdForLead
+    ? await db
+        .select({
+          program_id: Program.program_id,
+          name: Program.name,
+          description: Program.description,
+        })
+        .from(UserProgramLead)
+        .innerJoin(
+          Program,
+          eq(UserProgramLead.program_id, Program.program_id),
+        )
+        .where(
+          and(
+            eq(UserProgramLead.user_id, userId),
+            eq(UserProgramLead.academic_year_id, currentYearIdForLead),
+          ),
+        )
+    : [];
 
   // Get user roles with permissions
   const userRoleIds = await db
@@ -288,16 +302,18 @@ export const verifyOTP = asyncHandler(async (req: any, res: any) => {
     maxAge: 24 * 60 * 60 * 1000, // 24 hours
   });
 
-  logger.info(`OTP verified, login completed for user: ${user[0].username}`);
+  logger.info(
+    `Login completed for user: ${user[0].username} via ${loginMethod}`,
+  );
 
   // Record activity
   await recordActivity(
     userId,
     "LOGIN_SUCCESS",
-    "User successfully logged in via 2FA",
+    `User successfully logged in via ${loginMethod === "GOOGLE_OAUTH" ? "Google" : "2FA"}`,
     "User",
     userId,
-    { method: "OTP_EMAIL", timestamp: new Date().toISOString() },
+    { method: loginMethod, timestamp: new Date().toISOString() },
     userId,
   );
 
@@ -316,6 +332,96 @@ export const verifyOTP = asyncHandler(async (req: any, res: any) => {
     allGrades,
     systems,
   });
+};
+
+export const verifyOTP = asyncHandler(async (req: any, res: any) => {
+  const { otp } = req.body;
+  const userId = req.user.userId;
+
+  if (!otp) {
+    throw new ValidationError("OTP is required");
+  }
+
+  // Verify OTP
+  const isValidOTP = await verifyOTPUtil(userId, otp, "LOGIN_2FA");
+  if (!isValidOTP) {
+    throw new AuthenticationError("Invalid or expired OTP");
+  }
+
+  await completeLogin(userId, res, "OTP_EMAIL");
+});
+
+// "Sign in with Google" — the frontend obtains a Google ID token (via Google
+// Identity Services) and sends it here. We verify it server-side against our
+// GOOGLE_CLIENT_ID, then match the verified email to an existing NGA MIS
+// account. We deliberately do NOT auto-create accounts from Google logins —
+// only pre-provisioned accounts (created by an admin) may sign in, since
+// account creation/role assignment for a school MIS is an administrative
+// action.
+export const googleLogin = asyncHandler(async (req: any, res: any) => {
+  const { credential } = req.body;
+
+  if (!credential) {
+    throw new ValidationError("Google credential is required");
+  }
+
+  if (!config.google.clientId) {
+    throw new AuthenticationError("Google sign-in is not configured");
+  }
+
+  let payload;
+  try {
+    const ticket = await googleClient.verifyIdToken({
+      idToken: credential,
+      audience: config.google.clientId,
+    });
+    payload = ticket.getPayload();
+  } catch (error) {
+    logger.warn(`Google ID token verification failed: ${error}`);
+    throw new AuthenticationError("Invalid or expired Google credential");
+  }
+
+  if (!payload?.email || !payload.email_verified) {
+    throw new AuthenticationError(
+      "Your Google account's email is not verified",
+    );
+  }
+
+  const sanitizedEmail = sanitizeString(payload.email);
+
+  const user = await db
+    .select()
+    .from(User)
+    .where(eq(User.email, sanitizedEmail))
+    .limit(1);
+
+  if (user.length === 0) {
+    logger.warn(`Google login attempt for unknown email: ${sanitizedEmail}`);
+    throw new AuthenticationError(
+      "No NGA MIS account found for this Google email. Contact your administrator.",
+    );
+  }
+
+  if (user[0].status !== "ACTIVE") {
+    throw new AuthenticationError("Account is not active");
+  }
+
+  // Link the Google account to the existing AuthCredential row (if not
+  // already linked) so future logins can be audited/traced.
+  const auth = await db
+    .select()
+    .from(AuthCredential)
+    .where(eq(AuthCredential.user_id, user[0].user_id))
+    .limit(1);
+
+  if (auth.length > 0 && !auth[0].google_id) {
+    await db
+      .update(AuthCredential)
+      .set({ google_id: payload.sub })
+      .where(eq(AuthCredential.user_id, user[0].user_id));
+  }
+
+  await completeLogin(user[0].user_id, res, "GOOGLE_OAUTH");
 });
 
 export const getSession = asyncHandler(async (req: any, res: any) => {

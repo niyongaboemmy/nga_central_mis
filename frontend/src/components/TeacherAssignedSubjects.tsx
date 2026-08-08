@@ -1,41 +1,44 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
+import { motion, AnimatePresence } from "framer-motion";
 import { MyAssignedSubject, myAssignedSubjectsApi } from "../api/academics";
-import Button from "./ui/Button";
-import EnrolledStudents from "./EnrolledStudents";
+import { useAcademicPeriod } from "../contexts/AcademicPeriodContext";
 import {
   BookOpen,
   Users,
   GraduationCap,
   Calendar,
-  Eye,
-  Filter,
   Search,
   BarChart3,
-  ArrowRight,
+  X,
+  ArrowUpDown,
+  Layers,
 } from "lucide-react";
+import SubjectItemCard from "./subjects/SubjectItemCard";
+
+type SortMode = "name" | "classes";
 
 const TeacherAssignedSubjects: React.FC = () => {
   const navigate = useNavigate();
+  const { selectedYearId, selectedTermId } = useAcademicPeriod();
   const [subjects, setSubjects] = useState<MyAssignedSubject[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showStudentsModal, setShowStudentsModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [filterYear, setFilterYear] = useState<string>("all");
-  const [selectedSubjectData, setSelectedSubjectData] = useState<{
-    subjectId: number;
-    subjectName: string;
-    academicYearId: number;
-    academicYearName: string;
-  } | null>(null);
+  const [gradeFilter, setGradeFilter] = useState("all");
+  const [programFilter, setProgramFilter] = useState("all");
+  const [sortMode, setSortMode] = useState<SortMode>("name");
 
   useEffect(() => {
     loadAssignedSubjects();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedTermId]);
 
   const loadAssignedSubjects = async () => {
     try {
-      const response = await myAssignedSubjectsApi.getAll();
+      setLoading(true);
+      const response = await myAssignedSubjectsApi.getAll(
+        selectedTermId ?? undefined,
+      );
       setSubjects(response.data.data || []);
     } catch (error) {
       console.error("Failed to load assigned subjects:", error);
@@ -44,19 +47,9 @@ const TeacherAssignedSubjects: React.FC = () => {
     }
   };
 
-  const handleViewStudents = (subject: MyAssignedSubject, grade: any) => {
-    setSelectedSubjectData({
-      subjectId: subject.subject_id,
-      subjectName: subject.subject_name,
-      academicYearId: grade.academic_year_id,
-      academicYearName: grade.academic_year_name,
-    });
-    setShowStudentsModal(true);
-  };
-
-  const getUniqueGrades = () => {
+  const getUniqueGrades = (list: MyAssignedSubject[]) => {
     const gradeSet = new Set<string>();
-    subjects.forEach((subject) => {
+    list.forEach((subject) => {
       subject.grades.forEach((grade) => {
         gradeSet.add(`${grade.grade_name} - ${grade.program_name}`);
       });
@@ -64,9 +57,9 @@ const TeacherAssignedSubjects: React.FC = () => {
     return gradeSet.size;
   };
 
-  const getTotalClassGroups = () => {
+  const getTotalClassGroups = (list: MyAssignedSubject[]) => {
     const classGroupSet = new Set<string>();
-    subjects.forEach((subject) => {
+    list.forEach((subject) => {
       subject.grades.forEach((grade) => {
         classGroupSet.add(grade.class_group_name);
       });
@@ -74,34 +67,59 @@ const TeacherAssignedSubjects: React.FC = () => {
     return classGroupSet.size;
   };
 
-  const getUniqueYears = () => {
-    const yearSet = new Set<string>();
-    subjects.forEach((subject) => {
-      subject.grades.forEach((grade) => {
-        yearSet.add(grade.academic_year_name);
-      });
-    });
-    return Array.from(yearSet);
-  };
-
-  const filteredSubjects = subjects
+  const yearFilteredSubjects = subjects
     .map((subject) => ({
       ...subject,
-      grades:
-        filterYear === "all"
-          ? subject.grades
-          : subject.grades.filter(
-              (g) => g.academic_year_name === filterYear,
-            ),
+      grades: selectedYearId
+        ? subject.grades.filter((g) => g.academic_year_id === selectedYearId)
+        : subject.grades,
+    }))
+    .filter((subject) => subject.grades.length > 0);
+
+  const gradeOptions = useMemo(
+    () =>
+      Array.from(
+        new Set(yearFilteredSubjects.flatMap((s) => s.grades.map((g) => g.grade_name))),
+      ).sort(),
+    [yearFilteredSubjects],
+  );
+  const programOptions = useMemo(
+    () =>
+      Array.from(
+        new Set(yearFilteredSubjects.flatMap((s) => s.grades.map((g) => g.program_name))),
+      ).sort(),
+    [yearFilteredSubjects],
+  );
+
+  const filteredSubjects = yearFilteredSubjects
+    .map((subject) => ({
+      ...subject,
+      grades: subject.grades.filter(
+        (g) =>
+          (gradeFilter === "all" || g.grade_name === gradeFilter) &&
+          (programFilter === "all" || g.program_name === programFilter),
+      ),
     }))
     .filter(
       (subject) =>
-        subject.subject_name
-          .toLowerCase()
-          .includes(searchQuery.toLowerCase()) ||
-        subject.subject_code?.toLowerCase().includes(searchQuery.toLowerCase()),
+        subject.grades.length > 0 &&
+        (subject.subject_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          subject.subject_code?.toLowerCase().includes(searchQuery.toLowerCase())),
     )
-    .filter((subject) => subject.grades.length > 0);
+    .sort((a, b) =>
+      sortMode === "classes"
+        ? b.grades.length - a.grades.length
+        : a.subject_name.localeCompare(b.subject_name),
+    );
+
+  const hasActiveFilters =
+    searchQuery.trim() !== "" || gradeFilter !== "all" || programFilter !== "all";
+
+  const clearFilters = () => {
+    setSearchQuery("");
+    setGradeFilter("all");
+    setProgramFilter("all");
+  };
 
   if (loading) {
     return (
@@ -116,202 +134,197 @@ const TeacherAssignedSubjects: React.FC = () => {
     );
   }
 
-  const uniqueYears = getUniqueYears();
-
   return (
-    <>
-      <div className="space-y-6 p-3 md:p-5">
-        {/* Hero Header */}
-        <div className="bg-gradient-to-br from-blue-600 via-blue-700 to-blue-800 dark:from-blue-700 dark:via-blue-800 dark:to-blue-900 rounded-3xl p-3 md:p-4 text-white shadow-lg hover:shadow-xl transition-all duration-300 flex flex-col lg:flex-row items-center justify-center lg:justify-between gap-4">
-          <div className="flex items-center justify-between pl-2 md:pl-4">
-            <div className="text-center lg:text-left">
-              <h1 className="text-2xl md:text-3xl lg:text-2xl font-bold mb-1">
-                Assigned Subjects
-              </h1>
-              <p className="text-blue-100 text-sm">
-                Manage your courses and enrolled students
-              </p>
-            </div>
-            {/* <BookOpen className="w-12 h-12 opacity-20 animate-pulse" /> */}
-          </div>
-
-          {/* Stats Row */}
-          <div className="flex flex-row flex-wrap justify-center gap-3">
-            <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-3 hover:bg-white/20 transition-all duration-200 w-full sm:w-max">
-              <div className="flex items-center gap-2">
-                <BarChart3 className="w-6 h-6 text-blue-200 flex-shrink-0" />
-                <div className="min-w-0">
-                  <p className="text-blue-100 text-xs">Total Subjects</p>
-                  <p className="text-xl font-bold">{subjects.length}</p>
-                </div>
-              </div>
-            </div>
-            <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-3 hover:bg-white/20 transition-all duration-200 w-full sm:w-max">
-              <div className="flex items-center gap-2">
-                <Users className="w-6 h-6 text-blue-200 flex-shrink-0" />
-                <div className="min-w-0">
-                  <p className="text-blue-100 text-xs">Class Groups</p>
-                  <p className="text-xl font-bold">{getTotalClassGroups()}</p>
-                </div>
-              </div>
-            </div>
-            <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-3 hover:bg-white/20 transition-all duration-200 w-full sm:w-max">
-              <div className="flex items-center gap-2">
-                <GraduationCap className="w-6 h-6 text-blue-200 flex-shrink-0" />
-                <div className="min-w-0">
-                  <p className="text-blue-100 text-xs">Grades/Programs</p>
-                  <p className="text-xl font-bold">{getUniqueGrades()}</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Search and Filter Section */}
-        <div className="flex flex-col sm:flex-row gap-4">
-          <div className="flex-1 relative">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Search subjects by name or code..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-12 pr-4 py-3 rounded-2xl border border-gray-200 dark:border-gray-700/40 bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-          <div className="flex items-center gap-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700/40 rounded-2xl px-4 py-3">
-            <Filter className="w-5 h-5 text-gray-600 dark:text-gray-400" />
-            <select
-              value={filterYear}
-              onChange={(e) => setFilterYear(e.target.value)}
-              className="bg-transparent text-gray-900 dark:text-white focus:outline-none text-sm"
-            >
-              <option value="all">All Years</option>
-              {uniqueYears.map((year) => (
-                <option key={year} value={year}>
-                  {year}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        {/* Subjects Grid */}
-        {filteredSubjects.length === 0 ? (
-          <div className="text-center py-16">
-            <div className="w-20 h-20 bg-gray-100 dark:bg-gray-700 rounded-3xl flex items-center justify-center mx-auto mb-6">
-              <BookOpen className="w-10 h-10 text-gray-400" />
-            </div>
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-              {subjects.length === 0
-                ? "No Assigned Subjects"
-                : "No matches found"}
-            </h3>
-            <p className="text-gray-500 dark:text-gray-400 text-sm max-w-sm mx-auto">
-              {subjects.length === 0
-                ? "Subjects will appear once you're assigned to classes."
-                : "Try adjusting your search or filters."}
+    <div className="space-y-6 p-3 md:p-5">
+      {/* Hero Header */}
+      <div className="bg-gradient-to-br from-blue-600 via-blue-700 to-blue-800 dark:from-blue-700 dark:via-blue-800 dark:to-blue-900 rounded-3xl p-3 md:p-4 text-white shadow-lg hover:shadow-xl transition-all duration-300 flex flex-col lg:flex-row items-center justify-center lg:justify-between gap-4">
+        <div className="flex items-center justify-between pl-2 md:pl-4">
+          <div className="text-center lg:text-left">
+            <h1 className="text-2xl md:text-3xl lg:text-2xl font-bold mb-1">
+              Assigned Subjects
+            </h1>
+            <p className="text-blue-100 text-sm">
+              Manage your courses and enrolled students
             </p>
           </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-            {filteredSubjects.map((subject) => (
-              <div
-                key={subject.subject_id}
-                className="group bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700/40 overflow-hidden shadow-sm hover:shadow-lg hover:scale-105 transition-all duration-300 hover:border-blue-300 dark:hover:border-blue-600"
-              >
-                {/* Subject Header — click to open subject detail */}
-                <button
-                  onClick={() => navigate(`/subjects/${subject.subject_id}`)}
-                  className="w-full text-left bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-900 p-4 border-b border-gray-200 dark:border-gray-700/60 hover:from-blue-50 hover:to-blue-100 dark:hover:from-blue-950/30 dark:hover:to-blue-900/20 transition-all duration-200"
-                >
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-start gap-3">
-                      <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900 rounded-xl flex items-center justify-center group-hover:bg-blue-200 dark:group-hover:bg-blue-800/50 transition-colors">
-                        <BookOpen className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex items-center gap-1.5">
-                          <h3 className="text-sm font-bold text-gray-900 dark:text-white group-hover:text-blue-700 dark:group-hover:text-blue-400 transition-colors">
-                            {subject.subject_name}
-                          </h3>
-                          <ArrowRight className="w-3.5 h-3.5 text-gray-400 group-hover:text-blue-500 dark:group-hover:text-blue-400 opacity-0 group-hover:opacity-100 transition-all -translate-x-1 group-hover:translate-x-0" />
-                        </div>
-                        {subject.subject_code && (
-                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                            {subject.subject_code}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                    <div>
-                      <div className="bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 text-xs font-semibold px-2 py-0.5 rounded-full truncate">
-                        {subject.grades.length} class
-                        {subject.grades.length !== 1 ? "es" : ""}
-                      </div>
-                    </div>
-                  </div>
-                </button>
+        </div>
 
-                {/* Assignments */}
-                <div className="p-4 space-y-2">
-                  {subject.grades.map((grade, index) => (
-                    <div
-                      key={index}
-                      className="bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-600/20 rounded-xl p-3 hover:bg-gray-100 dark:hover:bg-gray-800/40 transition-all duration-200 hover:border-blue-300 dark:hover:border-blue-500"
-                    >
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="flex-1">
-                          <h4 className="font-semibold text-gray-900 dark:text-white text-xs mb-1">
-                            {grade.grade_name}
-                            <span className="text-gray-500 dark:text-gray-400 font-normal">
-                              {" "}
-                              • {grade.program_name}
-                            </span>
-                          </h4>
-                          <div className="flex flex-wrap items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
-                            <span className="flex items-center gap-1 bg-white dark:bg-gray-800 px-2 py-0.5 rounded-md">
-                              <Users className="w-3 h-3" />
-                              {grade.class_group_name}
-                            </span>
-                            <span className="flex items-center gap-1 bg-white dark:bg-gray-800 px-2 py-0.5 rounded-md">
-                              <Calendar className="w-3 h-3" />
-                              {grade.academic_year_name}
-                            </span>
-                          </div>
-                        </div>
-                        <Button
-                          onClick={() => handleViewStudents(subject, grade)}
-                          className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600 text-white rounded-full px-3 py-1.5 flex items-center gap-1.5 whitespace-nowrap text-xs font-medium transition-colors shadow-sm hover:shadow-md"
-                        >
-                          <Eye className="w-3.5 h-3.5" />
-                          <span className="hidden sm:inline">View</span>
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+        {/* Stats Row */}
+        <div className="flex flex-row flex-wrap justify-center gap-3">
+          <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-3 hover:bg-white/20 transition-all duration-200 w-full sm:w-max">
+            <div className="flex items-center gap-2">
+              <BarChart3 className="w-6 h-6 text-blue-200 flex-shrink-0" />
+              <div className="min-w-0">
+                <p className="text-blue-100 text-xs">Total Subjects</p>
+                <p className="text-xl font-bold">
+                  {yearFilteredSubjects.length}
+                </p>
               </div>
-            ))}
+            </div>
           </div>
-        )}
+          <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-3 hover:bg-white/20 transition-all duration-200 w-full sm:w-max">
+            <div className="flex items-center gap-2">
+              <Users className="w-6 h-6 text-blue-200 flex-shrink-0" />
+              <div className="min-w-0">
+                <p className="text-blue-100 text-xs">Class Groups</p>
+                <p className="text-xl font-bold">
+                  {getTotalClassGroups(yearFilteredSubjects)}
+                </p>
+              </div>
+            </div>
+          </div>
+          <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-3 hover:bg-white/20 transition-all duration-200 w-full sm:w-max">
+            <div className="flex items-center gap-2">
+              <GraduationCap className="w-6 h-6 text-blue-200 flex-shrink-0" />
+              <div className="min-w-0">
+                <p className="text-blue-100 text-xs">Grades/Programs</p>
+                <p className="text-xl font-bold">
+                  {getUniqueGrades(yearFilteredSubjects)}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
-      {/* Enrolled Students Modal */}
-      {selectedSubjectData && (
-        <EnrolledStudents
-          subjectId={selectedSubjectData.subjectId}
-          subjectName={selectedSubjectData.subjectName}
-          academicYearId={selectedSubjectData.academicYearId}
-          academicYearName={selectedSubjectData.academicYearName}
-          isOpen={showStudentsModal}
-          onClose={() => {
-            setShowStudentsModal(false);
-            setSelectedSubjectData(null);
-          }}
-        />
+      {/* Toolbar: search + filters + sort */}
+      <div className="flex flex-col sm:flex-row gap-3">
+        <div className="flex-1 relative">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Search subjects by name or code..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-12 pr-9 py-3 rounded-2xl border border-gray-200 dark:border-gray-700/30 bg-white dark:bg-gray-800/40 dark:backdrop-blur-sm text-gray-900 dark:text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery("")}
+              className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+
+        <select
+          value={gradeFilter}
+          onChange={(e) => setGradeFilter(e.target.value)}
+          className="px-3 py-3 text-sm rounded-2xl border border-gray-200 dark:border-gray-700/30 bg-white dark:bg-gray-800/40 dark:backdrop-blur-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+        >
+          <option value="all">All Grades</option>
+          {gradeOptions.map((g) => (
+            <option key={g} value={g}>
+              {g}
+            </option>
+          ))}
+        </select>
+
+        <select
+          value={programFilter}
+          onChange={(e) => setProgramFilter(e.target.value)}
+          className="px-3 py-3 text-sm rounded-2xl border border-gray-200 dark:border-gray-700/30 bg-white dark:bg-gray-800/40 dark:backdrop-blur-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+        >
+          <option value="all">All Programs</option>
+          {programOptions.map((p) => (
+            <option key={p} value={p}>
+              {p}
+            </option>
+          ))}
+        </select>
+
+        <div className="flex items-center gap-1.5 px-3 py-3 text-sm rounded-2xl border border-gray-200 dark:border-gray-700/30 bg-white dark:bg-gray-800/40 dark:backdrop-blur-sm text-gray-600 dark:text-gray-300">
+          <ArrowUpDown className="w-3.5 h-3.5 flex-shrink-0" />
+          <select
+            value={sortMode}
+            onChange={(e) => setSortMode(e.target.value as SortMode)}
+            className="bg-transparent focus:outline-none cursor-pointer"
+          >
+            <option value="name">Name (A-Z)</option>
+            <option value="classes">Most Classes</option>
+          </select>
+        </div>
+      </div>
+
+      {/* Active filters */}
+      {hasActiveFilters && (
+        <div className="flex items-center gap-2 flex-wrap text-xs">
+          <span className="text-gray-400 dark:text-gray-500">
+            {filteredSubjects.length} of {yearFilteredSubjects.length} subjects
+          </span>
+          <button
+            onClick={clearFilters}
+            className="text-blue-600 dark:text-blue-400 hover:underline font-medium"
+          >
+            Clear filters
+          </button>
+        </div>
       )}
-    </>
+
+      {/* Subjects List */}
+      {filteredSubjects.length === 0 ? (
+        <div className="text-center py-16">
+          <div className="w-20 h-20 bg-gray-100 dark:bg-gray-800/50 rounded-3xl flex items-center justify-center mx-auto mb-6">
+            <BookOpen className="w-10 h-10 text-gray-400" />
+          </div>
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+            {yearFilteredSubjects.length === 0
+              ? "No Assigned Subjects"
+              : "No matches found"}
+          </h3>
+          <p className="text-gray-500 dark:text-gray-400 text-sm max-w-sm mx-auto">
+            {yearFilteredSubjects.length === 0
+              ? "Subjects will appear once you're assigned to classes."
+              : "Try adjusting your search or filters."}
+          </p>
+        </div>
+      ) : (
+        <motion.div
+          className="space-y-3"
+          initial="hidden"
+          animate="visible"
+          variants={{
+            visible: { transition: { staggerChildren: 0.05 } },
+            hidden: {},
+          }}
+        >
+          <AnimatePresence initial={false}>
+            {filteredSubjects.map((subject) => (
+              <SubjectItemCard
+                key={subject.subject_id}
+                subjectName={subject.subject_name}
+                subjectCode={subject.subject_code}
+                grades={subject.grades.map((grade, index) => ({
+                  key: `${subject.subject_id}-${index}`,
+                  grade_name: grade.grade_name,
+                  class_group_name: grade.class_group_name,
+                  academic_year_name: grade.academic_year_name,
+                }))}
+                onCardClick={() => navigate(`/subjects/${subject.subject_id}`)}
+                animationVariants={{
+                  hidden: { opacity: 0, y: 10 },
+                  visible: { opacity: 1, y: 0 },
+                }}
+                rightMeta={
+                  <>
+                    <div className="flex items-center gap-1 text-xs text-gray-400 dark:text-gray-500">
+                      <Layers className="w-3.5 h-3.5" />
+                      {subject.grades.length} class
+                      {subject.grades.length !== 1 ? "es" : ""}
+                    </div>
+                    <div className="flex items-center gap-1 text-xs text-gray-400 dark:text-gray-500">
+                      <Calendar className="w-3.5 h-3.5" />
+                      {subject.grades[0]?.academic_year_name}
+                    </div>
+                  </>
+                }
+              />
+            ))}
+          </AnimatePresence>
+        </motion.div>
+      )}
+    </div>
   );
 };
 

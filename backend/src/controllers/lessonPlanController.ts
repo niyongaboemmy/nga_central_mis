@@ -19,6 +19,7 @@ import mammoth = require("mammoth");
 import { asyncHandler } from "../middleware/asyncHandler";
 import { successResponse } from "../utils/response";
 import { ValidationError } from "../errors/CustomError";
+import { persistLessonPlan } from "../services/lessonPlanPersistence";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY || "dummy",
@@ -151,118 +152,19 @@ export const createOrUpdateLessonPlan = async (req: Request, res: Response) => {
       return res.status(401).json({ message: "User not authenticated" });
     }
 
-    const result = await db.transaction(async (tx) => {
-      let finalLessonId = lesson_id;
-
-      if (lesson_id) {
-        // Update Master Record - only update lessonData fields, not user_id
-        await tx
-          .update(LO_Lesson)
-          .set(lessonData)
-          .where(eq(LO_Lesson.id, lesson_id));
-
-        // Clear existing related data for a clean re-write (common pattern for complex forms)
-        // Note: In production, you might want to do a proper sync/diff to preserve IDs
-        await tx
-          .delete(LO_LearningOutcome)
-          .where(eq(LO_LearningOutcome.lesson_id, lesson_id));
-        await tx
-          .delete(LO_LessonSection)
-          .where(eq(LO_LessonSection.lesson_id, lesson_id));
-        await tx
-          .delete(LO_IndicativeContent)
-          .where(eq(LO_IndicativeContent.lesson_id, lesson_id));
-        await tx
-          .delete(LO_LessonAssignment)
-          .where(eq(LO_LessonAssignment.lesson_id, lesson_id));
-        await tx
-          .delete(LO_LessonEvaluation)
-          .where(eq(LO_LessonEvaluation.lesson_id, lesson_id));
-      } else {
-        // Create Master Record - ensure user_id is set AFTER spread to override any undefined value
-        const insertResult = await tx.insert(LO_Lesson).values({
-          entry_id: Number(entry_id),
-          user_id: userId,
-          ...lessonData,
-        });
-        finalLessonId = (insertResult[0] as any).insertId;
-      }
-
-      // 1. Save Outcomes
-      if (outcomes && Array.isArray(outcomes)) {
-        for (const outcome of outcomes) {
-          const {
-            activities,
-            resources,
-            id: oldOutcomeId,
-            ...outcomeData
-          } = outcome;
-          const outResult = await tx.insert(LO_LearningOutcome).values({
-            ...outcomeData,
-            lesson_id: finalLessonId,
-          });
-          const newOutcomeId = (outResult[0] as any).insertId;
-
-          if (activities && Array.isArray(activities)) {
-            for (const activity of activities) {
-              await tx.insert(LO_LearningOutcomeActivity).values({
-                ...activity,
-                learning_outcome_id: newOutcomeId,
-              });
-            }
-          }
-
-          if (resources && Array.isArray(resources)) {
-            for (const resource of resources) {
-              await tx.insert(LO_LearningOutcomeResource).values({
-                ...resource,
-                learning_outcome_id: newOutcomeId,
-              });
-            }
-          }
-        }
-      }
-
-      // 2. Save Sections
-      if (sections && Array.isArray(sections)) {
-        for (const section of sections) {
-          await tx.insert(LO_LessonSection).values({
-            ...section,
-            lesson_id: finalLessonId,
-          });
-        }
-      }
-
-      // 3. Save Indicative Content
-      if (indicativeContent && Array.isArray(indicativeContent)) {
-        for (const content of indicativeContent) {
-          await tx.insert(LO_IndicativeContent).values({
-            ...content,
-            lesson_id: finalLessonId,
-          });
-        }
-      }
-
-      // 4. Save Assignments
-      if (assignments && Array.isArray(assignments)) {
-        for (const assignment of assignments) {
-          await tx.insert(LO_LessonAssignment).values({
-            ...assignment,
-            lesson_id: finalLessonId,
-          });
-        }
-      }
-
-      // 5. Save Evaluation
-      if (evaluation) {
-        await tx.insert(LO_LessonEvaluation).values({
-          ...evaluation,
-          lesson_id: finalLessonId,
-        });
-      }
-
-      return finalLessonId;
-    });
+    const result = await db.transaction(async (tx) =>
+      persistLessonPlan(tx, {
+        entryId: Number(entry_id),
+        userId,
+        lessonId: lesson_id,
+        lessonData,
+        outcomes,
+        sections,
+        indicativeContent,
+        assignments,
+        evaluation,
+      }),
+    );
 
     res.json({
       message: lesson_id

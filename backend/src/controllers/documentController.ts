@@ -92,15 +92,31 @@ async function getUserFilterAssociations(
       );
   }
 
-  const programLeads = await db
-    .select({ program_id: UserProgramLead.program_id })
-    .from(UserProgramLead)
-    .where(eq(UserProgramLead.user_id, userId));
+  // Program-lead and class-teacher-of-grade roles are year-scoped; only the
+  // current year's assignments should grant document access.
+  const programLeads = currentYearId
+    ? await db
+        .select({ program_id: UserProgramLead.program_id })
+        .from(UserProgramLead)
+        .where(
+          and(
+            eq(UserProgramLead.user_id, userId),
+            eq(UserProgramLead.academic_year_id, currentYearId),
+          ),
+        )
+    : [];
 
-  const gradeAssignments = await db
-    .select({ grade_id: UserGrade.grade_id })
-    .from(UserGrade)
-    .where(eq(UserGrade.user_id, userId));
+  const gradeAssignments = currentYearId
+    ? await db
+        .select({ grade_id: UserGrade.grade_id })
+        .from(UserGrade)
+        .where(
+          and(
+            eq(UserGrade.user_id, userId),
+            eq(UserGrade.academic_year_id, currentYearId),
+          ),
+        )
+    : [];
 
   return {
     assignedSubjectIds: assignedSubjects.map((s) => s.subject_id),
@@ -332,25 +348,43 @@ export const getDocumentShareFilterOptions = asyncHandler(
         );
     }
 
-    // Get user's program leads
-    const programLeads = await db
-      .select({
-        program_id: UserProgramLead.program_id,
-        program_name: Program.name,
-      })
-      .from(UserProgramLead)
-      .innerJoin(Program, eq(UserProgramLead.program_id, Program.program_id))
-      .where(eq(UserProgramLead.user_id, userId));
+    // Get user's program leads, scoped to the current academic year
+    const programLeads = currentYearId
+      ? await db
+          .select({
+            program_id: UserProgramLead.program_id,
+            program_name: Program.name,
+          })
+          .from(UserProgramLead)
+          .innerJoin(
+            Program,
+            eq(UserProgramLead.program_id, Program.program_id),
+          )
+          .where(
+            and(
+              eq(UserProgramLead.user_id, userId),
+              eq(UserProgramLead.academic_year_id, currentYearId),
+            ),
+          )
+      : [];
 
-    // Get user's grade assignments (class teacher)
-    const gradeAssignments = await db
-      .select({
-        grade_id: UserGrade.grade_id,
-        grade_name: Grade.name,
-      })
-      .from(UserGrade)
-      .innerJoin(Grade, eq(UserGrade.grade_id, Grade.grade_id))
-      .where(eq(UserGrade.user_id, userId));
+    // Get user's grade assignments (class teacher), scoped to the current
+    // academic year
+    const gradeAssignments = currentYearId
+      ? await db
+          .select({
+            grade_id: UserGrade.grade_id,
+            grade_name: Grade.name,
+          })
+          .from(UserGrade)
+          .innerJoin(Grade, eq(UserGrade.grade_id, Grade.grade_id))
+          .where(
+            and(
+              eq(UserGrade.user_id, userId),
+              eq(UserGrade.academic_year_id, currentYearId),
+            ),
+          )
+      : [];
 
     // Get all subjects (for SUPER_ADMIN or users with proper permissions)
     const allSubjects = await db
@@ -626,7 +660,8 @@ export const getUsersByRole = asyncHandler(async (req: any, res: any) => {
 
 export const createFolder = asyncHandler(async (req: any, res: any) => {
   const userId = req.user.userId;
-  const { name, description, parentFolderId, color } = req.body;
+  const { name, description, parentFolderId, color, academicYearId } =
+    req.body;
 
   // Validate input
   if (!name || name.trim().length === 0) {
@@ -658,6 +693,7 @@ export const createFolder = asyncHandler(async (req: any, res: any) => {
   const result = await db.insert(DocumentFolder).values({
     user_id: userId,
     parent_folder_id: parentFolderId || null,
+    academic_year_id: academicYearId ? parseInt(academicYearId) : null,
     name: sanitizeString(name),
     description: description ? sanitizeString(description) : null,
     color: color || "#008d3b",
@@ -707,7 +743,7 @@ export const getFolders = asyncHandler(async (req: any, res: any) => {
     });
   }
 
-  const { parentFolderId } = req.query;
+  const { parentFolderId, academicYearId } = req.query;
 
   if (
     parentFolderId &&
@@ -716,7 +752,15 @@ export const getFolders = asyncHandler(async (req: any, res: any) => {
     throw new ValidationError("Invalid parentFolderId");
   }
 
+  if (
+    academicYearId &&
+    (isNaN(Number(academicYearId)) || Number(academicYearId) <= 0)
+  ) {
+    throw new ValidationError("Invalid academicYearId");
+  }
+
   const parentId = parentFolderId ? parseInt(parentFolderId) : null;
+  const yearId = academicYearId ? parseInt(academicYearId) : null;
 
   // Get folders owned by the user
   const ownedFolders = await db
@@ -739,6 +783,11 @@ export const getFolders = asyncHandler(async (req: any, res: any) => {
         parentId === null
           ? isNull(DocumentFolder.parent_folder_id)
           : eq(DocumentFolder.parent_folder_id, parentId),
+        // Only scope root-level folders by academic year; folders opened by
+        // navigating into a parent are already scoped by that parent.
+        parentId === null && yearId !== null
+          ? eq(DocumentFolder.academic_year_id, yearId)
+          : undefined,
       ),
     );
 
@@ -772,6 +821,9 @@ export const getFolders = asyncHandler(async (req: any, res: any) => {
             isNull(FolderPermission.expires_at),
             gt(FolderPermission.expires_at, new Date()),
           ),
+          yearId !== null
+            ? eq(DocumentFolder.academic_year_id, yearId)
+            : undefined,
         ),
       );
   } else {
@@ -1302,6 +1354,11 @@ export const revokeFolderAccess = asyncHandler(async (req: any, res: any) => {
 // Get folders shared with me
 export const getSharedFolders = asyncHandler(async (req: any, res: any) => {
   const userId = req.user.userId;
+  const { academicYearId } = req.query;
+  const yearId =
+    academicYearId && !isNaN(Number(academicYearId))
+      ? parseInt(academicYearId as string)
+      : null;
 
   const shared = await db
     .select({
@@ -1329,6 +1386,9 @@ export const getSharedFolders = asyncHandler(async (req: any, res: any) => {
           isNull(FolderPermission.expires_at),
           gt(FolderPermission.expires_at, new Date()),
         ),
+        yearId !== null
+          ? eq(DocumentFolder.academic_year_id, yearId)
+          : undefined,
       ),
     );
 
@@ -1449,7 +1509,7 @@ export const previewSchemeOfWork = asyncHandler(async (req: any, res: any) => {
 
 export const uploadDocument = asyncHandler(async (req: any, res: any) => {
   const userId = req.user.userId;
-  const { folderId, description, tags } = req.body;
+  const { folderId, description, tags, academicYearId } = req.body;
   const file = req.file;
 
   if (!file) {
@@ -1494,6 +1554,7 @@ export const uploadDocument = asyncHandler(async (req: any, res: any) => {
     const result = await db.insert(Document).values({
       user_id: userId,
       folder_id: folderId ? parseInt(folderId) : null,
+      academic_year_id: academicYearId ? parseInt(academicYearId) : null,
       file_name: fileName,
       original_name: file.originalname,
       file_path: remoteFilePath,
@@ -1541,6 +1602,7 @@ export const getDocuments = asyncHandler(async (req: any, res: any) => {
   const userId = req.user.userId;
   const {
     folderId,
+    academicYearId,
     search,
     page = 1,
     limit = 20,
@@ -1575,6 +1637,13 @@ export const getDocuments = asyncHandler(async (req: any, res: any) => {
     }
   } else {
     conditions.push(isNull(Document.folder_id));
+
+    // Only scope root-level documents by academic year; documents inside a
+    // folder are already scoped by that folder.
+    if (academicYearId) {
+      const yearIdNum = parseInt(academicYearId as string);
+      conditions.push(eq(Document.academic_year_id, yearIdNum));
+    }
   }
 
   // Get total count
@@ -2282,6 +2351,11 @@ export const shareDocument = asyncHandler(async (req: any, res: any) => {
 
 export const getSharedDocuments = asyncHandler(async (req: any, res: any) => {
   const userId = req.user.userId;
+  const { academicYearId } = req.query;
+  const yearId =
+    academicYearId && !isNaN(Number(academicYearId))
+      ? parseInt(academicYearId as string)
+      : null;
 
   // Every DocumentPermission row for this user — both direct "user" shares
   // and expanded "role" shares (one row per role member, created at share
@@ -2314,6 +2388,7 @@ export const getSharedDocuments = asyncHandler(async (req: any, res: any) => {
           isNull(DocumentPermission.expires_at),
           gt(DocumentPermission.expires_at, new Date()),
         ),
+        yearId !== null ? eq(Document.academic_year_id, yearId) : undefined,
       ),
     );
 
@@ -2437,9 +2512,15 @@ export const getFolderTree = asyncHandler(async (req: any, res: any) => {
       throw new ValidationError("Invalid user ID");
     }
 
+    const { academicYearId } = req.query;
+    const yearId =
+      academicYearId && !isNaN(Number(academicYearId))
+        ? parseInt(academicYearId as string)
+        : null;
+
     // Fetch folders from database using raw SQL to avoid NaN issues
     const result = await db.execute(sql`
-      SELECT folder_id, user_id, parent_folder_id, name, description, color, created_at, updated_at
+      SELECT folder_id, user_id, parent_folder_id, academic_year_id, name, description, color, created_at, updated_at
       FROM DocumentFolder
       WHERE user_id = ${userId}
       ORDER BY name ASC
@@ -2456,7 +2537,20 @@ export const getFolderTree = asyncHandler(async (req: any, res: any) => {
         }));
     };
 
-    const tree = buildTree(folders);
+    // Only scope root folders by academic year — nested folders inherit
+    // their root ancestor's year context, mirroring getFolders navigation.
+    const rootFolders =
+      yearId !== null
+        ? folders.filter(
+            (f: any) =>
+              f.parent_folder_id === null && f.academic_year_id === yearId,
+          )
+        : folders.filter((f: any) => f.parent_folder_id === null);
+
+    const tree = rootFolders.map((root: any) => ({
+      ...root,
+      children: buildTree(folders, root.folder_id),
+    }));
 
     successResponse(res, "Folder tree retrieved successfully", tree);
   } catch (error: any) {

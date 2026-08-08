@@ -1,12 +1,8 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useUser } from "../contexts/UserContext";
 import { useToast } from "../contexts/ToastContext";
+import { useAcademicPeriod } from "../contexts/AcademicPeriodContext";
 import { Permissions } from "../constants/permissions";
-import {
-  academicYearsApi,
-  academicTermsApi,
-  AcademicTerm,
-} from "../api/academics";
 import {
   CalendarSlot,
   CalendarActivity,
@@ -113,12 +109,16 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({
       ),
     );
 
+  // Academic period (year/term) comes from the global selector in the top nav
+  const {
+    years: academicYears,
+    terms: academicTerms,
+    selectedYearId: selectedYear,
+    selectedTermId: selectedTerm,
+  } = useAcademicPeriod();
+
   // State
   const [loading, setLoading] = useState(true);
-  const [academicYears, setAcademicYears] = useState<any[]>([]);
-  const [academicTerms, setAcademicTerms] = useState<AcademicTerm[]>([]);
-  const [selectedYear, setSelectedYear] = useState<number | null>(null);
-  const [selectedTerm, setSelectedTerm] = useState<number | null>(null);
   const [slots, setSlots] = useState<CalendarSlot[]>([]);
   const [activities, setActivities] = useState<CalendarActivity[]>([]);
   const [upcomingLessons, setUpcomingLessons] = useState<UpcomingLesson[]>([]);
@@ -150,6 +150,12 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({
     useState<AcademicCalendar | null>(null);
   const [showCalendarModal, setShowCalendarModal] = useState(false);
   const [availableClassGroups, setAvailableClassGroups] = useState<any[]>([]);
+  // Every class group in the selected year, regardless of whether it has an
+  // AcademicCalendar row yet — lets the "Select a class group" dropdown list
+  // groups you can create a first calendar for, not just ones that already
+  // have one (previously the dropdown was populated from `calendars` alone,
+  // so a term with zero calendars had nothing selectable at all).
+  const [allClassGroupsForYear, setAllClassGroupsForYear] = useState<any[]>([]);
   const [calendarFormData, setCalendarFormData] = useState({
     academic_year_id: "",
     academic_term_id: "",
@@ -173,9 +179,14 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({
   }, [activities, selectedCalendar]);
 
   // There is no "all class groups" combined view — a calendar only ever
-  // renders for the one specific class group currently selected.
+  // renders for the one specific class group currently selected. A
+  // `calendar_id` of 0 is the synthetic placeholder used when the selected
+  // class group has no real AcademicCalendar row yet (see
+  // `allClassGroupsForYear` below) — never render a grid for that.
   const calendarsToDisplay = useMemo(() => {
-    return selectedCalendar ? [selectedCalendar] : [];
+    return selectedCalendar && selectedCalendar.calendar_id
+      ? [selectedCalendar]
+      : [];
   }, [selectedCalendar]);
 
   // Form state for creating/editing slots
@@ -219,18 +230,25 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({
     return getDateRangeString(weekDates);
   }, [weekDates]);
 
-  // Load data
+  // Set current week start to today (Monday of current week) on mount
   useEffect(() => {
-    loadAcademicYears();
+    const today = new Date();
+    setCurrentWeekStart(getStartOfWeek(today));
     const interval = setInterval(checkUpcoming, 60000);
     return () => clearInterval(interval);
   }, []);
 
-  // Load data when term changes
+  // Load data when term changes. The previously-selected class group's
+  // calendar almost never applies to the new term (a calendar is scoped to
+  // one specific year+term+class-group triple), so it's cleared here —
+  // otherwise the dropdown kept showing a stale selection from the prior
+  // term while the loaded slots/activities silently belonged to the new one.
   useEffect(() => {
+    setSelectedCalendar(null);
     if (selectedTerm) {
       loadData();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedTerm]);
 
   // Reload the instructor's schedule when they switch their own class group
@@ -268,48 +286,6 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({
     }
   }, [formData.class_group_id, selectedTerm, showModal]);
 
-  // Load academic terms for a year
-  const loadTerms = async (yearId: number) => {
-    try {
-      const termsRes = await academicTermsApi.getAll(yearId);
-      const responseData = (termsRes as any).data;
-      const terms = (responseData as any).data || responseData;
-      setAcademicTerms(terms);
-
-      // Find current term
-      const currentTerm = terms.find((t: AcademicTerm) => t.is_current === 1);
-      if (currentTerm) {
-        setSelectedTerm(currentTerm.academic_term_id);
-      }
-    } catch (error) {
-      console.error("Failed to load academic terms:", error);
-    }
-  };
-
-  // Load academic years and terms
-  const loadAcademicYears = async () => {
-    try {
-      const yearsRes = await academicYearsApi.getAll();
-      const responseData = (yearsRes as any).data;
-      const years = (responseData as any).data || responseData;
-      setAcademicYears(years);
-
-      // Find current year or first available
-      const currentYear =
-        years.find((y: any) => y.is_current === 1) || years[0];
-      if (currentYear) {
-        setSelectedYear(currentYear.academic_year_id);
-        loadTerms(currentYear.academic_year_id);
-        // Set current week start to today (Monday of current week)
-        const today = new Date();
-        const startOfWeek = getStartOfWeek(today);
-        setCurrentWeekStart(startOfWeek);
-      }
-    } catch (error) {
-      console.error("Failed to load academic years:", error);
-    }
-  };
-
   const loadData = async () => {
     setLoading(true);
     try {
@@ -328,7 +304,7 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({
           calendarParams.academic_term_id = selectedTerm;
         }
 
-        const [slotsData, activitiesData, setupDataRes, calendarsData] =
+        const [slotsData, activitiesData, setupDataRes, calendarsData, classGroupsData] =
           await Promise.all([
             getCalendarSlots(params),
             getCalendarActivities(params),
@@ -339,11 +315,15 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({
                 : undefined,
             ),
             getAcademicCalendars(calendarParams),
+            selectedYear
+              ? getCalendarClassGroups({ academic_year_id: selectedYear })
+              : Promise.resolve([]),
           ]);
         setSlots(slotsData);
         setActivities(activitiesData);
         setSetupData(setupDataRes);
         setCalendars(calendarsData);
+        setAllClassGroupsForYear(classGroupsData);
       } else if (isStudent) {
         // Student view — the backend already scopes this to the student's own
         // class group and enrolled subjects, so no group selector is needed.
@@ -687,6 +667,35 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({
     }
   };
 
+  // Same flow as handleCreateCalendarClick, but pre-selects a specific class
+  // group — used by the "Create calendar for {group}" prompt shown when a
+  // group picked from the dropdown has no calendar yet for the current term.
+  const handleCreateCalendarForGroup = async (
+    classGroupId: number,
+    classGroupName: string,
+  ) => {
+    if (!selectedYear || !selectedTerm) return;
+    try {
+      setIsLoadingClassGroups(true);
+      const classGroups = await getCalendarClassGroups({
+        academic_year_id: selectedYear,
+      });
+      setAvailableClassGroups(classGroups);
+      setCalendarFormData({
+        academic_year_id: selectedYear.toString(),
+        academic_term_id: selectedTerm.toString(),
+        class_group_id: classGroupId.toString(),
+        name: `${classGroupName} Calendar`,
+        description: "",
+      });
+      setShowCalendarModal(true);
+    } catch (error: any) {
+      showToast(error.message || "Failed to load class groups", "error");
+    } finally {
+      setIsLoadingClassGroups(false);
+    }
+  };
+
   // Handle add slot button click
   const handleAddSlotClick = () => {
     const firstSubject = setupData?.subjects[0];
@@ -710,15 +719,33 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({
     e.preventDefault();
     try {
       setIsSubmittingCalendar(true);
-      await createAcademicCalendar({
+      const classGroupId = parseInt(calendarFormData.class_group_id);
+      const created = await createAcademicCalendar({
         academic_year_id: parseInt(calendarFormData.academic_year_id),
         academic_term_id: parseInt(calendarFormData.academic_term_id),
-        class_group_id: parseInt(calendarFormData.class_group_id),
+        class_group_id: classGroupId,
         name: calendarFormData.name || undefined,
         description: calendarFormData.description || undefined,
       });
       showToast("Calendar created successfully", "success");
       setShowCalendarModal(false);
+
+      // loadData() will refresh `calendars`, but this closure's `selectedCalendar`
+      // still points at the pre-creation placeholder (calendar_id 0) — fetch the
+      // fresh list ourselves so we can point selectedCalendar at the real row
+      // that now exists, instead of leaving the "no calendar yet" banner showing.
+      const calendarParams: any = {};
+      if (selectedYear) calendarParams.academic_year_id = selectedYear;
+      if (selectedTerm) calendarParams.academic_term_id = selectedTerm;
+      const refreshedCalendars = await getAcademicCalendars(calendarParams);
+      setCalendars(refreshedCalendars);
+      const newCalendar = refreshedCalendars.find(
+        (c) => c.calendar_id === created.calendar_id,
+      );
+      if (newCalendar) {
+        setSelectedCalendar(newCalendar);
+      }
+
       loadData();
     } catch (error: any) {
       showToast(error.message || "Failed to create calendar", "error");
@@ -776,17 +803,13 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({
           academicYears={academicYears}
           academicTerms={academicTerms}
           calendars={calendars}
+          allClassGroupsForYear={allClassGroupsForYear}
           selectedYear={selectedYear}
           selectedTerm={selectedTerm}
           selectedCalendar={selectedCalendar}
           myClassGroups={myClassGroups}
           selectedTeacherClassGroupId={selectedTeacherClassGroupId}
           dateRangeString={dateRangeString}
-          onYearChange={(yearId) => {
-            setSelectedYear(yearId);
-            loadTerms(yearId);
-          }}
-          onTermChange={setSelectedTerm}
           onCalendarChange={setSelectedCalendar}
           onTeacherClassGroupChange={setSelectedTeacherClassGroupId}
           onCreateCalendarClick={handleCreateCalendarClick}
@@ -872,6 +895,51 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({
               onEmptyCellClick={handleEmptyCellClick}
             />
           ))}
+        </div>
+      )}
+
+      {/* Admin/manager view: a class group was picked, but it has no calendar
+          for this specific year/term yet (distinct from nothing being
+          picked at all — see the block below). Still renders the empty
+          weekly grid frame — matching what the instructor view already
+          shows for a class group with no lessons yet — instead of hiding
+          the schedule entirely behind a text-only message; "Add Slot" stays
+          disabled until a real calendar exists (CalendarGrid gates that on
+          a truthy calendarId). */}
+      {isBroadView && selectedCalendar && !selectedCalendar.calendar_id && (
+        <div className="space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/40 rounded-2xl">
+            <p className="text-sm text-amber-700 dark:text-amber-300">
+              No calendar created yet for <span className="font-semibold">{selectedCalendar.class_group_name}</span> in{" "}
+              {academicYears.find((y: any) => y.academic_year_id === selectedYear)?.name ?? "this year"}
+              {" / "}
+              {academicTerms.find((t) => t.academic_term_id === selectedTerm)?.name ?? "this term"} —
+              the schedule below is empty until one is created.
+            </p>
+            {canCreate && (
+              <button
+                onClick={() =>
+                  handleCreateCalendarForGroup(
+                    selectedCalendar.class_group_id,
+                    selectedCalendar.class_group_name || "Class Group",
+                  )
+                }
+                disabled={isLoadingClassGroups}
+                className="flex-shrink-0 flex items-center gap-2 px-4 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-full transition-colors disabled:opacity-50"
+              >
+                Create calendar for {selectedCalendar.class_group_name}
+              </button>
+            )}
+          </div>
+          <CalendarGrid
+            classGroupName={selectedCalendar.class_group_name}
+            slots={slots}
+            activities={filteredActivities}
+            weekDates={weekDates}
+            canEdit={false}
+            onSlotClick={handleSlotClick}
+            onEmptyCellClick={handleEmptyCellClick}
+          />
         </div>
       )}
 

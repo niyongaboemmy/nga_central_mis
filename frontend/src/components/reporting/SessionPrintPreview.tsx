@@ -58,7 +58,7 @@ const SessionPrintPreview: React.FC<Props> = ({ student, session, onClose }) => 
       <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
         <div
           id="session-print-root"
-          className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-6xl max-h-[92vh] flex flex-col"
+          className="bg-white dark:bg-gray-800/30 rounded-2xl shadow-2xl w-full max-w-6xl max-h-[92vh] flex flex-col"
         >
           {/* Header */}
           <div className="no-print flex items-center justify-between px-6 pt-5 pb-4 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">

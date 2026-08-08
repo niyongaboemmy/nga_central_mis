@@ -49,19 +49,25 @@ export const getDashboardStats = async (): Promise<DashboardStats> => {
 };
 
 // Teacher dashboard API
-export const getTeacherDashboardStats =
-  async (): Promise<TeacherDashboardStats> => {
-    const response = await api.get<{ data: TeacherDashboardStats }>(
-      "/dashboard/teacher-stats"
-    );
-    return response.data.data;
-  };
+export const getTeacherDashboardStats = async (params?: {
+  academic_year_id?: number;
+  academic_term_id?: number;
+}): Promise<TeacherDashboardStats> => {
+  const response = await api.get<{ data: TeacherDashboardStats }>(
+    "/dashboard/teacher-stats",
+    { params }
+  );
+  return response.data.data;
+};
 
 // Basic dashboard API
-export const getBasicDashboardStats =
-  async (): Promise<BasicDashboardStats> => {
-    const response = await api.get<{ data: BasicDashboardStats }>(
-      "/dashboard/basic-stats"
-    );
-    return response.data.data;
-  };
+export const getBasicDashboardStats = async (params?: {
+  academic_year_id?: number;
+  academic_term_id?: number;
+}): Promise<BasicDashboardStats> => {
+  const response = await api.get<{ data: BasicDashboardStats }>(
+    "/dashboard/basic-stats",
+    { params }
+  );
+  return response.data.data;
+};

@@ -50,8 +50,10 @@ import {
   // Teacher-Subject Assignments
   getTeacherSubjectAssignments,
   getSubjectTeacherAssignments,
+  getAllTeacherSubjectAssignments,
   assignTeacherToSubject,
   removeTeacherFromSubject,
+  copyTeacherSubjectAssignments,
   getMyAssignedSubjects,
   getSubjectEnrolledStudents,
   getSubjectEnrolledStudentsByTerm,
@@ -66,6 +68,9 @@ import {
   getStudentClassGroup,
   assignStudentToClassGroup,
   removeStudentFromClassGroup,
+  promoteStudentsToClassGroup,
+  getPromotionPreview,
+  promoteStudentsForYear,
 
   // Class Groups
   getClassGroups,
@@ -76,8 +81,10 @@ import {
 
   // Program Users
   getUsersByProgram,
+  getAllProgramLeads,
   assignUserToProgram,
   removeUserFromProgram,
+  copyProgramLeads,
 } from "../controllers/academicController";
 import { authenticate, authorize } from "../middleware/auth";
 
@@ -156,14 +163,21 @@ router.delete(
 
 // Program Users routes
 router.get("/programs/:programId/users", authenticate, getUsersByProgram);
+router.get("/program-leads", authenticate, getAllProgramLeads);
 router.post(
   "/programs/assign-lead",
   authenticate,
   authorize("MANAGE_ACADEMICS"),
   assignUserToProgram,
 );
+router.post(
+  "/programs/copy-leads",
+  authenticate,
+  authorize("MANAGE_ACADEMICS"),
+  copyProgramLeads,
+);
 router.delete(
-  "/programs/:program_id/leads/:user_id",
+  "/programs/:program_id/leads/:user_id/years/:academic_year_id",
   authenticate,
   authorize("MANAGE_ACADEMICS"),
   removeUserFromProgram,
@@ -234,14 +248,25 @@ router.get(
   authenticate,
   getSubjectTeacherAssignments,
 );
+router.get(
+  "/teacher-assignments",
+  authenticate,
+  getAllTeacherSubjectAssignments,
+);
 router.post(
   "/teachers/assign-subject",
   authenticate,
   authorize("MANAGE_ACADEMICS"),
   assignTeacherToSubject,
 );
+router.post(
+  "/teachers/copy-assignments",
+  authenticate,
+  authorize("MANAGE_ACADEMICS"),
+  copyTeacherSubjectAssignments,
+);
 router.delete(
-  "/teachers/:user_id/subjects/:subject_id/class-groups/:class_group_id",
+  "/teachers/:user_id/subjects/:subject_id/class-groups/:class_group_id/years/:academic_year_id",
   authenticate,
   authorize("MANAGE_ACADEMICS"),
   removeTeacherFromSubject,
@@ -269,7 +294,8 @@ router.delete(
   deleteSubject,
 );
 
-// Class Groups routes
+// Class Groups routes -- ClassGroup is a permanent label per grade now, not
+// year-scoped, so there's no more "copy class groups to a new year" action.
 router.get("/class-groups", authenticate, getClassGroups);
 router.get("/class-groups/:id", authenticate, getClassGroup);
 router.post(
@@ -301,11 +327,13 @@ router.get(
 router.get(
   "/subjects/:subject_id/years/:academic_year_id/students",
   authenticate,
+  authorize("VIEW_SUBJECT_ENROLLED_STUDENTS"),
   getSubjectEnrolledStudents,
 );
 router.get(
   "/subjects/:subject_id/terms/:term_id/students",
   authenticate,
+  authorize("VIEW_SUBJECT_ENROLLED_STUDENTS"),
   getSubjectEnrolledStudentsByTerm,
 );
 
@@ -323,13 +351,13 @@ router.get(
 router.post(
   "/students/enroll-subject",
   authenticate,
-  authorize("MANAGE_USERS"),
+  authorize("MANAGE_STUDENT_ENROLLMENTS"),
   enrollStudentInSubject,
 );
 router.delete(
   "/students/:user_id/subjects/:subject_id/years/:academic_year_id",
   authenticate,
-  authorize("MANAGE_USERS"),
+  authorize("MANAGE_STUDENT_ENROLLMENTS"),
   unenrollStudentFromSubject,
 );
 
@@ -342,14 +370,32 @@ router.get(
 router.post(
   "/students/assign-class-group",
   authenticate,
-  authorize("MANAGE_USERS"),
+  authorize("ASSIGN_STUDENT_CLASS_GROUPS"),
   assignStudentToClassGroup,
 );
 router.delete(
-  "/students/:user_id/class-groups/:class_group_id",
+  "/students/:user_id/class-groups/:class_group_id/years/:academic_year_id",
   authenticate,
-  authorize("MANAGE_USERS"),
+  authorize("ASSIGN_STUDENT_CLASS_GROUPS"),
   removeStudentFromClassGroup,
+);
+router.post(
+  "/students/promote-class",
+  authenticate,
+  authorize("ASSIGN_STUDENT_CLASS_GROUPS"),
+  promoteStudentsToClassGroup,
+);
+router.get(
+  "/students/promotion-preview",
+  authenticate,
+  authorize("ASSIGN_STUDENT_CLASS_GROUPS"),
+  getPromotionPreview,
+);
+router.post(
+  "/students/promote-year",
+  authenticate,
+  authorize("ASSIGN_STUDENT_CLASS_GROUPS"),
+  promoteStudentsForYear,
 );
 
 export default router;

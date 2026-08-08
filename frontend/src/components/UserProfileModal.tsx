@@ -1,4 +1,5 @@
 import React from "react";
+import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   User as UserIcon,
@@ -36,6 +37,8 @@ import {
   programLeadsApi,
   Grade,
   gradesApi,
+  academicYearsApi,
+  AcademicYear,
 } from "../api/academics";
 import { useToast } from "../contexts/ToastContext";
 import { usePermissions } from "../hooks/usePermissions";
@@ -100,6 +103,10 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
   const [availableGrades, setAvailableGrades] = React.useState<Grade[]>([]);
   const [showAddGradeModal, setShowAddGradeModal] = React.useState(false);
   const [assigningGrade, setAssigningGrade] = React.useState(false);
+  const [academicYears, setAcademicYears] = React.useState<AcademicYear[]>(
+    [],
+  );
+  const [assignYearId, setAssignYearId] = React.useState<number>(0);
   const [loadingRoles, setLoadingRoles] = React.useState(false);
   const [isEditingInfo, setIsEditingInfo] = React.useState(false);
   const [isSavingInfo, setIsSavingInfo] = React.useState(false);
@@ -118,6 +125,15 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
     if (user && isOpen) {
       loadUserPrograms();
       loadUserGrades();
+      academicYearsApi.getAll().then((res) => {
+        const data = res.data;
+        const years = ("data" in data ? data.data : data) as AcademicYear[];
+        setAcademicYears(years);
+        const currentYear = years.find((y) => y.is_current === 1);
+        setAssignYearId(
+          currentYear?.academic_year_id || years[0]?.academic_year_id || 0,
+        );
+      });
       // Initialize edited info when user changes or modal opens
       setEditedInfo({
         first_name: user.profile?.first_name || "",
@@ -290,6 +306,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
       await programLeadsApi.assign({
         user_id: user.user.user_id,
         program_id: programId,
+        academic_year_id: assignYearId,
       });
       showToast("Program assigned successfully", "success");
       // Refresh user programs
@@ -305,10 +322,17 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
     }
   };
 
-  const handleRemoveProgram = async (programId: number) => {
+  const handleRemoveProgram = async (
+    programId: number,
+    academicYearId: number,
+  ) => {
     setRemovingProgram(true);
     try {
-      await programLeadsApi.remove(programId, user.user.user_id);
+      await programLeadsApi.remove(
+        programId,
+        user.user.user_id,
+        academicYearId,
+      );
       showToast("Program removed successfully", "success");
       // Refresh user programs
       await loadUserPrograms();
@@ -322,10 +346,10 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
     }
   };
 
-  const handleRemoveGrade = async (gradeId: number) => {
+  const handleRemoveGrade = async (gradeId: number, academicYearId: number) => {
     setRemovingGrade(true);
     try {
-      await removeGradeFromUser(user.user.user_id, gradeId);
+      await removeGradeFromUser(user.user.user_id, gradeId, academicYearId);
       showToast("Grade removed successfully", "success");
       // Refresh user grades
       await loadUserGrades();
@@ -345,8 +369,11 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
       const response = await gradesApi.getAll();
       const grades = response.data.data;
       if (grades) {
-        // Filter out grades already assigned to this user
-        const assignedGradeIds = userGrades.map((g) => g.grade_id);
+        // Filter out grades already assigned to this user for the year
+        // being assigned into (they may still hold it in other years)
+        const assignedGradeIds = userGrades
+          .filter((g) => g.academic_year_id === assignYearId)
+          .map((g) => g.grade_id);
         const available = grades.filter(
           (g) => !assignedGradeIds.includes(g.grade_id),
         );
@@ -363,7 +390,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
   const handleAssignGrade = async (gradeId: number) => {
     setAssigningGrade(true);
     try {
-      await assignGradeToUser(user.user.user_id, gradeId);
+      await assignGradeToUser(user.user.user_id, gradeId, assignYearId);
       showToast("Grade assigned successfully", "success");
       // Refresh user grades
       await loadUserGrades();
@@ -378,14 +405,17 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
     }
   };
 
-  return (
+  // Portaled to document.body so the modal always sits above page-level
+  // stacking contexts (e.g. a page wrapper's `relative z-10`) rather than
+  // being trapped behind the fixed Navbar/Sidebar chrome (both z-50).
+  return createPortal(
     <AnimatePresence>
       {isOpen && (
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm"
+          className="fixed inset-0 z-[100] bg-black/50 backdrop-blur-sm"
           onClick={onClose}
         >
           <motion.div
@@ -402,7 +432,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
-                  className="absolute inset-0 z-[100] bg-white/80 dark:bg-gray-950/80 backdrop-blur-sm flex flex-col items-center justify-center"
+                  className="absolute inset-0 z-[110] bg-white/80 dark:bg-gray-950/80 backdrop-blur-sm flex flex-col items-center justify-center"
                 >
                   <div className="relative">
                     <div className="w-16 h-16 border-4 border-blue-500/20 border-t-blue-500 rounded-full animate-spin"></div>
@@ -657,7 +687,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+            className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
             onClick={() => setShowAddRoleModal(false)}
           >
             <motion.div
@@ -735,7 +765,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+            className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
             onClick={() => setShowAddProgramModal(false)}
           >
             <motion.div
@@ -756,6 +786,28 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                   >
                     <X className="w-5 h-5" />
                   </button>
+                </div>
+
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Academic Year
+                  </label>
+                  <select
+                    value={assignYearId}
+                    onChange={(e) => setAssignYearId(parseInt(e.target.value))}
+                    className="w-full px-3 py-2 border rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                  >
+                    <option value={0}>Select an academic year...</option>
+                    {academicYears.map((year) => (
+                      <option
+                        key={year.academic_year_id}
+                        value={year.academic_year_id}
+                      >
+                        {year.name}
+                        {year.is_current === 1 ? " (Current)" : ""}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 <div className="space-y-3 max-h-96 overflow-y-auto">
@@ -815,7 +867,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+            className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
             onClick={() => setShowAddGradeModal(false)}
           >
             <motion.div
@@ -836,6 +888,44 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                   >
                     <X className="w-5 h-5" />
                   </button>
+                </div>
+
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Academic Year
+                  </label>
+                  <select
+                    value={assignYearId}
+                    onChange={(e) => {
+                      const yearId = parseInt(e.target.value);
+                      setAssignYearId(yearId);
+                      const assignedGradeIds = userGrades
+                        .filter((g) => g.academic_year_id === yearId)
+                        .map((g) => g.grade_id);
+                      gradesApi.getAll().then((response) => {
+                        const grades = response.data.data;
+                        if (grades) {
+                          setAvailableGrades(
+                            grades.filter(
+                              (g) => !assignedGradeIds.includes(g.grade_id),
+                            ),
+                          );
+                        }
+                      });
+                    }}
+                    className="w-full px-3 py-2 border rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                  >
+                    <option value={0}>Select an academic year...</option>
+                    {academicYears.map((year) => (
+                      <option
+                        key={year.academic_year_id}
+                        value={year.academic_year_id}
+                      >
+                        {year.name}
+                        {year.is_current === 1 ? " (Current)" : ""}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 <div className="space-y-3 max-h-96 overflow-y-auto">
@@ -883,7 +973,8 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
           </motion.div>
         )}
       </AnimatePresence>
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body,
   );
 };
 

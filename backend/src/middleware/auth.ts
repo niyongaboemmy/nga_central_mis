@@ -27,6 +27,13 @@ export const authenticate = async (req: any, res: any, next: any) => {
     token = req.cookies.nga_auth_token;
   }
 
+  // Browser-rendered <img>/<a> tags can't attach an Authorization header or a
+  // cross-site Lax cookie, so GET endpoints that render into such tags (e.g.
+  // lesson note images) accept the same JWT as a query param instead.
+  if (!token && req.method === "GET" && req.query?.token) {
+    token = req.query.token;
+  }
+
   if (!token) {
     return res.status(401).json({ message: "Access denied" });
   }

@@ -1,6 +1,6 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { Plus, RefreshCw, Edit, Trash2 } from "lucide-react";
+import { Plus, RefreshCw, Edit, Trash2, AlertTriangle } from "lucide-react";
 import { Grade, Program } from "../../api/academics";
 import Button from "../ui/Button";
 import Modal from "../ui/Modal";
@@ -43,6 +43,30 @@ const GradesTab: React.FC<GradesTabProps> = ({
   });
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
+
+  // level_order is a single global sequence across every program (grades
+  // routinely hand off across program boundaries, e.g. Primary Grade 6 -->
+  // Lower Secondary Grade 7), so promotion resolves "next grade" purely by
+  // this number. Two grades sharing a value silently break that resolution
+  // for both of them -- surface it here instead of only discovering it when
+  // a promotion unexpectedly reports "no next grade".
+  const sortedData = useMemo(
+    () => [...data].sort((a, b) => a.level_order - b.level_order),
+    [data],
+  );
+  const duplicateLevelOrders = useMemo(() => {
+    const counts = new Map<number, number>();
+    data.forEach((g) => counts.set(g.level_order, (counts.get(g.level_order) || 0) + 1));
+    return new Set(
+      Array.from(counts.entries())
+        .filter(([, count]) => count > 1)
+        .map(([level]) => level),
+    );
+  }, [data]);
+  const conflictingGradeNames = (levelOrder: number, excludeGradeId?: number) =>
+    data
+      .filter((g) => g.level_order === levelOrder && g.grade_id !== excludeGradeId)
+      .map((g) => g.name);
 
   const resetForm = () => {
     setFormData({
@@ -225,7 +249,7 @@ const GradesTab: React.FC<GradesTabProps> = ({
                 </tr>
               </thead>
               <tbody className="bg-white dark:bg-gray-900/80 divide-y divide-gray-200 dark:divide-gray-700/50">
-                {data.length === 0 ? (
+                {sortedData.length === 0 ? (
                   <tr>
                     <td
                       colSpan={4}
@@ -245,7 +269,11 @@ const GradesTab: React.FC<GradesTabProps> = ({
                     </td>
                   </tr>
                 ) : (
-                  data.map((item, index) => (
+                  sortedData.map((item, index) => {
+                    const isDuplicate = duplicateLevelOrders.has(
+                      item.level_order,
+                    );
+                    return (
                     <motion.tr
                       key={item.grade_id}
                       initial={{ opacity: 0, y: 20 }}
@@ -277,7 +305,18 @@ const GradesTab: React.FC<GradesTabProps> = ({
                         </span>
                       </td>
                       <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">
-                        Level {item.level_order}
+                        <div className="flex items-center gap-2">
+                          Level {item.level_order}
+                          {isDuplicate && (
+                            <span
+                              title={`Same level order as: ${conflictingGradeNames(item.level_order, item.grade_id).join(", ")}. Promotion resolves "next grade" by this order school-wide, so a collision can make either grade report no next grade.`}
+                              className="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-semibold rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+                            >
+                              <AlertTriangle className="w-3 h-3" />
+                              Conflict
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="px-6 py-3 whitespace-nowrap text-right">
                         <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
@@ -300,7 +339,8 @@ const GradesTab: React.FC<GradesTabProps> = ({
                         </div>
                       </td>
                     </motion.tr>
-                  ))
+                    );
+                  })
                 )}
               </tbody>
             </table>
@@ -381,6 +421,17 @@ const GradesTab: React.FC<GradesTabProps> = ({
               required
               className="text-lg"
             />
+            {!formErrors.level_order &&
+              conflictingGradeNames(formData.level_order).length > 0 && (
+                <p className="-mt-3 text-sm text-amber-600 dark:text-amber-400 flex items-start gap-1.5">
+                  <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                  Level {formData.level_order} is already used by{" "}
+                  {conflictingGradeNames(formData.level_order).join(", ")}.
+                  Level order is global across all programs and drives
+                  automatic promotion -- a shared value will make promotion
+                  unable to tell which grade comes next.
+                </p>
+              )}
           </div>
 
           <div className="flex justify-end gap-4 mt-8 pt-6 border-t border-gray-200 dark:border-gray-600">
@@ -494,6 +545,23 @@ const GradesTab: React.FC<GradesTabProps> = ({
               required
               className="text-lg"
             />
+            {!formErrors.level_order &&
+              conflictingGradeNames(
+                formData.level_order,
+                selectedGrade?.grade_id,
+              ).length > 0 && (
+                <p className="-mt-3 text-sm text-amber-600 dark:text-amber-400 flex items-start gap-1.5">
+                  <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                  Level {formData.level_order} is already used by{" "}
+                  {conflictingGradeNames(
+                    formData.level_order,
+                    selectedGrade?.grade_id,
+                  ).join(", ")}
+                  . Level order is global across all programs and drives
+                  automatic promotion -- a shared value will make promotion
+                  unable to tell which grade comes next.
+                </p>
+              )}
           </div>
 
           <div className="flex justify-end gap-4 mt-8 pt-6 border-t border-gray-200 dark:border-gray-600">

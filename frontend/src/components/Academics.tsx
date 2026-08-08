@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useToast } from "../contexts/ToastContext";
+import { useMetadata } from "../contexts/MetadataContext";
 import {
   Clock,
   GraduationCap,
@@ -8,6 +9,7 @@ import {
   BookOpen,
   Users,
   Calendar1,
+  Award,
 } from "lucide-react";
 import {
   academicYearsApi,
@@ -17,6 +19,9 @@ import {
   subjectsApi,
   classGroupsApi,
   courseCategoriesApi,
+  teacherSubjectAssignmentsApi,
+  programLeadsApi,
+  studentClassGroupApi,
   AcademicYear,
   AcademicTerm,
   Program,
@@ -24,7 +29,16 @@ import {
   Subject,
   ClassGroup,
   CourseCategory,
+  AllTeacherSubjectAssignment,
+  AllProgramLead,
 } from "../api/academics";
+import {
+  getAllGradeAssignments,
+  copyGradeAssignments,
+  assignGradeToUser,
+  removeGradeFromUser,
+  AllGradeAssignment,
+} from "../api/users";
 
 // Import sub-components
 import AcademicYearsTab from "./academics/AcademicYearsTab";
@@ -34,9 +48,13 @@ import GradesTab from "./academics/GradesTab";
 import SubjectsTab from "./academics/SubjectsTab";
 import ClassGroupsTab from "./academics/ClassGroupsTab";
 import CourseCategoriesTab from "./academics/CourseCategoriesTab";
+import TeacherAssignmentsTab from "./academics/TeacherAssignmentsTab";
+import ProgramLeadsTab from "./academics/ProgramLeadsTab";
+import ClassTeachersTab from "./academics/ClassTeachersTab";
 
 const Academics: React.FC = () => {
   const { showToast } = useToast();
+  const { refreshYears, invalidateTerms } = useMetadata();
   const [activeTab, setActiveTab] = useState("academic-years");
 
   // State for data
@@ -49,6 +67,13 @@ const Academics: React.FC = () => {
   const [courseCategories, setCourseCategories] = useState<CourseCategory[]>(
     [],
   );
+  const [teacherAssignments, setTeacherAssignments] = useState<
+    AllTeacherSubjectAssignment[]
+  >([]);
+  const [programLeads, setProgramLeads] = useState<AllProgramLead[]>([]);
+  const [gradeAssignments, setGradeAssignments] = useState<
+    AllGradeAssignment[]
+  >([]);
 
   // Loading states
   const [loading, setLoading] = useState({
@@ -59,6 +84,9 @@ const Academics: React.FC = () => {
     subjects: false,
     classGroups: false,
     courseCategories: false,
+    teacherAssignments: false,
+    programLeads: false,
+    gradeAssignments: false,
   });
 
   // Fetch data functions
@@ -146,6 +174,42 @@ const Academics: React.FC = () => {
     }
   };
 
+  const fetchTeacherAssignments = async () => {
+    setLoading((prev) => ({ ...prev, teacherAssignments: true }));
+    try {
+      const response = await teacherSubjectAssignmentsApi.getAll();
+      setTeacherAssignments(response.data.data);
+    } catch (error: any) {
+      showToast("Failed to fetch teacher assignments", "error");
+    } finally {
+      setLoading((prev) => ({ ...prev, teacherAssignments: false }));
+    }
+  };
+
+  const fetchProgramLeads = async () => {
+    setLoading((prev) => ({ ...prev, programLeads: true }));
+    try {
+      const response = await programLeadsApi.getAll();
+      setProgramLeads(response.data.data);
+    } catch (error: any) {
+      showToast("Failed to fetch program leads", "error");
+    } finally {
+      setLoading((prev) => ({ ...prev, programLeads: false }));
+    }
+  };
+
+  const fetchGradeAssignments = async () => {
+    setLoading((prev) => ({ ...prev, gradeAssignments: true }));
+    try {
+      const assignments = await getAllGradeAssignments();
+      setGradeAssignments(assignments || []);
+    } catch (error: any) {
+      showToast("Failed to fetch class teacher assignments", "error");
+    } finally {
+      setLoading((prev) => ({ ...prev, gradeAssignments: false }));
+    }
+  };
+
   // Initial data fetch
   useEffect(() => {
     fetchAcademicYears();
@@ -155,6 +219,9 @@ const Academics: React.FC = () => {
     fetchSubjects();
     fetchClassGroups();
     fetchCourseCategories();
+    fetchTeacherAssignments();
+    fetchProgramLeads();
+    fetchGradeAssignments();
   }, []);
 
   const tabs = [
@@ -200,6 +267,24 @@ const Academics: React.FC = () => {
       icon: Users,
       color: "text-indigo-500",
     },
+    {
+      id: "teacher-assignments",
+      label: "Teacher Assignments",
+      icon: Users,
+      color: "text-teal-500",
+    },
+    {
+      id: "program-leads",
+      label: "Program Leads",
+      icon: GraduationCap,
+      color: "text-cyan-500",
+    },
+    {
+      id: "class-teachers",
+      label: "Class Teachers",
+      icon: Award,
+      color: "text-lime-500",
+    },
   ];
 
   const renderTabContent = () => {
@@ -213,16 +298,19 @@ const Academics: React.FC = () => {
             onCreate={async (data) => {
               await academicYearsApi.create(data);
               fetchAcademicYears();
+              refreshYears();
               showToast("Academic year created successfully", "success");
             }}
             onUpdate={async (id, data) => {
               await academicYearsApi.update(id, data);
               fetchAcademicYears();
+              refreshYears();
               showToast("Academic year updated successfully", "success");
             }}
             onDelete={async (id) => {
               await academicYearsApi.delete(id);
               fetchAcademicYears();
+              refreshYears();
               showToast("Academic year deleted successfully", "success");
             }}
           />
@@ -237,16 +325,27 @@ const Academics: React.FC = () => {
             onCreate={async (data) => {
               await academicTermsApi.create(data);
               fetchAcademicTerms();
+              invalidateTerms(data.academic_year_id);
               showToast("Academic term created successfully", "success");
             }}
             onUpdate={async (id, data) => {
+              const previousYearId = academicTerms.find(
+                (t) => t.academic_term_id === id,
+              )?.academic_year_id;
               await academicTermsApi.update(id, data);
               fetchAcademicTerms();
+              if (previousYearId != null) invalidateTerms(previousYearId);
+              if (data.academic_year_id != null)
+                invalidateTerms(data.academic_year_id);
               showToast("Academic term updated successfully", "success");
             }}
             onDelete={async (id) => {
+              const yearId = academicTerms.find(
+                (t) => t.academic_term_id === id,
+              )?.academic_year_id;
               await academicTermsApi.delete(id);
               fetchAcademicTerms();
+              if (yearId != null) invalidateTerms(yearId);
               showToast("Academic term deleted successfully", "success");
             }}
           />
@@ -367,6 +466,117 @@ const Academics: React.FC = () => {
               fetchClassGroups();
               showToast("Class group deleted successfully", "success");
             }}
+            onPromote={async (
+              sourceClassGroupId,
+              sourceAcademicYearId,
+              targetClassGroupId,
+              targetAcademicYearId,
+            ) => {
+              const res = await studentClassGroupApi.promote({
+                source_class_group_id: sourceClassGroupId,
+                source_academic_year_id: sourceAcademicYearId,
+                target_class_group_id: targetClassGroupId,
+                target_academic_year_id: targetAcademicYearId,
+              });
+              return res.data.data;
+            }}
+          />
+        );
+      case "teacher-assignments":
+        return (
+          <TeacherAssignmentsTab
+            data={teacherAssignments}
+            academicYears={academicYears}
+            subjects={subjects}
+            classGroups={classGroups}
+            loading={loading.teacherAssignments}
+            onRefresh={fetchTeacherAssignments}
+            onCreate={async (data) => {
+              await teacherSubjectAssignmentsApi.assign(data);
+              fetchTeacherAssignments();
+              showToast("Teacher assigned successfully", "success");
+            }}
+            onDelete={async (userId, subjectId, classGroupId, academicYearId) => {
+              await teacherSubjectAssignmentsApi.remove(
+                userId,
+                subjectId,
+                classGroupId,
+                academicYearId,
+              );
+              fetchTeacherAssignments();
+              showToast("Teacher assignment removed successfully", "success");
+            }}
+            onCopy={async (sourceYearId, targetYearId) => {
+              const res = await teacherSubjectAssignmentsApi.copy({
+                source_academic_year_id: sourceYearId,
+                target_academic_year_id: targetYearId,
+              });
+              fetchTeacherAssignments();
+              return res.data.data;
+            }}
+          />
+        );
+      case "program-leads":
+        return (
+          <ProgramLeadsTab
+            data={programLeads}
+            academicYears={academicYears}
+            programs={programs}
+            loading={loading.programLeads}
+            onRefresh={fetchProgramLeads}
+            onCreate={async (data) => {
+              await programLeadsApi.assign(data);
+              fetchProgramLeads();
+              showToast("Program lead assigned successfully", "success");
+            }}
+            onDelete={async (programId, userId, academicYearId) => {
+              await programLeadsApi.remove(programId, userId, academicYearId);
+              fetchProgramLeads();
+              showToast("Program lead removed successfully", "success");
+            }}
+            onCopy={async (sourceYearId, targetYearId) => {
+              const res = await programLeadsApi.copy({
+                source_academic_year_id: sourceYearId,
+                target_academic_year_id: targetYearId,
+              });
+              fetchProgramLeads();
+              return res.data.data;
+            }}
+          />
+        );
+      case "class-teachers":
+        return (
+          <ClassTeachersTab
+            data={gradeAssignments}
+            academicYears={academicYears}
+            grades={grades}
+            loading={loading.gradeAssignments}
+            onRefresh={fetchGradeAssignments}
+            onCreate={async (data) => {
+              await assignGradeToUser(
+                data.user_id,
+                data.grade_id,
+                data.academic_year_id,
+              );
+              fetchGradeAssignments();
+              showToast("Class teacher assigned successfully", "success");
+            }}
+            onDelete={async (userId, gradeId, academicYearId) => {
+              await removeGradeFromUser(userId, gradeId, academicYearId);
+              fetchGradeAssignments();
+              showToast(
+                "Class teacher assignment removed successfully",
+                "success",
+              );
+            }}
+            onCopy={async (sourceYearId, targetYearId) => {
+              const result = await copyGradeAssignments(
+                sourceYearId,
+                targetYearId,
+              );
+              fetchGradeAssignments();
+              return result;
+            }}
           />
         );
       default:
@@ -403,7 +613,7 @@ const Academics: React.FC = () => {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 }}
-            className="bg-white dark:bg-slate-800/70 rounded-2xl lg:rounded-full border border-white dark:border-slate-700/40 p-3"
+            className="bg-white dark:bg-slate-800/70 rounded-2xl border border-white dark:border-slate-700/40 p-3"
           >
             <nav
               className="flex flex-wrap gap-2 justify-start"
@@ -420,14 +630,14 @@ const Academics: React.FC = () => {
                     scale: 1.05,
                   }}
                   whileTap={{ scale: 0.95 }}
-                  className={`flex items-center space-x-3 px-4 py-2 rounded-full font-normal text-sm transition-all duration-300 ${
+                  className={`flex flex-shrink-0 items-center space-x-2.5 px-4 py-2 rounded-full font-normal text-sm whitespace-nowrap transition-all duration-300 ${
                     activeTab === tab.id
                       ? "bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-blue-500/25"
                       : "bg-gray-50 dark:bg-slate-700/50 text-gray-600 dark:text-gray-300 hover:bg-white dark:hover:bg-slate-600/50 hover:bg-blue-100/50 hover:text-blue-700"
                   }`}
                 >
                   <tab.icon
-                    className={`w-4 h-4 ${
+                    className={`w-4 h-4 flex-shrink-0 ${
                       activeTab === tab.id ? "text-white" : tab.color
                     }`}
                   />

@@ -36,8 +36,10 @@ const WELLBEING_COLOR: Record<string, string> = {
   EXCELLENT:  "#3B82F6",
 };
 
+// Harmonized on amber for "open/pending" (matches the rest of the
+// mentorship/reporting area's session_status rendering).
 const STATUS_STYLE: Record<string, string> = {
-  OPEN:        "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300",
+  OPEN:        "bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300",
   IN_PROGRESS: "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300",
   RESOLVED:    "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300",
 };
@@ -90,7 +92,7 @@ const AdminStudentSupportModal: React.FC<Props> = ({ studentId, studentName, onC
       onClick={onClose}
     >
       <div
-        className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col"
+        className="bg-white dark:bg-gray-800/30 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -213,7 +215,7 @@ const AdminStudentSupportModal: React.FC<Props> = ({ studentId, studentName, onC
                   {[...sessions].reverse().map((session) => (
                     <div key={session.mentorship_id} className="relative pl-10">
                       {/* Timeline dot */}
-                      <div className="absolute left-0 top-1 w-8 h-8 rounded-full bg-white dark:bg-gray-900 border-2 border-blue-400 flex items-center justify-center text-base">
+                      <div className="absolute left-0 top-1 w-8 h-8 rounded-full bg-white dark:bg-gray-800/30 border-2 border-blue-400 flex items-center justify-center text-base">
                         {session.wellbeing_status
                           ? WELLBEING_EMOJI[session.wellbeing_status] ?? "📝"
                           : "📝"}
