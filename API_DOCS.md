@@ -150,6 +150,9 @@ Verify OTP for login. Upon success, this endpoint sets a `nga_auth_token` cookie
 }
 ```
 
+> [!WARNING]
+> Unlike `GET /users/me`, this response does **not** include `assignedGrades` (the class-teacher's assigned grades). Only `allGrades` (the full grade catalog) is returned here. Clients that need `assignedGrades` right after login (e.g. to scope a class-teacher's dashboard) must follow up with `GET /users/me` using the returned `token` — do not assume it is present on the login/verify-otp payload.
+
 ### GET /auth/session
 
 Retrieve the current session and user profile. This is the primary endpoint for integrated systems to check if a user is already logged in via SSO.
@@ -201,21 +204,27 @@ Generate a short-lived authorization code for a logged-in user.
 
 **Query Parameters:**
 - `client_id`: Registered client ID.
-- `redirect_uri`: One of the pre-registered redirect URIs.
+- `redirect_uri`: One of the pre-registered redirect URIs (exact match after trailing-slash normalization).
+- `response_type` (optional): Only `"code"` is supported if provided.
+- `state` (optional): Opaque value echoed back unchanged in the response, for CSRF protection.
 
 **Response:**
 ```json
 {
   "success": true,
   "data": {
-    "code": "32_character_random_string"
+    "code": "64_character_hex_string",
+    "state": "whatever_you_sent_or_undefined"
   }
 }
 ```
 
+> [!NOTE]
+> The authorization code expires in **5 minutes** and is single-use (`is_used` flag). Exchange it immediately after receiving it.
+
 ### POST /sso/token
 
-Exchange an authorization code for a full JWT and user profile.
+Exchange an authorization code for a full JWT and user profile. This is a server-to-server call — never expose `client_secret` to the browser.
 
 **Authentication:** None (requires `client_id` and `client_secret`)
 
@@ -239,6 +248,9 @@ Exchange an authorization code for a full JWT and user profile.
   }
 }
 ```
+
+> [!WARNING]
+> This response intentionally only contains `token`, `user`, and `permissions` — no `profile`, `roles`, `assignedPrograms`, `assignedGrades`, `academicYears`/`currentAcademicYear`/`currentAcademicTerms`, or `systems`. Client apps must call `GET /users/me` with the returned `token` immediately after the exchange to hydrate the full profile/roles/academic context (this is what `nga-task-mentor`'s `ssoCallback` already does — see [SSO_CLIENT_INTEGRATION.md](./SSO_CLIENT_INTEGRATION.md)).
 
 ---
 
@@ -1041,7 +1053,7 @@ Get subjects assigned to a teacher.
 **Authentication:** Required
 
 ### POST /academics/teachers/assign-subject
-Assign teacher to a subject for a specific class/term.
+Assign teacher to a subject for a class group, scoped to an **academic year** (not term — see note below).
 **Authentication:** Required (MANAGE_ACADEMICS)
 **Request Body:**
 ```json
@@ -1049,9 +1061,11 @@ Assign teacher to a subject for a specific class/term.
   "user_id": 10,
   "subject_id": 2,
   "class_group_id": 5,
-  "academic_term_id": 3
+  "academic_year_id": 3
 }
 ```
+> [!IMPORTANT]
+> `academic_year_id` is optional and defaults to the current academic year if omitted. This field was renamed from `academic_term_id` — teacher-subject assignments are now year-scoped, not term-scoped.
 
 ### GET /academics/my-assigned-subjects
 Get subjects assigned to the currently logged-in teacher.
@@ -1079,14 +1093,42 @@ Create class group.
   "grade_id": 1
 }
 ```
+> [!IMPORTANT]
+> Class groups are a **permanent label per grade**, not year-scoped. There is no `academic_year_id`/`academicYearId` field — a class group created once (e.g. "P1 A") persists across academic years. There is no "copy class groups to a new year" action.
 
 ### POST /academics/students/enroll-subject
-Enroll student in an elective subject.
+Enroll student in an elective subject, scoped to an **academic year**.
 **Authentication:** Required (MANAGE_USERS)
+**Request Body:**
+```json
+{
+  "user_id": 10,
+  "subject_id": 2,
+  "academic_year_id": 3
+}
+```
+`academic_year_id` is optional and defaults to the current academic year.
 
 ### POST /academics/students/assign-class-group
-Assign student to a class group (Stream).
+Assign student to a class group (Stream), scoped to an **academic year** (a student's class group can change year to year even though the class group label itself is permanent).
 **Authentication:** Required (MANAGE_USERS)
+**Request Body:**
+```json
+{
+  "user_id": 10,
+  "class_group_id": 5,
+  "academic_year_id": 3
+}
+```
+`academic_year_id` is optional and defaults to the current academic year.
+
+### GET /users/grade-assignments
+Get all class-teacher grade assignments (admin view across all users/years).
+**Authentication:** Required
+
+### POST /users/grade-assignments/copy
+Copy class-teacher grade assignments from one academic year to another.
+**Authentication:** Required (ASSIGN_GRADE_TO_CLASS_TEACHER)
 
 Get documents in specific folder.
 
@@ -1471,7 +1513,7 @@ Get teachers assigned to subject.
 
 #### POST /academics/teachers/assign-subject
 
-Assign teacher to subject.
+Assign teacher to subject for a class group. **Year-scoped** (see note).
 
 **Authentication:** Required (MANAGE_ACADEMICS permission)
 
@@ -1482,21 +1524,32 @@ Assign teacher to subject.
   "user_id": 1,
   "subject_id": 1,
   "class_group_id": 1,
-  "academic_term_id": 1
+  "academic_year_id": 1
 }
 ```
 
-#### DELETE /academics/teachers/:user_id/subjects/:subject_id/class-groups/:class_group_id/terms/:academic_term_id
+`academic_year_id` is optional; defaults to the current academic year.
 
-Remove teacher from subject.
+#### POST /academics/teachers/copy-assignments
+
+Copy all teacher-subject assignments from one academic year to another (bulk rollover at year start).
 
 **Authentication:** Required (MANAGE_ACADEMICS permission)
+
+#### DELETE /academics/teachers/:user_id/subjects/:subject_id/class-groups/:class_group_id/years/:academic_year_id
+
+Remove teacher from subject for a given year.
+
+**Authentication:** Required (MANAGE_ACADEMICS permission)
+
+> [!IMPORTANT]
+> **Breaking change from earlier versions of this doc:** teacher-subject assignment, student-subject enrollment, and student class-group assignment used to be scoped by `academic_term_id` (with routes ending in `.../terms/:academic_term_id`). They are now scoped by `academic_year_id` (routes end in `.../years/:academic_year_id`). Class groups themselves (`ClassGroup`) are **no longer year-scoped at all** — a class group is a permanent label per grade (e.g. "P1 A" always refers to the same class group record, every year); only the *assignment* of teachers/students to that class group is year-scoped.
 
 ### Class Groups
 
 #### GET /academics/class-groups
 
-Get all class groups.
+Get all class groups. Optional `?grade_id=` filter.
 
 **Authentication:** Required (MANAGE_ACADEMICS permission)
 
@@ -1517,10 +1570,11 @@ Create class group.
 ```json
 {
   "name": "Class A",
-  "gradeId": 1,
-  "academicYearId": 1
+  "grade_id": 1
 }
 ```
+
+There is no `academic_year_id`/`academicYearId` field — class groups are a permanent label per grade, not created per year. Creating a class group with a `(grade_id, name)` pair that already exists returns a validation error rather than a duplicate.
 
 #### PUT /academics/class-groups/:id
 
@@ -1542,11 +1596,17 @@ Get subjects assigned to current teacher.
 
 **Authentication:** Required (VIEW_MY_ASSIGNED_SUBJECTS permission)
 
-#### GET /academics/subjects/:subject_id/terms/:academic_term_id/students
+#### GET /academics/subjects/:subject_id/years/:academic_year_id/students
 
-Get students enrolled in subject.
+Get students enrolled in subject for a given academic year.
 
-**Authentication:** Required (VIEW_MY_ASSIGNED_SUBJECTS permission)
+**Authentication:** Required (VIEW_SUBJECT_ENROLLED_STUDENTS permission)
+
+#### GET /academics/subjects/:subject_id/terms/:term_id/students
+
+Get students enrolled in subject for a given term (resolves the term's academic year internally). This is the endpoint `nga-task-mentor` uses for term-scoped rosters (quizzes, assignments, question bank).
+
+**Authentication:** Required (VIEW_SUBJECT_ENROLLED_STUDENTS permission)
 
 #### GET /academics/students/:studentId/enrolled-subjects
 
@@ -1562,7 +1622,7 @@ Get available subjects for student.
 
 #### POST /academics/students/enroll-subject
 
-Enroll student in subject.
+Enroll student in subject. **Year-scoped.**
 
 **Authentication:** Required (MANAGE_USERS permission)
 
@@ -1572,15 +1632,35 @@ Enroll student in subject.
 {
   "user_id": 1,
   "subject_id": 1,
-  "academic_term_id": 1
+  "academic_year_id": 1
 }
 ```
 
-#### DELETE /academics/students/:user_id/subjects/:subject_id/terms/:academic_term_id
+`academic_year_id` is optional; defaults to the current academic year.
 
-Unenroll student from subject.
+#### DELETE /academics/students/:user_id/subjects/:subject_id/years/:academic_year_id
+
+Unenroll student from subject for a given year.
 
 **Authentication:** Required (MANAGE_USERS permission)
+
+#### GET /academics/students/promotion-preview
+
+Preview an automatic whole-year promotion (which students move to which grade/class group) before running it.
+
+**Authentication:** Required (ASSIGN_STUDENT_CLASS_GROUPS permission)
+
+#### POST /academics/students/promote-year
+
+Run a whole-year promotion of students to the next grade/class group.
+
+**Authentication:** Required (ASSIGN_STUDENT_CLASS_GROUPS permission)
+
+#### POST /academics/students/promote-class
+
+Promote a specific set of students to a target class group.
+
+**Authentication:** Required (ASSIGN_STUDENT_CLASS_GROUPS permission)
 
 ### Student Class Group Assignment
 
@@ -1592,7 +1672,7 @@ Get student's class group.
 
 #### POST /academics/students/assign-class-group
 
-Assign student to class group.
+Assign student to class group. **Year-scoped** — the class group itself is permanent, but which students are in it is tracked per academic year.
 
 **Authentication:** Required (MANAGE_USERS permission)
 
@@ -1601,15 +1681,100 @@ Assign student to class group.
 ```json
 {
   "user_id": 1,
-  "class_group_id": 1
+  "class_group_id": 1,
+  "academic_year_id": 1
 }
 ```
 
-#### DELETE /academics/students/:user_id/class-groups/:class_group_id
+`academic_year_id` is optional; defaults to the current academic year.
 
-Remove student from class group.
+#### DELETE /academics/students/:user_id/class-groups/:class_group_id/years/:academic_year_id
+
+Remove student from class group for a given year.
 
 **Authentication:** Required (MANAGE_USERS permission)
+
+---
+
+## Scheme of Work Endpoints
+
+Base path: `/scheme-of-work`. All routes require authentication.
+
+### POST /scheme-of-work/upload
+
+Upload a DOCX/PDF/TXT curriculum-derived scheme document and extract entries.
+
+**Content-Type:** multipart/form-data (`file`)
+
+### POST /scheme-of-work/ai-generate/structure
+
+Detect Learning Outcome sections in an uploaded curriculum document (no AI call) so the UI can confirm scope before generation.
+
+**Content-Type:** multipart/form-data (`file`, max 15MB, `.docx`/`.pdf`/`.txt`)
+
+### POST /scheme-of-work/ai-generate
+
+AI-generate a full scheme of work from an uploaded curriculum document. Starts an async job.
+
+**Content-Type:** multipart/form-data (`file`)
+
+### GET /scheme-of-work/ai-generate/:jobId/status
+
+Poll status/result of an AI generation job.
+
+### GET /scheme-of-work/entries
+
+Get scheme entries filtered by subject/class group/term.
+
+**Query Parameters:** `subject_id`, `class_group_id`, `academic_term_id` (required — this is the endpoint `nga-task-mentor`'s question bank feature calls to scope AI question generation to the current term's curriculum coverage).
+
+### POST /scheme-of-work/entries
+
+Add a single scheme entry (appended at the end, using caller-supplied week/dates).
+
+### POST /scheme-of-work/entries/insert
+
+Insert a new entry at any position; auto-renumbers/reschedules the rest.
+
+### POST /scheme-of-work/entries/ai-suggest
+
+Generate a single entry's content from a custom AI prompt (for review — not auto-saved).
+
+### POST /scheme-of-work/entries/suggest-criteria
+
+AI-powered Performance Criteria matching for a scheme entry's free-text content (stateless, not auto-saved).
+
+### PUT /scheme-of-work/entries/:id/criteria
+
+Replace the full set of Performance Criteria linked to a scheme entry.
+
+### POST /scheme-of-work/schemes/:schemeId/link-criteria
+
+Bulk-resolve `criteria_numbers` proposed at AI-generation time into real links, once the subject's curriculum has been confirmed/saved.
+
+### POST /scheme-of-work/schemes/:schemeId/bulk-suggest-criteria
+
+On-demand bulk AI criteria matching for an existing scheme (predates auto-tagging, or entries not covered by it).
+
+### PATCH /scheme-of-work/entries/:id
+
+Update a single scheme entry.
+
+### DELETE /scheme-of-work/entries/:id
+
+Delete a single scheme entry.
+
+### GET /scheme-of-work/all-teachers
+
+Admin: get all teachers with their scheme-of-work completion status.
+
+**Authentication:** Required (VIEW_ALL_TEACHERS_SCHEME_OF_WORK_LIST permission)
+
+### POST /scheme-of-work/validate
+
+Admin: validate a scheme of work.
+
+**Authentication:** Required (VALIDATE_SCHEME_OF_WORK permission)
 
 ---
 

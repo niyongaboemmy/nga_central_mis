@@ -126,9 +126,23 @@ async function exchangeToken(authCode) {
 }
 ```
 
-### Step 4: Verify & Access Data
+### Step 4: Fetch the Full Profile
 
-Once authenticated, you can use the returned `token` to access protected NGA MIS APIs on behalf of the user. The token also contains the user's `preferred_theme` (light/dark), allowing your app to automatically match the user's appearance settings.
+`POST /sso/token` intentionally returns a minimal payload (`token`, `user`, `permissions` only) — no `profile`, `roles`, `assignedPrograms`, `assignedGrades`, academic-year/term data, or `systems`. Immediately after the exchange, call `GET /users/me` with the new token to hydrate everything your app needs (profile, roles+permissions, assigned programs/grades, current academic year/terms, and the active `systems` list):
+
+```typescript
+const profileResponse = await axios.get(`${process.env.NGA_MIS_BASE_URL}/users/me`, {
+  headers: { Authorization: `Bearer ${token}` },
+})
+const { profile, roles, assignedPrograms, assignedGrades, currentAcademicYear, currentAcademicTerms, systems } =
+  profileResponse.data.data
+```
+
+If this call fails (MIS temporarily slow/unreachable), fall back gracefully to the minimal `user`/`permissions` from Step 3 rather than failing the whole login.
+
+### Step 5: Verify & Access Data
+
+Once authenticated, use the returned `token` to access protected NGA MIS APIs on behalf of the user. The token also contains the user's `preferred_theme` (light/dark), allowing your app to automatically match the user's appearance settings.
 
 **Authorization Header:**
 
@@ -143,7 +157,7 @@ Authorization: Bearer <your_jwt_token>
 | Error                                | Possible Cause         | Solution                                                                                                               |
 | :----------------------------------- | :--------------------- | :--------------------------------------------------------------------------------------------------------------------- |
 | **404 Not Found** on Redirect        | Wrong Login URL        | Ensure you use `https://nga.ac.rw/mis/login`, NOT the API URL.                                                         |
-| **Invalid Authorization Code**       | Code reused or expired | Codes are one-time use and expire in 60s. Ensure your frontend sends it only once (use `useRef` in React strict mode). |
+| **Invalid Authorization Code**       | Code reused or expired | Codes are one-time use and expire after **5 minutes**. Ensure your frontend sends it only once (use `useRef` in React strict mode). |
 | **JsonWebTokenError**                | Stale local token      | Clear `localStorage` of old tokens. Ensure your app uses the fresh cookie/token from the SSO exchange.                 |
 | **401 Unauthorized** during exchange | Bad Secret             | Check `SSO_CLIENT_SECRET` matches the one in MIS Admin.                                                                |
 
