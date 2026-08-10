@@ -23,8 +23,9 @@ jobs:
             git reset --hard origin/main
 
             cd backend
-            npm ci --omit=dev
+            npm ci
             npm run build
+            npm prune --omit=dev
             # DB schema changes are applied manually (see DEPLOYMENT notes) — not auto-run here.
             cd ..
 
