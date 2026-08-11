@@ -22,6 +22,8 @@ jobs:
       # and only the compiled dist/ is shipped over.
       - name: Build frontend
         working-directory: frontend
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
         run: |
           npm ci
           npm run build
