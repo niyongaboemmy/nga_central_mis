@@ -51,9 +51,10 @@ jobs:
             npm run build
             npm prune --omit=dev
             # DB schema changes are applied manually (see DEPLOYMENT notes) — not auto-run here.
-            cd ..
 
-            pm2 restart mis-backend --update-env
+            pm2 restart mis-backend --update-env || pm2 start dist/index.js --name mis-backend --update-env
+            pm2 save
+            cd ..
 
       - name: Upload frontend build
         run: |
