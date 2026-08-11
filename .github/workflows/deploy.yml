@@ -22,15 +22,9 @@ jobs:
             git fetch origin main
             git reset --hard origin/main
 
-            # Puppeteer (PDF export) uses the system Chrome instead of its own
-            # bundled download, which was failing to install on this box.
-            if ! command -v google-chrome-stable >/dev/null 2>&1; then
-              wget -q -O /tmp/google-chrome.deb https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
-              sudo apt-get update -y
-              sudo apt-get install -y /tmp/google-chrome.deb
-              rm -f /tmp/google-chrome.deb
-            fi
-
+            # Puppeteer (PDF export) uses the system Chrome (installed once,
+            # manually, on this box) instead of its own bundled download,
+            # which was failing here. See DEPLOYMENT notes.
             cd backend
             cp .env.production .env
             export PUPPETEER_SKIP_DOWNLOAD=true
