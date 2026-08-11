@@ -96,7 +96,7 @@ const SystemsMenu: React.FC<SystemsMenuProps> = ({
     } catch (error: any) {
       if (error.response?.status === 401) {
         newWindow.close();
-        const loginUrl = new URL("/mis/login", window.location.origin);
+        const loginUrl = new URL("/login", window.location.origin);
         loginUrl.searchParams.set("client_id", system.client_id!);
         loginUrl.searchParams.set("redirect_uri", redirectUri);
         loginUrl.searchParams.set("response_type", "code");

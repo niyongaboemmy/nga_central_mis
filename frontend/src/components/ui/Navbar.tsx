@@ -89,7 +89,7 @@ const Navbar: React.FC<NavbarProps> = ({
   const handleLogout = () => {
     logout();
     setIsUserDropdownOpen(false);
-    window.location.href = "/mis/login";
+    window.location.href = "/login";
   };
 
   // const NavLink: React.FC<{

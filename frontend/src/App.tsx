@@ -218,7 +218,7 @@ function App() {
       <ToastInitializer>
         <MetadataProvider>
           <AcademicPeriodProvider>
-          <Router basename="/mis">
+          <Router basename="/">
             <Routes>
 
             {/* Landing page */}
