@@ -192,6 +192,7 @@ const CONTENT_CSS = `
 async function printHtmlToPdf(html: string, docTitle: string, footerLeft: string): Promise<Buffer> {
   const browser = await puppeteer.launch({
     headless: true,
+    executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
     args: ["--no-sandbox", "--disable-setuid-sandbox"],
   });
   try {
