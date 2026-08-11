@@ -26,7 +26,7 @@ import { asyncHandler } from "../middleware/asyncHandler";
 import { recordActivity } from "../utils/activityLogger";
 import { sanitizeString } from "../utils/sanitization";
 import logger from "../utils/logger";
-import ftpService from "../utils/ftp";
+import storageService from "../utils/fileServer";
 import path from "path";
 import { Permissions } from "../utils/permissions";
 import { getCurrentAcademicYearId } from "../utils/academicYear";
@@ -450,7 +450,7 @@ export const deleteCompetency = asyncHandler(async (req: any, res: any) => {
     throw new NotFoundError("Competency not found");
   }
 
-  // Delete FTP files linked to this competency before DB delete
+  // Delete storage files linked to this competency before DB delete
   const linkedDocs = await db
     .select()
     .from(SubjectDocument)
@@ -458,9 +458,9 @@ export const deleteCompetency = asyncHandler(async (req: any, res: any) => {
 
   for (const doc of linkedDocs) {
     try {
-      await ftpService.deleteFile(doc.file_path);
+      await storageService.deleteFile(doc.file_path);
     } catch (err) {
-      logger.warn(`Could not delete FTP file ${doc.file_path}: ${err}`);
+      logger.warn(`Could not delete storage file ${doc.file_path}: ${err}`);
     }
     await db
       .delete(SubjectDocument)
@@ -813,7 +813,7 @@ export const deleteDocumentCategory = asyncHandler(
       throw new NotFoundError("Category not found");
     }
 
-    // Delete all FTP files in this category
+    // Delete all storage files in this category
     const docs = await db
       .select()
       .from(SubjectDocument)
@@ -821,9 +821,9 @@ export const deleteDocumentCategory = asyncHandler(
 
     for (const doc of docs) {
       try {
-        await ftpService.deleteFile(doc.file_path);
+        await storageService.deleteFile(doc.file_path);
       } catch (err) {
-        logger.warn(`Could not delete FTP file ${doc.file_path}: ${err}`);
+        logger.warn(`Could not delete storage file ${doc.file_path}: ${err}`);
       }
     }
 
@@ -926,7 +926,7 @@ export const uploadSubjectDocument = asyncHandler(
     const remoteFilePath = `subjects/${sId}/${fileName}`;
 
     try {
-      await ftpService.uploadFile(file.buffer, remoteFilePath);
+      await storageService.uploadFile(file.buffer, remoteFilePath);
 
       const result = await db.insert(SubjectDocument).values({
         category_id: parseInt(categoryId),
@@ -1010,9 +1010,9 @@ export const deleteSubjectDocument = asyncHandler(
     }
 
     try {
-      await ftpService.deleteFile(doc.file_path);
+      await storageService.deleteFile(doc.file_path);
     } catch (err) {
-      logger.warn(`Could not delete FTP file ${doc.file_path}: ${err}`);
+      logger.warn(`Could not delete storage file ${doc.file_path}: ${err}`);
     }
 
     await db
@@ -1053,12 +1053,12 @@ export const downloadSubjectDocument = asyncHandler(
       Permissions.DOWNLOAD_SUBJECT_DOCUMENTS,
     );
 
-    const exists = await ftpService.fileExists(doc.file_path);
+    const exists = await storageService.fileExists(doc.file_path);
     if (!exists) {
       throw new NotFoundError("File not found on server");
     }
 
-    const buffer = await ftpService.downloadToBuffer(doc.file_path);
+    const buffer = await storageService.downloadToBuffer(doc.file_path);
 
     if (!buffer.length) {
       throw new NotFoundError("File is empty or corrupted");

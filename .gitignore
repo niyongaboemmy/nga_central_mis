@@ -7,6 +7,9 @@ dist/
 build/
 *.local
 
+# Locally-stored uploaded files (documents, lesson note images)
+backend/storage/
+
 # Environment files
 .env
 .env.local

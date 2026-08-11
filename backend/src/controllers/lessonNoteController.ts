@@ -21,7 +21,7 @@ import { successResponse } from "../utils/response";
 import { NotFoundError, ValidationError, AuthorizationError } from "../errors/CustomError";
 import { recordActivity } from "../utils/activityLogger";
 import { sanitizeNoteHtml } from "../utils/sanitizeNoteHtml";
-import ftpService from "../utils/ftp";
+import storageService from "../utils/fileServer";
 import logger from "../utils/logger";
 import { renderLessonNotePdf, renderCombinedLessonNotesPdf } from "../services/pdfExport";
 
@@ -376,9 +376,9 @@ export const deleteLessonNote = asyncHandler(async (req: any, res: any) => {
 
   for (const img of images) {
     try {
-      await ftpService.deleteFile(img.file_path);
+      await storageService.deleteFile(img.file_path);
     } catch (err) {
-      logger.warn(`Could not delete FTP file ${img.file_path}: ${err}`);
+      logger.warn(`Could not delete storage file ${img.file_path}: ${err}`);
     }
   }
 
@@ -412,7 +412,7 @@ export const uploadLessonNoteImage = asyncHandler(async (req: any, res: any) => 
   const remoteFileName = `${Date.now()}-${Math.round(Math.random() * 1e9)}.${ext}`;
   const remoteFilePath = `/lesson-notes/${noteId}/${remoteFileName}`;
 
-  await ftpService.uploadFile(req.file.buffer, remoteFilePath);
+  await storageService.uploadFile(req.file.buffer, remoteFilePath);
 
   const [result] = await db.insert(LessonNoteImage).values({
     note_id: noteId,
@@ -448,7 +448,7 @@ export const streamLessonNoteImage = asyncHandler(async (req: any, res: any) => 
     if (!hasShareAccess) throw err;
   });
 
-  const buffer = await ftpService.downloadToBuffer(image.file_path);
+  const buffer = await storageService.downloadToBuffer(image.file_path);
   res.setHeader("Content-Type", image.mime_type);
   res.setHeader("Cache-Control", "private, max-age=86400");
   res.send(buffer);

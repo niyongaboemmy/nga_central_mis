@@ -43,7 +43,7 @@ import { asyncHandler } from "../middleware/asyncHandler";
 import { recordActivity } from "../utils/activityLogger";
 import { sanitizeString } from "../utils/sanitization";
 import logger from "../utils/logger";
-import ftpService from "../utils/ftp";
+import storageService from "../utils/fileServer";
 import fs from "fs";
 import path from "path";
 const mammoth = require("mammoth");
@@ -1001,12 +1001,12 @@ export const deleteFolder = asyncHandler(async (req: any, res: any) => {
     .from(Document)
     .where(eq(Document.folder_id, folderIdNum));
 
-  // Delete physical files from FTP
+  // Delete physical files from storage
   for (const doc of documents) {
     try {
-      await ftpService.deleteFile(doc.file_path);
+      await storageService.deleteFile(doc.file_path);
     } catch (error) {
-      logger.warn(`Failed to delete file from FTP: ${doc.file_path}`);
+      logger.warn(`Failed to delete file from storage: ${doc.file_path}`);
     }
   }
 
@@ -1548,8 +1548,8 @@ export const uploadDocument = asyncHandler(async (req: any, res: any) => {
   const remoteFilePath = `${userId}/${fileName}`;
 
   try {
-    // Upload file buffer to FTP server
-    await ftpService.uploadFile(file.buffer, remoteFilePath);
+    // Upload file buffer to storage
+    await storageService.uploadFile(file.buffer, remoteFilePath);
 
     const result = await db.insert(Document).values({
       user_id: userId,
@@ -1827,11 +1827,11 @@ export const deleteDocument = asyncHandler(async (req: any, res: any) => {
     throw new NotFoundError("Document not found");
   }
 
-  // Delete physical file from FTP
+  // Delete physical file from storage
   try {
-    await ftpService.deleteFile(document[0].file_path);
+    await storageService.deleteFile(document[0].file_path);
   } catch (error) {
-    logger.warn(`Failed to delete file from FTP: ${document[0].file_path}`);
+    logger.warn(`Failed to delete file from storage: ${document[0].file_path}`);
   }
 
   // Delete document versions
@@ -1871,14 +1871,14 @@ export const downloadDocument = asyncHandler(async (req: any, res: any) => {
   }
   const doc = access.document;
 
-  // Check FTP file exists
-  const exists = await ftpService.fileExists(doc.file_path);
+  // Check storage file exists
+  const exists = await storageService.fileExists(doc.file_path);
   if (!exists) {
     throw new NotFoundError("File not found on server");
   }
 
   // Download file to memory
-  const buffer = await ftpService.downloadToBuffer(doc.file_path);
+  const buffer = await storageService.downloadToBuffer(doc.file_path);
 
   if (!buffer.length) {
     throw new NotFoundError("File is empty or corrupted");
@@ -1954,8 +1954,8 @@ export const uploadNewVersion = asyncHandler(async (req: any, res: any) => {
   );
 
   try {
-    // Upload file buffer to FTP server
-    await ftpService.uploadFile(file.buffer, filePath);
+    // Upload file buffer to storage
+    await storageService.uploadFile(file.buffer, filePath);
 
     // Save version
     const result = await db.insert(DocumentVersion).values({

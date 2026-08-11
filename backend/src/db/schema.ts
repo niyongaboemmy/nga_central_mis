@@ -1461,7 +1461,7 @@ export const LessonNoteShare = mysqlTable("LessonNoteShare", {
 });
 
 // LessonNoteImage — images embedded in a note's Tiptap content, stored via the same
-// FTP-backed flow as SubjectDocument, served through an authenticated streaming endpoint.
+// local-storage-backed flow as SubjectDocument, served through an authenticated streaming endpoint.
 export const LessonNoteImage = mysqlTable("LessonNoteImage", {
   image_id: bigint("image_id", { mode: "number" }).primaryKey().autoincrement(),
   note_id: bigint("note_id", { mode: "number" })

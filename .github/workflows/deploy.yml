@@ -65,6 +65,17 @@ jobs:
             pm2 save
             cd ..
 
+            # Shared file storage service (used by both this app and
+            # nga-task-mentor) -- see file-server/README for the API.
+            cd file-server
+            cp .env.production .env
+            npm ci
+            npm run build
+            npm prune --omit=dev
+            pm2 restart file-server --update-env || pm2 start dist/index.js --name file-server --update-env
+            pm2 save
+            cd ..
+
       - name: Upload frontend build
         run: |
           mkdir -p ~/.ssh

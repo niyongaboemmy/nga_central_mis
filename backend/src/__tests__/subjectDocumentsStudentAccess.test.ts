@@ -108,7 +108,7 @@ describe("Subject materials — student enrollment-scoped access", () => {
   });
 
   it("lets an enrolled student with the permission pass the download authorization check", async () => {
-    // The fixture document has no real file on the FTP backend used by the
+    // The fixture document has no real file on the local storage backend used by the
     // test suite, so a granted request surfaces as a 404 from the file
     // lookup rather than a 200 — what this asserts is that the request gets
     // past the 403 authorization gate at all.
