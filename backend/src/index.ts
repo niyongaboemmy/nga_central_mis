@@ -1,5 +1,9 @@
 import dotenv from "dotenv";
-dotenv.config();
+import path from "path";
+// Resolve .env relative to this file, not process.cwd() — pm2 restarts can
+// run with a different working directory, which otherwise makes dotenv
+// silently find nothing.
+dotenv.config({ path: path.resolve(__dirname, "../.env") });
 
 import config from "./config";
 import logger from "./utils/logger";
