@@ -23,6 +23,7 @@ jobs:
             git reset --hard origin/main
 
             cd backend
+            cp .env.production .env
             npm ci
             npm run build
             npm prune --omit=dev
