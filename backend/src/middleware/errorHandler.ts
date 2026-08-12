@@ -50,6 +50,13 @@ export const errorHandler = (
     });
   }
 
+  if (err.code === "ER_DATA_TOO_LONG") {
+    return res.status(400).json({
+      success: false,
+      message: "One or more fields exceed the maximum allowed length",
+    });
+  }
+
   if (err.message && err.message.includes("Unknown column")) {
     return res.status(400).json({
       success: false,

@@ -2420,6 +2420,10 @@ export const createClassGroup = asyncHandler(async (req: any, res: any) => {
 
   const sanitizedName = sanitizeString(name);
 
+  if (sanitizedName.length > 50) {
+    throw new ValidationError("Class group name must be 50 characters or fewer");
+  }
+
   // Class groups are a permanent label per grade -- creating the same
   // (grade, name) twice is almost always a mistake, not intentional.
   const existing = await db
@@ -2505,6 +2509,9 @@ export const updateClassGroup = asyncHandler(async (req: any, res: any) => {
 
   if (name !== undefined) {
     updateData.name = sanitizeString(name);
+    if (updateData.name.length > 50) {
+      throw new ValidationError("Class group name must be 50 characters or fewer");
+    }
   }
 
   await db
