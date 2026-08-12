@@ -5,10 +5,12 @@
  * Usage: npx ts-node scripts/run-migration.ts <file> [--db=nga_central_mis_test]
  */
 import dotenv from "dotenv";
-dotenv.config();
 import mysql from "mysql2/promise";
 import fs from "fs";
 import path from "path";
+// Resolve .env relative to this file, not process.cwd() -- so `npm run
+// migrate` works the same regardless of which directory it's invoked from.
+dotenv.config({ path: path.resolve(__dirname, "../.env") });
 
 async function main() {
   const fileArg = process.argv[2];

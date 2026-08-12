@@ -10,7 +10,9 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:db:reset": "ts-node scripts/reset-test-db.ts",
-    "test-email": "ts-node src/scripts/test-email.ts"
+    "test-email": "ts-node src/scripts/test-email.ts",
+    "migrate": "ts-node scripts/run-migration.ts",
+    "migrate:list": "ls -1 migrations/*.sql"
   },
   "keywords": [],
   "author": "",
