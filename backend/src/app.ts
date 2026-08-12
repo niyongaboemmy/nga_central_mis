@@ -22,6 +22,7 @@ import reportRoutes from "./routes/reportRoutes";
 import curriculumRoutes from "./routes/curriculum";
 import mentorshipRoutes from "./routes/mentorship";
 import lessonNoteRoutes from "./routes/lessonNotes";
+import databaseRoutes from "./routes/databaseRoutes";
 
 const app = express();
 
@@ -79,6 +80,7 @@ app.use("/reports", reportRoutes);
 app.use("/curriculum", curriculumRoutes);
 app.use("/mentorship", mentorshipRoutes);
 app.use("/lesson-notes", lessonNoteRoutes);
+app.use("/database", databaseRoutes);
 
 app.post("/test-post", (req, res) =>
   res.json({ success: true, message: "Root POST test works" }),

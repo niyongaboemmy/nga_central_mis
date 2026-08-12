@@ -1487,3 +1487,21 @@ export const LessonNotePromptPreset = mysqlTable("LessonNotePromptPreset", {
   prompt_text: text("prompt_text").notNull(),
   created_at: datetime("created_at").default(sql`CURRENT_TIMESTAMP`),
 });
+
+// DatabaseQueryLog — audit trail for every query executed through the Database
+// Management tool (both the free-form SQL runner and row insert/update/delete).
+export const DatabaseQueryLog = mysqlTable("DatabaseQueryLog", {
+  log_id: bigint("log_id", { mode: "number" }).primaryKey().autoincrement(),
+  user_id: bigint("user_id", { mode: "number" })
+    .notNull()
+    .references(() => User.user_id),
+  query_text: text("query_text").notNull(),
+  statement_type: varchar("statement_type", { length: 50 }).notNull(),
+  is_write: tinyint("is_write").default(0),
+  row_count: int("row_count"),
+  execution_ms: int("execution_ms"),
+  status: mysqlEnum("status", ["SUCCESS", "ERROR"]).notNull(),
+  error_message: text("error_message"),
+  ip_address: varchar("ip_address", { length: 64 }),
+  created_at: datetime("created_at").default(sql`CURRENT_TIMESTAMP`),
+});

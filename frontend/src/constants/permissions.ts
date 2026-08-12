@@ -114,6 +114,9 @@ export const Permissions = {
   // Lesson Notes
   MANAGE_LESSON_NOTES: "MANAGE_LESSON_NOTES",
   VIEW_SHARED_LESSON_NOTES: "VIEW_SHARED_LESSON_NOTES",
+
+  // Database Management
+  DATABASE_MANAGEMENT: "DATABASE_MANAGEMENT",
 } as const;
 
 export type PermissionKey = keyof typeof Permissions;
@@ -237,6 +240,7 @@ export const permissionGroups = {
   ],
   settings: [Permissions.MANAGE_SETTINGS],
   admin: [Permissions.ADMIN],
+  database: [Permissions.DATABASE_MANAGEMENT],
   calendar: [
     Permissions.MANAGE_ACADEMIC_CALENDAR,
     Permissions.CREATE_ACADEMIC_CALENDAR,

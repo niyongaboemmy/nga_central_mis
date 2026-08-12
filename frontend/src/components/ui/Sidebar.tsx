@@ -1,5 +1,5 @@
 import React from "react";
-import { School, Server, Activity } from "lucide-react";
+import { School, Server, Activity, Database } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useUser } from "../../contexts/UserContext";
 import { Permissions } from "../../constants/permissions";
@@ -498,6 +498,12 @@ const Sidebar: React.FC<SidebarProps> = ({
       path: "/logs-history",
       icon: <Activity className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
       requiredPermission: Permissions.VIEW_ALL_LOGS_HISTORY,
+    },
+    {
+      label: "Database Management",
+      path: "/database-management",
+      icon: <Database className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
+      requiredPermission: Permissions.DATABASE_MANAGEMENT,
     },
   ];
 

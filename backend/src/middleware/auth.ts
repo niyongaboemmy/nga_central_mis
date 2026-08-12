@@ -77,3 +77,28 @@ export const authorize =
     }
     next();
   };
+
+// Guards the Database Management tool: even an authenticated admin session
+// isn't enough, they must have separately re-confirmed their password via
+// POST /auth/confirm-db-access to obtain this short-lived token.
+export const requireDbStepUp = (req: any, res: any, next: any) => {
+  const token = req.header("X-Db-Access-Token");
+  if (!token) {
+    return res
+      .status(401)
+      .json({ message: "Step-up authentication required" });
+  }
+  try {
+    const decoded: any = jwt.verify(token, process.env.JWT_SECRET!);
+    if (decoded.dbAccess !== true || decoded.userId !== req.user.userId) {
+      return res
+        .status(401)
+        .json({ message: "Step-up authentication required" });
+    }
+    next();
+  } catch (error) {
+    return res
+      .status(401)
+      .json({ message: "Step-up session expired, please re-confirm your password" });
+  }
+};

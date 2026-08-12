@@ -7,6 +7,7 @@ import {
   verifyResetOTP,
   resetPassword,
   changePassword,
+  confirmDbAccess,
   getSession,
   logout,
 } from "../controllers/authController";
@@ -23,5 +24,6 @@ router.post("/forgot-password", forgotPassword);
 router.post("/verify-reset-otp", authenticate, verifyResetOTP);
 router.post("/reset-password", authenticate, resetPassword);
 router.post("/change-password", authenticate, changePassword);
+router.post("/confirm-db-access", authenticate, confirmDbAccess);
 
 export default router;

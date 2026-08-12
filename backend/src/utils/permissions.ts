@@ -124,6 +124,9 @@ export const Permissions = {
   // Lesson Notes
   MANAGE_LESSON_NOTES: "MANAGE_LESSON_NOTES",
   VIEW_SHARED_LESSON_NOTES: "VIEW_SHARED_LESSON_NOTES",
+
+  // Database Management
+  DATABASE_MANAGEMENT: "DATABASE_MANAGEMENT",
 } as const;
 
 /**

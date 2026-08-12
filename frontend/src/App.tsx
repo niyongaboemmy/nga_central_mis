@@ -33,6 +33,7 @@ import SchemeOfWorkList from "./components/SchemeOfWorkList";
 import SchemeOfWorkCalendar from "./components/SchemeOfWorkCalendar";
 import AcademicCalendar from "./components/AcademicCalendar";
 import LogsHistory from "./components/LogsHistory";
+import DatabaseManagement from "./components/DatabaseManagement";
 import AllTeachersSchemeOfWork from "./components/AllTeachersSchemeOfWork";
 import SchemeDetails from "./components/SchemeDetails";
 import ReportingModule from "./components/reporting/ReportingModule";
@@ -610,6 +611,18 @@ function App() {
                 <ProtectedRoute>
                   <SystemLayoutWrapper>
                     <LogsHistory />
+                  </SystemLayoutWrapper>
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Database Management - protected with sidebar, further gated by permission + step-up auth inside the page */}
+            <Route
+              path="/database-management"
+              element={
+                <ProtectedRoute>
+                  <SystemLayoutWrapper>
+                    <DatabaseManagement />
                   </SystemLayoutWrapper>
                 </ProtectedRoute>
               }

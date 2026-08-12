@@ -714,3 +714,52 @@ export const changePassword = asyncHandler(async (req: any, res: any) => {
 
   successResponse(res, "Password changed successfully");
 });
+
+// Step-up re-authentication gate for the Database Management tool: a valid
+// session is not enough to open it, the admin must re-prove their password.
+export const confirmDbAccess = asyncHandler(async (req: any, res: any) => {
+  const { password } = req.body;
+  const userId = req.user.userId;
+
+  if (!password) {
+    throw new ValidationError("Password is required");
+  }
+
+  const auth = await db
+    .select()
+    .from(AuthCredential)
+    .where(eq(AuthCredential.user_id, userId))
+    .limit(1);
+
+  if (auth.length === 0) {
+    throw new AuthenticationError("Authentication credentials not found");
+  }
+
+  const isValidPassword = await bcrypt.compare(password, auth[0].password_hash);
+  if (!isValidPassword) {
+    throw new AuthenticationError("Incorrect password");
+  }
+
+  const dbAccessToken = jwt.sign(
+    { userId, dbAccess: true },
+    config.jwtSecret,
+    { expiresIn: "20m" },
+  );
+
+  logger.info(`Database Management step-up auth granted for userId: ${userId}`);
+
+  await recordActivity(
+    userId,
+    "DATABASE_MANAGEMENT_ACCESS",
+    "Admin confirmed password to access the Database Management tool",
+    "User",
+    userId,
+    undefined,
+    userId,
+  );
+
+  successResponse(res, "Access confirmed", {
+    dbAccessToken,
+    expiresIn: 1200,
+  });
+});
