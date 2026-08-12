@@ -3,10 +3,15 @@ import { db } from "../db";
 import { sql, desc } from "drizzle-orm";
 import { DatabaseQueryLog, User, UserProfile } from "../db/schema";
 import { eq } from "drizzle-orm";
-import { ValidationError, NotFoundError } from "../errors/CustomError";
+import { ValidationError, NotFoundError, ServiceUnavailableError } from "../errors/CustomError";
 import { asyncHandler } from "../middleware/asyncHandler";
 import { successResponse, paginatedResponse } from "../utils/response";
 import { recordActivity } from "../utils/activityLogger";
+import {
+  generateStructuredContent,
+  isAnyProviderConfigured,
+  JSONSchema,
+} from "../services/aiProviders";
 
 const DENYLIST_PATTERNS = [
   /DROP\s+DATABASE/i,
@@ -173,11 +178,21 @@ export const getTableData = asyncHandler(async (req: any, res: Response) => {
     ? sql.raw(`ORDER BY \`${sortBy}\` ${sortDir}`)
     : sql``;
 
+  const search = String(req.query.search || "").trim();
+  const whereClause = search
+    ? sql`WHERE ${sql.join(
+        columns.map(
+          (c) => sql`CAST(${sql.raw(`\`${c}\``)} AS CHAR) LIKE ${`%${search}%`}`,
+        ),
+        sql.raw(" OR "),
+      )}`
+    : sql``;
+
   const [rowsResult, countResult] = await Promise.all([
     db.execute(
-      sql`SELECT * FROM ${tableIdent} ${orderClause} LIMIT ${limit} OFFSET ${offset}`,
+      sql`SELECT * FROM ${tableIdent} ${whereClause} ${orderClause} LIMIT ${limit} OFFSET ${offset}`,
     ),
-    db.execute(sql`SELECT COUNT(*) as total FROM ${tableIdent}`),
+    db.execute(sql`SELECT COUNT(*) as total FROM ${tableIdent} ${whereClause}`),
   ]);
 
   successResponse(res, "Table data retrieved", {
@@ -543,5 +558,102 @@ export const getServerStatus = asyncHandler(async (req: any, res: Response) => {
     uptimeSeconds: Number((uptimeResult as any)[0]?.[0]?.Value || 0),
     threadsConnected: Number((connResult as any)[0]?.[0]?.Value || 0),
     dbSizeMb: Number((sizeResult as any)[0]?.[0]?.sizeMb || 0),
+  });
+});
+
+const sqlGenerationSchema: JSONSchema = {
+  type: "object",
+  properties: {
+    sql: {
+      type: "string",
+      description:
+        "A single valid MySQL statement answering the request. No markdown fences, no trailing commentary.",
+    },
+    explanation: {
+      type: "string",
+      description: "One or two plain-language sentences explaining what the query does.",
+    },
+  },
+  required: ["sql"],
+};
+
+// Drafts a SQL query from a natural-language request, reusing the same
+// multi-provider AI fallback used for AI lesson note generation. Never
+// executed automatically — the admin reviews it in the editor before running it.
+export const generateSqlWithAI = asyncHandler(async (req: any, res: Response) => {
+  if (!isAnyProviderConfigured()) {
+    throw new ServiceUnavailableError(
+      "AI SQL generation is not configured. Add an API key for at least one AI provider (GEMINI_API_KEY, GROQ_API_KEY, or GLM_API_KEY) to the backend environment.",
+    );
+  }
+
+  const { prompt, table } = req.body;
+  if (!prompt || !String(prompt).trim()) {
+    throw new ValidationError("Describe the query you want in plain language");
+  }
+
+  const tablesResult: any = await db.execute(
+    sql`SELECT TABLE_NAME as name FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() ORDER BY TABLE_NAME`,
+  );
+  const tableNames = tablesResult[0].map((r: any) => r.name);
+
+  let structureBlock = "";
+  if (table && tableNames.includes(table)) {
+    const columns = await getTableColumns(table);
+    structureBlock = `\nThe admin is currently viewing table "${table}" with columns: ${columns.join(", ")}.`;
+  }
+
+  const { data, providerUsed } = await generateStructuredContent<{
+    sql?: string;
+    explanation?: string;
+  }>({
+    schemaName: "database_sql_query",
+    schema: sqlGenerationSchema,
+    maxOutputTokens: 800,
+    prompt: `You are a senior MySQL database administrator helping write a single SQL query for a school
+management system database (MySQL 8).
+
+Available tables in this database:
+${tableNames.join(", ")}
+${structureBlock}
+
+The admin's request, in their own words:
+"""
+${String(prompt).trim()}
+"""
+
+Write ONE single valid MySQL statement that fulfils this request. Prefer SELECT unless the request explicitly
+asks to insert, update, delete, or alter data. Use only the tables above, and only columns you're confident
+exist given the table/column names provided — if unsure of exact columns for a table you weren't given the
+structure of, prefer SELECT * over guessing specific column names. Never produce DROP DATABASE, DROP SCHEMA,
+GRANT, REVOKE, CREATE USER, DROP USER, ALTER USER, SET GLOBAL, or SHUTDOWN. Do not wrap the SQL in markdown
+code fences and do not include a trailing semicolon.`,
+  });
+
+  if (!data.sql) {
+    throw new ValidationError("The AI could not generate a query for that request. Try rephrasing it.");
+  }
+
+  const cleanSql = data.sql
+    .trim()
+    .replace(/^```sql\s*/i, "")
+    .replace(/```$/, "")
+    .replace(/;\s*$/, "")
+    .trim();
+
+  await recordActivity(
+    req.user.userId,
+    "DATABASE_AI_QUERY_DRAFT",
+    `Used AI (${providerUsed}) to draft a SQL query in Database Management`,
+    table || undefined,
+    undefined,
+    { prompt: String(prompt).trim(), provider: providerUsed },
+    req.user.userId,
+  );
+
+  successResponse(res, "SQL query generated", {
+    sql: cleanSql,
+    explanation: data.explanation || null,
+    providerUsed,
   });
 });

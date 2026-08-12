@@ -9,12 +9,14 @@ interface SystemLayoutProps {
   children: React.ReactNode;
   title?: string;
   showSidebar?: boolean;
+  fullWidth?: boolean;
 }
 
 const SystemLayout: React.FC<SystemLayoutProps> = ({
   children,
   title,
   showSidebar = false,
+  fullWidth = false,
 }) => {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -111,7 +113,7 @@ const SystemLayout: React.FC<SystemLayoutProps> = ({
             : "pt-16"
         }`}
       >
-        <div className="max-w-7xl mx-auto">
+        <div className={fullWidth ? "w-full px-4 md:px-6" : "max-w-7xl mx-auto"}>
           {title && (
             <h1 className="text-2xl font-bold text-text-primary-light dark:text-text-primary-dark mb-6">
               {title}

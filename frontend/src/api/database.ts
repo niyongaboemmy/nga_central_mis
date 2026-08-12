@@ -68,7 +68,13 @@ export const getTableStructure = async (
 
 export const getTableData = async (
   table: string,
-  params: { page?: number; limit?: number; sortBy?: string; sortDir?: string },
+  params: {
+    page?: number;
+    limit?: number;
+    sortBy?: string;
+    sortDir?: string;
+    search?: string;
+  },
 ): Promise<{ rows: any[]; total: number; page: number; limit: number }> => {
   const response = await api.get(`/database/tables/${table}/data`, {
     params,
@@ -119,6 +125,24 @@ export const runQuery = async (query: string, confirm = false): Promise<QueryRes
   const response = await api.post(
     "/database/query",
     { query, confirm },
+    { headers: dbHeaders() },
+  );
+  return response.data.data;
+};
+
+export interface AiSqlResult {
+  sql: string;
+  explanation: string | null;
+  providerUsed: string;
+}
+
+export const generateSqlWithAI = async (
+  prompt: string,
+  table?: string,
+): Promise<AiSqlResult> => {
+  const response = await api.post(
+    "/database/query/ai-generate",
+    { prompt, table },
     { headers: dbHeaders() },
   );
   return response.data.data;

@@ -106,10 +106,15 @@ const PublicRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 };
 
 // System layout with sidebar for authenticated users
-const SystemLayoutWrapper: React.FC<{ children: React.ReactNode }> = ({
-  children,
-}) => {
-  return <SystemLayout showSidebar={true}>{children}</SystemLayout>;
+const SystemLayoutWrapper: React.FC<{
+  children: React.ReactNode;
+  fullWidth?: boolean;
+}> = ({ children, fullWidth }) => {
+  return (
+    <SystemLayout showSidebar={true} fullWidth={fullWidth}>
+      {children}
+    </SystemLayout>
+  );
 };
 
 // Dashboard page with sidebar
@@ -621,7 +626,7 @@ function App() {
               path="/database-management"
               element={
                 <ProtectedRoute>
-                  <SystemLayoutWrapper>
+                  <SystemLayoutWrapper fullWidth>
                     <DatabaseManagement />
                   </SystemLayoutWrapper>
                 </ProtectedRoute>
