@@ -9,15 +9,21 @@ export interface GenerateStructuredContentResult<T> {
   providerUsed: string;
 }
 
+export interface GenerateStructuredContentOptions {
+  /** Try these providers, in this order, instead of AI_PROVIDER_ORDER — see orderedProviders(). */
+  providerOrder?: string[];
+}
+
 /**
- * Tries each configured provider in AI_PROVIDER_ORDER, skipping any currently
- * cooling down from a recent quota error. Returns the first success. Callers never
- * need to know which provider actually answered unless they want to (providerUsed).
+ * Tries each configured provider in AI_PROVIDER_ORDER (or `options.providerOrder` when given),
+ * skipping any currently cooling down from a recent quota error. Returns the first success.
+ * Callers never need to know which provider actually answered unless they want to (providerUsed).
  */
 export async function generateStructuredContent<T = any>(
   params: GenerateJSONParams,
+  options?: GenerateStructuredContentOptions,
 ): Promise<GenerateStructuredContentResult<T>> {
-  const providers = orderedProviders();
+  const providers = orderedProviders(options?.providerOrder);
   let lastErr: any = null;
   let attempted = 0;
 

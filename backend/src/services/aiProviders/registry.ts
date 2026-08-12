@@ -2,19 +2,26 @@ import { AIProvider } from "./types";
 import { geminiProvider } from "./geminiProvider";
 import { groqProvider } from "./groqProvider";
 import { glmProvider } from "./glmProvider";
+import { openaiProvider } from "./openaiProvider";
 
 const ALL_PROVIDERS: Record<string, AIProvider> = {
   gemini: geminiProvider,
   groq: groqProvider,
   glm: glmProvider,
+  openai: openaiProvider,
 };
 
 const DEFAULT_ORDER = "gemini,groq,glm";
 
-/** Providers to try, in order, per AI_PROVIDER_ORDER (comma-separated env var). */
-export function orderedProviders(): AIProvider[] {
-  const names = (process.env.AI_PROVIDER_ORDER || DEFAULT_ORDER)
-    .split(",")
+/**
+ * Providers to try, in order. Defaults to AI_PROVIDER_ORDER (comma-separated env var,
+ * falling back to DEFAULT_ORDER) — pass `overrideOrder` only when a specific feature has
+ * a genuine reason to prefer a different provider first (e.g. one provider is measurably
+ * better at a particular task), which still falls through to the rest of the configured
+ * providers rather than being limited to just the override.
+ */
+export function orderedProviders(overrideOrder?: string[]): AIProvider[] {
+  const names = (overrideOrder ?? (process.env.AI_PROVIDER_ORDER || DEFAULT_ORDER).split(","))
     .map((s) => s.trim())
     .filter(Boolean);
   return names.map((name) => ALL_PROVIDERS[name]).filter((p): p is AIProvider => !!p);

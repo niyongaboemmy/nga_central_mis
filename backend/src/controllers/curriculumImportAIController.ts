@@ -1,6 +1,6 @@
 import { randomUUID } from "crypto";
 import { extractTextFromFile } from "../utils/docExtract";
-import { generateCurriculumWithGemini } from "../services/curriculumExtraction";
+import { generateCurriculumWithAI } from "../services/curriculumExtraction";
 import { db } from "../db";
 import { eq } from "drizzle-orm";
 import { Subject, SubjectCompetency, CompetencyPerformanceCriteria } from "../db/schema";
@@ -10,6 +10,7 @@ import { NotFoundError, ValidationError } from "../errors/CustomError";
 import { recordActivity } from "../utils/activityLogger";
 import { sanitizeString } from "../utils/sanitization";
 import logger from "../utils/logger";
+import { isAnyProviderConfigured } from "../services/aiProviders";
 import {
   createImportJob,
   getImportJob,
@@ -18,10 +19,6 @@ import {
 } from "../services/curriculumImportJobStore";
 
 const MAX_CURRICULUM_CHARS = 60000;
-
-const isGeminiConfigured = () =>
-  !!process.env.GEMINI_API_KEY &&
-  process.env.GEMINI_API_KEY !== "your_gemini_api_key_here";
 
 const processImportJob = async (
   jobId: string,
@@ -43,7 +40,7 @@ const processImportJob = async (
       message: "Analyzing curriculum with AI...",
     });
 
-    const elements = await generateCurriculumWithGemini(rawText, subjectName);
+    const elements = await generateCurriculumWithAI(rawText, subjectName);
 
     updateImportJob(jobId, {
       status: "structuring",
@@ -71,9 +68,9 @@ export const startCurriculumImport = asyncHandler(async (req: any, res: any) => 
     throw new ValidationError("No file uploaded");
   }
 
-  if (!isGeminiConfigured()) {
+  if (!isAnyProviderConfigured()) {
     throw new ValidationError(
-      "AI curriculum import is not configured. Add a GEMINI_API_KEY to the backend environment (get a free key at https://aistudio.google.com/apikey).",
+      "AI curriculum import is not configured. Add an API key for at least one AI provider to the backend environment.",
     );
   }
 

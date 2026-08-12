@@ -1,5 +1,4 @@
 import { randomUUID } from "crypto";
-import { GoogleGenAI, Type } from "@google/genai";
 import { db } from "../db";
 import { eq } from "drizzle-orm";
 import {
@@ -18,47 +17,48 @@ import { recordActivity } from "../utils/activityLogger";
 import logger from "../utils/logger";
 import { createJob, getJob, updateJob } from "../services/aiLessonJobStore";
 import { persistLessonPlan } from "../services/lessonPlanPersistence";
+import {
+  generateStructuredContent,
+  isAnyProviderConfigured,
+  JSONSchema,
+} from "../services/aiProviders";
 
-const isGeminiConfigured = () =>
-  !!process.env.GEMINI_API_KEY &&
-  process.env.GEMINI_API_KEY !== "your_gemini_api_key_here";
-
-const lessonPlanSchema = {
-  type: Type.OBJECT,
+const lessonPlanSchema: JSONSchema = {
+  type: "object",
   properties: {
-    session_code: { type: Type.STRING },
-    sector: { type: Type.STRING },
-    trade: { type: Type.STRING },
-    level: { type: Type.STRING },
-    module_code: { type: Type.STRING },
-    module_name: { type: Type.STRING },
-    big_question: { type: Type.STRING },
-    total_duration_minutes: { type: Type.INTEGER },
+    session_code: { type: "string" },
+    sector: { type: "string" },
+    trade: { type: "string" },
+    level: { type: "string" },
+    module_code: { type: "string" },
+    module_name: { type: "string" },
+    big_question: { type: "string" },
+    total_duration_minutes: { type: "number" },
     outcomes: {
-      type: Type.ARRAY,
+      type: "array",
       items: {
-        type: Type.OBJECT,
+        type: "object",
         properties: {
-          code: { type: Type.STRING },
-          title: { type: Type.STRING },
-          description: { type: Type.STRING },
-          duration_minutes: { type: Type.INTEGER },
+          code: { type: "string" },
+          title: { type: "string" },
+          description: { type: "string" },
+          duration_minutes: { type: "number" },
           activities: {
-            type: Type.ARRAY,
+            type: "array",
             items: {
-              type: Type.OBJECT,
+              type: "object",
               properties: {
-                trainer_activities: { type: Type.STRING },
-                learner_activities: { type: Type.STRING },
+                trainer_activities: { type: "string" },
+                learner_activities: { type: "string" },
               },
               required: ["trainer_activities", "learner_activities"],
             },
           },
           resources: {
-            type: Type.ARRAY,
+            type: "array",
             items: {
-              type: Type.OBJECT,
-              properties: { resource_name: { type: Type.STRING } },
+              type: "object",
+              properties: { resource_name: { type: "string" } },
               required: ["resource_name"],
             },
           },
@@ -67,15 +67,15 @@ const lessonPlanSchema = {
       },
     },
     sections: {
-      type: Type.ARRAY,
+      type: "array",
       items: {
-        type: Type.OBJECT,
+        type: "object",
         properties: {
-          section_type: { type: Type.STRING },
-          trainer_activities: { type: Type.STRING },
-          learner_activities: { type: Type.STRING },
-          resources: { type: Type.STRING },
-          duration_minutes: { type: Type.INTEGER },
+          section_type: { type: "string" },
+          trainer_activities: { type: "string" },
+          learner_activities: { type: "string" },
+          resources: { type: "string" },
+          duration_minutes: { type: "number" },
         },
         required: [
           "section_type",
@@ -87,29 +87,29 @@ const lessonPlanSchema = {
       },
     },
     indicativeContent: {
-      type: Type.ARRAY,
+      type: "array",
       items: {
-        type: Type.OBJECT,
+        type: "object",
         properties: {
-          category: { type: Type.STRING },
-          content: { type: Type.STRING },
+          category: { type: "string" },
+          content: { type: "string" },
         },
         required: ["category", "content"],
       },
     },
     assignments: {
-      type: Type.ARRAY,
+      type: "array",
       items: {
-        type: Type.OBJECT,
-        properties: { description: { type: Type.STRING } },
+        type: "object",
+        properties: { description: { type: "string" } },
         required: ["description"],
       },
     },
     evaluation: {
-      type: Type.OBJECT,
+      type: "object",
       properties: {
-        teacher_notes: { type: Type.STRING },
-        references: { type: Type.STRING },
+        teacher_notes: { type: "string" },
+        references: { type: "string" },
       },
       required: ["teacher_notes"],
     },
@@ -146,7 +146,7 @@ const distributeDurations = <T extends { duration_minutes?: number }>(
   });
 };
 
-const generateLessonPlanWithGemini = async (context: {
+const generateLessonPlan = async (context: {
   subjectName: string;
   classGroupName: string;
   termName: string;
@@ -162,13 +162,12 @@ const generateLessonPlanWithGemini = async (context: {
   instructorName: string;
   totalMinutes: number;
 }) => {
-  const genAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-  const model = process.env.GEMINI_MODEL || "gemini-2.5-flash";
   const hours = (context.totalMinutes / 60).toFixed(2).replace(/\.00$/, "");
 
-  const response = await genAI.models.generateContent({
-    model,
-    contents: `You are ${context.instructorName || "an experienced, subject-matter-expert teacher"},
+  const { data: parsed } = await generateStructuredContent<any>({
+    schemaName: "lesson_plan",
+    schema: lessonPlanSchema,
+    prompt: `You are ${context.instructorName || "an experienced, subject-matter-expert teacher"},
 a professional teacher of "${context.subjectName}" for class "${context.classGroupName}" (${context.termName}).
 You are personally preparing a detailed, classroom-ready lesson plan for ${context.weekNumber} of your Scheme of
 Work — the way a seasoned teacher plans their own lesson, not a generic template.
@@ -205,14 +204,7 @@ invent unrelated content. Produce:
 
 Keep every field specific and classroom-realistic — the way a teacher who actually teaches this subject would
 write it, not a vague summary. Get the minute-by-minute budgeting genuinely right; don't just fill in round numbers.`,
-    config: {
-      responseMimeType: "application/json",
-      responseSchema: lessonPlanSchema,
-    },
   });
-
-  const text = response.text || "{}";
-  const parsed = JSON.parse(text);
 
   if (!parsed.outcomes || !Array.isArray(parsed.outcomes) || parsed.outcomes.length === 0) {
     throw new ValidationError(
@@ -276,7 +268,7 @@ const processJob = async (
 
     updateJob(jobId, { status: "analyzing", message: "Analyzing this week with AI..." });
 
-    const generated = await generateLessonPlanWithGemini({
+    const generated = await generateLessonPlan({
       subjectName: subjectName || "this subject",
       classGroupName: classGroupName || "",
       termName: termName || "",
@@ -370,9 +362,9 @@ const processJob = async (
 };
 
 export const startAILessonGeneration = asyncHandler(async (req: any, res: any) => {
-  if (!isGeminiConfigured()) {
+  if (!isAnyProviderConfigured()) {
     throw new ValidationError(
-      "AI lesson plan generation is not configured. Add a GEMINI_API_KEY to the backend environment (get a free key at https://aistudio.google.com/apikey).",
+      "AI lesson plan generation is not configured. Add an API key for at least one AI provider to the backend environment.",
     );
   }
 

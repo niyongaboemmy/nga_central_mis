@@ -1,4 +1,3 @@
-import { GoogleGenAI, Type } from "@google/genai";
 import { db } from "../db";
 import { eq, and, sql } from "drizzle-orm";
 import {
@@ -12,33 +11,33 @@ import {
 import { asyncHandler } from "../middleware/asyncHandler";
 import { successResponse } from "../utils/response";
 import { ValidationError, NotFoundError } from "../errors/CustomError";
+import {
+  generateStructuredContent,
+  isAnyProviderConfigured,
+  friendlyAIErrorMessage,
+  JSONSchema,
+} from "../services/aiProviders";
 import logger from "../utils/logger";
 
-// Same convention as lessonPlanAIController.ts/schemeAIController.ts — Gemini
-// via @google/genai, guarded by the same "is it actually configured" check.
-const isGeminiConfigured = () =>
-  !!process.env.GEMINI_API_KEY &&
-  process.env.GEMINI_API_KEY !== "your_gemini_api_key_here";
-
-const insightsSchema = {
-  type: Type.OBJECT,
+const insightsSchema: JSONSchema = {
+  type: "object",
   properties: {
     summary: {
-      type: Type.STRING,
+      type: "string",
       description: "A 2-4 sentence narrative overview of this mentee's trajectory this period.",
     },
     strengths: {
-      type: Type.ARRAY,
-      items: { type: Type.STRING },
+      type: "array",
+      items: { type: "string" },
       description: "Specific, evidence-based positives observed across sessions/grades.",
     },
     concerns: {
-      type: Type.ARRAY,
-      items: { type: Type.STRING },
+      type: "array",
+      items: { type: "string" },
       description: "Specific, evidence-based concerns or recurring challenges, if any.",
     },
     recommended_focus: {
-      type: Type.STRING,
+      type: "string",
       description: "One concrete, actionable recommendation for the mentor's next session.",
     },
   },
@@ -53,7 +52,7 @@ export const generateMenteeAIInsights = asyncHandler(async (req: any, res: any) 
   const studentId = parseInt(req.params.studentId, 10);
   if (!studentId || isNaN(studentId)) throw new ValidationError("Invalid student ID");
 
-  if (!isGeminiConfigured()) {
+  if (!isAnyProviderConfigured()) {
     throw new ValidationError(
       "AI insights are not available right now — the AI provider is not configured.",
     );
@@ -128,9 +127,6 @@ export const generateMenteeAIInsights = asyncHandler(async (req: any, res: any) 
 
   const studentName = `${student?.first_name ?? ""} ${student?.last_name ?? ""}`.trim() || "this student";
 
-  const genAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-  const model = process.env.GEMINI_MODEL || "gemini-2.5-flash";
-
   const sessionLines = sessions
     .map(
       (s) =>
@@ -151,11 +147,12 @@ export const generateMenteeAIInsights = asyncHandler(async (req: any, res: any) 
     ? checkins.map((c) => `- [${c.category}] "${c.message}"`).join("\n")
     : "(no self-submitted check-ins from the mentee)";
 
-  let response;
+  let parsed: { summary?: string; strengths?: string[]; concerns?: string[]; recommended_focus?: string };
   try {
-    response = await genAI.models.generateContent({
-      model,
-      contents: `You are an experienced academic mentor's assistant, helping analyze a mentee's recent mentorship
+    const result = await generateStructuredContent<typeof parsed>({
+      schemaName: "mentee_insights",
+      schema: insightsSchema,
+      prompt: `You are an experienced academic mentor's assistant, helping analyze a mentee's recent mentorship
 record to prepare for their next session. The mentee is ${studentName}.
 
 Recent mentorship sessions (most recent first):
@@ -170,17 +167,13 @@ ${checkinLines}
 Based strictly on this record, produce a concise, evidence-grounded analysis for the mentor. Do not invent facts
 not supported by the record above. If there is genuinely nothing concerning, say so plainly rather than manufacturing
 a concern.`,
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: insightsSchema,
-      },
     });
+    parsed = result.data;
   } catch (err: any) {
     logger.error("Mentorship AI insights generation failed", { error: err?.message, studentId, mentorId });
-    throw new ValidationError("Failed to generate AI insights. Please try again.");
+    throw new ValidationError(friendlyAIErrorMessage(err));
   }
 
-  const parsed = JSON.parse(response.text || "{}");
   if (!parsed.summary) {
     throw new ValidationError("The AI could not generate insights for this mentee. Please try again.");
   }

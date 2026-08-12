@@ -1,4 +1,3 @@
-import { GoogleGenAI, Type } from "@google/genai";
 import { db } from "../db";
 import { eq, and, inArray } from "drizzle-orm";
 import {
@@ -13,10 +12,11 @@ import { successResponse } from "../utils/response";
 import { NotFoundError, ValidationError } from "../errors/CustomError";
 import { assertTeacherOwnsScheme } from "../utils/schemeAuthorization";
 import logger from "../utils/logger";
-
-const isGeminiConfigured = () =>
-  !!process.env.GEMINI_API_KEY &&
-  process.env.GEMINI_API_KEY !== "your_gemini_api_key_here";
+import {
+  generateStructuredContent,
+  isAnyProviderConfigured,
+  JSONSchema,
+} from "../services/aiProviders";
 
 /** Fetches a subject's Performance Criteria (number + description), joined through its Elements. */
 export const getSubjectCriteria = async (subjectId: number) => {
@@ -113,10 +113,10 @@ export const replaceEntryCriteria = asyncHandler(async (req: any, res: any) => {
   successResponse(res, "Entry criteria updated", { criteria_ids: ids });
 });
 
-const suggestionSchema = {
-  type: Type.OBJECT,
+const suggestionSchema: JSONSchema = {
+  type: "object",
   properties: {
-    criteria_numbers: { type: Type.ARRAY, items: { type: Type.STRING } },
+    criteria_numbers: { type: "array", items: { type: "string" } },
   },
   required: ["criteria_numbers"],
 };
@@ -146,22 +146,22 @@ export const suggestEntryCriteria = asyncHandler(async (req: any, res: any) => {
     });
   }
 
-  if (!isGeminiConfigured()) {
+  if (!isAnyProviderConfigured()) {
     throw new ValidationError(
-      "AI matching is not configured. Add a GEMINI_API_KEY to the backend environment.",
+      "AI matching is not configured. Add an API key for at least one AI provider to the backend environment.",
     );
   }
-
-  const genAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-  const model = process.env.GEMINI_MODEL || "gemini-2.5-flash";
 
   const criteriaList = criteria
     .map((c) => `${c.criteria_number}: ${c.description}`)
     .join("\n");
 
-  const response = await genAI.models.generateContent({
-    model,
-    contents: `A teacher wrote the following Scheme of Work entry for one week of a subject:
+  let matchedNumbers: string[] = [];
+  try {
+    const { data: parsed } = await generateStructuredContent<{ criteria_numbers?: any[] }>({
+      schemaName: "criteria_suggestion",
+      schema: suggestionSchema,
+      prompt: `A teacher wrote the following Scheme of Work entry for one week of a subject:
 
 Topic: ${topic || "(none)"}
 Sub-topic: ${sub_topic || "(none)"}
@@ -178,16 +178,7 @@ meaning — the entry's wording will NOT match the criteria's wording exactly (t
 independently), so use your understanding of the subject matter, not text similarity. It is
 completely fine to return an empty list if nothing genuinely corresponds — do not force a match.
 Return only the criteria_number values (e.g. "1.1", "2.3") of genuine matches.`,
-    config: {
-      responseMimeType: "application/json",
-      responseSchema: suggestionSchema,
-    },
-  });
-
-  const text = response.text || "{}";
-  let matchedNumbers: string[] = [];
-  try {
-    const parsed = JSON.parse(text);
+    });
     matchedNumbers = Array.isArray(parsed.criteria_numbers)
       ? parsed.criteria_numbers.map((n: any) => String(n).trim())
       : [];
@@ -296,16 +287,16 @@ export const linkSchemeCriteria = asyncHandler(async (req: any, res: any) => {
 
 const MAX_BULK_ENTRIES = 60;
 
-const bulkSuggestionSchema = {
-  type: Type.OBJECT,
+const bulkSuggestionSchema: JSONSchema = {
+  type: "object",
   properties: {
     matches: {
-      type: Type.ARRAY,
+      type: "array",
       items: {
-        type: Type.OBJECT,
+        type: "object",
         properties: {
-          week_number: { type: Type.STRING },
-          criteria_numbers: { type: Type.ARRAY, items: { type: Type.STRING } },
+          week_number: { type: "string" },
+          criteria_numbers: { type: "array", items: { type: "string" } },
         },
         required: ["week_number", "criteria_numbers"],
       },
@@ -350,9 +341,9 @@ export const bulkSuggestCriteria = asyncHandler(async (req: any, res: any) => {
     );
   }
 
-  if (!isGeminiConfigured()) {
+  if (!isAnyProviderConfigured()) {
     throw new ValidationError(
-      "AI matching is not configured. Add a GEMINI_API_KEY to the backend environment.",
+      "AI matching is not configured. Add an API key for at least one AI provider to the backend environment.",
     );
   }
 
@@ -390,9 +381,6 @@ export const bulkSuggestCriteria = asyncHandler(async (req: any, res: any) => {
     });
   }
 
-  const genAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-  const model = process.env.GEMINI_MODEL || "gemini-2.5-flash";
-
   const entriesText = targets
     .map(
       (e) =>
@@ -404,9 +392,12 @@ export const bulkSuggestCriteria = asyncHandler(async (req: any, res: any) => {
     .map((c) => `${c.criteria_number}: ${c.description}`)
     .join("\n");
 
-  const response = await genAI.models.generateContent({
-    model,
-    contents: `A teacher's existing Scheme of Work has the following weekly entries:
+  const entryCriteriaNumbers: Record<string, string[]> = {};
+  try {
+    const { data: parsed } = await generateStructuredContent<{ matches?: any[] }>({
+      schemaName: "bulk_criteria_suggestion",
+      schema: bulkSuggestionSchema,
+      prompt: `A teacher's existing Scheme of Work has the following weekly entries:
 """
 ${entriesText}
 """
@@ -422,16 +413,7 @@ independently), so use your understanding of the subject matter, not text simila
 and expected for an entry to match zero, one, or a few — never force a match that doesn't
 genuinely fit. Return one result per entry, identified by its exact week_number, with the matching
 criteria_number values (e.g. "1.1", "2.3").`,
-    config: {
-      responseMimeType: "application/json",
-      responseSchema: bulkSuggestionSchema,
-    },
-  });
-
-  const text = response.text || "{}";
-  const entryCriteriaNumbers: Record<string, string[]> = {};
-  try {
-    const parsed = JSON.parse(text);
+    });
     const matches = Array.isArray(parsed.matches) ? parsed.matches : [];
     for (const m of matches) {
       if (m?.week_number && Array.isArray(m.criteria_numbers)) {

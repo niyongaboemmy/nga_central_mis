@@ -1,5 +1,4 @@
 import { Request, Response } from "express";
-import OpenAI from "openai";
 import { db } from "../db";
 import {
   LO_Lesson,
@@ -20,10 +19,144 @@ import { asyncHandler } from "../middleware/asyncHandler";
 import { successResponse } from "../utils/response";
 import { ValidationError } from "../errors/CustomError";
 import { persistLessonPlan } from "../services/lessonPlanPersistence";
+import {
+  generateStructuredContent,
+  isAnyProviderConfigured,
+  JSONSchema,
+} from "../services/aiProviders";
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY || "dummy",
-});
+// gpt-4o is the strongest of the configured models at extracting structure from messy,
+// inconsistently-formatted uploaded DOCX lesson plans — prefer it first when available,
+// but still fall through to the rest of AI_PROVIDER_ORDER rather than requiring OpenAI.
+const EXTRACTION_PROVIDER_ORDER = ["openai", "gemini", "groq", "glm"];
+
+const extractionSchema: JSONSchema = {
+  type: "object",
+  properties: {
+    session_code: { type: "string" },
+    sector: { type: "string" },
+    trade: { type: "string" },
+    level: { type: "string" },
+    module_code: { type: "string" },
+    module_name: { type: "string" },
+    week: { type: "number" },
+    term: { type: "string" },
+    school_year: { type: "string" },
+    class_name: { type: "string" },
+    number_of_trainees: { type: "number" },
+    lesson_date: { type: "string", description: "YYYY-MM-DD" },
+    start_time: { type: "string", description: "HH:MM" },
+    end_time: { type: "string", description: "HH:MM" },
+    instructor_name: { type: "string" },
+    big_question: { type: "string" },
+    total_duration_minutes: { type: "number" },
+    outcomes: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          code: { type: "string", description: "LO1, LO2, ..." },
+          title: { type: "string" },
+          description: { type: "string" },
+          duration_minutes: { type: "number" },
+          activities: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                trainer_activities: { type: "string" },
+                learner_activities: { type: "string" },
+              },
+              required: ["trainer_activities", "learner_activities"],
+            },
+          },
+          resources: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: { resource_name: { type: "string" } },
+              required: ["resource_name"],
+            },
+          },
+        },
+        required: ["code", "title", "description", "duration_minutes"],
+      },
+    },
+    sections: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          section_type: { type: "string", description: "Introduction, Conclusion, or Development" },
+          trainer_activities: { type: "string" },
+          learner_activities: { type: "string" },
+          resources: { type: "string" },
+          duration_minutes: { type: "number" },
+        },
+        required: [
+          "section_type",
+          "trainer_activities",
+          "learner_activities",
+          "resources",
+          "duration_minutes",
+        ],
+      },
+    },
+    indicativeContent: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          category: { type: "string" },
+          content: { type: "string" },
+        },
+        required: ["category", "content"],
+      },
+    },
+    assignments: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: { description: { type: "string" } },
+        required: ["description"],
+      },
+    },
+    evaluation: {
+      type: "object",
+      properties: {
+        teacher_notes: { type: "string" },
+        references: { type: "string" },
+        prepared_by: { type: "string" },
+        verified_by: { type: "string" },
+      },
+      required: ["teacher_notes", "references", "prepared_by", "verified_by"],
+    },
+  },
+  required: [
+    "session_code",
+    "sector",
+    "trade",
+    "level",
+    "module_code",
+    "module_name",
+    "week",
+    "term",
+    "school_year",
+    "class_name",
+    "number_of_trainees",
+    "lesson_date",
+    "start_time",
+    "end_time",
+    "instructor_name",
+    "big_question",
+    "total_duration_minutes",
+    "outcomes",
+    "sections",
+    "indicativeContent",
+    "assignments",
+    "evaluation",
+  ],
+};
 
 export const getLessonPlansByEntry = async (req: Request, res: Response) => {
   console.log(
@@ -199,77 +332,18 @@ export const extractLessonPlan = asyncHandler(async (req: any, res: any) => {
   const result = await mammoth.convertToHtml({ buffer: req.file.buffer });
   const html = result.value;
 
-  if (
-    process.env.OPENAI_API_KEY &&
-    process.env.OPENAI_API_KEY !== "your_openai_api_key_here"
-  ) {
+  if (isAnyProviderConfigured()) {
     try {
-      const completion = await openai.chat.completions.create({
-        model: "gpt-4o",
-        messages: [
-          {
-            role: "system",
-            content: `You are an expert at extracting pedagogical data from lesson plan documents into a structured relational format.
-            Return a valid JSON object matching this structure:
-            {
-              "session_code": string,
-              "sector": string,
-              "trade": string,
-              "level": string,
-              "module_code": string,
-              "module_name": string,
-              "week": number,
-              "term": string,
-              "school_year": string,
-              "class_name": string,
-              "number_of_trainees": number,
-              "lesson_date": "YYYY-MM-DD",
-              "start_time": "HH:MM",
-              "end_time": "HH:MM",
-              "instructor_name": string,
-              "big_question": string,
-              "total_duration_minutes": number,
-              "outcomes": [
-                {
-                  "code": string (LO1, LO2...),
-                  "title": string,
-                  "description": string,
-                  "duration_minutes": number,
-                  "activities": [{ "trainer_activities": string, "learner_activities": string }],
-                  "resources": [{ "resource_name": string }]
-                }
-              ],
-              "sections": [
-                {
-                  "section_type": "Introduction" | "Conclusion" | "Development",
-                  "trainer_activities": string,
-                  "learner_activities": string,
-                  "resources": string,
-                  "duration_minutes": number
-                }
-              ],
-              "indicativeContent": [{ "category": string, "content": string }],
-              "assignments": [{ "description": string }],
-              "evaluation": {
-                "teacher_notes": string,
-                "references": string,
-                "prepared_by": string,
-                "verified_by": string
-              }
-            }
-            
-            Strictly follow this structure. For activities, split trainer and learner roles.`,
-          },
-          {
-            role: "user",
-            content: `Extract lesson plan data from this HTML: \n\n${html}`,
-          },
-        ],
-        response_format: { type: "json_object" },
-      });
+      const { data: extracted } = await generateStructuredContent<any>(
+        {
+          schemaName: "lesson_plan_extraction",
+          schema: extractionSchema,
+          prompt: `You are an expert at extracting pedagogical data from lesson plan documents into a structured
+relational format. For activities, split trainer and learner roles. Extract lesson plan data from this HTML:
 
-      const extracted = JSON.parse(
-        completion.choices[0].message.content || "{}",
+${html}`,
+        },
+        { providerOrder: EXTRACTION_PROVIDER_ORDER },
       );
       return successResponse(
         res,
@@ -277,10 +351,9 @@ export const extractLessonPlan = asyncHandler(async (req: any, res: any) => {
         extracted,
       );
     } catch (err) {
-      console.error(
-        "OpenAI Error, falling back to deterministic extraction:",
-        err,
-      );
+      logger.warn("AI lesson plan extraction failed, falling back to deterministic extraction", {
+        error: (err as Error).message,
+      });
     }
   }
 

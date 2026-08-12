@@ -1,12 +1,11 @@
 import { randomUUID } from "crypto";
-import { GoogleGenAI, Type } from "@google/genai";
 import {
   extractTextFromFile,
   extractCurriculumStructure,
   extractLoContentItems,
   mapTermToLearningOutcome,
 } from "../utils/docExtract";
-import { generateCurriculumWithGemini } from "../services/curriculumExtraction";
+import { generateCurriculumWithAI } from "../services/curriculumExtraction";
 import { computeWeekDates } from "../utils/weekDates";
 import { db } from "../db";
 import { eq, and } from "drizzle-orm";
@@ -29,13 +28,14 @@ import {
   resolveAndLinkCriteria,
 } from "./schemeEntryCriteriaController";
 import { Permissions } from "../utils/permissions";
+import {
+  generateStructuredContent,
+  isAnyProviderConfigured,
+  JSONSchema,
+} from "../services/aiProviders";
 
 const MAX_CURRICULUM_CHARS = 60000;
 const MAX_ADDITIONAL_INSTRUCTIONS_CHARS = 2000;
-
-const isGeminiConfigured = () =>
-  !!process.env.GEMINI_API_KEY &&
-  process.env.GEMINI_API_KEY !== "your_gemini_api_key_here";
 
 interface GeneratedWeek {
   week_number: number;
@@ -95,20 +95,20 @@ const parseContentRefs = (raw: unknown): Map<number, Set<number>> => {
   return refs;
 };
 
-const weekSchema = {
-  type: Type.OBJECT,
+const weekSchema: JSONSchema = {
+  type: "object",
   properties: {
-    week_number: { type: Type.INTEGER },
-    topic: { type: Type.STRING },
-    sub_topic: { type: Type.STRING },
-    objective: { type: Type.STRING },
-    methodology: { type: Type.STRING },
-    resources: { type: Type.STRING },
-    evaluation: { type: Type.STRING },
-    learning_place: { type: Type.STRING },
-    observation: { type: Type.STRING },
-    duration: { type: Type.STRING },
-    criteria_numbers: { type: Type.ARRAY, items: { type: Type.STRING } },
+    week_number: { type: "number" },
+    topic: { type: "string" },
+    sub_topic: { type: "string" },
+    objective: { type: "string" },
+    methodology: { type: "string" },
+    resources: { type: "string" },
+    evaluation: { type: "string" },
+    learning_place: { type: "string" },
+    observation: { type: "string" },
+    duration: { type: "string" },
+    criteria_numbers: { type: "array", items: { type: "string" } },
   },
   required: [
     "week_number",
@@ -120,19 +120,23 @@ const weekSchema = {
   ],
 };
 
-const generateWeeksWithGemini = async (
+const generateWeeks = async (
   curriculumText: string,
   maxWeeks: number,
   subjectName: string,
   additionalInstructions?: string,
   criteriaList?: string[],
 ): Promise<GeneratedWeek[]> => {
-  const genAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-  const model = process.env.GEMINI_MODEL || "gemini-2.5-flash";
-
-  const response = await genAI.models.generateContent({
-    model,
-    contents: `You are a highly experienced, subject-matter-expert teacher of "${subjectName}", with years of
+  const { data: parsed } = await generateStructuredContent<{ weeks?: GeneratedWeek[] }>({
+    schemaName: "scheme_weeks",
+    schema: {
+      type: "object",
+      properties: {
+        weeks: { type: "array", items: weekSchema },
+      },
+      required: ["weeks"],
+    },
+    prompt: `You are a highly experienced, subject-matter-expert teacher of "${subjectName}", with years of
 classroom practice delivering this exact subject. You have been handed the official curriculum below and asked to
 personally plan your own Scheme of Work for the term — the way a seasoned, professional teacher would, not a
 generic assistant. Read and genuinely understand the curriculum's learning outcomes, indicative content, and
@@ -194,20 +198,8 @@ CURRICULUM CONTENT:
 """
 ${curriculumText}
 """`,
-    config: {
-      responseMimeType: "application/json",
-      responseSchema: {
-        type: Type.OBJECT,
-        properties: {
-          weeks: { type: Type.ARRAY, items: weekSchema },
-        },
-        required: ["weeks"],
-      },
-    },
   });
 
-  const text = response.text || "{}";
-  const parsed = JSON.parse(text);
   const weeks: GeneratedWeek[] = Array.isArray(parsed.weeks)
     ? parsed.weeks
     : [];
@@ -353,7 +345,7 @@ const processJob = async (
         stepIndex: stepFor.extracting_curriculum,
         totalSteps,
       });
-      proposedCurriculum = await generateCurriculumWithGemini(
+      proposedCurriculum = await generateCurriculumWithAI(
         rawText,
         params.subjectName,
       );
@@ -378,7 +370,7 @@ const processJob = async (
       totalSteps,
     });
 
-    const generatedWeeks = await generateWeeksWithGemini(
+    const generatedWeeks = await generateWeeks(
       rawText,
       contentCount,
       params.subjectName,
@@ -615,9 +607,9 @@ export const startAIGeneration = asyncHandler(async (req: any, res: any) => {
     throw new ValidationError("No file uploaded");
   }
 
-  if (!isGeminiConfigured()) {
+  if (!isAnyProviderConfigured()) {
     throw new ValidationError(
-      "AI scheme generation is not configured. Add a GEMINI_API_KEY to the backend environment (get a free key at https://aistudio.google.com/apikey).",
+      "AI scheme generation is not configured. Add an API key for at least one AI provider to the backend environment.",
     );
   }
 
@@ -722,18 +714,18 @@ export const getAIGenerationStatus = asyncHandler(
   },
 );
 
-const singleEntrySchema = {
-  type: Type.OBJECT,
+const singleEntrySchema: JSONSchema = {
+  type: "object",
   properties: {
-    topic: { type: Type.STRING },
-    sub_topic: { type: Type.STRING },
-    objective: { type: Type.STRING },
-    methodology: { type: Type.STRING },
-    resources: { type: Type.STRING },
-    evaluation: { type: Type.STRING },
-    learning_place: { type: Type.STRING },
-    observation: { type: Type.STRING },
-    duration: { type: Type.STRING },
+    topic: { type: "string" },
+    sub_topic: { type: "string" },
+    objective: { type: "string" },
+    methodology: { type: "string" },
+    resources: { type: "string" },
+    evaluation: { type: "string" },
+    learning_place: { type: "string" },
+    observation: { type: "string" },
+    duration: { type: "string" },
   },
   required: ["topic", "objective", "methodology", "resources", "evaluation"],
 };
@@ -751,9 +743,9 @@ export const DEFAULT_ENTRY_PROMPT_TEMPLATE =
  * job-polling is needed; the result just populates the form for review.
  */
 export const suggestEntryContent = asyncHandler(async (req: any, res: any) => {
-  if (!isGeminiConfigured()) {
+  if (!isAnyProviderConfigured()) {
     throw new ValidationError(
-      "AI suggestions are not configured. Add a GEMINI_API_KEY to the backend environment (get a free key at https://aistudio.google.com/apikey).",
+      "AI suggestions are not configured. Add an API key for at least one AI provider to the backend environment.",
     );
   }
 
@@ -762,12 +754,10 @@ export const suggestEntryContent = asyncHandler(async (req: any, res: any) => {
     throw new ValidationError("A prompt is required");
   }
 
-  const genAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-  const model = process.env.GEMINI_MODEL || "gemini-2.5-flash";
-
-  const response = await genAI.models.generateContent({
-    model,
-    contents: `You are an experienced, subject-matter-expert teacher of "${subject_name || "this subject"}",
+  const { data: parsed } = await generateStructuredContent<any>({
+    schemaName: "scheme_entry",
+    schema: singleEntrySchema,
+    prompt: `You are an experienced, subject-matter-expert teacher of "${subject_name || "this subject"}",
 personally planning a single week (${week_label || "this week"}) of your Scheme of Work.
 
 The teacher's instructions for this week:
@@ -779,14 +769,7 @@ Follow those instructions to produce this week's entry. Provide: the topic (indi
 sub-topic, a clear learning objective, the teaching methodology/activities, resources needed, the evaluation /
 evidence of formative assessment, the learning place, and any observation notes. Keep each field concise (1-3
 sentences) and write it the way a teacher who actually teaches this subject would — specific, not generic filler.`,
-    config: {
-      responseMimeType: "application/json",
-      responseSchema: singleEntrySchema,
-    },
   });
-
-  const text = response.text || "{}";
-  const parsed = JSON.parse(text);
 
   if (!parsed.topic) {
     throw new ValidationError(

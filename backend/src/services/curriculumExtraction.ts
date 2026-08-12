@@ -1,48 +1,53 @@
-import { GoogleGenAI, Type } from "@google/genai";
 import { ValidationError } from "../errors/CustomError";
 import { ImportedElement } from "./curriculumImportJobStore";
+import { generateStructuredContent, JSONSchema } from "./aiProviders";
 
 const MAX_ELEMENTS = 30;
 const MAX_CRITERIA_PER_ELEMENT = 30;
 
-const criteriaSchema = {
-  type: Type.OBJECT,
+const criteriaSchema: JSONSchema = {
+  type: "object",
   properties: {
-    criteria_number: { type: Type.STRING },
-    description: { type: Type.STRING },
+    criteria_number: { type: "string" },
+    description: { type: "string" },
   },
   required: ["criteria_number", "description"],
 };
 
-const elementSchema = {
-  type: Type.OBJECT,
+const elementSchema: JSONSchema = {
+  type: "object",
   properties: {
-    element_number: { type: Type.INTEGER },
-    title: { type: Type.STRING },
-    description: { type: Type.STRING },
-    learning_hours: { type: Type.INTEGER },
-    indicative_content: { type: Type.STRING },
-    criteria: { type: Type.ARRAY, items: criteriaSchema },
+    element_number: { type: "number" },
+    title: { type: "string" },
+    description: { type: "string" },
+    learning_hours: { type: "number" },
+    indicative_content: { type: "string" },
+    criteria: { type: "array", items: criteriaSchema },
   },
   required: ["element_number", "title", "criteria"],
 };
 
 /**
  * Extracts Elements of Competency + Performance Criteria (+ hours/indicative content) from raw
- * curriculum document text via Gemini. Shared by the standalone "Import from Curriculum" flow
+ * curriculum document text via the centralized AI provider service (Gemini/Groq/GLM, per
+ * AI_PROVIDER_ORDER). Shared by the standalone "Import from Curriculum" flow
  * (curriculumImportAIController.ts) and the Scheme of Work AI-generation flow (schemeAIController.ts)
  * so both callers agree on one extraction implementation instead of drifting apart.
  */
-export const generateCurriculumWithGemini = async (
+export const generateCurriculumWithAI = async (
   curriculumText: string,
   subjectName: string,
 ): Promise<ImportedElement[]> => {
-  const genAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-  const model = process.env.GEMINI_MODEL || "gemini-2.5-flash";
-
-  const response = await genAI.models.generateContent({
-    model,
-    contents: `You are a curriculum specialist at a national TVET board (in the style of RTB — Rwanda TVET Board),
+  const { data: parsed } = await generateStructuredContent<{ elements?: any[] }>({
+    schemaName: "curriculum_elements",
+    schema: {
+      type: "object",
+      properties: {
+        elements: { type: "array", items: elementSchema },
+      },
+      required: ["elements"],
+    },
+    prompt: `You are a curriculum specialist at a national TVET board (in the style of RTB — Rwanda TVET Board),
 digitizing an official competency-based curriculum document for the subject/module "${subjectName}" into a
 structured curriculum management system. You have deep familiarity with how these curricula are organized and know
 exactly where to find each piece of information, even when page breaks, running headers/footers, or PDF-to-text
@@ -97,20 +102,8 @@ judgement to see past it):
 """
 ${curriculumText}
 """`,
-    config: {
-      responseMimeType: "application/json",
-      responseSchema: {
-        type: Type.OBJECT,
-        properties: {
-          elements: { type: Type.ARRAY, items: elementSchema },
-        },
-        required: ["elements"],
-      },
-    },
   });
 
-  const text = response.text || "{}";
-  const parsed = JSON.parse(text);
   const rawElements: any[] = Array.isArray(parsed.elements) ? parsed.elements : [];
 
   if (rawElements.length === 0) {
