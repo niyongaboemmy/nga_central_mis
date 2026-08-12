@@ -134,14 +134,21 @@ JOIN `_ClassGroupRemap` r ON cg.class_group_id = r.old_id;
 ALTER TABLE `TeacherSubjectAssignment`
   ADD CONSTRAINT `tsa_academic_year_fk` FOREIGN KEY (`academic_year_id`) REFERENCES `AcademicYear` (`academic_year_id`);
 
--- ── Step 9: finalize StudentClassGroup (NOT NULL, FK, new PK) ──
+-- ── Step 9: finalize StudentClassGroup (NOT NULL, FK, new PK) -- some
+-- environments already have a (user_id, class_group_id) primary key on this
+-- table from earlier ad-hoc fixes, so drop it before adding the wider one ──
 ALTER TABLE `StudentClassGroup`
   MODIFY `academic_year_id` BIGINT(20) NOT NULL,
+  DROP PRIMARY KEY,
   ADD PRIMARY KEY (`user_id`, `class_group_id`, `academic_year_id`),
   ADD CONSTRAINT `scg_academic_year_fk` FOREIGN KEY (`academic_year_id`) REFERENCES `AcademicYear` (`academic_year_id`);
 
--- ── Step 10: drop ClassGroup.academic_year_id, replace the unique key ──
+-- ── Step 10: drop ClassGroup.academic_year_id, replace the unique key --
+-- the FK constraint on this column must be dropped explicitly first (InnoDB
+-- refuses to drop a column that's part of an FK, independent of
+-- FOREIGN_KEY_CHECKS, which only governs DML enforcement, not DDL) ──
 ALTER TABLE `ClassGroup`
+  DROP FOREIGN KEY `classgroup_ibfk_1`,
   DROP INDEX `academic_year_id`,
   DROP COLUMN `academic_year_id`,
   ADD UNIQUE KEY `uq_class_group_grade_name` (`grade_id`, `name`);
