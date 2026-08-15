@@ -17,6 +17,7 @@ import {
   Copy,
 } from "lucide-react";
 import Modal from "./ui/Modal";
+import ConfirmModal from "./ui/ConfirmModal";
 import { useToast } from "../contexts/ToastContext";
 import { useUser } from "../contexts/UserContext";
 import {
@@ -41,7 +42,7 @@ const SystemCard = ({
   system: System;
   onEdit: (s: System) => void;
   onAssign: (s: System) => void;
-  onDelete: (id: number) => void;
+  onDelete: (s: System) => void;
 }) => {
   return (
     <motion.div
@@ -98,7 +99,7 @@ const SystemCard = ({
           <Edit className="w-4 h-4" />
         </button>
         <button
-          onClick={() => onDelete(system.system_id)}
+          onClick={() => onDelete(system)}
           className="px-3 py-2 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-sm font-semibold rounded-lg hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors"
         >
           <Trash2 className="w-4 h-4" />
@@ -658,6 +659,8 @@ const Systems = () => {
   const [modalOpen, setModalOpen] = useState(false);
   const [assignModalOpen, setAssignModalOpen] = useState(false);
   const [selectedSystem, setSelectedSystem] = useState<System | null>(null);
+  const [systemToDelete, setSystemToDelete] = useState<System | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const { showToast } = useToast();
   const { user } = useUser();
 
@@ -695,15 +698,25 @@ const Systems = () => {
     setAssignModalOpen(true);
   };
 
-  const handleDelete = async (id: number) => {
-    if (!window.confirm("Are you sure you want to delete this module?")) return;
+  const handleDeleteClick = (system: System) => {
+    setSystemToDelete(system);
+  };
+
+  const confirmDelete = async () => {
+    if (!systemToDelete) return;
+    setDeleting(true);
     try {
-      await deleteSystem(id);
+      await deleteSystem(systemToDelete.system_id);
       showToast("Module deleted successfully", "success");
+      setSystemToDelete(null);
       fetchSystems();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to delete module", error);
-      showToast("Failed to delete module", "error");
+      const message =
+        error?.response?.data?.message || "Failed to delete module";
+      showToast(message, "error");
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -787,7 +800,7 @@ const Systems = () => {
                       system={system}
                       onEdit={handleEdit}
                       onAssign={handleAssign}
-                      onDelete={handleDelete}
+                      onDelete={handleDeleteClick}
                     />
                   ))}
                 </AnimatePresence>
@@ -823,6 +836,16 @@ const Systems = () => {
           system={selectedSystem}
         />
       )}
+
+      <ConfirmModal
+        isOpen={!!systemToDelete}
+        onClose={() => setSystemToDelete(null)}
+        onConfirm={confirmDelete}
+        title="Delete Module"
+        message={`Are you sure you want to delete "${systemToDelete?.name}"? This action cannot be undone.`}
+        confirmText="Delete"
+        isLoading={deleting}
+      />
     </>
   );
 };

@@ -163,21 +163,61 @@ export const updateSystem = async (req: Request, res: Response) => {
 export const deleteSystem = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
+    const systemId = Number(id);
 
     const existingSystem = await db
       .select()
       .from(System)
-      .where(eq(System.system_id, Number(id)));
+      .where(eq(System.system_id, systemId));
 
     if (existingSystem.length === 0) {
       return res.status(404).json({ message: "System not found" });
     }
 
-    await db.delete(System).where(eq(System.system_id, Number(id)));
+    // System.system_id is referenced by SchoolSystemAssignment and
+    // RoleSystemFragment with ON DELETE NO ACTION, so a module that's
+    // assigned to any school or role would otherwise fail the DELETE with
+    // an opaque FK constraint error. Check first and report clearly.
+    const [schoolAssignments, roleAssignments] = await Promise.all([
+      db
+        .select({ school_id: SchoolSystemAssignment.school_id })
+        .from(SchoolSystemAssignment)
+        .where(eq(SchoolSystemAssignment.system_id, systemId)),
+      db
+        .select({ fragment_id: RoleSystemFragment.fragment_id })
+        .from(RoleSystemFragment)
+        .where(eq(RoleSystemFragment.system_id, systemId)),
+    ]);
+
+    if (schoolAssignments.length > 0 || roleAssignments.length > 0) {
+      return res.status(409).json({
+        message:
+          "Cannot delete this module: it is still assigned to " +
+          [
+            schoolAssignments.length > 0
+              ? `${schoolAssignments.length} school(s)`
+              : null,
+            roleAssignments.length > 0
+              ? `${roleAssignments.length} role(s)`
+              : null,
+          ]
+            .filter(Boolean)
+            .join(" and ") +
+          ". Remove those assignments first.",
+      });
+    }
+
+    await db.delete(System).where(eq(System.system_id, systemId));
 
     res.status(200).json({ message: "System deleted successfully" });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error deleting system:", error);
+    if (error?.code === "ER_ROW_IS_REFERENCED_2" || error?.errno === 1451) {
+      return res.status(409).json({
+        message:
+          "Cannot delete this module: other records still reference it.",
+      });
+    }
     res.status(500).json({ message: "Internal server error" });
   }
 };
