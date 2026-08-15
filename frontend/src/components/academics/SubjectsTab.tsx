@@ -14,9 +14,23 @@ import Modal from "../ui/Modal";
 import ConfirmModal from "../ui/ConfirmModal";
 import Input from "../ui/Input";
 import Select from "../ui/Select";
-import { Eye, Users, BookOpen, Calendar, User as UserIcon, FolderOpen } from "lucide-react";
+import {
+  Eye,
+  Users,
+  BookOpen,
+  Calendar,
+  User as UserIcon,
+  FolderOpen,
+  Check,
+  GraduationCap,
+  Trash2,
+  CheckCheck,
+  Layers,
+  RotateCcw,
+} from "lucide-react";
 import CurriculumTab from "../curriculum/CurriculumTab";
 import SubjectMaterialsTab from "../curriculum/SubjectMaterialsTab";
+import { useToast } from "../../contexts/ToastContext";
 
 interface SubjectsTabProps {
   data: Subject[];
@@ -48,6 +62,355 @@ interface GradeAssignment {
   is_currently_assigned: boolean;
 }
 
+/** Compact two-step progress indicator shared by the create/edit modals. */
+const StepIndicator: React.FC<{ currentStep: 1 | 2; step2Label: string }> = ({
+  currentStep,
+  step2Label,
+}) => (
+  <div className="flex items-center mb-6">
+    <div
+      className={`flex items-center gap-2 transition-colors duration-200 ${
+        currentStep >= 1
+          ? "text-blue-600 dark:text-blue-400"
+          : "text-gray-400 dark:text-gray-500"
+      }`}
+    >
+      <div
+        className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold transition-colors duration-200 ${
+          currentStep >= 1
+            ? "bg-blue-600 text-white"
+            : "bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400"
+        }`}
+      >
+        {currentStep > 1 ? <Check className="w-3.5 h-3.5" /> : "1"}
+      </div>
+      <span className="text-sm font-medium">Subject Details</span>
+    </div>
+    <div
+      className={`flex-1 h-px mx-3 transition-colors duration-300 ${
+        currentStep >= 2
+          ? "bg-blue-500"
+          : "bg-gray-200 dark:bg-gray-700"
+      }`}
+    />
+    <div
+      className={`flex items-center gap-2 transition-colors duration-200 ${
+        currentStep >= 2
+          ? "text-blue-600 dark:text-blue-400"
+          : "text-gray-400 dark:text-gray-500"
+      }`}
+    >
+      <div
+        className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold transition-colors duration-200 ${
+          currentStep >= 2
+            ? "bg-blue-600 text-white"
+            : "bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400"
+        }`}
+      >
+        2
+      </div>
+      <span className="text-sm font-medium">{step2Label}</span>
+    </div>
+  </div>
+);
+
+/** Step 1 form fields shared by the create/edit modals. */
+const SubjectDetailsForm: React.FC<{
+  formData: SubjectFormData;
+  setFormData: React.Dispatch<React.SetStateAction<SubjectFormData>>;
+  formErrors: Record<string, string>;
+  categories: CourseCategory[];
+  loadingCategories: boolean;
+}> = ({ formData, setFormData, formErrors, categories, loadingCategories }) => (
+  <div className="space-y-3.5">
+    <Input
+      label="Name"
+      value={formData.name}
+      onChange={(e) =>
+        setFormData((prev) => ({ ...prev, name: e.target.value }))
+      }
+      error={formErrors.name}
+      placeholder="e.g., Mathematics"
+      required
+    />
+
+    <Input
+      label="Code"
+      value={formData.code}
+      onChange={(e) =>
+        setFormData((prev) => ({ ...prev, code: e.target.value }))
+      }
+      placeholder="e.g., MATH101"
+    />
+
+    <Input
+      label="Description"
+      value={formData.description}
+      onChange={(e) =>
+        setFormData((prev) => ({ ...prev, description: e.target.value }))
+      }
+      placeholder="Optional description"
+    />
+
+    <Select
+      label="Course Category"
+      value={formData.course_category_id?.toString() || ""}
+      onChange={(e) =>
+        setFormData((prev) => ({
+          ...prev,
+          course_category_id: e.target.value
+            ? parseInt(e.target.value)
+            : null,
+        }))
+      }
+      disabled={loadingCategories}
+      options={
+        loadingCategories
+          ? [{ value: "", label: "Loading categories..." }]
+          : [
+              { value: "", label: "No category" },
+              ...categories.map((category) => ({
+                value: category.category_id,
+                label: category.name,
+              })),
+            ]
+      }
+    />
+
+    <Input
+      label="Max Marks"
+      type="number"
+      value={formData.max_marks?.toString() || ""}
+      onChange={(e) =>
+        setFormData((prev) => ({
+          ...prev,
+          max_marks: e.target.value ? parseInt(e.target.value) : null,
+        }))
+      }
+      placeholder="e.g., 100"
+    />
+
+    <div className="space-y-1.5">
+      <label className="block text-sm font-medium text-text-primary-light dark:text-text-primary-dark">
+        Subject Color
+      </label>
+      <div className="flex items-center gap-3">
+        <input
+          type="color"
+          value={formData.color}
+          onChange={(e) =>
+            setFormData((prev) => ({ ...prev, color: e.target.value }))
+          }
+          className="w-10 h-10 rounded-lg border border-border-light dark:border-border-dark/30 bg-white dark:bg-gray-700 cursor-pointer p-1 flex-shrink-0"
+        />
+        <div className="flex-1">
+          <Input
+            value={formData.color.toUpperCase()}
+            onChange={(e) =>
+              setFormData((prev) => ({
+                ...prev,
+                color: e.target.value.startsWith("#")
+                  ? e.target.value
+                  : "#" + e.target.value,
+              }))
+            }
+            placeholder="#3B82F6"
+            className="font-mono"
+          />
+        </div>
+      </div>
+      <p className="text-xs text-text-secondary-light dark:text-text-secondary-dark/70">
+        This color will identify the subject in the academic calendar
+      </p>
+    </div>
+  </div>
+);
+
+/** Step 2 grade-assignment picker shared by the create/edit modals. */
+const GradeAssignmentGrid: React.FC<{
+  title: string;
+  subtitle: string;
+  gradeAssignments: GradeAssignment[];
+  setGradeAssignments: React.Dispatch<React.SetStateAction<GradeAssignment[]>>;
+  loadingGrades: boolean;
+  handleGradeSelection: (gradeId: number) => void;
+  showResetToCurrent: boolean;
+}> = ({
+  title,
+  subtitle,
+  gradeAssignments,
+  setGradeAssignments,
+  loadingGrades,
+  handleGradeSelection,
+  showResetToCurrent,
+}) => {
+  const selectedCount = gradeAssignments.filter((a) => a.is_assigned).length;
+  const coverage = gradeAssignments.length
+    ? Math.round((selectedCount / gradeAssignments.length) * 100)
+    : 0;
+
+  return (
+    <div className="space-y-4">
+      <div className="text-center">
+        <h3 className="flex items-center justify-center gap-2 text-base font-semibold text-gray-900 dark:text-white mb-1">
+          <GraduationCap className="w-4.5 h-4.5 text-blue-600 dark:text-blue-400" />
+          {title}
+        </h3>
+        <p className="text-sm text-gray-500 dark:text-gray-400">{subtitle}</p>
+      </div>
+
+      {loadingGrades ? (
+        <div className="flex items-center justify-center py-12">
+          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+          <span className="ml-3 text-sm text-gray-500 dark:text-gray-400">
+            Loading grades...
+          </span>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {/* Summary */}
+          <div className="flex items-center justify-between px-4 py-2.5 bg-gray-50 dark:bg-gray-800/40 rounded-xl border border-border-light dark:border-border-dark/30">
+            <div className="flex items-center gap-2.5">
+              <div className="w-7 h-7 bg-blue-100 dark:bg-blue-900/40 rounded-full flex items-center justify-center flex-shrink-0">
+                <span className="text-blue-600 dark:text-blue-400 font-semibold text-xs">
+                  {selectedCount}
+                </span>
+              </div>
+              <p className="text-sm text-gray-700 dark:text-gray-200">
+                {selectedCount} of {gradeAssignments.length} grades selected
+              </p>
+            </div>
+            <div className="text-sm font-semibold text-blue-600 dark:text-blue-400">
+              {coverage}%
+            </div>
+          </div>
+
+          {/* Grade selection grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-80 overflow-y-auto pr-1">
+            {gradeAssignments.map((assignment) => (
+              <label
+                key={assignment.grade_id}
+                className={`flex items-center p-3 rounded-xl border cursor-pointer transition-colors duration-150 ${
+                  assignment.is_assigned
+                    ? "border-blue-400 bg-blue-50 dark:border-blue-500 dark:bg-blue-900/20"
+                    : "border-border-light dark:border-border-dark/30 hover:border-blue-300 dark:hover:border-blue-600 hover:bg-gray-50 dark:hover:bg-gray-800/40"
+                }`}
+              >
+                <input
+                  type="checkbox"
+                  checked={assignment.is_selected}
+                  onChange={() => handleGradeSelection(assignment.grade_id)}
+                  className="sr-only"
+                />
+
+                <div
+                  className={`flex-shrink-0 w-4.5 h-4.5 rounded-md border flex items-center justify-center mr-3 transition-colors duration-150 ${
+                    assignment.is_selected
+                      ? "bg-blue-600 border-blue-600"
+                      : "border-gray-300 dark:border-gray-500"
+                  }`}
+                >
+                  {assignment.is_selected && (
+                    <Check className="w-3 h-3 text-white" strokeWidth={3} />
+                  )}
+                </div>
+
+                <div className="flex-1 min-w-0">
+                  <span className="text-sm font-medium text-gray-900 dark:text-white">
+                    {assignment.name}
+                  </span>
+                  {assignment.program_name && (
+                    <p className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                      <BookOpen className="w-3 h-3" />
+                      {assignment.program_name}
+                    </p>
+                  )}
+                </div>
+              </label>
+            ))}
+          </div>
+
+          {/* Quick actions */}
+          <div className="flex flex-wrap gap-2 pt-3 border-t border-border-light dark:border-border-dark/30">
+            {showResetToCurrent && (
+              <button
+                type="button"
+                onClick={() =>
+                  setGradeAssignments((prev) =>
+                    prev.map((a) => ({
+                      ...a,
+                      is_selected: a.is_currently_assigned,
+                      is_assigned: a.is_currently_assigned,
+                    })),
+                  )
+                }
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-orange-600 bg-orange-50 hover:bg-orange-100 dark:bg-orange-900/20 dark:text-orange-400 dark:hover:bg-orange-900/30 rounded-lg transition-colors"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                Reset to Current
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() =>
+                setGradeAssignments((prev) =>
+                  prev.map((a) => ({
+                    ...a,
+                    is_selected: false,
+                    is_assigned: false,
+                  })),
+                )
+              }
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-50 hover:bg-gray-100 dark:bg-gray-700/60 dark:text-gray-300 dark:hover:bg-gray-700 rounded-lg transition-colors"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              Clear All
+            </button>
+            <button
+              type="button"
+              onClick={() =>
+                setGradeAssignments((prev) =>
+                  prev.map((a) => ({
+                    ...a,
+                    is_selected: true,
+                    is_assigned: true,
+                  })),
+                )
+              }
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:text-blue-400 dark:hover:bg-blue-900/30 rounded-lg transition-colors"
+            >
+              <CheckCheck className="w-3.5 h-3.5" />
+              Select All
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                const selectedAssignments = gradeAssignments.filter(
+                  (a) => a.is_selected,
+                );
+                if (selectedAssignments.length > 0) {
+                  const targetProgram = selectedAssignments[0].program_name;
+                  setGradeAssignments((prev) =>
+                    prev.map((a) => ({
+                      ...a,
+                      is_selected: a.program_name === targetProgram,
+                      is_assigned: a.program_name === targetProgram,
+                    })),
+                  );
+                }
+              }}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-green-600 bg-green-50 hover:bg-green-100 dark:bg-green-900/20 dark:text-green-400 dark:hover:bg-green-900/30 rounded-lg transition-colors"
+            >
+              <Layers className="w-3.5 h-3.5" />
+              Same Program
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 const SubjectsTab: React.FC<SubjectsTabProps> = ({
   data,
   loading,
@@ -56,6 +419,7 @@ const SubjectsTab: React.FC<SubjectsTabProps> = ({
   onUpdate,
   onDelete,
 }) => {
+  const { showToast } = useToast();
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -113,6 +477,7 @@ const SubjectsTab: React.FC<SubjectsTabProps> = ({
       setCategories(response.data.data);
     } catch (error) {
       console.error("Failed to load categories:", error);
+      showToast("Failed to load course categories", "error");
     } finally {
       setLoadingCategories(false);
     }
@@ -127,6 +492,7 @@ const SubjectsTab: React.FC<SubjectsTabProps> = ({
       return loadedGrades;
     } catch (error) {
       console.error("Failed to load grades:", error);
+      showToast("Failed to load grades", "error");
       return [];
     } finally {
       setLoadingGrades(false);
@@ -175,6 +541,7 @@ const SubjectsTab: React.FC<SubjectsTabProps> = ({
       }
     } catch (error) {
       console.error("Failed to load grade assignments:", error);
+      showToast("Failed to load grade assignments", "error");
     } finally {
       setLoadingGrades(false);
     }
@@ -267,6 +634,7 @@ const SubjectsTab: React.FC<SubjectsTabProps> = ({
         onRefresh();
       } catch (error) {
         console.error("Failed to create subject and assign to grades:", error);
+        showToast("Failed to create subject. Please try again.", "error");
       } finally {
         setSubmitting(false);
       }
@@ -345,6 +713,7 @@ const SubjectsTab: React.FC<SubjectsTabProps> = ({
         onRefresh();
       } catch (error) {
         console.error("Failed to update subject and assignments:", error);
+        showToast("Failed to update subject. Please try again.", "error");
       } finally {
         setSubmitting(false);
       }
@@ -370,6 +739,7 @@ const SubjectsTab: React.FC<SubjectsTabProps> = ({
     } catch (error) {
       console.error("Failed to load subject teachers:", error);
       setSubjectTeachers([]);
+      showToast("Failed to load assigned teachers", "error");
     } finally {
       setLoadingTeachers(false);
     }
@@ -386,6 +756,7 @@ const SubjectsTab: React.FC<SubjectsTabProps> = ({
       onRefresh();
     } catch (error) {
       console.error("Failed to delete subject:", error);
+      showToast("Failed to delete subject. Please try again.", "error");
     } finally {
       setSubmitting(false);
     }
@@ -555,352 +926,26 @@ const SubjectsTab: React.FC<SubjectsTabProps> = ({
         title={`Create Subject - Step ${currentStep} of 2`}
         size="xl"
       >
-        {/* Enhanced Step Indicator */}
-        <div className="flex items-center mb-8">
-          <div
-            className={`flex items-center transition-all duration-300 ${
-              currentStep >= 1 ? "text-blue-600" : "text-gray-400"
-            }`}
-          >
-            <div
-              className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold transition-all duration-300 ${
-                currentStep >= 1
-                  ? "bg-blue-600 text-white shadow-lg scale-110"
-                  : "bg-gray-200 text-gray-600"
-              }`}
-            >
-              {currentStep > 1 ? "✓" : "1"}
-            </div>
-            <span className="ml-3 text-sm font-semibold">Subject Details</span>
-          </div>
-          <div
-            className={`flex-1 h-1 mx-4 rounded-full transition-all duration-500 ${
-              currentStep >= 2
-                ? "bg-gradient-to-r from-blue-600 to-blue-400"
-                : "bg-gray-200"
-            }`}
-          />
-          <div
-            className={`flex items-center transition-all duration-300 ${
-              currentStep >= 2 ? "text-blue-600" : "text-gray-400"
-            }`}
-          >
-            <div
-              className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold transition-all duration-300 ${
-                currentStep >= 2
-                  ? "bg-blue-600 text-white shadow-lg scale-110"
-                  : "bg-gray-200 text-gray-600"
-              }`}
-            >
-              2
-            </div>
-            <span className="ml-3 text-sm font-semibold">Assign to Grades</span>
-          </div>
-        </div>
+        <StepIndicator currentStep={currentStep} step2Label="Assign to Grades" />
 
         {currentStep === 1 ? (
-          <div className="space-y-4">
-            <Input
-              label="Name"
-              value={formData.name}
-              onChange={(e) =>
-                setFormData((prev) => ({ ...prev, name: e.target.value }))
-              }
-              error={formErrors.name}
-              placeholder="e.g., Mathematics"
-              required
-            />
-
-            <Input
-              label="Code"
-              value={formData.code}
-              onChange={(e) =>
-                setFormData((prev) => ({ ...prev, code: e.target.value }))
-              }
-              placeholder="e.g., MATH101"
-            />
-
-            <Input
-              label="Description"
-              value={formData.description}
-              onChange={(e) =>
-                setFormData((prev) => ({
-                  ...prev,
-                  description: e.target.value,
-                }))
-              }
-              placeholder="Optional description"
-            />
-
-            <Select
-              label="Course Category"
-              value={formData.course_category_id?.toString() || ""}
-              onChange={(e) =>
-                setFormData((prev) => ({
-                  ...prev,
-                  course_category_id: e.target.value
-                    ? parseInt(e.target.value)
-                    : null,
-                }))
-              }
-              disabled={loadingCategories}
-              options={
-                loadingCategories
-                  ? [{ value: "", label: "Loading categories..." }]
-                  : [
-                      { value: "", label: "No category" },
-                      ...categories.map((category) => ({
-                        value: category.category_id,
-                        label: category.name,
-                      })),
-                    ]
-              }
-            />
-
-            <Input
-              label="Max Marks"
-              type="number"
-              value={formData.max_marks?.toString() || ""}
-              onChange={(e) =>
-                setFormData((prev) => ({
-                  ...prev,
-                  max_marks: e.target.value ? parseInt(e.target.value) : null,
-                }))
-              }
-              placeholder="e.g., 100"
-            />
-
-            <div className="space-y-1.5">
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Subject Color
-              </label>
-              <div className="flex items-center space-x-3">
-                <input
-                  type="color"
-                  value={formData.color}
-                  onChange={(e) =>
-                    setFormData((prev) => ({ ...prev, color: e.target.value }))
-                  }
-                  className="w-12 h-12 rounded-xl border-2 border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 cursor-pointer p-1"
-                />
-                <div className="flex-1">
-                  <Input
-                    value={formData.color.toUpperCase()}
-                    onChange={(e) =>
-                      setFormData((prev) => ({
-                        ...prev,
-                        color: e.target.value.startsWith("#")
-                          ? e.target.value
-                          : "#" + e.target.value,
-                      }))
-                    }
-                    placeholder="#3B82F6"
-                    className="font-mono"
-                  />
-                </div>
-              </div>
-              <p className="text-xs text-gray-400 dark:text-gray-500">
-                This color will identify the subject in the academic calendar
-              </p>
-            </div>
-          </div>
+          <SubjectDetailsForm
+            formData={formData}
+            setFormData={setFormData}
+            formErrors={formErrors}
+            categories={categories}
+            loadingCategories={loadingCategories}
+          />
         ) : (
-          <div className="space-y-6">
-            <div className="text-center">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-                🎯 Assign to Grades
-              </h3>
-              <p className="text-sm text-gray-600 dark:text-gray-300">
-                Choose which grades should include this subject in their
-                curriculum
-              </p>
-            </div>
-
-            {loadingGrades ? (
-              <div className="flex items-center justify-center py-12">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                <span className="ml-3 text-sm text-gray-600 dark:text-gray-300">
-                  Loading grades...
-                </span>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {/* Enhanced Summary */}
-                <div className="flex items-center justify-between p-4 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 rounded-3xl border border-green-200 dark:border-green-800">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-10 h-10 bg-green-100 dark:bg-green-900/50 rounded-full flex items-center justify-center">
-                      <span className="text-green-600 dark:text-green-400 font-bold text-sm">
-                        {gradeAssignments.filter((a) => a.is_assigned).length}
-                      </span>
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-gray-900 dark:text-white">
-                        Grades Selected
-                      </p>
-                      <p className="text-xs text-gray-600 dark:text-gray-300">
-                        {gradeAssignments.filter((a) => a.is_assigned).length}{" "}
-                        of {gradeAssignments.length} grades chosen
-                      </p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-2xl font-bold text-green-600 dark:text-green-400">
-                      {Math.round(
-                        (gradeAssignments.filter((a) => a.is_assigned).length /
-                          gradeAssignments.length) *
-                          100,
-                      )}
-                      %
-                    </div>
-                    <div className="text-xs text-gray-500">Coverage</div>
-                  </div>
-                </div>
-
-                {/* Enhanced Grade Selection Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-96 overflow-y-auto">
-                  {gradeAssignments.map((assignment, index) => (
-                    <label
-                      key={assignment.grade_id}
-                      className={`group relative flex items-center p-5 rounded-3xl border-2 cursor-pointer transition-all duration-300 transform hover:scale-[1.02] animate-fade-in ${
-                        assignment.is_assigned
-                          ? "border-green-400 bg-gradient-to-r from-green-50 to-emerald-50 dark:border-green-500 dark:from-green-900/30 dark:to-emerald-900/30 shadow-lg ring-2 ring-green-200 dark:ring-green-800"
-                          : "border-gray-200 dark:border-gray-600 hover:border-blue-300 dark:hover:border-blue-500 hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 dark:hover:from-blue-900/20 dark:hover:to-indigo-900/20 hover:shadow-md"
-                      }`}
-                      style={{
-                        animationDelay: `${index * 50}ms`,
-                        animationFillMode: "both",
-                      }}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={assignment.is_selected}
-                        onChange={() =>
-                          handleGradeSelection(assignment.grade_id)
-                        }
-                        className="sr-only"
-                      />
-
-                      {/* Enhanced Custom Checkbox */}
-                      <div
-                        className={`flex-shrink-0 w-6 h-6 rounded-lg border-2 flex items-center justify-center mr-4 transition-all duration-300 ${
-                          assignment.is_selected
-                            ? "bg-green-600 border-green-600 shadow-lg"
-                            : "border-gray-300 dark:border-gray-500 group-hover:border-blue-400 group-hover:shadow-md"
-                        }`}
-                      >
-                        {assignment.is_selected && (
-                          <svg
-                            className="w-4 h-4 text-white animate-pulse"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={3}
-                              d="M5 13l4 4L19 7"
-                            />
-                          </svg>
-                        )}
-                      </div>
-
-                      {/* Enhanced Grade Info */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center space-x-3">
-                          <span
-                            className={`text-sm font-bold transition-colors duration-200 ${
-                              assignment.is_assigned
-                                ? "text-green-900 dark:text-green-100"
-                                : "text-gray-900 dark:text-white group-hover:text-blue-900 dark:group-hover:text-blue-100"
-                            }`}
-                          >
-                            {assignment.name}
-                          </span>
-                          {assignment.is_assigned && (
-                            <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-200 shadow-sm animate-bounce">
-                              ✓ Selected
-                            </span>
-                          )}
-                        </div>
-                        {assignment.program_name && (
-                          <p className="text-xs text-gray-600 dark:text-gray-300 mt-2 font-medium">
-                            📚 {assignment.program_name}
-                          </p>
-                        )}
-                      </div>
-
-                      {/* Enhanced Hover Effect */}
-                      <div
-                        className={`absolute inset-0 rounded-2xl transition-all duration-300 ${
-                          assignment.is_assigned
-                            ? "opacity-0"
-                            : "opacity-0 group-hover:opacity-20 bg-gradient-to-r from-blue-500 to-indigo-500"
-                        }`}
-                      />
-                    </label>
-                  ))}
-                </div>
-
-                {/* Enhanced Quick Actions */}
-                <div className="flex flex-wrap gap-3 pt-4 border-t border-gray-200 dark:border-gray-600">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setGradeAssignments((prev) =>
-                        prev.map((a) => ({
-                          ...a,
-                          is_selected: false,
-                          is_assigned: false,
-                        })),
-                      );
-                    }}
-                    className="px-4 py-2 text-sm font-medium text-gray-600 bg-gray-50 hover:bg-gray-100 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600 rounded-full transition-all duration-200 hover:shadow-md"
-                  >
-                    🗑️ Clear All
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setGradeAssignments((prev) =>
-                        prev.map((a) => ({
-                          ...a,
-                          is_selected: true,
-                          is_assigned: true,
-                        })),
-                      );
-                    }}
-                    className="px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:text-blue-400 dark:hover:bg-blue-900/30 rounded-full transition-all duration-200 hover:shadow-md"
-                  >
-                    ✅ Select All
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      // Select only grades from the same program as the first selected grade
-                      const selectedAssignments = gradeAssignments.filter(
-                        (a) => a.is_selected,
-                      );
-                      if (selectedAssignments.length > 0) {
-                        const targetProgram =
-                          selectedAssignments[0].program_name;
-                        setGradeAssignments((prev) =>
-                          prev.map((a) => ({
-                            ...a,
-                            is_selected: a.program_name === targetProgram,
-                            is_assigned: a.program_name === targetProgram,
-                          })),
-                        );
-                      }
-                    }}
-                    className="px-4 py-2 text-sm font-medium text-green-600 bg-green-50 hover:bg-green-100 dark:bg-green-900/20 dark:text-green-400 dark:hover:bg-green-900/30 rounded-full transition-all duration-200 hover:shadow-md"
-                  >
-                    🎯 Same Program
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
+          <GradeAssignmentGrid
+            title="Assign to Grades"
+            subtitle="Choose which grades should include this subject in their curriculum"
+            gradeAssignments={gradeAssignments}
+            setGradeAssignments={setGradeAssignments}
+            loadingGrades={loadingGrades}
+            handleGradeSelection={handleGradeSelection}
+            showResetToCurrent={false}
+          />
         )}
 
         <div className="flex justify-between mt-6">
@@ -940,370 +985,28 @@ const SubjectsTab: React.FC<SubjectsTabProps> = ({
           setSelectedSubject(null);
         }}
         title={`Edit Subject - Step ${currentStep} of 2`}
-        size="2xl"
+        size="xl"
       >
-        {/* Enhanced Step Indicator */}
-        <div className="flex items-center mb-8">
-          <div
-            className={`flex items-center transition-all duration-300 ${
-              currentStep >= 1 ? "text-blue-600" : "text-gray-400"
-            }`}
-          >
-            <div
-              className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold transition-all duration-300 ${
-                currentStep >= 1
-                  ? "bg-blue-600 text-white shadow-lg scale-110"
-                  : "bg-gray-200 text-gray-600"
-              }`}
-            >
-              {currentStep > 1 ? "✓" : "1"}
-            </div>
-            <span className="ml-3 text-sm font-semibold">Subject Details</span>
-          </div>
-          <div
-            className={`flex-1 h-1 mx-4 rounded-full transition-all duration-500 ${
-              currentStep >= 2
-                ? "bg-gradient-to-r from-blue-600 to-blue-400"
-                : "bg-gray-200"
-            }`}
-          />
-          <div
-            className={`flex items-center transition-all duration-300 ${
-              currentStep >= 2 ? "text-blue-600" : "text-gray-400"
-            }`}
-          >
-            <div
-              className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold transition-all duration-300 ${
-                currentStep >= 2
-                  ? "bg-blue-600 text-white shadow-lg scale-110"
-                  : "bg-gray-200 text-gray-600"
-              }`}
-            >
-              2
-            </div>
-            <span className="ml-3 text-sm font-semibold">
-              Manage Assignments
-            </span>
-          </div>
-        </div>
+        <StepIndicator currentStep={currentStep} step2Label="Manage Assignments" />
 
         {currentStep === 1 ? (
-          <div className="space-y-4">
-            <Input
-              label="Name"
-              value={formData.name}
-              onChange={(e) =>
-                setFormData((prev) => ({ ...prev, name: e.target.value }))
-              }
-              error={formErrors.name}
-              placeholder="e.g., Mathematics"
-              required
-            />
-
-            <Input
-              label="Code"
-              value={formData.code}
-              onChange={(e) =>
-                setFormData((prev) => ({ ...prev, code: e.target.value }))
-              }
-              placeholder="e.g., MATH101"
-            />
-
-            <Input
-              label="Description"
-              value={formData.description}
-              onChange={(e) =>
-                setFormData((prev) => ({
-                  ...prev,
-                  description: e.target.value,
-                }))
-              }
-              placeholder="Optional description"
-            />
-
-            <Select
-              label="Course Category"
-              value={formData.course_category_id?.toString() || ""}
-              onChange={(e) =>
-                setFormData((prev) => ({
-                  ...prev,
-                  course_category_id: e.target.value
-                    ? parseInt(e.target.value)
-                    : null,
-                }))
-              }
-              disabled={loadingCategories}
-              options={
-                loadingCategories
-                  ? [{ value: "", label: "Loading categories..." }]
-                  : [
-                      { value: "", label: "No category" },
-                      ...categories.map((category) => ({
-                        value: category.category_id,
-                        label: category.name,
-                      })),
-                    ]
-              }
-            />
-
-            <Input
-              label="Max Marks"
-              type="number"
-              value={formData.max_marks?.toString() || ""}
-              onChange={(e) =>
-                setFormData((prev) => ({
-                  ...prev,
-                  max_marks: e.target.value ? parseInt(e.target.value) : null,
-                }))
-              }
-              placeholder="e.g., 100"
-            />
-
-            <div className="space-y-1.5">
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Subject Color
-              </label>
-              <div className="flex items-center space-x-3">
-                <input
-                  type="color"
-                  value={formData.color}
-                  onChange={(e) =>
-                    setFormData((prev) => ({ ...prev, color: e.target.value }))
-                  }
-                  className="w-12 h-12 rounded-xl border-2 border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 cursor-pointer p-1"
-                />
-                <div className="flex-1">
-                  <Input
-                    value={formData.color.toUpperCase()}
-                    onChange={(e) =>
-                      setFormData((prev) => ({
-                        ...prev,
-                        color: e.target.value.startsWith("#")
-                          ? e.target.value
-                          : "#" + e.target.value,
-                      }))
-                    }
-                    placeholder="#3B82F6"
-                    className="font-mono"
-                  />
-                </div>
-              </div>
-              <p className="text-xs text-gray-400 dark:text-gray-500">
-                This color will identify the subject in the academic calendar
-              </p>
-            </div>
-          </div>
+          <SubjectDetailsForm
+            formData={formData}
+            setFormData={setFormData}
+            formErrors={formErrors}
+            categories={categories}
+            loadingCategories={loadingCategories}
+          />
         ) : (
-          <div className="space-y-6">
-            <div className="text-center">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-                🎯 Manage Grade Assignments
-              </h3>
-              <p className="text-sm text-gray-600 dark:text-gray-300">
-                Select the grades where this subject should be taught
-              </p>
-            </div>
-
-            {loadingGrades ? (
-              <div className="flex items-center justify-center py-12">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                <span className="ml-3 text-sm text-gray-600 dark:text-gray-300">
-                  Loading grades...
-                </span>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {/* Summary */}
-                <div className="flex items-center justify-between p-4 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-xl border border-blue-200 dark:border-blue-800">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/50 rounded-full flex items-center justify-center">
-                      <span className="text-blue-600 dark:text-blue-400 font-bold text-sm">
-                        {gradeAssignments.filter((a) => a.is_assigned).length}
-                      </span>
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-gray-900 dark:text-white">
-                        Grades Assigned
-                      </p>
-                      <p className="text-xs text-gray-600 dark:text-gray-300">
-                        {gradeAssignments.filter((a) => a.is_assigned).length}{" "}
-                        of {gradeAssignments.length} grades selected
-                      </p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-                      {Math.round(
-                        (gradeAssignments.filter((a) => a.is_assigned).length /
-                          gradeAssignments.length) *
-                          100,
-                      )}
-                      %
-                    </div>
-                    <div className="text-xs text-gray-500">Coverage</div>
-                  </div>
-                </div>
-
-                {/* Enhanced Grade Selection Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-96 overflow-y-auto">
-                  {gradeAssignments.map((assignment, index) => (
-                    <label
-                      key={assignment.grade_id}
-                      className={`group relative flex items-center p-5 rounded-2xl border-2 cursor-pointer transition-all duration-300 transform hover:scale-[1.02] animate-fade-in ${
-                        assignment.is_assigned
-                          ? "border-blue-400 bg-gradient-to-r from-blue-50 to-indigo-50 dark:border-blue-500 dark:from-blue-900/30 dark:to-indigo-900/30 shadow-lg ring-2 ring-blue-200 dark:ring-blue-800"
-                          : "border-gray-200 dark:border-gray-600 hover:border-blue-300 dark:hover:border-blue-500 hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 dark:hover:from-blue-900/20 dark:hover:to-indigo-900/20 hover:shadow-md"
-                      }`}
-                      style={{
-                        animationDelay: `${index * 50}ms`,
-                        animationFillMode: "both",
-                      }}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={assignment.is_selected}
-                        onChange={() =>
-                          handleGradeSelection(assignment.grade_id)
-                        }
-                        className="sr-only"
-                      />
-
-                      {/* Enhanced Custom Checkbox */}
-                      <div
-                        className={`flex-shrink-0 w-6 h-6 rounded-lg border-2 flex items-center justify-center mr-4 transition-all duration-300 ${
-                          assignment.is_selected
-                            ? "bg-blue-600 border-blue-600 shadow-lg"
-                            : "border-gray-300 dark:border-gray-500 group-hover:border-blue-400 group-hover:shadow-md"
-                        }`}
-                      >
-                        {assignment.is_selected && (
-                          <svg
-                            className="w-4 h-4 text-white animate-pulse"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={3}
-                              d="M5 13l4 4L19 7"
-                            />
-                          </svg>
-                        )}
-                      </div>
-
-                      {/* Enhanced Grade Info */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center space-x-3">
-                          <span
-                            className={`text-sm font-bold transition-colors duration-200 ${
-                              assignment.is_assigned
-                                ? "text-blue-900 dark:text-blue-100"
-                                : "text-gray-900 dark:text-white group-hover:text-blue-900 dark:group-hover:text-blue-100"
-                            }`}
-                          >
-                            {assignment.name}
-                          </span>
-                          {assignment.is_assigned && (
-                            <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-blue-100 text-blue-800 dark:bg-blue-800 dark:text-blue-200 shadow-sm animate-bounce">
-                              ✓ Assigned
-                            </span>
-                          )}
-                        </div>
-                        {assignment.program_name && (
-                          <p className="text-xs text-gray-600 dark:text-gray-300 mt-2 font-medium">
-                            📚 {assignment.program_name}
-                          </p>
-                        )}
-                      </div>
-
-                      {/* Enhanced Hover Effect */}
-                      <div
-                        className={`absolute inset-0 rounded-2xl transition-all duration-300 ${
-                          assignment.is_assigned
-                            ? "opacity-0"
-                            : "opacity-0 group-hover:opacity-20 bg-gradient-to-r from-blue-500 to-indigo-500"
-                        }`}
-                      />
-                    </label>
-                  ))}
-                </div>
-
-                {/* Enhanced Quick Actions */}
-                <div className="flex flex-wrap gap-3 pt-4 border-t border-gray-200 dark:border-gray-600">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setGradeAssignments((prev) =>
-                        prev.map((a) => ({
-                          ...a,
-                          is_selected: a.is_currently_assigned,
-                          is_assigned: a.is_currently_assigned,
-                        })),
-                      );
-                    }}
-                    className="px-4 py-2 text-sm font-medium text-orange-600 bg-orange-50 hover:bg-orange-100 dark:bg-orange-900/20 dark:text-orange-400 dark:hover:bg-orange-900/30 rounded-full transition-all duration-200 hover:shadow-md"
-                  >
-                    🔄 Reset to Current
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setGradeAssignments((prev) =>
-                        prev.map((a) => ({
-                          ...a,
-                          is_selected: false,
-                          is_assigned: false,
-                        })),
-                      );
-                    }}
-                    className="px-4 py-2 text-sm font-medium text-gray-600 bg-gray-50 hover:bg-gray-100 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600 rounded-full transition-all duration-200 hover:shadow-md"
-                  >
-                    🗑️ Clear All
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setGradeAssignments((prev) =>
-                        prev.map((a) => ({
-                          ...a,
-                          is_selected: true,
-                          is_assigned: true,
-                        })),
-                      );
-                    }}
-                    className="px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:text-blue-400 dark:hover:bg-blue-900/30 rounded-full transition-all duration-200 hover:shadow-md"
-                  >
-                    ✅ Select All
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      // Select only grades from the same program as the first selected grade
-                      const selectedAssignments = gradeAssignments.filter(
-                        (a) => a.is_selected,
-                      );
-                      if (selectedAssignments.length > 0) {
-                        const targetProgram =
-                          selectedAssignments[0].program_name;
-                        setGradeAssignments((prev) =>
-                          prev.map((a) => ({
-                            ...a,
-                            is_selected: a.program_name === targetProgram,
-                            is_assigned: a.program_name === targetProgram,
-                          })),
-                        );
-                      }
-                    }}
-                    className="px-4 py-2 text-sm font-medium text-green-600 bg-green-50 hover:bg-green-100 dark:bg-green-900/20 dark:text-green-400 dark:hover:bg-green-900/30 rounded-full transition-all duration-200 hover:shadow-md"
-                  >
-                    🎯 Same Program
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
+          <GradeAssignmentGrid
+            title="Manage Grade Assignments"
+            subtitle="Select the grades where this subject should be taught"
+            gradeAssignments={gradeAssignments}
+            setGradeAssignments={setGradeAssignments}
+            loadingGrades={loadingGrades}
+            handleGradeSelection={handleGradeSelection}
+            showResetToCurrent
+          />
         )}
 
         <div className="flex justify-between mt-6">
