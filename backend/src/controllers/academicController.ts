@@ -1,5 +1,5 @@
 import { db } from "../db";
-import { eq, and, or, sql, SQL, desc, not } from "drizzle-orm";
+import { eq, and, or, sql, SQL, desc, not, inArray } from "drizzle-orm";
 import { alias } from "drizzle-orm/mysql-core";
 import {
   AcademicYear,
@@ -1285,7 +1285,14 @@ export const getSubjects = asyncHandler(async (req: any, res: any) => {
     .where(whereCondition)
     .orderBy(Subject.name);
 
-  // Group subjects by subject_id and collect their grades/programs
+  // Group subjects by subject_id. The rows above may repeat per teacher
+  // assignment (joined only for the VIEW_PROGRAM_ACADEMICS scoping filter
+  // above), so grade/program columns from that join must not be used to
+  // build the displayed grades list -- they reflect "grades a teacher of
+  // this subject happens to teach in", not "grades this subject is
+  // assigned to". The latter lives in the GradeSubject junction table
+  // (the same table assignSubjectToGrade/removeSubjectFromGrade write to),
+  // fetched separately below.
   const subjectMap = new Map<number, any>();
 
   subjects.forEach((row) => {
@@ -1303,16 +1310,45 @@ export const getSubjects = asyncHandler(async (req: any, res: any) => {
         grades: [],
       });
     }
-
-    if (row.grade_id) {
-      subjectMap.get(subjectId).grades.push({
-        grade_id: row.grade_id,
-        grade_name: row.grade_name,
-        program_id: row.program_id,
-        program_name: row.program_name,
-      });
-    }
   });
+
+  const subjectIds = Array.from(subjectMap.keys());
+
+  if (subjectIds.length > 0) {
+    const GradeAssigned = alias(Grade, "grade_assigned");
+    const ProgramAssigned = alias(Program, "program_assigned");
+
+    const assignedGrades = await db
+      .select({
+        subject_id: GradeSubject.subject_id,
+        grade_id: GradeAssigned.grade_id,
+        grade_name: GradeAssigned.name,
+        program_id: ProgramAssigned.program_id,
+        program_name: ProgramAssigned.name,
+      })
+      .from(GradeSubject)
+      .innerJoin(
+        GradeAssigned,
+        eq(GradeSubject.grade_id, GradeAssigned.grade_id),
+      )
+      .leftJoin(
+        ProgramAssigned,
+        eq(GradeAssigned.program_id, ProgramAssigned.program_id),
+      )
+      .where(inArray(GradeSubject.subject_id, subjectIds));
+
+    assignedGrades.forEach((row) => {
+      const entry = subjectMap.get(row.subject_id);
+      if (entry) {
+        entry.grades.push({
+          grade_id: row.grade_id,
+          grade_name: row.grade_name,
+          program_id: row.program_id,
+          program_name: row.program_name,
+        });
+      }
+    });
+  }
 
   const result = Array.from(subjectMap.values());
 

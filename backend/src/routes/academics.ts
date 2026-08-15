@@ -229,7 +229,12 @@ router.delete(
 
 // Grade-Subject Assignment routes
 router.get("/grades/:grade_id/subjects", authenticate, getGradeSubjects);
-router.post("/grades/assign-subject", authenticate, assignSubjectToGrade);
+router.post(
+  "/grades/assign-subject",
+  authenticate,
+  authorize("MANAGE_ACADEMICS"),
+  assignSubjectToGrade,
+);
 router.delete(
   "/grades/:grade_id/subjects/:subject_id",
   authenticate,
