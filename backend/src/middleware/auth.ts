@@ -1,7 +1,7 @@
 import jwt from "jsonwebtoken";
 import { db } from "../db";
 import { eq, and } from "drizzle-orm";
-import { UserRole, Role } from "../db/schema";
+import { UserRole, Role, User } from "../db/schema";
 import { ValidationError } from "../errors/CustomError";
 import { ALL_PERMISSIONS } from "../utils/permissions";
 
@@ -17,6 +17,17 @@ const getUserRoles = async (userId: number): Promise<string[]> => {
     )
     .where(eq(UserRole.user_id, userId));
   return roles.map((r) => r.name);
+};
+
+/** Single indexed lookup backing the logout-revocation check below. Returns
+ *  null if the user row is gone (deleted account) so callers can reject. */
+const getUserTokenVersion = async (userId: number): Promise<number | null> => {
+  const row = await db
+    .select({ token_version: User.token_version })
+    .from(User)
+    .where(eq(User.user_id, userId))
+    .limit(1);
+  return row.length > 0 ? row[0].token_version : null;
 };
 
 export const authenticate = async (req: any, res: any, next: any) => {
@@ -45,6 +56,22 @@ export const authenticate = async (req: any, res: any, next: any) => {
     req.user.userId = Number(decoded.userId);
     if (isNaN(req.user.userId) || req.user.userId <= 0) {
       throw new ValidationError("Invalid user ID in token");
+    }
+
+    // Revoke on logout: a token issued before this user's most recent
+    // logout carries a stale tokenVersion and is rejected here even though
+    // it's still cryptographically valid and unexpired. Tokens signed
+    // before this check existed carry no tokenVersion claim at all --
+    // treated as 0, matching the column's default, so already-issued
+    // sessions keep working until their next logout.
+    const currentTokenVersion = await getUserTokenVersion(req.user.userId);
+    if (
+      currentTokenVersion === null ||
+      (decoded.tokenVersion ?? 0) !== currentTokenVersion
+    ) {
+      return res
+        .status(401)
+        .json({ message: "Session expired, please log in again." });
     }
 
     // Check if user has SUPER_ADMIN role - grant all permissions

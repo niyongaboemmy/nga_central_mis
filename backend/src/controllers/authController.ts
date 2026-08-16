@@ -2,7 +2,7 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { OAuth2Client } from "google-auth-library";
 import { db } from "../db";
-import { eq, and } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 import {
   User,
   AuthCredential,
@@ -288,6 +288,9 @@ const completeLogin = async (
       allGrades,
       systems,
       preferred_theme: user[0].preferred_theme,
+      // See middleware/auth.ts -- lets logout revoke this token before its
+      // natural 24h expiry.
+      tokenVersion: user[0].token_version || 0,
     },
     config.jwtSecret,
     { expiresIn: "24h" },
@@ -499,7 +502,25 @@ export const getSession = asyncHandler(async (req: any, res: any) => {
   });
 });
 
+/** Cheap session-validity probe -- authenticate() has already done the real
+ *  work (signature, expiry, and the logout-revocation tokenVersion check)
+ *  by the time this runs, so there's nothing left to do but confirm it. */
+export const verifySession = asyncHandler(async (req: any, res: any) => {
+  successResponse(res, "Token valid", { userId: req.user.userId });
+});
+
 export const logout = asyncHandler(async (req: any, res: any) => {
+  // Bumping this invalidates every outstanding JWT for the user -- this
+  // app's own cookie and, critically, the misToken copy any spoke app
+  // (TaskMentor, Tendo, ...) took at SSO-exchange time. Without this,
+  // logout only ever cleared the cookie in this one browser and every other
+  // session (this token in another tab, or a sibling app that already
+  // extracted its own copy) stayed valid until its natural 24h expiry.
+  await db
+    .update(User)
+    .set({ token_version: sql`token_version + 1` })
+    .where(eq(User.user_id, req.user.userId));
+
   res.clearCookie("nga_auth_token", {
     domain: config.cookieDomain,
     path: "/",

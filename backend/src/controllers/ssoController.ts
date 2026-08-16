@@ -199,6 +199,10 @@ export const getSSOToken = asyncHandler(async (req: any, res: any) => {
       allGrades,
       systems,
       preferred_theme: user[0].preferred_theme,
+      // See middleware/auth.ts -- lets an MIS logout revoke this token (and
+      // therefore any spoke app session built on it) before its natural
+      // 24h expiry.
+      tokenVersion: user[0].token_version || 0,
     },
     config.jwtSecret,
     { expiresIn: "24h" },

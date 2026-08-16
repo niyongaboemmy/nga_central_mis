@@ -10,6 +10,7 @@ import {
   confirmDbAccess,
   getSession,
   logout,
+  verifySession,
 } from "../controllers/authController";
 import { authenticate } from "../middleware/auth";
 
@@ -19,6 +20,12 @@ router.post("/login", login);
 router.post("/google", googleLogin);
 router.post("/logout", authenticate, logout);
 router.get("/session", authenticate, getSession);
+// Cheap "is this token still valid" check -- authenticate() already does
+// the token_version revocation check, this just returns without the
+// heavy profile/roles/systems payload getSession assembles. Meant to be
+// polled periodically by spoke apps (TaskMentor, Tendo, ...) so an MIS
+// logout ends their session too, not just this one.
+router.get("/verify", authenticate, verifySession);
 router.post("/verify-otp", authenticate, verifyOTP);
 router.post("/forgot-password", forgotPassword);
 router.post("/verify-reset-otp", authenticate, verifyResetOTP);

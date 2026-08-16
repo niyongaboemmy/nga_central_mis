@@ -28,6 +28,12 @@ export const User = mysqlTable("User", {
   preferred_theme: mysqlEnum("preferred_theme", ["light", "dark"]).default(
     "light",
   ),
+  // Bumped on logout so previously-issued JWTs (which embed the version at
+  // sign time) stop verifying immediately, even though they're otherwise
+  // still cryptographically valid for their full 24h lifetime. This is what
+  // makes logout actually revoke a session instead of just clearing a
+  // cookie -- see authenticate() in middleware/auth.ts.
+  token_version: int("token_version").notNull().default(0),
   created_at: datetime("created_at").default(sql`CURRENT_TIMESTAMP`),
   updated_at: datetime("updated_at").default(
     sql`CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP`,
