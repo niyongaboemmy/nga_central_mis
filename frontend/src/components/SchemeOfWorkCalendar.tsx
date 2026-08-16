@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { schemeOfWorkApi, SchemeEntry } from "../api/schemeOfWork";
 import { useToast } from "../contexts/ToastContext";
@@ -133,10 +133,25 @@ const SchemeOfWorkCalendar: React.FC = () => {
   // Keep this page in sync with the global Academic Year/Term selector: if the
   // user switches term while viewing this page, reload it for the new term; if
   // they switch to a year this class group doesn't belong to, return to the list.
+  //
+  // prevSelectedYearIdRef guards against firing on the initial load: subjectInfo
+  // (and its academicYearId) only populates after an async loadData() call, so
+  // this effect's deps change once that resolves even though selectedYearId
+  // itself never moved. Without tracking the previous value, opening a subject
+  // from a year that simply doesn't match whatever the global picker happens to
+  // show at that moment (e.g. it defaulted to the current year) bounced the
+  // user straight back out before the page ever rendered -- not just on an
+  // actual mid-visit year switch, which is the only case this should catch.
+  const prevSelectedYearIdRef = useRef<number | null>(null);
   useEffect(() => {
     if (!subjectId || !classGroupId || selectedYearId == null) return;
 
+    const prevSelectedYearId = prevSelectedYearIdRef.current;
+    prevSelectedYearIdRef.current = selectedYearId;
+
     if (
+      prevSelectedYearId != null &&
+      prevSelectedYearId !== selectedYearId &&
       subjectInfo?.academicYearId != null &&
       selectedYearId !== subjectInfo.academicYearId
     ) {
