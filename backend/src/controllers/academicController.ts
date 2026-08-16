@@ -16,6 +16,8 @@ import {
   User,
   UserProfile,
   UserProgramLead,
+  UserRole,
+  Role,
   SchemeOfWork,
 } from "../db/schema";
 import { sanitizeString } from "../utils/sanitization";
@@ -2940,10 +2942,29 @@ export const getSubjectEnrolledStudentsByTerm = asyncHandler(
 export const getClassGroupStudents = asyncHandler(
   async (req: any, res: any) => {
     const { class_group_id } = req.params;
+    const { academic_year_id } = req.query;
     const classGroupId = parseInt(class_group_id);
 
     if (isNaN(classGroupId)) {
       throw new ValidationError("Invalid class group ID");
+    }
+
+    const filters = [
+      eq(StudentClassGroup.class_group_id, classGroupId),
+      eq(StudentClassGroup.status, "ACTIVE"),
+      // A class group is a permanent label reused across years, so its
+      // membership rows accumulate one cohort per academic year. Without
+      // this filter the roster returned last year's cohort alongside (or
+      // instead of) the selected year's -- callers marking attendance for
+      // the current term got the wrong students entirely.
+    ];
+
+    if (academic_year_id !== undefined) {
+      const yearId = parseInt(academic_year_id as string);
+      if (isNaN(yearId)) {
+        throw new ValidationError("Invalid academic year ID");
+      }
+      filters.push(eq(StudentClassGroup.academic_year_id, yearId));
     }
 
     const students = await db
@@ -2954,6 +2975,7 @@ export const getClassGroupStudents = asyncHandler(
         first_name: UserProfile.first_name,
         last_name: UserProfile.last_name,
         gender: UserProfile.gender,
+        academic_year_id: StudentClassGroup.academic_year_id,
         enrolled_at: StudentClassGroup.assigned_at,
       })
       .from(StudentClassGroup)
@@ -2961,8 +2983,18 @@ export const getClassGroupStudents = asyncHandler(
       .innerJoin(UserProfile, eq(User.user_id, UserProfile.user_id))
       .where(
         and(
-          eq(StudentClassGroup.class_group_id, classGroupId),
-          eq(StudentClassGroup.status, "ACTIVE"),
+          ...filters,
+          // This is a *student* roster, so never surface a staff account
+          // that picked up a class-group row. Either signal counts: a real
+          // student missing one of them still appears (dropping them would
+          // silently remove someone from attendance), while staff have
+          // neither. EXISTS rather than a join so a user holding several
+          // roles can't be returned twice.
+          or(
+            eq(UserProfile.user_type, "STUDENT"),
+            sql`EXISTS (SELECT 1 FROM ${UserRole} ur JOIN ${Role} r ON r.role_id = ur.role_id
+                        WHERE ur.user_id = ${User.user_id} AND r.name = 'STUDENT')`,
+          )!,
         ),
       )
       .orderBy(UserProfile.first_name, UserProfile.last_name);

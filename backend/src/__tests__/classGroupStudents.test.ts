@@ -19,12 +19,20 @@ describe("GET /academics/class-groups/:class_group_id/students", () => {
   let studentUserId: number;
   let otherClassGroupId: number;
   let otherStudentUserId: number;
+  let thisYearId: number;
+  let priorYearId: number;
+  let priorCohortUserId: number;
+  let staffUserId: number;
 
   beforeAll(async () => {
     const viewerId = await createUser({ userType: "ADMIN" });
     token = signToken(viewerId);
 
-    const { academicYearId } = await createAcademicPeriod();
+    const prior = await createAcademicPeriod();
+    priorYearId = prior.academicYearId;
+    const current = await createAcademicPeriod();
+    thisYearId = current.academicYearId;
+
     classGroupId = await createProgramGradeClassGroup();
     otherClassGroupId = await createProgramGradeClassGroup();
 
@@ -32,15 +40,76 @@ describe("GET /academics/class-groups/:class_group_id/students", () => {
     await createStudentClassGroup({
       userId: studentUserId,
       classGroupId,
-      academicYearId,
+      academicYearId: thisYearId,
+    });
+
+    // Same class group, previous year's cohort — a class group is a
+    // permanent label reused each year, so both rows coexist.
+    priorCohortUserId = await createUser({ userType: "STUDENT" });
+    await createStudentClassGroup({
+      userId: priorCohortUserId,
+      classGroupId,
+      academicYearId: priorYearId,
+    });
+
+    // A staff account that picked up a class-group row must never show up
+    // on a student roster.
+    staffUserId = await createUser({ userType: "TEACHER" });
+    await createStudentClassGroup({
+      userId: staffUserId,
+      classGroupId,
+      academicYearId: thisYearId,
     });
 
     otherStudentUserId = await createUser({ userType: "STUDENT" });
     await createStudentClassGroup({
       userId: otherStudentUserId,
       classGroupId: otherClassGroupId,
-      academicYearId,
+      academicYearId: thisYearId,
     });
+  });
+
+  it("returns only the selected academic year's cohort", async () => {
+    const res = await request(app)
+      .get(`/academics/class-groups/${classGroupId}/students`)
+      .query({ academic_year_id: thisYearId })
+      .set("Authorization", `Bearer ${token}`);
+
+    expect(res.status).toBe(200);
+    const ids = res.body.data.map((s: any) => s.user_id);
+    expect(ids).toContain(studentUserId);
+    expect(ids).not.toContain(priorCohortUserId);
+  });
+
+  it("returns the prior year's cohort when that year is selected", async () => {
+    const res = await request(app)
+      .get(`/academics/class-groups/${classGroupId}/students`)
+      .query({ academic_year_id: priorYearId })
+      .set("Authorization", `Bearer ${token}`);
+
+    expect(res.status).toBe(200);
+    const ids = res.body.data.map((s: any) => s.user_id);
+    expect(ids).toContain(priorCohortUserId);
+    expect(ids).not.toContain(studentUserId);
+  });
+
+  it("excludes non-student accounts from the roster", async () => {
+    const res = await request(app)
+      .get(`/academics/class-groups/${classGroupId}/students`)
+      .query({ academic_year_id: thisYearId })
+      .set("Authorization", `Bearer ${token}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.map((s: any) => s.user_id)).not.toContain(staffUserId);
+  });
+
+  it("400s on a non-numeric academic year id", async () => {
+    const res = await request(app)
+      .get(`/academics/class-groups/${classGroupId}/students`)
+      .query({ academic_year_id: "not-a-year" })
+      .set("Authorization", `Bearer ${token}`);
+
+    expect(res.status).toBe(400);
   });
 
   it("returns only students in the requested class group", async () => {
