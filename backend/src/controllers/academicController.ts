@@ -2830,7 +2830,20 @@ export const getSubjectEnrolledStudents = asyncHandler(
       .from(StudentSubjectEnrollment)
       .innerJoin(User, eq(StudentSubjectEnrollment.user_id, User.user_id))
       .innerJoin(UserProfile, eq(User.user_id, UserProfile.user_id))
-      .leftJoin(StudentClassGroup, eq(User.user_id, StudentClassGroup.user_id))
+      // Scoped to this same year and ACTIVE only -- a student can have
+      // StudentClassGroup rows from other years (their promotion history)
+      // and the app guarantees at most one ACTIVE row per (user, year), see
+      // assignGradeToUser's DISABLED-the-others step. Without both of these
+      // this left join fans out into one duplicate result row per historical
+      // class group match.
+      .leftJoin(
+        StudentClassGroup,
+        and(
+          eq(User.user_id, StudentClassGroup.user_id),
+          eq(StudentClassGroup.academic_year_id, yearId),
+          eq(StudentClassGroup.status, "ACTIVE"),
+        ),
+      )
       .leftJoin(
         ClassGroup,
         eq(StudentClassGroup.class_group_id, ClassGroup.class_group_id),
@@ -2888,7 +2901,17 @@ export const getSubjectEnrolledStudentsByTerm = asyncHandler(
       .from(StudentSubjectEnrollment)
       .innerJoin(User, eq(StudentSubjectEnrollment.user_id, User.user_id))
       .innerJoin(UserProfile, eq(User.user_id, UserProfile.user_id))
-      .leftJoin(StudentClassGroup, eq(User.user_id, StudentClassGroup.user_id))
+      // See getSubjectEnrolledStudents above -- scoping to this year and
+      // ACTIVE only is what keeps this left join from fanning out into one
+      // duplicate result row per historical class group match.
+      .leftJoin(
+        StudentClassGroup,
+        and(
+          eq(User.user_id, StudentClassGroup.user_id),
+          eq(StudentClassGroup.academic_year_id, term.academic_year_id),
+          eq(StudentClassGroup.status, "ACTIVE"),
+        ),
+      )
       .leftJoin(
         ClassGroup,
         eq(StudentClassGroup.class_group_id, ClassGroup.class_group_id),
