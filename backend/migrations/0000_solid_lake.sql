@@ -202,7 +202,7 @@ CREATE TABLE `TeacherSubjectAssignment` (
 	`class_group_id` bigint NOT NULL,
 	`academic_term_id` bigint NOT NULL,
 	`assigned_at` datetime DEFAULT CURRENT_TIMESTAMP,
-	CONSTRAINT `TeacherSubjectAssignment_user_id_subject_id_class_group_id_academic_term_id_pk` PRIMARY KEY(`user_id`,`subject_id`,`class_group_id`,`academic_term_id`)
+	CONSTRAINT `TSA_user_subject_class_term_pk` PRIMARY KEY(`user_id`,`subject_id`,`class_group_id`,`academic_term_id`)
 );
 --> statement-breakpoint
 CREATE TABLE `User` (
@@ -277,11 +277,11 @@ ALTER TABLE `StudentClassGroup` ADD CONSTRAINT `StudentClassGroup_user_id_User_u
 ALTER TABLE `StudentClassGroup` ADD CONSTRAINT `StudentClassGroup_class_group_id_ClassGroup_class_group_id_fk` FOREIGN KEY (`class_group_id`) REFERENCES `ClassGroup`(`class_group_id`) ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE `StudentSubjectEnrollment` ADD CONSTRAINT `StudentSubjectEnrollment_user_id_User_user_id_fk` FOREIGN KEY (`user_id`) REFERENCES `User`(`user_id`) ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE `StudentSubjectEnrollment` ADD CONSTRAINT `StudentSubjectEnrollment_subject_id_Subject_subject_id_fk` FOREIGN KEY (`subject_id`) REFERENCES `Subject`(`subject_id`) ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE `StudentSubjectEnrollment` ADD CONSTRAINT `StudentSubjectEnrollment_academic_term_id_AcademicTerm_academic_term_id_fk` FOREIGN KEY (`academic_term_id`) REFERENCES `AcademicTerm`(`academic_term_id`) ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE `StudentSubjectEnrollment` ADD CONSTRAINT `SSE_academic_term_id_fk` FOREIGN KEY (`academic_term_id`) REFERENCES `AcademicTerm`(`academic_term_id`) ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE `TeacherSubjectAssignment` ADD CONSTRAINT `TeacherSubjectAssignment_user_id_User_user_id_fk` FOREIGN KEY (`user_id`) REFERENCES `User`(`user_id`) ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE `TeacherSubjectAssignment` ADD CONSTRAINT `TeacherSubjectAssignment_subject_id_Subject_subject_id_fk` FOREIGN KEY (`subject_id`) REFERENCES `Subject`(`subject_id`) ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE `TeacherSubjectAssignment` ADD CONSTRAINT `TeacherSubjectAssignment_class_group_id_ClassGroup_class_group_id_fk` FOREIGN KEY (`class_group_id`) REFERENCES `ClassGroup`(`class_group_id`) ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE `TeacherSubjectAssignment` ADD CONSTRAINT `TeacherSubjectAssignment_academic_term_id_AcademicTerm_academic_term_id_fk` FOREIGN KEY (`academic_term_id`) REFERENCES `AcademicTerm`(`academic_term_id`) ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE `TeacherSubjectAssignment` ADD CONSTRAINT `TSA_class_group_id_fk` FOREIGN KEY (`class_group_id`) REFERENCES `ClassGroup`(`class_group_id`) ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE `TeacherSubjectAssignment` ADD CONSTRAINT `TSA_academic_term_id_fk` FOREIGN KEY (`academic_term_id`) REFERENCES `AcademicTerm`(`academic_term_id`) ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE `UserGrade` ADD CONSTRAINT `UserGrade_user_id_User_user_id_fk` FOREIGN KEY (`user_id`) REFERENCES `User`(`user_id`) ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE `UserGrade` ADD CONSTRAINT `UserGrade_grade_id_Grade_grade_id_fk` FOREIGN KEY (`grade_id`) REFERENCES `Grade`(`grade_id`) ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE `UserProfile` ADD CONSTRAINT `UserProfile_user_id_User_user_id_fk` FOREIGN KEY (`user_id`) REFERENCES `User`(`user_id`) ON DELETE no action ON UPDATE no action;--> statement-breakpoint
