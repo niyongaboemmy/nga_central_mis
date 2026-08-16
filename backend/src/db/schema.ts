@@ -1505,3 +1505,38 @@ export const DatabaseQueryLog = mysqlTable("DatabaseQueryLog", {
   ip_address: varchar("ip_address", { length: 64 }),
   created_at: datetime("created_at").default(sql`CURRENT_TIMESTAMP`),
 });
+
+// IntegrationToken table
+//
+// Service credentials for partner systems pulling read-only snapshots (see
+// migrations/064_integration_tokens.sql). Only the hash is stored.
+export const IntegrationToken = mysqlTable(
+  "IntegrationToken",
+  {
+    token_id: bigint("token_id", { mode: "number" })
+      .primaryKey()
+      .autoincrement(),
+    name: varchar("name", { length: 100 }).notNull(),
+    token_hash: varchar("token_hash", { length: 64 }).notNull(),
+    token_prefix: varchar("token_prefix", { length: 16 }).notNull(),
+    scopes: varchar("scopes", { length: 255 }).notNull().default("sync:read"),
+    school_id: bigint("school_id", { mode: "number" }),
+    last_used_at: datetime("last_used_at"),
+    expires_at: datetime("expires_at"),
+    revoked_at: datetime("revoked_at"),
+    created_by: bigint("created_by", { mode: "number" }),
+    created_at: datetime("created_at").default(sql`CURRENT_TIMESTAMP`),
+    updated_at: datetime("updated_at").default(
+      sql`CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP`,
+    ),
+  },
+  (table) => ({
+    tokenHashUnique: uniqueIndex("integration_token_hash_unique").on(
+      table.token_hash,
+    ),
+    activeIdx: index("integration_token_active_idx").on(
+      table.revoked_at,
+      table.expires_at,
+    ),
+  }),
+);
