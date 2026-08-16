@@ -75,6 +75,7 @@ import {
   // Class Groups
   getClassGroups,
   getClassGroup,
+  getClassGroupStudents,
   createClassGroup,
   updateClassGroup,
   deleteClassGroup,
@@ -303,6 +304,11 @@ router.delete(
 // year-scoped, so there's no more "copy class groups to a new year" action.
 router.get("/class-groups", authenticate, getClassGroups);
 router.get("/class-groups/:id", authenticate, getClassGroup);
+router.get(
+  "/class-groups/:class_group_id/students",
+  authenticate,
+  getClassGroupStudents,
+);
 router.post(
   "/class-groups",
   authenticate,

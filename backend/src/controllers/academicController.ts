@@ -2930,6 +2930,47 @@ export const getSubjectEnrolledStudentsByTerm = asyncHandler(
   },
 );
 
+// GET /class-groups/:class_group_id/students
+// Roster for a homeroom/class group -- distinct from the subject-enrollment
+// endpoints above, which list who's taking a *subject*, not who's *in* a
+// class group. Used by external SSO-linked systems (e.g. the discipline &
+// attendance app) that mark attendance per class group rather than per
+// subject. Unauthenticated beyond a valid MIS session, matching the
+// looseness of the equivalent single-student lookup (getStudentClassGroup).
+export const getClassGroupStudents = asyncHandler(
+  async (req: any, res: any) => {
+    const { class_group_id } = req.params;
+    const classGroupId = parseInt(class_group_id);
+
+    if (isNaN(classGroupId)) {
+      throw new ValidationError("Invalid class group ID");
+    }
+
+    const students = await db
+      .select({
+        user_id: User.user_id,
+        username: User.username,
+        email: User.email,
+        first_name: UserProfile.first_name,
+        last_name: UserProfile.last_name,
+        gender: UserProfile.gender,
+        enrolled_at: StudentClassGroup.assigned_at,
+      })
+      .from(StudentClassGroup)
+      .innerJoin(User, eq(StudentClassGroup.user_id, User.user_id))
+      .innerJoin(UserProfile, eq(User.user_id, UserProfile.user_id))
+      .where(
+        and(
+          eq(StudentClassGroup.class_group_id, classGroupId),
+          eq(StudentClassGroup.status, "ACTIVE"),
+        ),
+      )
+      .orderBy(UserProfile.first_name, UserProfile.last_name);
+
+    successResponse(res, "Class group students retrieved successfully", students);
+  },
+);
+
 // Student Subject Enrollment Management
 export const getStudentEnrolledSubjects = asyncHandler(
   async (req: any, res: any) => {
