@@ -138,7 +138,7 @@ export const subjectsApi = {
   getAll: () => api.get<{ data: Subject[] }>("/academics/subjects"),
   getById: (id: number) => api.get<Subject>(`/academics/subjects/${id}`),
   create: (data: Omit<Subject, "subject_id">) =>
-    api.post<Subject>("/academics/subjects", data),
+    api.post<{ data: Subject }>("/academics/subjects", data),
   update: (id: number, data: Partial<Omit<Subject, "subject_id">>) =>
     api.put<Subject>(`/academics/subjects/${id}`, data),
   delete: (id: number) => api.delete(`/academics/subjects/${id}`),

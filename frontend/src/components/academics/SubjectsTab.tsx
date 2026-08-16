@@ -36,7 +36,7 @@ interface SubjectsTabProps {
   data: Subject[];
   loading: boolean;
   onRefresh: () => void;
-  onCreate: (data: Omit<Subject, "subject_id">) => Promise<void>;
+  onCreate: (data: Omit<Subject, "subject_id">) => Promise<Subject>;
   onUpdate: (
     id: number,
     data: Partial<Omit<Subject, "subject_id">>,
@@ -440,6 +440,11 @@ const SubjectsTab: React.FC<SubjectsTabProps> = ({
   });
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
+  // Distinct from formErrors (field-level validation) -- this is a
+  // create/assign request that failed on the server, shown inline in the
+  // modal instead of only as a toast so it doesn't disappear before the
+  // user has a chance to read it and retry.
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   // Two-step process states
   const [currentStep, setCurrentStep] = useState<1 | 2>(1);
@@ -466,6 +471,7 @@ const SubjectsTab: React.FC<SubjectsTabProps> = ({
       color: "#3B82F6",
     });
     setFormErrors({});
+    setSubmitError(null);
     setCurrentStep(1);
     setGradeAssignments([]);
   };
@@ -604,6 +610,7 @@ const SubjectsTab: React.FC<SubjectsTabProps> = ({
     } else {
       // Step 2: Assign to grades
       setSubmitting(true);
+      setSubmitError(null);
       try {
         // First create the subject
         const newSubject = await onCreate({
@@ -623,7 +630,7 @@ const SubjectsTab: React.FC<SubjectsTabProps> = ({
           .map((assignment) =>
             gradeSubjectsApi.assign({
               grade_id: assignment.grade_id,
-              subject_id: (newSubject as any).subject_id,
+              subject_id: newSubject.subject_id,
             }),
           );
 
@@ -632,9 +639,12 @@ const SubjectsTab: React.FC<SubjectsTabProps> = ({
         setShowCreateModal(false);
         resetForm();
         onRefresh();
-      } catch (error) {
+      } catch (error: any) {
         console.error("Failed to create subject and assign to grades:", error);
-        showToast("Failed to create subject. Please try again.", "error");
+        setSubmitError(
+          error.response?.data?.message ||
+            "Failed to create subject. Please try again.",
+        );
       } finally {
         setSubmitting(false);
       }
@@ -946,6 +956,12 @@ const SubjectsTab: React.FC<SubjectsTabProps> = ({
             handleGradeSelection={handleGradeSelection}
             showResetToCurrent={false}
           />
+        )}
+
+        {submitError && (
+          <p className="text-sm text-red-600 dark:text-red-400 font-medium mt-4">
+            {submitError}
+          </p>
         )}
 
         <div className="flex justify-between mt-6">

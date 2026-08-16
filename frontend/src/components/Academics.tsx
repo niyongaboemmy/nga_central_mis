@@ -427,9 +427,10 @@ const Academics: React.FC = () => {
             loading={loading.subjects}
             onRefresh={fetchSubjects}
             onCreate={async (data) => {
-              await subjectsApi.create(data);
+              const res = await subjectsApi.create(data);
               fetchSubjects();
               showToast("Subject created successfully", "success");
+              return res.data.data;
             }}
             onUpdate={async (id, data) => {
               await subjectsApi.update(id, data);

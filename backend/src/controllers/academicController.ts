@@ -1455,7 +1455,20 @@ export const createSubject = asyncHandler(async (req: any, res: any) => {
     );
   }
 
-  successResponse(res, "Subject created successfully", null, 201);
+  successResponse(
+    res,
+    "Subject created successfully",
+    {
+      subject_id: subjectId,
+      code: sanitizedCode || null,
+      name: sanitizedName,
+      description: sanitizedDescription || null,
+      course_category_id: course_category_id || null,
+      max_marks: max_marks || null,
+      color: sanitizedColor || "#3B82F6",
+    },
+    201,
+  );
 });
 
 export const updateSubject = asyncHandler(async (req: any, res: any) => {
