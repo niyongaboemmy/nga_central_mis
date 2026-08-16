@@ -448,6 +448,12 @@ const SubjectsTab: React.FC<SubjectsTabProps> = ({
 
   // Two-step process states
   const [currentStep, setCurrentStep] = useState<1 | 2>(1);
+  // Set once the subject is actually created (at the step 1 -> 2
+  // transition). Retrying step 2 after a failed grade assignment, or going
+  // back to step 1 and forward again, must reuse this instead of calling
+  // onCreate again -- that used to silently create a duplicate subject on
+  // every retry.
+  const [createdSubject, setCreatedSubject] = useState<Subject | null>(null);
   const [grades, setGrades] = useState<Grade[]>([]);
   const [categories, setCategories] = useState<CourseCategory[]>([]);
   const [gradeAssignments, setGradeAssignments] = useState<GradeAssignment[]>(
@@ -473,6 +479,7 @@ const SubjectsTab: React.FC<SubjectsTabProps> = ({
     setFormErrors({});
     setSubmitError(null);
     setCurrentStep(1);
+    setCreatedSubject(null);
     setGradeAssignments([]);
   };
 
@@ -594,26 +601,10 @@ const SubjectsTab: React.FC<SubjectsTabProps> = ({
   const handleCreate = async () => {
     if (currentStep === 1) {
       if (!validateForm()) return;
-      setCurrentStep(2);
-      const loadedGrades = await loadGrades();
-      // Initialize grade assignments as not assigned
-      setGradeAssignments(
-        loadedGrades.map((grade) => ({
-          grade_id: grade.grade_id,
-          name: grade.name,
-          program_name: grade.program_name,
-          is_assigned: false,
-          is_selected: false,
-          is_currently_assigned: false,
-        })),
-      );
-    } else {
-      // Step 2: Assign to grades
       setSubmitting(true);
       setSubmitError(null);
       try {
-        // First create the subject
-        const newSubject = await onCreate({
+        const subjectData = {
           name: formData.name.trim(),
           code: formData.code.trim() || null,
           description: formData.description.trim() || null,
@@ -622,15 +613,56 @@ const SubjectsTab: React.FC<SubjectsTabProps> = ({
           color: formData.color,
           grades: undefined,
           category_name: undefined,
-        });
+        };
 
-        // Then assign to selected grades
+        // The subject already exists if we're back here after using "Back"
+        // from step 2 -- update it in place instead of creating a second
+        // one with the (possibly edited) same details.
+        const subject = createdSubject
+          ? await onUpdate(createdSubject.subject_id, subjectData).then(
+              () => ({ ...createdSubject, ...subjectData }) as Subject,
+            )
+          : await onCreate(subjectData);
+        setCreatedSubject(subject);
+
+        setCurrentStep(2);
+        const loadedGrades = await loadGrades();
+        // Initialize grade assignments as not assigned
+        setGradeAssignments(
+          loadedGrades.map((grade) => ({
+            grade_id: grade.grade_id,
+            name: grade.name,
+            program_name: grade.program_name,
+            is_assigned: false,
+            is_selected: false,
+            is_currently_assigned: false,
+          })),
+        );
+      } catch (error: any) {
+        console.error("Failed to save subject:", error);
+        setSubmitError(
+          error.response?.data?.message ||
+            "Failed to save subject. Please try again.",
+        );
+      } finally {
+        setSubmitting(false);
+      }
+    } else {
+      // Step 2: assign the already-created subject (see above) to grades.
+      // Retrying this after a failure must never re-create the subject.
+      if (!createdSubject) {
+        setSubmitError("Something went wrong — please start over.");
+        return;
+      }
+      setSubmitting(true);
+      setSubmitError(null);
+      try {
         const assignmentPromises = gradeAssignments
           .filter((assignment) => assignment.is_assigned)
           .map((assignment) =>
             gradeSubjectsApi.assign({
               grade_id: assignment.grade_id,
-              subject_id: newSubject.subject_id,
+              subject_id: createdSubject.subject_id,
             }),
           );
 
@@ -640,10 +672,10 @@ const SubjectsTab: React.FC<SubjectsTabProps> = ({
         resetForm();
         onRefresh();
       } catch (error: any) {
-        console.error("Failed to create subject and assign to grades:", error);
+        console.error("Failed to assign subject to grades:", error);
         setSubmitError(
           error.response?.data?.message ||
-            "Failed to create subject. Please try again.",
+            "The subject was saved, but assigning it to grades failed. You can retry below.",
         );
       } finally {
         setSubmitting(false);
@@ -972,6 +1004,7 @@ const SubjectsTab: React.FC<SubjectsTabProps> = ({
                 setShowCreateModal(false);
                 resetForm();
               } else {
+                setSubmitError(null);
                 setCurrentStep(1);
               }
             }}
@@ -984,10 +1017,12 @@ const SubjectsTab: React.FC<SubjectsTabProps> = ({
             isLoading={submitting}
           >
             {currentStep === 1
-              ? "Next: Assign Grades"
+              ? submitting
+                ? "Saving..."
+                : "Next: Assign Grades"
               : submitting
-                ? "Creating..."
-                : "Create Subject"}
+                ? "Assigning..."
+                : "Finish"}
           </Button>
         </div>
       </Modal>
