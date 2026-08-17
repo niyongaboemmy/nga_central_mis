@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 // @ts-expect-error — katex ships no type declarations for this subpath
@@ -24,7 +24,6 @@ import {
 import { lessonNotesApi, SharedNoteDetail } from "../../api/lessonNotes";
 import { useToast } from "../../contexts/ToastContext";
 import { attachImageTokenToHtml } from "../../utils/lessonNoteImages";
-import { subjectAccent } from "./readerTheme";
 import { useReaderPrefs, readingPositionKey } from "./reader/useReaderPrefs";
 import { useNoteFind } from "./reader/useNoteFind";
 import ReaderSettingsMenu from "./reader/ReaderSettingsMenu";
@@ -88,7 +87,6 @@ const SharedLessonNoteViewPage: React.FC = () => {
   const askCounter = useRef(0);
 
   const bookMode = prefs.mode === "book";
-  const accent = useMemo(() => subjectAccent(note?.subject_name || ""), [note?.subject_name]);
 
   // ---------------------------------------------------------------- load
 
@@ -534,7 +532,7 @@ const SharedLessonNoteViewPage: React.FC = () => {
                       t.level === 3 ? "pl-5 text-xs" : ""
                     } ${
                       activeHeading === t.id
-                        ? "bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 font-medium"
+                        ? "bg-gray-100 dark:bg-gray-700/60 text-gray-900 dark:text-gray-100 font-medium"
                         : "text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/40"
                     }`}
                   >
@@ -565,9 +563,7 @@ const SharedLessonNoteViewPage: React.FC = () => {
           >
             {/* Title block — printed on the first sheet like a real hand-out cover. */}
             <header className="note-reader-titleblock">
-              <span className={`note-reader-eyebrow bg-gradient-to-r ${accent.gradient}`}>
-                {note.subject_name}
-              </span>
+              <span className="note-reader-eyebrow">{note.subject_name}</span>
               <h1>{note.title}</h1>
               <p>
                 Updated{" "}
@@ -676,7 +672,7 @@ const SharedLessonNoteViewPage: React.FC = () => {
                     t.level === 3 ? "pl-5 text-xs" : ""
                   } ${
                     activeHeading === t.id
-                      ? "bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 font-medium"
+                      ? "bg-gray-100 dark:bg-gray-700/60 text-gray-900 dark:text-gray-100 font-medium"
                       : "text-gray-600 dark:text-gray-300"
                   }`}
                 >

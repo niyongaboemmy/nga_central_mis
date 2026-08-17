@@ -3,13 +3,11 @@ import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { formatDistanceToNow } from "date-fns";
 import {
-  ArrowRight,
   BookOpen,
   Check,
+  ChevronRight,
   Clock,
   FileStack,
-  LayoutGrid,
-  Rows3,
   Search,
   SlidersHorizontal,
   Sparkles,
@@ -17,19 +15,14 @@ import {
 } from "lucide-react";
 import { lessonNotesApi, SharedNoteSummary } from "../../api/lessonNotes";
 import { useToast } from "../../contexts/ToastContext";
-import { subjectAccent } from "./readerTheme";
 
-type SortKey = "recent" | "title" | "subject" | "length";
-type ViewMode = "grid" | "list";
+type SortKey = "recent" | "title" | "length";
 
 const SORTS: { key: SortKey; label: string }[] = [
   { key: "recent", label: "Recently updated" },
   { key: "title", label: "Title (A–Z)" },
-  { key: "subject", label: "Subject" },
   { key: "length", label: "Longest read" },
 ];
-
-const VIEW_PREF_KEY = "sharedNotes.view";
 
 /** Scores a note against the query so the most relevant hit floats to the top instead of
  *  the list simply being filtered in its original order. A title match beats a subject or
@@ -69,7 +62,7 @@ const Highlight: React.FC<{ text: string; tokens: string[] }> = ({ text, tokens 
         lowered.includes(part.toLowerCase()) ? (
           <mark
             key={i}
-            className="rounded bg-amber-200/70 dark:bg-amber-400/25 text-inherit px-0.5 py-px"
+            className="rounded bg-amber-100 dark:bg-amber-400/20 text-inherit px-0.5 py-px"
           >
             {part}
           </mark>
@@ -81,13 +74,10 @@ const Highlight: React.FC<{ text: string; tokens: string[] }> = ({ text, tokens 
   );
 };
 
-const SkeletonCard: React.FC = () => (
-  <div className="rounded-2xl border border-gray-200 dark:border-gray-700/40 bg-white dark:bg-gray-800/30 p-5 animate-pulse">
-    <div className="h-3 w-24 rounded bg-gray-200 dark:bg-gray-700 mb-4" />
-    <div className="h-4 w-4/5 rounded bg-gray-200 dark:bg-gray-700 mb-2" />
-    <div className="h-4 w-3/5 rounded bg-gray-200 dark:bg-gray-700 mb-4" />
-    <div className="h-3 w-full rounded bg-gray-100 dark:bg-gray-700/60 mb-1.5" />
-    <div className="h-3 w-2/3 rounded bg-gray-100 dark:bg-gray-700/60" />
+const SkeletonRow: React.FC = () => (
+  <div className="px-4 py-3.5 animate-pulse">
+    <div className="h-4 w-2/5 rounded bg-gray-200 dark:bg-gray-700 mb-2" />
+    <div className="h-3 w-3/5 rounded bg-gray-100 dark:bg-gray-700/60" />
   </div>
 );
 
@@ -100,9 +90,6 @@ const SharedLessonNotesPage: React.FC = () => {
   const [subjectFilter, setSubjectFilter] = useState<string | null>(null);
   const [sort, setSort] = useState<SortKey>("recent");
   const [sortOpen, setSortOpen] = useState(false);
-  const [view, setView] = useState<ViewMode>(
-    () => (localStorage.getItem(VIEW_PREF_KEY) as ViewMode) || "grid",
-  );
   const searchRef = useRef<HTMLInputElement>(null);
   const sortMenuRef = useRef<HTMLDivElement>(null);
 
@@ -114,10 +101,6 @@ const SharedLessonNotesPage: React.FC = () => {
       .finally(() => setLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  useEffect(() => {
-    localStorage.setItem(VIEW_PREF_KEY, view);
-  }, [view]);
 
   // "/" jumps to search and Escape clears it — the shortcut pair readers expect from
   // every modern library UI. Ignored while the caret is already in a text field.
@@ -146,10 +129,8 @@ const SharedLessonNotesPage: React.FC = () => {
     return () => document.removeEventListener("mousedown", onClick);
   }, [sortOpen]);
 
-  const tokens = useMemo(
-    () => query.trim().toLowerCase().split(/\s+/).filter(Boolean),
-    [query],
-  );
+  const tokens = useMemo(() => query.trim().toLowerCase().split(/\s+/).filter(Boolean), [query]);
+  const searching = tokens.length > 0;
 
   const subjects = useMemo(() => {
     const counts = new Map<string, number>();
@@ -161,19 +142,14 @@ const SharedLessonNotesPage: React.FC = () => {
     const filtered = notes
       .filter((n) => !subjectFilter || n.subject_name === subjectFilter)
       .map((n) => ({ note: n, score: scoreNote(n, tokens) }))
-      .filter((r) => tokens.length === 0 || r.score > 0);
+      .filter((r) => !searching || r.score > 0);
 
     filtered.sort((a, b) => {
       // While searching, relevance always wins — the chosen sort only breaks ties.
-      if (tokens.length > 0 && b.score !== a.score) return b.score - a.score;
+      if (searching && b.score !== a.score) return b.score - a.score;
       switch (sort) {
         case "title":
           return a.note.title.localeCompare(b.note.title);
-        case "subject":
-          return (
-            a.note.subject_name.localeCompare(b.note.subject_name) ||
-            a.note.title.localeCompare(b.note.title)
-          );
         case "length":
           return (b.note.word_count || 0) - (a.note.word_count || 0);
         default:
@@ -181,7 +157,19 @@ const SharedLessonNotesPage: React.FC = () => {
       }
     });
     return filtered.map((r) => r.note);
-  }, [notes, tokens, subjectFilter, sort]);
+  }, [notes, tokens, searching, subjectFilter, sort]);
+
+  /** Notes are grouped under their subject — the way a student thinks about them. While
+   *  searching that grouping would fight the relevance order, so results become one list. */
+  const groups = useMemo((): [string, SharedNoteSummary[]][] => {
+    if (searching) return [["", results]];
+    const map = new Map<string, SharedNoteSummary[]>();
+    for (const n of results) {
+      if (!map.has(n.subject_name)) map.set(n.subject_name, []);
+      map.get(n.subject_name)!.push(n);
+    }
+    return [...map.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+  }, [results, searching]);
 
   const totalMinutes = useMemo(
     () => notes.reduce((sum, n) => sum + (n.reading_minutes || 0), 0),
@@ -195,10 +183,8 @@ const SharedLessonNotesPage: React.FC = () => {
     if (e.key === "Enter" && results.length > 0) openNote(results[0].note_id);
   };
 
-  const hasFilters = tokens.length > 0 || subjectFilter !== null;
-
   return (
-    <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
+    <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
       {/* Header */}
       <div className="flex flex-wrap items-start justify-between gap-4 mb-6">
         <div className="min-w-0">
@@ -286,7 +272,7 @@ const SharedLessonNotesPage: React.FC = () => {
                         }}
                         className={`flex items-center justify-between w-full text-left px-3 py-2 rounded-lg text-sm ${
                           sort === s.key
-                            ? "bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 font-medium"
+                            ? "bg-gray-100 dark:bg-gray-700/60 text-gray-900 dark:text-gray-100 font-medium"
                             : "text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50"
                         }`}
                       >
@@ -298,30 +284,9 @@ const SharedLessonNotesPage: React.FC = () => {
                 )}
               </AnimatePresence>
             </div>
-
-            <div className="hidden sm:flex items-center p-0.5 rounded-full border border-gray-200 dark:border-gray-700/60 bg-white dark:bg-gray-800/60 shadow-sm">
-              {([
-                { mode: "grid" as ViewMode, Icon: LayoutGrid, label: "Grid view" },
-                { mode: "list" as ViewMode, Icon: Rows3, label: "List view" },
-              ]).map(({ mode, Icon, label }) => (
-                <button
-                  key={mode}
-                  onClick={() => setView(mode)}
-                  aria-label={label}
-                  aria-pressed={view === mode}
-                  className={`p-2 rounded-full transition-colors ${
-                    view === mode
-                      ? "bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900"
-                      : "text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
-                  }`}
-                >
-                  <Icon className="w-4 h-4" />
-                </button>
-              ))}
-            </div>
           </div>
 
-          {/* Subject chips */}
+          {/* Subject filter */}
           {subjects.length > 1 && (
             <div className="flex items-center gap-1.5 mt-2.5 overflow-x-auto pb-0.5 -mb-0.5">
               <button
@@ -335,7 +300,6 @@ const SharedLessonNotesPage: React.FC = () => {
                 All subjects
               </button>
               {subjects.map(([subject, count]) => {
-                const accent = subjectAccent(subject);
                 const active = subjectFilter === subject;
                 return (
                   <button
@@ -343,11 +307,10 @@ const SharedLessonNotesPage: React.FC = () => {
                     onClick={() => setSubjectFilter(active ? null : subject)}
                     className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap border transition-colors ${
                       active
-                        ? `${accent.chipActive} border-transparent`
+                        ? "bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 border-transparent"
                         : "border-gray-200 dark:border-gray-700/60 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
                     }`}
                   >
-                    <span className={`w-1.5 h-1.5 rounded-full ${accent.dot}`} />
                     {subject}
                     <span className="opacity-60">{count}</span>
                   </button>
@@ -360,9 +323,9 @@ const SharedLessonNotesPage: React.FC = () => {
 
       {/* Results */}
       {loading ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {[0, 1, 2, 3, 4, 5].map((i) => (
-            <SkeletonCard key={i} />
+        <div className="rounded-xl border border-gray-200 dark:border-gray-700/40 bg-white dark:bg-gray-800/30 divide-y divide-gray-100 dark:divide-gray-700/40">
+          {[0, 1, 2, 3].map((i) => (
+            <SkeletonRow key={i} />
           ))}
         </div>
       ) : notes.length === 0 ? (
@@ -390,88 +353,75 @@ const SharedLessonNotesPage: React.FC = () => {
         </div>
       ) : (
         <>
-          {hasFilters && (
-            <p className="text-xs text-gray-400 mb-3">
+          {searching && (
+            <p className="text-xs text-gray-400 mb-2.5">
               {results.length} of {notes.length} notes
               {subjectFilter ? ` in ${subjectFilter}` : ""}
             </p>
           )}
-          <motion.div
-            layout
-            className={
-              view === "grid"
-                ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"
-                : "flex flex-col gap-2.5"
-            }
-          >
-            <AnimatePresence mode="popLayout">
-              {results.map((n) => {
-                const accent = subjectAccent(n.subject_name);
-                return (
-                  <motion.button
-                    key={n.note_id}
-                    layout
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, scale: 0.97 }}
-                    transition={{ duration: 0.18 }}
-                    onClick={() => openNote(n.note_id)}
-                    className={`group text-left rounded-2xl border border-gray-200 dark:border-gray-700/40 bg-white dark:bg-gray-800/30 hover:shadow-md hover:-translate-y-0.5 hover:border-transparent dark:hover:border-transparent hover:ring-2 hover:ring-blue-500/30 transition-all duration-200 ${
-                      view === "grid" ? "p-5 flex flex-col" : "p-4 flex items-center gap-4"
-                    }`}
-                  >
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2 mb-2">
-                        <span
-                          className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wide ${accent.chip}`}
-                        >
-                          <span className={`w-1.5 h-1.5 rounded-full ${accent.dot}`} />
-                          {n.subject_name}
-                        </span>
-                      </div>
-                      <p
-                        className={`font-semibold text-gray-900 dark:text-gray-100 leading-snug ${
-                          view === "grid" ? "line-clamp-2" : "truncate"
-                        }`}
-                      >
-                        <Highlight text={n.title} tokens={tokens} />
-                      </p>
-                      {view === "grid" && n.excerpt && (
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 line-clamp-3 leading-relaxed">
-                          <Highlight text={n.excerpt} tokens={tokens} />
+
+          <div className="flex flex-col gap-6">
+            {groups.map(([subject, items]) => (
+              <section key={subject || "results"}>
+                {subject && (
+                  <div className="flex items-baseline justify-between gap-3 px-1 mb-2">
+                    <h2 className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 truncate">
+                      {subject}
+                    </h2>
+                    <span className="text-[11px] text-gray-400 flex-shrink-0 tabular-nums">
+                      {items.length} note{items.length === 1 ? "" : "s"}
+                    </span>
+                  </div>
+                )}
+                <div className="rounded-xl border border-gray-200 dark:border-gray-700/40 bg-white dark:bg-gray-800/30 divide-y divide-gray-100 dark:divide-gray-700/40 overflow-hidden">
+                  {items.map((n) => (
+                    <button
+                      key={n.note_id}
+                      onClick={() => openNote(n.note_id)}
+                      className="group w-full flex items-center gap-3 px-4 py-3.5 text-left hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <p className="font-medium text-gray-900 dark:text-gray-100 truncate">
+                          <Highlight text={n.title} tokens={tokens} />
                         </p>
-                      )}
-                      <div
-                        className={`flex items-center gap-3 text-[11px] text-gray-400 ${
-                          view === "grid" ? "mt-4 pt-3 border-t border-gray-100 dark:border-gray-700/40" : "mt-1"
-                        }`}
-                      >
-                        <span className="inline-flex items-center gap-1 min-w-0">
-                          <span
-                            className={`w-4 h-4 rounded-full ${accent.avatar} text-[8px] font-bold text-white flex items-center justify-center flex-shrink-0`}
-                          >
-                            {(n.teacher_name || "?").charAt(0).toUpperCase()}
-                          </span>
+                        {n.excerpt && (
+                          <p className="text-xs text-gray-500 dark:text-gray-400 truncate mt-0.5">
+                            <Highlight text={n.excerpt} tokens={tokens} />
+                          </p>
+                        )}
+                        <div className="flex items-center gap-2 text-[11px] text-gray-400 mt-1.5">
+                          {/* Only worth naming the subject on a row when the group header
+                              isn't already doing it — i.e. in search results. */}
+                          {searching && (
+                            <>
+                              <span className="truncate">
+                                <Highlight text={n.subject_name} tokens={tokens} />
+                              </span>
+                              <span aria-hidden>·</span>
+                            </>
+                          )}
                           <span className="truncate">
                             <Highlight text={n.teacher_name} tokens={tokens} />
                           </span>
-                        </span>
-                        <span className="inline-flex items-center gap-1 flex-shrink-0">
-                          <Clock className="w-3 h-3" /> {n.reading_minutes || 1} min
-                        </span>
-                        <span className="hidden sm:inline flex-shrink-0">
-                          {formatDistanceToNow(new Date(n.updated_at), { addSuffix: true })}
-                        </span>
+                          <span aria-hidden>·</span>
+                          <span className="inline-flex items-center gap-1 flex-shrink-0">
+                            <Clock className="w-3 h-3" /> {n.reading_minutes || 1} min
+                          </span>
+                          <span aria-hidden className="hidden sm:inline">
+                            ·
+                          </span>
+                          <span className="hidden sm:inline flex-shrink-0">
+                            {formatDistanceToNow(new Date(n.updated_at), { addSuffix: true })}
+                          </span>
+                        </div>
                       </div>
-                    </div>
-                    {view === "list" && (
-                      <ArrowRight className="w-4 h-4 text-gray-300 group-hover:text-blue-500 group-hover:translate-x-0.5 transition-all flex-shrink-0" />
-                    )}
-                  </motion.button>
-                );
-              })}
-            </AnimatePresence>
-          </motion.div>
+                      <ChevronRight className="w-4 h-4 text-gray-300 dark:text-gray-600 group-hover:text-gray-500 dark:group-hover:text-gray-400 group-hover:translate-x-0.5 transition-all flex-shrink-0" />
+                    </button>
+                  ))}
+                </div>
+              </section>
+            ))}
+          </div>
 
           <p className="flex items-center justify-center gap-1.5 text-[11px] text-gray-400 mt-8">
             <Sparkles className="w-3 h-3" /> Open any note to read it as a book and ask the AI tutor about it.

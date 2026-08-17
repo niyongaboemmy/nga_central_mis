@@ -468,6 +468,8 @@ table th,
     border-bottom: 1px solid rgba(148, 163, 184, 0.3);
 }
 
+/* Neutral by design: the subject is a label, not a status, so it takes the sheet's own
+   ink at reduced weight rather than a colour of its own. */
 .note-reader-eyebrow {
     display: inline-block;
     padding: 0.15rem 0.6rem;
@@ -476,7 +478,9 @@ table th,
     font-weight: 700;
     letter-spacing: 0.08em;
     text-transform: uppercase;
-    color: #ffffff;
+    color: inherit;
+    opacity: 0.7;
+    background-color: rgba(148, 163, 184, 0.18);
 }
 
 .note-reader-titleblock h1 {

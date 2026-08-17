@@ -26,7 +26,6 @@ import {
 import { lessonNotesApi, CombinedNoteSection } from "../../api/lessonNotes";
 import { useToast } from "../../contexts/ToastContext";
 import { attachImageTokenToHtml } from "../../utils/lessonNoteImages";
-import { subjectAccent } from "./readerTheme";
 import { useReaderPrefs } from "./reader/useReaderPrefs";
 import { useNoteFind } from "./reader/useNoteFind";
 import ReaderSettingsMenu from "./reader/ReaderSettingsMenu";
@@ -381,10 +380,9 @@ const CombinedLessonNotesPage: React.FC<Props> = ({ mode }) => {
   // ---------------------------------------------------------------- render helpers
 
   const renderSectionHeader = (n: CombinedNoteSection, index: number) => {
-    const accent = subjectAccent(n.subject_name);
     return (
       <header className="note-reader-titleblock">
-        <span className={`note-reader-eyebrow bg-gradient-to-r ${accent.gradient}`}>
+        <span className="note-reader-eyebrow">
           {n.subject_name}
           {n.class_group_name ? ` · ${n.class_group_name}` : ""}
         </span>
@@ -609,12 +607,10 @@ const CombinedLessonNotesPage: React.FC<Props> = ({ mode }) => {
                   {notes.length} note{notes.length === 1 ? "" : "s"}
                 </p>
                 {groupedBySubject.map(([subject, subjectNotes]) => {
-                  const accent = subjectAccent(subject);
                   return (
                     <div key={subject} className="mb-3 last:mb-0">
-                      <p className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 dark:text-gray-400 px-2 mb-1">
-                        <span className={`w-1.5 h-1.5 rounded-full ${accent.dot} flex-shrink-0`} />
-                        <span className="truncate">{subject}</span>
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-400 px-2 mb-1 truncate">
+                        {subject}
                       </p>
                       <div className="flex flex-col gap-0.5">
                         {subjectNotes.map((n) => (
@@ -623,13 +619,13 @@ const CombinedLessonNotesPage: React.FC<Props> = ({ mode }) => {
                             onClick={() => scrollToNote(n.note_id)}
                             className={`group flex items-center gap-1.5 text-left px-2 py-1.5 rounded-lg text-[13px] transition-colors ${
                               activeId === n.note_id
-                                ? "bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 font-medium"
+                                ? "bg-gray-100 dark:bg-gray-700/60 text-gray-900 dark:text-gray-100 font-medium"
                                 : "text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/40"
                             }`}
                           >
                             <ChevronRight
                               className={`w-3 h-3 flex-shrink-0 transition-transform ${
-                                activeId === n.note_id ? "rotate-90 text-blue-500" : "text-gray-300"
+                                activeId === n.note_id ? "rotate-90 text-gray-500" : "text-gray-300"
                               }`}
                             />
                             <span className="truncate">{n.title}</span>
@@ -834,7 +830,7 @@ const CombinedLessonNotesPage: React.FC<Props> = ({ mode }) => {
                   }}
                   className={`block w-full text-left px-2 py-2 rounded-lg text-[13px] leading-snug ${
                     activeId === n.note_id
-                      ? "bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 font-medium"
+                      ? "bg-gray-100 dark:bg-gray-700/60 text-gray-900 dark:text-gray-100 font-medium"
                       : "text-gray-600 dark:text-gray-300"
                   }`}
                 >
