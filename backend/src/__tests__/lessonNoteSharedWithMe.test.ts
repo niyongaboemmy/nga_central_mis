@@ -183,6 +183,50 @@ describe("GET /lesson-notes/shared-with-me", () => {
     expect(detail.body.data.share_count).toBe(1);
   });
 
+  it("carries a plain-text excerpt and reading estimate, but never the note body itself", async () => {
+    // The reader's library cards show a preview line and an "x min read" badge. Both are
+    // derived server-side so the list stays light — the full HTML must not ride along.
+    const created = await request(app)
+      .post("/lesson-notes")
+      .set("Authorization", `Bearer ${teacherToken}`)
+      .send({ subject_id: subjectId, class_group_id: classGroupId, title: "Note with a body" });
+    const noteId = created.body.data.note_id;
+    await request(app)
+      .patch(`/lesson-notes/${noteId}`)
+      .set("Authorization", `Bearer ${teacherToken}`)
+      .send({
+        content_html: "<h2>Relational Algebra</h2><p>A relation is a set of tuples.</p>",
+        content_json: { type: "doc" },
+        status: "PUBLISHED",
+      });
+
+    const res = await request(app)
+      .get("/lesson-notes/shared-with-me")
+      .set("Authorization", `Bearer ${studentToken}`);
+    expect(res.status).toBe(200);
+    const summary = res.body.data.find((n: any) => n.note_id === noteId);
+    expect(summary.excerpt).toBe("Relational Algebra A relation is a set of tuples.");
+    expect(summary.word_count).toBe(9);
+    expect(summary.reading_minutes).toBeGreaterThanOrEqual(1);
+    expect(summary.content_html).toBeUndefined();
+  });
+
+  it("refuses an AI question about a note the student cannot read", async () => {
+    const strangerId = await createUser({ userType: "STUDENT" });
+    const strangerToken = signToken(strangerId);
+    const role = await createRoleWithPermissions("notes_student_ask_stranger", [
+      "VIEW_SHARED_LESSON_NOTES",
+    ]);
+    await assignRole(strangerId, role);
+
+    const noteId = await publishNote("Private to this class");
+    const res = await request(app)
+      .post(`/lesson-notes/shared-with-me/${noteId}/ask`)
+      .set("Authorization", `Bearer ${strangerToken}`)
+      .send({ question: "What is this note about?" });
+    expect(res.status).toBe(403);
+  });
+
   it("hides a note that is still a draft even though it was shared", async () => {
     const noteId = await publishNote("Unpublished again");
     await share(noteId, "class_group", [classGroupId]);

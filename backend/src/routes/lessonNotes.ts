@@ -30,6 +30,7 @@ import {
   startAINoteGeneration,
   getAINoteGenerationStatus,
   proposeAINoteEdit,
+  askAboutSharedNote,
 } from "../controllers/lessonNoteAIController";
 
 const router = Router();
@@ -52,6 +53,8 @@ router.get("/shared-with-me", authorize(Permissions.VIEW_SHARED_LESSON_NOTES), l
 router.get("/shared-with-me/combined", authorize(Permissions.VIEW_SHARED_LESSON_NOTES), getSharedCombinedNotes);
 router.get("/shared-with-me/combined-pdf", authorize(Permissions.VIEW_SHARED_LESSON_NOTES), exportSharedCombinedPdf);
 router.get("/shared-with-me/:id", authorize(Permissions.VIEW_SHARED_LESSON_NOTES), getSharedLessonNote);
+// Reader-side AI study assistant. Same permission + share gate as reading the note itself.
+router.post("/shared-with-me/:id/ask", authorize(Permissions.VIEW_SHARED_LESSON_NOTES), askAboutSharedNote);
 
 // Image streaming needs to come before the generic teacher gate below since students
 // viewing a shared note load images too — access is re-checked inside the controller.

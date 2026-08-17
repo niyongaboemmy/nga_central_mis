@@ -85,6 +85,19 @@ export interface SharedNoteSummary {
   subject_name: string;
   teacher_name: string;
   updated_at: string;
+  /** Plain-text preview of the note body, computed server-side so the list stays light. */
+  excerpt: string;
+  word_count: number;
+  reading_minutes: number;
+}
+
+export interface NoteAskAnswer {
+  answer_html: string;
+  key_points: string[];
+  follow_ups: string[];
+  /** false when the note itself doesn't cover the question — the UI flags this to the student. */
+  grounded: boolean;
+  provider_used: string;
 }
 
 export interface SharedNoteDetail {
@@ -176,6 +189,16 @@ export const lessonNotesApi = {
   sharedWithMe: () => apiService.get<{ data: SharedNoteSummary[] }>("/lesson-notes/shared-with-me"),
 
   getShared: (id: number) => apiService.get<{ data: SharedNoteDetail }>(`/lesson-notes/shared-with-me/${id}`),
+
+  askAboutShared: (
+    id: number,
+    data: {
+      question: string;
+      selection_text?: string;
+      mode?: "explain" | "simplify" | "example" | "define" | "quiz";
+      history?: { role: "user" | "assistant"; content: string }[];
+    },
+  ) => apiService.post<{ data: NoteAskAnswer }>(`/lesson-notes/shared-with-me/${id}/ask`, data),
 
   exportPdf: (id: number) =>
     apiService.get<Blob>(`/lesson-notes/${id}/export-pdf`, { responseType: "blob" }),

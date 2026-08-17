@@ -645,7 +645,7 @@ async function hasNaturalAudienceAccess(
   return !!enrollment;
 }
 
-async function hasSharedAccessToNote(noteId: number, studentUserId: number): Promise<boolean> {
+export async function hasSharedAccessToNote(noteId: number, studentUserId: number): Promise<boolean> {
   const [note] = await db
     .select({ subject_id: LessonNote.subject_id, class_group_id: LessonNote.class_group_id })
     .from(LessonNote)
@@ -802,12 +802,43 @@ async function resolveVisibleSharedNotes(studentId: number) {
     .map(({ scheme_start_date, ...rest }) => rest);
 }
 
+// The reader's library cards show a preview line and a "x min read" estimate. Both are
+// derived from content_html, which resolveVisibleSharedNotes already has in memory — doing
+// it here avoids shipping every note's full body to the client just to compute them.
+const PLAIN_TEXT_EXCERPT_LENGTH = 220;
+const WORDS_PER_MINUTE = 200;
+
+const htmlToPlainText = (html: string | null): string =>
+  (html || "")
+    .replace(/<(script|style)[^>]*>[\s\S]*?<\/\1>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&#39;|&apos;/gi, "'")
+    .replace(/&quot;/gi, '"')
+    .replace(/\s+/g, " ")
+    .trim();
+
 export const listSharedWithMe = asyncHandler(async (req: any, res: any) => {
   const notes = await resolveVisibleSharedNotes(req.user.userId);
   successResponse(
     res,
     "Notes shared with me",
-    notes.map(({ content_html, ...rest }) => rest),
+    notes.map(({ content_html, ...rest }) => {
+      const text = htmlToPlainText(content_html);
+      const wordCount = text ? text.split(" ").length : 0;
+      return {
+        ...rest,
+        word_count: wordCount,
+        reading_minutes: Math.max(1, Math.round(wordCount / WORDS_PER_MINUTE)),
+        excerpt:
+          text.length > PLAIN_TEXT_EXCERPT_LENGTH
+            ? `${text.slice(0, PLAIN_TEXT_EXCERPT_LENGTH).trimEnd()}...`
+            : text,
+      };
+    }),
   );
 });
 
