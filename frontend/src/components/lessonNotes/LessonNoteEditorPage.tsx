@@ -157,7 +157,7 @@ const LessonNoteEditorPage: React.FC = () => {
     setNote((prev) => (prev ? { ...prev, status: nextStatus } : prev));
     showToast(
       nextStatus === "PUBLISHED"
-        ? "Note published — share it so your students can see it"
+        ? "Note published — your students can now see it"
         : "Note unpublished",
       "success",
     );
@@ -359,19 +359,13 @@ const LessonNoteEditorPage: React.FC = () => {
             disabled={note.status !== "PUBLISHED"}
             title={
               note.status !== "PUBLISHED"
-                ? "Publish first to share"
-                : note.share_count > 0
-                  ? "Manage who this note is shared with"
-                  : "No student can see this note yet — share it"
+                ? "Publish first — publishing already lets this note's class read it"
+                : "Share beyond this note's class — hand-picked students, another class, or an expiry"
             }
-            className={`px-3 py-2 rounded-full text-sm font-medium flex items-center gap-1.5 disabled:opacity-30 ${
-              note.status === "PUBLISHED" && note.share_count === 0
-                ? "bg-blue-600 text-white hover:bg-blue-700"
-                : "text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800"
-            }`}
+            className="px-3 py-2 rounded-full text-sm font-medium flex items-center gap-1.5 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-30"
           >
             <Share2 className="w-4 h-4" />
-            <span>{note.share_count > 0 ? "Shared" : "Share"}</span>
+            <span>Share</span>
           </button>
           <button
             onClick={handlePublishToggle}

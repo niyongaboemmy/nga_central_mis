@@ -19,6 +19,7 @@ import {
 describe("GET /lesson-notes/shared-with-me", () => {
   let teacherToken: string;
   let studentToken: string;
+  let teacherId: number;
   let studentId: number;
   let subjectId: number;
   let classGroupId: number;
@@ -56,7 +57,7 @@ describe("GET /lesson-notes/shared-with-me", () => {
   };
 
   beforeAll(async () => {
-    const teacherId = await createUser({ userType: "TEACHER" });
+    teacherId = await createUser({ userType: "TEACHER" });
     studentId = await createUser({ userType: "STUDENT" });
     teacherToken = signToken(teacherId);
     studentToken = signToken(studentId);
@@ -74,6 +75,44 @@ describe("GET /lesson-notes/shared-with-me", () => {
     await createTeacherSubjectAssignment({ userId: teacherId, subjectId, classGroupId, academicYearId });
     await createStudentClassGroup({ userId: studentId, classGroupId, academicYearId });
     await createStudentSubjectEnrollment({ userId: studentId, subjectId, academicYearId });
+  });
+
+  it("shows a published note to its class group with no share row at all", async () => {
+    await publishNote("Just published");
+    expect(await sharedTitles()).toContain("Just published");
+  });
+
+  it("shows a published note to a student enrolled in the subject but not in its class group", async () => {
+    const outsiderId = await createUser({ userType: "STUDENT" });
+    const outsiderToken = signToken(outsiderId);
+    const studentRole = await createRoleWithPermissions("notes_student_enrolled", [
+      "VIEW_SHARED_LESSON_NOTES",
+    ]);
+    await assignRole(outsiderId, studentRole);
+    await createStudentSubjectEnrollment({ userId: outsiderId, subjectId, academicYearId });
+
+    await publishNote("Enrolled-only note");
+    const res = await request(app)
+      .get("/lesson-notes/shared-with-me")
+      .set("Authorization", `Bearer ${outsiderToken}`);
+    expect(res.status).toBe(200);
+    expect(res.body.data.map((n: any) => n.title)).toContain("Enrolled-only note");
+  });
+
+  it("hides a published note from a student in neither its class group nor its subject", async () => {
+    const strangerId = await createUser({ userType: "STUDENT" });
+    const strangerToken = signToken(strangerId);
+    const role = await createRoleWithPermissions("notes_student_stranger", [
+      "VIEW_SHARED_LESSON_NOTES",
+    ]);
+    await assignRole(strangerId, role);
+
+    await publishNote("Not for strangers");
+    const res = await request(app)
+      .get("/lesson-notes/shared-with-me")
+      .set("Authorization", `Bearer ${strangerToken}`);
+    expect(res.status).toBe(200);
+    expect(res.body.data.map((n: any) => n.title)).not.toContain("Not for strangers");
   });
 
   it("shows a note shared with the student's whole class group", async () => {
@@ -94,10 +133,31 @@ describe("GET /lesson-notes/shared-with-me", () => {
     expect(await sharedTitles()).toContain("Specific student note");
   });
 
-  it("hides a note shared only with a different student", async () => {
+  it("hides another class's note that was shared only with a different student", async () => {
+    // A note outside this student's class group and subject — the only thing that could
+    // surface it is the share, and that share names someone else.
+    const otherSubjectId = await createSubject();
+    const otherClassGroupId = await createProgramGradeClassGroup();
+    await createTeacherSubjectAssignment({
+      userId: teacherId,
+      subjectId: otherSubjectId,
+      classGroupId: otherClassGroupId,
+      academicYearId,
+    });
     const otherStudentId = await createUser({ userType: "STUDENT" });
-    const noteId = await publishNote("Someone else's note");
+
+    const created = await request(app)
+      .post("/lesson-notes")
+      .set("Authorization", `Bearer ${teacherToken}`)
+      .send({ subject_id: otherSubjectId, class_group_id: otherClassGroupId, title: "Someone else's note" });
+    expect(created.status).toBe(201);
+    const noteId = created.body.data.note_id;
+    await request(app)
+      .patch(`/lesson-notes/${noteId}`)
+      .set("Authorization", `Bearer ${teacherToken}`)
+      .send({ content_html: "<p>body</p>", content_json: { type: "doc" }, status: "PUBLISHED" });
     await share(noteId, "specific_students", [otherStudentId]);
+
     expect(await sharedTitles()).not.toContain("Someone else's note");
   });
 
