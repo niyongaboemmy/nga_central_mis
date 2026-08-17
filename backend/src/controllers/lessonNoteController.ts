@@ -1,5 +1,5 @@
 import { db } from "../db";
-import { eq, and, asc, desc, inArray, sql } from "drizzle-orm";
+import { eq, and, or, gt, isNull, asc, desc, inArray, sql } from "drizzle-orm";
 import {
   LessonNote,
   LessonNoteVersion,
@@ -101,6 +101,15 @@ export const listMyLessonNotes = asyncHandler(async (req: any, res: any) => {
       source: LessonNote.source,
       created_at: LessonNote.created_at,
       updated_at: LessonNote.updated_at,
+      // Publishing a note does NOT make it visible to students -- it only makes it
+      // shareable. Without this count the list gives a teacher no way to tell a note
+      // students can actually read from one that is published but never shared, which
+      // is exactly how notes ended up sitting published-but-invisible.
+      share_count: sql<number>`(
+        SELECT COUNT(*) FROM ${LessonNoteShare}
+        WHERE ${LessonNoteShare.note_id} = ${LessonNote.note_id}
+          AND (${LessonNoteShare.expires_at} IS NULL OR ${LessonNoteShare.expires_at} > NOW())
+      )`,
     })
     .from(LessonNote)
     .innerJoin(Subject, eq(LessonNote.subject_id, Subject.subject_id))
@@ -251,7 +260,23 @@ export const getLessonNote = asyncHandler(async (req: any, res: any) => {
     }
   }
 
-  successResponse(res, "Lesson note", { ...note, scheme_context: schemeContext });
+  // The editor uses this to tell "published" apart from "students can actually read it" --
+  // publishing alone shares nothing.
+  const activeShares = await db
+    .select({ share_id: LessonNoteShare.share_id })
+    .from(LessonNoteShare)
+    .where(
+      and(
+        eq(LessonNoteShare.note_id, noteId),
+        or(isNull(LessonNoteShare.expires_at), gt(LessonNoteShare.expires_at, new Date())),
+      ),
+    );
+
+  successResponse(res, "Lesson note", {
+    ...note,
+    scheme_context: schemeContext,
+    share_count: activeShares.length,
+  });
 });
 
 export const exportLessonNotePdf = asyncHandler(async (req: any, res: any) => {

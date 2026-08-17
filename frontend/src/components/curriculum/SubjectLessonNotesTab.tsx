@@ -5,6 +5,7 @@ import { lessonNotesApi, LessonNoteSummary } from "../../api/lessonNotes";
 import { useToast } from "../../contexts/ToastContext";
 import NewLessonNoteModal from "../lessonNotes/NewLessonNoteModal";
 import LessonNoteStatusBadge from "../lessonNotes/LessonNoteStatusBadge";
+import LessonNoteShareBadge from "../lessonNotes/LessonNoteShareBadge";
 
 interface Props {
   subjectId: number;
@@ -83,6 +84,9 @@ const SubjectLessonNotesTab: React.FC<Props> = ({ subjectId }) => {
                 )}
                 <div className="flex items-center gap-2 mt-3">
                   <LessonNoteStatusBadge status={note.status} />
+                  {note.status === "PUBLISHED" && (
+                    <LessonNoteShareBadge shareCount={note.share_count} />
+                  )}
                   <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full flex items-center gap-1 ${source.className}`}>
                     {note.source !== "MANUAL" && <Sparkles className="w-2.5 h-2.5" />}
                     {source.label}

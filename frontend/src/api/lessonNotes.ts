@@ -10,6 +10,8 @@ export interface LessonNoteSummary {
   title: string;
   status: "DRAFT" | "PUBLISHED";
   source: "MANUAL" | "AI_GENERATED" | "AI_ASSISTED";
+  /** Active (unexpired) shares. 0 means no student can see this note, published or not. */
+  share_count: number;
   created_at: string;
   updated_at: string;
 }
@@ -28,6 +30,8 @@ export interface LessonNoteDetail {
   source: "MANUAL" | "AI_GENERATED" | "AI_ASSISTED";
   created_at: string;
   updated_at: string;
+  /** Active (unexpired) shares. 0 means no student can see this note, published or not. */
+  share_count: number;
   scheme_context: {
     entry: {
       entry_id: number;

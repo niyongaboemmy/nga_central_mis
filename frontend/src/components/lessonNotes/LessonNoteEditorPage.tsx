@@ -18,6 +18,7 @@ import LessonNoteRichEditor from "./LessonNoteRichEditor";
 import ShareLessonNoteModal from "./ShareLessonNoteModal";
 import VersionHistoryModal from "./VersionHistoryModal";
 import LessonNoteStatusBadge from "./LessonNoteStatusBadge";
+import LessonNoteShareBadge from "./LessonNoteShareBadge";
 import {
   attachImageTokenToJson,
   attachImageTokenToHtml,
@@ -156,7 +157,7 @@ const LessonNoteEditorPage: React.FC = () => {
     setNote((prev) => (prev ? { ...prev, status: nextStatus } : prev));
     showToast(
       nextStatus === "PUBLISHED"
-        ? "Note published — you can now share it"
+        ? "Note published — share it so your students can see it"
         : "Note unpublished",
       "success",
     );
@@ -294,6 +295,9 @@ const LessonNoteEditorPage: React.FC = () => {
             className="flex-1 min-w-[6rem] text-lg font-semibold bg-transparent focus:outline-none focus:ring-0 text-gray-900 dark:text-gray-100 truncate"
           />
           <LessonNoteStatusBadge status={note.status} />
+          {note.status === "PUBLISHED" && (
+            <LessonNoteShareBadge shareCount={note.share_count} />
+          )}
         </div>
 
         <div className="flex items-center gap-2 flex-shrink-0 flex-wrap justify-end">
@@ -354,13 +358,20 @@ const LessonNoteEditorPage: React.FC = () => {
             onClick={() => setShowShare(true)}
             disabled={note.status !== "PUBLISHED"}
             title={
-              note.status === "PUBLISHED"
-                ? "Share with students"
-                : "Publish first to share"
+              note.status !== "PUBLISHED"
+                ? "Publish first to share"
+                : note.share_count > 0
+                  ? "Manage who this note is shared with"
+                  : "No student can see this note yet — share it"
             }
-            className="p-2 rounded-full text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-30"
+            className={`px-3 py-2 rounded-full text-sm font-medium flex items-center gap-1.5 disabled:opacity-30 ${
+              note.status === "PUBLISHED" && note.share_count === 0
+                ? "bg-blue-600 text-white hover:bg-blue-700"
+                : "text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800"
+            }`}
           >
             <Share2 className="w-4 h-4" />
+            <span>{note.share_count > 0 ? "Shared" : "Share"}</span>
           </button>
           <button
             onClick={handlePublishToggle}
@@ -420,6 +431,9 @@ const LessonNoteEditorPage: React.FC = () => {
         isOpen={showShare}
         onClose={() => setShowShare(false)}
         note={note}
+        onShareCountChange={(count) =>
+          setNote((prev) => (prev ? { ...prev, share_count: count } : prev))
+        }
       />
       <VersionHistoryModal
         isOpen={showVersions}

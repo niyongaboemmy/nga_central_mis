@@ -10,9 +10,11 @@ interface Props {
   isOpen: boolean;
   onClose: () => void;
   note: LessonNoteDetail;
+  /** Keeps the editor's "Shared / Not shared" state in step as shares are added or revoked. */
+  onShareCountChange?: (count: number) => void;
 }
 
-const ShareLessonNoteModal: React.FC<Props> = ({ isOpen, onClose, note }) => {
+const ShareLessonNoteModal: React.FC<Props> = ({ isOpen, onClose, note, onShareCountChange }) => {
   const { showToast } = useToast();
   const { selectedYearId } = useAcademicPeriod();
 
@@ -24,7 +26,15 @@ const ShareLessonNoteModal: React.FC<Props> = ({ isOpen, onClose, note }) => {
 
   useEffect(() => {
     if (!isOpen) return;
-    lessonNotesApi.listShares(note.note_id).then((res) => setShares(res.data.data)).catch(() => {});
+    lessonNotesApi
+      .listShares(note.note_id)
+      .then((res) => {
+        setShares(res.data.data);
+        onShareCountChange?.(res.data.data.length);
+      })
+      // A failed load previously left the modal looking like "no shares yet", which invites
+      // a duplicate share; say so instead.
+      .catch(() => showToast("Couldn't load who this note is shared with", "error"));
   }, [isOpen, note.note_id]);
 
   // Only fetch the enrolled-students roster once the teacher actually picks
@@ -65,7 +75,11 @@ const ShareLessonNoteModal: React.FC<Props> = ({ isOpen, onClose, note }) => {
     try {
       const res = await lessonNotesApi.share(note.note_id, { filter_type: filterType, filter_ids: filterIds });
       showToast("Lesson note shared", "success");
-      setShares((prev) => [{ share_id: res.data.data.share_id, note_id: note.note_id, filter_type: filterType, filter_ids: filterIds, permission: "VIEW", expires_at: null, created_at: new Date().toISOString() }, ...prev]);
+      setShares((prev) => {
+        const next = [{ share_id: res.data.data.share_id, note_id: note.note_id, filter_type: filterType, filter_ids: filterIds, permission: "VIEW" as const, expires_at: null, created_at: new Date().toISOString() }, ...prev];
+        onShareCountChange?.(next.length);
+        return next;
+      });
       setSelectedStudentIds([]);
     } catch (err: any) {
       showToast(err?.response?.data?.message || "Failed to share note", "error");
@@ -77,7 +91,11 @@ const ShareLessonNoteModal: React.FC<Props> = ({ isOpen, onClose, note }) => {
   const revoke = async (shareId: number) => {
     try {
       await lessonNotesApi.revokeShare(note.note_id, shareId);
-      setShares((prev) => prev.filter((s) => s.share_id !== shareId));
+      setShares((prev) => {
+        const next = prev.filter((s) => s.share_id !== shareId);
+        onShareCountChange?.(next.length);
+        return next;
+      });
     } catch {
       showToast("Failed to revoke share", "error");
     }

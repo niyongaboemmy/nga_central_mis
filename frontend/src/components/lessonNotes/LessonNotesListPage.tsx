@@ -6,6 +6,7 @@ import { useToast } from "../../contexts/ToastContext";
 import NewLessonNoteModal from "./NewLessonNoteModal";
 import ConfirmModal from "../ui/ConfirmModal";
 import LessonNoteStatusBadge from "./LessonNoteStatusBadge";
+import LessonNoteShareBadge from "./LessonNoteShareBadge";
 
 const sourceLabel: Record<string, { label: string; className: string }> = {
   MANUAL: { label: "Manual", className: "bg-gray-100 text-gray-600 dark:bg-gray-700/50 dark:text-gray-300" },
@@ -114,6 +115,9 @@ const LessonNotesListPage: React.FC = () => {
                 </p>
                 <div className="flex items-center gap-2 mt-3">
                   <LessonNoteStatusBadge status={note.status} />
+                  {note.status === "PUBLISHED" && (
+                    <LessonNoteShareBadge shareCount={note.share_count} />
+                  )}
                   <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full flex items-center gap-1 ${source.className}`}>
                     {note.source !== "MANUAL" && <Sparkles className="w-2.5 h-2.5" />}
                     {source.label}
