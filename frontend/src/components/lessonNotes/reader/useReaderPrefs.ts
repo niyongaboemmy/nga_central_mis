@@ -16,12 +16,15 @@ export interface ReaderPrefs {
 const DEFAULTS: ReaderPrefs = {
   fontScale: 1.15,
   lineHeight: 1.75,
-  font: "serif",
+  font: "sans",
   paper: "paper",
   mode: "scroll",
 };
 
-const STORAGE_KEY = "lessonNoteReader.prefs";
+// Bumped when a default changes in a way stored prefs would otherwise mask — v1 defaulted
+// the body to a serif face, and readers who never opened the settings menu would keep it
+// forever otherwise. Serif is still offered, it's just no longer the default.
+const STORAGE_KEY = "lessonNoteReader.prefs.v2";
 
 /** Reading preferences are per-device, not per-account: they describe this screen and this
  *  reader's eyes, so localStorage is the right home and no API round-trip is needed. */

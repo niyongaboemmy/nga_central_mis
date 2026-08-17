@@ -416,13 +416,10 @@ const SharedLessonNotesPage: React.FC = () => {
                     exit={{ opacity: 0, scale: 0.97 }}
                     transition={{ duration: 0.18 }}
                     onClick={() => openNote(n.note_id)}
-                    className={`group relative text-left rounded-2xl border border-gray-200 dark:border-gray-700/40 bg-white dark:bg-gray-800/30 hover:shadow-md hover:-translate-y-0.5 hover:border-transparent dark:hover:border-transparent hover:ring-2 hover:ring-blue-500/30 transition-all duration-200 overflow-hidden ${
+                    className={`group text-left rounded-2xl border border-gray-200 dark:border-gray-700/40 bg-white dark:bg-gray-800/30 hover:shadow-md hover:-translate-y-0.5 hover:border-transparent dark:hover:border-transparent hover:ring-2 hover:ring-blue-500/30 transition-all duration-200 ${
                       view === "grid" ? "p-5 flex flex-col" : "p-4 flex items-center gap-4"
                     }`}
                   >
-                    <span
-                      className={`absolute inset-x-0 top-0 h-1 ${accent.bar} opacity-70 group-hover:opacity-100 transition-opacity`}
-                    />
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2 mb-2">
                         <span
