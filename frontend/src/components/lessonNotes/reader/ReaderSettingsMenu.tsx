@@ -40,7 +40,7 @@ const ReaderSettingsMenu: React.FC<Props> = ({ prefs, update, open, setOpen }) =
         title="Reading settings"
         className={`p-2 rounded-lg transition-colors ${
           open
-            ? "bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900"
+            ? "bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
             : "text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
         }`}
       >
@@ -66,7 +66,7 @@ const ReaderSettingsMenu: React.FC<Props> = ({ prefs, update, open, setOpen }) =
               </button>
               <div className="flex-1 h-1.5 rounded-full bg-gray-100 dark:bg-gray-700 overflow-hidden">
                 <div
-                  className="h-full bg-gradient-to-r from-blue-500 to-violet-500"
+                  className="h-full bg-gradient-to-r from-blue-500 to-blue-600"
                   style={{
                     width: `${((prefs.fontScale - MIN_SCALE) / (MAX_SCALE - MIN_SCALE)) * 100}%`,
                   }}

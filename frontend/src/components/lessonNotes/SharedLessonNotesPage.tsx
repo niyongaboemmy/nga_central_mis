@@ -189,7 +189,7 @@ const SharedLessonNotesPage: React.FC = () => {
       <div className="flex flex-wrap items-start justify-between gap-4 mb-6">
         <div className="min-w-0">
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-gray-50 flex items-center gap-2.5">
-            <span className="p-2 rounded-xl bg-gradient-to-br from-blue-600 to-violet-600 text-white shadow-sm">
+            <span className="p-2 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-sm">
               <BookOpen className="w-5 h-5" />
             </span>
             My Library
@@ -272,7 +272,7 @@ const SharedLessonNotesPage: React.FC = () => {
                         }}
                         className={`flex items-center justify-between w-full text-left px-3 py-2 rounded-lg text-sm ${
                           sort === s.key
-                            ? "bg-gray-100 dark:bg-gray-700/60 text-gray-900 dark:text-gray-100 font-medium"
+                            ? "bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 font-medium"
                             : "text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50"
                         }`}
                       >
@@ -293,7 +293,7 @@ const SharedLessonNotesPage: React.FC = () => {
                 onClick={() => setSubjectFilter(null)}
                 className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap border transition-colors ${
                   subjectFilter === null
-                    ? "bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 border-transparent"
+                    ? "bg-blue-600 text-white border-transparent shadow-sm"
                     : "border-gray-200 dark:border-gray-700/60 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
                 }`}
               >
@@ -307,7 +307,7 @@ const SharedLessonNotesPage: React.FC = () => {
                     onClick={() => setSubjectFilter(active ? null : subject)}
                     className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap border transition-colors ${
                       active
-                        ? "bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 border-transparent"
+                        ? "bg-blue-600 text-white border-transparent shadow-sm"
                         : "border-gray-200 dark:border-gray-700/60 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
                     }`}
                   >
@@ -346,7 +346,7 @@ const SharedLessonNotesPage: React.FC = () => {
               setQuery("");
               setSubjectFilter(null);
             }}
-            className="mt-4 px-4 py-2 text-xs font-medium rounded-full bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900"
+            className="mt-4 px-4 py-2 text-xs font-medium rounded-full bg-blue-600 hover:bg-blue-700 text-white"
           >
             Clear filters
           </button>

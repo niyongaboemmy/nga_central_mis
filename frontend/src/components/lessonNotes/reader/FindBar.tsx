@@ -71,7 +71,7 @@ const FindBar: React.FC<Props> = ({
       {onAskAI && !tooShort && (
         <button
           onClick={onAskAI}
-          className="hidden sm:flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium text-violet-600 dark:text-violet-400 hover:bg-violet-50 dark:hover:bg-violet-900/20"
+          className="hidden sm:flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20"
         >
           <Sparkles className="w-3.5 h-3.5" /> Ask AI instead
         </button>

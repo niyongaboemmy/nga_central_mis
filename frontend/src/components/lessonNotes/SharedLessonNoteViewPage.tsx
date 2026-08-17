@@ -336,7 +336,7 @@ const SharedLessonNoteViewPage: React.FC = () => {
         <p className="text-gray-500 dark:text-gray-400">This lesson note isn't available to you.</p>
         <button
           onClick={() => navigate("/shared-lesson-notes")}
-          className="mt-4 px-4 py-2 text-sm font-medium rounded-full bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900"
+          className="mt-4 px-4 py-2 text-sm font-medium rounded-full bg-blue-600 hover:bg-blue-700 text-white"
         >
           Back to my library
         </button>
@@ -364,7 +364,7 @@ const SharedLessonNoteViewPage: React.FC = () => {
       {/* Reading progress — the one always-visible signal of how far in you are. */}
       <div className="fixed top-16 left-0 right-0 h-0.5 z-30 bg-transparent print:hidden">
         <div
-          className="h-full bg-gradient-to-r from-blue-500 to-violet-500 transition-[width] duration-150"
+          className="h-full bg-gradient-to-r from-blue-500 to-blue-600 transition-[width] duration-150"
           style={{ width: `${Math.round(progress * 100)}%` }}
         />
       </div>
@@ -404,7 +404,7 @@ const SharedLessonNoteViewPage: React.FC = () => {
                     title="Contents"
                     className={`p-2 rounded-lg transition-colors ${
                       tocOpen
-                        ? "bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900"
+                        ? "bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
                         : "text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
                     }`}
                   >
@@ -469,8 +469,8 @@ const SharedLessonNoteViewPage: React.FC = () => {
                   onClick={() => setAiOpen((o) => !o)}
                   className={`flex items-center gap-1.5 px-3 py-2 rounded-full text-sm font-medium shadow-sm transition-opacity ${
                     aiOpen
-                      ? "bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900"
-                      : "bg-gradient-to-r from-blue-600 to-violet-600 text-white hover:opacity-90"
+                      ? "bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
+                      : "bg-gradient-to-r from-blue-500 to-blue-600 text-white hover:opacity-90"
                   }`}
                 >
                   <Sparkles className="w-4 h-4" />
@@ -504,7 +504,7 @@ const SharedLessonNoteViewPage: React.FC = () => {
         <button
           onClick={() => setFocusMode(false)}
           title="Exit focus mode (Esc)"
-          className="fixed top-20 right-4 z-30 p-2.5 rounded-full bg-gray-900/80 dark:bg-gray-100/80 text-white dark:text-gray-900 backdrop-blur shadow-lg print:hidden"
+          className="fixed top-20 right-4 z-30 p-2.5 rounded-full bg-blue-600/90 text-white backdrop-blur shadow-lg print:hidden"
         >
           <Minimize2 className="w-4 h-4" />
         </button>
@@ -532,7 +532,7 @@ const SharedLessonNoteViewPage: React.FC = () => {
                       t.level === 3 ? "pl-5 text-xs" : ""
                     } ${
                       activeHeading === t.id
-                        ? "bg-gray-100 dark:bg-gray-700/60 text-gray-900 dark:text-gray-100 font-medium"
+                        ? "bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 font-medium"
                         : "text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/40"
                     }`}
                   >
@@ -672,7 +672,7 @@ const SharedLessonNoteViewPage: React.FC = () => {
                     t.level === 3 ? "pl-5 text-xs" : ""
                   } ${
                     activeHeading === t.id
-                      ? "bg-gray-100 dark:bg-gray-700/60 text-gray-900 dark:text-gray-100 font-medium"
+                      ? "bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 font-medium"
                       : "text-gray-600 dark:text-gray-300"
                   }`}
                 >
@@ -721,7 +721,7 @@ const SharedLessonNoteViewPage: React.FC = () => {
                 setSelectionText("");
                 setSelectionRect(null);
               }}
-              className="flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium bg-gradient-to-r from-blue-600 to-violet-600 text-white"
+              className="flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium bg-gradient-to-r from-blue-500 to-blue-600 text-white"
             >
               <Lightbulb className="w-3 h-3" /> Ask
             </button>
@@ -733,7 +733,7 @@ const SharedLessonNoteViewPage: React.FC = () => {
       {focusMode && (
         <button
           onClick={() => setAiOpen(true)}
-          className="fixed bottom-6 right-6 z-30 flex items-center gap-2 px-4 py-3 rounded-full bg-gradient-to-r from-blue-600 to-violet-600 text-white shadow-xl print:hidden"
+          className="fixed bottom-6 right-6 z-30 flex items-center gap-2 px-4 py-3 rounded-full bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-xl print:hidden"
         >
           <Sparkles className="w-4 h-4" /> Ask AI
         </button>

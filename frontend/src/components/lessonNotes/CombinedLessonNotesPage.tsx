@@ -416,7 +416,7 @@ const CombinedLessonNotesPage: React.FC<Props> = ({ mode }) => {
     >
       <div className="fixed top-16 left-0 right-0 h-0.5 z-30 print:hidden">
         <div
-          className="h-full bg-gradient-to-r from-blue-500 to-violet-500 transition-[width] duration-150"
+          className="h-full bg-gradient-to-r from-blue-500 to-blue-600 transition-[width] duration-150"
           style={{ width: `${Math.round(progress * 100)}%` }}
         />
       </div>
@@ -458,7 +458,7 @@ const CombinedLessonNotesPage: React.FC<Props> = ({ mode }) => {
                     title="Contents"
                     className={`p-2 rounded-lg transition-colors ${
                       tocOpen
-                        ? "bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900"
+                        ? "bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
                         : "text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
                     }`}
                   >
@@ -533,8 +533,8 @@ const CombinedLessonNotesPage: React.FC<Props> = ({ mode }) => {
                     onClick={() => setAiOpen((o) => !o)}
                     className={`flex items-center gap-1.5 px-3 py-2 rounded-full text-sm font-medium shadow-sm transition-opacity ${
                       aiOpen
-                        ? "bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900"
-                        : "bg-gradient-to-r from-blue-600 to-violet-600 text-white hover:opacity-90"
+                        ? "bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
+                        : "bg-gradient-to-r from-blue-500 to-blue-600 text-white hover:opacity-90"
                     }`}
                   >
                     <Sparkles className="w-4 h-4" />
@@ -572,7 +572,7 @@ const CombinedLessonNotesPage: React.FC<Props> = ({ mode }) => {
         <button
           onClick={() => setFocusMode(false)}
           title="Exit focus mode (Esc)"
-          className="fixed top-20 right-4 z-30 p-2.5 rounded-full bg-gray-900/80 dark:bg-gray-100/80 text-white dark:text-gray-900 backdrop-blur shadow-lg print:hidden"
+          className="fixed top-20 right-4 z-30 p-2.5 rounded-full bg-blue-600/90 text-white backdrop-blur shadow-lg print:hidden"
         >
           <Minimize2 className="w-4 h-4" />
         </button>
@@ -619,13 +619,13 @@ const CombinedLessonNotesPage: React.FC<Props> = ({ mode }) => {
                             onClick={() => scrollToNote(n.note_id)}
                             className={`group flex items-center gap-1.5 text-left px-2 py-1.5 rounded-lg text-[13px] transition-colors ${
                               activeId === n.note_id
-                                ? "bg-gray-100 dark:bg-gray-700/60 text-gray-900 dark:text-gray-100 font-medium"
+                                ? "bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 font-medium"
                                 : "text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/40"
                             }`}
                           >
                             <ChevronRight
                               className={`w-3 h-3 flex-shrink-0 transition-transform ${
-                                activeId === n.note_id ? "rotate-90 text-gray-500" : "text-gray-300"
+                                activeId === n.note_id ? "rotate-90 text-blue-500" : "text-gray-300 dark:text-gray-600"
                               }`}
                             />
                             <span className="truncate">{n.title}</span>
@@ -766,7 +766,7 @@ const CombinedLessonNotesPage: React.FC<Props> = ({ mode }) => {
                 setSelectionText("");
                 setSelectionRect(null);
               }}
-              className="flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium bg-gradient-to-r from-blue-600 to-violet-600 text-white"
+              className="flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium bg-gradient-to-r from-blue-500 to-blue-600 text-white"
             >
               <Lightbulb className="w-3 h-3" /> Ask
             </button>
@@ -777,7 +777,7 @@ const CombinedLessonNotesPage: React.FC<Props> = ({ mode }) => {
       {focusMode && aiAvailable && (
         <button
           onClick={() => setAiOpen(true)}
-          className="fixed bottom-6 right-6 z-30 flex items-center gap-2 px-4 py-3 rounded-full bg-gradient-to-r from-blue-600 to-violet-600 text-white shadow-xl print:hidden"
+          className="fixed bottom-6 right-6 z-30 flex items-center gap-2 px-4 py-3 rounded-full bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-xl print:hidden"
         >
           <Sparkles className="w-4 h-4" /> Ask AI
         </button>
@@ -830,7 +830,7 @@ const CombinedLessonNotesPage: React.FC<Props> = ({ mode }) => {
                   }}
                   className={`block w-full text-left px-2 py-2 rounded-lg text-[13px] leading-snug ${
                     activeId === n.note_id
-                      ? "bg-gray-100 dark:bg-gray-700/60 text-gray-900 dark:text-gray-100 font-medium"
+                      ? "bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 font-medium"
                       : "text-gray-600 dark:text-gray-300"
                   }`}
                 >

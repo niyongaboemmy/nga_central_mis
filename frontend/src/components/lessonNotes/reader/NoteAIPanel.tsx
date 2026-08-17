@@ -214,7 +214,7 @@ const NoteAIPanel: React.FC<Props> = ({ noteId, noteTitle, subjectName, open, on
             {/* Header */}
             <div className="flex items-center justify-between gap-2 px-4 py-3 border-b border-gray-100 dark:border-gray-800 flex-shrink-0">
               <div className="flex items-center gap-2.5 min-w-0">
-                <span className="p-1.5 rounded-lg bg-gradient-to-br from-blue-600 to-violet-600 text-white shadow-sm flex-shrink-0">
+                <span className="p-1.5 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-sm flex-shrink-0">
                   <Sparkles className="w-4 h-4" />
                 </span>
                 <div className="min-w-0">
@@ -248,7 +248,7 @@ const NoteAIPanel: React.FC<Props> = ({ noteId, noteTitle, subjectName, open, on
             <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
               {messages.length === 0 && !busy && (
                 <div className="text-center py-6">
-                  <div className="inline-flex p-3 rounded-2xl bg-gradient-to-br from-blue-50 to-violet-50 dark:from-blue-900/20 dark:to-violet-900/20 mb-3">
+                  <div className="inline-flex p-3 rounded-2xl bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-900/30 mb-3">
                     <Bot className="w-6 h-6 text-blue-600 dark:text-blue-400" />
                   </div>
                   <p className="text-sm font-medium text-gray-700 dark:text-gray-200">
@@ -282,7 +282,7 @@ const NoteAIPanel: React.FC<Props> = ({ noteId, noteTitle, subjectName, open, on
                         </p>
                       </div>
                     )}
-                    <div className="max-w-[92%] px-3.5 py-2.5 rounded-2xl rounded-br-sm bg-gradient-to-br from-blue-600 to-violet-600 text-white text-sm shadow-sm">
+                    <div className="max-w-[92%] px-3.5 py-2.5 rounded-2xl rounded-br-sm bg-gradient-to-br from-blue-500 to-blue-600 text-white text-sm shadow-sm">
                       {m.text}
                     </div>
                   </div>
@@ -292,7 +292,7 @@ const NoteAIPanel: React.FC<Props> = ({ noteId, noteTitle, subjectName, open, on
                       className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${
                         m.error
                           ? "bg-red-50 dark:bg-red-900/30 text-red-500"
-                          : "bg-gradient-to-br from-blue-600 to-violet-600 text-white"
+                          : "bg-gradient-to-br from-blue-500 to-blue-600 text-white"
                       }`}
                     >
                       {m.error ? <AlertTriangle className="w-3.5 h-3.5" /> : <Sparkles className="w-3.5 h-3.5" />}
@@ -375,7 +375,7 @@ const NoteAIPanel: React.FC<Props> = ({ noteId, noteTitle, subjectName, open, on
 
               {busy && (
                 <div className="flex gap-2.5">
-                  <span className="w-7 h-7 rounded-lg bg-gradient-to-br from-blue-600 to-violet-600 text-white flex items-center justify-center flex-shrink-0">
+                  <span className="w-7 h-7 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 text-white flex items-center justify-center flex-shrink-0">
                     <Sparkles className="w-3.5 h-3.5" />
                   </span>
                   <div className="flex items-center gap-2 px-3.5 py-3 rounded-2xl rounded-tl-sm bg-gray-50 dark:bg-gray-800/60 text-xs text-gray-400">
@@ -417,7 +417,7 @@ const NoteAIPanel: React.FC<Props> = ({ noteId, noteTitle, subjectName, open, on
                   onClick={() => send(input, pendingSelection || undefined)}
                   disabled={!input.trim() || busy}
                   aria-label="Send question"
-                  className="absolute right-2 bottom-2.5 p-2 rounded-xl bg-gradient-to-br from-blue-600 to-violet-600 text-white disabled:opacity-30 disabled:cursor-not-allowed hover:opacity-90 transition-opacity"
+                  className="absolute right-2 bottom-2.5 p-2 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 text-white disabled:opacity-30 disabled:cursor-not-allowed hover:opacity-90 transition-opacity"
                 >
                   {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ArrowUp className="w-3.5 h-3.5" />}
                 </button>
