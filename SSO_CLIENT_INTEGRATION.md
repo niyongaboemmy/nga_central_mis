@@ -41,8 +41,13 @@ VITE_SSO_CLIENT_ID=your_client_id
 **Backend (`server/.env`):**
 
 ```ini
-# The API base URL for token exchange
-NGA_MIS_BASE_URL=https://ngamis.isengesho.com
+# The API base URL for token exchange.
+# NOTE: this is api.amashuri.com — NOT the domain serving the MIS web app, and
+# NOT ngamis.isengesho.com, which this file used to say and which does not
+# resolve at all. The web app domains (nga.ac.rw, mis.amashuri.com) answer 200
+# with the SPA's HTML for *every* path, so pointing a client at one of those
+# fails as a confusing JSON parse error rather than a clean 404.
+NGA_MIS_BASE_URL=https://api.amashuri.com
 # Your credentials (NEVER expose these to the client)
 SSO_CLIENT_ID=your_client_id
 SSO_CLIENT_SECRET=your_client_secret
@@ -165,7 +170,15 @@ Authorization: Bearer <your_jwt_token>
 
 ## 📚 API Reference
 
-**Auth Base URL**: `https://ngamis.isengesho.com`
+**Auth Base URL**: `https://api.amashuri.com`
+
+> Routes mount at the **root** — `/sso/token`, `/users/me`, `/academics/…`.
+> There is no `/api` or `/api/v1` prefix.
+
+**Redirect URIs are matched EXACTLY** (trailing slash stripped) against the
+comma-separated `allowed_redirect_uris` on the client's `System` row. A registered
+origin like `http://localhost:3000` will therefore NOT authorise a callback at
+`http://localhost:3000/sso/ngamis/callback` — register the full callback path.
 
 ### `POST /sso/token`
 
@@ -193,3 +206,87 @@ Exchanges Authorization Code for Access Token.
   }
 }
 ```
+
+---
+
+## 🔄 Bulk Sync API (server-to-server)
+
+SSO tells you about **one** user, at the moment they log in. A partner that needs
+the school's whole roster — every user, the courses, the class groups, who
+teaches what — cannot get there from `/users/me`, and stitching it out of
+`/users` + `/users/:id/roles` + `/users/:id/grades` + `/users/:id/programs` costs
+`1 + 4N` requests and re-fetches everything on every run.
+
+`/integrations/*` exists for that case. It is **read-only** and authenticated by
+an **IntegrationToken**, not a user JWT.
+
+### Authentication
+
+```http
+Authorization: Bearer ngamis_<64-hex>
+```
+
+Mint one on the MIS server (the raw value is shown once and never stored):
+
+```bash
+npx ts-node scripts/create-integration-token.ts --name="Ganzaa production"
+npx ts-node scripts/create-integration-token.ts --list
+npx ts-node scripts/create-integration-token.ts --revoke=<id>
+```
+
+A service token is deliberately not a user JWT: it outlives any individual's
+employment, carries a fixed `sync:read` scope instead of a person's permissions,
+and can be revoked on its own without disabling anybody's login.
+
+### `GET /integrations/ping`
+
+Identity + row counts. Use it for a "Test connection" button — a wrong base URL
+or a token from the wrong environment shows up here instead of at 2am.
+
+### `GET /integrations/sync/reference`
+
+The academic skeleton in one call: `academicYears`, `academicTerms`, `programs`,
+`grades`, `subjects`, `gradeSubjects`, `classGroups`, `roles`.
+
+Always returns everything (`delta.supported: false`) because these tables carry
+no `updated_at` to filter on. It is a few thousand small rows.
+
+### `GET /integrations/sync/people?since=&cursor=&limit=`
+
+Users with `profile`, `roles`, `classGroups`, `subjectEnrollments`,
+`teachingAssignments` and `gradeAssignments` already attached.
+
+- `cursor` is **the last `id` you received**, not a page number. Paging is
+  keyset, so the hundredth page costs what the first did.
+- `limit` defaults to 500, capped at 2000.
+- `since` is an ISO-8601 timestamp filtering `User.updated_at`. **It only sees
+  changes to the user row** — moving a student between class groups does not
+  touch it — so run a full pass (omit `since`) periodically.
+
+Loop until `pagination.hasMore` is false:
+
+```typescript
+let cursor = 0
+for (;;) {
+  const { data } = await axios.get(`${BASE}/integrations/sync/people`, {
+    params: { cursor, limit: 500 },
+    headers: { Authorization: `Bearer ${process.env.MIS_SYNC_TOKEN}` },
+  })
+  await upsert(data.data.users)
+  if (!data.data.pagination.hasMore) break
+  cursor = data.data.pagination.nextCursor
+}
+```
+
+### ⚠️ Scoping: these endpoints are NOT school-scoped
+
+Every response carries `scope.schoolFilter: "instance"`. In this schema only
+`School`, `SchoolSystemAssignment` and `RoleSystemFragment` have a `school_id`;
+`User`, `Program`, `Grade`, `Subject`, `ClassGroup` and `AcademicYear` do not.
+So there is no honest way to filter by school, and a `school_id` parameter would
+silently return everything.
+
+**A partner therefore receives the entire MIS instance and must scope on its own
+side.** If this MIS ever serves a second school, add `school_id` upstream and
+change `scope.schoolFilter` — a client can then detect the change rather than
+quietly importing another school's students.

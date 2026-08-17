@@ -23,6 +23,7 @@ import curriculumRoutes from "./routes/curriculum";
 import mentorshipRoutes from "./routes/mentorship";
 import lessonNoteRoutes from "./routes/lessonNotes";
 import databaseRoutes from "./routes/databaseRoutes";
+import integrationRoutes from "./routes/integrationRoutes";
 
 const app = express();
 
@@ -81,6 +82,10 @@ app.use("/curriculum", curriculumRoutes);
 app.use("/mentorship", mentorshipRoutes);
 app.use("/lesson-notes", lessonNoteRoutes);
 app.use("/database", databaseRoutes);
+// Machine-to-machine, IntegrationToken-authenticated, read-only. Mounted last
+// among the API routers so it is obvious it shares no middleware with the
+// user-session routes above it.
+app.use("/integrations", integrationRoutes);
 
 app.post("/test-post", (req, res) =>
   res.json({ success: true, message: "Root POST test works" }),
