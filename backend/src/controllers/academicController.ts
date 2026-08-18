@@ -2237,6 +2237,191 @@ export const removeTeacherFromSubject = asyncHandler(
   },
 );
 
+// Move an existing teacher assignment onto a different teacher, subject,
+// class group and/or academic year. The table has no surrogate key -- the row
+// IS the (user, subject, class_group, year) tuple -- so an edit is a delete of
+// the old tuple plus an insert of the new one, done in one transaction.
+export const updateTeacherSubjectAssignment = asyncHandler(
+  async (req: any, res: any) => {
+    const {
+      current_user_id,
+      current_subject_id,
+      current_class_group_id,
+      current_academic_year_id,
+      user_id,
+      subject_id,
+      class_group_id,
+      academic_year_id,
+    } = req.body;
+
+    if (
+      !current_user_id ||
+      !current_subject_id ||
+      !current_class_group_id ||
+      !current_academic_year_id
+    ) {
+      throw new ValidationError(
+        "The assignment being edited must be identified by teacher, subject, class group and academic year",
+      );
+    }
+    if (!user_id || !subject_id || !class_group_id || !academic_year_id) {
+      throw new ValidationError(
+        "Teacher, subject, class group and academic year are required",
+      );
+    }
+
+    const oldIds = {
+      teacherId: parseInt(current_user_id),
+      subjId: parseInt(current_subject_id),
+      classGroupId: parseInt(current_class_group_id),
+      yearId: parseInt(current_academic_year_id),
+    };
+    const newIds = {
+      teacherId: parseInt(user_id),
+      subjId: parseInt(subject_id),
+      classGroupId: parseInt(class_group_id),
+      yearId: parseInt(academic_year_id),
+    };
+
+    if (Object.values(oldIds).some(isNaN) || Object.values(newIds).some(isNaN)) {
+      throw new ValidationError("Invalid IDs provided");
+    }
+
+    const oldWhere = and(
+      eq(TeacherSubjectAssignment.user_id, oldIds.teacherId),
+      eq(TeacherSubjectAssignment.subject_id, oldIds.subjId),
+      eq(TeacherSubjectAssignment.class_group_id, oldIds.classGroupId),
+      eq(TeacherSubjectAssignment.academic_year_id, oldIds.yearId),
+    );
+
+    const existingAssignment = await db
+      .select()
+      .from(TeacherSubjectAssignment)
+      .where(oldWhere)
+      .limit(1);
+
+    if (existingAssignment.length === 0) {
+      throw new NotFoundError("Teacher assignment not found");
+    }
+
+    const unchanged =
+      oldIds.teacherId === newIds.teacherId &&
+      oldIds.subjId === newIds.subjId &&
+      oldIds.classGroupId === newIds.classGroupId &&
+      oldIds.yearId === newIds.yearId;
+
+    if (unchanged) {
+      successResponse(res, "Teacher assignment updated successfully");
+      return;
+    }
+
+    // Verify every target entity exists before touching anything
+    const teacher = await db
+      .select()
+      .from(User)
+      .innerJoin(UserProfile, eq(User.user_id, UserProfile.user_id))
+      .where(eq(User.user_id, newIds.teacherId))
+      .limit(1);
+    if (teacher.length === 0) {
+      throw new NotFoundError("Teacher not found");
+    }
+
+    const subject = await db
+      .select()
+      .from(Subject)
+      .where(
+        and(eq(Subject.subject_id, newIds.subjId), eq(Subject.status, "ACTIVE")),
+      )
+      .limit(1);
+    if (subject.length === 0) {
+      throw new NotFoundError("Subject not found");
+    }
+
+    const classGroup = await db
+      .select()
+      .from(ClassGroup)
+      .where(eq(ClassGroup.class_group_id, newIds.classGroupId))
+      .limit(1);
+    if (classGroup.length === 0) {
+      throw new NotFoundError("Class group not found");
+    }
+
+    const academicYear = await db
+      .select()
+      .from(AcademicYear)
+      .where(eq(AcademicYear.academic_year_id, newIds.yearId))
+      .limit(1);
+    if (academicYear.length === 0) {
+      throw new NotFoundError("Academic year not found");
+    }
+
+    const duplicate = await db
+      .select()
+      .from(TeacherSubjectAssignment)
+      .where(
+        and(
+          eq(TeacherSubjectAssignment.user_id, newIds.teacherId),
+          eq(TeacherSubjectAssignment.subject_id, newIds.subjId),
+          eq(TeacherSubjectAssignment.class_group_id, newIds.classGroupId),
+          eq(TeacherSubjectAssignment.academic_year_id, newIds.yearId),
+        ),
+      )
+      .limit(1);
+    if (duplicate.length > 0) {
+      throw new ConflictError(
+        "That teacher is already assigned to this subject for the specified class group and academic year",
+      );
+    }
+
+    await db.transaction(async (tx) => {
+      await tx.delete(TeacherSubjectAssignment).where(oldWhere);
+      await tx.insert(TeacherSubjectAssignment).values({
+        user_id: newIds.teacherId,
+        subject_id: newIds.subjId,
+        class_group_id: newIds.classGroupId,
+        academic_year_id: newIds.yearId,
+      });
+    });
+
+    logger.info("Teacher assignment updated", { from: oldIds, to: newIds });
+
+    if (oldIds.teacherId !== newIds.teacherId) {
+      await recordActivity(
+        oldIds.teacherId,
+        "SUBJECT_UNASSIGN",
+        `You have been removed from subject ID: ${oldIds.subjId}`,
+        "TeacherSubjectAssignment",
+        undefined,
+        { subject_id: oldIds.subjId, removing_user_id: req.user?.userId },
+        req.user?.userId,
+      );
+    }
+    await recordActivity(
+      newIds.teacherId,
+      "SUBJECT_ASSIGN",
+      `Your assignment for subject ID: ${newIds.subjId} has been updated`,
+      "TeacherSubjectAssignment",
+      undefined,
+      { subject_id: newIds.subjId, assigning_user_id: req.user?.userId },
+      req.user?.userId,
+    );
+
+    if (req.user?.userId) {
+      await recordActivity(
+        req.user.userId,
+        "SUBJECT_ASSIGN_ADMIN",
+        `Updated teacher assignment (teacher ID: ${oldIds.teacherId} -> ${newIds.teacherId}, subject ID: ${oldIds.subjId} -> ${newIds.subjId})`,
+        "TeacherSubjectAssignment",
+        undefined,
+        { from: oldIds, to: newIds },
+        req.user.userId,
+      );
+    }
+
+    successResponse(res, "Teacher assignment updated successfully");
+  },
+);
+
 // Copy every teacher-subject assignment from one academic year into another.
 // ClassGroup is a permanent label now (not per-year), so this is a direct
 // (user_id, subject_id, class_group_id) copy into the target year -- no

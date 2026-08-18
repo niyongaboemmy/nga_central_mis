@@ -53,6 +53,7 @@ import {
   getAllTeacherSubjectAssignments,
   assignTeacherToSubject,
   removeTeacherFromSubject,
+  updateTeacherSubjectAssignment,
   copyTeacherSubjectAssignments,
   getMyAssignedSubjects,
   getSubjectEnrolledStudents,
@@ -264,6 +265,12 @@ router.post(
   authenticate,
   authorize("MANAGE_ACADEMICS"),
   assignTeacherToSubject,
+);
+router.put(
+  "/teachers/assignment",
+  authenticate,
+  authorize("MANAGE_ACADEMICS"),
+  updateTeacherSubjectAssignment,
 );
 router.post(
   "/teachers/copy-assignments",

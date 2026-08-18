@@ -10,6 +10,13 @@ import Button from "../ui/Button";
 import Modal from "../ui/Modal";
 import ConfirmModal from "../ui/ConfirmModal";
 
+interface AssignmentKey {
+  user_id: number;
+  subject_id: number;
+  class_group_id: number;
+  academic_year_id: number;
+}
+
 interface TeacherAssignmentsTabProps {
   data: AllTeacherSubjectAssignment[];
   academicYears: AcademicYear[];
@@ -23,6 +30,7 @@ interface TeacherAssignmentsTabProps {
     class_group_id: number;
     academic_year_id?: number;
   }) => Promise<void>;
+  onUpdate: (current: AssignmentKey, next: AssignmentKey) => Promise<void>;
   onDelete: (
     userId: number,
     subjectId: number,
@@ -38,6 +46,22 @@ interface TeacherAssignmentsTabProps {
   }>;
 }
 
+/** A teacher as held by the assignment form -- either picked from search or
+ *  seeded from the row being edited (where only id + display name are known). */
+interface PickedTeacher {
+  user_id: number;
+  label: string;
+}
+
+type SortColumn = "teacher" | "subject" | "class_group" | "academic_year";
+type SortDirection = "asc" | "desc";
+
+const selectClasses =
+  "px-4 py-2 border-2 border-border-light dark:border-border-dark/30 rounded-2xl focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/20 transition-all duration-200 bg-surface-light dark:bg-surface-dark/30 text-sm text-text-primary-light dark:text-text-primary-dark";
+
+const modalFieldClasses =
+  "w-full px-4 py-3 border-2 border-border-light dark:border-border-dark/30 rounded-2xl focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/20 transition-all duration-200 bg-surface-light dark:bg-surface-dark/30 text-text-primary-light dark:text-text-primary-dark";
+
 const TeacherAssignmentsTab: React.FC<TeacherAssignmentsTabProps> = ({
   data,
   academicYears,
@@ -46,6 +70,7 @@ const TeacherAssignmentsTab: React.FC<TeacherAssignmentsTabProps> = ({
   loading,
   onRefresh,
   onCreate,
+  onUpdate,
   onDelete,
   onCopy,
 }) => {
@@ -63,13 +88,164 @@ const TeacherAssignmentsTab: React.FC<TeacherAssignmentsTabProps> = ({
     }
   }, [currentYearId, yearFilterInitialized]);
 
-  const filteredData = useMemo(
+  // --- Browsing: search, filters, sorting -----------------------------------
+  const [search, setSearch] = useState("");
+  const [teacherFilter, setTeacherFilter] = useState<number>(0);
+  const [subjectFilter, setSubjectFilter] = useState<number>(0);
+  const [classGroupFilter, setClassGroupFilter] = useState<number>(0);
+  const [sortColumn, setSortColumn] = useState<SortColumn>("teacher");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
+
+  // Filter options come from the rows themselves so they never offer a choice
+  // that yields an empty table.
+  const yearScopedData = useMemo(
     () =>
       yearFilter
         ? data.filter((item) => item.academic_year_id === yearFilter)
         : data,
     [data, yearFilter],
   );
+
+  const teacherOptions = useMemo(() => {
+    const map = new Map<number, string>();
+    yearScopedData.forEach((item) => map.set(item.user_id, item.teacher_name));
+    return Array.from(map, ([user_id, name]) => ({ user_id, name })).sort(
+      (a, b) => a.name.localeCompare(b.name),
+    );
+  }, [yearScopedData]);
+
+  const subjectOptions = useMemo(() => {
+    const map = new Map<number, string>();
+    yearScopedData.forEach((item) =>
+      map.set(
+        item.subject_id,
+        item.subject_code
+          ? `${item.subject_name} (${item.subject_code})`
+          : item.subject_name,
+      ),
+    );
+    return Array.from(map, ([subject_id, name]) => ({ subject_id, name })).sort(
+      (a, b) => a.name.localeCompare(b.name),
+    );
+  }, [yearScopedData]);
+
+  const classGroupOptions = useMemo(() => {
+    const map = new Map<number, string>();
+    yearScopedData.forEach((item) =>
+      map.set(
+        item.class_group_id,
+        `${item.class_group_name} • ${item.grade_name}`,
+      ),
+    );
+    return Array.from(map, ([class_group_id, name]) => ({
+      class_group_id,
+      name,
+    })).sort((a, b) => a.name.localeCompare(b.name));
+  }, [yearScopedData]);
+
+  // Drop filters that no longer exist once the academic year changes
+  useEffect(() => {
+    if (
+      teacherFilter &&
+      !teacherOptions.some((t) => t.user_id === teacherFilter)
+    ) {
+      setTeacherFilter(0);
+    }
+  }, [teacherOptions, teacherFilter]);
+
+  useEffect(() => {
+    if (
+      subjectFilter &&
+      !subjectOptions.some((s) => s.subject_id === subjectFilter)
+    ) {
+      setSubjectFilter(0);
+    }
+  }, [subjectOptions, subjectFilter]);
+
+  useEffect(() => {
+    if (
+      classGroupFilter &&
+      !classGroupOptions.some((c) => c.class_group_id === classGroupFilter)
+    ) {
+      setClassGroupFilter(0);
+    }
+  }, [classGroupOptions, classGroupFilter]);
+
+  const filteredData = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    const rows = yearScopedData.filter((item) => {
+      if (teacherFilter && item.user_id !== teacherFilter) return false;
+      if (subjectFilter && item.subject_id !== subjectFilter) return false;
+      if (classGroupFilter && item.class_group_id !== classGroupFilter)
+        return false;
+      if (!term) return true;
+      return [
+        item.teacher_name,
+        item.teacher_username,
+        item.subject_name,
+        item.subject_code || "",
+        item.class_group_name,
+        item.grade_name,
+        item.program_name,
+        item.academic_year_name,
+      ]
+        .join(" ")
+        .toLowerCase()
+        .includes(term);
+    });
+
+    const value = (item: AllTeacherSubjectAssignment) => {
+      switch (sortColumn) {
+        case "subject":
+          return item.subject_name;
+        case "class_group":
+          return `${item.grade_name} ${item.class_group_name}`;
+        case "academic_year":
+          return item.academic_year_name;
+        default:
+          return item.teacher_name;
+      }
+    };
+
+    return [...rows].sort((a, b) => {
+      const comparison = value(a).localeCompare(value(b));
+      if (comparison !== 0) return sortDirection === "asc" ? comparison : -comparison;
+      // Stable secondary ordering so equal keys don't jump around
+      return `${a.teacher_name}${a.subject_name}${a.class_group_name}`.localeCompare(
+        `${b.teacher_name}${b.subject_name}${b.class_group_name}`,
+      );
+    });
+  }, [
+    yearScopedData,
+    search,
+    teacherFilter,
+    subjectFilter,
+    classGroupFilter,
+    sortColumn,
+    sortDirection,
+  ]);
+
+  const hasActiveFilters =
+    !!search.trim() || !!teacherFilter || !!subjectFilter || !!classGroupFilter;
+
+  const clearFilters = () => {
+    setSearch("");
+    setTeacherFilter(0);
+    setSubjectFilter(0);
+    setClassGroupFilter(0);
+  };
+
+  const toggleSort = (column: SortColumn) => {
+    if (sortColumn === column) {
+      setSortDirection((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortColumn(column);
+      setSortDirection("asc");
+    }
+  };
+
+  const sortIndicator = (column: SortColumn) =>
+    sortColumn === column ? (sortDirection === "asc" ? " ▲" : " ▼") : "";
 
   // How many assignments already exist per academic year, for the copy picker
   const countByYear = useMemo(() => {
@@ -83,6 +259,7 @@ const TeacherAssignmentsTab: React.FC<TeacherAssignmentsTabProps> = ({
     return counts;
   }, [data]);
 
+  // --- Copy assignments -----------------------------------------------------
   const [showCopyModal, setShowCopyModal] = useState(false);
   const [copySourceYearId, setCopySourceYearId] = useState<number>(0);
   const [copyTargetYearId, setCopyTargetYearId] = useState<number>(0);
@@ -142,32 +319,52 @@ const TeacherAssignmentsTab: React.FC<TeacherAssignmentsTabProps> = ({
     }
   };
 
-  const [showAssignModal, setShowAssignModal] = useState(false);
-  const [assignYearId, setAssignYearId] = useState<number>(0);
+  // --- Assign / edit form ---------------------------------------------------
+  // One modal drives both flows: `editingAssignment` is null when assigning.
+  const [showFormModal, setShowFormModal] = useState(false);
+  const [editingAssignment, setEditingAssignment] =
+    useState<AllTeacherSubjectAssignment | null>(null);
+  const [formYearId, setFormYearId] = useState<number>(0);
   const [teacherSearch, setTeacherSearch] = useState("");
   const [teacherResults, setTeacherResults] = useState<UserWithProfile[]>([]);
   const [searchingTeachers, setSearchingTeachers] = useState(false);
-  const [selectedTeacher, setSelectedTeacher] = useState<UserWithProfile | null>(
+  const [selectedTeacher, setSelectedTeacher] = useState<PickedTeacher | null>(
     null,
   );
-  const [assignSubjectId, setAssignSubjectId] = useState<number>(0);
-  const [assignClassGroupId, setAssignClassGroupId] = useState<number>(0);
-  const [assignSubmitting, setAssignSubmitting] = useState(false);
-  const [assignError, setAssignError] = useState("");
+  const [formSubjectId, setFormSubjectId] = useState<number>(0);
+  const [formClassGroupId, setFormClassGroupId] = useState<number>(0);
+  const [formSubmitting, setFormSubmitting] = useState(false);
+  const [formError, setFormError] = useState("");
 
   const openAssignModal = () => {
-    setAssignYearId(yearFilter || currentYearId);
+    setEditingAssignment(null);
+    setFormYearId(yearFilter || currentYearId);
     setTeacherSearch("");
     setTeacherResults([]);
     setSelectedTeacher(null);
-    setAssignSubjectId(0);
-    setAssignClassGroupId(0);
-    setAssignError("");
-    setShowAssignModal(true);
+    setFormSubjectId(0);
+    setFormClassGroupId(0);
+    setFormError("");
+    setShowFormModal(true);
+  };
+
+  const openEditModal = (assignment: AllTeacherSubjectAssignment) => {
+    setEditingAssignment(assignment);
+    setFormYearId(assignment.academic_year_id);
+    setTeacherSearch("");
+    setTeacherResults([]);
+    setSelectedTeacher({
+      user_id: assignment.user_id,
+      label: `${assignment.teacher_name} (${assignment.teacher_username})`,
+    });
+    setFormSubjectId(assignment.subject_id);
+    setFormClassGroupId(assignment.class_group_id);
+    setFormError("");
+    setShowFormModal(true);
   };
 
   useEffect(() => {
-    if (!showAssignModal || teacherSearch.trim().length < 2) {
+    if (!showFormModal || teacherSearch.trim().length < 2) {
       setTeacherResults([]);
       return;
     }
@@ -192,32 +389,104 @@ const TeacherAssignmentsTab: React.FC<TeacherAssignmentsTabProps> = ({
       cancelled = true;
       clearTimeout(timeout);
     };
-  }, [teacherSearch, showAssignModal]);
+  }, [teacherSearch, showFormModal]);
 
-  const handleAssign = async () => {
-    if (!selectedTeacher || !assignSubjectId || !assignClassGroupId) {
-      setAssignError("Select a teacher, subject, and class group");
+  const isDirty = useMemo(() => {
+    if (!editingAssignment) return true;
+    return (
+      selectedTeacher?.user_id !== editingAssignment.user_id ||
+      formSubjectId !== editingAssignment.subject_id ||
+      formClassGroupId !== editingAssignment.class_group_id ||
+      formYearId !== editingAssignment.academic_year_id
+    );
+  }, [
+    editingAssignment,
+    selectedTeacher,
+    formSubjectId,
+    formClassGroupId,
+    formYearId,
+  ]);
+
+  // Warn about a clash before hitting the API -- the same duplicate is also
+  // rejected server-side, this just makes it visible while editing.
+  const duplicateWarning = useMemo(() => {
+    if (!selectedTeacher || !formSubjectId || !formClassGroupId || !formYearId) {
+      return "";
+    }
+    const clash = data.find(
+      (item) =>
+        item.user_id === selectedTeacher.user_id &&
+        item.subject_id === formSubjectId &&
+        item.class_group_id === formClassGroupId &&
+        item.academic_year_id === formYearId &&
+        !(
+          editingAssignment &&
+          item.user_id === editingAssignment.user_id &&
+          item.subject_id === editingAssignment.subject_id &&
+          item.class_group_id === editingAssignment.class_group_id &&
+          item.academic_year_id === editingAssignment.academic_year_id
+        ),
+    );
+    return clash ? "This exact assignment already exists." : "";
+  }, [
+    data,
+    selectedTeacher,
+    formSubjectId,
+    formClassGroupId,
+    formYearId,
+    editingAssignment,
+  ]);
+
+  const handleSubmitForm = async () => {
+    if (!selectedTeacher || !formSubjectId || !formClassGroupId) {
+      setFormError("Select a teacher, subject, and class group");
       return;
     }
-    setAssignSubmitting(true);
-    setAssignError("");
+    if (editingAssignment && !formYearId) {
+      setFormError("Select an academic year");
+      return;
+    }
+    setFormSubmitting(true);
+    setFormError("");
     try {
-      await onCreate({
-        user_id: selectedTeacher.user.user_id,
-        subject_id: assignSubjectId,
-        class_group_id: assignClassGroupId,
-        academic_year_id: assignYearId || undefined,
-      });
-      setShowAssignModal(false);
+      if (editingAssignment) {
+        await onUpdate(
+          {
+            user_id: editingAssignment.user_id,
+            subject_id: editingAssignment.subject_id,
+            class_group_id: editingAssignment.class_group_id,
+            academic_year_id: editingAssignment.academic_year_id,
+          },
+          {
+            user_id: selectedTeacher.user_id,
+            subject_id: formSubjectId,
+            class_group_id: formClassGroupId,
+            academic_year_id: formYearId,
+          },
+        );
+      } else {
+        await onCreate({
+          user_id: selectedTeacher.user_id,
+          subject_id: formSubjectId,
+          class_group_id: formClassGroupId,
+          academic_year_id: formYearId || undefined,
+        });
+      }
+      setShowFormModal(false);
+      setEditingAssignment(null);
     } catch (error: any) {
-      setAssignError(
-        error?.response?.data?.message || "Failed to assign teacher",
+      setFormError(
+        error?.response?.data?.message ||
+          (editingAssignment
+            ? "Failed to update teacher assignment"
+            : "Failed to assign teacher"),
       );
     } finally {
-      setAssignSubmitting(false);
+      setFormSubmitting(false);
     }
   };
 
+  // --- Delete ---------------------------------------------------------------
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedAssignment, setSelectedAssignment] =
     useState<AllTeacherSubjectAssignment | null>(null);
@@ -252,6 +521,9 @@ const TeacherAssignmentsTab: React.FC<TeacherAssignmentsTabProps> = ({
     return year?.name || "Unknown";
   };
 
+  const classGroupLabel = (cg: ClassGroup) =>
+    cg.grade_name ? `${cg.name} • ${cg.grade_name}` : cg.name;
+
   return (
     <div className="">
       <div className="flex flex-col gap-4 mb-6 lg:flex-row lg:items-center lg:justify-between">
@@ -267,7 +539,7 @@ const TeacherAssignmentsTab: React.FC<TeacherAssignmentsTabProps> = ({
           <select
             value={yearFilter}
             onChange={(e) => setYearFilter(parseInt(e.target.value))}
-            className="px-4 py-2 border-2 border-border-light dark:border-border-dark/30 rounded-2xl focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/20 transition-all duration-200 bg-surface-light dark:bg-surface-dark/30 text-sm text-text-primary-light dark:text-text-primary-dark whitespace-nowrap"
+            className={`${selectClasses} whitespace-nowrap`}
           >
             <option value={0}>All Academic Years</option>
             {academicYears.map((year) => (
@@ -299,6 +571,84 @@ const TeacherAssignmentsTab: React.FC<TeacherAssignmentsTabProps> = ({
         </div>
       </div>
 
+      {/* Search + filters */}
+      <div className="flex flex-col gap-3 mb-4 xl:flex-row xl:items-center">
+        <div className="relative flex-1 min-w-0">
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search teacher, subject, class group..."
+            className={`${selectClasses} w-full pr-10`}
+          />
+          {search && (
+            <button
+              type="button"
+              onClick={() => setSearch("")}
+              aria-label="Clear search"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-text-secondary-light dark:text-text-secondary-dark/70 hover:text-text-primary-light dark:hover:text-text-primary-dark"
+            >
+              ×
+            </button>
+          )}
+        </div>
+        <div className="flex flex-wrap items-center gap-2.5">
+          <select
+            value={teacherFilter}
+            onChange={(e) => setTeacherFilter(parseInt(e.target.value))}
+            className={selectClasses}
+          >
+            <option value={0}>All Teachers</option>
+            {teacherOptions.map((t) => (
+              <option key={t.user_id} value={t.user_id}>
+                {t.name}
+              </option>
+            ))}
+          </select>
+          <select
+            value={subjectFilter}
+            onChange={(e) => setSubjectFilter(parseInt(e.target.value))}
+            className={selectClasses}
+          >
+            <option value={0}>All Subjects</option>
+            {subjectOptions.map((s) => (
+              <option key={s.subject_id} value={s.subject_id}>
+                {s.name}
+              </option>
+            ))}
+          </select>
+          <select
+            value={classGroupFilter}
+            onChange={(e) => setClassGroupFilter(parseInt(e.target.value))}
+            className={selectClasses}
+          >
+            <option value={0}>All Class Groups</option>
+            {classGroupOptions.map((c) => (
+              <option key={c.class_group_id} value={c.class_group_id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+          {hasActiveFilters && (
+            <button
+              type="button"
+              onClick={clearFilters}
+              className="text-sm text-blue-600 dark:text-blue-400 hover:underline whitespace-nowrap"
+            >
+              Clear filters
+            </button>
+          )}
+        </div>
+      </div>
+
+      {!loading && (
+        <p className="text-xs text-text-secondary-light dark:text-text-secondary-dark/70 mb-2">
+          Showing {filteredData.length} of {yearScopedData.length} assignment
+          {yearScopedData.length === 1 ? "" : "s"}
+          {yearFilter ? ` in ${getAcademicYearName(yearFilter)}` : ""}
+        </p>
+      )}
+
       <div className="bg-white dark:bg-gray-800/40 rounded-2xl shadow-sm border border-border-light dark:border-border-dark/30 overflow-hidden">
         {loading ? (
           <div className="flex items-center justify-center py-12">
@@ -309,18 +659,28 @@ const TeacherAssignmentsTab: React.FC<TeacherAssignmentsTabProps> = ({
             <table className="min-w-full divide-y divide-border-light dark:divide-border-dark/30">
               <thead className="bg-surface-light dark:bg-surface-dark">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary-light dark:text-text-secondary-dark/70 uppercase tracking-wider">
-                    Teacher
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary-light dark:text-text-secondary-dark/70 uppercase tracking-wider">
-                    Subject
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary-light dark:text-text-secondary-dark/70 uppercase tracking-wider">
-                    Class Group
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary-light dark:text-text-secondary-dark/70 uppercase tracking-wider">
-                    Academic Year
-                  </th>
+                  {(
+                    [
+                      ["teacher", "Teacher"],
+                      ["subject", "Subject"],
+                      ["class_group", "Class Group"],
+                      ["academic_year", "Academic Year"],
+                    ] as Array<[SortColumn, string]>
+                  ).map(([column, label]) => (
+                    <th
+                      key={column}
+                      className="px-4 py-3 text-left text-xs font-medium text-text-secondary-light dark:text-text-secondary-dark/70 uppercase tracking-wider"
+                    >
+                      <button
+                        type="button"
+                        onClick={() => toggleSort(column)}
+                        className="uppercase tracking-wider hover:text-text-primary-light dark:hover:text-text-primary-dark transition-colors"
+                      >
+                        {label}
+                        {sortIndicator(column)}
+                      </button>
+                    </th>
+                  ))}
                   <th className="px-6 py-3 text-right text-xs font-medium text-text-secondary-light dark:text-text-secondary-dark/70 uppercase tracking-wider">
                     Actions
                   </th>
@@ -333,16 +693,20 @@ const TeacherAssignmentsTab: React.FC<TeacherAssignmentsTabProps> = ({
                       colSpan={5}
                       className="px-6 py-12 text-center text-text-secondary-light dark:text-text-secondary-dark/70"
                     >
-                      {yearFilter
-                        ? `No teacher assignments found for ${getAcademicYearName(yearFilter)}. Use "Assign Teacher" to create one, or "Copy Teacher Assignments" to reuse another year's.`
-                        : "No teacher assignments found"}
+                      {hasActiveFilters
+                        ? "No teacher assignments match the current search and filters."
+                        : yearFilter
+                          ? `No teacher assignments found for ${getAcademicYearName(yearFilter)}. Use "Assign Teacher" to create one, or "Copy Teacher Assignments" to reuse another year's.`
+                          : "No teacher assignments found"}
                     </td>
                   </tr>
                 ) : (
                   filteredData.map((item) => (
                     <tr
                       key={item.assignment_id}
-                      className="hover:bg-surface-light dark:hover:bg-surface-dark"
+                      onDoubleClick={() => openEditModal(item)}
+                      title="Double-click to edit this assignment"
+                      className="hover:bg-surface-light dark:hover:bg-surface-dark cursor-pointer"
                     >
                       <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-text-primary-light dark:text-text-primary-dark">
                         {item.teacher_name}
@@ -358,12 +722,20 @@ const TeacherAssignmentsTab: React.FC<TeacherAssignmentsTabProps> = ({
                         {item.academic_year_name}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-right text-sm font-medium">
-                        <button
-                          onClick={() => handleDeleteClick(item)}
-                          className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
-                        >
-                          Remove
-                        </button>
+                        <div className="flex items-center justify-end gap-3">
+                          <button
+                            onClick={() => openEditModal(item)}
+                            className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => handleDeleteClick(item)}
+                            className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
+                          >
+                            Remove
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -398,7 +770,7 @@ const TeacherAssignmentsTab: React.FC<TeacherAssignmentsTabProps> = ({
             <select
               value={copySourceYearId}
               onChange={(e) => setCopySourceYearId(parseInt(e.target.value))}
-              className="w-full px-4 py-3 border-2 border-border-light dark:border-border-dark/30 rounded-2xl focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/20 transition-all duration-200 bg-surface-light dark:bg-surface-dark/30 text-text-primary-light dark:text-text-primary-dark"
+              className={modalFieldClasses}
             >
               <option value={0}>Select source academic year</option>
               {academicYears.map((year) => (
@@ -418,7 +790,7 @@ const TeacherAssignmentsTab: React.FC<TeacherAssignmentsTabProps> = ({
             <select
               value={copyTargetYearId}
               onChange={(e) => setCopyTargetYearId(parseInt(e.target.value))}
-              className="w-full px-4 py-3 border-2 border-border-light dark:border-border-dark/30 rounded-2xl focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/20 transition-all duration-200 bg-surface-light dark:bg-surface-dark/30 text-text-primary-light dark:text-text-primary-dark"
+              className={modalFieldClasses}
             >
               <option value={0}>Select target academic year</option>
               {academicYears.map((year) => (
@@ -465,24 +837,40 @@ const TeacherAssignmentsTab: React.FC<TeacherAssignmentsTabProps> = ({
         </div>
       </Modal>
 
-      {/* Assign Teacher Modal */}
+      {/* Assign / Edit Teacher Assignment Modal */}
       <Modal
-        isOpen={showAssignModal}
-        onClose={() => setShowAssignModal(false)}
-        title="Assign Teacher to Subject"
+        isOpen={showFormModal}
+        onClose={() => {
+          setShowFormModal(false);
+          setEditingAssignment(null);
+        }}
+        title={
+          editingAssignment
+            ? "Edit Teacher Assignment"
+            : "Assign Teacher to Subject"
+        }
       >
         <div className="space-y-4">
+          {editingAssignment && (
+            <p className="text-sm text-text-secondary-light dark:text-text-secondary-dark/70">
+              Editing{" "}
+              <span className="font-medium text-text-primary-light dark:text-text-primary-dark">
+                {editingAssignment.teacher_name}
+              </span>{" "}
+              — {editingAssignment.subject_name} ·{" "}
+              {editingAssignment.class_group_name} ·{" "}
+              {editingAssignment.academic_year_name}
+            </p>
+          )}
+
           <div>
             <label className="block text-sm font-medium text-text-primary-light dark:text-text-primary-dark mb-2">
               Academic Year
             </label>
             <select
-              value={assignYearId}
-              onChange={(e) => {
-                setAssignYearId(parseInt(e.target.value));
-                setAssignClassGroupId(0);
-              }}
-              className="w-full px-4 py-3 border-2 border-border-light dark:border-border-dark/30 rounded-2xl focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/20 transition-all duration-200 bg-surface-light dark:bg-surface-dark/30 text-text-primary-light dark:text-text-primary-dark"
+              value={formYearId}
+              onChange={(e) => setFormYearId(parseInt(e.target.value))}
+              className={modalFieldClasses}
             >
               <option value={0}>Select an academic year...</option>
               {academicYears.map((year) => (
@@ -501,12 +889,13 @@ const TeacherAssignmentsTab: React.FC<TeacherAssignmentsTabProps> = ({
             {selectedTeacher ? (
               <div className="flex items-center justify-between p-3 bg-blue-50 dark:bg-blue-900/20 rounded-2xl border border-blue-100 dark:border-blue-800/30">
                 <span className="text-sm text-text-primary-light dark:text-text-primary-dark">
-                  {selectedTeacher.profile?.first_name}{" "}
-                  {selectedTeacher.profile?.last_name} (
-                  {selectedTeacher.user.username})
+                  {selectedTeacher.label}
                 </span>
                 <button
-                  onClick={() => setSelectedTeacher(null)}
+                  onClick={() => {
+                    setSelectedTeacher(null);
+                    setTeacherSearch("");
+                  }}
                   className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
                 >
                   Change
@@ -519,7 +908,7 @@ const TeacherAssignmentsTab: React.FC<TeacherAssignmentsTabProps> = ({
                   value={teacherSearch}
                   onChange={(e) => setTeacherSearch(e.target.value)}
                   placeholder="Search teacher by name or username..."
-                  className="w-full px-4 py-3 border-2 border-border-light dark:border-border-dark/30 rounded-2xl focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/20 transition-all duration-200 bg-surface-light dark:bg-surface-dark/30 text-text-primary-light dark:text-text-primary-dark"
+                  className={modalFieldClasses}
                 />
                 {searchingTeachers && (
                   <p className="text-xs text-text-secondary-light dark:text-text-secondary-dark/70 mt-1">
@@ -531,7 +920,12 @@ const TeacherAssignmentsTab: React.FC<TeacherAssignmentsTabProps> = ({
                     {teacherResults.map((u) => (
                       <button
                         key={u.user.user_id}
-                        onClick={() => setSelectedTeacher(u)}
+                        onClick={() =>
+                          setSelectedTeacher({
+                            user_id: u.user.user_id,
+                            label: `${u.profile?.first_name} ${u.profile?.last_name} (${u.user.username})`,
+                          })
+                        }
                         className="w-full text-left px-3 py-2 text-sm hover:bg-surface-light dark:hover:bg-surface-dark text-text-primary-light dark:text-text-primary-dark"
                       >
                         {u.profile?.first_name} {u.profile?.last_name} (
@@ -549,9 +943,9 @@ const TeacherAssignmentsTab: React.FC<TeacherAssignmentsTabProps> = ({
               Subject
             </label>
             <select
-              value={assignSubjectId}
-              onChange={(e) => setAssignSubjectId(parseInt(e.target.value))}
-              className="w-full px-4 py-3 border-2 border-border-light dark:border-border-dark/30 rounded-2xl focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/20 transition-all duration-200 bg-surface-light dark:bg-surface-dark/30 text-text-primary-light dark:text-text-primary-dark"
+              value={formSubjectId}
+              onChange={(e) => setFormSubjectId(parseInt(e.target.value))}
+              className={modalFieldClasses}
             >
               <option value={0}>Select a subject...</option>
               {subjects.map((subject) => (
@@ -567,41 +961,62 @@ const TeacherAssignmentsTab: React.FC<TeacherAssignmentsTabProps> = ({
               Class Group
             </label>
             <select
-              value={assignClassGroupId}
-              onChange={(e) => setAssignClassGroupId(parseInt(e.target.value))}
-              className="w-full px-4 py-3 border-2 border-border-light dark:border-border-dark/30 rounded-2xl focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/20 transition-all duration-200 bg-surface-light dark:bg-surface-dark/30 text-text-primary-light dark:text-text-primary-dark"
+              value={formClassGroupId}
+              onChange={(e) => setFormClassGroupId(parseInt(e.target.value))}
+              className={modalFieldClasses}
             >
               <option value={0}>Select a class group...</option>
               {classGroups.map((cg) => (
                 <option key={cg.class_group_id} value={cg.class_group_id}>
-                  {cg.name}
+                  {classGroupLabel(cg)}
                 </option>
               ))}
             </select>
           </div>
 
-          {assignError && (
+          {duplicateWarning && (
+            <p className="text-sm text-amber-600 dark:text-amber-400 font-medium">
+              {duplicateWarning}
+            </p>
+          )}
+
+          {formError && (
             <p className="text-sm text-red-600 dark:text-red-400 font-medium">
-              {assignError}
+              {formError}
             </p>
           )}
         </div>
 
         <div className="flex justify-end space-x-3 mt-6">
-          <Button variant="secondary" onClick={() => setShowAssignModal(false)}>
+          <Button
+            variant="secondary"
+            onClick={() => {
+              setShowFormModal(false);
+              setEditingAssignment(null);
+            }}
+          >
             Cancel
           </Button>
           <Button
-            onClick={handleAssign}
+            onClick={handleSubmitForm}
             disabled={
-              assignSubmitting ||
+              formSubmitting ||
               !selectedTeacher ||
-              !assignSubjectId ||
-              !assignClassGroupId
+              !formSubjectId ||
+              !formClassGroupId ||
+              !!duplicateWarning ||
+              !isDirty ||
+              (!!editingAssignment && !formYearId)
             }
-            isLoading={assignSubmitting}
+            isLoading={formSubmitting}
           >
-            {assignSubmitting ? "Assigning..." : "Assign"}
+            {editingAssignment
+              ? formSubmitting
+                ? "Saving..."
+                : "Save Changes"
+              : formSubmitting
+                ? "Assigning..."
+                : "Assign"}
           </Button>
         </div>
       </Modal>

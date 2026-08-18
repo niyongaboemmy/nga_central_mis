@@ -270,6 +270,18 @@ export const teacherSubjectAssignmentsApi = {
     class_group_id: number;
     academic_year_id?: number;
   }) => api.post("/academics/teachers/assign-subject", data),
+  // The row has no surrogate key, so an edit sends both the current tuple and
+  // the new one; the backend swaps them inside a transaction.
+  update: (data: {
+    current_user_id: number;
+    current_subject_id: number;
+    current_class_group_id: number;
+    current_academic_year_id: number;
+    user_id: number;
+    subject_id: number;
+    class_group_id: number;
+    academic_year_id: number;
+  }) => api.put("/academics/teachers/assignment", data),
   remove: (
     teacherId: number,
     subjectId: number,

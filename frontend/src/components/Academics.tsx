@@ -497,6 +497,20 @@ const Academics: React.FC = () => {
               fetchTeacherAssignments();
               showToast("Teacher assigned successfully", "success");
             }}
+            onUpdate={async (current, next) => {
+              await teacherSubjectAssignmentsApi.update({
+                current_user_id: current.user_id,
+                current_subject_id: current.subject_id,
+                current_class_group_id: current.class_group_id,
+                current_academic_year_id: current.academic_year_id,
+                user_id: next.user_id,
+                subject_id: next.subject_id,
+                class_group_id: next.class_group_id,
+                academic_year_id: next.academic_year_id,
+              });
+              fetchTeacherAssignments();
+              showToast("Teacher assignment updated successfully", "success");
+            }}
             onDelete={async (userId, subjectId, classGroupId, academicYearId) => {
               await teacherSubjectAssignmentsApi.remove(
                 userId,
