@@ -115,6 +115,36 @@ describe("Scoped rosters carry forward across academic years", () => {
     expect(ids.filter((id: number) => id === movedStudentId)).toHaveLength(1);
   });
 
+  it("shows only the selected year's placement on the profile", async () => {
+    // The profile listed BOTH "L3. Class B (Year 1)" and "L4. Class A (Year 2)"
+    // for one student: the query widens to `<= selectedYear` so a stale roster
+    // still resolves, but the rows were never collapsed to the newest year.
+    const res = await request(app)
+      .get(
+        `/users/scope/users/${movedStudentId}?academic_year_id=${currentYearId}`,
+      )
+      .set("Authorization", `Bearer ${classTeacherToken}`);
+
+    expect(res.status).toBe(200);
+    const groupIds = res.body.data.classGroups.map(
+      (c: any) => c.class_group_id,
+    );
+    expect(groupIds).toEqual([newClassGroupId]);
+  });
+
+  it("keeps a never-re-stamped placement visible on the profile", async () => {
+    const res = await request(app)
+      .get(
+        `/users/scope/users/${stayingStudentId}?academic_year_id=${currentYearId}`,
+      )
+      .set("Authorization", `Bearer ${classTeacherToken}`);
+
+    const groupIds = res.body.data.classGroups.map(
+      (c: any) => c.class_group_id,
+    );
+    expect(groupIds).toEqual([oldClassGroupId]);
+  });
+
   it("opens the profile of a carried-forward student rather than 403ing", async () => {
     // The roster and the profile must agree on who is in scope -- listing
     // someone you then cannot open is the bug this pins down.

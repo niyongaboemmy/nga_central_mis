@@ -89,20 +89,40 @@ const scopeForRequest = async (req: any) => {
  * the history to the latest row per user, so a student who genuinely moved
  * class group shows up in their new one and only there.
  */
-const latestPerUser = <T extends { user_id: number; academic_year_id: number | null }>(
+/**
+ * The single-user form of the same rule: keep only the rows belonging to the
+ * most recent academic year present. A student who sat in L3 Class B last year
+ * and L4 Class A this year has two placement rows once the query widens to
+ * `<= selectedYear`; the profile must show where they are *now*, not both.
+ */
+const latestYearOnly = <T extends { academic_year_id: number | null }>(
   rows: T[],
+): T[] => {
+  if (rows.length === 0) return rows;
+  const newest = Math.max(...rows.map((r) => r.academic_year_id ?? 0));
+  return rows.filter((r) => (r.academic_year_id ?? 0) === newest);
+};
+
+const latestPerKey = <T extends { academic_year_id: number | null }>(
+  rows: T[],
+  keyOf: (row: T) => number | null | undefined,
 ): T[] => {
   const newestYear = new Map<number, number>();
   for (const row of rows) {
+    const key = keyOf(row);
+    if (key == null) continue;
     const year = row.academic_year_id ?? 0;
-    if (year >= (newestYear.get(row.user_id) ?? -1)) {
-      newestYear.set(row.user_id, year);
-    }
+    if (year >= (newestYear.get(key) ?? -1)) newestYear.set(key, year);
   }
-  return rows.filter(
-    (row) => (row.academic_year_id ?? 0) === newestYear.get(row.user_id),
-  );
+  return rows.filter((row) => {
+    const key = keyOf(row);
+    return key == null || (row.academic_year_id ?? 0) === newestYear.get(key);
+  });
 };
+
+const latestPerUser = <T extends { user_id: number; academic_year_id: number | null }>(
+  rows: T[],
+): T[] => latestPerKey(rows, (row) => row.user_id);
 
 /** Every role each of the given users holds, keyed by user_id. */
 const rolesByUser = async (userIds: number[]) => {
@@ -257,6 +277,7 @@ export const getScopedSubjects = asyncHandler(async (req: any, res: any) => {
       grade_name: Grade.name,
       class_group_id: ClassGroup.class_group_id,
       class_group_name: ClassGroup.name,
+      academic_year_id: TeacherSubjectAssignment.academic_year_id,
       teacher_id: User.user_id,
       teacher_username: User.username,
       teacher_first_name: UserProfile.first_name,
@@ -289,6 +310,7 @@ export const getScopedSubjects = asyncHandler(async (req: any, res: any) => {
       grade_name: Grade.name,
       class_group_id: ClassGroup.class_group_id,
       class_group_name: ClassGroup.name,
+      academic_year_id: StudentClassGroup.academic_year_id,
     })
     .from(Subject)
     .innerJoin(
@@ -374,7 +396,9 @@ export const getScopedSubjects = asyncHandler(async (req: any, res: any) => {
     return entry;
   };
 
-  for (const row of taught) {
+  // Each class group contributes only its most recent year's assignments, so a
+  // subject dropped after last year stops showing on this year's cards.
+  for (const row of latestPerKey(taught, (r) => r.class_group_id)) {
     const entry = ensure(row);
     if (
       row.teacher_id &&
@@ -388,7 +412,9 @@ export const getScopedSubjects = asyncHandler(async (req: any, res: any) => {
       });
     }
   }
-  for (const row of enrolledOnly) ensure(row);
+  for (const row of latestPerKey(enrolledOnly, (r) => r.class_group_id)) {
+    ensure(row);
+  }
 
   let subjects = Array.from(bySubject.values());
   if (search) {
@@ -501,6 +527,7 @@ export const getScopedSubjectDetail = asyncHandler(
         class_group_name: ClassGroup.name,
         grade_id: ClassGroup.grade_id,
         grade_name: Grade.name,
+        academic_year_id: StudentClassGroup.academic_year_id,
       })
       .from(StudentSubjectEnrollment)
       .innerJoin(
@@ -533,7 +560,7 @@ export const getScopedSubjectDetail = asyncHandler(
       );
 
     const classGroups = new Map<number, any>();
-    for (const row of [...assignments, ...enrolledGroups]) {
+    for (const row of [...assignments, ...latestYearOnly(enrolledGroups)]) {
       if (!row.class_group_id || classGroups.has(row.class_group_id)) continue;
       classGroups.set(row.class_group_id, {
         class_group_id: row.class_group_id,
@@ -595,6 +622,7 @@ export const getScopedSubjectDetail = asyncHandler(
               status: User.status,
               class_group_id: StudentClassGroup.class_group_id,
               class_group_name: ClassGroup.name,
+              academic_year_id: StudentClassGroup.academic_year_id,
             })
             .from(StudentSubjectEnrollment)
             .innerJoin(
@@ -702,7 +730,10 @@ export const getScopedSubjectDetail = asyncHandler(
       subject,
       classGroups: Array.from(classGroups.values()),
       teachers: Array.from(teachers.values()),
-      students: (students as any[]).map((s) => ({
+      // One row per student, from their most recent placement -- see
+      // latestPerUser. Without it a student carried over from a prior year
+      // appears once per year they have ever been enrolled.
+      students: latestPerUser(students as any[]).map((s) => ({
         ...s,
         full_name:
           `${s.first_name ?? ""} ${s.last_name ?? ""}`.trim() || s.username,
@@ -792,8 +823,11 @@ export const getScopedUsers = asyncHandler(async (req: any, res: any) => {
     );
   const students = latestPerUser(studentRows);
 
-  const teachers = await db
-    .select(baseColumns)
+  const teacherRows = await db
+    .select({
+      ...baseColumns,
+      academic_year_id: TeacherSubjectAssignment.academic_year_id,
+    })
     .from(User)
     .leftJoin(UserProfile, eq(User.user_id, UserProfile.user_id))
     .innerJoin(
@@ -815,6 +849,8 @@ export const getScopedUsers = asyncHandler(async (req: any, res: any) => {
         ].filter(Boolean) as any[]),
       ),
     );
+
+  const teachers = latestPerUser(teacherRows);
 
   // One row per (user, class group) collapses to one entry per user carrying
   // every class group they appear in. The previous implementation also joined
@@ -1011,6 +1047,7 @@ export const getScopedUserDetail = asyncHandler(async (req: any, res: any) => {
         grade_id: Grade.grade_id,
         grade_name: Grade.name,
         program_name: Program.name,
+        academic_year_id: StudentClassGroup.academic_year_id,
       })
       .from(StudentClassGroup)
       .innerJoin(
@@ -1042,6 +1079,7 @@ export const getScopedUserDetail = asyncHandler(async (req: any, res: any) => {
         name: Subject.name,
         code: Subject.code,
         class_group_name: ClassGroup.name,
+        academic_year_id: TeacherSubjectAssignment.academic_year_id,
       })
       .from(TeacherSubjectAssignment)
       .innerJoin(
@@ -1065,6 +1103,7 @@ export const getScopedUserDetail = asyncHandler(async (req: any, res: any) => {
         subject_id: Subject.subject_id,
         name: Subject.name,
         code: Subject.code,
+        academic_year_id: StudentSubjectEnrollment.academic_year_id,
       })
       .from(StudentSubjectEnrollment)
       .innerJoin(
@@ -1120,10 +1159,13 @@ export const getScopedUserDetail = asyncHandler(async (req: any, res: any) => {
       new Set(roles.flatMap((r) => r.permissions.map((p) => p.name))),
     ),
     assignedGrades: gradeRows,
-    classGroups: classGroupRows,
+    // Collapsed to the selected year's placement/enrolment -- the queries widen
+    // to `<= yearId` so a roster that was never re-stamped still resolves, but
+    // the profile must not stack last year's class group on top of this one's.
+    classGroups: latestYearOnly(classGroupRows),
     assignedPrograms: programRows,
-    subjectsTaught: taughtRows,
-    subjectsEnrolled: enrolledRows,
+    subjectsTaught: latestYearOnly(taughtRows),
+    subjectsEnrolled: latestYearOnly(enrolledRows),
   });
 });
 
