@@ -6,6 +6,8 @@ import app from "../app";
 import {
   createUser,
   createAcademicPeriod,
+  createStudentClassGroup,
+  createStudentSubjectEnrollment,
   createProgramGradeClassGroupDetailed,
   createUserGradeAssignment,
   createSubject,
@@ -30,8 +32,14 @@ describe("Subject detail — schedule and scheme follow the selected year/term",
   let subjectId: number;
   let classGroupId: number;
   let teacherId: number;
+  let priorYearId: number;
+  let formerTeacherId: number;
+  let currentStudentId: number;
+  let futureStudentId: number;
 
   beforeAll(async () => {
+    const prior = await createAcademicPeriod();
+    priorYearId = prior.academicYearId;
     const period = await createAcademicPeriod();
     yearId = period.academicYearId;
     termOneId = period.academicTermId;
@@ -91,6 +99,43 @@ describe("Subject detail — schedule and scheme follow the selected year/term",
       endTime: "14:50",
     });
 
+    // Taught this class group last year, handed it over since.
+    formerTeacherId = await createUser({ userType: "TEACHER" });
+    await createTeacherSubjectAssignment({
+      userId: formerTeacherId,
+      subjectId,
+      classGroupId,
+      academicYearId: priorYearId,
+    });
+
+    // Enrolled and placed for the selected year.
+    currentStudentId = await createUser({ userType: "STUDENT" });
+    await createStudentClassGroup({
+      userId: currentStudentId,
+      classGroupId,
+      academicYearId: yearId,
+    });
+    await createStudentSubjectEnrollment({
+      userId: currentStudentId,
+      subjectId,
+      academicYearId: yearId,
+    });
+
+    // Enrolled, but only placed in this class group in a LATER year — they
+    // have not moved in yet and must not appear on this year's roster.
+    const laterYear = await createAcademicPeriod();
+    futureStudentId = await createUser({ userType: "STUDENT" });
+    await createStudentClassGroup({
+      userId: futureStudentId,
+      classGroupId,
+      academicYearId: laterYear.academicYearId,
+    });
+    await createStudentSubjectEnrollment({
+      userId: futureStudentId,
+      subjectId,
+      academicYearId: laterYear.academicYearId,
+    });
+
     await createSchemeOfWork({
       userId: teacherId,
       subjectId,
@@ -139,5 +184,30 @@ describe("Subject detail — schedule and scheme follow the selected year/term",
   it("falls back to the whole year when no term is given", async () => {
     const res = await detail(`academic_year_id=${yearId}`);
     expect(res.body.data.schedule).toHaveLength(2);
+  });
+
+  it("lists the current year's teacher, not last year's", async () => {
+    const res = await detail(
+      `academic_year_id=${yearId}&academic_term_id=${termOneId}`,
+    );
+    const ids = res.body.data.teachers.map((t: any) => t.user_id);
+    expect(ids).toContain(teacherId);
+    expect(ids).not.toContain(formerTeacherId);
+  });
+
+  it("keeps a student placed for the selected year", async () => {
+    const res = await detail(
+      `academic_year_id=${yearId}&academic_term_id=${termOneId}`,
+    );
+    const ids = res.body.data.students.map((s: any) => s.user_id);
+    expect(ids).toContain(currentStudentId);
+  });
+
+  it("excludes a student only placed in a later year", async () => {
+    const res = await detail(
+      `academic_year_id=${yearId}&academic_term_id=${termOneId}`,
+    );
+    const ids = res.body.data.students.map((s: any) => s.user_id);
+    expect(ids).not.toContain(futureStudentId);
   });
 });

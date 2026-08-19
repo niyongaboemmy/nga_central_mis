@@ -181,7 +181,7 @@ describe("Grade-scoped subjects and users", () => {
     const res = await getSubjects(classTeacherToken, "&limit=500");
     expect(res.status).toBe(200);
 
-    const subject = res.body.data.find(
+    const subject = res.body.data.subjects.find(
       (s: any) => s.subject_id === sharedSubjectId,
     );
     expect(subject).toBeDefined();
@@ -197,7 +197,7 @@ describe("Grade-scoped subjects and users", () => {
 
   it("excludes subjects taught only outside the assigned grades", async () => {
     const res = await getSubjects(classTeacherToken, "&limit=500");
-    const ids = res.body.data.map((s: any) => s.subject_id);
+    const ids = res.body.data.subjects.map((s: any) => s.subject_id);
     expect(ids).toContain(sharedSubjectId);
     expect(ids).not.toContain(outsideSubjectId);
   });

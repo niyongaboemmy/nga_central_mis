@@ -576,6 +576,8 @@ export interface ScopedSubject {
   description?: string | null;
   status: string;
   color?: string | null;
+  category_id?: number | null;
+  category_name?: string | null;
   teachers: ScopedTeacher[];
   grades: { grade_id: number; name: string | null }[];
   class_groups: { class_group_id: number; name: string | null }[];
@@ -670,6 +672,31 @@ export interface ScopedUser {
   class_groups: { class_group_id: number; name: string | null }[];
 }
 
+export interface Facet {
+  id: number | string;
+  name: string;
+  count: number;
+}
+
+/** Filter options and their counts, computed server-side with the list. */
+export interface SubjectFacets {
+  categories: Facet[];
+  classGroups: Facet[];
+  grades: Facet[];
+  teachers: Facet[];
+  statuses: Facet[];
+  unassigned: number;
+}
+
+export interface SubjectFilters {
+  classGroupIds?: number[];
+  teacherIds?: number[];
+  categoryIds?: number[];
+  status?: string;
+  assignment?: "assigned" | "unassigned" | "";
+  sort?: string;
+}
+
 export interface ScopedRoleGroup {
   role_id: number;
   name: string;
@@ -708,18 +735,40 @@ export interface Paged<T> {
   items: T;
 }
 
+const EMPTY_FACETS: SubjectFacets = {
+  categories: [],
+  classGroups: [],
+  grades: [],
+  teachers: [],
+  statuses: [],
+  unassigned: 0,
+};
+
 export const getScopedSubjects = async (
-  query?: ScopeQuery,
-): Promise<Paged<ScopedSubject[]>> => {
+  query?: ScopeQuery & SubjectFilters,
+): Promise<Paged<ScopedSubject[]> & { facets: SubjectFacets }> => {
   const params = scopeParams(query);
-  const response = await api.get<BackendResponse<ScopedSubject[]>>(
-    "/users/scope/subjects",
-    { params },
-  );
+  if (query?.classGroupIds?.length) {
+    params.class_group_ids = query.classGroupIds.join(",");
+  }
+  if (query?.teacherIds?.length) {
+    params.teacher_ids = query.teacherIds.join(",");
+  }
+  if (query?.categoryIds?.length) {
+    params.category_ids = query.categoryIds.join(",");
+  }
+  if (query?.status) params.status = query.status;
+  if (query?.assignment) params.assignment = query.assignment;
+  if (query?.sort) params.sort = query.sort;
+
+  const response = await api.get<
+    BackendResponse<{ subjects: ScopedSubject[]; facets: SubjectFacets }>
+  >("/users/scope/subjects", { params });
   const total = parseInt(response.headers["x-total-count"] || "0", 10);
   const limit = Number(params.limit) || 100;
   return {
-    items: response.data.data || [],
+    items: response.data.data?.subjects || [],
+    facets: response.data.data?.facets || EMPTY_FACETS,
     total,
     page: Number(params.page) || 1,
     totalPages: Math.max(1, Math.ceil(total / limit)),

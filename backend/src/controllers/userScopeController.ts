@@ -124,6 +124,17 @@ const latestPerUser = <T extends { user_id: number; academic_year_id: number | n
   rows: T[],
 ): T[] => latestPerKey(rows, (row) => row.user_id);
 
+/** Distinct {id, name} values with how many rows carried each, name-sorted. */
+const countBy = <T extends { id: number | string; name: string }>(items: T[]) => {
+  const counts = new Map<number | string, { id: T["id"]; name: string; count: number }>();
+  for (const item of items) {
+    const entry = counts.get(item.id) ?? { ...item, count: 0 };
+    entry.count += 1;
+    counts.set(item.id, entry);
+  }
+  return Array.from(counts.values()).sort((a, b) => a.name.localeCompare(b.name));
+};
+
 /** Every role each of the given users holds, keyed by user_id. */
 const rolesByUser = async (userIds: number[]) => {
   if (userIds.length === 0) return new Map<number, any[]>();
@@ -236,6 +247,15 @@ export const getUserStats = asyncHandler(async (req: any, res: any) => {
 // GET /users/scope/subjects
 // ---------------------------------------------------------------------------
 
+const EMPTY_FACETS = {
+  categories: [],
+  classGroups: [],
+  grades: [],
+  teachers: [],
+  statuses: [],
+  unassigned: 0,
+};
+
 export const getScopedSubjects = asyncHandler(async (req: any, res: any) => {
   const { gradeIds, unrestricted, yearId, scope } = await scopeForRequest(req);
   const { pageNum, limitNum, offset } = readPaging(req.query);
@@ -250,7 +270,10 @@ export const getScopedSubjects = asyncHandler(async (req: any, res: any) => {
 
   if (!unrestricted && gradeIds.length === 0) {
     setPaginationHeaders(res, 0, pageNum, limitNum);
-    return successResponse(res, "Subjects retrieved successfully", []);
+    return successResponse(res, "Subjects retrieved successfully", {
+      subjects: [],
+      facets: EMPTY_FACETS,
+    });
   }
 
   const gradeFilter = unrestricted
@@ -273,6 +296,8 @@ export const getScopedSubjects = asyncHandler(async (req: any, res: any) => {
       description: Subject.description,
       status: Subject.status,
       color: Subject.color,
+      category_id: Subject.course_category_id,
+      category_name: CourseCategory.name,
       grade_id: ClassGroup.grade_id,
       grade_name: Grade.name,
       class_group_id: ClassGroup.class_group_id,
@@ -284,6 +309,10 @@ export const getScopedSubjects = asyncHandler(async (req: any, res: any) => {
       teacher_last_name: UserProfile.last_name,
     })
     .from(Subject)
+    .leftJoin(
+      CourseCategory,
+      eq(Subject.course_category_id, CourseCategory.category_id),
+    )
     .innerJoin(
       TeacherSubjectAssignment,
       eq(Subject.subject_id, TeacherSubjectAssignment.subject_id),
@@ -306,6 +335,8 @@ export const getScopedSubjects = asyncHandler(async (req: any, res: any) => {
       description: Subject.description,
       status: Subject.status,
       color: Subject.color,
+      category_id: Subject.course_category_id,
+      category_name: CourseCategory.name,
       grade_id: ClassGroup.grade_id,
       grade_name: Grade.name,
       class_group_id: ClassGroup.class_group_id,
@@ -313,6 +344,10 @@ export const getScopedSubjects = asyncHandler(async (req: any, res: any) => {
       academic_year_id: StudentClassGroup.academic_year_id,
     })
     .from(Subject)
+    .leftJoin(
+      CourseCategory,
+      eq(Subject.course_category_id, CourseCategory.category_id),
+    )
     .innerJoin(
       StudentSubjectEnrollment,
       eq(Subject.subject_id, StudentSubjectEnrollment.subject_id),
@@ -350,6 +385,8 @@ export const getScopedSubjects = asyncHandler(async (req: any, res: any) => {
     description: string | null;
     status: string | null;
     color: string | null;
+    category_id: number | null;
+    category_name: string | null;
     teachers: {
       user_id: number;
       username: string | null;
@@ -372,6 +409,8 @@ export const getScopedSubjects = asyncHandler(async (req: any, res: any) => {
         description: row.description,
         status: row.status,
         color: row.color,
+        category_id: row.category_id ?? null,
+        category_name: row.category_name ?? null,
         teachers: [],
         grades: [],
         class_groups: [],
@@ -418,19 +457,104 @@ export const getScopedSubjects = asyncHandler(async (req: any, res: any) => {
 
   let subjects = Array.from(bySubject.values());
   if (search) {
-    subjects = subjects.filter((s) =>
-      matches(search, s.name, s.code, s.description),
+    subjects = subjects.filter(
+      (s) =>
+        matches(search, s.name, s.code, s.description, s.category_name) ||
+        s.teachers.some((t) =>
+          matches(search, t.first_name, t.last_name, t.username),
+        ) ||
+        s.class_groups.some((c) => matches(search, c.name)),
     );
   }
-  subjects.sort((a, b) => a.name.localeCompare(b.name));
+
+  // Facets are computed over the search-filtered set but BEFORE the facet
+  // filters, so the option lists stay put while you toggle them -- a dropdown
+  // whose choices vanish as you use it is unusable.
+  const facets = {
+    categories: countBy(
+      subjects.flatMap((s) =>
+        s.category_id
+          ? [{ id: s.category_id, name: s.category_name ?? "Uncategorised" }]
+          : [],
+      ),
+    ),
+    classGroups: countBy(
+      subjects.flatMap((s) =>
+        s.class_groups.map((c: any) => ({ id: c.class_group_id, name: c.name })),
+      ),
+    ),
+    grades: countBy(
+      subjects.flatMap((s) =>
+        s.grades.map((g: any) => ({ id: g.grade_id, name: g.name })),
+      ),
+    ),
+    teachers: countBy(
+      subjects.flatMap((s) =>
+        s.teachers.map((t: any) => ({
+          id: t.user_id,
+          name:
+            `${t.first_name ?? ""} ${t.last_name ?? ""}`.trim() ||
+            t.username ||
+            "Unknown",
+        })),
+      ),
+    ),
+    statuses: countBy(
+      subjects.map((s) => ({ id: s.status ?? "UNKNOWN", name: s.status ?? "UNKNOWN" })),
+    ),
+    unassigned: subjects.filter((s) => s.teachers.length === 0).length,
+  };
+
+  const classGroupFilter = parseIdList(req.query.class_group_ids);
+  const teacherFilter = parseIdList(req.query.teacher_ids);
+  const categoryFilter = parseIdList(req.query.category_ids);
+  const statusFilter = (req.query.status as string | undefined)?.trim();
+  const assignment = (req.query.assignment as string | undefined)?.trim();
+
+  if (classGroupFilter) {
+    subjects = subjects.filter((s) =>
+      s.class_groups.some((c: any) =>
+        classGroupFilter.includes(c.class_group_id),
+      ),
+    );
+  }
+  if (teacherFilter) {
+    subjects = subjects.filter((s) =>
+      s.teachers.some((t: any) => teacherFilter.includes(t.user_id)),
+    );
+  }
+  if (categoryFilter) {
+    subjects = subjects.filter(
+      (s) => s.category_id != null && categoryFilter.includes(s.category_id),
+    );
+  }
+  if (statusFilter && statusFilter !== "all") {
+    subjects = subjects.filter(
+      (s) => (s.status ?? "").toUpperCase() === statusFilter.toUpperCase(),
+    );
+  }
+  if (assignment === "assigned") {
+    subjects = subjects.filter((s) => s.teachers.length > 0);
+  } else if (assignment === "unassigned") {
+    subjects = subjects.filter((s) => s.teachers.length === 0);
+  }
+
+  const sort = (req.query.sort as string | undefined) ?? "name";
+  const compare: Record<string, (a: any, b: any) => number> = {
+    name: (a, b) => a.name.localeCompare(b.name),
+    "name-desc": (a, b) => b.name.localeCompare(a.name),
+    code: (a, b) => (a.code ?? "").localeCompare(b.code ?? ""),
+    teachers: (a, b) => b.teachers.length - a.teachers.length,
+    "class-groups": (a, b) => b.class_groups.length - a.class_groups.length,
+  };
+  subjects.sort(compare[sort] ?? compare.name);
 
   const totalCount = subjects.length;
   setPaginationHeaders(res, totalCount, pageNum, limitNum);
-  successResponse(
-    res,
-    "Subjects retrieved successfully",
-    subjects.slice(offset, offset + limitNum),
-  );
+  successResponse(res, "Subjects retrieved successfully", {
+    subjects: subjects.slice(offset, offset + limitNum),
+    facets,
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -499,6 +623,7 @@ export const getScopedSubjectDetail = asyncHandler(
         class_group_name: ClassGroup.name,
         grade_id: ClassGroup.grade_id,
         grade_name: Grade.name,
+        academic_year_id: TeacherSubjectAssignment.academic_year_id,
         teacher_id: User.user_id,
         teacher_username: User.username,
         teacher_email: User.email,
@@ -525,6 +650,13 @@ export const getScopedSubjectDetail = asyncHandler(
           ].filter(Boolean) as any[]),
         ),
       );
+
+    // Only the most recent year's assignment per class group counts -- a
+    // teacher who handed the subject over last year is no longer its teacher.
+    const currentAssignments = latestPerKey(
+      assignments,
+      (row) => row.class_group_id,
+    );
 
     // Class groups reached through enrolled students too -- a subject can be
     // enrolled before anyone is assigned to teach it.
@@ -567,7 +699,10 @@ export const getScopedSubjectDetail = asyncHandler(
       );
 
     const classGroups = new Map<number, any>();
-    for (const row of [...assignments, ...latestYearOnly(enrolledGroups)]) {
+    for (const row of [
+      ...currentAssignments,
+      ...latestYearOnly(enrolledGroups),
+    ]) {
       if (!row.class_group_id || classGroups.has(row.class_group_id)) continue;
       classGroups.set(row.class_group_id, {
         class_group_id: row.class_group_id,
@@ -589,7 +724,7 @@ export const getScopedSubjectDetail = asyncHandler(
 
     // Teachers, deduped, each carrying the class groups they teach it in.
     const teachers = new Map<number, any>();
-    for (const row of assignments) {
+    for (const row of currentAssignments) {
       if (!row.teacher_id) continue;
       let entry = teachers.get(row.teacher_id);
       if (!entry) {
@@ -640,9 +775,18 @@ export const getScopedSubjectDetail = asyncHandler(
             .innerJoin(
               StudentClassGroup,
               and(
-                eq(StudentClassGroup.user_id, User.user_id),
-                inArray(StudentClassGroup.class_group_id, classGroupIds),
-                eq(StudentClassGroup.status, "ACTIVE"),
+                ...([
+                  eq(StudentClassGroup.user_id, User.user_id),
+                  inArray(StudentClassGroup.class_group_id, classGroupIds),
+                  eq(StudentClassGroup.status, "ACTIVE"),
+                  // Bound the placement by the selected year as well. Without
+                  // it a placement stamped for a LATER year joined in, so the
+                  // roster showed a student in a class group they have not
+                  // moved into yet.
+                  yearId
+                    ? lte(StudentClassGroup.academic_year_id, yearId)
+                    : undefined,
+                ].filter(Boolean) as any[]),
               ),
             )
             .innerJoin(

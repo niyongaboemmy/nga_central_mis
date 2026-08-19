@@ -1,51 +1,35 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   BookOpen,
-  Search,
   ChevronLeft,
   ChevronRight,
   Users as UsersIcon,
   Layers,
+  SearchX,
 } from "lucide-react";
 import { useUser } from "../contexts/UserContext";
-import { getScopedSubjects, ScopedSubject } from "../api/users";
+import { getScopedSubjects, ScopedSubject, SubjectFacets } from "../api/users";
 import { useScopedGrades } from "../hooks/useScopedGrades";
 import { useAcademicPeriod } from "../contexts/AcademicPeriodContext";
 import { useToast } from "../contexts/ToastContext";
 import SubjectDetailsPanel from "./SubjectDetailsPanel";
+import SubjectFilterBar, {
+  EMPTY_FILTERS,
+  SubjectFilterState,
+} from "./subjects/SubjectFilterBar";
 
 const PAGE_SIZE = 24;
+const VIEW_STORAGE_KEY = "class_subjects_view";
 
-// Animated floating particles
-const FloatingParticles = () => (
-  <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
-    {[...Array(8)].map((_, i) => (
-      <motion.div
-        key={i}
-        initial={{
-          opacity: 0,
-          x: `${Math.random() * 100}%`,
-          y: "100%",
-        }}
-        animate={{
-          opacity: [0, 0.3, 0],
-          y: "-10%",
-        }}
-        transition={{
-          repeat: Infinity,
-          duration: 20 + Math.random() * 20,
-          delay: Math.random() * 20,
-          ease: "linear",
-        }}
-        className="absolute"
-        style={{ left: `${Math.random() * 100}%` }}
-      >
-        <div className="w-2 h-2 bg-blue-300/30 rounded-full" />
-      </motion.div>
-    ))}
-  </div>
-);
+const EMPTY_FACETS: SubjectFacets = {
+  categories: [],
+  classGroups: [],
+  grades: [],
+  teachers: [],
+  statuses: [],
+  unassigned: 0,
+};
 
 const teacherLabel = (t: {
   first_name?: string | null;
@@ -56,156 +40,227 @@ const teacherLabel = (t: {
     ? `${t.first_name} ${t.last_name}`
     : t.username ?? "Unknown";
 
-// Subject card component
+const initialsOf = (name: string) =>
+  name
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((p) => p.charAt(0))
+    .join("")
+    .toUpperCase();
+
+// ---------------------------------------------------------------------------
+// Cards
+// ---------------------------------------------------------------------------
+
+const StatusPill = ({ status }: { status: string }) => (
+  <span
+    className={`px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wide flex-shrink-0 ${
+      status === "ACTIVE"
+        ? "bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300"
+        : "bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300"
+    }`}
+  >
+    {status}
+  </span>
+);
+
+const TeacherChips = ({ subject }: { subject: ScopedSubject }) =>
+  subject.teachers.length > 0 ? (
+    <div className="flex flex-wrap gap-1">
+      {subject.teachers.map((teacher) => (
+        <span
+          key={teacher.user_id}
+          className="inline-flex items-center gap-1 pl-1 pr-2 py-0.5 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full text-xs border border-blue-100 dark:border-blue-900/50"
+        >
+          <span className="w-4 h-4 rounded-full bg-blue-600 text-white text-[8px] font-bold flex items-center justify-center">
+            {initialsOf(teacherLabel(teacher))}
+          </span>
+          {teacherLabel(teacher)}
+        </span>
+      ))}
+    </div>
+  ) : (
+    // Worth calling out rather than leaving blank — an unstaffed subject is
+    // something a class teacher needs to chase.
+    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 border border-amber-100 dark:border-amber-900/40">
+      No teacher yet
+    </span>
+  );
+
 const SubjectCard = ({
   subject,
   index,
-  showGrades,
+  showGroups,
   onOpen,
 }: {
   subject: ScopedSubject;
   index: number;
-  showGrades: boolean;
+  showGroups: boolean;
   onOpen: () => void;
 }) => (
   <motion.button
     type="button"
     onClick={onOpen}
     aria-label={`Open details for ${subject.name}`}
-    initial={{ opacity: 0, y: 10 }}
+    layout
+    initial={{ opacity: 0, y: 8 }}
     animate={{ opacity: 1, y: 0 }}
-    whileHover={{ y: -2 }}
-    transition={{ delay: Math.min(index, 12) * 0.02 }}
-    className="group w-full text-left bg-white dark:bg-slate-800/60 backdrop-blur-sm rounded-2xl p-4 border border-blue-100/70 dark:border-slate-700/30 hover:border-blue-400 dark:hover:border-blue-500/60 hover:shadow-lg hover:shadow-blue-500/5 transition-all cursor-pointer"
+    exit={{ opacity: 0, scale: 0.97 }}
+    whileHover={{ y: -3 }}
+    transition={{ delay: Math.min(index, 10) * 0.02 }}
+    className="group h-full w-full text-left flex flex-col bg-white dark:bg-slate-800/60 rounded-2xl p-4 border border-blue-100/80 dark:border-slate-700/40 hover:border-blue-400 dark:hover:border-blue-600 hover:shadow-lg hover:shadow-blue-500/10 transition-all"
   >
     <div className="flex items-start gap-3">
       <div
-        className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
-        style={{ backgroundColor: subject.color || "#3B82F6" }}
+        className="w-11 h-11 rounded-2xl flex items-center justify-center flex-shrink-0 ring-1 ring-black/5"
+        style={{ backgroundColor: subject.color || "#2563eb" }}
       >
         <BookOpen className="w-5 h-5 text-white" />
       </div>
       <div className="flex-1 min-w-0">
-        <h3 className="font-medium text-gray-900 dark:text-white text-sm truncate">
+        <h3 className="font-semibold text-slate-900 dark:text-white text-sm leading-snug break-words">
           {subject.name}
         </h3>
-        <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
-          {subject.code && `Code: ${subject.code}`}
+        <p className="text-xs text-blue-900/50 dark:text-blue-100/40 mt-0.5 truncate">
+          {subject.code}
+          {subject.category_name ? ` · ${subject.category_name}` : ""}
         </p>
-        {subject.description && (
-          <p className="text-xs text-gray-400 dark:text-gray-500 mt-1 line-clamp-2">
-            {subject.description}
-          </p>
-        )}
-
-        {/* Which of the user's grades / class groups this subject runs in —
-            without it, a teacher covering two grades cannot tell the cards
-            apart. */}
-        {showGrades && subject.class_groups.length > 0 && (
-          <div className="flex flex-wrap items-center gap-1 mt-2">
-            <Layers className="w-3 h-3 text-gray-400" />
-            {subject.class_groups.map((cg) => (
-              <span
-                key={cg.class_group_id}
-                className="px-2 py-0.5 bg-gray-100 dark:bg-slate-700/60 text-gray-600 dark:text-gray-300 rounded-full text-[11px]"
-              >
-                {cg.name}
-              </span>
-            ))}
-          </div>
-        )}
-
-        <div className="mt-2">
-          <p className="text-xs text-gray-500 dark:text-gray-400 mb-1 flex items-center gap-1">
-            <UsersIcon className="w-3 h-3" />
-            Teachers
-          </p>
-          {subject.teachers.length > 0 ? (
-            <div className="flex flex-wrap gap-1">
-              {subject.teachers.map((teacher) => (
-                <span
-                  key={teacher.user_id}
-                  className="px-2 py-1 bg-blue-100 dark:bg-blue-900/20 text-blue-800 dark:text-blue-400 rounded-full text-xs"
-                >
-                  {teacherLabel(teacher)}
-                </span>
-              ))}
-            </div>
-          ) : (
-            <p className="text-xs text-gray-400 italic">Not yet assigned</p>
-          )}
-        </div>
       </div>
-      <div className="flex-shrink-0">
-        <span
-          className={`px-2 py-1 rounded-full text-xs font-medium ${
-            subject.status === "ACTIVE"
-              ? "bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400"
-              : "bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400"
-          }`}
-        >
-          {subject.status}
-        </span>
-      </div>
+      <StatusPill status={subject.status} />
     </div>
 
-    <div className="flex items-center gap-1 mt-3 pt-2 border-t border-blue-50 dark:border-slate-700/40 text-xs font-medium text-blue-600 dark:text-blue-400 opacity-0 group-hover:opacity-100 transition-opacity">
+    {subject.description && (
+      <p className="text-xs text-slate-500 dark:text-slate-400 mt-2 line-clamp-2">
+        {subject.description}
+      </p>
+    )}
+
+    {showGroups && subject.class_groups.length > 0 && (
+      <div className="flex flex-wrap items-center gap-1 mt-2.5">
+        <Layers className="w-3 h-3 text-blue-400" />
+        {subject.class_groups.map((cg) => (
+          <span
+            key={cg.class_group_id}
+            className="px-2 py-0.5 bg-slate-100 dark:bg-slate-700/60 text-slate-600 dark:text-slate-300 rounded-full text-[11px]"
+          >
+            {cg.name}
+          </span>
+        ))}
+      </div>
+    )}
+
+    <div className="mt-2.5">
+      <p className="text-[11px] text-blue-900/45 dark:text-blue-100/35 mb-1 flex items-center gap-1">
+        <UsersIcon className="w-3 h-3" />
+        Teachers
+      </p>
+      <TeacherChips subject={subject} />
+    </div>
+
+    <div className="flex items-center gap-1 mt-auto pt-3 text-xs font-semibold text-blue-600 dark:text-blue-400 opacity-0 group-hover:opacity-100 transition-opacity">
       View details
       <ChevronRight className="w-3.5 h-3.5" />
     </div>
   </motion.button>
 );
 
-const EmptyState = ({
-  title,
-  message,
+/** Denser alternative for scanning many subjects at once. */
+const SubjectRow = ({
+  subject,
+  index,
+  onOpen,
 }: {
-  title: string;
-  message: string;
+  subject: ScopedSubject;
+  index: number;
+  onOpen: () => void;
 }) => (
-  <div className="min-h-screen bg-gray-50 dark:bg-black overflow-hidden relative">
-    <FloatingParticles />
+  <motion.button
+    type="button"
+    onClick={onOpen}
+    aria-label={`Open details for ${subject.name}`}
+    layout
+    initial={{ opacity: 0, y: 6 }}
+    animate={{ opacity: 1, y: 0 }}
+    exit={{ opacity: 0 }}
+    transition={{ delay: Math.min(index, 12) * 0.015 }}
+    className="w-full text-left flex items-center gap-3 bg-white dark:bg-slate-800/60 rounded-2xl p-3 border border-blue-100/80 dark:border-slate-700/40 hover:border-blue-400 dark:hover:border-blue-600 transition-colors"
+  >
+    <div
+      className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+      style={{ backgroundColor: subject.color || "#2563eb" }}
+    >
+      <BookOpen className="w-4 h-4 text-white" />
+    </div>
+    <div className="min-w-0 flex-1">
+      <p className="text-sm font-semibold text-slate-900 dark:text-white truncate">
+        {subject.name}
+      </p>
+      <p className="text-xs text-blue-900/50 dark:text-blue-100/40 truncate">
+        {subject.code}
+        {subject.class_groups.length > 0 &&
+          ` · ${subject.class_groups.map((c) => c.name).join(", ")}`}
+      </p>
+    </div>
+    <div className="hidden md:block max-w-[16rem]">
+      <TeacherChips subject={subject} />
+    </div>
+    <StatusPill status={subject.status} />
+    <ChevronRight className="w-4 h-4 text-blue-300 flex-shrink-0" />
+  </motion.button>
+);
+
+const CardSkeleton = () => (
+  <div className="h-44 rounded-2xl bg-gradient-to-br from-blue-50 via-white to-blue-50 dark:from-slate-800 dark:via-slate-800/50 dark:to-slate-800 border border-blue-100/70 dark:border-slate-700/40 animate-pulse" />
+);
+
+const PageShell = ({ children }: { children: React.ReactNode }) => (
+  <div className="min-h-screen relative">
     <div className="relative z-10 pb-10 pt-4 px-4 md:px-6">
-      <div className="max-w-7xl mx-auto">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="text-center py-8"
-        >
-          <BookOpen className="w-10 h-10 text-gray-400 mx-auto mb-2" />
-          <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-1">
-            {title}
-          </h2>
-          <p className="text-sm text-gray-600 dark:text-gray-400">{message}</p>
-        </motion.div>
-      </div>
+      <div className="max-w-7xl mx-auto">{children}</div>
     </div>
   </div>
 );
 
-// Class Teacher Subjects Page
+const Notice = ({ title, message }: { title: string; message: string }) => (
+  <PageShell>
+    <div className="text-center py-16">
+      <div className="w-14 h-14 rounded-2xl bg-blue-50 dark:bg-blue-950/50 flex items-center justify-center mx-auto mb-3">
+        <BookOpen className="w-7 h-7 text-blue-400" />
+      </div>
+      <h2 className="text-lg font-bold text-slate-900 dark:text-white mb-1">
+        {title}
+      </h2>
+      <p className="text-sm text-slate-500 dark:text-slate-400">{message}</p>
+    </div>
+  </PageShell>
+);
+
+// ---------------------------------------------------------------------------
+// Page
+// ---------------------------------------------------------------------------
+
 const ClassTeacherSubjectsPage: React.FC = () => {
   const { user } = useUser();
   const { showToast } = useToast();
   const scope = useScopedGrades();
   // Year/term come from the global selector in the top nav — the timetable and
   // scheme of work shown in the details panel are both per-term.
-  const {
-    selectedYearId,
-    selectedTermId,
-    selectedYear,
-    selectedTerm,
-  } = useAcademicPeriod();
+  const { selectedYearId, selectedTermId, selectedYear, selectedTerm } =
+    useAcademicPeriod();
 
   const [subjects, setSubjects] = useState<ScopedSubject[]>([]);
+  const [facets, setFacets] = useState<SubjectFacets>(EMPTY_FACETS);
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
+  const [filters, setFilters] = useState<SubjectFilterState>(EMPTY_FILTERS);
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
-  const [gradeFilter, setGradeFilter] = useState<number | "all">("all");
   const [selectedSubject, setSelectedSubject] = useState<ScopedSubject | null>(
     null,
+  );
+  const [view, setView] = useState<"grid" | "list">(
+    () => (localStorage.getItem(VIEW_STORAGE_KEY) as "grid" | "list") ?? "grid",
   );
 
   const canView = user?.permissions?.includes(
@@ -217,23 +272,40 @@ const ClassTeacherSubjectsPage: React.FC = () => {
     [selectedYear?.name, selectedTerm?.name].filter(Boolean).join(" · ") || null;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
-  // Debounce search term
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedSearchTerm(searchTerm);
-      setPage(1);
-    }, 500);
+    localStorage.setItem(VIEW_STORAGE_KEY, view);
+  }, [view]);
+
+  // Only the text box is debounced; every other filter applies immediately.
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(filters.search), 400);
     return () => clearTimeout(timer);
-  }, [searchTerm]);
+  }, [filters.search]);
 
   const gradeIds = useMemo(
-    () => (gradeFilter === "all" ? scope.gradeIds : [gradeFilter]),
-    [gradeFilter, scope.gradeIds],
+    () => (filters.gradeId === "all" ? scope.gradeIds : [filters.gradeId]),
+    [filters.gradeId, scope.gradeIds],
   );
 
-  // One request covering every grade in scope — search and pagination are the
-  // server's job, so the page count is real rather than a slice of whatever
-  // happened to be fetched.
+  // One key for every filter, so the fetch effect has a single stable dependency
+  // instead of eight that each re-trigger it.
+  const filterKey = JSON.stringify({
+    gradeIds,
+    classGroupIds: filters.classGroupIds,
+    teacherIds: filters.teacherIds,
+    categoryIds: filters.categoryIds,
+    status: filters.status,
+    assignment: filters.assignment,
+    sort: filters.sort,
+    debouncedSearch,
+  });
+
+  // Any filter change goes back to page 1 — staying on page 3 of a result set
+  // that just shrank to one page shows nothing at all.
+  useEffect(() => {
+    setPage(1);
+  }, [filterKey]);
+
   useEffect(() => {
     if (!canView) {
       setLoading(false);
@@ -247,11 +319,18 @@ const ClassTeacherSubjectsPage: React.FC = () => {
       academicYearId,
       page,
       limit: PAGE_SIZE,
-      search: debouncedSearchTerm || undefined,
+      search: debouncedSearch || undefined,
+      classGroupIds: filters.classGroupIds,
+      teacherIds: filters.teacherIds,
+      categoryIds: filters.categoryIds,
+      status: filters.status || undefined,
+      assignment: filters.assignment || undefined,
+      sort: filters.sort,
     })
       .then((result) => {
         if (cancelled) return;
         setSubjects(result.items);
+        setFacets(result.facets);
         setTotal(result.total);
       })
       .catch((error: any) => {
@@ -266,11 +345,11 @@ const ClassTeacherSubjectsPage: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [canView, gradeIds, academicYearId, page, debouncedSearchTerm]);
+  }, [canView, academicYearId, page, filterKey]);
 
   if (!canView) {
     return (
-      <EmptyState
+      <Notice
         title="Access Denied"
         message="No permission to view class subjects."
       />
@@ -279,7 +358,7 @@ const ClassTeacherSubjectsPage: React.FC = () => {
 
   if (scope.isScoped && scope.gradeIds.length === 0) {
     return (
-      <EmptyState
+      <Notice
         title="No Grades Assigned"
         message={
           scope.source === "programs"
@@ -290,151 +369,134 @@ const ClassTeacherSubjectsPage: React.FC = () => {
     );
   }
 
+  const hasFilters =
+    Boolean(debouncedSearch) ||
+    filters.classGroupIds.length > 0 ||
+    filters.teacherIds.length > 0 ||
+    filters.categoryIds.length > 0 ||
+    Boolean(filters.status) ||
+    Boolean(filters.assignment) ||
+    filters.gradeId !== "all";
+
   return (
-    <div className="min-h-screen overflow-hidden relative">
-      <FloatingParticles />
+    <PageShell>
+      <motion.div
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="mb-5"
+      >
+        <h1 className="text-2xl font-bold text-slate-900 dark:text-white">
+          Class Subjects
+        </h1>
+        <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
+          {scope.isScoped
+            ? `Subjects in ${scope.grades.map((g) => g.name).join(", ")}`
+            : "Subjects across all grades"}
+          {periodLabel ? ` · ${periodLabel}` : ""}
+        </p>
+      </motion.div>
 
-      <div className="relative z-10 pb-10 pt-4 px-4 md:px-6">
-        <div className="max-w-7xl mx-auto">
-          {/* Header */}
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="mb-4"
-          >
-            <div>
-              <h1 className="text-2xl font-bold text-gray-800 dark:text-white">
-                Class Subjects
-              </h1>
-              <p className="text-sm text-gray-500 mt-0.5">
-                {scope.isScoped
-                  ? `Subjects in ${scope.grades
-                      .map((g) => g.name)
-                      .join(", ")}`
-                  : "Subjects across all grades"}
-              </p>
-            </div>
-          </motion.div>
-
-          {/* Subjects Section */}
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-          >
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                Subjects in Your Grades
-              </h3>
-              <span className="text-sm text-gray-500">
-                {total} subject{total === 1 ? "" : "s"}
-              </span>
-            </div>
-
-            {/* Search + grade filter */}
-            <div className="mb-4 flex flex-col sm:flex-row gap-2">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-                <input
-                  type="text"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  placeholder="Search subjects..."
-                  className="w-full pl-10 pr-3 py-2.5 bg-white dark:bg-gray-800/40 border border-gray-200 dark:border-slate-700 dark:text-white rounded-[0.8rem] text-sm focus:outline-none focus:border-blue-500"
-                />
-              </div>
-              {scope.grades.length > 1 && (
-                <select
-                  value={gradeFilter}
-                  onChange={(e) => {
-                    setGradeFilter(
-                      e.target.value === "all"
-                        ? "all"
-                        : Number(e.target.value),
-                    );
-                    setPage(1);
-                  }}
-                  className="px-3 py-2.5 bg-white dark:bg-gray-800/40 border border-gray-200 dark:border-slate-700 dark:text-white rounded-[0.8rem] text-sm focus:outline-none focus:border-blue-500"
-                >
-                  <option value="all">All my grades</option>
-                  {scope.grades.map((g) => (
-                    <option key={g.grade_id} value={g.grade_id}>
-                      {g.name}
-                    </option>
-                  ))}
-                </select>
-              )}
-            </div>
-
-            {/* Subjects List */}
-            {loading ? (
-              <div className="flex items-center justify-center py-6">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
-              </div>
-            ) : (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
-              >
-                {subjects.length > 0 ? (
-                  subjects.map((subject, index) => (
-                    <SubjectCard
-                      key={subject.subject_id}
-                      subject={subject}
-                      index={index}
-                      showGrades={scope.grades.length > 1 || !scope.isScoped}
-                      onOpen={() => setSelectedSubject(subject)}
-                    />
-                  ))
-                ) : (
-                  <div className="col-span-full text-center py-6 text-sm text-gray-400">
-                    No subjects found
-                  </div>
-                )}
-              </motion.div>
-            )}
-
-            {/* Pagination */}
-            {!loading && total > 0 && totalPages > 1 && (
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.2 }}
-                className="mt-6 pt-4 border-t border-gray-200 dark:border-slate-700"
-              >
-                <div className="flex items-center justify-between">
-                  <div className="text-sm text-gray-500">
-                    Showing {(page - 1) * PAGE_SIZE + 1} to{" "}
-                    {Math.min(page * PAGE_SIZE, total)} of {total} subjects
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => setPage((p) => Math.max(1, p - 1))}
-                      disabled={page === 1}
-                      className="p-2 rounded-lg bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors"
-                    >
-                      <ChevronLeft className="w-4 h-4" />
-                    </button>
-                    <span className="text-sm text-gray-500">
-                      Page {page} of {totalPages}
-                    </span>
-                    <button
-                      onClick={() =>
-                        setPage((p) => Math.min(totalPages, p + 1))
-                      }
-                      disabled={page === totalPages}
-                      className="p-2 rounded-lg bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors"
-                    >
-                      <ChevronRight className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-              </motion.div>
-            )}
-          </motion.div>
-        </div>
+      {/* Sticky so the filters stay reachable while scrolling a long list. */}
+      <div className="sticky top-0 z-20 -mx-4 md:-mx-6 px-4 md:px-6 py-3 bg-slate-50/85 dark:bg-slate-950/85 backdrop-blur-md border-b border-blue-100/70 dark:border-slate-800 mb-4">
+        <SubjectFilterBar
+          filters={filters}
+          onChange={(next) => setFilters((prev) => ({ ...prev, ...next }))}
+          onReset={() => setFilters(EMPTY_FILTERS)}
+          facets={facets}
+          grades={scope.grades}
+          total={total}
+          view={view}
+          onViewChange={setView}
+        />
       </div>
+
+      {loading ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+          {[...Array(6)].map((_, i) => (
+            <CardSkeleton key={i} />
+          ))}
+        </div>
+      ) : subjects.length === 0 ? (
+        <div className="text-center py-16">
+          <div className="w-14 h-14 rounded-2xl bg-blue-50 dark:bg-blue-950/50 flex items-center justify-center mx-auto mb-3">
+            <SearchX className="w-7 h-7 text-blue-400" />
+          </div>
+          <p className="text-sm text-slate-500 dark:text-slate-400">
+            {hasFilters
+              ? "No subject matches these filters."
+              : "No subjects in your grades yet."}
+          </p>
+          {hasFilters && (
+            <button
+              type="button"
+              onClick={() => setFilters(EMPTY_FILTERS)}
+              className="mt-3 text-sm font-semibold text-blue-600 dark:text-blue-400 hover:underline"
+            >
+              Clear all filters
+            </button>
+          )}
+        </div>
+      ) : view === "grid" ? (
+        <motion.div
+          layout
+          className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 items-stretch"
+        >
+          <AnimatePresence mode="popLayout">
+            {subjects.map((subject, index) => (
+              <SubjectCard
+                key={subject.subject_id}
+                subject={subject}
+                index={index}
+                showGroups={scope.grades.length > 1 || !scope.isScoped}
+                onOpen={() => setSelectedSubject(subject)}
+              />
+            ))}
+          </AnimatePresence>
+        </motion.div>
+      ) : (
+        <motion.div layout className="space-y-2">
+          <AnimatePresence mode="popLayout">
+            {subjects.map((subject, index) => (
+              <SubjectRow
+                key={subject.subject_id}
+                subject={subject}
+                index={index}
+                onOpen={() => setSelectedSubject(subject)}
+              />
+            ))}
+          </AnimatePresence>
+        </motion.div>
+      )}
+
+      {!loading && total > 0 && totalPages > 1 && (
+        <div className="mt-6 pt-4 border-t border-blue-100 dark:border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3">
+          <div className="text-sm text-slate-500">
+            Showing {(page - 1) * PAGE_SIZE + 1}–
+            {Math.min(page * PAGE_SIZE, total)} of {total}
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page === 1}
+              aria-label="Previous page"
+              className="p-2 rounded-xl bg-white dark:bg-slate-800 border border-blue-100 dark:border-slate-700 disabled:opacity-40 disabled:cursor-not-allowed hover:border-blue-400 transition-colors"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <span className="text-sm text-slate-500 tabular-nums">
+              Page {page} of {totalPages}
+            </span>
+            <button
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              disabled={page === totalPages}
+              aria-label="Next page"
+              className="p-2 rounded-xl bg-white dark:bg-slate-800 border border-blue-100 dark:border-slate-700 disabled:opacity-40 disabled:cursor-not-allowed hover:border-blue-400 transition-colors"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
 
       <SubjectDetailsPanel
         isOpen={selectedSubject !== null}
@@ -445,7 +507,7 @@ const ClassTeacherSubjectsPage: React.FC = () => {
         academicTermId={selectedTermId}
         periodLabel={periodLabel}
       />
-    </div>
+    </PageShell>
   );
 };
 
