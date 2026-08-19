@@ -1,15 +1,21 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { motion } from "framer-motion";
 import {
   User as UserIcon,
   Search,
   ChevronLeft,
   ChevronRight,
+  Mail,
+  Phone,
+  Layers,
 } from "lucide-react";
 import { useUser } from "../contexts/UserContext";
-import { getUsersByGrade, GradeUser } from "../api/users";
+import { getScopedUsers, ScopedUser, ScopedRoleGroup } from "../api/users";
+import { useScopedGrades } from "../hooks/useScopedGrades";
 import { useToast } from "../contexts/ToastContext";
-import UserProfileModal from "./UserProfileModal";
+import UserProfileViewer from "./UserProfileViewer";
+
+const PAGE_SIZE = 40;
 
 // Animated floating particles
 const FloatingParticles = () => (
@@ -41,46 +47,81 @@ const FloatingParticles = () => (
   </div>
 );
 
+const initialsOf = (u: ScopedUser) =>
+  (
+    `${(u.first_name ?? "").charAt(0)}${(u.last_name ?? "").charAt(0)}`.trim() ||
+    u.username.charAt(0)
+  ).toUpperCase();
+
 // User card component
 const UserCard = ({
   user,
   index,
   onClick,
-  isLoading,
+  showClassGroups,
 }: {
-  user: GradeUser;
+  user: ScopedUser;
   index: number;
   onClick: () => void;
-  isLoading?: boolean;
+  showClassGroups: boolean;
 }) => (
-  <motion.div
+  <motion.button
+    type="button"
     initial={{ opacity: 0, y: 10 }}
     animate={{ opacity: 1, y: 0 }}
-    transition={{ delay: index * 0.02 }}
+    transition={{ delay: Math.min(index, 15) * 0.02 }}
     onClick={onClick}
-    className={`bg-white dark:bg-slate-800/60 backdrop-blur-sm rounded-2xl p-3 border border-white/50 dark:border-slate-700/30 cursor-pointer hover:bg-white/80 dark:hover:bg-slate-800/80 transition-colors ${
-      isLoading ? "pointer-events-none opacity-50" : ""
+    aria-label={`View profile of ${user.first_name ?? ""} ${
+      user.last_name ?? user.username
     }`}
+    className="w-full text-left bg-white dark:bg-slate-800/60 backdrop-blur-sm rounded-2xl p-3 border border-white/50 dark:border-slate-700/30 cursor-pointer hover:bg-white/80 dark:hover:bg-slate-800/80 transition-colors"
   >
-    <div className="flex items-center justify-between">
-      <div className="flex items-center gap-2">
-        <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center flex-shrink-0">
-          {isLoading ? (
-            <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white" />
-          ) : (
-            <UserIcon className="w-4 h-4 text-white" />
-          )}
+    <div className="flex items-center justify-between gap-3">
+      <div className="flex items-center gap-3 min-w-0">
+        <div className="w-9 h-9 bg-blue-500 rounded-full flex items-center justify-center flex-shrink-0 text-white text-xs font-semibold">
+          {initialsOf(user)}
         </div>
         <div className="min-w-0 flex-1">
           <h3 className="font-medium text-gray-900 dark:text-white text-sm truncate">
-            {user.first_name} {user.last_name}
+            {user.first_name || user.last_name
+              ? `${user.first_name ?? ""} ${user.last_name ?? ""}`.trim()
+              : user.username}
           </h3>
-          <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
-            {user.phone_number && user.phone_number} • {user.email}
+          <p className="text-xs text-gray-500 dark:text-gray-400 truncate flex items-center gap-2">
+            {user.email && (
+              <span className="inline-flex items-center gap-1 truncate">
+                <Mail className="w-3 h-3" />
+                {user.email}
+              </span>
+            )}
+            {user.phone_number && (
+              <span className="inline-flex items-center gap-1">
+                <Phone className="w-3 h-3" />
+                {user.phone_number}
+              </span>
+            )}
           </p>
+          {showClassGroups && user.class_groups.length > 0 && (
+            <p className="text-[11px] text-gray-400 truncate flex items-center gap-1 mt-0.5">
+              <Layers className="w-3 h-3" />
+              {user.class_groups.map((c) => c.name).join(", ")}
+            </p>
+          )}
         </div>
       </div>
       <div className="flex items-center gap-2 flex-shrink-0">
+        {/* Every role, not just the first — a user can be both a teacher and a
+            parent, and the old one-row-per-role query silently dropped one. */}
+        <div className="hidden sm:flex flex-wrap gap-1 justify-end max-w-[220px]">
+          {user.roles.map((r) => (
+            <span
+              key={r.role_id}
+              className="px-2 py-0.5 rounded-full text-[11px] bg-blue-50 dark:bg-blue-900/25 text-blue-700 dark:text-blue-300"
+            >
+              {r.name}
+            </span>
+          ))}
+        </div>
         <span
           className={`px-2 py-0.5 rounded-full text-xs font-medium ${
             user.status === "ACTIVE"
@@ -92,188 +133,136 @@ const UserCard = ({
         </span>
       </div>
     </div>
-  </motion.div>
+  </motion.button>
+);
+
+const EmptyState = ({ title, message }: { title: string; message: string }) => (
+  <div className="min-h-screen bg-gray-50 dark:bg-black overflow-hidden relative">
+    <FloatingParticles />
+    <div className="relative z-10 pb-10 pt-4 px-4 md:px-6">
+      <div className="max-w-7xl mx-auto">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="text-center py-8"
+        >
+          <UserIcon className="w-10 h-10 text-gray-400 mx-auto mb-2" />
+          <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-1">
+            {title}
+          </h2>
+          <p className="text-sm text-gray-600 dark:text-gray-400">{message}</p>
+        </motion.div>
+      </div>
+    </div>
+  </div>
 );
 
 // Class Teacher Users Page
 const ClassTeacherUsersPage: React.FC = () => {
   const { user } = useUser();
   const { showToast } = useToast();
-  const [users, setUsers] = useState<GradeUser[]>([]);
-  const [loading, setLoading] = useState(false);
+  const scope = useScopedGrades();
+
+  const [users, setUsers] = useState<ScopedUser[]>([]);
+  const [roleGroups, setRoleGroups] = useState<ScopedRoleGroup[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
-  const [pagination, setPagination] = useState({
-    page: 1,
-    limit: 100,
-    total: 0,
-    totalPages: 0,
-  });
-  const [selectedUser, setSelectedUser] = useState<any | null>(null);
-  const [userProfileModalOpen, setUserProfileModalOpen] = useState(false);
-  const [loadingUserId, setLoadingUserId] = useState<number | null>(null);
-  const [activeTab, setActiveTab] = useState<string>("");
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [activeRole, setActiveRole] = useState<string>("");
+  const [gradeFilter, setGradeFilter] = useState<number | "all">("all");
+  const [selectedUser, setSelectedUser] = useState<ScopedUser | null>(null);
 
-  const initialLoadRef = useRef(false);
-  const lastSearchRef = useRef("");
-
-  const assignedGrades = user?.assignedGrades || [];
   const canView = user?.permissions?.includes(
-    "VIEW_USERS_BY_CLASS_TEACHER_GRADE"
+    "VIEW_USERS_BY_CLASS_TEACHER_GRADE",
   );
+  const academicYearId = user?.currentAcademicYear?.academic_year_id ?? null;
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   // Debounce search term
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedSearchTerm(searchTerm);
+      setPage(1);
     }, 500);
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
-  // Load users when component mounts or debounced search changes
+  const gradeIds = useMemo(
+    () => (gradeFilter === "all" ? scope.gradeIds : [gradeFilter]),
+    [gradeFilter, scope.gradeIds],
+  );
+
+  // One request for every grade in scope. Role tab counts come back in the same
+  // payload, so switching tabs doesn't need a second round trip either.
   useEffect(() => {
-    if (canView && assignedGrades.length > 0) {
-      if (!initialLoadRef.current) {
-        initialLoadRef.current = true;
-        lastSearchRef.current = debouncedSearchTerm;
-        setPagination((prev) => ({ ...prev, page: 1 }));
-        loadUsers(1);
-      } else if (debouncedSearchTerm !== lastSearchRef.current) {
-        lastSearchRef.current = debouncedSearchTerm;
-        setPagination((prev) => ({ ...prev, page: 1 }));
-        loadUsers(1);
-      }
-    }
-  }, [canView, assignedGrades, debouncedSearchTerm]);
-
-  // Set active tab when users are loaded
-  useEffect(() => {
-    if (users.length > 0 && !activeTab) {
-      const roles = [...new Set(users.map((u) => u.role_name).filter(Boolean))];
-      if (roles.length > 0) {
-        setActiveTab(roles[0] || "");
-      }
-    }
-  }, [users, activeTab]);
-
-  const loadUsers = async (page: number = 1) => {
-    if (assignedGrades.length === 0) return;
-
-    setLoading(true);
-    try {
-      // Load users from all assigned grades
-      const allUsers: GradeUser[] = [];
-      for (const grade of assignedGrades) {
-        const result = await getUsersByGrade(grade.grade_id, {
-          page,
-          limit: pagination.limit,
-          search: debouncedSearchTerm || undefined,
-        });
-        if (result) {
-          allUsers.push(...result.users);
-        }
-      }
-
-      // Remove duplicates based on user_id
-      const uniqueUsers = allUsers.filter(
-        (user, index, self) =>
-          index === self.findIndex((u) => u.user_id === user.user_id)
-      );
-
-      setUsers(uniqueUsers);
-      setPagination({
-        ...pagination,
-        page,
-        total: uniqueUsers.length,
-        totalPages: Math.ceil(uniqueUsers.length / pagination.limit),
-      });
-    } catch (error) {
-      console.error("Failed to load users:", error);
-      showToast("Failed to load users", "error");
-    } finally {
+    if (!canView) {
       setLoading(false);
+      return;
     }
-  };
+    let cancelled = false;
+    setLoading(true);
 
-  const handlePageChange = (newPage: number) => {
-    if (newPage >= 1 && newPage <= pagination.totalPages) {
-      setPagination((prev) => ({ ...prev, page: newPage }));
-      loadUsers(newPage);
-    }
-  };
+    getScopedUsers({
+      gradeIds,
+      academicYearId,
+      page,
+      limit: PAGE_SIZE,
+      search: debouncedSearchTerm || undefined,
+      role: activeRole || undefined,
+    })
+      .then((result) => {
+        if (cancelled) return;
+        setUsers(result.items);
+        setTotal(result.total);
+        setRoleGroups(result.roleGroups);
+      })
+      .catch((error: any) => {
+        if (cancelled) return;
+        console.error("Failed to load users:", error);
+        showToast(error?.message || "Failed to load users", "error");
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
 
-  const handleUserClick = async (userId: number) => {
-    setLoadingUserId(userId);
-    try {
-      // For now, we'll use a simple user object. In a real implementation,
-      // you'd fetch the full user details from the API
-      const userData = users.find((u) => u.user_id === userId);
-      if (userData) {
-        setSelectedUser({
-          user: userData,
-          profile: {
-            first_name: userData.first_name,
-            last_name: userData.last_name,
-            user_type: userData.user_type,
-          },
-        });
-        setUserProfileModalOpen(true);
-      }
-    } catch (error) {
-      console.error("Failed to load user details:", error);
-      showToast("Failed to load user details", "error");
-    } finally {
-      setLoadingUserId(null);
-    }
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    canView,
+    gradeIds,
+    academicYearId,
+    page,
+    debouncedSearchTerm,
+    activeRole,
+  ]);
+
+  const selectRole = (role: string) => {
+    setActiveRole((current) => (current === role ? "" : role));
+    setPage(1);
   };
 
   if (!canView) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-black overflow-hidden relative">
-        <FloatingParticles />
-        <div className="relative z-10 pb-10 pt-4 px-4 md:px-6">
-          <div className="max-w-7xl mx-auto">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="text-center py-8"
-            >
-              <UserIcon className="w-10 h-10 text-gray-400 mx-auto mb-2" />
-              <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-1">
-                Access Denied
-              </h2>
-              <p className="text-sm text-gray-600 dark:text-gray-400">
-                No permission to view class users.
-              </p>
-            </motion.div>
-          </div>
-        </div>
-      </div>
+      <EmptyState
+        title="Access Denied"
+        message="No permission to view class users."
+      />
     );
   }
 
-  if (assignedGrades.length === 0) {
+  if (scope.isScoped && scope.gradeIds.length === 0) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-black overflow-hidden relative">
-        <FloatingParticles />
-        <div className="relative z-10 pb-10 pt-4 px-4 md:px-6">
-          <div className="max-w-7xl mx-auto">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="text-center py-8"
-            >
-              <UserIcon className="w-10 h-10 text-gray-400 mx-auto mb-2" />
-              <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-1">
-                No Grades Assigned
-              </h2>
-              <p className="text-sm text-gray-600 dark:text-gray-400">
-                You are not assigned to any grades.
-              </p>
-            </motion.div>
-          </div>
-        </div>
-      </div>
+      <EmptyState
+        title="No Grades Assigned"
+        message={
+          scope.source === "programs"
+            ? "Your programs have no grades yet."
+            : "You are not assigned to any grades."
+        }
+      />
     );
   }
 
@@ -294,12 +283,15 @@ const ClassTeacherUsersPage: React.FC = () => {
                 Class Users
               </h1>
               <p className="text-sm text-gray-500 mt-0.5">
-                View students in your assigned grades
+                {scope.isScoped
+                  ? `Students and teachers in ${scope.grades
+                      .map((g) => g.name)
+                      .join(", ")}`
+                  : "Students and teachers across all grades"}
               </p>
             </div>
           </motion.div>
 
-          {/* Users Section */}
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
@@ -309,53 +301,71 @@ const ClassTeacherUsersPage: React.FC = () => {
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
                 Users in Your Grades
               </h3>
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-gray-500">
-                  {activeTab
-                    ? `${
-                        users.filter((u) => u.role_name === activeTab).length
-                      } ${activeTab.toLowerCase()} users`
-                    : `${pagination.total} users`}
-                </span>
-              </div>
+              <span className="text-sm text-gray-500">
+                {total} {activeRole ? `${activeRole.toLowerCase()} ` : ""}user
+                {total === 1 ? "" : "s"}
+              </span>
             </div>
 
-            {/* Search */}
-            <div className="mb-4">
-              <div className="relative">
+            {/* Search + grade filter */}
+            <div className="mb-4 flex flex-col sm:flex-row gap-2">
+              <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
                 <input
                   type="text"
                   value={searchTerm}
-                  onChange={(e) => {
-                    setSearchTerm(e.target.value);
-                  }}
+                  onChange={(e) => setSearchTerm(e.target.value)}
                   placeholder="Search users..."
                   className="w-full pl-10 pr-3 py-2.5 bg-white dark:bg-gray-800/40 border border-gray-200 dark:border-slate-700 dark:text-white rounded-[0.8rem] text-sm focus:outline-none focus:border-blue-500"
                 />
               </div>
+              {scope.grades.length > 1 && (
+                <select
+                  value={gradeFilter}
+                  onChange={(e) => {
+                    setGradeFilter(
+                      e.target.value === "all" ? "all" : Number(e.target.value),
+                    );
+                    setPage(1);
+                  }}
+                  className="px-3 py-2.5 bg-white dark:bg-gray-800/40 border border-gray-200 dark:border-slate-700 dark:text-white rounded-[0.8rem] text-sm focus:outline-none focus:border-blue-500"
+                >
+                  <option value="all">All my grades</option>
+                  {scope.grades.map((g) => (
+                    <option key={g.grade_id} value={g.grade_id}>
+                      {g.name}
+                    </option>
+                  ))}
+                </select>
+              )}
             </div>
 
-            {/* Role Tabs */}
-            {users.length > 0 && (
+            {/* Role Tabs — counts come from the server over the whole result
+                set, not just the current page. */}
+            {roleGroups.length > 0 && (
               <div className="mb-6">
                 <div className="flex flex-wrap gap-2 border-b border-gray-200 dark:border-slate-700">
-                  {(
-                    [
-                      ...new Set(users.map((u) => u.role_name).filter(Boolean)),
-                    ] as string[]
-                  ).map((role) => (
+                  <button
+                    onClick={() => selectRole("")}
+                    className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${
+                      activeRole === ""
+                        ? "bg-blue-500 text-white border-b-2 border-blue-500"
+                        : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700"
+                    }`}
+                  >
+                    All
+                  </button>
+                  {roleGroups.map((group) => (
                     <button
-                      key={role}
-                      onClick={() => setActiveTab(role)}
+                      key={group.role_id}
+                      onClick={() => selectRole(group.name)}
                       className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${
-                        activeTab === role
+                        activeRole === group.name
                           ? "bg-blue-500 text-white border-b-2 border-blue-500"
                           : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700"
                       }`}
                     >
-                      {role} ({users.filter((u) => u.role_name === role).length}
-                      )
+                      {group.name} ({group.count})
                     </button>
                   ))}
                 </div>
@@ -374,23 +384,17 @@ const ClassTeacherUsersPage: React.FC = () => {
                 className="space-y-2"
               >
                 {users.length > 0 ? (
-                  users
-                    .filter(
-                      (user) => !activeTab || user.role_name === activeTab
-                    )
-                    .slice(
-                      (pagination.page - 1) * pagination.limit,
-                      pagination.page * pagination.limit
-                    )
-                    .map((user, index) => (
-                      <UserCard
-                        key={user.user_id}
-                        user={user}
-                        index={index}
-                        onClick={() => handleUserClick(user.user_id)}
-                        isLoading={loadingUserId === user.user_id}
-                      />
-                    ))
+                  users.map((u, index) => (
+                    <UserCard
+                      key={u.user_id}
+                      user={u}
+                      index={index}
+                      onClick={() => setSelectedUser(u)}
+                      showClassGroups={
+                        scope.grades.length > 1 || !scope.isScoped
+                      }
+                    />
+                  ))
                 ) : (
                   <div className="text-center py-6 text-sm text-gray-400">
                     No users found
@@ -400,68 +404,50 @@ const ClassTeacherUsersPage: React.FC = () => {
             )}
 
             {/* Pagination */}
-            {!loading &&
-              (() => {
-                const filteredUsers = users.filter(
-                  (user) => !activeTab || user.role_name === activeTab
-                );
-                const filteredTotal = filteredUsers.length;
-                const filteredTotalPages = Math.ceil(
-                  filteredTotal / pagination.limit
-                );
-
-                return filteredTotal > 0 && filteredTotalPages > 1 ? (
-                  <motion.div
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.2 }}
-                    className="mt-6 pt-4 border-t border-gray-200 dark:border-slate-700"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="text-sm text-gray-500">
-                        Showing {(pagination.page - 1) * pagination.limit + 1}{" "}
-                        to{" "}
-                        {Math.min(
-                          pagination.page * pagination.limit,
-                          filteredTotal
-                        )}{" "}
-                        of {filteredTotal} users
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => handlePageChange(pagination.page - 1)}
-                          disabled={pagination.page === 1}
-                          className="p-2 rounded-lg bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors"
-                        >
-                          <ChevronLeft className="w-4 h-4" />
-                        </button>
-                        <span className="text-sm text-gray-500">
-                          Page {pagination.page} of {filteredTotalPages}
-                        </span>
-                        <button
-                          onClick={() => handlePageChange(pagination.page + 1)}
-                          disabled={pagination.page === filteredTotalPages}
-                          className="p-2 rounded-lg bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors"
-                        >
-                          <ChevronRight className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </div>
-                  </motion.div>
-                ) : null;
-              })()}
+            {!loading && total > 0 && totalPages > 1 && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.2 }}
+                className="mt-6 pt-4 border-t border-gray-200 dark:border-slate-700"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="text-sm text-gray-500">
+                    Showing {(page - 1) * PAGE_SIZE + 1} to{" "}
+                    {Math.min(page * PAGE_SIZE, total)} of {total} users
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setPage((p) => Math.max(1, p - 1))}
+                      disabled={page === 1}
+                      className="p-2 rounded-lg bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors"
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                    </button>
+                    <span className="text-sm text-gray-500">
+                      Page {page} of {totalPages}
+                    </span>
+                    <button
+                      onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                      disabled={page === totalPages}
+                      className="p-2 rounded-lg bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors"
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            )}
           </motion.div>
         </div>
       </div>
 
-      {/* User Profile Modal */}
-      <UserProfileModal
-        isOpen={userProfileModalOpen}
-        onClose={() => {
-          setUserProfileModalOpen(false);
-          setSelectedUser(null);
-        }}
-        user={selectedUser}
+      {/* Read-only profile */}
+      <UserProfileViewer
+        isOpen={selectedUser !== null}
+        onClose={() => setSelectedUser(null)}
+        summary={selectedUser}
+        academicYearId={academicYearId}
       />
     </div>
   );

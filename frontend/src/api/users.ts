@@ -554,6 +554,194 @@ export const getSubjectsByGrade = async (
   }
 };
 
+// ==================== Grade/Program-Scoped Reads ====================
+//
+// A class teacher (assignedGrades) or program lead (assignedPrograms) sees a
+// slice of the school. These endpoints answer for the caller's *whole* scope in
+// one request; the pages used to loop one request per assigned grade and merge
+// client-side, which broke server-side pagination and hid the duplicate-row
+// fan-outs the backend now collapses.
+
+export interface ScopedTeacher {
+  user_id: number;
+  username: string | null;
+  first_name?: string | null;
+  last_name?: string | null;
+}
+
+export interface ScopedSubject {
+  subject_id: number;
+  code?: string | null;
+  name: string;
+  description?: string | null;
+  status: string;
+  color?: string | null;
+  teachers: ScopedTeacher[];
+  grades: { grade_id: number; name: string | null }[];
+  class_groups: { class_group_id: number; name: string | null }[];
+}
+
+export interface ScopedUser {
+  user_id: number;
+  username: string;
+  email: string;
+  phone_number?: string | null;
+  status: string;
+  first_name?: string | null;
+  last_name?: string | null;
+  user_type?: string | null;
+  gender?: string | null;
+  roles: { role_id: number; name: string; description?: string | null }[];
+  role_name?: string | null;
+  grades: { grade_id: number; name: string | null }[];
+  class_groups: { class_group_id: number; name: string | null }[];
+}
+
+export interface ScopedRoleGroup {
+  role_id: number;
+  name: string;
+  count: number;
+}
+
+export interface ScopeQuery {
+  gradeIds?: number[];
+  academicYearId?: number | null;
+  page?: number;
+  limit?: number;
+  search?: string;
+  role?: string;
+}
+
+const scopeParams = (query?: ScopeQuery) => {
+  const params: Record<string, string | number> = {
+    page: query?.page ?? 1,
+    limit: query?.limit ?? 100,
+  };
+  if (query?.gradeIds && query.gradeIds.length > 0) {
+    params.grade_ids = query.gradeIds.join(",");
+  }
+  if (query?.academicYearId) params.academic_year_id = query.academicYearId;
+  if (query?.search) params.search = query.search;
+  if (query?.role) params.role = query.role;
+  return params;
+};
+
+export interface Paged<T> {
+  total: number;
+  page: number;
+  totalPages: number;
+  items: T;
+}
+
+export const getScopedSubjects = async (
+  query?: ScopeQuery,
+): Promise<Paged<ScopedSubject[]>> => {
+  const params = scopeParams(query);
+  const response = await api.get<BackendResponse<ScopedSubject[]>>(
+    "/users/scope/subjects",
+    { params },
+  );
+  const total = parseInt(response.headers["x-total-count"] || "0", 10);
+  const limit = Number(params.limit) || 100;
+  return {
+    items: response.data.data || [],
+    total,
+    page: Number(params.page) || 1,
+    totalPages: Math.max(1, Math.ceil(total / limit)),
+  };
+};
+
+export const getScopedUsers = async (
+  query?: ScopeQuery,
+): Promise<Paged<ScopedUser[]> & { roleGroups: ScopedRoleGroup[] }> => {
+  const params = scopeParams(query);
+  const response = await api.get<
+    BackendResponse<{ users: ScopedUser[]; roleGroups: ScopedRoleGroup[] }>
+  >("/users/scope/users", { params });
+  const total = parseInt(response.headers["x-total-count"] || "0", 10);
+  const limit = Number(params.limit) || 100;
+  return {
+    items: response.data.data?.users || [],
+    roleGroups: response.data.data?.roleGroups || [],
+    total,
+    page: Number(params.page) || 1,
+    totalPages: Math.max(1, Math.ceil(total / limit)),
+  };
+};
+
+export interface ScopedUserDetail {
+  user: User;
+  profile: UserProfile | null;
+  roles: UserRole[];
+  permissions: string[];
+  assignedGrades: {
+    grade_id: number;
+    name: string;
+    program_name?: string | null;
+    class_group_id: number;
+    class_group_name?: string | null;
+  }[];
+  classGroups: {
+    class_group_id: number;
+    name: string;
+    grade_id?: number | null;
+    grade_name?: string | null;
+    program_name?: string | null;
+  }[];
+  assignedPrograms: { program_id: number; name: string }[];
+  subjectsTaught: {
+    subject_id: number;
+    name: string;
+    code?: string | null;
+    class_group_name?: string | null;
+  }[];
+  subjectsEnrolled: { subject_id: number; name: string; code?: string | null }[];
+}
+
+export const getScopedUserDetail = async (
+  userId: number,
+  academicYearId?: number | null,
+): Promise<ScopedUserDetail> => {
+  const response = await api.get<BackendResponse<ScopedUserDetail>>(
+    `/users/scope/users/${userId}`,
+    { params: academicYearId ? { academic_year_id: academicYearId } : undefined },
+  );
+  return response.data.data as ScopedUserDetail;
+};
+
+// ==================== User Statistics ====================
+
+export interface UserStatsRole {
+  role_id: number;
+  name: string;
+  description?: string | null;
+  status: string;
+  total: number;
+  active: number;
+  disabled: number;
+}
+
+export interface UserStats {
+  overall: { total: number; active: number; disabled: number };
+  roles: UserStatsRole[];
+}
+
+/**
+ * One request for every count the Users screens need. Previously the same
+ * numbers cost `3 + 2 * roles` requests to `/users?page=1&limit=1&userRole=...`.
+ */
+export const getUserStats = async (search?: string): Promise<UserStats> => {
+  const response = await api.get<BackendResponse<UserStats>>("/users/stats", {
+    params: search ? { search } : undefined,
+  });
+  return (
+    response.data.data ?? {
+      overall: { total: 0, active: 0, disabled: 0 },
+      roles: [],
+    }
+  );
+};
+
 export const getCurrentUser = async (
   onSuccess?: (user: UserWithProfile) => void,
   onError?: (error: any) => void,

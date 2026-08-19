@@ -31,6 +31,12 @@ import {
   getSubjectsByGrade,
   updateThemePreference,
 } from "../controllers/userController";
+import {
+  getUserStats,
+  getScopedSubjects,
+  getScopedUsers,
+  getScopedUserDetail,
+} from "../controllers/userScopeController";
 import { getUserActivities } from "../controllers/activityController";
 import { authenticate, authorize } from "../middleware/auth";
 
@@ -59,6 +65,32 @@ router.get("/me", authenticate, getCurrentUser);
 router.put("/me/profile", authenticate, updateCurrentUserProfile);
 router.patch("/me/theme", authenticate, updateThemePreference);
 router.get("/", authenticate, authorize("MANAGE_USERS"), getUsers);
+
+// Role/status counts for the management chips and dashboard. Two aggregate
+// queries in place of the `3 + 2 * roles` per-role HEAD-style requests the
+// client used to fire at "/" just to read X-Total-Count off each one.
+router.get("/stats", authenticate, authorize("VIEW_USERS"), getUserStats);
+
+// Grade-scoped reads for class teachers and program leads. Registered before
+// the bare "/:id" route so "scope" is not matched as an :id.
+router.get(
+  "/scope/subjects",
+  authenticate,
+  authorize("VIEW_SUBJECTS_BY_CLASS_TEACHER_GRADE"),
+  getScopedSubjects,
+);
+router.get(
+  "/scope/users",
+  authenticate,
+  authorize("VIEW_USERS_BY_CLASS_TEACHER_GRADE"),
+  getScopedUsers,
+);
+router.get(
+  "/scope/users/:id",
+  authenticate,
+  authorize("VIEW_USERS_BY_CLASS_TEACHER_GRADE"),
+  getScopedUserDetail,
+);
 router.get(
   "/template",
   authenticate,

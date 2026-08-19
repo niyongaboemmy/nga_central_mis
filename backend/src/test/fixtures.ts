@@ -24,6 +24,8 @@ import {
   StudentClassGroup,
   SubjectDocumentCategory,
   SubjectDocument,
+  UserGrade,
+  UserProgramLead,
 } from "../db/schema";
 import { eq, sql } from "drizzle-orm";
 
@@ -156,6 +158,70 @@ export async function createProgramGradeClassGroup() {
   });
 
   return classGroupId;
+}
+
+/**
+ * Same as createProgramGradeClassGroup, but hands back the whole chain --
+ * scope tests need the grade and program ids, not just the leaf class group.
+ */
+export async function createProgramGradeClassGroupDetailed(params: {
+  programId?: number;
+  gradeId?: number;
+} = {}) {
+  let programId = params.programId;
+  if (!programId) {
+    programId = await nextId("Program", "program_id");
+    await db
+      .insert(Program)
+      .values({ program_id: programId, name: unique("Program") });
+  }
+
+  let gradeId = params.gradeId;
+  if (!gradeId) {
+    const [gradeResult] = (await db.insert(Grade).values({
+      program_id: programId,
+      name: unique("Grade"),
+      level_order: 1,
+    })) as any;
+    gradeId = gradeResult.insertId as number;
+  }
+
+  const classGroupId = await nextId("ClassGroup", "class_group_id");
+  await db.insert(ClassGroup).values({
+    class_group_id: classGroupId,
+    grade_id: gradeId,
+    name: unique("ClassGroup"),
+  });
+
+  return { programId, gradeId: gradeId as number, classGroupId };
+}
+
+/** Class-teacher assignment: one user leads one class group of one grade. */
+export async function createUserGradeAssignment(params: {
+  userId: number;
+  gradeId: number;
+  classGroupId: number;
+  academicYearId: number;
+}) {
+  await db.insert(UserGrade).values({
+    user_id: params.userId,
+    grade_id: params.gradeId,
+    class_group_id: params.classGroupId,
+    academic_year_id: params.academicYearId,
+  });
+}
+
+/** Program-lead assignment. */
+export async function createProgramLead(params: {
+  userId: number;
+  programId: number;
+  academicYearId: number;
+}) {
+  await db.insert(UserProgramLead).values({
+    user_id: params.userId,
+    program_id: params.programId,
+    academic_year_id: params.academicYearId,
+  });
 }
 
 export async function createSubject() {

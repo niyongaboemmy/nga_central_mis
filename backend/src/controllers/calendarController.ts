@@ -35,6 +35,7 @@ import {
 import { successResponse } from "../utils/response";
 import { asyncHandler } from "../middleware/asyncHandler";
 import logger from "../utils/logger";
+import { resolveUserScope } from "../services/userScope";
 
 // Helper function to format date for MySQL
 const formatDateForMySQL = (dateStr: string | undefined) => {
@@ -1730,26 +1731,43 @@ export const getCalendarClassGroups = asyncHandler(
       throw new ValidationError("Academic year is required");
     }
 
+    // A class teacher / program lead may only pick from their own grades.
+    // Enforced here rather than filtered in the browser, so the dropdown and
+    // the data behind it agree.
+    const scope = await resolveUserScope(req.user?.userId, yearId);
+    const scopeFilter =
+      scope.scoped && scope.gradeIds.length > 0
+        ? inArray(ClassGroup.grade_id, scope.gradeIds)
+        : undefined;
+
     // Get class groups that have a teacher assignment in this academic
     // year -- ClassGroup itself is a permanent label with no year of its
     // own, so "for this academic year" is derived via TeacherSubjectAssignment.
-    const classGroups = await db
-      .selectDistinct({
-        class_group_id: ClassGroup.class_group_id,
-        name: ClassGroup.name,
-        grade_name: Grade.name,
-        grade_level: Grade.level_order,
-      })
-      .from(ClassGroup)
-      .leftJoin(Grade, eq(ClassGroup.grade_id, Grade.grade_id))
-      .innerJoin(
-        TeacherSubjectAssignment,
-        and(
-          eq(TeacherSubjectAssignment.class_group_id, ClassGroup.class_group_id),
-          eq(TeacherSubjectAssignment.academic_year_id, yearId),
-        ),
-      )
-      .orderBy(Grade.level_order, ClassGroup.name);
+    const classGroups =
+      scope.scoped && scope.gradeIds.length === 0
+        ? []
+        : await db
+            .selectDistinct({
+              class_group_id: ClassGroup.class_group_id,
+              name: ClassGroup.name,
+              grade_id: ClassGroup.grade_id,
+              grade_name: Grade.name,
+              grade_level: Grade.level_order,
+            })
+            .from(ClassGroup)
+            .leftJoin(Grade, eq(ClassGroup.grade_id, Grade.grade_id))
+            .innerJoin(
+              TeacherSubjectAssignment,
+              and(
+                eq(
+                  TeacherSubjectAssignment.class_group_id,
+                  ClassGroup.class_group_id,
+                ),
+                eq(TeacherSubjectAssignment.academic_year_id, yearId),
+              ),
+            )
+            .where(scopeFilter)
+            .orderBy(Grade.level_order, ClassGroup.name);
 
     successResponse(res, "Class groups retrieved successfully", classGroups);
   },

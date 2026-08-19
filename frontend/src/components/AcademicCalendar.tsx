@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useUser } from "../contexts/UserContext";
+import { useScopedGrades } from "../hooks/useScopedGrades";
 import { useToast } from "../contexts/ToastContext";
 import { useAcademicPeriod } from "../contexts/AcademicPeriodContext";
 import { Permissions } from "../constants/permissions";
@@ -108,6 +109,11 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({
         (perm) => perm.name === Permissions.STUDENT_VIEW_LESSON_PLAN_SUMMARY,
       ),
     );
+
+  // A class teacher / program lead is confined to their own class groups --
+  // the server clamps `allClassGroupsForYear` to them, and the effect below
+  // lands them on their own calendar instead of an empty picker.
+  const scope = useScopedGrades();
 
   // Academic period (year/term) comes from the global selector in the top nav
   const {
@@ -250,6 +256,57 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedTerm]);
+
+  // Land a scoped user on their own class group's calendar. Without this they
+  // arrive at "Select a class group to view its calendar" every single time,
+  // even though there is only ever one right answer for them. Only fills an
+  // empty selection, so it never fights a manual choice.
+  useEffect(() => {
+    if (!isBroadView || selectedCalendar || !selectedYear || !selectedTerm) {
+      return;
+    }
+    if (allClassGroupsForYear.length === 0) return;
+
+    const preferred =
+      (scope.defaultClassGroupId &&
+        allClassGroupsForYear.find(
+          (g) => g.class_group_id === scope.defaultClassGroupId,
+        )) ||
+      // A program lead has no single class group of their own; with the list
+      // already clamped to their scope, the first entry is the sane default.
+      (scope.isScoped ? allClassGroupsForYear[0] : null);
+
+    if (!preferred) return;
+
+    const existing = calendars.find(
+      (c) =>
+        c.class_group_id === preferred.class_group_id &&
+        c.academic_year_id === selectedYear &&
+        c.academic_term_id === selectedTerm,
+    );
+
+    setSelectedCalendar(
+      existing ?? {
+        // Placeholder row (calendar_id 0) -- the page renders its
+        // "create a calendar for this group" prompt rather than a blank grid.
+        calendar_id: 0,
+        academic_year_id: selectedYear,
+        academic_term_id: selectedTerm,
+        class_group_id: preferred.class_group_id,
+        class_group_name: preferred.name,
+        is_active: 0,
+      },
+    );
+  }, [
+    isBroadView,
+    selectedCalendar,
+    selectedYear,
+    selectedTerm,
+    allClassGroupsForYear,
+    calendars,
+    scope.defaultClassGroupId,
+    scope.isScoped,
+  ]);
 
   // Reload the instructor's schedule when they switch their own class group
   useEffect(() => {
@@ -636,14 +693,14 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({
           return;
         }
 
-        // Filter class groups to only those within the user's assigned grades
-        const userGradeNames = user?.assignedGrades?.map((g) => g.name) ?? [];
-        const filteredClassGroups =
-          userGradeNames.length > 0
-            ? classGroups.filter((cg: any) =>
-                userGradeNames.includes(cg.grade_name ?? ""),
-              )
-            : classGroups;
+        // The server already clamps this list to the caller's scope; narrow it
+        // further by grade_id (not by matching grade *names*, which broke as
+        // soon as two programs used the same grade label).
+        const filteredClassGroups = scope.isScoped
+          ? classGroups.filter((cg: any) =>
+              scope.gradeIds.includes(cg.grade_id),
+            )
+          : classGroups;
 
         setAvailableClassGroups(
           filteredClassGroups.length > 0 ? filteredClassGroups : classGroups,

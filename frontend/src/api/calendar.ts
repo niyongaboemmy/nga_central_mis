@@ -380,6 +380,7 @@ export const getCalendarClassGroups = async (params: {
   {
     class_group_id: number;
     name: string;
+    grade_id?: number;
     grade_name?: string;
     grade_level?: number;
   }[]
@@ -391,6 +392,7 @@ export const getCalendarClassGroups = async (params: {
         data: {
           class_group_id: number;
           name: string;
+          grade_id?: number;
           grade_name?: string;
           grade_level?: number;
         }[];
@@ -399,6 +401,7 @@ export const getCalendarClassGroups = async (params: {
         data: {
           class_group_id: number;
           name: string;
+          grade_id?: number;
           grade_name?: string;
           grade_level?: number;
         }[];
@@ -415,6 +418,7 @@ export const getMyClassGroups = async (params?: {
   {
     class_group_id: number;
     name: string;
+    grade_id?: number;
     grade_name?: string;
     grade_level?: number;
   }[]
@@ -426,6 +430,7 @@ export const getMyClassGroups = async (params?: {
         data: {
           class_group_id: number;
           name: string;
+          grade_id?: number;
           grade_name?: string;
           grade_level?: number;
         }[];
@@ -434,6 +439,7 @@ export const getMyClassGroups = async (params?: {
         data: {
           class_group_id: number;
           name: string;
+          grade_id?: number;
           grade_name?: string;
           grade_level?: number;
         }[];

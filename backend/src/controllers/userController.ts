@@ -3229,7 +3229,15 @@ export const getSubjectsByGrade = asyncHandler(async (req: any, res: any) => {
       });
     }
 
-    if (row.teacher_id) {
+    // One row per (subject, class group, year) assignment, so the same
+    // teacher recurs -- dedupe by user_id or the UI renders their chip once
+    // per assignment.
+    if (
+      row.teacher_id &&
+      !subjectMap
+        .get(subjectId)
+        .teachers.some((t: any) => t.user_id === row.teacher_id)
+    ) {
       subjectMap.get(subjectId).teachers.push({
         user_id: row.teacher_id,
         username: row.teacher_username,
