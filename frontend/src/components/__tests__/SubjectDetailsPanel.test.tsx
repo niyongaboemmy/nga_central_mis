@@ -130,29 +130,52 @@ describe("SubjectDetailsPanel", () => {
     expect(screen.getByText("Approved")).toBeTruthy();
   });
 
+  // Panels cross-fade on tab change, so the incoming one arrives a tick later
+  // than the click -- hence findBy rather than getBy here.
   it("switches to teachers, students and schedule", async () => {
     render(<SubjectDetailsPanel isOpen onClose={() => {}} summary={SUMMARY} />);
-    await waitFor(() => expect(screen.getByText("Sciences")).toBeTruthy());
+    await screen.findByText("Sciences");
 
-    fireEvent.click(screen.getByRole("tab", { name: /Teachers/ }));
-    expect(screen.getByText("jdn@example.com")).toBeTruthy();
+    fireEvent.click(screen.getByRole("tab", { name: "Teachers" }));
+    expect(await screen.findByText("jdn@example.com")).toBeTruthy();
 
-    fireEvent.click(screen.getByRole("tab", { name: /Students/ }));
-    expect(screen.getByText("Amina K")).toBeTruthy();
+    fireEvent.click(screen.getByRole("tab", { name: "Students" }));
+    expect(await screen.findByText("Amina K")).toBeTruthy();
     expect(screen.getByText("Bosco M")).toBeTruthy();
 
-    fireEvent.click(screen.getByRole("tab", { name: /Schedule/ }));
-    expect(screen.getByText("Monday")).toBeTruthy();
+    fireEvent.click(screen.getByRole("tab", { name: "Schedule" }));
+    expect(await screen.findByText("Monday")).toBeTruthy();
     expect(screen.getByText("09:00–09:50")).toBeTruthy();
     expect(screen.getByText(/Lab 2/)).toBeTruthy();
   });
 
+  it("moves between tabs with the arrow keys", async () => {
+    render(<SubjectDetailsPanel isOpen onClose={() => {}} summary={SUMMARY} />);
+    await screen.findByText("Sciences");
+
+    fireEvent.keyDown(screen.getByRole("tablist"), { key: "ArrowRight" });
+    expect(await screen.findByText("jdn@example.com")).toBeTruthy();
+
+    fireEvent.keyDown(screen.getByRole("tablist"), { key: "ArrowLeft" });
+    expect(await screen.findByText("Runs in")).toBeTruthy();
+  });
+
+  it("jumps to a tab from its stat tile", async () => {
+    // Reading "2 students" and then having to hunt for the tab is a wasted
+    // click, so the tiles navigate.
+    render(<SubjectDetailsPanel isOpen onClose={() => {}} summary={SUMMARY} />);
+    await screen.findByText("Sciences");
+
+    fireEvent.click(screen.getByRole("button", { name: "2 Students" }));
+    expect(await screen.findByText("Amina K")).toBeTruthy();
+  });
+
   it("filters the student list client-side", async () => {
     render(<SubjectDetailsPanel isOpen onClose={() => {}} summary={SUMMARY} />);
-    await waitFor(() => expect(screen.getByText("Sciences")).toBeTruthy());
+    await screen.findByText("Sciences");
 
-    fireEvent.click(screen.getByRole("tab", { name: /Students/ }));
-    fireEvent.change(screen.getByPlaceholderText("Filter students..."), {
+    fireEvent.click(screen.getByRole("tab", { name: "Students" }));
+    fireEvent.change(await screen.findByPlaceholderText("Filter students..."), {
       target: { value: "amina" },
     });
 
