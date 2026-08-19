@@ -135,6 +135,61 @@ const countBy = <T extends { id: number | string; name: string }>(items: T[]) =>
   return Array.from(counts.values()).sort((a, b) => a.name.localeCompare(b.name));
 };
 
+/**
+ * Each student's placement for the selected year, already narrowed to scope.
+ *
+ * The collapse to the latest placement happens BEFORE the grade filter, and
+ * that order is the whole point. Filtering first kept whichever historical row
+ * happened to sit in the caller's grades: a student who did Year 1 last year
+ * and has moved up to Year 2 still matched the Year 1 filter, so their Year 2
+ * enrolments were attributed to their old class group and Year 2 subjects
+ * appeared on a Year 1 class teacher's page.
+ */
+const effectiveStudentPlacements = async (params: {
+  yearId: number | null;
+  gradeIds: number[];
+  unrestricted: boolean;
+  userIds?: number[];
+}) => {
+  if (params.userIds && params.userIds.length === 0) return [];
+
+  const rows = await db
+    .select({
+      user_id: StudentClassGroup.user_id,
+      class_group_id: ClassGroup.class_group_id,
+      class_group_name: ClassGroup.name,
+      grade_id: ClassGroup.grade_id,
+      grade_name: Grade.name,
+      academic_year_id: StudentClassGroup.academic_year_id,
+    })
+    .from(StudentClassGroup)
+    .innerJoin(
+      ClassGroup,
+      eq(StudentClassGroup.class_group_id, ClassGroup.class_group_id),
+    )
+    .leftJoin(Grade, eq(ClassGroup.grade_id, Grade.grade_id))
+    .where(
+      and(
+        ...([
+          eq(StudentClassGroup.status, "ACTIVE"),
+          params.yearId
+            ? lte(StudentClassGroup.academic_year_id, params.yearId)
+            : undefined,
+          params.userIds?.length
+            ? inArray(StudentClassGroup.user_id, params.userIds)
+            : undefined,
+        ].filter(Boolean) as any[]),
+      ),
+    );
+
+  const current = latestPerUser(rows);
+  return params.unrestricted
+    ? current
+    : current.filter(
+        (row) => row.grade_id != null && params.gradeIds.includes(row.grade_id),
+      );
+};
+
 /** Every role each of the given users holds, keyed by user_id. */
 const rolesByUser = async (userIds: number[]) => {
   if (userIds.length === 0) return new Map<number, any[]>();
@@ -327,59 +382,71 @@ export const getScopedSubjects = asyncHandler(async (req: any, res: any) => {
     .where(and(...[gradeFilter, yearFilter].filter(Boolean) as any[]));
 
   // Subjects students are enrolled in that have no teacher assigned yet.
-  const enrolledOnly = await db
-    .select({
-      subject_id: Subject.subject_id,
-      code: Subject.code,
-      name: Subject.name,
-      description: Subject.description,
-      status: Subject.status,
-      color: Subject.color,
-      category_id: Subject.course_category_id,
-      category_name: CourseCategory.name,
-      grade_id: ClassGroup.grade_id,
-      grade_name: Grade.name,
-      class_group_id: ClassGroup.class_group_id,
-      class_group_name: ClassGroup.name,
-      academic_year_id: StudentClassGroup.academic_year_id,
-    })
-    .from(Subject)
-    .leftJoin(
-      CourseCategory,
-      eq(Subject.course_category_id, CourseCategory.category_id),
-    )
-    .innerJoin(
-      StudentSubjectEnrollment,
-      eq(Subject.subject_id, StudentSubjectEnrollment.subject_id),
-    )
-    // Joined on the student alone, NOT on matching years: the enrolment is
-    // pinned to the selected year below, while the placement that names their
-    // section carries forward. Requiring both to carry the same year dropped
-    // students whose placement had not been re-stamped for the new year.
-    .innerJoin(
-      StudentClassGroup,
-      eq(StudentSubjectEnrollment.user_id, StudentClassGroup.user_id),
-    )
-    .innerJoin(
-      ClassGroup,
-      eq(StudentClassGroup.class_group_id, ClassGroup.class_group_id),
-    )
-    .leftJoin(Grade, eq(ClassGroup.grade_id, Grade.grade_id))
-    .where(
-      and(
-        ...([
-          gradeFilter,
-          eq(StudentClassGroup.status, "ACTIVE"),
-          eq(StudentSubjectEnrollment.status, "ACTIVE"),
-          // Enrolment: exact selected year.
-          yearId
-            ? eq(StudentSubjectEnrollment.academic_year_id, yearId)
-            : undefined,
-          // Placement: carry-forward -- see latestPerUser.
-          yearId ? lte(StudentClassGroup.academic_year_id, yearId) : undefined,
-        ].filter(Boolean) as any[]),
-      ),
-    );
+  // Resolved from each student's placement FOR THIS YEAR, so a student who has
+  // moved up a grade brings their new grade's subjects to that grade's page
+  // only -- never to the one they left.
+  const placements = await effectiveStudentPlacements({
+    yearId,
+    gradeIds,
+    unrestricted,
+  });
+  const placementsByUser = new Map<number, typeof placements>();
+  for (const row of placements) {
+    placementsByUser.set(row.user_id, [
+      ...(placementsByUser.get(row.user_id) ?? []),
+      row,
+    ]);
+  }
+  const placedStudentIds = Array.from(placementsByUser.keys());
+
+  const enrolmentRows =
+    placedStudentIds.length > 0
+      ? await db
+          .select({
+            subject_id: Subject.subject_id,
+            code: Subject.code,
+            name: Subject.name,
+            description: Subject.description,
+            status: Subject.status,
+            color: Subject.color,
+            category_id: Subject.course_category_id,
+            category_name: CourseCategory.name,
+            user_id: StudentSubjectEnrollment.user_id,
+          })
+          .from(StudentSubjectEnrollment)
+          .innerJoin(
+            Subject,
+            eq(StudentSubjectEnrollment.subject_id, Subject.subject_id),
+          )
+          .leftJoin(
+            CourseCategory,
+            eq(Subject.course_category_id, CourseCategory.category_id),
+          )
+          .where(
+            and(
+              ...([
+                inArray(StudentSubjectEnrollment.user_id, placedStudentIds),
+                eq(StudentSubjectEnrollment.status, "ACTIVE"),
+                // Enrolment is per-year and explicit -- exact match.
+                yearId
+                  ? eq(StudentSubjectEnrollment.academic_year_id, yearId)
+                  : undefined,
+              ].filter(Boolean) as any[]),
+            ),
+          )
+      : [];
+
+  // Attribute each enrolment to the class group that student actually sits in.
+  const enrolledOnly = enrolmentRows.flatMap((row) =>
+    (placementsByUser.get(row.user_id) ?? []).map((placement) => ({
+      ...row,
+      grade_id: placement.grade_id,
+      grade_name: placement.grade_name,
+      class_group_id: placement.class_group_id,
+      class_group_name: placement.class_group_name,
+      academic_year_id: placement.academic_year_id,
+    })),
+  );
 
   interface ScopedSubject {
     subject_id: number;
@@ -454,9 +521,7 @@ export const getScopedSubjects = asyncHandler(async (req: any, res: any) => {
       });
     }
   }
-  for (const row of latestPerKey(enrolledOnly, (r) => r.class_group_id)) {
-    ensure(row);
-  }
+  for (const row of enrolledOnly) ensure(row);
 
   let subjects = Array.from(bySubject.values());
   if (search) {
@@ -662,47 +727,83 @@ export const getScopedSubjectDetail = asyncHandler(
     );
 
     // Class groups reached through enrolled students too -- a subject can be
-    // enrolled before anyone is assigned to teach it.
-    const enrolledGroups = await db
-      .selectDistinct({
-        class_group_id: ClassGroup.class_group_id,
-        class_group_name: ClassGroup.name,
-        grade_id: ClassGroup.grade_id,
-        grade_name: Grade.name,
-        academic_year_id: StudentClassGroup.academic_year_id,
-      })
-      .from(StudentSubjectEnrollment)
-      // Student alone, for the same reason as above.
-      .innerJoin(
-        StudentClassGroup,
-        eq(StudentSubjectEnrollment.user_id, StudentClassGroup.user_id),
-      )
-      .innerJoin(
-        ClassGroup,
-        eq(StudentClassGroup.class_group_id, ClassGroup.class_group_id),
-      )
-      .leftJoin(Grade, eq(ClassGroup.grade_id, Grade.grade_id))
-      .where(
-        and(
-          ...([
-            eq(StudentSubjectEnrollment.subject_id, subjectId),
-            eq(StudentSubjectEnrollment.status, "ACTIVE"),
-            eq(StudentClassGroup.status, "ACTIVE"),
-            gradeFilter,
-            yearId
-              ? eq(StudentSubjectEnrollment.academic_year_id, yearId)
-              : undefined,
-            yearId
-              ? lte(StudentClassGroup.academic_year_id, yearId)
-              : undefined,
-          ].filter(Boolean) as any[]),
-        ),
-      );
+    // enrolled before anyone is assigned to teach it. Resolved from each
+    // student's placement for THIS year, so a student who has moved up does
+    // not drag the subject back onto their old grade's page.
+    const detailPlacements = await effectiveStudentPlacements({
+      yearId,
+      gradeIds,
+      unrestricted,
+    });
+    const detailPlacementsByUser = new Map<number, typeof detailPlacements>();
+    for (const row of detailPlacements) {
+      detailPlacementsByUser.set(row.user_id, [
+        ...(detailPlacementsByUser.get(row.user_id) ?? []),
+        row,
+      ]);
+    }
+
+    const enrolledUserRows =
+      detailPlacementsByUser.size > 0
+        ? await db
+            .select({
+              user_id: StudentSubjectEnrollment.user_id,
+              username: User.username,
+              email: User.email,
+              first_name: UserProfile.first_name,
+              last_name: UserProfile.last_name,
+              status: User.status,
+            })
+            .from(StudentSubjectEnrollment)
+            .innerJoin(User, eq(StudentSubjectEnrollment.user_id, User.user_id))
+            .leftJoin(UserProfile, eq(User.user_id, UserProfile.user_id))
+            .where(
+              and(
+                ...([
+                  eq(StudentSubjectEnrollment.subject_id, subjectId),
+                  eq(StudentSubjectEnrollment.status, "ACTIVE"),
+                  inArray(
+                    StudentSubjectEnrollment.user_id,
+                    Array.from(detailPlacementsByUser.keys()),
+                  ),
+                  yearId
+                    ? eq(StudentSubjectEnrollment.academic_year_id, yearId)
+                    : undefined,
+                ].filter(Boolean) as any[]),
+              ),
+            )
+        : [];
+
+    // One row per (student, class group they sit in).
+    const enrolledStudents = enrolledUserRows.flatMap((row) =>
+      (detailPlacementsByUser.get(row.user_id) ?? []).map((placement) => ({
+        ...row,
+        class_group_id: placement.class_group_id,
+        class_group_name: placement.class_group_name,
+        academic_year_id: placement.academic_year_id,
+      })),
+    );
+
+    const enrolledGroups = enrolledStudents.map((row) => ({
+      class_group_id: row.class_group_id,
+      class_group_name: row.class_group_name,
+      grade_id:
+        detailPlacementsByUser
+          .get(row.user_id)
+          ?.find((p) => p.class_group_id === row.class_group_id)?.grade_id ??
+        null,
+      grade_name:
+        detailPlacementsByUser
+          .get(row.user_id)
+          ?.find((p) => p.class_group_id === row.class_group_id)?.grade_name ??
+        null,
+      academic_year_id: row.academic_year_id,
+    }));
 
     const classGroups = new Map<number, any>();
     for (const row of [
       ...currentAssignments,
-      ...latestYearOnly(enrolledGroups),
+      ...enrolledGroups,
     ]) {
       if (!row.class_group_id || classGroups.has(row.class_group_id)) continue;
       classGroups.set(row.class_group_id, {
@@ -753,66 +854,7 @@ export const getScopedSubjectDetail = asyncHandler(
       }
     }
 
-    const [students, slots, schemes] = await Promise.all([
-      classGroupIds.length > 0
-        ? db
-            .selectDistinct({
-              user_id: User.user_id,
-              username: User.username,
-              email: User.email,
-              first_name: UserProfile.first_name,
-              last_name: UserProfile.last_name,
-              status: User.status,
-              class_group_id: StudentClassGroup.class_group_id,
-              class_group_name: ClassGroup.name,
-              academic_year_id: StudentClassGroup.academic_year_id,
-            })
-            .from(StudentSubjectEnrollment)
-            .innerJoin(
-              User,
-              eq(StudentSubjectEnrollment.user_id, User.user_id),
-            )
-            .leftJoin(UserProfile, eq(User.user_id, UserProfile.user_id))
-            .innerJoin(
-              StudentClassGroup,
-              and(
-                ...([
-                  eq(StudentClassGroup.user_id, User.user_id),
-                  inArray(StudentClassGroup.class_group_id, classGroupIds),
-                  eq(StudentClassGroup.status, "ACTIVE"),
-                  // Bound the placement by the selected year as well. Without
-                  // it a placement stamped for a LATER year joined in, so the
-                  // roster showed a student in a class group they have not
-                  // moved into yet.
-                  yearId
-                    ? lte(StudentClassGroup.academic_year_id, yearId)
-                    : undefined,
-                ].filter(Boolean) as any[]),
-              ),
-            )
-            .innerJoin(
-              ClassGroup,
-              eq(StudentClassGroup.class_group_id, ClassGroup.class_group_id),
-            )
-            .where(
-              and(
-                ...([
-                  eq(StudentSubjectEnrollment.subject_id, subjectId),
-                  eq(StudentSubjectEnrollment.status, "ACTIVE"),
-                  // Enrolment is an explicit per-year record -- a student is
-                  // enrolled in this subject FOR a given year -- so it matches
-                  // the selected year exactly. That is a different rule from
-                  // the class-group placement below, which carries forward
-                  // (see latestPerUser): the placement only names the section
-                  // an already-enrolled student sits in.
-                  yearId
-                    ? eq(StudentSubjectEnrollment.academic_year_id, yearId)
-                    : undefined,
-                ].filter(Boolean) as any[]),
-              ),
-            )
-        : Promise.resolve([]),
-
+    const [slots, schemes] = await Promise.all([
       // Where the subject sits in the week, for the caller's class groups.
       classGroupIds.length > 0
         ? db
@@ -907,10 +949,8 @@ export const getScopedSubjectDetail = asyncHandler(
       subject,
       classGroups: Array.from(classGroups.values()),
       teachers: Array.from(teachers.values()),
-      // One row per student, from their most recent placement -- see
-      // latestPerUser. Without it a student carried over from a prior year
-      // appears once per year they have ever been enrolled.
-      students: latestPerUser(students as any[]).map((s) => ({
+      // Already one row per (student, class group they sit in this year).
+      students: enrolledStudents.map((s) => ({
         ...s,
         full_name:
           `${s.first_name ?? ""} ${s.last_name ?? ""}`.trim() || s.username,
@@ -976,29 +1016,52 @@ export const getScopedUsers = asyncHandler(async (req: any, res: any) => {
     class_group_name: ClassGroup.name,
   };
 
-  const studentRows = await db
-    .select({
-      ...baseColumns,
-      academic_year_id: StudentClassGroup.academic_year_id,
-    })
-    .from(User)
-    .leftJoin(UserProfile, eq(User.user_id, UserProfile.user_id))
-    .innerJoin(StudentClassGroup, eq(User.user_id, StudentClassGroup.user_id))
-    .innerJoin(
-      ClassGroup,
-      eq(StudentClassGroup.class_group_id, ClassGroup.class_group_id),
-    )
-    .leftJoin(Grade, eq(ClassGroup.grade_id, Grade.grade_id))
-    .where(
-      and(
-        ...([
-          gradeFilter,
-          eq(StudentClassGroup.status, "ACTIVE"),
-          yearId ? lte(StudentClassGroup.academic_year_id, yearId) : undefined,
-        ].filter(Boolean) as any[]),
-      ),
-    );
-  const students = latestPerUser(studentRows);
+  // Resolved placement-first: collapse to each student's current class group,
+  // THEN apply the grade filter. Filtering first kept a student who has since
+  // moved up to another grade on their old grade's roster.
+  const studentPlacements = await effectiveStudentPlacements({
+    yearId,
+    gradeIds,
+    unrestricted,
+  });
+  const studentIds = Array.from(
+    new Set(studentPlacements.map((p) => p.user_id)),
+  );
+  const studentProfiles =
+    studentIds.length > 0
+      ? await db
+          .select({
+            user_id: User.user_id,
+            username: User.username,
+            email: User.email,
+            phone_number: User.phone_number,
+            status: User.status,
+            first_name: UserProfile.first_name,
+            last_name: UserProfile.last_name,
+            user_type: UserProfile.user_type,
+            gender: UserProfile.gender,
+          })
+          .from(User)
+          .leftJoin(UserProfile, eq(User.user_id, UserProfile.user_id))
+          .where(inArray(User.user_id, studentIds))
+      : [];
+  const profileById = new Map(studentProfiles.map((p) => [p.user_id, p]));
+
+  const students = studentPlacements.flatMap((placement) => {
+    const profile = profileById.get(placement.user_id);
+    return profile
+      ? [
+          {
+            ...profile,
+            grade_id: placement.grade_id,
+            grade_name: placement.grade_name,
+            class_group_id: placement.class_group_id,
+            class_group_name: placement.class_group_name,
+            academic_year_id: placement.academic_year_id,
+          },
+        ]
+      : [];
+  });
 
   const teacherRows = await db
     .select({
