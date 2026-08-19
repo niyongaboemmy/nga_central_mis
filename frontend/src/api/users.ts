@@ -739,6 +739,13 @@ export const getScopedUsers = async (
   };
 };
 
+export interface ScopedUserSubject {
+  subject_id: number;
+  name: string;
+  code?: string | null;
+  class_groups: { class_group_id: number; name: string }[];
+}
+
 export interface ScopedUserDetail {
   user: User;
   profile: UserProfile | null;
@@ -759,13 +766,8 @@ export interface ScopedUserDetail {
     program_name?: string | null;
   }[];
   assignedPrograms: { program_id: number; name: string }[];
-  subjectsTaught: {
-    subject_id: number;
-    name: string;
-    code?: string | null;
-    class_group_name?: string | null;
-  }[];
-  subjectsEnrolled: { subject_id: number; name: string; code?: string | null }[];
+  subjectsTaught: ScopedUserSubject[];
+  subjectsEnrolled: ScopedUserSubject[];
 }
 
 export const getScopedUserDetail = async (

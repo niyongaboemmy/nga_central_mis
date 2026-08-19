@@ -1078,7 +1078,9 @@ export const getScopedUserDetail = asyncHandler(async (req: any, res: any) => {
         subject_id: Subject.subject_id,
         name: Subject.name,
         code: Subject.code,
+        class_group_id: TeacherSubjectAssignment.class_group_id,
         class_group_name: ClassGroup.name,
+        grade_name: Grade.name,
         academic_year_id: TeacherSubjectAssignment.academic_year_id,
       })
       .from(TeacherSubjectAssignment)
@@ -1090,6 +1092,7 @@ export const getScopedUserDetail = asyncHandler(async (req: any, res: any) => {
         ClassGroup,
         eq(TeacherSubjectAssignment.class_group_id, ClassGroup.class_group_id),
       )
+      .leftJoin(Grade, eq(ClassGroup.grade_id, Grade.grade_id))
       .where(
         and(
           eq(TeacherSubjectAssignment.user_id, targetId),
@@ -1149,6 +1152,62 @@ export const getScopedUserDetail = asyncHandler(async (req: any, res: any) => {
       .map(({ role_id, ...perm }) => perm),
   }));
 
+  // A teacher assigned the same subject in two sections produced two rows; the
+  // profile wants one card per subject naming both class groups.
+  const groupSubjects = (
+    rows: any[],
+    classGroupsFor: (row: any) => { class_group_id: number; name: string }[],
+  ) => {
+    const bySubject = new Map<number, any>();
+    for (const row of rows) {
+      let entry = bySubject.get(row.subject_id);
+      if (!entry) {
+        entry = {
+          subject_id: row.subject_id,
+          name: row.name,
+          code: row.code,
+          class_groups: [],
+        };
+        bySubject.set(row.subject_id, entry);
+      }
+      for (const cg of classGroupsFor(row)) {
+        if (
+          cg.class_group_id &&
+          !entry.class_groups.some(
+            (c: any) => c.class_group_id === cg.class_group_id,
+          )
+        ) {
+          entry.class_groups.push(cg);
+        }
+      }
+    }
+    return Array.from(bySubject.values());
+  };
+
+  const currentClassGroups = latestYearOnly(classGroupRows);
+
+  const subjectsTaught = groupSubjects(latestYearOnly(taughtRows), (row) =>
+    row.class_group_id
+      ? [
+          {
+            class_group_id: row.class_group_id,
+            name: [row.grade_name, row.class_group_name]
+              .filter(Boolean)
+              .join(" · "),
+          },
+        ]
+      : [],
+  );
+
+  // A student's enrolment is not itself tied to a class group, so the section
+  // shown is the one they are actually placed in this year.
+  const subjectsEnrolled = groupSubjects(latestYearOnly(enrolledRows), () =>
+    currentClassGroups.map((cg: any) => ({
+      class_group_id: cg.class_group_id,
+      name: [cg.grade_name, cg.name].filter(Boolean).join(" · "),
+    })),
+  );
+
   const { password_hash, ...safeUser } = target as any;
 
   successResponse(res, "User profile retrieved successfully", {
@@ -1162,10 +1221,10 @@ export const getScopedUserDetail = asyncHandler(async (req: any, res: any) => {
     // Collapsed to the selected year's placement/enrolment -- the queries widen
     // to `<= yearId` so a roster that was never re-stamped still resolves, but
     // the profile must not stack last year's class group on top of this one's.
-    classGroups: latestYearOnly(classGroupRows),
+    classGroups: currentClassGroups,
     assignedPrograms: programRows,
-    subjectsTaught: latestYearOnly(taughtRows),
-    subjectsEnrolled: latestYearOnly(enrolledRows),
+    subjectsTaught,
+    subjectsEnrolled,
   });
 });
 

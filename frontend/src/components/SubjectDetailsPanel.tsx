@@ -73,7 +73,7 @@ const StatTile = ({
   value: number;
   label: string;
 }) => (
-  <div className="flex-1 rounded-xl border border-blue-100 dark:border-blue-900/40 bg-blue-50/70 dark:bg-blue-950/30 px-3 py-2.5">
+  <div className="flex-1 min-w-[6rem] rounded-xl border border-blue-100 dark:border-blue-900/40 bg-blue-50/70 dark:bg-blue-950/30 px-3 py-2.5">
     <div className="flex items-center gap-2">
       <Icon className="w-4 h-4 text-blue-600 dark:text-blue-400" />
       <span className="text-lg font-semibold text-blue-900 dark:text-blue-100 leading-none">
@@ -286,7 +286,7 @@ const SubjectDetailsPanel: React.FC<SubjectDetailsPanelProps> = ({
           exit={{ x: "100%" }}
           transition={{ type: "spring", damping: 30, stiffness: 300 }}
           onClick={(e) => e.stopPropagation()}
-          className="w-full max-w-lg h-full bg-white dark:bg-slate-900 shadow-2xl flex flex-col"
+          className="w-full sm:max-w-lg h-full bg-white dark:bg-slate-900 shadow-2xl flex flex-col"
         >
           {/* Header */}
           <header className="relative bg-gradient-to-br from-blue-600 to-indigo-700 px-5 pt-5 pb-6 text-white">
@@ -335,7 +335,7 @@ const SubjectDetailsPanel: React.FC<SubjectDetailsPanelProps> = ({
           </header>
 
           {/* Stat strip */}
-          <div className="flex gap-2 px-5 -mt-3 relative z-10">
+          <div className="flex flex-wrap gap-2 px-5 -mt-3 relative z-10">
             <StatTile
               icon={GraduationCap}
               value={classGroups.length}

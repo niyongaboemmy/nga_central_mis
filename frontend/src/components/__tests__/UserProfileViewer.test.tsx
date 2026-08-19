@@ -55,7 +55,14 @@ const DETAIL = {
   ],
   assignedPrograms: [],
   subjectsTaught: [],
-  subjectsEnrolled: [{ subject_id: 1, name: "Mathematics", code: "MATH101" }],
+  subjectsEnrolled: [
+    {
+      subject_id: 1,
+      name: "Mathematics",
+      code: "MATH101",
+      class_groups: [{ class_group_id: 7, name: "Grade 5 · Grade 5 A" }],
+    },
+  ],
 };
 
 describe("UserProfileViewer", () => {
@@ -92,6 +99,20 @@ describe("UserProfileViewer", () => {
       screen.getByRole("button", { name: /^Subjects/ }),
     );
     expect(screen.getByText(/MATH101/)).toBeTruthy();
+  });
+
+  it("names the class group each subject is taken with", async () => {
+    // A subject name alone does not say which section the person takes it in;
+    // for a teacher of the same subject in two sections it is the only thing
+    // telling the rows apart.
+    render(<UserProfileViewer isOpen onClose={() => {}} summary={SUMMARY} />);
+    await waitFor(() => expect(screen.getByText("Grade 5 A")).toBeTruthy());
+
+    fireEvent.click(screen.getByRole("button", { name: /^Subjects/ }));
+    expect(screen.getByText("Mathematics")).toBeTruthy();
+    expect(screen.getByText("Grade 5 · Grade 5 A")).toBeTruthy();
+    // Teaching vs enrolment stays labelled rather than merged.
+    expect(screen.getByText("Enrolled")).toBeTruthy();
   });
 
   it("offers no way to modify the user", async () => {

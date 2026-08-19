@@ -17,6 +17,7 @@ import {
   ChevronDown,
   Hash,
   Building2,
+  Search,
 } from "lucide-react";
 import {
   getScopedUserDetail,
@@ -64,10 +65,13 @@ const CopyableRow = ({
   icon: Icon,
   label,
   value,
+  href,
 }: {
   icon: React.ElementType;
   label: string;
   value?: string | null;
+  /** Makes the value actionable (mailto:/tel:) as well as copyable. */
+  href?: string;
 }) => {
   const [copied, setCopied] = React.useState(false);
   const { showToast } = useToast();
@@ -93,7 +97,18 @@ const CopyableRow = ({
         <p className="text-[11px] uppercase tracking-wide text-blue-500/80">
           {label}
         </p>
-        <p className="text-sm text-gray-900 dark:text-white truncate">{value}</p>
+        {href ? (
+          <a
+            href={href}
+            className="text-sm text-blue-700 dark:text-blue-300 hover:underline truncate block"
+          >
+            {value}
+          </a>
+        ) : (
+          <p className="text-sm text-gray-900 dark:text-white truncate">
+            {value}
+          </p>
+        )}
       </div>
       <button
         type="button"
@@ -120,7 +135,7 @@ const StatTile = ({
   value: number;
   label: string;
 }) => (
-  <div className="flex-1 rounded-xl bg-blue-50/80 dark:bg-blue-950/40 border border-blue-100 dark:border-blue-900/40 px-3 py-2.5 backdrop-blur">
+  <div className="flex-1 min-w-[6rem] rounded-xl bg-blue-50/80 dark:bg-blue-950/40 border border-blue-100 dark:border-blue-900/40 px-3 py-2.5 backdrop-blur">
     <div className="flex items-center gap-2">
       <Icon className="w-4 h-4 text-blue-600 dark:text-blue-400" />
       <span className="text-lg font-semibold text-blue-900 dark:text-blue-50 leading-none">
@@ -166,7 +181,19 @@ const Section = ({
           }`}
         />
       </button>
-      {open && <div className="p-4 space-y-2">{children}</div>}
+      <AnimatePresence initial={false}>
+        {open && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.18, ease: "easeOut" }}
+            className="overflow-hidden"
+          >
+            <div className="p-4 space-y-2">{children}</div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </section>
   );
 };
@@ -214,6 +241,7 @@ const UserProfileViewer: React.FC<UserProfileViewerProps> = ({
   const [detail, setDetail] = React.useState<ScopedUserDetail | null>(null);
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  const [subjectFilter, setSubjectFilter] = React.useState("");
 
   const userId = summary?.user_id ?? null;
 
@@ -223,6 +251,7 @@ const UserProfileViewer: React.FC<UserProfileViewerProps> = ({
     setLoading(true);
     setError(null);
     setDetail(null);
+    setSubjectFilter("");
 
     getScopedUserDetail(userId, academicYearId)
       .then((data) => {
@@ -266,11 +295,31 @@ const UserProfileViewer: React.FC<UserProfileViewerProps> = ({
   const roles = detail?.roles ?? summary.roles ?? [];
   const classGroups = detail?.classGroups ?? [];
   const assignedGrades = detail?.assignedGrades ?? [];
+  // Teaching and enrolment are different relationships to a subject, so they
+  // stay labelled rather than being concatenated into one anonymous list.
   const subjects = [
-    ...(detail?.subjectsTaught ?? []),
-    ...(detail?.subjectsEnrolled ?? []),
+    ...(detail?.subjectsTaught ?? []).map((s) => ({
+      ...s,
+      class_groups: s.class_groups ?? [],
+      relation: "Teaching" as const,
+    })),
+    ...(detail?.subjectsEnrolled ?? []).map((s) => ({
+      ...s,
+      class_groups: s.class_groups ?? [],
+      relation: "Enrolled" as const,
+    })),
   ];
   const placementCount = classGroups.length + assignedGrades.length;
+
+  const needle = subjectFilter.trim().toLowerCase();
+  const visibleSubjects = needle
+    ? subjects.filter(
+        (s) =>
+          s.name.toLowerCase().includes(needle) ||
+          (s.code ?? "").toLowerCase().includes(needle) ||
+          s.class_groups.some((cg) => cg.name.toLowerCase().includes(needle)),
+      )
+    : subjects;
 
   return createPortal(
     <AnimatePresence>
@@ -290,7 +339,7 @@ const UserProfileViewer: React.FC<UserProfileViewerProps> = ({
           exit={{ x: "100%" }}
           transition={{ type: "spring", damping: 30, stiffness: 300 }}
           onClick={(e) => e.stopPropagation()}
-          className="w-full max-w-md h-full bg-white dark:bg-slate-900 shadow-2xl flex flex-col"
+          className="w-full sm:max-w-md h-full bg-white dark:bg-slate-900 shadow-2xl flex flex-col"
         >
           {/* Identity header */}
           <header
@@ -332,7 +381,7 @@ const UserProfileViewer: React.FC<UserProfileViewerProps> = ({
           </header>
 
           {/* Stat strip */}
-          <div className="flex gap-2 px-5 -mt-3 relative z-10">
+          <div className="flex flex-wrap gap-2 px-5 -mt-3 relative z-10">
             <StatTile icon={Shield} value={roles.length} label="Roles" />
             <StatTile
               icon={GraduationCap}
@@ -360,11 +409,21 @@ const UserProfileViewer: React.FC<UserProfileViewerProps> = ({
                     icon={Mail}
                     label="Email"
                     value={detail?.user?.email ?? summary.email}
+                    href={
+                      (detail?.user?.email ?? summary.email)
+                        ? `mailto:${detail?.user?.email ?? summary.email}`
+                        : undefined
+                    }
                   />
                   <CopyableRow
                     icon={Phone}
                     label="Phone"
                     value={detail?.user?.phone_number ?? summary.phone_number}
+                    href={
+                      (detail?.user?.phone_number ?? summary.phone_number)
+                        ? `tel:${detail?.user?.phone_number ?? summary.phone_number}`
+                        : undefined
+                    }
                   />
                   {!(detail?.user?.email ?? summary.email) &&
                     !(detail?.user?.phone_number ?? summary.phone_number) && (
@@ -492,13 +551,63 @@ const UserProfileViewer: React.FC<UserProfileViewerProps> = ({
                   {subjects.length === 0 ? (
                     <Empty>No subjects this academic year.</Empty>
                   ) : (
-                    <div className="flex flex-wrap gap-1.5">
-                      {subjects.map((s: any, i: number) => (
-                        <Chip key={`${s.subject_id}-${i}`}>
-                          {s.code ? `${s.code} · ` : ""}
-                          {s.name}
-                        </Chip>
-                      ))}
+                    <div className="space-y-2">
+                      {/* A teacher can hold 20+ subjects; a filter beats
+                          scrolling a wall of chips. */}
+                      {subjects.length > 6 && (
+                        <div className="relative">
+                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-blue-400" />
+                          <input
+                            type="text"
+                            value={subjectFilter}
+                            onChange={(e) => setSubjectFilter(e.target.value)}
+                            placeholder="Filter subjects..."
+                            className="w-full pl-9 pr-3 py-2 rounded-lg border border-blue-100 dark:border-blue-900/40 bg-white dark:bg-slate-800 text-xs dark:text-white focus:outline-none focus:border-blue-500"
+                          />
+                        </div>
+                      )}
+                      {visibleSubjects.length === 0 ? (
+                        <Empty>No subject matches that filter.</Empty>
+                      ) : (
+                        visibleSubjects.map((s, i) => (
+                          <div
+                            key={`${s.relation}-${s.subject_id}-${i}`}
+                            className="p-2.5 rounded-xl bg-blue-50/60 dark:bg-blue-950/25 border border-blue-100/70 dark:border-blue-900/30"
+                          >
+                            <div className="flex items-start gap-2">
+                              <BookOpen className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
+                              <div className="min-w-0 flex-1">
+                                <p className="text-sm text-gray-900 dark:text-white break-words">
+                                  {s.name}
+                                </p>
+                                {s.code && (
+                                  <p className="text-[11px] text-blue-900/50 dark:text-blue-100/40">
+                                    {s.code}
+                                  </p>
+                                )}
+                              </div>
+                              <span className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded-full bg-blue-600 text-white flex-shrink-0">
+                                {s.relation}
+                              </span>
+                            </div>
+                            {/* Which section they take it with — a subject name
+                                alone does not say that. */}
+                            {s.class_groups.length > 0 && (
+                              <div className="flex flex-wrap gap-1 mt-1.5 pl-5">
+                                {s.class_groups.map((cg) => (
+                                  <span
+                                    key={cg.class_group_id}
+                                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] bg-white dark:bg-slate-800 text-blue-700 dark:text-blue-300 border border-blue-100 dark:border-blue-900/50"
+                                  >
+                                    <Layers className="w-2.5 h-2.5" />
+                                    {cg.name}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        ))
+                      )}
                     </div>
                   )}
                 </Section>
