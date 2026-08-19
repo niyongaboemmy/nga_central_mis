@@ -444,10 +444,16 @@ export const getCurrentUser = asyncHandler(async (req: any, res: any) => {
           level_order: Grade.level_order,
           program_id: Grade.program_id,
           program_name: Program.name,
+          class_group_id: UserGrade.class_group_id,
+          class_group_name: ClassGroup.name,
           assigned_at: UserGrade.assigned_at,
         })
         .from(UserGrade)
         .innerJoin(Grade, eq(UserGrade.grade_id, Grade.grade_id))
+        .innerJoin(
+          ClassGroup,
+          eq(UserGrade.class_group_id, ClassGroup.class_group_id),
+        )
         .innerJoin(Program, eq(Grade.program_id, Program.program_id))
         .where(
           and(
@@ -455,7 +461,7 @@ export const getCurrentUser = asyncHandler(async (req: any, res: any) => {
             eq(UserGrade.academic_year_id, currentYearIdForAssignments),
           ),
         )
-        .orderBy(Grade.level_order)
+        .orderBy(Grade.level_order, ClassGroup.name)
     : [];
 
   // Get all academic years
@@ -2357,15 +2363,50 @@ export const getUserPrograms = asyncHandler(async (req: any, res: any) => {
   successResponse(res, "User programs retrieved successfully", uniquePrograms);
 });
 
+// A class-teacher assignment names both a grade and a class group, and the
+// two must agree -- ClassGroup already carries its own grade_id, so a
+// mismatched pair would put the row in a state no UI could render sensibly.
+const assertClassGroupBelongsToGrade = async (
+  classGroupId: number,
+  gradeId: number,
+) => {
+  const classGroup = await db
+    .select({
+      class_group_id: ClassGroup.class_group_id,
+      grade_id: ClassGroup.grade_id,
+      name: ClassGroup.name,
+    })
+    .from(ClassGroup)
+    .where(eq(ClassGroup.class_group_id, classGroupId))
+    .limit(1);
+
+  if (classGroup.length === 0) {
+    throw new NotFoundError("Class group not found");
+  }
+
+  if (classGroup[0].grade_id !== gradeId) {
+    throw new ValidationError(
+      "The selected class group does not belong to the selected grade",
+    );
+  }
+
+  return classGroup[0];
+};
+
 // Assign grade to class teacher
 export const assignGradeToUser = asyncHandler(async (req: any, res: any) => {
   const { id } = req.params;
-  const { grade_id, academic_year_id } = req.body;
+  const { grade_id, class_group_id, academic_year_id } = req.body;
   const userId = parseInt(id);
   const gradeId = parseInt(grade_id);
+  const classGroupId = parseInt(class_group_id);
 
   if (isNaN(userId) || isNaN(gradeId)) {
     throw new ValidationError("Invalid user ID or grade ID");
+  }
+
+  if (isNaN(classGroupId)) {
+    throw new ValidationError("Class group ID is required");
   }
 
   const yearId = academic_year_id
@@ -2381,6 +2422,7 @@ export const assignGradeToUser = asyncHandler(async (req: any, res: any) => {
   logger.info("Assigning grade to user", {
     userId,
     gradeId,
+    classGroupId,
     academicYearId: yearId,
     assignedBy: req.user?.userId,
   });
@@ -2407,6 +2449,9 @@ export const assignGradeToUser = asyncHandler(async (req: any, res: any) => {
     throw new NotFoundError("Grade not found");
   }
 
+  // Check the class group exists and sits under the grade being assigned
+  await assertClassGroupBelongsToGrade(classGroupId, gradeId);
+
   // Check if academic year exists
   const academicYear = await db
     .select()
@@ -2418,7 +2463,7 @@ export const assignGradeToUser = asyncHandler(async (req: any, res: any) => {
     throw new NotFoundError("Academic year not found");
   }
 
-  // Check if user already has this grade for this academic year
+  // Check if user already leads this class group for this academic year
   const existingAssignment = await db
     .select()
     .from(UserGrade)
@@ -2426,6 +2471,7 @@ export const assignGradeToUser = asyncHandler(async (req: any, res: any) => {
       and(
         eq(UserGrade.user_id, userId),
         eq(UserGrade.grade_id, gradeId),
+        eq(UserGrade.class_group_id, classGroupId),
         eq(UserGrade.academic_year_id, yearId),
       ),
     )
@@ -2433,7 +2479,7 @@ export const assignGradeToUser = asyncHandler(async (req: any, res: any) => {
 
   if (existingAssignment.length > 0) {
     throw new ConflictError(
-      "User already has this grade assigned for the selected academic year",
+      "User is already class teacher of this class group for the selected academic year",
     );
   }
 
@@ -2441,6 +2487,7 @@ export const assignGradeToUser = asyncHandler(async (req: any, res: any) => {
   await db.insert(UserGrade).values({
     user_id: userId,
     grade_id: gradeId,
+    class_group_id: classGroupId,
     academic_year_id: yearId,
   });
 
@@ -2452,7 +2499,12 @@ export const assignGradeToUser = asyncHandler(async (req: any, res: any) => {
       `Grade assigned to teacher`,
       "UserGrade",
       gradeId,
-      { teacher_id: userId, grade_id: gradeId, academic_year_id: yearId },
+      {
+        teacher_id: userId,
+        grade_id: gradeId,
+        class_group_id: classGroupId,
+        academic_year_id: yearId,
+      },
       req.user.userId,
     );
   }
@@ -2462,20 +2514,27 @@ export const assignGradeToUser = asyncHandler(async (req: any, res: any) => {
 
 // Remove grade from class teacher
 export const removeGradeFromUser = asyncHandler(async (req: any, res: any) => {
-  const { id, gradeId, academicYearId } = req.params;
+  const { id, gradeId, classGroupId, academicYearId } = req.params;
   const userId = parseInt(id);
   const gradeIdNum = parseInt(gradeId);
+  const classGroupIdNum = parseInt(classGroupId);
   const yearIdNum = parseInt(academicYearId);
 
-  if (isNaN(userId) || isNaN(gradeIdNum) || isNaN(yearIdNum)) {
+  if (
+    isNaN(userId) ||
+    isNaN(gradeIdNum) ||
+    isNaN(classGroupIdNum) ||
+    isNaN(yearIdNum)
+  ) {
     throw new ValidationError(
-      "Invalid user ID, grade ID, or academic year ID",
+      "Invalid user ID, grade ID, class group ID, or academic year ID",
     );
   }
 
   logger.info("Removing grade from user", {
     userId,
     gradeId: gradeIdNum,
+    classGroupId: classGroupIdNum,
     academicYearId: yearIdNum,
     removedBy: req.user?.userId,
   });
@@ -2488,6 +2547,7 @@ export const removeGradeFromUser = asyncHandler(async (req: any, res: any) => {
       and(
         eq(UserGrade.user_id, userId),
         eq(UserGrade.grade_id, gradeIdNum),
+        eq(UserGrade.class_group_id, classGroupIdNum),
         eq(UserGrade.academic_year_id, yearIdNum),
       ),
     )
@@ -2495,7 +2555,7 @@ export const removeGradeFromUser = asyncHandler(async (req: any, res: any) => {
 
   if (existingAssignment.length === 0) {
     throw new NotFoundError(
-      "User does not have this grade assigned for the selected academic year",
+      "User is not class teacher of this class group for the selected academic year",
     );
   }
 
@@ -2506,6 +2566,7 @@ export const removeGradeFromUser = asyncHandler(async (req: any, res: any) => {
       and(
         eq(UserGrade.user_id, userId),
         eq(UserGrade.grade_id, gradeIdNum),
+        eq(UserGrade.class_group_id, classGroupIdNum),
         eq(UserGrade.academic_year_id, yearIdNum),
       ),
     );
@@ -2521,6 +2582,7 @@ export const removeGradeFromUser = asyncHandler(async (req: any, res: any) => {
       {
         teacher_id: userId,
         grade_id: gradeIdNum,
+        class_group_id: classGroupIdNum,
         academic_year_id: yearIdNum,
       },
       req.user.userId,
@@ -2549,12 +2611,14 @@ export const getAllGradeAssignments = asyncHandler(
 
     const assignments = await db
       .select({
-        grade_assignment_id: sql`CONCAT(${UserGrade.user_id}, '-', ${UserGrade.grade_id}, '-', ${UserGrade.academic_year_id})`,
+        grade_assignment_id: sql`CONCAT(${UserGrade.user_id}, '-', ${UserGrade.grade_id}, '-', ${UserGrade.class_group_id}, '-', ${UserGrade.academic_year_id})`,
         user_id: UserGrade.user_id,
         user_name: sql`CONCAT(${UserProfile.first_name}, ' ', ${UserProfile.last_name})`,
         username: User.username,
         grade_id: UserGrade.grade_id,
         grade_name: Grade.name,
+        class_group_id: UserGrade.class_group_id,
+        class_group_name: ClassGroup.name,
         program_name: Program.name,
         academic_year_id: UserGrade.academic_year_id,
         academic_year_name: AcademicYear.name,
@@ -2565,6 +2629,10 @@ export const getAllGradeAssignments = asyncHandler(
       .innerJoin(User, eq(UserGrade.user_id, User.user_id))
       .innerJoin(UserProfile, eq(User.user_id, UserProfile.user_id))
       .innerJoin(Grade, eq(UserGrade.grade_id, Grade.grade_id))
+      .innerJoin(
+        ClassGroup,
+        eq(UserGrade.class_group_id, ClassGroup.class_group_id),
+      )
       .innerJoin(Program, eq(Grade.program_id, Program.program_id))
       .innerJoin(
         AcademicYear,
@@ -2585,11 +2653,209 @@ export const getAllGradeAssignments = asyncHandler(
   },
 );
 
+// Edit an existing class-teacher assignment in place. Every column of
+// UserGrade is part of its primary key, so there is nothing to UPDATE --
+// this is a delete of the old row plus an insert of the new one, wrapped in
+// a transaction so a rejected insert cannot leave the assignment deleted.
+export const updateGradeAssignment = asyncHandler(
+  async (req: any, res: any) => {
+    const { id, gradeId, classGroupId, academicYearId } = req.params;
+    const currentUserId = parseInt(id);
+    const currentGradeId = parseInt(gradeId);
+    const currentClassGroupId = parseInt(classGroupId);
+    const currentYearId = parseInt(academicYearId);
+
+    if (
+      isNaN(currentUserId) ||
+      isNaN(currentGradeId) ||
+      isNaN(currentClassGroupId) ||
+      isNaN(currentYearId)
+    ) {
+      throw new ValidationError(
+        "Invalid user ID, grade ID, class group ID, or academic year ID",
+      );
+    }
+
+    // Each field falls back to its current value, so the client may send only
+    // what actually changed.
+    const nextUserId =
+      req.body.user_id !== undefined
+        ? parseInt(req.body.user_id)
+        : currentUserId;
+    const nextGradeId =
+      req.body.grade_id !== undefined
+        ? parseInt(req.body.grade_id)
+        : currentGradeId;
+    const nextClassGroupId =
+      req.body.class_group_id !== undefined
+        ? parseInt(req.body.class_group_id)
+        : currentClassGroupId;
+    const nextYearId =
+      req.body.academic_year_id !== undefined
+        ? parseInt(req.body.academic_year_id)
+        : currentYearId;
+
+    if (
+      isNaN(nextUserId) ||
+      isNaN(nextGradeId) ||
+      isNaN(nextClassGroupId) ||
+      isNaN(nextYearId)
+    ) {
+      throw new ValidationError(
+        "Invalid user, grade, class group, or academic year",
+      );
+    }
+
+    logger.info("Updating class teacher assignment", {
+      from: {
+        userId: currentUserId,
+        gradeId: currentGradeId,
+        classGroupId: currentClassGroupId,
+        academicYearId: currentYearId,
+      },
+      to: {
+        userId: nextUserId,
+        gradeId: nextGradeId,
+        classGroupId: nextClassGroupId,
+        academicYearId: nextYearId,
+      },
+      updatedBy: req.user?.userId,
+    });
+
+    const existingAssignment = await db
+      .select()
+      .from(UserGrade)
+      .where(
+        and(
+          eq(UserGrade.user_id, currentUserId),
+          eq(UserGrade.grade_id, currentGradeId),
+          eq(UserGrade.class_group_id, currentClassGroupId),
+          eq(UserGrade.academic_year_id, currentYearId),
+        ),
+      )
+      .limit(1);
+
+    if (existingAssignment.length === 0) {
+      throw new NotFoundError("Class teacher assignment not found");
+    }
+
+    const unchanged =
+      nextUserId === currentUserId &&
+      nextGradeId === currentGradeId &&
+      nextClassGroupId === currentClassGroupId &&
+      nextYearId === currentYearId;
+
+    if (unchanged) {
+      successResponse(res, "Class teacher assignment updated successfully");
+      return;
+    }
+
+    const [nextUser, nextGrade, nextYear] = await Promise.all([
+      db
+        .select({ user_id: User.user_id })
+        .from(User)
+        .where(eq(User.user_id, nextUserId))
+        .limit(1),
+      db
+        .select({ grade_id: Grade.grade_id })
+        .from(Grade)
+        .where(eq(Grade.grade_id, nextGradeId))
+        .limit(1),
+      db
+        .select({ academic_year_id: AcademicYear.academic_year_id })
+        .from(AcademicYear)
+        .where(eq(AcademicYear.academic_year_id, nextYearId))
+        .limit(1),
+    ]);
+
+    if (nextUser.length === 0) {
+      throw new NotFoundError("User not found");
+    }
+    if (nextGrade.length === 0) {
+      throw new NotFoundError("Grade not found");
+    }
+    if (nextYear.length === 0) {
+      throw new NotFoundError("Academic year not found");
+    }
+
+    await assertClassGroupBelongsToGrade(nextClassGroupId, nextGradeId);
+
+    const conflicting = await db
+      .select()
+      .from(UserGrade)
+      .where(
+        and(
+          eq(UserGrade.user_id, nextUserId),
+          eq(UserGrade.grade_id, nextGradeId),
+          eq(UserGrade.class_group_id, nextClassGroupId),
+          eq(UserGrade.academic_year_id, nextYearId),
+        ),
+      )
+      .limit(1);
+
+    if (conflicting.length > 0) {
+      throw new ConflictError(
+        "That user is already class teacher of this class group for the selected academic year",
+      );
+    }
+
+    await db.transaction(async (tx) => {
+      await tx
+        .delete(UserGrade)
+        .where(
+          and(
+            eq(UserGrade.user_id, currentUserId),
+            eq(UserGrade.grade_id, currentGradeId),
+            eq(UserGrade.class_group_id, currentClassGroupId),
+            eq(UserGrade.academic_year_id, currentYearId),
+          ),
+        );
+
+      await tx.insert(UserGrade).values({
+        user_id: nextUserId,
+        grade_id: nextGradeId,
+        class_group_id: nextClassGroupId,
+        academic_year_id: nextYearId,
+        // Preserve the original assignment timestamp -- editing which class
+        // group a teacher leads is not a re-assignment.
+        assigned_at: existingAssignment[0].assigned_at ?? undefined,
+      });
+    });
+
+    if (req.user?.userId) {
+      await recordActivity(
+        nextUserId,
+        "GRADE_ASSIGNMENT_UPDATE",
+        `Class teacher assignment updated`,
+        "UserGrade",
+        nextGradeId,
+        {
+          previous: {
+            teacher_id: currentUserId,
+            grade_id: currentGradeId,
+            class_group_id: currentClassGroupId,
+            academic_year_id: currentYearId,
+          },
+          updated: {
+            teacher_id: nextUserId,
+            grade_id: nextGradeId,
+            class_group_id: nextClassGroupId,
+            academic_year_id: nextYearId,
+          },
+        },
+        req.user.userId,
+      );
+    }
+
+    successResponse(res, "Class teacher assignment updated successfully");
+  },
+);
+
 // Copy every class-teacher grade assignment from one academic year into
-// another. Like UserProgramLead, UserGrade points directly at Grade (not at
-// a per-year row), so this is a straight (user_id, grade_id) copy with no
-// re-matching step needed -- skip pairs that already exist in the target
-// year.
+// another. Like UserProgramLead, UserGrade points directly at Grade and
+// ClassGroup (not at per-year rows), so this is a straight
+// (user_id, grade_id, class_group_id) copy with no re-matching step needed
+// -- skip triples that already exist in the target year.
 export const copyGradeAssignments = asyncHandler(async (req: any, res: any) => {
   const { source_academic_year_id, target_academic_year_id } = req.body;
 
@@ -2631,11 +2897,19 @@ export const copyGradeAssignments = asyncHandler(async (req: any, res: any) => {
 
   const [sourceAssignments, targetAssignments] = await Promise.all([
     db
-      .select({ user_id: UserGrade.user_id, grade_id: UserGrade.grade_id })
+      .select({
+        user_id: UserGrade.user_id,
+        grade_id: UserGrade.grade_id,
+        class_group_id: UserGrade.class_group_id,
+      })
       .from(UserGrade)
       .where(eq(UserGrade.academic_year_id, sourceYearId)),
     db
-      .select({ user_id: UserGrade.user_id, grade_id: UserGrade.grade_id })
+      .select({
+        user_id: UserGrade.user_id,
+        grade_id: UserGrade.grade_id,
+        class_group_id: UserGrade.class_group_id,
+      })
       .from(UserGrade)
       .where(eq(UserGrade.academic_year_id, targetYearId)),
   ]);
@@ -2647,11 +2921,14 @@ export const copyGradeAssignments = asyncHandler(async (req: any, res: any) => {
   }
 
   const existingKeys = new Set(
-    targetAssignments.map((a) => `${a.user_id}::${a.grade_id}`),
+    targetAssignments.map(
+      (a) => `${a.user_id}::${a.grade_id}::${a.class_group_id}`,
+    ),
   );
 
   const toInsert = sourceAssignments.filter(
-    (a) => !existingKeys.has(`${a.user_id}::${a.grade_id}`),
+    (a) =>
+      !existingKeys.has(`${a.user_id}::${a.grade_id}::${a.class_group_id}`),
   );
 
   if (toInsert.length > 0) {
@@ -2659,6 +2936,7 @@ export const copyGradeAssignments = asyncHandler(async (req: any, res: any) => {
       toInsert.map((a) => ({
         user_id: a.user_id,
         grade_id: a.grade_id,
+        class_group_id: a.class_group_id,
         academic_year_id: targetYearId,
       })),
     );
@@ -2723,6 +3001,8 @@ export const getUserGrades = asyncHandler(async (req: any, res: any) => {
       level_order: Grade.level_order,
       program_id: Grade.program_id,
       program_name: Program.name,
+      class_group_id: UserGrade.class_group_id,
+      class_group_name: ClassGroup.name,
       academic_year_id: UserGrade.academic_year_id,
       academic_year_name: AcademicYear.name,
       academic_year_is_current: AcademicYear.is_current,
@@ -2730,13 +3010,21 @@ export const getUserGrades = asyncHandler(async (req: any, res: any) => {
     })
     .from(UserGrade)
     .innerJoin(Grade, eq(UserGrade.grade_id, Grade.grade_id))
+    .innerJoin(
+      ClassGroup,
+      eq(UserGrade.class_group_id, ClassGroup.class_group_id),
+    )
     .innerJoin(Program, eq(Grade.program_id, Program.program_id))
     .innerJoin(
       AcademicYear,
       eq(UserGrade.academic_year_id, AcademicYear.academic_year_id),
     )
     .where(eq(UserGrade.user_id, userId))
-    .orderBy(desc(AcademicYear.academic_year_id), Grade.level_order);
+    .orderBy(
+      desc(AcademicYear.academic_year_id),
+      Grade.level_order,
+      ClassGroup.name,
+    );
 
   successResponse(res, "User grades retrieved successfully", grades);
 });

@@ -34,6 +34,7 @@ import {
 } from "../api/academics";
 import {
   getAllGradeAssignments,
+  updateGradeAssignment,
   copyGradeAssignments,
   assignGradeToUser,
   removeGradeFromUser,
@@ -565,19 +566,47 @@ const Academics: React.FC = () => {
             data={gradeAssignments}
             academicYears={academicYears}
             grades={grades}
+            classGroups={classGroups}
             loading={loading.gradeAssignments}
             onRefresh={fetchGradeAssignments}
             onCreate={async (data) => {
               await assignGradeToUser(
                 data.user_id,
                 data.grade_id,
+                data.class_group_id,
                 data.academic_year_id,
               );
               fetchGradeAssignments();
               showToast("Class teacher assigned successfully", "success");
             }}
-            onDelete={async (userId, gradeId, academicYearId) => {
-              await removeGradeFromUser(userId, gradeId, academicYearId);
+            onUpdate={async (current, next) => {
+              await updateGradeAssignment(
+                {
+                  userId: current.user_id,
+                  gradeId: current.grade_id,
+                  classGroupId: current.class_group_id,
+                  academicYearId: current.academic_year_id,
+                },
+                next,
+              );
+              fetchGradeAssignments();
+              showToast(
+                "Class teacher assignment updated successfully",
+                "success",
+              );
+            }}
+            onDelete={async (
+              userId,
+              gradeId,
+              classGroupId,
+              academicYearId,
+            ) => {
+              await removeGradeFromUser(
+                userId,
+                gradeId,
+                classGroupId,
+                academicYearId,
+              );
               fetchGradeAssignments();
               showToast(
                 "Class teacher assignment removed successfully",

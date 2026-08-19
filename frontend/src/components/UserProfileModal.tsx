@@ -35,8 +35,8 @@ import {
   programsApi,
   Program,
   programLeadsApi,
-  Grade,
-  gradesApi,
+  ClassGroup,
+  classGroupsApi,
   academicYearsApi,
   AcademicYear,
 } from "../api/academics";
@@ -100,7 +100,11 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
   const [loadingAvailableGrades, setLoadingAvailableGrades] =
     React.useState(false);
   const [removingGrade, setRemovingGrade] = React.useState(false);
-  const [availableGrades, setAvailableGrades] = React.useState<Grade[]>([]);
+  // A class-teacher assignment names a class group, not a whole grade, so the
+  // picker offers class groups (each labelled with its grade).
+  const [availableClassGroups, setAvailableClassGroups] = React.useState<
+    ClassGroup[]
+  >([]);
   const [showAddGradeModal, setShowAddGradeModal] = React.useState(false);
   const [assigningGrade, setAssigningGrade] = React.useState(false);
   const [academicYears, setAcademicYears] = React.useState<AcademicYear[]>(
@@ -346,10 +350,19 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
     }
   };
 
-  const handleRemoveGrade = async (gradeId: number, academicYearId: number) => {
+  const handleRemoveGrade = async (
+    gradeId: number,
+    classGroupId: number,
+    academicYearId: number,
+  ) => {
     setRemovingGrade(true);
     try {
-      await removeGradeFromUser(user.user.user_id, gradeId, academicYearId);
+      await removeGradeFromUser(
+        user.user.user_id,
+        gradeId,
+        classGroupId,
+        academicYearId,
+      );
       showToast("Grade removed successfully", "success");
       // Refresh user grades
       await loadUserGrades();
@@ -363,34 +376,47 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
     }
   };
 
+  // Class groups this user does not already lead in `yearId`. They may still
+  // hold the same class group in other years, so the filter is year-scoped.
+  const unassignedClassGroupsForYear = (
+    classGroups: ClassGroup[],
+    yearId: number,
+  ) => {
+    const assignedIds = userGrades
+      .filter((g) => g.academic_year_id === yearId)
+      .map((g) => g.class_group_id);
+    return classGroups.filter(
+      (cg) => !assignedIds.includes(cg.class_group_id),
+    );
+  };
+
   const openAddGradeModal = async () => {
     setLoadingAvailableGrades(true);
     try {
-      const response = await gradesApi.getAll();
-      const grades = response.data.data;
-      if (grades) {
-        // Filter out grades already assigned to this user for the year
-        // being assigned into (they may still hold it in other years)
-        const assignedGradeIds = userGrades
-          .filter((g) => g.academic_year_id === assignYearId)
-          .map((g) => g.grade_id);
-        const available = grades.filter(
-          (g) => !assignedGradeIds.includes(g.grade_id),
+      const response = await classGroupsApi.getAll();
+      const classGroups = response.data.data;
+      if (classGroups) {
+        setAvailableClassGroups(
+          unassignedClassGroupsForYear(classGroups, assignYearId),
         );
-        setAvailableGrades(available);
       }
       setShowAddGradeModal(true);
     } catch (error) {
-      showToast("Failed to load available grades", "error");
+      showToast("Failed to load available class groups", "error");
     } finally {
       setLoadingAvailableGrades(false);
     }
   };
 
-  const handleAssignGrade = async (gradeId: number) => {
+  const handleAssignGrade = async (gradeId: number, classGroupId: number) => {
     setAssigningGrade(true);
     try {
-      await assignGradeToUser(user.user.user_id, gradeId, assignYearId);
+      await assignGradeToUser(
+        user.user.user_id,
+        gradeId,
+        classGroupId,
+        assignYearId,
+      );
       showToast("Grade assigned successfully", "success");
       // Refresh user grades
       await loadUserGrades();
@@ -899,16 +925,11 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                     onChange={(e) => {
                       const yearId = parseInt(e.target.value);
                       setAssignYearId(yearId);
-                      const assignedGradeIds = userGrades
-                        .filter((g) => g.academic_year_id === yearId)
-                        .map((g) => g.grade_id);
-                      gradesApi.getAll().then((response) => {
-                        const grades = response.data.data;
-                        if (grades) {
-                          setAvailableGrades(
-                            grades.filter(
-                              (g) => !assignedGradeIds.includes(g.grade_id),
-                            ),
+                      classGroupsApi.getAll().then((response) => {
+                        const classGroups = response.data.data;
+                        if (classGroups) {
+                          setAvailableClassGroups(
+                            unassignedClassGroupsForYear(classGroups, yearId),
                           );
                         }
                       });
@@ -929,29 +950,34 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                 </div>
 
                 <div className="space-y-3 max-h-96 overflow-y-auto">
-                  {availableGrades.length === 0 ? (
+                  {availableClassGroups.length === 0 ? (
                     <div className="text-center py-8">
                       <Award className="w-12 h-12 text-gray-300 dark:text-gray-600 mx-auto mb-2" />
                       <p className="text-sm text-gray-500 dark:text-gray-400">
-                        No available grades to assign
+                        No available class groups to assign
                       </p>
                     </div>
                   ) : (
-                    availableGrades.map((grade) => (
+                    availableClassGroups.map((classGroup) => (
                       <div
-                        key={grade.grade_id}
+                        key={classGroup.class_group_id}
                         className="flex items-center justify-between p-3 bg-gray-50 dark:bg-slate-800 rounded-2xl"
                       >
                         <div>
                           <h5 className="font-medium text-gray-900 dark:text-white text-sm">
-                            {grade.name}
+                            {classGroup.grade_name} • {classGroup.name}
                           </h5>
                           <p className="text-sm text-gray-500 dark:text-gray-400/50">
-                            Level {grade.level_order}
+                            {classGroup.program_name}
                           </p>
                         </div>
                         <button
-                          onClick={() => handleAssignGrade(grade.grade_id)}
+                          onClick={() =>
+                            handleAssignGrade(
+                              classGroup.grade_id,
+                              classGroup.class_group_id,
+                            )
+                          }
                           disabled={assigningGrade}
                           className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-full transition-colors disabled:opacity-50"
                         >

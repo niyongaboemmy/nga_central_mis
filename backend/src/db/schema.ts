@@ -333,7 +333,11 @@ export const TeacherSubjectAssignment = mysqlTable(
   }),
 );
 
-// UserGrade junction table for class teacher grade assignments
+// UserGrade junction table for class teacher grade assignments. Scoped to a
+// single ClassGroup (see 066) -- a class teacher leads one section of a
+// grade, not the whole grade -- so two teachers on the same grade stay
+// distinguishable. ClassGroup is not year-scoped, hence class_group_id sits
+// alongside academic_year_id in the key rather than replacing it.
 export const UserGrade = mysqlTable(
   "UserGrade",
   {
@@ -343,13 +347,21 @@ export const UserGrade = mysqlTable(
     grade_id: bigint("grade_id", { mode: "number" })
       .notNull()
       .references(() => Grade.grade_id),
+    class_group_id: bigint("class_group_id", { mode: "number" })
+      .notNull()
+      .references(() => ClassGroup.class_group_id),
     academic_year_id: bigint("academic_year_id", { mode: "number" })
       .notNull()
       .references(() => AcademicYear.academic_year_id),
     assigned_at: datetime("assigned_at").default(sql`CURRENT_TIMESTAMP`),
   },
   (table) => ({
-    pk: primaryKey(table.user_id, table.grade_id, table.academic_year_id),
+    pk: primaryKey(
+      table.user_id,
+      table.grade_id,
+      table.class_group_id,
+      table.academic_year_id,
+    ),
   }),
 );
 

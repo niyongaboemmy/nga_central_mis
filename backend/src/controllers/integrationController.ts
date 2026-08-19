@@ -378,6 +378,7 @@ export const syncPeople = asyncHandler(async (req: any, res: any) => {
             .select({
               userId: UserGrade.user_id,
               gradeId: UserGrade.grade_id,
+              classGroupId: UserGrade.class_group_id,
               academicYearId: UserGrade.academic_year_id,
               assignedAt: UserGrade.assigned_at,
             })

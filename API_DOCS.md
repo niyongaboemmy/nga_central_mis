@@ -578,13 +578,14 @@ Get all users in a program.
 
 ### GET /users/:id/grades
 
-Get grades assigned to a user.
+Get class-teacher assignments for a user. Each entry carries the grade and the
+class group within it (`class_group_id`, `class_group_name`).
 
 **Authentication:** Required
 
 ### POST /users/:id/grades
 
-Assign grade to class teacher.
+Assign a class teacher to one class group of a grade.
 
 **Authentication:** Required (ASSIGN_GRADE_TO_CLASS_TEACHER permission)
 
@@ -592,13 +593,37 @@ Assign grade to class teacher.
 
 ```json
 {
-  "grade_id": 1
+  "grade_id": 1,
+  "class_group_id": 4,
+  "academic_year_id": 3
 }
 ```
 
-### DELETE /users/:id/grades/:gradeId
+`class_group_id` is required and must belong to `grade_id`. `academic_year_id`
+is optional and defaults to the current academic year.
 
-Remove grade from class teacher.
+### PUT /users/:id/grades/:gradeId/class-groups/:classGroupId/years/:academicYearId
+
+Edit an existing class-teacher assignment. The path addresses the assignment as
+it stands; the body carries the new values. Any omitted field keeps its current
+value.
+
+**Authentication:** Required (ASSIGN_GRADE_TO_CLASS_TEACHER permission)
+
+**Request Body:**
+
+```json
+{
+  "user_id": 12,
+  "grade_id": 1,
+  "class_group_id": 5,
+  "academic_year_id": 3
+}
+```
+
+### DELETE /users/:id/grades/:gradeId/class-groups/:classGroupId/years/:academicYearId
+
+Remove a class-teacher assignment.
 
 **Authentication:** Required (ASSIGN_GRADE_TO_CLASS_TEACHER permission)
 
@@ -1123,7 +1148,9 @@ Assign student to a class group (Stream), scoped to an **academic year** (a stud
 `academic_year_id` is optional and defaults to the current academic year.
 
 ### GET /users/grade-assignments
-Get all class-teacher grade assignments (admin view across all users/years).
+Get all class-teacher assignments (admin view across all users/years). Each row
+includes `grade_id`/`grade_name`, `class_group_id`/`class_group_name`,
+`program_name`, and the academic year.
 **Authentication:** Required
 
 ### POST /users/grade-assignments/copy

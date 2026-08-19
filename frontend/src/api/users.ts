@@ -276,6 +276,8 @@ export interface UserGrade {
   level_order: number;
   program_id: number;
   program_name: string;
+  class_group_id: number;
+  class_group_name: string;
   academic_year_id: number;
   academic_year_name: string;
   academic_year_is_current: number;
@@ -306,6 +308,7 @@ export const getUserGrades = async (
 export const assignGradeToUser = async (
   userId: number,
   gradeId: number,
+  classGroupId: number,
   academicYearId: number,
   onSuccess?: () => void,
   onError?: (error: any) => void,
@@ -313,6 +316,7 @@ export const assignGradeToUser = async (
   try {
     await api.post(`/users/${userId}/grades`, {
       grade_id: gradeId,
+      class_group_id: classGroupId,
       academic_year_id: academicYearId,
     });
     if (onSuccess) {
@@ -329,13 +333,14 @@ export const assignGradeToUser = async (
 export const removeGradeFromUser = async (
   userId: number,
   gradeId: number,
+  classGroupId: number,
   academicYearId: number,
   onSuccess?: () => void,
   onError?: (error: any) => void,
 ): Promise<void> => {
   try {
     await api.delete(
-      `/users/${userId}/grades/${gradeId}/years/${academicYearId}`,
+      `/users/${userId}/grades/${gradeId}/class-groups/${classGroupId}/years/${academicYearId}`,
     );
     if (onSuccess) {
       onSuccess();
@@ -348,6 +353,29 @@ export const removeGradeFromUser = async (
   }
 };
 
+// Edit an existing class-teacher assignment. Every field of the assignment is
+// part of its key, so the current values address the row and the body carries
+// the new ones.
+export const updateGradeAssignment = async (
+  current: {
+    userId: number;
+    gradeId: number;
+    classGroupId: number;
+    academicYearId: number;
+  },
+  next: {
+    user_id: number;
+    grade_id: number;
+    class_group_id: number;
+    academic_year_id: number;
+  },
+): Promise<void> => {
+  await api.put(
+    `/users/${current.userId}/grades/${current.gradeId}/class-groups/${current.classGroupId}/years/${current.academicYearId}`,
+    next,
+  );
+};
+
 export interface AllGradeAssignment {
   grade_assignment_id: string;
   user_id: number;
@@ -355,6 +383,8 @@ export interface AllGradeAssignment {
   username: string;
   grade_id: number;
   grade_name: string;
+  class_group_id: number;
+  class_group_name: string;
   program_name: string;
   academic_year_id: number;
   academic_year_name: string;

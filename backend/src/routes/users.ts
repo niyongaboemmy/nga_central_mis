@@ -25,6 +25,7 @@ import {
   removeGradeFromUser,
   getUserGrades,
   getAllGradeAssignments,
+  updateGradeAssignment,
   copyGradeAssignments,
   getUsersByGrade,
   getSubjectsByGrade,
@@ -150,8 +151,16 @@ router.post(
   authorize("ASSIGN_GRADE_TO_CLASS_TEACHER"),
   assignGradeToUser,
 );
+// A class-teacher assignment is keyed by user + grade + class group + year,
+// so both editing and removing one address all four.
+router.put(
+  "/:id/grades/:gradeId/class-groups/:classGroupId/years/:academicYearId",
+  authenticate,
+  authorize("ASSIGN_GRADE_TO_CLASS_TEACHER"),
+  updateGradeAssignment,
+);
 router.delete(
-  "/:id/grades/:gradeId/years/:academicYearId",
+  "/:id/grades/:gradeId/class-groups/:classGroupId/years/:academicYearId",
   authenticate,
   authorize("ASSIGN_GRADE_TO_CLASS_TEACHER"),
   removeGradeFromUser,

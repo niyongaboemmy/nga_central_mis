@@ -106,9 +106,11 @@ async function getUserFilterAssociations(
         )
     : [];
 
+  // Distinct: a class teacher may hold several class groups within one grade,
+  // and document scoping only cares about the grade.
   const gradeAssignments = currentYearId
     ? await db
-        .select({ grade_id: UserGrade.grade_id })
+        .selectDistinct({ grade_id: UserGrade.grade_id })
         .from(UserGrade)
         .where(
           and(
@@ -372,7 +374,7 @@ export const getDocumentShareFilterOptions = asyncHandler(
     // academic year
     const gradeAssignments = currentYearId
       ? await db
-          .select({
+          .selectDistinct({
             grade_id: UserGrade.grade_id,
             grade_name: Grade.name,
           })

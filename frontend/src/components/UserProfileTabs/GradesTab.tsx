@@ -12,6 +12,7 @@ interface GradesTabProps {
   removingGrade: boolean;
   handleRemoveGrade: (
     gradeId: number,
+    classGroupId: number,
     academicYearId: number,
   ) => Promise<void>;
   openAddGradeModal: () => void;
@@ -87,7 +88,7 @@ const GradesTab: React.FC<GradesTabProps> = ({
               <div className="space-y-4">
                 {items.map((grade: UserGrade) => (
                   <motion.div
-                    key={`${grade.grade_id}-${grade.academic_year_id}`}
+                    key={`${grade.grade_id}-${grade.class_group_id}-${grade.academic_year_id}`}
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     className="p-4 md:p-6 bg-gradient-to-br from-blue-100/40 to-blue-100/40 dark:from-blue-900/30 dark:to-blue-900/30 rounded-2xl border border-blue-200/30 dark:border-blue-700/30"
@@ -99,7 +100,7 @@ const GradesTab: React.FC<GradesTabProps> = ({
                         </div>
                         <div>
                           <h4 className="font-semibold text-gray-900 dark:text-white">
-                            {grade.name}
+                            {grade.name} • {grade.class_group_name}
                           </h4>
                           <p className="text-xs text-gray-500 dark:text-gray-400">
                             {grade.program_name} • Level {grade.level_order}
@@ -113,6 +114,7 @@ const GradesTab: React.FC<GradesTabProps> = ({
                           onClick={() =>
                             handleRemoveGrade(
                               grade.grade_id,
+                              grade.class_group_id,
                               grade.academic_year_id,
                             )
                           }

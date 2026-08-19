@@ -1,24 +1,33 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { AcademicYear, Grade } from "../../api/academics";
+import { AcademicYear, ClassGroup, Grade } from "../../api/academics";
 import { AllGradeAssignment, getUsers, UserWithProfile } from "../../api/users";
 import Button from "../ui/Button";
 import Modal from "../ui/Modal";
 import ConfirmModal from "../ui/ConfirmModal";
 
+export interface ClassTeacherAssignmentInput {
+  user_id: number;
+  grade_id: number;
+  class_group_id: number;
+  academic_year_id: number;
+}
+
 interface ClassTeachersTabProps {
   data: AllGradeAssignment[];
   academicYears: AcademicYear[];
   grades: Grade[];
+  classGroups: ClassGroup[];
   loading: boolean;
   onRefresh: () => void;
-  onCreate: (data: {
-    user_id: number;
-    grade_id: number;
-    academic_year_id: number;
-  }) => Promise<void>;
+  onCreate: (data: ClassTeacherAssignmentInput) => Promise<void>;
+  onUpdate: (
+    current: AllGradeAssignment,
+    next: ClassTeacherAssignmentInput,
+  ) => Promise<void>;
   onDelete: (
     userId: number,
     gradeId: number,
+    classGroupId: number,
     academicYearId: number,
   ) => Promise<void>;
   onCopy: (
@@ -27,13 +36,21 @@ interface ClassTeachersTabProps {
   ) => Promise<{ copied: number; skipped: number; total: number }>;
 }
 
+const inputClasses =
+  "w-full px-4 py-3 border-2 border-border-light dark:border-border-dark/30 rounded-2xl focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/20 transition-all duration-200 bg-surface-light dark:bg-surface-dark/30 text-text-primary-light dark:text-text-primary-dark";
+
+const labelClasses =
+  "block text-sm font-medium text-text-primary-light dark:text-text-primary-dark mb-2";
+
 const ClassTeachersTab: React.FC<ClassTeachersTabProps> = ({
   data,
   academicYears,
   grades,
+  classGroups,
   loading,
   onRefresh,
   onCreate,
+  onUpdate,
   onDelete,
   onCopy,
 }) => {
@@ -129,30 +146,63 @@ const ClassTeachersTab: React.FC<ClassTeachersTabProps> = ({
     }
   };
 
-  const [showAssignModal, setShowAssignModal] = useState(false);
-  const [assignYearId, setAssignYearId] = useState<number>(0);
+  // One piece of form state drives both the Assign and Edit modals -- they
+  // collect exactly the same four fields, only the starting values and the
+  // submit action differ.
+  const [formMode, setFormMode] = useState<"assign" | "edit" | null>(null);
+  const [editingAssignment, setEditingAssignment] =
+    useState<AllGradeAssignment | null>(null);
+  const [formYearId, setFormYearId] = useState<number>(0);
+  const [formGradeId, setFormGradeId] = useState<number>(0);
+  const [formClassGroupId, setFormClassGroupId] = useState<number>(0);
   const [teacherSearch, setTeacherSearch] = useState("");
   const [teacherResults, setTeacherResults] = useState<UserWithProfile[]>([]);
   const [searchingUsers, setSearchingUsers] = useState(false);
   const [selectedUser, setSelectedUser] = useState<UserWithProfile | null>(
     null,
   );
-  const [assignGradeId, setAssignGradeId] = useState<number>(0);
-  const [assignSubmitting, setAssignSubmitting] = useState(false);
-  const [assignError, setAssignError] = useState("");
+  // When editing, the current teacher is known by name only (the list endpoint
+  // returns no profile object), so keep it separate from `selectedUser` and
+  // let picking someone new take precedence.
+  const [existingUserLabel, setExistingUserLabel] = useState("");
+  const [formSubmitting, setFormSubmitting] = useState(false);
+  const [formError, setFormError] = useState("");
 
-  const openAssignModal = () => {
-    setAssignYearId(yearFilter || currentYearId);
+  const resetForm = () => {
     setTeacherSearch("");
     setTeacherResults([]);
     setSelectedUser(null);
-    setAssignGradeId(0);
-    setAssignError("");
-    setShowAssignModal(true);
+    setExistingUserLabel("");
+    setFormError("");
+  };
+
+  const openAssignModal = () => {
+    resetForm();
+    setEditingAssignment(null);
+    setFormYearId(yearFilter || currentYearId);
+    setFormGradeId(0);
+    setFormClassGroupId(0);
+    setFormMode("assign");
+  };
+
+  const openEditModal = (assignment: AllGradeAssignment) => {
+    resetForm();
+    setEditingAssignment(assignment);
+    setFormYearId(assignment.academic_year_id);
+    setFormGradeId(assignment.grade_id);
+    setFormClassGroupId(assignment.class_group_id);
+    setExistingUserLabel(`${assignment.user_name} (${assignment.username})`);
+    setFormMode("edit");
+  };
+
+  const closeFormModal = () => {
+    setFormMode(null);
+    setEditingAssignment(null);
+    resetForm();
   };
 
   useEffect(() => {
-    if (!showAssignModal || teacherSearch.trim().length < 2) {
+    if (!formMode || teacherSearch.trim().length < 2) {
       setTeacherResults([]);
       return;
     }
@@ -174,28 +224,61 @@ const ClassTeachersTab: React.FC<ClassTeachersTabProps> = ({
       cancelled = true;
       clearTimeout(timeout);
     };
-  }, [teacherSearch, showAssignModal]);
+  }, [teacherSearch, formMode]);
 
-  const handleAssign = async () => {
-    if (!selectedUser || !assignGradeId || !assignYearId) {
-      setAssignError("Select a user, grade, and academic year");
+  // Class groups belong to a grade, so the picker only ever offers the ones
+  // under the grade currently selected.
+  const classGroupsForGrade = useMemo(
+    () =>
+      formGradeId
+        ? classGroups.filter((cg) => cg.grade_id === formGradeId)
+        : [],
+    [classGroups, formGradeId],
+  );
+
+  const handleGradeChange = (gradeId: number) => {
+    setFormGradeId(gradeId);
+    const groups = classGroups.filter((cg) => cg.grade_id === gradeId);
+    // Keep the current class group only if it still belongs to the new grade;
+    // otherwise preselect the only option when there is exactly one.
+    setFormClassGroupId((previous) => {
+      if (groups.some((cg) => cg.class_group_id === previous)) return previous;
+      return groups.length === 1 ? groups[0].class_group_id : 0;
+    });
+  };
+
+  const formUserId =
+    selectedUser?.user.user_id ?? editingAssignment?.user_id ?? 0;
+
+  const handleSubmitForm = async () => {
+    if (!formUserId || !formGradeId || !formClassGroupId || !formYearId) {
+      setFormError("Select a user, grade, class group, and academic year");
       return;
     }
-    setAssignSubmitting(true);
-    setAssignError("");
+    setFormSubmitting(true);
+    setFormError("");
     try {
-      await onCreate({
-        user_id: selectedUser.user.user_id,
-        grade_id: assignGradeId,
-        academic_year_id: assignYearId,
-      });
-      setShowAssignModal(false);
+      const payload: ClassTeacherAssignmentInput = {
+        user_id: formUserId,
+        grade_id: formGradeId,
+        class_group_id: formClassGroupId,
+        academic_year_id: formYearId,
+      };
+      if (formMode === "edit" && editingAssignment) {
+        await onUpdate(editingAssignment, payload);
+      } else {
+        await onCreate(payload);
+      }
+      closeFormModal();
     } catch (error: any) {
-      setAssignError(
-        error?.response?.data?.message || "Failed to assign class teacher",
+      setFormError(
+        error?.response?.data?.message ||
+          (formMode === "edit"
+            ? "Failed to update class teacher assignment"
+            : "Failed to assign class teacher"),
       );
     } finally {
-      setAssignSubmitting(false);
+      setFormSubmitting(false);
     }
   };
 
@@ -216,6 +299,7 @@ const ClassTeachersTab: React.FC<ClassTeachersTabProps> = ({
       await onDelete(
         selectedAssignment.user_id,
         selectedAssignment.grade_id,
+        selectedAssignment.class_group_id,
         selectedAssignment.academic_year_id,
       );
       setShowDeleteModal(false);
@@ -240,7 +324,8 @@ const ClassTeachersTab: React.FC<ClassTeachersTabProps> = ({
             Class Teachers
           </h2>
           <p className="text-sm text-text-secondary-light dark:text-text-secondary-dark/70 mt-1">
-            Everyone assigned as class teacher of a grade, across every user
+            Everyone assigned as class teacher of a class group, across every
+            user
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2.5">
@@ -296,6 +381,9 @@ const ClassTeachersTab: React.FC<ClassTeachersTabProps> = ({
                     Grade
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary-light dark:text-text-secondary-dark/70 uppercase tracking-wider">
+                    Class Group
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary-light dark:text-text-secondary-dark/70 uppercase tracking-wider">
                     Academic Year
                   </th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-text-secondary-light dark:text-text-secondary-dark/70 uppercase tracking-wider">
@@ -307,7 +395,7 @@ const ClassTeachersTab: React.FC<ClassTeachersTabProps> = ({
                 {filteredData.length === 0 ? (
                   <tr>
                     <td
-                      colSpan={4}
+                      colSpan={5}
                       className="px-6 py-12 text-center text-text-secondary-light dark:text-text-secondary-dark/70"
                     >
                       {yearFilter
@@ -327,16 +415,29 @@ const ClassTeachersTab: React.FC<ClassTeachersTabProps> = ({
                       <td className="px-4 py-3 whitespace-nowrap text-sm text-text-secondary-light dark:text-text-secondary-dark/70">
                         {item.grade_name} • {item.program_name}
                       </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-sm">
+                        <span className="inline-flex px-2.5 py-1 rounded-full bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 text-xs font-medium">
+                          {item.class_group_name}
+                        </span>
+                      </td>
                       <td className="px-4 py-3 whitespace-nowrap text-sm text-text-secondary-light dark:text-text-secondary-dark/70">
                         {item.academic_year_name}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-right text-sm font-medium">
-                        <button
-                          onClick={() => handleDeleteClick(item)}
-                          className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
-                        >
-                          Remove
-                        </button>
+                        <div className="flex items-center justify-end gap-3">
+                          <button
+                            onClick={() => openEditModal(item)}
+                            className="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => handleDeleteClick(item)}
+                            className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
+                          >
+                            Remove
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -365,13 +466,11 @@ const ClassTeachersTab: React.FC<ClassTeachersTabProps> = ({
           </p>
 
           <div>
-            <label className="block text-sm font-medium text-text-primary-light dark:text-text-primary-dark mb-2">
-              Copy from
-            </label>
+            <label className={labelClasses}>Copy from</label>
             <select
               value={copySourceYearId}
               onChange={(e) => setCopySourceYearId(parseInt(e.target.value))}
-              className="w-full px-4 py-3 border-2 border-border-light dark:border-border-dark/30 rounded-2xl focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/20 transition-all duration-200 bg-surface-light dark:bg-surface-dark/30 text-text-primary-light dark:text-text-primary-dark"
+              className={inputClasses}
             >
               <option value={0}>Select source academic year</option>
               {academicYears.map((year) => (
@@ -385,13 +484,11 @@ const ClassTeachersTab: React.FC<ClassTeachersTabProps> = ({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-text-primary-light dark:text-text-primary-dark mb-2">
-              Copy to
-            </label>
+            <label className={labelClasses}>Copy to</label>
             <select
               value={copyTargetYearId}
               onChange={(e) => setCopyTargetYearId(parseInt(e.target.value))}
-              className="w-full px-4 py-3 border-2 border-border-light dark:border-border-dark/30 rounded-2xl focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/20 transition-all duration-200 bg-surface-light dark:bg-surface-dark/30 text-text-primary-light dark:text-text-primary-dark"
+              className={inputClasses}
             >
               <option value={0}>Select target academic year</option>
               {academicYears.map((year) => (
@@ -438,21 +535,23 @@ const ClassTeachersTab: React.FC<ClassTeachersTabProps> = ({
         </div>
       </Modal>
 
-      {/* Assign Class Teacher Modal */}
+      {/* Assign / Edit Class Teacher Modal */}
       <Modal
-        isOpen={showAssignModal}
-        onClose={() => setShowAssignModal(false)}
-        title="Assign Class Teacher"
+        isOpen={formMode !== null}
+        onClose={closeFormModal}
+        title={
+          formMode === "edit"
+            ? "Edit Class Teacher Assignment"
+            : "Assign Class Teacher"
+        }
       >
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-text-primary-light dark:text-text-primary-dark mb-2">
-              Academic Year
-            </label>
+            <label className={labelClasses}>Academic Year</label>
             <select
-              value={assignYearId}
-              onChange={(e) => setAssignYearId(parseInt(e.target.value))}
-              className="w-full px-4 py-3 border-2 border-border-light dark:border-border-dark/30 rounded-2xl focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/20 transition-all duration-200 bg-surface-light dark:bg-surface-dark/30 text-text-primary-light dark:text-text-primary-dark"
+              value={formYearId}
+              onChange={(e) => setFormYearId(parseInt(e.target.value))}
+              className={inputClasses}
             >
               <option value={0}>Select an academic year...</option>
               {academicYears.map((year) => (
@@ -465,18 +564,19 @@ const ClassTeachersTab: React.FC<ClassTeachersTabProps> = ({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-text-primary-light dark:text-text-primary-dark mb-2">
-              User
-            </label>
-            {selectedUser ? (
+            <label className={labelClasses}>User</label>
+            {selectedUser || existingUserLabel ? (
               <div className="flex items-center justify-between p-3 bg-blue-50 dark:bg-blue-900/20 rounded-2xl border border-blue-100 dark:border-blue-800/30">
                 <span className="text-sm text-text-primary-light dark:text-text-primary-dark">
-                  {selectedUser.profile?.first_name}{" "}
-                  {selectedUser.profile?.last_name} (
-                  {selectedUser.user.username})
+                  {selectedUser
+                    ? `${selectedUser.profile?.first_name} ${selectedUser.profile?.last_name} (${selectedUser.user.username})`
+                    : existingUserLabel}
                 </span>
                 <button
-                  onClick={() => setSelectedUser(null)}
+                  onClick={() => {
+                    setSelectedUser(null);
+                    setExistingUserLabel("");
+                  }}
                   className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
                 >
                   Change
@@ -489,7 +589,7 @@ const ClassTeachersTab: React.FC<ClassTeachersTabProps> = ({
                   value={teacherSearch}
                   onChange={(e) => setTeacherSearch(e.target.value)}
                   placeholder="Search by name or username..."
-                  className="w-full px-4 py-3 border-2 border-border-light dark:border-border-dark/30 rounded-2xl focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/20 transition-all duration-200 bg-surface-light dark:bg-surface-dark/30 text-text-primary-light dark:text-text-primary-dark"
+                  className={inputClasses}
                 />
                 {searchingUsers && (
                   <p className="text-xs text-text-secondary-light dark:text-text-secondary-dark/70 mt-1">
@@ -515,13 +615,11 @@ const ClassTeachersTab: React.FC<ClassTeachersTabProps> = ({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-text-primary-light dark:text-text-primary-dark mb-2">
-              Grade
-            </label>
+            <label className={labelClasses}>Grade</label>
             <select
-              value={assignGradeId}
-              onChange={(e) => setAssignGradeId(parseInt(e.target.value))}
-              className="w-full px-4 py-3 border-2 border-border-light dark:border-border-dark/30 rounded-2xl focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/20 transition-all duration-200 bg-surface-light dark:bg-surface-dark/30 text-text-primary-light dark:text-text-primary-dark"
+              value={formGradeId}
+              onChange={(e) => handleGradeChange(parseInt(e.target.value))}
+              className={inputClasses}
             >
               <option value={0}>Select a grade...</option>
               {grades.map((grade) => (
@@ -532,25 +630,63 @@ const ClassTeachersTab: React.FC<ClassTeachersTabProps> = ({
             </select>
           </div>
 
-          {assignError && (
+          <div>
+            <label className={labelClasses}>Class Group</label>
+            <select
+              value={formClassGroupId}
+              onChange={(e) => setFormClassGroupId(parseInt(e.target.value))}
+              disabled={!formGradeId || classGroupsForGrade.length === 0}
+              className={`${inputClasses} disabled:opacity-60 disabled:cursor-not-allowed`}
+            >
+              <option value={0}>
+                {formGradeId ? "Select a class group..." : "Select a grade first"}
+              </option>
+              {classGroupsForGrade.map((classGroup) => (
+                <option
+                  key={classGroup.class_group_id}
+                  value={classGroup.class_group_id}
+                >
+                  {classGroup.name}
+                </option>
+              ))}
+            </select>
+            {formGradeId > 0 && classGroupsForGrade.length === 0 && (
+              <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                This grade has no class groups yet. Create one in the Class
+                Groups tab first.
+              </p>
+            )}
+          </div>
+
+          {formError && (
             <p className="text-sm text-red-600 dark:text-red-400 font-medium">
-              {assignError}
+              {formError}
             </p>
           )}
         </div>
 
         <div className="flex justify-end space-x-3 mt-6">
-          <Button variant="secondary" onClick={() => setShowAssignModal(false)}>
+          <Button variant="secondary" onClick={closeFormModal}>
             Cancel
           </Button>
           <Button
-            onClick={handleAssign}
+            onClick={handleSubmitForm}
             disabled={
-              assignSubmitting || !selectedUser || !assignGradeId || !assignYearId
+              formSubmitting ||
+              !formUserId ||
+              !formGradeId ||
+              !formClassGroupId ||
+              !formYearId
             }
-            isLoading={assignSubmitting}
+            isLoading={formSubmitting}
           >
-            {assignSubmitting ? "Assigning..." : "Assign"}
+            {formSubmitting
+              ? formMode === "edit"
+                ? "Saving..."
+                : "Assigning..."
+              : formMode === "edit"
+                ? "Save Changes"
+                : "Assign"}
           </Button>
         </div>
       </Modal>
@@ -564,7 +700,7 @@ const ClassTeachersTab: React.FC<ClassTeachersTabProps> = ({
         }}
         onConfirm={confirmDelete}
         title="Remove Class Teacher Assignment"
-        message={`Are you sure you want to remove "${selectedAssignment?.user_name}" as class teacher of "${selectedAssignment?.grade_name}"? This action cannot be undone.`}
+        message={`Are you sure you want to remove "${selectedAssignment?.user_name}" as class teacher of "${selectedAssignment?.grade_name} • ${selectedAssignment?.class_group_name}"? This action cannot be undone.`}
         isLoading={deleting}
       />
     </div>
