@@ -11,6 +11,7 @@ import {
 import { useUser } from "../contexts/UserContext";
 import { getScopedSubjects, ScopedSubject } from "../api/users";
 import { useScopedGrades } from "../hooks/useScopedGrades";
+import { useAcademicPeriod } from "../contexts/AcademicPeriodContext";
 import { useToast } from "../contexts/ToastContext";
 import SubjectDetailsPanel from "./SubjectDetailsPanel";
 
@@ -187,6 +188,14 @@ const ClassTeacherSubjectsPage: React.FC = () => {
   const { user } = useUser();
   const { showToast } = useToast();
   const scope = useScopedGrades();
+  // Year/term come from the global selector in the top nav — the timetable and
+  // scheme of work shown in the details panel are both per-term.
+  const {
+    selectedYearId,
+    selectedTermId,
+    selectedYear,
+    selectedTerm,
+  } = useAcademicPeriod();
 
   const [subjects, setSubjects] = useState<ScopedSubject[]>([]);
   const [loading, setLoading] = useState(true);
@@ -202,7 +211,10 @@ const ClassTeacherSubjectsPage: React.FC = () => {
   const canView = user?.permissions?.includes(
     "VIEW_SUBJECTS_BY_CLASS_TEACHER_GRADE",
   );
-  const academicYearId = user?.currentAcademicYear?.academic_year_id ?? null;
+  const academicYearId =
+    selectedYearId ?? user?.currentAcademicYear?.academic_year_id ?? null;
+  const periodLabel =
+    [selectedYear?.name, selectedTerm?.name].filter(Boolean).join(" · ") || null;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   // Debounce search term
@@ -430,6 +442,8 @@ const ClassTeacherSubjectsPage: React.FC = () => {
         summary={selectedSubject}
         gradeIds={gradeIds}
         academicYearId={academicYearId}
+        academicTermId={selectedTermId}
+        periodLabel={periodLabel}
       />
     </div>
   );

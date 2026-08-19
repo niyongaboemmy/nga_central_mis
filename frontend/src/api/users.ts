@@ -636,13 +636,16 @@ export interface SubjectDetail {
 
 export const getScopedSubjectDetail = async (
   subjectId: number,
-  query?: Pick<ScopeQuery, "gradeIds" | "academicYearId">,
+  query?: Pick<ScopeQuery, "gradeIds" | "academicYearId" | "academicTermId">,
 ): Promise<SubjectDetail> => {
   const params: Record<string, string | number> = {};
   if (query?.gradeIds && query.gradeIds.length > 0) {
     params.grade_ids = query.gradeIds.join(",");
   }
   if (query?.academicYearId) params.academic_year_id = query.academicYearId;
+  // The timetable and the scheme of work are both per-term, so the panel must
+  // ask for the term the user currently has selected in the top bar.
+  if (query?.academicTermId) params.academic_term_id = query.academicTermId;
 
   const response = await api.get<BackendResponse<SubjectDetail>>(
     `/users/scope/subjects/${subjectId}`,
@@ -676,6 +679,7 @@ export interface ScopedRoleGroup {
 export interface ScopeQuery {
   gradeIds?: number[];
   academicYearId?: number | null;
+  academicTermId?: number | null;
   page?: number;
   limit?: number;
   search?: string;
@@ -691,6 +695,7 @@ const scopeParams = (query?: ScopeQuery) => {
     params.grade_ids = query.gradeIds.join(",");
   }
   if (query?.academicYearId) params.academic_year_id = query.academicYearId;
+  if (query?.academicTermId) params.academic_term_id = query.academicTermId;
   if (query?.search) params.search = query.search;
   if (query?.role) params.role = query.role;
   return params;

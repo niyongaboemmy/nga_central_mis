@@ -452,6 +452,13 @@ export const getScopedSubjectDetail = asyncHandler(
     if (!Number.isFinite(subjectId)) throw new NotFoundError("Subject not found");
 
     const { gradeIds, unrestricted, yearId } = await scopeForRequest(req);
+    // The timetable is per year AND per term -- a slot only means anything
+    // inside one calendar, and a calendar is scoped to a single year+term+class
+    // group triple. Without the term filter the panel stacked every term's
+    // periods on top of each other.
+    const termId = req.query.academic_term_id
+      ? parseInt(req.query.academic_term_id, 10)
+      : null;
 
     const [subject] = await db
       .select({
@@ -672,6 +679,13 @@ export const getScopedSubjectDetail = asyncHandler(
               teacher_username: User.username,
             })
             .from(CalendarSlot)
+            // A term belongs to exactly one year, so the slot's own term column
+            // pins both -- no need to reach through the calendar, which also
+            // keeps any slot predating calendar_id in scope.
+            .leftJoin(
+              AcademicTerm,
+              eq(CalendarSlot.academic_term_id, AcademicTerm.academic_term_id),
+            )
             .leftJoin(
               ClassGroup,
               eq(CalendarSlot.class_group_id, ClassGroup.class_group_id),
@@ -680,9 +694,16 @@ export const getScopedSubjectDetail = asyncHandler(
             .leftJoin(UserProfile, eq(User.user_id, UserProfile.user_id))
             .where(
               and(
-                eq(CalendarSlot.subject_id, subjectId),
-                eq(CalendarSlot.is_active, 1),
-                inArray(CalendarSlot.class_group_id, classGroupIds),
+                ...([
+                  eq(CalendarSlot.subject_id, subjectId),
+                  eq(CalendarSlot.is_active, 1),
+                  inArray(CalendarSlot.class_group_id, classGroupIds),
+                  termId
+                    ? eq(CalendarSlot.academic_term_id, termId)
+                    : yearId
+                      ? eq(AcademicTerm.academic_year_id, yearId)
+                      : undefined,
+                ].filter(Boolean) as any[]),
               ),
             )
             .orderBy(CalendarSlot.day_of_week, CalendarSlot.start_time)
@@ -720,6 +741,11 @@ export const getScopedSubjectDetail = asyncHandler(
                 inArray(SchemeOfWork.class_group_id, classGroupIds),
                 ...(yearId
                   ? [eq(AcademicTerm.academic_year_id, yearId)]
+                  : []),
+                // A scheme of work covers one term; showing every term's at
+                // once made "is it submitted?" unanswerable at a glance.
+                ...(termId
+                  ? [eq(SchemeOfWork.academic_term_id, termId)]
                   : []),
               ),
             )

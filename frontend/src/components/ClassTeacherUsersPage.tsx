@@ -12,6 +12,7 @@ import {
 import { useUser } from "../contexts/UserContext";
 import { getScopedUsers, ScopedUser, ScopedRoleGroup } from "../api/users";
 import { useScopedGrades } from "../hooks/useScopedGrades";
+import { useAcademicPeriod } from "../contexts/AcademicPeriodContext";
 import { useToast } from "../contexts/ToastContext";
 import UserProfileViewer from "./UserProfileViewer";
 
@@ -162,6 +163,9 @@ const ClassTeacherUsersPage: React.FC = () => {
   const { user } = useUser();
   const { showToast } = useToast();
   const scope = useScopedGrades();
+  // Follow the year picked in the top nav, not just whichever year is flagged
+  // current — otherwise the roster ignores the selector sitting above it.
+  const { selectedYearId } = useAcademicPeriod();
 
   const [users, setUsers] = useState<ScopedUser[]>([]);
   const [roleGroups, setRoleGroups] = useState<ScopedRoleGroup[]>([]);
@@ -177,7 +181,8 @@ const ClassTeacherUsersPage: React.FC = () => {
   const canView = user?.permissions?.includes(
     "VIEW_USERS_BY_CLASS_TEACHER_GRADE",
   );
-  const academicYearId = user?.currentAcademicYear?.academic_year_id ?? null;
+  const academicYearId =
+    selectedYearId ?? user?.currentAcademicYear?.academic_year_id ?? null;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   // Debounce search term

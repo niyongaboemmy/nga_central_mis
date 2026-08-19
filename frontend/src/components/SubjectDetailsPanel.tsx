@@ -197,6 +197,10 @@ interface SubjectDetailsPanelProps {
   summary: ScopedSubject | null;
   gradeIds?: number[];
   academicYearId?: number | null;
+  /** Label for the selected period, shown so an empty timetable is unambiguous. */
+  periodLabel?: string | null;
+  /** Selected term from the top bar — the timetable and scheme are per-term. */
+  academicTermId?: number | null;
 }
 
 const SubjectDetailsPanel: React.FC<SubjectDetailsPanelProps> = ({
@@ -205,6 +209,8 @@ const SubjectDetailsPanel: React.FC<SubjectDetailsPanelProps> = ({
   summary,
   gradeIds,
   academicYearId,
+  academicTermId,
+  periodLabel,
 }) => {
   const { showToast } = useToast();
   const [detail, setDetail] = React.useState<SubjectDetail | null>(null);
@@ -224,7 +230,11 @@ const SubjectDetailsPanel: React.FC<SubjectDetailsPanelProps> = ({
     setTab("overview");
     setStudentSearch("");
 
-    getScopedSubjectDetail(subjectId, { gradeIds, academicYearId })
+    getScopedSubjectDetail(subjectId, {
+      gradeIds,
+      academicYearId,
+      academicTermId,
+    })
       .then((data) => {
         if (!cancelled) setDetail(data);
       })
@@ -244,7 +254,7 @@ const SubjectDetailsPanel: React.FC<SubjectDetailsPanelProps> = ({
     return () => {
       cancelled = true;
     };
-  }, [isOpen, subjectId, academicYearId]);
+  }, [isOpen, subjectId, academicYearId, academicTermId]);
 
   React.useEffect(() => {
     if (!isOpen) return;
@@ -706,10 +716,15 @@ const SubjectDetailsPanel: React.FC<SubjectDetailsPanelProps> = ({
 
                   {tab === "schedule" && (
                     <div className="space-y-4">
+                      {periodLabel && scheduleByDay.length > 0 && (
+                        <p className="text-[11px] text-blue-500 font-medium">
+                          Showing {periodLabel}
+                        </p>
+                      )}
                       {scheduleByDay.length === 0 ? (
                         <Empty icon={CalendarDays}>
-                          This subject is not on the timetable for your class
-                          groups yet.
+                          Not on the timetable for your class groups
+                          {periodLabel ? ` in ${periodLabel}` : ""} yet.
                         </Empty>
                       ) : (
                         scheduleByDay.map(([day, slots]) => (
