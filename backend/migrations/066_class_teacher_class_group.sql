@@ -15,16 +15,47 @@
 -- the lowest-id ClassGroup belonging to its grade. Where a grade has several
 -- class groups that choice is arbitrary and admins must review it afterwards
 -- (the query at the bottom of this file lists the affected rows). Where a
--- grade has NO class group at all nothing can be mapped, and the
--- `MODIFY ... NOT NULL` below aborts the migration under MySQL strict mode
--- rather than silently coercing the value to 0 -- create the missing class
--- groups first, then re-run.
+-- grade has NO class group at all nothing can be mapped, so those rows are
+-- dropped (see below) rather than left to trip the NOT NULL step.
+--
+-- Where the real split was known it is pinned explicitly below instead of
+-- being left to the backfill -- the whole point of this change is that the
+-- right teacher shows against the right section, and a guess would defeat it.
 
 SET FOREIGN_KEY_CHECKS=0;
 
 ALTER TABLE `UserGrade`
   ADD COLUMN `class_group_id` BIGINT(20) NULL AFTER `grade_id`;
 
+-- A class teacher of a grade that has no class groups at all cannot be
+-- represented once the column is required. There is no section to point at
+-- and no basis for inventing one, so the assignment is dropped. On the
+-- production database this matches exactly one row: user 17 on grade 9
+-- ("primary"), academic year 3 -- a legacy grade, in a past year.
+DELETE ug FROM `UserGrade` ug
+WHERE NOT EXISTS (
+  SELECT 1 FROM `ClassGroup` cg WHERE cg.`grade_id` = ug.`grade_id`
+);
+
+-- Known assignments, pinned by class group name so the statement is a no-op
+-- on any database where the pairing does not exist. Grade 25 ("Year 1") runs
+-- two sections and had two class teachers, which the lowest-id backfill would
+-- have collapsed onto the same one.
+UPDATE `UserGrade` ug
+JOIN `ClassGroup` cg
+  ON cg.`grade_id` = ug.`grade_id` AND cg.`name` = 'L3. Class A'
+SET ug.`class_group_id` = cg.`class_group_id`
+WHERE ug.`user_id` = 16 AND ug.`grade_id` = 25;
+
+UPDATE `UserGrade` ug
+JOIN `ClassGroup` cg
+  ON cg.`grade_id` = ug.`grade_id` AND cg.`name` = 'L3. Class B'
+SET ug.`class_group_id` = cg.`class_group_id`
+WHERE ug.`user_id` = 15 AND ug.`grade_id` = 25;
+
+-- Everything still unmapped goes to the lowest-id class group of its grade.
+-- Exact where the grade runs a single section; an arbitrary pick where it
+-- runs several, which the review query at the bottom lists for follow-up.
 UPDATE `UserGrade` ug
 SET ug.`class_group_id` = (
   SELECT MIN(cg.`class_group_id`)

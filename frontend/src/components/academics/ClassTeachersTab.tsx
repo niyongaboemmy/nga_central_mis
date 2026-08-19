@@ -1,9 +1,15 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { AcademicYear, ClassGroup, Grade } from "../../api/academics";
-import { AllGradeAssignment, getUsers, UserWithProfile } from "../../api/users";
+import {
+  AllGradeAssignment,
+  getUser,
+  getUsers,
+  UserWithProfile,
+} from "../../api/users";
 import Button from "../ui/Button";
 import Modal from "../ui/Modal";
 import ConfirmModal from "../ui/ConfirmModal";
+import UserProfileModal from "../UserProfileModal";
 
 export interface ClassTeacherAssignmentInput {
   user_id: number;
@@ -282,6 +288,23 @@ const ClassTeachersTab: React.FC<ClassTeachersTabProps> = ({
     }
   };
 
+  // Viewing a teacher reuses the app-wide profile modal, which already covers
+  // personal info, roles, programs, subjects and activity. The list endpoint
+  // returns only a flattened row, so the full user is fetched on demand.
+  const [viewedUser, setViewedUser] = useState<UserWithProfile | null>(null);
+  const [viewingUserId, setViewingUserId] = useState<number | null>(null);
+
+  const openUserProfile = async (userId: number) => {
+    setViewingUserId(userId);
+    try {
+      const user = await getUser(userId);
+      if (user) setViewedUser(user);
+    } catch (error) {
+      console.error("Failed to load user profile:", error);
+      setViewingUserId(null);
+    }
+  };
+
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedAssignment, setSelectedAssignment] =
     useState<AllGradeAssignment | null>(null);
@@ -377,6 +400,7 @@ const ClassTeachersTab: React.FC<ClassTeachersTabProps> = ({
                   <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary-light dark:text-text-secondary-dark/70 uppercase tracking-wider">
                     User
                   </th>
+
                   <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary-light dark:text-text-secondary-dark/70 uppercase tracking-wider">
                     Grade
                   </th>
@@ -409,8 +433,16 @@ const ClassTeachersTab: React.FC<ClassTeachersTabProps> = ({
                       key={item.grade_assignment_id}
                       className="hover:bg-surface-light dark:hover:bg-surface-dark"
                     >
-                      <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-text-primary-light dark:text-text-primary-dark">
-                        {item.user_name}
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <button
+                          onClick={() => openUserProfile(item.user_id)}
+                          className="text-sm font-medium text-text-primary-light dark:text-text-primary-dark hover:text-blue-600 dark:hover:text-blue-400 hover:underline text-left"
+                        >
+                          {item.user_name}
+                        </button>
+                        <p className="text-xs text-text-secondary-light dark:text-text-secondary-dark/70">
+                          {item.email}
+                        </p>
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-sm text-text-secondary-light dark:text-text-secondary-dark/70">
                         {item.grade_name} • {item.program_name}
@@ -425,6 +457,15 @@ const ClassTeachersTab: React.FC<ClassTeachersTabProps> = ({
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-right text-sm font-medium">
                         <div className="flex items-center justify-end gap-3">
+                          <button
+                            onClick={() => openUserProfile(item.user_id)}
+                            disabled={viewingUserId === item.user_id}
+                            className="text-text-secondary-light dark:text-text-secondary-dark/70 hover:text-blue-600 dark:hover:text-blue-400 disabled:opacity-50"
+                          >
+                            {viewingUserId === item.user_id && !viewedUser
+                              ? "Loading..."
+                              : "View"}
+                          </button>
                           <button
                             onClick={() => openEditModal(item)}
                             className="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300"
@@ -690,6 +731,19 @@ const ClassTeachersTab: React.FC<ClassTeachersTabProps> = ({
           </Button>
         </div>
       </Modal>
+
+      {/* User details -- reuses the app-wide profile modal (info, roles,
+          programs, subjects, enrolment, grades, activity) */}
+      <UserProfileModal
+        isOpen={viewedUser !== null}
+        onClose={() => {
+          setViewedUser(null);
+          setViewingUserId(null);
+        }}
+        user={viewedUser}
+        onViewUser={openUserProfile}
+        isSwitchingUser={viewingUserId !== null && viewedUser === null}
+      />
 
       {/* Delete Modal */}
       <ConfirmModal

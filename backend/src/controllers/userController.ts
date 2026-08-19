@@ -2615,6 +2615,7 @@ export const getAllGradeAssignments = asyncHandler(
         user_id: UserGrade.user_id,
         user_name: sql`CONCAT(${UserProfile.first_name}, ' ', ${UserProfile.last_name})`,
         username: User.username,
+        email: User.email,
         grade_id: UserGrade.grade_id,
         grade_name: Grade.name,
         class_group_id: UserGrade.class_group_id,

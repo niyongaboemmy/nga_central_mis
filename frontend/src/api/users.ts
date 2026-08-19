@@ -381,6 +381,7 @@ export interface AllGradeAssignment {
   user_id: number;
   user_name: string;
   username: string;
+  email: string;
   grade_id: number;
   grade_name: string;
   class_group_id: number;
