@@ -36,6 +36,7 @@ describe("Subject detail — schedule and scheme follow the selected year/term",
   let formerTeacherId: number;
   let currentStudentId: number;
   let futureStudentId: number;
+  let staleEnrolmentStudentId: number;
 
   beforeAll(async () => {
     const prior = await createAcademicPeriod();
@@ -136,6 +137,20 @@ describe("Subject detail — schedule and scheme follow the selected year/term",
       academicYearId: laterYear.academicYearId,
     });
 
+    // Enrolled LAST year only, but still placed in the class group. The
+    // placement carries forward; the enrolment must not.
+    staleEnrolmentStudentId = await createUser({ userType: "STUDENT" });
+    await createStudentClassGroup({
+      userId: staleEnrolmentStudentId,
+      classGroupId,
+      academicYearId: priorYearId,
+    });
+    await createStudentSubjectEnrollment({
+      userId: staleEnrolmentStudentId,
+      subjectId,
+      academicYearId: priorYearId,
+    });
+
     await createSchemeOfWork({
       userId: teacherId,
       subjectId,
@@ -201,6 +216,43 @@ describe("Subject detail — schedule and scheme follow the selected year/term",
     );
     const ids = res.body.data.students.map((s: any) => s.user_id);
     expect(ids).toContain(currentStudentId);
+  });
+
+  it("excludes a student whose enrolment belongs to a previous year", async () => {
+    // Enrolment is an explicit per-year record, so it matches the selected
+    // year exactly -- unlike the class-group placement, which carries forward
+    // because schools do not re-stamp rosters the day a new year opens.
+    const res = await detail(
+      `academic_year_id=${yearId}&academic_term_id=${termOneId}`,
+    );
+    const ids = res.body.data.students.map((s: any) => s.user_id);
+    expect(ids).not.toContain(staleEnrolmentStudentId);
+    expect(ids).toContain(currentStudentId);
+  });
+
+  it("still names the section from a placement that carried forward", async () => {
+    // The student IS enrolled this year but was placed last year and never
+    // re-stamped -- they must keep their class group, not lose it.
+    const carriedId = await createUser({ userType: "STUDENT" });
+    await createStudentClassGroup({
+      userId: carriedId,
+      classGroupId,
+      academicYearId: priorYearId,
+    });
+    await createStudentSubjectEnrollment({
+      userId: carriedId,
+      subjectId,
+      academicYearId: yearId,
+    });
+
+    const res = await detail(
+      `academic_year_id=${yearId}&academic_term_id=${termOneId}`,
+    );
+    const row = res.body.data.students.find(
+      (s: any) => s.user_id === carriedId,
+    );
+    expect(row).toBeDefined();
+    expect(row.class_group_id).toBe(classGroupId);
   });
 
   it("excludes a student only placed in a later year", async () => {

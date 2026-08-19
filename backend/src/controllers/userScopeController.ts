@@ -79,7 +79,7 @@ const scopeForRequest = async (req: any) => {
 };
 
 /**
- * Keep only each user's most recent placement/enrolment.
+ * Keep only each user's most recent placement.
  *
  * StudentClassGroup and StudentSubjectEnrollment rows are stamped with the year
  * they were created, and schools do not re-stamp them the moment a new academic
@@ -352,15 +352,13 @@ export const getScopedSubjects = asyncHandler(async (req: any, res: any) => {
       StudentSubjectEnrollment,
       eq(Subject.subject_id, StudentSubjectEnrollment.subject_id),
     )
+    // Joined on the student alone, NOT on matching years: the enrolment is
+    // pinned to the selected year below, while the placement that names their
+    // section carries forward. Requiring both to carry the same year dropped
+    // students whose placement had not been re-stamped for the new year.
     .innerJoin(
       StudentClassGroup,
-      and(
-        eq(StudentSubjectEnrollment.user_id, StudentClassGroup.user_id),
-        eq(
-          StudentSubjectEnrollment.academic_year_id,
-          StudentClassGroup.academic_year_id,
-        ),
-      ),
+      eq(StudentSubjectEnrollment.user_id, StudentClassGroup.user_id),
     )
     .innerJoin(
       ClassGroup,
@@ -372,7 +370,12 @@ export const getScopedSubjects = asyncHandler(async (req: any, res: any) => {
         ...([
           gradeFilter,
           eq(StudentClassGroup.status, "ACTIVE"),
-          // Same carry-forward rule as the rosters -- see latestPerUser.
+          eq(StudentSubjectEnrollment.status, "ACTIVE"),
+          // Enrolment: exact selected year.
+          yearId
+            ? eq(StudentSubjectEnrollment.academic_year_id, yearId)
+            : undefined,
+          // Placement: carry-forward -- see latestPerUser.
           yearId ? lte(StudentClassGroup.academic_year_id, yearId) : undefined,
         ].filter(Boolean) as any[]),
       ),
@@ -669,15 +672,10 @@ export const getScopedSubjectDetail = asyncHandler(
         academic_year_id: StudentClassGroup.academic_year_id,
       })
       .from(StudentSubjectEnrollment)
+      // Student alone, for the same reason as above.
       .innerJoin(
         StudentClassGroup,
-        and(
-          eq(StudentSubjectEnrollment.user_id, StudentClassGroup.user_id),
-          eq(
-            StudentSubjectEnrollment.academic_year_id,
-            StudentClassGroup.academic_year_id,
-          ),
-        ),
+        eq(StudentSubjectEnrollment.user_id, StudentClassGroup.user_id),
       )
       .innerJoin(
         ClassGroup,
@@ -691,6 +689,9 @@ export const getScopedSubjectDetail = asyncHandler(
             eq(StudentSubjectEnrollment.status, "ACTIVE"),
             eq(StudentClassGroup.status, "ACTIVE"),
             gradeFilter,
+            yearId
+              ? eq(StudentSubjectEnrollment.academic_year_id, yearId)
+              : undefined,
             yearId
               ? lte(StudentClassGroup.academic_year_id, yearId)
               : undefined,
@@ -798,8 +799,14 @@ export const getScopedSubjectDetail = asyncHandler(
                 ...([
                   eq(StudentSubjectEnrollment.subject_id, subjectId),
                   eq(StudentSubjectEnrollment.status, "ACTIVE"),
+                  // Enrolment is an explicit per-year record -- a student is
+                  // enrolled in this subject FOR a given year -- so it matches
+                  // the selected year exactly. That is a different rule from
+                  // the class-group placement below, which carries forward
+                  // (see latestPerUser): the placement only names the section
+                  // an already-enrolled student sits in.
                   yearId
-                    ? lte(StudentSubjectEnrollment.academic_year_id, yearId)
+                    ? eq(StudentSubjectEnrollment.academic_year_id, yearId)
                     : undefined,
                 ].filter(Boolean) as any[]),
               ),
@@ -1287,8 +1294,10 @@ export const getScopedUserDetail = asyncHandler(async (req: any, res: any) => {
         and(
           eq(StudentSubjectEnrollment.user_id, targetId),
           eq(StudentSubjectEnrollment.status, "ACTIVE"),
+          // Exact year, as above -- last year's enrolments are not this
+          // year's subjects.
           ...(yearId
-            ? [lte(StudentSubjectEnrollment.academic_year_id, yearId)]
+            ? [eq(StudentSubjectEnrollment.academic_year_id, yearId)]
             : []),
         ),
       ),
