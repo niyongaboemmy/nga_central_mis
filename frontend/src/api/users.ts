@@ -581,6 +581,76 @@ export interface ScopedSubject {
   class_groups: { class_group_id: number; name: string | null }[];
 }
 
+export interface SubjectDetail {
+  subject: {
+    subject_id: number;
+    code?: string | null;
+    name: string;
+    description?: string | null;
+    status: string;
+    color?: string | null;
+    max_marks?: number | null;
+    category_name?: string | null;
+  };
+  classGroups: {
+    class_group_id: number;
+    name: string;
+    grade_id?: number | null;
+    grade_name?: string | null;
+  }[];
+  teachers: (ScopedTeacher & {
+    email?: string | null;
+    phone_number?: string | null;
+    class_groups: { class_group_id: number; name: string }[];
+  })[];
+  students: {
+    user_id: number;
+    username: string;
+    email?: string | null;
+    first_name?: string | null;
+    last_name?: string | null;
+    full_name: string;
+    status: string;
+    class_group_id: number;
+    class_group_name?: string | null;
+  }[];
+  schedule: {
+    slot_id: number;
+    day_of_week: number;
+    start_time: string;
+    end_time: string;
+    location?: string | null;
+    class_group_id?: number | null;
+    class_group_name?: string | null;
+    teacher_name?: string | null;
+  }[];
+  schemes: {
+    scheme_id: number;
+    class_group_id: number;
+    class_group_name?: string | null;
+    validation_status: "PENDING" | "APPROVED" | "REJECTED";
+    term_name?: string | null;
+    teacher_name?: string | null;
+  }[];
+}
+
+export const getScopedSubjectDetail = async (
+  subjectId: number,
+  query?: Pick<ScopeQuery, "gradeIds" | "academicYearId">,
+): Promise<SubjectDetail> => {
+  const params: Record<string, string | number> = {};
+  if (query?.gradeIds && query.gradeIds.length > 0) {
+    params.grade_ids = query.gradeIds.join(",");
+  }
+  if (query?.academicYearId) params.academic_year_id = query.academicYearId;
+
+  const response = await api.get<BackendResponse<SubjectDetail>>(
+    `/users/scope/subjects/${subjectId}`,
+    { params },
+  );
+  return response.data.data as SubjectDetail;
+};
+
 export interface ScopedUser {
   user_id: number;
   username: string;

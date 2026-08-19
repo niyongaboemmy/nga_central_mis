@@ -1,12 +1,16 @@
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, eq, inArray, lte, sql } from "drizzle-orm";
 import { db } from "../db";
 import {
+  AcademicTerm,
+  CalendarSlot,
   ClassGroup,
+  CourseCategory,
   Grade,
   Permission,
   Program,
   Role,
   RolePermission,
+  SchemeOfWork,
   StudentClassGroup,
   StudentSubjectEnrollment,
   Subject,
@@ -72,6 +76,32 @@ const scopeForRequest = async (req: any) => {
     scope,
   );
   return { scope, gradeIds, unrestricted, yearId };
+};
+
+/**
+ * Keep only each user's most recent placement/enrolment.
+ *
+ * StudentClassGroup and StudentSubjectEnrollment rows are stamped with the year
+ * they were created, and schools do not re-stamp them the moment a new academic
+ * year opens -- in practice a roster written for 2025-2026 is still the live
+ * roster well into 2026-2027. Filtering on `= currentYear` therefore emptied
+ * every class list. Queries instead select `<= selectedYear` and this collapses
+ * the history to the latest row per user, so a student who genuinely moved
+ * class group shows up in their new one and only there.
+ */
+const latestPerUser = <T extends { user_id: number; academic_year_id: number | null }>(
+  rows: T[],
+): T[] => {
+  const newestYear = new Map<number, number>();
+  for (const row of rows) {
+    const year = row.academic_year_id ?? 0;
+    if (year >= (newestYear.get(row.user_id) ?? -1)) {
+      newestYear.set(row.user_id, year);
+    }
+  }
+  return rows.filter(
+    (row) => (row.academic_year_id ?? 0) === newestYear.get(row.user_id),
+  );
 };
 
 /** Every role each of the given users holds, keyed by user_id. */
@@ -206,8 +236,9 @@ export const getScopedSubjects = asyncHandler(async (req: any, res: any) => {
   const gradeFilter = unrestricted
     ? undefined
     : inArray(ClassGroup.grade_id, gradeIds);
+  // Teacher assignments carry forward the same way a roster does.
   const yearFilter = yearId
-    ? eq(TeacherSubjectAssignment.academic_year_id, yearId)
+    ? lte(TeacherSubjectAssignment.academic_year_id, yearId)
     : undefined;
 
   // Subjects taught in the scoped class groups, with the teacher on each row.
@@ -284,7 +315,8 @@ export const getScopedSubjects = asyncHandler(async (req: any, res: any) => {
         ...([
           gradeFilter,
           eq(StudentClassGroup.status, "ACTIVE"),
-          yearId ? eq(StudentClassGroup.academic_year_id, yearId) : undefined,
+          // Same carry-forward rule as the rosters -- see latestPerUser.
+          yearId ? lte(StudentClassGroup.academic_year_id, yearId) : undefined,
         ].filter(Boolean) as any[]),
       ),
     );
@@ -376,6 +408,322 @@ export const getScopedSubjects = asyncHandler(async (req: any, res: any) => {
 });
 
 // ---------------------------------------------------------------------------
+// GET /users/scope/subjects/:id -- everything the subject card cannot show
+// ---------------------------------------------------------------------------
+
+/**
+ * Read-only detail for one subject, narrowed to the caller's own class groups.
+ *
+ * A class teacher looking at "Applied Physics II" wants to know who teaches it
+ * to *their* class, when it sits in the week, who is enrolled, and whether the
+ * scheme of work has been submitted. Everything here is therefore filtered by
+ * the caller's scope -- the same subject seen by two different class teachers
+ * legitimately shows different rosters and different timetable rows.
+ */
+export const getScopedSubjectDetail = asyncHandler(
+  async (req: any, res: any) => {
+    const subjectId = parseInt(req.params.id, 10);
+    if (!Number.isFinite(subjectId)) throw new NotFoundError("Subject not found");
+
+    const { gradeIds, unrestricted, yearId } = await scopeForRequest(req);
+
+    const [subject] = await db
+      .select({
+        subject_id: Subject.subject_id,
+        code: Subject.code,
+        name: Subject.name,
+        description: Subject.description,
+        status: Subject.status,
+        color: Subject.color,
+        max_marks: Subject.max_marks,
+        category_name: CourseCategory.name,
+      })
+      .from(Subject)
+      .leftJoin(
+        CourseCategory,
+        eq(Subject.course_category_id, CourseCategory.category_id),
+      )
+      .where(eq(Subject.subject_id, subjectId))
+      .limit(1);
+
+    if (!subject) throw new NotFoundError("Subject not found");
+
+    if (!unrestricted && gradeIds.length === 0) {
+      throw new AuthorizationError(
+        "This subject is outside your assigned grades",
+      );
+    }
+
+    const gradeFilter = unrestricted
+      ? undefined
+      : inArray(ClassGroup.grade_id, gradeIds);
+
+    // Which of the caller's class groups this subject actually runs in, and
+    // who teaches it in each.
+    const assignments = await db
+      .select({
+        class_group_id: ClassGroup.class_group_id,
+        class_group_name: ClassGroup.name,
+        grade_id: ClassGroup.grade_id,
+        grade_name: Grade.name,
+        teacher_id: User.user_id,
+        teacher_username: User.username,
+        teacher_email: User.email,
+        teacher_phone: User.phone_number,
+        teacher_first_name: UserProfile.first_name,
+        teacher_last_name: UserProfile.last_name,
+      })
+      .from(TeacherSubjectAssignment)
+      .innerJoin(
+        ClassGroup,
+        eq(TeacherSubjectAssignment.class_group_id, ClassGroup.class_group_id),
+      )
+      .leftJoin(Grade, eq(ClassGroup.grade_id, Grade.grade_id))
+      .leftJoin(User, eq(TeacherSubjectAssignment.user_id, User.user_id))
+      .leftJoin(UserProfile, eq(User.user_id, UserProfile.user_id))
+      .where(
+        and(
+          ...([
+            eq(TeacherSubjectAssignment.subject_id, subjectId),
+            gradeFilter,
+            yearId
+              ? lte(TeacherSubjectAssignment.academic_year_id, yearId)
+              : undefined,
+          ].filter(Boolean) as any[]),
+        ),
+      );
+
+    // Class groups reached through enrolled students too -- a subject can be
+    // enrolled before anyone is assigned to teach it.
+    const enrolledGroups = await db
+      .selectDistinct({
+        class_group_id: ClassGroup.class_group_id,
+        class_group_name: ClassGroup.name,
+        grade_id: ClassGroup.grade_id,
+        grade_name: Grade.name,
+      })
+      .from(StudentSubjectEnrollment)
+      .innerJoin(
+        StudentClassGroup,
+        and(
+          eq(StudentSubjectEnrollment.user_id, StudentClassGroup.user_id),
+          eq(
+            StudentSubjectEnrollment.academic_year_id,
+            StudentClassGroup.academic_year_id,
+          ),
+        ),
+      )
+      .innerJoin(
+        ClassGroup,
+        eq(StudentClassGroup.class_group_id, ClassGroup.class_group_id),
+      )
+      .leftJoin(Grade, eq(ClassGroup.grade_id, Grade.grade_id))
+      .where(
+        and(
+          ...([
+            eq(StudentSubjectEnrollment.subject_id, subjectId),
+            eq(StudentSubjectEnrollment.status, "ACTIVE"),
+            eq(StudentClassGroup.status, "ACTIVE"),
+            gradeFilter,
+            yearId
+              ? lte(StudentClassGroup.academic_year_id, yearId)
+              : undefined,
+          ].filter(Boolean) as any[]),
+        ),
+      );
+
+    const classGroups = new Map<number, any>();
+    for (const row of [...assignments, ...enrolledGroups]) {
+      if (!row.class_group_id || classGroups.has(row.class_group_id)) continue;
+      classGroups.set(row.class_group_id, {
+        class_group_id: row.class_group_id,
+        name: row.class_group_name,
+        grade_id: row.grade_id,
+        grade_name: row.grade_name,
+      });
+    }
+
+    // Nothing of this subject touches the caller's class groups -- it is not
+    // theirs to look at.
+    if (!unrestricted && classGroups.size === 0) {
+      throw new AuthorizationError(
+        "This subject is outside your assigned grades",
+      );
+    }
+
+    const classGroupIds = Array.from(classGroups.keys());
+
+    // Teachers, deduped, each carrying the class groups they teach it in.
+    const teachers = new Map<number, any>();
+    for (const row of assignments) {
+      if (!row.teacher_id) continue;
+      let entry = teachers.get(row.teacher_id);
+      if (!entry) {
+        entry = {
+          user_id: row.teacher_id,
+          username: row.teacher_username,
+          email: row.teacher_email,
+          phone_number: row.teacher_phone,
+          first_name: row.teacher_first_name,
+          last_name: row.teacher_last_name,
+          class_groups: [] as any[],
+        };
+        teachers.set(row.teacher_id, entry);
+      }
+      if (
+        row.class_group_id &&
+        !entry.class_groups.some(
+          (c: any) => c.class_group_id === row.class_group_id,
+        )
+      ) {
+        entry.class_groups.push({
+          class_group_id: row.class_group_id,
+          name: row.class_group_name,
+        });
+      }
+    }
+
+    const [students, slots, schemes] = await Promise.all([
+      classGroupIds.length > 0
+        ? db
+            .selectDistinct({
+              user_id: User.user_id,
+              username: User.username,
+              email: User.email,
+              first_name: UserProfile.first_name,
+              last_name: UserProfile.last_name,
+              status: User.status,
+              class_group_id: StudentClassGroup.class_group_id,
+              class_group_name: ClassGroup.name,
+            })
+            .from(StudentSubjectEnrollment)
+            .innerJoin(
+              User,
+              eq(StudentSubjectEnrollment.user_id, User.user_id),
+            )
+            .leftJoin(UserProfile, eq(User.user_id, UserProfile.user_id))
+            .innerJoin(
+              StudentClassGroup,
+              and(
+                eq(StudentClassGroup.user_id, User.user_id),
+                inArray(StudentClassGroup.class_group_id, classGroupIds),
+                eq(StudentClassGroup.status, "ACTIVE"),
+              ),
+            )
+            .innerJoin(
+              ClassGroup,
+              eq(StudentClassGroup.class_group_id, ClassGroup.class_group_id),
+            )
+            .where(
+              and(
+                ...([
+                  eq(StudentSubjectEnrollment.subject_id, subjectId),
+                  eq(StudentSubjectEnrollment.status, "ACTIVE"),
+                  yearId
+                    ? lte(StudentSubjectEnrollment.academic_year_id, yearId)
+                    : undefined,
+                ].filter(Boolean) as any[]),
+              ),
+            )
+        : Promise.resolve([]),
+
+      // Where the subject sits in the week, for the caller's class groups.
+      classGroupIds.length > 0
+        ? db
+            .select({
+              slot_id: CalendarSlot.slot_id,
+              day_of_week: CalendarSlot.day_of_week,
+              start_time: CalendarSlot.start_time,
+              end_time: CalendarSlot.end_time,
+              location: CalendarSlot.location,
+              class_group_id: CalendarSlot.class_group_id,
+              class_group_name: ClassGroup.name,
+              teacher_id: User.user_id,
+              teacher_first_name: UserProfile.first_name,
+              teacher_last_name: UserProfile.last_name,
+              teacher_username: User.username,
+            })
+            .from(CalendarSlot)
+            .leftJoin(
+              ClassGroup,
+              eq(CalendarSlot.class_group_id, ClassGroup.class_group_id),
+            )
+            .leftJoin(User, eq(CalendarSlot.user_id, User.user_id))
+            .leftJoin(UserProfile, eq(User.user_id, UserProfile.user_id))
+            .where(
+              and(
+                eq(CalendarSlot.subject_id, subjectId),
+                eq(CalendarSlot.is_active, 1),
+                inArray(CalendarSlot.class_group_id, classGroupIds),
+              ),
+            )
+            .orderBy(CalendarSlot.day_of_week, CalendarSlot.start_time)
+        : Promise.resolve([]),
+
+      // Scheme-of-work status per teacher/class group -- the one thing a class
+      // teacher usually opens a subject to check.
+      classGroupIds.length > 0
+        ? db
+            .select({
+              scheme_id: SchemeOfWork.scheme_id,
+              class_group_id: SchemeOfWork.class_group_id,
+              class_group_name: ClassGroup.name,
+              validation_status: SchemeOfWork.validation_status,
+              term_name: AcademicTerm.name,
+              academic_term_id: SchemeOfWork.academic_term_id,
+              teacher_first_name: UserProfile.first_name,
+              teacher_last_name: UserProfile.last_name,
+              teacher_username: User.username,
+            })
+            .from(SchemeOfWork)
+            .leftJoin(
+              ClassGroup,
+              eq(SchemeOfWork.class_group_id, ClassGroup.class_group_id),
+            )
+            .leftJoin(
+              AcademicTerm,
+              eq(SchemeOfWork.academic_term_id, AcademicTerm.academic_term_id),
+            )
+            .leftJoin(User, eq(SchemeOfWork.user_id, User.user_id))
+            .leftJoin(UserProfile, eq(User.user_id, UserProfile.user_id))
+            .where(
+              and(
+                eq(SchemeOfWork.subject_id, subjectId),
+                inArray(SchemeOfWork.class_group_id, classGroupIds),
+                ...(yearId
+                  ? [eq(AcademicTerm.academic_year_id, yearId)]
+                  : []),
+              ),
+            )
+        : Promise.resolve([]),
+    ]);
+
+    successResponse(res, "Subject detail retrieved successfully", {
+      subject,
+      classGroups: Array.from(classGroups.values()),
+      teachers: Array.from(teachers.values()),
+      students: (students as any[]).map((s) => ({
+        ...s,
+        full_name:
+          `${s.first_name ?? ""} ${s.last_name ?? ""}`.trim() || s.username,
+      })),
+      schedule: (slots as any[]).map((s) => ({
+        ...s,
+        teacher_name:
+          `${s.teacher_first_name ?? ""} ${s.teacher_last_name ?? ""}`.trim() ||
+          s.teacher_username,
+      })),
+      schemes: (schemes as any[]).map((s) => ({
+        ...s,
+        teacher_name:
+          `${s.teacher_first_name ?? ""} ${s.teacher_last_name ?? ""}`.trim() ||
+          s.teacher_username,
+      })),
+    });
+  },
+);
+
+// ---------------------------------------------------------------------------
 // GET /users/scope/users
 // ---------------------------------------------------------------------------
 
@@ -420,8 +768,11 @@ export const getScopedUsers = asyncHandler(async (req: any, res: any) => {
     class_group_name: ClassGroup.name,
   };
 
-  const students = await db
-    .select(baseColumns)
+  const studentRows = await db
+    .select({
+      ...baseColumns,
+      academic_year_id: StudentClassGroup.academic_year_id,
+    })
     .from(User)
     .leftJoin(UserProfile, eq(User.user_id, UserProfile.user_id))
     .innerJoin(StudentClassGroup, eq(User.user_id, StudentClassGroup.user_id))
@@ -435,10 +786,11 @@ export const getScopedUsers = asyncHandler(async (req: any, res: any) => {
         ...([
           gradeFilter,
           eq(StudentClassGroup.status, "ACTIVE"),
-          yearId ? eq(StudentClassGroup.academic_year_id, yearId) : undefined,
+          yearId ? lte(StudentClassGroup.academic_year_id, yearId) : undefined,
         ].filter(Boolean) as any[]),
       ),
     );
+  const students = latestPerUser(studentRows);
 
   const teachers = await db
     .select(baseColumns)
@@ -458,7 +810,7 @@ export const getScopedUsers = asyncHandler(async (req: any, res: any) => {
         ...([
           gradeFilter,
           yearId
-            ? eq(TeacherSubjectAssignment.academic_year_id, yearId)
+            ? lte(TeacherSubjectAssignment.academic_year_id, yearId)
             : undefined,
         ].filter(Boolean) as any[]),
       ),
@@ -593,8 +945,13 @@ export const getScopedUserDetail = asyncHandler(async (req: any, res: any) => {
   // A scoped viewer may only open profiles of people inside their own grades.
   // Without this the read-only viewer would be a way around the MANAGE_USERS
   // requirement on GET /users/:id.
+  //
+  // Reachability is checked at GRADE level, deliberately matching what
+  // getScopedUsers lists. Checking the caller's own class groups instead made
+  // the list and the profile disagree: a teacher who teaches a sibling section
+  // of the same grade appeared in the roster and then 403'd on open.
   if (scope.scoped && targetId !== req.user?.userId) {
-    const reachable = await isWithinScope(targetId, scope.classGroupIds, yearId);
+    const reachable = await isWithinScope(targetId, scope.gradeIds, yearId);
     if (!reachable) {
       throw new AuthorizationError(
         "This user is outside your assigned grades",
@@ -666,7 +1023,7 @@ export const getScopedUserDetail = asyncHandler(async (req: any, res: any) => {
         and(
           eq(StudentClassGroup.user_id, targetId),
           eq(StudentClassGroup.status, "ACTIVE"),
-          ...(yearId ? [eq(StudentClassGroup.academic_year_id, yearId)] : []),
+          ...(yearId ? [lte(StudentClassGroup.academic_year_id, yearId)] : []),
         ),
       ),
     db
@@ -699,7 +1056,7 @@ export const getScopedUserDetail = asyncHandler(async (req: any, res: any) => {
         and(
           eq(TeacherSubjectAssignment.user_id, targetId),
           ...(yearId
-            ? [eq(TeacherSubjectAssignment.academic_year_id, yearId)]
+            ? [lte(TeacherSubjectAssignment.academic_year_id, yearId)]
             : []),
         ),
       ),
@@ -719,7 +1076,7 @@ export const getScopedUserDetail = asyncHandler(async (req: any, res: any) => {
           eq(StudentSubjectEnrollment.user_id, targetId),
           eq(StudentSubjectEnrollment.status, "ACTIVE"),
           ...(yearId
-            ? [eq(StudentSubjectEnrollment.academic_year_id, yearId)]
+            ? [lte(StudentSubjectEnrollment.academic_year_id, yearId)]
             : []),
         ),
       ),
@@ -770,22 +1127,26 @@ export const getScopedUserDetail = asyncHandler(async (req: any, res: any) => {
   });
 });
 
-/** Is the target user a student or teacher in any of these class groups? */
+/** Is the target user a student or teacher in any class group of these grades? */
 const isWithinScope = async (
   targetId: number,
-  classGroupIds: number[],
+  gradeIds: number[],
   yearId: number | null,
 ) => {
-  if (classGroupIds.length === 0) return false;
+  if (gradeIds.length === 0) return false;
 
   const asStudent = await db
     .select({ user_id: StudentClassGroup.user_id })
     .from(StudentClassGroup)
+    .innerJoin(
+      ClassGroup,
+      eq(StudentClassGroup.class_group_id, ClassGroup.class_group_id),
+    )
     .where(
       and(
         eq(StudentClassGroup.user_id, targetId),
-        inArray(StudentClassGroup.class_group_id, classGroupIds),
-        ...(yearId ? [eq(StudentClassGroup.academic_year_id, yearId)] : []),
+        inArray(ClassGroup.grade_id, gradeIds),
+        ...(yearId ? [lte(StudentClassGroup.academic_year_id, yearId)] : []),
       ),
     )
     .limit(1);
@@ -794,12 +1155,16 @@ const isWithinScope = async (
   const asTeacher = await db
     .select({ user_id: TeacherSubjectAssignment.user_id })
     .from(TeacherSubjectAssignment)
+    .innerJoin(
+      ClassGroup,
+      eq(TeacherSubjectAssignment.class_group_id, ClassGroup.class_group_id),
+    )
     .where(
       and(
         eq(TeacherSubjectAssignment.user_id, targetId),
-        inArray(TeacherSubjectAssignment.class_group_id, classGroupIds),
+        inArray(ClassGroup.grade_id, gradeIds),
         ...(yearId
-          ? [eq(TeacherSubjectAssignment.academic_year_id, yearId)]
+          ? [lte(TeacherSubjectAssignment.academic_year_id, yearId)]
           : []),
       ),
     )

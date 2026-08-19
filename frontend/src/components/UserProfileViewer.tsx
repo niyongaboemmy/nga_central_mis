@@ -46,15 +46,17 @@ const initialsOf = (first?: string | null, last?: string | null, fallback = "?")
   return (letters || fallback.charAt(0)).toUpperCase();
 };
 
-// A stable hue per user so the same person always gets the same avatar colour —
-// recognisable at a glance when scanning a class list.
+// Blue is the product's primary, so the header is always blue. Only the depth
+// of the second stop varies per user — enough that the same person is
+// recognisable at a glance across visits, without turning the panel into a
+// different-coloured surface each time you open it.
 const GRADIENTS = [
-  "from-blue-500 to-indigo-600",
-  "from-emerald-500 to-teal-600",
-  "from-amber-500 to-orange-600",
-  "from-fuchsia-500 to-purple-600",
-  "from-rose-500 to-pink-600",
-  "from-cyan-500 to-sky-600",
+  "from-blue-600 to-indigo-700",
+  "from-blue-500 to-blue-700",
+  "from-sky-600 to-blue-700",
+  "from-blue-600 to-blue-800",
+  "from-indigo-600 to-blue-700",
+  "from-sky-500 to-indigo-600",
 ];
 const gradientFor = (id: number) => GRADIENTS[id % GRADIENTS.length];
 
@@ -83,12 +85,12 @@ const CopyableRow = ({
   };
 
   return (
-    <div className="flex items-center gap-3 p-3 rounded-xl bg-gray-50 dark:bg-slate-800/60">
-      <div className="w-9 h-9 rounded-lg bg-white dark:bg-slate-700 flex items-center justify-center flex-shrink-0">
-        <Icon className="w-4 h-4 text-gray-500 dark:text-gray-300" />
+    <div className="flex items-center gap-3 p-3 rounded-xl bg-blue-50/60 dark:bg-blue-950/25 border border-blue-100/70 dark:border-blue-900/30">
+      <div className="w-9 h-9 rounded-lg bg-white dark:bg-slate-800 flex items-center justify-center flex-shrink-0">
+        <Icon className="w-4 h-4 text-blue-600 dark:text-blue-400" />
       </div>
       <div className="min-w-0 flex-1">
-        <p className="text-[11px] uppercase tracking-wide text-gray-400">
+        <p className="text-[11px] uppercase tracking-wide text-blue-500/80">
           {label}
         </p>
         <p className="text-sm text-gray-900 dark:text-white truncate">{value}</p>
@@ -97,10 +99,10 @@ const CopyableRow = ({
         type="button"
         onClick={copy}
         aria-label={`Copy ${label}`}
-        className="p-2 rounded-lg text-gray-400 hover:text-gray-700 dark:hover:text-white hover:bg-white dark:hover:bg-slate-700 transition-colors"
+        className="p-2 rounded-lg text-blue-400 hover:text-blue-700 dark:hover:text-blue-200 hover:bg-white dark:hover:bg-slate-800 transition-colors"
       >
         {copied ? (
-          <Check className="w-4 h-4 text-green-500" />
+          <Check className="w-4 h-4 text-blue-600" />
         ) : (
           <Copy className="w-4 h-4" />
         )}
@@ -118,14 +120,14 @@ const StatTile = ({
   value: number;
   label: string;
 }) => (
-  <div className="flex-1 rounded-xl bg-white/70 dark:bg-slate-800/60 border border-gray-100 dark:border-slate-700/50 px-3 py-2.5">
+  <div className="flex-1 rounded-xl bg-blue-50/80 dark:bg-blue-950/40 border border-blue-100 dark:border-blue-900/40 px-3 py-2.5 backdrop-blur">
     <div className="flex items-center gap-2">
-      <Icon className="w-4 h-4 text-blue-500" />
-      <span className="text-lg font-semibold text-gray-900 dark:text-white leading-none">
+      <Icon className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+      <span className="text-lg font-semibold text-blue-900 dark:text-blue-50 leading-none">
         {value}
       </span>
     </div>
-    <p className="text-[11px] text-gray-400 mt-1">{label}</p>
+    <p className="text-[11px] text-blue-700/70 dark:text-blue-300/70 mt-1">{label}</p>
   </div>
 );
 
@@ -144,22 +146,22 @@ const Section = ({
 }) => {
   const [open, setOpen] = React.useState(defaultOpen);
   return (
-    <section className="rounded-2xl border border-gray-100 dark:border-slate-700/50 overflow-hidden">
+    <section className="rounded-2xl border border-blue-100 dark:border-blue-900/40 overflow-hidden">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        className="w-full flex items-center gap-2 px-4 py-3 bg-gray-50/80 dark:bg-slate-800/60 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors"
+        className="w-full flex items-center gap-2 px-4 py-3 bg-blue-50/70 dark:bg-blue-950/30 hover:bg-blue-100/70 dark:hover:bg-blue-950/50 transition-colors"
       >
-        <Icon className="w-4 h-4 text-gray-400" />
-        <span className="text-sm font-semibold text-gray-800 dark:text-gray-100">
+        <Icon className="w-4 h-4 text-blue-500" />
+        <span className="text-sm font-semibold text-blue-900 dark:text-blue-50">
           {title}
         </span>
         {typeof count === "number" && (
-          <span className="text-xs text-gray-400">({count})</span>
+          <span className="text-xs text-blue-500/70">({count})</span>
         )}
         <ChevronDown
-          className={`w-4 h-4 text-gray-400 ml-auto transition-transform ${
+          className={`w-4 h-4 text-blue-400 ml-auto transition-transform ${
             open ? "rotate-180" : ""
           }`}
         />
@@ -170,13 +172,13 @@ const Section = ({
 };
 
 const Chip = ({ children }: { children: React.ReactNode }) => (
-  <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs bg-blue-50 dark:bg-blue-900/25 text-blue-700 dark:text-blue-300">
+  <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-100 dark:border-blue-900/50">
     {children}
   </span>
 );
 
 const Empty = ({ children }: { children: React.ReactNode }) => (
-  <p className="text-xs text-gray-400 italic">{children}</p>
+  <p className="text-xs text-blue-900/45 dark:text-blue-100/35 italic">{children}</p>
 );
 
 const Skeleton = () => (
@@ -184,7 +186,7 @@ const Skeleton = () => (
     {[...Array(5)].map((_, i) => (
       <div
         key={i}
-        className="h-14 rounded-xl bg-gray-100 dark:bg-slate-800 animate-pulse"
+        className="h-14 rounded-xl bg-blue-50 dark:bg-blue-950/40 animate-pulse"
       />
     ))}
   </div>
@@ -276,7 +278,7 @@ const UserProfileViewer: React.FC<UserProfileViewerProps> = ({
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 z-[60] bg-black/50 backdrop-blur-sm flex justify-end"
+        className="fixed inset-0 z-[60] bg-blue-950/50 backdrop-blur-sm flex justify-end"
         onClick={onClose}
       >
         <motion.aside
@@ -344,8 +346,8 @@ const UserProfileViewer: React.FC<UserProfileViewerProps> = ({
           <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3">
             {error ? (
               <div className="text-center py-10">
-                <UserIcon className="w-8 h-8 text-gray-300 mx-auto mb-2" />
-                <p className="text-sm text-gray-500 dark:text-gray-400">
+                <UserIcon className="w-8 h-8 text-blue-200 dark:text-blue-900 mx-auto mb-2" />
+                <p className="text-sm text-blue-900/60 dark:text-blue-100/50">
                   {error}
                 </p>
               </div>
@@ -409,14 +411,14 @@ const UserProfileViewer: React.FC<UserProfileViewerProps> = ({
                       {classGroups.map((cg) => (
                         <div
                           key={`cg-${cg.class_group_id}`}
-                          className="flex items-center gap-3 p-3 rounded-xl bg-gray-50 dark:bg-slate-800/60"
+                          className="flex items-center gap-3 p-3 rounded-xl bg-blue-50/60 dark:bg-blue-950/25 border border-blue-100/70 dark:border-blue-900/30"
                         >
-                          <GraduationCap className="w-4 h-4 text-blue-500 flex-shrink-0" />
+                          <GraduationCap className="w-4 h-4 text-blue-600 dark:text-blue-400 flex-shrink-0" />
                           <div className="min-w-0">
                             <p className="text-sm text-gray-900 dark:text-white truncate">
                               {cg.name}
                             </p>
-                            <p className="text-xs text-gray-400 truncate">
+                            <p className="text-xs text-blue-900/50 dark:text-blue-100/40 truncate">
                               {[cg.grade_name, cg.program_name]
                                 .filter(Boolean)
                                 .join(" · ") || "Student"}
@@ -427,14 +429,14 @@ const UserProfileViewer: React.FC<UserProfileViewerProps> = ({
                       {assignedGrades.map((g) => (
                         <div
                           key={`ug-${g.grade_id}-${g.class_group_id}`}
-                          className="flex items-center gap-3 p-3 rounded-xl bg-gray-50 dark:bg-slate-800/60"
+                          className="flex items-center gap-3 p-3 rounded-xl bg-blue-50/60 dark:bg-blue-950/25 border border-blue-100/70 dark:border-blue-900/30"
                         >
-                          <Building2 className="w-4 h-4 text-emerald-500 flex-shrink-0" />
+                          <Building2 className="w-4 h-4 text-indigo-600 dark:text-indigo-400 flex-shrink-0" />
                           <div className="min-w-0">
                             <p className="text-sm text-gray-900 dark:text-white truncate">
                               Class teacher · {g.class_group_name ?? g.name}
                             </p>
-                            <p className="text-xs text-gray-400 truncate">
+                            <p className="text-xs text-blue-900/50 dark:text-blue-100/40 truncate">
                               {[g.name, g.program_name]
                                 .filter(Boolean)
                                 .join(" · ")}
@@ -453,19 +455,19 @@ const UserProfileViewer: React.FC<UserProfileViewerProps> = ({
                     roles.map((role: any) => (
                       <details
                         key={role.role_id}
-                        className="rounded-xl bg-gray-50 dark:bg-slate-800/60 p-3"
+                        className="rounded-xl bg-blue-50/60 dark:bg-blue-950/25 border border-blue-100/70 dark:border-blue-900/30 p-3"
                       >
                         <summary className="cursor-pointer text-sm text-gray-900 dark:text-white flex items-center gap-2">
-                          <Shield className="w-4 h-4 text-blue-500" />
+                          <Shield className="w-4 h-4 text-blue-600" />
                           {role.name}
                           {role.permissions?.length ? (
-                            <span className="text-xs text-gray-400 ml-auto">
+                            <span className="text-xs text-blue-500/70 ml-auto">
                               {role.permissions.length} permissions
                             </span>
                           ) : null}
                         </summary>
                         {role.description && (
-                          <p className="text-xs text-gray-400 mt-2">
+                          <p className="text-xs text-blue-900/50 dark:text-blue-100/40 mt-2">
                             {role.description}
                           </p>
                         )}
@@ -504,8 +506,8 @@ const UserProfileViewer: React.FC<UserProfileViewerProps> = ({
             )}
           </div>
 
-          <footer className="px-5 py-3 border-t border-gray-100 dark:border-slate-700/50">
-            <p className="text-[11px] text-gray-400 text-center">
+          <footer className="px-5 py-3 border-t border-blue-100 dark:border-blue-950/60">
+            <p className="text-[11px] text-blue-900/40 dark:text-blue-100/30 text-center">
               Read-only view — profile changes are made in User Management.
             </p>
           </footer>

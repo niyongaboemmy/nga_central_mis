@@ -12,6 +12,7 @@ import { useUser } from "../contexts/UserContext";
 import { getScopedSubjects, ScopedSubject } from "../api/users";
 import { useScopedGrades } from "../hooks/useScopedGrades";
 import { useToast } from "../contexts/ToastContext";
+import SubjectDetailsPanel from "./SubjectDetailsPanel";
 
 const PAGE_SIZE = 24;
 
@@ -59,16 +60,22 @@ const SubjectCard = ({
   subject,
   index,
   showGrades,
+  onOpen,
 }: {
   subject: ScopedSubject;
   index: number;
   showGrades: boolean;
+  onOpen: () => void;
 }) => (
-  <motion.div
+  <motion.button
+    type="button"
+    onClick={onOpen}
+    aria-label={`Open details for ${subject.name}`}
     initial={{ opacity: 0, y: 10 }}
     animate={{ opacity: 1, y: 0 }}
+    whileHover={{ y: -2 }}
     transition={{ delay: Math.min(index, 12) * 0.02 }}
-    className="bg-white dark:bg-slate-800/60 backdrop-blur-sm rounded-2xl p-4 border border-white/50 dark:border-slate-700/30"
+    className="group w-full text-left bg-white dark:bg-slate-800/60 backdrop-blur-sm rounded-2xl p-4 border border-blue-100/70 dark:border-slate-700/30 hover:border-blue-400 dark:hover:border-blue-500/60 hover:shadow-lg hover:shadow-blue-500/5 transition-all cursor-pointer"
   >
     <div className="flex items-start gap-3">
       <div
@@ -140,7 +147,12 @@ const SubjectCard = ({
         </span>
       </div>
     </div>
-  </motion.div>
+
+    <div className="flex items-center gap-1 mt-3 pt-2 border-t border-blue-50 dark:border-slate-700/40 text-xs font-medium text-blue-600 dark:text-blue-400 opacity-0 group-hover:opacity-100 transition-opacity">
+      View details
+      <ChevronRight className="w-3.5 h-3.5" />
+    </div>
+  </motion.button>
 );
 
 const EmptyState = ({
@@ -183,6 +195,9 @@ const ClassTeacherSubjectsPage: React.FC = () => {
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [gradeFilter, setGradeFilter] = useState<number | "all">("all");
+  const [selectedSubject, setSelectedSubject] = useState<ScopedSubject | null>(
+    null,
+  );
 
   const canView = user?.permissions?.includes(
     "VIEW_SUBJECTS_BY_CLASS_TEACHER_GRADE",
@@ -357,6 +372,7 @@ const ClassTeacherSubjectsPage: React.FC = () => {
                       subject={subject}
                       index={index}
                       showGrades={scope.grades.length > 1 || !scope.isScoped}
+                      onOpen={() => setSelectedSubject(subject)}
                     />
                   ))
                 ) : (
@@ -407,6 +423,14 @@ const ClassTeacherSubjectsPage: React.FC = () => {
           </motion.div>
         </div>
       </div>
+
+      <SubjectDetailsPanel
+        isOpen={selectedSubject !== null}
+        onClose={() => setSelectedSubject(null)}
+        summary={selectedSubject}
+        gradeIds={gradeIds}
+        academicYearId={academicYearId}
+      />
     </div>
   );
 };

@@ -34,6 +34,7 @@ import {
 import {
   getUserStats,
   getScopedSubjects,
+  getScopedSubjectDetail,
   getScopedUsers,
   getScopedUserDetail,
 } from "../controllers/userScopeController";
@@ -78,6 +79,12 @@ router.get(
   authenticate,
   authorize("VIEW_SUBJECTS_BY_CLASS_TEACHER_GRADE"),
   getScopedSubjects,
+);
+router.get(
+  "/scope/subjects/:id",
+  authenticate,
+  authorize("VIEW_SUBJECTS_BY_CLASS_TEACHER_GRADE"),
+  getScopedSubjectDetail,
 );
 router.get(
   "/scope/users",
