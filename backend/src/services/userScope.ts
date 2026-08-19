@@ -143,6 +143,20 @@ export const resolveRequestedGradeIds = (
   };
 };
 
+/**
+ * Guard for anything keyed by a single class group (a calendar, a timetable
+ * slot). A class-teacher assignment names one *class group*, not a whole grade
+ * -- two teachers can lead L3 Class A and L3 Class B independently -- so grade
+ * membership is not enough to authorise a write.
+ */
+export const isClassGroupInScope = (
+  classGroupId: number,
+  scope: UserScope,
+): boolean => {
+  if (!scope.scoped) return true;
+  return scope.classGroupIds.includes(classGroupId);
+};
+
 /** Parse a `1,2,3` query-string list into distinct positive integers. */
 export const parseIdList = (raw: unknown): number[] | null => {
   if (raw === undefined || raw === null || raw === "") return null;

@@ -31,11 +31,34 @@ import {
   ValidationError,
   NotFoundError,
   ConflictError,
+  AuthorizationError,
 } from "../errors/CustomError";
 import { successResponse } from "../utils/response";
 import { asyncHandler } from "../middleware/asyncHandler";
 import logger from "../utils/logger";
-import { resolveUserScope } from "../services/userScope";
+import {
+  resolveUserScope,
+  isClassGroupInScope,
+} from "../services/userScope";
+
+/**
+ * A calendar and every slot on it belong to exactly one class group. A scoped
+ * caller (class teacher / program lead) may only write to the class groups
+ * named in their own assignments -- being a class teacher of L3 Class A does
+ * not confer anything over L3 Class B, even though they share a grade.
+ */
+const assertClassGroupWritable = async (
+  req: any,
+  classGroupId: number,
+  academicYearId?: number | null,
+) => {
+  const scope = await resolveUserScope(req.user?.userId, academicYearId);
+  if (!isClassGroupInScope(classGroupId, scope)) {
+    throw new AuthorizationError(
+      "This class group is outside your assigned class groups",
+    );
+  }
+};
 
 // Helper function to format date for MySQL
 const formatDateForMySQL = (dateStr: string | undefined) => {
@@ -172,6 +195,11 @@ export const createCalendarSlot = asyncHandler(async (req: any, res: any) => {
   }
 
   const calendarClassGroupId = calendar[0].class_group_id;
+  await assertClassGroupWritable(
+    req,
+    calendarClassGroupId,
+    calendar[0].academic_year_id,
+  );
 
   // Check if slot already exists at this time
   const existingSlot = await db
@@ -254,6 +282,12 @@ export const updateCalendarSlot = asyncHandler(async (req: any, res: any) => {
     throw new NotFoundError("Calendar slot not found");
   }
 
+  // A slot inherits its class group from its calendar -- guard the write on
+  // that, not on the slot's own denormalised column.
+  if (existingSlot[0].class_group_id) {
+    await assertClassGroupWritable(req, existingSlot[0].class_group_id);
+  }
+
   // Validate time format if provided
   if (start_time) {
     const timeRegex = /^([01]?[0-9]|2[0-3]):[0-5][0-9]$/;
@@ -310,6 +344,12 @@ export const deleteCalendarSlot = asyncHandler(async (req: any, res: any) => {
 
   if (existingSlot.length === 0) {
     throw new NotFoundError("Calendar slot not found");
+  }
+
+  // A slot inherits its class group from its calendar -- guard the write on
+  // that, not on the slot's own denormalised column.
+  if (existingSlot[0].class_group_id) {
+    await assertClassGroupWritable(req, existingSlot[0].class_group_id);
   }
 
   await db
@@ -1329,26 +1369,41 @@ export const getCalendarSetupData = asyncHandler(async (req: any, res: any) => {
     throw new ValidationError("No academic term specified or found");
   }
 
+  // Same class-group clamp as the picker -- the slot form must not offer a
+  // class group the caller was never assigned.
+  const setupScope = await resolveUserScope(req.user?.userId, yearId);
+  const setupScopeFilter =
+    setupScope.scoped && setupScope.classGroupIds.length > 0
+      ? inArray(ClassGroup.class_group_id, setupScope.classGroupIds)
+      : undefined;
+
   // Get class groups that actually have a teacher assignment in this
   // academic year -- ClassGroup itself is a permanent label (no year), so
   // "relevant to this year" is now determined via TeacherSubjectAssignment.
-  const classGroups = await db
-    .selectDistinct({
-      class_group_id: ClassGroup.class_group_id,
-      name: ClassGroup.name,
-      grade_name: Grade.name,
-      level_order: Grade.level_order,
-    })
-    .from(ClassGroup)
-    .leftJoin(Grade, eq(ClassGroup.grade_id, Grade.grade_id))
-    .innerJoin(
-      TeacherSubjectAssignment,
-      and(
-        eq(TeacherSubjectAssignment.class_group_id, ClassGroup.class_group_id),
-        eq(TeacherSubjectAssignment.academic_year_id, yearId),
-      ),
-    )
-    .orderBy(Grade.level_order, ClassGroup.name);
+  const classGroups =
+    setupScope.scoped && setupScope.classGroupIds.length === 0
+      ? []
+      : await db
+          .selectDistinct({
+            class_group_id: ClassGroup.class_group_id,
+            name: ClassGroup.name,
+            grade_name: Grade.name,
+            level_order: Grade.level_order,
+          })
+          .from(ClassGroup)
+          .leftJoin(Grade, eq(ClassGroup.grade_id, Grade.grade_id))
+          .innerJoin(
+            TeacherSubjectAssignment,
+            and(
+              eq(
+                TeacherSubjectAssignment.class_group_id,
+                ClassGroup.class_group_id,
+              ),
+              eq(TeacherSubjectAssignment.academic_year_id, yearId),
+            ),
+          )
+          .where(setupScopeFilter)
+          .orderBy(Grade.level_order, ClassGroup.name);
 
   // Get subjects - if class_group_id is provided, filter by that class group
   let subjects: any[];
@@ -1369,7 +1424,14 @@ export const getCalendarSetupData = asyncHandler(async (req: any, res: any) => {
         UserProfile,
         eq(TeacherSubjectAssignment.user_id, UserProfile.user_id),
       )
-      .where(eq(TeacherSubjectAssignment.class_group_id, classGroupId));
+      // Year-scoped: without this, a class group carried over from a prior
+      // year offered that year's subject/teacher pairs in the slot form.
+      .where(
+        and(
+          eq(TeacherSubjectAssignment.class_group_id, classGroupId),
+          eq(TeacherSubjectAssignment.academic_year_id, yearId),
+        ),
+      );
 
     // Get unique subject IDs
     const subjectIds = [
@@ -1489,6 +1551,8 @@ export const createAcademicCalendar = asyncHandler(
         "Academic year, term, and class group are required",
       );
     }
+
+    await assertClassGroupWritable(req, class_group_id, academic_year_id);
 
     // Check if calendar already exists for this combination
     const existingCalendar = await db
@@ -1660,6 +1724,12 @@ export const updateAcademicCalendar = asyncHandler(
       throw new NotFoundError("Academic calendar not found");
     }
 
+    await assertClassGroupWritable(
+      req,
+      existingCalendar[0].class_group_id,
+      existingCalendar[0].academic_year_id,
+    );
+
     const updateData: any = {};
     if (name !== undefined) updateData.name = name;
     if (description !== undefined) updateData.description = description;
@@ -1695,6 +1765,12 @@ export const deleteAcademicCalendar = asyncHandler(
     }
 
     // Check if there are slots associated with this calendar
+    await assertClassGroupWritable(
+      req,
+      existingCalendar[0].class_group_id,
+      existingCalendar[0].academic_year_id,
+    );
+
     const slotsWithCalendar = await db
       .select()
       .from(CalendarSlot)
@@ -1731,20 +1807,22 @@ export const getCalendarClassGroups = asyncHandler(
       throw new ValidationError("Academic year is required");
     }
 
-    // A class teacher / program lead may only pick from their own grades.
-    // Enforced here rather than filtered in the browser, so the dropdown and
-    // the data behind it agree.
+    // A class teacher leads *one class group*, not a whole grade -- L3 Class A
+    // and L3 Class B are different assignments held by different people. Clamp
+    // on class_group_id so the picker offers exactly what the caller was
+    // assigned in their auth payload, and enforce it here rather than
+    // filtering in the browser so the dropdown and the data behind it agree.
     const scope = await resolveUserScope(req.user?.userId, yearId);
     const scopeFilter =
-      scope.scoped && scope.gradeIds.length > 0
-        ? inArray(ClassGroup.grade_id, scope.gradeIds)
+      scope.scoped && scope.classGroupIds.length > 0
+        ? inArray(ClassGroup.class_group_id, scope.classGroupIds)
         : undefined;
 
     // Get class groups that have a teacher assignment in this academic
     // year -- ClassGroup itself is a permanent label with no year of its
     // own, so "for this academic year" is derived via TeacherSubjectAssignment.
     const classGroups =
-      scope.scoped && scope.gradeIds.length === 0
+      scope.scoped && scope.classGroupIds.length === 0
         ? []
         : await db
             .selectDistinct({

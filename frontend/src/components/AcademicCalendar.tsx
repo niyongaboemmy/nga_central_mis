@@ -693,18 +693,20 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({
           return;
         }
 
-        // The server already clamps this list to the caller's scope; narrow it
-        // further by grade_id (not by matching grade *names*, which broke as
-        // soon as two programs used the same grade label).
-        const filteredClassGroups = scope.isScoped
-          ? classGroups.filter((cg: any) =>
-              scope.gradeIds.includes(cg.grade_id),
-            )
-          : classGroups;
+        // Only the class groups this user was actually assigned — a class
+        // teacher of L3 Class A must not be offered L3 Class B just because
+        // they share a grade. The server clamps the same way; this keeps the
+        // form honest if a stale list is ever in hand. No fallback to the
+        // unfiltered list: an empty result means "you have none", not
+        // "show everything".
+        const filteredClassGroups =
+          scope.isScoped && scope.classGroupIds.length > 0
+            ? classGroups.filter((cg: any) =>
+                scope.classGroupIds.includes(cg.class_group_id),
+              )
+            : classGroups;
 
-        setAvailableClassGroups(
-          filteredClassGroups.length > 0 ? filteredClassGroups : classGroups,
-        );
+        setAvailableClassGroups(filteredClassGroups);
 
         setCalendarFormData({
           academic_year_id: selectedYear.toString(),
@@ -737,7 +739,13 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({
       const classGroups = await getCalendarClassGroups({
         academic_year_id: selectedYear,
       });
-      setAvailableClassGroups(classGroups);
+      setAvailableClassGroups(
+        scope.isScoped && scope.classGroupIds.length > 0
+          ? classGroups.filter((cg: any) =>
+              scope.classGroupIds.includes(cg.class_group_id),
+            )
+          : classGroups,
+      );
       setCalendarFormData({
         academic_year_id: selectedYear.toString(),
         academic_term_id: selectedTerm.toString(),
