@@ -13,6 +13,11 @@ import {
   removeSystemFromRoleInSchool,
   getLogsHistory,
 } from "../controllers/systemController";
+import {
+  listIntegrationTokens,
+  createIntegrationToken,
+  revokeIntegrationToken,
+} from "../controllers/integrationTokenController";
 import { authenticate, authorize } from "../middleware/auth";
 import { Permissions } from "../utils/permissions";
 
@@ -24,6 +29,37 @@ router.get(
   authenticate,
   authorize([Permissions.VIEW_ALL_LOGS_HISTORY]),
   getLogsHistory,
+);
+
+// Integration tokens — the machine credentials partner systems (Ganzaa) use to
+// pull read-only data from /integrations. Managed here rather than under
+// /integrations because these are authenticated as a PERSON: everything mounted
+// at /integrations is machine-authenticated and read-only, and keeping that true
+// of the whole router is worth more than the tidier URL.
+//
+// Registered before "/:id" below — Express matches in order, so the parametric
+// route would otherwise swallow "/integration-tokens" and try to load a system
+// with that id.
+//
+// MANAGE_SYSTEMS is the right permission: an admin who can register an SSO
+// client is the same admin who decides which partner may read the school's data.
+router.get(
+  "/integration-tokens",
+  authenticate,
+  authorize([Permissions.MANAGE_SYSTEMS]),
+  listIntegrationTokens,
+);
+router.post(
+  "/integration-tokens",
+  authenticate,
+  authorize([Permissions.MANAGE_SYSTEMS]),
+  createIntegrationToken,
+);
+router.delete(
+  "/integration-tokens/:id",
+  authenticate,
+  authorize([Permissions.MANAGE_SYSTEMS]),
+  revokeIntegrationToken,
 );
 
 // System Management
