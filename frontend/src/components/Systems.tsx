@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Server as SystemIcon,
@@ -35,11 +36,13 @@ import { getRoles, Role } from "../api/users";
 // Modern System Card with Actions Overlay
 const SystemCard = ({
   system,
+  onView,
   onEdit,
   // onAssign,
   onDelete,
 }: {
   system: System;
+  onView: (s: System) => void;
   onEdit: (s: System) => void;
   onAssign: (s: System) => void;
   onDelete: (s: System) => void;
@@ -49,7 +52,8 @@ const SystemCard = ({
       layout
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
-      className="group relative bg-white dark:bg-gray-900/60 rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-slate-700/30 hover:shadow-xl hover:-translate-y-1 transition-all duration-300"
+      onClick={() => onView(system)}
+      className="group relative bg-white dark:bg-gray-900/60 rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-slate-700/30 hover:shadow-xl hover:-translate-y-1 hover:border-blue-200 dark:hover:border-blue-800/50 transition-all duration-300 cursor-pointer"
     >
       <div className="flex items-start justify-between mb-4">
         <div className="w-12 h-12 rounded-xl bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 flex items-center justify-center overflow-hidden">
@@ -91,15 +95,30 @@ const SystemCard = ({
           <Check className="w-4 h-4" />
           Assign
         </button> */}
-        <div className="w-full"></div>
         <button
-          onClick={() => onEdit(system)}
+          onClick={(e) => {
+            e.stopPropagation();
+            onView(system);
+          }}
+          className="flex-1 px-3 py-2 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 text-sm font-semibold rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors flex items-center justify-center gap-1.5"
+        >
+          View details
+          <ChevronRight className="w-4 h-4" />
+        </button>
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onEdit(system);
+          }}
           className="px-3 py-2 bg-gray-50 dark:bg-slate-700/50 text-gray-600 dark:text-gray-400 text-sm font-semibold rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors"
         >
           <Edit className="w-4 h-4" />
         </button>
         <button
-          onClick={() => onDelete(system)}
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete(system);
+          }}
           className="px-3 py-2 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-sm font-semibold rounded-lg hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors"
         >
           <Trash2 className="w-4 h-4" />
@@ -663,6 +682,11 @@ const Systems = () => {
   const [deleting, setDeleting] = useState(false);
   const { showToast } = useToast();
   const { user } = useUser();
+  const navigate = useNavigate();
+
+  const handleView = (system: System) => {
+    navigate(`/systems/${system.system_id}`);
+  };
 
   const canManage = user?.roles?.find((itm) =>
     itm.permissions?.find(
@@ -798,6 +822,7 @@ const Systems = () => {
                     <SystemCard
                       key={system.system_id}
                       system={system}
+                      onView={handleView}
                       onEdit={handleEdit}
                       onAssign={handleAssign}
                       onDelete={handleDeleteClick}

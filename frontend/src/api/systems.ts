@@ -28,6 +28,22 @@ export const getSystems = async (
   }
 };
 
+export const getSystemById = async (
+  id: number,
+  onSuccess?: (system: System) => void,
+  onError?: (error: any) => void,
+): Promise<System | void> => {
+  try {
+    const response = await api.get<System>(`/systems/${id}`);
+    const data = response.data;
+    if (onSuccess) onSuccess(data);
+    return data;
+  } catch (error) {
+    if (onError) onError(error);
+    throw error;
+  }
+};
+
 export const createSystem = async (
   systemData: Partial<System>,
   onSuccess?: () => void,
