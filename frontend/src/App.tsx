@@ -29,6 +29,7 @@ import ClassTeacherUsersPage from "./components/ClassTeacherUsersPage";
 import ClassTeacherSubjectsPage from "./components/ClassTeacherSubjectsPage";
 import Schools from "./components/Schools";
 import Systems from "./components/Systems";
+import SystemDetails from "./components/SystemDetails";
 import SchemeOfWorkList from "./components/SchemeOfWorkList";
 import SchemeOfWorkCalendar from "./components/SchemeOfWorkCalendar";
 import AcademicCalendar from "./components/AcademicCalendar";
@@ -534,6 +535,18 @@ function App() {
                 <ProtectedRoute>
                   <SystemLayoutWrapper>
                     <Systems />
+                  </SystemLayoutWrapper>
+                </ProtectedRoute>
+              }
+            />
+
+            {/* System details page - protected with sidebar */}
+            <Route
+              path="/systems/:id"
+              element={
+                <ProtectedRoute>
+                  <SystemLayoutWrapper>
+                    <SystemDetails />
                   </SystemLayoutWrapper>
                 </ProtectedRoute>
               }
