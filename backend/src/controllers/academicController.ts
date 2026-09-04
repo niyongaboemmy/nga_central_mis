@@ -3585,6 +3585,75 @@ export const unenrollStudentFromSubject = asyncHandler(
   },
 );
 
+// Enrolls each of `userIds` into every subject in `gradeId`'s curriculum
+// (GradeSubject) for `academicYearId`, skipping subjects a student is
+// already ACTIVE-enrolled in. A grade with no GradeSubject rows yet is a
+// no-op, not an error -- curriculum may simply not be configured for it.
+// Shared by the single-student class-group assignment (one user) and the
+// bulk class-group assignment endpoint (many users) below, so enrollment
+// always follows from class-group membership rather than being a separate
+// manual step.
+async function autoEnrollGradeSubjects(
+  userIds: number[],
+  gradeId: number,
+  academicYearId: number,
+): Promise<{ enrolled: number; subjectIds: number[] }> {
+  if (userIds.length === 0) {
+    return { enrolled: 0, subjectIds: [] };
+  }
+
+  const gradeSubjectRows = await db
+    .select({ subject_id: GradeSubject.subject_id })
+    .from(GradeSubject)
+    .where(eq(GradeSubject.grade_id, gradeId));
+  const subjectIds = gradeSubjectRows.map((r) => Number(r.subject_id));
+
+  if (subjectIds.length === 0) {
+    return { enrolled: 0, subjectIds: [] };
+  }
+
+  const existingRows = await db
+    .select({
+      user_id: StudentSubjectEnrollment.user_id,
+      subject_id: StudentSubjectEnrollment.subject_id,
+    })
+    .from(StudentSubjectEnrollment)
+    .where(
+      and(
+        inArray(StudentSubjectEnrollment.user_id, userIds),
+        inArray(StudentSubjectEnrollment.subject_id, subjectIds),
+        eq(StudentSubjectEnrollment.academic_year_id, academicYearId),
+        eq(StudentSubjectEnrollment.status, "ACTIVE"),
+      ),
+    );
+  const existingKeys = new Set(
+    existingRows.map((r) => `${r.user_id}-${r.subject_id}`),
+  );
+
+  const toInsert: {
+    user_id: number;
+    subject_id: number;
+    academic_year_id: number;
+  }[] = [];
+  for (const userId of userIds) {
+    for (const subjectId of subjectIds) {
+      if (!existingKeys.has(`${userId}-${subjectId}`)) {
+        toInsert.push({
+          user_id: userId,
+          subject_id: subjectId,
+          academic_year_id: academicYearId,
+        });
+      }
+    }
+  }
+
+  if (toInsert.length > 0) {
+    await db.insert(StudentSubjectEnrollment).values(toInsert);
+  }
+
+  return { enrolled: toInsert.length, subjectIds };
+}
+
 // Student Class Group Assignment Management
 export const getStudentClassGroup = asyncHandler(async (req: any, res: any) => {
   const { studentId } = req.params;
@@ -3740,8 +3809,30 @@ export const assignStudentToClassGroup = asyncHandler(
         ),
       );
 
+    // Auto-enroll into the target class group's grade curriculum. A
+    // curriculum hiccup should never fail the class-group assignment itself
+    // (which may have already been written by the time this runs), so this
+    // is best-effort and logged rather than thrown.
+    const autoEnroll = async () => {
+      try {
+        await autoEnrollGradeSubjects(
+          [studentId],
+          Number(classGroup[0].grade_id),
+          yearId,
+        );
+      } catch (err) {
+        logger.warn("Auto-enroll into grade subjects failed", {
+          studentId,
+          classGroupId,
+          yearId,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    };
+
     if (existingAssignment.length > 0) {
       if (existingAssignment[0].status === "ACTIVE") {
+        await autoEnroll();
         return successResponse(
           res,
           "Student is already assigned to this class group",
@@ -3770,6 +3861,8 @@ export const assignStudentToClassGroup = asyncHandler(
           yearId,
         });
 
+        await autoEnroll();
+
         return successResponse(
           res,
           "Student assigned to class group successfully",
@@ -3791,6 +3884,8 @@ export const assignStudentToClassGroup = asyncHandler(
       classGroupId,
       yearId,
     });
+
+    await autoEnroll();
 
     // Record activity for student
     await recordActivity(
@@ -4452,6 +4547,469 @@ export const promoteStudentsForYear = asyncHandler(
       totalSkippedExisting,
       promotedGrades,
       skippedGrades,
+    });
+  },
+);
+
+// Bulk-assigns many students to one class group + year in a single request,
+// then auto-enrolls all of them into that grade's curriculum -- the batched
+// counterpart to assignStudentToClassGroup, for the "select students, enroll
+// them into a class group" bulk-enrollment page.
+export const bulkAssignStudentsToClassGroup = asyncHandler(
+  async (req: any, res: any) => {
+    const { user_ids, class_group_id, academic_year_id } = req.body;
+
+    if (!Array.isArray(user_ids) || user_ids.length === 0 || !class_group_id) {
+      throw new ValidationError(
+        "user_ids (non-empty array) and class_group_id are required",
+      );
+    }
+
+    const studentIds = user_ids.map((id: any) => Number(id));
+    if (studentIds.some((id: number) => isNaN(id))) {
+      throw new ValidationError("Invalid user ID in user_ids");
+    }
+
+    const classGroupId = Number(class_group_id);
+    const yearId = academic_year_id
+      ? Number(academic_year_id)
+      : await getCurrentAcademicYearId();
+
+    if (isNaN(classGroupId)) {
+      throw new ValidationError("Invalid class group ID");
+    }
+    if (!yearId || isNaN(yearId)) {
+      throw new ValidationError(
+        "Academic year ID is required (no current academic year set)",
+      );
+    }
+
+    const classGroup = await db
+      .select()
+      .from(ClassGroup)
+      .where(eq(ClassGroup.class_group_id, classGroupId))
+      .limit(1);
+    if (classGroup.length === 0) {
+      throw new NotFoundError("Class group not found");
+    }
+
+    const academicYear = await db
+      .select()
+      .from(AcademicYear)
+      .where(eq(AcademicYear.academic_year_id, yearId))
+      .limit(1);
+    if (academicYear.length === 0) {
+      throw new NotFoundError("Academic year not found");
+    }
+
+    // Only real students are eligible -- silently drop anything else rather
+    // than erroring out the whole batch over one bad id.
+    const validStudents = await db
+      .select({ user_id: User.user_id })
+      .from(User)
+      .innerJoin(UserProfile, eq(User.user_id, UserProfile.user_id))
+      .where(
+        and(
+          inArray(User.user_id, studentIds),
+          eq(UserProfile.user_type, "STUDENT"),
+        ),
+      );
+    const validStudentIds = validStudents.map((s) => Number(s.user_id));
+
+    if (validStudentIds.length === 0) {
+      throw new ValidationError("None of the provided user_ids are students");
+    }
+
+    // Disable other active class-group assignments for these students in
+    // this same year (mirrors assignStudentToClassGroup's single-student
+    // logic, batched across all of them in one statement).
+    await db
+      .update(StudentClassGroup)
+      .set({ status: "DISABLED" })
+      .where(
+        and(
+          inArray(StudentClassGroup.user_id, validStudentIds),
+          eq(StudentClassGroup.academic_year_id, yearId),
+          eq(StudentClassGroup.status, "ACTIVE"),
+          not(eq(StudentClassGroup.class_group_id, classGroupId)),
+        ),
+      );
+
+    const existingRows = await db
+      .select({
+        user_id: StudentClassGroup.user_id,
+        status: StudentClassGroup.status,
+      })
+      .from(StudentClassGroup)
+      .where(
+        and(
+          inArray(StudentClassGroup.user_id, validStudentIds),
+          eq(StudentClassGroup.class_group_id, classGroupId),
+          eq(StudentClassGroup.academic_year_id, yearId),
+        ),
+      );
+    const existingByUser = new Map(
+      existingRows.map((r) => [Number(r.user_id), r.status]),
+    );
+
+    const toInsert = validStudentIds.filter((id) => !existingByUser.has(id));
+    const toReactivate = validStudentIds.filter(
+      (id) => existingByUser.get(id) === "DISABLED",
+    );
+    const alreadyActive = validStudentIds.filter(
+      (id) => existingByUser.get(id) === "ACTIVE",
+    ).length;
+
+    if (toInsert.length > 0) {
+      await db.insert(StudentClassGroup).values(
+        toInsert.map((id) => ({
+          user_id: id,
+          class_group_id: classGroupId,
+          academic_year_id: yearId,
+          status: "ACTIVE" as const,
+        })),
+      );
+    }
+
+    if (toReactivate.length > 0) {
+      await db
+        .update(StudentClassGroup)
+        .set({ status: "ACTIVE", assigned_at: sql`CURRENT_TIMESTAMP` })
+        .where(
+          and(
+            inArray(StudentClassGroup.user_id, toReactivate),
+            eq(StudentClassGroup.class_group_id, classGroupId),
+            eq(StudentClassGroup.academic_year_id, yearId),
+          ),
+        );
+    }
+
+    let subjectsEnrolled = 0;
+    try {
+      const result = await autoEnrollGradeSubjects(
+        validStudentIds,
+        Number(classGroup[0].grade_id),
+        yearId,
+      );
+      subjectsEnrolled = result.enrolled;
+    } catch (err) {
+      logger.warn("Bulk auto-enroll into grade subjects failed", {
+        classGroupId,
+        yearId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+
+    const assigned = toInsert.length;
+    const reactivated = toReactivate.length;
+
+    logger.info("Students bulk-assigned to class group", {
+      classGroupId,
+      yearId,
+      assigned,
+      reactivated,
+      alreadyActive,
+      subjectsEnrolled,
+    });
+
+    if (req.user?.userId) {
+      await recordActivity(
+        req.user.userId,
+        "STUDENTS_BULK_ASSIGN_CLASS_GROUP",
+        `Assigned ${assigned + reactivated} student(s) to ${classGroup[0].name} (${academicYear[0].name}), auto-enrolled ${subjectsEnrolled} subject enrollment(s)`,
+        "StudentClassGroup",
+        undefined,
+        { classGroupId, yearId, assigned, reactivated, alreadyActive, subjectsEnrolled },
+        req.user.userId,
+      );
+    }
+
+    successResponse(res, "Students assigned to class group successfully", {
+      assigned,
+      reactivated,
+      already_active: alreadyActive,
+      subjects_enrolled: subjectsEnrolled,
+      total: validStudentIds.length,
+    });
+  },
+);
+
+// Bulk-enrolls many students into an explicit list of subjects for a year in
+// a single request -- used to backfill missing subjects for students already
+// in a class group, or to enroll into a subset rather than the full grade
+// curriculum.
+export const bulkEnrollStudentsInSubjects = asyncHandler(
+  async (req: any, res: any) => {
+    const { user_ids, subject_ids, academic_year_id } = req.body;
+
+    if (
+      !Array.isArray(user_ids) ||
+      user_ids.length === 0 ||
+      !Array.isArray(subject_ids) ||
+      subject_ids.length === 0
+    ) {
+      throw new ValidationError(
+        "user_ids and subject_ids (non-empty arrays) are required",
+      );
+    }
+
+    const studentIds = user_ids.map((id: any) => Number(id));
+    const subjectIds = subject_ids.map((id: any) => Number(id));
+    if (
+      studentIds.some((id: number) => isNaN(id)) ||
+      subjectIds.some((id: number) => isNaN(id))
+    ) {
+      throw new ValidationError("Invalid ID in user_ids or subject_ids");
+    }
+
+    const yearId = academic_year_id
+      ? Number(academic_year_id)
+      : await getCurrentAcademicYearId();
+    if (!yearId || isNaN(yearId)) {
+      throw new ValidationError(
+        "Academic year ID is required (no current academic year set)",
+      );
+    }
+
+    const academicYear = await db
+      .select()
+      .from(AcademicYear)
+      .where(eq(AcademicYear.academic_year_id, yearId))
+      .limit(1);
+    if (academicYear.length === 0) {
+      throw new NotFoundError("Academic year not found");
+    }
+
+    const validStudents = await db
+      .select({ user_id: User.user_id })
+      .from(User)
+      .innerJoin(UserProfile, eq(User.user_id, UserProfile.user_id))
+      .where(
+        and(
+          inArray(User.user_id, studentIds),
+          eq(UserProfile.user_type, "STUDENT"),
+        ),
+      );
+    const validStudentIds = validStudents.map((s) => Number(s.user_id));
+    if (validStudentIds.length === 0) {
+      throw new ValidationError("None of the provided user_ids are students");
+    }
+
+    const validSubjects = await db
+      .select({ subject_id: Subject.subject_id })
+      .from(Subject)
+      .where(
+        and(inArray(Subject.subject_id, subjectIds), eq(Subject.status, "ACTIVE")),
+      );
+    const validSubjectIds = validSubjects.map((s) => Number(s.subject_id));
+    if (validSubjectIds.length === 0) {
+      throw new ValidationError(
+        "None of the provided subject_ids are active subjects",
+      );
+    }
+
+    const existingRows = await db
+      .select({
+        user_id: StudentSubjectEnrollment.user_id,
+        subject_id: StudentSubjectEnrollment.subject_id,
+      })
+      .from(StudentSubjectEnrollment)
+      .where(
+        and(
+          inArray(StudentSubjectEnrollment.user_id, validStudentIds),
+          inArray(StudentSubjectEnrollment.subject_id, validSubjectIds),
+          eq(StudentSubjectEnrollment.academic_year_id, yearId),
+          eq(StudentSubjectEnrollment.status, "ACTIVE"),
+        ),
+      );
+    const existingKeys = new Set(
+      existingRows.map((r) => `${r.user_id}-${r.subject_id}`),
+    );
+
+    const toInsert: {
+      user_id: number;
+      subject_id: number;
+      academic_year_id: number;
+    }[] = [];
+    for (const studentId of validStudentIds) {
+      for (const subjectId of validSubjectIds) {
+        if (!existingKeys.has(`${studentId}-${subjectId}`)) {
+          toInsert.push({
+            user_id: studentId,
+            subject_id: subjectId,
+            academic_year_id: yearId,
+          });
+        }
+      }
+    }
+
+    if (toInsert.length > 0) {
+      await db.insert(StudentSubjectEnrollment).values(toInsert);
+    }
+
+    const total = validStudentIds.length * validSubjectIds.length;
+    const enrolled = toInsert.length;
+    const skipped = total - enrolled;
+
+    logger.info("Students bulk-enrolled in subjects", {
+      yearId,
+      students: validStudentIds.length,
+      subjects: validSubjectIds.length,
+      enrolled,
+      skipped,
+    });
+
+    if (req.user?.userId) {
+      await recordActivity(
+        req.user.userId,
+        "STUDENTS_BULK_ENROLL_SUBJECTS",
+        `Enrolled ${validStudentIds.length} student(s) in ${validSubjectIds.length} subject(s) for ${academicYear[0].name} (${enrolled} new, ${skipped} already enrolled)`,
+        "StudentSubjectEnrollment",
+        undefined,
+        {
+          studentIds: validStudentIds,
+          subjectIds: validSubjectIds,
+          yearId,
+          enrolled,
+          skipped,
+        },
+        req.user.userId,
+      );
+    }
+
+    successResponse(res, "Students enrolled in subjects successfully", {
+      enrolled,
+      skipped,
+      total,
+    });
+  },
+);
+
+// Roster for a class group's grade curriculum, with each student's
+// enrollment coverage against it -- powers the bulk enrollment page: which
+// students are in this class group, which subjects their grade teaches, and
+// who's still missing which of those subjects for the given year.
+export const getClassGroupEnrollmentRoster = asyncHandler(
+  async (req: any, res: any) => {
+    const { class_group_id } = req.params;
+    const { academic_year_id } = req.query;
+
+    const classGroupId = parseInt(class_group_id);
+    if (isNaN(classGroupId)) {
+      throw new ValidationError("Invalid class group ID");
+    }
+
+    const classGroupRows = await db
+      .select({
+        class_group_id: ClassGroup.class_group_id,
+        class_group_name: ClassGroup.name,
+        grade_id: Grade.grade_id,
+        grade_name: Grade.name,
+        program_id: Program.program_id,
+        program_name: Program.name,
+      })
+      .from(ClassGroup)
+      .innerJoin(Grade, eq(ClassGroup.grade_id, Grade.grade_id))
+      .innerJoin(Program, eq(Grade.program_id, Program.program_id))
+      .where(eq(ClassGroup.class_group_id, classGroupId))
+      .limit(1);
+
+    if (classGroupRows.length === 0) {
+      throw new NotFoundError("Class group not found");
+    }
+    const classGroupInfo = classGroupRows[0];
+    const gradeId = Number(classGroupInfo.grade_id);
+
+    const yearId = academic_year_id
+      ? parseInt(academic_year_id as string)
+      : await getCurrentAcademicYearId();
+    if (!yearId || isNaN(yearId)) {
+      throw new ValidationError(
+        "Academic year ID is required (no current academic year set)",
+      );
+    }
+
+    const subjects = await db
+      .select({
+        subject_id: Subject.subject_id,
+        code: Subject.code,
+        name: Subject.name,
+        color: Subject.color,
+      })
+      .from(GradeSubject)
+      .innerJoin(Subject, eq(GradeSubject.subject_id, Subject.subject_id))
+      .where(
+        and(eq(GradeSubject.grade_id, gradeId), eq(Subject.status, "ACTIVE")),
+      )
+      .orderBy(Subject.name);
+    const subjectIds = subjects.map((s) => Number(s.subject_id));
+
+    const students = await db
+      .select({
+        user_id: User.user_id,
+        username: User.username,
+        email: User.email,
+        first_name: UserProfile.first_name,
+        last_name: UserProfile.last_name,
+        gender: UserProfile.gender,
+      })
+      .from(StudentClassGroup)
+      .innerJoin(User, eq(StudentClassGroup.user_id, User.user_id))
+      .innerJoin(UserProfile, eq(User.user_id, UserProfile.user_id))
+      .where(
+        and(
+          eq(StudentClassGroup.class_group_id, classGroupId),
+          eq(StudentClassGroup.academic_year_id, yearId),
+          eq(StudentClassGroup.status, "ACTIVE"),
+          eq(UserProfile.user_type, "STUDENT"),
+        ),
+      )
+      .orderBy(UserProfile.first_name, UserProfile.last_name);
+
+    const studentIds = students.map((s) => Number(s.user_id));
+
+    const enrollmentRows =
+      studentIds.length > 0 && subjectIds.length > 0
+        ? await db
+            .select({
+              user_id: StudentSubjectEnrollment.user_id,
+              subject_id: StudentSubjectEnrollment.subject_id,
+            })
+            .from(StudentSubjectEnrollment)
+            .where(
+              and(
+                inArray(StudentSubjectEnrollment.user_id, studentIds),
+                inArray(StudentSubjectEnrollment.subject_id, subjectIds),
+                eq(StudentSubjectEnrollment.academic_year_id, yearId),
+                eq(StudentSubjectEnrollment.status, "ACTIVE"),
+              ),
+            )
+        : [];
+
+    const enrolledByStudent = new Map<number, Set<number>>();
+    for (const row of enrollmentRows) {
+      const uid = Number(row.user_id);
+      if (!enrolledByStudent.has(uid)) enrolledByStudent.set(uid, new Set());
+      enrolledByStudent.get(uid)!.add(Number(row.subject_id));
+    }
+
+    const studentRoster = students.map((s) => {
+      const enrolledSubjectIds = Array.from(
+        enrolledByStudent.get(Number(s.user_id)) || [],
+      );
+      return {
+        ...s,
+        enrolled_subject_ids: enrolledSubjectIds,
+        enrolled_count: enrolledSubjectIds.length,
+        total_subjects: subjectIds.length,
+      };
+    });
+
+    successResponse(res, "Class group enrollment roster retrieved successfully", {
+      class_group: classGroupInfo,
+      academic_year_id: yearId,
+      subjects,
+      students: studentRoster,
     });
   },
 );

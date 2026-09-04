@@ -214,6 +214,31 @@ export const getUsersWithPagination = async (
   }
 };
 
+export interface UserSearchResult {
+  user_id: number;
+  username: string;
+  email: string;
+  phone_number?: string;
+  status: string;
+  first_name?: string;
+  last_name?: string;
+  address?: string;
+  external_id?: string;
+  user_type?: string;
+}
+
+/** Free-text search across username, email, phone, and first/last/full name
+ * -- unlike getUsersWithPagination's `search`, which only matches
+ * username/email/phone, this also matches on a person's name. Used by
+ * pickers where an admin searches for a specific student by name. */
+export const searchUsers = async (q: string): Promise<UserSearchResult[]> => {
+  const response = await api.get<BackendResponse<UserSearchResult[]>>(
+    "/users/search",
+    { params: { q } },
+  );
+  return response.data.data || [];
+};
+
 // ==================== User Activity API ====================
 
 export interface Activity {

@@ -398,6 +398,64 @@ export const studentEnrollmentApi = {
     api.delete(
       `/academics/students/${studentId}/subjects/${subjectId}/years/${academicYearId}`,
     ),
+  /** Enroll many students into an explicit set of subjects for a year in one
+   * request, skipping any (student, subject) pair already enrolled. */
+  bulkEnroll: (data: {
+    user_ids: number[];
+    subject_ids: number[];
+    academic_year_id?: number;
+  }) =>
+    api.post<{
+      data: { enrolled: number; skipped: number; total: number };
+    }>("/academics/students/bulk-enroll-subjects", data),
+};
+
+// Class Group Enrollment Roster API -- powers the bulk enrollment page: a
+// class group's students plus their grade's curriculum, with per-student
+// subject coverage, in one call.
+export interface EnrollmentRosterSubject {
+  subject_id: number;
+  code: string | null;
+  name: string;
+  color?: string;
+}
+
+export interface EnrollmentRosterStudent {
+  user_id: number;
+  username: string;
+  email: string;
+  first_name: string;
+  last_name: string;
+  gender: string | null;
+  enrolled_subject_ids: number[];
+  enrolled_count: number;
+  total_subjects: number;
+}
+
+export interface ClassGroupEnrollmentRoster {
+  class_group: {
+    class_group_id: number;
+    class_group_name: string;
+    grade_id: number;
+    grade_name: string;
+    program_id: number;
+    program_name: string;
+  };
+  academic_year_id: number;
+  subjects: EnrollmentRosterSubject[];
+  students: EnrollmentRosterStudent[];
+}
+
+export const enrollmentRosterApi = {
+  get: (classGroupId: number, academicYearId?: number) =>
+    api.get<{ data: ClassGroupEnrollmentRoster }>(
+      `/academics/class-groups/${classGroupId}/enrollment-roster`,
+      {
+        params: academicYearId
+          ? { academic_year_id: academicYearId }
+          : undefined,
+      },
+    ),
 };
 
 // Student Class Group Assignment API
@@ -428,6 +486,23 @@ export const studentClassGroupApi = {
     api.post<{
       data: { promoted: number; skipped: number; total: number };
     }>("/academics/students/promote-class", data),
+  /** Assign many students to one class group + year in a single request.
+   * Each student's grade curriculum (GradeSubject) is auto-enrolled as a
+   * side effect, same as the single-student `assign` above. */
+  bulkAssign: (data: {
+    user_ids: number[];
+    class_group_id: number;
+    academic_year_id?: number;
+  }) =>
+    api.post<{
+      data: {
+        assigned: number;
+        reactivated: number;
+        already_active: number;
+        subjects_enrolled: number;
+        total: number;
+      };
+    }>("/academics/students/bulk-assign-class-group", data),
 };
 
 export interface PromotionGradePlan {

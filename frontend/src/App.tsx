@@ -48,6 +48,7 @@ import LessonNoteEditorPage from "./components/lessonNotes/LessonNoteEditorPage"
 import SharedLessonNotesPage from "./components/lessonNotes/SharedLessonNotesPage";
 import SharedLessonNoteViewPage from "./components/lessonNotes/SharedLessonNoteViewPage";
 import CombinedLessonNotesPage from "./components/lessonNotes/CombinedLessonNotesPage";
+import EnrollmentManager from "./components/enrollment/EnrollmentManager";
 
 const LoginPage: React.FC = () => {
   const navigate = useNavigate();
@@ -179,6 +180,11 @@ const MyEnrolledSubjectsPage: React.FC = () => {
 // Permissions page with sidebar
 const PermissionsPage: React.FC = () => {
   return <Permissions />;
+};
+
+// Bulk subject enrollment page with sidebar
+const EnrollmentPage: React.FC = () => {
+  return <EnrollmentManager />;
 };
 
 // Users page with sidebar
@@ -317,6 +323,18 @@ function App() {
                 <ProtectedRoute>
                   <SystemLayoutWrapper>
                     <AcademicsPage />
+                  </SystemLayoutWrapper>
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Bulk Subject Enrollment - protected with sidebar */}
+            <Route
+              path="/enrollment"
+              element={
+                <ProtectedRoute>
+                  <SystemLayoutWrapper>
+                    <EnrollmentPage />
                   </SystemLayoutWrapper>
                 </ProtectedRoute>
               }

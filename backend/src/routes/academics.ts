@@ -64,6 +64,7 @@ import {
   getAvailableSubjectsForStudent,
   enrollStudentInSubject,
   unenrollStudentFromSubject,
+  bulkEnrollStudentsInSubjects,
 
   // Student Class Group Assignment
   getStudentClassGroup,
@@ -72,11 +73,13 @@ import {
   promoteStudentsToClassGroup,
   getPromotionPreview,
   promoteStudentsForYear,
+  bulkAssignStudentsToClassGroup,
 
   // Class Groups
   getClassGroups,
   getClassGroup,
   getClassGroupStudents,
+  getClassGroupEnrollmentRoster,
   createClassGroup,
   updateClassGroup,
   deleteClassGroup,
@@ -316,6 +319,12 @@ router.get(
   authenticate,
   getClassGroupStudents,
 );
+router.get(
+  "/class-groups/:class_group_id/enrollment-roster",
+  authenticate,
+  authorize("MANAGE_STUDENT_ENROLLMENTS"),
+  getClassGroupEnrollmentRoster,
+);
 router.post(
   "/class-groups",
   authenticate,
@@ -378,6 +387,12 @@ router.delete(
   authorize("MANAGE_STUDENT_ENROLLMENTS"),
   unenrollStudentFromSubject,
 );
+router.post(
+  "/students/bulk-enroll-subjects",
+  authenticate,
+  authorize("MANAGE_STUDENT_ENROLLMENTS"),
+  bulkEnrollStudentsInSubjects,
+);
 
 // Student Class Group Assignment routes
 router.get(
@@ -414,6 +429,12 @@ router.post(
   authenticate,
   authorize("ASSIGN_STUDENT_CLASS_GROUPS"),
   promoteStudentsForYear,
+);
+router.post(
+  "/students/bulk-assign-class-group",
+  authenticate,
+  authorize("ASSIGN_STUDENT_CLASS_GROUPS"),
+  bulkAssignStudentsToClassGroup,
 );
 
 export default router;
