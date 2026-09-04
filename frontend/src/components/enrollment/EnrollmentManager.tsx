@@ -57,7 +57,7 @@ const StatTile: React.FC<{
 }> = ({ icon: Icon, label, value, accent }) => (
   <motion.div
     whileHover={{ y: -2 }}
-    className="bg-white/60 dark:bg-slate-800/60 backdrop-blur-sm rounded-xl p-3 border border-white/50 dark:border-slate-700/30"
+    className="bg-white/60 dark:bg-gray-800/60 backdrop-blur-sm rounded-xl p-3 border border-white/50 dark:border-gray-700/30"
   >
     <div className="flex items-center gap-2">
       <div
@@ -84,7 +84,7 @@ const CardShell: React.FC<{
     initial={{ opacity: 0, y: 12 }}
     animate={{ opacity: 1, y: 0 }}
     transition={{ delay }}
-    className={`bg-white/90 dark:bg-slate-800/60 backdrop-blur-sm rounded-2xl border border-white/50 dark:border-slate-700/30 ${className}`}
+    className={`bg-white/90 dark:bg-gray-800/60 backdrop-blur-sm rounded-2xl border border-white/50 dark:border-gray-700/30 ${className}`}
   >
     {children}
   </motion.div>
@@ -105,6 +105,10 @@ const EnrollmentManager: React.FC = () => {
   const [programId, setProgramId] = useState<number | null>(null);
   const [gradeId, setGradeId] = useState<number | null>(null);
   const [classGroupId, setClassGroupId] = useState<number | null>(null);
+
+  const [loadingFilters, setLoadingFilters] = useState(true);
+  const [loadingGrades, setLoadingGrades] = useState(false);
+  const [loadingClassGroups, setLoadingClassGroups] = useState(false);
 
   const [roster, setRoster] = useState<ClassGroupEnrollmentRoster | null>(
     null,
@@ -139,20 +143,33 @@ const EnrollmentManager: React.FC = () => {
 
   // Initial reference data
   useEffect(() => {
-    academicYearsApi.getAll().then((res) => {
-      const years = res.data.data;
-      setAcademicYears(years);
-      const current = years.find((y) => y.is_current === 1);
-      setAcademicYearId(current?.academic_year_id ?? years[0]?.academic_year_id ?? null);
-    });
-    programsApi.getAll().then((res) => setPrograms(res.data.data));
+    setLoadingFilters(true);
+    Promise.all([academicYearsApi.getAll(), programsApi.getAll()])
+      .then(([yearsRes, programsRes]) => {
+        const years = yearsRes.data.data;
+        setAcademicYears(years);
+        const current = years.find((y) => y.is_current === 1);
+        setAcademicYearId(
+          current?.academic_year_id ?? years[0]?.academic_year_id ?? null,
+        );
+        setPrograms(programsRes.data.data);
+      })
+      .catch(() =>
+        showToast("Failed to load programs/academic years", "error"),
+      )
+      .finally(() => setLoadingFilters(false));
   }, []);
 
   // Grades follow the selected program
   useEffect(() => {
     setGradeId(null);
     setClassGroupId(null);
-    gradesApi.getAll(programId ?? undefined).then((res) => setGrades(res.data.data));
+    setLoadingGrades(true);
+    gradesApi
+      .getAll(programId ?? undefined)
+      .then((res) => setGrades(res.data.data))
+      .catch(() => showToast("Failed to load grades", "error"))
+      .finally(() => setLoadingGrades(false));
   }, [programId]);
 
   // Class groups follow the selected grade
@@ -162,7 +179,12 @@ const EnrollmentManager: React.FC = () => {
       setClassGroups([]);
       return;
     }
-    classGroupsApi.getAll(gradeId).then((res) => setClassGroups(res.data.data));
+    setLoadingClassGroups(true);
+    classGroupsApi
+      .getAll(gradeId)
+      .then((res) => setClassGroups(res.data.data))
+      .catch(() => showToast("Failed to load class groups", "error"))
+      .finally(() => setLoadingClassGroups(false));
   }, [gradeId]);
 
   const fetchRoster = () => {
@@ -429,7 +451,7 @@ const EnrollmentManager: React.FC = () => {
   }, [roster]);
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-5 pt-4 pb-10 px-4 md:px-6">
       {/* Intro banner */}
       <motion.div
         initial={{ opacity: 0, y: -8 }}
@@ -463,6 +485,7 @@ const EnrollmentManager: React.FC = () => {
             onChange={(v) => setProgramId((v as number) || null)}
             placeholder="All programs..."
             isClearable
+            isLoading={loadingFilters}
             options={programs.map((p) => ({
               value: p.program_id,
               label: p.name,
@@ -473,6 +496,7 @@ const EnrollmentManager: React.FC = () => {
             value={gradeId}
             onChange={(v) => setGradeId((v as number) || null)}
             placeholder="Select a grade..."
+            isLoading={loadingGrades}
             options={grades.map((g) => ({
               value: g.grade_id,
               label: g.name,
@@ -484,6 +508,7 @@ const EnrollmentManager: React.FC = () => {
             onChange={(v) => setClassGroupId((v as number) || null)}
             placeholder="Select a class group..."
             isDisabled={!gradeId}
+            isLoading={loadingClassGroups}
             options={classGroups.map((cg) => ({
               value: cg.class_group_id,
               label: cg.name,
@@ -494,6 +519,7 @@ const EnrollmentManager: React.FC = () => {
             value={academicYearId}
             onChange={(v) => setAcademicYearId((v as number) || null)}
             placeholder="Select academic year..."
+            isLoading={loadingFilters}
             options={academicYears.map((y) => ({
               value: y.academic_year_id,
               label: y.name,
@@ -515,7 +541,7 @@ const EnrollmentManager: React.FC = () => {
             You'll see its curriculum and student roster here.
           </p>
         </CardShell>
-      ) : loadingRoster ? (
+      ) : loadingRoster && !roster ? (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
           <CardShell className="p-5 h-40 animate-pulse" />
           <CardShell className="p-5 h-40 lg:col-span-2 animate-pulse" />
@@ -590,7 +616,7 @@ const EnrollmentManager: React.FC = () => {
                     return (
                       <li
                         key={subject.subject_id}
-                        className="flex items-center gap-2.5 px-2.5 py-2 rounded-xl hover:bg-gray-50 dark:hover:bg-slate-700/30 transition-colors"
+                        className="flex items-center gap-2.5 px-2.5 py-2 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors"
                       >
                         <span
                           className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 text-[10px] font-bold text-white"
@@ -612,7 +638,7 @@ const EnrollmentManager: React.FC = () => {
                           className={`flex-shrink-0 text-[11px] font-semibold px-2 py-0.5 rounded-full ${
                             total > 0 && count === total
                               ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
-                              : "bg-gray-100 text-gray-500 dark:bg-slate-700/50 dark:text-gray-400"
+                              : "bg-gray-100 text-gray-500 dark:bg-gray-700/50 dark:text-gray-400"
                           }`}
                         >
                           {count}/{total}
@@ -632,8 +658,11 @@ const EnrollmentManager: React.FC = () => {
                     <Users className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
                   </div>
                   <div className="min-w-0">
-                    <h3 className="font-semibold text-gray-900 dark:text-white text-sm truncate">
+                    <h3 className="font-semibold text-gray-900 dark:text-white text-sm truncate flex items-center gap-1.5">
                       {roster.class_group.class_group_name}
+                      {loadingRoster && (
+                        <Loader2 className="w-3.5 h-3.5 text-gray-400 animate-spin" />
+                      )}
                     </h3>
                     <p className="text-xs text-gray-400">
                       {rosterStats.total} student
@@ -642,7 +671,7 @@ const EnrollmentManager: React.FC = () => {
                   </div>
                 </div>
                 {canAssign && (
-                  <div className="flex gap-1 bg-gray-50 dark:bg-slate-700/40 rounded-full p-1">
+                  <div className="flex gap-1 bg-gray-50 dark:bg-gray-700/40 rounded-full p-1">
                     <button
                       onClick={() => setMode("roster")}
                       className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors flex items-center gap-1.5 ${
@@ -671,18 +700,18 @@ const EnrollmentManager: React.FC = () => {
                 <>
                   {roster.students.length > 0 && (
                     <div className="relative mb-3">
-                      <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                      <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -trangray-y-1/2" />
                       <input
                         type="text"
                         value={rosterFilter}
                         onChange={(e) => setRosterFilter(e.target.value)}
                         placeholder="Filter students in this roster..."
-                        className="w-full pl-9 pr-8 py-2 text-sm border rounded-xl bg-gray-50 dark:bg-slate-900/40 text-gray-900 dark:text-white border-gray-200 dark:border-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:bg-white dark:focus:bg-slate-900"
+                        className="w-full pl-9 pr-8 py-2 text-sm border rounded-xl bg-gray-50 dark:bg-gray-900/40 text-gray-900 dark:text-white border-gray-200 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:bg-white dark:focus:bg-gray-900"
                       />
                       {rosterFilter && (
                         <button
                           onClick={() => setRosterFilter("")}
-                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                          className="absolute right-2.5 top-1/2 -trangray-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
                         >
                           <X className="w-3.5 h-3.5" />
                         </button>
@@ -778,13 +807,13 @@ const EnrollmentManager: React.FC = () => {
               ) : (
                 <>
                   <div className="relative mb-3">
-                    <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                    <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -trangray-y-1/2" />
                     <input
                       type="text"
                       value={studentSearch}
                       onChange={(e) => setStudentSearch(e.target.value)}
                       placeholder="Search students by name, username or email..."
-                      className="w-full pl-9 pr-3 py-2 text-sm border rounded-xl bg-gray-50 dark:bg-slate-900/40 text-gray-900 dark:text-white border-gray-200 dark:border-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:bg-white dark:focus:bg-slate-900"
+                      className="w-full pl-9 pr-3 py-2 text-sm border rounded-xl bg-gray-50 dark:bg-gray-900/40 text-gray-900 dark:text-white border-gray-200 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:bg-white dark:focus:bg-gray-900"
                     />
                   </div>
                   {searching ? (
@@ -900,7 +929,7 @@ const EnrollmentManager: React.FC = () => {
                       className={`flex items-center gap-2.5 px-2.5 py-2 rounded-xl transition-colors ${
                         isEnrolled
                           ? "bg-green-50/60 dark:bg-green-900/10"
-                          : "hover:bg-gray-50 dark:hover:bg-slate-700/30"
+                          : "hover:bg-gray-50 dark:hover:bg-gray-700/30"
                       }`}
                     >
                       <span
@@ -928,7 +957,7 @@ const EnrollmentManager: React.FC = () => {
                           className={`flex-shrink-0 text-xs font-semibold px-2.5 py-1 rounded-full transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
                             isEnrolled
                               ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 hover:bg-rose-100 hover:text-rose-600 dark:hover:bg-rose-900/30 dark:hover:text-rose-400"
-                              : "bg-gray-100 text-gray-500 dark:bg-slate-700/50 dark:text-gray-400 hover:bg-blue-100 hover:text-blue-600 dark:hover:bg-blue-900/30 dark:hover:text-blue-400"
+                              : "bg-gray-100 text-gray-500 dark:bg-gray-700/50 dark:text-gray-400 hover:bg-blue-100 hover:text-blue-600 dark:hover:bg-blue-900/30 dark:hover:text-blue-400"
                           }`}
                         >
                           {isEnrolled ? "Remove" : "Enroll"}
@@ -971,7 +1000,7 @@ const coverageMeta = (enrolled: number, total: number) => {
     return {
       barClass: "bg-gray-300 dark:bg-gray-600",
       badgeClass:
-        "bg-gray-100 text-gray-500 dark:bg-slate-700/50 dark:text-gray-400",
+        "bg-gray-100 text-gray-500 dark:bg-gray-700/50 dark:text-gray-400",
     };
   if (enrolled === total)
     return {
@@ -1025,7 +1054,7 @@ const StudentRow: React.FC<{
       className={`group flex items-center gap-3 px-2.5 py-2 rounded-xl cursor-pointer outline-none transition-colors ${
         selected
           ? "bg-blue-50 dark:bg-blue-900/15 ring-1 ring-blue-200 dark:ring-blue-800/40"
-          : "hover:bg-gray-50 dark:hover:bg-slate-700/30 focus-visible:bg-gray-50 dark:focus-visible:bg-slate-700/30"
+          : "hover:bg-gray-50 dark:hover:bg-gray-700/30 focus-visible:bg-gray-50 dark:focus-visible:bg-gray-700/30"
       }`}
     >
       <input
@@ -1051,7 +1080,7 @@ const StudentRow: React.FC<{
           {fullyEnrolled && <CheckCircle2 className="w-3 h-3" />}
           {student.enrolled_count}/{student.total_subjects}
         </span>
-        <div className="w-full h-1.5 rounded-full bg-gray-100 dark:bg-slate-700/60 overflow-hidden">
+        <div className="w-full h-1.5 rounded-full bg-gray-100 dark:bg-gray-700/60 overflow-hidden">
           <div
             className={`h-full rounded-full transition-all ${barClass}`}
             style={{ width: `${pct}%` }}
@@ -1073,7 +1102,7 @@ const AssignRow: React.FC<{
     className={`flex items-center gap-3 px-2.5 py-2 rounded-xl cursor-pointer transition-colors ${
       selected
         ? "bg-emerald-50 dark:bg-emerald-900/15 ring-1 ring-emerald-200 dark:ring-emerald-800/40"
-        : "hover:bg-gray-50 dark:hover:bg-slate-700/30"
+        : "hover:bg-gray-50 dark:hover:bg-gray-700/30"
     }`}
   >
     <input
