@@ -700,7 +700,7 @@ const EnrollmentManager: React.FC = () => {
                 <>
                   {roster.students.length > 0 && (
                     <div className="relative mb-3">
-                      <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -trangray-y-1/2" />
+                      <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
                       <input
                         type="text"
                         value={rosterFilter}
@@ -711,7 +711,7 @@ const EnrollmentManager: React.FC = () => {
                       {rosterFilter && (
                         <button
                           onClick={() => setRosterFilter("")}
-                          className="absolute right-2.5 top-1/2 -trangray-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
                         >
                           <X className="w-3.5 h-3.5" />
                         </button>
@@ -807,7 +807,7 @@ const EnrollmentManager: React.FC = () => {
               ) : (
                 <>
                   <div className="relative mb-3">
-                    <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -trangray-y-1/2" />
+                    <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
                     <input
                       type="text"
                       value={studentSearch}
