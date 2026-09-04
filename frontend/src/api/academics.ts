@@ -347,6 +347,49 @@ export const myAssignedSubjectsApi = {
     ),
 };
 
+// My Students API (for teachers) -- every student across all of a
+// teacher's assigned subjects/class groups, filterable by either.
+export interface MyStudent {
+  user_id: number;
+  username: string;
+  email: string | null;
+  first_name: string;
+  last_name: string;
+  gender: string | null;
+  class_group_id: number;
+  class_group_name: string;
+  grade_name: string;
+  program_name: string;
+  subjects: Array<{ subject_id: number; subject_name: string; subject_code: string | null }>;
+}
+
+export interface MyStudentsResponse {
+  students: MyStudent[];
+  filters: {
+    subjects: Array<{ subject_id: number; subject_name: string; subject_code: string | null }>;
+    class_groups: Array<{
+      class_group_id: number;
+      class_group_name: string;
+      grade_name: string;
+      program_name: string;
+    }>;
+  };
+  academic_year_id: number;
+  total: number;
+}
+
+export const myStudentsApi = {
+  getAll: (params: { academicYearId?: number; academicTermId?: number; subjectId?: number; classGroupId?: number }) =>
+    api.get<{ data: MyStudentsResponse }>("/academics/my-students", {
+      params: {
+        academic_year_id: params.academicYearId,
+        academic_term_id: params.academicTermId,
+        subject_id: params.subjectId,
+        class_group_id: params.classGroupId,
+      },
+    }),
+};
+
 // Student Subject Enrollment API
 export interface StudentEnrolledSubject {
   enrollment_id: string;

@@ -3117,6 +3117,184 @@ export const getSubjectEnrolledStudentsByTerm = asyncHandler(
   },
 );
 
+// GET /my-students
+// Every student in any class group where the teacher has a subject
+// assignment for the selected academic year -- "all my class groups across
+// all my assigned subjects", not just one subject at a time the way
+// getSubjectEnrolledStudents is. Optional subject_id/class_group_id query
+// params narrow which of the teacher's own assignments to draw the roster
+// from; the two filter option lists in the response are always built from
+// the teacher's *full* (unfiltered) assignment set, so the dropdowns never
+// shrink to only what's currently selected.
+export const getMyStudents = asyncHandler(async (req: any, res: any) => {
+  const teacherId = req.user?.user_id || req.user?.id || req.user?.userId;
+  if (!req.user || teacherId == null) {
+    throw new ValidationError("User not authenticated");
+  }
+  const teacherIdNum = typeof teacherId === "string" ? parseInt(teacherId) : teacherId;
+  if (isNaN(teacherIdNum)) {
+    throw new ValidationError("Invalid user ID");
+  }
+
+  const { academic_term_id, subject_id, class_group_id } = req.query;
+
+  // Same "resolve the selected period" convention as the rest of this file:
+  // an explicit year wins, otherwise fall back to the term's year, otherwise
+  // whichever year is flagged current.
+  let yearId: number | null = req.query.academic_year_id
+    ? parseInt(req.query.academic_year_id as string, 10)
+    : null;
+  if ((yearId == null || isNaN(yearId)) && academic_term_id) {
+    const [termRow] = await db
+      .select({ academic_year_id: AcademicTerm.academic_year_id })
+      .from(AcademicTerm)
+      .where(eq(AcademicTerm.academic_term_id, parseInt(academic_term_id as string, 10)))
+      .limit(1);
+    yearId = termRow?.academic_year_id ?? null;
+  }
+  if (yearId == null || isNaN(yearId)) {
+    yearId = await getCurrentAcademicYearId();
+  }
+  if (yearId == null) {
+    throw new ValidationError("No academic year selected and no current academic year is set");
+  }
+
+  const subjectIdFilter = subject_id ? parseInt(subject_id as string, 10) : undefined;
+  const classGroupIdFilter = class_group_id ? parseInt(class_group_id as string, 10) : undefined;
+
+  // The teacher's full set of (subject, class group) assignments for this
+  // year -- source of both the filter dropdown options and, once narrowed
+  // below, the class groups whose rosters we actually fetch.
+  const assignments = await db
+    .select({
+      subject_id: TeacherSubjectAssignment.subject_id,
+      subject_name: Subject.name,
+      subject_code: Subject.code,
+      class_group_id: TeacherSubjectAssignment.class_group_id,
+      class_group_name: ClassGroup.name,
+      grade_id: Grade.grade_id,
+      grade_name: Grade.name,
+      program_id: Program.program_id,
+      program_name: Program.name,
+    })
+    .from(TeacherSubjectAssignment)
+    .innerJoin(Subject, eq(TeacherSubjectAssignment.subject_id, Subject.subject_id))
+    .innerJoin(ClassGroup, eq(TeacherSubjectAssignment.class_group_id, ClassGroup.class_group_id))
+    .innerJoin(Grade, eq(ClassGroup.grade_id, Grade.grade_id))
+    .innerJoin(Program, eq(Grade.program_id, Program.program_id))
+    .where(
+      and(
+        eq(TeacherSubjectAssignment.user_id, teacherIdNum),
+        eq(TeacherSubjectAssignment.academic_year_id, yearId),
+      ),
+    );
+
+  const subjectOptions = new Map<number, { subject_id: number; subject_name: string; subject_code: string | null }>();
+  const classGroupOptions = new Map<
+    number,
+    { class_group_id: number; class_group_name: string; grade_name: string; program_name: string }
+  >();
+  for (const a of assignments) {
+    if (!subjectOptions.has(a.subject_id)) {
+      subjectOptions.set(a.subject_id, {
+        subject_id: a.subject_id,
+        subject_name: a.subject_name,
+        subject_code: a.subject_code,
+      });
+    }
+    if (!classGroupOptions.has(a.class_group_id)) {
+      classGroupOptions.set(a.class_group_id, {
+        class_group_id: a.class_group_id,
+        class_group_name: a.class_group_name,
+        grade_name: a.grade_name,
+        program_name: a.program_name,
+      });
+    }
+  }
+
+  const filteredAssignments = assignments.filter(
+    (a) =>
+      (subjectIdFilter === undefined || a.subject_id === subjectIdFilter) &&
+      (classGroupIdFilter === undefined || a.class_group_id === classGroupIdFilter),
+  );
+
+  // Per class group, which of the teacher's (filtered) subjects are taught
+  // there -- attached to each student below as their subject badges.
+  const subjectsByClassGroup = new Map<number, Array<{ subject_id: number; subject_name: string; subject_code: string | null }>>();
+  const classGroupIds = new Set<number>();
+  for (const a of filteredAssignments) {
+    classGroupIds.add(a.class_group_id);
+    const list = subjectsByClassGroup.get(a.class_group_id) ?? [];
+    if (!list.some((s) => s.subject_id === a.subject_id)) {
+      list.push({ subject_id: a.subject_id, subject_name: a.subject_name, subject_code: a.subject_code });
+    }
+    subjectsByClassGroup.set(a.class_group_id, list);
+  }
+
+  if (classGroupIds.size === 0) {
+    return successResponse(res, "Students retrieved successfully", {
+      students: [],
+      filters: {
+        subjects: Array.from(subjectOptions.values()).sort((a, b) => a.subject_name.localeCompare(b.subject_name)),
+        class_groups: Array.from(classGroupOptions.values()).sort((a, b) => a.class_group_name.localeCompare(b.class_group_name)),
+      },
+      academic_year_id: yearId,
+      total: 0,
+    });
+  }
+
+  const students = await db
+    .select({
+      user_id: User.user_id,
+      username: User.username,
+      email: User.email,
+      first_name: UserProfile.first_name,
+      last_name: UserProfile.last_name,
+      gender: UserProfile.gender,
+      class_group_id: StudentClassGroup.class_group_id,
+      class_group_name: ClassGroup.name,
+      grade_name: Grade.name,
+      program_name: Program.name,
+    })
+    .from(StudentClassGroup)
+    .innerJoin(User, eq(StudentClassGroup.user_id, User.user_id))
+    .innerJoin(UserProfile, eq(User.user_id, UserProfile.user_id))
+    .innerJoin(ClassGroup, eq(StudentClassGroup.class_group_id, ClassGroup.class_group_id))
+    .innerJoin(Grade, eq(ClassGroup.grade_id, Grade.grade_id))
+    .innerJoin(Program, eq(Grade.program_id, Program.program_id))
+    .where(
+      and(
+        inArray(StudentClassGroup.class_group_id, Array.from(classGroupIds)),
+        eq(StudentClassGroup.academic_year_id, yearId),
+        eq(StudentClassGroup.status, "ACTIVE"),
+        // Same defensive real-student check as getClassGroupStudents -- a
+        // class group row belongs to a student account either way, but this
+        // keeps a staff account that picked one up out of the roster.
+        or(
+          eq(UserProfile.user_type, "STUDENT"),
+          sql`EXISTS (SELECT 1 FROM ${UserRole} ur JOIN ${Role} r ON r.role_id = ur.role_id
+                      WHERE ur.user_id = ${User.user_id} AND r.name = 'STUDENT')`,
+        )!,
+      ),
+    )
+    .orderBy(UserProfile.first_name, UserProfile.last_name);
+
+  const result = students.map((s) => ({
+    ...s,
+    subjects: subjectsByClassGroup.get(s.class_group_id) ?? [],
+  }));
+
+  successResponse(res, "Students retrieved successfully", {
+    students: result,
+    filters: {
+      subjects: Array.from(subjectOptions.values()).sort((a, b) => a.subject_name.localeCompare(b.subject_name)),
+      class_groups: Array.from(classGroupOptions.values()).sort((a, b) => a.class_group_name.localeCompare(b.class_group_name)),
+    },
+    academic_year_id: yearId,
+    total: result.length,
+  });
+});
+
 // GET /class-groups/:class_group_id/students
 // Roster for a homeroom/class group -- distinct from the subject-enrollment
 // endpoints above, which list who's taking a *subject*, not who's *in* a

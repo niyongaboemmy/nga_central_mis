@@ -58,6 +58,7 @@ import {
   getMyAssignedSubjects,
   getSubjectEnrolledStudents,
   getSubjectEnrolledStudentsByTerm,
+  getMyStudents,
 
   // Student Subject Enrollment
   getStudentEnrolledSubjects,
@@ -362,6 +363,12 @@ router.get(
   authenticate,
   authorize("VIEW_SUBJECT_ENROLLED_STUDENTS"),
   getSubjectEnrolledStudentsByTerm,
+);
+router.get(
+  "/my-students",
+  authenticate,
+  authorize("VIEW_MY_STUDENTS"),
+  getMyStudents,
 );
 
 // Student Subject Enrollment routes

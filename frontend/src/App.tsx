@@ -22,6 +22,7 @@ import "./App.css";
 import Documents from "./components/documents/Documents";
 import Academics from "./components/Academics";
 import TeacherAssignedSubjects from "./components/TeacherAssignedSubjects";
+import MyStudents from "./components/MyStudents";
 import MyEnrolledSubjects from "./components/MyEnrolledSubjects";
 import ProgramUsersPage from "./components/ProgramUsersPage";
 import ProgramAcademicPage from "./components/ProgramAcademicPage";
@@ -170,6 +171,11 @@ const AcademicsPage: React.FC = () => {
 // Teacher Assigned Subjects page with sidebar
 const TeacherAssignedSubjectsPage: React.FC = () => {
   return <TeacherAssignedSubjects />;
+};
+
+// My Students page with sidebar
+const MyStudentsPage: React.FC = () => {
+  return <MyStudents />;
 };
 
 // Student's Enrolled Subjects page with sidebar
@@ -347,6 +353,18 @@ function App() {
                 <ProtectedRoute>
                   <SystemLayoutWrapper>
                     <TeacherAssignedSubjectsPage />
+                  </SystemLayoutWrapper>
+                </ProtectedRoute>
+              }
+            />
+
+            {/* My Students - protected with sidebar */}
+            <Route
+              path="/my-students"
+              element={
+                <ProtectedRoute>
+                  <SystemLayoutWrapper>
+                    <MyStudentsPage />
                   </SystemLayoutWrapper>
                 </ProtectedRoute>
               }
