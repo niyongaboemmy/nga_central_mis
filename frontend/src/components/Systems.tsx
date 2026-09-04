@@ -17,6 +17,7 @@ import {
   Link,
   Copy,
 } from "lucide-react";
+import IntegrationTokens from "./IntegrationTokens";
 import Modal from "./ui/Modal";
 import ConfirmModal from "./ui/ConfirmModal";
 import { useToast } from "../contexts/ToastContext";
@@ -845,6 +846,13 @@ const Systems = () => {
             )}
           </>
         )}
+
+        {/* The other half of "connect another system": a module is an SSO
+            client (it signs our users in), a token is machine access (it reads
+            our data). Ganzaa needs one of each, so they belong on one screen. */}
+        <div className="pt-2 border-t border-gray-100 dark:border-slate-700/30">
+          <IntegrationTokens />
+        </div>
       </div>
       {/* Modals */}
       <SystemModal

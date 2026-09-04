@@ -8,6 +8,8 @@ import {
   AcademicTerm,
   AcademicYear,
   AssessmentScore,
+  SubjectCompetency,
+  CompetencyPerformanceCriteria,
   CalendarActivity,
   CalendarSlot,
   ClassGroup,
@@ -488,7 +490,7 @@ export const syncAcademics = asyncHandler(async (req: any, res: any) => {
     ? gte(CalendarActivity.updated_at, since)
     : undefined;
 
-  const [notes, schemes, lessons, calendars, slots, activities, scores] =
+  const [notes, schemes, lessons, calendars, slots, activities, competencies, scores] =
     await Promise.all([
       db
         .select({
@@ -616,6 +618,27 @@ export const syncAcademics = asyncHandler(async (req: any, res: any) => {
         .where(activityFilter)
         .orderBy(asc(CalendarActivity.activity_id))
         .limit(ACADEMICS_MAX_ROWS),
+      // Curriculum — the Elements of Competency a subject is taught against, and
+      // the performance criteria under each. This is the spine of what a course
+      // IS: a partner mirroring lesson notes and schemes without it has the
+      // paperwork and none of the curriculum the paperwork refers to.
+      //
+      // Sent whole: neither table carries updated_at, and the whole catalogue is
+      // a few hundred short rows.
+      db
+        .select({
+          id: SubjectCompetency.competency_id,
+          subjectId: SubjectCompetency.subject_id,
+          elementNumber: SubjectCompetency.element_number,
+          title: SubjectCompetency.title,
+          description: SubjectCompetency.description,
+          indicativeContent: SubjectCompetency.indicative_content,
+          learningHours: SubjectCompetency.learning_hours,
+          sortOrder: SubjectCompetency.sort_order,
+        })
+        .from(SubjectCompetency)
+        .orderBy(asc(SubjectCompetency.subject_id), asc(SubjectCompetency.sort_order))
+        .limit(ACADEMICS_MAX_ROWS),
       db
         .select({
           id: AssessmentScore.score_id,
@@ -640,6 +663,25 @@ export const syncAcademics = asyncHandler(async (req: any, res: any) => {
   // `since`-filtered run doesn't drag along entries for schemes it isn't sending.
   const schemeIds = schemes.map((s) => s.id);
   const lessonIds = lessons.map((l) => l.id);
+  const competencyIds = competencies.map((c) => c.id);
+
+  const criteria =
+    competencyIds.length === 0
+      ? []
+      : await db
+          .select({
+            id: CompetencyPerformanceCriteria.criteria_id,
+            competencyId: CompetencyPerformanceCriteria.competency_id,
+            criteriaNumber: CompetencyPerformanceCriteria.criteria_number,
+            description: CompetencyPerformanceCriteria.description,
+            sortOrder: CompetencyPerformanceCriteria.sort_order,
+          })
+          .from(CompetencyPerformanceCriteria)
+          .where(inArray(CompetencyPerformanceCriteria.competency_id, competencyIds))
+          .orderBy(
+            asc(CompetencyPerformanceCriteria.competency_id),
+            asc(CompetencyPerformanceCriteria.sort_order),
+          );
 
   const [entries, outcomes, sections, indicative, assignments, evaluations] =
     await Promise.all([
@@ -787,6 +829,8 @@ export const syncAcademics = asyncHandler(async (req: any, res: any) => {
   const resourcesByOutcome = groupBy(outcomeResources, (r) =>
     Number(r.learningOutcomeId),
   );
+  const criteriaByCompetency = groupBy(criteria, (r) => Number(r.competencyId));
+
   const slotsByCalendar = groupBy(
     slots.filter((s) => s.calendarId !== null),
     (r) => Number(r.calendarId),
@@ -802,6 +846,8 @@ export const syncAcademics = asyncHandler(async (req: any, res: any) => {
     calendars: calendars.length,
     calendarSlots: slots.length,
     calendarActivities: activities.length,
+    competencies: competencies.length,
+    performanceCriteria: criteria.length,
     assessmentScores: scores.length,
   })
     .filter(([, n]) => n >= ACADEMICS_MAX_ROWS)
@@ -858,6 +904,15 @@ export const syncAcademics = asyncHandler(async (req: any, res: any) => {
     })),
     calendarSlots: slots,
     calendarActivities: activities,
+
+    // Nested: an element without its performance criteria is not a curriculum
+    // element, it is a heading. The flat list is sent alongside for callers that
+    // would rather join it themselves.
+    competencies: competencies.map((c) => ({
+      ...c,
+      criteria: criteriaByCompetency.get(c.id) ?? [],
+    })),
+    performanceCriteria: criteria,
 
     assessmentScores: scores,
   });
