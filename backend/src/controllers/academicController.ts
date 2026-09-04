@@ -3447,9 +3447,12 @@ export const enrollStudentInSubject = asyncHandler(
       throw new NotFoundError("Academic year not found");
     }
 
-    // Check if enrollment already exists
+    // Check if enrollment already exists -- any status, since unenrolling
+    // soft-disables the row rather than deleting it (see
+    // unenrollStudentFromSubject below), so its primary key still exists and
+    // a blind insert would collide with it.
     const existingEnrollment = await db
-      .select()
+      .select({ status: StudentSubjectEnrollment.status })
       .from(StudentSubjectEnrollment)
       .where(
         and(
@@ -3460,17 +3463,32 @@ export const enrollStudentInSubject = asyncHandler(
       )
       .limit(1);
 
-    if (existingEnrollment.length > 0) {
+    if (existingEnrollment.length > 0 && existingEnrollment[0].status === "ACTIVE") {
       throw new ConflictError(
         "Student is already enrolled in this subject for the specified academic year",
       );
     }
 
-    await db.insert(StudentSubjectEnrollment).values({
-      user_id: studentId,
-      subject_id: subjId,
-      academic_year_id: yearId,
-    });
+    if (existingEnrollment.length > 0) {
+      // Reactivate the previously-disabled enrollment instead of inserting
+      // a second row with the same primary key.
+      await db
+        .update(StudentSubjectEnrollment)
+        .set({ status: "ACTIVE", enrolled_at: sql`CURRENT_TIMESTAMP` })
+        .where(
+          and(
+            eq(StudentSubjectEnrollment.user_id, studentId),
+            eq(StudentSubjectEnrollment.subject_id, subjId),
+            eq(StudentSubjectEnrollment.academic_year_id, yearId),
+          ),
+        );
+    } else {
+      await db.insert(StudentSubjectEnrollment).values({
+        user_id: studentId,
+        subject_id: subjId,
+        academic_year_id: yearId,
+      });
+    }
 
     logger.info(`Student ID: ${studentId} enrolled in subject ID: ${subjId}`);
 
@@ -3585,6 +3603,75 @@ export const unenrollStudentFromSubject = asyncHandler(
   },
 );
 
+// Reactivates DISABLED StudentSubjectEnrollment rows and inserts brand-new
+// ones for every (user_id, subject_id) pair not already ACTIVE for the given
+// year. The single write path every enroll/sync endpoint below shares:
+// unenrolling soft-disables a row rather than deleting it, so its primary
+// key still exists afterward, and a blind insert on re-enroll would collide
+// with it (composite PK on user_id+subject_id+academic_year_id).
+async function upsertEnrollmentPairs(
+  pairs: { user_id: number; subject_id: number }[],
+  academicYearId: number,
+): Promise<number> {
+  if (pairs.length === 0) return 0;
+
+  const userIds = Array.from(new Set(pairs.map((p) => p.user_id)));
+  const subjectIds = Array.from(new Set(pairs.map((p) => p.subject_id)));
+
+  const existingRows = await db
+    .select({
+      user_id: StudentSubjectEnrollment.user_id,
+      subject_id: StudentSubjectEnrollment.subject_id,
+      status: StudentSubjectEnrollment.status,
+    })
+    .from(StudentSubjectEnrollment)
+    .where(
+      and(
+        inArray(StudentSubjectEnrollment.user_id, userIds),
+        inArray(StudentSubjectEnrollment.subject_id, subjectIds),
+        eq(StudentSubjectEnrollment.academic_year_id, academicYearId),
+      ),
+    );
+  const existingStatus = new Map(
+    existingRows.map((r) => [`${r.user_id}-${r.subject_id}`, r.status]),
+  );
+
+  const toInsert: {
+    user_id: number;
+    subject_id: number;
+    academic_year_id: number;
+  }[] = [];
+  const toReactivate: { user_id: number; subject_id: number }[] = [];
+  for (const { user_id, subject_id } of pairs) {
+    const status = existingStatus.get(`${user_id}-${subject_id}`);
+    if (status === "ACTIVE") continue;
+    if (status === "DISABLED") toReactivate.push({ user_id, subject_id });
+    else toInsert.push({ user_id, subject_id, academic_year_id: academicYearId });
+  }
+
+  if (toInsert.length > 0) {
+    await db.insert(StudentSubjectEnrollment).values(toInsert);
+  }
+  if (toReactivate.length > 0) {
+    await Promise.all(
+      toReactivate.map(({ user_id, subject_id }) =>
+        db
+          .update(StudentSubjectEnrollment)
+          .set({ status: "ACTIVE", enrolled_at: sql`CURRENT_TIMESTAMP` })
+          .where(
+            and(
+              eq(StudentSubjectEnrollment.user_id, user_id),
+              eq(StudentSubjectEnrollment.subject_id, subject_id),
+              eq(StudentSubjectEnrollment.academic_year_id, academicYearId),
+            ),
+          ),
+      ),
+    );
+  }
+
+  return toInsert.length + toReactivate.length;
+}
+
 // Enrolls each of `userIds` into every subject in `gradeId`'s curriculum
 // (GradeSubject) for `academicYearId`, skipping subjects a student is
 // already ACTIVE-enrolled in. A grade with no GradeSubject rows yet is a
@@ -3612,46 +3699,12 @@ async function autoEnrollGradeSubjects(
     return { enrolled: 0, subjectIds: [] };
   }
 
-  const existingRows = await db
-    .select({
-      user_id: StudentSubjectEnrollment.user_id,
-      subject_id: StudentSubjectEnrollment.subject_id,
-    })
-    .from(StudentSubjectEnrollment)
-    .where(
-      and(
-        inArray(StudentSubjectEnrollment.user_id, userIds),
-        inArray(StudentSubjectEnrollment.subject_id, subjectIds),
-        eq(StudentSubjectEnrollment.academic_year_id, academicYearId),
-        eq(StudentSubjectEnrollment.status, "ACTIVE"),
-      ),
-    );
-  const existingKeys = new Set(
-    existingRows.map((r) => `${r.user_id}-${r.subject_id}`),
+  const pairs = userIds.flatMap((user_id) =>
+    subjectIds.map((subject_id) => ({ user_id, subject_id })),
   );
+  const enrolled = await upsertEnrollmentPairs(pairs, academicYearId);
 
-  const toInsert: {
-    user_id: number;
-    subject_id: number;
-    academic_year_id: number;
-  }[] = [];
-  for (const userId of userIds) {
-    for (const subjectId of subjectIds) {
-      if (!existingKeys.has(`${userId}-${subjectId}`)) {
-        toInsert.push({
-          user_id: userId,
-          subject_id: subjectId,
-          academic_year_id: academicYearId,
-        });
-      }
-    }
-  }
-
-  if (toInsert.length > 0) {
-    await db.insert(StudentSubjectEnrollment).values(toInsert);
-  }
-
-  return { enrolled: toInsert.length, subjectIds };
+  return { enrolled, subjectIds };
 }
 
 // Student Class Group Assignment Management
@@ -4808,47 +4861,12 @@ export const bulkEnrollStudentsInSubjects = asyncHandler(
       );
     }
 
-    const existingRows = await db
-      .select({
-        user_id: StudentSubjectEnrollment.user_id,
-        subject_id: StudentSubjectEnrollment.subject_id,
-      })
-      .from(StudentSubjectEnrollment)
-      .where(
-        and(
-          inArray(StudentSubjectEnrollment.user_id, validStudentIds),
-          inArray(StudentSubjectEnrollment.subject_id, validSubjectIds),
-          eq(StudentSubjectEnrollment.academic_year_id, yearId),
-          eq(StudentSubjectEnrollment.status, "ACTIVE"),
-        ),
-      );
-    const existingKeys = new Set(
-      existingRows.map((r) => `${r.user_id}-${r.subject_id}`),
+    const pairs = validStudentIds.flatMap((user_id) =>
+      validSubjectIds.map((subject_id) => ({ user_id, subject_id })),
     );
-
-    const toInsert: {
-      user_id: number;
-      subject_id: number;
-      academic_year_id: number;
-    }[] = [];
-    for (const studentId of validStudentIds) {
-      for (const subjectId of validSubjectIds) {
-        if (!existingKeys.has(`${studentId}-${subjectId}`)) {
-          toInsert.push({
-            user_id: studentId,
-            subject_id: subjectId,
-            academic_year_id: yearId,
-          });
-        }
-      }
-    }
-
-    if (toInsert.length > 0) {
-      await db.insert(StudentSubjectEnrollment).values(toInsert);
-    }
+    const enrolled = await upsertEnrollmentPairs(pairs, yearId);
 
     const total = validStudentIds.length * validSubjectIds.length;
-    const enrolled = toInsert.length;
     const skipped = total - enrolled;
 
     logger.info("Students bulk-enrolled in subjects", {

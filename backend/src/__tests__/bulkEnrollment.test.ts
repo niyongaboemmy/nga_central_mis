@@ -174,6 +174,77 @@ describe("Bulk subject enrollment", () => {
     }
   });
 
+  it("re-enrolls a subject after it was unenrolled, via both the single and bulk endpoints, without a 409 conflict", async () => {
+    const studentId = await createUser({ userType: "STUDENT" });
+    await request(app)
+      .post("/academics/students/bulk-assign-class-group")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({
+        user_ids: [studentId],
+        class_group_id: classGroupId,
+        academic_year_id: academicYearId,
+      });
+
+    // Unenroll both subjects -- these rows are now DISABLED, not deleted.
+    await request(app)
+      .delete(
+        `/academics/students/${studentId}/subjects/${subjectAId}/years/${academicYearId}`,
+      )
+      .set("Authorization", `Bearer ${adminToken}`)
+      .expect(200);
+    await request(app)
+      .delete(
+        `/academics/students/${studentId}/subjects/${subjectBId}/years/${academicYearId}`,
+      )
+      .set("Authorization", `Bearer ${adminToken}`)
+      .expect(200);
+
+    // Single re-enroll must reactivate the disabled row, not 409.
+    const singleReEnroll = await request(app)
+      .post("/academics/students/enroll-subject")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({
+        user_id: studentId,
+        subject_id: subjectAId,
+        academic_year_id: academicYearId,
+      });
+    expect(singleReEnroll.status).toBe(201);
+
+    // Bulk re-enroll must also reactivate rather than fail/duplicate-insert.
+    const bulkReEnroll = await request(app)
+      .post("/academics/students/bulk-enroll-subjects")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({
+        user_ids: [studentId],
+        subject_ids: [subjectBId],
+        academic_year_id: academicYearId,
+      });
+    expect(bulkReEnroll.status).toBe(200);
+    expect(bulkReEnroll.body.data.enrolled).toBe(1);
+    expect(bulkReEnroll.body.data.skipped).toBe(0);
+
+    const enrolledRes = await request(app)
+      .get(`/academics/students/${studentId}/enrolled-subjects`)
+      .query({ academic_year_id: academicYearId })
+      .set("Authorization", `Bearer ${adminToken}`);
+    expect(enrolledRes.body.data.map((e: any) => e.subject_id)).toEqual(
+      expect.arrayContaining([subjectAId, subjectBId]),
+    );
+
+    // Re-running the class-group auto-enroll sync afterward must not error
+    // or double-insert either (both subjects already ACTIVE again).
+    const resync = await request(app)
+      .post("/academics/students/bulk-assign-class-group")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({
+        user_ids: [studentId],
+        class_group_id: classGroupId,
+        academic_year_id: academicYearId,
+      });
+    expect(resync.status).toBe(200);
+    expect(resync.body.data.subjects_enrolled).toBe(0);
+  });
+
   it("403s bulk-assign-class-group without the required permission", async () => {
     const res = await request(app)
       .post("/academics/students/bulk-assign-class-group")
