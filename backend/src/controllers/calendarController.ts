@@ -83,10 +83,12 @@ const formatDateForMySQL = (dateStr: string | undefined) => {
 
 // Get all calendar slots with filters
 export const getCalendarSlots = asyncHandler(async (req: any, res: any) => {
-  const { academic_term_id, class_group_id, day_of_week } = req.query;
+  const { calendar_id, academic_term_id, class_group_id, day_of_week } =
+    req.query;
   const user = req.user;
 
   logger.info("Fetching calendar slots", {
+    calendar_id,
     academic_term_id,
     class_group_id,
     day_of_week,
@@ -95,14 +97,49 @@ export const getCalendarSlots = asyncHandler(async (req: any, res: any) => {
 
   const filters: SQL[] = [];
 
+  // calendar_id is the key the write path uses (see createCalendarSlot's
+  // duplicate check), so it is the only filter that is guaranteed to agree
+  // with what actually got stored. Asking by calendar also keeps the payload
+  // to one grid's worth of slots instead of every slot in the school.
+  if (calendar_id) {
+    const calendarId = parseInt(calendar_id);
+    if (!isNaN(calendarId)) {
+      filters.push(eq(CalendarSlot.calendar_id, calendarId));
+    }
+  }
+
+  // A slot's academic_term_id / class_group_id are denormalised copies of its
+  // calendar's. Older rows were written from the request body and can hold a
+  // stale (or outright wrong) value, which used to hide them from every read
+  // while they still blocked the timeslot on create. Match the calendar's
+  // value as well so such a row stays visible and can be fixed or deleted.
   if (academic_term_id) {
-    filters.push(eq(CalendarSlot.academic_term_id, parseInt(academic_term_id)));
+    const termId = parseInt(academic_term_id);
+    if (!isNaN(termId)) {
+      filters.push(
+        or(
+          eq(CalendarSlot.academic_term_id, termId),
+          eq(AcademicCalendar.academic_term_id, termId),
+        )!,
+      );
+    }
   }
   if (class_group_id) {
-    filters.push(eq(CalendarSlot.class_group_id, parseInt(class_group_id)));
+    const classGroupId = parseInt(class_group_id);
+    if (!isNaN(classGroupId)) {
+      filters.push(
+        or(
+          eq(CalendarSlot.class_group_id, classGroupId),
+          eq(AcademicCalendar.class_group_id, classGroupId),
+        )!,
+      );
+    }
   }
   if (day_of_week) {
-    filters.push(eq(CalendarSlot.day_of_week, parseInt(day_of_week)));
+    const day = parseInt(day_of_week);
+    if (!isNaN(day)) {
+      filters.push(eq(CalendarSlot.day_of_week, day));
+    }
   }
 
   // Only show active slots
@@ -112,8 +149,10 @@ export const getCalendarSlots = asyncHandler(async (req: any, res: any) => {
     .select({
       slot_id: CalendarSlot.slot_id,
       calendar_id: CalendarSlot.calendar_id, // needed by CalendarGrid to filter slots per grid
-      academic_term_id: CalendarSlot.academic_term_id,
-      class_group_id: CalendarSlot.class_group_id,
+      // Report the calendar's term/class group when the slot's own copy has
+      // drifted, so the client sees the values the slot actually belongs to.
+      academic_term_id: sql<number>`COALESCE(${AcademicCalendar.academic_term_id}, ${CalendarSlot.academic_term_id})`,
+      class_group_id: sql<number>`COALESCE(${AcademicCalendar.class_group_id}, ${CalendarSlot.class_group_id})`,
       subject_id: CalendarSlot.subject_id,
       user_id: CalendarSlot.user_id,
       day_of_week: CalendarSlot.day_of_week,
@@ -130,12 +169,16 @@ export const getCalendarSlots = asyncHandler(async (req: any, res: any) => {
       class_group_name: ClassGroup.name,
     })
     .from(CalendarSlot)
+    .leftJoin(
+      AcademicCalendar,
+      eq(CalendarSlot.calendar_id, AcademicCalendar.calendar_id),
+    )
     .leftJoin(Subject, eq(CalendarSlot.subject_id, Subject.subject_id))
     .leftJoin(User, eq(CalendarSlot.user_id, User.user_id))
     .leftJoin(UserProfile, eq(CalendarSlot.user_id, UserProfile.user_id))
     .leftJoin(
       ClassGroup,
-      eq(CalendarSlot.class_group_id, ClassGroup.class_group_id),
+      sql`${ClassGroup.class_group_id} = COALESCE(${AcademicCalendar.class_group_id}, ${CalendarSlot.class_group_id})`,
     )
     .where(filters.length > 0 ? and(...filters) : undefined)
     .orderBy(CalendarSlot.day_of_week, CalendarSlot.start_time);

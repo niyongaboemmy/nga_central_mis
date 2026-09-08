@@ -308,6 +308,28 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({
     scope.isScoped,
   ]);
 
+  // Slots are fetched per calendar (see loadData), so switching the selected
+  // class group has to refetch them -- otherwise the grid keeps the previous
+  // calendar's slots, which its own calendar_id filter then renders as empty.
+  useEffect(() => {
+    const calendarId = selectedCalendar?.calendar_id;
+    if (!isBroadView || !calendarId) return;
+    let cancelled = false;
+    getCalendarSlots({ calendar_id: calendarId })
+      .then((data) => {
+        if (!cancelled) setSlots(data);
+      })
+      .catch((error: any) => {
+        if (!cancelled) {
+          showToast(error.message || "Failed to load calendar slots", "error");
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isBroadView, selectedCalendar?.calendar_id]);
+
   // Reload the instructor's schedule when they switch their own class group
   useEffect(() => {
     if (
@@ -361,9 +383,18 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({
           calendarParams.academic_term_id = selectedTerm;
         }
 
+        // With a calendar selected, ask for that calendar's slots by id --
+        // the same key they were written under. Filtering by term instead
+        // dropped any slot whose denormalised term had drifted from its
+        // calendar's, leaving a grid that looked empty while the timeslot
+        // was still taken.
+        const slotParams = selectedCalendar?.calendar_id
+          ? { calendar_id: selectedCalendar.calendar_id }
+          : params;
+
         const [slotsData, activitiesData, setupDataRes, calendarsData, classGroupsData] =
           await Promise.all([
-            getCalendarSlots(params),
+            getCalendarSlots(slotParams),
             getCalendarActivities(params),
             getCalendarSetupData(
               selectedTerm || undefined,
@@ -577,14 +608,17 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({
         const calendarId = formData.calendar_id
           ? parseInt(formData.calendar_id)
           : selectedCalendar?.calendar_id || 0;
-        const termId = formData.calendar_id
-          ? calendars.find((c) => c.calendar_id === calendarId)
-              ?.academic_term_id ||
-            setupData?.academic_term_id ||
-            1
-          : selectedCalendar?.academic_term_id ||
-            setupData?.academic_term_id ||
-            1;
+        // The server derives the term (and class group) from the calendar --
+        // these are sent for the API's shape only. The old `|| 1` fallback
+        // here is what wrote slots under a term they never belonged to,
+        // hiding them from every grid.
+        const termId =
+          calendars.find((c) => c.calendar_id === calendarId)
+            ?.academic_term_id ??
+          selectedCalendar?.academic_term_id ??
+          setupData?.academic_term_id ??
+          selectedTerm ??
+          0;
         await createCalendarSlot({
           calendar_id: calendarId,
           academic_term_id: termId,

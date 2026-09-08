@@ -32,25 +32,74 @@ export const timeToMinutes = (timeStr: string): number => {
   return hours * 60 + minutes;
 };
 
-// Helper to count how many schedule slots a course spans
+export interface ScheduleRow {
+  start: string;
+  end: string;
+  label: string;
+  type: string;
+}
+
+/**
+ * The rows a calendar grid should draw for a given set of slots.
+ *
+ * SCHEDULE_SLOTS is this institution's standard timetable, but slots are
+ * stored with whatever start/end time they were created with, and the grid
+ * only ever draws a slot on a row whose `start` matches it exactly. A period
+ * that isn't in the standard timetable — a school running 08:00-09:40, say —
+ * therefore matched no row at all and vanished from the grid entirely, while
+ * still occupying its time as far as the server was concerned (an empty cell
+ * that answers "a slot already exists at this time").
+ *
+ * So the standard timetable is a starting point, not the whole truth: any
+ * start time present in the data that it doesn't cover gets its own row,
+ * placed chronologically.
+ */
+export const buildScheduleRows = (
+  slots: { start_time: string; end_time: string }[],
+): ScheduleRow[] => {
+  const rows: ScheduleRow[] = SCHEDULE_SLOTS.map((s) => ({ ...s }));
+  const knownStarts = new Set(rows.map((r) => r.start));
+
+  for (const slot of slots) {
+    if (!slot?.start_time || knownStarts.has(slot.start_time)) continue;
+    knownStarts.add(slot.start_time);
+    rows.push({
+      start: slot.start_time,
+      end: slot.end_time || slot.start_time,
+      label: "Course",
+      type: "course",
+    });
+  }
+
+  return rows.sort((a, b) => timeToMinutes(a.start) - timeToMinutes(b.start));
+};
+
+/**
+ * How many rows a course occupies, counting from its own row forward.
+ *
+ * Counting every overlapping row (rather than only the ones at or after the
+ * course's own) would over-count as soon as the rows aren't a clean partition
+ * of the day — which is exactly what happens once a non-standard period is
+ * spliced in next to a standard one that overlaps it.
+ */
 export const countScheduleSlots = (
   courseStart: string,
   courseEnd: string,
+  rows: readonly ScheduleRow[] = SCHEDULE_SLOTS,
+  startIndex = 0,
 ): number => {
+  const courseStartMin = timeToMinutes(courseStart);
+  const courseEndMin = timeToMinutes(courseEnd);
   let count = 0;
-  for (const slot of SCHEDULE_SLOTS) {
-    // Check if this schedule slot overlaps with the course
-    const scheduleStart = timeToMinutes(slot.start);
-    const scheduleEnd = timeToMinutes(slot.end);
-    const courseStartMin = timeToMinutes(courseStart);
-    const courseEndMin = timeToMinutes(courseEnd);
 
-    // If scheduleSlot overlaps with course, count it
-    if (scheduleStart < courseEndMin && scheduleEnd > courseStartMin) {
-      count++;
-    }
+  for (let i = startIndex; i < rows.length; i++) {
+    const rowStart = timeToMinutes(rows[i].start);
+    const rowEnd = timeToMinutes(rows[i].end);
+    if (rowStart >= courseEndMin) break;
+    if (rowStart < courseEndMin && rowEnd > courseStartMin) count++;
   }
-  return count;
+
+  return Math.max(1, count);
 };
 
 // Helper function to convert display day index to backend day of week

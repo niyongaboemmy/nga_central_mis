@@ -90,6 +90,9 @@ export interface CalendarSetupData {
 
 // Get calendar slots (admin)
 export const getCalendarSlots = async (params?: {
+  // Prefer calendar_id: it is the key slots are actually written under, so it
+  // cannot miss a slot whose denormalised term/class group has drifted.
+  calendar_id?: number;
   academic_term_id?: number;
   class_group_id?: number;
   day_of_week?: number;

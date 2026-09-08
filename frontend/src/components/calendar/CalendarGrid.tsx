@@ -1,9 +1,9 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { MdAdd } from "react-icons/md";
 import type { CalendarSlot, CalendarActivity } from "../../api/calendar";
 import {
   DAYS,
-  SCHEDULE_SLOTS,
+  buildScheduleRows,
   displayDayToBackend,
   backendDayToDisplay,
   countScheduleSlots,
@@ -40,6 +40,13 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
     ? slots.filter((s) => s.calendar_id === calendarId)
     : slots;
 
+  // Rows follow the data: a period outside the standard timetable still needs
+  // a row of its own, or its slots match nothing and the grid renders empty.
+  const scheduleRows = useMemo(
+    () => buildScheduleRows(calendarSlots),
+    [calendarSlots],
+  );
+
   return (
     <div>
       <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-3 px-2">
@@ -70,7 +77,7 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
             {(() => {
               const occupiedCells = new Set<string>(); // key: "dayIdx-scheduleIdx"
 
-              return SCHEDULE_SLOTS.map((scheduleSlot, scheduleIdx) => {
+              return scheduleRows.map((scheduleSlot, scheduleIdx) => {
                 const isBreakOrLunch =
                   scheduleSlot.type === "break" ||
                   scheduleSlot.type === "lunch";
@@ -137,6 +144,8 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
                         const rowSpan = countScheduleSlots(
                           courseStartingHere.start_time,
                           courseStartingHere.end_time,
+                          scheduleRows,
+                          scheduleIdx,
                         );
 
                         // Mark all future rows this rowspan will cover as occupied

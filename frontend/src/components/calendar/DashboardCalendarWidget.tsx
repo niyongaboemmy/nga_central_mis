@@ -13,7 +13,7 @@ import {
 } from "../../api/calendar";
 import {
   DAYS,
-  SCHEDULE_SLOTS,
+  buildScheduleRows,
   displayDayToBackend,
   countScheduleSlots,
   getStartOfWeek,
@@ -386,6 +386,10 @@ const ReadOnlyCalendarGrid: React.FC<ReadOnlyCalendarGridProps> = ({
   onSlotClick,
   showClassGroup = false,
 }) => {
+  // Rows follow the data, so a period outside the standard timetable still
+  // gets a row instead of silently matching none (see buildScheduleRows).
+  const scheduleRows = useMemo(() => buildScheduleRows(slots), [slots]);
+
   return (
     <div className="overflow-x-auto -mx-6 border-4 border-white dark:border-gray-800/20">
       <table className="w-full border-collapse table-fixed">
@@ -430,7 +434,7 @@ const ReadOnlyCalendarGrid: React.FC<ReadOnlyCalendarGridProps> = ({
           {(() => {
             const occupiedCells = new Set<string>();
 
-            return SCHEDULE_SLOTS.map((scheduleSlot, scheduleIdx) => {
+            return scheduleRows.map((scheduleSlot, scheduleIdx) => {
               const isBreakOrLunch =
                 scheduleSlot.type === "break" || scheduleSlot.type === "lunch";
 
@@ -490,6 +494,8 @@ const ReadOnlyCalendarGrid: React.FC<ReadOnlyCalendarGridProps> = ({
                       const rowSpan = countScheduleSlots(
                         courseStartingHere.start_time,
                         courseStartingHere.end_time,
+                        scheduleRows,
+                        scheduleIdx,
                       );
 
                       for (let r = 1; r < rowSpan; r++) {
