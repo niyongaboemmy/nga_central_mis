@@ -94,7 +94,7 @@ const MultiSelect = ({
         className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium border transition-colors ${
           selected.length > 0
             ? "bg-blue-600 text-white border-blue-600"
-            : "bg-white dark:bg-slate-800 text-blue-800 dark:text-blue-200 border-blue-100 dark:border-blue-900/50 hover:border-blue-400"
+            : "bg-white dark:bg-gray-800/30 text-gray-700 dark:text-gray-200 border-gray-200 dark:border-gray-700/40 hover:border-gray-300 dark:hover:border-gray-600"
         }`}
       >
         {label}
@@ -115,7 +115,7 @@ const MultiSelect = ({
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -4 }}
             transition={{ duration: 0.12 }}
-            className="absolute z-30 mt-1 w-60 max-h-72 overflow-y-auto rounded-2xl border border-blue-100 dark:border-blue-900/50 bg-white dark:bg-slate-800 shadow-xl p-1"
+            className="absolute z-30 mt-1 w-60 max-h-72 overflow-y-auto rounded-2xl border border-gray-200 dark:border-gray-700/40 bg-white dark:bg-gray-800/30 shadow-xl p-1"
           >
             {options.map((opt) => {
               const active = selected.includes(opt.id);
@@ -124,21 +124,21 @@ const MultiSelect = ({
                   key={opt.id}
                   type="button"
                   onClick={() => toggle(opt.id)}
-                  className="w-full flex items-center gap-2 px-2.5 py-2 rounded-xl text-sm text-left hover:bg-blue-50 dark:hover:bg-blue-950/50 transition-colors"
+                  className="w-full flex items-center gap-2 px-2.5 py-2 rounded-xl text-sm text-left hover:bg-gray-50 dark:hover:bg-gray-800/60 transition-colors"
                 >
                   <span
                     className={`w-4 h-4 rounded-md border flex items-center justify-center flex-shrink-0 ${
                       active
                         ? "bg-blue-600 border-blue-600"
-                        : "border-blue-200 dark:border-blue-800"
+                        : "border-gray-300 dark:border-gray-600"
                     }`}
                   >
                     {active && <Check className="w-3 h-3 text-white" />}
                   </span>
-                  <span className="flex-1 truncate text-slate-700 dark:text-slate-200">
+                  <span className="flex-1 truncate text-gray-700 dark:text-gray-200">
                     {opt.name}
                   </span>
-                  <span className="text-[11px] text-blue-400 tabular-nums">
+                  <span className="text-[11px] text-gray-400 tabular-nums">
                     {opt.count}
                   </span>
                 </button>
@@ -160,7 +160,7 @@ const Segmented = <T extends string>({
   value: T;
   onChange: (v: T) => void;
 }) => (
-  <div className="inline-flex p-0.5 rounded-xl bg-blue-100/70 dark:bg-blue-950/50">
+  <div className="inline-flex p-0.5 rounded-xl bg-gray-100 dark:bg-gray-800/50">
     {options.map((opt) => (
       <button
         key={opt.value}
@@ -170,7 +170,7 @@ const Segmented = <T extends string>({
         className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
           value === opt.value
             ? "bg-blue-600 text-white shadow-sm"
-            : "text-blue-700/70 dark:text-blue-300/70 hover:text-blue-800"
+            : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
         }`}
       >
         {opt.label}
@@ -273,20 +273,20 @@ const SubjectFilterBar: React.FC<SubjectFilterBarProps> = ({
       {/* Search + controls */}
       <div className="flex flex-col sm:flex-row gap-2">
         <div className="relative flex-1">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-400" />
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <input
             type="text"
             value={filters.search}
             onChange={(e) => onChange({ search: e.target.value })}
             placeholder="Search subjects, teachers, class groups..."
-            className="w-full pl-10 pr-9 py-2.5 rounded-2xl border border-blue-100 dark:border-blue-900/50 bg-white dark:bg-slate-800 text-sm dark:text-white placeholder:text-blue-400/70 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 transition-shadow"
+            className="w-full pl-10 pr-9 py-2.5 rounded-2xl border border-gray-200 dark:border-gray-700/40 bg-white dark:bg-gray-800/30 text-sm dark:text-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 transition-shadow"
           />
           {filters.search && (
             <button
               type="button"
               onClick={() => onChange({ search: "" })}
               aria-label="Clear search"
-              className="absolute right-3 top-1/2 -translate-y-1/2 p-0.5 rounded-md text-blue-400 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-950"
+              className="absolute right-3 top-1/2 -translate-y-1/2 p-0.5 rounded-md text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
             >
               <X className="w-4 h-4" />
             </button>
@@ -301,7 +301,7 @@ const SubjectFilterBar: React.FC<SubjectFilterBarProps> = ({
             className={`inline-flex items-center gap-1.5 px-3 py-2.5 rounded-2xl text-sm font-medium border transition-colors ${
               showFilters || activeCount > 0
                 ? "bg-blue-600 text-white border-blue-600"
-                : "bg-white dark:bg-slate-800 text-blue-800 dark:text-blue-200 border-blue-100 dark:border-blue-900/50 hover:border-blue-400"
+                : "bg-white dark:bg-gray-800/30 text-gray-700 dark:text-gray-200 border-gray-200 dark:border-gray-700/40 hover:border-gray-300 dark:hover:border-gray-600"
             }`}
           >
             <SlidersHorizontal className="w-4 h-4" />
@@ -313,7 +313,7 @@ const SubjectFilterBar: React.FC<SubjectFilterBarProps> = ({
             )}
           </button>
 
-          <div className="hidden sm:flex p-0.5 rounded-xl bg-blue-100/70 dark:bg-blue-950/50">
+          <div className="hidden sm:flex p-0.5 rounded-xl bg-gray-100 dark:bg-gray-800/50">
             <button
               type="button"
               onClick={() => onViewChange("grid")}
@@ -322,7 +322,7 @@ const SubjectFilterBar: React.FC<SubjectFilterBarProps> = ({
               className={`p-2 rounded-lg transition-colors ${
                 view === "grid"
                   ? "bg-blue-600 text-white"
-                  : "text-blue-700/70 dark:text-blue-300/70"
+                  : "text-gray-500 dark:text-gray-400"
               }`}
             >
               <LayoutGrid className="w-4 h-4" />
@@ -335,7 +335,7 @@ const SubjectFilterBar: React.FC<SubjectFilterBarProps> = ({
               className={`p-2 rounded-lg transition-colors ${
                 view === "list"
                   ? "bg-blue-600 text-white"
-                  : "text-blue-700/70 dark:text-blue-300/70"
+                  : "text-gray-500 dark:text-gray-400"
               }`}
             >
               <ListIcon className="w-4 h-4" />
@@ -354,7 +354,7 @@ const SubjectFilterBar: React.FC<SubjectFilterBarProps> = ({
             transition={{ duration: 0.18 }}
             className="overflow-visible"
           >
-            <div className="flex flex-wrap items-center gap-2 p-3 rounded-2xl border border-blue-100 dark:border-blue-900/50 bg-white/80 dark:bg-slate-800/60">
+            <div className="flex flex-wrap items-center gap-2 p-3 rounded-2xl border border-gray-200 dark:border-gray-700/40 bg-white dark:bg-gray-800/30">
               {grades.length > 1 && (
                 <select
                   value={filters.gradeId}
@@ -367,7 +367,7 @@ const SubjectFilterBar: React.FC<SubjectFilterBarProps> = ({
                     })
                   }
                   aria-label="Grade"
-                  className="px-3 py-2 rounded-xl text-sm font-medium border border-blue-100 dark:border-blue-900/50 bg-white dark:bg-slate-800 text-blue-800 dark:text-blue-200 focus:outline-none focus:border-blue-500"
+                  className="px-3 py-2 rounded-xl text-sm font-medium border border-gray-200 dark:border-gray-700/40 bg-white dark:bg-gray-800/30 text-gray-700 dark:text-gray-200 focus:outline-none focus:border-blue-500"
                 >
                   <option value="all">All my grades</option>
                   {grades.map((g) => (
@@ -425,12 +425,12 @@ const SubjectFilterBar: React.FC<SubjectFilterBarProps> = ({
               />
 
               <div className="flex items-center gap-1.5 ml-auto">
-                <ArrowUpDown className="w-3.5 h-3.5 text-blue-400" />
+                <ArrowUpDown className="w-3.5 h-3.5 text-gray-400" />
                 <select
                   value={filters.sort}
                   onChange={(e) => onChange({ sort: e.target.value })}
                   aria-label="Sort by"
-                  className="px-3 py-2 rounded-xl text-sm font-medium border border-blue-100 dark:border-blue-900/50 bg-white dark:bg-slate-800 text-blue-800 dark:text-blue-200 focus:outline-none focus:border-blue-500"
+                  className="px-3 py-2 rounded-xl text-sm font-medium border border-gray-200 dark:border-gray-700/40 bg-white dark:bg-gray-800/30 text-gray-700 dark:text-gray-200 focus:outline-none focus:border-blue-500"
                 >
                   {SORTS.map((s) => (
                     <option key={s.value} value={s.value}>
@@ -446,8 +446,8 @@ const SubjectFilterBar: React.FC<SubjectFilterBarProps> = ({
 
       {/* Active filters + result count */}
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-sm text-blue-900/60 dark:text-blue-100/50">
-          <strong className="text-blue-900 dark:text-blue-50 tabular-nums">
+        <span className="text-sm text-gray-500 dark:text-gray-400">
+          <strong className="text-gray-900 dark:text-white tabular-nums">
             {total}
           </strong>{" "}
           subject{total === 1 ? "" : "s"}
@@ -456,14 +456,14 @@ const SubjectFilterBar: React.FC<SubjectFilterBarProps> = ({
         {chips.map((chip) => (
           <span
             key={chip.key}
-            className="inline-flex items-center gap-1 pl-2.5 pr-1 py-1 rounded-full text-xs font-medium bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-100 dark:border-blue-900/50"
+            className="inline-flex items-center gap-1 pl-2.5 pr-1 py-1 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-800/60 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700/40"
           >
             {chip.label}
             <button
               type="button"
               onClick={chip.onRemove}
               aria-label={`Remove filter ${chip.label}`}
-              className="p-0.5 rounded-full hover:bg-blue-200/70 dark:hover:bg-blue-800"
+              className="p-0.5 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"
             >
               <X className="w-3 h-3" />
             </button>

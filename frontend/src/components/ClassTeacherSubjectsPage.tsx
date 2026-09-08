@@ -57,8 +57,8 @@ const StatusPill = ({ status }: { status: string }) => (
   <span
     className={`px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wide flex-shrink-0 ${
       status === "ACTIVE"
-        ? "bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300"
-        : "bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300"
+        ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+        : "bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300"
     }`}
   >
     {status}
@@ -71,9 +71,9 @@ const TeacherChips = ({ subject }: { subject: ScopedSubject }) =>
       {subject.teachers.map((teacher) => (
         <span
           key={teacher.user_id}
-          className="inline-flex items-center gap-1 pl-1 pr-2 py-0.5 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full text-xs border border-blue-100 dark:border-blue-900/50"
+          className="inline-flex items-center gap-1 pl-1 pr-2 py-0.5 bg-gray-100 dark:bg-gray-800/60 text-gray-700 dark:text-gray-300 rounded-full text-xs border border-gray-200 dark:border-gray-700/40"
         >
-          <span className="w-4 h-4 rounded-full bg-blue-600 text-white text-[8px] font-bold flex items-center justify-center">
+          <span className="w-4 h-4 rounded-full bg-gray-400 dark:bg-gray-600 text-white text-[8px] font-bold flex items-center justify-center">
             {initialsOf(teacherLabel(teacher))}
           </span>
           {teacherLabel(teacher)}
@@ -109,7 +109,7 @@ const SubjectCard = ({
     exit={{ opacity: 0, scale: 0.97 }}
     whileHover={{ y: -3 }}
     transition={{ delay: Math.min(index, 10) * 0.02 }}
-    className="group h-full w-full text-left flex flex-col bg-white dark:bg-slate-800/60 rounded-2xl p-4 border border-blue-100/80 dark:border-slate-700/40 hover:border-blue-400 dark:hover:border-blue-600 hover:shadow-lg hover:shadow-blue-500/10 transition-all"
+    className="group h-full w-full text-left flex flex-col bg-white dark:bg-gray-800/30 rounded-2xl p-4 border border-gray-200 dark:border-gray-700/40 hover:border-gray-300 dark:hover:border-gray-600 hover:shadow-lg hover:shadow-black/5 transition-all"
   >
     <div className="flex items-start gap-3">
       <div
@@ -119,10 +119,10 @@ const SubjectCard = ({
         <BookOpen className="w-5 h-5 text-white" />
       </div>
       <div className="flex-1 min-w-0">
-        <h3 className="font-semibold text-slate-900 dark:text-white text-sm leading-snug break-words">
+        <h3 className="font-semibold text-gray-900 dark:text-white text-sm leading-snug break-words">
           {subject.name}
         </h3>
-        <p className="text-xs text-blue-900/50 dark:text-blue-100/40 mt-0.5 truncate">
+        <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 truncate">
           {subject.code}
           {subject.category_name ? ` · ${subject.category_name}` : ""}
         </p>
@@ -131,18 +131,18 @@ const SubjectCard = ({
     </div>
 
     {subject.description && (
-      <p className="text-xs text-slate-500 dark:text-slate-400 mt-2 line-clamp-2">
+      <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 line-clamp-2">
         {subject.description}
       </p>
     )}
 
     {showGroups && subject.class_groups.length > 0 && (
       <div className="flex flex-wrap items-center gap-1 mt-2.5">
-        <Layers className="w-3 h-3 text-blue-400" />
+        <Layers className="w-3 h-3 text-gray-400" />
         {subject.class_groups.map((cg) => (
           <span
             key={cg.class_group_id}
-            className="px-2 py-0.5 bg-slate-100 dark:bg-slate-700/60 text-slate-600 dark:text-slate-300 rounded-full text-[11px]"
+            className="px-2 py-0.5 bg-gray-100 dark:bg-gray-700/60 text-gray-600 dark:text-gray-300 rounded-full text-[11px]"
           >
             {cg.name}
           </span>
@@ -151,7 +151,7 @@ const SubjectCard = ({
     )}
 
     <div className="mt-2.5">
-      <p className="text-[11px] text-blue-900/45 dark:text-blue-100/35 mb-1 flex items-center gap-1">
+      <p className="text-[11px] text-gray-400 dark:text-gray-500 mb-1 flex items-center gap-1">
         <UsersIcon className="w-3 h-3" />
         Teachers
       </p>
@@ -184,7 +184,8 @@ const SubjectRow = ({
     animate={{ opacity: 1, y: 0 }}
     exit={{ opacity: 0 }}
     transition={{ delay: Math.min(index, 12) * 0.015 }}
-    className="w-full text-left flex items-center gap-3 bg-white dark:bg-slate-800/60 rounded-2xl p-3 border border-blue-100/80 dark:border-slate-700/40 hover:border-blue-400 dark:hover:border-blue-600 transition-colors"
+    role="listitem"
+    className="w-full text-left flex items-center gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700/30 focus-visible:bg-gray-50 dark:focus-visible:bg-gray-700/30 outline-none transition-colors"
   >
     <div
       className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
@@ -193,10 +194,10 @@ const SubjectRow = ({
       <BookOpen className="w-4 h-4 text-white" />
     </div>
     <div className="min-w-0 flex-1">
-      <p className="text-sm font-semibold text-slate-900 dark:text-white truncate">
+      <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">
         {subject.name}
       </p>
-      <p className="text-xs text-blue-900/50 dark:text-blue-100/40 truncate">
+      <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
         {subject.code}
         {subject.class_groups.length > 0 &&
           ` · ${subject.class_groups.map((c) => c.name).join(", ")}`}
@@ -206,12 +207,12 @@ const SubjectRow = ({
       <TeacherChips subject={subject} />
     </div>
     <StatusPill status={subject.status} />
-    <ChevronRight className="w-4 h-4 text-blue-300 flex-shrink-0" />
+    <ChevronRight className="w-4 h-4 text-gray-300 dark:text-gray-600 flex-shrink-0" />
   </motion.button>
 );
 
 const CardSkeleton = () => (
-  <div className="h-44 rounded-2xl bg-gradient-to-br from-blue-50 via-white to-blue-50 dark:from-slate-800 dark:via-slate-800/50 dark:to-slate-800 border border-blue-100/70 dark:border-slate-700/40 animate-pulse" />
+  <div className="h-44 rounded-2xl bg-gray-100 dark:bg-gray-800/40 border border-gray-200 dark:border-gray-700/40 animate-pulse" />
 );
 
 const PageShell = ({ children }: { children: React.ReactNode }) => (
@@ -225,13 +226,13 @@ const PageShell = ({ children }: { children: React.ReactNode }) => (
 const Notice = ({ title, message }: { title: string; message: string }) => (
   <PageShell>
     <div className="text-center py-16">
-      <div className="w-14 h-14 rounded-2xl bg-blue-50 dark:bg-blue-950/50 flex items-center justify-center mx-auto mb-3">
-        <BookOpen className="w-7 h-7 text-blue-400" />
+      <div className="w-14 h-14 rounded-2xl bg-gray-100 dark:bg-gray-800/60 flex items-center justify-center mx-auto mb-3">
+        <BookOpen className="w-7 h-7 text-gray-400" />
       </div>
-      <h2 className="text-lg font-bold text-slate-900 dark:text-white mb-1">
+      <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-1">
         {title}
       </h2>
-      <p className="text-sm text-slate-500 dark:text-slate-400">{message}</p>
+      <p className="text-sm text-gray-500 dark:text-gray-400">{message}</p>
     </div>
   </PageShell>
 );
@@ -385,10 +386,10 @@ const ClassTeacherSubjectsPage: React.FC = () => {
         animate={{ opacity: 1, y: 0 }}
         className="mb-5"
       >
-        <h1 className="text-2xl font-bold text-slate-900 dark:text-white">
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
           Class Subjects
         </h1>
-        <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
+        <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
           {scope.isScoped
             ? `Subjects in ${scope.grades.map((g) => g.name).join(", ")}`
             : "Subjects across all grades"}
@@ -397,7 +398,7 @@ const ClassTeacherSubjectsPage: React.FC = () => {
       </motion.div>
 
       {/* Sticky so the filters stay reachable while scrolling a long list. */}
-      <div className="sticky top-0 z-20 -mx-4 md:-mx-6 px-4 md:px-6 py-3 bg-slate-50/85 dark:bg-slate-950/85 backdrop-blur-md border-b border-blue-100/70 dark:border-slate-800 mb-4">
+      <div className="sticky top-0 z-20 -mx-4 md:-mx-6 px-4 md:px-6 py-3 bg-gray-50/90 dark:bg-black/80 backdrop-blur-md border-b border-gray-200 dark:border-gray-700/40 mb-4">
         <SubjectFilterBar
           filters={filters}
           onChange={(next) => setFilters((prev) => ({ ...prev, ...next }))}
@@ -418,10 +419,10 @@ const ClassTeacherSubjectsPage: React.FC = () => {
         </div>
       ) : subjects.length === 0 ? (
         <div className="text-center py-16">
-          <div className="w-14 h-14 rounded-2xl bg-blue-50 dark:bg-blue-950/50 flex items-center justify-center mx-auto mb-3">
-            <SearchX className="w-7 h-7 text-blue-400" />
+          <div className="w-14 h-14 rounded-2xl bg-gray-100 dark:bg-gray-800/60 flex items-center justify-center mx-auto mb-3">
+            <SearchX className="w-7 h-7 text-gray-400" />
           </div>
-          <p className="text-sm text-slate-500 dark:text-slate-400">
+          <p className="text-sm text-gray-500 dark:text-gray-400">
             {hasFilters
               ? "No subject matches these filters."
               : "No subjects in your grades yet."}
@@ -454,7 +455,13 @@ const ClassTeacherSubjectsPage: React.FC = () => {
           </AnimatePresence>
         </motion.div>
       ) : (
-        <motion.div layout className="space-y-2">
+        // A list group: one bordered surface with divided rows, rather than a
+        // stack of separately-bordered cards pretending to be a list.
+        <motion.div
+          layout
+          role="list"
+          className="rounded-2xl border border-gray-200 dark:border-gray-700/40 bg-white dark:bg-gray-800/30 divide-y divide-gray-200 dark:divide-gray-700/40 overflow-hidden"
+        >
           <AnimatePresence mode="popLayout">
             {subjects.map((subject, index) => (
               <SubjectRow
@@ -469,8 +476,8 @@ const ClassTeacherSubjectsPage: React.FC = () => {
       )}
 
       {!loading && total > 0 && totalPages > 1 && (
-        <div className="mt-6 pt-4 border-t border-blue-100 dark:border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3">
-          <div className="text-sm text-slate-500">
+        <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700/40 flex flex-col sm:flex-row items-center justify-between gap-3">
+          <div className="text-sm text-gray-500">
             Showing {(page - 1) * PAGE_SIZE + 1}–
             {Math.min(page * PAGE_SIZE, total)} of {total}
           </div>
@@ -479,18 +486,18 @@ const ClassTeacherSubjectsPage: React.FC = () => {
               onClick={() => setPage((p) => Math.max(1, p - 1))}
               disabled={page === 1}
               aria-label="Previous page"
-              className="p-2 rounded-xl bg-white dark:bg-slate-800 border border-blue-100 dark:border-slate-700 disabled:opacity-40 disabled:cursor-not-allowed hover:border-blue-400 transition-colors"
+              className="p-2 rounded-xl bg-white dark:bg-gray-800/30 border border-gray-200 dark:border-gray-700/40 disabled:opacity-40 disabled:cursor-not-allowed hover:border-gray-300 dark:hover:border-gray-600 transition-colors"
             >
               <ChevronLeft className="w-4 h-4" />
             </button>
-            <span className="text-sm text-slate-500 tabular-nums">
+            <span className="text-sm text-gray-500 tabular-nums">
               Page {page} of {totalPages}
             </span>
             <button
               onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
               disabled={page === totalPages}
               aria-label="Next page"
-              className="p-2 rounded-xl bg-white dark:bg-slate-800 border border-blue-100 dark:border-slate-700 disabled:opacity-40 disabled:cursor-not-allowed hover:border-blue-400 transition-colors"
+              className="p-2 rounded-xl bg-white dark:bg-gray-800/30 border border-gray-200 dark:border-gray-700/40 disabled:opacity-40 disabled:cursor-not-allowed hover:border-gray-300 dark:hover:border-gray-600 transition-colors"
             >
               <ChevronRight className="w-4 h-4" />
             </button>

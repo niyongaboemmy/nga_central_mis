@@ -95,15 +95,15 @@ const StatTile = ({
     type="button"
     onClick={onClick}
     aria-label={`${value} ${label}`}
-    className="flex-1 min-w-[5.5rem] text-left rounded-2xl border border-blue-100 dark:border-blue-900/40 bg-white/95 dark:bg-slate-800/80 px-3 py-2.5 shadow-sm shadow-blue-900/5 hover:border-blue-400 dark:hover:border-blue-600 hover:shadow-md hover:-translate-y-0.5 transition-all"
+    className="flex-1 min-w-[5.5rem] text-left rounded-2xl border border-gray-200 dark:border-gray-700/40 bg-white dark:bg-gray-800/30 px-3 py-2.5 shadow-sm hover:border-gray-300 dark:hover:border-gray-600 hover:shadow-md hover:-translate-y-0.5 transition-all"
   >
     <div className="flex items-center gap-2">
-      <Icon className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-      <span className="text-lg font-bold text-blue-950 dark:text-blue-50 leading-none tabular-nums">
+      <Icon className="w-4 h-4 text-gray-400 dark:text-gray-500" />
+      <span className="text-lg font-bold text-gray-900 dark:text-white leading-none tabular-nums">
         {value}
       </span>
     </div>
-    <p className="text-[11px] font-medium text-blue-700/70 dark:text-blue-300/70 mt-1 truncate">
+    <p className="text-[11px] font-medium text-gray-500 dark:text-gray-400 mt-1 truncate">
       {label}
     </p>
   </button>
@@ -116,7 +116,7 @@ const Chip = ({
   children: React.ReactNode;
   icon?: React.ElementType;
 }) => (
-  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-100 dark:border-blue-900/50">
+  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-800/60 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700/40">
     {Icon && <Icon className="w-3 h-3" />}
     {children}
   </span>
@@ -129,9 +129,9 @@ const Card = ({
   title?: string;
   children: React.ReactNode;
 }) => (
-  <section className="rounded-2xl border border-blue-100 dark:border-blue-900/40 bg-white dark:bg-slate-800/50 p-4">
+  <section className="rounded-2xl border border-gray-200 dark:border-gray-700/40 bg-white dark:bg-gray-800/30 p-4">
     {title && (
-      <p className="text-[11px] font-semibold uppercase tracking-wider text-blue-500 mb-2">
+      <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-400 mb-2">
         {title}
       </p>
     )}
@@ -147,10 +147,10 @@ const Empty = ({
   children: React.ReactNode;
 }) => (
   <div className="text-center py-12 px-6">
-    <div className="w-12 h-12 rounded-2xl bg-blue-50 dark:bg-blue-950/50 flex items-center justify-center mx-auto mb-3">
-      <Icon className="w-6 h-6 text-blue-400 dark:text-blue-600" />
+    <div className="w-12 h-12 rounded-2xl bg-gray-100 dark:bg-gray-800/60 flex items-center justify-center mx-auto mb-3">
+      <Icon className="w-6 h-6 text-gray-400 dark:text-gray-500" />
     </div>
-    <p className="text-sm text-blue-900/55 dark:text-blue-100/45">{children}</p>
+    <p className="text-sm text-gray-500 dark:text-gray-400">{children}</p>
   </div>
 );
 
@@ -159,7 +159,7 @@ const Skeleton = () => (
     {[...Array(4)].map((_, i) => (
       <div
         key={i}
-        className="h-16 rounded-2xl bg-gradient-to-r from-blue-50 via-blue-100/70 to-blue-50 dark:from-blue-950/40 dark:via-blue-900/30 dark:to-blue-950/40 animate-pulse"
+        className="h-16 rounded-2xl bg-gray-100 dark:bg-gray-800/50 animate-pulse"
       />
     ))}
   </div>
@@ -168,14 +168,14 @@ const Skeleton = () => (
 const SCHEME_STATUS = {
   APPROVED: {
     icon: CheckCircle2,
-    pill: "bg-blue-600 text-white",
-    rail: "border-blue-600",
+    pill: "bg-green-600 text-white",
+    rail: "border-green-500",
     label: "Approved",
   },
   PENDING: {
     icon: AlertCircle,
-    pill: "bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300",
-    rail: "border-blue-300 dark:border-blue-700",
+    pill: "bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400",
+    rail: "border-amber-400",
     label: "Pending",
   },
   REJECTED: {
@@ -352,7 +352,7 @@ const SubjectDetailsPanel: React.FC<SubjectDetailsPanelProps> = ({
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 z-[60] bg-blue-950/60 backdrop-blur-sm flex justify-end"
+        className="fixed inset-0 z-[60] bg-gray-900/70 dark:bg-black/70 backdrop-blur-sm flex justify-end"
         onClick={onClose}
       >
         <motion.aside
@@ -364,63 +364,59 @@ const SubjectDetailsPanel: React.FC<SubjectDetailsPanelProps> = ({
           exit={{ x: "100%" }}
           transition={{ type: "spring", damping: 32, stiffness: 320 }}
           onClick={(e) => e.stopPropagation()}
-          className="w-full sm:max-w-lg lg:max-w-xl h-full bg-slate-50 dark:bg-slate-900 shadow-2xl flex flex-col sm:rounded-l-3xl overflow-hidden"
+          className="w-full sm:max-w-lg lg:max-w-xl h-full bg-gray-50 dark:bg-gray-900 shadow-2xl flex flex-col sm:rounded-l-3xl overflow-hidden"
         >
           {/* Header */}
-          <header className="relative bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 px-5 pt-5 pb-4 text-white flex-shrink-0">
-            {/* Soft highlight so the flat gradient reads as a surface. */}
-            <div
-              aria-hidden="true"
-              className="absolute inset-0 opacity-40 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.35),transparent_60%)]"
-            />
-            <div className="relative">
-              <button
-                type="button"
-                onClick={onClose}
-                aria-label="Close subject details"
-                className="absolute top-0 right-0 p-2 rounded-xl bg-white/15 hover:bg-white/30 active:scale-95 transition-all"
-              >
-                <X className="w-4 h-4" />
-              </button>
+          {/* Header sits on the panel's own surface rather than a saturated
+              blue block -- the accent is carried by the icon tile alone, so
+              the colour marks the subject instead of flooding the drawer. */}
+          <header className="relative bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700/40 px-5 pt-5 pb-4 flex-shrink-0">
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close subject details"
+              className="absolute top-5 right-5 p-2 rounded-xl text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 active:scale-95 transition-all"
+            >
+              <X className="w-4 h-4" />
+            </button>
 
-              <div className="flex items-start gap-3.5 pr-12">
-                <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur ring-1 ring-white/25 flex items-center justify-center flex-shrink-0">
-                  <BookOpen className="w-6 h-6" />
-                </div>
-                <div className="min-w-0 pt-0.5">
-                  <h2 className="text-lg sm:text-xl font-bold leading-snug break-words">
-                    {subject.name}
-                  </h2>
-                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1.5 text-xs text-white/85">
-                    {subject.code && (
-                      <span className="inline-flex items-center gap-1 font-medium">
-                        <Hash className="w-3 h-3" />
-                        {subject.code}
-                      </span>
-                    )}
-                    {detail?.subject?.category_name && (
-                      <span className="inline-flex items-center gap-1">
-                        <Layers className="w-3 h-3" />
-                        {detail.subject.category_name}
-                      </span>
-                    )}
-                    <span
-                      className={`px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wide ${
-                        subject.status === "ACTIVE"
-                          ? "bg-white/25 ring-1 ring-white/30"
-                          : "bg-rose-500/90"
-                      }`}
-                    >
-                      {subject.status}
+            <div className="flex items-start gap-3.5 pr-12">
+              <div className="w-12 h-12 rounded-2xl bg-blue-500/10 dark:bg-blue-500/15 text-blue-600 dark:text-blue-400 flex items-center justify-center flex-shrink-0">
+                <BookOpen className="w-6 h-6" />
+              </div>
+              <div className="min-w-0 pt-0.5">
+                <h2 className="text-lg sm:text-xl font-bold leading-snug break-words text-gray-900 dark:text-white">
+                  {subject.name}
+                </h2>
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1.5 text-xs text-gray-500 dark:text-gray-400">
+                  {subject.code && (
+                    <span className="inline-flex items-center gap-1 font-medium">
+                      <Hash className="w-3 h-3" />
+                      {subject.code}
                     </span>
-                  </div>
+                  )}
+                  {detail?.subject?.category_name && (
+                    <span className="inline-flex items-center gap-1">
+                      <Layers className="w-3 h-3" />
+                      {detail.subject.category_name}
+                    </span>
+                  )}
+                  <span
+                    className={`px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wide ${
+                      subject.status === "ACTIVE"
+                        ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                        : "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400"
+                    }`}
+                  >
+                    {subject.status}
+                  </span>
                 </div>
               </div>
             </div>
           </header>
 
           {/* Stat strip — tiles jump to their tab */}
-          <div className="flex flex-wrap gap-2 px-4 sm:px-5 -mt-3 relative z-10 flex-shrink-0">
+          <div className="flex flex-wrap gap-2 px-4 sm:px-5 mt-3 flex-shrink-0">
             <StatTile
               icon={Layers}
               value={classGroups.length}
@@ -447,7 +443,7 @@ const SubjectDetailsPanel: React.FC<SubjectDetailsPanelProps> = ({
             role="tablist"
             aria-label="Subject sections"
             onKeyDown={onTabKeyDown}
-            className="grid grid-cols-4 gap-1 mx-4 sm:mx-5 mt-3 p-1 rounded-2xl bg-blue-100/60 dark:bg-blue-950/50 flex-shrink-0"
+            className="grid grid-cols-4 gap-1 mx-4 sm:mx-5 mt-3 p-1 rounded-2xl bg-gray-100 dark:bg-gray-800/50 flex-shrink-0"
           >
             {TABS.map(({ key, label, icon: Icon, count }) => {
               const active = tab === key;
@@ -473,7 +469,7 @@ const SubjectDetailsPanel: React.FC<SubjectDetailsPanelProps> = ({
                     className={`relative flex items-center gap-1 ${
                       active
                         ? "text-white"
-                        : "text-blue-700/70 dark:text-blue-300/70"
+                        : "text-gray-500 dark:text-gray-400"
                     }`}
                   >
                     <Icon className="w-4 h-4" />
@@ -482,7 +478,7 @@ const SubjectDetailsPanel: React.FC<SubjectDetailsPanelProps> = ({
                         className={`text-[10px] font-bold tabular-nums px-1.5 rounded-full ${
                           active
                             ? "bg-white/25"
-                            : "bg-white/70 dark:bg-blue-900/60"
+                            : "bg-gray-200 dark:bg-gray-700/60"
                         }`}
                       >
                         {count}
@@ -493,7 +489,7 @@ const SubjectDetailsPanel: React.FC<SubjectDetailsPanelProps> = ({
                     className={`relative text-[11px] font-semibold ${
                       active
                         ? "text-white"
-                        : "text-blue-700/70 dark:text-blue-300/70"
+                        : "text-gray-500 dark:text-gray-400"
                     }`}
                   >
                     {label}
@@ -523,7 +519,7 @@ const SubjectDetailsPanel: React.FC<SubjectDetailsPanelProps> = ({
                     <div className="space-y-3">
                       {subject.description && (
                         <Card title="Description">
-                          <p className="text-sm text-slate-700 dark:text-slate-200 leading-relaxed">
+                          <p className="text-sm text-gray-700 dark:text-gray-200 leading-relaxed">
                             {subject.description}
                           </p>
                         </Card>
@@ -540,7 +536,7 @@ const SubjectDetailsPanel: React.FC<SubjectDetailsPanelProps> = ({
                             ))}
                           </div>
                         ) : (
-                          <p className="text-xs text-blue-900/50 dark:text-blue-100/40 italic">
+                          <p className="text-xs text-gray-500 dark:text-gray-400 italic">
                             Not linked to any of your class groups.
                           </p>
                         )}
@@ -549,15 +545,15 @@ const SubjectDetailsPanel: React.FC<SubjectDetailsPanelProps> = ({
                       {weeklyMinutes > 0 && (
                         <Card title="Weekly load">
                           <div className="flex items-center gap-4">
-                            <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-blue-900 dark:text-blue-100">
-                              <CalendarDays className="w-4 h-4 text-blue-600" />
+                            <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-gray-900 dark:text-white">
+                              <CalendarDays className="w-4 h-4 text-gray-400" />
                               {detail?.schedule.length}{" "}
                               {detail?.schedule.length === 1
                                 ? "period"
                                 : "periods"}
                             </span>
-                            <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-blue-900 dark:text-blue-100">
-                              <Timer className="w-4 h-4 text-blue-600" />
+                            <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-gray-900 dark:text-white">
+                              <Timer className="w-4 h-4 text-gray-400" />
                               {Math.floor(weeklyMinutes / 60)}h{" "}
                               {weeklyMinutes % 60}m
                             </span>
@@ -578,7 +574,7 @@ const SubjectDetailsPanel: React.FC<SubjectDetailsPanelProps> = ({
                               return (
                                 <div
                                   key={scheme.scheme_id}
-                                  className={`flex items-center gap-3 p-2.5 rounded-xl border-l-4 ${config.rail} bg-blue-50/60 dark:bg-blue-950/30`}
+                                  className={`flex items-center gap-3 p-2.5 rounded-xl border-l-4 ${config.rail} bg-gray-50 dark:bg-gray-800/40`}
                                 >
                                   <span
                                     className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-semibold flex-shrink-0 ${config.pill}`}
@@ -587,13 +583,13 @@ const SubjectDetailsPanel: React.FC<SubjectDetailsPanelProps> = ({
                                     {config.label}
                                   </span>
                                   <div className="min-w-0">
-                                    <p className="text-sm text-slate-800 dark:text-slate-100 truncate">
+                                    <p className="text-sm text-gray-800 dark:text-gray-100 truncate">
                                       {scheme.class_group_name}
                                       {scheme.term_name
                                         ? ` · ${scheme.term_name}`
                                         : ""}
                                     </p>
-                                    <p className="text-xs text-blue-900/50 dark:text-blue-100/40 truncate">
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
                                       {scheme.teacher_name}
                                     </p>
                                   </div>
@@ -602,7 +598,7 @@ const SubjectDetailsPanel: React.FC<SubjectDetailsPanelProps> = ({
                             })}
                           </div>
                         ) : (
-                          <p className="text-xs text-blue-900/50 dark:text-blue-100/40 italic">
+                          <p className="text-xs text-gray-500 dark:text-gray-400 italic">
                             No scheme of work submitted yet.
                           </p>
                         )}
@@ -620,13 +616,13 @@ const SubjectDetailsPanel: React.FC<SubjectDetailsPanelProps> = ({
                         teachers.map((t: any) => (
                           <div
                             key={t.user_id}
-                            className="flex items-start gap-3 p-3 rounded-2xl border border-blue-100 dark:border-blue-900/40 bg-white dark:bg-slate-800/50 hover:border-blue-300 dark:hover:border-blue-700 transition-colors"
+                            className="flex items-start gap-3 p-3 rounded-2xl border border-gray-200 dark:border-gray-700/40 bg-white dark:bg-gray-800/30 hover:border-gray-300 dark:hover:border-gray-600 transition-colors"
                           >
-                            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white flex items-center justify-center text-xs font-bold flex-shrink-0">
+                            <div className="w-10 h-10 rounded-xl bg-blue-500/10 dark:bg-blue-500/15 text-blue-600 dark:text-blue-400 flex items-center justify-center text-xs font-bold flex-shrink-0">
                               {initialsOf(teacherName(t))}
                             </div>
                             <div className="min-w-0 flex-1">
-                              <p className="text-sm font-semibold text-slate-900 dark:text-white break-words">
+                              <p className="text-sm font-semibold text-gray-900 dark:text-white break-words">
                                 {teacherName(t)}
                               </p>
                               {t.class_groups?.length > 0 && (
@@ -644,7 +640,7 @@ const SubjectDetailsPanel: React.FC<SubjectDetailsPanelProps> = ({
                                 {t.email && (
                                   <a
                                     href={`mailto:${t.email}`}
-                                    className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/60 transition-colors max-w-full"
+                                    className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs bg-gray-100 dark:bg-gray-800/60 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700/60 transition-colors max-w-full"
                                   >
                                     <Mail className="w-3 h-3 flex-shrink-0" />
                                     <span className="truncate">{t.email}</span>
@@ -653,7 +649,7 @@ const SubjectDetailsPanel: React.FC<SubjectDetailsPanelProps> = ({
                                 {t.phone_number && (
                                   <a
                                     href={`tel:${t.phone_number}`}
-                                    className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/60 transition-colors"
+                                    className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs bg-gray-100 dark:bg-gray-800/60 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700/60 transition-colors"
                                   >
                                     <Phone className="w-3 h-3" />
                                     {t.phone_number}
@@ -670,13 +666,13 @@ const SubjectDetailsPanel: React.FC<SubjectDetailsPanelProps> = ({
                   {tab === "students" && (
                     <div className="space-y-2">
                       <div className="relative mb-3">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-400" />
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                         <input
                           type="text"
                           value={studentSearch}
                           onChange={(e) => setStudentSearch(e.target.value)}
                           placeholder="Filter students..."
-                          className="w-full pl-10 pr-3 py-2.5 rounded-xl border border-blue-100 dark:border-blue-900/40 bg-white dark:bg-slate-800 text-sm dark:text-white placeholder:text-blue-400/70 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 transition-shadow"
+                          className="w-full pl-10 pr-3 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700/40 bg-white dark:bg-gray-800/30 text-sm dark:text-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 transition-shadow"
                         />
                       </div>
                       {students.length === 0 ? (
@@ -689,19 +685,19 @@ const SubjectDetailsPanel: React.FC<SubjectDetailsPanelProps> = ({
                         students.map((s, i) => (
                           <div
                             key={`${s.user_id}-${s.class_group_id}`}
-                            className="flex items-center gap-3 p-2.5 rounded-2xl border border-blue-100 dark:border-blue-900/40 bg-white dark:bg-slate-800/50 hover:border-blue-300 dark:hover:border-blue-700 transition-colors"
+                            className="flex items-center gap-3 p-2.5 rounded-2xl border border-gray-200 dark:border-gray-700/40 bg-white dark:bg-gray-800/30 hover:border-gray-300 dark:hover:border-gray-600 transition-colors"
                           >
-                            <span className="w-6 text-[11px] font-semibold text-blue-400 tabular-nums text-right flex-shrink-0">
+                            <span className="w-6 text-[11px] font-semibold text-gray-400 tabular-nums text-right flex-shrink-0">
                               {i + 1}
                             </span>
-                            <div className="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 flex items-center justify-center text-[11px] font-bold flex-shrink-0">
+                            <div className="w-8 h-8 rounded-lg bg-gray-200 dark:bg-gray-700/50 text-gray-600 dark:text-gray-300 flex items-center justify-center text-[11px] font-bold flex-shrink-0">
                               {initialsOf(s.full_name)}
                             </div>
                             <div className="min-w-0 flex-1">
-                              <p className="text-sm font-medium text-slate-900 dark:text-white truncate">
+                              <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
                                 {s.full_name}
                               </p>
-                              <p className="text-xs text-blue-900/50 dark:text-blue-100/40 truncate">
+                              <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
                                 {s.email}
                               </p>
                             </div>
@@ -717,7 +713,7 @@ const SubjectDetailsPanel: React.FC<SubjectDetailsPanelProps> = ({
                   {tab === "schedule" && (
                     <div className="space-y-4">
                       {periodLabel && scheduleByDay.length > 0 && (
-                        <p className="text-[11px] text-blue-500 font-medium">
+                        <p className="text-[11px] text-gray-400 font-medium">
                           Showing {periodLabel}
                         </p>
                       )}
@@ -730,11 +726,11 @@ const SubjectDetailsPanel: React.FC<SubjectDetailsPanelProps> = ({
                         scheduleByDay.map(([day, slots]) => (
                           <div key={day}>
                             <div className="flex items-center gap-2 mb-2">
-                              <span className="text-[11px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">
+                              <span className="text-[11px] font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
                                 {DAY_NAMES[day] ?? `Day ${day}`}
                               </span>
-                              <span className="flex-1 h-px bg-blue-100 dark:bg-blue-900/50" />
-                              <span className="text-[11px] text-blue-400 tabular-nums">
+                              <span className="flex-1 h-px bg-gray-200 dark:bg-gray-700/50" />
+                              <span className="text-[11px] text-gray-400 tabular-nums">
                                 {slots.length}
                               </span>
                             </div>
@@ -742,13 +738,13 @@ const SubjectDetailsPanel: React.FC<SubjectDetailsPanelProps> = ({
                               {slots.map((slot) => (
                                 <div
                                   key={slot.slot_id}
-                                  className="flex items-start gap-3 p-3 rounded-2xl border border-blue-100 dark:border-blue-900/40 bg-white dark:bg-slate-800/50 hover:border-blue-300 dark:hover:border-blue-700 transition-colors"
+                                  className="flex items-start gap-3 p-3 rounded-2xl border border-gray-200 dark:border-gray-700/40 bg-white dark:bg-gray-800/30 hover:border-gray-300 dark:hover:border-gray-600 transition-colors"
                                 >
                                   <div className="flex flex-col items-center flex-shrink-0">
-                                    <span className="text-sm font-bold text-blue-700 dark:text-blue-300 tabular-nums whitespace-nowrap">
+                                    <span className="text-sm font-bold text-gray-600 dark:text-gray-300 tabular-nums whitespace-nowrap">
                                       {slot.start_time}–{slot.end_time}
                                     </span>
-                                    <span className="inline-flex items-center gap-1 text-[10px] text-blue-400 mt-0.5">
+                                    <span className="inline-flex items-center gap-1 text-[10px] text-gray-400 mt-0.5">
                                       <Clock className="w-2.5 h-2.5" />
                                       {minutesBetween(
                                         slot.start_time,
@@ -758,10 +754,10 @@ const SubjectDetailsPanel: React.FC<SubjectDetailsPanelProps> = ({
                                     </span>
                                   </div>
                                   <div className="min-w-0 flex-1">
-                                    <p className="text-sm font-medium text-slate-800 dark:text-slate-100 truncate">
+                                    <p className="text-sm font-medium text-gray-800 dark:text-gray-100 truncate">
                                       {slot.teacher_name || "Unassigned"}
                                     </p>
-                                    <p className="text-xs text-blue-900/50 dark:text-blue-100/40 truncate flex items-center gap-2 flex-wrap">
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 truncate flex items-center gap-2 flex-wrap">
                                       {slot.class_group_name}
                                       {slot.location && (
                                         <span className="inline-flex items-center gap-1">
@@ -784,8 +780,8 @@ const SubjectDetailsPanel: React.FC<SubjectDetailsPanelProps> = ({
             )}
           </div>
 
-          <footer className="px-5 py-3 border-t border-blue-100 dark:border-blue-950/60 bg-white/70 dark:bg-slate-900/70 flex-shrink-0">
-            <p className="text-[11px] text-blue-900/40 dark:text-blue-100/30 text-center">
+          <footer className="px-5 py-3 border-t border-gray-200 dark:border-gray-700/40 bg-white dark:bg-gray-900/60 flex-shrink-0">
+            <p className="text-[11px] text-gray-400 dark:text-gray-500 text-center">
               Read-only view, scoped to your assigned grades.
             </p>
           </footer>
