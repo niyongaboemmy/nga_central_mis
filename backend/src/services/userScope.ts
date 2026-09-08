@@ -91,6 +91,35 @@ export const resolveUserScope = async (
 
   const programIds = unique(programAssignments.map((p) => p.program_id));
   if (programIds.length === 0) {
+    // Nothing for *this* year. Before falling back to "unscoped", check
+    // whether this user is scoped in any other year: a class teacher who
+    // switches the period selector to a year they were not assigned to must
+    // see nothing there, not the whole school. Only a user with no assignment
+    // in any year at all is a genuine admin.
+    const [everAssigned] = await db
+      .select({ user_id: UserGrade.user_id })
+      .from(UserGrade)
+      .where(eq(UserGrade.user_id, userId))
+      .limit(1);
+
+    const [everLead] = everAssigned
+      ? [undefined]
+      : await db
+          .select({ user_id: UserProgramLead.user_id })
+          .from(UserProgramLead)
+          .where(eq(UserProgramLead.user_id, userId))
+          .limit(1);
+
+    if (everAssigned || everLead) {
+      return {
+        scoped: true,
+        gradeIds: [],
+        classGroupIds: [],
+        programIds: [],
+        academicYearId: yearId,
+      };
+    }
+
     return UNSCOPED(yearId);
   }
 

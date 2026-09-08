@@ -38,6 +38,7 @@ router.get(
     "MANAGE_ACADEMIC_CALENDAR",
     "VIEW_ACADEMIC_CALENDAR",
     "UPDATE_CALENDAR_SLOT",
+    "VIEW_CALENDAR_BY_CLASS_TEACHER_GRADE",
   ]),
   asyncHandler(getCalendarSlots),
 );
@@ -68,6 +69,7 @@ router.get(
     "MANAGE_ACADEMIC_CALENDAR",
     "CREATE_ACADEMIC_CALENDAR",
     "UPDATE_CALENDAR_SLOT",
+    "VIEW_CALENDAR_BY_CLASS_TEACHER_GRADE",
   ]),
   asyncHandler(getCalendarSetupData),
 );
@@ -80,6 +82,7 @@ router.get(
     "MANAGE_ACADEMIC_CALENDAR",
     "VIEW_ACADEMIC_CALENDAR",
     "VIEW_MY_CALENDAR",
+    "VIEW_CALENDAR_BY_CLASS_TEACHER_GRADE",
   ]),
   asyncHandler(getCalendarActivities),
 );
@@ -161,6 +164,7 @@ router.get(
     "MANAGE_ACADEMIC_CALENDAR",
     "VIEW_ACADEMIC_CALENDAR",
     "CREATE_ACADEMIC_CALENDAR",
+    "VIEW_CALENDAR_BY_CLASS_TEACHER_GRADE",
   ]),
   asyncHandler(getCalendarClassGroups),
 );
@@ -179,6 +183,7 @@ router.get(
     "VIEW_ACADEMIC_CALENDAR",
     "CREATE_ACADEMIC_CALENDAR",
     "UPDATE_CALENDAR_SLOT",
+    "VIEW_CALENDAR_BY_CLASS_TEACHER_GRADE",
   ]),
   asyncHandler(getAcademicCalendars),
 );
@@ -190,6 +195,7 @@ router.get(
     "VIEW_ACADEMIC_CALENDAR",
     "CREATE_ACADEMIC_CALENDAR",
     "UPDATE_CALENDAR_SLOT",
+    "VIEW_CALENDAR_BY_CLASS_TEACHER_GRADE",
   ]),
   asyncHandler(getAcademicCalendar),
 );

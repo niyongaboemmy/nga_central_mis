@@ -1,5 +1,5 @@
 import { db } from "../db";
-import { eq, and, or, sql, desc, lte, gte, SQL, inArray } from "drizzle-orm";
+import { eq, and, or, sql, desc, lte, gte, isNull, SQL, inArray } from "drizzle-orm";
 import {
   CalendarSlot,
   CalendarNotification,
@@ -58,6 +58,59 @@ const assertClassGroupWritable = async (
       "This class group is outside your assigned class groups",
     );
   }
+};
+
+/**
+ * The same rule applied to reads.
+ *
+ * Writes have been scope-guarded since 066, but the list endpoints were not:
+ * MANAGE_ACADEMIC_CALENDAR is enough to pass `authorize()`, and CLASS_TEACHER
+ * holds it, so a class teacher asking for a term's slots got back every class
+ * group in the school. Returns the class group ids a caller may read, or null
+ * when they are unscoped (an admin) and may read everything.
+ *
+ * A scoped caller assigned to nothing gets an empty list rather than null --
+ * "assigned to nothing" must resolve to no rows, never to all of them.
+ */
+const readableClassGroupIds = async (
+  req: any,
+  academicYearId?: number | null,
+): Promise<number[] | null> => {
+  const scope = await resolveUserScope(req.user?.userId, academicYearId);
+  return scope.scoped ? scope.classGroupIds : null;
+};
+
+/**
+ * The academic year a calendar request is about.
+ *
+ * Class-teacher assignments are per year, so the scope has to be resolved
+ * against the year being *viewed*, not whichever year happens to be flagged
+ * current -- otherwise last term's calendar is judged against this year's
+ * assignments and the caller silently reads as unscoped.
+ */
+const academicYearForRequest = async (params: {
+  calendarId?: number | null;
+  academicTermId?: number | null;
+}): Promise<number | undefined> => {
+  if (params.calendarId) {
+    const [calendar] = await db
+      .select({ academic_year_id: AcademicCalendar.academic_year_id })
+      .from(AcademicCalendar)
+      .where(eq(AcademicCalendar.calendar_id, params.calendarId))
+      .limit(1);
+    if (calendar?.academic_year_id) return calendar.academic_year_id;
+  }
+
+  if (params.academicTermId) {
+    const [term] = await db
+      .select({ academic_year_id: AcademicTerm.academic_year_id })
+      .from(AcademicTerm)
+      .where(eq(AcademicTerm.academic_term_id, params.academicTermId))
+      .limit(1);
+    if (term?.academic_year_id) return term.academic_year_id;
+  }
+
+  return undefined;
 };
 
 // Helper function to format date for MySQL
@@ -140,6 +193,28 @@ export const getCalendarSlots = asyncHandler(async (req: any, res: any) => {
     if (!isNaN(day)) {
       filters.push(eq(CalendarSlot.day_of_week, day));
     }
+  }
+
+  // Confine a class teacher / program lead to their own class groups. Matched
+  // through the calendar (a slot's own class_group_id is only a denormalised
+  // copy) so the scope can't be side-stepped by a stale value.
+  const allowedClassGroups = await readableClassGroupIds(
+    req,
+    await academicYearForRequest({
+      calendarId: calendar_id ? parseInt(calendar_id) : null,
+      academicTermId: academic_term_id ? parseInt(academic_term_id) : null,
+    }),
+  );
+  if (allowedClassGroups !== null) {
+    if (allowedClassGroups.length === 0) {
+      return successResponse(res, "Calendar slots retrieved successfully", []);
+    }
+    filters.push(
+      sql`COALESCE(${AcademicCalendar.class_group_id}, ${CalendarSlot.class_group_id}) IN (${sql.join(
+        allowedClassGroups.map((id) => sql`${id}`),
+        sql`, `,
+      )})`,
+    );
   }
 
   // Only show active slots
@@ -709,6 +784,25 @@ export const getCalendarActivities = asyncHandler(
     }
     if (day_of_week !== undefined) {
       filters.push(eq(CalendarActivity.day_of_week, parseInt(day_of_week)));
+    }
+
+    // School-wide activities (no class group) stay visible to everyone; the
+    // ones pinned to a class group follow the same confinement as slots.
+    const allowedClassGroups = await readableClassGroupIds(
+      req,
+      await academicYearForRequest({
+        academicTermId: academic_term_id ? parseInt(academic_term_id) : null,
+      }),
+    );
+    if (allowedClassGroups !== null) {
+      filters.push(
+        allowedClassGroups.length === 0
+          ? isNull(CalendarActivity.class_group_id)
+          : or(
+              isNull(CalendarActivity.class_group_id),
+              inArray(CalendarActivity.class_group_id, allowedClassGroups),
+            )!,
+      );
     }
 
     let activities = await db
@@ -1663,6 +1757,25 @@ export const getAcademicCalendars = asyncHandler(async (req: any, res: any) => {
   }
   if (is_active !== undefined) {
     filters.push(eq(AcademicCalendar.is_active, parseInt(is_active)));
+  }
+
+  // Same confinement the slot list applies: a class teacher may only list the
+  // calendars of the class groups they were assigned.
+  const allowedClassGroups = await readableClassGroupIds(
+    req,
+    academic_year_id ? parseInt(academic_year_id) : undefined,
+  );
+  if (allowedClassGroups !== null) {
+    if (allowedClassGroups.length === 0) {
+      return successResponse(
+        res,
+        "Academic calendars retrieved successfully",
+        [],
+      );
+    }
+    filters.push(
+      inArray(AcademicCalendar.class_group_id, allowedClassGroups),
+    );
   }
 
   const calendars = await db

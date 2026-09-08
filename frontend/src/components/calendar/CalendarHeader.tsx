@@ -5,6 +5,10 @@ import type { AcademicCalendar } from "../../api/calendar";
 
 interface CalendarHeaderProps {
   isAdmin: boolean | undefined;
+  /** Overrides the heading, so an embedding page (the class teacher's own
+   *  Class Calendar) titles the grid itself instead of stacking a second
+   *  header of its own above it. */
+  title?: string;
   isStudent: boolean | undefined;
   academicYears: any[];
   academicTerms: AcademicTerm[];
@@ -35,6 +39,7 @@ interface CalendarHeaderProps {
 
 const CalendarHeader: React.FC<CalendarHeaderProps> = ({
   isAdmin,
+  title,
   isStudent,
   academicYears,
   academicTerms,
@@ -55,6 +60,7 @@ const CalendarHeader: React.FC<CalendarHeaderProps> = ({
   isCreatingCalendar,
 }) => {
   const getTitle = () => {
+    if (title) return title;
     if (isAdmin) return "Academic Calendar";
     if (isStudent) return "My Class Schedule";
     return "My Teaching Calendar";

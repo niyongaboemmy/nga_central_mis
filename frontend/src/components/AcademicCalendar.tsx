@@ -49,10 +49,14 @@ import {
 
 interface AcademicCalendarProps {
   isAdminView?: boolean;
+  /** Heading for the grid. Lets an embedding page name it ("Class Calendar")
+   *  rather than adding a second header above the component's own. */
+  title?: string;
 }
 
 const AcademicCalendar: React.FC<AcademicCalendarProps> = ({
   isAdminView = false,
+  title,
 }) => {
   const { user } = useUser();
   const { showToast } = useToast();
@@ -88,9 +92,23 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({
     ),
   );
 
+  // A class teacher reaches the same grid through their own "Class Calendar"
+  // entry. The server confines every calendar read to their assigned class
+  // groups (resolveUserScope), so this only decides whether the weekly grid
+  // renders at all -- never how much of the school it can show.
+  const hasClassTeacherCalendar = user?.roles?.some((role) =>
+    role.permissions?.some(
+      (perm) => perm.name === Permissions.VIEW_CALENDAR_BY_CLASS_TEACHER_GRADE,
+    ),
+  );
+
   const canManage = isAdminView || canManageCalendar;
   const canViewAll =
-    canManage || hasViewCalendar || canCreateCalendar || canUpdateSlot;
+    canManage ||
+    hasViewCalendar ||
+    canCreateCalendar ||
+    canUpdateSlot ||
+    hasClassTeacherCalendar;
   const canEdit = canUpdateSlot;
   const canCreate = canCreateCalendar;
   const isBroadView = canViewAll;
@@ -896,6 +914,7 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({
       <div className="flex items-center justify-between mb-6">
         <CalendarHeader
           isAdmin={isBroadView}
+          title={title}
           canEdit={canEdit}
           canCreate={canCreate}
           isStudent={isStudent}

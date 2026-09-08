@@ -28,6 +28,7 @@ import ProgramUsersPage from "./components/ProgramUsersPage";
 import ProgramAcademicPage from "./components/ProgramAcademicPage";
 import ClassTeacherUsersPage from "./components/ClassTeacherUsersPage";
 import ClassTeacherSubjectsPage from "./components/ClassTeacherSubjectsPage";
+import ClassTeacherCalendarPage from "./components/ClassTeacherCalendarPage";
 import Schools from "./components/Schools";
 import Systems from "./components/Systems";
 import SystemDetails from "./components/SystemDetails";
@@ -216,6 +217,12 @@ const ClassTeacherUsersPageWrapper: React.FC = () => {
 // Class Teacher Subjects page with sidebar
 const ClassTeacherSubjectsPageWrapper: React.FC = () => {
   return <ClassTeacherSubjectsPage />;
+};
+
+// Class Teacher Calendar page with sidebar — the weekly timetable of the
+// class group the signed-in teacher is assigned to.
+const ClassTeacherCalendarPageWrapper: React.FC = () => {
+  return <ClassTeacherCalendarPage />;
 };
 
 // Initialize toast store for API interceptor
@@ -507,6 +514,18 @@ function App() {
             />
 
             {/* Class Teacher Subjects page - protected with sidebar */}
+            {/* Class Calendar - class teacher's own class group timetable */}
+            <Route
+              path="/class-calendar"
+              element={
+                <ProtectedRoute>
+                  <SystemLayoutWrapper>
+                    <ClassTeacherCalendarPageWrapper />
+                  </SystemLayoutWrapper>
+                </ProtectedRoute>
+              }
+            />
+
             <Route
               path="/class-subjects"
               element={
