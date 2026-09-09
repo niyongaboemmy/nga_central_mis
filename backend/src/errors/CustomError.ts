@@ -43,8 +43,11 @@ export class NotFoundError extends CustomError {
 }
 
 export class ConflictError extends CustomError {
-  constructor(message: string = "Resource conflict") {
+  public errors: any[];
+
+  constructor(message: string = "Resource conflict", errors: any[] = []) {
     super(message, 409);
+    this.errors = errors;
   }
 }
 

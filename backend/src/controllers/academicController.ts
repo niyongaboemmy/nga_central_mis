@@ -19,6 +19,13 @@ import {
   UserRole,
   Role,
   SchemeOfWork,
+  UserGrade,
+  AcademicCalendar,
+  CalendarSlot,
+  CalendarActivity,
+  InstructorReport,
+  LessonReport,
+  LessonNote,
 } from "../db/schema";
 import { sanitizeString } from "../utils/sanitization";
 import {
@@ -2777,6 +2784,148 @@ export const updateClassGroup = asyncHandler(async (req: any, res: any) => {
   successResponse(res, "Class group updated successfully");
 });
 
+// Everything in the database that points at a ClassGroup, in one place --
+// a new class_group_id column belongs on this list, so a delete reports it
+// up front instead of surfacing as a raw FK error from MySQL.
+//
+// "blocking" rows are authored academic records (schemes of work, reports,
+// notes): a delete must never destroy them, so it refuses and names them.
+// The rest are assignment/config rows -- who sits in the class group and
+// what its timetable looks like -- which are meaningless once the class
+// group is gone, so a confirmed delete clears them in the same transaction.
+interface ClassGroupDependency {
+  key: string;
+  label: string;
+  count: number;
+  blocking: boolean;
+}
+
+// One round trip rather than ten: the production pool deliberately runs on
+// a single connection, so counting each table in its own query would just
+// queue behind itself.
+const getClassGroupDependencies = async (
+  classGroupId: number,
+): Promise<ClassGroupDependency[]> => {
+  const countOf = (table: any, column: any) =>
+    sql`(SELECT COUNT(*) FROM ${table} WHERE ${column} = ${classGroupId})`;
+
+  const result = await db.execute(sql`SELECT
+    ${countOf(SchemeOfWork, SchemeOfWork.class_group_id)} AS schemes,
+    ${countOf(LessonReport, LessonReport.class_group_id)} AS lesson_reports,
+    ${countOf(LessonNote, LessonNote.class_group_id)} AS lesson_notes,
+    ${countOf(InstructorReport, InstructorReport.class_group_id)} AS instructor_reports,
+    ${countOf(StudentClassGroup, StudentClassGroup.class_group_id)} AS students,
+    ${countOf(TeacherSubjectAssignment, TeacherSubjectAssignment.class_group_id)} AS teacher_assignments,
+    ${countOf(UserGrade, UserGrade.class_group_id)} AS class_teachers,
+    ${countOf(AcademicCalendar, AcademicCalendar.class_group_id)} AS calendars,
+    ${countOf(CalendarSlot, CalendarSlot.class_group_id)} AS calendar_slots,
+    ${countOf(CalendarActivity, CalendarActivity.class_group_id)} AS calendar_activities`);
+
+  const counts = (result as any)[0][0] ?? {};
+  const countFor = (key: string) => Number(counts[key] ?? 0);
+
+  return [
+    // Authored academic records -- these block the delete.
+    {
+      key: "schemes_of_work",
+      label: "scheme(s) of work",
+      count: countFor("schemes"),
+      blocking: true,
+    },
+    {
+      key: "lesson_reports",
+      label: "lesson report(s)",
+      count: countFor("lesson_reports"),
+      blocking: true,
+    },
+    {
+      key: "lesson_notes",
+      label: "lesson note(s)",
+      count: countFor("lesson_notes"),
+      blocking: true,
+    },
+    {
+      key: "instructor_reports",
+      label: "instructor report(s)",
+      count: countFor("instructor_reports"),
+      blocking: true,
+    },
+    // Assignment/config rows -- these are cleared alongside the class group.
+    {
+      key: "students",
+      label: "student assignment(s)",
+      count: countFor("students"),
+      blocking: false,
+    },
+    {
+      key: "teacher_assignments",
+      label: "teacher subject assignment(s)",
+      count: countFor("teacher_assignments"),
+      blocking: false,
+    },
+    {
+      key: "class_teachers",
+      label: "class teacher assignment(s)",
+      count: countFor("class_teachers"),
+      blocking: false,
+    },
+    {
+      key: "calendars",
+      label: "timetable(s)",
+      count: countFor("calendars"),
+      blocking: false,
+    },
+    {
+      key: "calendar_slots",
+      label: "timetable slot(s)",
+      count: countFor("calendar_slots"),
+      blocking: false,
+    },
+    {
+      key: "calendar_activities",
+      label: "calendar activity(ies)",
+      count: countFor("calendar_activities"),
+      blocking: false,
+    },
+  ];
+};
+
+const describeDependencies = (dependencies: ClassGroupDependency[]) =>
+  dependencies.map((d) => `${d.count} ${d.label}`).join(", ");
+
+export const getClassGroupDependencyReport = asyncHandler(
+  async (req: any, res: any) => {
+    const classGroupId = parseInt(req.params.id);
+
+    if (isNaN(classGroupId)) {
+      throw new ValidationError("Invalid class group ID");
+    }
+
+    const existingClassGroup = await db
+      .select()
+      .from(ClassGroup)
+      .where(eq(ClassGroup.class_group_id, classGroupId))
+      .limit(1);
+
+    if (existingClassGroup.length === 0) {
+      throw new NotFoundError("Class group not found");
+    }
+
+    const dependencies = await getClassGroupDependencies(classGroupId);
+    const blocking = dependencies.filter((d) => d.blocking && d.count > 0);
+    const detachable = dependencies.filter((d) => !d.blocking && d.count > 0);
+
+    successResponse(res, "Class group dependencies retrieved successfully", {
+      class_group_id: classGroupId,
+      name: existingClassGroup[0].name,
+      can_delete: blocking.length === 0,
+      requires_confirmation: detachable.length > 0,
+      blocking,
+      detachable,
+    });
+  },
+);
+
 export const deleteClassGroup = asyncHandler(async (req: any, res: any) => {
   const { id } = req.params;
   const classGroupId = parseInt(id);
@@ -2795,26 +2944,94 @@ export const deleteClassGroup = asyncHandler(async (req: any, res: any) => {
     throw new NotFoundError("Class group not found");
   }
 
-  await db
-    .delete(ClassGroup)
-    .where(eq(ClassGroup.class_group_id, classGroupId));
+  const classGroupName = existingClassGroup[0].name;
+  const force = req.query?.force === "true" || req.query?.force === true;
 
-  logger.info("Class group deleted", { classGroupId });
+  const dependencies = await getClassGroupDependencies(classGroupId);
+  const blocking = dependencies.filter((d) => d.blocking && d.count > 0);
+
+  if (blocking.length > 0) {
+    throw new ConflictError(
+      `"${classGroupName}" still has ${describeDependencies(blocking)}. ` +
+        `Reassign or delete them first, then delete the class group.`,
+      blocking,
+    );
+  }
+
+  const detachable = dependencies.filter((d) => !d.blocking && d.count > 0);
+
+  if (detachable.length > 0 && !force) {
+    throw new ConflictError(
+      `"${classGroupName}" is still linked to ${describeDependencies(detachable)}. ` +
+        `Confirm the delete to remove those links along with the class group.`,
+      detachable,
+    );
+  }
+
+  await db.transaction(async (tx) => {
+    // Slots hang off the class group both directly and through the class
+    // group's own calendars, and CalendarSlot -> AcademicCalendar is
+    // RESTRICT, so both sets have to go before the calendars do.
+    const calendars = await tx
+      .select({ calendar_id: AcademicCalendar.calendar_id })
+      .from(AcademicCalendar)
+      .where(eq(AcademicCalendar.class_group_id, classGroupId));
+
+    if (calendars.length > 0) {
+      await tx.delete(CalendarSlot).where(
+        inArray(
+          CalendarSlot.calendar_id,
+          calendars.map((c) => c.calendar_id),
+        ),
+      );
+    }
+
+    await tx
+      .delete(CalendarSlot)
+      .where(eq(CalendarSlot.class_group_id, classGroupId));
+    await tx
+      .delete(CalendarActivity)
+      .where(eq(CalendarActivity.class_group_id, classGroupId));
+    await tx
+      .delete(AcademicCalendar)
+      .where(eq(AcademicCalendar.class_group_id, classGroupId));
+
+    // Roster and assignment rows. StudentClassGroup/TeacherSubjectAssignment
+    // carry no FK to ClassGroup on the live schema, so skipping these would
+    // leave orphans pointing at a dead id rather than raise an error.
+    await tx
+      .delete(StudentClassGroup)
+      .where(eq(StudentClassGroup.class_group_id, classGroupId));
+    await tx
+      .delete(TeacherSubjectAssignment)
+      .where(eq(TeacherSubjectAssignment.class_group_id, classGroupId));
+    await tx
+      .delete(UserGrade)
+      .where(eq(UserGrade.class_group_id, classGroupId));
+
+    await tx.delete(ClassGroup).where(eq(ClassGroup.class_group_id, classGroupId));
+  });
+
+  logger.info("Class group deleted", {
+    classGroupId,
+    forced: force,
+    detached: detachable.map((d) => `${d.key}:${d.count}`),
+  });
 
   // Record activity
   if (req.user?.userId) {
     await recordActivity(
       req.user.userId,
       "CLASS_GROUP_DELETE",
-      `Deleted class group ID: ${classGroupId}`,
+      `Deleted class group: ${classGroupName}`,
       "ClassGroup",
       classGroupId,
-      undefined,
+      { name: classGroupName, detached: detachable },
       req.user.userId,
     );
   }
 
-  successResponse(res, "Class group deleted successfully");
+  successResponse(res, "Class group deleted successfully", { detached: detachable });
 });
 
 // Teacher Assigned Subjects for Dashboard

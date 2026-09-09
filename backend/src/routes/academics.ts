@@ -84,6 +84,7 @@ import {
   createClassGroup,
   updateClassGroup,
   deleteClassGroup,
+  getClassGroupDependencyReport,
 
   // Program Users
   getUsersByProgram,
@@ -337,6 +338,12 @@ router.put(
   authenticate,
   authorize("MANAGE_ACADEMICS"),
   updateClassGroup,
+);
+router.get(
+  "/class-groups/:id/dependencies",
+  authenticate,
+  authorize("MANAGE_ACADEMICS"),
+  getClassGroupDependencyReport,
 );
 router.delete(
   "/class-groups/:id",

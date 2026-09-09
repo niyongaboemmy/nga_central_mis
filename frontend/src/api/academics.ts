@@ -159,6 +159,24 @@ export const courseCategoriesApi = {
   delete: (id: number) => api.delete(`/academics/course-categories/${id}`),
 };
 
+export interface ClassGroupDependency {
+  key: string;
+  label: string;
+  count: number;
+  blocking: boolean;
+}
+
+export interface ClassGroupDependencyReport {
+  class_group_id: number;
+  name: string;
+  /** false when authored academic records still point at the class group */
+  can_delete: boolean;
+  /** true when deleting would clear roster/timetable links */
+  requires_confirmation: boolean;
+  blocking: ClassGroupDependency[];
+  detachable: ClassGroupDependency[];
+}
+
 // Class Groups API -- ClassGroup is a permanent label per grade, not
 // year-scoped, so there's no "copy class groups to a new year" action.
 export const classGroupsApi = {
@@ -173,7 +191,16 @@ export const classGroupsApi = {
     api.post<ClassGroup>("/academics/class-groups", data),
   update: (id: number, data: Partial<Omit<ClassGroup, "class_group_id">>) =>
     api.put<ClassGroup>(`/academics/class-groups/${id}`, data),
-  delete: (id: number) => api.delete(`/academics/class-groups/${id}`),
+  // What a delete would hit: records that block it, and links it would clear.
+  dependencies: (id: number) =>
+    api.get<{ data: ClassGroupDependencyReport }>(
+      `/academics/class-groups/${id}/dependencies`,
+    ),
+  // `force` acknowledges the detachable links listed by `dependencies`.
+  delete: (id: number, force = false) =>
+    api.delete(
+      `/academics/class-groups/${id}${force ? "?force=true" : ""}`,
+    ),
 };
 
 // Grade-Subject Assignment API

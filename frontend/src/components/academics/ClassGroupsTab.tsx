@@ -1,8 +1,13 @@
 import React, { useMemo, useState } from "react";
-import { ClassGroup, AcademicYear, Grade } from "../../api/academics";
+import {
+  ClassGroup,
+  AcademicYear,
+  Grade,
+  ClassGroupDependencyReport,
+  classGroupsApi,
+} from "../../api/academics";
 import Button from "../ui/Button";
 import Modal from "../ui/Modal";
-import ConfirmModal from "../ui/ConfirmModal";
 import Input from "../ui/Input";
 import PromoteStudentsModal from "./PromoteStudentsModal";
 import { usePermissions } from "../../hooks/usePermissions";
@@ -19,7 +24,7 @@ interface ClassGroupsTabProps {
     id: number,
     data: Partial<Omit<ClassGroup, "class_group_id">>
   ) => Promise<void>;
-  onDelete: (id: number) => Promise<void>;
+  onDelete: (id: number, force?: boolean) => Promise<void>;
   onPromote: (
     sourceClassGroupId: number,
     sourceAcademicYearId: number,
@@ -134,6 +139,14 @@ const ClassGroupsTab: React.FC<ClassGroupsTabProps> = ({
   });
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
+  // A class group is referenced by rosters, timetables, schemes and reports.
+  // The delete modal preflights those so the admin sees what a delete would
+  // clear -- or why it can't run -- before confirming, instead of the delete
+  // failing on a foreign key with nothing shown.
+  const [deleteReport, setDeleteReport] =
+    useState<ClassGroupDependencyReport | null>(null);
+  const [deleteReportLoading, setDeleteReportLoading] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
 
   const resetForm = () => {
     setFormData({
@@ -200,22 +213,53 @@ const ClassGroupsTab: React.FC<ClassGroupsTabProps> = ({
     }
   };
 
-  const handleDelete = (classGroup: ClassGroup) => {
+  const handleDelete = async (classGroup: ClassGroup) => {
     setSelectedClassGroup(classGroup);
+    setDeleteReport(null);
+    setDeleteError("");
     setShowDeleteModal(true);
+    setDeleteReportLoading(true);
+    try {
+      const response = await classGroupsApi.dependencies(
+        classGroup.class_group_id,
+      );
+      setDeleteReport(response.data.data);
+    } catch (error: any) {
+      setDeleteError(
+        error?.response?.data?.message ||
+          "Could not check what this class group is linked to",
+      );
+    } finally {
+      setDeleteReportLoading(false);
+    }
+  };
+
+  const closeDeleteModal = () => {
+    setShowDeleteModal(false);
+    setSelectedClassGroup(null);
+    setDeleteReport(null);
+    setDeleteError("");
   };
 
   const confirmDelete = async () => {
     if (!selectedClassGroup) return;
 
     setSubmitting(true);
+    setDeleteError("");
     try {
-      await onDelete(selectedClassGroup.class_group_id);
-      setShowDeleteModal(false);
-      setSelectedClassGroup(null);
+      // The backend refuses an unconfirmed delete that would clear links, so
+      // pass force once the modal has shown the admin exactly what they are.
+      await onDelete(
+        selectedClassGroup.class_group_id,
+        (deleteReport?.detachable.length ?? 0) > 0,
+      );
+      closeDeleteModal();
       onRefresh();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to delete class group:", error);
+      setDeleteError(
+        error?.response?.data?.message || "Failed to delete class group",
+      );
     } finally {
       setSubmitting(false);
     }
@@ -666,17 +710,87 @@ const ClassGroupsTab: React.FC<ClassGroupsTabProps> = ({
       </Modal>
 
       {/* Delete Modal */}
-      <ConfirmModal
+      <Modal
         isOpen={showDeleteModal}
-        onClose={() => {
-          setShowDeleteModal(false);
-          setSelectedClassGroup(null);
-        }}
-        onConfirm={confirmDelete}
+        onClose={closeDeleteModal}
         title="Delete Class Group"
-        message={`Are you sure you want to delete "${selectedClassGroup?.name}"? This action cannot be undone.`}
-        isLoading={submitting}
-      />
+      >
+        <div className="space-y-4">
+          <p className="text-text-secondary-light dark:text-text-secondary-dark/70">
+            Are you sure you want to delete "{selectedClassGroup?.name}"? This
+            action cannot be undone.
+          </p>
+
+          {deleteReportLoading && (
+            <p className="text-sm text-text-secondary-light dark:text-text-secondary-dark/70">
+              Checking what this class group is linked to...
+            </p>
+          )}
+
+          {deleteReport && deleteReport.blocking.length > 0 && (
+            <div className="rounded-lg border border-red-500/40 bg-red-500/10 p-3">
+              <p className="text-sm font-medium text-red-600 dark:text-red-400">
+                This class group can't be deleted yet. It still has:
+              </p>
+              <ul className="mt-2 list-disc pl-5 text-sm text-red-600 dark:text-red-400">
+                {deleteReport.blocking.map((item) => (
+                  <li key={item.key}>
+                    {item.count} {item.label}
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-2 text-sm text-red-600 dark:text-red-400">
+                Reassign or delete those records first.
+              </p>
+            </div>
+          )}
+
+          {deleteReport &&
+            deleteReport.blocking.length === 0 &&
+            deleteReport.detachable.length > 0 && (
+              <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3">
+                <p className="text-sm font-medium text-amber-600 dark:text-amber-400">
+                  Deleting it will also remove:
+                </p>
+                <ul className="mt-2 list-disc pl-5 text-sm text-amber-600 dark:text-amber-400">
+                  {deleteReport.detachable.map((item) => (
+                    <li key={item.key}>
+                      {item.count} {item.label}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+          {deleteError && (
+            <p className="text-sm text-red-600 dark:text-red-400">
+              {deleteError}
+            </p>
+          )}
+
+          <div className="flex justify-end space-x-3">
+            <Button
+              variant="secondary"
+              onClick={closeDeleteModal}
+              disabled={submitting}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="danger"
+              onClick={confirmDelete}
+              disabled={
+                submitting ||
+                deleteReportLoading ||
+                deleteReport?.can_delete === false
+              }
+              isLoading={submitting}
+            >
+              Delete
+            </Button>
+          </div>
+        </div>
+      </Modal>
 
       {/* Promote Students by Grade Modal (automatic, whole-year rollover) */}
       <PromoteStudentsModal

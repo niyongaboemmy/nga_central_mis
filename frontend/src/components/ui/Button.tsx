@@ -32,9 +32,13 @@ const Button: React.FC<ButtonProps> = ({
     lg: "px-6 py-3 text-lg",
   };
 
+  // `disabled` is pulled out of props above, so it has to be put back on the
+  // element explicitly -- without this every disabled={...} in the app (guards
+  // against double-submits, blocked actions) rendered a clickable button.
   return (
     <button
-      className={`${baseClasses} ${variantClasses[variant]} ${sizeClasses[size]} ${className}`}
+      className={`${baseClasses} ${variantClasses[variant]} ${sizeClasses[size]} disabled:opacity-50 disabled:cursor-not-allowed ${className}`}
+      disabled={disabled || isLoading}
       {...props}
     >
       {children}

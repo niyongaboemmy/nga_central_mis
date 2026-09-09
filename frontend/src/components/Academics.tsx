@@ -463,8 +463,8 @@ const Academics: React.FC = () => {
               fetchClassGroups();
               showToast("Class group updated successfully", "success");
             }}
-            onDelete={async (id) => {
-              await classGroupsApi.delete(id);
+            onDelete={async (id, force) => {
+              await classGroupsApi.delete(id, force);
               fetchClassGroups();
               showToast("Class group deleted successfully", "success");
             }}

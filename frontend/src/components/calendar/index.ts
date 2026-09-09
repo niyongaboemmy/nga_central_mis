@@ -1,5 +1,7 @@
 // Constants and helpers
 export * from "./calendarConstants";
+export * from "./calendarLayout";
+export * from "./useCurrentTime";
 
 // Components
 export { default as CalendarHeader } from "./CalendarHeader";

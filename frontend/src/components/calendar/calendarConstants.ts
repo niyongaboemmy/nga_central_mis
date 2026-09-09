@@ -10,20 +10,24 @@ export const DAYS_FULL = [
   "Sunday",
 ];
 
-// Daily schedule - each row in the calendar (based on institution timetable)
+// Daily schedule - each row in the calendar (based on institution timetable).
+//
+// The teaching day opens with a 07:30-08:00 devotion/self-study block; the
+// first period starts at 08:00. Periods are 50 minutes, paired into doubles,
+// with a short break between pairs and an hour for lunch.
 export const SCHEDULE_SLOTS = [
-  { start: "07:30", end: "09:00", label: "Self Study/Devotion", type: "break" },
-  { start: "09:00", end: "09:50", label: "Course", type: "course" },
-  { start: "09:50", end: "10:40", label: "Course", type: "course" },
-  { start: "10:40", end: "11:00", label: "Break", type: "break" },
-  { start: "11:00", end: "11:50", label: "Course", type: "course" },
-  { start: "11:50", end: "12:40", label: "Course", type: "course" },
-  { start: "12:40", end: "13:40", label: "Lunch", type: "lunch" },
-  { start: "13:40", end: "14:30", label: "Course", type: "course" },
-  { start: "14:30", end: "15:20", label: "Course", type: "course" },
-  { start: "15:20", end: "15:40", label: "Break", type: "break" },
-  { start: "15:40", end: "16:30", label: "Course", type: "course" },
-  { start: "16:30", end: "17:20", label: "Course", type: "course" },
+  { start: "07:30", end: "08:00", label: "Self Study/Devotion", type: "break" },
+  { start: "08:00", end: "08:50", label: "Course", type: "course" },
+  { start: "08:50", end: "09:40", label: "Course", type: "course" },
+  { start: "09:40", end: "10:00", label: "Break", type: "break" },
+  { start: "10:00", end: "10:50", label: "Course", type: "course" },
+  { start: "10:50", end: "11:40", label: "Course", type: "course" },
+  { start: "11:40", end: "12:40", label: "Lunch", type: "lunch" },
+  { start: "12:40", end: "13:30", label: "Course", type: "course" },
+  { start: "13:30", end: "14:20", label: "Course", type: "course" },
+  { start: "14:20", end: "14:40", label: "Break", type: "break" },
+  { start: "14:40", end: "15:30", label: "Course", type: "course" },
+  { start: "15:30", end: "16:20", label: "Course", type: "course" },
 ] as const;
 
 // Helper function to convert time string (HH:MM) to minutes since midnight
@@ -165,4 +169,44 @@ export const getDateRangeString = (weekDates: Date[]): string => {
   const start = weekDates[0];
   const end = weekDates[6];
   return `${formatDateShort(start)} - ${formatDateShort(end)}, ${end.getFullYear()}`;
+};
+
+// Convert minutes since midnight back to a "HH:MM" string
+export const minutesToTime = (mins: number): string => {
+  const clamped = Math.max(0, Math.min(24 * 60 - 1, Math.round(mins)));
+  const h = Math.floor(clamped / 60);
+  const m = clamped % 60;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+};
+
+// Minutes since midnight for a Date (defaults to now)
+export const dateToMinutes = (date: Date = new Date()): number =>
+  date.getHours() * 60 + date.getMinutes();
+
+/**
+ * Index of the row that `nowMinutes` falls inside, or -1 when the school day
+ * hasn't started, has ended, or the rows leave a gap over that minute.
+ *
+ * Rows are half-open ([start, end)) so a minute that is the end of one row and
+ * the start of the next belongs to the next — otherwise two rows would both
+ * claim to be "in session" at 09:40.
+ */
+export const findCurrentRowIndex = (
+  rows: readonly ScheduleRow[],
+  nowMinutes: number,
+): number =>
+  rows.findIndex(
+    (r) =>
+      nowMinutes >= timeToMinutes(r.start) && nowMinutes < timeToMinutes(r.end),
+  );
+
+/** How far through a row we are, 0-1. Returns null when outside the row. */
+export const rowProgress = (
+  row: ScheduleRow,
+  nowMinutes: number,
+): number | null => {
+  const start = timeToMinutes(row.start);
+  const end = timeToMinutes(row.end);
+  if (end <= start || nowMinutes < start || nowMinutes >= end) return null;
+  return (nowMinutes - start) / (end - start);
 };
