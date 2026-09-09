@@ -1,7 +1,8 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { myStudentsApi, MyStudent, MyStudentsResponse } from "../api/academics";
 import { useAcademicPeriod } from "../contexts/AcademicPeriodContext";
+import { useScopedGrades } from "../hooks/useScopedGrades";
 import {
   Users,
   GraduationCap,
@@ -24,11 +25,15 @@ const EMPTY: MyStudentsResponse = {
 
 const MyStudents: React.FC = () => {
   const { selectedYearId } = useAcademicPeriod();
+  const scope = useScopedGrades();
   const [data, setData] = useState<MyStudentsResponse>(EMPTY);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [subjectFilter, setSubjectFilter] = useState<string>("all");
   const [classGroupFilter, setClassGroupFilter] = useState<string>("all");
+  // The profile default is applied once per academic year, so choosing "All
+  // Class Groups" afterwards is not immediately undone by the next fetch.
+  const appliedDefaultForYear = useRef<number | null>(null);
 
   // Server-side filters (subject/class group) -- refetches, since they
   // narrow which of the teacher's own assignments the roster is drawn from.
@@ -54,6 +59,34 @@ const MyStudents: React.FC = () => {
       cancelled = true;
     };
   }, [selectedYearId, subjectFilter, classGroupFilter]);
+
+  // A class teacher lands on their own class group rather than on everyone
+  // they teach. Only when that group is actually one they teach a subject to
+  // -- a class-teacher assignment is not a teaching assignment, and
+  // defaulting to a group absent from the options would render an empty
+  // roster with a filter the teacher never set.
+  useEffect(() => {
+    if (selectedYearId == null) return;
+    if (appliedDefaultForYear.current === selectedYearId) return;
+    if (data.filters.class_groups.length === 0) return;
+
+    appliedDefaultForYear.current = selectedYearId;
+
+    const preferred = scope.defaultClassGroupId;
+    if (
+      preferred &&
+      data.filters.class_groups.some((c) => c.class_group_id === preferred)
+    ) {
+      setClassGroupFilter(String(preferred));
+    }
+  }, [selectedYearId, data.filters.class_groups, scope.defaultClassGroupId]);
+
+  // Switching year re-opens the question of which group to land on.
+  useEffect(() => {
+    appliedDefaultForYear.current = null;
+    setClassGroupFilter("all");
+    setSubjectFilter("all");
+  }, [selectedYearId]);
 
   // Free-text search is applied client-side against the already-fetched page.
   const filteredStudents = useMemo(() => {

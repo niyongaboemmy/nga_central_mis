@@ -31,6 +31,10 @@ import { asyncHandler } from "../middleware/asyncHandler";
 import { recordActivity } from "../utils/activityLogger";
 import logger from "../utils/logger";
 import { getCurrentAcademicYearId } from "../utils/academicYear";
+import {
+  getTeacherAssignments,
+  getTeacherRosterRows,
+} from "../services/teacherRoster";
 
 // Helper function to format date for MySQL
 const formatDateForMySQL = (dateStr: string | undefined) => {
@@ -3159,35 +3163,25 @@ export const getMyStudents = asyncHandler(async (req: any, res: any) => {
     throw new ValidationError("No academic year selected and no current academic year is set");
   }
 
-  const subjectIdFilter = subject_id ? parseInt(subject_id as string, 10) : undefined;
-  const classGroupIdFilter = class_group_id ? parseInt(class_group_id as string, 10) : undefined;
+  // Reject a malformed filter rather than letting NaN through: NaN matches no
+  // assignment, so a typo'd id would silently render "no students" as if the
+  // teacher had none.
+  const parseFilter = (raw: unknown, label: string): number | undefined => {
+    if (raw === undefined || raw === null || raw === "") return undefined;
+    const value = parseInt(String(raw), 10);
+    if (isNaN(value) || value <= 0) {
+      throw new ValidationError(`Invalid ${label}`);
+    }
+    return value;
+  };
+
+  const subjectIdFilter = parseFilter(subject_id, "subject ID");
+  const classGroupIdFilter = parseFilter(class_group_id, "class group ID");
 
   // The teacher's full set of (subject, class group) assignments for this
   // year -- source of both the filter dropdown options and, once narrowed
   // below, the class groups whose rosters we actually fetch.
-  const assignments = await db
-    .select({
-      subject_id: TeacherSubjectAssignment.subject_id,
-      subject_name: Subject.name,
-      subject_code: Subject.code,
-      class_group_id: TeacherSubjectAssignment.class_group_id,
-      class_group_name: ClassGroup.name,
-      grade_id: Grade.grade_id,
-      grade_name: Grade.name,
-      program_id: Program.program_id,
-      program_name: Program.name,
-    })
-    .from(TeacherSubjectAssignment)
-    .innerJoin(Subject, eq(TeacherSubjectAssignment.subject_id, Subject.subject_id))
-    .innerJoin(ClassGroup, eq(TeacherSubjectAssignment.class_group_id, ClassGroup.class_group_id))
-    .innerJoin(Grade, eq(ClassGroup.grade_id, Grade.grade_id))
-    .innerJoin(Program, eq(Grade.program_id, Program.program_id))
-    .where(
-      and(
-        eq(TeacherSubjectAssignment.user_id, teacherIdNum),
-        eq(TeacherSubjectAssignment.academic_year_id, yearId),
-      ),
-    );
+  const assignments = await getTeacherAssignments(teacherIdNum, yearId);
 
   const subjectOptions = new Map<number, { subject_id: number; subject_name: string; subject_code: string | null }>();
   const classGroupOptions = new Map<
@@ -3243,45 +3237,35 @@ export const getMyStudents = asyncHandler(async (req: any, res: any) => {
     });
   }
 
-  const students = await db
-    .select({
-      user_id: User.user_id,
-      username: User.username,
-      email: User.email,
-      first_name: UserProfile.first_name,
-      last_name: UserProfile.last_name,
-      gender: UserProfile.gender,
-      class_group_id: StudentClassGroup.class_group_id,
-      class_group_name: ClassGroup.name,
-      grade_name: Grade.name,
-      program_name: Program.name,
-    })
-    .from(StudentClassGroup)
-    .innerJoin(User, eq(StudentClassGroup.user_id, User.user_id))
-    .innerJoin(UserProfile, eq(User.user_id, UserProfile.user_id))
-    .innerJoin(ClassGroup, eq(StudentClassGroup.class_group_id, ClassGroup.class_group_id))
-    .innerJoin(Grade, eq(ClassGroup.grade_id, Grade.grade_id))
-    .innerJoin(Program, eq(Grade.program_id, Program.program_id))
-    .where(
-      and(
-        inArray(StudentClassGroup.class_group_id, Array.from(classGroupIds)),
-        eq(StudentClassGroup.academic_year_id, yearId),
-        eq(StudentClassGroup.status, "ACTIVE"),
-        // Same defensive real-student check as getClassGroupStudents -- a
-        // class group row belongs to a student account either way, but this
-        // keeps a staff account that picked one up out of the roster.
-        or(
-          eq(UserProfile.user_type, "STUDENT"),
-          sql`EXISTS (SELECT 1 FROM ${UserRole} ur JOIN ${Role} r ON r.role_id = ur.role_id
-                      WHERE ur.user_id = ${User.user_id} AND r.name = 'STUDENT')`,
-        )!,
-      ),
-    )
-    .orderBy(UserProfile.first_name, UserProfile.last_name);
+  // Who the teacher actually teaches, resolved by the shared rule so the
+  // dashboard's headline count and this roster can never disagree.
+  const enrolments = await getTeacherRosterRows(filteredAssignments, yearId);
 
-  const result = students.map((s) => ({
+  // One row per (student, subject); fold to one entry per student carrying
+  // only the subjects that student actually takes with this teacher. A
+  // student in two of the teacher's class groups appears once per group,
+  // which is what the class-group column means.
+  const byStudent = new Map<string, any>();
+  for (const row of enrolments) {
+    const key = `${row.user_id}-${row.class_group_id}`;
+    const existing = byStudent.get(key);
+    const subject = subjectOptions.get(row.subject_id);
+    if (!existing) {
+      const { subject_id: _omit, ...student } = row;
+      byStudent.set(key, { ...student, subjects: subject ? [subject] : [] });
+    } else if (
+      subject &&
+      !existing.subjects.some((s: any) => s.subject_id === subject.subject_id)
+    ) {
+      existing.subjects.push(subject);
+    }
+  }
+
+  const result = Array.from(byStudent.values()).map((s) => ({
     ...s,
-    subjects: subjectsByClassGroup.get(s.class_group_id) ?? [],
+    subjects: [...s.subjects].sort((a: any, b: any) =>
+      a.subject_name.localeCompare(b.subject_name),
+    ),
   }));
 
   successResponse(res, "Students retrieved successfully", {

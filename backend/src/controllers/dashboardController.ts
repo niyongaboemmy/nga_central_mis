@@ -20,6 +20,7 @@ import {
 } from "../db/schema";
 import { successResponse } from "../utils/response";
 import { asyncHandler } from "../middleware/asyncHandler";
+import { countTeacherStudents } from "../services/teacherRoster";
 
 // Dashboard statistics interface
 interface DashboardStats {
@@ -257,24 +258,18 @@ export const getTeacherDashboardStats = asyncHandler(
     ];
     const assignedClassGroups = uniqueClassGroups.length;
 
-    // Get total students in teacher's assigned subjects for the selected year
-    let totalStudents = 0;
-    if (assignedSubjectsResult.length > 0 && yearId) {
-      const subjectIds = [
-        ...new Set(assignedSubjectsResult.map((r) => r.subject_id)),
-      ];
-
-      const [studentsResult] = await db
-        .select({ count: count(StudentSubjectEnrollment.user_id) })
-        .from(StudentSubjectEnrollment)
-        .where(
-          and(
-            inArray(StudentSubjectEnrollment.subject_id, subjectIds),
-            eq(StudentSubjectEnrollment.academic_year_id, yearId)
-          )
-        );
-      totalStudents = studentsResult?.count || 0;
-    }
+    // Distinct students the teacher actually teaches, resolved by the same
+    // rule the My Students roster uses so the two can never disagree again.
+    //
+    // This counted enrolment *rows* in the teacher's subjects across the whole
+    // school: a student taking three of their subjects counted three times,
+    // other teachers' class groups counted too, and disabled enrolments and
+    // non-student accounts were never excluded. One real teacher's headline
+    // read 76 where the truth was 11.
+    const totalStudents =
+      assignedSubjectsResult.length > 0 && yearId
+        ? await countTeacherStudents(teacherId, yearId)
+        : 0;
 
     const stats: TeacherDashboardStats = {
       assignedSubjects,
