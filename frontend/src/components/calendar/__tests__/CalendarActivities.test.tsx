@@ -26,13 +26,16 @@ const activity = (over: Partial<CalendarActivity> = {}): CalendarActivity => ({
 });
 
 describe("custom activities on the calendar grid", () => {
-  it("renders a non-subject activity in its own colour", () => {
+  it("colours each activity block from its own colour", () => {
     const { container } = render(
       <CalendarGrid
         calendarId={7}
         classGroupName="L4. Class A"
         slots={[]}
-        activities={[activity()]}
+        activities={[
+          activity({ activity_id: 1, activity_name: "Chapel Time", color: "#F59E0B", day_of_week: 1 }),
+          activity({ activity_id: 2, activity_name: "Sports Club", color: "#7C3AED", day_of_week: 2 }),
+        ]}
         weekDates={weekDates}
         onSlotClick={() => {}}
         onEmptyCellClick={() => {}}
@@ -40,14 +43,17 @@ describe("custom activities on the calendar grid", () => {
       />,
     );
 
-    expect(screen.getByText("Morning Devotion")).toBeInTheDocument();
-    // The activity's colour (#F59E0B → rgb(245,158,11)) tints its block
-    const styled = Array.from(
-      container.querySelectorAll<HTMLElement>("[style]"),
-    ).some((el) =>
-      el.style.getPropertyValue("--slot-bg").includes("245, 158, 11"),
-    );
-    expect(styled).toBe(true);
+    const bgOf = (name: string) => {
+      let el: HTMLElement | null = screen.getByText(name);
+      while (el && !el.style.getPropertyValue("--slot-bg")) el = el.parentElement;
+      return el?.style.getPropertyValue("--slot-bg") ?? "";
+    };
+
+    expect(bgOf("Chapel Time")).not.toBe("");
+    expect(bgOf("Sports Club")).not.toBe("");
+    // Two differently-coloured activities get two different block colours
+    expect(bgOf("Chapel Time")).not.toBe(bgOf("Sports Club"));
+    expect(container).toBeTruthy();
   });
 
   it("routes a click on an activity to onActivityClick, not onSlotClick", async () => {

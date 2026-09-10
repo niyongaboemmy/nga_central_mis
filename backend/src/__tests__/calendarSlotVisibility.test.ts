@@ -191,4 +191,69 @@ describe("Calendar slot visibility", () => {
     expect(listRes.body.data).toHaveLength(1);
     expect(listRes.body.data[0].calendar_id).toBe(calendarId);
   });
+
+  // "My Teaching Schedule" (GET /calendar/my-calendar) reads by the selected
+  // term. It used to filter on CalendarSlot.academic_term_id alone, so a
+  // teacher's lessons for a class group whose calendar term had drifted from
+  // the slot's stored copy silently vanished -- the widget then showed only
+  // some of the teacher's class groups (or none).
+  it("my-calendar shows a teacher's slot even when its stored term drifted", async () => {
+    const teacherRoleId = await createRoleWithPermissions("my-cal-teacher", [
+      "VIEW_MY_CALENDAR",
+    ]);
+    await assignRole(teacherId, teacherRoleId);
+    const teacherToken = signToken(teacherId);
+
+    const { classGroupId: driftGroup } =
+      await createProgramGradeClassGroupDetailed();
+    await createTeacherSubjectAssignment({
+      userId: teacherId,
+      subjectId,
+      classGroupId: driftGroup,
+      academicYearId,
+    });
+
+    const calRes = await request(app)
+      .post("/calendar/calendars")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({
+        academic_year_id: academicYearId,
+        academic_term_id: academicTermId,
+        class_group_id: driftGroup,
+        name: "My-Cal Drift Calendar",
+      });
+    const calendarId = calRes.body.data.calendar_id;
+
+    const slotRes = await request(app)
+      .post("/calendar/slots")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({
+        calendar_id: calendarId,
+        subject_id: subjectId,
+        user_id: teacherId,
+        day_of_week: 1,
+        start_time: "15:00",
+        end_time: "15:50",
+      });
+    expect(slotRes.status).toBe(201);
+
+    // Drift the slot's own term away from its calendar's.
+    await db
+      .update(CalendarSlot)
+      .set({ academic_term_id: otherTermId })
+      .where(eq(CalendarSlot.slot_id, slotRes.body.data.slot_id));
+
+    // Asking for the calendar's real term must still return the lesson.
+    const mine = await request(app)
+      .get("/calendar/my-calendar")
+      .query({ academic_term_id: academicTermId })
+      .set("Authorization", `Bearer ${teacherToken}`);
+    expect(mine.status).toBe(200);
+    const found = mine.body.data.slots.filter(
+      (s: any) => s.start_time === "15:00" && s.class_group_id === driftGroup,
+    );
+    expect(found).toHaveLength(1);
+    // and it is reported under the calendar's term, not the drifted copy
+    expect(found[0].academic_term_id).toBe(academicTermId);
+  });
 });

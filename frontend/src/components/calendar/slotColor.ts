@@ -3,15 +3,17 @@ import type { CalendarSlot } from "../../api/calendar";
 /**
  * Subject / activity colour handling for the calendar grid.
  *
- * A slot's colour comes from its subject (`Subject.color`), but many subjects
- * are left on the seed default (`#3B82F6`), which makes a whole week render in
- * one flat blue. So: an explicitly-chosen colour is always honoured, and any
- * slot still on the default (or with no colour at all) falls back to a stable,
- * evenly-spread palette colour derived from the subject — same subject, same
- * colour, every week, with no data entry required.
+ * A slot's colour is the subject's own colour (`Subject.color`) — exactly the
+ * swatch shown against that subject in admin → Academics → Subjects. Every
+ * calendar surface (admin grid, teacher schedule, dashboard widget, tooltip)
+ * reads it the same way, so a subject looks identical everywhere.
+ *
+ * The only fallback is for a slot with no colour at all (a null join, legacy
+ * data): a stable palette colour derived from the subject id, so it is at
+ * least distinct and consistent rather than blank.
  */
 
-const DEFAULT_SUBJECT_COLOR = "#3b82f6";
+const HEX_RE = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
 
 /** A hand-picked palette: distinct hues, similar saturation/lightness so no
  *  one slot shouts louder than the rest. */
@@ -43,16 +45,15 @@ const hashString = (value: string): number => {
   return Math.abs(hash);
 };
 
-const isDefaultOrEmpty = (color?: string | null): boolean =>
-  !color || color.trim().toLowerCase() === DEFAULT_SUBJECT_COLOR;
-
 /** The colour a slot should actually render in. */
 export const getSlotColor = (slot: {
   color?: string | null;
   subject_id?: number | null;
   subject_name?: string | null;
 }): string => {
-  if (!isDefaultOrEmpty(slot.color)) return slot.color as string;
+  const raw = slot.color?.trim();
+  if (raw && HEX_RE.test(raw)) return raw;
+  // No usable stored colour — derive a stable one so the slot is still legible.
   const seed =
     slot.subject_id != null
       ? `id:${slot.subject_id}`
@@ -119,6 +120,20 @@ export const darkenColor = (hex: string, amount: number): string => {
   return `rgb(${mix(r)}, ${mix(g)}, ${mix(b)})`;
 };
 
+/** Blend `hex` toward the opaque colour `toward` (also hex). `amount` 0..1 is
+ *  how much of `toward` to mix in. Produces an opaque colour, so the result
+ *  does not depend on whatever sits behind it. */
+export const blendColor = (
+  hex: string,
+  toward: string,
+  amount: number,
+): string => {
+  const [r1, g1, b1] = hexToRgb(hex);
+  const [r2, g2, b2] = hexToRgb(toward);
+  const mix = (a: number, b: number) => Math.round(a + (b - a) * amount);
+  return `rgb(${mix(r1, r2)}, ${mix(g1, g2)}, ${mix(b1, b2)})`;
+};
+
 export interface SlotSurface {
   background: string;
   hoverBackground: string;
@@ -127,25 +142,31 @@ export interface SlotSurface {
   accent: string;
 }
 
+// The surface each slot blends toward, per theme. Opaque blends (not alpha
+// washes) so a slot reads the same regardless of the cell / page behind it —
+// an alpha wash over a near-black page flattened every hue into the same murk.
+const DARK_SURFACE = "#0f1729";
+const LIGHT_SURFACE = "#ffffff";
+
 /**
- * The calm, flat "tinted card" treatment for a slot — a light wash of the
- * subject colour with a solid left accent, tuned per theme. No gradients,
- * no shadows: it reads as a schedule, not a set of buttons.
+ * The flat "coloured card" treatment for a slot: an opaque blend of the
+ * subject colour toward the page surface, kept saturated enough that two
+ * subjects never look alike, with no gradient, shadow, or accent bar.
  */
 export const slotSurface = (color: string, isDark: boolean): SlotSurface =>
   isDark
     ? {
-        background: hexToRgba(color, 0.2),
-        hoverBackground: hexToRgba(color, 0.3),
-        text: tintColor(color, 0.72),
-        meta: tintColor(color, 0.55),
+        background: blendColor(color, DARK_SURFACE, 0.66),
+        hoverBackground: blendColor(color, DARK_SURFACE, 0.52),
+        text: tintColor(color, 0.7),
+        meta: tintColor(color, 0.48),
         accent: color,
       }
     : {
-        background: hexToRgba(color, 0.12),
-        hoverBackground: hexToRgba(color, 0.2),
-        text: darkenColor(color, 0.35),
-        meta: darkenColor(color, 0.15),
+        background: blendColor(color, LIGHT_SURFACE, 0.84),
+        hoverBackground: blendColor(color, LIGHT_SURFACE, 0.74),
+        text: darkenColor(color, 0.4),
+        meta: darkenColor(color, 0.18),
         accent: color,
       };
 

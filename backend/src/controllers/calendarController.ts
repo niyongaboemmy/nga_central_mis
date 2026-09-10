@@ -517,22 +517,30 @@ export const getMyCalendar = asyncHandler(async (req: any, res: any) => {
     throw new ValidationError("No academic term specified or found");
   }
 
-  // Build filters
+  // Build filters. Match the term the *calendar* the slot belongs to declares,
+  // falling back to the slot's own denormalised copy — the two can drift, and
+  // filtering on CalendarSlot.academic_term_id alone silently dropped every
+  // lesson for a class group whose calendar term had moved on, so "My Teaching
+  // Schedule" showed only some of a teacher's class groups (or none).
+  const effectiveTerm = sql`COALESCE(${AcademicCalendar.academic_term_id}, ${CalendarSlot.academic_term_id})`;
+  const effectiveClassGroup = sql`COALESCE(${AcademicCalendar.class_group_id}, ${CalendarSlot.class_group_id})`;
+
   const filters: SQL[] = [
     eq(CalendarSlot.user_id, userId),
     eq(CalendarSlot.is_active, 1),
-    eq(CalendarSlot.academic_term_id, termId),
+    sql`${effectiveTerm} = ${termId}`,
   ];
 
   if (class_group_id) {
-    filters.push(eq(CalendarSlot.class_group_id, parseInt(class_group_id)));
+    filters.push(sql`${effectiveClassGroup} = ${parseInt(class_group_id)}`);
   }
 
   const slots = await db
     .select({
       slot_id: CalendarSlot.slot_id,
-      academic_term_id: CalendarSlot.academic_term_id,
-      class_group_id: CalendarSlot.class_group_id,
+      calendar_id: CalendarSlot.calendar_id,
+      academic_term_id: sql<number>`${effectiveTerm}`,
+      class_group_id: sql<number>`${effectiveClassGroup}`,
       subject_id: CalendarSlot.subject_id,
       user_id: CalendarSlot.user_id,
       day_of_week: CalendarSlot.day_of_week,
@@ -547,10 +555,14 @@ export const getMyCalendar = asyncHandler(async (req: any, res: any) => {
       class_group_name: ClassGroup.name,
     })
     .from(CalendarSlot)
+    .leftJoin(
+      AcademicCalendar,
+      eq(CalendarSlot.calendar_id, AcademicCalendar.calendar_id),
+    )
     .leftJoin(Subject, eq(CalendarSlot.subject_id, Subject.subject_id))
     .leftJoin(
       ClassGroup,
-      eq(CalendarSlot.class_group_id, ClassGroup.class_group_id),
+      sql`${ClassGroup.class_group_id} = ${effectiveClassGroup}`,
     )
     .where(and(...filters))
     .orderBy(CalendarSlot.day_of_week, CalendarSlot.start_time);
@@ -1381,18 +1393,29 @@ export const getStudentCalendar = asyncHandler(async (req: any, res: any) => {
     });
   }
 
-  // Get calendar slots for enrolled subjects in student's class groups
+  // Get calendar slots for enrolled subjects in student's class groups.
+  // Match the calendar's term/class group, falling back to the slot's own
+  // denormalised copy — the two drift, and keying off CalendarSlot alone drops
+  // lessons whose calendar term has moved on (same bug fixed for the admin and
+  // teacher grids).
+  const effectiveTerm = sql`COALESCE(${AcademicCalendar.academic_term_id}, ${CalendarSlot.academic_term_id})`;
+  const effectiveClassGroup = sql`COALESCE(${AcademicCalendar.class_group_id}, ${CalendarSlot.class_group_id})`;
+
   const filters: SQL[] = [
-    eq(CalendarSlot.academic_term_id, termId),
+    sql`${effectiveTerm} = ${termId}`,
     eq(CalendarSlot.is_active, 1),
-    inArray(CalendarSlot.class_group_id, classGroupIds),
+    sql`${effectiveClassGroup} IN (${sql.join(
+      classGroupIds.map((id) => sql`${id}`),
+      sql`, `,
+    )})`,
   ];
 
   const slots = await db
     .select({
       slot_id: CalendarSlot.slot_id,
-      academic_term_id: CalendarSlot.academic_term_id,
-      class_group_id: CalendarSlot.class_group_id,
+      calendar_id: CalendarSlot.calendar_id,
+      academic_term_id: sql<number>`${effectiveTerm}`,
+      class_group_id: sql<number>`${effectiveClassGroup}`,
       subject_id: CalendarSlot.subject_id,
       user_id: CalendarSlot.user_id,
       day_of_week: CalendarSlot.day_of_week,
@@ -1409,12 +1432,16 @@ export const getStudentCalendar = asyncHandler(async (req: any, res: any) => {
       class_group_name: ClassGroup.name,
     })
     .from(CalendarSlot)
+    .leftJoin(
+      AcademicCalendar,
+      eq(CalendarSlot.calendar_id, AcademicCalendar.calendar_id),
+    )
     .leftJoin(Subject, eq(CalendarSlot.subject_id, Subject.subject_id))
     .leftJoin(User, eq(CalendarSlot.user_id, User.user_id))
     .leftJoin(UserProfile, eq(CalendarSlot.user_id, UserProfile.user_id))
     .leftJoin(
       ClassGroup,
-      eq(CalendarSlot.class_group_id, ClassGroup.class_group_id),
+      sql`${ClassGroup.class_group_id} = ${effectiveClassGroup}`,
     )
     .where(and(...filters))
     .orderBy(CalendarSlot.day_of_week, CalendarSlot.start_time);
