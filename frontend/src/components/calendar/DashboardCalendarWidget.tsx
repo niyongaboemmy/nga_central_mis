@@ -465,6 +465,20 @@ const ReadOnlyCalendarGrid: React.FC<ReadOnlyCalendarGridProps> = ({
   // gets a row instead of silently matching none (see buildScheduleRows).
   const scheduleRows = useMemo(() => buildScheduleRows(slots), [slots]);
 
+  // One swatch per distinct subject on the grid, so the colours are a key
+  // rather than decoration (mirrors the admin CalendarGrid legend).
+  const subjectLegend = useMemo(() => {
+    const seen = new Map<string, { name: string; color: string }>();
+    for (const s of slots) {
+      const name = s.subject_name;
+      if (!name || seen.has(name)) continue;
+      seen.set(name, { name, color: getSlotColor(s) });
+    }
+    return Array.from(seen.values()).sort((a, b) =>
+      a.name.localeCompare(b.name),
+    );
+  }, [slots]);
+
   // Every lesson starting on a row is kept, not just the first: a teacher
   // viewing all their class groups can have two lessons on the same day and
   // time, and dropping one made "all class groups" look like one calendar.
@@ -805,6 +819,23 @@ const ReadOnlyCalendarGrid: React.FC<ReadOnlyCalendarGridProps> = ({
           </tbody>
         </table>
       </div>
+
+      {subjectLegend.length > 0 && (
+        <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 px-1 pb-1">
+          {subjectLegend.map((s) => (
+            <div
+              key={s.name}
+              className="flex items-center gap-1.5 text-[11px] text-gray-600 dark:text-gray-300"
+            >
+              <span
+                className="w-2.5 h-2.5 rounded-[3px] flex-shrink-0 ring-1 ring-black/5"
+                style={{ backgroundColor: s.color }}
+              />
+              <span className="truncate max-w-[11rem]">{s.name}</span>
+            </div>
+          ))}
+        </div>
+      )}
 
       <SlotTooltip state={tooltip} />
     </div>

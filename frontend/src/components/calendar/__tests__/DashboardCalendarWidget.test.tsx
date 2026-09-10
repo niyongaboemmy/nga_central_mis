@@ -139,7 +139,7 @@ describe("DashboardCalendarWidget — class group filter", () => {
     render(<DashboardCalendarWidget />);
 
     // both lessons claim Monday 08:00 — neither may be swallowed
-    await screen.findByText("Develop Web Applications Using Frameworks");
+    await screen.findAllByText("Develop Web Applications Using Frameworks");
     const grid = within(screen.getByRole("grid"));
     expect(grid.getByText("Web3 Applications")).toBeInTheDocument();
     expect(grid.getByText("L4. Class A")).toBeInTheDocument();
@@ -211,7 +211,8 @@ describe("DashboardCalendarWidget — class group filter", () => {
     getMyCalendarMock.mockResolvedValue({ slots: [lesson({})], upcoming: [] });
 
     render(<DashboardCalendarWidget />);
-    const card = await screen.findByText(
+    await screen.findAllByText("Develop Web Applications Using Frameworks");
+    const card = within(screen.getByRole("grid")).getByText(
       "Develop Web Applications Using Frameworks",
     );
 

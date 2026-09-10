@@ -53,7 +53,7 @@ describe("slotSurface", () => {
       const a = slotSurface("#06bc12", isDark); // green
       const b = slotSurface("#3B82F6", isDark); // blue
       expect(a.background).not.toBe(b.background);
-      expect(a.text).not.toBe(b.text);
+      expect(["#ffffff", "#1f2937"]).toContain(a.text);
     }
   });
 

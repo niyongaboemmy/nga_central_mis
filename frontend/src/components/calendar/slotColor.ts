@@ -71,7 +71,16 @@ const normaliseHex = (hex: string): string => {
   return h.length === 6 ? h : "3b82f6";
 };
 
+/** Parse `#hex`, `#rgb`, or `rgb(r, g, b)` / `rgba(...)` into an [r,g,b] triple. */
 export const hexToRgb = (hex: string): [number, number, number] => {
+  const rgbMatch = hex.match(/rgba?\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)/i);
+  if (rgbMatch) {
+    return [
+      Number(rgbMatch[1]),
+      Number(rgbMatch[2]),
+      Number(rgbMatch[3]),
+    ];
+  }
   const h = normaliseHex(hex);
   return [
     parseInt(h.slice(0, 2), 16),
@@ -145,29 +154,32 @@ export interface SlotSurface {
 // The surface each slot blends toward, per theme. Opaque blends (not alpha
 // washes) so a slot reads the same regardless of the cell / page behind it —
 // an alpha wash over a near-black page flattened every hue into the same murk.
-const DARK_SURFACE = "#0f1729";
+const DARK_SURFACE = "#0b1220";
 const LIGHT_SURFACE = "#ffffff";
 
 /**
- * The flat "coloured card" treatment for a slot: an opaque blend of the
- * subject colour toward the page surface, kept saturated enough that two
- * subjects never look alike, with no gradient, shadow, or accent bar.
+ * The flat "coloured event card" treatment for a slot.
+ *
+ * The subject colour carries the card — only lightly blended toward the page
+ * surface so a blue subject reads unmistakably blue next to a green one — with
+ * no gradient, shadow, or accent bar. Text colour is chosen for contrast
+ * against the resulting fill so every subject colour stays legible.
  */
-export const slotSurface = (color: string, isDark: boolean): SlotSurface =>
-  isDark
-    ? {
-        background: blendColor(color, DARK_SURFACE, 0.66),
-        hoverBackground: blendColor(color, DARK_SURFACE, 0.52),
-        text: tintColor(color, 0.7),
-        meta: tintColor(color, 0.48),
-        accent: color,
-      }
-    : {
-        background: blendColor(color, LIGHT_SURFACE, 0.84),
-        hoverBackground: blendColor(color, LIGHT_SURFACE, 0.74),
-        text: darkenColor(color, 0.4),
-        meta: darkenColor(color, 0.18),
-        accent: color,
-      };
+export const slotSurface = (color: string, isDark: boolean): SlotSurface => {
+  const background = isDark
+    ? blendColor(color, DARK_SURFACE, 0.28)
+    : blendColor(color, LIGHT_SURFACE, 0.12);
+  const hoverBackground = isDark
+    ? blendColor(color, DARK_SURFACE, 0.14)
+    : blendColor(color, LIGHT_SURFACE, 0);
+  const text = readableTextColor(background);
+  return {
+    background,
+    hoverBackground,
+    text,
+    meta: hexToRgba(text, 0.78),
+    accent: color,
+  };
+};
 
 export type ColoredSlot = CalendarSlot;
