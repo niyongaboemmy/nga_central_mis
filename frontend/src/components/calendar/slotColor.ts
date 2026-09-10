@@ -105,4 +105,48 @@ export const shadeColor = (hex: string, amount = 0.78): string => {
   )})`;
 };
 
+/** `hex` mixed toward white by `amount` (0 = unchanged, 1 = white). */
+export const tintColor = (hex: string, amount: number): string => {
+  const [r, g, b] = hexToRgb(hex);
+  const mix = (c: number) => Math.round(c + (255 - c) * amount);
+  return `rgb(${mix(r)}, ${mix(g)}, ${mix(b)})`;
+};
+
+/** `hex` mixed toward black by `amount`. */
+export const darkenColor = (hex: string, amount: number): string => {
+  const [r, g, b] = hexToRgb(hex);
+  const mix = (c: number) => Math.round(c * (1 - amount));
+  return `rgb(${mix(r)}, ${mix(g)}, ${mix(b)})`;
+};
+
+export interface SlotSurface {
+  background: string;
+  hoverBackground: string;
+  text: string;
+  meta: string;
+  accent: string;
+}
+
+/**
+ * The calm, flat "tinted card" treatment for a slot — a light wash of the
+ * subject colour with a solid left accent, tuned per theme. No gradients,
+ * no shadows: it reads as a schedule, not a set of buttons.
+ */
+export const slotSurface = (color: string, isDark: boolean): SlotSurface =>
+  isDark
+    ? {
+        background: hexToRgba(color, 0.2),
+        hoverBackground: hexToRgba(color, 0.3),
+        text: tintColor(color, 0.72),
+        meta: tintColor(color, 0.55),
+        accent: color,
+      }
+    : {
+        background: hexToRgba(color, 0.12),
+        hoverBackground: hexToRgba(color, 0.2),
+        text: darkenColor(color, 0.35),
+        meta: darkenColor(color, 0.15),
+        accent: color,
+      };
+
 export type ColoredSlot = CalendarSlot;

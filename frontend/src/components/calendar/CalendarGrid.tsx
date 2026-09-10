@@ -15,12 +15,8 @@ import {
 import { buildGridLayout, cellKey, type GridCell } from "./calendarLayout";
 import SlotTooltip, { instructorOf, useSlotTooltip } from "./SlotTooltip";
 import { useCurrentTime } from "./useCurrentTime";
-import {
-  getSlotColor,
-  hexToRgba,
-  readableTextColor,
-  shadeColor,
-} from "./slotColor";
+import { getSlotColor, hexToRgba, slotSurface } from "./slotColor";
+import { useIsDark } from "./useIsDark";
 
 interface CalendarGridProps {
   calendarId?: number;
@@ -135,6 +131,7 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
     [scheduleRows, calendarSlots],
   );
 
+  const isDark = useIsDark();
   const { minutes: nowMinutes, date: now } = useCurrentTime();
   const currentRowIndex = findCurrentRowIndex(scheduleRows, nowMinutes);
   const todayIndex = weekDates.findIndex(
@@ -435,56 +432,40 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
                                 (course as GridEntry).__activity,
                               );
                               const color = getSlotColor(course);
-                              const textColor = readableTextColor(color);
+                              const surface = slotSurface(color, isDark);
                               const isLive = progress !== null;
                               return (
                                 <div
                                   key={course.slot_id}
-                                  className={`group/slot relative flex-1 min-w-0 overflow-hidden rounded-lg cursor-pointer transition-all duration-200 hover:-translate-y-px ${
-                                    isLive
-                                      ? "ring-2 ring-rose-400 shadow-lg shadow-rose-500/20"
-                                      : isToday
-                                        ? "shadow-md"
-                                        : "shadow-sm hover:shadow-md"
-                                  }`}
-                                  style={{
-                                    background: `linear-gradient(160deg, ${hexToRgba(
-                                      color,
-                                      0.96,
-                                    )}, ${shadeColor(color, 0.82)})`,
-                                    borderLeft: `3px solid ${shadeColor(color, 0.6)}`,
-                                  }}
+                                  className="group/slot relative flex-1 min-w-0 overflow-hidden rounded-md cursor-pointer transition-colors duration-150 bg-[var(--slot-bg)] hover:bg-[var(--slot-bg-hover)]"
+                                  style={
+                                    {
+                                      "--slot-bg": surface.background,
+                                      "--slot-bg-hover": surface.hoverBackground,
+                                      borderLeft: `3px solid ${surface.accent}`,
+                                      boxShadow: isLive
+                                        ? `inset 0 0 0 1.5px ${surface.accent}`
+                                        : undefined,
+                                    } as React.CSSProperties
+                                  }
                                   onClick={() => activate(cell, course)}
                                   onMouseEnter={(e) =>
                                     showTooltip(course, e.currentTarget)
                                   }
                                   onMouseLeave={hideTooltip}
                                 >
-                                  {/* top sheen for a bit of depth */}
-                                  <div
-                                    aria-hidden="true"
-                                    className="pointer-events-none absolute inset-x-0 top-0 h-1/2"
-                                    style={{
-                                      background:
-                                        "linear-gradient(180deg, rgba(255,255,255,0.18), rgba(255,255,255,0))",
-                                    }}
-                                  />
                                   <div
                                     className="relative h-full p-2 text-xs flex flex-col justify-start gap-0.5"
-                                    style={{ color: textColor }}
+                                    style={{ color: surface.text }}
                                   >
                                     <div className="flex items-center gap-1 min-w-0">
                                       {isActivity && (
                                         <span
                                           aria-hidden="true"
-                                          className="text-[9px] font-bold uppercase tracking-wide px-1 py-px rounded"
+                                          className="text-[9px] font-semibold uppercase tracking-wide px-1 py-px rounded"
                                           style={{
-                                            backgroundColor: hexToRgba(
-                                              textColor === "#ffffff"
-                                                ? "#000000"
-                                                : "#ffffff",
-                                              0.18,
-                                            ),
+                                            backgroundColor: hexToRgba(color, 0.22),
+                                            color: surface.text,
                                           }}
                                         >
                                           Event
@@ -497,22 +478,25 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
                                     {course.class_group_name && (
                                       <div
                                         className="text-[10px] truncate"
-                                        style={{ opacity: 0.85 }}
+                                        style={{ color: surface.meta }}
                                       >
                                         {course.class_group_name}
                                       </div>
                                     )}
                                     <div
                                       className="text-[10px] mt-auto font-medium tabular-nums"
-                                      style={{ opacity: 0.9 }}
+                                      style={{ color: surface.meta }}
                                     >
                                       {course.start_time} - {course.end_time}
                                     </div>
                                   </div>
                                   {isLive && (
                                     <div
-                                      className="absolute bottom-0 left-0 h-1 bg-white/90"
-                                      style={{ width: `${(progress ?? 0) * 100}%` }}
+                                      className="absolute bottom-0 left-0 h-0.5"
+                                      style={{
+                                        width: `${(progress ?? 0) * 100}%`,
+                                        backgroundColor: surface.accent,
+                                      }}
                                       aria-hidden="true"
                                     />
                                   )}

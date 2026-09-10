@@ -28,7 +28,8 @@ import {
 import { buildGridLayout, cellKey, type GridCell } from "./calendarLayout";
 import SlotTooltip, { useSlotTooltip } from "./SlotTooltip";
 import { useCurrentTime } from "./useCurrentTime";
-import { getSlotColor, readableTextColor, shadeColor } from "./slotColor";
+import { getSlotColor, slotSurface } from "./slotColor";
+import { useIsDark } from "./useIsDark";
 import CalendarSlotModal from "./CalendarSlotModal";
 import LessonPlanModal from "./LessonPlanModal";
 
@@ -479,6 +480,7 @@ const ReadOnlyCalendarGrid: React.FC<ReadOnlyCalendarGridProps> = ({
     [scheduleRows, slots],
   );
 
+  const isDark = useIsDark();
   const { minutes: nowMinutes, date: now } = useCurrentTime();
   const currentRowIndex = findCurrentRowIndex(scheduleRows, nowMinutes);
   const todayIndex = weekDates.findIndex(
@@ -720,18 +722,22 @@ const ReadOnlyCalendarGrid: React.FC<ReadOnlyCalendarGridProps> = ({
                                 ? lessonProgress(course, nowMinutes)
                                 : null;
                               const color = getSlotColor(course);
-                              const textColor = readableTextColor(color);
+                              const surface = slotSurface(color, isDark);
+                              const isLive = progress !== null;
                               return (
                                 <div
                                   key={course.slot_id}
-                                  className="relative flex-1 min-w-0 overflow-hidden rounded-md shadow-sm"
-                                  style={{
-                                    background: `linear-gradient(160deg, ${color}, ${shadeColor(
-                                      color,
-                                      0.82,
-                                    )})`,
-                                    borderLeft: `3px solid ${shadeColor(color, 0.6)}`,
-                                  }}
+                                  className="relative flex-1 min-w-0 overflow-hidden rounded-md transition-colors duration-150 bg-[var(--slot-bg)] hover:bg-[var(--slot-bg-hover)]"
+                                  style={
+                                    {
+                                      "--slot-bg": surface.background,
+                                      "--slot-bg-hover": surface.hoverBackground,
+                                      borderLeft: `3px solid ${surface.accent}`,
+                                      boxShadow: isLive
+                                        ? `inset 0 0 0 1.5px ${surface.accent}`
+                                        : undefined,
+                                    } as React.CSSProperties
+                                  }
                                   onClick={() =>
                                     onSlotClick(course, weekDates[dayIdx]!)
                                   }
@@ -741,38 +747,35 @@ const ReadOnlyCalendarGrid: React.FC<ReadOnlyCalendarGridProps> = ({
                                   onMouseLeave={hideTooltip}
                                 >
                                   <div
-                                    className={`h-full p-1.5 text-xs flex flex-col justify-start hover:brightness-110 transition-all duration-200 ${
-                                      progress !== null
-                                        ? "ring-2 ring-rose-400 shadow-lg"
-                                        : isToday
-                                          ? "ring-2 ring-white dark:ring-gray-600 shadow-lg"
-                                          : ""
-                                    }`}
-                                    style={{ color: textColor }}
+                                    className="h-full p-1.5 text-xs flex flex-col justify-start"
+                                    style={{ color: surface.text }}
                                   >
-                                    <div className="font-medium truncate text-[12px]">
+                                    <div className="font-semibold truncate text-[12px]">
                                       {course.subject_name}
                                     </div>
                                     {showClassGroup &&
                                       course.class_group_name && (
                                         <div
                                           className="truncate text-[10px]"
-                                          style={{ opacity: 0.85 }}
+                                          style={{ color: surface.meta }}
                                         >
                                           {course.class_group_name}
                                         </div>
                                       )}
                                     <div
-                                      className="text-[10px] mt-auto"
-                                      style={{ opacity: 0.8 }}
+                                      className="text-[10px] mt-auto tabular-nums"
+                                      style={{ color: surface.meta }}
                                     >
                                       {course.start_time} - {course.end_time}
                                     </div>
                                   </div>
-                                  {progress !== null && (
+                                  {isLive && (
                                     <div
-                                      className="absolute bottom-0 left-0 h-1 bg-white/90"
-                                      style={{ width: `${progress * 100}%` }}
+                                      className="absolute bottom-0 left-0 h-0.5"
+                                      style={{
+                                        width: `${progress * 100}%`,
+                                        backgroundColor: surface.accent,
+                                      }}
                                       aria-hidden="true"
                                     />
                                   )}
