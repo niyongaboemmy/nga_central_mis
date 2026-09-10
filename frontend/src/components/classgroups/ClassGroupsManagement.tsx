@@ -140,15 +140,22 @@ const Workspace: React.FC = () => {
                     role="tab"
                     aria-selected={selected}
                     onClick={() => setActiveLens(lens.id)}
+                    aria-label={lens.label}
                     className={`whitespace-nowrap px-3 py-1.5 rounded-full text-sm font-medium transition-all flex items-center gap-1.5 ${
                       selected
                         ? "bg-blue-500 text-white"
                         : "text-gray-600 dark:text-gray-300 hover:bg-white/60 dark:hover:bg-slate-700/60"
                     }`}
                   >
-                    <Icon className="w-4 h-4 shrink-0" />
-                    <span className="hidden lg:inline">{lens.label}</span>
-                    <span className="lg:hidden">{lens.shortLabel}</span>
+                    <Icon className="w-4 h-4 shrink-0" aria-hidden="true" />
+                    {/* See Users.tsx: the responsive label pair is hidden from
+                        the a11y tree in favour of the button's aria-label. */}
+                    <span className="hidden lg:inline" aria-hidden="true">
+                      {lens.label}
+                    </span>
+                    <span className="lg:hidden" aria-hidden="true">
+                      {lens.shortLabel}
+                    </span>
                   </button>
                 );
               })}

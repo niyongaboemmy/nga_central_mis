@@ -126,7 +126,10 @@ export const OVERVIEW: ClassGroupOverviewRow[] = [
   },
 ];
 
-export const wrapped = <T,>(data: T) => Promise.resolve({ data: { data } });
+// Deliberately `any`: every mock below is re-pointed at differently shaped
+// fixtures per test, and a precisely inferred first shape would reject them.
+export const wrapped = (data: unknown): Promise<any> =>
+  Promise.resolve({ data: { data } });
 
 /** Every academics API call the workspace makes, mocked and inspectable. */
 export const academicsMocks = {
@@ -143,6 +146,7 @@ export const academicsMocks = {
   },
   classGroupsApi: {
     getAll: vi.fn(() => wrapped(CLASS_GROUPS)),
+    students: vi.fn(() => wrapped([])),
     create: vi.fn(() => wrapped({})),
     update: vi.fn(() => wrapped({})),
     dependencies: vi.fn(() =>

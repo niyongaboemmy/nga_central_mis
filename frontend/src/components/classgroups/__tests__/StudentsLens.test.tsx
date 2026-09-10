@@ -229,7 +229,7 @@ describe("Students lens", () => {
 
   it("falls back to the permission-light roster without MANAGE_STUDENT_ENROLLMENTS", async () => {
     setPermissions(["MANAGE_ACADEMICS", "ASSIGN_STUDENT_CLASS_GROUPS"]);
-    academicsMocks.classGroupsApi.students = vi.fn(() =>
+    academicsMocks.classGroupsApi.students.mockImplementation(() =>
       wrapped([
         {
           user_id: 501,
@@ -242,7 +242,7 @@ describe("Students lens", () => {
           enrolled_at: null,
         },
       ]),
-    ) as any;
+    );
 
     const user = userEvent.setup();
     render(<ClassGroupsManagement />);

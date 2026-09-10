@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll } from "vitest";
 import request from "supertest";
 import app from "../app";
 import { db } from "../db";
-import { GradeSubject, StudentSubjectEnrollment } from "../db/schema";
+import { GradeSubject, StudentSubjectEnrollment, User } from "../db/schema";
 import { eq, and } from "drizzle-orm";
 import {
   createUser,
@@ -185,29 +185,62 @@ describe("Class Groups Management endpoints", () => {
     });
   });
 
+  // The suite shares one long-lived schema, so the unassigned pool is far
+  // bigger than one page. These search by the fixture's own username rather
+  // than trusting it to land on page one.
+  const usernameOf = async (userId: number) => {
+    const rows = await db
+      .select({ username: User.username })
+      .from(User)
+      .where(eq(User.user_id, userId))
+      .limit(1);
+    return rows[0].username;
+  };
+
   describe("GET /academics/students/unassigned", () => {
     it("lists students with no class group for the year", async () => {
       const stray = await createUser({ userType: "STUDENT" });
 
       const res = await request(app)
         .get("/academics/students/unassigned")
-        .query({ academic_year_id: yearId, limit: 100 })
+        .query({
+          academic_year_id: yearId,
+          search: await usernameOf(stray),
+          limit: 100,
+        })
         .set("Authorization", `Bearer ${adminToken}`);
 
       expect(res.status).toBe(200);
       const ids = (res.body.data.students as any[]).map((s) => s.user_id);
-      expect(ids).toContain(stray);
-      expect(ids).not.toContain(fullyEnrolledStudent);
+      expect(ids).toEqual([stray]);
+    });
+
+    it("excludes a student already assigned for that year", async () => {
+      const res = await request(app)
+        .get("/academics/students/unassigned")
+        .query({
+          academic_year_id: yearId,
+          search: await usernameOf(fullyEnrolledStudent),
+          limit: 100,
+        })
+        .set("Authorization", `Bearer ${adminToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.data.students).toHaveLength(0);
     });
 
     it("counts a student assigned only in another year as unassigned", async () => {
       const res = await request(app)
         .get("/academics/students/unassigned")
-        .query({ academic_year_id: otherYearId, limit: 200 })
+        .query({
+          academic_year_id: otherYearId,
+          search: await usernameOf(fullyEnrolledStudent),
+          limit: 100,
+        })
         .set("Authorization", `Bearer ${adminToken}`);
 
       const ids = (res.body.data.students as any[]).map((s) => s.user_id);
-      expect(ids).toContain(fullyEnrolledStudent);
+      expect(ids).toEqual([fullyEnrolledStudent]);
     });
 
     it("rejects a caller without ASSIGN_STUDENT_CLASS_GROUPS", async () => {

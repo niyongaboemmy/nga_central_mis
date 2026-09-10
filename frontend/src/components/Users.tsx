@@ -176,15 +176,23 @@ const Users: React.FC = () => {
                   role="tab"
                   aria-selected={activeTab === tab.id}
                   onClick={() => handleSelectTab(tab.id)}
+                  aria-label={tab.label}
                   className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all flex items-center gap-1.5 whitespace-nowrap ${
                     activeTab === tab.id
                       ? "bg-blue-500 text-white"
                       : "text-gray-600 dark:text-gray-300 hover:bg-white/60 dark:hover:bg-slate-700/60"
                   }`}
                 >
-                  <Icon className="w-4 h-4 shrink-0" />
-                  <span className="hidden sm:inline">{tab.label}</span>
-                  <span className="sm:hidden">{tab.shortLabel}</span>
+                  <Icon className="w-4 h-4 shrink-0" aria-hidden="true" />
+                  {/* Both labels are in the DOM for the responsive swap, so
+                      they are hidden from the a11y tree in favour of the
+                      button's own aria-label. */}
+                  <span className="hidden sm:inline" aria-hidden="true">
+                    {tab.label}
+                  </span>
+                  <span className="sm:hidden" aria-hidden="true">
+                    {tab.shortLabel}
+                  </span>
                 </button>
               );
             })}

@@ -3,8 +3,8 @@
 **Target:** a third tab on `/users` (`Users Management`), alongside **Management** and **Dashboard**.
 **Tab label:** `Class Groups Management`
 **Owner surface:** `frontend/src/components/Users.tsx` → new `frontend/src/components/classgroups/*`
-**Status:** proposal / not yet implemented
-**Date:** 2026-09-09
+**Status:** implemented — all six phases delivered and tested
+**Date:** 2026-09-09 (plan) · 2026-09-10 (implementation)
 
 ---
 
@@ -509,3 +509,90 @@ next year → confirm checklist goes all-green.
 - [Data Table Pattern — UX Patterns for Developers](https://uxpatterns.dev/patterns/data-display/table)
 - [What is a Student Information System (SIS)? — Classe365](https://www.classe365.com/blog/what-is-a-student-information-system-sis-features-and-benefits/)
 - [Student Enrollment Management Systems — FlowForma](https://www.flowforma.com/blog/student-enrollment-management-systems)
+
+
+---
+
+## 15. Implementation record
+
+All six phases are built, typechecked, and covered by tests. `frontend/npm run build`
+emits `ClassGroupsManagement-*.js` as its own ~97 kB chunk, confirming the code-split.
+
+### Test results
+
+| Suite | Result |
+| --- | --- |
+| Backend (`backend/npx vitest run`) | **262 passed / 43 files** |
+| New backend file `classGroupsManagement.test.ts` | **18 passed** |
+| Frontend (`frontend/npx vitest run`) | **213 passed / 36 files** |
+| New frontend `components/classgroups/__tests__` | **63 passed / 6 files** |
+| `tsc --noEmit`, both packages | clean |
+
+### What shipped
+
+**Backend** — all additive, no migrations:
+- `getClassGroupsOverview`, `getUnassignedStudents`, `bulkAssignTeacherToSubjects`,
+  `bulkUnenrollStudentsFromSubjects` in
+  [academicController.ts](backend/src/controllers/academicController.ts), routed in
+  [academics.ts](backend/src/routes/academics.ts). The `overview` and `unassigned`
+  routes are registered before their `:id`/`:studentId` siblings so Express does not
+  match the literal as a parameter.
+- `class_group_id` + `academic_year_id` filter on `getUsers`
+  ([userController.ts](backend/src/controllers/userController.ts)).
+
+**Frontend** — `frontend/src/components/classgroups/`:
+`ClassGroupsManagement` (shell), `ClassGroupsContext` (selection + invalidation bus),
+`ContextBar`, `ClassGroupNavigator`, `SetupChecklistPanel`, `BulkActionBar`,
+`ReadinessRing`, `shared.tsx`, `readiness.ts`, three hooks (`useClassRoster`,
+`useClassAcademics`, `useVirtualRows`) and the five lenses. Plus
+`frontend/src/api/classGroups.ts` and a `classGroupsApi.students` wrapper in
+[academics.ts](frontend/src/api/academics.ts).
+
+### Deviations from the plan, and why
+
+1. **The matrix stages every edit rather than writing single cells optimistically.**
+   The plan had single clicks commit immediately and only bulk gestures stage a diff.
+   Shipping both would make a click and a drag behave differently on the same cell.
+   Instead every edit flips the cell instantly (the optimistic *feel*) but lands in a
+   pending diff with Apply/Discard, committed in at most two requests. Nothing is lost
+   to a mis-click, and painting forty cells is still two writes.
+
+2. **No separate mobile accordion for the matrix.** A parallel `md:hidden` rendering
+   would duplicate every cell's `aria-label` in the DOM, which is worse for assistive
+   tech than the sticky-column horizontal scroll the grid already has. The rest of the
+   responsive plan (navigator rail → drawer below `xl`, wrapping tab strips, abbreviated
+   labels) shipped as designed.
+
+3. **Tab buttons carry an explicit `aria-label`.** Both tab strips render a long and a
+   short label for the responsive swap. CSS is invisible to the accessibility tree, so
+   screen readers announced "Class Groups Management Class Groups"; the labels are now
+   `aria-hidden` behind one authoritative name.
+
+4. **`ReadinessRing` counts five checks, not six.** "Every grade has ≥1 class group" is a
+   property of a *grade*, not of a class group, so it cannot fail for a row that exists.
+   It is implied by a grade having no rows in the navigator at all.
+
+5. **Students lens degrades instead of splitting its source.** It reads the richer
+   `enrollment-roster` endpoint when the caller holds `MANAGE_STUDENT_ENROLLMENTS` (one
+   request, includes per-student coverage) and falls back to the permission-light
+   `class-groups/:id/students`, dropping only the coverage column. See
+   `useClassRoster.ts`.
+
+6. **The class-group delete modal follows the newer `deletes`/`unlinks` contract**, not
+   the `blocking`/`detachable` shape the plan was written against — that contract changed
+   in the working tree during implementation.
+
+### Known pre-existing issues found along the way (not fixed here)
+
+- **`GET /users` fans out N+1×3 queries per page, concurrently.** At `limit: 5` against
+  the test database it exhausts the pool and 500s with `Connection lost`; at `limit: 1`
+  it succeeds. It is unchanged by this work and reproduces on a clean checkout, but it is
+  a real scalability ceiling on the Users page worth its own fix.
+- **`frontend/npm run lint` cannot run** — there is no ESLint config file in the repo.
+  `tsc --noEmit` is the working gate.
+- **The backend suite is not safe to run concurrently with itself.** Every test file
+  shares one `nga_central_mis_test` schema (`fileParallelism: false` only orders files
+  *within* a run). While two runs overlap, a different single test fails each time and
+  every one of them passes in isolation. Re-run before believing a lone failure.
+- **`frontend/dist/assets` is root-owned**, so `npm run build` fails at the clean step
+  with `ENOTEMPTY`. Building to any other `--outDir` succeeds.
