@@ -15,6 +15,12 @@ import {
 import { buildGridLayout, cellKey, type GridCell } from "./calendarLayout";
 import SlotTooltip, { instructorOf, useSlotTooltip } from "./SlotTooltip";
 import { useCurrentTime } from "./useCurrentTime";
+import {
+  getSlotColor,
+  hexToRgba,
+  readableTextColor,
+  shadeColor,
+} from "./slotColor";
 
 interface CalendarGridProps {
   calendarId?: number;
@@ -254,6 +260,21 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
 
   const headingId = `calendar-grid-${calendarId ?? "personal"}`;
 
+  // One swatch per distinct subject actually on this grid, so the colours mean
+  // something to the reader instead of being decoration.
+  const subjectLegend = useMemo(() => {
+    const seen = new Map<string, { name: string; color: string }>();
+    for (const s of calendarSlots) {
+      if ((s as GridEntry).__activity) continue;
+      const name = s.subject_name;
+      if (!name || seen.has(name)) continue;
+      seen.set(name, { name, color: getSlotColor(s) });
+    }
+    return Array.from(seen.values()).sort((a, b) =>
+      a.name.localeCompare(b.name),
+    );
+  }, [calendarSlots]);
+
   return (
     <div>
       <h3
@@ -405,17 +426,33 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
                         >
                           {/* Lessons that start at the same time sit side by
                               side rather than one hiding the other. */}
-                          <div className="absolute inset-0.5 flex gap-0.5">
+                          <div className="absolute inset-1 flex gap-1">
                             {courses.map((course) => {
                               const progress = isToday
                                 ? lessonProgress(course, nowMinutes)
                                 : null;
+                              const isActivity = Boolean(
+                                (course as GridEntry).__activity,
+                              );
+                              const color = getSlotColor(course);
+                              const textColor = readableTextColor(color);
+                              const isLive = progress !== null;
                               return (
                                 <div
                                   key={course.slot_id}
-                                  className="relative flex-1 min-w-0 overflow-hidden rounded-sm"
+                                  className={`group/slot relative flex-1 min-w-0 overflow-hidden rounded-lg cursor-pointer transition-all duration-200 hover:-translate-y-px ${
+                                    isLive
+                                      ? "ring-2 ring-rose-400 shadow-lg shadow-rose-500/20"
+                                      : isToday
+                                        ? "shadow-md"
+                                        : "shadow-sm hover:shadow-md"
+                                  }`}
                                   style={{
-                                    backgroundColor: course.color || "#3B82F6",
+                                    background: `linear-gradient(160deg, ${hexToRgba(
+                                      color,
+                                      0.96,
+                                    )}, ${shadeColor(color, 0.82)})`,
+                                    borderLeft: `3px solid ${shadeColor(color, 0.6)}`,
                                   }}
                                   onClick={() => activate(cell, course)}
                                   onMouseEnter={(e) =>
@@ -423,31 +460,59 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
                                   }
                                   onMouseLeave={hideTooltip}
                                 >
+                                  {/* top sheen for a bit of depth */}
                                   <div
-                                    className={`h-full p-2 text-xs hover:brightness-110 transition-all duration-200 flex flex-col justify-start ${
-                                      progress !== null
-                                        ? "ring-2 ring-rose-400 shadow-lg"
-                                        : isToday
-                                          ? "ring-2 ring-white dark:ring-gray-600 shadow-lg"
-                                          : ""
-                                    }`}
+                                    aria-hidden="true"
+                                    className="pointer-events-none absolute inset-x-0 top-0 h-1/2"
+                                    style={{
+                                      background:
+                                        "linear-gradient(180deg, rgba(255,255,255,0.18), rgba(255,255,255,0))",
+                                    }}
+                                  />
+                                  <div
+                                    className="relative h-full p-2 text-xs flex flex-col justify-start gap-0.5"
+                                    style={{ color: textColor }}
                                   >
-                                    <div className="font-medium text-white truncate">
-                                      {course.subject_name}
+                                    <div className="flex items-center gap-1 min-w-0">
+                                      {isActivity && (
+                                        <span
+                                          aria-hidden="true"
+                                          className="text-[9px] font-bold uppercase tracking-wide px-1 py-px rounded"
+                                          style={{
+                                            backgroundColor: hexToRgba(
+                                              textColor === "#ffffff"
+                                                ? "#000000"
+                                                : "#ffffff",
+                                              0.18,
+                                            ),
+                                          }}
+                                        >
+                                          Event
+                                        </span>
+                                      )}
+                                      <span className="font-semibold truncate">
+                                        {course.subject_name}
+                                      </span>
                                     </div>
                                     {course.class_group_name && (
-                                      <div className="text-white/80 text-[10px] truncate">
+                                      <div
+                                        className="text-[10px] truncate"
+                                        style={{ opacity: 0.85 }}
+                                      >
                                         {course.class_group_name}
                                       </div>
                                     )}
-                                    <div className="text-white/90 text-[10px] mt-1 font-medium">
+                                    <div
+                                      className="text-[10px] mt-auto font-medium tabular-nums"
+                                      style={{ opacity: 0.9 }}
+                                    >
                                       {course.start_time} - {course.end_time}
                                     </div>
                                   </div>
-                                  {progress !== null && (
+                                  {isLive && (
                                     <div
                                       className="absolute bottom-0 left-0 h-1 bg-white/90"
-                                      style={{ width: `${progress * 100}%` }}
+                                      style={{ width: `${(progress ?? 0) * 100}%` }}
                                       aria-hidden="true"
                                     />
                                   )}
@@ -465,11 +530,11 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
                         {...commonProps}
                         key={dayIdx}
                         aria-label={`${dayLabel}, free${canEdit ? " — press Enter to schedule a lesson" : ""}`}
-                        className={`p-2 border-l border-gray-100 dark:border-gray-700/20 group focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 ${
+                        className={`p-1 border-l border-gray-100 dark:border-gray-700/20 group focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 ${
                           canEdit
-                            ? "cursor-pointer hover:bg-blue-500 dark:hover:bg-blue-900/20 transition-colors"
+                            ? "cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-900/15 transition-colors"
                             : ""
-                        } ${isToday ? "bg-blue-100 dark:bg-blue-900/10" : ""} ${
+                        } ${isToday ? "bg-blue-50/60 dark:bg-blue-900/10" : ""} ${
                           isNow ? "ring-1 ring-inset ring-rose-400/60" : ""
                         }`}
                         onClick={() => activate(cell)}
@@ -480,8 +545,10 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
                         }
                       >
                         {canEdit && dayIdx < 5 && (
-                          <div className="flex items-center justify-center text-4xl text-blue-300/10 group-hover:text-white dark:text-gray-900/10">
-                            <MdAdd />
+                          <div className="flex h-full items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                            <span className="flex items-center justify-center w-6 h-6 rounded-full bg-blue-500/10 text-blue-500 dark:text-blue-400 text-lg">
+                              <MdAdd />
+                            </span>
                           </div>
                         )}
                       </td>
@@ -493,6 +560,23 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
           </tbody>
         </table>
       </div>
+
+      {subjectLegend.length > 0 && (
+        <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2 px-2">
+          {subjectLegend.map((s) => (
+            <div
+              key={s.name}
+              className="flex items-center gap-1.5 text-xs text-gray-600 dark:text-gray-300"
+            >
+              <span
+                className="w-3 h-3 rounded-[4px] flex-shrink-0 ring-1 ring-black/5"
+                style={{ backgroundColor: s.color }}
+              />
+              <span className="truncate max-w-[12rem]">{s.name}</span>
+            </div>
+          ))}
+        </div>
+      )}
 
       <SlotTooltip state={tooltip} />
     </div>

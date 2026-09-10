@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import CalendarGrid from "../CalendarGrid";
 import {
@@ -84,9 +84,10 @@ describe("calendar grid rows follow the data", () => {
       />,
     );
 
-    expect(screen.getByText("Applied Physics I")).toBeInTheDocument();
-    expect(screen.getByText("Applied Math I")).toBeInTheDocument();
-    expect(screen.getByText("08:00 - 09:40")).toBeInTheDocument();
+    const grid = within(screen.getByRole("grid"));
+    expect(grid.getByText("Applied Physics I")).toBeInTheDocument();
+    expect(grid.getByText("Applied Math I")).toBeInTheDocument();
+    expect(grid.getByText("08:00 - 09:40")).toBeInTheDocument();
   });
 
   it("still renders slots that do sit on the standard timetable", () => {
@@ -102,7 +103,9 @@ describe("calendar grid rows follow the data", () => {
       />,
     );
 
-    expect(screen.getByText("Computer Basics")).toBeInTheDocument();
+    expect(
+      within(screen.getByRole("grid")).getByText("Computer Basics"),
+    ).toBeInTheDocument();
   });
 });
 
@@ -154,7 +157,7 @@ describe("keyboard navigation", () => {
     const user = userEvent.setup();
     renderGrid();
 
-    const monday08 = screen
+    const monday08 = within(screen.getByRole("grid"))
       .getByText("Applied Physics I")
       .closest("td") as HTMLElement;
     monday08.focus();
@@ -195,7 +198,11 @@ describe("keyboard navigation", () => {
       />,
     );
 
-    (screen.getByText("Applied Physics I").closest("td") as HTMLElement).focus();
+    (
+      within(screen.getByRole("grid"))
+        .getByText("Applied Physics I")
+        .closest("td") as HTMLElement
+    ).focus();
     await user.keyboard("{Enter}");
     expect(onSlotClick).toHaveBeenCalledTimes(1);
   });

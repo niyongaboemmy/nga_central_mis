@@ -1,5 +1,6 @@
 import React, { useCallback, useState } from "react";
 import type { CalendarSlot } from "../../api/calendar";
+import { getSlotColor } from "./slotColor";
 
 export const instructorOf = (slot: CalendarSlot): string =>
   [slot.instructor_name, slot.instructor_lastname].filter(Boolean).join(" ");
@@ -36,14 +37,15 @@ const SlotTooltip: React.FC<{ state: SlotTooltipState | null }> = ({
   if (!state) return null;
   const { slot } = state;
   const instructor = instructorOf(slot);
+  const color = getSlotColor(slot);
 
   return (
     <div
       role="tooltip"
       // Fixed to the viewport: the grid scrolls horizontally, and a tooltip
       // positioned inside that container would be clipped by its overflow.
-      style={{ left: state.x, top: state.y - 8 }}
-      className="fixed z-50 -translate-x-1/2 -translate-y-full pointer-events-none max-w-xs rounded-lg bg-gray-900/95 dark:bg-gray-800 px-3 py-2 text-xs text-white shadow-xl ring-1 ring-white/10"
+      style={{ left: state.x, top: state.y - 8, borderLeftColor: color }}
+      className="fixed z-50 -translate-x-1/2 -translate-y-full pointer-events-none max-w-xs rounded-lg border-l-4 bg-gray-900/95 dark:bg-gray-800 px-3 py-2 text-xs text-white shadow-xl ring-1 ring-white/10"
     >
       <div className="font-semibold leading-snug">{slot.subject_name}</div>
       {slot.subject_code && (

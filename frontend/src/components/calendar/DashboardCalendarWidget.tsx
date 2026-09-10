@@ -28,6 +28,7 @@ import {
 import { buildGridLayout, cellKey, type GridCell } from "./calendarLayout";
 import SlotTooltip, { useSlotTooltip } from "./SlotTooltip";
 import { useCurrentTime } from "./useCurrentTime";
+import { getSlotColor, readableTextColor, shadeColor } from "./slotColor";
 import CalendarSlotModal from "./CalendarSlotModal";
 import LessonPlanModal from "./LessonPlanModal";
 
@@ -718,12 +719,18 @@ const ReadOnlyCalendarGrid: React.FC<ReadOnlyCalendarGridProps> = ({
                               const progress = isToday
                                 ? lessonProgress(course, nowMinutes)
                                 : null;
+                              const color = getSlotColor(course);
+                              const textColor = readableTextColor(color);
                               return (
                                 <div
                                   key={course.slot_id}
-                                  className="relative flex-1 min-w-0 overflow-hidden rounded-sm"
+                                  className="relative flex-1 min-w-0 overflow-hidden rounded-md shadow-sm"
                                   style={{
-                                    backgroundColor: course.color || "#3B82F6",
+                                    background: `linear-gradient(160deg, ${color}, ${shadeColor(
+                                      color,
+                                      0.82,
+                                    )})`,
+                                    borderLeft: `3px solid ${shadeColor(color, 0.6)}`,
                                   }}
                                   onClick={() =>
                                     onSlotClick(course, weekDates[dayIdx]!)
@@ -741,17 +748,24 @@ const ReadOnlyCalendarGrid: React.FC<ReadOnlyCalendarGridProps> = ({
                                           ? "ring-2 ring-white dark:ring-gray-600 shadow-lg"
                                           : ""
                                     }`}
+                                    style={{ color: textColor }}
                                   >
-                                    <div className="font-normal text-white truncate text-[12px]">
+                                    <div className="font-medium truncate text-[12px]">
                                       {course.subject_name}
                                     </div>
                                     {showClassGroup &&
                                       course.class_group_name && (
-                                        <div className="text-white/80 truncate text-[10px]">
+                                        <div
+                                          className="truncate text-[10px]"
+                                          style={{ opacity: 0.85 }}
+                                        >
                                           {course.class_group_name}
                                         </div>
                                       )}
-                                    <div className="text-white/70 text-[10px] mt-auto">
+                                    <div
+                                      className="text-[10px] mt-auto"
+                                      style={{ opacity: 0.8 }}
+                                    >
                                       {course.start_time} - {course.end_time}
                                     </div>
                                   </div>

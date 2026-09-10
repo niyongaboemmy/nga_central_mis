@@ -2,6 +2,7 @@
 export * from "./calendarConstants";
 export * from "./calendarLayout";
 export * from "./useCurrentTime";
+export * from "./slotColor";
 
 // Components
 export { default as CalendarHeader } from "./CalendarHeader";

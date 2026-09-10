@@ -27,7 +27,7 @@ const activity = (over: Partial<CalendarActivity> = {}): CalendarActivity => ({
 
 describe("custom activities on the calendar grid", () => {
   it("renders a non-subject activity in its own colour", () => {
-    render(
+    const { container } = render(
       <CalendarGrid
         calendarId={7}
         classGroupName="L4. Class A"
@@ -41,11 +41,16 @@ describe("custom activities on the calendar grid", () => {
     );
 
     expect(screen.getByText("Morning Devotion")).toBeInTheDocument();
-    // The activity's colour is applied to its block
-    const block = screen
-      .getByText("Morning Devotion")
-      .closest("[style]") as HTMLElement;
-    expect(block.style.backgroundColor).toBe("rgb(245, 158, 11)");
+    // The activity's colour (#F59E0B → rgb(245,158,11)) drives its block styling
+    const styled = Array.from(
+      container.querySelectorAll<HTMLElement>("[style]"),
+    ).some(
+      (el) =>
+        el.style.background.includes("245, 158, 11") ||
+        el.style.borderLeft.includes("245, 158, 11") ||
+        el.style.borderLeftColor.includes("245, 158, 11"),
+    );
+    expect(styled).toBe(true);
   });
 
   it("routes a click on an activity to onActivityClick, not onSlotClick", async () => {

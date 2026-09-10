@@ -2,6 +2,7 @@ import React from "react";
 import { X, Clock, CalendarDays, Sparkles } from "lucide-react";
 import SubjectSelect from "../ui/SubjectSelect";
 import { DAYS_FULL, backendDayToDisplay } from "./calendarConstants";
+import { getSlotColor, readableTextColor } from "./slotColor";
 import type {
   CalendarSlot,
   CalendarActivity,
@@ -371,9 +372,12 @@ const CalendarSlotModal: React.FC<CalendarSlotModalProps> = ({
             <div className="flex items-start gap-4">
               <div
                 className="w-12 h-12 rounded-2xl flex-shrink-0 flex items-center justify-center shadow-inner"
-                style={{ backgroundColor: selectedSlot.color || "#3B82F6" }}
+                style={{ backgroundColor: getSlotColor(selectedSlot) }}
               >
-                <div className="text-white font-bold text-xl">
+                <div
+                  className="font-bold text-xl"
+                  style={{ color: readableTextColor(getSlotColor(selectedSlot)) }}
+                >
                   {selectedSlot.subject_name?.charAt(0)}
                 </div>
               </div>
