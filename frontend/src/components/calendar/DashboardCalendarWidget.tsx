@@ -732,7 +732,6 @@ const ReadOnlyCalendarGrid: React.FC<ReadOnlyCalendarGridProps> = ({
                                     {
                                       "--slot-bg": surface.background,
                                       "--slot-bg-hover": surface.hoverBackground,
-                                      borderLeft: `3px solid ${surface.accent}`,
                                       boxShadow: isLive
                                         ? `inset 0 0 0 1.5px ${surface.accent}`
                                         : undefined,

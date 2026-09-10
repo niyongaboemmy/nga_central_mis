@@ -1,13 +1,12 @@
-// Day names - starting with Monday for European week format
-export const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+// Day names - the school week runs Monday to Friday, so the calendar only ever
+// shows those five days (weekend columns were noise: never any lessons in them).
+export const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri"];
 export const DAYS_FULL = [
   "Monday",
   "Tuesday",
   "Wednesday",
   "Thursday",
   "Friday",
-  "Saturday",
-  "Sunday",
 ];
 
 // Daily schedule — the institution's official daily bell schedule.
@@ -169,13 +168,13 @@ export const getStartOfWeek = (date: Date): Date => {
   return result;
 };
 
-// Get dates for a 7-day week starting from Monday (index 0)
+// Get dates for the school week: Monday (index 0) to Friday (index 4)
 export const getWeekDates = (currentWeekStart: Date): Date[] => {
   const dates: Date[] = [];
   const start = new Date(currentWeekStart);
   start.setHours(0, 0, 0, 0);
 
-  for (let i = 0; i < 7; i++) {
+  for (let i = 0; i < 5; i++) {
     const date = new Date(start);
     date.setDate(start.getDate() + i);
     dates.push(date);
@@ -187,7 +186,7 @@ export const getWeekDates = (currentWeekStart: Date): Date[] => {
 export const getDateRangeString = (weekDates: Date[]): string => {
   if (weekDates.length === 0) return "";
   const start = weekDates[0];
-  const end = weekDates[6];
+  const end = weekDates[weekDates.length - 1];
   return `${formatDateShort(start)} - ${formatDateShort(end)}, ${end.getFullYear()}`;
 };
 

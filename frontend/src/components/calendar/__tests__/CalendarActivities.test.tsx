@@ -41,14 +41,11 @@ describe("custom activities on the calendar grid", () => {
     );
 
     expect(screen.getByText("Morning Devotion")).toBeInTheDocument();
-    // The activity's colour (#F59E0B → rgb(245,158,11)) drives its block styling
+    // The activity's colour (#F59E0B → rgb(245,158,11)) tints its block
     const styled = Array.from(
       container.querySelectorAll<HTMLElement>("[style]"),
-    ).some(
-      (el) =>
-        el.style.background.includes("245, 158, 11") ||
-        el.style.borderLeft.includes("245, 158, 11") ||
-        el.style.borderLeftColor.includes("245, 158, 11"),
+    ).some((el) =>
+      el.style.getPropertyValue("--slot-bg").includes("245, 158, 11"),
     );
     expect(styled).toBe(true);
   });
