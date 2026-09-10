@@ -142,6 +142,20 @@ export const subjectsApi = {
   update: (id: number, data: Partial<Omit<Subject, "subject_id">>) =>
     api.put<Subject>(`/academics/subjects/${id}`, data),
   delete: (id: number) => api.delete(`/academics/subjects/${id}`),
+  /** Give every subject a distinct calendar colour in one pass. `force` also
+   *  reassigns colours that were picked by hand. */
+  assignColors: (opts?: { force?: boolean; includeDisabled?: boolean }) =>
+    api.post<{
+      data: {
+        updated: number;
+        total: number;
+        assignments: {
+          subject_id: number;
+          previous_color: string | null;
+          color: string;
+        }[];
+      };
+    }>("/academics/subjects/assign-colors", opts ?? {}),
 };
 
 // Course Categories API

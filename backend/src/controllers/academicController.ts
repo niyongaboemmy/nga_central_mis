@@ -41,6 +41,10 @@ import { recordActivity } from "../utils/activityLogger";
 import logger from "../utils/logger";
 import { getCurrentAcademicYearId } from "../utils/academicYear";
 import {
+  assignUniqueSubjectColors,
+  nextSubjectColor,
+} from "../utils/subjectColors";
+import {
   getTeacherAssignments,
   getTeacherRosterRows,
 } from "../services/teacherRoster";
@@ -1445,13 +1449,24 @@ export const createSubject = asyncHandler(async (req: any, res: any) => {
     }
   }
 
+  // No colour picked → give the subject a distinct one straight away rather
+  // than the shared default, so the academic calendar never renders it as
+  // "just another blue block".
+  let resolvedColor = sanitizedColor;
+  if (!resolvedColor) {
+    const takenColors = await db
+      .select({ color: Subject.color })
+      .from(Subject);
+    resolvedColor = nextSubjectColor(takenColors.map((s: any) => s.color));
+  }
+
   const result = await db.insert(Subject).values({
     code: sanitizedCode || null,
     name: sanitizedName,
     description: sanitizedDescription || null,
     course_category_id: course_category_id || null,
     max_marks: max_marks || null,
-    color: sanitizedColor || "#3B82F6",
+    color: resolvedColor,
   });
 
   const subjectId = (result as any).insertId;
@@ -1465,7 +1480,7 @@ export const createSubject = asyncHandler(async (req: any, res: any) => {
       `Created subject: ${sanitizedName}`,
       "Subject",
       subjectId,
-      { name: sanitizedName, description, code, color: sanitizedColor },
+      { name: sanitizedName, description, code, color: resolvedColor },
       req.user.userId,
     );
   }
@@ -1480,7 +1495,7 @@ export const createSubject = asyncHandler(async (req: any, res: any) => {
       description: sanitizedDescription || null,
       course_category_id: course_category_id || null,
       max_marks: max_marks || null,
-      color: sanitizedColor || "#3B82F6",
+      color: resolvedColor,
     },
     201,
   );
@@ -1640,6 +1655,63 @@ export const deleteSubject = asyncHandler(async (req: any, res: any) => {
 
   successResponse(res, "Subject disabled successfully");
 });
+
+/**
+ * Give every subject a distinct calendar colour in one pass.
+ *
+ * Ranks subjects by id and walks the golden-angle hue sweep, so colours stay
+ * maximally separated for any number of subjects and a subject keeps its
+ * colour as the catalogue grows. Hand-picked colours are preserved (generated
+ * ones step around them) unless `force` is set. See utils/subjectColors.ts.
+ *
+ * Body: { force?: boolean, includeDisabled?: boolean }
+ */
+export const assignSubjectColors = asyncHandler(
+  async (req: any, res: any) => {
+    const force = req.body?.force === true || req.body?.force === "true";
+    const includeDisabled =
+      req.body?.includeDisabled === true ||
+      req.body?.includeDisabled === "true";
+
+    const subjects = await db
+      .select({ subject_id: Subject.subject_id, color: Subject.color })
+      .from(Subject)
+      .where(includeDisabled ? undefined : eq(Subject.status, "ACTIVE"));
+
+    const assignments = assignUniqueSubjectColors(subjects, { force });
+
+    for (const a of assignments) {
+      await db
+        .update(Subject)
+        .set({ color: a.color })
+        .where(eq(Subject.subject_id, a.subject_id));
+    }
+
+    logger.info("Subject colours assigned", {
+      updated: assignments.length,
+      total: subjects.length,
+      force,
+    });
+
+    if (req.user?.userId && assignments.length > 0) {
+      await recordActivity(
+        req.user.userId,
+        "SUBJECT_UPDATE",
+        `Auto-assigned distinct colours to ${assignments.length} subject(s)`,
+        "Subject",
+        undefined,
+        undefined,
+        req.user.userId,
+      );
+    }
+
+    successResponse(res, "Subject colours assigned", {
+      updated: assignments.length,
+      total: subjects.length,
+      assignments,
+    });
+  },
+);
 
 // Grade-Subject Assignment Management
 export const getGradeSubjects = asyncHandler(async (req: any, res: any) => {

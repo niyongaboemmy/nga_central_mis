@@ -41,6 +41,7 @@ import {
   createSubject,
   updateSubject,
   deleteSubject,
+  assignSubjectColors,
 
   // Grade-Subject Assignments
   getGradeSubjects,
@@ -304,6 +305,13 @@ router.delete(
 
 // Subjects routes
 router.get("/subjects", authenticate, getSubjects);
+// Registered before "/subjects/:id" so "assign-colors" isn't read as an id.
+router.post(
+  "/subjects/assign-colors",
+  authenticate,
+  authorize("MANAGE_ACADEMICS"),
+  assignSubjectColors,
+);
 router.get("/subjects/:id", authenticate, getSubject);
 router.post(
   "/subjects",

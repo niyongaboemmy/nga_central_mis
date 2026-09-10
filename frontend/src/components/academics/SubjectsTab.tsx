@@ -7,6 +7,7 @@ import {
   gradesApi,
   courseCategoriesApi,
   teacherSubjectAssignmentsApi,
+  subjectsApi,
   SubjectTeacherAssignment,
 } from "../../api/academics";
 import Button from "../ui/Button";
@@ -420,6 +421,38 @@ const SubjectsTab: React.FC<SubjectsTabProps> = ({
   onDelete,
 }) => {
   const { showToast } = useToast();
+  const [assigningColors, setAssigningColors] = useState(false);
+
+  // Give every subject a distinct calendar colour in one pass. Subjects with a
+  // hand-picked colour keep it; only the ones still on the shared default get a
+  // new one. The academic calendar reads Subject.color, so this immediately
+  // spreads the timetable across the palette.
+  const handleAssignColors = async () => {
+    if (
+      !window.confirm(
+        "Give every subject still on the default colour a distinct one? " +
+          "Colours you picked by hand are kept.",
+      )
+    )
+      return;
+    try {
+      setAssigningColors(true);
+      const res = await subjectsApi.assignColors();
+      const { updated, total } = res.data.data;
+      showToast(
+        updated === 0
+          ? `All ${total} subjects already have a distinct colour`
+          : `Assigned distinct colours to ${updated} of ${total} subjects`,
+        "success",
+      );
+      onRefresh();
+    } catch {
+      showToast("Failed to assign subject colours", "error");
+    } finally {
+      setAssigningColors(false);
+    }
+  };
+
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -817,6 +850,14 @@ const SubjectsTab: React.FC<SubjectsTabProps> = ({
         <div className="flex space-x-3">
           <Button variant="secondary" onClick={onRefresh} disabled={loading}>
             Refresh
+          </Button>
+          <Button
+            variant="secondary"
+            onClick={handleAssignColors}
+            disabled={loading || assigningColors || data.length === 0}
+            title="Give every subject a distinct academic-calendar colour"
+          >
+            {assigningColors ? "Assigning…" : "Auto-assign colours"}
           </Button>
           <Button
             onClick={() => {
