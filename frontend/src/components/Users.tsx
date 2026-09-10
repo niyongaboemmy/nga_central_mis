@@ -1,12 +1,45 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, Suspense, lazy } from "react";
 import { motion } from "framer-motion";
-import { User as UserIcon, LayoutGrid, LayoutDashboard } from "lucide-react";
+import {
+  User as UserIcon,
+  LayoutGrid,
+  LayoutDashboard,
+  Network,
+  Loader2,
+} from "lucide-react";
 import { useUser } from "../contexts/UserContext";
 import { getRoles, Role } from "../api/users";
 import UsersManagement from "./UsersManagement";
 import UsersDashboard from "./UsersDashboard";
 
-type Tab = "management" | "dashboard";
+// The class-groups workspace pulls in a virtualised enrollment matrix and a
+// class tree; code-split so admins who only use Management never load it.
+const ClassGroupsManagement = lazy(
+  () => import("./classgroups/ClassGroupsManagement"),
+);
+
+type Tab = "management" | "dashboard" | "classgroups";
+
+const TABS: { id: Tab; label: string; shortLabel: string; icon: React.ElementType }[] = [
+  {
+    id: "management",
+    label: "Management",
+    shortLabel: "Management",
+    icon: LayoutGrid,
+  },
+  {
+    id: "dashboard",
+    label: "Dashboard",
+    shortLabel: "Dashboard",
+    icon: LayoutDashboard,
+  },
+  {
+    id: "classgroups",
+    label: "Class Groups Management",
+    shortLabel: "Class Groups",
+    icon: Network,
+  },
+];
 
 // Animated floating particles
 const FloatingParticles = () => (
@@ -42,6 +75,9 @@ const FloatingParticles = () => (
 const Users: React.FC = () => {
   const { user } = useUser();
   const [activeTab, setActiveTab] = useState<Tab>("management");
+  const [visitedTabs, setVisitedTabs] = useState<Set<Tab>>(
+    () => new Set<Tab>(["management"]),
+  );
   const [roles, setRoles] = useState<Role[]>([]);
   const [pendingRoleFilter, setPendingRoleFilter] = useState<string | null>(
     null,
@@ -93,6 +129,11 @@ const Users: React.FC = () => {
     );
   }
 
+  const handleSelectTab = (tab: Tab) => {
+    setVisitedTabs((prev) => (prev.has(tab) ? prev : new Set(prev).add(tab)));
+    setActiveTab(tab);
+  };
+
   const handleSelectRoleFromDashboard = (roleId: string) => {
     setPendingRoleFilter(roleId);
     setActiveTab("management");
@@ -125,34 +166,28 @@ const Users: React.FC = () => {
             transition={{ delay: 0.03 }}
             role="tablist"
             aria-label="Users view"
-            className="flex gap-1 mb-5 bg-white/60 dark:bg-slate-800/60 backdrop-blur-sm border border-white/50 dark:border-slate-700/30 rounded-full p-1 w-fit"
+            className="flex flex-wrap gap-1 mb-5 bg-white/60 dark:bg-slate-800/60 backdrop-blur-sm border border-white/50 dark:border-slate-700/30 rounded-full p-1 w-fit max-w-full"
           >
-            <button
-              role="tab"
-              aria-selected={activeTab === "management"}
-              onClick={() => setActiveTab("management")}
-              className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all flex items-center gap-1.5 ${
-                activeTab === "management"
-                  ? "bg-blue-500 text-white"
-                  : "text-gray-600 dark:text-gray-300 hover:bg-white/60 dark:hover:bg-slate-700/60"
-              }`}
-            >
-              <LayoutGrid className="w-4 h-4" />
-              Management
-            </button>
-            <button
-              role="tab"
-              aria-selected={activeTab === "dashboard"}
-              onClick={() => setActiveTab("dashboard")}
-              className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all flex items-center gap-1.5 ${
-                activeTab === "dashboard"
-                  ? "bg-blue-500 text-white"
-                  : "text-gray-600 dark:text-gray-300 hover:bg-white/60 dark:hover:bg-slate-700/60"
-              }`}
-            >
-              <LayoutDashboard className="w-4 h-4" />
-              Dashboard
-            </button>
+            {TABS.map((tab) => {
+              const Icon = tab.icon;
+              return (
+                <button
+                  key={tab.id}
+                  role="tab"
+                  aria-selected={activeTab === tab.id}
+                  onClick={() => handleSelectTab(tab.id)}
+                  className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all flex items-center gap-1.5 whitespace-nowrap ${
+                    activeTab === tab.id
+                      ? "bg-blue-500 text-white"
+                      : "text-gray-600 dark:text-gray-300 hover:bg-white/60 dark:hover:bg-slate-700/60"
+                  }`}
+                >
+                  <Icon className="w-4 h-4 shrink-0" />
+                  <span className="hidden sm:inline">{tab.label}</span>
+                  <span className="sm:hidden">{tab.shortLabel}</span>
+                </button>
+              );
+            })}
           </motion.div>
 
           {/* Both tabs stay mounted permanently so switching between them
@@ -170,6 +205,23 @@ const Users: React.FC = () => {
               onSelectRole={handleSelectRoleFromDashboard}
             />
           </div>
+          {/* Mounted on first visit rather than upfront: unlike the other two
+              tabs it is heavy (class tree + enrollment matrix). Once opened it
+              stays mounted, so its selection and scroll survive tab switches. */}
+          {visitedTabs.has("classgroups") && (
+            <div className={activeTab === "classgroups" ? "" : "hidden"}>
+              <Suspense
+                fallback={
+                  <div className="flex items-center justify-center py-16 text-gray-400">
+                    <Loader2 className="w-5 h-5 animate-spin mr-2" />
+                    Loading class groups workspace…
+                  </div>
+                }
+              >
+                <ClassGroupsManagement />
+              </Suspense>
+            </div>
+          )}
         </div>
       </div>
     </div>

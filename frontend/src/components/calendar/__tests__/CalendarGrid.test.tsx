@@ -94,7 +94,7 @@ describe("calendar grid rows follow the data", () => {
       <CalendarGrid
         calendarId={7}
         classGroupName="L4. Class A"
-        slots={[slot({ start_time: "12:40", end_time: "13:30", subject_name: "Computer Basics" })]}
+        slots={[slot({ start_time: "13:30", end_time: "14:20", subject_name: "Computer Basics" })]}
         activities={[]}
         weekDates={weekDates}
         onSlotClick={() => {}}
@@ -164,7 +164,7 @@ describe("keyboard navigation", () => {
     // successor row (10:00), not back inside the same lesson.
     expect(document.activeElement).toHaveAttribute(
       "aria-label",
-      expect.stringContaining("Monday 10:00"),
+      expect.stringContaining("Monday P3 10:00"),
     );
   });
 

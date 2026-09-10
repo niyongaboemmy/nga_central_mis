@@ -10,25 +10,38 @@ export const DAYS_FULL = [
   "Sunday",
 ];
 
-// Daily schedule - each row in the calendar (based on institution timetable).
+// Daily schedule — the institution's official daily bell schedule.
 //
-// The teaching day opens with a 07:30-08:00 devotion/self-study block; the
-// first period starts at 08:00. Periods are 50 minutes, paired into doubles,
-// with a short break between pairs and an hour for lunch.
+// Eight 50-minute periods (P1-P8) from 08:00, with 20-minute breaks after P2
+// and P7, an hour for lunch after P5, and office hours closing the day. The
+// 07:30 devotion block runs before the first bell.
+//
+// `label` names the block the way the bell schedule does, so the grid can show
+// "P3" next to 10:00-10:50 instead of leaving the reader to count rows.
 export const SCHEDULE_SLOTS = [
-  { start: "07:30", end: "08:00", label: "Self Study/Devotion", type: "break" },
-  { start: "08:00", end: "08:50", label: "Course", type: "course" },
-  { start: "08:50", end: "09:40", label: "Course", type: "course" },
-  { start: "09:40", end: "10:00", label: "Break", type: "break" },
-  { start: "10:00", end: "10:50", label: "Course", type: "course" },
-  { start: "10:50", end: "11:40", label: "Course", type: "course" },
-  { start: "11:40", end: "12:40", label: "Lunch", type: "lunch" },
-  { start: "12:40", end: "13:30", label: "Course", type: "course" },
-  { start: "13:30", end: "14:20", label: "Course", type: "course" },
-  { start: "14:20", end: "14:40", label: "Break", type: "break" },
-  { start: "14:40", end: "15:30", label: "Course", type: "course" },
-  { start: "15:30", end: "16:20", label: "Course", type: "course" },
+  { start: "07:30", end: "08:00", label: "Devotion", type: "break" },
+  { start: "08:00", end: "08:50", label: "P1", type: "course" },
+  { start: "08:50", end: "09:40", label: "P2", type: "course" },
+  { start: "09:40", end: "10:00", label: "Short Break", type: "break" },
+  { start: "10:00", end: "10:50", label: "P3", type: "course" },
+  { start: "10:50", end: "11:40", label: "P4", type: "course" },
+  { start: "11:40", end: "12:30", label: "P5", type: "course" },
+  { start: "12:30", end: "13:30", label: "Lunch Break", type: "lunch" },
+  { start: "13:30", end: "14:20", label: "P6", type: "course" },
+  { start: "14:20", end: "15:10", label: "P7", type: "course" },
+  { start: "15:10", end: "15:30", label: "Short Break", type: "break" },
+  { start: "15:30", end: "16:20", label: "P8", type: "course" },
+  { start: "16:20", end: "17:20", label: "Office Hours", type: "office" },
 ] as const;
+
+/**
+ * Whether lessons can be scheduled on a row.
+ *
+ * Everything else — breaks, lunch, office hours — is a band drawn across the
+ * whole week rather than a set of per-day cells.
+ */
+export const isTeachingRow = (row: { type: string }): boolean =>
+  row.type === "course";
 
 // Helper function to convert time string (HH:MM) to minutes since midnight
 export const timeToMinutes = (timeStr: string): number => {
@@ -70,7 +83,8 @@ export const buildScheduleRows = (
     rows.push({
       start: slot.start_time,
       end: slot.end_time || slot.start_time,
-      label: "Course",
+      // No bell-schedule name: this period isn't on the official schedule.
+      label: "",
       type: "course",
     });
   }
@@ -85,6 +99,11 @@ export const buildScheduleRows = (
  * course's own) would over-count as soon as the rows aren't a clean partition
  * of the day — which is exactly what happens once a non-standard period is
  * spliced in next to a standard one that overlaps it.
+ *
+ * The count also stops at the first break, lunch or office-hours band. A slot
+ * recorded as running through lunch would otherwise draw a cell over a row the
+ * grid renders as a single week-wide band, and the two would fight for the
+ * same space.
  */
 export const countScheduleSlots = (
   courseStart: string,
@@ -97,6 +116,7 @@ export const countScheduleSlots = (
   let count = 0;
 
   for (let i = startIndex; i < rows.length; i++) {
+    if (i > startIndex && !isTeachingRow(rows[i])) break;
     const rowStart = timeToMinutes(rows[i].start);
     const rowEnd = timeToMinutes(rows[i].end);
     if (rowStart >= courseEndMin) break;

@@ -10,6 +10,11 @@ import {
   UserGrade,
   CalendarSlot,
   AcademicCalendar,
+  SchemeOfWork,
+  SchemeOfWorkEntry,
+  LO_Lesson,
+  LessonReport,
+  InstructorReport,
 } from "../db/schema";
 import {
   createUser,
@@ -24,7 +29,10 @@ import {
   createUserGradeAssignment,
   createCalendarSlot,
   createSchemeOfWork,
+  createSchemeOfWorkEntry,
+  createLoLesson,
   createInstructorReport,
+  createLessonReport,
   signToken,
 } from "../test/fixtures";
 
@@ -32,8 +40,9 @@ import {
 // ClassGroup. Every referencing table (timetables, schemes, reports, the
 // class-teacher junction) is RESTRICT, so deleting anything in use failed on
 // a foreign key and surfaced as a bare 500 -- the delete looked like it did
-// nothing. It now reports what is in the way and clears the links a class
-// group's deletion makes meaningless.
+// nothing. Nothing blocks it now: rows describing the class group go with it,
+// and records that can outlive it (lesson reports/notes, instructor reports)
+// are kept with their class_group_id cleared.
 describe("DELETE /academics/class-groups/:id", () => {
   let token: string;
   let adminId: number;
@@ -70,43 +79,85 @@ describe("DELETE /academics/class-groups/:id", () => {
     expect(await rowsFor(classGroupId)).toHaveLength(0);
   });
 
-  it("refuses to delete a class group that has a scheme of work", async () => {
+  it("deletes a scheme of work, its entries and its lesson plans", async () => {
     const classGroupId = await createProgramGradeClassGroup();
     const subjectId = await createSubject();
-    await createSchemeOfWork({
+    const schemeId = await createSchemeOfWork({
       userId: adminId,
       subjectId,
       classGroupId,
       academicTermId,
+    });
+    const entryId = await createSchemeOfWorkEntry(schemeId);
+    const lessonId = await createLoLesson({
+      userId: adminId,
+      entryId,
+      lessonDate: "2026-02-02",
     });
 
     const response = await request(app)
       .delete(`/academics/class-groups/${classGroupId}?force=true`)
       .set("Authorization", `Bearer ${token}`);
 
-    // Authored academic records block the delete even when forced.
-    expect(response.status).toBe(409);
-    expect(response.body.message).toContain("scheme(s) of work");
-    expect(response.body.errors).toEqual([
-      expect.objectContaining({ key: "schemes_of_work", count: 1 }),
-    ]);
-    expect(await rowsFor(classGroupId)).toHaveLength(1);
+    expect(response.status).toBe(200);
+    expect(await rowsFor(classGroupId)).toHaveLength(0);
+    expect(
+      await db
+        .select()
+        .from(SchemeOfWork)
+        .where(eq(SchemeOfWork.scheme_id, schemeId)),
+    ).toHaveLength(0);
+    // SchemeOfWork -> SchemeOfWorkEntry -> LO_Lesson both cascade in the
+    // database, so the delete does not have to walk the chain itself.
+    expect(
+      await db
+        .select()
+        .from(SchemeOfWorkEntry)
+        .where(eq(SchemeOfWorkEntry.entry_id, entryId)),
+    ).toHaveLength(0);
+    expect(
+      await db.select().from(LO_Lesson).where(eq(LO_Lesson.id, lessonId)),
+    ).toHaveLength(0);
   });
 
-  it("refuses to delete a class group that has an instructor report", async () => {
+  it("keeps lesson reports, lesson notes and instructor reports, unlinked", async () => {
     const classGroupId = await createProgramGradeClassGroup();
-    await createInstructorReport({ userId: adminId, classGroupId });
+    const subjectId = await createSubject();
+
+    const instructorReportId = await createInstructorReport({
+      userId: adminId,
+      classGroupId,
+    });
+    const lessonReportId = await createLessonReport({
+      userId: adminId,
+      deliveryDate: "2026-02-03",
+      subjectId,
+      classGroupId,
+    });
 
     const response = await request(app)
       .delete(`/academics/class-groups/${classGroupId}?force=true`)
       .set("Authorization", `Bearer ${token}`);
 
-    expect(response.status).toBe(409);
-    expect(response.body.message).toContain("instructor report(s)");
-    expect(await rowsFor(classGroupId)).toHaveLength(1);
+    expect(response.status).toBe(200);
+    expect(await rowsFor(classGroupId)).toHaveLength(0);
+
+    const [instructorReport] = await db
+      .select()
+      .from(InstructorReport)
+      .where(eq(InstructorReport.report_id, instructorReportId));
+    expect(instructorReport).toBeTruthy();
+    expect(instructorReport.class_group_id).toBeNull();
+
+    const [lessonReport] = await db
+      .select()
+      .from(LessonReport)
+      .where(eq(LessonReport.lesson_report_id, lessonReportId));
+    expect(lessonReport).toBeTruthy();
+    expect(lessonReport.class_group_id).toBeNull();
   });
 
-  it("asks for confirmation before clearing roster and timetable links", async () => {
+  it("asks for confirmation before taking anything with it", async () => {
     const { gradeId, classGroupId } =
       await createProgramGradeClassGroupDetailed();
     const studentId = await createUser({ userType: "STUDENT" });
@@ -281,7 +332,7 @@ describe("GET /academics/class-groups/:id/dependencies", () => {
     academicTermId = period.academicTermId;
   });
 
-  it("reports an unreferenced class group as deletable with no confirmation", async () => {
+  it("reports an unreferenced class group as needing no confirmation", async () => {
     const classGroupId = await createProgramGradeClassGroup();
 
     const response = await request(app)
@@ -289,13 +340,12 @@ describe("GET /academics/class-groups/:id/dependencies", () => {
       .set("Authorization", `Bearer ${token}`);
 
     expect(response.status).toBe(200);
-    expect(response.body.data.can_delete).toBe(true);
     expect(response.body.data.requires_confirmation).toBe(false);
-    expect(response.body.data.blocking).toEqual([]);
-    expect(response.body.data.detachable).toEqual([]);
+    expect(response.body.data.deletes).toEqual([]);
+    expect(response.body.data.unlinks).toEqual([]);
   });
 
-  it("splits blocking records from links the delete would clear", async () => {
+  it("separates what the delete destroys from what it merely unlinks", async () => {
     const classGroupId = await createProgramGradeClassGroup();
     const subjectId = await createSubject();
     const studentId = await createUser({ userType: "STUDENT" });
@@ -305,25 +355,30 @@ describe("GET /academics/class-groups/:id/dependencies", () => {
       classGroupId,
       academicYearId,
     });
-    await createSchemeOfWork({
+    const schemeId = await createSchemeOfWork({
       userId: adminId,
       subjectId,
       classGroupId,
       academicTermId,
     });
+    await createSchemeOfWorkEntry(schemeId);
+    await createInstructorReport({ userId: adminId, classGroupId });
 
     const response = await request(app)
       .get(`/academics/class-groups/${classGroupId}/dependencies`)
       .set("Authorization", `Bearer ${token}`);
 
     expect(response.status).toBe(200);
-    expect(response.body.data.can_delete).toBe(false);
     expect(response.body.data.requires_confirmation).toBe(true);
-    expect(response.body.data.blocking).toEqual([
-      expect.objectContaining({ key: "schemes_of_work", count: 1 }),
-    ]);
-    expect(response.body.data.detachable).toEqual([
+    expect(response.body.data.deletes).toEqual([
       expect.objectContaining({ key: "students", count: 1 }),
+      expect.objectContaining({ key: "schemes_of_work", count: 1 }),
+      expect.objectContaining({ key: "scheme_entries", count: 1 }),
+    ]);
+    // Kept records are reported apart from the destructive list so the modal
+    // can promise they survive.
+    expect(response.body.data.unlinks).toEqual([
+      expect.objectContaining({ key: "instructor_reports", count: 1 }),
     ]);
   });
 });

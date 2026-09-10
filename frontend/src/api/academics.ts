@@ -163,18 +163,30 @@ export interface ClassGroupDependency {
   key: string;
   label: string;
   count: number;
-  blocking: boolean;
+  /** true = removed with the class group; false = kept, link cleared */
+  destructive: boolean;
 }
 
 export interface ClassGroupDependencyReport {
   class_group_id: number;
   name: string;
-  /** false when authored academic records still point at the class group */
-  can_delete: boolean;
-  /** true when deleting would clear roster/timetable links */
+  /** true when the delete carries records with it and must be confirmed */
   requires_confirmation: boolean;
-  blocking: ClassGroupDependency[];
-  detachable: ClassGroupDependency[];
+  /** removed along with the class group */
+  deletes: ClassGroupDependency[];
+  /** kept, with their class group link cleared */
+  unlinks: ClassGroupDependency[];
+}
+
+export interface ClassGroupStudent {
+  user_id: number;
+  username: string;
+  email: string;
+  first_name: string | null;
+  last_name: string | null;
+  gender: string | null;
+  academic_year_id: number;
+  enrolled_at: string | null;
 }
 
 // Class Groups API -- ClassGroup is a permanent label per grade, not
@@ -187,6 +199,18 @@ export const classGroupsApi = {
       },
     }),
   getById: (id: number) => api.get<ClassGroup>(`/academics/class-groups/${id}`),
+  /** The class group's active roster for a year. Permission-light (any
+   * authenticated user) unlike the enrollment roster, which also carries each
+   * student's subject coverage and needs MANAGE_STUDENT_ENROLLMENTS. */
+  students: (classGroupId: number, academicYearId?: number) =>
+    api.get<{ data: ClassGroupStudent[] }>(
+      `/academics/class-groups/${classGroupId}/students`,
+      {
+        params: academicYearId
+          ? { academic_year_id: academicYearId }
+          : undefined,
+      },
+    ),
   create: (data: Omit<ClassGroup, "class_group_id">) =>
     api.post<ClassGroup>("/academics/class-groups", data),
   update: (id: number, data: Partial<Omit<ClassGroup, "class_group_id">>) =>

@@ -19,6 +19,8 @@ import {
   UserRole,
   Role,
   SchemeOfWork,
+  SchemeOfWorkEntry,
+  LO_Lesson,
   UserGrade,
   AcademicCalendar,
   CalendarSlot,
@@ -2788,20 +2790,20 @@ export const updateClassGroup = asyncHandler(async (req: any, res: any) => {
 // a new class_group_id column belongs on this list, so a delete reports it
 // up front instead of surfacing as a raw FK error from MySQL.
 //
-// "blocking" rows are authored academic records (schemes of work, reports,
-// notes): a delete must never destroy them, so it refuses and names them.
-// The rest are assignment/config rows -- who sits in the class group and
-// what its timetable looks like -- which are meaningless once the class
-// group is gone, so a confirmed delete clears them in the same transaction.
+// Nothing blocks a delete. Records whose class_group_id is nullable (lesson
+// reports, lesson notes, instructor reports) are unlinked and kept -- losing
+// a class group shouldn't erase the history of what was taught. The rest are
+// rows that only exist to describe this class group, and go with it.
 interface ClassGroupDependency {
   key: string;
   label: string;
   count: number;
-  blocking: boolean;
+  /** true = row is deleted; false = row survives with class_group_id NULL */
+  destructive: boolean;
 }
 
-// One round trip rather than ten: the production pool deliberately runs on
-// a single connection, so counting each table in its own query would just
+// One round trip rather than a dozen: the production pool deliberately runs
+// on a single connection, so counting each table in its own query would just
 // queue behind itself.
 const getClassGroupDependencies = async (
   classGroupId: number,
@@ -2809,83 +2811,107 @@ const getClassGroupDependencies = async (
   const countOf = (table: any, column: any) =>
     sql`(SELECT COUNT(*) FROM ${table} WHERE ${column} = ${classGroupId})`;
 
+  // Deleting a scheme cascades to its entries and to the lesson plans built
+  // on them, so both are counted and named before the admin confirms.
+  const schemeEntries = sql`(SELECT COUNT(*) FROM ${SchemeOfWorkEntry}
+    JOIN ${SchemeOfWork} ON ${SchemeOfWork.scheme_id} = ${SchemeOfWorkEntry.scheme_id}
+    WHERE ${SchemeOfWork.class_group_id} = ${classGroupId})`;
+  const lessonPlans = sql`(SELECT COUNT(*) FROM ${LO_Lesson}
+    JOIN ${SchemeOfWorkEntry} ON ${SchemeOfWorkEntry.entry_id} = ${LO_Lesson.entry_id}
+    JOIN ${SchemeOfWork} ON ${SchemeOfWork.scheme_id} = ${SchemeOfWorkEntry.scheme_id}
+    WHERE ${SchemeOfWork.class_group_id} = ${classGroupId})`;
+
   const result = await db.execute(sql`SELECT
     ${countOf(SchemeOfWork, SchemeOfWork.class_group_id)} AS schemes,
-    ${countOf(LessonReport, LessonReport.class_group_id)} AS lesson_reports,
-    ${countOf(LessonNote, LessonNote.class_group_id)} AS lesson_notes,
-    ${countOf(InstructorReport, InstructorReport.class_group_id)} AS instructor_reports,
+    ${schemeEntries} AS scheme_entries,
+    ${lessonPlans} AS lesson_plans,
     ${countOf(StudentClassGroup, StudentClassGroup.class_group_id)} AS students,
     ${countOf(TeacherSubjectAssignment, TeacherSubjectAssignment.class_group_id)} AS teacher_assignments,
     ${countOf(UserGrade, UserGrade.class_group_id)} AS class_teachers,
     ${countOf(AcademicCalendar, AcademicCalendar.class_group_id)} AS calendars,
     ${countOf(CalendarSlot, CalendarSlot.class_group_id)} AS calendar_slots,
-    ${countOf(CalendarActivity, CalendarActivity.class_group_id)} AS calendar_activities`);
+    ${countOf(CalendarActivity, CalendarActivity.class_group_id)} AS calendar_activities,
+    ${countOf(LessonReport, LessonReport.class_group_id)} AS lesson_reports,
+    ${countOf(LessonNote, LessonNote.class_group_id)} AS lesson_notes,
+    ${countOf(InstructorReport, InstructorReport.class_group_id)} AS instructor_reports`);
 
   const counts = (result as any)[0][0] ?? {};
   const countFor = (key: string) => Number(counts[key] ?? 0);
 
   return [
-    // Authored academic records -- these block the delete.
-    {
-      key: "schemes_of_work",
-      label: "scheme(s) of work",
-      count: countFor("schemes"),
-      blocking: true,
-    },
-    {
-      key: "lesson_reports",
-      label: "lesson report(s)",
-      count: countFor("lesson_reports"),
-      blocking: true,
-    },
-    {
-      key: "lesson_notes",
-      label: "lesson note(s)",
-      count: countFor("lesson_notes"),
-      blocking: true,
-    },
-    {
-      key: "instructor_reports",
-      label: "instructor report(s)",
-      count: countFor("instructor_reports"),
-      blocking: true,
-    },
-    // Assignment/config rows -- these are cleared alongside the class group.
+    // Removed with the class group.
     {
       key: "students",
       label: "student assignment(s)",
       count: countFor("students"),
-      blocking: false,
+      destructive: true,
     },
     {
       key: "teacher_assignments",
       label: "teacher subject assignment(s)",
       count: countFor("teacher_assignments"),
-      blocking: false,
+      destructive: true,
     },
     {
       key: "class_teachers",
       label: "class teacher assignment(s)",
       count: countFor("class_teachers"),
-      blocking: false,
+      destructive: true,
     },
     {
       key: "calendars",
       label: "timetable(s)",
       count: countFor("calendars"),
-      blocking: false,
+      destructive: true,
     },
     {
       key: "calendar_slots",
       label: "timetable slot(s)",
       count: countFor("calendar_slots"),
-      blocking: false,
+      destructive: true,
     },
     {
       key: "calendar_activities",
       label: "calendar activity(ies)",
       count: countFor("calendar_activities"),
-      blocking: false,
+      destructive: true,
+    },
+    {
+      key: "schemes_of_work",
+      label: "scheme(s) of work",
+      count: countFor("schemes"),
+      destructive: true,
+    },
+    {
+      key: "scheme_entries",
+      label: "scheme of work entry(ies)",
+      count: countFor("scheme_entries"),
+      destructive: true,
+    },
+    {
+      key: "lesson_plans",
+      label: "lesson plan(s) built on those schemes",
+      count: countFor("lesson_plans"),
+      destructive: true,
+    },
+    // Kept, with the class group link cleared.
+    {
+      key: "lesson_reports",
+      label: "lesson report(s)",
+      count: countFor("lesson_reports"),
+      destructive: false,
+    },
+    {
+      key: "lesson_notes",
+      label: "lesson note(s)",
+      count: countFor("lesson_notes"),
+      destructive: false,
+    },
+    {
+      key: "instructor_reports",
+      label: "instructor report(s)",
+      count: countFor("instructor_reports"),
+      destructive: false,
     },
   ];
 };
@@ -2912,16 +2938,15 @@ export const getClassGroupDependencyReport = asyncHandler(
     }
 
     const dependencies = await getClassGroupDependencies(classGroupId);
-    const blocking = dependencies.filter((d) => d.blocking && d.count > 0);
-    const detachable = dependencies.filter((d) => !d.blocking && d.count > 0);
+    const deletes = dependencies.filter((d) => d.destructive && d.count > 0);
+    const unlinks = dependencies.filter((d) => !d.destructive && d.count > 0);
 
     successResponse(res, "Class group dependencies retrieved successfully", {
       class_group_id: classGroupId,
       name: existingClassGroup[0].name,
-      can_delete: blocking.length === 0,
-      requires_confirmation: detachable.length > 0,
-      blocking,
-      detachable,
+      requires_confirmation: deletes.length > 0 || unlinks.length > 0,
+      deletes,
+      unlinks,
     });
   },
 );
@@ -2948,27 +2973,38 @@ export const deleteClassGroup = asyncHandler(async (req: any, res: any) => {
   const force = req.query?.force === "true" || req.query?.force === true;
 
   const dependencies = await getClassGroupDependencies(classGroupId);
-  const blocking = dependencies.filter((d) => d.blocking && d.count > 0);
+  const deletes = dependencies.filter((d) => d.destructive && d.count > 0);
+  const unlinks = dependencies.filter((d) => !d.destructive && d.count > 0);
 
-  if (blocking.length > 0) {
+  // The class group carries records with it, so an unconfirmed delete is
+  // refused once rather than silently taking them. `force` is the UI's
+  // acknowledgement that the admin has been shown this exact list.
+  if ((deletes.length > 0 || unlinks.length > 0) && !force) {
     throw new ConflictError(
-      `"${classGroupName}" still has ${describeDependencies(blocking)}. ` +
-        `Reassign or delete them first, then delete the class group.`,
-      blocking,
-    );
-  }
-
-  const detachable = dependencies.filter((d) => !d.blocking && d.count > 0);
-
-  if (detachable.length > 0 && !force) {
-    throw new ConflictError(
-      `"${classGroupName}" is still linked to ${describeDependencies(detachable)}. ` +
-        `Confirm the delete to remove those links along with the class group.`,
-      detachable,
+      `"${classGroupName}" still has ${describeDependencies([
+        ...deletes,
+        ...unlinks,
+      ])}. Confirm the delete to remove or unlink them along with the class group.`,
+      [...deletes, ...unlinks],
     );
   }
 
   await db.transaction(async (tx) => {
+    // Records that outlive the class group: keep them, drop the link. Their
+    // class_group_id is nullable precisely so this is possible.
+    await tx
+      .update(LessonReport)
+      .set({ class_group_id: null })
+      .where(eq(LessonReport.class_group_id, classGroupId));
+    await tx
+      .update(LessonNote)
+      .set({ class_group_id: null })
+      .where(eq(LessonNote.class_group_id, classGroupId));
+    await tx
+      .update(InstructorReport)
+      .set({ class_group_id: null })
+      .where(eq(InstructorReport.class_group_id, classGroupId));
+
     // Slots hang off the class group both directly and through the class
     // group's own calendars, and CalendarSlot -> AcademicCalendar is
     // RESTRICT, so both sets have to go before the calendars do.
@@ -2996,6 +3032,13 @@ export const deleteClassGroup = asyncHandler(async (req: any, res: any) => {
       .delete(AcademicCalendar)
       .where(eq(AcademicCalendar.class_group_id, classGroupId));
 
+    // Schemes cascade in the database to their entries, and from there to
+    // lesson plans and criteria; lesson reports/notes pointing at those
+    // entries are set NULL by the same constraints rather than deleted.
+    await tx
+      .delete(SchemeOfWork)
+      .where(eq(SchemeOfWork.class_group_id, classGroupId));
+
     // Roster and assignment rows. StudentClassGroup/TeacherSubjectAssignment
     // carry no FK to ClassGroup on the live schema, so skipping these would
     // leave orphans pointing at a dead id rather than raise an error.
@@ -3014,8 +3057,8 @@ export const deleteClassGroup = asyncHandler(async (req: any, res: any) => {
 
   logger.info("Class group deleted", {
     classGroupId,
-    forced: force,
-    detached: detachable.map((d) => `${d.key}:${d.count}`),
+    deleted: deletes.map((d) => `${d.key}:${d.count}`),
+    unlinked: unlinks.map((d) => `${d.key}:${d.count}`),
   });
 
   // Record activity
@@ -3026,12 +3069,15 @@ export const deleteClassGroup = asyncHandler(async (req: any, res: any) => {
       `Deleted class group: ${classGroupName}`,
       "ClassGroup",
       classGroupId,
-      { name: classGroupName, detached: detachable },
+      { name: classGroupName, deleted: deletes, unlinked: unlinks },
       req.user.userId,
     );
   }
 
-  successResponse(res, "Class group deleted successfully", { detached: detachable });
+  successResponse(res, "Class group deleted successfully", {
+    deleted: deletes,
+    unlinked: unlinks,
+  });
 });
 
 // Teacher Assigned Subjects for Dashboard
@@ -5852,3 +5898,565 @@ export const copyProgramLeads = asyncHandler(async (req: any, res: any) => {
     total: sourceLeads.length,
   });
 });
+
+// ==================== Class Groups Management workspace ====================
+// The Class Groups Management tab (frontend/src/components/classgroups) drives
+// every class-group relationship from one screen. Its navigator would otherwise
+// need one roster + one curriculum + one assignment request per class group, so
+// these endpoints answer the aggregate questions in a single round trip each.
+
+/**
+ * Per-class-group readiness counts for one academic year: how many students are
+ * in it, how big its grade's curriculum is, how much of that curriculum has a
+ * teacher, who the class teacher is, and how many students hold the full
+ * curriculum. Everything the navigator and the setup checklist render.
+ */
+export const getClassGroupsOverview = asyncHandler(
+  async (req: any, res: any) => {
+    const { academic_year_id, program_id } = req.query;
+
+    const yearId = academic_year_id
+      ? parseInt(academic_year_id as string)
+      : await getCurrentAcademicYearId();
+    if (!yearId || isNaN(yearId)) {
+      throw new ValidationError(
+        "Academic year ID is required (no current academic year set)",
+      );
+    }
+
+    const programFilter =
+      program_id !== undefined ? parseInt(program_id as string) : undefined;
+    if (programFilter !== undefined && isNaN(programFilter)) {
+      throw new ValidationError("Invalid program ID");
+    }
+
+    const classGroups = await db
+      .select({
+        class_group_id: ClassGroup.class_group_id,
+        class_group_name: ClassGroup.name,
+        grade_id: Grade.grade_id,
+        grade_name: Grade.name,
+        level_order: Grade.level_order,
+        program_id: Program.program_id,
+        program_name: Program.name,
+      })
+      .from(ClassGroup)
+      .innerJoin(Grade, eq(ClassGroup.grade_id, Grade.grade_id))
+      .innerJoin(Program, eq(Grade.program_id, Program.program_id))
+      .where(
+        programFilter !== undefined
+          ? eq(Program.program_id, programFilter)
+          : undefined,
+      )
+      .orderBy(Program.name, Grade.level_order, ClassGroup.name);
+
+    if (classGroups.length === 0) {
+      successResponse(res, "Class group overview retrieved successfully", []);
+      return;
+    }
+
+    const classGroupIds = classGroups.map((c) => Number(c.class_group_id));
+    const gradeIds = Array.from(
+      new Set(classGroups.map((c) => Number(c.grade_id))),
+    );
+
+    // Students per class group for this year. A class group is a permanent
+    // label reused across years, so the year filter is what keeps last year's
+    // cohort out of this year's counts.
+    const studentRows = await db
+      .select({
+        class_group_id: StudentClassGroup.class_group_id,
+        user_id: StudentClassGroup.user_id,
+      })
+      .from(StudentClassGroup)
+      .innerJoin(UserProfile, eq(StudentClassGroup.user_id, UserProfile.user_id))
+      .where(
+        and(
+          inArray(StudentClassGroup.class_group_id, classGroupIds),
+          eq(StudentClassGroup.academic_year_id, yearId),
+          eq(StudentClassGroup.status, "ACTIVE"),
+          eq(UserProfile.user_type, "STUDENT"),
+        ),
+      );
+
+    const studentsByClassGroup = new Map<number, number[]>();
+    for (const row of studentRows) {
+      const cg = Number(row.class_group_id);
+      if (!studentsByClassGroup.has(cg)) studentsByClassGroup.set(cg, []);
+      studentsByClassGroup.get(cg)!.push(Number(row.user_id));
+    }
+
+    // Curriculum size per grade.
+    const curriculumRows = await db
+      .select({
+        grade_id: GradeSubject.grade_id,
+        subject_id: GradeSubject.subject_id,
+      })
+      .from(GradeSubject)
+      .innerJoin(Subject, eq(GradeSubject.subject_id, Subject.subject_id))
+      .where(
+        and(inArray(GradeSubject.grade_id, gradeIds), eq(Subject.status, "ACTIVE")),
+      );
+
+    const curriculumByGrade = new Map<number, number[]>();
+    for (const row of curriculumRows) {
+      const g = Number(row.grade_id);
+      if (!curriculumByGrade.has(g)) curriculumByGrade.set(g, []);
+      curriculumByGrade.get(g)!.push(Number(row.subject_id));
+    }
+
+    // Distinct taught subjects per class group. A subject taught by two
+    // teachers is still one covered subject, hence the Set.
+    const assignmentRows = await db
+      .select({
+        class_group_id: TeacherSubjectAssignment.class_group_id,
+        subject_id: TeacherSubjectAssignment.subject_id,
+      })
+      .from(TeacherSubjectAssignment)
+      .where(
+        and(
+          inArray(TeacherSubjectAssignment.class_group_id, classGroupIds),
+          eq(TeacherSubjectAssignment.academic_year_id, yearId),
+        ),
+      );
+
+    const taughtByClassGroup = new Map<number, Set<number>>();
+    for (const row of assignmentRows) {
+      const cg = Number(row.class_group_id);
+      if (!taughtByClassGroup.has(cg)) taughtByClassGroup.set(cg, new Set());
+      taughtByClassGroup.get(cg)!.add(Number(row.subject_id));
+    }
+
+    // Class teacher per class group.
+    const classTeacherRows = await db
+      .select({
+        class_group_id: UserGrade.class_group_id,
+        user_id: User.user_id,
+        first_name: UserProfile.first_name,
+        last_name: UserProfile.last_name,
+      })
+      .from(UserGrade)
+      .innerJoin(User, eq(UserGrade.user_id, User.user_id))
+      .innerJoin(UserProfile, eq(User.user_id, UserProfile.user_id))
+      .where(
+        and(
+          inArray(UserGrade.class_group_id, classGroupIds),
+          eq(UserGrade.academic_year_id, yearId),
+        ),
+      );
+
+    const classTeacherByClassGroup = new Map<
+      number,
+      { user_id: number; first_name: string | null; last_name: string | null }
+    >();
+    for (const row of classTeacherRows) {
+      const cg = Number(row.class_group_id);
+      // A class group leads to one class teacher; if the data holds more than
+      // one, the first by query order wins rather than the endpoint failing.
+      if (!classTeacherByClassGroup.has(cg)) {
+        classTeacherByClassGroup.set(cg, {
+          user_id: Number(row.user_id),
+          first_name: row.first_name,
+          last_name: row.last_name,
+        });
+      }
+    }
+
+    // Enrollment coverage: how many of each class group's students hold every
+    // subject in their grade's curriculum.
+    const allStudentIds = studentRows.map((r) => Number(r.user_id));
+    const allCurriculumSubjectIds = Array.from(
+      new Set(curriculumRows.map((r) => Number(r.subject_id))),
+    );
+
+    const enrollmentRows =
+      allStudentIds.length > 0 && allCurriculumSubjectIds.length > 0
+        ? await db
+            .select({
+              user_id: StudentSubjectEnrollment.user_id,
+              subject_id: StudentSubjectEnrollment.subject_id,
+            })
+            .from(StudentSubjectEnrollment)
+            .where(
+              and(
+                inArray(StudentSubjectEnrollment.user_id, allStudentIds),
+                inArray(
+                  StudentSubjectEnrollment.subject_id,
+                  allCurriculumSubjectIds,
+                ),
+                eq(StudentSubjectEnrollment.academic_year_id, yearId),
+                eq(StudentSubjectEnrollment.status, "ACTIVE"),
+              ),
+            )
+        : [];
+
+    const enrolledByStudent = new Map<number, Set<number>>();
+    for (const row of enrollmentRows) {
+      const uid = Number(row.user_id);
+      if (!enrolledByStudent.has(uid)) enrolledByStudent.set(uid, new Set());
+      enrolledByStudent.get(uid)!.add(Number(row.subject_id));
+    }
+
+    const overview = classGroups.map((cg) => {
+      const classGroupId = Number(cg.class_group_id);
+      const gradeId = Number(cg.grade_id);
+      const curriculum = curriculumByGrade.get(gradeId) || [];
+      const students = studentsByClassGroup.get(classGroupId) || [];
+      const taught = taughtByClassGroup.get(classGroupId) || new Set<number>();
+
+      // Only curriculum subjects count as covered — a teacher assigned to a
+      // subject that is no longer in the grade's curriculum is not coverage.
+      const taughtInCurriculum = curriculum.filter((s) => taught.has(s)).length;
+
+      const fullyEnrolled =
+        curriculum.length === 0
+          ? 0
+          : students.filter((userId) => {
+              const enrolled = enrolledByStudent.get(userId);
+              if (!enrolled) return false;
+              return curriculum.every((subjectId) => enrolled.has(subjectId));
+            }).length;
+
+      return {
+        class_group_id: classGroupId,
+        class_group_name: cg.class_group_name,
+        grade_id: gradeId,
+        grade_name: cg.grade_name,
+        level_order: Number(cg.level_order),
+        program_id: Number(cg.program_id),
+        program_name: cg.program_name,
+        student_count: students.length,
+        curriculum_subject_count: curriculum.length,
+        taught_subject_count: taughtInCurriculum,
+        class_teacher: classTeacherByClassGroup.get(classGroupId) || null,
+        fully_enrolled_student_count: fullyEnrolled,
+      };
+    });
+
+    logger.info("Class group overview retrieved", {
+      yearId,
+      programFilter,
+      classGroups: overview.length,
+    });
+
+    successResponse(res, "Class group overview retrieved successfully", overview);
+  },
+);
+
+/**
+ * Students with no class group for the given year — the pool an admin draws
+ * from when filling a roster. A student assigned only in a *different* year
+ * still counts as unassigned here.
+ */
+export const getUnassignedStudents = asyncHandler(
+  async (req: any, res: any) => {
+    const { academic_year_id, search, page = 1, limit = 25 } = req.query;
+
+    const yearId = academic_year_id
+      ? parseInt(academic_year_id as string)
+      : await getCurrentAcademicYearId();
+    if (!yearId || isNaN(yearId)) {
+      throw new ValidationError(
+        "Academic year ID is required (no current academic year set)",
+      );
+    }
+
+    const pageNum = Math.max(1, parseInt(page as string) || 1);
+    const limitNum = Math.min(100, Math.max(1, parseInt(limit as string) || 25));
+    const offset = (pageNum - 1) * limitNum;
+
+    const assignedRows = await db
+      .select({ user_id: StudentClassGroup.user_id })
+      .from(StudentClassGroup)
+      .where(
+        and(
+          eq(StudentClassGroup.academic_year_id, yearId),
+          eq(StudentClassGroup.status, "ACTIVE"),
+        ),
+      );
+    const assignedIds = Array.from(
+      new Set(assignedRows.map((r) => Number(r.user_id))),
+    );
+
+    const conditions: any[] = [
+      eq(UserProfile.user_type, "STUDENT"),
+      eq(User.status, "ACTIVE"),
+    ];
+    if (assignedIds.length > 0) {
+      conditions.push(not(inArray(User.user_id, assignedIds)));
+    }
+    if (search) {
+      conditions.push(
+        or(
+          sql`${User.username} LIKE ${`%${search}%`}`,
+          sql`${User.email} LIKE ${`%${search}%`}`,
+          sql`${UserProfile.first_name} LIKE ${`%${search}%`}`,
+          sql`${UserProfile.last_name} LIKE ${`%${search}%`}`,
+        ),
+      );
+    }
+
+    const [{ count: total }] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(User)
+      .innerJoin(UserProfile, eq(User.user_id, UserProfile.user_id))
+      .where(and(...conditions));
+
+    const students = await db
+      .select({
+        user_id: User.user_id,
+        username: User.username,
+        email: User.email,
+        first_name: UserProfile.first_name,
+        last_name: UserProfile.last_name,
+        gender: UserProfile.gender,
+      })
+      .from(User)
+      .innerJoin(UserProfile, eq(User.user_id, UserProfile.user_id))
+      .where(and(...conditions))
+      .orderBy(UserProfile.first_name, UserProfile.last_name)
+      .limit(limitNum)
+      .offset(offset);
+
+    successResponse(res, "Unassigned students retrieved successfully", {
+      students,
+      total: Number(total),
+      page: pageNum,
+      totalPages: Math.ceil(Number(total) / limitNum) || 1,
+      academic_year_id: yearId,
+    });
+  },
+);
+
+/**
+ * Assign one teacher to many subjects of a class group in one request.
+ * Staffing a twelve-subject class was otherwise twelve sequential POSTs.
+ * Idempotent: pairs already assigned are reported as `skipped`, not errors.
+ */
+export const bulkAssignTeacherToSubjects = asyncHandler(
+  async (req: any, res: any) => {
+    const { user_id, subject_ids, class_group_id, academic_year_id } = req.body;
+
+    if (!user_id || !class_group_id) {
+      throw new ValidationError("user_id and class_group_id are required");
+    }
+    if (!Array.isArray(subject_ids) || subject_ids.length === 0) {
+      throw new ValidationError("subject_ids (non-empty array) is required");
+    }
+
+    const teacherId = Number(user_id);
+    const classGroupId = Number(class_group_id);
+    const subjectIds = subject_ids.map((id: any) => Number(id));
+    if (
+      isNaN(teacherId) ||
+      isNaN(classGroupId) ||
+      subjectIds.some((id: number) => isNaN(id))
+    ) {
+      throw new ValidationError("Invalid IDs provided");
+    }
+
+    const yearId = academic_year_id
+      ? Number(academic_year_id)
+      : await getCurrentAcademicYearId();
+    if (!yearId || isNaN(yearId)) {
+      throw new ValidationError(
+        "Academic year ID is required (no current academic year set)",
+      );
+    }
+
+    const teacher = await db
+      .select({ user_id: User.user_id })
+      .from(User)
+      .where(eq(User.user_id, teacherId))
+      .limit(1);
+    if (teacher.length === 0) {
+      throw new NotFoundError("Teacher not found");
+    }
+
+    const classGroup = await db
+      .select({ class_group_id: ClassGroup.class_group_id })
+      .from(ClassGroup)
+      .where(eq(ClassGroup.class_group_id, classGroupId))
+      .limit(1);
+    if (classGroup.length === 0) {
+      throw new NotFoundError("Class group not found");
+    }
+
+    const academicYear = await db
+      .select({ name: AcademicYear.name })
+      .from(AcademicYear)
+      .where(eq(AcademicYear.academic_year_id, yearId))
+      .limit(1);
+    if (academicYear.length === 0) {
+      throw new NotFoundError("Academic year not found");
+    }
+
+    const validSubjects = await db
+      .select({ subject_id: Subject.subject_id })
+      .from(Subject)
+      .where(
+        and(
+          inArray(Subject.subject_id, subjectIds),
+          eq(Subject.status, "ACTIVE"),
+        ),
+      );
+    const validSubjectIds = validSubjects.map((s) => Number(s.subject_id));
+    if (validSubjectIds.length === 0) {
+      throw new ValidationError(
+        "None of the provided subject_ids are active subjects",
+      );
+    }
+
+    const existing = await db
+      .select({ subject_id: TeacherSubjectAssignment.subject_id })
+      .from(TeacherSubjectAssignment)
+      .where(
+        and(
+          eq(TeacherSubjectAssignment.user_id, teacherId),
+          inArray(TeacherSubjectAssignment.subject_id, validSubjectIds),
+          eq(TeacherSubjectAssignment.class_group_id, classGroupId),
+          eq(TeacherSubjectAssignment.academic_year_id, yearId),
+        ),
+      );
+    const existingIds = new Set(existing.map((r) => Number(r.subject_id)));
+
+    const toInsert = validSubjectIds
+      .filter((subjectId) => !existingIds.has(subjectId))
+      .map((subjectId) => ({
+        user_id: teacherId,
+        subject_id: subjectId,
+        class_group_id: classGroupId,
+        academic_year_id: yearId,
+      }));
+
+    if (toInsert.length > 0) {
+      await db.insert(TeacherSubjectAssignment).values(toInsert);
+    }
+
+    const result = {
+      assigned: toInsert.length,
+      skipped: validSubjectIds.length - toInsert.length,
+      total: validSubjectIds.length,
+    };
+
+    logger.info("Teacher bulk-assigned to subjects", {
+      teacherId,
+      classGroupId,
+      yearId,
+      ...result,
+    });
+
+    if (req.user?.userId) {
+      await recordActivity(
+        req.user.userId,
+        "TEACHER_BULK_ASSIGN_SUBJECTS",
+        `Assigned teacher ${teacherId} to ${result.assigned} subject(s) for a class group in ${academicYear[0].name} (${result.skipped} already assigned)`,
+        "TeacherSubjectAssignment",
+        classGroupId,
+      );
+    }
+
+    successResponse(res, "Teacher assigned to subjects successfully", result);
+  },
+);
+
+/**
+ * Remove many (student, subject) enrollments in one request — the mirror of
+ * bulkEnrollStudentsInSubjects, so the enrollment matrix can commit a staged
+ * diff in one round trip per direction instead of one call per cell.
+ * Enrollments are soft-deleted (status DISABLED), matching the single-pair
+ * unenrollStudentFromSubject.
+ */
+export const bulkUnenrollStudentsFromSubjects = asyncHandler(
+  async (req: any, res: any) => {
+    const { user_ids, subject_ids, academic_year_id } = req.body;
+
+    if (
+      !Array.isArray(user_ids) ||
+      user_ids.length === 0 ||
+      !Array.isArray(subject_ids) ||
+      subject_ids.length === 0
+    ) {
+      throw new ValidationError(
+        "user_ids and subject_ids (non-empty arrays) are required",
+      );
+    }
+
+    const studentIds = user_ids.map((id: any) => Number(id));
+    const subjectIds = subject_ids.map((id: any) => Number(id));
+    if (
+      studentIds.some((id: number) => isNaN(id)) ||
+      subjectIds.some((id: number) => isNaN(id))
+    ) {
+      throw new ValidationError("Invalid ID in user_ids or subject_ids");
+    }
+
+    const yearId = academic_year_id
+      ? Number(academic_year_id)
+      : await getCurrentAcademicYearId();
+    if (!yearId || isNaN(yearId)) {
+      throw new ValidationError(
+        "Academic year ID is required (no current academic year set)",
+      );
+    }
+
+    const academicYear = await db
+      .select({ name: AcademicYear.name })
+      .from(AcademicYear)
+      .where(eq(AcademicYear.academic_year_id, yearId))
+      .limit(1);
+    if (academicYear.length === 0) {
+      throw new NotFoundError("Academic year not found");
+    }
+
+    const activeRows = await db
+      .select({
+        user_id: StudentSubjectEnrollment.user_id,
+        subject_id: StudentSubjectEnrollment.subject_id,
+      })
+      .from(StudentSubjectEnrollment)
+      .where(
+        and(
+          inArray(StudentSubjectEnrollment.user_id, studentIds),
+          inArray(StudentSubjectEnrollment.subject_id, subjectIds),
+          eq(StudentSubjectEnrollment.academic_year_id, yearId),
+          eq(StudentSubjectEnrollment.status, "ACTIVE"),
+        ),
+      );
+
+    if (activeRows.length > 0) {
+      await db
+        .update(StudentSubjectEnrollment)
+        .set({ status: "DISABLED" })
+        .where(
+          and(
+            inArray(StudentSubjectEnrollment.user_id, studentIds),
+            inArray(StudentSubjectEnrollment.subject_id, subjectIds),
+            eq(StudentSubjectEnrollment.academic_year_id, yearId),
+            eq(StudentSubjectEnrollment.status, "ACTIVE"),
+          ),
+        );
+    }
+
+    const total = studentIds.length * subjectIds.length;
+    const result = {
+      unenrolled: activeRows.length,
+      skipped: total - activeRows.length,
+      total,
+    };
+
+    logger.info("Students bulk-unenrolled from subjects", { yearId, ...result });
+
+    if (req.user?.userId) {
+      await recordActivity(
+        req.user.userId,
+        "STUDENTS_BULK_UNENROLL_SUBJECTS",
+        `Unenrolled ${result.unenrolled} student-subject pair(s) for ${academicYear[0].name}`,
+        "StudentSubjectEnrollment",
+        yearId,
+      );
+    }
+
+    successResponse(res, "Students unenrolled from subjects successfully", result);
+  },
+);

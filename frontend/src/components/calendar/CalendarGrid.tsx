@@ -8,10 +8,12 @@ import {
   displayDayToBackend,
   backendDayToDisplay,
   findCurrentRowIndex,
+  isTeachingRow,
   minutesToTime,
   timeToMinutes,
 } from "./calendarConstants";
 import { buildGridLayout, cellKey, type GridCell } from "./calendarLayout";
+import SlotTooltip, { instructorOf, useSlotTooltip } from "./SlotTooltip";
 import { useCurrentTime } from "./useCurrentTime";
 
 interface CalendarGridProps {
@@ -28,15 +30,6 @@ interface CalendarGridProps {
   ) => void;
   canEdit?: boolean;
 }
-
-interface TooltipState {
-  slot: CalendarSlot;
-  x: number;
-  y: number;
-}
-
-const instructorOf = (slot: CalendarSlot): string =>
-  [slot.instructor_name, slot.instructor_lastname].filter(Boolean).join(" ");
 
 /** How far through a lesson we are, 0-1, or null when it isn't running. */
 const lessonProgress = (
@@ -78,7 +71,7 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
   const layout = useMemo(
     () =>
       buildGridLayout<CalendarSlot>(scheduleRows, DAYS.length, (dayIdx, start) =>
-        calendarSlots.find(
+        calendarSlots.filter(
           (s) =>
             Number(s.day_of_week) === displayDayToBackend(dayIdx) &&
             s.start_time === start,
@@ -93,7 +86,7 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
     (d) => d && d.toDateString() === now.toDateString(),
   );
 
-  const [tooltip, setTooltip] = useState<TooltipState | null>(null);
+  const { tooltip, show: showTooltip, hide: hideTooltip } = useSlotTooltip();
   const cellRefs = useRef(new Map<string, HTMLTableCellElement>());
 
   // Roving tabindex: exactly one cell is in the tab order at a time, and the
@@ -105,22 +98,15 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
   const [activeCell, setActiveCell] = useState<string | null>(null);
   const tabStop = activeCell ?? firstCourseCell;
 
-  const showTooltip = useCallback(
-    (slot: CalendarSlot, el: HTMLElement) => {
-      const rect = el.getBoundingClientRect();
-      setTooltip({ slot, x: rect.left + rect.width / 2, y: rect.top });
-    },
-    [],
-  );
-
   const activate = useCallback(
-    (cell: GridCell<CalendarSlot>) => {
+    (cell: GridCell<CalendarSlot>, target?: CalendarSlot) => {
       const weekDate = weekDates[cell.dayIndex];
-      if (cell.slot) {
+      const slot = target ?? cell.slots[0];
+      if (slot) {
         onSlotClick(
           {
-            ...cell.slot,
-            day_of_week: backendDayToDisplay(Number(cell.slot.day_of_week)),
+            ...slot,
+            day_of_week: backendDayToDisplay(Number(slot.day_of_week)),
           } as CalendarSlot,
           weekDate!,
         );
@@ -139,7 +125,7 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
       for (let r = rowIndex; r >= 0 && r < scheduleRows.length; r += step) {
         const owner = layout.ownerOf.get(cellKey(r, dayIndex));
         const cell = owner ? layout.cells.get(owner) : undefined;
-        if (cell && cell.type === "course") return owner!;
+        if (cell && isTeachingRow(cell)) return owner!;
       }
       return null;
     },
@@ -192,7 +178,7 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
           activate(cell);
           return;
         case "Escape":
-          setTooltip(null);
+          hideTooltip();
           return;
         default:
           return;
@@ -201,7 +187,7 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
       event.preventDefault();
       moveTo(next);
     },
-    [activate, moveTo, resolve, scheduleRows.length],
+    [activate, hideTooltip, moveTo, resolve, scheduleRows.length],
   );
 
   const headingId = `calendar-grid-${calendarId ?? "personal"}`;
@@ -255,17 +241,14 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
           </thead>
           <tbody className="border-b border-blue-200/50 dark:border-blue-700/20">
             {scheduleRows.map((scheduleSlot, scheduleIdx) => {
-              const isBreakOrLunch =
-                scheduleSlot.type === "break" || scheduleSlot.type === "lunch";
+              const isTeaching = isTeachingRow(scheduleSlot);
               const isNow = scheduleIdx === currentRowIndex && todayIndex !== -1;
 
               return (
                 <tr
                   key={`${scheduleSlot.start}-${scheduleSlot.end}`}
                   className={`border-t border-gray-100 dark:border-gray-700/20 ${
-                    isBreakOrLunch
-                      ? "h-10 bg-gray-50 dark:bg-gray-800/10"
-                      : "h-16"
+                    isTeaching ? "h-16" : "h-10 bg-gray-50 dark:bg-gray-800/10"
                   } transition-colors`}
                 >
                   {/* TIME CELL */}
@@ -274,18 +257,18 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
                     className={`p-2 text-center text-xs font-medium align-middle border border-blue-200/50 dark:border-blue-700/20 ${
                       isNow ? "border-l-4 !border-l-rose-500" : ""
                     } ${
-                      isBreakOrLunch
-                        ? "h-10 bg-gray-100 dark:bg-gray-800/50 text-gray-400 dark:text-gray-500/60 font-light"
-                        : "h-16 bg-gray-50 dark:bg-gray-800/20 text-gray-700 dark:text-gray-200 font-semibold"
+                      isTeaching
+                        ? "h-16 bg-gray-50 dark:bg-gray-800/20 text-gray-700 dark:text-gray-200 font-semibold"
+                        : "h-10 bg-gray-100 dark:bg-gray-800/50 text-gray-400 dark:text-gray-500/60 font-light"
                     }`}
                   >
-                    <div>{scheduleSlot.start}</div>
-                    <div>{scheduleSlot.end}</div>
-                    {isBreakOrLunch && (
-                      <div className="text-[9px] font-bold mt-1 text-orange-600 dark:text-orange-400">
-                        {scheduleSlot.type === "lunch" ? "🍴 LUNCH" : "⏸ BREAK"}
+                    {isTeaching && scheduleSlot.label && (
+                      <div className="text-[11px] font-bold text-blue-600 dark:text-blue-400">
+                        {scheduleSlot.label}
                       </div>
                     )}
+                    <div>{scheduleSlot.start}</div>
+                    <div>{scheduleSlot.end}</div>
                     {isNow && (
                       <div className="text-[9px] font-bold mt-1 text-rose-600 dark:text-rose-400">
                         ● NOW {minutesToTime(nowMinutes)}
@@ -293,8 +276,24 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
                     )}
                   </th>
 
+                  {/* Breaks, lunch and office hours run right across the week,
+                      as one labelled band rather than seven blank cells. */}
+                  {!isTeaching && (
+                    <td
+                      colSpan={DAYS.length}
+                      className={`border-l border-gray-100 dark:border-gray-700/20 text-center text-[11px] font-bold uppercase tracking-wider ${
+                        scheduleSlot.type === "lunch"
+                          ? "bg-amber-50 dark:bg-amber-900/10 text-amber-700 dark:text-amber-400/80"
+                          : "bg-gray-100 dark:bg-gray-800/50 text-gray-500 dark:text-gray-400/70"
+                      }`}
+                    >
+                      {scheduleSlot.label}
+                    </td>
+                  )}
+
                   {/* DAY CELLS */}
-                  {DAYS.map((_, dayIdx) => {
+                  {isTeaching &&
+                    DAYS.map((_, dayIdx) => {
                     const key = cellKey(scheduleIdx, dayIdx);
                     const cell = layout.cells.get(key);
                     // A rowSpan from an earlier row already covers this one
@@ -303,18 +302,9 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
                     const weekDate = weekDates[dayIdx];
                     const isToday = dayIdx === todayIndex;
 
-                    if (isBreakOrLunch) {
-                      return (
-                        <td
-                          key={dayIdx}
-                          className="p-2 border-l border-gray-100 dark:border-gray-700/20 bg-gray-100 dark:bg-gray-800/50"
-                        />
-                      );
-                    }
-
                     const isTabStop = key === tabStop;
-                    const course = cell.slot;
-                    const dayLabel = `${DAYS_FULL[dayIdx]} ${scheduleSlot.start}`;
+                    const courses = cell.slots;
+                    const dayLabel = `${DAYS_FULL[dayIdx]} ${scheduleSlot.label ? `${scheduleSlot.label} ` : ""}${scheduleSlot.start}`;
                     const commonProps = {
                       ref: (el: HTMLTableCellElement | null) => {
                         if (el) cellRefs.current.set(key, el);
@@ -327,59 +317,81 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
                         handleKeyDown(e, cell),
                     };
 
-                    if (course) {
-                      const progress = isToday
-                        ? lessonProgress(course, nowMinutes)
-                        : null;
-                      const instructor = instructorOf(course);
+                    if (courses.length > 0) {
+                      const label = courses
+                        .map(
+                          (c) =>
+                            `${c.subject_name ?? "Lesson"}${c.class_group_name ? `, ${c.class_group_name}` : ""}, ${c.start_time} to ${c.end_time}${instructorOf(c) ? `, ${instructorOf(c)}` : ""}`,
+                        )
+                        .join("; ");
 
                       return (
                         <td
                           {...commonProps}
                           key={dayIdx}
                           rowSpan={cell.rowSpan}
-                          aria-label={`${dayLabel}, ${course.subject_name ?? "Lesson"}, ${course.start_time} to ${course.end_time}${instructor ? `, ${instructor}` : ""}`}
+                          aria-label={`${dayLabel}, ${label}`}
                           className={`p-0 border-l border-gray-100 dark:border-gray-700/20 relative cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 ${
                             isToday ? "bg-blue-50/50 dark:bg-blue-900/10" : ""
                           }`}
-                          onClick={() => activate(cell)}
-                          onMouseEnter={(e) =>
-                            showTooltip(course, e.currentTarget)
-                          }
-                          onMouseLeave={() => setTooltip(null)}
-                          onFocus={(e) => {
+                          onFocus={() => {
                             setActiveCell(key);
-                            showTooltip(course, e.currentTarget);
+                            const el = cellRefs.current.get(key);
+                            if (el) showTooltip(courses[0], el);
                           }}
-                          onBlur={() => setTooltip(null)}
+                          onBlur={hideTooltip}
                         >
-                          <div
-                            className="absolute inset-0.5 overflow-hidden rounded-sm"
-                            style={{ backgroundColor: course.color || "#3B82F6" }}
-                          >
-                            <div
-                              className={`h-full p-2 text-xs hover:brightness-110 transition-all duration-200 flex flex-col justify-start ${
-                                progress !== null
-                                  ? "ring-2 ring-rose-400 shadow-lg"
-                                  : isToday
-                                    ? "ring-2 ring-white dark:ring-gray-600 shadow-lg"
-                                    : ""
-                              }`}
-                            >
-                              <div className="font-medium text-white truncate">
-                                {course.subject_name}
-                              </div>
-                              <div className="text-white/90 text-[10px] mt-1 font-medium">
-                                {course.start_time} - {course.end_time}
-                              </div>
-                            </div>
-                            {progress !== null && (
-                              <div
-                                className="absolute bottom-0 left-0 h-1 bg-white/90"
-                                style={{ width: `${progress * 100}%` }}
-                                aria-hidden="true"
-                              />
-                            )}
+                          {/* Lessons that start at the same time sit side by
+                              side rather than one hiding the other. */}
+                          <div className="absolute inset-0.5 flex gap-0.5">
+                            {courses.map((course) => {
+                              const progress = isToday
+                                ? lessonProgress(course, nowMinutes)
+                                : null;
+                              return (
+                                <div
+                                  key={course.slot_id}
+                                  className="relative flex-1 min-w-0 overflow-hidden rounded-sm"
+                                  style={{
+                                    backgroundColor: course.color || "#3B82F6",
+                                  }}
+                                  onClick={() => activate(cell, course)}
+                                  onMouseEnter={(e) =>
+                                    showTooltip(course, e.currentTarget)
+                                  }
+                                  onMouseLeave={hideTooltip}
+                                >
+                                  <div
+                                    className={`h-full p-2 text-xs hover:brightness-110 transition-all duration-200 flex flex-col justify-start ${
+                                      progress !== null
+                                        ? "ring-2 ring-rose-400 shadow-lg"
+                                        : isToday
+                                          ? "ring-2 ring-white dark:ring-gray-600 shadow-lg"
+                                          : ""
+                                    }`}
+                                  >
+                                    <div className="font-medium text-white truncate">
+                                      {course.subject_name}
+                                    </div>
+                                    {course.class_group_name && (
+                                      <div className="text-white/80 text-[10px] truncate">
+                                        {course.class_group_name}
+                                      </div>
+                                    )}
+                                    <div className="text-white/90 text-[10px] mt-1 font-medium">
+                                      {course.start_time} - {course.end_time}
+                                    </div>
+                                  </div>
+                                  {progress !== null && (
+                                    <div
+                                      className="absolute bottom-0 left-0 h-1 bg-white/90"
+                                      style={{ width: `${progress * 100}%` }}
+                                      aria-hidden="true"
+                                    />
+                                  )}
+                                </div>
+                              );
+                            })}
                           </div>
                         </td>
                       );
@@ -420,35 +432,7 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
         </table>
       </div>
 
-      {tooltip && (
-        <div
-          role="tooltip"
-          // Fixed to the viewport: the grid scrolls horizontally, and a tooltip
-          // positioned inside that container would be clipped by its overflow.
-          style={{ left: tooltip.x, top: tooltip.y }}
-          className="fixed z-50 -translate-x-1/2 -translate-y-full mb-2 pointer-events-none max-w-xs rounded-lg bg-gray-900/95 dark:bg-gray-800 px-3 py-2 text-xs text-white shadow-xl ring-1 ring-white/10"
-        >
-          <div className="font-semibold">{tooltip.slot.subject_name}</div>
-          {tooltip.slot.subject_code && (
-            <div className="text-white/60">{tooltip.slot.subject_code}</div>
-          )}
-          <div className="mt-1 text-white/90">
-            {tooltip.slot.start_time} - {tooltip.slot.end_time}
-          </div>
-          {tooltip.slot.class_group_name && (
-            <div className="text-white/80">{tooltip.slot.class_group_name}</div>
-          )}
-          {instructorOf(tooltip.slot) && (
-            <div className="text-white/80">{instructorOf(tooltip.slot)}</div>
-          )}
-          {tooltip.slot.location && (
-            <div className="text-white/60">📍 {tooltip.slot.location}</div>
-          )}
-          {tooltip.slot.notes && (
-            <div className="mt-1 text-white/60 italic">{tooltip.slot.notes}</div>
-          )}
-        </div>
-      )}
+      <SlotTooltip state={tooltip} />
     </div>
   );
 };

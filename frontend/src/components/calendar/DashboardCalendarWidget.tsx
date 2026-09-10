@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { Calendar, ChevronLeft, ChevronRight } from "lucide-react";
 import { useUser } from "../../contexts/UserContext";
 import { useToast } from "../../contexts/ToastContext";
@@ -13,14 +13,21 @@ import {
 } from "../../api/calendar";
 import {
   DAYS,
+  DAYS_FULL,
   buildScheduleRows,
   displayDayToBackend,
-  countScheduleSlots,
+  findCurrentRowIndex,
+  isTeachingRow,
+  minutesToTime,
+  timeToMinutes,
   getStartOfWeek,
   getWeekDates,
   getDateRangeString,
   formatDateShort,
 } from "./calendarConstants";
+import { buildGridLayout, cellKey, type GridCell } from "./calendarLayout";
+import SlotTooltip, { useSlotTooltip } from "./SlotTooltip";
+import { useCurrentTime } from "./useCurrentTime";
 import CalendarSlotModal from "./CalendarSlotModal";
 import LessonPlanModal from "./LessonPlanModal";
 
@@ -59,6 +66,13 @@ const DashboardCalendarWidget: React.FC = () => {
   const [selectedClassGroupId, setSelectedClassGroupId] = useState<
     number | "all"
   >("all");
+  // Class groups seen in the loaded slots. getMyClassGroups is the teacher's
+  // assignment list, which can be incomplete (or fail) while the timetable
+  // itself clearly names a group — a group with lessons on screen must always
+  // be selectable, so what the slots reveal is remembered here and merged in.
+  const [discoveredGroups, setDiscoveredGroups] = useState<
+    Record<number, string>
+  >({});
 
   // Modal State
   const [selectedSlot, setSelectedSlot] = useState<CalendarSlot | null>(null);
@@ -132,6 +146,7 @@ const DashboardCalendarWidget: React.FC = () => {
   // so a stale group from a different year isn't silently applied.
   useEffect(() => {
     setSelectedClassGroupId("all");
+    setDiscoveredGroups({});
   }, [selectedYearId]);
 
   // Load slots for the globally selected academic term — reloads whenever
@@ -173,6 +188,49 @@ const DashboardCalendarWidget: React.FC = () => {
 
     load();
   }, [isStudent, selectedTermId, selectedClassGroupId]);
+
+  // Remember any class group the loaded slots name, so filtering down to one
+  // group never removes the others from the dropdown.
+  useEffect(() => {
+    setDiscoveredGroups((prev) => {
+      let changed = false;
+      const next = { ...prev };
+      for (const slot of slots) {
+        const id = slot.class_group_id;
+        if (!id || next[id]) continue;
+        next[id] = slot.class_group_name || `Class group ${id}`;
+        changed = true;
+      }
+      return changed ? next : prev;
+    });
+  }, [slots]);
+
+  // Everything the teacher can filter by: their assigned groups, plus any
+  // group the timetable itself has revealed.
+  const classGroupOptions = useMemo(() => {
+    const byId = new Map<number, string>();
+    for (const cg of classGroups) {
+      byId.set(
+        cg.class_group_id,
+        `${cg.name}${cg.grade_name ? ` (${cg.grade_name})` : ""}`,
+      );
+    }
+    for (const [id, label] of Object.entries(discoveredGroups)) {
+      if (!byId.has(Number(id))) byId.set(Number(id), label);
+    }
+    return [...byId.entries()]
+      .map(([class_group_id, label]) => ({ class_group_id, label }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }, [classGroups, discoveredGroups]);
+
+  // With a single class group there is nothing to filter: select it so the
+  // dropdown names the group being shown rather than a vague "All".
+  useEffect(() => {
+    if (isStudent) return;
+    if (classGroupOptions.length === 1 && selectedClassGroupId === "all") {
+      setSelectedClassGroupId(classGroupOptions[0].class_group_id);
+    }
+  }, [classGroupOptions, isStudent, selectedClassGroupId]);
 
   // Handle slot click
   const handleSlotClick = (slot: CalendarSlot, date: Date) => {
@@ -260,7 +318,7 @@ const DashboardCalendarWidget: React.FC = () => {
 
         <div className="flex items-center gap-2">
           {/* Class group filter (teachers with more than one group) */}
-          {!isStudent && classGroups.length > 1 && (
+          {!isStudent && classGroupOptions.length > 0 && (
             <select
               aria-label="Filter by class group"
               value={selectedClassGroupId}
@@ -269,13 +327,14 @@ const DashboardCalendarWidget: React.FC = () => {
                   e.target.value === "all" ? "all" : Number(e.target.value),
                 )
               }
-              className="text-xs font-medium bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/40 rounded-lg px-2 py-1.5 text-gray-700 dark:text-gray-200 focus:outline-none cursor-pointer"
+              className="text-xs font-medium bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/40 rounded-lg px-2 py-1.5 text-gray-700 dark:text-gray-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 cursor-pointer hover:border-blue-400 transition-colors"
             >
-              <option value="all">All Class Groups</option>
-              {classGroups.map((cg) => (
+              {classGroupOptions.length > 1 && (
+                <option value="all">All Class Groups</option>
+              )}
+              {classGroupOptions.map((cg) => (
                 <option key={cg.class_group_id} value={cg.class_group_id}>
-                  {cg.name}
-                  {cg.grade_name ? ` (${cg.grade_name})` : ""}
+                  {cg.label}
                 </option>
               ))}
             </select>
@@ -333,7 +392,7 @@ const DashboardCalendarWidget: React.FC = () => {
           slots={slots}
           weekDates={weekDates}
           onSlotClick={handleSlotClick}
-          showClassGroup={!isStudent && selectedClassGroupId === "all"}
+          showClassGroup={!isStudent}
         />
       )}
 
@@ -372,6 +431,9 @@ const DashboardCalendarWidget: React.FC = () => {
 // ─── ReadOnlyCalendarGrid ─────────────────────────────────────────────────
 // Stripped-down grid that shows slots for the current user only.
 // No calendar_id filter needed — slots are already scoped to the user.
+//
+// Shares the timetable rows, the layout resolver, the "now" marker and the
+// hover/focus tooltip with the editable CalendarGrid, so the two stay in step.
 
 interface ReadOnlyCalendarGridProps {
   slots: CalendarSlot[];
@@ -379,6 +441,17 @@ interface ReadOnlyCalendarGridProps {
   onSlotClick: (slot: CalendarSlot, date: Date) => void;
   showClassGroup?: boolean;
 }
+
+/** How far through a lesson we are, 0-1, or null when it isn't running. */
+const lessonProgress = (
+  slot: CalendarSlot,
+  nowMinutes: number,
+): number | null => {
+  const start = timeToMinutes(slot.start_time);
+  const end = timeToMinutes(slot.end_time);
+  if (end <= start || nowMinutes < start || nowMinutes >= end) return null;
+  return (nowMinutes - start) / (end - start);
+};
 
 const ReadOnlyCalendarGrid: React.FC<ReadOnlyCalendarGridProps> = ({
   slots,
@@ -390,158 +463,308 @@ const ReadOnlyCalendarGrid: React.FC<ReadOnlyCalendarGridProps> = ({
   // gets a row instead of silently matching none (see buildScheduleRows).
   const scheduleRows = useMemo(() => buildScheduleRows(slots), [slots]);
 
-  return (
-    <div className="overflow-x-auto -mx-6 border-4 border-white dark:border-gray-800/20">
-      <table className="w-full border-collapse table-fixed">
-        <thead>
-          <tr className="bg-gradient-to-r from-blue-50 to-blue-100/30 dark:from-gray-800/30 dark:to-gray-800/30 border-b-4 border-white dark:border-none">
-            {/* Time column header */}
-            <th className="p-2 text-center text-xs font-semibold text-blue-600 dark:text-gray-300 w-20 min-w-20">
-              Time
-            </th>
-            {DAYS.map((day, idx) => {
-              const weekDate = weekDates[idx];
-              const isToday =
-                weekDate &&
-                new Date().toDateString() === weekDate.toDateString();
-              return (
-                <th
-                  key={idx}
-                  className="p-2 text-center text-sm font-semibold text-gray-600 dark:text-gray-300 flex-1 min-w-0"
-                >
-                  <div className="flex flex-col items-center gap-0.5">
-                    <span
-                      className={`px-2.5 py-0.5 rounded-full text-xs ${
-                        isToday
-                          ? "bg-blue-600 text-white"
-                          : "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300"
-                      }`}
-                    >
-                      {day}
-                    </span>
-                    {weekDate && (
-                      <span className="text-[10px] text-gray-400 dark:text-gray-500">
-                        {formatDateShort(weekDate)}
-                      </span>
-                    )}
-                  </div>
-                </th>
-              );
-            })}
-          </tr>
-        </thead>
-        <tbody className="border-b border-blue-200/50 dark:border-blue-700/20">
-          {(() => {
-            const occupiedCells = new Set<string>();
+  // Every lesson starting on a row is kept, not just the first: a teacher
+  // viewing all their class groups can have two lessons on the same day and
+  // time, and dropping one made "all class groups" look like one calendar.
+  const layout = useMemo(
+    () =>
+      buildGridLayout<CalendarSlot>(scheduleRows, DAYS.length, (dayIdx, start) =>
+        slots.filter(
+          (s) =>
+            Number(s.day_of_week) === displayDayToBackend(dayIdx) &&
+            s.start_time === start,
+        ),
+      ),
+    [scheduleRows, slots],
+  );
 
-            return scheduleRows.map((scheduleSlot, scheduleIdx) => {
-              const isBreakOrLunch =
-                scheduleSlot.type === "break" || scheduleSlot.type === "lunch";
+  const { minutes: nowMinutes, date: now } = useCurrentTime();
+  const currentRowIndex = findCurrentRowIndex(scheduleRows, nowMinutes);
+  const todayIndex = weekDates.findIndex(
+    (d) => d && d.toDateString() === now.toDateString(),
+  );
+
+  const { tooltip, show: showTooltip, hide: hideTooltip } = useSlotTooltip();
+  const cellRefs = useRef(new Map<string, HTMLTableCellElement>());
+
+  // Roving tabindex: one cell in the tab order, arrows move the point.
+  const firstCourseCell = useMemo(() => {
+    const row = scheduleRows.findIndex((r) => r.type === "course");
+    return row === -1 ? null : cellKey(row, 0);
+  }, [scheduleRows]);
+  const [activeCell, setActiveCell] = useState<string | null>(null);
+  const tabStop = activeCell ?? firstCourseCell;
+
+  /** The nearest navigable (course-row) cell at or beyond a coordinate. */
+  const resolve = useCallback(
+    (rowIndex: number, dayIndex: number, step: 1 | -1): string | null => {
+      for (let r = rowIndex; r >= 0 && r < scheduleRows.length; r += step) {
+        const owner = layout.ownerOf.get(cellKey(r, dayIndex));
+        const cell = owner ? layout.cells.get(owner) : undefined;
+        if (cell && isTeachingRow(cell)) return owner!;
+      }
+      return null;
+    },
+    [layout, scheduleRows.length],
+  );
+
+  const moveTo = useCallback((key: string | null) => {
+    if (!key) return;
+    setActiveCell(key);
+    cellRefs.current.get(key)?.focus();
+  }, []);
+
+  const handleKeyDown = useCallback(
+    (event: React.KeyboardEvent, cell: GridCell<CalendarSlot>) => {
+      const { rowIndex, dayIndex, rowSpan } = cell;
+      const lastDay = DAYS.length - 1;
+      let next: string | null = null;
+
+      switch (event.key) {
+        case "ArrowRight":
+          next = resolve(rowIndex, Math.min(dayIndex + 1, lastDay), 1);
+          break;
+        case "ArrowLeft":
+          next = resolve(rowIndex, Math.max(dayIndex - 1, 0), 1);
+          break;
+        case "ArrowDown":
+          next = resolve(rowIndex + rowSpan, dayIndex, 1);
+          break;
+        case "ArrowUp":
+          next = resolve(rowIndex - 1, dayIndex, -1);
+          break;
+        case "Home":
+          next = resolve(rowIndex, 0, 1);
+          break;
+        case "End":
+          next = resolve(rowIndex, lastDay, 1);
+          break;
+        case "PageUp":
+          next = resolve(0, dayIndex, 1);
+          break;
+        case "PageDown":
+          next = resolve(scheduleRows.length - 1, dayIndex, -1);
+          break;
+        case "Enter":
+        case " ": {
+          const slot = cell.slots[0];
+          if (slot) {
+            event.preventDefault();
+            onSlotClick(slot, weekDates[dayIndex]!);
+          }
+          return;
+        }
+        case "Escape":
+          hideTooltip();
+          return;
+        default:
+          return;
+      }
+
+      event.preventDefault();
+      moveTo(next);
+    },
+    [hideTooltip, moveTo, onSlotClick, resolve, scheduleRows.length, weekDates],
+  );
+
+  return (
+    <div>
+      <div className="overflow-x-auto -mx-6 border-4 border-white dark:border-gray-800/20">
+        <table role="grid" className="w-full border-collapse table-fixed">
+          <thead>
+            <tr className="bg-gradient-to-r from-blue-50 to-blue-100/30 dark:from-gray-800/30 dark:to-gray-800/30 border-b-4 border-white dark:border-none">
+              {/* Time column header */}
+              <th
+                scope="col"
+                className="p-2 text-center text-xs font-semibold text-blue-600 dark:text-gray-300 w-20 min-w-20"
+              >
+                Time
+              </th>
+              {DAYS.map((day, idx) => {
+                const weekDate = weekDates[idx];
+                const isToday = idx === todayIndex;
+                return (
+                  <th
+                    key={idx}
+                    scope="col"
+                    aria-current={isToday ? "date" : undefined}
+                    className="p-2 text-center text-sm font-semibold text-gray-600 dark:text-gray-300 flex-1 min-w-0"
+                  >
+                    <div className="flex flex-col items-center gap-0.5">
+                      <span
+                        className={`px-2.5 py-0.5 rounded-full text-xs ${
+                          isToday
+                            ? "bg-blue-600 text-white"
+                            : "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300"
+                        }`}
+                      >
+                        {day}
+                      </span>
+                      {weekDate && (
+                        <span className="text-[10px] text-gray-400 dark:text-gray-500">
+                          {formatDateShort(weekDate)}
+                        </span>
+                      )}
+                    </div>
+                  </th>
+                );
+              })}
+            </tr>
+          </thead>
+          <tbody className="border-b border-blue-200/50 dark:border-blue-700/20">
+            {scheduleRows.map((scheduleSlot, scheduleIdx) => {
+              const isTeaching = isTeachingRow(scheduleSlot);
+              const isNow = scheduleIdx === currentRowIndex && todayIndex !== -1;
 
               return (
                 <tr
-                  key={scheduleIdx}
+                  key={`${scheduleSlot.start}-${scheduleSlot.end}`}
                   className={`border-t border-gray-100 dark:border-gray-700/20 ${
-                    isBreakOrLunch
-                      ? "h-8 bg-gray-50 dark:bg-gray-800/10"
-                      : "h-14"
+                    isTeaching ? "h-14" : "h-8 bg-gray-50 dark:bg-gray-800/10"
                   } transition-colors`}
                 >
                   {/* Time cell */}
-                  <td
+                  <th
+                    scope="row"
                     className={`p-1.5 text-center text-[10px] font-medium align-middle border border-blue-200/50 dark:border-blue-700/20 ${
-                      isBreakOrLunch
-                        ? "bg-gray-100 dark:bg-gray-800/50 text-gray-400 dark:text-gray-500/60 font-light"
-                        : "bg-gray-50 dark:bg-gray-800/20 text-gray-700 dark:text-gray-200 font-semibold"
+                      isNow ? "border-l-4 !border-l-rose-500" : ""
+                    } ${
+                      isTeaching
+                        ? "bg-gray-50 dark:bg-gray-800/20 text-gray-700 dark:text-gray-200 font-semibold"
+                        : "bg-gray-100 dark:bg-gray-800/50 text-gray-400 dark:text-gray-500/60 font-light"
                     }`}
                   >
-                    <div>{scheduleSlot.start}</div>
-                    <div>{scheduleSlot.end}</div>
-                    {isBreakOrLunch && (
-                      <div className="text-[8px] font-bold mt-0.5 text-orange-600 dark:text-orange-400">
-                        {scheduleSlot.type === "lunch" ? "🍴" : "⏸"}
+                    {isTeaching && scheduleSlot.label && (
+                      <div className="text-[10px] font-bold text-blue-600 dark:text-blue-400">
+                        {scheduleSlot.label}
                       </div>
                     )}
-                  </td>
+                    <div>{scheduleSlot.start}</div>
+                    <div>{scheduleSlot.end}</div>
+                    {isNow && (
+                      <div className="text-[8px] font-bold mt-0.5 text-rose-600 dark:text-rose-400">
+                        ● {minutesToTime(nowMinutes)}
+                      </div>
+                    )}
+                  </th>
+
+                  {/* Breaks, lunch and office hours run right across the week,
+                      as one labelled band rather than seven blank cells. */}
+                  {!isTeaching && (
+                    <td
+                      colSpan={DAYS.length}
+                      className={`border-l border-gray-100 dark:border-gray-700/20 text-center text-[10px] font-bold uppercase tracking-wider ${
+                        scheduleSlot.type === "lunch"
+                          ? "bg-amber-50 dark:bg-amber-900/10 text-amber-700 dark:text-amber-400/80"
+                          : "bg-gray-100 dark:bg-gray-800/50 text-gray-500 dark:text-gray-400/70"
+                      }`}
+                    >
+                      {scheduleSlot.label}
+                    </td>
+                  )}
 
                   {/* Day cells */}
-                  {DAYS.map((_, dayIdx) => {
-                    const weekDate = weekDates[dayIdx];
-                    const isToday =
-                      weekDate &&
-                      new Date().toDateString() === weekDate.toDateString();
+                  {isTeaching &&
+                    DAYS.map((_, dayIdx) => {
+                    const key = cellKey(scheduleIdx, dayIdx);
+                    const cell = layout.cells.get(key);
+                    // A rowSpan from an earlier row already covers this one
+                    if (!cell) return null;
 
-                    const cellKey = `${dayIdx}-${scheduleIdx}`;
-                    if (occupiedCells.has(cellKey)) return null;
+                    const isToday = dayIdx === todayIndex;
 
-                    if (isBreakOrLunch) {
-                      return (
-                        <td
-                          key={dayIdx}
-                          className="p-1 border-l border-gray-100 dark:border-gray-700/20 bg-gray-100 dark:bg-gray-800/50"
-                        />
-                      );
-                    }
+                    const courses = cell.slots;
+                    const isTabStop = key === tabStop;
+                    const dayLabel = `${DAYS_FULL[dayIdx]} ${scheduleSlot.label ? `${scheduleSlot.label} ` : ""}${scheduleSlot.start}`;
+                    const commonProps = {
+                      ref: (el: HTMLTableCellElement | null) => {
+                        if (el) cellRefs.current.set(key, el);
+                        else cellRefs.current.delete(key);
+                      },
+                      role: "gridcell",
+                      tabIndex: isTabStop ? 0 : -1,
+                      onKeyDown: (e: React.KeyboardEvent) =>
+                        handleKeyDown(e, cell),
+                    };
 
-                    const courseStartingHere = slots.find(
-                      (s) =>
-                        parseInt(s.day_of_week as any) ===
-                          displayDayToBackend(dayIdx) &&
-                        s.start_time === scheduleSlot.start,
-                    );
-
-                    if (courseStartingHere) {
-                      const rowSpan = countScheduleSlots(
-                        courseStartingHere.start_time,
-                        courseStartingHere.end_time,
-                        scheduleRows,
-                        scheduleIdx,
-                      );
-
-                      for (let r = 1; r < rowSpan; r++) {
-                        occupiedCells.add(`${dayIdx}-${scheduleIdx + r}`);
-                      }
+                    if (courses.length > 0) {
+                      const label = courses
+                        .map(
+                          (c) =>
+                            `${c.subject_name ?? "Lesson"}${c.class_group_name ? `, ${c.class_group_name}` : ""}, ${c.start_time} to ${c.end_time}`,
+                        )
+                        .join("; ");
 
                       return (
                         <td
+                          {...commonProps}
                           key={dayIdx}
-                          rowSpan={rowSpan}
-                          className={`p-0 border-l border-gray-100 dark:border-gray-700/20 relative cursor-pointer ${
+                          rowSpan={cell.rowSpan}
+                          aria-label={`${dayLabel}, ${label}`}
+                          className={`p-0 border-l border-gray-100 dark:border-gray-700/20 relative cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 ${
                             isToday ? "bg-blue-50/50 dark:bg-blue-900/10" : ""
                           }`}
-                          onClick={() =>
-                            onSlotClick(courseStartingHere, weekDate!)
-                          }
+                          onFocus={() => {
+                            setActiveCell(key);
+                            const el = cellRefs.current.get(key);
+                            if (el) showTooltip(courses[0], el);
+                          }}
+                          onBlur={hideTooltip}
                         >
-                          <div
-                            className="absolute inset-0.5 overflow-hidden rounded-sm"
-                            style={{
-                              backgroundColor:
-                                courseStartingHere.color || "#3B82F6",
-                            }}
-                          >
-                            <div
-                              className={`h-full p-1.5 text-xs flex flex-col justify-start hover:brightness-110 transition-all duration-200 ${
-                                isToday
-                                  ? "ring-2 ring-white dark:ring-gray-600 shadow-lg"
-                                  : ""
-                              }`}
-                              title={`${courseStartingHere.subject_name}${courseStartingHere.class_group_name ? ` - ${courseStartingHere.class_group_name}` : ""}`}
-                            >
-                              <div className="font-normal text-white truncate text-[12px]">
-                                {courseStartingHere.subject_name}
-                              </div>
-                              {showClassGroup &&
-                                courseStartingHere.class_group_name && (
-                                  <div className="text-white/80 truncate text-[10px]">
-                                    {courseStartingHere.class_group_name}
+                          {/* Lessons starting at the same time sit side by
+                              side rather than one hiding the other. */}
+                          <div className="absolute inset-0.5 flex gap-0.5">
+                            {courses.map((course) => {
+                              const progress = isToday
+                                ? lessonProgress(course, nowMinutes)
+                                : null;
+                              return (
+                                <div
+                                  key={course.slot_id}
+                                  className="relative flex-1 min-w-0 overflow-hidden rounded-sm"
+                                  style={{
+                                    backgroundColor: course.color || "#3B82F6",
+                                  }}
+                                  onClick={() =>
+                                    onSlotClick(course, weekDates[dayIdx]!)
+                                  }
+                                  onMouseEnter={(e) =>
+                                    showTooltip(course, e.currentTarget)
+                                  }
+                                  onMouseLeave={hideTooltip}
+                                >
+                                  <div
+                                    className={`h-full p-1.5 text-xs flex flex-col justify-start hover:brightness-110 transition-all duration-200 ${
+                                      progress !== null
+                                        ? "ring-2 ring-rose-400 shadow-lg"
+                                        : isToday
+                                          ? "ring-2 ring-white dark:ring-gray-600 shadow-lg"
+                                          : ""
+                                    }`}
+                                  >
+                                    <div className="font-normal text-white truncate text-[12px]">
+                                      {course.subject_name}
+                                    </div>
+                                    {showClassGroup &&
+                                      course.class_group_name && (
+                                        <div className="text-white/80 truncate text-[10px]">
+                                          {course.class_group_name}
+                                        </div>
+                                      )}
+                                    <div className="text-white/70 text-[10px] mt-auto">
+                                      {course.start_time} - {course.end_time}
+                                    </div>
                                   </div>
-                                )}
-                              <div className="text-white/70 text-[10px] mt-auto">
-                                {courseStartingHere.start_time} -{" "}
-                                {courseStartingHere.end_time}
-                              </div>
-                            </div>
+                                  {progress !== null && (
+                                    <div
+                                      className="absolute bottom-0 left-0 h-1 bg-white/90"
+                                      style={{ width: `${progress * 100}%` }}
+                                      aria-hidden="true"
+                                    />
+                                  )}
+                                </div>
+                              );
+                            })}
                           </div>
                         </td>
                       );
@@ -550,19 +773,24 @@ const ReadOnlyCalendarGrid: React.FC<ReadOnlyCalendarGridProps> = ({
                     // Empty cell – read-only, no hover add icon
                     return (
                       <td
+                        {...commonProps}
                         key={dayIdx}
-                        className={`p-1 border-l border-gray-100 dark:border-gray-700/20 ${
+                        aria-label={`${dayLabel}, free`}
+                        onFocus={() => setActiveCell(key)}
+                        className={`p-1 border-l border-gray-100 dark:border-gray-700/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 ${
                           isToday ? "bg-blue-50/30 dark:bg-blue-900/5" : ""
-                        }`}
+                        } ${isNow ? "ring-1 ring-inset ring-rose-400/60" : ""}`}
                       />
                     );
                   })}
                 </tr>
               );
-            });
-          })()}
-        </tbody>
-      </table>
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      <SlotTooltip state={tooltip} />
     </div>
   );
 };

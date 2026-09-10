@@ -24,10 +24,9 @@ const report = (overrides: any = {}) => ({
     data: {
       class_group_id: 9,
       name: "L3. Class B",
-      can_delete: true,
       requires_confirmation: false,
-      blocking: [],
-      detachable: [],
+      deletes: [],
+      unlinks: [],
       ...overrides,
     },
   },
@@ -73,7 +72,7 @@ describe("ClassGroupsTab delete flow", () => {
     dependenciesMock.mockReset();
   });
 
-  it("deletes without a force flag when nothing references the class group", async () => {
+  it("deletes a class group that nothing references", async () => {
     dependenciesMock.mockResolvedValue(report());
     const onDelete = renderTab();
 
@@ -82,19 +81,19 @@ describe("ClassGroupsTab delete flow", () => {
 
     await userEvent.click(confirmButton());
 
-    await waitFor(() => expect(onDelete).toHaveBeenCalledWith(9, false));
+    await waitFor(() => expect(onDelete).toHaveBeenCalledWith(9, true));
   });
 
-  it("lists what a delete would clear and forces the delete once confirmed", async () => {
+  it("lists what the delete removes and goes ahead once confirmed", async () => {
     dependenciesMock.mockResolvedValue(
       report({
         requires_confirmation: true,
-        detachable: [
+        deletes: [
           {
             key: "students",
             label: "student assignment(s)",
             count: 12,
-            blocking: false,
+            destructive: true,
           },
         ],
       }),
@@ -111,16 +110,24 @@ describe("ClassGroupsTab delete flow", () => {
     await waitFor(() => expect(onDelete).toHaveBeenCalledWith(9, true));
   });
 
-  it("blocks the delete and names the records in the way", async () => {
+  it("still allows the delete when schemes and reports are involved", async () => {
     dependenciesMock.mockResolvedValue(
       report({
-        can_delete: false,
-        blocking: [
+        requires_confirmation: true,
+        deletes: [
           {
             key: "schemes_of_work",
             label: "scheme(s) of work",
-            count: 3,
-            blocking: true,
+            count: 2,
+            destructive: true,
+          },
+        ],
+        unlinks: [
+          {
+            key: "instructor_reports",
+            label: "instructor report(s)",
+            count: 41,
+            destructive: false,
           },
         ],
       }),
@@ -128,10 +135,20 @@ describe("ClassGroupsTab delete flow", () => {
     const onDelete = renderTab();
 
     await openDeleteModal();
-    expect(await screen.findByText("3 scheme(s) of work")).toBeInTheDocument();
+    expect(await screen.findByText("2 scheme(s) of work")).toBeInTheDocument();
+    // Reports survive the delete, so they are listed separately from the
+    // things it destroys.
+    expect(screen.getByText("41 instructor report(s)")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "These are kept, but will no longer be linked to a class group:",
+      ),
+    ).toBeInTheDocument();
 
-    expect(confirmButton()).toBeDisabled();
-    expect(onDelete).not.toHaveBeenCalled();
+    expect(confirmButton()).not.toBeDisabled();
+    await userEvent.click(confirmButton());
+
+    await waitFor(() => expect(onDelete).toHaveBeenCalledWith(9, true));
   });
 
   it("surfaces the server's reason when the delete fails", async () => {

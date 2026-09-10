@@ -532,7 +532,15 @@ export const getCurrentUser = asyncHandler(async (req: any, res: any) => {
 });
 
 export const getUsers = asyncHandler(async (req: any, res: any) => {
-  const { userRole, page = 1, limit = 10, search, status } = req.query;
+  const {
+    userRole,
+    page = 1,
+    limit = 10,
+    search,
+    status,
+    class_group_id,
+    academic_year_id,
+  } = req.query;
   const pageNum = parseInt(page);
   const limitNum = parseInt(limit);
   const offset = (pageNum - 1) * limitNum;
@@ -578,6 +586,41 @@ export const getUsers = asyncHandler(async (req: any, res: any) => {
           : sql`1 = 0`,
       );
     }
+  }
+
+  // Class Groups Management filters the roster by class group. ClassGroup is a
+  // permanent label reused across years, so without the year filter this would
+  // return every cohort that ever sat in the group, not the current one.
+  if (class_group_id !== undefined && class_group_id !== "") {
+    const classGroupId = parseInt(class_group_id as string, 10);
+    if (isNaN(classGroupId)) {
+      throw new ValidationError("Invalid class group ID");
+    }
+
+    const membershipFilters: any[] = [
+      eq(StudentClassGroup.class_group_id, classGroupId),
+      eq(StudentClassGroup.status, "ACTIVE"),
+    ];
+
+    const yearId =
+      academic_year_id !== undefined && academic_year_id !== ""
+        ? parseInt(academic_year_id as string, 10)
+        : await getCurrentAcademicYearId();
+    if (yearId && !isNaN(yearId)) {
+      membershipFilters.push(eq(StudentClassGroup.academic_year_id, yearId));
+    }
+
+    const memberRows = await db
+      .select({ user_id: StudentClassGroup.user_id })
+      .from(StudentClassGroup)
+      .where(and(...membershipFilters));
+    const memberIds = Array.from(
+      new Set(memberRows.map((r) => Number(r.user_id))),
+    );
+
+    whereConditions.push(
+      memberIds.length > 0 ? inArray(User.user_id, memberIds) : sql`1 = 0`,
+    );
   }
 
   const totalCountResult = await db

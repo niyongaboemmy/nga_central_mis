@@ -140,9 +140,9 @@ const ClassGroupsTab: React.FC<ClassGroupsTabProps> = ({
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
   // A class group is referenced by rosters, timetables, schemes and reports.
-  // The delete modal preflights those so the admin sees what a delete would
-  // clear -- or why it can't run -- before confirming, instead of the delete
-  // failing on a foreign key with nothing shown.
+  // The delete modal preflights those so the admin sees exactly what goes and
+  // what is merely unlinked before confirming, instead of the delete failing
+  // on a foreign key with nothing shown.
   const [deleteReport, setDeleteReport] =
     useState<ClassGroupDependencyReport | null>(null);
   const [deleteReportLoading, setDeleteReportLoading] = useState(false);
@@ -249,10 +249,7 @@ const ClassGroupsTab: React.FC<ClassGroupsTabProps> = ({
     try {
       // The backend refuses an unconfirmed delete that would clear links, so
       // pass force once the modal has shown the admin exactly what they are.
-      await onDelete(
-        selectedClassGroup.class_group_id,
-        (deleteReport?.detachable.length ?? 0) > 0,
-      );
+      await onDelete(selectedClassGroup.class_group_id, true);
       closeDeleteModal();
       onRefresh();
     } catch (error: any) {
@@ -727,40 +724,35 @@ const ClassGroupsTab: React.FC<ClassGroupsTabProps> = ({
             </p>
           )}
 
-          {deleteReport && deleteReport.blocking.length > 0 && (
+          {deleteReport && deleteReport.deletes.length > 0 && (
             <div className="rounded-lg border border-red-500/40 bg-red-500/10 p-3">
               <p className="text-sm font-medium text-red-600 dark:text-red-400">
-                This class group can't be deleted yet. It still has:
+                This will also permanently delete:
               </p>
               <ul className="mt-2 list-disc pl-5 text-sm text-red-600 dark:text-red-400">
-                {deleteReport.blocking.map((item) => (
+                {deleteReport.deletes.map((item) => (
                   <li key={item.key}>
                     {item.count} {item.label}
                   </li>
                 ))}
               </ul>
-              <p className="mt-2 text-sm text-red-600 dark:text-red-400">
-                Reassign or delete those records first.
-              </p>
             </div>
           )}
 
-          {deleteReport &&
-            deleteReport.blocking.length === 0 &&
-            deleteReport.detachable.length > 0 && (
-              <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3">
-                <p className="text-sm font-medium text-amber-600 dark:text-amber-400">
-                  Deleting it will also remove:
-                </p>
-                <ul className="mt-2 list-disc pl-5 text-sm text-amber-600 dark:text-amber-400">
-                  {deleteReport.detachable.map((item) => (
-                    <li key={item.key}>
-                      {item.count} {item.label}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
+          {deleteReport && deleteReport.unlinks.length > 0 && (
+            <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3">
+              <p className="text-sm font-medium text-amber-600 dark:text-amber-400">
+                These are kept, but will no longer be linked to a class group:
+              </p>
+              <ul className="mt-2 list-disc pl-5 text-sm text-amber-600 dark:text-amber-400">
+                {deleteReport.unlinks.map((item) => (
+                  <li key={item.key}>
+                    {item.count} {item.label}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
 
           {deleteError && (
             <p className="text-sm text-red-600 dark:text-red-400">
@@ -779,11 +771,7 @@ const ClassGroupsTab: React.FC<ClassGroupsTabProps> = ({
             <Button
               variant="danger"
               onClick={confirmDelete}
-              disabled={
-                submitting ||
-                deleteReportLoading ||
-                deleteReport?.can_delete === false
-              }
+              disabled={submitting || deleteReportLoading}
               isLoading={submitting}
             >
               Delete

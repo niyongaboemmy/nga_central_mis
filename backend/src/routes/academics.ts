@@ -86,6 +86,12 @@ import {
   deleteClassGroup,
   getClassGroupDependencyReport,
 
+  // Class Groups Management workspace
+  getClassGroupsOverview,
+  getUnassignedStudents,
+  bulkAssignTeacherToSubjects,
+  bulkUnenrollStudentsFromSubjects,
+
   // Program Users
   getUsersByProgram,
   getAllProgramLeads,
@@ -278,6 +284,12 @@ router.put(
   updateTeacherSubjectAssignment,
 );
 router.post(
+  "/teachers/bulk-assign-subjects",
+  authenticate,
+  authorize("MANAGE_ACADEMICS"),
+  bulkAssignTeacherToSubjects,
+);
+router.post(
   "/teachers/copy-assignments",
   authenticate,
   authorize("MANAGE_ACADEMICS"),
@@ -315,6 +327,14 @@ router.delete(
 // Class Groups routes -- ClassGroup is a permanent label per grade now, not
 // year-scoped, so there's no more "copy class groups to a new year" action.
 router.get("/class-groups", authenticate, getClassGroups);
+// Registered before "/class-groups/:id", otherwise Express matches
+// "overview" as :id and calls getClassGroup instead.
+router.get(
+  "/class-groups/overview",
+  authenticate,
+  authorize("VIEW_ACADEMICS"),
+  getClassGroupsOverview,
+);
 router.get("/class-groups/:id", authenticate, getClassGroup);
 router.get(
   "/class-groups/:class_group_id/students",
@@ -379,6 +399,14 @@ router.get(
 );
 
 // Student Subject Enrollment routes
+// Registered before every "/students/:studentId/..." route so Express does not
+// match "unassigned" as a student id.
+router.get(
+  "/students/unassigned",
+  authenticate,
+  authorize("ASSIGN_STUDENT_CLASS_GROUPS"),
+  getUnassignedStudents,
+);
 router.get(
   "/students/:studentId/enrolled-subjects",
   authenticate,
@@ -406,6 +434,12 @@ router.post(
   authenticate,
   authorize("MANAGE_STUDENT_ENROLLMENTS"),
   bulkEnrollStudentsInSubjects,
+);
+router.post(
+  "/students/bulk-unenroll-subjects",
+  authenticate,
+  authorize("MANAGE_STUDENT_ENROLLMENTS"),
+  bulkUnenrollStudentsFromSubjects,
 );
 
 // Student Class Group Assignment routes
