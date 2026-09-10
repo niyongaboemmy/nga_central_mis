@@ -28,8 +28,42 @@ interface CalendarGridProps {
     scheduleSlot: { start: string; end: string; type: string },
     class_group_id: number,
   ) => void;
+  /** Opens an existing custom activity (non-subject event) for view/edit. */
+  onActivityClick?: (activity: CalendarActivity) => void;
   canEdit?: boolean;
 }
+
+/**
+ * A custom activity rendered on the weekly grid.
+ *
+ * Activities aren't tied to a subject or instructor, but they occupy a
+ * day + time range exactly like a lesson does, so they're mapped onto the
+ * same `CalendarSlot` shape the layout engine already understands (negative
+ * `slot_id` keeps them from colliding with real slot ids) and tagged with
+ * `__activity` so clicks route to the activity editor instead of the lesson one.
+ */
+type GridEntry = CalendarSlot & { __activity?: CalendarActivity };
+
+const activityToEntry = (
+  a: CalendarActivity,
+  calendarId?: number,
+): GridEntry => ({
+  slot_id: -Math.abs(a.activity_id),
+  calendar_id: calendarId,
+  academic_term_id: a.academic_term_id,
+  class_group_id: a.class_group_id,
+  subject_id: 0,
+  user_id: 0,
+  day_of_week: Number(a.day_of_week ?? 0),
+  start_time: a.start_time,
+  end_time: a.end_time,
+  location: a.location,
+  color: a.color || "#10B981",
+  notes: a.description,
+  subject_name: a.activity_name,
+  class_group_name: a.activity_type,
+  __activity: a,
+});
 
 /** How far through a lesson we are, 0-1, or null when it isn't running. */
 const lessonProgress = (
@@ -46,18 +80,33 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
   calendarId,
   classGroupName,
   slots,
-  activities: _activities,
+  activities,
   weekDates,
   onSlotClick,
   onEmptyCellClick,
+  onActivityClick,
   canEdit = false,
 }) => {
   // Filter slots for this calendar (skip filtering for personal/teacher & student
-  // views, which have no calendar_id — slots are already scoped server-side)
-  const calendarSlots = useMemo(
-    () => (calendarId ? slots.filter((s) => s.calendar_id === calendarId) : slots),
-    [calendarId, slots],
-  );
+  // views, which have no calendar_id — slots are already scoped server-side).
+  // Custom activities (non-subject events) are merged in as pseudo-slots so the
+  // layout engine positions them exactly like lessons; only weekly (recurring
+  // day-of-week) activities are drawn here — one-off dated ones are skipped.
+  const calendarSlots = useMemo(() => {
+    const base = calendarId
+      ? slots.filter((s) => s.calendar_id === calendarId)
+      : slots;
+    const activityEntries = (activities ?? [])
+      .filter(
+        (a) =>
+          a.start_time &&
+          a.end_time &&
+          a.day_of_week !== null &&
+          a.day_of_week !== undefined,
+      )
+      .map((a) => activityToEntry(a, calendarId));
+    return [...base, ...activityEntries];
+  }, [calendarId, slots, activities]);
 
   // Rows follow the data: a period outside the standard timetable still needs
   // a row of its own, or its slots match nothing and the grid renders empty.
@@ -103,6 +152,11 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
       const weekDate = weekDates[cell.dayIndex];
       const slot = target ?? cell.slots[0];
       if (slot) {
+        const activity = (slot as GridEntry).__activity;
+        if (activity) {
+          onActivityClick?.(activity);
+          return;
+        }
         onSlotClick(
           {
             ...slot,
@@ -116,7 +170,15 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
         onEmptyCellClick(cell.dayIndex, scheduleRows[cell.rowIndex], calendarId);
       }
     },
-    [calendarId, canEdit, onEmptyCellClick, onSlotClick, scheduleRows, weekDates],
+    [
+      calendarId,
+      canEdit,
+      onActivityClick,
+      onEmptyCellClick,
+      onSlotClick,
+      scheduleRows,
+      weekDates,
+    ],
   );
 
   /** The nearest navigable (course-row) cell at or beyond a coordinate. */

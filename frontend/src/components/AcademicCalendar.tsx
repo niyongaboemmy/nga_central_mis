@@ -14,6 +14,9 @@ import {
   updateCalendarSlot,
   deleteCalendarSlot,
   getCalendarActivities,
+  createCalendarActivity,
+  updateCalendarActivity,
+  deleteCalendarActivity,
   getMyCalendar,
   getStudentCalendar,
   getNotificationSettings,
@@ -198,7 +201,9 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({
   const filteredActivities = useMemo(() => {
     if (!selectedCalendar) return activities;
     return activities.filter(
-      (a) => a.class_group_id === selectedCalendar.class_group_id,
+      (a) =>
+        a.class_group_id == null ||
+        a.class_group_id === selectedCalendar.class_group_id,
     );
   }, [activities, selectedCalendar]);
 
@@ -242,6 +247,31 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({
     start_time?: string;
     end_time?: string;
   }>({});
+
+  // ── Custom activity (non-subject event) state ────────────────────────────
+  const [entryKind, setEntryKind] = useState<"lesson" | "activity">("lesson");
+  const [selectedActivity, setSelectedActivity] =
+    useState<CalendarActivity | null>(null);
+  const emptyActivityForm = {
+    activity_name: "",
+    activity_type: "",
+    day_of_week: "",
+    start_time: "",
+    end_time: "",
+    location: "",
+    description: "",
+    color: "#10B981",
+  };
+  const [activityForm, setActivityForm] = useState(emptyActivityForm);
+  const [activityErrors, setActivityErrors] = useState<{
+    activity_name?: string;
+    activity_type?: string;
+    day_of_week?: string;
+    start_time?: string;
+    end_time?: string;
+  }>({});
+  const [isSubmittingActivity, setIsSubmittingActivity] = useState(false);
+  const [isDeletingActivity, setIsDeletingActivity] = useState(false);
 
   // Week dates
   const weekDates = useMemo(() => {
@@ -458,15 +488,20 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({
           return;
         }
 
-        const [calendarData, notificationsData, upcomingData] =
+        const [calendarData, notificationsData, upcomingData, activitiesData] =
           await Promise.all([
             getMyCalendar({ ...params, class_group_id: effectiveGroupId }),
             getNotificationSettings(),
             checkUpcomingLessons(),
+            getCalendarActivities({
+              ...params,
+              class_group_id: effectiveGroupId,
+            }).catch(() => [] as CalendarActivity[]),
           ]);
         setSlots(calendarData.slots);
         setUpcomingLessons(upcomingData);
         setNotifications(notificationsData);
+        setActivities(activitiesData);
       }
     } catch (error: any) {
       showToast(error.message || "Failed to load calendar data", "error");
@@ -500,6 +535,9 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({
     const calendar = calendars.find((c) => c.calendar_id === calendarId);
 
     setSelectedSlot(null);
+    setSelectedActivity(null);
+    setEntryKind("lesson");
+    setActivityErrors({});
     setFormData({
       calendar_id: calendar?.calendar_id?.toString() || "",
       class_group_id: calendar?.class_group_id?.toString() || "",
@@ -510,8 +548,122 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({
       end_time: scheduleSlot.end,
       location: "room 1",
     });
+    // Seed the activity form with the same cell so toggling Lesson → Activity
+    // keeps the day/time the user clicked.
+    setActivityForm({
+      ...emptyActivityForm,
+      day_of_week: dayIndex.toString(),
+      start_time: scheduleSlot.start,
+      end_time: scheduleSlot.end,
+    });
 
     setShowModal(true);
+  };
+
+  // View / edit an existing custom activity
+  const handleActivityClick = (activity: CalendarActivity) => {
+    setModalMode("details");
+    setSelectedSlot(null);
+    setSelectedActivity(activity);
+    setEntryKind("activity");
+    setActivityErrors({});
+    setActivityForm({
+      activity_name: activity.activity_name || "",
+      activity_type: activity.activity_type || "",
+      day_of_week:
+        activity.day_of_week != null
+          ? backendDayToDisplay(activity.day_of_week).toString()
+          : "",
+      start_time: activity.start_time || "",
+      end_time: activity.end_time || "",
+      location: activity.location || "",
+      description: activity.description || "",
+      color: activity.color || "#10B981",
+    });
+    setShowModal(true);
+  };
+
+  const handleActivitySubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const errors: typeof activityErrors = {};
+    if (!activityForm.activity_name.trim())
+      errors.activity_name = "Please enter an activity name";
+    if (!activityForm.activity_type.trim())
+      errors.activity_type = "Please choose a type";
+    if (activityForm.day_of_week === "")
+      errors.day_of_week = "Please select a day";
+    if (!activityForm.start_time) errors.start_time = "Please select start time";
+    if (!activityForm.end_time) errors.end_time = "Please select end time";
+    if (
+      activityForm.start_time &&
+      activityForm.end_time &&
+      activityForm.start_time >= activityForm.end_time
+    ) {
+      errors.end_time = "End time must be after start time";
+    }
+    if (Object.keys(errors).length > 0) {
+      setActivityErrors(errors);
+      return;
+    }
+    setActivityErrors({});
+
+    const classGroupId =
+      selectedActivity?.class_group_id ??
+      selectedCalendar?.class_group_id ??
+      (formData.class_group_id ? parseInt(formData.class_group_id) : undefined);
+    const termId =
+      selectedActivity?.academic_term_id ??
+      selectedCalendar?.academic_term_id ??
+      selectedTerm ??
+      0;
+
+    const payload = {
+      activity_name: activityForm.activity_name.trim(),
+      activity_type: activityForm.activity_type.trim(),
+      day_of_week: displayDayToBackend(parseInt(activityForm.day_of_week)),
+      start_time: activityForm.start_time,
+      end_time: activityForm.end_time,
+      location: activityForm.location || undefined,
+      description: activityForm.description || undefined,
+      color: activityForm.color,
+    };
+
+    try {
+      setIsSubmittingActivity(true);
+      if (selectedActivity) {
+        await updateCalendarActivity(selectedActivity.activity_id, payload);
+        showToast("Activity updated successfully", "success");
+      } else {
+        await createCalendarActivity({
+          ...payload,
+          academic_term_id: termId,
+          class_group_id: classGroupId,
+          is_recurring: 1,
+        });
+        showToast("Activity created successfully", "success");
+      }
+      resetSlotModal();
+      loadData();
+    } catch (error: any) {
+      showToast(error.message || "Failed to save activity", "error");
+    } finally {
+      setIsSubmittingActivity(false);
+    }
+  };
+
+  const handleActivityDelete = async (id: number) => {
+    if (!confirm("Are you sure you want to delete this activity?")) return;
+    try {
+      setIsDeletingActivity(true);
+      await deleteCalendarActivity(id);
+      showToast("Activity deleted successfully", "success");
+      resetSlotModal();
+      loadData();
+    } catch (error: any) {
+      showToast(error.message || "Failed to delete activity", "error");
+    } finally {
+      setIsDeletingActivity(false);
+    }
   };
 
   // Handle slot click to view details (then potentially edit)
@@ -674,6 +826,10 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({
     setFormErrors({});
     setSelectedSlot(null);
     setSetupData(null); // clear stale subjects so next open starts fresh
+    setSelectedActivity(null);
+    setEntryKind("lesson");
+    setActivityForm(emptyActivityForm);
+    setActivityErrors({});
     setShowModal(false);
   };
   // ─────────────────────────────────────────────────────────────────────────
@@ -818,6 +974,15 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({
     const firstSubject = setupData?.subjects[0];
     const firstTeacher = firstSubject?.teachers?.[0];
     setSelectedSlot(null);
+    setSelectedActivity(null);
+    setEntryKind("lesson");
+    setActivityForm({
+      ...emptyActivityForm,
+      day_of_week: "0",
+      start_time: "09:00",
+      end_time: "09:50",
+    });
+    setModalMode("form");
     setFormData({
       calendar_id: selectedCalendar?.calendar_id?.toString() || "",
       class_group_id: selectedCalendar?.class_group_id?.toString() || "",
@@ -960,6 +1125,7 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({
             canEdit={false}
             onSlotClick={handleSlotClick}
             onEmptyCellClick={handleEmptyCellClick}
+            onActivityClick={handleActivityClick}
           />
         </div>
       )}
@@ -979,6 +1145,7 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({
             canEdit={canEdit}
             onSlotClick={handleSlotClick}
             onEmptyCellClick={handleEmptyCellClick}
+            onActivityClick={handleActivityClick}
           />
         </div>
       )}
@@ -1008,9 +1175,10 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({
               slots={slots}
               activities={filteredActivities}
               weekDates={weekDates}
-              canEdit={canEdit}
+              canEdit={canEdit || canManage}
               onSlotClick={handleSlotClick}
               onEmptyCellClick={handleEmptyCellClick}
+              onActivityClick={handleActivityClick}
             />
           ))}
         </div>
@@ -1057,6 +1225,7 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({
             canEdit={false}
             onSlotClick={handleSlotClick}
             onEmptyCellClick={handleEmptyCellClick}
+            onActivityClick={handleActivityClick}
           />
         </div>
       )}
@@ -1095,9 +1264,21 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({
         canViewLessonPlan={Boolean(canViewSummaryLessonPlan)}
         onEditClick={() => setModalMode("form")}
         onViewLessonPlan={handleViewLessonPlan}
-        isSubmitting={isSubmittingSlot}
-        isDeleting={isDeletingSlot}
+        isSubmitting={entryKind === "activity" ? isSubmittingActivity : isSubmittingSlot}
+        isDeleting={entryKind === "activity" ? isDeletingActivity : isDeletingSlot}
         isLoadingLessonPlan={isLoadingLessonPlan}
+        entryKind={entryKind}
+        onEntryKindChange={setEntryKind}
+        canManageActivities={Boolean(canManage)}
+        selectedActivity={selectedActivity}
+        activityForm={activityForm}
+        activityErrors={activityErrors}
+        onActivityFormChange={(data) =>
+          setActivityForm((prev) => ({ ...prev, ...data }))
+        }
+        onActivityErrorsChange={setActivityErrors}
+        onActivitySubmit={handleActivitySubmit}
+        onActivityDelete={handleActivityDelete}
       />
 
       <AcademicCalendarModal
