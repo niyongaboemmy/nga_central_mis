@@ -66,13 +66,20 @@ jobs:
             # tries to replay all of them from scratch and fails on the first one that already
             # exists. Revisit with a proper tracking table (seeded against actual prod state)
             # before automating migrations more broadly.
-            # .env.production has an unquoted value that trips a harmless "command not found" when
-            # sourced (doesn't affect the DB_* vars actually needed here) -- but under `set -e`
-            # above, that alone would kill this whole step, so force success on the source itself.
-            set -a; . ./.env || true; set +a
-            if ! mysql -h "$DB_HOST" -u "$DB_USERNAME" -p"$DB_PASSWORD" "$DB_NAME" -e "SHOW COLUMNS FROM SchemeOfWork LIKE 'source';" | grep -q "DOCX_IMPORT_AI"; then
+            # Read just the 4 DB values straight out of .env rather than sourcing the whole file:
+            # sourcing it (even with `set -a; ... ; set +a`) exports EVERYTHING in .env.production
+            # -- including e.g. NODE_ENV=production -- into every command for the rest of this
+            # script, which broke the unrelated file-server `npm ci` below (silently skips
+            # devDependencies, so `tsc` goes missing). Plain grep avoids that entirely, and also
+            # sidesteps .env.production's unrelated unquoted-value "command not found" line.
+            migration_db_val() { grep -E "^$1=" .env | tail -1 | cut -d= -f2- | sed -e 's/^"//' -e 's/"$//' -e "s/^'//" -e "s/'$//"; }
+            MIGRATION_DB_HOST=$(migration_db_val DB_HOST)
+            MIGRATION_DB_USERNAME=$(migration_db_val DB_USERNAME)
+            MIGRATION_DB_PASSWORD=$(migration_db_val DB_PASSWORD)
+            MIGRATION_DB_NAME=$(migration_db_val DB_NAME)
+            if ! mysql -h "$MIGRATION_DB_HOST" -u "$MIGRATION_DB_USERNAME" -p"$MIGRATION_DB_PASSWORD" "$MIGRATION_DB_NAME" -e "SHOW COLUMNS FROM SchemeOfWork LIKE 'source';" | grep -q "DOCX_IMPORT_AI"; then
               echo "Applying migration 071 (SchemeOfWork.source: DOCX_IMPORT_AI)..."
-              mysql -h "$DB_HOST" -u "$DB_USERNAME" -p"$DB_PASSWORD" "$DB_NAME" < migrations/071_scheme_of_work_docx_import_ai_source.sql
+              mysql -h "$MIGRATION_DB_HOST" -u "$MIGRATION_DB_USERNAME" -p"$MIGRATION_DB_PASSWORD" "$MIGRATION_DB_NAME" < migrations/071_scheme_of_work_docx_import_ai_source.sql
             else
               echo "Migration 071 already applied, skipping."
             fi
