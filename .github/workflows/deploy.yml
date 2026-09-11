@@ -66,7 +66,10 @@ jobs:
             # tries to replay all of them from scratch and fails on the first one that already
             # exists. Revisit with a proper tracking table (seeded against actual prod state)
             # before automating migrations more broadly.
-            set -a; . ./.env; set +a
+            # .env.production has an unquoted value that trips a harmless "command not found" when
+            # sourced (doesn't affect the DB_* vars actually needed here) -- but under `set -e`
+            # above, that alone would kill this whole step, so force success on the source itself.
+            set -a; . ./.env || true; set +a
             if ! mysql -h "$DB_HOST" -u "$DB_USERNAME" -p"$DB_PASSWORD" "$DB_NAME" -e "SHOW COLUMNS FROM SchemeOfWork LIKE 'source';" | grep -q "DOCX_IMPORT_AI"; then
               echo "Applying migration 071 (SchemeOfWork.source: DOCX_IMPORT_AI)..."
               mysql -h "$DB_HOST" -u "$DB_USERNAME" -p"$DB_PASSWORD" "$DB_NAME" < migrations/071_scheme_of_work_docx_import_ai_source.sql
