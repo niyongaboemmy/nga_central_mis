@@ -57,10 +57,23 @@ jobs:
             cp .env.production .env
             export PUPPETEER_SKIP_DOWNLOAD=true
             npm ci
-            # Applies any migrations/*.sql not yet recorded in the _schema_migrations tracking
-            # table, then records them -- safe to run on every deploy since already-applied files
-            # are skipped. Must run before `npm prune` below, which removes ts-node (a devDependency).
-            npm run migrate:all
+
+            # Applies migration 071 (adds DOCX_IMPORT_AI to SchemeOfWork.source, needed for the
+            # DOCX-import AI-extraction fallback) if this environment doesn't have it yet.
+            # Deliberately scoped to just this one file, checked idempotently, rather than a
+            # generic "run everything in migrations/ not yet applied" step: the other 70+ files in
+            # this repo were applied by hand over time with no tracking table, so a blanket runner
+            # tries to replay all of them from scratch and fails on the first one that already
+            # exists. Revisit with a proper tracking table (seeded against actual prod state)
+            # before automating migrations more broadly.
+            set -a; . ./.env; set +a
+            if ! mysql -h "$DB_HOST" -u "$DB_USERNAME" -p"$DB_PASSWORD" "$DB_NAME" -e "SHOW COLUMNS FROM SchemeOfWork LIKE 'source';" | grep -q "DOCX_IMPORT_AI"; then
+              echo "Applying migration 071 (SchemeOfWork.source: DOCX_IMPORT_AI)..."
+              mysql -h "$DB_HOST" -u "$DB_USERNAME" -p"$DB_PASSWORD" "$DB_NAME" < migrations/071_scheme_of_work_docx_import_ai_source.sql
+            else
+              echo "Migration 071 already applied, skipping."
+            fi
+
             npm run build
             npm prune --omit=dev
 
