@@ -57,9 +57,12 @@ jobs:
             cp .env.production .env
             export PUPPETEER_SKIP_DOWNLOAD=true
             npm ci
+            # Applies any migrations/*.sql not yet recorded in the _schema_migrations tracking
+            # table, then records them -- safe to run on every deploy since already-applied files
+            # are skipped. Must run before `npm prune` below, which removes ts-node (a devDependency).
+            npm run migrate:all
             npm run build
             npm prune --omit=dev
-            # DB schema changes are applied manually (see DEPLOYMENT notes) — not auto-run here.
 
             pm2 restart mis-backend --update-env || pm2 start dist/index.js --name mis-backend --update-env
             pm2 save
