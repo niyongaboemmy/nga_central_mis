@@ -130,8 +130,11 @@ export const DEFAULT_ENTRY_PROMPT_TEMPLATE =
 
 export const schemeOfWorkApi = {
   upload: (formData: FormData) =>
+    // Non-standard documents fall back to a synchronous AI extraction call on the backend (see
+    // uploadAndExtractScheme), which can take well over the default 10s timeout -- give it room.
     apiService.post("/scheme-of-work/upload", formData, {
       headers: { "Content-Type": "multipart/form-data" },
+      timeout: 120000,
     }),
 
   startAIGenerate: (formData: FormData) =>

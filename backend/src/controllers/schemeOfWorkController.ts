@@ -24,11 +24,115 @@ import logger from "../utils/logger";
 import mammoth = require("mammoth");
 import { computeWeekDates } from "../utils/weekDates";
 import { assertTeacherOwnsScheme } from "../utils/schemeAuthorization";
+import { extractTextFromFile } from "../utils/docExtract";
+import {
+  generateStructuredContent,
+  isAnyProviderConfigured,
+  JSONSchema,
+} from "../services/aiProviders";
 
 /**
  * Parses DOCX and extracts entries based on date ranges
  */
 import * as cheerio from "cheerio";
+
+interface AIExtractedEntry {
+  week_number: number;
+  start_date?: string;
+  end_date?: string;
+  topic: string;
+  sub_topic?: string;
+  objective?: string;
+  methodology?: string;
+  resources?: string;
+  evaluation?: string;
+  duration?: string;
+  learning_place?: string;
+  observation?: string;
+}
+
+const aiExtractedEntrySchema: JSONSchema = {
+  type: "object",
+  properties: {
+    week_number: { type: "number" },
+    start_date: { type: "string" },
+    end_date: { type: "string" },
+    topic: { type: "string" },
+    sub_topic: { type: "string" },
+    objective: { type: "string" },
+    methodology: { type: "string" },
+    resources: { type: "string" },
+    evaluation: { type: "string" },
+    duration: { type: "string" },
+    learning_place: { type: "string" },
+    observation: { type: "string" },
+  },
+  required: ["week_number", "topic"],
+};
+
+/**
+ * Fallback for when the fixed-column table parser above finds nothing — the uploaded document is
+ * the teacher's own Scheme of Work, but not in this system's standard table template (different
+ * column order/headers, a list instead of a table, merged cells, etc.), so it can't be parsed with
+ * fixed rules. Reads the raw document text with an AI provider and asks it to faithfully extract
+ * the weekly entries that are already there, rather than generating new content (that's the
+ * separate "Generate with AI" flow in schemeAIController.ts).
+ */
+const extractEntriesWithAI = async (
+  documentText: string,
+  subjectName: string,
+): Promise<AIExtractedEntry[]> => {
+  const { data: parsed } = await generateStructuredContent<{
+    entries?: AIExtractedEntry[];
+  }>({
+    schemaName: "scheme_of_work_entries",
+    schema: {
+      type: "object",
+      properties: { entries: { type: "array", items: aiExtractedEntrySchema } },
+      required: ["entries"],
+    },
+    prompt: `You are reading a teacher's own Scheme of Work document for "${subjectName}". It was written in a
+layout this system's standard parser could not recognize (different column order or headers, merged/split table
+cells, a numbered list, or plain paragraphs per week instead of a table) — so it needs to be read and understood
+rather than parsed with fixed rules.
+
+Your job is to carefully READ and FAITHFULLY EXTRACT the weekly entries the teacher already wrote. Do NOT invent,
+rewrite, summarize, or improve their content — preserve their own wording as closely as possible. You may only clean
+up obvious noise introduced by automatic document-to-text conversion (broken line breaks, stray table artifacts,
+duplicated whitespace, jumbled ordering near page breaks).
+
+Identify every distinct week/session/lesson the document describes and, for each one, extract:
+- week_number: the week's ordinal number (1, 2, 3, ...). If the document doesn't number weeks explicitly, infer the
+  sequence from the order entries appear in the document, starting at 1.
+- start_date / end_date: ONLY if the document states an actual calendar date (or date range) for that week, in ISO
+  format "YYYY-MM-DD". If no date is given for a week, omit both fields entirely for that entry — never guess or
+  invent a date.
+- topic: the indicative content / subject matter for that week (required — every entry must have one).
+- sub_topic: a narrower focus within the topic, only if the document distinguishes one.
+- objective: the learning outcome/objective for that week, if stated.
+- methodology: the teaching/learning activities described, if stated.
+- resources: materials, tools, or equipment mentioned, if stated.
+- evaluation: the assessment method or evidence described, if stated.
+- duration: the time allocation for that week, if stated (e.g. "6 hours", "2 periods").
+- learning_place: where the session happens, if stated (e.g. classroom, workshop, computer lab).
+- observation: any notes, remarks, or comments attached to that week, if present.
+
+Omit a field entirely when the document simply doesn't mention it for that week — never fabricate a value to fill a
+gap. Extract EVERY week you can find, even if some fields are sparse for it; do not skip a week just because most of
+its fields are missing, as long as it clearly has a topic.
+
+DOCUMENT CONTENT (extracted automatically — a table may appear flattened into plain lines; use context and any
+repeated structure to tell entries apart):
+"""
+${documentText}
+"""`,
+  });
+
+  const list = Array.isArray(parsed.entries) ? parsed.entries : [];
+  return list
+    .filter((e) => e && typeof e.topic === "string" && e.topic.trim())
+    .sort((a, b) => (a.week_number || 0) - (b.week_number || 0));
+};
 
 export const uploadAndExtractScheme = asyncHandler(
   async (req: any, res: any) => {
@@ -150,10 +254,79 @@ export const uploadAndExtractScheme = asyncHandler(
       }
     });
 
+    let usedAIExtraction = false;
+
     if (entries.length === 0) {
-      throw new ValidationError(
-        "No valid scheme rows found in the document. Please ensure it follows the standard format.",
+      if (!isAnyProviderConfigured()) {
+        throw new ValidationError(
+          "No valid scheme rows found in the document. Please ensure it follows the standard format, or ask an administrator to configure an AI provider so non-standard documents can be read automatically.",
+        );
+      }
+
+      logger.info(
+        "Standard DOCX table parsing found no rows — falling back to AI-assisted extraction",
+        { subjectId, classGroupId, academicTermId },
       );
+
+      const rawText = await extractTextFromFile(req.file);
+      if (!rawText.trim()) {
+        throw new ValidationError(
+          "No readable text found in the uploaded document.",
+        );
+      }
+
+      const [subjectRecord] = await db
+        .select({ name: Subject.name })
+        .from(Subject)
+        .where(eq(Subject.subject_id, subjectId))
+        .limit(1);
+
+      const aiEntries = await extractEntriesWithAI(
+        rawText,
+        subjectRecord?.name || "this subject",
+      );
+
+      if (aiEntries.length === 0) {
+        throw new ValidationError(
+          "Could not detect any scheme-of-work entries in this document, even with AI assistance. Please check the file, or use the 'Build Manually' / 'Generate with AI' options instead.",
+        );
+      }
+
+      // The document may not state a calendar date for every (or any) week -- fill in whatever the
+      // AI couldn't find by continuing a Mon-Fri weekly cadence from the academic term's start
+      // date, the same way the "Generate with AI" flow schedules its own output.
+      const [term] = await db
+        .select()
+        .from(AcademicTerm)
+        .where(eq(AcademicTerm.academic_term_id, academicTermId))
+        .limit(1);
+      const anchor = term?.start_date ? new Date(term.start_date) : new Date();
+      const computedDates = computeWeekDates(anchor, aiEntries.length);
+
+      aiEntries.forEach((e, idx) => {
+        const hasValidDates =
+          !!e.start_date &&
+          !!e.end_date &&
+          !isNaN(Date.parse(e.start_date)) &&
+          !isNaN(Date.parse(e.end_date));
+
+        entries.push({
+          week_number: `Week ${e.week_number || idx + 1}`,
+          start_date: hasValidDates ? e.start_date : computedDates[idx].start_date,
+          end_date: hasValidDates ? e.end_date : computedDates[idx].end_date,
+          topic: e.topic || "",
+          sub_topic: e.sub_topic || "",
+          objective: e.objective || "",
+          duration: e.duration || "",
+          methodology: e.methodology || "",
+          resources: e.resources || "",
+          evaluation: e.evaluation || "",
+          learning_place: e.learning_place || "",
+          observation: e.observation || "",
+        });
+      });
+
+      usedAIExtraction = true;
     }
 
     // Save to database
@@ -171,12 +344,21 @@ export const uploadAndExtractScheme = asyncHandler(
 
     let schemeId: number;
 
+    const source = usedAIExtraction ? "DOCX_IMPORT_AI" : "DOCX_IMPORT";
+
     if (scheme.length > 0) {
       schemeId = scheme[0].scheme_id;
       logger.info(`Updating existing scheme ID: ${schemeId}`);
       await db
         .delete(SchemeOfWorkEntry)
         .where(eq(SchemeOfWorkEntry.scheme_id, schemeId));
+      await db
+        .update(SchemeOfWork)
+        .set({
+          source,
+          ai_source_filename: usedAIExtraction ? req.file.originalname : null,
+        })
+        .where(eq(SchemeOfWork.scheme_id, schemeId));
     } else {
       logger.info("Creating new scheme record");
       const schemeResult = await db.insert(SchemeOfWork).values({
@@ -184,7 +366,8 @@ export const uploadAndExtractScheme = asyncHandler(
         subject_id: subjectId,
         class_group_id: classGroupId,
         academic_term_id: academicTermId,
-        source: "DOCX_IMPORT",
+        source,
+        ai_source_filename: usedAIExtraction ? req.file.originalname : null,
       });
 
       // Fix: Drizzle with mysql2 returns [ResultSetHeader, undefined] or the header itself

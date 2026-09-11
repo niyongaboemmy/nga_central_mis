@@ -1390,7 +1390,8 @@ const SchemeOfWorkCalendar: React.FC = () => {
                     Upload DOCX Scheme
                   </h3>
                   <p className="text-sm text-gray-500 dark:text-gray-400 text-center max-w-xs mb-6">
-                    We'll extract weeks and topics from your file automatically.
+                    We'll extract weeks and topics from your file automatically — even if it's not
+                    in the standard table format, AI will read it and detect the entries for you.
                   </p>
                   {!file ? (
                     <label className="cursor-pointer inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-full transition-colors shadow-sm">

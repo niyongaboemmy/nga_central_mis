@@ -675,9 +675,12 @@ export const SchemeOfWork = mysqlTable("SchemeOfWork", {
     "REJECTED",
   ]).default("PENDING"),
   validation_comment: text("validation_comment"),
-  source: mysqlEnum("source", ["MANUAL", "DOCX_IMPORT", "AI_GENERATED"]).default(
+  source: mysqlEnum("source", [
     "MANUAL",
-  ),
+    "DOCX_IMPORT",
+    "DOCX_IMPORT_AI",
+    "AI_GENERATED",
+  ]).default("MANUAL"),
   ai_source_filename: varchar("ai_source_filename", { length: 255 }),
   created_at: datetime("created_at").default(sql`CURRENT_TIMESTAMP`),
   updated_at: datetime("updated_at").default(
