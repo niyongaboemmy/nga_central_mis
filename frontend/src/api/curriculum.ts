@@ -204,11 +204,34 @@ export const subjectDocumentsApi = {
       `/curriculum/subjects/${subjectId}/documents`,
       { params: categoryId ? { categoryId } : undefined },
     ),
-  upload: (subjectId: number, formData: FormData) =>
+  // Kept in sync with the server-side caps: backend multer limit
+  // (curriculum.ts), file-server multer limit, and nginx client_max_body_size.
+  MAX_UPLOAD_SIZE: 5 * 1024 * 1024 * 1024, // 5GB
+  upload: (
+    subjectId: number,
+    formData: FormData,
+    onUploadProgress?: (percent: number) => void,
+    signal?: AbortSignal,
+  ) =>
     api.post(
       `/curriculum/subjects/${subjectId}/documents/upload`,
       formData,
-      { headers: { "Content-Type": "multipart/form-data" } },
+      {
+        headers: { "Content-Type": "multipart/form-data" },
+        // The shared axios instance defaults to a 10s timeout, which is fine
+        // for JSON calls but was silently aborting any document upload that
+        // took longer than that -- exactly what happens with a large file
+        // or a slow connection. 0 disables the timeout for this request only.
+        timeout: 0,
+        signal,
+        onUploadProgress: onUploadProgress
+          ? (evt) => {
+              if (evt.total) {
+                onUploadProgress(Math.round((evt.loaded / evt.total) * 100));
+              }
+            }
+          : undefined,
+      },
     ),
   delete: (documentId: number) =>
     api.delete(`/curriculum/documents/${documentId}`),

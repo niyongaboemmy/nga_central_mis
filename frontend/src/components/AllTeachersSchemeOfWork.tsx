@@ -9,6 +9,9 @@ import {
   AlertCircle,
   Users,
   Lock,
+  Download,
+  FileSpreadsheet,
+  FileDown,
 } from "lucide-react";
 import { Grade } from "../api/academics";
 import { schemeOfWorkApi, TeacherWithSchemes } from "../api/schemeOfWork";
@@ -18,6 +21,7 @@ import { useMetadata } from "../contexts/MetadataContext";
 import { useAcademicPeriod } from "../contexts/AcademicPeriodContext";
 import AllTeachersSOW_Dashboard from "./AllTeachersSOW_Dashboard";
 import AllTeachersSOW_List from "./AllTeachersSOW_List";
+import { exportSowReportPdf, exportSowReportExcel } from "../utils/sowReportExport";
 
 const PERMISSION = "VIEW_ALL_TEACHERS_SCHEME_OF_WORK_LIST";
 
@@ -101,6 +105,25 @@ const AllTeachersSchemeOfWork: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>(
     getInitialValue("status", "all"),
   );
+  const [exportMenuOpen, setExportMenuOpen] = useState(false);
+
+  const reportContext = {
+    programName: programs.find((p) => p.program_id === selectedProgram)?.name || "All Programs",
+    gradeName: grades.find((g) => g.grade_id === selectedGrade)?.name || "All Grades",
+    roleLabel: selectedRole,
+    yearName: selectedYear?.name || "—",
+    termName: selectedTerm?.name || "—",
+  };
+
+  const handleExportPdf = () => {
+    exportSowReportPdf(teachers, reportContext);
+    setExportMenuOpen(false);
+  };
+
+  const handleExportExcel = () => {
+    exportSowReportExcel(teachers, reportContext);
+    setExportMenuOpen(false);
+  };
 
   // Load grades when program changes
   useEffect(() => {
@@ -253,7 +276,7 @@ const AllTeachersSchemeOfWork: React.FC = () => {
   ];
 
   return (
-    <div className="p-5 max-w-7xl mx-auto space-y-6">
+    <div className="p-5 max-w-7xl mx-auto space-y-5">
       {/* Header */}
       <motion.div
         initial={{ opacity: 0, y: -16 }}
@@ -261,35 +284,74 @@ const AllTeachersSchemeOfWork: React.FC = () => {
         className="flex flex-col md:flex-row md:items-end justify-between gap-4"
       >
         <div className="space-y-1">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-xs font-bold uppercase tracking-wider">
+          <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-[10px] font-bold uppercase tracking-wider">
             <TrendingUp className="w-3 h-3" />
             Admin View
           </div>
-          <h1 className="text-2xl font-extrabold text-gray-900 dark:text-white flex items-center gap-3">
-            <div className="p-2 bg-blue-600 rounded-xl">
-              <FileText className="h-6 w-6 text-white" />
+          <h1 className="text-xl font-extrabold text-gray-900 dark:text-white flex items-center gap-2.5">
+            <div className="p-1.5 bg-blue-600 rounded-lg">
+              <FileText className="h-4 w-4 text-white" />
             </div>
             Teachers' Scheme of Work
           </h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400">
+          <p className="text-xs text-gray-500 dark:text-gray-400">
             Monitor all submitted and pending scheme of works across teachers.
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
+          <div className="relative">
+            <button
+              onClick={() => setExportMenuOpen((v) => !v)}
+              disabled={!hasLoaded || teachers.length === 0}
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 hover:border-blue-400 disabled:opacity-40 disabled:cursor-not-allowed text-gray-700 dark:text-gray-300 text-xs font-semibold transition-all"
+              title="Export progress report"
+            >
+              <Download className="w-3.5 h-3.5" />
+              Export Report
+            </button>
+            {exportMenuOpen && (
+              <>
+                <div
+                  className="fixed inset-0 z-10"
+                  onClick={() => setExportMenuOpen(false)}
+                />
+                <motion.div
+                  initial={{ opacity: 0, y: -6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="absolute right-0 mt-2 w-48 z-20 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-xl shadow-xl overflow-hidden"
+                >
+                  <button
+                    onClick={handleExportPdf}
+                    className="w-full flex items-center gap-2 px-3.5 py-2.5 text-xs font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                  >
+                    <FileDown className="w-3.5 h-3.5 text-rose-500" />
+                    Download as PDF
+                  </button>
+                  <button
+                    onClick={handleExportExcel}
+                    className="w-full flex items-center gap-2 px-3.5 py-2.5 text-xs font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors border-t border-gray-50 dark:border-gray-800"
+                  >
+                    <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+                    Download as Excel
+                  </button>
+                </motion.div>
+              </>
+            )}
+          </div>
           <button
             onClick={clearSowCache}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-full bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 text-sm font-semibold transition-all"
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 text-xs font-semibold transition-all"
             title="Clean all local session cache"
           >
-            <RefreshCw className="w-4 h-4" />
+            <RefreshCw className="w-3.5 h-3.5" />
             Clean Cache
           </button>
           <button
             onClick={() => loadTeachers(true)}
             disabled={!canLoad || loading}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-full bg-blue-600 hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-semibold transition-all shadow-md shadow-blue-500/20"
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-blue-600 hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-semibold transition-all shadow-md shadow-blue-500/20"
           >
-            <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
             Refresh
           </button>
         </div>
@@ -300,13 +362,13 @@ const AllTeachersSchemeOfWork: React.FC = () => {
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.08 }}
-        className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-5"
+        className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 p-4"
       >
-        <div className="flex items-center justify-between mb-4">
-          <p className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest">
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest">
             Filter by Context
           </p>
-          <p className="text-xs font-medium text-gray-500 dark:text-gray-400">
+          <p className="text-[11px] font-medium text-gray-500 dark:text-gray-400">
             Academic Period:{" "}
             <span className="text-blue-600 dark:text-blue-400 font-bold">
               {selectedYear?.name || "—"} / {selectedTerm?.name || "—"}
@@ -395,16 +457,16 @@ const AllTeachersSchemeOfWork: React.FC = () => {
               <button
                 key={tab.key}
                 onClick={() => setActiveTab(tab.key)}
-                className={`flex items-center gap-2 px-5 py-3 text-sm font-semibold border-b-2 transition-all ${
+                className={`flex items-center gap-1.5 px-4 py-2.5 text-xs font-semibold border-b-2 transition-all ${
                   activeTab === tab.key
                     ? "border-blue-600 text-blue-600 dark:text-blue-400"
                     : "border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
                 }`}
               >
-                <tab.icon className="w-4 h-4" />
+                <tab.icon className="w-3.5 h-3.5" />
                 {tab.label}
                 <span
-                  className={`text-xs px-1.5 py-0.5 rounded-full ${activeTab === tab.key ? "bg-blue-100 dark:bg-blue-900/30 text-blue-600" : "bg-gray-100 dark:bg-gray-800 text-gray-500"}`}
+                  className={`text-[10px] px-1.5 py-0.5 rounded-full ${activeTab === tab.key ? "bg-blue-100 dark:bg-blue-900/30 text-blue-600" : "bg-gray-100 dark:bg-gray-800 text-gray-500"}`}
                 >
                   {teachers.length}
                 </span>

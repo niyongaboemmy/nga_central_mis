@@ -27,6 +27,16 @@ export const errorHandler = (
     });
   }
 
+  // Multer rejects an oversized upload before any route handler runs, so it
+  // never gets the friendly ValidationError treatment controllers use --
+  // this is the only place it can be caught.
+  if (err.code === "LIMIT_FILE_SIZE") {
+    return res.status(413).json({
+      success: false,
+      message: "File is too large. Maximum allowed size is 5GB.",
+    });
+  }
+
   // Handle JWT errors
   if (err.name === "JsonWebTokenError") {
     return res.status(401).json({

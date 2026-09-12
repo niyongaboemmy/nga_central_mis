@@ -38,7 +38,9 @@ interface SubjectMaterialsTabProps {
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  if (bytes < 1024 * 1024 * 1024)
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
 }
 
 function getFileIcon(ext: string) {
@@ -69,6 +71,18 @@ const SubjectMaterialsTab: React.FC<SubjectMaterialsTabProps> = ({
   const [loadingDocs, setLoadingDocs] = useState(false);
   const [isDraggingOver, setIsDraggingOver] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<
+    Record<
+      string,
+      {
+        name: string;
+        size: number;
+        percent: number;
+        status: "uploading" | "error";
+        controller: AbortController;
+      }
+    >
+  >({});
   const [deletingDocId, setDeletingDocId] = useState<number | null>(null);
   const [deletingCatId, setDeletingCatId] = useState<number | null>(null);
   const [previewDoc, setPreviewDoc] = useState<SubjectDoc | null>(null);
@@ -162,19 +176,93 @@ const SubjectMaterialsTab: React.FC<SubjectMaterialsTabProps> = ({
     }
   };
 
+  const cancelUpload = (key: string) => {
+    setUploadProgress((prev) => {
+      const item = prev[key];
+      item?.controller.abort();
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
+  };
+
+  const dismissUploadError = (key: string) => {
+    setUploadProgress((prev) => {
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
+  };
+
   const uploadFiles = async (files: FileList | File[]) => {
     if (!selectedCategoryId) {
       showToast("Select a category first", "error");
       return;
     }
+
+    const allFiles = Array.from(files);
+    const fileArr = allFiles.filter(
+      (f) => f.size <= subjectDocumentsApi.MAX_UPLOAD_SIZE,
+    );
+    const oversized = allFiles.filter(
+      (f) => f.size > subjectDocumentsApi.MAX_UPLOAD_SIZE,
+    );
+    if (oversized.length > 0) {
+      showToast(
+        oversized.length === 1
+          ? `"${oversized[0].name}" is over the 5GB limit and was skipped`
+          : `${oversized.length} files are over the 5GB limit and were skipped`,
+        "error",
+      );
+    }
+    if (fileArr.length === 0) return;
+
+    const keys = fileArr.map(
+      (_, i) => `${Date.now()}-${i}-${Math.random().toString(36).slice(2)}`,
+    );
+    // Built locally (not read back from state) so the upload loop below has
+    // synchronous, reliable access to each file's controller regardless of
+    // when React actually flushes the setUploadProgress call underneath it.
+    const controllers: Record<string, AbortController> = {};
+    keys.forEach((key) => {
+      controllers[key] = new AbortController();
+    });
+
     setUploading(true);
+    setUploadProgress((prev) => {
+      const next = { ...prev };
+      fileArr.forEach((file, i) => {
+        next[keys[i]] = {
+          name: file.name,
+          size: file.size,
+          percent: 0,
+          status: "uploading",
+          controller: controllers[keys[i]],
+        };
+      });
+      return next;
+    });
+
     let successCount = 0;
-    for (const file of Array.from(files)) {
+    for (let i = 0; i < fileArr.length; i++) {
+      const file = fileArr[i];
+      const key = keys[i];
       try {
         const fd = new FormData();
         fd.append("file", file);
         fd.append("categoryId", String(selectedCategoryId));
-        const res = await subjectDocumentsApi.upload(subjectId, fd);
+        // No request timeout (set on the api client) -- the file can take as
+        // long as it needs to send, and won't be aborted just for being slow.
+        const res = await subjectDocumentsApi.upload(
+          subjectId,
+          fd,
+          (percent) => {
+            setUploadProgress((prev) =>
+              prev[key] ? { ...prev, [key]: { ...prev[key], percent } } : prev,
+            );
+          },
+          controllers[key].signal,
+        );
         const created: SubjectDoc = res.data.data;
         setDocuments((prev) => [created, ...prev]);
         setCategories((prev) =>
@@ -185,8 +273,22 @@ const SubjectMaterialsTab: React.FC<SubjectMaterialsTabProps> = ({
           ),
         );
         successCount++;
-      } catch {
-        showToast(`Failed to upload ${file.name}`, "error");
+        setUploadProgress((prev) => {
+          const next = { ...prev };
+          delete next[key];
+          return next;
+        });
+      } catch (err: any) {
+        const wasCancelled =
+          err?.code === "ERR_CANCELED" || controllers[key].signal.aborted;
+        if (!wasCancelled) {
+          showToast(`Failed to upload ${file.name}`, "error");
+          setUploadProgress((prev) =>
+            prev[key]
+              ? { ...prev, [key]: { ...prev[key], status: "error" } }
+              : prev,
+          );
+        }
       }
     }
     if (successCount > 0) {
@@ -465,11 +567,14 @@ const SubjectMaterialsTab: React.FC<SubjectMaterialsTabProps> = ({
                 )}
               </div>
               {canUpload && (
-                <>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <span className="hidden md:inline text-[11px] text-gray-400 dark:text-gray-500">
+                    Max {formatBytes(subjectDocumentsApi.MAX_UPLOAD_SIZE)} per file
+                  </span>
                   <button
                     onClick={() => fileInputRef.current?.click()}
                     disabled={uploading}
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-60 rounded-xl transition-colors shadow-sm flex-shrink-0"
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-60 rounded-xl transition-colors shadow-sm"
                   >
                     {uploading ? (
                       <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -485,9 +590,75 @@ const SubjectMaterialsTab: React.FC<SubjectMaterialsTabProps> = ({
                     className="hidden"
                     onChange={handleFileInput}
                   />
-                </>
+                </div>
               )}
             </div>
+
+            {/* Upload progress */}
+            {Object.keys(uploadProgress).length > 0 && (
+              <div className="px-5 py-3 border-b border-gray-100 dark:border-gray-700/20 space-y-3">
+                <AnimatePresence>
+                  {Object.entries(uploadProgress).map(([key, item]) => (
+                    <motion.div
+                      key={key}
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: "auto" }}
+                      exit={{ opacity: 0, height: 0 }}
+                      transition={{ duration: 0.15 }}
+                    >
+                      <div className="flex items-center justify-between mb-1 gap-2">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          {item.status === "error" ? (
+                            <X className="w-3 h-3 text-red-500 flex-shrink-0" />
+                          ) : (
+                            <Loader2 className="w-3 h-3 text-blue-500 animate-spin flex-shrink-0" />
+                          )}
+                          <span
+                            className="text-xs text-gray-600 dark:text-gray-300 truncate"
+                            title={item.name}
+                          >
+                            {item.name}
+                          </span>
+                          <span className="text-[11px] text-gray-400 dark:text-gray-500 flex-shrink-0">
+                            ({formatBytes(item.size)})
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          {item.status === "error" ? (
+                            <span className="text-[11px] text-red-500">Failed</span>
+                          ) : (
+                            <span className="text-xs text-gray-400 dark:text-gray-500">
+                              {item.percent}%
+                            </span>
+                          )}
+                          <button
+                            onClick={() =>
+                              item.status === "error"
+                                ? dismissUploadError(key)
+                                : cancelUpload(key)
+                            }
+                            title={item.status === "error" ? "Dismiss" : "Cancel upload"}
+                            className="p-0.5 rounded text-gray-400 hover:text-red-600 dark:hover:text-red-400 transition-colors"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                      </div>
+                      <div className="w-full h-1.5 rounded-full bg-gray-100 dark:bg-gray-700/50 overflow-hidden">
+                        <div
+                          className={`h-full transition-[width] duration-150 ${
+                            item.status === "error" ? "bg-red-400" : "bg-blue-500"
+                          }`}
+                          style={{
+                            width: `${item.status === "error" ? 100 : item.percent}%`,
+                          }}
+                        />
+                      </div>
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
+              </div>
+            )}
 
             {/* Toolbar: search + sort */}
             {documents.length > 0 && (
@@ -546,7 +717,7 @@ const SubjectMaterialsTab: React.FC<SubjectMaterialsTabProps> = ({
                 </p>
                 <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
                   {canUpload
-                    ? "Upload files or drag and drop them here."
+                    ? `Upload files or drag and drop them here. Max ${formatBytes(subjectDocumentsApi.MAX_UPLOAD_SIZE)} per file.`
                     : "No documents have been uploaded to this category."}
                 </p>
               </div>

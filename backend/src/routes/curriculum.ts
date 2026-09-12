@@ -1,5 +1,7 @@
 import { Router } from "express";
 import multer from "multer";
+import os from "os";
+import path from "path";
 import { authenticate, authorize } from "../middleware/auth";
 import { Permissions } from "../utils/permissions";
 import {
@@ -31,9 +33,24 @@ import {
 
 const router = Router();
 
+// Kept in sync with the frontend's subjectDocumentsApi.MAX_UPLOAD_SIZE, the
+// file-server's own multer limit, and nginx's client_max_body_size.
+export const MAX_SUBJECT_DOCUMENT_SIZE = 5 * 1024 * 1024 * 1024; // 5GB
+
+// Subject documents (Materials tab): streamed to a temp file on disk as
+// they're received rather than buffered in memory. The old 50MB
+// memoryStorage limit (and the even lower 25MB nginx cap in front of it)
+// is what was rejecting larger uploads -- 5GB is a sane ceiling to protect
+// disk space rather than a real constraint on legitimate course materials.
 const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: 50 * 1024 * 1024 },
+  storage: multer.diskStorage({
+    destination: os.tmpdir(),
+    filename: (_req, file, cb) => {
+      const suffix = Math.random().toString(36).slice(2);
+      cb(null, `subject-doc-${Date.now()}-${suffix}${path.extname(file.originalname)}`);
+    },
+  }),
+  limits: { fileSize: MAX_SUBJECT_DOCUMENT_SIZE },
 });
 
 const uploadCurriculumDoc = multer({

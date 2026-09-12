@@ -11,6 +11,7 @@ import fs from "fs";
 import config from "./config";
 import { apiKeyAuth } from "./middleware/apiKeyAuth";
 import filesRouter from "./routes/files";
+import { InvalidPathError } from "./utils/paths";
 
 fs.mkdirSync(config.storageRoot, { recursive: true });
 
@@ -42,12 +43,24 @@ app.use(
         .status(413)
         .json({ success: false, message: "File exceeds maximum size" });
     }
+    // diskStorage's destination callback (routes/files.ts) resolves the
+    // upload path before multer's route handler runs, so an invalid path
+    // now surfaces here instead of the route's own try/catch.
+    if (err instanceof InvalidPathError) {
+      return res.status(400).json({ success: false, message: err.message });
+    }
     console.error(err);
     res.status(500).json({ success: false, message: "Internal Server Error" });
   },
 );
 
-app.listen(config.port, () => {
+const server = app.listen(config.port, () => {
   console.log(`file-server listening on port ${config.port}`);
   console.log(`storage root: ${config.storageRoot}`);
 });
+
+// Large file uploads/downloads can legitimately take a while on a slow
+// connection -- don't let Node's default socket timeout abort them mid-transfer.
+server.timeout = 0;
+server.headersTimeout = 60000;
+server.keepAliveTimeout = 65000;

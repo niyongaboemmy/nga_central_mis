@@ -173,26 +173,26 @@ const AllTeachersSOW_List: React.FC<Props> = ({
   return (
     <div className="space-y-6">
       {/* Search + filter row */}
-      <div className="flex flex-col sm:flex-row gap-3">
+      <div className="flex flex-col sm:flex-row gap-2.5">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
           <input
             type="text"
             placeholder="Search by teacher name or username..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-10 pr-4 py-2.5 text-sm bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 dark:text-white"
+            className="w-full pl-9 pr-4 py-2 text-xs bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:text-white"
           />
         </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          <Filter className="w-4 h-4 text-gray-400 flex-shrink-0" />
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <Filter className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
           {filterChips.map((chip) => (
             <button
               key={chip.key}
               onClick={() => onStatusFilterChange(chip.key)}
-              className={`px-3 py-2 rounded-xl text-xs font-semibold transition-all ${
+              className={`px-2.5 py-1.5 rounded-lg text-[11px] font-semibold transition-all ${
                 statusFilter === chip.key
-                  ? "bg-blue-600 text-white shadow-md shadow-blue-500/25"
+                  ? "bg-blue-600 text-white shadow-sm shadow-blue-500/25"
                   : "bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-700 hover:border-blue-400"
               }`}
             >
@@ -203,7 +203,7 @@ const AllTeachersSOW_List: React.FC<Props> = ({
       </div>
 
       {/* Count */}
-      <p className="text-xs text-gray-400 dark:text-gray-500 font-medium">
+      <p className="text-[11px] text-gray-400 dark:text-gray-500 font-medium">
         Showing {listItems.length} subject assignment
         {listItems.length !== 1 ? "s" : ""}
       </p>
@@ -214,18 +214,18 @@ const AllTeachersSOW_List: React.FC<Props> = ({
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="text-center py-24 bg-white dark:bg-gray-900 rounded-2xl border border-dashed border-gray-200 dark:border-gray-700"
+            className="text-center py-16 bg-white dark:bg-gray-900 rounded-xl border border-dashed border-gray-200 dark:border-gray-700"
           >
-            <Users className="w-12 h-12 text-gray-300 dark:text-gray-600 mx-auto mb-3" />
-            <p className="text-gray-500 dark:text-gray-400 font-medium">
+            <Users className="w-10 h-10 text-gray-300 dark:text-gray-600 mx-auto mb-2" />
+            <p className="text-gray-500 dark:text-gray-400 text-sm font-medium">
               No records found
             </p>
-            <p className="text-sm text-gray-400 dark:text-gray-500 mt-1">
+            <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
               Try adjusting your search or filters
             </p>
           </motion.div>
         ) : (
-          <div className="grid grid-cols-1 gap-3">
+          <div className="bg-white dark:bg-gray-900/80 rounded-xl border border-gray-100 dark:border-gray-800/50 overflow-hidden">
             {listItems.map(({ teacher, scheme }, idx) => {
               return (
                 <motion.div
@@ -234,18 +234,20 @@ const AllTeachersSOW_List: React.FC<Props> = ({
                   initial={{ opacity: 0, x: -10 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: 10 }}
-                  transition={{ delay: idx * 0.03 }}
+                  transition={{ delay: idx * 0.02 }}
                   onClick={() =>
                     navigate(
                       `/all-teachers-sow/details?user_id=${teacher.user_id}&subject_id=${scheme.subject_id}&class_group_id=${scheme.class_group_id}&academic_term_id=${scheme.academic_term_id}&name=${encodeURIComponent(teacher.full_name)}&subject_name=${encodeURIComponent(scheme.subject_name)}`,
                     )
                   }
-                  className="group cursor-pointer bg-white dark:bg-gray-900/80 rounded-2xl border border-gray-100 dark:border-gray-800/50 hover:border-blue-300 dark:hover:border-blue-700 hover:shadow-lg transition-all duration-300 p-5"
+                  className={`group cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/40 transition-colors px-4 py-2.5 ${
+                    idx !== 0 ? "border-t border-gray-50 dark:border-gray-800/50" : ""
+                  }`}
                 >
-                  <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-3">
                     {/* Avatar */}
                     <div
-                      className="w-11 h-11 rounded-xl flex items-center justify-center text-white font-bold text-sm flex-shrink-0 shadow-sm"
+                      className="w-8 h-8 rounded-lg flex items-center justify-center text-white font-bold text-[11px] flex-shrink-0"
                       style={{
                         backgroundColor: scheme.subject_color || "#3B82F6",
                       }}

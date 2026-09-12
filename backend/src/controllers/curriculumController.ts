@@ -28,6 +28,7 @@ import { sanitizeString } from "../utils/sanitization";
 import logger from "../utils/logger";
 import storageService from "../utils/fileServer";
 import path from "path";
+import fs from "fs/promises";
 import { Permissions } from "../utils/permissions";
 import { getCurrentAcademicYearId } from "../utils/academicYear";
 
@@ -895,11 +896,6 @@ export const uploadSubjectDocument = asyncHandler(
       throw new ValidationError("No file uploaded");
     }
 
-    const maxSize = 50 * 1024 * 1024;
-    if (file.size > maxSize) {
-      throw new ValidationError("File size exceeds 50MB limit");
-    }
-
     if (!categoryId) {
       throw new ValidationError("categoryId is required");
     }
@@ -926,7 +922,7 @@ export const uploadSubjectDocument = asyncHandler(
     const remoteFilePath = `subjects/${sId}/${fileName}`;
 
     try {
-      await storageService.uploadFile(file.buffer, remoteFilePath);
+      await storageService.uploadFile(file.path, remoteFilePath);
 
       const result = await db.insert(SubjectDocument).values({
         category_id: parseInt(categoryId),
@@ -989,6 +985,10 @@ export const uploadSubjectDocument = asyncHandler(
     } catch (error) {
       logger.error("Subject document upload failed:", error);
       throw error;
+    } finally {
+      // multer's diskStorage wrote this to a temp path -- always clean it up,
+      // whether the upload to the file-server succeeded or not.
+      await fs.unlink(file.path).catch(() => {});
     }
   },
 );

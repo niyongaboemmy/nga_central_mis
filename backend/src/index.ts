@@ -20,8 +20,17 @@ process.on("SIGINT", () => {
   process.exit(0);
 });
 
-app.listen(config.port, () => {
+const server = app.listen(config.port, () => {
   logger.info(
     `Server running on port ${config.port} in ${config.nodeEnv} mode`,
   );
 });
+
+// Node's default 5-minute socket inactivity timeout was aborting large
+// document uploads (Materials tab, lesson notes, etc.) partway through on
+// slow connections. Disabling it (0 = no timeout) lets those requests run
+// as long as they need to; headersTimeout stays finite so a client that
+// never sends headers can't hold a socket open forever.
+server.timeout = 0;
+server.headersTimeout = 60000;
+server.keepAliveTimeout = 65000;

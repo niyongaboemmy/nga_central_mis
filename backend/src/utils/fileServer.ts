@@ -39,19 +39,23 @@ class FileServerService {
     localPathOrBuffer: string | Buffer,
     remotePath: string,
   ): Promise<void> {
-    if (typeof localPathOrBuffer === "string") {
-      throw new Error(
-        "uploadFile: local file path uploads are not supported by the file-server client -- pass a Buffer",
-      );
-    }
+    // A string is a path to a file already sitting on disk (large uploads are
+    // streamed there by multer's diskStorage so we never hold two full
+    // in-memory copies at once). fs.openAsBlob() opens a Blob backed by the
+    // file handle -- undici/fetch reads it lazily as the request body is
+    // sent, rather than buffering the whole file into memory up front.
+    const filePart =
+      typeof localPathOrBuffer === "string"
+        ? await (await import("fs")).openAsBlob(localPathOrBuffer)
+        : new Blob([new Uint8Array(localPathOrBuffer)]);
 
     const form = new FormData();
-    form.append(
-      "file",
-      new Blob([new Uint8Array(localPathOrBuffer)]),
-      remotePath.split("/").pop(),
-    );
+    // "path" must be appended before "file": the file-server streams the
+    // upload straight to its final destination via multer diskStorage, and
+    // that destination is resolved from this field, which multer can only
+    // see if it arrives before the file part in the multipart body.
     form.append("path", namespaced(remotePath));
+    form.append("file", filePart, remotePath.split("/").pop());
 
     const res = await request("/files", { method: "POST", body: form });
     if (!res.ok) {
