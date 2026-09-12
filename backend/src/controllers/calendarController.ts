@@ -500,21 +500,70 @@ export const getMyCalendar = asyncHandler(async (req: any, res: any) => {
 
   // Get the current or specified academic term
   let termId = academic_term_id ? parseInt(academic_term_id) : null;
+  let yearId: number | null = null;
 
   if (!termId) {
     const currentTerm = await db
-      .select()
+      .select({
+        academic_term_id: AcademicTerm.academic_term_id,
+        academic_year_id: AcademicTerm.academic_year_id,
+      })
       .from(AcademicTerm)
       .where(eq(AcademicTerm.is_current, 1))
       .limit(1);
 
     if (currentTerm.length > 0) {
       termId = currentTerm[0].academic_term_id;
+      yearId = currentTerm[0].academic_year_id;
+    }
+  } else {
+    const termRecord = await db
+      .select({ academic_year_id: AcademicTerm.academic_year_id })
+      .from(AcademicTerm)
+      .where(eq(AcademicTerm.academic_term_id, termId))
+      .limit(1);
+    if (termRecord.length > 0) {
+      yearId = termRecord[0].academic_year_id;
     }
   }
 
   if (!termId) {
     throw new ValidationError("No academic term specified or found");
+  }
+
+  // `CalendarSlot.user_id` is set once when a lesson slot is created and is
+  // never touched again when a teacher is reassigned (updateTeacherSubjectAssignment
+  // only rewrites TeacherSubjectAssignment) — so a slot can keep pointing at a
+  // teacher who no longer actually teaches that class/subject. TeacherSubjectAssignment
+  // is the real source of truth for "who currently teaches what" (it's what backs
+  // the dashboard's "Assigned Subjects" count), so cross-check against it the same
+  // way getStudentCalendar cross-checks slots against StudentSubjectEnrollment.
+  let currentAssignmentKeys: Set<string> | null = null;
+  if (yearId) {
+    const assignments = await db
+      .select({
+        subject_id: TeacherSubjectAssignment.subject_id,
+        class_group_id: TeacherSubjectAssignment.class_group_id,
+      })
+      .from(TeacherSubjectAssignment)
+      .where(
+        and(
+          eq(TeacherSubjectAssignment.user_id, userId),
+          eq(TeacherSubjectAssignment.academic_year_id, yearId),
+        ),
+      );
+
+    if (assignments.length === 0) {
+      return successResponse(res, "No assigned subjects for this term", {
+        slots: [],
+        upcoming: [],
+        term_id: termId,
+      });
+    }
+
+    currentAssignmentKeys = new Set(
+      assignments.map((a: any) => `${a.subject_id}:${a.class_group_id}`),
+    );
   }
 
   // Build filters. Match the term the *calendar* the slot belongs to declares,
@@ -567,6 +616,15 @@ export const getMyCalendar = asyncHandler(async (req: any, res: any) => {
     .where(and(...filters))
     .orderBy(CalendarSlot.day_of_week, CalendarSlot.start_time);
 
+  // Drop any slot whose (subject, class group) isn't in this teacher's
+  // current TeacherSubjectAssignment set — see the comment above where
+  // currentAssignmentKeys is built.
+  const filteredSlots = currentAssignmentKeys
+    ? slots.filter((slot: any) =>
+        currentAssignmentKeys!.has(`${slot.subject_id}:${slot.class_group_id}`),
+      )
+    : slots;
+
   // Get upcoming lessons (lessons starting soon - within 30 mins)
   const now = new Date();
   const currentHour = now.getHours();
@@ -574,7 +632,7 @@ export const getMyCalendar = asyncHandler(async (req: any, res: any) => {
   const currentTimeInMinutes = currentHour * 60 + currentMinute;
   const currentDayOfWeek = now.getDay();
 
-  const upcomingSlots = slots
+  const upcomingSlots = filteredSlots
     .filter((slot: any) => {
       const [hours, minutes] = slot.start_time.split(":").map(Number);
       const slotTimeInMinutes = hours * 60 + minutes;
@@ -607,7 +665,7 @@ export const getMyCalendar = asyncHandler(async (req: any, res: any) => {
     .sort((a, b) => a.minutes_until_start - b.minutes_until_start);
 
   const response = {
-    slots,
+    slots: filteredSlots,
     upcoming: upcomingSlots,
     term_id: termId,
   };

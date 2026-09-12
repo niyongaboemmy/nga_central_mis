@@ -256,4 +256,70 @@ describe("Calendar slot visibility", () => {
     // and it is reported under the calendar's term, not the drifted copy
     expect(found[0].academic_term_id).toBe(academicTermId);
   });
+
+  // Reassigning a teacher (updateTeacherSubjectAssignment) only rewrites
+  // TeacherSubjectAssignment -- it never touches the old CalendarSlot rows'
+  // user_id. Before this fix, my-calendar trusted CalendarSlot.user_id alone,
+  // so a teacher kept seeing a class/subject on their calendar (and it
+  // counted toward their register) long after they'd been reassigned off it.
+  // Reported symptom: a teacher's weekly attendance calendar showed an extra
+  // "Advanced Database" lesson that didn't appear anywhere in their own
+  // "Assigned Subjects" / "My Teaching Schedule" dashboard widget.
+  it("excludes a slot whose user_id no longer has a matching TeacherSubjectAssignment", async () => {
+    const teacherRoleId = await createRoleWithPermissions(
+      "my-cal-stale-teacher",
+      ["VIEW_MY_CALENDAR"],
+    );
+    await assignRole(teacherId, teacherRoleId);
+    const teacherToken = signToken(teacherId);
+
+    // A class group the teacher has never been assigned to teach this subject
+    // for -- simulates a stale CalendarSlot left over from a reassignment.
+    const { classGroupId: staleGroup } =
+      await createProgramGradeClassGroupDetailed();
+
+    const calRes = await request(app)
+      .post("/calendar/calendars")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({
+        academic_year_id: academicYearId,
+        academic_term_id: academicTermId,
+        class_group_id: staleGroup,
+        name: "Stale Assignment Calendar",
+      });
+    const calendarId = calRes.body.data.calendar_id;
+
+    const slotRes = await request(app)
+      .post("/calendar/slots")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({
+        calendar_id: calendarId,
+        subject_id: subjectId,
+        user_id: teacherId,
+        day_of_week: 5,
+        start_time: "10:00",
+        end_time: "10:50",
+      });
+    expect(slotRes.status).toBe(201);
+
+    const mine = await request(app)
+      .get("/calendar/my-calendar")
+      .query({ academic_term_id: academicTermId })
+      .set("Authorization", `Bearer ${teacherToken}`);
+    expect(mine.status).toBe(200);
+
+    // The stale slot must not surface, even though CalendarSlot.user_id
+    // still names this teacher.
+    const stale = mine.body.data.slots.filter(
+      (s: any) => s.start_time === "10:00" && s.class_group_id === staleGroup,
+    );
+    expect(stale).toHaveLength(0);
+
+    // A currently-assigned lesson for the same teacher must still come
+    // through unaffected -- this isn't just "return nothing".
+    const assigned = mine.body.data.slots.filter(
+      (s: any) => s.class_group_id === classGroupId,
+    );
+    expect(assigned.length).toBeGreaterThan(0);
+  });
 });
