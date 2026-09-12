@@ -314,7 +314,7 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
                 name="lesson_date"
                 value={formData.lesson_date || ""}
                 onChange={handleChange}
-                className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-xl px-4 py-2 dark:text-white"
+                className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-xl px-3 py-2 text-sm text-gray-900 dark:text-white"
               />
             </div>
             <div className="space-y-2">
@@ -328,7 +328,7 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
                   placeholder="08:30"
                   value={formData.start_time || ""}
                   onChange={handleChange}
-                  className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-xl px-4 py-2 dark:text-white"
+                  className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-xl px-3 py-2 text-sm text-gray-900 dark:text-white"
                 />
                 <input
                   type="text"
@@ -336,7 +336,7 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
                   placeholder="10:30"
                   value={formData.end_time || ""}
                   onChange={handleChange}
-                  className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-xl px-4 py-2 dark:text-white"
+                  className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-xl px-3 py-2 text-sm text-gray-900 dark:text-white"
                 />
               </div>
             </div>
@@ -349,7 +349,7 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
                 name="sector"
                 value={formData.sector || ""}
                 onChange={handleChange}
-                className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-xl px-4 py-2 dark:text-white"
+                className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-xl px-3 py-2 text-sm text-gray-900 dark:text-white"
               />
             </div>
             <div className="space-y-2">
@@ -361,7 +361,7 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
                 name="trade"
                 value={formData.trade || ""}
                 onChange={handleChange}
-                className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-xl px-4 py-2 dark:text-white"
+                className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-xl px-3 py-2 text-sm text-gray-900 dark:text-white"
               />
             </div>
             <div className="space-y-2">
@@ -373,7 +373,7 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
                 name="instructor_name"
                 value={formData.instructor_name || ""}
                 onChange={handleChange}
-                className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-xl px-4 py-2 dark:text-white"
+                className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-xl px-3 py-2 text-sm text-gray-900 dark:text-white"
               />
             </div>
             <div className="space-y-2">
@@ -385,7 +385,7 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
                 name="class_name"
                 value={formData.class_name || ""}
                 onChange={handleChange}
-                className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-xl px-4 py-2 dark:text-white"
+                className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-xl px-3 py-2 text-sm text-gray-900 dark:text-white"
               />
             </div>
           </div>
@@ -402,7 +402,7 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
                 value={formData.big_question || ""}
                 onChange={handleChange}
                 rows={2}
-                className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-xl px-4 py-2 text-gray-900 dark:text-white"
+                className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-xl px-3 py-2 text-sm text-gray-900 dark:text-white"
               />
             </div>
             <div className="space-y-4">
@@ -1235,15 +1235,15 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
 
       {/* Modal Container */}
       <div className="flex min-h-full items-center justify-center p-4">
-        <div className="relative w-full max-w-6xl bg-white dark:bg-gray-950 rounded-3xl shadow-2xl overflow-hidden border border-gray-100 dark:border-gray-800 animate-in zoom-in-95 duration-300">
+        <div className="relative w-full max-w-6xl bg-white dark:bg-gray-950 rounded-2xl shadow-2xl overflow-hidden border border-gray-100 dark:border-gray-800 animate-in zoom-in-95 duration-300">
           {/* Header */}
-          <div className="px-8 py-6 flex items-center justify-between border-b border-gray-50 dark:border-gray-900 bg-white dark:bg-gray-950">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-2xl bg-blue-500/10 flex items-center justify-center">
-                <LayoutDashboard className="w-6 h-6 text-blue-600" />
+          <div className="px-5 py-4 flex items-center justify-between border-b border-gray-50 dark:border-gray-900 bg-white dark:bg-gray-950">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-blue-500/10 flex items-center justify-center flex-shrink-0">
+                <LayoutDashboard className="w-4 h-4 text-blue-600" />
               </div>
               <div>
-                <h2 className="text-xl font-black text-gray-900 dark:text-white uppercase tracking-tight">
+                <h2 className="text-sm font-bold text-gray-900 dark:text-white">
                   {initialData
                     ? "Refine Lesson Plan"
                     : mode === "ai"
@@ -1252,17 +1252,17 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
                         ? "New Lesson Plan"
                         : "Draft New Lesson Plan"}
                 </h2>
-                <p className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest mt-1">
+                <p className="text-[11px] font-medium text-gray-400 dark:text-gray-500 mt-0.5">
                   {entryWeekLabel ? `${entryWeekLabel} · ` : ""}Step-by-step curriculum planning
                 </p>
               </div>
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
               {mode === "manual" && (
                 <button
                   onClick={() => setMode("ai")}
-                  className="flex items-center gap-2 px-4 py-2 bg-violet-50 hover:bg-violet-100 dark:bg-violet-900/20 dark:hover:bg-violet-900/40 text-violet-600 dark:text-violet-400 rounded-full text-xs font-bold border border-violet-100 dark:border-violet-900/40 transition-all"
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-violet-50 hover:bg-violet-100 dark:bg-violet-900/20 dark:hover:bg-violet-900/40 text-violet-600 dark:text-violet-400 rounded-full text-xs font-semibold border border-violet-100 dark:border-violet-900/40 transition-all"
                 >
                   <Sparkles className="w-3.5 h-3.5" />
                   Generate with AI
@@ -1270,7 +1270,7 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
               )}
               {mode === "manual" && (
                 <label
-                  className={`cursor-pointer flex items-center gap-2 px-4 py-2 bg-gray-50 hover:bg-gray-100 dark:bg-gray-900 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-400 rounded-full text-xs font-bold border border-gray-100 dark:border-gray-800 transition-all ${loading ? "opacity-50 cursor-not-allowed" : ""}`}
+                  className={`cursor-pointer flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 hover:bg-gray-100 dark:bg-gray-900 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-400 rounded-full text-xs font-semibold border border-gray-100 dark:border-gray-800 transition-all ${loading ? "opacity-50 cursor-not-allowed" : ""}`}
                 >
                   {loading ? (
                     <div className="w-3.5 h-3.5 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
@@ -1289,9 +1289,9 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
               )}
               <button
                 onClick={onClose}
-                className="p-2 hover:bg-red-50 dark:hover:bg-red-950/30 text-gray-400 hover:text-red-500 rounded-full transition-all"
+                className="p-1.5 hover:bg-red-50 dark:hover:bg-red-950/30 text-gray-400 hover:text-red-500 rounded-full transition-all"
               >
-                <X className="w-6 h-6" />
+                <X className="w-4 h-4" />
               </button>
             </div>
           </div>
@@ -1309,54 +1309,54 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <button
                     onClick={() => setMode("manual")}
-                    className="relative group text-left p-6 rounded-3xl bg-gradient-to-br from-blue-600 to-indigo-700 text-white shadow-xl shadow-blue-600/25 hover:shadow-blue-600/40 transition-all overflow-hidden"
+                    className="relative group text-left p-5 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-700 text-white shadow-lg shadow-blue-600/25 hover:shadow-blue-600/40 hover:-translate-y-0.5 transition-all overflow-hidden"
                   >
-                    <div className="w-12 h-12 rounded-2xl bg-white/20 flex items-center justify-center mb-4">
-                      <PenLine className="w-6 h-6 text-white" />
+                    <div className="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center mb-3">
+                      <PenLine className="w-4 h-4 text-white" />
                     </div>
-                    <h4 className="text-lg font-bold mb-1">Build Manually</h4>
-                    <p className="text-sm text-white/80 leading-relaxed mb-4">
+                    <h4 className="text-sm font-bold mb-1">Build Manually</h4>
+                    <p className="text-xs text-white/80 leading-relaxed mb-3">
                       Fill out the full lesson plan yourself, section by section.
                     </p>
-                    <div className="flex items-center gap-2 text-sm font-semibold">
-                      Open Editor <ArrowRight className="w-4 h-4" />
+                    <div className="flex items-center gap-1.5 text-xs font-semibold">
+                      Open Editor <ArrowRight className="w-3.5 h-3.5" />
                     </div>
                   </button>
 
                   <button
                     onClick={() => setMode("ai")}
-                    className="relative group text-left p-6 rounded-3xl bg-gradient-to-br from-violet-600 to-purple-700 text-white shadow-xl shadow-violet-600/25 hover:shadow-violet-600/40 transition-all overflow-hidden"
+                    className="relative group text-left p-5 rounded-2xl bg-gradient-to-br from-violet-600 to-purple-700 text-white shadow-lg shadow-violet-600/25 hover:shadow-violet-600/40 hover:-translate-y-0.5 transition-all overflow-hidden"
                   >
-                    <div className="absolute top-3 right-3 bg-white/20 text-white text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
+                    <div className="absolute top-2.5 right-2.5 bg-white/20 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full uppercase tracking-wider">
                       New
                     </div>
-                    <div className="w-12 h-12 rounded-2xl bg-white/20 flex items-center justify-center mb-4">
-                      <Sparkles className="w-6 h-6 text-white" />
+                    <div className="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center mb-3">
+                      <Sparkles className="w-4 h-4 text-white" />
                     </div>
-                    <h4 className="text-lg font-bold mb-1">Generate with AI</h4>
-                    <p className="text-sm text-white/80 leading-relaxed mb-4">
+                    <h4 className="text-sm font-bold mb-1">Generate with AI</h4>
+                    <p className="text-xs text-white/80 leading-relaxed mb-3">
                       AI acts as your subject teacher and builds the full lesson plan from this week's scheme entry.
                     </p>
-                    <div className="flex items-center gap-2 text-sm font-semibold">
-                      Generate Now <ArrowRight className="w-4 h-4" />
+                    <div className="flex items-center gap-1.5 text-xs font-semibold">
+                      Generate Now <ArrowRight className="w-3.5 h-3.5" />
                     </div>
                   </button>
 
                   <button
                     onClick={() => chooseFileInputRef.current?.click()}
-                    className="group text-left p-6 rounded-3xl bg-white dark:bg-slate-900 border-2 border-gray-200 dark:border-slate-700 hover:border-blue-300 dark:hover:border-blue-600 hover:shadow-lg transition-all"
+                    className="group text-left p-5 rounded-2xl bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 hover:border-blue-300 dark:hover:border-blue-600 hover:shadow-md hover:-translate-y-0.5 transition-all"
                   >
-                    <div className="w-12 h-12 rounded-2xl bg-gray-100 dark:bg-slate-800 group-hover:bg-blue-50 dark:group-hover:bg-blue-900/20 flex items-center justify-center mb-4 transition-colors">
-                      <CloudUpload className="w-6 h-6 text-gray-500 dark:text-gray-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors" />
+                    <div className="w-9 h-9 rounded-xl bg-gray-100 dark:bg-slate-800 group-hover:bg-blue-50 dark:group-hover:bg-blue-900/20 flex items-center justify-center mb-3 transition-colors">
+                      <CloudUpload className="w-4 h-4 text-gray-500 dark:text-gray-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors" />
                     </div>
-                    <h4 className="text-lg font-bold text-gray-900 dark:text-white mb-1">
+                    <h4 className="text-sm font-bold text-gray-900 dark:text-white mb-1">
                       Import from DOCX
                     </h4>
-                    <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed mb-4">
+                    <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed mb-3">
                       Already have a lesson plan file? Upload it and we'll extract the content.
                     </p>
-                    <div className="flex items-center gap-2 text-sm font-semibold text-gray-600 dark:text-gray-300">
-                      Upload File <ArrowRight className="w-4 h-4" />
+                    <div className="flex items-center gap-1.5 text-xs font-semibold text-gray-600 dark:text-gray-300">
+                      Upload File <ArrowRight className="w-3.5 h-3.5" />
                     </div>
                   </button>
                 </div>
@@ -1383,16 +1383,16 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
           {mode === "manual" && (
           <div className="flex flex-col lg:flex-row h-[75vh]">
             {/* Sidebar Navigation */}
-            <div className="w-full lg:w-64 bg-gray-50/50 dark:bg-gray-900/10 border-r border-gray-50 dark:border-gray-900 p-6 space-y-1 overflow-y-auto">
+            <div className="w-full lg:w-56 bg-gray-50/50 dark:bg-gray-900/10 border-r border-gray-50 dark:border-gray-900 p-4 space-y-1 overflow-y-auto">
               {tabs.map((tab) => {
                 const isActive = activeTab === tab;
                 return (
                   <button
                     key={tab}
                     onClick={() => setActiveTab(tab)}
-                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-full text-xs font-bold uppercase tracking-wider transition-all duration-300 ${
+                    className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-full text-xs font-semibold transition-all duration-200 ${
                       isActive
-                        ? "bg-blue-600 text-white shadow-lg shadow-blue-500/30"
+                        ? "bg-blue-600 text-white shadow-sm shadow-blue-500/30"
                         : "text-gray-500 hover:text-gray-800 dark:text-gray-500 dark:hover:text-gray-300 hover:bg-white dark:hover:bg-gray-900/50"
                     }`}
                   >
@@ -1402,16 +1402,16 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
                 );
               })}
 
-              <div className="mt-8 pt-8 border-t border-gray-100 dark:border-gray-900">
+              <div className="mt-6 pt-5 border-t border-gray-100 dark:border-gray-900">
                 <button
                   onClick={handleSave}
                   disabled={loading}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-green-600 hover:bg-green-700 text-white rounded-full text-xs font-black uppercase tracking-widest shadow-lg shadow-green-500/20 transition-all active:scale-95 disabled:opacity-50"
+                  className="w-full flex items-center justify-center gap-2 px-3.5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-full text-xs font-bold shadow-sm shadow-emerald-500/20 transition-all active:scale-95 disabled:opacity-50"
                 >
                   {loading ? (
-                    <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+                    <div className="w-3.5 h-3.5 border-2 border-white/20 border-t-white rounded-full animate-spin" />
                   ) : (
-                    <Save className="w-4 h-4" />
+                    <Save className="w-3.5 h-3.5" />
                   )}
                   {loading
                     ? "Saving..."
@@ -1424,11 +1424,11 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
                   <button
                     onClick={handleDelete}
                     disabled={loading}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-red-50 hover:bg-red-100 dark:bg-red-950/20 dark:hover:bg-red-950/40 text-red-600 dark:text-red-400 rounded-full text-xs font-black uppercase tracking-widest transition-all active:scale-95 disabled:opacity-50 mt-2"
+                    className="w-full flex items-center justify-center gap-2 px-3.5 py-2.5 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/20 dark:hover:bg-rose-950/40 text-rose-600 dark:text-rose-400 rounded-full text-xs font-semibold transition-all active:scale-95 disabled:opacity-50 mt-2"
                   >
-                    {!loading && <Trash2 className="w-4 h-4" />}
+                    {!loading && <Trash2 className="w-3.5 h-3.5" />}
                     {loading && (
-                      <div className="w-4 h-4 border-2 border-red-600 dark:border-red-400 border-t-transparent rounded-full animate-spin" />
+                      <div className="w-3.5 h-3.5 border-2 border-red-600 dark:border-red-400 border-t-transparent rounded-full animate-spin" />
                     )}
                     {loading ? "Deleting..." : "Delete Plan"}
                   </button>
@@ -1437,7 +1437,7 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
             </div>
 
             {/* Content Area */}
-            <div className="flex-1 overflow-y-auto bg-white dark:bg-gray-950 p-8">
+            <div className="flex-1 overflow-y-auto bg-white dark:bg-gray-950 p-6">
               <div className="max-w-4xl mx-auto">{renderTabContent()}</div>
             </div>
           </div>

@@ -14,6 +14,7 @@ import {
   SchemeOfWork,
   SchemeOfWorkEntry,
   SubjectCompetency,
+  CompetencyPerformanceCriteria,
 } from "../db/schema";
 import { asyncHandler } from "../middleware/asyncHandler";
 import { successResponse } from "../utils/response";
@@ -93,6 +94,85 @@ const parseContentRefs = (raw: unknown): Map<number, Set<number>> => {
     }
   }
   return refs;
+};
+
+/**
+ * Parses a comma-separated list of "competencyId:criteriaId" refs (e.g. "4:10,4:12,5:0") into a
+ * Map<competencyId, Set<criteriaId>>, representing exactly which Performance Criteria of the
+ * subject's existing Curriculum were selected to be covered this term. An empty set for a
+ * competency means "the whole element" (all of its criteria). Ignores malformed tokens.
+ */
+const parseCriteriaRefs = (raw: unknown): Map<number, Set<number>> => {
+  const refs = new Map<number, Set<number>>();
+  if (typeof raw !== "string" || !raw.trim()) return refs;
+
+  for (const token of raw.split(",")) {
+    const [compRaw, critRaw] = token.trim().split(":");
+    const competencyId = parseInt(compRaw, 10);
+    if (!Number.isInteger(competencyId) || competencyId <= 0) continue;
+    if (!refs.has(competencyId)) refs.set(competencyId, new Set());
+    const criteriaId = parseInt(critRaw, 10);
+    if (Number.isInteger(criteriaId) && criteriaId > 0) {
+      refs.get(competencyId)!.add(criteriaId);
+    }
+  }
+  return refs;
+};
+
+/**
+ * Builds curriculum text (and the flat criteria list fed to the AI prompt) from a subject's
+ * already-saved Curriculum, scoped to the Elements/Performance Criteria the teacher selected in
+ * the "use existing curriculum" step — used instead of extracting text from an uploaded document
+ * when the subject already has Curriculum defined.
+ */
+const buildTextFromExistingCurriculum = async (
+  subjectId: number,
+  refs: Map<number, Set<number>>,
+): Promise<{
+  rawText: string;
+  criteriaForPrompt: { criteria_number: string; description: string }[];
+}> => {
+  const elements = await db
+    .select()
+    .from(SubjectCompetency)
+    .where(eq(SubjectCompetency.subject_id, subjectId))
+    .orderBy(SubjectCompetency.sort_order);
+
+  const selectedElements =
+    refs.size > 0 ? elements.filter((el) => refs.has(el.competency_id)) : elements;
+
+  const blocks: string[] = [];
+  const criteriaForPrompt: { criteria_number: string; description: string }[] = [];
+
+  for (const el of selectedElements) {
+    const allCriteria = await db
+      .select()
+      .from(CompetencyPerformanceCriteria)
+      .where(eq(CompetencyPerformanceCriteria.competency_id, el.competency_id))
+      .orderBy(CompetencyPerformanceCriteria.sort_order);
+
+    const criteriaIds = refs.get(el.competency_id);
+    const criteria =
+      criteriaIds && criteriaIds.size > 0
+        ? allCriteria.filter((c) => criteriaIds.has(c.criteria_id))
+        : allCriteria;
+
+    const lines = [
+      `Element ${el.element_number}: ${el.title}${el.learning_hours ? ` (${el.learning_hours} learning hrs)` : ""}`,
+      el.description ? `Description: ${el.description}` : "",
+      el.indicative_content ? `Indicative content: ${el.indicative_content}` : "",
+      criteria.length > 0
+        ? `Performance Criteria:\n${criteria.map((c) => `${c.criteria_number}: ${c.description}`).join("\n")}`
+        : "",
+    ].filter(Boolean);
+
+    blocks.push(lines.join("\n"));
+    for (const c of criteria) {
+      criteriaForPrompt.push({ criteria_number: c.criteria_number, description: c.description });
+    }
+  }
+
+  return { rawText: blocks.join("\n\n"), criteriaForPrompt };
 };
 
 const weekSchema: JSONSchema = {
@@ -217,7 +297,7 @@ ${curriculumText}
 
 const processJob = async (
   jobId: string,
-  file: Express.Multer.File,
+  file: Express.Multer.File | null,
   params: {
     userId: number;
     subjectId: number;
@@ -228,6 +308,9 @@ const processJob = async (
     startDateOverride?: string;
     skipWeeks: Set<number>;
     selectedContentRefs: Map<number, Set<number>>;
+    /** Set only when generating from the subject's already-saved Curriculum instead of an
+     * uploaded document — which Elements/Performance Criteria were selected to be covered. */
+    existingCurriculumRefs?: Map<number, Set<number>>;
     additionalInstructions?: string;
     /** True only when the caller requested curriculum generation, holds MANAGE_CURRICULUM, and the
      * subject had zero existing SubjectCompetency rows at request time (checked in
@@ -285,82 +368,100 @@ const processJob = async (
       );
     }
 
-    const fullText = await extractTextFromFile(file);
-    let rawText = fullText;
-
-    if (params.selectedContentRefs.size > 0) {
-      const structure = extractCurriculumStructure(fullText);
-      const blocks: string[] = [];
-
-      for (const lo of structure.los) {
-        const selectedItemIndices = params.selectedContentRefs.get(
-          lo.loNumber,
-        );
-        if (!selectedItemIndices || selectedItemIndices.size === 0) continue;
-
-        const items = extractLoContentItems(fullText, lo);
-
-        if (selectedItemIndices.size >= items.length) {
-          // Every detected line for this LO was selected — use the full contiguous slice so
-          // nothing outside the line-splitting heuristic (surrounding context, resource lists,
-          // etc.) is lost.
-          blocks.push(fullText.slice(lo.start, lo.end));
-        } else {
-          // Only part of the LO applies this term — assemble just the selected lines, with a
-          // header for context so the model knows which Learning Outcome they belong to.
-          const selectedLines = items
-            .filter((item) => selectedItemIndices.has(item.index))
-            .map((item) => item.text)
-            .join("\n");
-          blocks.push(
-            `Learning Outcome ${lo.loNumber}: ${lo.title}\n${selectedLines}`,
-          );
-        }
-      }
-
-      if (blocks.length > 0) {
-        rawText = blocks.join("\n\n");
-      }
-      // If nothing matched (e.g. a different file was uploaded than was previewed), fall through
-      // to the full text below rather than failing the generation.
-    }
-
-    rawText = rawText.slice(0, MAX_CURRICULUM_CHARS);
-    if (!rawText.trim()) {
-      throw new ValidationError(
-        "No readable text found in the uploaded document.",
-      );
-    }
-
-    // Curriculum generation (only when requested, permitted, and the subject had none — checked
-    // in startAIGeneration) and/or fetching the subject's existing criteria, both feeding the
-    // same AI-matching prompt used to tag each generated week with criteria_numbers.
+    let rawText: string;
     let proposedCurriculum: ImportedElement[] | undefined;
     let criteriaForPrompt: { criteria_number: string; description: string }[] = [];
 
-    if (params.shouldGenerateCurriculum) {
-      updateJob(jobId, {
-        status: "extracting_curriculum",
-        message: "Extracting curriculum structure...",
-        stepIndex: stepFor.extracting_curriculum,
-        totalSteps,
-      });
-      proposedCurriculum = await generateCurriculumWithAI(
-        rawText,
-        params.subjectName,
-      );
-      criteriaForPrompt = proposedCurriculum.flatMap((el) =>
-        el.criteria.map((c) => ({
+    if (file) {
+      const fullText = await extractTextFromFile(file);
+      rawText = fullText;
+
+      if (params.selectedContentRefs.size > 0) {
+        const structure = extractCurriculumStructure(fullText);
+        const blocks: string[] = [];
+
+        for (const lo of structure.los) {
+          const selectedItemIndices = params.selectedContentRefs.get(
+            lo.loNumber,
+          );
+          if (!selectedItemIndices || selectedItemIndices.size === 0) continue;
+
+          const items = extractLoContentItems(fullText, lo);
+
+          if (selectedItemIndices.size >= items.length) {
+            // Every detected line for this LO was selected — use the full contiguous slice so
+            // nothing outside the line-splitting heuristic (surrounding context, resource lists,
+            // etc.) is lost.
+            blocks.push(fullText.slice(lo.start, lo.end));
+          } else {
+            // Only part of the LO applies this term — assemble just the selected lines, with a
+            // header for context so the model knows which Learning Outcome they belong to.
+            const selectedLines = items
+              .filter((item) => selectedItemIndices.has(item.index))
+              .map((item) => item.text)
+              .join("\n");
+            blocks.push(
+              `Learning Outcome ${lo.loNumber}: ${lo.title}\n${selectedLines}`,
+            );
+          }
+        }
+
+        if (blocks.length > 0) {
+          rawText = blocks.join("\n\n");
+        }
+        // If nothing matched (e.g. a different file was uploaded than was previewed), fall through
+        // to the full text below rather than failing the generation.
+      }
+
+      rawText = rawText.slice(0, MAX_CURRICULUM_CHARS);
+      if (!rawText.trim()) {
+        throw new ValidationError(
+          "No readable text found in the uploaded document.",
+        );
+      }
+
+      // Curriculum generation (only when requested, permitted, and the subject had none — checked
+      // in startAIGeneration) and/or fetching the subject's existing criteria, both feeding the
+      // same AI-matching prompt used to tag each generated week with criteria_numbers.
+      if (params.shouldGenerateCurriculum) {
+        updateJob(jobId, {
+          status: "extracting_curriculum",
+          message: "Extracting curriculum structure...",
+          stepIndex: stepFor.extracting_curriculum,
+          totalSteps,
+        });
+        proposedCurriculum = await generateCurriculumWithAI(
+          rawText,
+          params.subjectName,
+        );
+        criteriaForPrompt = proposedCurriculum.flatMap((el) =>
+          el.criteria.map((c) => ({
+            criteria_number: c.criteria_number,
+            description: c.description,
+          })),
+        );
+      } else {
+        const existingCriteria = await getSubjectCriteria(params.subjectId);
+        criteriaForPrompt = existingCriteria.map((c) => ({
           criteria_number: c.criteria_number,
           description: c.description,
-        })),
-      );
+        }));
+      }
     } else {
-      const existingCriteria = await getSubjectCriteria(params.subjectId);
-      criteriaForPrompt = existingCriteria.map((c) => ({
-        criteria_number: c.criteria_number,
-        description: c.description,
-      }));
+      // No file — generating from the subject's already-saved Curriculum, scoped to whichever
+      // Elements/Performance Criteria the teacher selected in the "use existing curriculum" step.
+      const built = await buildTextFromExistingCurriculum(
+        params.subjectId,
+        params.existingCurriculumRefs || new Map(),
+      );
+      rawText = built.rawText.slice(0, MAX_CURRICULUM_CHARS);
+      criteriaForPrompt = built.criteriaForPrompt;
+
+      if (!rawText.trim()) {
+        throw new ValidationError(
+          "No Curriculum content found for the selected Elements/Performance Criteria.",
+        );
+      }
     }
 
     updateJob(jobId, {
@@ -425,6 +526,8 @@ const processJob = async (
       totalSteps,
     });
 
+    const sourceLabel = file ? file.originalname : "Existing Curriculum";
+
     let scheme = await db
       .select()
       .from(SchemeOfWork)
@@ -448,7 +551,7 @@ const processJob = async (
         .update(SchemeOfWork)
         .set({
           source: "AI_GENERATED",
-          ai_source_filename: file.originalname,
+          ai_source_filename: sourceLabel,
         })
         .where(eq(SchemeOfWork.scheme_id, schemeId));
     } else {
@@ -458,7 +561,7 @@ const processJob = async (
         class_group_id: params.classGroupId,
         academic_term_id: params.academicTermId,
         source: "AI_GENERATED",
-        ai_source_filename: file.originalname,
+        ai_source_filename: sourceLabel,
       });
       const resultHeader = Array.isArray(schemeResult)
         ? schemeResult[0]
@@ -480,7 +583,7 @@ const processJob = async (
     await recordActivity(
       params.userId,
       "SCHEME_AI_GENERATE",
-      `AI-generated scheme of work for subject ID ${params.subjectId} from "${file.originalname}"`,
+      `AI-generated scheme of work for subject ID ${params.subjectId} from "${sourceLabel}"`,
       "SchemeOfWork",
       schemeId,
       { subject_id: params.subjectId, entries_count: entries.length },
@@ -603,16 +706,6 @@ export const getCurriculumStructure = asyncHandler(
 );
 
 export const startAIGeneration = asyncHandler(async (req: any, res: any) => {
-  if (!req.file) {
-    throw new ValidationError("No file uploaded");
-  }
-
-  if (!isAnyProviderConfigured()) {
-    throw new ValidationError(
-      "AI scheme generation is not configured. Add an API key for at least one AI provider to the backend environment.",
-    );
-  }
-
   const {
     subject_id,
     class_group_id,
@@ -624,7 +717,29 @@ export const startAIGeneration = asyncHandler(async (req: any, res: any) => {
     selected_content_refs,
     additional_instructions,
     generate_curriculum,
+    use_existing_curriculum,
+    selected_criteria_refs,
   } = req.body;
+
+  const usingExistingCurriculum =
+    use_existing_curriculum === "true" || use_existing_curriculum === true;
+
+  if (!req.file && !usingExistingCurriculum) {
+    throw new ValidationError("No file uploaded");
+  }
+
+  const criteriaRefs = parseCriteriaRefs(selected_criteria_refs);
+  if (usingExistingCurriculum && criteriaRefs.size === 0) {
+    throw new ValidationError(
+      "Select at least one Element or Performance Criteria to generate from",
+    );
+  }
+
+  if (!isAnyProviderConfigured()) {
+    throw new ValidationError(
+      "AI scheme generation is not configured. Add an API key for at least one AI provider to the backend environment.",
+    );
+  }
 
   if (!subject_id || !class_group_id || !academic_term_id) {
     throw new ValidationError(
@@ -647,9 +762,11 @@ export const startAIGeneration = asyncHandler(async (req: any, res: any) => {
   // app — Scheme of Work generation alone does not, so this must not become a side door around
   // that gate), and the subject genuinely has no Curriculum yet (never re-generate/overwrite
   // existing Curriculum data from this flow). See
-  // CURRICULUM_SCHEME_OF_WORK_INTEGRATION_IMPLEMENTATION_PLAN.md §5.5.
+  // CURRICULUM_SCHEME_OF_WORK_INTEGRATION_IMPLEMENTATION_PLAN.md §5.5. Never applies when
+  // generating from an already-existing Curriculum — there's nothing left to extract.
   let shouldGenerateCurriculum = false;
   if (
+    !usingExistingCurriculum &&
     (generate_curriculum === "true" || generate_curriculum === true) &&
     (req.user.permissions || []).includes(Permissions.MANAGE_CURRICULUM)
   ) {
@@ -670,7 +787,7 @@ export const startAIGeneration = asyncHandler(async (req: any, res: any) => {
   const numWeeksOverride = num_weeks ? parseInt(num_weeks, 10) : undefined;
 
   // Fire-and-forget: progress is tracked via the job store and polled by the client.
-  processJob(jobId, req.file, {
+  processJob(jobId, usingExistingCurriculum ? null : req.file, {
     userId,
     subjectId,
     classGroupId: parseInt(class_group_id),
@@ -681,6 +798,7 @@ export const startAIGeneration = asyncHandler(async (req: any, res: any) => {
     startDateOverride: start_date || undefined,
     skipWeeks: parseSkipWeeks(skip_weeks),
     selectedContentRefs: parseContentRefs(selected_content_refs),
+    existingCurriculumRefs: usingExistingCurriculum ? criteriaRefs : undefined,
     additionalInstructions:
       typeof additional_instructions === "string"
         ? additional_instructions.trim().slice(0, MAX_ADDITIONAL_INSTRUCTIONS_CHARS)
