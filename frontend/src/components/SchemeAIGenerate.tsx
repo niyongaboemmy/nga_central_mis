@@ -52,6 +52,7 @@ import {
   CurriculumStructurePreview,
 } from "../api/schemeOfWork";
 import { academicTermsApi } from "../api/academics";
+import { useAcademicPeriod } from "../contexts/AcademicPeriodContext";
 import { competenciesApi, SubjectCompetency } from "../api/curriculum";
 import { useToast } from "../contexts/ToastContext";
 import usePermissions from "../hooks/usePermissions";
@@ -314,6 +315,7 @@ const SchemeAIGenerate: React.FC<Props> = ({
   onCancel,
 }) => {
   const { showToast } = useToast();
+  const { selectedYear, selectedTerm } = useAcademicPeriod();
   const { hasPermission } = usePermissions();
   const [file, setFile] = useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -811,61 +813,73 @@ const SchemeAIGenerate: React.FC<Props> = ({
       transition={{ duration: 0.2 }}
       className={containerWidthClass}
     >
-      <div className="relative overflow-hidden py-10 px-8 sm:px-10 bg-white dark:bg-slate-900 border-2 border-violet-100 dark:border-violet-900/40 rounded-3xl">
-        <div className="absolute -top-16 -right-16 w-40 h-40 bg-violet-500/10 rounded-full blur-3xl" />
-        <div className="absolute -bottom-16 -left-16 w-40 h-40 bg-indigo-500/10 rounded-full blur-3xl" />
+      <div className="relative overflow-hidden py-5 px-4 sm:py-6 sm:px-6 md:px-8 bg-white dark:bg-slate-900 border-2 border-violet-100 dark:border-violet-900/40 rounded-3xl">
+        <div className="absolute -top-16 -right-16 w-40 h-40 bg-violet-500/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute -bottom-16 -left-16 w-40 h-40 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
 
-        <div className="relative flex flex-col items-center text-center">
-          <div className="w-16 h-16 bg-gradient-to-br from-violet-500 to-indigo-600 rounded-2xl flex items-center justify-center mb-5 shadow-lg shadow-violet-500/25">
-            <Sparkles className="w-8 h-8 text-white" />
-          </div>
-          <h3 className="text-base font-bold text-gray-900 dark:text-white mb-1">
-            Generate Scheme of Work with AI
-          </h3>
-          <p className="text-sm text-gray-500 dark:text-gray-400 max-w-xs mb-6">
-            {hasCurriculum
-              ? "Pick what this term should cover, then let AI turn it into a complete weekly scheme."
-              : "Upload your curriculum and let AI turn it into a complete weekly scheme, saved automatically."}
-          </p>
-
-          {showWizardChrome && (
-            <div className="w-full flex items-center justify-center gap-3 mb-6">
-              {(["curriculum", "generate"] as WizardStep[]).map((step, idx) => {
-                const stepNum = idx + 1;
-                const isActive = wizardStep === step;
-                const isDone =
-                  (step === "curriculum" && wizardStep === "generate");
-                return (
-                  <React.Fragment key={step}>
-                    <div className="flex items-center gap-2">
-                      <div
-                        className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
-                          isActive
-                            ? "bg-violet-600 text-white"
-                            : isDone
-                              ? "bg-emerald-500 text-white"
-                              : "bg-gray-100 dark:bg-slate-800 text-gray-400"
-                        }`}
-                      >
-                        {isDone ? <CheckCircle2 className="w-4 h-4" /> : stepNum}
-                      </div>
-                      <span
-                        className={`text-xs font-semibold ${
-                          isActive
-                            ? "text-violet-700 dark:text-violet-300"
-                            : "text-gray-400 dark:text-gray-500"
-                        }`}
-                      >
-                        {step === "curriculum" ? "Curriculum" : "Scheme of Work"}
-                      </span>
-                    </div>
-                    {idx === 0 && (
-                      <div className="w-8 h-px bg-gray-200 dark:bg-slate-700" />
-                    )}
-                  </React.Fragment>
-                );
-              })}
+        <div className="relative">
+          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3 mb-5">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-9 h-9 flex-shrink-0 bg-gradient-to-br from-violet-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-sm shadow-violet-500/25">
+                <Sparkles className="w-[18px] h-[18px] text-white" />
+              </div>
+              <h3 className="text-sm sm:text-base font-bold text-gray-900 dark:text-white truncate">
+                Generate Scheme of Work with AI
+              </h3>
+              {(selectedYear || selectedTerm) && (
+                <span className="hidden sm:inline-flex items-center gap-1.5 text-[11px] font-medium text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-slate-800 px-2.5 py-1 rounded-full flex-shrink-0">
+                  <CalendarDays className="w-3 h-3" />
+                  {selectedYear?.name}
+                  {selectedYear && selectedTerm && " · "}
+                  {selectedTerm?.name}
+                </span>
+              )}
             </div>
+
+            {showWizardChrome && (
+              <div className="flex items-center gap-2 flex-shrink-0">
+                {(["curriculum", "generate"] as WizardStep[]).map((step, idx) => {
+                  const stepNum = idx + 1;
+                  const isActive = wizardStep === step;
+                  const isDone = step === "curriculum" && wizardStep === "generate";
+                  return (
+                    <React.Fragment key={step}>
+                      <div className="flex items-center gap-1.5">
+                        <div
+                          className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0 ${
+                            isActive
+                              ? "bg-violet-600 text-white"
+                              : isDone
+                                ? "bg-emerald-500 text-white"
+                                : "bg-gray-100 dark:bg-slate-800 text-gray-400"
+                          }`}
+                        >
+                          {isDone ? <CheckCircle2 className="w-3 h-3" /> : stepNum}
+                        </div>
+                        <span
+                          className={`hidden sm:inline text-xs font-semibold ${
+                            isActive
+                              ? "text-violet-700 dark:text-violet-300"
+                              : "text-gray-400 dark:text-gray-500"
+                          }`}
+                        >
+                          {step === "curriculum" ? "Curriculum" : "Scheme of Work"}
+                        </span>
+                      </div>
+                      {idx === 0 && <div className="w-5 sm:w-6 h-px bg-gray-200 dark:bg-slate-700" />}
+                    </React.Fragment>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {!showWizardChrome && (
+            <p className="text-xs text-gray-400 dark:text-gray-500 mb-4 -mt-2">
+              {hasCurriculum
+                ? "Preparing your weekly scheme from the selected Curriculum..."
+                : "Preparing your weekly scheme from the uploaded document..."}
+            </p>
           )}
 
           <AnimatePresence mode="wait">
@@ -997,7 +1011,7 @@ const SchemeAIGenerate: React.FC<Props> = ({
                       </div>
 
                       <div className="lg:col-span-1">
-                        <div className="sticky top-4 bg-gray-50 dark:bg-slate-800/60 border border-gray-200 dark:border-slate-700 rounded-2xl p-4 flex flex-col gap-4">
+                        <div className="lg:sticky lg:top-4 bg-gray-50 dark:bg-slate-800/60 border border-gray-200 dark:border-slate-700 rounded-2xl p-4 flex flex-col gap-4">
                           <div>
                             <div className="flex items-center justify-between mb-1.5">
                               <span className="text-xs font-semibold text-gray-600 dark:text-gray-300">
@@ -1659,13 +1673,15 @@ const SchemeAIGenerate: React.FC<Props> = ({
           </AnimatePresence>
 
           {!isProcessing && jobStatus?.status !== "done" && (
-            <button
-              onClick={onCancel}
-              className="mt-6 inline-flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
-            >
-              <ArrowLeft className="w-3.5 h-3.5" />
-              Back to options
-            </button>
+            <div className="flex justify-center">
+              <button
+                onClick={onCancel}
+                className="mt-6 inline-flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+              >
+                <ArrowLeft className="w-3.5 h-3.5" />
+                Back to options
+              </button>
+            </div>
           )}
         </div>
       </div>
