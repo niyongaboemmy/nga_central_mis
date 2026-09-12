@@ -614,39 +614,39 @@ const SchemeDetails: React.FC = () => {
         <div className="flex items-center justify-between">
           <button
             onClick={() => navigate(-1)}
-            className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 font-medium transition-colors"
+            className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 font-medium transition-colors"
           >
-            <ArrowLeft className="w-4 h-4" />
+            <ArrowLeft className="w-3.5 h-3.5" />
             Back to Overview
           </button>
           <button
             onClick={handleClearCache}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 text-sm font-bold transition-all border border-gray-200 dark:border-gray-700"
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 text-xs font-semibold transition-all"
             title="Refresh from Server"
           >
-            <RefreshCw className="w-4 h-4" />
+            <RefreshCw className="w-3.5 h-3.5" />
             Clear Cache
           </button>
         </div>
 
         {/* Teacher / Subject Info Card */}
-        <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-5">
-          <div className="flex flex-col md:flex-row md:items-center gap-5">
+        <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 p-4">
+          <div className="flex flex-col md:flex-row md:items-center gap-4">
             {/* Avatar */}
-            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white font-black text-lg flex-shrink-0 shadow-lg">
+            <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white font-black text-sm flex-shrink-0 shadow-sm">
               {teacherName ? teacherName.slice(0, 2).toUpperCase() : "??"}
             </div>
 
             <div className="flex-1 min-w-0">
               <div className="flex flex-wrap items-center gap-2 mb-1">
-                <h1 className="text-lg font-extrabold text-gray-900 dark:text-white">
+                <h1 className="text-base font-extrabold text-gray-900 dark:text-white">
                   {teacherName || "Instructor"}
                 </h1>
-                <span className="text-xs px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 font-semibold">
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 font-semibold">
                   Teacher
                 </span>
               </div>
-              <div className="flex flex-wrap items-center gap-3 text-sm text-gray-500 dark:text-gray-400">
+              <div className="flex flex-wrap items-center gap-2.5 text-xs text-gray-500 dark:text-gray-400">
                 <span className="flex items-center gap-1.5">
                   <BookOpen className="w-3.5 h-3.5" />
                   {subjectName}
@@ -666,7 +666,7 @@ const SchemeDetails: React.FC = () => {
 
             {/* Quick stats */}
             {!loading && (
-              <div className="flex gap-3 flex-shrink-0">
+              <div className="flex gap-2 flex-shrink-0">
                 {[
                   {
                     label: "Weeks",
@@ -686,12 +686,12 @@ const SchemeDetails: React.FC = () => {
                 ].map((s) => (
                   <div
                     key={s.label}
-                    className="text-center bg-gray-50 dark:bg-gray-800 rounded-xl px-4 py-2"
+                    className="text-center bg-gray-50 dark:bg-gray-800 rounded-lg px-3 py-1.5"
                   >
-                    <div className={`text-xl font-black ${s.color}`}>
+                    <div className={`text-base font-black leading-tight ${s.color}`}>
                       {s.value}
                     </div>
-                    <div className="text-[11px] text-gray-500 dark:text-gray-400">
+                    <div className="text-[10px] text-gray-500 dark:text-gray-400">
                       {s.label}
                     </div>
                   </div>
@@ -702,12 +702,12 @@ const SchemeDetails: React.FC = () => {
 
           {/* Progress bar */}
           {!loading && (
-            <div className="mt-4">
-              <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mb-1.5">
+            <div className="mt-3">
+              <div className="flex justify-between text-[11px] text-gray-500 dark:text-gray-400 mb-1">
                 <span>Lesson Plan Progress</span>
                 <span className="font-bold">{stats.progress}%</span>
               </div>
-              <div className="h-2 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
+              <div className="h-1.5 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
                 <motion.div
                   initial={{ width: 0 }}
                   animate={{ width: `${stats.progress}%` }}
@@ -726,12 +726,12 @@ const SchemeDetails: React.FC = () => {
             <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-5 overflow-hidden relative shadow-sm"
+              className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 p-4 overflow-hidden relative"
             >
-              <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-                <div className="flex items-center gap-4">
+              <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
                   <div
-                    className={`p-3 rounded-2xl ${
+                    className={`p-2.5 rounded-xl ${
                       currentSchemeRecord?.validation_status === "APPROVED"
                         ? "bg-emerald-50 text-emerald-600 dark:bg-emerald-900/20 dark:text-emerald-400"
                         : currentSchemeRecord?.validation_status === "REJECTED"
@@ -739,10 +739,10 @@ const SchemeDetails: React.FC = () => {
                           : "bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400"
                     }`}
                   >
-                    <CheckCircle2 className="w-6 h-6" />
+                    <CheckCircle2 className="w-5 h-5" />
                   </div>
                   <div>
-                    <h3 className="text-base font-bold text-gray-900 dark:text-white leading-tight">
+                    <h3 className="text-sm font-bold text-gray-900 dark:text-white leading-tight">
                       Scheme Approval Status
                     </h3>
                     <div className="flex items-center gap-2 mt-1">
@@ -752,11 +752,23 @@ const SchemeDetails: React.FC = () => {
                             ? "bg-emerald-50 border-emerald-100 text-emerald-700 dark:bg-emerald-900/10 dark:border-emerald-800 dark:text-emerald-400"
                             : schemeStatus === "REJECTED"
                               ? "bg-rose-50 border-rose-100 text-rose-700 dark:bg-rose-900/10 dark:border-rose-800 dark:text-rose-400"
-                              : "bg-gray-50 border-gray-100 text-gray-500 dark:bg-gray-800 dark:border-gray-700 opacity-60"
+                              : "bg-amber-50 border-amber-100 text-amber-600 dark:bg-amber-900/10 dark:border-amber-800 dark:text-amber-400"
                         }`}
                       >
                         {schemeStatus}
                       </span>
+                      {schemeStatus !== "PENDING" &&
+                        currentSchemeRecord?.updated_at && (
+                          <span className="text-[11px] text-gray-400 dark:text-gray-500">
+                            Updated{" "}
+                            {new Date(
+                              currentSchemeRecord.updated_at,
+                            ).toLocaleDateString(undefined, {
+                              month: "short",
+                              day: "numeric",
+                            })}
+                          </span>
+                        )}
                     </div>
                   </div>
                 </div>
@@ -774,18 +786,18 @@ const SchemeDetails: React.FC = () => {
                           setValidationError(null);
                           setIsValidationModalOpen(true);
                         }}
-                        className="px-8 py-3 bg-blue-600 text-white rounded-full font-black text-sm hover:bg-blue-700 shadow-blue-600/30 transition-all flex items-center gap-2 animate-pulse hover:animate-none scale-110 md:scale-100"
+                        className="px-5 py-2 bg-blue-600 text-white rounded-full font-bold text-xs hover:bg-blue-700 hover:shadow-md hover:shadow-blue-600/25 active:scale-95 transition-all flex items-center gap-1.5"
                       >
-                        <CheckCircle2 className="w-5 h-5 flex-shrink-0" />
+                        <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
                         Validate Scheme
                       </button>
                     ) : (
                       <>
                         <button
                           onClick={() => setIsDetailsModalOpen(true)}
-                          className="px-5 py-2.5 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-full font-bold text-sm hover:bg-gray-200 dark:hover:bg-gray-700 transition-all flex items-center gap-2"
+                          className="px-4 py-2 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-full font-semibold text-xs hover:bg-gray-200 dark:hover:bg-gray-700 active:scale-95 transition-all flex items-center gap-1.5"
                         >
-                          <Eye className="w-4 h-4" />
+                          <Eye className="w-3.5 h-3.5" />
                           Details
                         </button>
                         <button
@@ -803,9 +815,9 @@ const SchemeDetails: React.FC = () => {
                             setValidationError(null);
                             setIsValidationModalOpen(true);
                           }}
-                          className="px-5 py-2.5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 rounded-full font-bold text-sm hover:bg-gray-50 dark:hover:bg-gray-800 transition-all flex items-center gap-2"
+                          className="px-4 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 rounded-full font-semibold text-xs hover:bg-gray-50 dark:hover:bg-gray-800 active:scale-95 transition-all flex items-center gap-1.5"
                         >
-                          <RefreshCw className="w-4 h-4" />
+                          <RefreshCw className="w-3.5 h-3.5" />
                           Update Validation
                         </button>
                       </>
@@ -824,10 +836,10 @@ const SchemeDetails: React.FC = () => {
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0 }}
-            className="flex items-center gap-4 p-4 bg-rose-50 dark:bg-rose-900/10 border border-rose-200 dark:border-rose-800 rounded-2xl"
+            className="flex items-center gap-3 px-4 py-2.5 bg-rose-50 dark:bg-rose-900/10 border border-rose-200 dark:border-rose-800 rounded-xl"
           >
-            <AlertTriangle className="w-5 h-5 text-rose-500 flex-shrink-0 animate-pulse" />
-            <p className="text-sm text-rose-600 dark:text-rose-400">
+            <AlertTriangle className="w-4 h-4 text-rose-500 flex-shrink-0" />
+            <p className="text-xs text-rose-600 dark:text-rose-400">
               <span className="font-bold">
                 {stats.missing} week{stats.missing !== 1 ? "s" : ""}
               </span>{" "}
@@ -866,13 +878,13 @@ const SchemeDetails: React.FC = () => {
             <button
               key={tab.key}
               onClick={() => setActiveTab(tab.key)}
-              className={`flex items-center gap-2 px-5 py-3 text-sm font-semibold border-b-2 transition-all ${
+              className={`flex items-center gap-1.5 px-4 py-2.5 text-xs font-semibold border-b-2 transition-all ${
                 activeTab === tab.key
                   ? "border-blue-600 text-blue-600 dark:text-blue-400"
                   : "border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
               }`}
             >
-              <tab.icon className="w-4 h-4" />
+              <tab.icon className="w-3.5 h-3.5" />
               {tab.label}
             </button>
           ))}
@@ -881,10 +893,10 @@ const SchemeDetails: React.FC = () => {
         {/* Download Button moved here */}
         <button
           onClick={handlePreviewReport}
-          className="hidden sm:flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/30 dark:hover:bg-blue-800/40 text-blue-600 dark:text-blue-400 text-sm font-bold transition-all border border-blue-200 dark:border-blue-800"
+          className="flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/30 dark:hover:bg-blue-800/40 text-blue-600 dark:text-blue-400 text-xs font-semibold transition-all"
           title="Download PDF Report"
         >
-          <Download className="w-4 h-4" />
+          <Download className="w-3.5 h-3.5" />
           Download PDF
         </button>
       </div>
@@ -926,26 +938,26 @@ const SchemeDetails: React.FC = () => {
         /* ── Timeline View ── */
         <div className="space-y-4">
           {/* Controls */}
-          <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700/30 rounded-2xl p-4 space-y-4">
-            <div className="flex flex-col lg:flex-row gap-3">
+          <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700/30 rounded-xl p-3.5 space-y-3.5">
+            <div className="flex flex-col lg:flex-row gap-2.5">
               <div className="flex-1 relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
                 <input
                   type="text"
                   placeholder="Search topics, objectives..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 text-sm bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700/60 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500 dark:text-white"
+                  className="w-full pl-9 pr-4 py-1.5 text-xs bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700/60 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500 dark:text-white"
                 />
               </div>
               <div className="flex items-center gap-2">
-                <Filter className="w-4 h-4 text-gray-400" />
+                <Filter className="w-3.5 h-3.5 text-gray-400" />
                 <select
                   value={filterStatus}
                   onChange={(e) =>
                     setFilterStatus(e.target.value as StatusFilter)
                   }
-                  className="px-3 py-2 text-sm bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500 dark:text-white"
+                  className="px-3 py-1.5 text-xs bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500 dark:text-white"
                 >
                   <option value="all">All Weeks</option>
                   <option value="complete">Complete</option>
@@ -1287,15 +1299,15 @@ const SchemeDetails: React.FC = () => {
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
-              className="w-full max-w-lg bg-white dark:bg-gray-900 rounded-[2.5rem] shadow-2xl overflow-hidden"
+              className="w-full max-w-md bg-white dark:bg-gray-900 rounded-2xl shadow-2xl overflow-hidden"
             >
-              <div className="p-6 bg-blue-600 text-white flex items-center justify-between">
+              <div className="p-5 bg-blue-600 text-white flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="p-2 bg-white/20 rounded-xl">
-                    <CheckCircle2 className="w-6 h-6" />
+                  <div className="p-2 bg-white/20 rounded-lg">
+                    <CheckCircle2 className="w-5 h-5" />
                   </div>
                   <div>
-                    <h3 className="font-bold leading-tight">
+                    <h3 className="text-sm font-bold leading-tight">
                       Validate Scheme of Work
                     </h3>
                     <p className="text-xs text-white/80">
@@ -1305,45 +1317,45 @@ const SchemeDetails: React.FC = () => {
                 </div>
                 <button
                   onClick={() => setIsValidationModalOpen(false)}
-                  className="p-2 hover:bg-white/20 rounded-full transition-colors"
+                  className="p-1.5 hover:bg-white/20 rounded-full transition-colors"
                 >
-                  <X className="w-5 h-5" />
+                  <X className="w-4 h-4" />
                 </button>
               </div>
 
-              <div className="p-8 space-y-6">
+              <div className="p-5 space-y-5">
                 <div>
-                  <label className="block text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-3">
+                  <label className="block text-[11px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-2.5">
                     Set Validation Status
                   </label>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-2 gap-2.5">
                     <button
                       onClick={() => setValidationStatus("APPROVED")}
-                      className={`flex flex-col items-center gap-2 p-4 rounded-3xl border-2 transition-all ${
+                      className={`flex flex-col items-center gap-1.5 p-3.5 rounded-xl border-2 transition-all hover:-translate-y-0.5 ${
                         validationStatus === "APPROVED"
-                          ? "bg-emerald-50 border-emerald-500 text-emerald-700 dark:bg-emerald-900/20"
-                          : "bg-gray-50 border-transparent text-gray-500 dark:bg-gray-800"
+                          ? "bg-emerald-50 border-emerald-500 text-emerald-700 dark:bg-emerald-900/20 shadow-sm shadow-emerald-500/10"
+                          : "bg-gray-50 border-transparent text-gray-500 dark:bg-gray-800 hover:border-gray-200 dark:hover:border-gray-700"
                       }`}
                     >
                       <CheckCircle2
-                        className={`w-8 h-8 ${validationStatus === "APPROVED" ? "text-emerald-500" : "text-gray-300"}`}
+                        className={`w-6 h-6 ${validationStatus === "APPROVED" ? "text-emerald-500" : "text-gray-300"}`}
                       />
-                      <span className="font-black text-sm uppercase tracking-tighter">
+                      <span className="font-bold text-xs uppercase tracking-wide">
                         Approve
                       </span>
                     </button>
                     <button
                       onClick={() => setValidationStatus("REJECTED")}
-                      className={`flex flex-col items-center gap-2 p-4 rounded-3xl border-2 transition-all ${
+                      className={`flex flex-col items-center gap-1.5 p-3.5 rounded-xl border-2 transition-all hover:-translate-y-0.5 ${
                         validationStatus === "REJECTED"
-                          ? "bg-rose-50 border-rose-500 text-rose-700 dark:bg-rose-900/20"
-                          : "bg-gray-50 border-transparent text-gray-500 dark:bg-gray-800"
+                          ? "bg-rose-50 border-rose-500 text-rose-700 dark:bg-rose-900/20 shadow-sm shadow-rose-500/10"
+                          : "bg-gray-50 border-transparent text-gray-500 dark:bg-gray-800 hover:border-gray-200 dark:hover:border-gray-700"
                       }`}
                     >
                       <AlertCircle
-                        className={`w-8 h-8 ${validationStatus === "REJECTED" ? "text-rose-500" : "text-gray-300"}`}
+                        className={`w-6 h-6 ${validationStatus === "REJECTED" ? "text-rose-500" : "text-gray-300"}`}
                       />
-                      <span className="font-black text-sm uppercase tracking-tighter">
+                      <span className="font-bold text-xs uppercase tracking-wide">
                         Reject
                       </span>
                     </button>
@@ -1351,7 +1363,7 @@ const SchemeDetails: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-3">
+                  <label className="block text-[11px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-2.5">
                     Comment / Feedback{" "}
                     {validationStatus === "REJECTED" && (
                       <span className="text-rose-500">*</span>
@@ -1365,7 +1377,7 @@ const SchemeDetails: React.FC = () => {
                     }
                     value={validationComment}
                     onChange={(e) => setValidationComment(e.target.value)}
-                    className="w-full h-32 p-4 text-sm bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-3xl focus:ring-2 focus:ring-blue-500 outline-none transition-all dark:text-white resize-none"
+                    className="w-full h-24 p-3 text-sm bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all dark:text-white resize-none"
                   />
                 </div>
 
@@ -1373,17 +1385,17 @@ const SchemeDetails: React.FC = () => {
                   <motion.div
                     initial={{ opacity: 0, y: -10 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="p-4 bg-rose-50 dark:bg-rose-900/20 border border-rose-100 dark:border-rose-800 rounded-2xl flex items-center gap-3 text-rose-600 dark:text-rose-400 text-sm font-medium"
+                    className="p-3 bg-rose-50 dark:bg-rose-900/20 border border-rose-100 dark:border-rose-800 rounded-xl flex items-center gap-2.5 text-rose-600 dark:text-rose-400 text-xs font-medium"
                   >
-                    <AlertCircle className="w-5 h-5 flex-shrink-0" />
+                    <AlertCircle className="w-4 h-4 flex-shrink-0" />
                     {validationError}
                   </motion.div>
                 )}
 
-                <div className="flex gap-3 pt-2">
+                <div className="flex gap-2.5 pt-1">
                   <button
                     onClick={() => setIsValidationModalOpen(false)}
-                    className="flex-1 py-2.5 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-full font-bold transition-all active:scale-95"
+                    className="flex-1 py-2.5 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-full text-sm font-bold transition-all active:scale-95"
                   >
                     Cancel
                   </button>
@@ -1394,16 +1406,16 @@ const SchemeDetails: React.FC = () => {
                       (validationStatus === "REJECTED" &&
                         !validationComment.trim())
                     }
-                    className="flex-[2] py-2.5 bg-blue-600 text-white rounded-full font-bold shadow-lg shadow-blue-600/20 transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2"
+                    className="flex-[2] py-2.5 bg-blue-600 text-white rounded-full text-sm font-bold shadow-md shadow-blue-600/20 hover:bg-blue-700 transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2"
                   >
                     {validating ? (
                       <>
-                        <RefreshCw className="w-5 h-5 animate-spin" />
+                        <RefreshCw className="w-4 h-4 animate-spin" />
                         Validating...
                       </>
                     ) : (
                       <>
-                        <CheckCircle2 className="w-5 h-5" />
+                        <CheckCircle2 className="w-4 h-4" />
                         Confirm Validation
                       </>
                     )}
@@ -1423,44 +1435,44 @@ const SchemeDetails: React.FC = () => {
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
-              className="w-full max-w-md bg-white dark:bg-gray-900 rounded-3xl shadow-2xl overflow-hidden"
+              className="w-full max-w-sm bg-white dark:bg-gray-900 rounded-2xl shadow-2xl overflow-hidden"
             >
               <div
-                className={`p-6 flex items-center justify-between ${
+                className={`p-5 flex items-center justify-between ${
                   schemeStatus === "APPROVED" ? "bg-emerald-600" : "bg-rose-600"
                 } text-white`}
               >
                 <div className="flex items-center gap-3">
-                  <div className="p-2 bg-white/20 rounded-xl">
-                    <Eye className="w-6 h-6" />
+                  <div className="p-2 bg-white/20 rounded-lg">
+                    <Eye className="w-5 h-5" />
                   </div>
-                  <h3 className="font-bold">Validation Details</h3>
+                  <h3 className="text-sm font-bold">Validation Details</h3>
                 </div>
                 <button
                   onClick={() => setIsDetailsModalOpen(false)}
-                  className="p-2 hover:bg-white/20 rounded-full transition-colors"
+                  className="p-1.5 hover:bg-white/20 rounded-full transition-colors"
                 >
-                  <X className="w-5 h-5" />
+                  <X className="w-4 h-4" />
                 </button>
               </div>
 
-              <div className="p-8 space-y-6">
+              <div className="p-5 space-y-4">
                 <div className="flex flex-col items-center text-center">
                   <div
-                    className={`w-20 h-20 rounded-full flex items-center justify-center mb-4 ${
+                    className={`w-14 h-14 rounded-full flex items-center justify-center mb-3 ${
                       schemeStatus === "APPROVED"
                         ? "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600"
                         : "bg-rose-100 dark:bg-rose-900/30 text-rose-600"
                     }`}
                   >
                     {schemeStatus === "APPROVED" ? (
-                      <CheckCircle2 className="w-10 h-10" />
+                      <CheckCircle2 className="w-7 h-7" />
                     ) : (
-                      <AlertCircle className="w-10 h-10" />
+                      <AlertCircle className="w-7 h-7" />
                     )}
                   </div>
                   <h4
-                    className={`text-2xl font-black uppercase tracking-tighter ${
+                    className={`text-lg font-black uppercase tracking-tighter ${
                       schemeStatus === "APPROVED"
                         ? "text-emerald-600"
                         : "text-rose-600"
@@ -1468,14 +1480,14 @@ const SchemeDetails: React.FC = () => {
                   >
                     {schemeStatus}
                   </h4>
-                  <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">
+                  <p className="text-gray-500 dark:text-gray-400 text-xs mt-1">
                     Scheme was validated manually by Administrator
                   </p>
                 </div>
 
                 {schemeComment && (
-                  <div className="p-5 bg-gray-50 dark:bg-gray-800 rounded-3xl border border-gray-100 dark:border-gray-800">
-                    <div className="flex items-center gap-2 mb-2 text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">
+                  <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-800">
+                    <div className="flex items-center gap-2 mb-1.5 text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">
                       <MessageSquare className="w-3.5 h-3.5" />
                       Administrator Comment
                     </div>
@@ -1487,7 +1499,7 @@ const SchemeDetails: React.FC = () => {
 
                 <button
                   onClick={() => setIsDetailsModalOpen(false)}
-                  className="w-full py-4 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-2xl font-bold transition-all active:scale-95 shadow-lg"
+                  className="w-full py-2.5 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-full text-sm font-bold transition-all active:scale-95"
                 >
                   Close View
                 </button>

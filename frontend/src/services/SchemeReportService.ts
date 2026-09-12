@@ -22,8 +22,42 @@ export interface ReportMetadata {
   logo2?: string; // base64 or URL
 }
 
+/**
+ * jsPDF's built-in fonts (helvetica/times/courier) only support the WinAnsi
+ * (Latin-1) glyph set. Content extracted by the AI pipeline concatenates list
+ * items with a "✓" separator, and other unsupported symbols slip in too —
+ * none of those exist in WinAnsi, so jsPDF/autotable can't measure their
+ * width and falls back to wrapping the surrounding text one character at a
+ * time. Converting known separators to real line breaks (and stripping any
+ * other unsupported code point) keeps the PDF layout stable and readable.
+ */
+const sanitizePdfText = (value: string | null | undefined): string => {
+  if (!value) return "";
+  return value
+    .replace(/\s*✓\s*/g, "\n- ")
+    .replace(/^\n/, "")
+    .replace(/[✗×]/g, "x")
+    .replace(/[→➜]/g, "->")
+    .replace(/[‘’]/g, "'")
+    .replace(/[“”]/g, '"')
+    .replace(/[–—]/g, "-")
+    .replace(/[•]/g, "-")
+    // Safety net: drop any remaining character outside the WinAnsi range,
+    // which base-14 PDF fonts (helvetica/times/courier) cannot measure or draw.
+    .replace(/[^\x00-\xFF]/g, "")
+    .trim();
+};
+
 export const SchemeReportService = {
-  buildSOWReport: (entries: SchemeEntry[], metadata: ReportMetadata) => {
+  buildSOWReport: (entries: SchemeEntry[], rawMetadata: ReportMetadata) => {
+    const metadata: ReportMetadata = Object.fromEntries(
+      Object.entries(rawMetadata).map(([key, val]) => [
+        key,
+        typeof val === "string" && key !== "logo1" && key !== "logo2"
+          ? sanitizePdfText(val)
+          : val,
+      ]),
+    ) as ReportMetadata;
     const doc = new jsPDF("l", "mm", "a4");
     const docWidth = doc.internal.pageSize.getWidth();
     const docHeight = doc.internal.pageSize.getHeight();
@@ -213,14 +247,14 @@ export const SchemeReportService = {
     // Using objects for body to handle rowSpan robustly
     const tableData = entries.map((entry) => ({
       week: `${entry.week_number}\n${new Date(entry.start_date).toLocaleDateString()} - ${new Date(entry.end_date).toLocaleDateString()}`,
-      lo: entry.objective || "",
-      duration: entry.duration || "",
-      ic: entry.topic || "",
-      activities: entry.methodology || "",
-      resources: entry.resources || "",
-      evidence: entry.evaluation || "",
-      place: entry.learning_place || "Classroom",
-      obs: entry.observation || "",
+      lo: sanitizePdfText(entry.objective),
+      duration: sanitizePdfText(entry.duration),
+      ic: sanitizePdfText(entry.topic),
+      activities: sanitizePdfText(entry.methodology),
+      resources: sanitizePdfText(entry.resources),
+      evidence: sanitizePdfText(entry.evaluation),
+      place: sanitizePdfText(entry.learning_place) || "Classroom",
+      obs: sanitizePdfText(entry.observation),
     }));
 
     // Pre-calculate Row Spans
@@ -349,17 +383,23 @@ export const SchemeReportService = {
       ],
       theme: "grid",
       styles: {
-        fontSize: 8,
-        cellPadding: 2,
-        textColor: 0,
-        lineColor: "#939393",
+        fontSize: 8.5,
+        cellPadding: 2.4,
+        textColor: 30,
+        lineColor: "#c7c7c7",
         lineWidth: 0.1,
         font: "helvetica",
+        valign: "top" as "top",
+        overflow: "linebreak" as "linebreak",
       },
       headStyles: {
         fillColor: [219, 196, 162] as any, // #dbc4a2 tan/beige
         textColor: [0, 0, 0] as any,
         fontStyle: "bold" as "bold",
+        fontSize: 8.5,
+      },
+      alternateRowStyles: {
+        fillColor: [250, 248, 244] as any,
       },
       columnStyles: {
         0: { cellWidth: 22 }, // Weeks
