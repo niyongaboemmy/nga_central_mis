@@ -1037,7 +1037,9 @@ const SchemeDetails: React.FC = () => {
 
           {/* Entries */}
           <div className="relative">
-            <div className="absolute left-6 top-0 bottom-0 w-0.5 bg-gradient-to-b from-blue-200 to-blue-200 dark:from-blue-900 dark:to-blue-900 hidden md:block" />
+            {/* Vertical Timeline Line — centered on the same w-6 rail column each dot sits in, so
+                the two can never drift out of alignment the way separate magic-number offsets could. */}
+            <div className="absolute left-3 top-2 bottom-2 w-px bg-gradient-to-b from-gray-200 via-gray-200 to-transparent dark:from-gray-700 dark:via-gray-800 dark:to-transparent hidden md:block" />
             <AnimatePresence mode="popLayout">
               {filteredEntries.length === 0 ? (
                 <motion.div
@@ -1061,12 +1063,13 @@ const SchemeDetails: React.FC = () => {
                       animate={{ opacity: 1, x: 0 }}
                       exit={{ opacity: 0, x: 20 }}
                       transition={{ delay: index * 0.04 }}
-                      className="relative mb-4 md:ml-12"
+                      className="relative mb-4 flex md:gap-4"
                     >
-                      {/* Timeline dot */}
-                      <div className="absolute -left-[31px] top-1 hidden md:block">
-                        <div
-                          className={`w-4 h-4 rounded-full border-2 border-white dark:border-gray-900 ${
+                      {/* Timeline dot — centered in the same w-6 rail column the connecting line
+                          runs through, via flex, instead of a hand-tuned negative-left offset. */}
+                      <div className="hidden md:flex flex-col items-center w-6 flex-shrink-0">
+                        <span
+                          className={`mt-6 w-3 h-3 rounded-full ring-4 ring-white dark:ring-gray-950 shadow-sm ${
                             status === "complete"
                               ? "bg-emerald-500"
                               : status === "missing"
@@ -1076,7 +1079,7 @@ const SchemeDetails: React.FC = () => {
                         />
                       </div>
 
-                      <div className="group bg-white dark:bg-gray-900/80 border border-gray-200 dark:border-gray-700/30 rounded-xl overflow-hidden hover:shadow-lg hover:border-blue-300 dark:hover:border-blue-700 transition-all duration-300">
+                      <div className="group flex-1 min-w-0 bg-white dark:bg-gray-900/80 border border-gray-200 dark:border-gray-700/30 rounded-xl overflow-hidden hover:shadow-lg hover:border-blue-300 dark:hover:border-blue-700 transition-all duration-300">
                         <div className="p-5">
                           <div className="flex flex-col md:flex-row md:items-start gap-4">
                             {/* Week + date */}

@@ -372,25 +372,6 @@ const SchemeOfWorkCalendar: React.FC = () => {
     setIsModalOpen(true);
   };
 
-  const handleHeaderUpload = async (f: File) => {
-    setIsUploading(true);
-    const formData = new FormData();
-    formData.append("file", f);
-    formData.append("subject_id", subjectId.toString());
-    formData.append("class_group_id", classGroupId.toString());
-    formData.append("academic_term_id", academicTermId.toString());
-
-    try {
-      await schemeOfWorkApi.upload(formData);
-      showToast("Scheme updated successfully", "success");
-      loadData();
-    } catch (error: any) {
-      showToast(error.response?.data?.message || "Upload failed", "error");
-    } finally {
-      setIsUploading(false);
-    }
-  };
-
   const handleBulkMatchCriteria = async () => {
     if (!schemeMetadata?.scheme_id) return;
     setIsMatchingCriteria(true);
@@ -790,8 +771,9 @@ const SchemeOfWorkCalendar: React.FC = () => {
 
       {/* Timeline Entries */}
       <div className="relative">
-        {/* Vertical Timeline Line */}
-        <div className="absolute left-6 top-0 bottom-0 w-0.5 bg-gradient-to-b from-blue-200 via-blue-200 to-blue-200 dark:from-blue-900 dark:via-blue-900 dark:to-blue-900 hidden md:block" />
+        {/* Vertical Timeline Line — centered on the same w-6 rail column each dot sits in, so the
+            two can never drift out of alignment the way separate magic-number offsets could. */}
+        <div className="absolute left-3 top-2 bottom-2 w-px bg-gradient-to-b from-gray-200 via-gray-200 to-transparent dark:from-gray-700 dark:via-gray-800 dark:to-transparent hidden md:block" />
 
         <AnimatePresence mode="popLayout">
           {filteredEntries.length === 0 ? (
@@ -820,7 +802,7 @@ const SchemeOfWorkCalendar: React.FC = () => {
               }: {
                 afterEntryId: number | "start";
               }) => (
-                <div className="relative h-6 md:ml-12 group/divider flex items-center">
+                <div className="relative h-6 md:ml-6 group/divider flex items-center">
                   <div className="w-full h-px bg-transparent group-hover/divider:bg-blue-200 dark:group-hover/divider:bg-blue-900 transition-colors" />
                   <button
                     onClick={() => openInsertModal(afterEntryId)}
@@ -842,12 +824,13 @@ const SchemeOfWorkCalendar: React.FC = () => {
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: 20 }}
                   transition={{ delay: index * 0.05 }}
-                  className="relative mb-4 md:ml-12"
+                  className="relative mb-4 flex md:gap-4"
                 >
-                  {/* Timeline Dot */}
-                  <div className="absolute -left-[31px] top-1 hidden md:block">
-                    <div
-                      className={`w-4 h-4 rounded-full border-2 border-white dark:border-gray-900 ${
+                  {/* Timeline Dot — centered in the same w-6 rail column the connecting line runs
+                      through, via flex, instead of a hand-tuned negative-left offset. */}
+                  <div className="hidden md:flex flex-col items-center w-6 flex-shrink-0">
+                    <span
+                      className={`mt-6 w-3 h-3 rounded-full ring-4 ring-white dark:ring-gray-950 shadow-sm ${
                         status === "complete"
                           ? "bg-green-500"
                           : status === "missing"
@@ -857,7 +840,7 @@ const SchemeOfWorkCalendar: React.FC = () => {
                     />
                   </div>
 
-                  <div className="group bg-white dark:bg-gray-900/80 border border-gray-200 dark:border-gray-700/30 rounded-xl overflow-hidden hover:shadow-lg hover:border-blue-300 dark:hover:border-blue-700 transition-all duration-300">
+                  <div className="group flex-1 min-w-0 bg-white dark:bg-gray-900/80 border border-gray-200 dark:border-gray-700/30 rounded-xl overflow-hidden hover:shadow-lg hover:border-blue-300 dark:hover:border-blue-700 transition-all duration-300">
                     {/* Main Content */}
                     <div className="p-5">
                       <div className="flex flex-col md:flex-row md:items-start gap-5">
@@ -1169,35 +1152,6 @@ const SchemeOfWorkCalendar: React.FC = () => {
         <div className="flex flex-row items-center gap-2 mb-4">
           {entries.length > 0 && (
             <div className="flex items-center gap-3">
-              {/* Upload Action */}
-              <input
-                type="file"
-                id="header-upload"
-                className="hidden"
-                accept=".docx"
-                onChange={(e) => {
-                  if (e.target.files?.[0])
-                    handleHeaderUpload(e.target.files[0]);
-                }}
-              />
-              <button
-                onClick={() =>
-                  document.getElementById("header-upload")?.click()
-                }
-                disabled={
-                  isUploading ||
-                  schemeMetadata?.validation_status === "APPROVED"
-                }
-                className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 bg-white dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-full hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-blue-500 transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isUploading ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <CloudUpload className="w-4 h-4" />
-                )}
-                <span>Update Scheme</span>
-              </button>
-
               {/* Download PDF Action */}
               <button
                 onClick={handlePreviewReport}
