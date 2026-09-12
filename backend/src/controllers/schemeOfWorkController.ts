@@ -18,12 +18,17 @@ import {
 } from "../db/schema";
 import { asyncHandler } from "../middleware/asyncHandler";
 import { successResponse } from "../utils/response";
-import { ValidationError, NotFoundError } from "../errors/CustomError";
+import {
+  ValidationError,
+  NotFoundError,
+  AuthorizationError,
+} from "../errors/CustomError";
 import { recordActivity } from "../utils/activityLogger";
 import logger from "../utils/logger";
 import mammoth = require("mammoth");
 import { computeWeekDates } from "../utils/weekDates";
 import { assertTeacherOwnsScheme } from "../utils/schemeAuthorization";
+import { Permissions } from "../utils/permissions";
 import { extractTextFromFile } from "../utils/docExtract";
 import {
   generateStructuredContent,
@@ -778,6 +783,67 @@ export const deleteSchemeEntry = asyncHandler(async (req: any, res: any) => {
   }
 
   successResponse(res, "Scheme entry deleted successfully");
+});
+
+/**
+ * Deletes an entire Scheme of Work — every weekly entry, their lesson plans, and their
+ * Performance Criteria links — so a teacher can start over from scratch. Relies on the DB's own
+ * ON DELETE CASCADE chain (SchemeOfWork -> SchemeOfWorkEntry -> LO_Lesson/SchemeEntryCriteria and
+ * further down) rather than deleting children manually; LessonReport/LessonNote rows referencing
+ * a deleted entry are preserved with entry_id set to NULL (ON DELETE SET NULL), so a teacher's
+ * already-submitted delivery history and notes survive a reset.
+ */
+export const deleteScheme = asyncHandler(async (req: any, res: any) => {
+  const { schemeId } = req.params;
+  const id = parseInt(schemeId);
+  if (isNaN(id)) {
+    throw new ValidationError("Invalid scheme ID");
+  }
+
+  const [scheme] = await db
+    .select()
+    .from(SchemeOfWork)
+    .where(eq(SchemeOfWork.scheme_id, id))
+    .limit(1);
+
+  if (!scheme) {
+    throw new NotFoundError("Scheme of work not found");
+  }
+
+  const userId = req.user.userId;
+  const isOwner = scheme.user_id === userId;
+  const canManageAny = (req.user.permissions || []).includes(
+    Permissions.VALIDATE_SCHEME_OF_WORK,
+  );
+  if (!isOwner && !canManageAny) {
+    throw new AuthorizationError(
+      "You do not have permission to delete this scheme of work",
+    );
+  }
+
+  const entryCount = await db
+    .select({ entry_id: SchemeOfWorkEntry.entry_id })
+    .from(SchemeOfWorkEntry)
+    .where(eq(SchemeOfWorkEntry.scheme_id, id));
+
+  await db.delete(SchemeOfWork).where(eq(SchemeOfWork.scheme_id, id));
+
+  await recordActivity(
+    userId,
+    "SCHEME_DELETE",
+    `Deleted scheme of work ID ${id} (subject ID ${scheme.subject_id}) and its ${entryCount.length} weekly entries`,
+    "SchemeOfWork",
+    id,
+    {
+      subject_id: scheme.subject_id,
+      class_group_id: scheme.class_group_id,
+      academic_term_id: scheme.academic_term_id,
+      entries_count: entryCount.length,
+    },
+    userId,
+  );
+
+  successResponse(res, "Scheme of work deleted successfully");
 });
 
 /**

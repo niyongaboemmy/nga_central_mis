@@ -8,6 +8,7 @@ import {
   insertSchemeEntry,
   updateSchemeEntry,
   deleteSchemeEntry,
+  deleteScheme,
   getAllTeachersSchemeOfWork,
   validateScheme,
 } from "../controllers/schemeOfWorkController";
@@ -89,6 +90,10 @@ router.post("/schemes/:schemeId/link-criteria", linkSchemeCriteria);
 // On-demand bulk AI matching for an already-existing scheme (content and/or curriculum that
 // predates this feature, or entries not covered by generation-time auto-tagging)
 router.post("/schemes/:schemeId/bulk-suggest-criteria", bulkSuggestCriteria);
+
+// Delete an entire scheme of work (all weekly entries, their lesson plans, and criteria links) so
+// the teacher can start over from the 3-option chooser
+router.delete("/schemes/:schemeId", deleteScheme);
 
 // Update a single scheme entry
 router.patch("/entries/:id", updateSchemeEntry);

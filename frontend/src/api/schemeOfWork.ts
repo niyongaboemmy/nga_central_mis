@@ -246,6 +246,11 @@ export const schemeOfWorkApi = {
       data: { taggedCount: number; entriesProcessed: number };
     }>(`/scheme-of-work/schemes/${schemeId}/bulk-suggest-criteria`, { overwrite }),
 
+  /** Permanently deletes an entire scheme of work — every weekly entry and their lesson plans —
+   * so the teacher can start over from the 3-option chooser. */
+  deleteScheme: (schemeId: number) =>
+    apiService.delete<{ success: boolean }>(`/scheme-of-work/schemes/${schemeId}`),
+
   getAllTeachers: (params: {
     academic_year_id: number;
     academic_term_id: number;

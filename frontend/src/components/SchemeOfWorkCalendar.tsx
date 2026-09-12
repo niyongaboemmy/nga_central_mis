@@ -54,6 +54,7 @@ import {
 } from "lucide-react";
 import SchemeManualEntry from "./SchemeManualEntry";
 import SchemeAIGenerate from "./SchemeAIGenerate";
+import ConfirmModal from "./ui/ConfirmModal";
 
 const SchemeOfWorkCalendar: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -75,6 +76,8 @@ const SchemeOfWorkCalendar: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
   const [isMatchingCriteria, setIsMatchingCriteria] = useState(false);
+  const [isDeleteSchemeConfirmOpen, setIsDeleteSchemeConfirmOpen] = useState(false);
+  const [isDeletingScheme, setIsDeletingScheme] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [subjectInfo, setSubjectInfo] = useState<{
     name: string;
@@ -410,6 +413,26 @@ const SchemeOfWorkCalendar: React.FC = () => {
       );
     } finally {
       setIsMatchingCriteria(false);
+    }
+  };
+
+  const handleDeleteScheme = async () => {
+    if (!schemeMetadata?.scheme_id) return;
+    setIsDeletingScheme(true);
+    try {
+      await schemeOfWorkApi.deleteScheme(schemeMetadata.scheme_id);
+      showToast("Scheme of work deleted — start over whenever you're ready", "success");
+      setIsDeleteSchemeConfirmOpen(false);
+      setEntries([]);
+      setSchemeMetadata(null);
+      setEntryMode("choose");
+    } catch (error: any) {
+      showToast(
+        error.response?.data?.message || "Could not delete this scheme of work",
+        "error",
+      );
+    } finally {
+      setIsDeletingScheme(false);
     }
   };
 
@@ -1200,6 +1223,17 @@ const SchemeOfWorkCalendar: React.FC = () => {
                 <span>{isMatchingCriteria ? "Matching..." : "Match with AI"}</span>
               </button>
 
+              {/* Delete Scheme — wipes every weekly entry and their lesson plans so the teacher
+                  can start over from the 3-option chooser */}
+              <button
+                onClick={() => setIsDeleteSchemeConfirmOpen(true)}
+                title="Delete this scheme of work and start over"
+                className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/50 rounded-full hover:bg-red-100 dark:hover:bg-red-800/30 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-red-500 transition-all shadow-sm"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span className="hidden sm:inline">Delete Scheme</span>
+              </button>
+
               {/* View Switcher */}
               <div className="flex items-center p-1 bg-gray-100 dark:bg-gray-900 rounded-full border border-gray-200 dark:border-gray-700">
                 <button
@@ -1507,6 +1541,16 @@ const SchemeOfWorkCalendar: React.FC = () => {
           onClose={() => setIsPreviewReportOpen(false)}
           pdfUrl={reportPdfUrl}
           onDownload={handleActualDownload}
+        />
+
+        <ConfirmModal
+          isOpen={isDeleteSchemeConfirmOpen}
+          onClose={() => setIsDeleteSchemeConfirmOpen(false)}
+          onConfirm={handleDeleteScheme}
+          title="Delete this scheme of work?"
+          message={`This permanently deletes all ${entries.length} weekly ${entries.length === 1 ? "entry" : "entries"} and their lesson plans for ${subjectInfo?.name || "this subject"} — ${subjectInfo?.classGroupName || ""}. This cannot be undone, and you'll start over from the create-scheme options.`}
+          confirmText={isDeletingScheme ? "Deleting..." : "Delete Scheme"}
+          isLoading={isDeletingScheme}
         />
       </div>
     </div>
