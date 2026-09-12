@@ -152,23 +152,23 @@ const MonthCalendarPicker: React.FC<{
   const hasSchedule = !!scheduleSlots && scheduleSlots.length > 0;
 
   return (
-    <div className="w-full bg-gray-50 dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700 rounded-2xl p-4">
+    <div className="w-full bg-gray-50 dark:bg-gray-900/60 border border-gray-200 dark:border-gray-700 rounded-2xl p-4">
       <div className="flex items-center justify-between mb-3">
         <button
           type="button"
           onClick={() => setViewMonth((m) => subMonths(m, 1))}
-          className="w-7 h-7 flex items-center justify-center rounded-full text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+          className="w-7 h-7 flex items-center justify-center rounded-full text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-800 transition-colors"
           aria-label="Previous month"
         >
           <ChevronLeft className="w-4 h-4" />
         </button>
-        <span className="text-sm font-semibold text-gray-800 dark:text-gray-200">
+        <span className="text-sm font-semibold text-gray-900 dark:text-gray-200">
           {format(viewMonth, "MMMM yyyy")}
         </span>
         <button
           type="button"
           onClick={() => setViewMonth((m) => addMonths(m, 1))}
-          className="w-7 h-7 flex items-center justify-center rounded-full text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+          className="w-7 h-7 flex items-center justify-center rounded-full text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-800 transition-colors"
           aria-label="Next month"
         >
           <ChevronRight className="w-4 h-4" />
@@ -206,7 +206,7 @@ const MonthCalendarPicker: React.FC<{
           } else if (inMonth) {
             cellClasses += "text-gray-700 dark:text-gray-200 hover:bg-violet-50 dark:hover:bg-violet-900/20";
           } else {
-            cellClasses += "text-gray-300 dark:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700/40";
+            cellClasses += "text-gray-300 dark:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800/40";
           }
 
           return (
@@ -813,9 +813,9 @@ const SchemeAIGenerate: React.FC<Props> = ({
       transition={{ duration: 0.2 }}
       className={containerWidthClass}
     >
-      <div className="relative overflow-hidden py-5 px-4 sm:py-6 sm:px-6 md:px-8 bg-white dark:bg-gray-900 border-2 border-violet-100 dark:border-violet-900/40 rounded-3xl">
+      <div className="relative overflow-hidden py-5 px-4 sm:py-6 sm:px-6 md:px-8 bg-white dark:bg-gray-950 border-2 border-violet-100 dark:border-violet-900/40 rounded-3xl">
         {/* Decorative glow — light mode only. In dark mode the card stays a flat, neutral near-black
-            to match the sidebar/page shell (SystemLayout's dark:bg-black + Sidebar's gray-800/30) —
+            to match the sidebar/page shell (SystemLayout's dark:bg-black + Sidebar's gray-900/30) —
             a tinted glow here would fight that consistency. */}
         <div className="absolute -top-16 -right-16 w-40 h-40 bg-violet-500/10 rounded-full blur-3xl pointer-events-none dark:hidden" />
         <div className="absolute -bottom-16 -left-16 w-40 h-40 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none dark:hidden" />
@@ -830,7 +830,7 @@ const SchemeAIGenerate: React.FC<Props> = ({
                 Generate Scheme of Work with AI
               </h3>
               {(selectedYear || selectedTerm) && (
-                <span className="hidden sm:inline-flex items-center gap-1.5 text-[11px] font-medium text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 px-2.5 py-1 rounded-full flex-shrink-0">
+                <span className="hidden sm:inline-flex items-center gap-1.5 text-[11px] font-medium text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-900 px-2.5 py-1 rounded-full flex-shrink-0">
                   <CalendarDays className="w-3 h-3" />
                   {selectedYear?.name}
                   {selectedYear && selectedTerm && " · "}
@@ -854,7 +854,7 @@ const SchemeAIGenerate: React.FC<Props> = ({
                               ? "bg-violet-600 text-white"
                               : isDone
                                 ? "bg-emerald-500 text-white"
-                                : "bg-gray-100 dark:bg-gray-800 text-gray-400"
+                                : "bg-gray-100 dark:bg-gray-900 text-gray-400"
                           }`}
                         >
                           {isDone ? <CheckCircle2 className="w-3 h-3" /> : stepNum}
@@ -903,7 +903,7 @@ const SchemeAIGenerate: React.FC<Props> = ({
                   <div className="w-full text-left">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
                       <div>
-                        <p className="flex items-center gap-1.5 text-sm font-semibold text-gray-800 dark:text-gray-200">
+                        <p className="flex items-center gap-1.5 text-sm font-semibold text-gray-900 dark:text-gray-200">
                           <Layers className="w-4 h-4 text-violet-500" />
                           This subject's Curriculum
                         </p>
@@ -918,7 +918,7 @@ const SchemeAIGenerate: React.FC<Props> = ({
                           value={curriculumSearch}
                           onChange={(e) => setCurriculumSearch(e.target.value)}
                           placeholder="Search elements or criteria..."
-                          className="w-full pl-8 pr-3 py-2 text-xs rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-violet-500"
+                          className="w-full pl-8 pr-3 py-2 text-xs rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-violet-500"
                         />
                       </div>
                     </div>
@@ -955,7 +955,7 @@ const SchemeAIGenerate: React.FC<Props> = ({
                                   className="flex-1 flex items-start justify-between gap-2 text-left"
                                 >
                                   <span>
-                                    <span className="text-sm font-semibold text-gray-800 dark:text-gray-200">
+                                    <span className="text-sm font-semibold text-gray-900 dark:text-gray-200">
                                       Element {el.element_number}: {el.title}
                                     </span>
                                     {el.learning_hours != null && (
@@ -1014,7 +1014,7 @@ const SchemeAIGenerate: React.FC<Props> = ({
                       </div>
 
                       <div className="lg:col-span-1">
-                        <div className="lg:sticky lg:top-4 bg-gray-50 dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700 rounded-2xl p-4 flex flex-col gap-4">
+                        <div className="lg:sticky lg:top-4 bg-gray-50 dark:bg-gray-900/60 border border-gray-200 dark:border-gray-700 rounded-2xl p-4 flex flex-col gap-4">
                           <div>
                             <div className="flex items-center justify-between mb-1.5">
                               <span className="text-xs font-semibold text-gray-600 dark:text-gray-300">
@@ -1098,7 +1098,7 @@ const SchemeAIGenerate: React.FC<Props> = ({
                           className={`w-full flex flex-col items-center justify-center gap-3 py-14 px-6 rounded-2xl border-2 border-dashed transition-colors ${
                             isDraggingFile
                               ? "border-violet-500 bg-violet-50 dark:bg-violet-900/20"
-                              : "border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/40"
+                              : "border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40"
                           }`}
                         >
                           <div className="w-14 h-14 rounded-2xl bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center">
@@ -1124,7 +1124,7 @@ const SchemeAIGenerate: React.FC<Props> = ({
                             {[".docx", ".pdf", ".txt"].map((ext) => (
                               <span
                                 key={ext}
-                                className="text-xs bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400 border border-gray-200 dark:border-gray-700 px-2.5 py-0.5 rounded-full font-medium"
+                                className="text-xs bg-white dark:bg-gray-900 text-gray-500 dark:text-gray-400 border border-gray-200 dark:border-gray-700 px-2.5 py-0.5 rounded-full font-medium"
                               >
                                 {ext}
                               </span>
@@ -1148,7 +1148,7 @@ const SchemeAIGenerate: React.FC<Props> = ({
                           )}
 
                           {!isLoadingStructure && structurePreview?.hasStructure && (
-                            <div className="w-full text-left px-4 py-3 bg-gray-50 dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700 rounded-xl max-h-80 overflow-y-auto">
+                            <div className="w-full text-left px-4 py-3 bg-gray-50 dark:bg-gray-900/60 border border-gray-200 dark:border-gray-700 rounded-xl max-h-80 overflow-y-auto">
                               <p className="flex items-center gap-1.5 text-xs font-semibold text-gray-600 dark:text-gray-300 mb-2">
                                 <ListChecks className="w-3.5 h-3.5" />
                                 {structurePreview.autoSelectedLoNumbers.length > 0
@@ -1170,7 +1170,7 @@ const SchemeAIGenerate: React.FC<Props> = ({
                                     selectedCount > 0 && !allSelected;
                                   return (
                                     <div key={lo.loNumber}>
-                                      <label className="flex items-start gap-2 text-sm font-medium text-gray-800 dark:text-gray-200 cursor-pointer">
+                                      <label className="flex items-start gap-2 text-sm font-medium text-gray-900 dark:text-gray-200 cursor-pointer">
                                         <TriStateCheckbox
                                           checked={allSelected}
                                           indeterminate={someSelected}
@@ -1252,7 +1252,7 @@ const SchemeAIGenerate: React.FC<Props> = ({
                                 setSelectedRefs(new Set());
                                 showToast("File cleared — select another to continue", "success");
                               }}
-                              className="flex-shrink-0 px-4 py-2.5 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 text-sm font-medium rounded-full transition-colors"
+                              className="flex-shrink-0 px-4 py-2.5 bg-gray-100 dark:bg-gray-900 hover:bg-gray-200 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-300 text-sm font-medium rounded-full transition-colors"
                             >
                               Change file
                             </button>
@@ -1273,7 +1273,7 @@ const SchemeAIGenerate: React.FC<Props> = ({
                     </div>
 
                     <div className="lg:col-span-1">
-                      <div className="bg-gray-50 dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700 rounded-2xl p-4 flex flex-col gap-3">
+                      <div className="bg-gray-50 dark:bg-gray-900/60 border border-gray-200 dark:border-gray-700 rounded-2xl p-4 flex flex-col gap-3">
                         <p className="flex items-center gap-1.5 text-sm font-semibold text-gray-700 dark:text-gray-200">
                           <Lightbulb className="w-4 h-4 text-violet-500" />
                           How this works
@@ -1355,7 +1355,7 @@ const SchemeAIGenerate: React.FC<Props> = ({
                           </span>
                         )}
                       </label>
-                      <div className="flex-1 bg-gray-50 dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700 rounded-2xl p-2.5">
+                      <div className="flex-1 bg-gray-50 dark:bg-gray-900/60 border border-gray-200 dark:border-gray-700 rounded-2xl p-2.5">
                         {scheduleSlots.length > 0 ? (
                           <div className="flex flex-col gap-1.5 max-h-[26.5rem] overflow-y-auto pr-1">
                             {scheduleSlots.map((s) => (
@@ -1366,7 +1366,7 @@ const SchemeAIGenerate: React.FC<Props> = ({
                                 className={`w-full flex items-center justify-between gap-2 px-3 py-2 rounded-xl text-xs transition-colors text-left ${
                                   s.skipped
                                     ? "bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/30 border border-amber-200 dark:border-amber-800/50"
-                                    : "bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-violet-50 dark:hover:bg-violet-900/20 border border-gray-200 dark:border-gray-700"
+                                    : "bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-300 hover:bg-violet-50 dark:hover:bg-violet-900/20 border border-gray-200 dark:border-gray-700"
                                 }`}
                               >
                                 <span className="font-semibold flex-shrink-0">Week {s.slot}</span>
@@ -1404,7 +1404,7 @@ const SchemeAIGenerate: React.FC<Props> = ({
                         <button
                           type="button"
                           onClick={() => adjustNumWeeks(-1)}
-                          className="w-9 h-9 flex-shrink-0 flex items-center justify-center rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                          className="w-9 h-9 flex-shrink-0 flex items-center justify-center rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
                           aria-label="Decrease number of weeks"
                         >
                           <Minus className="w-3.5 h-3.5" />
@@ -1416,12 +1416,12 @@ const SchemeAIGenerate: React.FC<Props> = ({
                           value={numWeeks}
                           onChange={(e) => setNumWeeks(e.target.value)}
                           placeholder="Auto"
-                          className="w-full px-3 py-2 text-sm text-center rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
+                          className="w-full px-3 py-2 text-sm text-center rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
                         />
                         <button
                           type="button"
                           onClick={() => adjustNumWeeks(1)}
-                          className="w-9 h-9 flex-shrink-0 flex items-center justify-center rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                          className="w-9 h-9 flex-shrink-0 flex items-center justify-center rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
                           aria-label="Increase number of weeks"
                         >
                           <Plus className="w-3.5 h-3.5" />
@@ -1439,7 +1439,7 @@ const SchemeAIGenerate: React.FC<Props> = ({
                         value={skipWeeks}
                         onChange={(e) => setSkipWeeks(e.target.value)}
                         placeholder="e.g. 8, 16 for midterm breaks"
-                        className="w-full px-3 py-2 text-sm rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-violet-500"
+                        className="w-full px-3 py-2 text-sm rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-violet-500"
                       />
                       {skipWeekNumbers.length > 0 && (
                         <div className="flex flex-wrap gap-1.5 mt-2">
@@ -1500,7 +1500,7 @@ const SchemeAIGenerate: React.FC<Props> = ({
                           ? "Anything you want the AI to emphasize or skip — e.g. 'focus more on practical exercises than theory'"
                           : "If the document didn't extract cleanly (garbled tables, missing sections, scanned text) or you want the AI to emphasize/skip something, say so here — e.g. 'ignore the resources table, it's scrambled' or 'focus more on practical exercises than theory'"
                       }
-                      className="w-full px-3 py-2 text-sm rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-violet-500 resize-none"
+                      className="w-full px-3 py-2 text-sm rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-violet-500 resize-none"
                     />
                   </div>
                 </div>
@@ -1508,7 +1508,7 @@ const SchemeAIGenerate: React.FC<Props> = ({
                 <div className="w-full flex items-center gap-2">
                   <button
                     onClick={() => setWizardStep("curriculum")}
-                    className="flex-shrink-0 inline-flex items-center gap-1.5 px-4 py-2.5 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 text-sm font-medium rounded-full transition-colors"
+                    className="flex-shrink-0 inline-flex items-center gap-1.5 px-4 py-2.5 bg-gray-100 dark:bg-gray-900 hover:bg-gray-200 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-300 text-sm font-medium rounded-full transition-colors"
                   >
                     <ArrowLeft className="w-3.5 h-3.5" />
                     Back
@@ -1546,7 +1546,7 @@ const SchemeAIGenerate: React.FC<Props> = ({
                     {activeSteps.length - jobStatus.stepIndex === 1 ? "" : "s"} remaining
                   </span>
                 </div>
-                <div className="w-full h-1.5 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden mb-6">
+                <div className="w-full h-1.5 bg-gray-100 dark:bg-gray-900 rounded-full overflow-hidden mb-6">
                   <motion.div
                     className="h-full bg-gradient-to-r from-violet-500 to-indigo-500"
                     initial={{ width: 0 }}
@@ -1666,7 +1666,7 @@ const SchemeAIGenerate: React.FC<Props> = ({
                 </p>
                 <button
                   onClick={handleRetry}
-                  className="inline-flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 text-sm font-medium rounded-full transition-colors"
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-gray-900 hover:bg-gray-200 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300 text-sm font-medium rounded-full transition-colors"
                 >
                   <RefreshCcw className="w-4 h-4" />
                   Try Again
