@@ -250,7 +250,7 @@ export const schemeOfWorkApi = {
     academic_year_id: number;
     academic_term_id: number;
     program_id: number;
-    grade_id: number;
+    grade_id: number | "all";
     role?: string;
   }) =>
     apiService.get<{ success: boolean; data: TeacherWithSchemes[] }>(

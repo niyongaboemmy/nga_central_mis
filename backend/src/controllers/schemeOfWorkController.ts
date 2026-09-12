@@ -847,37 +847,43 @@ export const getAllTeachersSchemeOfWork = asyncHandler(
     const { academic_year_id, academic_term_id, program_id, grade_id, role } =
       req.query;
 
-    if (!academic_year_id || !academic_term_id || !program_id || !grade_id) {
+    if (!academic_year_id || !academic_term_id || !program_id) {
       throw new ValidationError(
-        "academic_year_id, academic_term_id, program_id, grade_id are required",
+        "academic_year_id, academic_term_id, program_id are required",
       );
     }
 
     const termId = parseInt(academic_term_id);
-    const gradeId = parseInt(grade_id);
-    const userType = role || "TEACHER";
+    const programId = parseInt(program_id);
+    // "all" (or an omitted grade_id/role) means "don't filter on this dimension" —
+    // the UI defaults to showing every grade and every role in the program.
+    const isAllGrades = !grade_id || grade_id === "all";
+    const gradeId = isAllGrades ? null : parseInt(grade_id);
+    const isAllRoles = !role || role === "ALL";
+    const userType = isAllRoles ? null : role;
 
-    // Get all grades in this program
+    // Get the grade(s) in this program we're reporting on
     const gradesInProgram = await db
       .select({ grade_id: Grade.grade_id })
       .from(Grade)
       .where(
-        and(
-          eq(Grade.program_id, parseInt(program_id)),
-          eq(Grade.grade_id, gradeId),
-        ),
+        isAllGrades
+          ? eq(Grade.program_id, programId)
+          : and(eq(Grade.program_id, programId), eq(Grade.grade_id, gradeId!)),
       );
 
     if (gradesInProgram.length === 0) {
       return successResponse(res, "No grades found for this program", [], 200);
     }
 
-    // Get class groups for this grade (a permanent label, not year-scoped --
+    const gradeIds = gradesInProgram.map((g) => g.grade_id);
+
+    // Get class groups for these grades (a permanent label, not year-scoped --
     // the academic year is applied below when filtering assignments)
     const classGroups = await db
       .select()
       .from(ClassGroup)
-      .where(eq(ClassGroup.grade_id, gradeId));
+      .where(inArray(ClassGroup.grade_id, gradeIds));
 
     if (classGroups.length === 0) {
       return successResponse(
@@ -951,10 +957,12 @@ export const getAllTeachersSchemeOfWork = asyncHandler(
       .from(User)
       .innerJoin(UserProfile, eq(User.user_id, UserProfile.user_id))
       .where(
-        and(
-          inArray(User.user_id, teacherIds),
-          eq(UserProfile.user_type, userType as any),
-        ),
+        isAllRoles
+          ? inArray(User.user_id, teacherIds)
+          : and(
+              inArray(User.user_id, teacherIds),
+              eq(UserProfile.user_type, userType as any),
+            ),
       );
 
     // Get all existing SchemeOfWork records for these assignments

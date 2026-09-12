@@ -12,6 +12,10 @@ import {
   Download,
   FileSpreadsheet,
   FileDown,
+  GraduationCap,
+  Layers,
+  UserCog,
+  SlidersHorizontal,
 } from "lucide-react";
 import { Grade } from "../api/academics";
 import { schemeOfWorkApi, TeacherWithSchemes } from "../api/schemeOfWork";
@@ -85,12 +89,19 @@ const AllTeachersSchemeOfWork: React.FC = () => {
   const [selectedProgram, setSelectedProgram] = useState<number | "">(
     authProgramId || getInitialValue("program", ""),
   );
-  const [selectedGrade, setSelectedGrade] = useState<number | "">(
-    authGradeId || getInitialValue("grade", ""),
+  const [selectedGrade, setSelectedGrade] = useState<number | "all">(
+    authGradeId || getInitialValue("grade", "all"),
   );
-  const [selectedRole, setSelectedRole] = useState(
-    getInitialValue("role", "TEACHER"),
+  const [selectedRole, setSelectedRole] = useState<string>(
+    getInitialValue("role", "ALL"),
   );
+
+  const roleLabels: Record<string, string> = {
+    ALL: "All Roles",
+    TEACHER: "Teacher",
+    STAFF: "Staff",
+    ADMIN: "Admin",
+  };
 
   // Data
   const [teachers, setTeachers] = useState<TeacherWithSchemes[]>([]);
@@ -110,7 +121,7 @@ const AllTeachersSchemeOfWork: React.FC = () => {
   const reportContext = {
     programName: programs.find((p) => p.program_id === selectedProgram)?.name || "All Programs",
     gradeName: grades.find((g) => g.grade_id === selectedGrade)?.name || "All Grades",
-    roleLabel: selectedRole,
+    roleLabel: roleLabels[selectedRole] || selectedRole,
     yearName: selectedYear?.name || "—",
     termName: selectedTerm?.name || "—",
   };
@@ -129,16 +140,16 @@ const AllTeachersSchemeOfWork: React.FC = () => {
   useEffect(() => {
     if (!selectedProgram) {
       setGrades([]);
-      setSelectedGrade("");
+      if (!authGradeId) setSelectedGrade("all");
       return;
     }
     getGrades(selectedProgram as number).then((data) => {
       setGrades(data);
     });
-  }, [selectedProgram, getGrades]);
+  }, [selectedProgram, getGrades, authGradeId]);
 
   const canLoad = Boolean(
-    selectedYearId && selectedTermId && selectedProgram && selectedGrade,
+    selectedYearId && selectedTermId && selectedProgram,
   );
 
   const loadTeachers = useCallback(
@@ -169,7 +180,7 @@ const AllTeachersSchemeOfWork: React.FC = () => {
           academic_year_id: selectedYearId as number,
           academic_term_id: selectedTermId as number,
           program_id: selectedProgram as number,
-          grade_id: selectedGrade as number,
+          grade_id: selectedGrade,
           role: selectedRole,
         });
         const data = (res.data as any)?.data || [];
@@ -362,34 +373,26 @@ const AllTeachersSchemeOfWork: React.FC = () => {
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.08 }}
-        className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 p-4"
+        className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 px-4 py-3"
       >
-        <div className="flex items-center justify-between mb-3">
-          <p className="text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest">
-            Filter by Context
-          </p>
-          <p className="text-[11px] font-medium text-gray-500 dark:text-gray-400">
-            Academic Period:{" "}
-            <span className="text-blue-600 dark:text-blue-400 font-bold">
-              {selectedYear?.name || "—"} / {selectedTerm?.name || "—"}
-            </span>{" "}
-            <span className="text-gray-400">(change in the top bar)</span>
-          </p>
-        </div>
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2.5">
+          <div className="flex items-center gap-1.5 text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest flex-shrink-0">
+            <SlidersHorizontal className="w-3.5 h-3.5" />
+            Filters
+          </div>
+
           {/* Program */}
-          <div>
-            <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1">
-              Program
-            </label>
+          <div className="flex items-center gap-1.5 flex-1 min-w-[150px]">
+            <GraduationCap className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
             <select
               value={selectedProgram}
               onChange={(e) => {
                 setSelectedProgram(Number(e.target.value) || "");
-                if (!authGradeId) setSelectedGrade("");
+                if (!authGradeId) setSelectedGrade("all");
               }}
               disabled={!!authProgramId}
-              className="w-full px-3 py-2 text-sm bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 dark:text-white disabled:opacity-50 disabled:cursor-not-allowed"
+              title="Program"
+              className="w-full px-2.5 py-1.5 text-xs font-medium bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:text-white disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <option value="">Select Program</option>
               {programs.map((p) => (
@@ -401,17 +404,20 @@ const AllTeachersSchemeOfWork: React.FC = () => {
           </div>
 
           {/* Grade */}
-          <div>
-            <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1">
-              Grade / Level
-            </label>
+          <div className="flex items-center gap-1.5 flex-1 min-w-[130px]">
+            <Layers className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
             <select
               value={selectedGrade}
-              onChange={(e) => setSelectedGrade(Number(e.target.value) || "")}
+              onChange={(e) =>
+                setSelectedGrade(
+                  e.target.value === "all" ? "all" : Number(e.target.value),
+                )
+              }
               disabled={!selectedProgram || !!authGradeId}
-              className="w-full px-3 py-2 text-sm bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 dark:text-white disabled:opacity-50 disabled:cursor-not-allowed"
+              title="Grade / Level"
+              className="w-full px-2.5 py-1.5 text-xs font-medium bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:text-white disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <option value="">Select Grade</option>
+              <option value="all">All Grades</option>
               {grades.map((g) => (
                 <option key={g.grade_id} value={g.grade_id}>
                   {g.name}
@@ -421,26 +427,33 @@ const AllTeachersSchemeOfWork: React.FC = () => {
           </div>
 
           {/* Role */}
-          <div>
-            <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1">
-              User Role
-            </label>
+          <div className="flex items-center gap-1.5 flex-1 min-w-[130px]">
+            <UserCog className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
             <select
               value={selectedRole}
               onChange={(e) => setSelectedRole(e.target.value)}
-              className="w-full px-3 py-2 text-sm bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 dark:text-white"
+              title="User Role"
+              className="w-full px-2.5 py-1.5 text-xs font-medium bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:text-white"
             >
+              <option value="ALL">All Roles</option>
               <option value="TEACHER">Teacher</option>
               <option value="STAFF">Staff</option>
               <option value="ADMIN">Admin</option>
             </select>
           </div>
+
+          <p className="text-[11px] font-medium text-gray-400 dark:text-gray-500 flex-shrink-0 ml-auto">
+            <span className="text-blue-600 dark:text-blue-400 font-bold">
+              {selectedYear?.name || "—"} / {selectedTerm?.name || "—"}
+            </span>{" "}
+            <span className="hidden sm:inline">(change in the top bar)</span>
+          </p>
         </div>
 
         {!canLoad && (
-          <p className="mt-3 text-xs text-amber-500 dark:text-amber-400 flex items-center gap-1.5">
+          <p className="mt-2.5 text-xs text-amber-500 dark:text-amber-400 flex items-center gap-1.5">
             <AlertCircle className="w-3.5 h-3.5" />
-            Please select all filters to load data.
+            Select a program to load data.
           </p>
         )}
       </motion.div>

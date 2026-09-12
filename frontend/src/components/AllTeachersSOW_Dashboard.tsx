@@ -534,13 +534,13 @@ const AllTeachersSOW_Dashboard: React.FC<Props> = ({
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="relative w-full max-w-2xl bg-white dark:bg-gray-900/80 rounded-3xl shadow-2xl overflow-hidden border border-gray-100 dark:border-gray-800/50"
+              className="relative w-full max-w-2xl max-h-[85vh] bg-white dark:bg-gray-900 rounded-2xl shadow-2xl overflow-hidden border border-gray-100 dark:border-gray-800/50 flex flex-col"
             >
               {/* Header */}
-              <div className="px-6 py-5 border-b border-gray-100 dark:border-gray-800/50 flex items-center justify-between bg-gray-50 dark:bg-gray-800/50">
-                <div className="flex items-center gap-4">
+              <div className="px-5 py-4 border-b border-gray-100 dark:border-gray-800/50 flex items-center justify-between gap-3 bg-gray-50 dark:bg-gray-800/50 flex-shrink-0">
+                <div className="flex items-center gap-3 min-w-0">
                   <div
-                    className="w-12 h-12 rounded-2xl flex items-center justify-center text-white font-bold shadow-lg"
+                    className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold text-sm flex-shrink-0 shadow-sm"
                     style={{
                       backgroundColor:
                         selectedTeacherForModal.schemes[0]?.subject_color ||
@@ -549,124 +549,127 @@ const AllTeachersSOW_Dashboard: React.FC<Props> = ({
                   >
                     {getInitials(selectedTeacherForModal.full_name)}
                   </div>
-                  <div>
-                    <h2 className="text-lg font-bold text-gray-900 dark:text-white">
+                  <div className="min-w-0">
+                    <h2 className="text-sm font-bold text-gray-900 dark:text-white truncate">
                       {selectedTeacherForModal.full_name}
                     </h2>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">
-                      Select a subject to view details
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      {selectedTeacherForModal.schemes.length} subject
+                      {selectedTeacherForModal.schemes.length !== 1 ? "s" : ""}{" "}
+                      • select one to view details
                     </p>
                   </div>
                 </div>
                 <button
                   onClick={() => setSelectedTeacherForModal(null)}
-                  className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-colors"
+                  className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors flex-shrink-0"
                 >
-                  <X className="w-5 h-5" />
+                  <X className="w-4 h-4" />
                 </button>
               </div>
 
               {/* Subject List */}
-              <div className="p-6 max-h-[60vh] overflow-y-auto">
+              <div className="p-4 overflow-y-auto space-y-2">
                 {selectedTeacherForModal.schemes.length === 0 ? (
                   <div className="text-center py-10">
-                    <BookOpen className="w-12 h-12 text-gray-300 dark:text-gray-700 mx-auto mb-3" />
-                    <p className="text-gray-500 dark:text-gray-400 font-medium">
+                    <BookOpen className="w-10 h-10 text-gray-300 dark:text-gray-700 mx-auto mb-3" />
+                    <p className="text-gray-500 dark:text-gray-400 text-sm font-medium">
                       No subjects assigned
                     </p>
                   </div>
                 ) : (
-                  <div className="grid gap-3">
-                    {selectedTeacherForModal.schemes.map((scheme) => (
+                  selectedTeacherForModal.schemes.map((scheme) => (
+                    <div
+                      key={`${scheme.subject_id}-${scheme.class_group_id}`}
+                      onClick={() =>
+                        navigate(
+                          `/all-teachers-sow/details?user_id=${selectedTeacherForModal.user_id}&subject_id=${scheme.subject_id}&class_group_id=${scheme.class_group_id}&academic_term_id=${scheme.academic_term_id}&name=${encodeURIComponent(selectedTeacherForModal.full_name)}&subject_name=${encodeURIComponent(scheme.subject_name)}`,
+                        )
+                      }
+                      className="group relative flex flex-col sm:flex-row sm:items-start gap-3 pl-4 pr-3 py-3 rounded-xl border border-gray-100 dark:border-gray-800/50 bg-white dark:bg-gray-900/60 hover:border-blue-300 dark:hover:border-blue-700 hover:shadow-md hover:-translate-y-0.5 transition-all cursor-pointer overflow-hidden"
+                    >
+                      {/* Colored accent bar */}
                       <div
-                        key={`${scheme.subject_id}-${scheme.class_group_id}`}
-                        onClick={() =>
-                          navigate(
-                            `/all-teachers-sow/details?user_id=${selectedTeacherForModal.user_id}&subject_id=${scheme.subject_id}&class_group_id=${scheme.class_group_id}&academic_term_id=${scheme.academic_term_id}&name=${encodeURIComponent(selectedTeacherForModal.full_name)}&subject_name=${encodeURIComponent(scheme.subject_name)}`,
-                          )
-                        }
-                        className="group flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-2xl border border-gray-100 dark:border-gray-800/50 bg-white dark:bg-gray-900/80 hover:border-blue-300 dark:hover:border-blue-700 hover:shadow-md transition-all cursor-pointer"
-                      >
-                        <div className="flex items-center gap-3">
-                          <div
-                            className="w-3 h-3 rounded-full flex-shrink-0"
-                            style={{
-                              backgroundColor:
-                                scheme.subject_color || "#3B82F6",
-                            }}
-                          />
-                          <div>
-                            <h3 className="font-bold text-gray-900 dark:text-white text-sm group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
-                              {scheme.subject_name}
-                              {scheme.subject_code && (
-                                <span className="text-gray-400 ml-1">
-                                  ({scheme.subject_code})
-                                </span>
-                              )}
-                            </h3>
-                            <div className="flex flex-wrap items-center gap-3 mt-1 text-xs text-gray-500 dark:text-gray-400">
-                              <span className="flex items-center gap-1">
-                                <Users className="w-3 h-3" />
-                                {scheme.class_group_name}
-                              </span>
+                        className="absolute left-0 top-0 bottom-0 w-1"
+                        style={{
+                          backgroundColor: scheme.subject_color || "#3B82F6",
+                        }}
+                      />
+
+                      {/* Title + meta */}
+                      <div className="min-w-0 flex-1">
+                        <h3 className="font-bold text-gray-900 dark:text-white text-sm leading-snug group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                          {scheme.subject_name}
+                          {scheme.subject_code && (
+                            <span className="text-gray-400 font-medium ml-1">
+                              ({scheme.subject_code})
+                            </span>
+                          )}
+                        </h3>
+                        <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 mt-1 text-xs text-gray-500 dark:text-gray-400">
+                          <span className="flex items-center gap-1 whitespace-nowrap">
+                            <Users className="w-3 h-3" />
+                            {scheme.class_group_name}
+                          </span>
+                          <span className="text-gray-300 dark:text-gray-700">
+                            •
+                          </span>
+                          <span className="flex items-center gap-1 whitespace-nowrap">
+                            <Calendar className="w-3 h-3" />
+                            {scheme.academic_term_name}
+                          </span>
+                          {scheme.entries_count > 0 && (
+                            <>
                               <span className="text-gray-300 dark:text-gray-700">
                                 •
                               </span>
-                              <span className="flex items-center gap-1">
-                                <Calendar className="w-3 h-3" />
-                                {scheme.academic_term_name}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center justify-between sm:justify-end gap-4 w-full sm:w-auto mt-2 sm:mt-0 pt-3 sm:pt-0 border-t border-gray-50 sm:border-t-0 dark:border-gray-800/50">
-                          <div className="flex items-center gap-3">
-                            <div className="flex items-center gap-2">
-                              <span
-                                className={`inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded-xl uppercase tracking-tighter border ${
-                                  scheme.validation_status === "APPROVED"
-                                    ? "bg-emerald-50 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400 border-emerald-100 dark:border-emerald-800"
-                                    : scheme.validation_status === "REJECTED"
-                                      ? "bg-rose-50 dark:bg-rose-900/40 text-rose-600 dark:text-rose-400 border-rose-100 dark:border-rose-800"
-                                      : "bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400 border-gray-100 dark:border-gray-700 opacity-60"
-                                }`}
-                              >
-                                {scheme.validation_status === "APPROVED"
-                                  ? "Approved"
-                                  : scheme.validation_status === "REJECTED"
-                                    ? "Rejected"
-                                    : "Not Validated"}
-                              </span>
-                              <span
-                                className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full border ${
-                                  scheme.status === "submitted"
-                                    ? "bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800"
-                                    : "bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400 border-rose-200 dark:border-rose-800"
-                                }`}
-                              >
-                                {scheme.status === "submitted" ? (
-                                  <CheckCircle2 className="w-3 h-3" />
-                                ) : (
-                                  <AlertTriangle className="w-3 h-3" />
-                                )}
-                                {scheme.status === "submitted"
-                                  ? "Submitted"
-                                  : "Pending"}
-                              </span>
-                            </div>
-                            {scheme.entries_count > 0 && (
-                              <span className="flex items-center gap-1 text-xs text-gray-400 font-medium">
+                              <span className="flex items-center gap-1 whitespace-nowrap">
                                 <FileText className="w-3 h-3" />
-                                {scheme.entries_count}
+                                {scheme.entries_count} week
+                                {scheme.entries_count !== 1 ? "s" : ""}
                               </span>
-                            )}
-                          </div>
-                          <ChevronRight className="w-4 h-4 text-gray-300 dark:text-gray-600 group-hover:text-blue-500 transition-colors" />
+                            </>
+                          )}
                         </div>
                       </div>
-                    ))}
-                  </div>
+
+                      {/* Badges + chevron */}
+                      <div className="flex items-center flex-wrap gap-1.5 flex-shrink-0 sm:pt-0.5">
+                        <span
+                          className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-tight whitespace-nowrap border ${
+                            scheme.validation_status === "APPROVED"
+                              ? "bg-emerald-50 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400 border-emerald-100 dark:border-emerald-800"
+                              : scheme.validation_status === "REJECTED"
+                                ? "bg-rose-50 dark:bg-rose-900/40 text-rose-600 dark:text-rose-400 border-rose-100 dark:border-rose-800"
+                                : "bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400 border-gray-100 dark:border-gray-700"
+                          }`}
+                        >
+                          {scheme.validation_status === "APPROVED"
+                            ? "Approved"
+                            : scheme.validation_status === "REJECTED"
+                              ? "Rejected"
+                              : "Not Validated"}
+                        </span>
+                        <span
+                          className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap border ${
+                            scheme.status === "submitted"
+                              ? "bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800"
+                              : "bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400 border-rose-200 dark:border-rose-800"
+                          }`}
+                        >
+                          {scheme.status === "submitted" ? (
+                            <CheckCircle2 className="w-3 h-3" />
+                          ) : (
+                            <AlertTriangle className="w-3 h-3" />
+                          )}
+                          {scheme.status === "submitted"
+                            ? "Submitted"
+                            : "Pending"}
+                        </span>
+                        <ChevronRight className="w-4 h-4 text-gray-300 dark:text-gray-600 group-hover:text-blue-500 group-hover:translate-x-0.5 transition-all flex-shrink-0" />
+                      </div>
+                    </div>
+                  ))
                 )}
               </div>
             </motion.div>
