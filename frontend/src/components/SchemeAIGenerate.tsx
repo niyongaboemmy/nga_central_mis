@@ -1,6 +1,22 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
+  format,
+  startOfMonth,
+  endOfMonth,
+  startOfWeek,
+  endOfWeek,
+  addDays,
+  addMonths,
+  subMonths,
+  addWeeks,
+  isSameMonth,
+  isSameDay,
+  isToday,
+  parseISO,
+  isValid as isValidDate,
+} from "date-fns";
+import {
   Sparkles,
   FileText,
   Loader2,
@@ -19,9 +35,14 @@ import {
   BookOpen,
   ChevronDown,
   ChevronRight,
+  ChevronLeft,
   Layers,
   CheckSquare,
   Square,
+  Plus,
+  Minus,
+  X,
+  CalendarRange,
 } from "lucide-react";
 import {
   schemeOfWorkApi,
@@ -81,6 +102,107 @@ const TriStateCheckbox: React.FC<{
       onChange={onChange}
       className={className || "mt-0.5 accent-violet-600"}
     />
+  );
+};
+
+/** A self-contained month-grid date picker, styled to match the wizard's violet theme — replaces
+ * the plain native <input type="date"> on the "Scheme of Work" step with something that actually
+ * feels like part of a scheduling tool. */
+const MonthCalendarPicker: React.FC<{
+  value: string;
+  onChange: (isoDate: string) => void;
+}> = ({ value, onChange }) => {
+  const selected = value ? parseISO(value) : null;
+  const [viewMonth, setViewMonth] = useState<Date>(
+    selected && isValidDate(selected) ? selected : new Date(),
+  );
+
+  useEffect(() => {
+    if (selected && isValidDate(selected)) setViewMonth(selected);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value]);
+
+  const gridStart = startOfWeek(startOfMonth(viewMonth));
+  const gridEnd = endOfWeek(endOfMonth(viewMonth));
+  const days: Date[] = [];
+  for (let d = gridStart; d <= gridEnd; d = addDays(d, 1)) days.push(d);
+
+  const goToday = () => {
+    const today = new Date();
+    setViewMonth(today);
+    onChange(format(today, "yyyy-MM-dd"));
+  };
+
+  return (
+    <div className="w-full bg-gray-50 dark:bg-slate-800/60 border border-gray-200 dark:border-slate-700 rounded-2xl p-4">
+      <div className="flex items-center justify-between mb-3">
+        <button
+          type="button"
+          onClick={() => setViewMonth((m) => subMonths(m, 1))}
+          className="w-7 h-7 flex items-center justify-center rounded-full text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-slate-700 transition-colors"
+          aria-label="Previous month"
+        >
+          <ChevronLeft className="w-4 h-4" />
+        </button>
+        <span className="text-sm font-semibold text-gray-800 dark:text-gray-200">
+          {format(viewMonth, "MMMM yyyy")}
+        </span>
+        <button
+          type="button"
+          onClick={() => setViewMonth((m) => addMonths(m, 1))}
+          className="w-7 h-7 flex items-center justify-center rounded-full text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-slate-700 transition-colors"
+          aria-label="Next month"
+        >
+          <ChevronRight className="w-4 h-4" />
+        </button>
+      </div>
+
+      <div className="grid grid-cols-7 gap-1 mb-1">
+        {["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map((d) => (
+          <div
+            key={d}
+            className="text-center text-[10px] font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500 py-1"
+          >
+            {d}
+          </div>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-7 gap-1">
+        {days.map((day) => {
+          const inMonth = isSameMonth(day, viewMonth);
+          const isSelected = selected && isValidDate(selected) && isSameDay(day, selected);
+          const isCurrentDay = isToday(day);
+          return (
+            <button
+              type="button"
+              key={day.toISOString()}
+              onClick={() => onChange(format(day, "yyyy-MM-dd"))}
+              className={`relative h-8 rounded-lg text-xs font-medium transition-colors ${
+                isSelected
+                  ? "bg-violet-600 text-white shadow-sm shadow-violet-500/40"
+                  : inMonth
+                    ? "text-gray-700 dark:text-gray-200 hover:bg-violet-100 dark:hover:bg-violet-900/30"
+                    : "text-gray-300 dark:text-gray-600 hover:bg-gray-100 dark:hover:bg-slate-700/40"
+              }`}
+            >
+              {format(day, "d")}
+              {isCurrentDay && !isSelected && (
+                <span className="absolute bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-violet-500" />
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      <button
+        type="button"
+        onClick={goToday}
+        className="w-full mt-3 text-[11px] font-medium text-violet-600 dark:text-violet-400 hover:underline"
+      >
+        Jump to today
+      </button>
+    </div>
   );
 };
 
@@ -312,6 +434,34 @@ const SchemeAIGenerate: React.FC<Props> = ({
     [existingElements],
   );
 
+  const skipWeekNumbers = useMemo(
+    () =>
+      skipWeeks
+        .split(/[,\s]+/)
+        .map((t) => parseInt(t, 10))
+        .filter((n) => Number.isInteger(n) && n > 0),
+    [skipWeeks],
+  );
+
+  const removeSkipWeek = (weekNum: number) => {
+    setSkipWeeks(skipWeekNumbers.filter((w) => w !== weekNum).join(", "));
+  };
+
+  const adjustNumWeeks = (delta: number) => {
+    const current = parseInt(numWeeks, 10) || 0;
+    const next = Math.min(52, Math.max(1, current + delta));
+    setNumWeeks(String(next));
+  };
+
+  const scheduleEndDate = useMemo(() => {
+    const start = startDate ? parseISO(startDate) : null;
+    const weeks = parseInt(numWeeks, 10);
+    if (!start || !isValidDate(start) || !Number.isInteger(weeks) || weeks <= 0) {
+      return null;
+    }
+    return addWeeks(start, weeks);
+  }, [startDate, numWeeks]);
+
   const pollStatus = (jobId: string) => {
     pollRef.current = setInterval(async () => {
       try {
@@ -366,6 +516,12 @@ const SchemeAIGenerate: React.FC<Props> = ({
       return;
     }
     setWizardStep("generate");
+    showToast(
+      hasCurriculum
+        ? `${selectedCriteriaRefs.size} performance criteria confirmed — set the schedule to continue`
+        : "Curriculum confirmed — set the schedule to continue",
+      "success",
+    );
   };
 
   const handleGenerate = async () => {
@@ -464,15 +620,25 @@ const SchemeAIGenerate: React.FC<Props> = ({
 
   const showWizardChrome = !jobStatus;
 
+  // The card widens as the wizard progresses — Step 1's curriculum picker and Step 2's calendar
+  // layout both benefit from more breathing room than the compact progress/done/error states need.
+  const containerWidthClass = needsCurriculumReview
+    ? "max-w-5xl mx-auto"
+    : !jobStatus && wizardStep === "generate"
+      ? "max-w-4xl mx-auto"
+      : !jobStatus && wizardStep === "curriculum"
+        ? "max-w-3xl mx-auto"
+        : "max-w-2xl mx-auto";
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -10 }}
       transition={{ duration: 0.2 }}
-      className={needsCurriculumReview ? "max-w-4xl mx-auto" : "max-w-xl mx-auto"}
+      className={containerWidthClass}
     >
-      <div className="relative overflow-hidden py-10 px-8 bg-white dark:bg-slate-900 border-2 border-violet-100 dark:border-violet-900/40 rounded-3xl">
+      <div className="relative overflow-hidden py-10 px-8 sm:px-10 bg-white dark:bg-slate-900 border-2 border-violet-100 dark:border-violet-900/40 rounded-3xl">
         <div className="absolute -top-16 -right-16 w-40 h-40 bg-violet-500/10 rounded-full blur-3xl" />
         <div className="absolute -bottom-16 -left-16 w-40 h-40 bg-indigo-500/10 rounded-full blur-3xl" />
 
@@ -573,7 +739,7 @@ const SchemeAIGenerate: React.FC<Props> = ({
                       </button>
                     </div>
 
-                    <div className="w-full flex flex-col gap-2 max-h-80 overflow-y-auto pr-1">
+                    <div className="w-full flex flex-col gap-2 max-h-[26rem] overflow-y-auto pr-1">
                       {existingElements!.map((el) => {
                         const criteria = el.criteria || [];
                         const keys = criteria.map((c) => `${el.competency_id}:${c.criteria_id}`);
@@ -847,48 +1013,98 @@ const SchemeAIGenerate: React.FC<Props> = ({
                   </p>
                 </div>
 
-                <div className="w-full grid grid-cols-1 sm:grid-cols-2 gap-3 mb-5 text-left">
-                  <div>
+                <div className="w-full grid grid-cols-1 lg:grid-cols-5 gap-6 mb-5 text-left">
+                  <div className="lg:col-span-3">
                     <label className="flex items-center gap-1.5 text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1.5">
                       <CalendarDays className="w-3.5 h-3.5" />
                       Start Date
                     </label>
-                    <input
-                      type="date"
-                      value={startDate}
-                      onChange={(e) => setStartDate(e.target.value)}
-                      className="w-full px-3 py-2 text-sm rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
-                    />
+                    <MonthCalendarPicker value={startDate} onChange={setStartDate} />
                   </div>
-                  <div>
-                    <label className="flex items-center gap-1.5 text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1.5">
-                      <ListOrdered className="w-3.5 h-3.5" />
-                      Number of Weeks
-                    </label>
-                    <input
-                      type="number"
-                      min={1}
-                      max={52}
-                      value={numWeeks}
-                      onChange={(e) => setNumWeeks(e.target.value)}
-                      placeholder="Auto"
-                      className="w-full px-3 py-2 text-sm rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
-                    />
+
+                  <div className="lg:col-span-2 flex flex-col gap-4">
+                    <div>
+                      <label className="flex items-center gap-1.5 text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1.5">
+                        <ListOrdered className="w-3.5 h-3.5" />
+                        Number of Weeks
+                      </label>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => adjustNumWeeks(-1)}
+                          className="w-9 h-9 flex-shrink-0 flex items-center justify-center rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors"
+                          aria-label="Decrease number of weeks"
+                        >
+                          <Minus className="w-3.5 h-3.5" />
+                        </button>
+                        <input
+                          type="number"
+                          min={1}
+                          max={52}
+                          value={numWeeks}
+                          onChange={(e) => setNumWeeks(e.target.value)}
+                          placeholder="Auto"
+                          className="w-full px-3 py-2 text-sm text-center rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => adjustNumWeeks(1)}
+                          className="w-9 h-9 flex-shrink-0 flex items-center justify-center rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors"
+                          aria-label="Increase number of weeks"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="flex items-center gap-1.5 text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1.5">
+                        <SkipForward className="w-3.5 h-3.5" />
+                        Weeks to Skip <span className="font-normal text-gray-400">(optional)</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={skipWeeks}
+                        onChange={(e) => setSkipWeeks(e.target.value)}
+                        placeholder="e.g. 8, 16 for midterm breaks"
+                        className="w-full px-3 py-2 text-sm rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-gray-900 dark:text-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-violet-500"
+                      />
+                      {skipWeekNumbers.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5 mt-2">
+                          {skipWeekNumbers.map((w) => (
+                            <span
+                              key={w}
+                              className="inline-flex items-center gap-1 text-[11px] font-medium bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800/50 pl-2 pr-1 py-0.5 rounded-full"
+                            >
+                              Week {w}
+                              <button
+                                type="button"
+                                onClick={() => removeSkipWeek(w)}
+                                className="w-3.5 h-3.5 flex items-center justify-center rounded-full hover:bg-amber-200/60 dark:hover:bg-amber-800/60"
+                                aria-label={`Remove week ${w} from skip list`}
+                              >
+                                <X className="w-2.5 h-2.5" />
+                              </button>
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {scheduleEndDate && (
+                      <div className="flex items-start gap-2 px-3 py-2.5 bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-800/50 rounded-xl">
+                        <CalendarRange className="w-4 h-4 text-violet-600 dark:text-violet-400 flex-shrink-0 mt-0.5" />
+                        <p className="text-xs text-violet-700 dark:text-violet-300">
+                          Runs <span className="font-semibold">{format(parseISO(startDate), "d MMM yyyy")}</span> to{" "}
+                          <span className="font-semibold">{format(scheduleEndDate, "d MMM yyyy")}</span>
+                          {skipWeekNumbers.length > 0 &&
+                            ` — skipping week${skipWeekNumbers.length > 1 ? "s" : ""} ${skipWeekNumbers.join(", ")}`}
+                        </p>
+                      </div>
+                    )}
                   </div>
-                  <div className="sm:col-span-2">
-                    <label className="flex items-center gap-1.5 text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1.5">
-                      <SkipForward className="w-3.5 h-3.5" />
-                      Weeks to Skip <span className="font-normal text-gray-400">(optional)</span>
-                    </label>
-                    <input
-                      type="text"
-                      value={skipWeeks}
-                      onChange={(e) => setSkipWeeks(e.target.value)}
-                      placeholder="e.g. 8, 16 for midterm breaks — leave blank to use all weeks"
-                      className="w-full px-3 py-2 text-sm rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-gray-900 dark:text-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-violet-500"
-                    />
-                  </div>
-                  <div className="sm:col-span-2">
+
+                  <div className="lg:col-span-5">
                     <label className="flex items-center gap-1.5 text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1.5">
                       <MessageSquarePlus className="w-3.5 h-3.5" />
                       Notes for the AI{" "}
