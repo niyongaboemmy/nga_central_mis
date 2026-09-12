@@ -43,6 +43,8 @@ import {
   Minus,
   X,
   CalendarRange,
+  Search,
+  Lightbulb,
 } from "lucide-react";
 import {
   schemeOfWorkApi,
@@ -107,18 +109,29 @@ const TriStateCheckbox: React.FC<{
 
 /** A self-contained month-grid date picker, styled to match the wizard's violet theme — replaces
  * the plain native <input type="date"> on the "Scheme of Work" step with something that actually
- * feels like part of a scheduling tool. */
+ * feels like part of a scheduling tool. When `scheduleMap` is given (built from the teacher's
+ * chosen start date / week count / skip list), it also renders a live preview of exactly which
+ * days become each teaching week and which weeks are being skipped. */
 const MonthCalendarPicker: React.FC<{
   value: string;
   onChange: (isoDate: string) => void;
-}> = ({ value, onChange }) => {
+  scheduleMap?: Map<string, ScheduleSlot>;
+  scheduleSlots?: ScheduleSlot[];
+}> = ({ value, onChange, scheduleMap, scheduleSlots }) => {
   const selected = value ? parseISO(value) : null;
+  // The actual first teaching week starts on the Monday on/after the chosen date (see
+  // computeWeekDates on the backend) — jump the calendar there rather than to the raw picked
+  // date, so a Wednesday start date doesn't land the user on a month with no highlighted weeks.
+  const firstWeekMonth = (d: Date) => {
+    const dow = d.getDay();
+    return dow === 1 ? d : addDays(d, (1 - dow + 7) % 7);
+  };
   const [viewMonth, setViewMonth] = useState<Date>(
-    selected && isValidDate(selected) ? selected : new Date(),
+    selected && isValidDate(selected) ? firstWeekMonth(selected) : new Date(),
   );
 
   useEffect(() => {
-    if (selected && isValidDate(selected)) setViewMonth(selected);
+    if (selected && isValidDate(selected)) setViewMonth(firstWeekMonth(selected));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value]);
 
@@ -132,6 +145,10 @@ const MonthCalendarPicker: React.FC<{
     setViewMonth(today);
     onChange(format(today, "yyyy-MM-dd"));
   };
+
+  const jumpToSlot = (slot: ScheduleSlot) => setViewMonth(slot.start);
+
+  const hasSchedule = !!scheduleSlots && scheduleSlots.length > 0;
 
   return (
     <div className="w-full bg-gray-50 dark:bg-slate-800/60 border border-gray-200 dark:border-slate-700 rounded-2xl p-4">
@@ -170,23 +187,53 @@ const MonthCalendarPicker: React.FC<{
 
       <div className="grid grid-cols-7 gap-1">
         {days.map((day) => {
+          const dateKey = format(day, "yyyy-MM-dd");
           const inMonth = isSameMonth(day, viewMonth);
           const isSelected = selected && isValidDate(selected) && isSameDay(day, selected);
           const isCurrentDay = isToday(day);
+          const info = scheduleMap?.get(dateKey);
+          const isSlotStart = !!info && isSameDay(day, info.start);
+
+          let cellClasses =
+            "relative h-11 rounded-lg flex flex-col items-center justify-center gap-0.5 text-xs font-medium transition-colors ";
+          if (isSelected) {
+            cellClasses += "bg-violet-600 text-white shadow-sm shadow-violet-500/40";
+          } else if (info) {
+            cellClasses += info.skipped
+              ? "bg-amber-100 dark:bg-amber-900/25 text-amber-800 dark:text-amber-300 hover:bg-amber-200 dark:hover:bg-amber-900/40"
+              : "bg-violet-100 dark:bg-violet-900/25 text-violet-800 dark:text-violet-200 hover:bg-violet-200 dark:hover:bg-violet-900/40";
+          } else if (inMonth) {
+            cellClasses += "text-gray-700 dark:text-gray-200 hover:bg-violet-50 dark:hover:bg-violet-900/20";
+          } else {
+            cellClasses += "text-gray-300 dark:text-gray-600 hover:bg-gray-100 dark:hover:bg-slate-700/40";
+          }
+
           return (
             <button
               type="button"
-              key={day.toISOString()}
-              onClick={() => onChange(format(day, "yyyy-MM-dd"))}
-              className={`relative h-8 rounded-lg text-xs font-medium transition-colors ${
-                isSelected
-                  ? "bg-violet-600 text-white shadow-sm shadow-violet-500/40"
-                  : inMonth
-                    ? "text-gray-700 dark:text-gray-200 hover:bg-violet-100 dark:hover:bg-violet-900/30"
-                    : "text-gray-300 dark:text-gray-600 hover:bg-gray-100 dark:hover:bg-slate-700/40"
-              }`}
+              key={dateKey}
+              onClick={() => onChange(dateKey)}
+              title={
+                info
+                  ? `Week ${info.slot}${info.skipped ? " — skipped" : ""}: ${format(info.start, "d MMM")} – ${format(info.end, "d MMM")}`
+                  : undefined
+              }
+              className={cellClasses}
             >
-              {format(day, "d")}
+              <span>{format(day, "d")}</span>
+              {isSlotStart && (
+                <span
+                  className={`text-[8px] font-bold leading-none tracking-wide ${
+                    isSelected
+                      ? "text-white/90"
+                      : info!.skipped
+                        ? "text-amber-600 dark:text-amber-400"
+                        : "text-violet-600 dark:text-violet-400"
+                  }`}
+                >
+                  {info!.skipped ? "SKIP" : `W${info!.slot}`}
+                </span>
+              )}
               {isCurrentDay && !isSelected && (
                 <span className="absolute bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-violet-500" />
               )}
@@ -195,18 +242,68 @@ const MonthCalendarPicker: React.FC<{
         })}
       </div>
 
-      <button
-        type="button"
-        onClick={goToday}
-        className="w-full mt-3 text-[11px] font-medium text-violet-600 dark:text-violet-400 hover:underline"
-      >
-        Jump to today
-      </button>
+      <div className="flex items-center justify-between mt-3 gap-3">
+        <button
+          type="button"
+          onClick={goToday}
+          className="text-[11px] font-medium text-violet-600 dark:text-violet-400 hover:underline"
+        >
+          Jump to today
+        </button>
+        {hasSchedule && (
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => jumpToSlot(scheduleSlots![0])}
+              className="text-[11px] font-medium text-gray-500 dark:text-gray-400 hover:text-violet-600 dark:hover:text-violet-400 hover:underline"
+            >
+              First week
+            </button>
+            <span className="text-gray-300 dark:text-gray-600">·</span>
+            <button
+              type="button"
+              onClick={() => jumpToSlot(scheduleSlots![scheduleSlots!.length - 1])}
+              className="text-[11px] font-medium text-gray-500 dark:text-gray-400 hover:text-violet-600 dark:hover:text-violet-400 hover:underline"
+            >
+              Last week
+            </button>
+          </div>
+        )}
+      </div>
+
+      {hasSchedule && (
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 mt-3 pt-3 border-t border-gray-200 dark:border-slate-700 text-[11px] text-gray-500 dark:text-gray-400">
+          <span className="flex items-center gap-1.5">
+            <span className="w-2.5 h-2.5 rounded bg-violet-600" /> Start date
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="w-2.5 h-2.5 rounded bg-violet-100 dark:bg-violet-900/50 border border-violet-300 dark:border-violet-700" />{" "}
+            Scheme week
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="w-2.5 h-2.5 rounded bg-amber-100 dark:bg-amber-900/50 border border-amber-300 dark:border-amber-700" />{" "}
+            Skipped week
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-violet-500" /> Today
+          </span>
+        </div>
+      )}
     </div>
   );
 };
 
 type WizardStep = "curriculum" | "generate";
+
+/** One Mon-Fri teaching week slot in the scheduled range, as the backend will actually generate
+ * it (see computeWeekDates) — lets the calendar preview show exactly which days become "Week N"
+ * and which weeks the teacher chose to skip. */
+interface ScheduleSlot {
+  slot: number;
+  start: Date;
+  end: Date;
+  skipped: boolean;
+}
 
 const SchemeAIGenerate: React.FC<Props> = ({
   subjectId,
@@ -243,6 +340,8 @@ const SchemeAIGenerate: React.FC<Props> = ({
   // to prepare for this term. Defaults to "everything selected".
   const [selectedCriteriaRefs, setSelectedCriteriaRefs] = useState<Set<string>>(new Set());
   const [expandedElements, setExpandedElements] = useState<Set<number>>(new Set());
+  const [curriculumSearch, setCurriculumSearch] = useState("");
+  const [isDraggingFile, setIsDraggingFile] = useState(false);
 
   const [wizardStep, setWizardStep] = useState<WizardStep>("curriculum");
   const [wantsCurriculumGen, setWantsCurriculumGen] = useState(true);
@@ -323,9 +422,7 @@ const SchemeAIGenerate: React.FC<Props> = ({
     };
   }, [academicTermId]);
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const selected = e.target.files?.[0];
-    if (!selected) return;
+  const processSelectedFile = async (selected: File) => {
     setFile(selected);
     setStructurePreview(null);
     setSelectedRefs(new Set());
@@ -361,6 +458,23 @@ const SchemeAIGenerate: React.FC<Props> = ({
     } finally {
       setIsLoadingStructure(false);
     }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selected = e.target.files?.[0];
+    if (selected) processSelectedFile(selected);
+  };
+
+  const handleFileDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDraggingFile(false);
+    const dropped = e.dataTransfer.files?.[0];
+    if (!dropped) return;
+    if (!/\.(docx|pdf|txt)$/i.test(dropped.name)) {
+      showToast("Only .docx, .pdf, and .txt files are supported", "error");
+      return;
+    }
+    processSelectedFile(dropped);
   };
 
   const toggleContentItem = (loNumber: number, itemIndex: number) => {
@@ -434,6 +548,20 @@ const SchemeAIGenerate: React.FC<Props> = ({
     [existingElements],
   );
 
+  const filteredElements = useMemo(() => {
+    const all = existingElements || [];
+    const query = curriculumSearch.trim().toLowerCase();
+    if (!query) return all;
+    return all.filter((el) => {
+      if (el.title.toLowerCase().includes(query)) return true;
+      return (el.criteria || []).some(
+        (c) =>
+          c.criteria_number.toLowerCase().includes(query) ||
+          c.description.toLowerCase().includes(query),
+      );
+    });
+  }, [existingElements, curriculumSearch]);
+
   const skipWeekNumbers = useMemo(
     () =>
       skipWeeks
@@ -445,6 +573,16 @@ const SchemeAIGenerate: React.FC<Props> = ({
 
   const removeSkipWeek = (weekNum: number) => {
     setSkipWeeks(skipWeekNumbers.filter((w) => w !== weekNum).join(", "));
+  };
+
+  const toggleSkipWeek = (weekNum: number) => {
+    if (skipWeekNumbers.includes(weekNum)) {
+      removeSkipWeek(weekNum);
+      showToast(`Week ${weekNum} added back to the teaching schedule`, "success");
+    } else {
+      setSkipWeeks([...skipWeekNumbers, weekNum].sort((a, b) => a - b).join(", "));
+      showToast(`Week ${weekNum} marked as skipped`, "success");
+    }
   };
 
   const adjustNumWeeks = (delta: number) => {
@@ -461,6 +599,42 @@ const SchemeAIGenerate: React.FC<Props> = ({
     }
     return addWeeks(start, weeks);
   }, [startDate, numWeeks]);
+
+  // The exact Mon-Fri slots the backend will generate (see computeWeekDates: anchor snaps forward
+  // to the next Monday, then each week is 5 consecutive days) — drives the calendar's week bands.
+  const scheduleSlots = useMemo<ScheduleSlot[]>(() => {
+    const start = startDate ? parseISO(startDate) : null;
+    const weeks = parseInt(numWeeks, 10);
+    if (!start || !isValidDate(start) || !Number.isInteger(weeks) || weeks <= 0) return [];
+
+    const dow = start.getDay();
+    const anchor = dow === 1 ? start : addDays(start, (1 - dow + 7) % 7);
+    const skipSet = new Set(skipWeekNumbers);
+    const cap = Math.min(weeks, 52);
+    const slots: ScheduleSlot[] = [];
+    for (let i = 0; i < cap; i++) {
+      const slotStart = addDays(anchor, i * 7);
+      slots.push({
+        slot: i + 1,
+        start: slotStart,
+        end: addDays(slotStart, 4),
+        skipped: skipSet.has(i + 1),
+      });
+    }
+    return slots;
+  }, [startDate, numWeeks, skipWeekNumbers]);
+
+  const scheduleByDate = useMemo(() => {
+    const map = new Map<string, ScheduleSlot>();
+    for (const s of scheduleSlots) {
+      for (let d = s.start; d <= s.end; d = addDays(d, 1)) {
+        map.set(format(d, "yyyy-MM-dd"), s);
+      }
+    }
+    return map;
+  }, [scheduleSlots]);
+
+  const skippedWeekCount = scheduleSlots.filter((s) => s.skipped).length;
 
   const pollStatus = (jobId: string) => {
     pollRef.current = setInterval(async () => {
@@ -620,15 +794,14 @@ const SchemeAIGenerate: React.FC<Props> = ({
 
   const showWizardChrome = !jobStatus;
 
-  // The card widens as the wizard progresses — Step 1's curriculum picker and Step 2's calendar
-  // layout both benefit from more breathing room than the compact progress/done/error states need.
+  // Step 1 and Step 2 stretch to the page's full content width (they use two-column layouts that
+  // need the room); the compact progress/done/error states stay centered and narrower since they
+  // hold nothing but a short status message.
   const containerWidthClass = needsCurriculumReview
     ? "max-w-5xl mx-auto"
-    : !jobStatus && wizardStep === "generate"
-      ? "max-w-4xl mx-auto"
-      : !jobStatus && wizardStep === "curriculum"
-        ? "max-w-3xl mx-auto"
-        : "max-w-2xl mx-auto";
+    : !jobStatus && (wizardStep === "generate" || wizardStep === "curriculum")
+      ? "w-full"
+      : "max-w-2xl mx-auto";
 
   return (
     <motion.div
@@ -711,287 +884,412 @@ const SchemeAIGenerate: React.FC<Props> = ({
                   </div>
                 ) : hasCurriculum ? (
                   <div className="w-full text-left">
-                    <div className="flex items-center justify-between mb-3">
-                      <p className="flex items-center gap-1.5 text-xs font-semibold text-gray-600 dark:text-gray-300">
-                        <Layers className="w-3.5 h-3.5 text-violet-500" />
-                        This subject's Curriculum — pick what to prepare for
-                      </p>
-                      <span className="text-[11px] font-medium text-violet-600 dark:text-violet-400 bg-violet-50 dark:bg-violet-900/30 px-2 py-0.5 rounded-full">
-                        {selectedCriteriaRefs.size}/{totalCriteriaCount} criteria
-                      </span>
-                    </div>
-
-                    <div className="flex items-center gap-2 mb-3">
-                      <button
-                        type="button"
-                        onClick={() => selectAllElements(true)}
-                        className="inline-flex items-center gap-1 text-[11px] font-medium text-violet-600 dark:text-violet-400 hover:underline"
-                      >
-                        <CheckSquare className="w-3 h-3" /> Select all
-                      </button>
-                      <span className="text-gray-300 dark:text-gray-600">·</span>
-                      <button
-                        type="button"
-                        onClick={() => selectAllElements(false)}
-                        className="inline-flex items-center gap-1 text-[11px] font-medium text-gray-500 dark:text-gray-400 hover:underline"
-                      >
-                        <Square className="w-3 h-3" /> Clear all
-                      </button>
-                    </div>
-
-                    <div className="w-full flex flex-col gap-2 max-h-[26rem] overflow-y-auto pr-1">
-                      {existingElements!.map((el) => {
-                        const criteria = el.criteria || [];
-                        const keys = criteria.map((c) => `${el.competency_id}:${c.criteria_id}`);
-                        const selectedCount = keys.filter((k) => selectedCriteriaRefs.has(k)).length;
-                        const allSelected = keys.length > 0 && selectedCount === keys.length;
-                        const someSelected = selectedCount > 0 && !allSelected;
-                        const isExpanded = expandedElements.has(el.competency_id);
-                        return (
-                          <div
-                            key={el.competency_id}
-                            className={`rounded-xl border transition-colors ${
-                              selectedCount > 0
-                                ? "border-violet-200 dark:border-violet-800/60 bg-violet-50/50 dark:bg-violet-900/10"
-                                : "border-gray-200 dark:border-slate-700"
-                            }`}
-                          >
-                            <div className="flex items-start gap-2 px-3 py-2.5">
-                              <TriStateCheckbox
-                                checked={allSelected}
-                                indeterminate={someSelected}
-                                onChange={() => toggleWholeElement(el)}
-                                className="mt-1 accent-violet-600"
-                              />
-                              <button
-                                type="button"
-                                onClick={() => toggleElementExpanded(el.competency_id)}
-                                className="flex-1 flex items-start justify-between gap-2 text-left"
-                              >
-                                <span>
-                                  <span className="text-sm font-semibold text-gray-800 dark:text-gray-200">
-                                    Element {el.element_number}: {el.title}
-                                  </span>
-                                  {el.learning_hours != null && (
-                                    <span className="ml-1.5 text-xs font-normal text-gray-400">
-                                      ({el.learning_hours} learning hrs)
-                                    </span>
-                                  )}
-                                  <span className="block text-[11px] text-gray-400 mt-0.5">
-                                    {selectedCount}/{keys.length} criteria selected
-                                  </span>
-                                </span>
-                                {isExpanded ? (
-                                  <ChevronDown className="w-4 h-4 text-gray-400 flex-shrink-0 mt-0.5" />
-                                ) : (
-                                  <ChevronRight className="w-4 h-4 text-gray-400 flex-shrink-0 mt-0.5" />
-                                )}
-                              </button>
-                            </div>
-                            {isExpanded && (
-                              <div className="px-3 pb-3 ml-6 flex flex-col gap-1.5 border-l border-gray-200 dark:border-slate-700 pl-3">
-                                {criteria.map((c) => (
-                                  <label
-                                    key={c.criteria_id}
-                                    className="flex items-start gap-2 text-xs text-gray-600 dark:text-gray-400 cursor-pointer"
-                                  >
-                                    <input
-                                      type="checkbox"
-                                      checked={selectedCriteriaRefs.has(
-                                        `${el.competency_id}:${c.criteria_id}`,
-                                      )}
-                                      onChange={() => toggleCriterion(el.competency_id, c.criteria_id)}
-                                      className="mt-0.5 accent-violet-600"
-                                    />
-                                    <span>
-                                      <span className="font-medium text-gray-500 dark:text-gray-400">
-                                        {c.criteria_number}
-                                      </span>{" "}
-                                      {c.description}
-                                    </span>
-                                  </label>
-                                ))}
-                                {criteria.length === 0 && (
-                                  <p className="text-xs text-gray-400 italic">No performance criteria defined for this element.</p>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-
-                    <button
-                      onClick={goToGenerateStep}
-                      disabled={selectedCriteriaRefs.size === 0}
-                      className="w-full mt-5 flex items-center justify-center gap-2 px-5 py-2.5 bg-violet-600 hover:bg-violet-700 text-white text-sm font-medium rounded-full transition-colors shadow-sm disabled:opacity-50"
-                    >
-                      Continue to Scheme of Work
-                      <ArrowRight className="w-4 h-4" />
-                    </button>
-                  </div>
-                ) : (
-                  <>
-                    {!file ? (
-                      <label className="cursor-pointer inline-flex items-center gap-2 px-5 py-2.5 bg-violet-600 hover:bg-violet-700 text-white text-sm font-medium rounded-full transition-colors shadow-sm">
-                        <CloudUpload className="w-4 h-4" />
-                        Select Curriculum File
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+                      <div>
+                        <p className="flex items-center gap-1.5 text-sm font-semibold text-gray-800 dark:text-gray-200">
+                          <Layers className="w-4 h-4 text-violet-500" />
+                          This subject's Curriculum
+                        </p>
+                        <p className="text-xs text-gray-400 mt-0.5">
+                          Pick the Elements and Performance Criteria this term should prepare for
+                        </p>
+                      </div>
+                      <div className="relative w-full sm:w-64">
+                        <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
                         <input
-                          type="file"
-                          accept=".docx,.pdf,.txt"
-                          className="hidden"
-                          onChange={handleFileChange}
+                          type="text"
+                          value={curriculumSearch}
+                          onChange={(e) => setCurriculumSearch(e.target.value)}
+                          placeholder="Search elements or criteria..."
+                          className="w-full pl-8 pr-3 py-2 text-xs rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-gray-900 dark:text-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-violet-500"
                         />
-                      </label>
-                    ) : (
-                      <div className="flex flex-col items-center gap-3 w-full">
-                        <div className="w-full flex items-center gap-3 px-4 py-3 bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-800/50 rounded-xl">
-                          <FileText className="w-5 h-5 text-violet-600 dark:text-violet-400 flex-shrink-0" />
-                          <span className="text-sm text-violet-700 dark:text-violet-300 font-medium truncate">
-                            {file.name}
-                          </span>
-                        </div>
+                      </div>
+                    </div>
 
-                        {isLoadingStructure && (
-                          <div className="w-full flex items-center gap-2 px-4 py-3 text-xs text-gray-500 dark:text-gray-400">
-                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                            Checking document structure...
-                          </div>
-                        )}
-
-                        {!isLoadingStructure && structurePreview?.hasStructure && (
-                          <div className="w-full text-left px-4 py-3 bg-gray-50 dark:bg-slate-800/60 border border-gray-200 dark:border-slate-700 rounded-xl max-h-72 overflow-y-auto">
-                            <p className="flex items-center gap-1.5 text-xs font-semibold text-gray-600 dark:text-gray-300 mb-2">
-                              <ListChecks className="w-3.5 h-3.5" />
-                              {structurePreview.autoSelectedLoNumbers.length > 0
-                                ? `Detected content for Term ${structurePreview.termOrdinal} — confirm or narrow down what this term will actually cover`
-                                : "We couldn't automatically match a Learning Outcome to this term — please select which content applies"}
-                            </p>
-                            <div className="flex flex-col gap-3">
-                              {structurePreview.los.map((lo) => {
-                                const itemKeys = lo.contentItems.map(
-                                  (item) => `${lo.loNumber}:${item.index}`,
-                                );
-                                const selectedCount = itemKeys.filter((k) =>
-                                  selectedRefs.has(k),
-                                ).length;
-                                const allSelected =
-                                  itemKeys.length > 0 &&
-                                  selectedCount === itemKeys.length;
-                                const someSelected =
-                                  selectedCount > 0 && !allSelected;
-                                return (
-                                  <div key={lo.loNumber}>
-                                    <label className="flex items-start gap-2 text-sm font-medium text-gray-800 dark:text-gray-200 cursor-pointer">
-                                      <TriStateCheckbox
-                                        checked={allSelected}
-                                        indeterminate={someSelected}
-                                        onChange={() => toggleWholeLo(lo)}
+                    <div className="w-full grid grid-cols-1 lg:grid-cols-3 gap-5">
+                      <div className="lg:col-span-2 flex flex-col gap-2 max-h-[30rem] overflow-y-auto pr-1">
+                        {filteredElements.map((el) => {
+                          const criteria = el.criteria || [];
+                          const keys = criteria.map((c) => `${el.competency_id}:${c.criteria_id}`);
+                          const selectedCount = keys.filter((k) => selectedCriteriaRefs.has(k)).length;
+                          const allSelected = keys.length > 0 && selectedCount === keys.length;
+                          const someSelected = selectedCount > 0 && !allSelected;
+                          const isExpanded =
+                            expandedElements.has(el.competency_id) || !!curriculumSearch.trim();
+                          return (
+                            <div
+                              key={el.competency_id}
+                              className={`rounded-xl border transition-colors ${
+                                selectedCount > 0
+                                  ? "border-violet-200 dark:border-violet-800/60 bg-violet-50/50 dark:bg-violet-900/10"
+                                  : "border-gray-200 dark:border-slate-700 hover:border-violet-200 dark:hover:border-violet-800/50"
+                              }`}
+                            >
+                              <div className="flex items-start gap-2 px-3 py-2.5">
+                                <TriStateCheckbox
+                                  checked={allSelected}
+                                  indeterminate={someSelected}
+                                  onChange={() => toggleWholeElement(el)}
+                                  className="mt-1 accent-violet-600"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => toggleElementExpanded(el.competency_id)}
+                                  className="flex-1 flex items-start justify-between gap-2 text-left"
+                                >
+                                  <span>
+                                    <span className="text-sm font-semibold text-gray-800 dark:text-gray-200">
+                                      Element {el.element_number}: {el.title}
+                                    </span>
+                                    {el.learning_hours != null && (
+                                      <span className="ml-1.5 text-xs font-normal text-gray-400">
+                                        ({el.learning_hours} learning hrs)
+                                      </span>
+                                    )}
+                                    <span className="block text-[11px] text-gray-400 mt-0.5">
+                                      {selectedCount}/{keys.length} criteria selected
+                                    </span>
+                                  </span>
+                                  {isExpanded ? (
+                                    <ChevronDown className="w-4 h-4 text-gray-400 flex-shrink-0 mt-0.5" />
+                                  ) : (
+                                    <ChevronRight className="w-4 h-4 text-gray-400 flex-shrink-0 mt-0.5" />
+                                  )}
+                                </button>
+                              </div>
+                              {isExpanded && (
+                                <div className="px-3 pb-3 ml-6 flex flex-col gap-1.5 border-l border-gray-200 dark:border-slate-700 pl-3">
+                                  {criteria.map((c) => (
+                                    <label
+                                      key={c.criteria_id}
+                                      className="flex items-start gap-2 text-xs text-gray-600 dark:text-gray-400 cursor-pointer"
+                                    >
+                                      <input
+                                        type="checkbox"
+                                        checked={selectedCriteriaRefs.has(
+                                          `${el.competency_id}:${c.criteria_id}`,
+                                        )}
+                                        onChange={() => toggleCriterion(el.competency_id, c.criteria_id)}
+                                        className="mt-0.5 accent-violet-600"
                                       />
                                       <span>
-                                        LO {lo.loNumber}: {lo.title}
-                                        {lo.hours != null && (
-                                          <span className="font-normal text-gray-400">
-                                            {" "}
-                                            ({lo.hours} learning hrs)
-                                          </span>
-                                        )}
+                                        <span className="font-medium text-gray-500 dark:text-gray-400">
+                                          {c.criteria_number}
+                                        </span>{" "}
+                                        {c.description}
                                       </span>
                                     </label>
-                                    <div className="mt-1.5 ml-6 flex flex-col gap-1 border-l border-gray-200 dark:border-slate-700 pl-3">
-                                      {lo.contentItems.map((item) => (
-                                        <label
-                                          key={item.index}
-                                          className="flex items-start gap-2 text-xs text-gray-600 dark:text-gray-400 cursor-pointer"
-                                        >
-                                          <input
-                                            type="checkbox"
-                                            checked={selectedRefs.has(
-                                              `${lo.loNumber}:${item.index}`,
-                                            )}
-                                            onChange={() =>
-                                              toggleContentItem(
-                                                lo.loNumber,
-                                                item.index,
-                                              )
-                                            }
-                                            className="mt-0.5 accent-violet-600"
-                                          />
-                                          <span>{item.text}</span>
-                                        </label>
-                                      ))}
-                                    </div>
-                                  </div>
-                                );
-                              })}
+                                  ))}
+                                  {criteria.length === 0 && (
+                                    <p className="text-xs text-gray-400 italic">No performance criteria defined for this element.</p>
+                                  )}
+                                </div>
+                              )}
                             </div>
+                          );
+                        })}
+                        {filteredElements.length === 0 && (
+                          <div className="flex flex-col items-center gap-2 py-10 text-gray-400 dark:text-gray-500">
+                            <Search className="w-6 h-6" />
+                            <p className="text-xs">No elements or criteria match "{curriculumSearch}"</p>
                           </div>
                         )}
+                      </div>
 
-                        {!isLoadingStructure &&
-                          structurePreview &&
-                          !structurePreview.hasStructure && (
-                            <p className="w-full text-xs text-gray-400 dark:text-gray-500 px-1">
-                              Couldn't detect separate terms in this document —
-                              the whole file will be used.
-                            </p>
-                          )}
-
-                        {offerCurriculumGen && (
-                          <label className="w-full flex items-start gap-2.5 text-left px-4 py-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800/50 rounded-xl cursor-pointer">
-                            <input
-                              type="checkbox"
-                              checked={wantsCurriculumGen}
-                              onChange={(e) => setWantsCurriculumGen(e.target.checked)}
-                              className="mt-0.5 accent-blue-600"
-                            />
-                            <span className="flex items-start gap-2">
-                              <BookOpen className="w-4 h-4 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
-                              <span className="text-xs text-blue-700 dark:text-blue-300">
-                                <span className="font-semibold">This subject has no Curriculum defined yet</span> —
-                                also extract Elements of Competency and Performance Criteria from this same document?
-                                You'll review it before anything is saved.
+                      <div className="lg:col-span-1">
+                        <div className="sticky top-4 bg-gray-50 dark:bg-slate-800/60 border border-gray-200 dark:border-slate-700 rounded-2xl p-4 flex flex-col gap-4">
+                          <div>
+                            <div className="flex items-center justify-between mb-1.5">
+                              <span className="text-xs font-semibold text-gray-600 dark:text-gray-300">
+                                Selection progress
                               </span>
-                            </span>
-                          </label>
-                        )}
+                              <span className="text-xs font-bold text-violet-600 dark:text-violet-400">
+                                {selectedCriteriaRefs.size}/{totalCriteriaCount}
+                              </span>
+                            </div>
+                            <div className="w-full h-2 bg-gray-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                              <motion.div
+                                className="h-full bg-gradient-to-r from-violet-500 to-indigo-500"
+                                initial={{ width: 0 }}
+                                animate={{
+                                  width:
+                                    totalCriteriaCount > 0
+                                      ? `${(selectedCriteriaRefs.size / totalCriteriaCount) * 100}%`
+                                      : "0%",
+                                }}
+                                transition={{ duration: 0.3 }}
+                              />
+                            </div>
+                          </div>
 
-                        <div className="w-full flex items-center gap-2">
-                          <button
-                            onClick={() => {
-                              setFile(null);
-                              setStructurePreview(null);
-                              setSelectedRefs(new Set());
-                            }}
-                            className="flex-shrink-0 px-4 py-2.5 bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 dark:hover:bg-slate-700 text-gray-600 dark:text-gray-300 text-sm font-medium rounded-full transition-colors"
-                          >
-                            Change file
-                          </button>
+                          <div className="flex items-center gap-2 text-[11px]">
+                            <button
+                              type="button"
+                              onClick={() => selectAllElements(true)}
+                              className="inline-flex items-center gap-1 font-medium text-violet-600 dark:text-violet-400 hover:underline"
+                            >
+                              <CheckSquare className="w-3 h-3" /> Select all
+                            </button>
+                            <span className="text-gray-300 dark:text-gray-600">·</span>
+                            <button
+                              type="button"
+                              onClick={() => selectAllElements(false)}
+                              className="inline-flex items-center gap-1 font-medium text-gray-500 dark:text-gray-400 hover:underline"
+                            >
+                              <Square className="w-3 h-3" /> Clear all
+                            </button>
+                          </div>
+
+                          <div className="flex flex-col gap-1.5 text-xs text-gray-500 dark:text-gray-400 pt-3 border-t border-gray-200 dark:border-slate-700">
+                            <p className="flex items-center justify-between">
+                              <span>Elements defined</span>
+                              <span className="font-semibold text-gray-700 dark:text-gray-300">
+                                {existingElements!.length}
+                              </span>
+                            </p>
+                            <p className="flex items-center justify-between">
+                              <span>Performance criteria</span>
+                              <span className="font-semibold text-gray-700 dark:text-gray-300">
+                                {totalCriteriaCount}
+                              </span>
+                            </p>
+                          </div>
+
                           <button
                             onClick={goToGenerateStep}
-                            disabled={
-                              isLoadingStructure ||
-                              (!!structurePreview?.hasStructure && selectedRefs.size === 0)
-                            }
-                            className="flex-1 flex items-center justify-center gap-2 px-5 py-2.5 bg-violet-600 hover:bg-violet-700 text-white text-sm font-medium rounded-full transition-colors shadow-sm disabled:opacity-50"
+                            disabled={selectedCriteriaRefs.size === 0}
+                            className="w-full flex items-center justify-center gap-2 px-5 py-2.5 bg-violet-600 hover:bg-violet-700 text-white text-sm font-medium rounded-full transition-colors shadow-sm disabled:opacity-50"
                           >
                             Continue to Scheme of Work
                             <ArrowRight className="w-4 h-4" />
                           </button>
                         </div>
                       </div>
-                    )}
-                    <div className="flex flex-wrap gap-2 justify-center mt-4">
-                      {[".docx", ".pdf", ".txt"].map((ext) => (
-                        <span
-                          key={ext}
-                          className="text-xs bg-gray-100 dark:bg-slate-800 text-gray-500 dark:text-gray-400 px-2.5 py-0.5 rounded-full font-medium"
-                        >
-                          {ext}
-                        </span>
-                      ))}
                     </div>
-                  </>
+                  </div>
+                ) : (
+                  <div className="w-full grid grid-cols-1 lg:grid-cols-3 gap-6 text-left">
+                    <div className="lg:col-span-2">
+                      {!file ? (
+                        <div
+                          onDragOver={(e) => {
+                            e.preventDefault();
+                            setIsDraggingFile(true);
+                          }}
+                          onDragLeave={() => setIsDraggingFile(false)}
+                          onDrop={handleFileDrop}
+                          className={`w-full flex flex-col items-center justify-center gap-3 py-14 px-6 rounded-2xl border-2 border-dashed transition-colors ${
+                            isDraggingFile
+                              ? "border-violet-500 bg-violet-50 dark:bg-violet-900/20"
+                              : "border-gray-300 dark:border-slate-700 bg-gray-50 dark:bg-slate-800/40"
+                          }`}
+                        >
+                          <div className="w-14 h-14 rounded-2xl bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center">
+                            <CloudUpload className="w-7 h-7 text-violet-600 dark:text-violet-400" />
+                          </div>
+                          <div className="text-center">
+                            <p className="text-sm font-semibold text-gray-700 dark:text-gray-200">
+                              Drag & drop your curriculum file here
+                            </p>
+                            <p className="text-xs text-gray-400 mt-0.5">or click below to browse</p>
+                          </div>
+                          <label className="cursor-pointer inline-flex items-center gap-2 px-5 py-2.5 bg-violet-600 hover:bg-violet-700 text-white text-sm font-medium rounded-full transition-colors shadow-sm">
+                            <CloudUpload className="w-4 h-4" />
+                            Select Curriculum File
+                            <input
+                              type="file"
+                              accept=".docx,.pdf,.txt"
+                              className="hidden"
+                              onChange={handleFileChange}
+                            />
+                          </label>
+                          <div className="flex flex-wrap gap-2 justify-center mt-1">
+                            {[".docx", ".pdf", ".txt"].map((ext) => (
+                              <span
+                                key={ext}
+                                className="text-xs bg-white dark:bg-slate-800 text-gray-500 dark:text-gray-400 border border-gray-200 dark:border-slate-700 px-2.5 py-0.5 rounded-full font-medium"
+                              >
+                                {ext}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex flex-col items-center gap-3 w-full">
+                          <div className="w-full flex items-center gap-3 px-4 py-3 bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-800/50 rounded-xl">
+                            <FileText className="w-5 h-5 text-violet-600 dark:text-violet-400 flex-shrink-0" />
+                            <span className="text-sm text-violet-700 dark:text-violet-300 font-medium truncate">
+                              {file.name}
+                            </span>
+                          </div>
+
+                          {isLoadingStructure && (
+                            <div className="w-full flex items-center gap-2 px-4 py-3 text-xs text-gray-500 dark:text-gray-400">
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              Checking document structure...
+                            </div>
+                          )}
+
+                          {!isLoadingStructure && structurePreview?.hasStructure && (
+                            <div className="w-full text-left px-4 py-3 bg-gray-50 dark:bg-slate-800/60 border border-gray-200 dark:border-slate-700 rounded-xl max-h-80 overflow-y-auto">
+                              <p className="flex items-center gap-1.5 text-xs font-semibold text-gray-600 dark:text-gray-300 mb-2">
+                                <ListChecks className="w-3.5 h-3.5" />
+                                {structurePreview.autoSelectedLoNumbers.length > 0
+                                  ? `Detected content for Term ${structurePreview.termOrdinal} — confirm or narrow down what this term will actually cover`
+                                  : "We couldn't automatically match a Learning Outcome to this term — please select which content applies"}
+                              </p>
+                              <div className="flex flex-col gap-3">
+                                {structurePreview.los.map((lo) => {
+                                  const itemKeys = lo.contentItems.map(
+                                    (item) => `${lo.loNumber}:${item.index}`,
+                                  );
+                                  const selectedCount = itemKeys.filter((k) =>
+                                    selectedRefs.has(k),
+                                  ).length;
+                                  const allSelected =
+                                    itemKeys.length > 0 &&
+                                    selectedCount === itemKeys.length;
+                                  const someSelected =
+                                    selectedCount > 0 && !allSelected;
+                                  return (
+                                    <div key={lo.loNumber}>
+                                      <label className="flex items-start gap-2 text-sm font-medium text-gray-800 dark:text-gray-200 cursor-pointer">
+                                        <TriStateCheckbox
+                                          checked={allSelected}
+                                          indeterminate={someSelected}
+                                          onChange={() => toggleWholeLo(lo)}
+                                        />
+                                        <span>
+                                          LO {lo.loNumber}: {lo.title}
+                                          {lo.hours != null && (
+                                            <span className="font-normal text-gray-400">
+                                              {" "}
+                                              ({lo.hours} learning hrs)
+                                            </span>
+                                          )}
+                                        </span>
+                                      </label>
+                                      <div className="mt-1.5 ml-6 flex flex-col gap-1 border-l border-gray-200 dark:border-slate-700 pl-3">
+                                        {lo.contentItems.map((item) => (
+                                          <label
+                                            key={item.index}
+                                            className="flex items-start gap-2 text-xs text-gray-600 dark:text-gray-400 cursor-pointer"
+                                          >
+                                            <input
+                                              type="checkbox"
+                                              checked={selectedRefs.has(
+                                                `${lo.loNumber}:${item.index}`,
+                                              )}
+                                              onChange={() =>
+                                                toggleContentItem(
+                                                  lo.loNumber,
+                                                  item.index,
+                                                )
+                                              }
+                                              className="mt-0.5 accent-violet-600"
+                                            />
+                                            <span>{item.text}</span>
+                                          </label>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
+
+                          {!isLoadingStructure &&
+                            structurePreview &&
+                            !structurePreview.hasStructure && (
+                              <p className="w-full text-xs text-gray-400 dark:text-gray-500 px-1">
+                                Couldn't detect separate terms in this document —
+                                the whole file will be used.
+                              </p>
+                            )}
+
+                          {offerCurriculumGen && (
+                            <label className="w-full flex items-start gap-2.5 text-left px-4 py-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800/50 rounded-xl cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={wantsCurriculumGen}
+                                onChange={(e) => setWantsCurriculumGen(e.target.checked)}
+                                className="mt-0.5 accent-blue-600"
+                              />
+                              <span className="flex items-start gap-2">
+                                <BookOpen className="w-4 h-4 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
+                                <span className="text-xs text-blue-700 dark:text-blue-300">
+                                  <span className="font-semibold">This subject has no Curriculum defined yet</span> —
+                                  also extract Elements of Competency and Performance Criteria from this same document?
+                                  You'll review it before anything is saved.
+                                </span>
+                              </span>
+                            </label>
+                          )}
+
+                          <div className="w-full flex items-center gap-2">
+                            <button
+                              onClick={() => {
+                                setFile(null);
+                                setStructurePreview(null);
+                                setSelectedRefs(new Set());
+                                showToast("File cleared — select another to continue", "success");
+                              }}
+                              className="flex-shrink-0 px-4 py-2.5 bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 dark:hover:bg-slate-700 text-gray-600 dark:text-gray-300 text-sm font-medium rounded-full transition-colors"
+                            >
+                              Change file
+                            </button>
+                            <button
+                              onClick={goToGenerateStep}
+                              disabled={
+                                isLoadingStructure ||
+                                (!!structurePreview?.hasStructure && selectedRefs.size === 0)
+                              }
+                              className="flex-1 flex items-center justify-center gap-2 px-5 py-2.5 bg-violet-600 hover:bg-violet-700 text-white text-sm font-medium rounded-full transition-colors shadow-sm disabled:opacity-50"
+                            >
+                              Continue to Scheme of Work
+                              <ArrowRight className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="lg:col-span-1">
+                      <div className="bg-gray-50 dark:bg-slate-800/60 border border-gray-200 dark:border-slate-700 rounded-2xl p-4 flex flex-col gap-3">
+                        <p className="flex items-center gap-1.5 text-sm font-semibold text-gray-700 dark:text-gray-200">
+                          <Lightbulb className="w-4 h-4 text-violet-500" />
+                          How this works
+                        </p>
+                        <ul className="text-xs text-gray-500 dark:text-gray-400 space-y-2.5">
+                          <li className="flex items-start gap-2">
+                            <span className="w-4 h-4 flex-shrink-0 mt-0.5 rounded-full bg-violet-100 dark:bg-violet-900/40 text-violet-600 dark:text-violet-400 text-[10px] font-bold flex items-center justify-center">
+                              1
+                            </span>
+                            Upload your official curriculum document (DOCX, PDF, or TXT).
+                          </li>
+                          <li className="flex items-start gap-2">
+                            <span className="w-4 h-4 flex-shrink-0 mt-0.5 rounded-full bg-violet-100 dark:bg-violet-900/40 text-violet-600 dark:text-violet-400 text-[10px] font-bold flex items-center justify-center">
+                              2
+                            </span>
+                            AI scans it and detects the Learning Outcomes relevant to this term.
+                          </li>
+                          <li className="flex items-start gap-2">
+                            <span className="w-4 h-4 flex-shrink-0 mt-0.5 rounded-full bg-violet-100 dark:bg-violet-900/40 text-violet-600 dark:text-violet-400 text-[10px] font-bold flex items-center justify-center">
+                              3
+                            </span>
+                            Confirm what to cover, then continue to schedule the weekly scheme.
+                          </li>
+                        </ul>
+                        {offerCurriculumGen && (
+                          <p className="text-xs text-gray-400 dark:text-gray-500 pt-2 border-t border-gray-200 dark:border-slate-700">
+                            Since this subject has no Curriculum yet, you can also let AI extract one
+                            from the same document — you'll review it before it's saved.
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
                 )}
               </motion.div>
             )}
@@ -1014,12 +1312,69 @@ const SchemeAIGenerate: React.FC<Props> = ({
                 </div>
 
                 <div className="w-full grid grid-cols-1 lg:grid-cols-5 gap-6 mb-5 text-left">
-                  <div className="lg:col-span-3">
-                    <label className="flex items-center gap-1.5 text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1.5">
-                      <CalendarDays className="w-3.5 h-3.5" />
-                      Start Date
-                    </label>
-                    <MonthCalendarPicker value={startDate} onChange={setStartDate} />
+                  <div className="lg:col-span-3 flex flex-col xl:flex-row gap-4">
+                    <div className="w-full xl:w-80 xl:flex-shrink-0">
+                      <label className="flex items-center gap-1.5 text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1.5">
+                        <CalendarDays className="w-3.5 h-3.5" />
+                        Start Date
+                      </label>
+                      <MonthCalendarPicker
+                        value={startDate}
+                        onChange={setStartDate}
+                        scheduleMap={scheduleByDate}
+                        scheduleSlots={scheduleSlots}
+                      />
+                    </div>
+
+                    <div className="flex-1 min-w-0 flex flex-col">
+                      <label className="flex items-center justify-between gap-1.5 text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1.5">
+                        <span className="flex items-center gap-1.5">
+                          <ListChecks className="w-3.5 h-3.5" />
+                          Weekly Breakdown
+                        </span>
+                        {scheduleSlots.length > 0 && (
+                          <span className="font-normal text-gray-400">
+                            {scheduleSlots.length - skippedWeekCount} teaching · {skippedWeekCount} skipped
+                          </span>
+                        )}
+                      </label>
+                      <div className="flex-1 bg-gray-50 dark:bg-slate-800/60 border border-gray-200 dark:border-slate-700 rounded-2xl p-2.5">
+                        {scheduleSlots.length > 0 ? (
+                          <div className="flex flex-col gap-1.5 max-h-[26.5rem] overflow-y-auto pr-1">
+                            {scheduleSlots.map((s) => (
+                              <button
+                                type="button"
+                                key={s.slot}
+                                onClick={() => toggleSkipWeek(s.slot)}
+                                className={`w-full flex items-center justify-between gap-2 px-3 py-2 rounded-xl text-xs transition-colors text-left ${
+                                  s.skipped
+                                    ? "bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/30 border border-amber-200 dark:border-amber-800/50"
+                                    : "bg-white dark:bg-slate-800 text-gray-600 dark:text-gray-300 hover:bg-violet-50 dark:hover:bg-violet-900/20 border border-gray-200 dark:border-slate-700"
+                                }`}
+                              >
+                                <span className="font-semibold flex-shrink-0">Week {s.slot}</span>
+                                <span className="flex-1 text-center text-[11px]">
+                                  {format(s.start, "d MMM")} – {format(s.end, "d MMM")}
+                                </span>
+                                <span
+                                  className={`text-[9px] font-bold uppercase tracking-wide flex-shrink-0 px-1.5 py-0.5 rounded-full ${
+                                    s.skipped
+                                      ? "bg-amber-200/70 dark:bg-amber-800/50"
+                                      : "bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300"
+                                  }`}
+                                >
+                                  {s.skipped ? "Skip" : "Teach"}
+                                </span>
+                              </button>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-xs text-gray-400 italic text-center py-10 px-3">
+                            Pick a start date and number of weeks to preview the weekly schedule.
+                          </p>
+                        )}
+                      </div>
+                    </div>
                   </div>
 
                   <div className="lg:col-span-2 flex flex-col gap-4">
@@ -1097,8 +1452,13 @@ const SchemeAIGenerate: React.FC<Props> = ({
                         <p className="text-xs text-violet-700 dark:text-violet-300">
                           Runs <span className="font-semibold">{format(parseISO(startDate), "d MMM yyyy")}</span> to{" "}
                           <span className="font-semibold">{format(scheduleEndDate, "d MMM yyyy")}</span>
-                          {skipWeekNumbers.length > 0 &&
-                            ` — skipping week${skipWeekNumbers.length > 1 ? "s" : ""} ${skipWeekNumbers.join(", ")}`}
+                          {" — "}
+                          <span className="font-semibold">
+                            {scheduleSlots.length - skippedWeekCount} teaching week
+                            {scheduleSlots.length - skippedWeekCount === 1 ? "" : "s"}
+                          </span>
+                          {skippedWeekCount > 0 &&
+                            `, ${skippedWeekCount} skipped (${skipWeekNumbers.join(", ")})`}
                         </p>
                       </div>
                     )}
