@@ -89,12 +89,13 @@ const AllTeachersSchemeOfWork: React.FC = () => {
   const [selectedProgram, setSelectedProgram] = useState<number | "">(
     authProgramId || getInitialValue("program", ""),
   );
+  // Grade and role always default to "all" / "ALL" on load — they are not
+  // restored from a previous session, so a stale narrow pick from an earlier
+  // visit never silently hides teachers on a fresh page load.
   const [selectedGrade, setSelectedGrade] = useState<number | "all">(
-    authGradeId || getInitialValue("grade", "all"),
+    authGradeId || "all",
   );
-  const [selectedRole, setSelectedRole] = useState<string>(
-    getInitialValue("role", "ALL"),
-  );
+  const [selectedRole, setSelectedRole] = useState<string>("ALL");
 
   const roleLabels: Record<string, string> = {
     ALL: "All Roles",
@@ -233,24 +234,18 @@ const AllTeachersSchemeOfWork: React.FC = () => {
     }
   }, [canLoad, loadTeachers]);
 
-  // Persist selections (year/term are governed by the global academic period)
+  // Persist the program selection only (year/term are governed by the global
+  // academic period). Grade and role are intentionally not persisted so every
+  // fresh page load starts from "All Grades" / "All Roles".
   useEffect(() => {
     if (selectedProgram)
       sessionStorage.setItem(
         "allTeachersSow_program",
         JSON.stringify(selectedProgram),
       );
-    if (selectedGrade)
-      sessionStorage.setItem(
-        "allTeachersSow_grade",
-        JSON.stringify(selectedGrade),
-      );
-    if (selectedRole)
-      sessionStorage.setItem(
-        "allTeachersSow_role",
-        JSON.stringify(selectedRole),
-      );
-  }, [selectedProgram, selectedGrade, selectedRole]);
+    sessionStorage.removeItem("allTeachersSow_grade");
+    sessionStorage.removeItem("allTeachersSow_role");
+  }, [selectedProgram]);
 
   // Persist tab and status filter
   useEffect(() => {
