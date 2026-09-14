@@ -57,9 +57,16 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
   const [mode, setMode] = useState<ModalMode>(initialData ? "manual" : "choose");
   const chooseFileInputRef = useRef<HTMLInputElement>(null);
 
+  // Local date, not toISOString() — that converts to UTC first and rolls
+  // back to yesterday for anyone west of UTC in the evening.
+  const todayLocal = () => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  };
+
   const defaultFormData: Partial<LessonPlan> = {
     entry_id: entryId,
-    lesson_date: new Date().toISOString().split("T")[0],
+    lesson_date: todayLocal(),
     sector: "",
     trade: "",
     level: "3",

@@ -462,7 +462,13 @@ const SchemeOfWorkCalendar: React.FC = () => {
       showToast("This day is not within a scheduled week.", "info");
       return;
     }
-    const dateStr = date.toISOString().split("T")[0];
+    // toISOString() converts to UTC first, which rolls the date back a day
+    // for any timezone behind UTC (e.g. clicking the 15th pre-filled the
+    // 14th) — format the calendar cell's own local date instead.
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    const dateStr = `${year}-${month}-${day}`;
     setSelectedEntryId(entryId);
     setEditingLesson({ lesson_date: dateStr, entry_id: entryId } as any);
     setIsLessonModalOpen(true);
