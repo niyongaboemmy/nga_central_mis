@@ -9,20 +9,38 @@ import {
   FileQuestion,
   FolderOpen,
   Trash2,
+  AlertTriangle,
+  Clock3,
+  CalendarCheck2,
+  ArrowRight,
 } from "lucide-react";
 import LessonPlanPreviewModal from "./LessonPlanPreviewModal";
 
 interface RealCalendarViewProps {
   entries: SchemeEntry[];
   lessonPlans: Record<number, LessonPlan[]>;
+  // Real weekdays this subject/class meets, taken from the teacher's own
+  // timetable (0=Sun..6=Sat, matching Date#getDay()). When empty (no
+  // timetable data yet for this subject/class), the view falls back to the
+  // legacy "every 7 days from the first logged plan" guess below.
+  scheduledWeekdays?: Set<number>;
   onDayClick: (date: Date, entryId: number | null) => void;
   onPlanClick: (plan: LessonPlan) => void;
   onDeletePlan: (id: number) => void;
 }
 
+/** YYYY-MM-DD in local time — avoids the UTC-shift bugs of toISOString(). */
+const toDateKey = (date: Date): string => {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+};
+
 const RealCalendarView: React.FC<RealCalendarViewProps> = ({
   entries,
   lessonPlans,
+  scheduledWeekdays,
   onDayClick,
   onPlanClick,
   onDeletePlan,
@@ -59,15 +77,16 @@ const RealCalendarView: React.FC<RealCalendarViewProps> = ({
     "December",
   ];
 
-  // Smart Pattern Matching: Global Expected Dates (7-day intervals)
-  // Find the FIRST lesson plan across ALL entries, then expect lessons every 7 days
-  // This works across all scheme weeks, not just within a single entry
-  const expectedDates = useMemo(() => {
-    const allPlans = Object.values(lessonPlans || {}).flat();
+  // Legacy fallback pattern: when the teacher's timetable hasn't produced any
+  // scheduled weekdays for this subject/class yet (e.g. the calendar hasn't
+  // been set up), fall back to the old guess — expect a lesson every 7 days
+  // starting from whichever lesson plan was logged first.
+  const legacyExpectedDates = useMemo(() => {
+    if (scheduledWeekdays && scheduledWeekdays.size > 0) return new Set<string>();
 
+    const allPlans = Object.values(lessonPlans || {}).flat();
     if (allPlans.length === 0) return new Set<string>();
 
-    // Find the absolute first lesson plan date across all entries
     const sortedPlans = [...allPlans].sort((a, b) => {
       const dateA = a.lesson_date ? new Date(a.lesson_date).getTime() : 0;
       const dateB = b.lesson_date ? new Date(b.lesson_date).getTime() : 0;
@@ -77,15 +96,12 @@ const RealCalendarView: React.FC<RealCalendarViewProps> = ({
     const firstPlan = sortedPlans[0];
     if (!firstPlan?.lesson_date) return new Set<string>();
 
-    // Parse the first date correctly (avoid timezone issues)
-    // Use local timezone parsing to match how the calendar renders dates
     const firstDateStr = firstPlan.lesson_date.split("T")[0];
     const [firstYear, firstMonth, firstDay] = firstDateStr
       .split("-")
       .map(Number);
     const firstDate = new Date(firstYear, firstMonth - 1, firstDay);
 
-    // Find the latest end date across all entries
     const latestEndDate = entries.reduce((latest, entry) => {
       const endDateStr = entry.end_date.split("T")[0];
       const [endYear, endMonth, endDay] = endDateStr.split("-").map(Number);
@@ -93,24 +109,75 @@ const RealCalendarView: React.FC<RealCalendarViewProps> = ({
       return endDate > latest ? endDate : latest;
     }, new Date(0));
 
-    // Generate expected dates: first date, first date + 7 days, first date + 14 days, etc.
     const expectedDatesSet = new Set<string>();
-    let currentDate = new Date(firstDate);
+    let cursor = new Date(firstDate);
+    while (cursor <= latestEndDate) {
+      expectedDatesSet.add(toDateKey(cursor));
+      cursor = new Date(cursor.getTime() + 7 * 24 * 60 * 60 * 1000);
+    }
+    return expectedDatesSet;
+  }, [lessonPlans, entries, scheduledWeekdays]);
 
-    while (currentDate <= latestEndDate) {
-      // Format as YYYY-MM-DD in local timezone
-      const currentYear = currentDate.getFullYear();
-      const currentMonth = String(currentDate.getMonth() + 1).padStart(2, "0");
-      const currentDay = String(currentDate.getDate()).padStart(2, "0");
-      const dateStr = `${currentYear}-${currentMonth}-${currentDay}`;
-      expectedDatesSet.add(dateStr);
+  type DayStatus = "missing" | "due-soon" | "ok";
 
-      // Add 7 days
-      currentDate = new Date(currentDate.getTime() + 7 * 24 * 60 * 60 * 1000);
+  // Walk every date inside every scheme week and classify it against the
+  // teacher's real timetable: a "teaching day" that has gone by with no
+  // lesson plan is Missing; one landing today or in the next 3 days is Due
+  // Soon (a nudge, not yet an alarm); everything else is fine.
+  const { dayStatus, missingDates, dueSoonDates } = useMemo(() => {
+    const statusMap = new Map<string, DayStatus>();
+    const missing: string[] = [];
+    const dueSoon: string[] = [];
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const dueSoonCutoff = new Date(today);
+    dueSoonCutoff.setDate(dueSoonCutoff.getDate() + 3);
+
+    const usingRealTimetable = !!scheduledWeekdays && scheduledWeekdays.size > 0;
+
+    for (const entry of entries) {
+      const start = new Date(entry.start_date);
+      const end = new Date(entry.end_date);
+      start.setHours(0, 0, 0, 0);
+      end.setHours(0, 0, 0, 0);
+
+      const plans = lessonPlans[entry.entry_id] || [];
+      const plannedDates = new Set(
+        plans.map((p) => p.lesson_date?.split("T")[0]).filter(Boolean),
+      );
+
+      for (
+        let d = new Date(start);
+        d <= end;
+        d = new Date(d.getTime() + 24 * 60 * 60 * 1000)
+      ) {
+        const key = toDateKey(d);
+        const isTeachingDay = usingRealTimetable
+          ? scheduledWeekdays!.has(d.getDay())
+          : legacyExpectedDates.has(key);
+
+        if (!isTeachingDay || plannedDates.has(key)) continue;
+
+        if (d < today) {
+          statusMap.set(key, "missing");
+          missing.push(key);
+        } else if (d <= dueSoonCutoff) {
+          statusMap.set(key, "due-soon");
+          dueSoon.push(key);
+        }
+      }
     }
 
-    return expectedDatesSet;
-  }, [lessonPlans, entries]);
+    missing.sort();
+    dueSoon.sort();
+    return { dayStatus: statusMap, missingDates: missing, dueSoonDates: dueSoon };
+  }, [entries, lessonPlans, scheduledWeekdays, legacyExpectedDates]);
+
+  const jumpToDate = (dateKey: string) => {
+    const [y, m] = dateKey.split("-").map(Number);
+    setCurrentDate(new Date(y, m - 1, 1));
+  };
 
   const days = [];
   // padding for previous month
@@ -150,19 +217,25 @@ const RealCalendarView: React.FC<RealCalendarViewProps> = ({
         })
       : [];
 
-    const hasPlan = plansForDay.length > 0;
-
-    // Is Missing? Check if this exact date is in the global expected pattern
-    const isMissingPlan = entry && !hasPlan && expectedDates.has(dateStr);
+    // Status computed once, up front, from the teacher's real timetable
+    // (falling back to the legacy 7-day guess only when no timetable data
+    // exists for this subject/class yet).
+    const status = dayStatus.get(dateStr);
+    const isMissingPlan = status === "missing";
+    const isDueSoon = status === "due-soon";
 
     days.push(
       <div
         key={d}
         onClick={() => onDayClick(date, entry?.entry_id || null)}
-        className={`group relative min-h-[140px] p-2 border-b border-r border-gray-100 dark:border-gray-700 transition-colors ${
-          entry
-            ? "bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800/40 cursor-pointer"
-            : "bg-gray-50/50 dark:bg-gray-950"
+        className={`group relative min-h-[140px] p-2 border-b border-r transition-colors ${
+          isMissingPlan
+            ? "border-red-200 dark:border-red-900/40 bg-red-50/60 dark:bg-red-950/20 hover:bg-red-50 dark:hover:bg-red-950/30 cursor-pointer ring-1 ring-inset ring-red-200 dark:ring-red-900/40"
+            : isDueSoon
+              ? "border-amber-200 dark:border-amber-900/40 bg-amber-50/50 dark:bg-amber-950/10 hover:bg-amber-50 dark:hover:bg-amber-950/20 cursor-pointer"
+              : entry
+                ? "border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800/40 cursor-pointer"
+                : "border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-950"
         }`}
       >
         <div className="flex justify-between items-start mb-2">
@@ -170,9 +243,13 @@ const RealCalendarView: React.FC<RealCalendarViewProps> = ({
             className={`text-sm font-medium w-8 h-8 flex items-center justify-center rounded-full ${
               isToday
                 ? "bg-blue-600 text-white shadow-md shadow-blue-200 dark:shadow-none"
-                : entry
-                  ? "text-gray-900 dark:text-gray-100"
-                  : "text-gray-400 dark:text-gray-600"
+                : isMissingPlan
+                  ? "text-red-700 dark:text-red-300"
+                  : isDueSoon
+                    ? "text-amber-700 dark:text-amber-300"
+                    : entry
+                      ? "text-gray-900 dark:text-gray-100"
+                      : "text-gray-400 dark:text-gray-600"
             }`}
           >
             {d}
@@ -180,10 +257,24 @@ const RealCalendarView: React.FC<RealCalendarViewProps> = ({
           <div className="flex items-center gap-1">
             {isMissingPlan && (
               <div
-                className="group/tooltip relative"
-                title="Missing Lesson Plan"
+                className="group/tooltip relative flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-red-100 dark:bg-red-900/40"
+                title="Missing lesson plan — this class already met without one"
               >
-                <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+                <span className="text-[9px] font-bold uppercase tracking-wide text-red-600 dark:text-red-400">
+                  Missing
+                </span>
+              </div>
+            )}
+            {isDueSoon && (
+              <div
+                className="group/tooltip relative flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/40"
+                title="Class day coming up — add a lesson plan"
+              >
+                <Clock3 className="w-2.5 h-2.5 text-amber-600 dark:text-amber-400" />
+                <span className="text-[9px] font-bold uppercase tracking-wide text-amber-700 dark:text-amber-400">
+                  Due
+                </span>
               </div>
             )}
             {entry && (
@@ -235,17 +326,29 @@ const RealCalendarView: React.FC<RealCalendarViewProps> = ({
 
           {isMissingPlan && (
             <div
-              className="flex flex-col items-center justify-center p-2 py-4 rounded-xl border-2 border-dashed border-red-200 dark:border-red-900/30 bg-red-50/50 dark:bg-red-900/5 group-hover:bg-red-50 dark:group-hover:bg-red-900/10 transition-colors mt-1"
-              title="Missing Plan"
+              className="flex flex-col items-center justify-center p-2 py-4 rounded-xl border-2 border-dashed border-red-300 dark:border-red-800/50 bg-red-50/70 dark:bg-red-900/10 group-hover:bg-red-100/70 dark:group-hover:bg-red-900/20 transition-colors mt-1"
+              title="This class already met and has no lesson plan on file"
             >
-              <FileQuestion className="w-9 h-9 text-red-300 dark:text-red-700 mb-1" />
-              <span className="text-[10px] font-bold text-red-400 dark:text-red-500">
-                Missing
+              <AlertTriangle className="w-8 h-8 text-red-400 dark:text-red-600 mb-1" />
+              <span className="text-[10px] font-bold text-red-500 dark:text-red-400">
+                Add lesson plan
               </span>
             </div>
           )}
 
-          {entry && plansForDay.length === 0 && !isMissingPlan && (
+          {isDueSoon && (
+            <div
+              className="flex flex-col items-center justify-center p-2 py-4 rounded-xl border-2 border-dashed border-amber-300 dark:border-amber-800/50 bg-amber-50/60 dark:bg-amber-900/10 group-hover:bg-amber-100/70 dark:group-hover:bg-amber-900/20 transition-colors mt-1"
+              title="Upcoming class day — plan ahead"
+            >
+              <FileQuestion className="w-8 h-8 text-amber-400 dark:text-amber-600 mb-1" />
+              <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400">
+                Plan needed
+              </span>
+            </div>
+          )}
+
+          {entry && plansForDay.length === 0 && !isMissingPlan && !isDueSoon && (
             <div className="hidden group-hover:flex items-center justify-center py-2 text-gray-300">
               <Plus className="w-4 h-4" />
             </div>
@@ -255,8 +358,72 @@ const RealCalendarView: React.FC<RealCalendarViewProps> = ({
     );
   }
 
+  const formatDateLabel = (dateKey: string) => {
+    const [y, m, dd] = dateKey.split("-").map(Number);
+    return new Date(y, m - 1, dd).toLocaleDateString(undefined, {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+    });
+  };
+
   return (
     <>
+      {/* Notification strip — only appears when the real timetable has
+          flagged actual teaching days without a lesson plan, so a teacher
+          never has to hunt through months to notice a gap. */}
+      {(missingDates.length > 0 || dueSoonDates.length > 0) && (
+        <div className="mb-4 flex flex-col sm:flex-row sm:items-center gap-3 rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900/50 p-4">
+          <div className="flex items-center gap-3 flex-1 min-w-0">
+            <div
+              className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                missingDates.length > 0
+                  ? "bg-red-100 dark:bg-red-900/30"
+                  : "bg-amber-100 dark:bg-amber-900/30"
+              }`}
+            >
+              <AlertTriangle
+                className={`w-5 h-5 ${
+                  missingDates.length > 0
+                    ? "text-red-600 dark:text-red-400"
+                    : "text-amber-600 dark:text-amber-400"
+                }`}
+              />
+            </div>
+            <div className="min-w-0">
+              <p className="text-sm font-bold text-gray-900 dark:text-white">
+                {missingDates.length > 0
+                  ? `${missingDates.length} teaching day${missingDates.length === 1 ? "" : "s"} missing a lesson plan`
+                  : `${dueSoonDates.length} upcoming class day${dueSoonDates.length === 1 ? "" : "s"} still need a plan`}
+              </p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                {missingDates.length > 0
+                  ? `Earliest: ${formatDateLabel(missingDates[0])}`
+                  : `Next up: ${formatDateLabel(dueSoonDates[0])}`}
+                {missingDates.length > 0 && dueSoonDates.length > 0 && (
+                  <span> · {dueSoonDates.length} more due soon</span>
+                )}
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() =>
+              jumpToDate(
+                missingDates.length > 0 ? missingDates[0] : dueSoonDates[0],
+              )
+            }
+            className={`flex items-center justify-center gap-2 px-4 py-2 text-sm font-bold rounded-full transition-all hover:scale-[1.02] active:scale-95 shadow-sm flex-shrink-0 ${
+              missingDates.length > 0
+                ? "bg-red-600 hover:bg-red-700 text-white"
+                : "bg-amber-500 hover:bg-amber-600 text-white"
+            }`}
+          >
+            Go to date
+            <ArrowRight className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
       <div className="bg-white dark:bg-gray-900/50 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
         {/* Header */}
         <div className="p-4 flex items-center justify-between border-b border-gray-200 dark:border-gray-700">
@@ -265,25 +432,40 @@ const RealCalendarView: React.FC<RealCalendarViewProps> = ({
             <span className="text-gray-400 font-normal">{year}</span>
           </h2>
 
-          <div className="flex items-center gap-1">
-            <button
-              onClick={prevMonth}
-              className="p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 transition-colors"
-            >
-              <ChevronLeft className="w-5 h-5" />
-            </button>
-            <button
-              onClick={() => setCurrentDate(new Date())}
-              className="px-3 py-1 text-xs font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors"
-            >
-              Today
-            </button>
-            <button
-              onClick={nextMonth}
-              className="p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 transition-colors"
-            >
-              <ChevronRight className="w-5 h-5" />
-            </button>
+          <div className="flex items-center gap-3">
+            {/* Legend — makes the colour coding self-explanatory instead of
+                relying on the reader noticing the red/amber tint. */}
+            <div className="hidden md:flex items-center gap-3 text-[11px] text-gray-500 dark:text-gray-400 mr-2">
+              <span className="flex items-center gap-1">
+                <span className="w-2 h-2 rounded-full bg-red-500" /> Missing
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="w-2 h-2 rounded-full bg-amber-400" /> Due soon
+              </span>
+              <span className="flex items-center gap-1">
+                <CalendarCheck2 className="w-3 h-3 text-blue-400" /> Planned
+              </span>
+            </div>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={prevMonth}
+                className="p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 transition-colors"
+              >
+                <ChevronLeft className="w-5 h-5" />
+              </button>
+              <button
+                onClick={() => setCurrentDate(new Date())}
+                className="px-3 py-1 text-xs font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors"
+              >
+                Today
+              </button>
+              <button
+                onClick={nextMonth}
+                className="p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 transition-colors"
+              >
+                <ChevronRight className="w-5 h-5" />
+              </button>
+            </div>
           </div>
         </div>
 

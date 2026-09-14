@@ -3,6 +3,7 @@ import { useSearchParams, useNavigate } from "react-router-dom";
 import { schemeOfWorkApi, SchemeEntry } from "../api/schemeOfWork";
 import { useToast } from "../contexts/ToastContext";
 import { lessonPlanApi, LessonPlan } from "../api/lessonPlan";
+import { getMyCalendar } from "../api/calendar";
 import {
   myAssignedSubjectsApi,
   MyAssignedSubject,
@@ -72,6 +73,13 @@ const SchemeOfWorkCalendar: React.FC = () => {
   const [entries, setEntries] = useState<SchemeEntry[]>([]);
   const [lessonPlans, setLessonPlans] = useState<Record<number, LessonPlan[]>>(
     {},
+  );
+  // Real weekdays this subject/class actually meets, straight from the
+  // teacher's own timetable (0=Sun..6=Sat, matching Date#getDay()) — used to
+  // tell the calendar which cells are teaching days rather than guessing off
+  // a 7-day pattern from the first lesson plan ever logged.
+  const [scheduledWeekdays, setScheduledWeekdays] = useState<Set<number>>(
+    new Set(),
   );
   const [loading, setLoading] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
@@ -224,6 +232,26 @@ const SchemeOfWorkCalendar: React.FC = () => {
         }
       } catch (err) {
         console.error("Failed to load subject info", err);
+      }
+
+      // Pull the teacher's real timetable for this term/class group so the
+      // calendar can flag actual teaching days that lack a lesson plan,
+      // instead of guessing a 7-day pattern from whenever the first plan
+      // happened to be logged.
+      try {
+        const calendarData = await getMyCalendar({
+          academic_term_id: academicTermId,
+          class_group_id: classGroupId,
+        });
+        const weekdays = new Set(
+          (calendarData.slots || [])
+            .filter((s) => s.subject_id === subjectId)
+            .map((s) => Number(s.day_of_week)),
+        );
+        setScheduledWeekdays(weekdays);
+      } catch (err) {
+        console.error("Failed to load timetable for scheme calendar", err);
+        setScheduledWeekdays(new Set());
       }
 
       // Fetch lesson plans for each entry
@@ -1423,6 +1451,7 @@ const SchemeOfWorkCalendar: React.FC = () => {
               <RealCalendarView
                 entries={entries}
                 lessonPlans={lessonPlans}
+                scheduledWeekdays={scheduledWeekdays}
                 onDayClick={handleDayClick}
                 onPlanClick={handlePlanClick}
                 onDeletePlan={handleDeleteLessonPlan}
