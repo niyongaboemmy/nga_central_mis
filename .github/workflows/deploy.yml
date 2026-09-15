@@ -84,6 +84,16 @@ jobs:
               echo "Migration 071 already applied, skipping."
             fi
 
+            # Applies migration 072 (Notification + DocumentShareLink tables, and adds
+            # DOWNLOAD to FolderPermission.permission_type) for the document-sharing
+            # feature -- same idempotent, single-file pattern as migration 071 above.
+            if ! mysql -h "$MIGRATION_DB_HOST" -u "$MIGRATION_DB_USERNAME" -p"$MIGRATION_DB_PASSWORD" "$MIGRATION_DB_NAME" -e "SHOW TABLES LIKE 'Notification';" | grep -q "Notification"; then
+              echo "Applying migration 072 (Notification, DocumentShareLink, FolderPermission.DOWNLOAD)..."
+              mysql -h "$MIGRATION_DB_HOST" -u "$MIGRATION_DB_USERNAME" -p"$MIGRATION_DB_PASSWORD" "$MIGRATION_DB_NAME" < migrations/072_document_sharing_and_notifications.sql
+            else
+              echo "Migration 072 already applied, skipping."
+            fi
+
             npm run build
             npm prune --omit=dev
 
