@@ -81,6 +81,12 @@ const SchemeOfWorkCalendar: React.FC = () => {
   const [scheduledWeekdays, setScheduledWeekdays] = useState<Set<number>>(
     new Set(),
   );
+  // The subject/class's own timetable slots, keyed by weekday, so the lesson
+  // plan editor can auto-fill time slot and class info instead of a teacher
+  // retyping what the timetable already knows.
+  const [weekdayDefaults, setWeekdayDefaults] = useState<
+    Record<number, { start_time: string; end_time: string; class_name?: string; location?: string }>
+  >({});
   const [loading, setLoading] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
   const [isMatchingCriteria, setIsMatchingCriteria] = useState(false);
@@ -235,23 +241,46 @@ const SchemeOfWorkCalendar: React.FC = () => {
       }
 
       // Pull the teacher's real timetable for this term/class group so the
-      // calendar can flag actual teaching days that lack a lesson plan,
-      // instead of guessing a 7-day pattern from whenever the first plan
-      // happened to be logged.
+      // calendar can flag actual teaching days that lack a lesson plan
+      // (instead of guessing a 7-day pattern from whenever the first plan
+      // happened to be logged), and so the lesson plan editor can auto-fill
+      // the time slot and class info a new plan would otherwise ask for by
+      // hand.
       try {
         const calendarData = await getMyCalendar({
           academic_term_id: academicTermId,
           class_group_id: classGroupId,
         });
-        const weekdays = new Set(
-          (calendarData.slots || [])
-            .filter((s) => s.subject_id === subjectId)
-            .map((s) => Number(s.day_of_week)),
+        const subjectSlots = (calendarData.slots || []).filter(
+          (s) => s.subject_id === subjectId,
         );
-        setScheduledWeekdays(weekdays);
+        setScheduledWeekdays(
+          new Set(subjectSlots.map((s) => Number(s.day_of_week))),
+        );
+
+        const byWeekday: Record<
+          number,
+          { start_time: string; end_time: string; class_name?: string; location?: string }
+        > = {};
+        for (const slot of subjectSlots) {
+          const day = Number(slot.day_of_week);
+          // A day can carry more than one period for the same subject/class
+          // (double period, or two separate slots) — keep the earliest one.
+          if (byWeekday[day] && byWeekday[day].start_time <= slot.start_time) {
+            continue;
+          }
+          byWeekday[day] = {
+            start_time: slot.start_time,
+            end_time: slot.end_time,
+            class_name: slot.class_group_name,
+            location: slot.location,
+          };
+        }
+        setWeekdayDefaults(byWeekday);
       } catch (err) {
         console.error("Failed to load timetable for scheme calendar", err);
         setScheduledWeekdays(new Set());
+        setWeekdayDefaults({});
       }
 
       // Fetch lesson plans for each entry
@@ -1496,6 +1525,12 @@ const SchemeOfWorkCalendar: React.FC = () => {
             initialData={editingLesson}
             entryTopic={entries.find((e) => e.entry_id === selectedEntryId)?.topic}
             entryWeekLabel={entries.find((e) => e.entry_id === selectedEntryId)?.week_number}
+            weekdayDefaults={weekdayDefaults}
+            instructorName={
+              user?.profile?.first_name
+                ? `${user.profile.first_name} ${user.profile.last_name || ""}`.trim()
+                : user?.user?.username
+            }
           />
         )}
 

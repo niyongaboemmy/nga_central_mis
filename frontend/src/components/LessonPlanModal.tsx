@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   X,
   Save,
@@ -16,10 +16,26 @@ import {
   Sparkles,
   CloudUpload,
   ArrowRight,
+  ArrowLeft,
+  CalendarDays,
+  Timer,
+  GraduationCap,
+  UserRound,
+  Users,
+  CheckCircle2,
+  Circle,
+  AlertCircle,
 } from "lucide-react";
 import { LessonPlan, lessonPlanApi } from "../api/lessonPlan";
 import { useToast } from "../contexts/ToastContext";
 import LessonPlanAIGenerate from "./LessonPlanAIGenerate";
+
+interface WeekdayDefault {
+  start_time: string;
+  end_time: string;
+  class_name?: string;
+  location?: string;
+}
 
 interface LessonPlanModalProps {
   isOpen: boolean;
@@ -29,6 +45,12 @@ interface LessonPlanModalProps {
   initialData?: LessonPlan | null;
   entryTopic?: string;
   entryWeekLabel?: string;
+  // The subject/class's real timetable, keyed by weekday (0=Sun..6=Sat,
+  // matching Date#getDay()) — lets a brand-new plan auto-fill its time slot
+  // and class name instead of asking the teacher to retype what the
+  // timetable already knows.
+  weekdayDefaults?: Record<number, WeekdayDefault>;
+  instructorName?: string;
 }
 
 type ModalMode = "choose" | "manual" | "ai";
@@ -50,6 +72,8 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
   initialData,
   entryTopic,
   entryWeekLabel,
+  weekdayDefaults,
+  instructorName,
 }) => {
   const { showToast } = useToast();
   const [activeTab, setActiveTab] = useState<TabType>("Header");
@@ -115,18 +139,117 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
 
   const [formData, setFormData] =
     useState<Partial<LessonPlan>>(defaultFormData);
+  // Snapshot of the form the moment it was opened/loaded, so we can tell a
+  // teacher apart who is mid-edit from one who hasn't touched anything yet —
+  // used to warn before a close/Escape would silently drop their work.
+  const [savedSnapshot, setSavedSnapshot] = useState<string>(
+    JSON.stringify(defaultFormData),
+  );
+  // Which fields were pre-filled from the timetable rather than typed by the
+  // teacher — surfaced as a small "from timetable" hint so it's clear these
+  // values are a suggestion, not something already saved.
+  const [autoFilledFields, setAutoFilledFields] = useState<Set<string>>(
+    new Set(),
+  );
+  // Turns on inline "Required" messaging — deliberately withheld until the
+  // teacher actually tries to save, so opening the modal never greets them
+  // with a wall of red.
+  const [attemptedSave, setAttemptedSave] = useState(false);
+
+  // Only ever fills gaps — never overwrites a value the teacher (or a saved
+  // plan) already has, whether that's real data or something typed a moment
+  // ago and not yet saved.
+  const withTimetableDefaults = (
+    data: Partial<LessonPlan>,
+  ): { data: Partial<LessonPlan>; filled: Set<string> } => {
+    const filled = new Set<string>();
+    if (!weekdayDefaults || !data.lesson_date) return { data, filled };
+
+    const [y, m, d] = data.lesson_date.split("-").map(Number);
+    const weekday = new Date(y, (m || 1) - 1, d || 1).getDay();
+    const slot = weekdayDefaults[weekday];
+    const next = { ...data };
+
+    if (slot) {
+      if (!next.start_time) {
+        next.start_time = slot.start_time;
+        filled.add("start_time");
+      }
+      if (!next.end_time) {
+        next.end_time = slot.end_time;
+        filled.add("end_time");
+      }
+      if (!next.class_name && slot.class_name) {
+        next.class_name = slot.class_name;
+        filled.add("class_name");
+      }
+    }
+    if (!next.instructor_name && instructorName) {
+      next.instructor_name = instructorName;
+      filled.add("instructor_name");
+    }
+    return { data: next, filled };
+  };
 
   useEffect(() => {
     if (initialData) {
       // Merge initialData with defaultFormData to ensure all required fields exist
-      setFormData({ ...defaultFormData, ...initialData, entry_id: entryId });
+      const merged = { ...defaultFormData, ...initialData, entry_id: entryId };
+      // Only worth auto-filling for a plan that isn't saved yet — an
+      // existing plan's own recorded time slot always wins.
+      const { data: withDefaults, filled } = merged.id
+        ? { data: merged, filled: new Set<string>() }
+        : withTimetableDefaults(merged);
+      setFormData(withDefaults);
+      setAutoFilledFields(filled);
+      setSavedSnapshot(JSON.stringify(withDefaults));
       setMode("manual");
     } else {
-      setFormData({ ...defaultFormData, entry_id: entryId });
+      const { data: fresh, filled } = withTimetableDefaults({
+        ...defaultFormData,
+        entry_id: entryId,
+      });
+      setFormData(fresh);
+      setAutoFilledFields(filled);
+      setSavedSnapshot(JSON.stringify(fresh));
       setMode("choose");
     }
     setActiveTab("Header");
+    setAttemptedSave(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialData, entryId, isOpen]);
+
+  const isDirty = mode === "manual" && JSON.stringify(formData) !== savedSnapshot;
+
+  // A close request (backdrop click, X button, Escape) checks for unsaved
+  // work first — losing a half-written lesson plan silently is the single
+  // most frustrating thing this modal could do to a teacher.
+  const requestClose = useCallback(() => {
+    if (isDirty && !window.confirm("You have unsaved changes. Discard them?")) {
+      return;
+    }
+    onClose();
+  }, [isDirty, onClose]);
+
+  // Esc closes (with the unsaved-changes guard); Cmd/Ctrl+S saves without
+  // needing to reach for the sidebar button.
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        requestClose();
+      } else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "s") {
+        if (mode === "manual") {
+          e.preventDefault();
+          handleSave();
+        }
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, requestClose, mode, formData]);
 
   const handleChange = (
     e: React.ChangeEvent<
@@ -135,6 +258,14 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
   ) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
+    // Once a teacher edits an auto-filled field it's their value now — drop
+    // the "from timetable" hint so it doesn't look stale.
+    setAutoFilledFields((prev) => {
+      if (!prev.has(name)) return prev;
+      const next = new Set(prev);
+      next.delete(name);
+      return next;
+    });
   };
 
   const handleOutcomeChange = (index: number, field: string, value: any) => {
@@ -226,7 +357,28 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
     }));
   };
 
+  // Sections a plan can't be finalized without. Footer (notes/sign-off) and
+  // Preview are left out on purpose — useful, but not blocking.
+  const requiredTabs: TabType[] = [
+    "Header",
+    "Objectives",
+    "Introduction",
+    "Development",
+    "Conclusion",
+  ];
+
   const handleSave = async () => {
+    const missing = requiredTabs.filter((t) => !isTabComplete(t));
+    if (missing.length > 0) {
+      setAttemptedSave(true);
+      setActiveTab(missing[0]);
+      showToast(
+        `Please complete before saving: ${missing.join(", ")}`,
+        "error",
+      );
+      return;
+    }
+
     setLoading(true);
     try {
       await lessonPlanApi.save({
@@ -307,110 +459,261 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
     "Preview",
   ];
 
+  // Shared validation helpers — surfaced only after a save attempt, so
+  // opening the modal never front-loads a wall of red before the teacher has
+  // typed anything.
+  const showRequiredError = (value: unknown) => attemptedSave && !value;
+  const requiredFieldClass = (invalid: boolean) =>
+    invalid
+      ? "border-red-300 dark:border-red-800 focus:ring-2 focus:ring-red-500/40 focus:border-red-500 bg-red-50/50 dark:bg-red-950/10"
+      : "";
+  const RequiredHint = ({ show }: { show: boolean }) =>
+    show ? (
+      <p className="flex items-center gap-1 text-[11px] font-semibold text-red-500 dark:text-red-400 mt-1">
+        <AlertCircle className="w-3 h-3" /> Required
+      </p>
+    ) : null;
+
+  // The banner every section shows once it's incomplete: amber before a save
+  // attempt (a gentle heads-up), red after one (something blocked the save).
+  const SectionBanner = ({ tab, message }: { tab: TabType; message: string }) =>
+    !isTabComplete(tab) ? (
+      <div
+        className={`flex items-center gap-2 text-xs rounded-xl px-4 py-2.5 border ${
+          attemptedSave
+            ? "text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/10 border-red-100 dark:border-red-900/30"
+            : "text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/10 border-amber-100 dark:border-amber-900/30"
+        }`}
+      >
+        <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
+        {message}
+      </div>
+    ) : null;
+
   const renderTabContent = () => {
     switch (activeTab) {
-      case "Header":
+      case "Header": {
+        const baseField =
+          "w-full bg-gray-50 dark:bg-gray-900 border rounded-xl pl-9 pr-3 py-2.5 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 hover:border-gray-200 dark:hover:border-gray-600 transition-all";
+        const okBorder =
+          "border-gray-100 dark:border-gray-700 focus:ring-blue-500/50 focus:border-blue-500 dark:focus:border-blue-500";
+        const errBorder =
+          "border-red-300 dark:border-red-800 focus:ring-red-500/40 focus:border-red-500 bg-red-50/50 dark:bg-red-950/10";
+        const fieldClass = (invalid: boolean) =>
+          `${baseField} ${invalid ? errBorder : okBorder}`;
+        const showError = (value: unknown) =>
+          attemptedSave && !value;
+
+        const FieldIcon = ({ children }: { children: React.ReactNode }) => (
+          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+            {children}
+          </span>
+        );
+        const AutoBadge = ({ field }: { field: string }) =>
+          autoFilledFields.has(field) ? (
+            <span
+              className="inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-wide text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 px-1.5 py-0.5 rounded-full"
+              title="Pre-filled from your timetable — edit if this lesson differs"
+            >
+              <CalendarDays className="w-2.5 h-2.5" />
+              From timetable
+            </span>
+          ) : null;
+        const RequiredHint = ({ show }: { show: boolean }) =>
+          show ? (
+            <p className="flex items-center gap-1 text-[11px] font-semibold text-red-500 dark:text-red-400">
+              <AlertCircle className="w-3 h-3" /> Required
+            </p>
+          ) : null;
+
         return (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-in fade-in slide-in-from-right-2">
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-gray-400 uppercase">
-                Lesson Date
-              </label>
-              <input
-                type="date"
-                name="lesson_date"
-                value={formData.lesson_date || ""}
-                onChange={handleChange}
-                className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-xl px-3 py-2 text-sm text-gray-900 dark:text-white"
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-gray-400 uppercase">
-                Time Slot
-              </label>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  name="start_time"
-                  placeholder="08:30"
-                  value={formData.start_time || ""}
-                  onChange={handleChange}
-                  className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-xl px-3 py-2 text-sm text-gray-900 dark:text-white"
-                />
-                <input
-                  type="text"
-                  name="end_time"
-                  placeholder="10:30"
-                  value={formData.end_time || ""}
-                  onChange={handleChange}
-                  className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-xl px-3 py-2 text-sm text-gray-900 dark:text-white"
-                />
+          <div className="space-y-6 animate-in fade-in slide-in-from-right-2">
+            {Object.keys(weekdayDefaults || {}).length > 0 && autoFilledFields.size > 0 && (
+              <div className="flex items-center gap-2 text-xs text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-900/30 rounded-xl px-4 py-2.5">
+                <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0" />
+                Time slot and class details were pre-filled from this subject's timetable — adjust anything that's different for this lesson.
+              </div>
+            )}
+
+            {/* Schedule */}
+            <div className="p-5 rounded-2xl border border-gray-100 dark:border-gray-800 bg-gray-50/40 dark:bg-gray-900/20">
+              <h3 className="flex items-center gap-2 text-xs font-black text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-4">
+                <CalendarDays className="w-3.5 h-3.5 text-blue-500" />
+                Schedule
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-gray-400 uppercase">
+                    Lesson Date <span className="text-red-400">*</span>
+                  </label>
+                  <div className="relative">
+                    <FieldIcon>
+                      <CalendarDays className="w-4 h-4" />
+                    </FieldIcon>
+                    <input
+                      type="date"
+                      name="lesson_date"
+                      value={formData.lesson_date || ""}
+                      onChange={handleChange}
+                      required
+                      className={fieldClass(showError(formData.lesson_date))}
+                    />
+                  </div>
+                  <RequiredHint show={showError(formData.lesson_date)} />
+                </div>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <label className="text-xs font-bold text-gray-400 uppercase">
+                      Time Slot <span className="text-red-400">*</span>
+                    </label>
+                    <AutoBadge field="start_time" />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="relative flex-1">
+                      <FieldIcon>
+                        <Timer className="w-4 h-4" />
+                      </FieldIcon>
+                      <input
+                        type="time"
+                        name="start_time"
+                        value={formData.start_time || ""}
+                        onChange={handleChange}
+                        required
+                        className={fieldClass(showError(formData.start_time))}
+                      />
+                    </div>
+                    <ArrowRight className="w-3.5 h-3.5 text-gray-300 dark:text-gray-700 flex-shrink-0" />
+                    <div className="relative flex-1">
+                      <FieldIcon>
+                        <Timer className="w-4 h-4" />
+                      </FieldIcon>
+                      <input
+                        type="time"
+                        name="end_time"
+                        value={formData.end_time || ""}
+                        onChange={handleChange}
+                        required
+                        className={fieldClass(showError(formData.end_time))}
+                      />
+                    </div>
+                  </div>
+                  <RequiredHint
+                    show={showError(formData.start_time) || showError(formData.end_time)}
+                  />
+                </div>
               </div>
             </div>
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-gray-400 uppercase">
-                Sector
-              </label>
-              <input
-                type="text"
-                name="sector"
-                value={formData.sector || ""}
-                onChange={handleChange}
-                className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-xl px-3 py-2 text-sm text-gray-900 dark:text-white"
-              />
+
+            {/* Class & Instructor */}
+            <div className="p-5 rounded-2xl border border-gray-100 dark:border-gray-800 bg-gray-50/40 dark:bg-gray-900/20">
+              <h3 className="flex items-center gap-2 text-xs font-black text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-4">
+                <GraduationCap className="w-3.5 h-3.5 text-blue-500" />
+                Class &amp; Instructor
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-gray-400 uppercase">
+                    Sector
+                  </label>
+                  <div className="relative">
+                    <FieldIcon>
+                      <BookOpen className="w-4 h-4" />
+                    </FieldIcon>
+                    <input
+                      type="text"
+                      name="sector"
+                      placeholder="e.g. ICT"
+                      value={formData.sector || ""}
+                      onChange={handleChange}
+                      className={fieldClass(false)}
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-gray-400 uppercase">
+                    Trade
+                  </label>
+                  <div className="relative">
+                    <FieldIcon>
+                      <Target className="w-4 h-4" />
+                    </FieldIcon>
+                    <input
+                      type="text"
+                      name="trade"
+                      placeholder="e.g. Software Development"
+                      value={formData.trade || ""}
+                      onChange={handleChange}
+                      className={fieldClass(false)}
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <label className="text-xs font-bold text-gray-400 uppercase">
+                      Instructor Name
+                    </label>
+                    <AutoBadge field="instructor_name" />
+                  </div>
+                  <div className="relative">
+                    <FieldIcon>
+                      <UserRound className="w-4 h-4" />
+                    </FieldIcon>
+                    <input
+                      type="text"
+                      name="instructor_name"
+                      placeholder="Your name"
+                      value={formData.instructor_name || ""}
+                      onChange={handleChange}
+                      className={fieldClass(false)}
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <label className="text-xs font-bold text-gray-400 uppercase">
+                      Class Name
+                    </label>
+                    <AutoBadge field="class_name" />
+                  </div>
+                  <div className="relative">
+                    <FieldIcon>
+                      <Users className="w-4 h-4" />
+                    </FieldIcon>
+                    <input
+                      type="text"
+                      name="class_name"
+                      placeholder="e.g. L3 Class A"
+                      value={formData.class_name || ""}
+                      onChange={handleChange}
+                      className={fieldClass(false)}
+                    />
+                  </div>
+                </div>
+              </div>
             </div>
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-gray-400 uppercase">
-                Trade
-              </label>
-              <input
-                type="text"
-                name="trade"
-                value={formData.trade || ""}
-                onChange={handleChange}
-                className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-xl px-3 py-2 text-sm text-gray-900 dark:text-white"
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-gray-400 uppercase">
-                Instructor Name
-              </label>
-              <input
-                type="text"
-                name="instructor_name"
-                value={formData.instructor_name || ""}
-                onChange={handleChange}
-                className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-xl px-3 py-2 text-sm text-gray-900 dark:text-white"
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-gray-400 uppercase">
-                Class Name
-              </label>
-              <input
-                type="text"
-                name="class_name"
-                value={formData.class_name || ""}
-                onChange={handleChange}
-                className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-xl px-3 py-2 text-sm text-gray-900 dark:text-white"
-              />
-            </div>
+
+            <SectionBanner
+              tab="Header"
+              message="Date and time slot are required before this plan can be finalized."
+            />
           </div>
         );
+      }
       case "Objectives":
         return (
           <div className="space-y-6 animate-in fade-in slide-in-from-right-2">
             <div className="space-y-2">
               <label className="text-xs font-bold text-gray-400 uppercase">
-                Big Question
+                Big Question <span className="text-red-400">*</span>
               </label>
               <textarea
                 name="big_question"
                 value={formData.big_question || ""}
                 onChange={handleChange}
                 rows={2}
-                className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-xl px-3 py-2 text-sm text-gray-900 dark:text-white"
+                className={`w-full bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-xl px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 dark:focus:border-blue-500 hover:border-gray-200 dark:hover:border-gray-600 transition-all ${requiredFieldClass(showRequiredError(formData.big_question))}`}
               />
+              <RequiredHint show={showRequiredError(formData.big_question)} />
             </div>
             <div className="space-y-4">
               <div className="flex items-center justify-between">
@@ -443,7 +746,7 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
                       onChange={(e) =>
                         handleOutcomeChange(idx, "code", e.target.value)
                       }
-                      className="bg-transparent border-b border-gray-200 dark:border-gray-700 px-2 py-1 text-xs font-bold text-gray-900 dark:text-white"
+                      className="bg-transparent border-b border-gray-200 dark:border-gray-700 px-2 py-1 text-xs font-bold text-gray-900 dark:text-white focus:outline-none focus:border-blue-500 transition-colors"
                     />
                     <input
                       type="text"
@@ -452,7 +755,7 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
                       onChange={(e) =>
                         handleOutcomeChange(idx, "title", e.target.value)
                       }
-                      className="col-span-2 bg-transparent border-b border-gray-200 dark:border-gray-700 px-2 py-1 text-xs text-gray-900 dark:text-white"
+                      className="col-span-2 bg-transparent border-b border-gray-200 dark:border-gray-700 px-2 py-1 text-xs text-gray-900 dark:text-white focus:outline-none focus:border-blue-500 transition-colors"
                     />
                     <input
                       type="number"
@@ -465,7 +768,7 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
                           parseInt(e.target.value) || 0,
                         )
                       }
-                      className="bg-transparent border-b border-gray-200 dark:border-gray-700 px-2 py-1 text-xs text-gray-900 dark:text-white"
+                      className="bg-transparent border-b border-gray-200 dark:border-gray-700 px-2 py-1 text-xs text-gray-900 dark:text-white focus:outline-none focus:border-blue-500 transition-colors"
                     />
                   </div>
                   <textarea
@@ -522,7 +825,7 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
                                 outcomes: newOutcomes,
                               }));
                             }}
-                            className="flex-1 bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded px-2 py-1 text-xs"
+                            className="flex-1 bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 dark:focus:border-blue-500 hover:border-gray-200 dark:hover:border-gray-600 transition-all"
                           />
                           <button
                             onClick={() => {
@@ -548,6 +851,11 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
                 </div>
               ))}
             </div>
+
+            <SectionBanner
+              tab="Objectives"
+              message="A big question and at least one titled learning outcome are required."
+            />
           </div>
         );
       case "Introduction":
@@ -564,7 +872,7 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <label className="text-xs font-bold text-gray-400 uppercase">
-                  Trainer Activities
+                  Trainer Activities <span className="text-red-400">*</span>
                 </label>
                 <textarea
                   value={intro.trainer_activities}
@@ -576,12 +884,13 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
                     )
                   }
                   rows={6}
-                  className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-xl px-4 py-2 text-sm text-gray-900 dark:text-gray-100"
+                  className={`w-full bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-xl px-4 py-2 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 dark:focus:border-blue-500 hover:border-gray-200 dark:hover:border-gray-600 transition-all ${requiredFieldClass(showRequiredError(intro.trainer_activities))}`}
                 />
+                <RequiredHint show={showRequiredError(intro.trainer_activities)} />
               </div>
               <div className="space-y-2">
                 <label className="text-xs font-bold text-gray-400 uppercase">
-                  Learner Activities
+                  Learner Activities <span className="text-red-400">*</span>
                 </label>
                 <textarea
                   value={intro.learner_activities}
@@ -593,8 +902,9 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
                     )
                   }
                   rows={6}
-                  className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-xl px-4 py-2 text-sm text-gray-900 dark:text-gray-100"
+                  className={`w-full bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-xl px-4 py-2 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 dark:focus:border-blue-500 hover:border-gray-200 dark:hover:border-gray-600 transition-all ${requiredFieldClass(showRequiredError(intro.learner_activities))}`}
                 />
+                <RequiredHint show={showRequiredError(intro.learner_activities)} />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
@@ -612,7 +922,7 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
                       e.target.value,
                     )
                   }
-                  className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-xl px-4 py-2 text-sm text-gray-900 dark:text-white"
+                  className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-xl px-4 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 dark:focus:border-blue-500 hover:border-gray-200 dark:hover:border-gray-600 transition-all"
                 />
               </div>
               <div className="space-y-2">
@@ -629,10 +939,14 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
                       parseInt(e.target.value) || 0,
                     )
                   }
-                  className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-xl px-4 py-2 text-sm text-gray-900 dark:text-white"
+                  className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-xl px-4 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 dark:focus:border-blue-500 hover:border-gray-200 dark:hover:border-gray-600 transition-all"
                 />
               </div>
             </div>
+            <SectionBanner
+              tab="Introduction"
+              message="Trainer and learner activities are required for this section."
+            />
           </div>
         );
       case "Development":
@@ -649,7 +963,7 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <label className="text-xs font-bold text-gray-400 uppercase">
-                  Trainer Activities
+                  Trainer Activities <span className="text-red-400">*</span>
                 </label>
                 <textarea
                   value={dev.trainer_activities}
@@ -661,12 +975,13 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
                     )
                   }
                   rows={6}
-                  className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-2xl px-5 py-3 text-sm text-gray-900 dark:text-gray-100"
+                  className={`w-full bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-2xl px-5 py-3 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 dark:focus:border-blue-500 hover:border-gray-200 dark:hover:border-gray-600 transition-all ${requiredFieldClass(showRequiredError(dev.trainer_activities))}`}
                 />
+                <RequiredHint show={showRequiredError(dev.trainer_activities)} />
               </div>
               <div className="space-y-2">
                 <label className="text-xs font-bold text-gray-400 uppercase">
-                  Learner Activities
+                  Learner Activities <span className="text-red-400">*</span>
                 </label>
                 <textarea
                   value={dev.learner_activities}
@@ -678,8 +993,9 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
                     )
                   }
                   rows={6}
-                  className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-2xl px-5 py-3 text-sm text-gray-900 dark:text-gray-100"
+                  className={`w-full bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-2xl px-5 py-3 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 dark:focus:border-blue-500 hover:border-gray-200 dark:hover:border-gray-600 transition-all ${requiredFieldClass(showRequiredError(dev.learner_activities))}`}
                 />
+                <RequiredHint show={showRequiredError(dev.learner_activities)} />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
@@ -697,7 +1013,7 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
                       e.target.value,
                     )
                   }
-                  className="w-full h-11 px-5 text-sm bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-full text-gray-900 dark:text-white"
+                  className="w-full h-11 px-5 text-sm bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-full text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 dark:focus:border-blue-500 hover:border-gray-200 dark:hover:border-gray-600 transition-all"
                 />
               </div>
               <div className="space-y-2">
@@ -714,7 +1030,7 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
                       parseInt(e.target.value) || 0,
                     )
                   }
-                  className="w-full h-11 px-5 text-sm bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-full text-gray-900 dark:text-white"
+                  className="w-full h-11 px-5 text-sm bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-full text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 dark:focus:border-blue-500 hover:border-gray-200 dark:hover:border-gray-600 transition-all"
                 />
               </div>
             </div>
@@ -746,7 +1062,7 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
                           indicativeContent: newList,
                         }));
                       }}
-                      className="w-1/3 bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-xl px-3 py-1.5 text-xs font-bold text-blue-600"
+                      className="w-1/3 bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-xl px-3 py-1.5 text-xs font-bold text-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 dark:focus:border-blue-500 hover:border-gray-200 dark:hover:border-gray-600 transition-all"
                     />
                     <textarea
                       placeholder="Content"
@@ -760,7 +1076,7 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
                         }));
                       }}
                       rows={1}
-                      className="flex-1 bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-xl px-3 py-1.5 text-xs text-gray-900 dark:text-gray-100"
+                      className="flex-1 bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-xl px-3 py-1.5 text-xs text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 dark:focus:border-blue-500 hover:border-gray-200 dark:hover:border-gray-600 transition-all"
                     />
                     <button
                       onClick={() => removeIndicativeContent(idx)}
@@ -840,6 +1156,11 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
                 </div>
               ))}
             </div>
+
+            <SectionBanner
+              tab="Development"
+              message="Trainer and learner activities are required for this section."
+            />
           </div>
         );
       case "Conclusion":
@@ -856,7 +1177,7 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <label className="text-xs font-bold text-gray-400 uppercase">
-                  Trainer Activities
+                  Trainer Activities <span className="text-red-400">*</span>
                 </label>
                 <textarea
                   value={conc.trainer_activities}
@@ -868,12 +1189,13 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
                     )
                   }
                   rows={6}
-                  className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-2xl px-5 py-3 text-sm text-gray-900 dark:text-gray-100"
+                  className={`w-full bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-2xl px-5 py-3 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 dark:focus:border-blue-500 hover:border-gray-200 dark:hover:border-gray-600 transition-all ${requiredFieldClass(showRequiredError(conc.trainer_activities))}`}
                 />
+                <RequiredHint show={showRequiredError(conc.trainer_activities)} />
               </div>
               <div className="space-y-2">
                 <label className="text-xs font-bold text-gray-400 uppercase">
-                  Learner Activities
+                  Learner Activities <span className="text-red-400">*</span>
                 </label>
                 <textarea
                   value={conc.learner_activities}
@@ -885,8 +1207,9 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
                     )
                   }
                   rows={6}
-                  className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-2xl px-5 py-3 text-sm text-gray-900 dark:text-gray-100"
+                  className={`w-full bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-2xl px-5 py-3 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 dark:focus:border-blue-500 hover:border-gray-200 dark:hover:border-gray-600 transition-all ${requiredFieldClass(showRequiredError(conc.learner_activities))}`}
                 />
+                <RequiredHint show={showRequiredError(conc.learner_activities)} />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
@@ -904,7 +1227,7 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
                       e.target.value,
                     )
                   }
-                  className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-2xl px-5 py-3 text-sm text-gray-900 dark:text-white"
+                  className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-2xl px-5 py-3 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 dark:focus:border-blue-500 hover:border-gray-200 dark:hover:border-gray-600 transition-all"
                 />
               </div>
               <div className="space-y-2">
@@ -921,10 +1244,15 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
                       parseInt(e.target.value) || 0,
                     )
                   }
-                  className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-2xl px-5 py-3 text-sm text-gray-900 dark:text-white"
+                  className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-2xl px-5 py-3 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 dark:focus:border-blue-500 hover:border-gray-200 dark:hover:border-gray-600 transition-all"
                 />
               </div>
             </div>
+
+            <SectionBanner
+              tab="Conclusion"
+              message="Trainer and learner activities are required for this section."
+            />
           </div>
         );
       case "Footer":
@@ -957,7 +1285,7 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
                         }));
                       }}
                       rows={1}
-                      className="flex-1 bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-xl px-4 py-2 text-xs text-gray-900 dark:text-gray-100"
+                      className="flex-1 bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-xl px-4 py-2 text-xs text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 dark:focus:border-blue-500 hover:border-gray-200 dark:hover:border-gray-600 transition-all"
                     />
                     <button
                       onClick={() => removeAssignment(idx)}
@@ -991,7 +1319,7 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
                   }))
                 }
                 rows={4}
-                className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-2xl px-5 py-3 text-sm text-gray-900 dark:text-gray-100"
+                className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-2xl px-5 py-3 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 dark:focus:border-blue-500 hover:border-gray-200 dark:hover:border-gray-600 transition-all"
               />
             </div>
             <div className="space-y-2">
@@ -1015,7 +1343,7 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
                   }))
                 }
                 rows={2}
-                className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-xl px-4 py-2 text-sm text-gray-900 dark:text-gray-100"
+                className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-xl px-4 py-2 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 dark:focus:border-blue-500 hover:border-gray-200 dark:hover:border-gray-600 transition-all"
               />
             </div>
             <div className="grid grid-cols-2 gap-4">
@@ -1041,7 +1369,7 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
                       } as any,
                     }))
                   }
-                  className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-xl px-4 py-2 text-sm text-gray-900 dark:text-white"
+                  className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-xl px-4 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 dark:focus:border-blue-500 hover:border-gray-200 dark:hover:border-gray-600 transition-all"
                 />
               </div>
               <div className="space-y-1">
@@ -1066,7 +1394,7 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
                       } as any,
                     }))
                   }
-                  className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-xl px-4 py-2 text-sm text-gray-900 dark:text-white"
+                  className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-xl px-4 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 dark:focus:border-blue-500 hover:border-gray-200 dark:hover:border-gray-600 transition-all"
                 />
               </div>
             </div>
@@ -1230,6 +1558,53 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
     }
   };
 
+  // Lightweight completion signal per section — lets the sidebar show a
+  // teacher at a glance which parts of the plan still need attention instead
+  // of them having to click through all seven tabs to find out. "Preview" is
+  // a read-only summary, so it isn't part of the checklist.
+  const sectionOf = (type: "Introduction" | "Development" | "Conclusion") =>
+    formData.sections?.find((s) => s.section_type === type);
+
+  const isTabComplete = (tab: TabType): boolean => {
+    switch (tab) {
+      case "Header":
+        return !!(formData.lesson_date && formData.start_time && formData.end_time);
+      case "Objectives":
+        return !!(
+          formData.big_question &&
+          formData.outcomes &&
+          formData.outcomes.length > 0 &&
+          formData.outcomes.every((o) => o.title)
+        );
+      case "Introduction": {
+        const s = sectionOf("Introduction");
+        return !!(s?.trainer_activities && s?.learner_activities);
+      }
+      case "Development": {
+        const s = sectionOf("Development");
+        return !!(s?.trainer_activities && s?.learner_activities);
+      }
+      case "Conclusion": {
+        const s = sectionOf("Conclusion");
+        return !!(s?.trainer_activities && s?.learner_activities);
+      }
+      case "Footer":
+        return !!formData.evaluation?.teacher_notes;
+      case "Preview":
+        return true;
+    }
+  };
+
+  const checklistTabs = tabs.filter((t) => t !== "Preview");
+  const completedCount = checklistTabs.filter(isTabComplete).length;
+  const progressPct = Math.round((completedCount / checklistTabs.length) * 100);
+
+  const goToStep = (delta: 1 | -1) => {
+    const idx = tabs.indexOf(activeTab);
+    const next = tabs[idx + delta];
+    if (next) setActiveTab(next);
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -1237,7 +1612,7 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
       {/* Backdrop */}
       <div
         className="fixed inset-0 bg-black/40 backdrop-blur-sm transition-opacity animate-in fade-in duration-300"
-        onClick={onClose}
+        onClick={requestClose}
       />
 
       {/* Modal Container */}
@@ -1250,7 +1625,7 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
                 <LayoutDashboard className="w-4 h-4 text-blue-600" />
               </div>
               <div>
-                <h2 className="text-sm font-bold text-gray-900 dark:text-white">
+                <h2 className="text-sm font-bold text-gray-900 dark:text-white flex items-center gap-2">
                   {initialData
                     ? "Refine Lesson Plan"
                     : mode === "ai"
@@ -1258,6 +1633,15 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
                       : mode === "choose"
                         ? "New Lesson Plan"
                         : "Draft New Lesson Plan"}
+                  {isDirty && (
+                    <span
+                      className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 px-2 py-0.5 rounded-full"
+                      title="Unsaved changes — Cmd/Ctrl+S to save"
+                    >
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                      Unsaved
+                    </span>
+                  )}
                 </h2>
                 <p className="text-[11px] font-medium text-gray-400 dark:text-gray-500 mt-0.5">
                   {entryWeekLabel ? `${entryWeekLabel} · ` : ""}Step-by-step curriculum planning
@@ -1295,7 +1679,8 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
                 </label>
               )}
               <button
-                onClick={onClose}
+                onClick={requestClose}
+                title="Close (Esc)"
                 className="p-1.5 hover:bg-red-50 dark:hover:bg-red-950/30 text-gray-400 hover:text-red-500 rounded-full transition-all"
               >
                 <X className="w-4 h-4" />
@@ -1389,30 +1774,65 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
 
           {mode === "manual" && (
           <div className="flex flex-col lg:flex-row h-[75vh]">
-            {/* Sidebar Navigation */}
-            <div className="w-full lg:w-56 bg-gray-50/50 dark:bg-gray-900/10 border-r border-gray-50 dark:border-gray-900 p-4 space-y-1 overflow-y-auto">
-              {tabs.map((tab) => {
-                const isActive = activeTab === tab;
-                return (
-                  <button
-                    key={tab}
-                    onClick={() => setActiveTab(tab)}
-                    className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-full text-xs font-semibold transition-all duration-200 ${
-                      isActive
-                        ? "bg-blue-600 text-white shadow-sm shadow-blue-500/30"
-                        : "text-gray-500 hover:text-gray-800 dark:text-gray-500 dark:hover:text-gray-300 hover:bg-white dark:hover:bg-gray-900/50"
-                    }`}
-                  >
-                    {getIcon(tab)}
-                    {tab}
-                  </button>
-                );
-              })}
+            {/* Sidebar Navigation — a stepper, not just a tab list: a
+                progress bar and per-section dots tell a teacher at a glance
+                what's left before the plan is genuinely complete. */}
+            <div className="w-full lg:w-56 flex flex-col bg-gray-50/50 dark:bg-gray-900/10 border-r border-gray-50 dark:border-gray-900">
+              <div className="p-4 pb-3">
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                    Progress
+                  </span>
+                  <span className="text-[10px] font-bold text-gray-500 dark:text-gray-400">
+                    {completedCount}/{checklistTabs.length}
+                  </span>
+                </div>
+                <div className="h-1.5 bg-gray-200 dark:bg-gray-800 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-gradient-to-r from-blue-500 to-emerald-500 rounded-full transition-all duration-500"
+                    style={{ width: `${progressPct}%` }}
+                  />
+                </div>
+              </div>
 
-              <div className="mt-6 pt-5 border-t border-gray-100 dark:border-gray-900">
+              <div className="flex-1 overflow-y-auto px-4 space-y-1">
+                {tabs.map((tab) => {
+                  const isActive = activeTab === tab;
+                  const complete = tab !== "Preview" && isTabComplete(tab);
+                  return (
+                    <button
+                      key={tab}
+                      onClick={() => setActiveTab(tab)}
+                      className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-full text-xs font-semibold transition-all duration-200 ${
+                        isActive
+                          ? "bg-blue-600 text-white shadow-sm shadow-blue-500/30"
+                          : "text-gray-500 hover:text-gray-800 dark:text-gray-500 dark:hover:text-gray-300 hover:bg-white dark:hover:bg-gray-900/50"
+                      }`}
+                    >
+                      {getIcon(tab)}
+                      <span className="flex-1 text-left">{tab}</span>
+                      {tab !== "Preview" &&
+                        (complete ? (
+                          <CheckCircle2
+                            className={`w-3.5 h-3.5 flex-shrink-0 ${isActive ? "text-white" : "text-emerald-500"}`}
+                          />
+                        ) : (
+                          <Circle
+                            className={`w-3.5 h-3.5 flex-shrink-0 ${isActive ? "text-white/50" : "text-gray-300 dark:text-gray-700"}`}
+                          />
+                        ))}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Sticky footer — always reachable regardless of how long the
+                  step list gets or how far the user has scrolled it. */}
+              <div className="p-4 pt-3 border-t border-gray-100 dark:border-gray-900 space-y-2">
                 <button
                   onClick={handleSave}
                   disabled={loading}
+                  title="Cmd/Ctrl+S"
                   className="w-full flex items-center justify-center gap-2 px-3.5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-full text-xs font-bold shadow-sm shadow-emerald-500/20 transition-all active:scale-95 disabled:opacity-50"
                 >
                   {loading ? (
@@ -1431,7 +1851,7 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
                   <button
                     onClick={handleDelete}
                     disabled={loading}
-                    className="w-full flex items-center justify-center gap-2 px-3.5 py-2.5 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/20 dark:hover:bg-rose-950/40 text-rose-600 dark:text-rose-400 rounded-full text-xs font-semibold transition-all active:scale-95 disabled:opacity-50 mt-2"
+                    className="w-full flex items-center justify-center gap-2 px-3.5 py-2.5 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/20 dark:hover:bg-rose-950/40 text-rose-600 dark:text-rose-400 rounded-full text-xs font-semibold transition-all active:scale-95 disabled:opacity-50"
                   >
                     {!loading && <Trash2 className="w-3.5 h-3.5" />}
                     {loading && (
@@ -1444,8 +1864,34 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
             </div>
 
             {/* Content Area */}
-            <div className="flex-1 overflow-y-auto bg-white dark:bg-gray-950 p-6">
-              <div className="max-w-4xl mx-auto">{renderTabContent()}</div>
+            <div className="flex-1 flex flex-col overflow-hidden bg-white dark:bg-gray-950">
+              <div className="flex-1 overflow-y-auto p-6">
+                <div className="max-w-4xl mx-auto">{renderTabContent()}</div>
+              </div>
+
+              {/* Back/Continue — keeps the seven sections a linear walk
+                  instead of forcing every step back out to the sidebar. */}
+              <div className="flex items-center justify-between px-6 py-3 border-t border-gray-50 dark:border-gray-900 bg-white/80 dark:bg-gray-950/80 backdrop-blur-sm">
+                <button
+                  onClick={() => goToStep(-1)}
+                  disabled={tabs.indexOf(activeTab) === 0}
+                  className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200 rounded-full hover:bg-gray-50 dark:hover:bg-gray-900 transition-all disabled:opacity-0 disabled:pointer-events-none"
+                >
+                  <ArrowLeft className="w-3.5 h-3.5" />
+                  Back
+                </button>
+                <span className="text-[11px] font-medium text-gray-400 dark:text-gray-600">
+                  Step {tabs.indexOf(activeTab) + 1} of {tabs.length}
+                </span>
+                <button
+                  onClick={() => goToStep(1)}
+                  disabled={tabs.indexOf(activeTab) === tabs.length - 1}
+                  className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-blue-600 hover:text-blue-700 dark:text-blue-400 rounded-full hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all disabled:opacity-0 disabled:pointer-events-none"
+                >
+                  Continue
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
             </div>
           </div>
           )}
