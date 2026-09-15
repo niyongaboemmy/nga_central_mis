@@ -132,7 +132,6 @@ const Documents: React.FC = () => {
   const [isRenaming, setIsRenaming] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isRemovingAccess, setIsRemovingAccess] = useState(false);
-  const [isRemovingPermission, setIsRemovingPermission] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const [isLoadingFolderTree, setIsLoadingFolderTree] = useState(false);
   const [isNavigating, setIsNavigating] = useState(false);
@@ -1068,7 +1067,7 @@ const Documents: React.FC = () => {
     const confirmMessage = `Are you sure you want to remove access to "${sharedFolder.folder.name}"?`;
     if (!window.confirm(confirmMessage)) return;
 
-    setIsRemovingPermission(true);
+    setIsRemovingAccess(true);
     try {
       await folderPermissionApi.revokeAccess(
         sharedFolder.permission?.permission_id,
@@ -1081,32 +1080,23 @@ const Documents: React.FC = () => {
         "error",
       );
     } finally {
-      setIsRemovingPermission(false);
+      setIsRemovingAccess(false);
       setContextMenu(null);
     }
   };
 
   // Remove permission from share modal
-  const handleRemovePermission = async (permissionId: number) => {
-    setIsRemovingPermission(true);
-    try {
-      if (shareItem && (shareItem as Document).document_id !== undefined) {
-        await documentApi.revokeAccess(permissionId);
-      } else if (shareItem) {
-        await folderPermissionApi.revokeAccess(permissionId);
-      }
-      showToast("Access removed successfully", "success");
-      if (shareItem) {
-        fetchPermissions(shareItem);
-      }
-    } catch (error: any) {
-      showToast(
-        error.response?.data?.message || "Failed to remove access",
-        "error",
-      );
-    } finally {
-      setIsRemovingPermission(false);
+  // Called after ShareModal has already revoked access itself (see its own
+  // handleRemovePermission, which owns the actual API call) — this only
+  // refreshes local state. Calling revokeAccess again here on an
+  // already-deleted permission used to 404 and show a false "Failed to
+  // remove access" error right after the real removal had succeeded.
+  const handleRemovePermission = async (_permissionId: number) => {
+    showToast("Access removed successfully", "success");
+    if (shareItem) {
+      fetchPermissions(shareItem);
     }
+    fetchData();
   };
 
   // Download document
@@ -1373,11 +1363,17 @@ const Documents: React.FC = () => {
       } else if (response.data?.message) {
         showToast(response.data.message, "warning");
       }
+      // Deliberately leave the modal open: closing immediately hid the
+      // freshly-added person from the "People with access" list, so the only
+      // confirmation was a toast that had already faded by the time anyone
+      // looked back. Clear the pending selection so it's obvious the share
+      // went through and the panel is ready for the next one.
       setSelectedShareUsers([]);
       setSelectedShareRoles([]);
       setUserSearchQuery("");
-      setIsShareModalOpen(false);
-      setShareItem(null);
+      // Refresh the main folder/document list so its share-count badge
+      // reflects this share immediately, without waiting for a full reload.
+      fetchData();
     } catch (error: any) {
       showToast(error.response?.data?.message || "Failed to share", "error");
     } finally {
@@ -1680,7 +1676,6 @@ const Documents: React.FC = () => {
         isLoadingRoles={isLoadingRoles}
         existingPermissions={existingPermissions}
         isLoadingPermissions={isLoadingPermissions}
-        isRemovingPermission={isRemovingPermission}
         expirationDate={expirationDate}
         copySuccess={copySuccess}
         searchError={searchError}
@@ -1715,6 +1710,7 @@ const Documents: React.FC = () => {
         onCopyLink={copyShareLink}
         onShare={handleShare}
         onRemovePermission={handleRemovePermission}
+        onRemovePermissionError={(message) => showToast(message, "error")}
         onFilterTypeChange={setSelectedFilterType}
         onFilterIdsChange={setSelectedFilterIds}
         onAcademicTermIdChange={setSelectedAcademicTermId}

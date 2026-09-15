@@ -128,7 +128,6 @@ interface ShareModalProps {
   isLoadingRoles: boolean;
   existingPermissions: DocumentPermission[];
   isLoadingPermissions: boolean;
-  isRemovingPermission: boolean;
   expirationDate: string;
   copySuccess: boolean;
   searchError: string | null;
@@ -166,6 +165,7 @@ interface ShareModalProps {
   onCopyLink: () => void;
   onShare: () => void;
   onRemovePermission: (permissionId: number) => void;
+  onRemovePermissionError: (message: string) => void;
   onFilterTypeChange: (filterType: string) => void;
   onFilterIdsChange: (filterIds: number[]) => void;
   onAcademicTermIdChange: (termId: number | null) => void;
@@ -314,7 +314,6 @@ const ShareModal: React.FC<ShareModalProps> = ({
   isLoadingRoles,
   existingPermissions,
   isLoadingPermissions,
-  isRemovingPermission,
   expirationDate,
   copySuccess,
   searchError,
@@ -341,6 +340,7 @@ const ShareModal: React.FC<ShareModalProps> = ({
   onCopyLink,
   onShare,
   onRemovePermission,
+  onRemovePermissionError,
   onClose,
 }) => {
   const isFolderItem =
@@ -369,7 +369,12 @@ const ShareModal: React.FC<ShareModalProps> = ({
     [shareLink],
   );
 
+  const [removingPermissionId, setRemovingPermissionId] = useState<
+    number | null
+  >(null);
+
   const handleRemovePermission = async (permissionId: number) => {
+    setRemovingPermissionId(permissionId);
     try {
       if (isFolderItem && shareItem) {
         await folderPermissionApi.revokeAccess(permissionId);
@@ -377,8 +382,13 @@ const ShareModal: React.FC<ShareModalProps> = ({
         await documentApi.revokeAccess(permissionId);
       }
       onRemovePermission(permissionId);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to remove permission:", error);
+      onRemovePermissionError(
+        error.response?.data?.message || "Failed to remove access",
+      );
+    } finally {
+      setRemovingPermissionId(null);
     }
   };
 
@@ -491,9 +501,15 @@ const ShareModal: React.FC<ShareModalProps> = ({
                   ) : (
                     existingPermissions.length > 0 && (
                       <div className="space-y-2">
+                        <AnimatePresence initial={false}>
                         {existingPermissions.map((perm) => (
-                          <div
+                          <motion.div
                             key={perm.permission_id}
+                            layout
+                            initial={{ opacity: 0, y: -8, scale: 0.98 }}
+                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.95, height: 0, marginBottom: 0 }}
+                            transition={{ duration: 0.2 }}
                             className="flex items-center justify-between gap-3 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-2xl hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
                           >
                             <div className="flex items-center gap-3 min-w-0 flex-1">
@@ -541,15 +557,20 @@ const ShareModal: React.FC<ShareModalProps> = ({
                                 onClick={() =>
                                   handleRemovePermission(perm.permission_id)
                                 }
-                                disabled={isRemovingPermission}
+                                disabled={removingPermissionId === perm.permission_id}
                                 className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-full transition-colors disabled:opacity-50"
                                 aria-label="Remove access"
                               >
-                                <FiTrash className="w-4 h-4" />
+                                {removingPermissionId === perm.permission_id ? (
+                                  <div className="w-4 h-4 border-2 border-red-300 border-t-red-500 rounded-full animate-spin" />
+                                ) : (
+                                  <FiTrash className="w-4 h-4" />
+                                )}
                               </button>
                             </div>
-                          </div>
+                          </motion.div>
                         ))}
+                        </AnimatePresence>
                       </div>
                     )
                   )}
@@ -857,7 +878,12 @@ const ShareModal: React.FC<ShareModalProps> = ({
                   onClick={onClose}
                   className="px-5 py-2 text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full transition-all"
                 >
-                  Cancel
+                  {/* "Cancel" implies discarding a pending action; once there's
+                      nothing pending (nothing selected to share), "Close" is
+                      the honest label — nothing here would be undone. */}
+                  {selectedShareUsers.length > 0 || selectedShareRoles.length > 0
+                    ? "Cancel"
+                    : "Close"}
                 </button>
                 <button
                   onClick={onShare}
