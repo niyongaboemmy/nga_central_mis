@@ -1763,6 +1763,7 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
                 lessonId={initialData?.id}
                 weekLabel={entryWeekLabel}
                 topic={entryTopic}
+                lessonDate={formData.lesson_date}
                 onComplete={() => {
                   onSaved();
                   onClose();

@@ -19,6 +19,9 @@ interface Props {
   lessonId?: number;
   weekLabel?: string;
   topic?: string;
+  // The exact calendar day (YYYY-MM-DD) this plan is for — the day the
+  // teacher clicked, not just the scheme week it falls in.
+  lessonDate?: string;
   onComplete: () => void;
   onCancel: () => void;
 }
@@ -32,7 +35,7 @@ const STEPS: { key: AILessonGenerationStatus["status"]; label: string; descripti
 
 const POLL_INTERVAL_MS = 1200;
 
-const LessonPlanAIGenerate: React.FC<Props> = ({ entryId, lessonId, weekLabel, topic, onComplete, onCancel }) => {
+const LessonPlanAIGenerate: React.FC<Props> = ({ entryId, lessonId, weekLabel, topic, lessonDate, onComplete, onCancel }) => {
   const { showToast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [jobStatus, setJobStatus] = useState<AILessonGenerationStatus | null>(null);
@@ -83,7 +86,7 @@ const LessonPlanAIGenerate: React.FC<Props> = ({ entryId, lessonId, weekLabel, t
     setJobStatus({ status: "loading", stepIndex: 1, totalSteps: 4, message: "Loading week context..." });
 
     try {
-      const resp = await lessonPlanApi.startAIGenerate(entryId, hours, lessonId);
+      const resp = await lessonPlanApi.startAIGenerate(entryId, hours, lessonId, lessonDate);
       const { jobId } = resp.data.data;
       pollStatus(jobId);
     } catch (error: any) {

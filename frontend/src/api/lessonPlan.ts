@@ -98,10 +98,20 @@ export const lessonPlanApi = {
   getByEntry: (entryId: number) =>
     apiService.get<LessonPlan[]>(`/lesson-plans/entry/${entryId}`),
 
-  startAIGenerate: (entryId: number, sessionHours: number, lessonId?: number) =>
+  startAIGenerate: (
+    entryId: number,
+    sessionHours: number,
+    lessonId?: number,
+    lessonDate?: string,
+  ) =>
     apiService.post<{ success: boolean; data: { jobId: string } }>(
       "/lesson-plans/ai-generate",
-      { entry_id: entryId, lesson_id: lessonId, session_hours: sessionHours },
+      {
+        entry_id: entryId,
+        lesson_id: lessonId,
+        session_hours: sessionHours,
+        lesson_date: lessonDate,
+      },
     ),
 
   getAIGenerateStatus: (jobId: string) =>

@@ -229,6 +229,11 @@ const processJob = async (
     entryId: number;
     lessonId?: number;
     totalMinutes: number;
+    // The specific calendar day the teacher generated this plan for — e.g.
+    // clicking the 15th inside a scheme week that runs Mon 14th to Fri 18th.
+    // Falls back to the entry's own start date only when the caller never
+    // sent one, so old clients still work.
+    lessonDate?: string;
   },
 ) => {
   try {
@@ -305,7 +310,7 @@ const processJob = async (
       school_year: yearName || "",
       class_name: classGroupName || "",
       number_of_trainees: null,
-      lesson_date: entry.start_date,
+      lesson_date: params.lessonDate || entry.start_date,
       start_time: null,
       end_time: null,
       instructor_name: instructorName,
@@ -368,10 +373,17 @@ export const startAILessonGeneration = asyncHandler(async (req: any, res: any) =
     );
   }
 
-  const { entry_id, lesson_id, session_hours } = req.body;
+  const { entry_id, lesson_id, session_hours, lesson_date } = req.body;
   if (!entry_id) {
     throw new ValidationError("entry_id is required");
   }
+  // Accept only a plain YYYY-MM-DD (or a "...T..." timestamp we trim down to
+  // that) — never hand a raw Date-ish value to the AI job, since round-
+  // tripping it through Date/toISOString is exactly what shifts it a day.
+  const lessonDate =
+    typeof lesson_date === "string" && lesson_date
+      ? lesson_date.split("T")[0]
+      : undefined;
 
   let totalMinutes = 100; // matches the app's prior implicit default
   if (session_hours !== undefined && session_hours !== null && session_hours !== "") {
@@ -393,6 +405,7 @@ export const startAILessonGeneration = asyncHandler(async (req: any, res: any) =
     entryId: parseInt(entry_id, 10),
     lessonId: lesson_id ? parseInt(lesson_id, 10) : undefined,
     totalMinutes,
+    lessonDate,
   });
 });
 
