@@ -23,8 +23,11 @@ interface DocumentsToolbarProps {
   sortOrder: "asc" | "desc";
   sharedDocumentsCount: number;
   sharedFoldersCount: number;
+  unreadSharedCount?: number;
   showFolderTree: boolean;
   isUploading: boolean;
+  canUpload?: boolean;
+  canUploadReason?: string;
   onTabChange: (tab: TabType) => void;
   onBreadcrumbClick: (index: number) => void;
   onGoToRoot: () => void;
@@ -46,8 +49,11 @@ const DocumentsToolbar: React.FC<DocumentsToolbarProps> = ({
   sortOrder,
   sharedDocumentsCount,
   sharedFoldersCount,
+  unreadSharedCount = 0,
   showFolderTree,
   isUploading,
+  canUpload = true,
+  canUploadReason,
   onTabChange,
   onBreadcrumbClick,
   onGoToRoot,
@@ -90,7 +96,7 @@ const DocumentsToolbar: React.FC<DocumentsToolbarProps> = ({
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
             onClick={() => onTabChange("shared-with-me")}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
+            className={`relative flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
               activeTab === "shared-with-me"
                 ? "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 shadow-sm"
                 : "text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-100/50 dark:hover:bg-gray-700/50"
@@ -100,9 +106,20 @@ const DocumentsToolbar: React.FC<DocumentsToolbarProps> = ({
             <span className="hidden sm:inline">Shared</span>
             <span className="sm:hidden">Shared</span>
             {(sharedDocumentsCount > 0 || sharedFoldersCount > 0) && (
-              <span className="ml-1 px-1.5 py-0.5 text-xs bg-blue-500 text-white rounded-full">
+              <span
+                className={`ml-1 px-1.5 py-0.5 text-xs text-white rounded-full transition-colors ${
+                  unreadSharedCount > 0 ? "bg-red-500" : "bg-blue-500"
+                }`}
+              >
                 {sharedDocumentsCount + sharedFoldersCount}
               </span>
+            )}
+            {unreadSharedCount > 0 && (
+              <motion.span
+                className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-red-500 border-2 border-white dark:border-gray-800"
+                animate={{ scale: [1, 1.3, 1] }}
+                transition={{ duration: 1.4, repeat: Infinity }}
+              />
             )}
           </motion.button>
         </div>
@@ -228,11 +245,12 @@ const DocumentsToolbar: React.FC<DocumentsToolbarProps> = ({
               <span className="hidden md:inline">New Folder</span>
             </motion.button>
             <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
+              whileHover={canUpload ? { scale: 1.02 } : undefined}
+              whileTap={canUpload ? { scale: 0.98 } : undefined}
               onClick={onUploadClick}
-              disabled={isUploading}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-green-500 text-white rounded-full hover:bg-green-600 shadow-sm transition-all disabled:opacity-50"
+              disabled={isUploading || !canUpload}
+              title={!canUpload ? canUploadReason : undefined}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-green-500 text-white rounded-full hover:bg-green-600 shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <FiUpload className="w-3.5 h-3.5" />
               <span className="hidden md:inline">

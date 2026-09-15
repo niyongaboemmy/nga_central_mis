@@ -18,6 +18,8 @@ export interface Folder {
     first_name: string | null;
     last_name: string | null;
   };
+  /** How many people this folder is shared with (owner's own listing only). */
+  share_count?: number;
 }
 
 export interface Document {
@@ -43,6 +45,8 @@ export interface Document {
     first_name: string | null;
     last_name: string | null;
   };
+  /** How many people this document is shared with (owner's own listing only). */
+  share_count?: number;
 }
 
 export interface DocumentVersion {
@@ -265,7 +269,41 @@ export const documentApi = {
 
   revokeAccess: (permissionId: number) =>
     apiService.delete(`/documents/permissions/${permissionId}`),
+
+  updatePermission: (
+    permissionId: number,
+    data: { permissionType?: string; expiresAt?: string | null },
+  ) => apiService.put(`/documents/permissions/${permissionId}`, data),
+
+  getShareLink: (documentId: number) =>
+    apiService.get<{ data: ShareLink | null }>(
+      `/documents/${documentId}/share-link`,
+    ),
+
+  createShareLink: (
+    documentId: number,
+    data: { permissionType?: "VIEW" | "DOWNLOAD"; expiresAt?: string },
+  ) =>
+    apiService.post<{ data: ShareLink }>(
+      `/documents/${documentId}/share-link`,
+      data,
+    ),
+
+  revokeShareLink: (documentId: number) =>
+    apiService.delete(`/documents/${documentId}/share-link`),
 };
+
+export interface ShareLink {
+  link_id: number;
+  document_id: number | null;
+  folder_id: number | null;
+  token: string;
+  permission_type: "VIEW" | "DOWNLOAD";
+  created_by: number;
+  expires_at: string | null;
+  revoked_at: string | null;
+  created_at: string;
+}
 
 // Utility functions
 export const formatFileSize = (bytes: number): string => {
@@ -395,6 +433,11 @@ export const folderPermissionApi = {
   revokeAccess: (permissionId: number) =>
     apiService.delete(`/documents/folders/permissions/${permissionId}`),
 
+  updatePermission: (
+    permissionId: number,
+    data: { permissionType?: string; expiresAt?: string | null },
+  ) => apiService.put(`/documents/folders/permissions/${permissionId}`, data),
+
   getSharedWithMe: (academicYearId?: number) =>
     apiService.get<{
       data: {
@@ -410,4 +453,21 @@ export const folderPermissionApi = {
     }>("/documents/shared/folders", {
       params: academicYearId ? { academicYearId } : undefined,
     }),
+
+  getShareLink: (folderId: number) =>
+    apiService.get<{ data: ShareLink | null }>(
+      `/documents/folders/${folderId}/share-link`,
+    ),
+
+  createShareLink: (
+    folderId: number,
+    data: { permissionType?: "VIEW" | "DOWNLOAD"; expiresAt?: string },
+  ) =>
+    apiService.post<{ data: ShareLink }>(
+      `/documents/folders/${folderId}/share-link`,
+      data,
+    ),
+
+  revokeShareLink: (folderId: number) =>
+    apiService.delete(`/documents/folders/${folderId}/share-link`),
 };

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "../../contexts/ToastContext";
 import { useAcademicPeriod } from "../../contexts/AcademicPeriodContext";
+import { useNotifications } from "../../contexts/NotificationContext";
 import {
   folderApi,
   documentApi,
@@ -12,6 +13,7 @@ import {
   type UserSearchResult,
   type Role,
   type FilterOptions,
+  type ShareLink,
 } from "../../api/documents";
 import { roleApi, folderPermissionApi } from "../../api/documents";
 import FolderTree from "./FolderTree";
@@ -38,6 +40,13 @@ import type {
 const Documents: React.FC = () => {
   const { showToast } = useToast();
   const { selectedYearId } = useAcademicPeriod();
+  const { notifications: appNotifications } = useNotifications();
+  const unreadSharedCount = appNotifications.filter(
+    (n) =>
+      !n.notification.read_at &&
+      (n.notification.kind === "document_shared" ||
+        n.notification.kind === "folder_shared"),
+  ).length;
 
   // State
   const [activeTab, setActiveTab] = useState<TabType>("my-documents");
@@ -165,6 +174,18 @@ const Documents: React.FC = () => {
   const [copySuccess, setCopySuccess] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [_rolePermissions, setRolePermissions] = useState<any[]>([]);
+
+  // Link sharing state (authenticated-only "anyone with the link")
+  const [shareLink, setShareLink] = useState<ShareLink | null>(null);
+  const [isLoadingShareLink, setIsLoadingShareLink] = useState(false);
+  const [isCreatingShareLink, setIsCreatingShareLink] = useState(false);
+  const [isRevokingShareLink, setIsRevokingShareLink] = useState(false);
+  const [linkPermission, setLinkPermission] = useState<"VIEW" | "DOWNLOAD">(
+    "VIEW",
+  );
+  const [updatingPermissionId, setUpdatingPermissionId] = useState<
+    number | null
+  >(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const contextMenuRef = useRef<HTMLDivElement>(null);
@@ -793,9 +814,29 @@ const Documents: React.FC = () => {
   };
 
   // Handle file upload
+  // Owner (not in a shared folder) or a share with EDIT/SHARE can upload;
+  // VIEW/DOWNLOAD-only access cannot — matches the backend check in
+  // uploadDocument, so this only prevents a doomed request rather than
+  // being the actual enforcement point.
+  const canUploadToCurrentFolder =
+    !currentSharedFolder ||
+    ["EDIT", "SHARE"].includes(currentSharedFolder.permission?.permission_type);
+  const canUploadReason = !canUploadToCurrentFolder
+    ? `You have ${currentSharedFolder?.permission?.permission_type || "VIEW"} access to this folder — ask the owner for Edit access to upload.`
+    : undefined;
+
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
+
+    if (!canUploadToCurrentFolder) {
+      showToast(
+        canUploadReason || "You do not have permission to upload here",
+        "error",
+      );
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
 
     setIsUploading(true);
     const uploadProgressState: { [key: string]: number } = {};
@@ -1103,10 +1144,116 @@ const Documents: React.FC = () => {
     setExpirationDate("");
     setSelectedFilterType("");
     setSelectedFilterIds([]);
+    setShareLink(null);
+    setLinkPermission("VIEW");
     fetchRoles();
     fetchPermissions(item);
     fetchFilterOptions();
+    fetchShareLink(item);
     setContextMenu(null);
+  };
+
+  const isShareItemFolder = (item: Folder | Document | null): item is Folder =>
+    !!item && (item as Document).document_id === undefined;
+
+  const fetchShareLink = async (item: Folder | Document) => {
+    setIsLoadingShareLink(true);
+    try {
+      const isDoc = !isShareItemFolder(item);
+      const response = isDoc
+        ? await documentApi.getShareLink((item as Document).document_id)
+        : await folderPermissionApi.getShareLink((item as Folder).folder_id);
+      const link = (response.data as any).data as ShareLink | null;
+      setShareLink(link);
+      if (link) setLinkPermission(link.permission_type);
+    } catch (error) {
+      setShareLink(null);
+    } finally {
+      setIsLoadingShareLink(false);
+    }
+  };
+
+  const createOrRotateShareLink = async () => {
+    if (!shareItem) return;
+    setIsCreatingShareLink(true);
+    try {
+      const isDoc = !isShareItemFolder(shareItem);
+      const response = isDoc
+        ? await documentApi.createShareLink((shareItem as Document).document_id, {
+            permissionType: linkPermission,
+          })
+        : await folderPermissionApi.createShareLink(
+            (shareItem as Folder).folder_id,
+            { permissionType: linkPermission },
+          );
+      setShareLink((response.data as any).data as ShareLink);
+      showToast("Share link created", "success");
+    } catch (error: any) {
+      showToast(
+        error.response?.data?.message || "Failed to create share link",
+        "error",
+      );
+    } finally {
+      setIsCreatingShareLink(false);
+    }
+  };
+
+  const revokeShareLink = async () => {
+    if (!shareItem) return;
+    setIsRevokingShareLink(true);
+    try {
+      const isDoc = !isShareItemFolder(shareItem);
+      if (isDoc) {
+        await documentApi.revokeShareLink((shareItem as Document).document_id);
+      } else {
+        await folderPermissionApi.revokeShareLink(
+          (shareItem as Folder).folder_id,
+        );
+      }
+      setShareLink(null);
+      showToast("Share link revoked", "success");
+    } catch (error: any) {
+      showToast(
+        error.response?.data?.message || "Failed to revoke share link",
+        "error",
+      );
+    } finally {
+      setIsRevokingShareLink(false);
+    }
+  };
+
+  const getShareLinkUrl = (link: ShareLink) =>
+    `${window.location.origin}/documents/shared-link/${link.token}`;
+
+  // Change an existing grantee's permission level in place.
+  const updateExistingPermission = async (
+    permission: DocumentPermission,
+    newPermissionType: string,
+  ) => {
+    if (!shareItem) return;
+    setUpdatingPermissionId(permission.permission_id);
+    try {
+      const isDoc = !isShareItemFolder(shareItem);
+      if (isDoc) {
+        await documentApi.updatePermission(permission.permission_id, {
+          permissionType: newPermissionType,
+        });
+        await fetchPermissions(shareItem);
+      } else {
+        await folderPermissionApi.updatePermission(permission.permission_id, {
+          permissionType: newPermissionType,
+        });
+        await fetchFolderPermissions((shareItem as Folder).folder_id);
+      }
+      showToast("Permission updated", "success");
+    } catch (error: any) {
+      showToast(
+        error.response?.data?.message || "Failed to update permission",
+        "error",
+      );
+    } finally {
+      setUpdatingPermissionId(null);
+    }
   };
 
   // Add user to share list
@@ -1143,17 +1290,16 @@ const Documents: React.FC = () => {
     );
   };
 
-  // Copy share link
+  // Copy the active share link (created via createOrRotateShareLink) to the
+  // clipboard. Requires a link to already exist — the modal creates one on
+  // demand before this is reachable.
   const copyShareLink = () => {
-    if (shareItem && (shareItem as Document).document_id !== undefined) {
-      const docId = (shareItem as Document).document_id;
-      const link = `${window.location.origin}/documents/shared/${docId}`;
-      navigator.clipboard.writeText(link).then(() => {
-        setCopySuccess(true);
-        showToast("Link copied to clipboard!", "success");
-        setTimeout(() => setCopySuccess(false), 2000);
-      });
-    }
+    if (!shareLink) return;
+    navigator.clipboard.writeText(getShareLinkUrl(shareLink)).then(() => {
+      setCopySuccess(true);
+      showToast("Link copied to clipboard!", "success");
+      setTimeout(() => setCopySuccess(false), 2000);
+    });
   };
 
   // Share document/folder with selected users and/or roles
@@ -1344,6 +1490,7 @@ const Documents: React.FC = () => {
           sortOrder={sortOrder}
           sharedDocumentsCount={sharedDocuments.length}
           sharedFoldersCount={sharedFolders.length}
+          unreadSharedCount={unreadSharedCount}
           showFolderTree={showFolderTree}
           isUploading={isUploading}
           // currentFolderId={currentFolderId}
@@ -1381,7 +1528,18 @@ const Documents: React.FC = () => {
           }
           onToggleFolderTree={toggleFolderTree}
           onCreateFolder={() => setIsCreateFolderModalOpen(true)}
-          onUploadClick={() => fileInputRef.current?.click()}
+          onUploadClick={() => {
+            if (!canUploadToCurrentFolder) {
+              showToast(
+                canUploadReason || "You do not have permission to upload here",
+                "error",
+              );
+              return;
+            }
+            fileInputRef.current?.click();
+          }}
+          canUpload={canUploadToCurrentFolder}
+          canUploadReason={canUploadReason}
         />
 
         {/* Content Area */}
@@ -1437,6 +1595,7 @@ const Documents: React.FC = () => {
               onNavigateToSharedSubFolder={navigateToSharedSubFolder}
               onContextMenu={handleContextMenu}
               onPreview={handlePreview}
+              onOpenShareModal={handleOpenShareModal}
             />
           )}
         </div>
@@ -1525,6 +1684,19 @@ const Documents: React.FC = () => {
         expirationDate={expirationDate}
         copySuccess={copySuccess}
         searchError={searchError}
+        // Link sharing
+        shareLink={shareLink}
+        isLoadingShareLink={isLoadingShareLink}
+        isCreatingShareLink={isCreatingShareLink}
+        isRevokingShareLink={isRevokingShareLink}
+        linkPermission={linkPermission}
+        onLinkPermissionChange={setLinkPermission}
+        onCreateShareLink={createOrRotateShareLink}
+        onRevokeShareLink={revokeShareLink}
+        getShareLinkUrl={getShareLinkUrl}
+        // Inline per-person permission editing
+        updatingPermissionId={updatingPermissionId}
+        onUpdatePermission={updateExistingPermission}
         // Filter options
         filterOptions={filterOptions}
         isLoadingFilterOptions={isLoadingFilterOptions}
@@ -1556,6 +1728,8 @@ const Documents: React.FC = () => {
           setSelectedFilterType("");
           setSelectedFilterIds([]);
           setSelectedAcademicTermId(null);
+          setShareLink(null);
+          setLinkPermission("VIEW");
         }}
       />
 
@@ -1576,7 +1750,16 @@ const Documents: React.FC = () => {
           onRemoveSharedAccess={handleRemoveSharedAccess}
           onRemoveSharedFolderAccess={handleRemoveSharedFolderAccess}
           onCreateFolder={() => setIsCreateFolderModalOpen(true)}
-          onUploadFiles={() => fileInputRef.current?.click()}
+          onUploadFiles={() => {
+            if (!canUploadToCurrentFolder) {
+              showToast(
+                canUploadReason || "You do not have permission to upload here",
+                "error",
+              );
+              return;
+            }
+            fileInputRef.current?.click();
+          }}
           onClose={() => setContextMenu(null)}
         />
       </div>

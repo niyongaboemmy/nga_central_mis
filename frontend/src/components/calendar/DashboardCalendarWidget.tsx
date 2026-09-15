@@ -82,6 +82,9 @@ const DashboardCalendarWidget: React.FC = () => {
   const [showModal, setShowModal] = useState(false);
   const [showLessonPlan, setShowLessonPlan] = useState(false);
   const [lessonPlan, setLessonPlan] = useState<any>(null);
+  const [lessonPlanSlot, setLessonPlanSlot] = useState<CalendarSlot | null>(
+    null,
+  );
   const [isLoadingLessonPlan, setIsLoadingLessonPlan] = useState(false);
   const [modalMode, setModalMode] = useState<"details" | "form">("details");
   const [formData, setFormData] = useState({
@@ -266,6 +269,7 @@ const DashboardCalendarWidget: React.FC = () => {
         : undefined;
       const data = await getLessonPlanForSlot(slot.slot_id, formattedDate);
       setLessonPlan(data);
+      setLessonPlanSlot(slot);
       setShowLessonPlan(true);
     } catch (error: any) {
       console.error("Failed to load lesson plan:", error);
@@ -423,8 +427,14 @@ const DashboardCalendarWidget: React.FC = () => {
 
       <LessonPlanModal
         showModal={showLessonPlan}
-        onClose={() => setShowLessonPlan(false)}
+        onClose={() => {
+          setShowLessonPlan(false);
+          setLessonPlanSlot(null);
+        }}
         lessonPlan={lessonPlan}
+        onGenerated={() => {
+          if (lessonPlanSlot) handleViewLessonPlan(lessonPlanSlot);
+        }}
       />
     </div>
   );

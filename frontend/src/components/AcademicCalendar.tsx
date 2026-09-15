@@ -158,6 +158,9 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({
   const [showModal, setShowModal] = useState(false);
   const [showLessonPlan, setShowLessonPlan] = useState(false);
   const [lessonPlan, setLessonPlan] = useState<any>(null);
+  const [lessonPlanSlot, setLessonPlanSlot] = useState<CalendarSlot | null>(
+    null,
+  );
   const [showNotificationSettings, setShowNotificationSettings] =
     useState(false);
   const [modalMode, setModalMode] = useState<"details" | "form">("details");
@@ -713,6 +716,7 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({
         slotDateString,
       );
       setLessonPlan(lessonPlanData);
+      setLessonPlanSlot(slot);
       setShowLessonPlan(true);
     } catch (error: any) {
       showToast(error.message || "No lesson plan found for this slot", "error");
@@ -1299,6 +1303,10 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({
         onClose={() => {
           setShowLessonPlan(false);
           setLessonPlan(null);
+          setLessonPlanSlot(null);
+        }}
+        onGenerated={() => {
+          if (lessonPlanSlot) handleViewLessonPlan(lessonPlanSlot);
         }}
       />
 

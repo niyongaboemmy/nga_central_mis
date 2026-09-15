@@ -5,6 +5,7 @@ import {
   DocumentVersion,
   DocumentPermission,
   FolderPermission,
+  DocumentShareLink,
   User,
   UserProfile,
   Role,
@@ -37,10 +38,12 @@ import {
   ValidationError,
   NotFoundError,
   AuthenticationError,
+  AuthorizationError,
 } from "../errors/CustomError";
 import { successResponse, paginatedResponse } from "../utils/response";
 import { asyncHandler } from "../middleware/asyncHandler";
 import { recordActivity } from "../utils/activityLogger";
+import { notifyUsers } from "../utils/notifications";
 import { sanitizeString } from "../utils/sanitization";
 import logger from "../utils/logger";
 import storageService from "../utils/fileServer";
@@ -864,8 +867,44 @@ export const getFolders = asyncHandler(async (req: any, res: any) => {
     }
   }
 
+  // How many people each owned folder is shared with — lets the owner see
+  // at a glance who has access without opening the Share modal.
+  let folderShareCounts = new Map<number, number>();
+  if (ownedFolders.length > 0) {
+    const counts = await db
+      .select({
+        folder_id: FolderPermission.folder_id,
+        count: sql<number>`COUNT(*)`,
+      })
+      .from(FolderPermission)
+      .where(
+        and(
+          inArray(
+            FolderPermission.folder_id,
+            ownedFolders.map((f) => f.folder.folder_id),
+          ),
+          or(
+            isNull(FolderPermission.expires_at),
+            gt(FolderPermission.expires_at, new Date()),
+          ),
+        ),
+      )
+      .groupBy(FolderPermission.folder_id);
+    folderShareCounts = new Map(
+      counts.map((c) => [c.folder_id, Number(c.count)]),
+    );
+  }
+
   // Combine owned and shared folders, removing duplicates
-  const allFolders = [...ownedFolders];
+  const allFolders = [
+    ...ownedFolders.map((f) => ({
+      ...f,
+      folder: {
+        ...f.folder,
+        share_count: folderShareCounts.get(f.folder.folder_id) || 0,
+      },
+    })),
+  ];
   const ownedFolderIds = new Set(ownedFolders.map((f) => f.folder.folder_id));
 
   for (const shared of sharedFolders) {
@@ -919,20 +958,18 @@ export const updateFolder = asyncHandler(async (req: any, res: any) => {
   const { folderId } = req.params;
   const { name, description, color } = req.body;
 
-  // Check if folder exists and belongs to user
-  const existingFolder = await db
-    .select()
-    .from(DocumentFolder)
-    .where(
-      and(
-        eq(DocumentFolder.folder_id, parseInt(folderId)),
-        eq(DocumentFolder.user_id, userId),
-      ),
-    )
-    .limit(1);
-
-  if (existingFolder.length === 0) {
+  // Owner or a share (direct/inherited) with EDIT can rename/restyle a folder.
+  const folderAccess = await resolveFolderAccess(userId, parseInt(folderId));
+  if (!folderAccess) {
     throw new NotFoundError("Folder not found");
+  }
+  if (
+    folderAccess.permissionType !== "OWNER" &&
+    folderAccess.permissionType !== "EDIT"
+  ) {
+    throw new AuthorizationError(
+      "You do not have permission to edit this folder",
+    );
   }
 
   const updateData: any = {};
@@ -981,7 +1018,7 @@ export const deleteFolder = asyncHandler(async (req: any, res: any) => {
   const { folderId } = req.params;
   const folderIdNum = parseInt(folderId);
 
-  // Check if folder exists and belongs to user
+  // Only the owner can delete a folder — same rationale as deleteDocument.
   const folder = await db
     .select()
     .from(DocumentFolder)
@@ -1263,6 +1300,21 @@ export const shareFolder = asyncHandler(async (req: any, res: any) => {
 
   logger.info(`Folder ${folderId} shared with users/roles by user ${userId}`);
 
+  const newlyGrantedUserIds = [
+    ...new Set(permissions.map((p: any) => p.user_id).filter(Boolean)),
+  ] as number[];
+  if (newlyGrantedUserIds.length > 0) {
+    await notifyUsers(newlyGrantedUserIds, {
+      kind: "folder_shared",
+      title: `"${folder[0].name}" was shared with you`,
+      body: `Permission: ${permissionType || "VIEW"}`,
+      link: `/documents?folder=${folderId}`,
+      subjectType: "folder",
+      subjectId: parseInt(folderId),
+      actorId: userId,
+    });
+  }
+
   // Build response with warning if some users were already shared
   const response: any = {
     permissions,
@@ -1291,6 +1343,61 @@ export const shareFolder = asyncHandler(async (req: any, res: any) => {
     response,
   );
 });
+
+// Update an existing folder permission's level/expiry in place (used by the
+// Share modal's inline per-person permission editor).
+export const updateFolderPermission = asyncHandler(
+  async (req: any, res: any) => {
+    const userId = req.user.userId;
+    const { permissionId } = req.params;
+    const { permissionType, expiresAt } = req.body;
+
+    const validTypes = ["VIEW", "EDIT", "DOWNLOAD", "SHARE"];
+    if (permissionType && !validTypes.includes(permissionType)) {
+      throw new ValidationError(
+        `Invalid permission type. Must be one of: ${validTypes.join(", ")}`,
+      );
+    }
+
+    const [existingPerm] = await db
+      .select()
+      .from(FolderPermission)
+      .where(eq(FolderPermission.permission_id, parseInt(permissionId)))
+      .limit(1);
+    if (!existingPerm) throw new NotFoundError("Permission not found");
+
+    const [folder] = await db
+      .select()
+      .from(DocumentFolder)
+      .where(eq(DocumentFolder.folder_id, existingPerm.folder_id))
+      .limit(1);
+    const isFolderOwner = folder && folder.user_id === userId;
+    if (!isFolderOwner && existingPerm.shared_by !== userId) {
+      throw new AuthorizationError(
+        "You do not have permission to modify this share",
+      );
+    }
+
+    const updateData: any = {};
+    if (permissionType) updateData.permission_type = permissionType;
+    if (expiresAt !== undefined) {
+      updateData.expires_at = expiresAt ? new Date(expiresAt) : null;
+    }
+
+    await db
+      .update(FolderPermission)
+      .set(updateData)
+      .where(eq(FolderPermission.permission_id, parseInt(permissionId)));
+
+    const [updated] = await db
+      .select()
+      .from(FolderPermission)
+      .where(eq(FolderPermission.permission_id, parseInt(permissionId)))
+      .limit(1);
+
+    successResponse(res, "Permission updated successfully", updated);
+  },
+);
 
 // Revoke folder access
 export const revokeFolderAccess = asyncHandler(async (req: any, res: any) => {
@@ -1349,6 +1456,15 @@ export const revokeFolderAccess = asyncHandler(async (req: any, res: any) => {
     .where(eq(FolderPermission.permission_id, parseInt(permissionId)));
 
   logger.info(`Folder permission ${permissionId} revoked by user ${userId}`);
+
+  await notifyUsers([existingPerm[0].user_id], {
+    kind: "permission_revoked",
+    title: `${folder.length > 0 ? `"${folder[0].name}"` : "A folder"}: your access was removed`,
+    link: "/documents",
+    subjectType: "folder",
+    subjectId: existingPerm[0].folder_id,
+    actorId: userId,
+  });
 
   successResponse(res, "Access revoked successfully", null);
 });
@@ -1524,21 +1640,22 @@ export const uploadDocument = asyncHandler(async (req: any, res: any) => {
     throw new ValidationError("File size exceeds maximum limit of 50MB");
   }
 
-  // Check if folder exists and belongs to user (if folderId provided)
+  // Check the caller can actually upload into this folder: ownership or a
+  // share (direct or inherited from an ancestor) with EDIT permission.
+  // Previously this only checked raw ownership, so a folder shared with
+  // EDIT would 404 as "Folder not found" instead of accepting the upload.
   if (folderId) {
-    const folder = await db
-      .select()
-      .from(DocumentFolder)
-      .where(
-        and(
-          eq(DocumentFolder.folder_id, parseInt(folderId)),
-          eq(DocumentFolder.user_id, userId),
-        ),
-      )
-      .limit(1);
-
-    if (folder.length === 0) {
-      throw new ValidationError("Folder not found");
+    const folderAccess = await resolveFolderAccess(userId, parseInt(folderId));
+    if (!folderAccess) {
+      throw new NotFoundError("Folder not found");
+    }
+    if (
+      folderAccess.permissionType !== "OWNER" &&
+      folderAccess.permissionType !== "EDIT"
+    ) {
+      throw new AuthorizationError(
+        "You only have view access to this folder and cannot upload files into it",
+      );
     }
   }
 
@@ -1716,7 +1833,42 @@ export const getDocuments = asyncHandler(async (req: any, res: any) => {
     .limit(limitNum)
     .offset(offset);
 
-  paginatedResponse(res, "Documents retrieved successfully", documents, {
+  // How many people each of the caller's own documents is shared with — not
+  // meaningful (and not computed) when browsing someone else's shared folder.
+  let documentsWithCounts = documents;
+  if (!isSharedFolder && documents.length > 0) {
+    const counts = await db
+      .select({
+        document_id: DocumentPermission.document_id,
+        count: sql<number>`COUNT(*)`,
+      })
+      .from(DocumentPermission)
+      .where(
+        and(
+          inArray(
+            DocumentPermission.document_id,
+            documents.map((d) => d.document.document_id),
+          ),
+          or(
+            isNull(DocumentPermission.expires_at),
+            gt(DocumentPermission.expires_at, new Date()),
+          ),
+        ),
+      )
+      .groupBy(DocumentPermission.document_id);
+    const documentShareCounts = new Map(
+      counts.map((c) => [c.document_id, Number(c.count)]),
+    );
+    documentsWithCounts = documents.map((d) => ({
+      ...d,
+      document: {
+        ...d.document,
+        share_count: documentShareCounts.get(d.document.document_id) || 0,
+      },
+    }));
+  }
+
+  paginatedResponse(res, "Documents retrieved successfully", documentsWithCounts, {
     page: pageNum,
     limit: limitNum,
     total,
@@ -1748,20 +1900,15 @@ export const updateDocument = asyncHandler(async (req: any, res: any) => {
   const { description, tags, is_public, original_name } = req.body;
   const documentIdNum = parseInt(documentId);
 
-  // Check if document exists and belongs to user
-  const existingDoc = await db
-    .select()
-    .from(Document)
-    .where(
-      and(
-        eq(Document.document_id, documentIdNum),
-        eq(Document.user_id, userId),
-      ),
-    )
-    .limit(1);
-
-  if (existingDoc.length === 0) {
+  // Owner or a share (direct/inherited) with EDIT can update metadata.
+  const access = await resolveDocumentAccess(userId, documentIdNum);
+  if (!access) {
     throw new NotFoundError("Document not found");
+  }
+  if (access.permissionType !== "OWNER" && access.permissionType !== "EDIT") {
+    throw new AuthorizationError(
+      "You do not have permission to edit this document",
+    );
   }
 
   const updateData: any = {};
@@ -1813,7 +1960,9 @@ export const deleteDocument = asyncHandler(async (req: any, res: any) => {
   const { documentId } = req.params;
   const documentIdNum = parseInt(documentId);
 
-  // Check if document exists and belongs to user
+  // Only the owner can delete — EDIT access lets you upload/replace content
+  // but not remove the document outright (mirrors Google Drive's model
+  // where editors can't delete someone else's file).
   const document = await db
     .select()
     .from(Document)
@@ -2322,6 +2471,21 @@ export const shareDocument = asyncHandler(async (req: any, res: any) => {
     `Document ${documentId} shared with users/roles by user ${userId}`,
   );
 
+  const newlyGrantedUserIds = [
+    ...new Set(permissions.map((p: any) => p.user_id).filter(Boolean)),
+  ] as number[];
+  if (newlyGrantedUserIds.length > 0) {
+    await notifyUsers(newlyGrantedUserIds, {
+      kind: "document_shared",
+      title: `${document[0].original_name} was shared with you`,
+      body: `Permission: ${permissionType || "VIEW"}`,
+      link: `/documents?doc=${documentId}`,
+      subjectType: "document",
+      subjectId: parseInt(documentId),
+      actorId: userId,
+    });
+  }
+
   // Build response with warning if some users were already shared
   const response: any = {
     permissions,
@@ -2416,6 +2580,61 @@ export const getSharedDocuments = asyncHandler(async (req: any, res: any) => {
   successResponse(res, "Shared documents retrieved successfully", shared);
 });
 
+// Update an existing document permission's level/expiry in place (used by
+// the Share modal's inline per-person permission editor).
+export const updateDocumentPermission = asyncHandler(
+  async (req: any, res: any) => {
+    const userId = req.user.userId;
+    const { permissionId } = req.params;
+    const { permissionType, expiresAt } = req.body;
+
+    const validTypes = ["VIEW", "EDIT", "DOWNLOAD", "SHARE"];
+    if (permissionType && !validTypes.includes(permissionType)) {
+      throw new ValidationError(
+        `Invalid permission type. Must be one of: ${validTypes.join(", ")}`,
+      );
+    }
+
+    const [existingPerm] = await db
+      .select()
+      .from(DocumentPermission)
+      .where(eq(DocumentPermission.permission_id, parseInt(permissionId)))
+      .limit(1);
+    if (!existingPerm) throw new NotFoundError("Permission not found");
+
+    const [document] = await db
+      .select()
+      .from(Document)
+      .where(eq(Document.document_id, existingPerm.document_id))
+      .limit(1);
+    const isDocumentOwner = document && document.user_id === userId;
+    if (!isDocumentOwner && existingPerm.shared_by !== userId) {
+      throw new AuthorizationError(
+        "You do not have permission to modify this share",
+      );
+    }
+
+    const updateData: any = {};
+    if (permissionType) updateData.permission_type = permissionType;
+    if (expiresAt !== undefined) {
+      updateData.expires_at = expiresAt ? new Date(expiresAt) : null;
+    }
+
+    await db
+      .update(DocumentPermission)
+      .set(updateData)
+      .where(eq(DocumentPermission.permission_id, parseInt(permissionId)));
+
+    const [updated] = await db
+      .select()
+      .from(DocumentPermission)
+      .where(eq(DocumentPermission.permission_id, parseInt(permissionId)))
+      .limit(1);
+
+    successResponse(res, "Permission updated successfully", updated);
+  },
+);
+
 export const revokeDocumentAccess = asyncHandler(async (req: any, res: any) => {
   const userId = req.user.userId;
   const { permissionId } = req.params;
@@ -2479,8 +2698,384 @@ export const revokeDocumentAccess = asyncHandler(async (req: any, res: any) => {
 
   logger.info(`Document permission ${permissionId} revoked by user ${userId}`);
 
+  await notifyUsers([permission[0].user_id], {
+    kind: "permission_revoked",
+    title: `${document[0].original_name}: your access was removed`,
+    link: "/documents",
+    subjectType: "document",
+    subjectId: permission[0].document_id,
+    actorId: userId,
+  });
+
   successResponse(res, "Access revoked successfully", null);
 });
+
+// ======================
+// LINK SHARING (authenticated-only "anyone with the link")
+//
+// A DocumentShareLink is a bearer token scoped to exactly one document or
+// folder. Unlike DocumentPermission/FolderPermission it isn't tied to a
+// specific recipient — anyone signed in to this MIS who has the link can
+// use it — but it never bypasses login, and access is only granted through
+// the dedicated /shared-link/:token endpoints below, never implicitly via
+// resolveDocumentAccess/resolveFolderAccess (which would otherwise leak
+// link-gated items to anyone who can guess an id).
+// ======================
+
+const generateShareToken = () => {
+  // 32 bytes -> 64 hex chars, matches DocumentShareLink.token's VARCHAR(64).
+  return require("crypto").randomBytes(32).toString("hex");
+};
+
+export const getDocumentShareLink = asyncHandler(
+  async (req: any, res: any) => {
+    const userId = req.user.userId;
+    const documentId = parseInt(req.params.documentId);
+
+    const [doc] = await db
+      .select()
+      .from(Document)
+      .where(
+        and(eq(Document.document_id, documentId), eq(Document.user_id, userId)),
+      )
+      .limit(1);
+    if (!doc) throw new NotFoundError("Document not found");
+
+    const [link] = await db
+      .select()
+      .from(DocumentShareLink)
+      .where(
+        and(
+          eq(DocumentShareLink.document_id, documentId),
+          isNull(DocumentShareLink.revoked_at),
+        ),
+      )
+      .orderBy(desc(DocumentShareLink.link_id))
+      .limit(1);
+
+    successResponse(res, "Share link retrieved successfully", link || null);
+  },
+);
+
+export const createDocumentShareLink = asyncHandler(
+  async (req: any, res: any) => {
+    const userId = req.user.userId;
+    const documentId = parseInt(req.params.documentId);
+    const { permissionType, expiresAt } = req.body;
+
+    if (permissionType && !["VIEW", "DOWNLOAD"].includes(permissionType)) {
+      throw new ValidationError(
+        "Link permission must be VIEW or DOWNLOAD",
+      );
+    }
+
+    const [doc] = await db
+      .select()
+      .from(Document)
+      .where(
+        and(eq(Document.document_id, documentId), eq(Document.user_id, userId)),
+      )
+      .limit(1);
+    if (!doc) throw new NotFoundError("Document not found");
+
+    // Rotating: revoke any existing active link before minting a new one.
+    await db
+      .update(DocumentShareLink)
+      .set({ revoked_at: sql`CURRENT_TIMESTAMP` })
+      .where(
+        and(
+          eq(DocumentShareLink.document_id, documentId),
+          isNull(DocumentShareLink.revoked_at),
+        ),
+      );
+
+    const token = generateShareToken();
+    await db.insert(DocumentShareLink).values({
+      document_id: documentId,
+      token,
+      permission_type: permissionType || "VIEW",
+      created_by: userId,
+      expires_at: expiresAt ? new Date(expiresAt) : null,
+    });
+
+    const [link] = await db
+      .select()
+      .from(DocumentShareLink)
+      .where(eq(DocumentShareLink.token, token))
+      .limit(1);
+
+    successResponse(res, "Share link created successfully", link);
+  },
+);
+
+export const revokeDocumentShareLink = asyncHandler(
+  async (req: any, res: any) => {
+    const userId = req.user.userId;
+    const documentId = parseInt(req.params.documentId);
+
+    const [doc] = await db
+      .select()
+      .from(Document)
+      .where(
+        and(eq(Document.document_id, documentId), eq(Document.user_id, userId)),
+      )
+      .limit(1);
+    if (!doc) throw new NotFoundError("Document not found");
+
+    await db
+      .update(DocumentShareLink)
+      .set({ revoked_at: sql`CURRENT_TIMESTAMP` })
+      .where(
+        and(
+          eq(DocumentShareLink.document_id, documentId),
+          isNull(DocumentShareLink.revoked_at),
+        ),
+      );
+
+    successResponse(res, "Share link revoked successfully", null);
+  },
+);
+
+export const getFolderShareLink = asyncHandler(async (req: any, res: any) => {
+  const userId = req.user.userId;
+  const folderId = parseInt(req.params.folderId);
+
+  const [folder] = await db
+    .select()
+    .from(DocumentFolder)
+    .where(
+      and(
+        eq(DocumentFolder.folder_id, folderId),
+        eq(DocumentFolder.user_id, userId),
+      ),
+    )
+    .limit(1);
+  if (!folder) throw new NotFoundError("Folder not found");
+
+  const [link] = await db
+    .select()
+    .from(DocumentShareLink)
+    .where(
+      and(
+        eq(DocumentShareLink.folder_id, folderId),
+        isNull(DocumentShareLink.revoked_at),
+      ),
+    )
+    .orderBy(desc(DocumentShareLink.link_id))
+    .limit(1);
+
+  successResponse(res, "Share link retrieved successfully", link || null);
+});
+
+export const createFolderShareLink = asyncHandler(
+  async (req: any, res: any) => {
+    const userId = req.user.userId;
+    const folderId = parseInt(req.params.folderId);
+    const { permissionType, expiresAt } = req.body;
+
+    if (permissionType && !["VIEW", "DOWNLOAD"].includes(permissionType)) {
+      throw new ValidationError("Link permission must be VIEW or DOWNLOAD");
+    }
+
+    const [folder] = await db
+      .select()
+      .from(DocumentFolder)
+      .where(
+        and(
+          eq(DocumentFolder.folder_id, folderId),
+          eq(DocumentFolder.user_id, userId),
+        ),
+      )
+      .limit(1);
+    if (!folder) throw new NotFoundError("Folder not found");
+
+    await db
+      .update(DocumentShareLink)
+      .set({ revoked_at: sql`CURRENT_TIMESTAMP` })
+      .where(
+        and(
+          eq(DocumentShareLink.folder_id, folderId),
+          isNull(DocumentShareLink.revoked_at),
+        ),
+      );
+
+    const token = generateShareToken();
+    await db.insert(DocumentShareLink).values({
+      folder_id: folderId,
+      token,
+      permission_type: permissionType || "VIEW",
+      created_by: userId,
+      expires_at: expiresAt ? new Date(expiresAt) : null,
+    });
+
+    const [link] = await db
+      .select()
+      .from(DocumentShareLink)
+      .where(eq(DocumentShareLink.token, token))
+      .limit(1);
+
+    successResponse(res, "Share link created successfully", link);
+  },
+);
+
+export const revokeFolderShareLink = asyncHandler(
+  async (req: any, res: any) => {
+    const userId = req.user.userId;
+    const folderId = parseInt(req.params.folderId);
+
+    const [folder] = await db
+      .select()
+      .from(DocumentFolder)
+      .where(
+        and(
+          eq(DocumentFolder.folder_id, folderId),
+          eq(DocumentFolder.user_id, userId),
+        ),
+      )
+      .limit(1);
+    if (!folder) throw new NotFoundError("Folder not found");
+
+    await db
+      .update(DocumentShareLink)
+      .set({ revoked_at: sql`CURRENT_TIMESTAMP` })
+      .where(
+        and(
+          eq(DocumentShareLink.folder_id, folderId),
+          isNull(DocumentShareLink.revoked_at),
+        ),
+      );
+
+    successResponse(res, "Share link revoked successfully", null);
+  },
+);
+
+async function resolveActiveShareLink(token: string) {
+  const [link] = await db
+    .select()
+    .from(DocumentShareLink)
+    .where(eq(DocumentShareLink.token, token))
+    .limit(1);
+
+  if (!link) return null;
+  if (link.revoked_at) return null;
+  if (link.expires_at && new Date(link.expires_at) < new Date()) return null;
+  return link;
+}
+
+// Resolve a share link for the signed-in caller (still requires login — see
+// header comment above). Returns the target document/folder plus, for a
+// folder link, the documents inside it.
+export const resolveShareLink = asyncHandler(async (req: any, res: any) => {
+  const { token } = req.params;
+
+  const link = await resolveActiveShareLink(token);
+  if (!link) {
+    throw new NotFoundError("This link is invalid, expired, or was revoked");
+  }
+
+  if (link.document_id) {
+    const [doc] = await db
+      .select()
+      .from(Document)
+      .where(eq(Document.document_id, link.document_id))
+      .limit(1);
+    if (!doc) throw new NotFoundError("This link is invalid, expired, or was revoked");
+
+    successResponse(res, "Link resolved successfully", {
+      kind: "document",
+      permissionType: link.permission_type,
+      document: doc,
+    });
+    return;
+  }
+
+  const [folder] = await db
+    .select()
+    .from(DocumentFolder)
+    .where(eq(DocumentFolder.folder_id, link.folder_id!))
+    .limit(1);
+  if (!folder) throw new NotFoundError("This link is invalid, expired, or was revoked");
+
+  const documents = await db
+    .select()
+    .from(Document)
+    .where(eq(Document.folder_id, link.folder_id!));
+
+  successResponse(res, "Link resolved successfully", {
+    kind: "folder",
+    permissionType: link.permission_type,
+    folder,
+    documents,
+  });
+});
+
+// Download a file through a share link. For a document link, documentId is
+// optional and must match the link's own document; for a folder link it
+// selects which file inside the folder to download. Requires the link's
+// permission to be DOWNLOAD (a VIEW-only link intentionally can't be used
+// to pull the raw file).
+export const downloadViaShareLink = asyncHandler(
+  async (req: any, res: any) => {
+    const { token } = req.params;
+    const documentId = req.params.documentId
+      ? parseInt(req.params.documentId)
+      : null;
+
+    const link = await resolveActiveShareLink(token);
+    if (!link) {
+      throw new NotFoundError("This link is invalid, expired, or was revoked");
+    }
+    if (link.permission_type !== "DOWNLOAD") {
+      throw new AuthorizationError(
+        "This link only grants view access, not download",
+      );
+    }
+
+    let targetDocumentId: number;
+    if (link.document_id) {
+      targetDocumentId = link.document_id;
+    } else if (documentId) {
+      const [belongs] = await db
+        .select({ document_id: Document.document_id })
+        .from(Document)
+        .where(
+          and(
+            eq(Document.document_id, documentId),
+            eq(Document.folder_id, link.folder_id!),
+          ),
+        )
+        .limit(1);
+      if (!belongs) throw new NotFoundError("Document not found in this folder");
+      targetDocumentId = documentId;
+    } else {
+      throw new ValidationError("documentId is required for a folder link");
+    }
+
+    const [doc] = await db
+      .select()
+      .from(Document)
+      .where(eq(Document.document_id, targetDocumentId))
+      .limit(1);
+    if (!doc) throw new NotFoundError("Document not found");
+
+    const exists = await storageService.fileExists(doc.file_path);
+    if (!exists) throw new NotFoundError("File not found on server");
+
+    const buffer = await storageService.downloadToBuffer(doc.file_path);
+    const mime =
+      doc.file_extension?.toLowerCase() === "pdf"
+        ? "application/pdf"
+        : doc.mime_type || "application/octet-stream";
+
+    res.setHeader("Content-Type", mime);
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="${doc.original_name}"`,
+    );
+    res.setHeader("Content-Length", buffer.length);
+    res.send(buffer);
+  },
+);
 
 // Get folder tree for Quick Access
 export const getFolderTree = asyncHandler(async (req: any, res: any) => {

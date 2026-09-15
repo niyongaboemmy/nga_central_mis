@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   X,
   FileText,
@@ -11,59 +11,110 @@ import {
   Calendar,
   Layers,
   MapPin,
+  Sparkles,
 } from "lucide-react";
+import LessonPlanAIGenerate from "../LessonPlanAIGenerate";
 
 interface LessonPlanModalProps {
   showModal: boolean;
   lessonPlan: any;
   onClose: () => void;
+  /** Called after the AI finishes (re)generating this lesson plan, so the
+   *  caller can refetch and hand back the freshly saved plan. */
+  onGenerated?: () => void;
 }
 
 const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
   showModal,
   lessonPlan,
   onClose,
+  onGenerated,
 }) => {
+  const [mode, setMode] = useState<"preview" | "ai">("preview");
+
   if (!showModal) return null;
 
+  // Full-access viewers (teacher/admin) get an entry_id back even when no
+  // plan has been generated yet — that's what lets AI generation happen
+  // straight from this preview instead of only from the Scheme of Work page.
+  const entryId: number | undefined = lessonPlan?.entry_id;
+  const canGenerate = !!entryId && !lessonPlan?.is_summary;
+  const hasPlan = !!lessonPlan && lessonPlan.has_plan !== false;
+
+  const closeAndReset = () => {
+    setMode("preview");
+    onClose();
+  };
+
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
-      <div className="bg-white dark:bg-gray-900 rounded-3xl w-full max-w-4xl max-h-[95vh] overflow-hidden shadow-2xl border border-gray-200 dark:border-gray-700/20 flex flex-col animate-in fade-in zoom-in duration-200">
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-[60] p-4">
+      <div className="relative bg-white dark:bg-gray-900 rounded-3xl w-full max-w-4xl max-h-[95vh] overflow-hidden shadow-2xl shadow-black/20 border border-gray-200/80 dark:border-white/10 flex flex-col animate-in fade-in zoom-in duration-200">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-800/50">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
-              <FileText className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+        <div className="relative flex items-center justify-between p-6 border-b border-gray-100 dark:border-white/10 bg-gradient-to-r from-gray-50 via-white to-gray-50 dark:from-gray-900 dark:via-gray-900 dark:to-gray-900 overflow-hidden">
+          <div className="absolute -top-10 -left-10 w-40 h-40 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
+          <div className="relative flex items-center gap-3">
+            <div className="p-2.5 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl shadow-lg shadow-blue-500/25">
+              <FileText className="w-5 h-5 text-white" />
             </div>
             <div>
-              <h3 className="text-xl font-bold text-gray-900 dark:text-white">
-                {lessonPlan?.is_summary
-                  ? "Lesson Plan Summary"
-                  : "Detailed Lesson Plan"}
+              <h3 className="text-xl font-bold text-gray-900 dark:text-white tracking-tight">
+                {mode === "ai"
+                  ? "Generate with AI"
+                  : lessonPlan?.is_summary
+                    ? "Lesson Plan Summary"
+                    : "Detailed Lesson Plan"}
               </h3>
               <p className="text-sm text-gray-500 dark:text-gray-400">
                 {lessonPlan?.module_name || "Structured Pedagogical Guide"}
               </p>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full transition-colors"
-          >
-            <X className="w-6 h-6 text-gray-500" />
-          </button>
+          <div className="relative flex items-center gap-2">
+            {mode === "preview" && canGenerate && (
+              <button
+                onClick={() => setMode("ai")}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white text-xs font-bold rounded-full shadow-sm shadow-violet-600/25 transition-all hover:-translate-y-0.5"
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                {hasPlan ? "Regenerate with AI" : "Generate with AI"}
+              </button>
+            )}
+            <button
+              onClick={closeAndReset}
+              className="p-2 hover:bg-gray-200 dark:hover:bg-white/10 rounded-full transition-colors"
+            >
+              <X className="w-6 h-6 text-gray-500" />
+            </button>
+          </div>
         </div>
 
-        {/* Content */}
+        {mode === "ai" && entryId ? (
+          <div className="flex-1 overflow-y-auto p-8 flex items-center justify-center">
+            <LessonPlanAIGenerate
+              entryId={entryId}
+              lessonId={hasPlan ? lessonPlan?.id : undefined}
+              weekLabel={lessonPlan?.week_number ? `Week ${lessonPlan.week_number}` : undefined}
+              topic={lessonPlan?.topic || lessonPlan?.module_name}
+              lessonDate={lessonPlan?.lesson_date}
+              onComplete={() => {
+                setMode("preview");
+                onGenerated?.();
+              }}
+              onCancel={() => setMode("preview")}
+            />
+          </div>
+        ) : (
         <div className="flex-1 overflow-y-auto p-8 space-y-10 custom-scrollbar">
-          {lessonPlan ? (
+          {hasPlan ? (
             <>
               {/* Top Overview Cards */}
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-gray-100 dark:border-gray-800">
-                  <div className="flex items-center gap-2 mb-1 text-gray-500">
-                    <Calendar className="w-4 h-4" />
-                    <span className="text-xs font-semibold uppercase">
+                <div className="group p-4 bg-gradient-to-br from-blue-50 to-white dark:from-blue-900/10 dark:to-gray-900 rounded-2xl border border-blue-100/70 dark:border-blue-900/30 hover:shadow-md hover:-translate-y-0.5 transition-all">
+                  <div className="flex items-center gap-2 mb-1.5 text-blue-500">
+                    <div className="p-1.5 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
+                      <Calendar className="w-3.5 h-3.5" />
+                    </div>
+                    <span className="text-[10px] font-bold uppercase tracking-wider">
                       Date
                     </span>
                   </div>
@@ -71,10 +122,12 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
                     {new Date(lessonPlan.lesson_date || "N/A").toUTCString()}
                   </p>
                 </div>
-                <div className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-gray-100 dark:border-gray-800">
-                  <div className="flex items-center gap-2 mb-1 text-gray-500">
-                    <Clock className="w-4 h-4" />
-                    <span className="text-xs font-semibold uppercase">
+                <div className="group p-4 bg-gradient-to-br from-violet-50 to-white dark:from-violet-900/10 dark:to-gray-900 rounded-2xl border border-violet-100/70 dark:border-violet-900/30 hover:shadow-md hover:-translate-y-0.5 transition-all">
+                  <div className="flex items-center gap-2 mb-1.5 text-violet-500">
+                    <div className="p-1.5 bg-violet-100 dark:bg-violet-900/30 rounded-lg">
+                      <Clock className="w-3.5 h-3.5" />
+                    </div>
+                    <span className="text-[10px] font-bold uppercase tracking-wider">
                       Time
                     </span>
                   </div>
@@ -82,10 +135,12 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
                     {lessonPlan.start_time} - {lessonPlan.end_time}
                   </p>
                 </div>
-                <div className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-gray-100 dark:border-gray-800">
-                  <div className="flex items-center gap-2 mb-1 text-gray-500">
-                    <MapPin className="w-4 h-4" />
-                    <span className="text-xs font-semibold uppercase">
+                <div className="group p-4 bg-gradient-to-br from-emerald-50 to-white dark:from-emerald-900/10 dark:to-gray-900 rounded-2xl border border-emerald-100/70 dark:border-emerald-900/30 hover:shadow-md hover:-translate-y-0.5 transition-all">
+                  <div className="flex items-center gap-2 mb-1.5 text-emerald-500">
+                    <div className="p-1.5 bg-emerald-100 dark:bg-emerald-900/30 rounded-lg">
+                      <MapPin className="w-3.5 h-3.5" />
+                    </div>
+                    <span className="text-[10px] font-bold uppercase tracking-wider">
                       Sector
                     </span>
                   </div>
@@ -93,10 +148,12 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
                     {lessonPlan.sector || "N/A"}
                   </p>
                 </div>
-                <div className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-gray-100 dark:border-gray-800">
-                  <div className="flex items-center gap-2 mb-1 text-gray-500">
-                    <Layers className="w-4 h-4" />
-                    <span className="text-xs font-semibold uppercase">
+                <div className="group p-4 bg-gradient-to-br from-amber-50 to-white dark:from-amber-900/10 dark:to-gray-900 rounded-2xl border border-amber-100/70 dark:border-amber-900/30 hover:shadow-md hover:-translate-y-0.5 transition-all">
+                  <div className="flex items-center gap-2 mb-1.5 text-amber-500">
+                    <div className="p-1.5 bg-amber-100 dark:bg-amber-900/30 rounded-lg">
+                      <Layers className="w-3.5 h-3.5" />
+                    </div>
+                    <span className="text-[10px] font-bold uppercase tracking-wider">
                       Trade
                     </span>
                   </div>
@@ -107,17 +164,16 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
               </div>
 
               {/* Big Question */}
-              <div className="bg-gradient-to-r from-blue-600 to-indigo-700 p-6 rounded-2xl text-white shadow-lg">
-                <h4 className="flex items-center gap-2 text-sm font-bold uppercase tracking-wider mb-2 opacity-90">
+              <div className="relative bg-gradient-to-br from-blue-600 via-indigo-600 to-violet-700 p-6 rounded-2xl text-white shadow-lg shadow-indigo-600/20 overflow-hidden">
+                <div className="absolute -top-10 -right-10 w-32 h-32 bg-white/10 rounded-full blur-2xl" />
+                <h4 className="relative flex items-center gap-2 text-xs font-bold uppercase tracking-wider mb-2 opacity-90">
                   <Target className="w-4 h-4" />
                   The Big Question
                 </h4>
-                <p className="text-xl font-medium leading-relaxed">
+                <p className="relative text-xl font-medium leading-relaxed">
                   "{lessonPlan.big_question || "What will we achieve today?"}"
                 </p>
               </div>
-
-              {!lessonPlan.is_summary && <></>}
 
               {/* Learning Outcomes - Visible in both full and summary views */}
               <section className="space-y-4">
@@ -130,10 +186,10 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
                   {lessonPlan.outcomes?.map((outcome: any, idx: number) => (
                     <div
                       key={idx}
-                      className="p-5 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm"
+                      className="p-5 bg-white dark:bg-gray-800/60 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-md transition-shadow"
                     >
                       <div className="flex justify-between items-start mb-3">
-                        <span className="px-2.5 py-1 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 text-xs font-bold rounded-md">
+                        <span className="px-2.5 py-1 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 text-xs font-bold rounded-full">
                           {outcome.code || `LO${idx + 1}`}
                         </span>
                         <div className="flex items-center gap-1.5 text-xs text-gray-500">
@@ -381,26 +437,37 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
             </>
           ) : (
             <div className="flex flex-col items-center justify-center py-20 text-center space-y-4">
-              <div className="p-6 bg-gray-50 dark:bg-gray-800 rounded-full">
-                <FileText className="w-12 h-12 text-gray-300" />
+              <div className="p-6 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-full">
+                <FileText className="w-12 h-12 text-blue-300 dark:text-blue-500/50" />
               </div>
               <div>
                 <h4 className="text-xl font-bold text-gray-900 dark:text-white">
-                  Empty Lesson Plan
+                  No lesson plan yet
                 </h4>
                 <p className="text-gray-500 max-w-xs mx-auto">
-                  No comprehensive lesson data has been compiled for this
-                  specific slot yet.
+                  {canGenerate
+                    ? "Let AI build a full, classroom-ready plan from this week's scheme of work entry."
+                    : "No comprehensive lesson data has been compiled for this specific slot yet."}
                 </p>
               </div>
+              {canGenerate && (
+                <button
+                  onClick={() => setMode("ai")}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white text-sm font-bold rounded-full shadow-sm shadow-violet-600/25 transition-all hover:-translate-y-0.5"
+                >
+                  <Sparkles className="w-4 h-4" />
+                  Generate with AI
+                </button>
+              )}
             </div>
           )}
         </div>
+        )}
 
         {/* Footer */}
         <div className="p-6 border-t border-gray-100 dark:border-gray-800 flex justify-end bg-gray-50/30 dark:bg-gray-900/30">
           <button
-            onClick={onClose}
+            onClick={closeAndReset}
             className="px-6 py-2.5 bg-gray-200/50 text-black dark:text-white dark:bg-gray-800 rounded-2xl font-bold text-sm transition-all active:scale-95"
           >
             Close Document

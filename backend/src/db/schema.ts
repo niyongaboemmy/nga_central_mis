@@ -490,6 +490,7 @@ export const FolderPermission = mysqlTable(
     permission_type: mysqlEnum("permission_type", [
       "VIEW",
       "EDIT",
+      "DOWNLOAD",
       "SHARE",
     ]).default("VIEW"),
     shared_by: bigint("shared_by", { mode: "number" })
@@ -513,6 +514,53 @@ export const FolderPermission = mysqlTable(
     pk: primaryKey(table.permission_id),
   }),
 );
+
+// DocumentShareLink table: backs the Share modal's "Links" tab with a real,
+// authenticated-only "anyone with the link" flow (login still required —
+// see resolveShareLinkAccess in documentController.ts).
+export const DocumentShareLink = mysqlTable("DocumentShareLink", {
+  link_id: bigint("link_id", { mode: "number" }).primaryKey().autoincrement(),
+  document_id: bigint("document_id", { mode: "number" }).references(
+    () => Document.document_id,
+  ),
+  folder_id: bigint("folder_id", { mode: "number" }).references(
+    () => DocumentFolder.folder_id,
+  ),
+  token: varchar("token", { length: 64 }).notNull(),
+  permission_type: mysqlEnum("permission_type", ["VIEW", "DOWNLOAD"]).default(
+    "VIEW",
+  ),
+  created_by: bigint("created_by", { mode: "number" })
+    .notNull()
+    .references(() => User.user_id),
+  expires_at: datetime("expires_at"),
+  revoked_at: datetime("revoked_at"),
+  created_at: datetime("created_at").default(sql`CURRENT_TIMESTAMP`),
+});
+
+// Notification table: generic in-app notification inbox. The unique
+// dedupe index means re-sharing the same item with the same person should
+// be done via an upsert (bump created_at / clear read_at) rather than a
+// plain insert, so it doesn't stack duplicate unread rows.
+export const Notification = mysqlTable("Notification", {
+  notification_id: bigint("notification_id", { mode: "number" })
+    .primaryKey()
+    .autoincrement(),
+  user_id: bigint("user_id", { mode: "number" })
+    .notNull()
+    .references(() => User.user_id),
+  kind: varchar("kind", { length: 50 }).notNull(),
+  title: varchar("title", { length: 255 }).notNull(),
+  body: varchar("body", { length: 500 }),
+  link: varchar("link", { length: 500 }),
+  subject_type: varchar("subject_type", { length: 50 }),
+  subject_id: bigint("subject_id", { mode: "number" }),
+  actor_id: bigint("actor_id", { mode: "number" }).references(
+    () => User.user_id,
+  ),
+  read_at: datetime("read_at"),
+  created_at: datetime("created_at").default(sql`CURRENT_TIMESTAMP`),
+});
 
 // Parenting table
 export const Parenting = mysqlTable(

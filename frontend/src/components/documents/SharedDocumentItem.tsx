@@ -17,6 +17,8 @@ import {
   getFileTypeColor,
   type SharedDocument,
 } from "../../api/documents";
+import { useNotifications } from "../../contexts/NotificationContext";
+import NewBadge from "./NewBadge";
 
 // Get file icon component helper
 const getFileIconComponent = (doc: any, size: number = 20) => {
@@ -67,6 +69,16 @@ const SharedDocumentItem: React.FC<SharedDocumentItemProps> = ({
   onContextMenu,
   onMoreClick,
 }) => {
+  const { isSubjectUnread, markSubjectRead } = useNotifications();
+  const isNew = isSubjectUnread(
+    "document",
+    sharedDocument.document.document_id,
+  );
+  const handleClick = () => {
+    if (isNew) markSubjectRead("document", sharedDocument.document.document_id);
+    onClick();
+  };
+
   const ownerName = sharedDocument.permission?.shared_by_user
     ? `${sharedDocument.permission.shared_by_user.first_name || ""} ${
         sharedDocument.permission.shared_by_user.last_name || ""
@@ -83,9 +95,14 @@ const SharedDocumentItem: React.FC<SharedDocumentItemProps> = ({
           e.preventDefault();
           onContextMenu(e);
         }}
-        onClick={onClick}
-        className="p-4 rounded-2xl border cursor-pointer transition-all hover:shadow-xl border-gray-200 dark:border-gray-700/20 bg-white dark:bg-gray-800/40 hover:border-blue-300 dark:hover:border-blue-500"
+        onClick={handleClick}
+        className={`relative p-4 rounded-2xl border cursor-pointer transition-all hover:shadow-xl bg-white dark:bg-gray-800/40 hover:border-blue-300 dark:hover:border-blue-500 ${
+          isNew
+            ? "border-red-300 dark:border-red-800 ring-2 ring-red-100 dark:ring-red-900/30"
+            : "border-gray-200 dark:border-gray-700/20"
+        }`}
       >
+        {isNew && <NewBadge className="absolute top-2 right-2" />}
         <div className="flex flex-col items-center text-center">
           <div className="mb-3 transform hover:scale-110 transition-transform duration-200">
             {getFileIconComponent(sharedDocument.document)}
@@ -126,8 +143,10 @@ const SharedDocumentItem: React.FC<SharedDocumentItemProps> = ({
         e.preventDefault();
         onContextMenu(e);
       }}
-      onClick={onClick}
-      className="group cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/20 transition-colors duration-150"
+      onClick={handleClick}
+      className={`group cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/20 transition-colors duration-150 ${
+        isNew ? "bg-red-50/50 dark:bg-red-900/10" : ""
+      }`}
     >
       <div className="flex items-center px-4 py-2 min-h-[48px]">
         {/* Icon */}
@@ -139,10 +158,11 @@ const SharedDocumentItem: React.FC<SharedDocumentItemProps> = ({
 
         {/* Name */}
         <div className="flex-1 min-w-0">
-          <div className="flex items-center">
+          <div className="flex items-center gap-2">
             <span className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
               {sharedDocument.document.original_name}
             </span>
+            {isNew && <NewBadge />}
           </div>
           <div className="flex items-center gap-1 mt-0.5">
             <FiUser className="w-3 h-3 text-gray-400" />

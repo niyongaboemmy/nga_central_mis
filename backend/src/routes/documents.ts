@@ -19,15 +19,25 @@ import {
   getDocumentPermissions,
   shareDocument,
   getSharedDocuments,
+  updateDocumentPermission,
   revokeDocumentAccess,
   getAllRoles,
   getUsersByRole,
   getFolderPermissions,
   shareFolder,
+  updateFolderPermission,
   revokeFolderAccess,
   getSharedFolders,
   previewSchemeOfWork,
   getDocumentShareFilterOptions,
+  getDocumentShareLink,
+  createDocumentShareLink,
+  revokeDocumentShareLink,
+  getFolderShareLink,
+  createFolderShareLink,
+  revokeFolderShareLink,
+  resolveShareLink,
+  downloadViaShareLink,
 } from "../controllers/documentController";
 
 const router = Router();
@@ -95,11 +105,19 @@ router.get("/folders/:folderId/permissions", getFolderPermissions);
 // Share a folder with users or roles
 router.post("/folders/:folderId/share", shareFolder);
 
+// Update an existing folder permission's level/expiry in place
+router.put("/folders/permissions/:permissionId", updateFolderPermission);
+
 // Revoke folder access
 router.delete("/folders/permissions/:permissionId", revokeFolderAccess);
 
 // Get folders shared with me
 router.get("/shared/folders", getSharedFolders);
+
+// Folder link sharing (authenticated-only "anyone with the link")
+router.get("/folders/:folderId/share-link", getFolderShareLink);
+router.post("/folders/:folderId/share-link", createFolderShareLink);
+router.delete("/folders/:folderId/share-link", revokeFolderShareLink);
 
 // ======================
 // DOCUMENT ROUTES
@@ -156,7 +174,20 @@ router.post("/:documentId/share", shareDocument);
 // Get documents shared with me
 router.get("/shared/with-me", getSharedDocuments);
 
+// Update an existing document permission's level/expiry in place
+router.put("/permissions/:permissionId", updateDocumentPermission);
+
 // Revoke document access
 router.delete("/permissions/:permissionId", revokeDocumentAccess);
+
+// Document link sharing (authenticated-only "anyone with the link")
+router.get("/:documentId/share-link", getDocumentShareLink);
+router.post("/:documentId/share-link", createDocumentShareLink);
+router.delete("/:documentId/share-link", revokeDocumentShareLink);
+
+// Resolve/consume a share link (still behind router.use(authenticate) above)
+router.get("/shared-link/:token", resolveShareLink);
+router.get("/shared-link/:token/download", downloadViaShareLink);
+router.get("/shared-link/:token/download/:documentId", downloadViaShareLink);
 
 export default router;

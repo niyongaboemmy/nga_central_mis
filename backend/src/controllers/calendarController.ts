@@ -1351,6 +1351,21 @@ export const getLessonPlanForSlot = asyncHandler(async (req: any, res: any) => {
     });
   }
 
+  // No lesson has been generated for this entry yet — for a full-access
+  // viewer (the instructor/an admin), still hand back the resolved scheme
+  // entry so the preview can offer "Generate with AI" instead of a dead end.
+  // A summary-only viewer (e.g. a student) can't generate anything, so they
+  // keep seeing a plain empty state.
+  if (!fullDetails && hasFullAccess) {
+    return successResponse(res, "No lesson plan generated yet", {
+      entry_id: entries[0].entry.entry_id,
+      week_number: entries[0].entry.week_number,
+      topic: entries[0].entry.topic,
+      lesson_date: formattedDate || entries[0].entry.start_date,
+      has_plan: false,
+    });
+  }
+
   successResponse(res, "Lesson plan retrieved successfully", fullDetails);
 });
 

@@ -46,6 +46,7 @@ interface DocumentsContentProps {
     item: Folder | Document | SharedDocument,
     type: "folder" | "document" | "shared-document" | "shared-folder"
   ) => void;
+  onOpenShareModal: (item: Folder | Document) => void;
 }
 
 const DocumentsContent: React.FC<DocumentsContentProps> = ({
@@ -65,6 +66,7 @@ const DocumentsContent: React.FC<DocumentsContentProps> = ({
   onNavigateToSharedSubFolder,
   onPreview,
   onContextMenu,
+  onOpenShareModal,
 }) => {
   // Sort items helper
   const getSortedItems = () => {
@@ -173,6 +175,7 @@ const DocumentsContent: React.FC<DocumentsContentProps> = ({
                 viewMode="grid"
                 onClick={() => onNavigateToFolder(item)}
                 onContextMenu={(e) => onContextMenu(e, item, "folder")}
+                onShareBadgeClick={() => onOpenShareModal(item)}
               />
             ) : (
               <FileItem
@@ -180,6 +183,7 @@ const DocumentsContent: React.FC<DocumentsContentProps> = ({
                 viewMode="grid"
                 onClick={() => onPreview(item)}
                 onContextMenu={(e) => onContextMenu(e, item, "document")}
+                onShareBadgeClick={() => onOpenShareModal(item)}
               />
             )}
           </motion.div>
@@ -210,6 +214,7 @@ const DocumentsContent: React.FC<DocumentsContentProps> = ({
                   onClick={() => onNavigateToFolder(item)}
                   onContextMenu={(e) => onContextMenu(e, item, "folder")}
                   onMoreClick={(e) => onContextMenu(e, item, "folder")}
+                  onShareBadgeClick={() => onOpenShareModal(item)}
                 />
               ) : (
                 <FileItem
@@ -218,6 +223,7 @@ const DocumentsContent: React.FC<DocumentsContentProps> = ({
                   onClick={() => onPreview(item)}
                   onContextMenu={(e) => onContextMenu(e, item, "document")}
                   onMoreClick={(e) => onContextMenu(e, item, "document")}
+                  onShareBadgeClick={() => onOpenShareModal(item)}
                 />
               )}
             </div>
