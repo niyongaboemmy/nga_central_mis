@@ -1,0 +1,50 @@
+name: Run DB Migration on EC2
+
+# Deliberately separate from deploy.yml: schema changes should be a conscious,
+# reviewed action a human triggers, never something that fires automatically
+# on every push/deploy. Run this manually (Actions tab -> Run workflow) when
+# a migration needs to go out, typically right before or after deploying the
+# code that depends on it.
+on:
+  workflow_dispatch:
+    inputs:
+      migration_file:
+        description: "Filename in backend/migrations/ (e.g. 072_document_sharing_and_notifications.sql)"
+        required: true
+        type: string
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run migration over SSH
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          MIGRATION_FILE: ${{ inputs.migration_file }}
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          envs: MIGRATION_FILE
+          script: |
+            set -e
+            cd /opt/apps/nga_central_mis/backend
+
+            if [ ! -f "migrations/$MIGRATION_FILE" ]; then
+              echo "migrations/$MIGRATION_FILE not found on the server. Deploy the code that adds it first (or check the filename), then re-run this workflow."
+              exit 1
+            fi
+
+            # Read just the 4 DB values straight out of .env rather than sourcing the
+            # whole file: sourcing (even with `set -a; ...; set +a`) exports EVERYTHING
+            # in .env -- including unrelated values with quoting/escaping quirks -- into
+            # this shell. Plain grep avoids that.
+            migration_db_val() { grep -E "^$1=" .env | tail -1 | cut -d= -f2- | sed -e 's/^"//' -e 's/"$//' -e "s/^'//" -e "s/'$//"; }
+            DB_HOST_VAL=$(migration_db_val DB_HOST)
+            DB_USERNAME_VAL=$(migration_db_val DB_USERNAME)
+            DB_PASSWORD_VAL=$(migration_db_val DB_PASSWORD)
+            DB_NAME_VAL=$(migration_db_val DB_NAME)
+
+            echo "Applying migrations/$MIGRATION_FILE to $DB_NAME_VAL..."
+            mysql -h "$DB_HOST_VAL" -u "$DB_USERNAME_VAL" -p"$DB_PASSWORD_VAL" "$DB_NAME_VAL" < "migrations/$MIGRATION_FILE"
+            echo "Migration applied successfully."

@@ -401,7 +401,7 @@ const ShareModal: React.FC<ShareModalProps> = ({
           onClick={(e) => e.stopPropagation()}
           role="dialog"
           aria-modal="true"
-          className="bg-white dark:bg-gray-800 w-full sm:max-w-lg lg:max-w-3xl sm:rounded-3xl rounded-t-3xl shadow-2xl flex flex-col max-h-[92vh] sm:max-h-[85vh]"
+          className="bg-white dark:bg-gray-800 w-full sm:max-w-lg lg:max-w-3xl xl:max-w-5xl sm:rounded-3xl rounded-t-3xl shadow-2xl flex flex-col max-h-[92vh] sm:max-h-[85vh]"
         >
           {/* Mobile drag handle */}
           <div className="sm:hidden flex justify-center pt-2 pb-1 flex-shrink-0">
@@ -476,7 +476,7 @@ const ShareModal: React.FC<ShareModalProps> = ({
           <div className="flex-1 overflow-y-auto lg:overflow-hidden lg:flex lg:min-h-0">
           <div className="p-4 lg:flex-1 lg:overflow-y-auto lg:min-h-0">
             {shareTab === "people" && (
-              <div className="space-y-4 lg:space-y-0 lg:grid lg:grid-cols-2 lg:gap-6 lg:items-start">
+              <div className="space-y-4 xl:space-y-0 xl:grid xl:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)] xl:gap-6 xl:items-start">
                 {/* Existing permissions */}
                 <div>
                   {existingPermissions.length > 0 && (
@@ -494,11 +494,11 @@ const ShareModal: React.FC<ShareModalProps> = ({
                         {existingPermissions.map((perm) => (
                           <div
                             key={perm.permission_id}
-                            className="flex items-center justify-between gap-2 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-2xl"
+                            className="flex items-center justify-between gap-3 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-2xl hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
                           >
-                            <div className="flex items-center gap-3 min-w-0">
+                            <div className="flex items-center gap-3 min-w-0 flex-1">
                               <div
-                                className={`w-9 h-9 rounded-xl flex items-center justify-center text-white text-sm font-semibold flex-shrink-0 ${getAvatarColor(
+                                className={`w-10 h-10 rounded-xl flex items-center justify-center text-white text-sm font-semibold flex-shrink-0 ${getAvatarColor(
                                   perm.user.username,
                                 )}`}
                               >
@@ -508,13 +508,23 @@ const ShareModal: React.FC<ShareModalProps> = ({
                                   perm.user.username,
                                 )}
                               </div>
-                              <div className="min-w-0">
-                                <p className="font-medium text-sm text-gray-700 dark:text-gray-200 truncate">
+                              <div className="min-w-0 flex-1">
+                                <p
+                                  className="font-medium text-sm text-gray-700 dark:text-gray-200 truncate"
+                                  title={
+                                    perm.user.first_name && perm.user.last_name
+                                      ? `${perm.user.first_name} ${perm.user.last_name}`
+                                      : perm.user.username
+                                  }
+                                >
                                   {perm.user.first_name && perm.user.last_name
                                     ? `${perm.user.first_name} ${perm.user.last_name}`
                                     : perm.user.username}
                                 </p>
-                                <p className="text-xs text-gray-500 truncate">
+                                <p
+                                  className="text-xs text-gray-500 truncate"
+                                  title={perm.user.email}
+                                >
                                   {perm.user.email}
                                 </p>
                               </div>
@@ -599,14 +609,23 @@ const ShareModal: React.FC<ShareModalProps> = ({
                               )}
                             </div>
                             <div className="flex-1 min-w-0">
-                              <p className="font-medium text-sm text-gray-700 dark:text-gray-200 truncate">
+                              <p
+                                className="font-medium text-sm text-gray-700 dark:text-gray-200 truncate"
+                                title={
+                                  user.first_name || user.last_name
+                                    ? `${user.first_name || ""} ${
+                                        user.last_name || ""
+                                      }`.trim()
+                                    : user.username
+                                }
+                              >
                                 {user.first_name || user.last_name
                                   ? `${user.first_name || ""} ${
                                       user.last_name || ""
                                     }`.trim()
                                   : user.username}
                               </p>
-                              <p className="text-xs text-gray-500 truncate">
+                              <p className="text-xs text-gray-500 truncate" title={user.email}>
                                 {user.email}
                               </p>
                             </div>
@@ -633,9 +652,9 @@ const ShareModal: React.FC<ShareModalProps> = ({
                         {selectedShareUsers.map((user) => (
                           <div
                             key={user.user_id}
-                            className="flex items-center justify-between p-2.5 bg-blue-50 dark:bg-blue-900/20 rounded-2xl border border-blue-100 dark:border-blue-800"
+                            className="flex items-center justify-between gap-2 p-2.5 bg-blue-50 dark:bg-blue-900/20 rounded-2xl border border-blue-100 dark:border-blue-800"
                           >
-                            <div className="flex items-center gap-3 min-w-0">
+                            <div className="flex items-center gap-3 min-w-0 flex-1">
                               <div
                                 className={`w-8 h-8 rounded-xl flex items-center justify-center text-white text-xs font-semibold flex-shrink-0 ${getAvatarColor(
                                   user.username,
@@ -647,7 +666,16 @@ const ShareModal: React.FC<ShareModalProps> = ({
                                   user.username,
                                 )}
                               </div>
-                              <span className="text-sm font-medium text-gray-700 dark:text-gray-200 truncate">
+                              <span
+                                className="text-sm font-medium text-gray-700 dark:text-gray-200 truncate"
+                                title={
+                                  user.first_name || user.last_name
+                                    ? `${user.first_name || ""} ${
+                                        user.last_name || ""
+                                      }`.trim()
+                                    : user.username
+                                }
+                              >
                                 {user.first_name || user.last_name
                                   ? `${user.first_name || ""} ${
                                       user.last_name || ""
