@@ -458,10 +458,21 @@ const Documents: React.FC = () => {
     fetchFolderTree();
   }, [fetchFolderTree]);
 
+  // Fetch shared-with-me data unconditionally on load (and whenever the
+  // academic year changes) so the "Shared" tab's count badge reflects reality
+  // right away — it used to only populate once you switched to that tab,
+  // which made the badge (and therefore "do I have anything shared with me?")
+  // silently read 0 the whole time you were on "My Docs".
+  useEffect(() => {
+    fetchSharedDocuments();
+  }, [fetchSharedDocuments]);
+
   useEffect(() => {
     if (activeTab === "my-documents") {
       fetchData();
     } else {
+      // Re-fetch on every visit to this tab too, in case something changed
+      // (e.g. a share arrived) since the eager load above.
       fetchSharedDocuments();
     }
   }, [fetchData, fetchSharedDocuments, activeTab]);
