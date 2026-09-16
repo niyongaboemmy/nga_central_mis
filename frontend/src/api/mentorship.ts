@@ -4,6 +4,7 @@ export interface AssignedStudent {
   user_id: number;
   first_name: string | null;
   last_name: string | null;
+  registration_number: string | null;
   class_group_name: string;
   last_session_date: string | null;
   days_since_last_session: number | null;
@@ -414,7 +415,12 @@ export const mentorshipApi = {
   getUnassignedStudents: (academicYearId?: number) =>
     api.get<{
       success: boolean;
-      data: { student_id: number; student_name: string | null; class_group_name: string | null }[];
+      data: {
+        student_id: number;
+        student_name: string | null;
+        registration_number: string | null;
+        class_group_name: string | null;
+      }[];
     }>("/mentorship/admin/unassigned-students", {
       params: academicYearId ? { academic_year_id: academicYearId } : undefined,
     }),

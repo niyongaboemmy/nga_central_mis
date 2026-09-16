@@ -24,7 +24,12 @@ const AdminMentorAssignments: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [unassigned, setUnassigned] = useState<
-    { student_id: number; student_name: string | null; class_group_name: string | null }[]
+    {
+      student_id: number;
+      student_name: string | null;
+      registration_number: string | null;
+      class_group_name: string | null;
+    }[]
   >([]);
   const [showGapPanel, setShowGapPanel] = useState(false);
   const [downloadingMentorId, setDownloadingMentorId] = useState<number | null>(null);
@@ -279,6 +284,7 @@ const AdminMentorAssignments: React.FC = () => {
                 className="text-xs px-2.5 py-1 bg-white dark:bg-gray-800 border border-amber-100 dark:border-amber-900/30 rounded-full text-gray-700 dark:text-gray-300"
               >
                 {u.student_name ?? `#${u.student_id}`}
+                {u.registration_number ? ` (${u.registration_number})` : ""}
                 {u.class_group_name ? ` · ${u.class_group_name}` : ""}
               </span>
             ))}

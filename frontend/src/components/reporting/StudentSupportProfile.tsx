@@ -161,7 +161,11 @@ const StudentSupportProfile: React.FC<Props> = ({ student, onBack }) => {
           </button>
           <div>
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{fullName}</h2>
-            <p className="text-sm text-gray-500 dark:text-gray-400">{student.class_group_name}</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              {student.registration_number
+                ? `${student.registration_number} · ${student.class_group_name}`
+                : student.class_group_name}
+            </p>
           </div>
         </div>
         <button

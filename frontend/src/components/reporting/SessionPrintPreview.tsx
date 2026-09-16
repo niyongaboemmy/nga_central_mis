@@ -67,7 +67,9 @@ const SessionPrintPreview: React.FC<Props> = ({ student, session, onClose }) => 
                 Mentorship Session Log — Preview
               </h2>
               <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
-                {fullName} · {student.class_group_name}
+                {fullName}
+                {student.registration_number && ` (${student.registration_number})`} ·{" "}
+                {student.class_group_name}
               </p>
             </div>
             <button
@@ -124,6 +126,11 @@ const SessionPrintPreview: React.FC<Props> = ({ student, session, onClose }) => 
                   <tr className="align-top">
                     <td className="border border-gray-300 dark:border-gray-600 px-3 py-3 text-gray-800 dark:text-gray-200 font-medium">
                       {fullName}
+                      {student.registration_number && (
+                        <div className="text-[10px] text-gray-500 dark:text-gray-400 font-normal">
+                          {student.registration_number}
+                        </div>
+                      )}
                     </td>
                     <td className="border border-gray-300 dark:border-gray-600 px-3 py-3 text-gray-700 dark:text-gray-300 whitespace-nowrap">
                       {formattedDate}

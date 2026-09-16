@@ -8,6 +8,7 @@ const overdueStudent: AssignedStudent = {
   user_id: 1,
   first_name: "Ada",
   last_name: "Lovelace",
+  registration_number: "NGA-2026-00001",
   class_group_name: "Year 2A",
   last_session_date: null,
   days_since_last_session: null,

@@ -220,7 +220,9 @@ const EnrollmentManager: React.FC = () => {
     const q = rosterFilter.trim().toLowerCase();
     if (!q) return roster.students;
     return roster.students.filter((s) =>
-      `${s.first_name} ${s.last_name} ${s.email}`.toLowerCase().includes(q),
+      `${s.first_name} ${s.last_name} ${s.email} ${s.registration_number ?? ""}`
+        .toLowerCase()
+        .includes(q),
     );
   }, [roster, rosterFilter]);
 
@@ -899,6 +901,11 @@ const EnrollmentManager: React.FC = () => {
                 <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
                   {detailStudent.email}
                 </p>
+                {detailStudent.registration_number && (
+                  <p className="text-xs text-gray-400 truncate">
+                    {detailStudent.registration_number}
+                  </p>
+                )}
                 <p className="text-xs text-gray-400">
                   {roster.class_group.class_group_name} --{" "}
                   {roster.class_group.grade_name}
@@ -1071,7 +1078,11 @@ const StudentRow: React.FC<{
         <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
           {student.first_name} {student.last_name}
         </p>
-        <p className="text-xs text-gray-400 truncate">{student.email}</p>
+        <p className="text-xs text-gray-400 truncate">
+          {student.registration_number
+            ? `${student.registration_number} · ${student.email}`
+            : student.email}
+        </p>
       </div>
       <div className="flex flex-col items-end gap-1 flex-shrink-0 w-20">
         <span
@@ -1119,7 +1130,11 @@ const AssignRow: React.FC<{
       <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
         {user.first_name} {user.last_name}
       </p>
-      <p className="text-xs text-gray-400 truncate">{user.email}</p>
+      <p className="text-xs text-gray-400 truncate">
+        {user.registration_number
+          ? `${user.registration_number} · ${user.email}`
+          : user.email}
+      </p>
     </div>
   </div>
 );

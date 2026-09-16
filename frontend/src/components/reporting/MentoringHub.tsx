@@ -171,7 +171,8 @@ const MentoringHub: React.FC = () => {
   }
 
   const filtered = students.filter((s) => {
-    const full = `${s.first_name ?? ""} ${s.last_name ?? ""}`.toLowerCase();
+    const full =
+      `${s.first_name ?? ""} ${s.last_name ?? ""} ${s.registration_number ?? ""}`.toLowerCase();
     return full.includes(search.toLowerCase());
   });
 
@@ -287,7 +288,9 @@ const MentoringHub: React.FC = () => {
                       {fullName || "Unnamed"}
                     </p>
                     <p className="text-xs text-gray-400 dark:text-gray-500 truncate">
-                      {student.class_group_name}
+                      {student.registration_number
+                        ? `${student.registration_number} · ${student.class_group_name}`
+                        : student.class_group_name}
                     </p>
                   </div>
 
