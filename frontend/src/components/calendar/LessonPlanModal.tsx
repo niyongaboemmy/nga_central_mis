@@ -91,7 +91,16 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
         isOpen={true}
         onClose={() => setMode("preview")}
         entryId={entryId}
-        initialData={lessonPlan}
+        initialData={{
+          ...lessonPlan,
+          // An AI-generated plan never captures a real start_time/end_time
+          // (that path saves them as null) — fall back to the actual
+          // timetable slot's time rather than leaving the edit form's Time
+          // Slot fields blank when the real time is right there on the
+          // calendar slot this plan was opened from.
+          start_time: lessonPlan?.start_time || lessonPlan?.slot_start_time,
+          end_time: lessonPlan?.end_time || lessonPlan?.slot_end_time,
+        }}
         onSaved={() => {
           setMode("preview");
           onGenerated?.();

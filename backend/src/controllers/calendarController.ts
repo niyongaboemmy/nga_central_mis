@@ -1260,7 +1260,16 @@ export const getLessonPlanForSlot = asyncHandler(async (req: any, res: any) => {
         return successResponse(
           res,
           "Specific lesson plan for date retrieved successfully",
-          fullDetails,
+          {
+            ...fullDetails,
+            // The real timetable slot's own time — a fallback for the edit
+            // form when this LO_Lesson row's own start_time/end_time are
+            // empty (e.g. an AI-generated plan, which never captures a real
+            // time slot), so editing doesn't show blank inputs for a time
+            // that's genuinely known from the calendar.
+            slot_start_time: slot[0].start_time,
+            slot_end_time: slot[0].end_time,
+          },
         );
       }
     }
@@ -1366,7 +1375,11 @@ export const getLessonPlanForSlot = asyncHandler(async (req: any, res: any) => {
     });
   }
 
-  successResponse(res, "Lesson plan retrieved successfully", fullDetails);
+  successResponse(res, "Lesson plan retrieved successfully", {
+    ...fullDetails,
+    slot_start_time: slot[0].start_time,
+    slot_end_time: slot[0].end_time,
+  });
 });
 
 // ============================================

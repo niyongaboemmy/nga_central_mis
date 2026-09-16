@@ -88,6 +88,24 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   };
 
+  // Native <input type="date">/<input type="time"> silently render blank
+  // for anything that isn't exactly "YYYY-MM-DD" / "HH:MM" — but LO_Lesson's
+  // lesson_date is a SQL DATE column, which Drizzle returns as a JS Date and
+  // therefore round-trips through the API as a full ISO datetime string
+  // ("2026-09-16T00:00:00.000Z"), and start_time/end_time occasionally carry
+  // trailing ":00" seconds. Without this, an existing plan's date/time
+  // fields look empty even though the data is really there.
+  const toDateInputValue = (value: unknown): string => {
+    if (!value) return "";
+    const match = String(value).match(/^(\d{4}-\d{2}-\d{2})/);
+    return match ? match[1] : String(value);
+  };
+  const toTimeInputValue = (value: unknown): string => {
+    if (!value) return "";
+    const match = String(value).trim().match(/^(\d{1,2}):(\d{2})/);
+    return match ? `${match[1].padStart(2, "0")}:${match[2]}` : String(value);
+  };
+
   const defaultFormData: Partial<LessonPlan> = {
     entry_id: entryId,
     lesson_date: todayLocal(),
@@ -194,12 +212,21 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
   useEffect(() => {
     if (initialData) {
       // Merge initialData with defaultFormData to ensure all required fields exist
-      const merged = { ...defaultFormData, ...initialData, entry_id: entryId };
-      // Only worth auto-filling for a plan that isn't saved yet — an
-      // existing plan's own recorded time slot always wins.
-      const { data: withDefaults, filled } = merged.id
-        ? { data: merged, filled: new Set<string>() }
-        : withTimetableDefaults(merged);
+      const merged = {
+        ...defaultFormData,
+        ...initialData,
+        entry_id: entryId,
+        lesson_date: toDateInputValue(initialData.lesson_date),
+        start_time: toTimeInputValue(initialData.start_time),
+        end_time: toTimeInputValue(initialData.end_time),
+      };
+      // withTimetableDefaults only ever fills a genuinely empty field, so
+      // it's safe to run for an existing plan too — a saved start_time/
+      // end_time always wins, but an AI-generated plan that never got a
+      // real time slot (that path saves them as null) can still fall back
+      // to the subject's actual timetable instead of showing blank inputs
+      // with no idea what to put there.
+      const { data: withDefaults, filled } = withTimetableDefaults(merged);
       setFormData(withDefaults);
       setAutoFilledFields(filled);
       setSavedSnapshot(JSON.stringify(withDefaults));
@@ -1400,13 +1427,23 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
             </div>
           </div>
         );
-      case "Preview":
+      case "Preview": {
+        const metaParts = [
+          formData.start_time && formData.end_time
+            ? `${formData.start_time} – ${formData.end_time}`
+            : null,
+          formData.sector || null,
+          formData.class_name || null,
+        ].filter(Boolean) as string[];
+
         return (
-          <div className="space-y-8 animate-in fade-in slide-in-from-right-2 pb-10">
-            <div className="bg-blue-600 text-white p-6 rounded-3xl space-y-2 shadow-xl shadow-blue-500/20">
-              <div className="flex justify-between items-start">
-                <div>
-                  <h3 className="text-2xl font-black uppercase tracking-tight">
+          <div className="space-y-6 animate-in fade-in slide-in-from-right-2 pb-10">
+            {/* Summary banner */}
+            <div className="relative overflow-hidden bg-gradient-to-br from-blue-600 to-indigo-700 text-white p-6 sm:p-7 rounded-3xl shadow-xl shadow-blue-600/20">
+              <div className="absolute -top-10 -right-10 w-40 h-40 bg-white/10 rounded-full blur-3xl pointer-events-none" />
+              <div className="relative flex flex-wrap items-start justify-between gap-4">
+                <div className="min-w-0">
+                  <h3 className="text-xl sm:text-2xl font-black uppercase tracking-tight break-words">
                     {formData.lesson_date
                       ? new Date(formData.lesson_date).toLocaleDateString(
                           "en-GB",
@@ -1419,92 +1456,121 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
                         )
                       : "Draft Date"}
                   </h3>
-                  <p className="opacity-80 font-bold text-sm">
-                    {formData.start_time} - {formData.end_time} •{" "}
-                    {formData.sector}
-                  </p>
+                  {metaParts.length > 0 ? (
+                    <p className="opacity-90 font-bold text-sm mt-1 flex flex-wrap items-center gap-x-2">
+                      {metaParts.map((part, i) => (
+                        <React.Fragment key={i}>
+                          {i > 0 && <span className="opacity-50">•</span>}
+                          <span>{part}</span>
+                        </React.Fragment>
+                      ))}
+                    </p>
+                  ) : (
+                    <p className="opacity-70 font-medium text-xs mt-1 italic">
+                      Add a time slot and sector in the Header tab
+                    </p>
+                  )}
                 </div>
-                <div className="bg-white/20 p-3 rounded-2xl backdrop-blur-md">
+                <div className="bg-white/20 p-3 rounded-2xl backdrop-blur-md flex-shrink-0">
                   <FileText className="w-6 h-6" />
                 </div>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="space-y-6 min-w-0">
                 <div className="space-y-3">
-                  <h4 className="text-[10px] font-black text-blue-600 uppercase tracking-[0.2em]">
+                  <h4 className="flex items-center gap-2 text-[10px] font-black text-blue-600 dark:text-blue-400 uppercase tracking-[0.2em]">
+                    <Target className="w-3.5 h-3.5" />
                     The Big Question
                   </h4>
                   <div className="bg-gray-50 dark:bg-gray-800/60 p-4 rounded-2xl border border-gray-200 dark:border-gray-700 italic text-sm text-gray-700 dark:text-gray-300">
-                    "{formData.big_question}"
+                    {formData.big_question
+                      ? `"${formData.big_question}"`
+                      : "Not defined yet — add one in the Objectives tab."}
                   </div>
                 </div>
 
                 <div className="space-y-3">
-                  <h4 className="text-[10px] font-black text-green-600 uppercase tracking-[0.2em]">
+                  <h4 className="flex items-center gap-2 text-[10px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-[0.2em]">
+                    <CheckCircle className="w-3.5 h-3.5" />
                     Learning Outcomes
                   </h4>
                   <div className="space-y-2">
-                    {formData.outcomes?.map((out, i) => (
-                      <div
-                        key={i}
-                        className="bg-white dark:bg-gray-800/60 p-4 rounded-2xl border border-gray-200 dark:border-gray-700 flex gap-4"
-                      >
-                        <div className="w-10 h-10 rounded-xl bg-green-500/10 flex items-center justify-center text-green-600 font-bold text-xs shrink-0">
-                          {out.code}
+                    {formData.outcomes && formData.outcomes.length > 0 ? (
+                      formData.outcomes.map((out, i) => (
+                        <div
+                          key={i}
+                          className="bg-white dark:bg-gray-800/60 p-4 rounded-2xl border border-gray-200 dark:border-gray-700 flex gap-4 hover:shadow-md hover:-translate-y-0.5 transition-all"
+                        >
+                          <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-600 dark:text-emerald-400 font-bold text-xs shrink-0">
+                            {out.code || `LO${i + 1}`}
+                          </div>
+                          <div className="min-w-0">
+                            <p className="font-black text-xs text-gray-900 dark:text-white uppercase mb-1 break-words">
+                              {out.title || "Untitled outcome"}
+                            </p>
+                            <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
+                              {out.description || "No description yet."}
+                            </p>
+                          </div>
                         </div>
-                        <div>
-                          <p className="font-black text-xs text-gray-900 dark:text-white uppercase mb-1">
-                            {out.title}
-                          </p>
-                          <p className="text-xs text-gray-500 leading-relaxed">
-                            {out.description}
-                          </p>
-                        </div>
-                      </div>
-                    ))}
+                      ))
+                    ) : (
+                      <p className="text-xs text-gray-400 italic p-4 bg-gray-50 dark:bg-gray-800/60 rounded-2xl border border-gray-200 dark:border-gray-700">
+                        No learning outcomes added yet.
+                      </p>
+                    )}
                   </div>
                 </div>
               </div>
 
-              <div className="space-y-6">
+              <div className="space-y-6 min-w-0">
                 <div className="space-y-3">
-                  <h4 className="text-[10px] font-black text-purple-600 uppercase tracking-[0.2em]">
+                  <h4 className="flex items-center gap-2 text-[10px] font-black text-purple-600 dark:text-purple-400 uppercase tracking-[0.2em]">
+                    <BookOpen className="w-3.5 h-3.5" />
                     Indicative Content
                   </h4>
                   <div className="grid grid-cols-1 gap-2">
-                    {formData.indicativeContent?.map((ic, i) => (
-                      <div
-                        key={i}
-                        className="p-3 bg-purple-500/5 dark:bg-purple-500/10 rounded-xl border border-purple-500/10 flex justify-between items-center"
-                      >
-                        <span className="text-[10px] font-black text-purple-600 uppercase">
-                          {ic.category}
-                        </span>
-                        <span className="text-xs font-bold text-gray-700 dark:text-gray-300">
-                          {ic.content}
-                        </span>
-                      </div>
-                    ))}
+                    {formData.indicativeContent &&
+                    formData.indicativeContent.length > 0 ? (
+                      formData.indicativeContent.map((ic, i) => (
+                        <div
+                          key={i}
+                          className="p-3 bg-purple-50 dark:bg-purple-500/10 rounded-xl border border-purple-200/70 dark:border-purple-500/20 hover:shadow-sm transition-all"
+                        >
+                          <span className="block text-[10px] font-black text-purple-600 dark:text-purple-400 uppercase tracking-wide mb-1">
+                            {ic.category || "Uncategorized"}
+                          </span>
+                          <span className="block text-xs font-medium text-gray-700 dark:text-gray-300 leading-relaxed">
+                            {ic.content || "—"}
+                          </span>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-xs text-gray-400 italic p-4 bg-gray-50 dark:bg-gray-800/60 rounded-2xl border border-gray-200 dark:border-gray-700">
+                        No indicative content added yet.
+                      </p>
+                    )}
                   </div>
                 </div>
 
                 <div className="space-y-3">
-                  <h4 className="text-[10px] font-black text-orange-600 uppercase tracking-[0.2em]">
+                  <h4 className="flex items-center gap-2 text-[10px] font-black text-orange-600 dark:text-orange-400 uppercase tracking-[0.2em]">
+                    <Clock className="w-3.5 h-3.5" />
                     Lesson Flow
                   </h4>
                   <div className="space-y-3">
                     {formData.sections?.map((s, i) => (
                       <div
                         key={i}
-                        className="p-4 bg-gray-50 dark:bg-gray-800/60 rounded-2xl border border-gray-200 dark:border-gray-700 space-y-2"
+                        className="p-4 bg-gray-50 dark:bg-gray-800/60 rounded-2xl border border-gray-200 dark:border-gray-700 space-y-2 hover:shadow-md hover:-translate-y-0.5 transition-all"
                       >
-                        <div className="flex justify-between items-center pb-2 border-b border-gray-200 dark:border-gray-700">
-                          <span className="text-xs font-black text-orange-600 uppercase tracking-wider">
+                        <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-gray-200 dark:border-gray-700">
+                          <span className="text-xs font-black text-orange-600 dark:text-orange-400 uppercase tracking-wider">
                             {s.section_type}
                           </span>
-                          <span className="text-[10px] font-bold text-gray-400">
+                          <span className="text-[10px] font-bold text-gray-400 bg-gray-100 dark:bg-gray-700/60 px-2 py-0.5 rounded-full">
                             {s.duration_minutes} min
                           </span>
                         </div>
@@ -1534,6 +1600,7 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
             </div>
           </div>
         );
+      }
       default:
         return null;
     }
