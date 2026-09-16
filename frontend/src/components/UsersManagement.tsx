@@ -17,6 +17,7 @@ import {
   Filter,
   ChevronDown,
   Check,
+  Hash,
 } from "lucide-react";
 import {
   getUsersWithPagination,
@@ -24,6 +25,7 @@ import {
   enableUser,
   disableUser,
   getUser,
+  generateStudentRegistrationNumbers,
   User,
   Role,
 } from "../api/users";
@@ -308,6 +310,9 @@ const UsersManagement: React.FC<UsersManagementProps> = ({
   const [allRoleTotal, setAllRoleTotal] = useState(0);
   const [statsLoading, setStatsLoading] = useState(true);
   const [isExporting, setIsExporting] = useState(false);
+  const [isGeneratingRegNumbers, setIsGeneratingRegNumbers] = useState(false);
+  const [confirmGenerateRegNumbers, setConfirmGenerateRegNumbers] =
+    useState(false);
   const [total, setTotal] = useState(0);
   const [togglingUserId, setTogglingUserId] = useState<number | null>(null);
   const [isSwitchingUser, setIsSwitchingUser] = useState(false);
@@ -612,6 +617,33 @@ const UsersManagement: React.FC<UsersManagementProps> = ({
     }
   };
 
+  const handleGenerateRegNumbers = async () => {
+    setConfirmGenerateRegNumbers(false);
+    setIsGeneratingRegNumbers(true);
+    try {
+      const result = await generateStudentRegistrationNumbers();
+      if (result.updated > 0) {
+        showToast(
+          `Generated ${result.updated} registration number${result.updated === 1 ? "" : "s"}`,
+          "success",
+        );
+        pageRef.current = 1;
+        fetchPage(1, true);
+      } else {
+        showToast("Every student already has a registration number", "info");
+      }
+    } catch (error: any) {
+      console.error("Failed to generate registration numbers", error);
+      showToast(
+        error.response?.data?.message ||
+          "Failed to generate registration numbers",
+        "error",
+      );
+    } finally {
+      setIsGeneratingRegNumbers(false);
+    }
+  };
+
   return (
     <div>
       {/* Actions */}
@@ -640,6 +672,19 @@ const UsersManagement: React.FC<UsersManagementProps> = ({
           <span className="hidden sm:inline">Bulk Upload</span>
         </button>
         <button
+          onClick={() => setConfirmGenerateRegNumbers(true)}
+          disabled={isGeneratingRegNumbers}
+          title="Generate registration numbers for students that don't have one yet, oldest first"
+          className="px-5 py-2 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-700 text-gray-700 dark:text-gray-200 text-sm font-medium rounded-full transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {isGeneratingRegNumbers ? (
+            <Loader2 className="w-4 h-4 animate-spin" />
+          ) : (
+            <Hash className="w-4 h-4" />
+          )}
+          <span className="hidden sm:inline">Generate Reg. Numbers</span>
+        </button>
+        <button
           onClick={() => setCreateModalOpen(true)}
           className="px-5 py-2 bg-blue-500 hover:bg-blue-600 text-white text-sm font-medium rounded-full transition-colors flex items-center gap-2"
         >
@@ -647,6 +692,43 @@ const UsersManagement: React.FC<UsersManagementProps> = ({
           <span className="hidden sm:inline">Add User</span>
         </button>
       </motion.div>
+
+      {confirmGenerateRegNumbers && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="w-full max-w-sm bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-xl"
+          >
+            <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-xl flex items-center justify-center mb-4">
+              <Hash className="w-6 h-6" />
+            </div>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+              Generate registration numbers?
+            </h3>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
+              This assigns the next registration number to every student who
+              doesn't have one yet, starting with the earliest-registered
+              student. Students that already have a number are left
+              untouched.
+            </p>
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setConfirmGenerateRegNumbers(false)}
+                className="px-4 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-full transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleGenerateRegNumbers}
+                className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white text-sm font-medium rounded-full transition-colors"
+              >
+                Generate
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
 
       {/* Stats */}
       <motion.div

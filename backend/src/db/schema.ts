@@ -61,6 +61,16 @@ export const UserProfile = mysqlTable("UserProfile", {
     "STAFF",
   ]),
   external_id: varchar("external_id", { length: 100 }),
+  registration_number: varchar("registration_number", { length: 20 }).unique(),
+});
+
+// RegistrationSequence table -- single-row counter backing every student
+// registration number (see utils/registrationNumber.ts).
+export const RegistrationSequence = mysqlTable("RegistrationSequence", {
+  id: tinyint("id").primaryKey(),
+  current_value: bigint("current_value", { mode: "number" })
+    .notNull()
+    .default(0),
 });
 
 // AuthCredential table

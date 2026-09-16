@@ -10,6 +10,7 @@ import {
   updateCurrentUserProfile,
   updateUserProfile,
   bulkCreateUsers,
+  generateStudentRegistrationNumbers,
   downloadTemplate,
   searchUsers,
   assignRoleToUser,
@@ -116,6 +117,15 @@ router.post(
   authenticate,
   authorize("ASSIGN_GRADE_TO_CLASS_TEACHER"),
   copyGradeAssignments,
+);
+
+// Registered before the bare "/:id" route below, otherwise Express matches
+// "/students" as :id="students" and calls getUser instead.
+router.post(
+  "/students/generate-registration-numbers",
+  authenticate,
+  authorize("MANAGE_USERS"),
+  generateStudentRegistrationNumbers,
 );
 
 router.get("/:id", authenticate, getUser);

@@ -8,6 +8,8 @@ import {
   or,
   like,
   desc,
+  asc,
+  isNull,
   count,
   inArray,
   sql as drizzleSql,
@@ -51,6 +53,7 @@ import * as fs from "fs";
 import * as path from "path";
 import { recordActivity } from "../utils/activityLogger";
 import { getCurrentAcademicYearId } from "../utils/academicYear";
+import { generateStudentRegistrationNumber } from "../utils/registrationNumber";
 
 // Helper function to convert date to MySQL DATE format
 const formatDateForMySQL = (dateStr: string | undefined) => {
@@ -923,6 +926,11 @@ export const createUser = asyncHandler(async (req: any, res: any) => {
     sanitizedAddress ||
     userType
   ) {
+    const registrationNumber =
+      userType === "STUDENT"
+        ? await generateStudentRegistrationNumber()
+        : null;
+
     await db.insert(UserProfile).values({
       user_id: newUserId,
       first_name: sanitizedFirstName || null,
@@ -931,6 +939,7 @@ export const createUser = asyncHandler(async (req: any, res: any) => {
       date_of_birth: formattedDateOfBirth ? sql`${formattedDateOfBirth}` : null,
       address: sanitizedAddress || null,
       user_type: userType || "STAFF",
+      registration_number: registrationNumber,
     });
   }
 
@@ -1268,8 +1277,15 @@ export const bulkCreateUsers = asyncHandler(async (req: any, res: any) => {
         });
       }
 
-      // Insert profile if any profile data is provided
-      if (firstName || lastName || gender || dateOfBirth || address) {
+      // Insert profile if any profile data (or a role/user_type) is provided
+      // -- a student profile row must exist even with no other fields, since
+      // that's where the registration number below gets stored.
+      if (firstName || lastName || gender || dateOfBirth || address || role_id) {
+        const registrationNumber =
+          validatedUserType === "STUDENT"
+            ? await generateStudentRegistrationNumber()
+            : null;
+
         await db.insert(UserProfile).values({
           user_id: newUserId,
           first_name: firstName || null,
@@ -1278,6 +1294,7 @@ export const bulkCreateUsers = asyncHandler(async (req: any, res: any) => {
           date_of_birth: dateOfBirth ? sql`${dateOfBirth}` : null,
           address: address || null,
           user_type: validatedUserType,
+          registration_number: registrationNumber,
         });
       }
 
@@ -1323,6 +1340,75 @@ export const bulkCreateUsers = asyncHandler(async (req: any, res: any) => {
     { success: successCount, failed: failedCount, errors: errors.slice(0, 10) },
   );
 });
+
+/**
+ * Backfill registration numbers for every STUDENT that doesn't have one yet,
+ * oldest first (by user_id, i.e. "first in"). New students already get a
+ * number automatically at creation (see createUser / bulkCreateUsers above)
+ * -- this is only for students that predate the feature or slipped through.
+ * Each number's year segment is the student's own admission year
+ * (`User.created_at`), not the year this endpoint happens to run in.
+ */
+export const generateStudentRegistrationNumbers = asyncHandler(
+  async (req: any, res: any) => {
+    const pending = await db
+      .select({
+        profile_id: UserProfile.profile_id,
+        user_id: UserProfile.user_id,
+        created_at: User.created_at,
+      })
+      .from(UserProfile)
+      .innerJoin(User, eq(UserProfile.user_id, User.user_id))
+      .where(
+        and(
+          eq(UserProfile.user_type, "STUDENT"),
+          isNull(UserProfile.registration_number),
+        ),
+      )
+      .orderBy(asc(UserProfile.user_id));
+
+    const assignments: { user_id: number; registration_number: string }[] =
+      [];
+
+    for (const row of pending) {
+      const registrationNumber = await generateStudentRegistrationNumber(
+        row.created_at ? new Date(row.created_at) : new Date(),
+      );
+      await db
+        .update(UserProfile)
+        .set({ registration_number: registrationNumber })
+        .where(eq(UserProfile.profile_id, row.profile_id));
+      assignments.push({
+        user_id: row.user_id,
+        registration_number: registrationNumber,
+      });
+    }
+
+    logger.info("Student registration numbers generated", {
+      updated: assignments.length,
+      total: pending.length,
+      triggeredBy: req.user?.userId,
+    });
+
+    if (req.user?.userId && assignments.length > 0) {
+      await recordActivity(
+        req.user.userId,
+        "USER_UPDATE",
+        `Generated registration numbers for ${assignments.length} student(s)`,
+        "UserProfile",
+        undefined,
+        { updated: assignments.length },
+        req.user.userId,
+      );
+    }
+
+    successResponse(res, "Student registration numbers generated", {
+      updated: assignments.length,
+      total: pending.length,
+      assignments,
+    });
+  },
+);
 
 // Download user template
 export const downloadTemplate = asyncHandler(async (req: any, res: any) => {

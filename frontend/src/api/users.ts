@@ -30,6 +30,7 @@ export interface UserProfile {
   address?: string;
   user_type?: string;
   external_id?: string;
+  registration_number?: string;
   created_at?: string;
   updated_at?: string;
 }
@@ -455,6 +456,26 @@ export const copyGradeAssignments = async (
     skipped: number;
     total: number;
   };
+};
+
+export interface RegistrationNumberAssignment {
+  user_id: number;
+  registration_number: string;
+}
+
+export interface GenerateRegistrationNumbersResult {
+  updated: number;
+  total: number;
+  assignments: RegistrationNumberAssignment[];
+}
+
+export const generateStudentRegistrationNumbers = async (): Promise<
+  GenerateRegistrationNumbersResult
+> => {
+  const response = await api.post<
+    BackendResponse<GenerateRegistrationNumbersResult>
+  >("/users/students/generate-registration-numbers");
+  return response.data.data as GenerateRegistrationNumbersResult;
 };
 
 export interface GradeUser {

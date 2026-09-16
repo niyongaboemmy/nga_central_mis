@@ -11,6 +11,7 @@ import {
   Activity,
   UserCircle,
   History,
+  Hash,
 } from "lucide-react";
 import { UserWithProfile } from "../../api/users";
 import { InfoItem } from "./TabShared";
@@ -194,6 +195,14 @@ const InfoTab: React.FC<InfoTabProps> = ({
             label="Account Status"
             value={user.user.status}
           />
+          {user.profile?.user_type === "STUDENT" && (
+            <InfoItem
+              icon={Hash}
+              label="Registration Number"
+              value={user.profile?.registration_number || "Not yet assigned"}
+              highlight={!!user.profile?.registration_number}
+            />
+          )}
         </div>
       </section>
 
