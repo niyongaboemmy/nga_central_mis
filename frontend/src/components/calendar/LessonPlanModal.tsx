@@ -39,7 +39,27 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
   // straight from this preview instead of only from the Scheme of Work page.
   const entryId: number | undefined = lessonPlan?.entry_id;
   const canGenerate = !!entryId && !lessonPlan?.is_summary;
-  const hasPlan = !!lessonPlan && lessonPlan.has_plan !== false;
+  // has_plan === false is the explicit "nothing generated yet" signal from
+  // the backend, but a stale/partial LO_Lesson row (e.g. left over from an
+  // interrupted save) can come back with has_plan simply absent — a "plan"
+  // with no date, no outcomes and no sections isn't actually usable, so
+  // treat it the same as no plan rather than rendering a mostly-blank
+  // detail view with no way to fix it. The summary payload (student view)
+  // never includes outcomes/sections by design, so it's judged on lesson_date
+  // alone rather than being incorrectly caught by this check.
+  const hasSubstance = lessonPlan?.is_summary
+    ? !!lessonPlan?.lesson_date
+    : !!lessonPlan?.lesson_date &&
+      ((lessonPlan?.outcomes?.length ?? 0) > 0 ||
+        (lessonPlan?.sections?.length ?? 0) > 0);
+  const hasPlan =
+    !!lessonPlan && lessonPlan.has_plan !== false && hasSubstance;
+  // A row exists but is empty (as opposed to no row/entry resolving at all)
+  // gets a more accurate "incomplete" label instead of the generic one.
+  const isStalePlan = !!lessonPlan && !lessonPlan.is_summary && !hasSubstance;
+  const emptyStateTitle = isStalePlan
+    ? "This lesson plan is incomplete"
+    : "No lesson plan yet";
 
   const closeAndReset = () => {
     setMode("preview");
@@ -73,7 +93,7 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
             {mode === "preview" && canGenerate && (
               <button
                 onClick={() => setMode("ai")}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white text-xs font-bold rounded-full shadow-sm shadow-violet-600/25 transition-all hover:-translate-y-0.5"
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-full shadow-sm shadow-blue-600/25 transition-all hover:-translate-y-0.5"
               >
                 <Sparkles className="w-3.5 h-3.5" />
                 {hasPlan ? "Regenerate with AI" : "Generate with AI"}
@@ -437,23 +457,32 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
             </>
           ) : (
             <div className="flex flex-col items-center justify-center py-20 text-center space-y-4">
-              <div className="p-6 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-full">
+              <div className="p-6 bg-blue-50 dark:bg-blue-900/20 rounded-full">
                 <FileText className="w-12 h-12 text-blue-300 dark:text-blue-500/50" />
               </div>
               <div>
                 <h4 className="text-xl font-bold text-gray-900 dark:text-white">
-                  No lesson plan yet
+                  {emptyStateTitle}
                 </h4>
-                <p className="text-gray-500 max-w-xs mx-auto">
+                {(lessonPlan?.week_number || lessonPlan?.topic) && (
+                  <p className="text-xs font-semibold text-blue-500 dark:text-blue-400 uppercase tracking-wide mt-1">
+                    {lessonPlan?.week_number ? `Week ${lessonPlan.week_number}` : ""}
+                    {lessonPlan?.week_number && lessonPlan?.topic ? " · " : ""}
+                    {lessonPlan?.topic || ""}
+                  </p>
+                )}
+                <p className="text-gray-500 max-w-xs mx-auto mt-1">
                   {canGenerate
                     ? "Let AI build a full, classroom-ready plan from this week's scheme of work entry."
-                    : "No comprehensive lesson data has been compiled for this specific slot yet."}
+                    : lessonPlan?.is_summary
+                      ? "Your teacher hasn't finalized this lesson yet — check back closer to the date."
+                      : "No scheme of work entry is linked to this subject/class yet, so there's nothing for AI to build from. Set up a scheme of work first."}
                 </p>
               </div>
               {canGenerate && (
                 <button
                   onClick={() => setMode("ai")}
-                  className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white text-sm font-bold rounded-full shadow-sm shadow-violet-600/25 transition-all hover:-translate-y-0.5"
+                  className="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-sm font-bold rounded-full shadow-sm shadow-blue-600/25 transition-all hover:-translate-y-0.5"
                 >
                   <Sparkles className="w-4 h-4" />
                   Generate with AI
