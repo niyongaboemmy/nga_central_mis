@@ -494,9 +494,9 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
     switch (activeTab) {
       case "Header": {
         const baseField =
-          "w-full bg-gray-50 dark:bg-gray-900 border rounded-xl pl-9 pr-3 py-2.5 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 hover:border-gray-200 dark:hover:border-gray-600 transition-all";
+          "w-full bg-white dark:bg-gray-900/80 border rounded-xl pl-9 pr-3 py-2.5 text-sm text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus:ring-2 hover:border-gray-300 dark:hover:border-gray-500 transition-all";
         const okBorder =
-          "border-gray-100 dark:border-gray-700 focus:ring-blue-500/50 focus:border-blue-500 dark:focus:border-blue-500";
+          "border-gray-200 dark:border-gray-600 focus:ring-blue-500/50 focus:border-blue-500 dark:focus:border-blue-500";
         const errBorder =
           "border-red-300 dark:border-red-800 focus:ring-red-500/40 focus:border-red-500 bg-red-50/50 dark:bg-red-950/10";
         const fieldClass = (invalid: boolean) =>
@@ -536,14 +536,14 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
             )}
 
             {/* Schedule */}
-            <div className="p-5 rounded-2xl border border-gray-100 dark:border-gray-800 bg-gray-50/40 dark:bg-gray-900/20">
+            <div className="p-5 rounded-2xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/60">
               <h3 className="flex items-center gap-2 text-xs font-black text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-4">
                 <CalendarDays className="w-3.5 h-3.5 text-blue-500" />
                 Schedule
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <label className="text-xs font-bold text-gray-400 uppercase">
+                  <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
                     Lesson Date <span className="text-red-400">*</span>
                   </label>
                   <div className="relative">
@@ -563,7 +563,7 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
                 </div>
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
-                    <label className="text-xs font-bold text-gray-400 uppercase">
+                    <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
                       Time Slot <span className="text-red-400">*</span>
                     </label>
                     <AutoBadge field="start_time" />
@@ -605,14 +605,14 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
             </div>
 
             {/* Class & Instructor */}
-            <div className="p-5 rounded-2xl border border-gray-100 dark:border-gray-800 bg-gray-50/40 dark:bg-gray-900/20">
+            <div className="p-5 rounded-2xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/60">
               <h3 className="flex items-center gap-2 text-xs font-black text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-4">
                 <GraduationCap className="w-3.5 h-3.5 text-blue-500" />
                 Class &amp; Instructor
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <label className="text-xs font-bold text-gray-400 uppercase">
+                  <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
                     Sector
                   </label>
                   <div className="relative">
@@ -630,7 +630,7 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <label className="text-xs font-bold text-gray-400 uppercase">
+                  <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
                     Trade
                   </label>
                   <div className="relative">
@@ -649,7 +649,7 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
                 </div>
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
-                    <label className="text-xs font-bold text-gray-400 uppercase">
+                    <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
                       Instructor Name
                     </label>
                     <AutoBadge field="instructor_name" />
@@ -670,7 +670,7 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
                 </div>
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
-                    <label className="text-xs font-bold text-gray-400 uppercase">
+                    <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
                       Class Name
                     </label>
                     <AutoBadge field="class_name" />
@@ -703,7 +703,7 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
         return (
           <div className="space-y-6 animate-in fade-in slide-in-from-right-2">
             <div className="space-y-2">
-              <label className="text-xs font-bold text-gray-400 uppercase">
+              <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
                 Big Question <span className="text-red-400">*</span>
               </label>
               <textarea
@@ -711,18 +711,18 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
                 value={formData.big_question || ""}
                 onChange={handleChange}
                 rows={2}
-                className={`w-full bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-xl px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 dark:focus:border-blue-500 hover:border-gray-200 dark:hover:border-gray-600 transition-all ${requiredFieldClass(showRequiredError(formData.big_question))}`}
+                className={`w-full bg-white dark:bg-gray-900/80 border border-gray-200 dark:border-gray-600 rounded-xl px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 dark:focus:border-blue-500 hover:border-gray-300 dark:hover:border-gray-500 transition-all ${requiredFieldClass(showRequiredError(formData.big_question))}`}
               />
               <RequiredHint show={showRequiredError(formData.big_question)} />
             </div>
             <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <label className="text-xs font-bold text-gray-400 uppercase">
+                <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
                   Learning Outcomes
                 </label>
                 <button
                   onClick={addOutcome}
-                  className="text-xs font-bold text-blue-600 hover:text-blue-700"
+                  className="inline-flex items-center gap-1 text-xs font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/40 px-2.5 py-1 rounded-full transition-all"
                 >
                   + Add Outcome
                 </button>
@@ -730,15 +730,15 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
               {formData.outcomes?.map((outcome, idx) => (
                 <div
                   key={idx}
-                  className="p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-700 space-y-3 relative group"
+                  className="p-4 bg-gray-50 dark:bg-gray-800/60 rounded-2xl border border-gray-200 dark:border-gray-600 space-y-3 relative group"
                 >
                   <button
                     onClick={() => removeOutcome(idx)}
-                    className="absolute top-2 right-2 p-1 text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                    className="absolute top-2 right-2 p-1 text-gray-400 hover:text-red-500 opacity-60 sm:opacity-0 group-hover:opacity-100 transition-opacity"
                   >
                     <X className="w-4 h-4" />
                   </button>
-                  <div className="grid grid-cols-4 gap-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
                     <input
                       type="text"
                       placeholder="Code (LO1)"
@@ -746,7 +746,7 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
                       onChange={(e) =>
                         handleOutcomeChange(idx, "code", e.target.value)
                       }
-                      className="bg-transparent border-b border-gray-200 dark:border-gray-700 px-2 py-1 text-xs font-bold text-gray-900 dark:text-white focus:outline-none focus:border-blue-500 transition-colors"
+                      className="bg-white dark:bg-gray-900/80 border border-gray-200 dark:border-gray-600 rounded-lg px-2.5 py-1.5 text-xs font-bold text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 hover:border-gray-300 dark:hover:border-gray-500 transition-all"
                     />
                     <input
                       type="text"
@@ -755,7 +755,7 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
                       onChange={(e) =>
                         handleOutcomeChange(idx, "title", e.target.value)
                       }
-                      className="col-span-2 bg-transparent border-b border-gray-200 dark:border-gray-700 px-2 py-1 text-xs text-gray-900 dark:text-white focus:outline-none focus:border-blue-500 transition-colors"
+                      className="sm:col-span-2 bg-white dark:bg-gray-900/80 border border-gray-200 dark:border-gray-600 rounded-lg px-2.5 py-1.5 text-xs text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 hover:border-gray-300 dark:hover:border-gray-500 transition-all"
                     />
                     <input
                       type="number"
@@ -768,7 +768,7 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
                           parseInt(e.target.value) || 0,
                         )
                       }
-                      className="bg-transparent border-b border-gray-200 dark:border-gray-700 px-2 py-1 text-xs text-gray-900 dark:text-white focus:outline-none focus:border-blue-500 transition-colors"
+                      className="bg-white dark:bg-gray-900/80 border border-gray-200 dark:border-gray-600 rounded-lg px-2.5 py-1.5 text-xs text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 hover:border-gray-300 dark:hover:border-gray-500 transition-all"
                     />
                   </div>
                   <textarea
@@ -778,7 +778,7 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
                       handleOutcomeChange(idx, "description", e.target.value)
                     }
                     rows={2}
-                    className="w-full bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-lg p-2 text-xs text-gray-900 dark:text-gray-100"
+                    className="w-full bg-white dark:bg-gray-900/80 border border-gray-200 dark:border-gray-600 rounded-xl px-3 py-2 text-xs text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 hover:border-gray-300 dark:hover:border-gray-500 transition-all"
                   />
 
                   {/* Resources for this outcome */}
@@ -799,7 +799,7 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
                             outcomes: newOutcomes,
                           }));
                         }}
-                        className="text-[10px] font-bold text-blue-600 hover:text-blue-700"
+                        className="inline-flex items-center gap-1 text-[10px] font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/40 px-2 py-0.5 rounded-full transition-all"
                       >
                         + Add Resource
                       </button>
@@ -825,7 +825,7 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
                                 outcomes: newOutcomes,
                               }));
                             }}
-                            className="flex-1 bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 dark:focus:border-blue-500 hover:border-gray-200 dark:hover:border-gray-600 transition-all"
+                            className="flex-1 bg-white dark:bg-gray-900/80 border border-gray-200 dark:border-gray-600 rounded-lg px-2.5 py-1.5 text-xs text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 hover:border-gray-300 dark:hover:border-gray-500 transition-all"
                           />
                           <button
                             onClick={() => {
@@ -840,7 +840,7 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
                                 outcomes: newOutcomes,
                               }));
                             }}
-                            className="p-1 text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                            className="p-1 text-gray-400 hover:text-red-500 opacity-60 sm:opacity-0 group-hover:opacity-100 transition-opacity"
                           >
                             <X className="w-3 h-3" />
                           </button>
@@ -869,9 +869,9 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
         };
         return (
           <div className="space-y-4 animate-in fade-in slide-in-from-right-2">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <label className="text-xs font-bold text-gray-400 uppercase">
+                <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
                   Trainer Activities <span className="text-red-400">*</span>
                 </label>
                 <textarea
@@ -884,12 +884,12 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
                     )
                   }
                   rows={6}
-                  className={`w-full bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-xl px-4 py-2 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 dark:focus:border-blue-500 hover:border-gray-200 dark:hover:border-gray-600 transition-all ${requiredFieldClass(showRequiredError(intro.trainer_activities))}`}
+                  className={`w-full bg-white dark:bg-gray-900/80 border border-gray-200 dark:border-gray-600 rounded-xl px-4 py-2 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 dark:focus:border-blue-500 hover:border-gray-300 dark:hover:border-gray-500 transition-all ${requiredFieldClass(showRequiredError(intro.trainer_activities))}`}
                 />
                 <RequiredHint show={showRequiredError(intro.trainer_activities)} />
               </div>
               <div className="space-y-2">
-                <label className="text-xs font-bold text-gray-400 uppercase">
+                <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
                   Learner Activities <span className="text-red-400">*</span>
                 </label>
                 <textarea
@@ -902,14 +902,14 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
                     )
                   }
                   rows={6}
-                  className={`w-full bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-xl px-4 py-2 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 dark:focus:border-blue-500 hover:border-gray-200 dark:hover:border-gray-600 transition-all ${requiredFieldClass(showRequiredError(intro.learner_activities))}`}
+                  className={`w-full bg-white dark:bg-gray-900/80 border border-gray-200 dark:border-gray-600 rounded-xl px-4 py-2 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 dark:focus:border-blue-500 hover:border-gray-300 dark:hover:border-gray-500 transition-all ${requiredFieldClass(showRequiredError(intro.learner_activities))}`}
                 />
                 <RequiredHint show={showRequiredError(intro.learner_activities)} />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <label className="text-xs font-bold text-gray-400 uppercase">
+                <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
                   Resources
                 </label>
                 <input
@@ -922,11 +922,11 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
                       e.target.value,
                     )
                   }
-                  className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-xl px-4 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 dark:focus:border-blue-500 hover:border-gray-200 dark:hover:border-gray-600 transition-all"
+                  className="w-full bg-white dark:bg-gray-900/80 border border-gray-200 dark:border-gray-600 rounded-xl px-4 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 dark:focus:border-blue-500 hover:border-gray-300 dark:hover:border-gray-500 transition-all"
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-xs font-bold text-gray-400 uppercase">
+                <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
                   Duration (mins)
                 </label>
                 <input
@@ -939,7 +939,7 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
                       parseInt(e.target.value) || 0,
                     )
                   }
-                  className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-xl px-4 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 dark:focus:border-blue-500 hover:border-gray-200 dark:hover:border-gray-600 transition-all"
+                  className="w-full bg-white dark:bg-gray-900/80 border border-gray-200 dark:border-gray-600 rounded-xl px-4 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 dark:focus:border-blue-500 hover:border-gray-300 dark:hover:border-gray-500 transition-all"
                 />
               </div>
             </div>
@@ -960,9 +960,9 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
         };
         return (
           <div className="space-y-6 animate-in fade-in slide-in-from-right-2">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <label className="text-xs font-bold text-gray-400 uppercase">
+                <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
                   Trainer Activities <span className="text-red-400">*</span>
                 </label>
                 <textarea
@@ -975,12 +975,12 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
                     )
                   }
                   rows={6}
-                  className={`w-full bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-2xl px-5 py-3 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 dark:focus:border-blue-500 hover:border-gray-200 dark:hover:border-gray-600 transition-all ${requiredFieldClass(showRequiredError(dev.trainer_activities))}`}
+                  className={`w-full bg-white dark:bg-gray-900/80 border border-gray-200 dark:border-gray-600 rounded-2xl px-5 py-3 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 dark:focus:border-blue-500 hover:border-gray-300 dark:hover:border-gray-500 transition-all ${requiredFieldClass(showRequiredError(dev.trainer_activities))}`}
                 />
                 <RequiredHint show={showRequiredError(dev.trainer_activities)} />
               </div>
               <div className="space-y-2">
-                <label className="text-xs font-bold text-gray-400 uppercase">
+                <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
                   Learner Activities <span className="text-red-400">*</span>
                 </label>
                 <textarea
@@ -993,14 +993,14 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
                     )
                   }
                   rows={6}
-                  className={`w-full bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-2xl px-5 py-3 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 dark:focus:border-blue-500 hover:border-gray-200 dark:hover:border-gray-600 transition-all ${requiredFieldClass(showRequiredError(dev.learner_activities))}`}
+                  className={`w-full bg-white dark:bg-gray-900/80 border border-gray-200 dark:border-gray-600 rounded-2xl px-5 py-3 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 dark:focus:border-blue-500 hover:border-gray-300 dark:hover:border-gray-500 transition-all ${requiredFieldClass(showRequiredError(dev.learner_activities))}`}
                 />
                 <RequiredHint show={showRequiredError(dev.learner_activities)} />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <label className="text-xs font-bold text-gray-400 uppercase">
+                <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
                   Resources
                 </label>
                 <input
@@ -1013,11 +1013,11 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
                       e.target.value,
                     )
                   }
-                  className="w-full h-11 px-5 text-sm bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-full text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 dark:focus:border-blue-500 hover:border-gray-200 dark:hover:border-gray-600 transition-all"
+                  className="w-full h-11 px-5 text-sm bg-white dark:bg-gray-900/80 border border-gray-200 dark:border-gray-600 rounded-full text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 dark:focus:border-blue-500 hover:border-gray-300 dark:hover:border-gray-500 transition-all"
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-xs font-bold text-gray-400 uppercase">
+                <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
                   Duration (mins)
                 </label>
                 <input
@@ -1030,19 +1030,19 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
                       parseInt(e.target.value) || 0,
                     )
                   }
-                  className="w-full h-11 px-5 text-sm bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-full text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 dark:focus:border-blue-500 hover:border-gray-200 dark:hover:border-gray-600 transition-all"
+                  className="w-full h-11 px-5 text-sm bg-white dark:bg-gray-900/80 border border-gray-200 dark:border-gray-600 rounded-full text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 dark:focus:border-blue-500 hover:border-gray-300 dark:hover:border-gray-500 transition-all"
                 />
               </div>
             </div>
 
-            <div className="pt-4 border-t border-gray-100 dark:border-gray-800">
+            <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
               <div className="flex items-center justify-between mb-2">
-                <label className="text-xs font-bold text-gray-400 uppercase">
+                <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
                   Indicative Content
                 </label>
                 <button
                   onClick={addIndicativeContent}
-                  className="text-xs font-bold text-blue-600 hover:text-blue-700"
+                  className="inline-flex items-center gap-1 text-xs font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/40 px-2.5 py-1 rounded-full transition-all"
                 >
                   + Add Content
                 </button>
@@ -1062,7 +1062,7 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
                           indicativeContent: newList,
                         }));
                       }}
-                      className="w-1/3 bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-xl px-3 py-1.5 text-xs font-bold text-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 dark:focus:border-blue-500 hover:border-gray-200 dark:hover:border-gray-600 transition-all"
+                      className="w-1/3 bg-white dark:bg-gray-900/80 border border-gray-200 dark:border-gray-600 rounded-xl px-3 py-1.5 text-xs font-bold text-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 dark:focus:border-blue-500 hover:border-gray-300 dark:hover:border-gray-500 transition-all"
                     />
                     <textarea
                       placeholder="Content"
@@ -1076,11 +1076,11 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
                         }));
                       }}
                       rows={1}
-                      className="flex-1 bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-xl px-3 py-1.5 text-xs text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 dark:focus:border-blue-500 hover:border-gray-200 dark:hover:border-gray-600 transition-all"
+                      className="flex-1 bg-white dark:bg-gray-900/80 border border-gray-200 dark:border-gray-600 rounded-xl px-3 py-1.5 text-xs text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 dark:focus:border-blue-500 hover:border-gray-300 dark:hover:border-gray-500 transition-all"
                     />
                     <button
                       onClick={() => removeIndicativeContent(idx)}
-                      className="p-1.5 text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                      className="p-1.5 text-gray-400 hover:text-red-500 opacity-60 sm:opacity-0 group-hover:opacity-100 transition-opacity"
                     >
                       <X className="w-4 h-4" />
                     </button>
@@ -1089,21 +1089,21 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
               </div>
             </div>
 
-            <div className="pt-4 border-t border-gray-100 dark:border-gray-800">
+            <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
               <p className="text-xs text-gray-500 italic pb-2">
                 Detailed activities for each learning outcome are managed here.
               </p>
               {formData.outcomes?.map((outcome, idx) => (
                 <div
                   key={idx}
-                  className="space-y-2 p-4 bg-gray-50/50 dark:bg-gray-900/50 rounded-2xl border border-gray-100 dark:border-gray-700 mb-4"
+                  className="space-y-2 p-4 bg-gray-50 dark:bg-gray-800/60 rounded-2xl border border-gray-200 dark:border-gray-600 mb-4"
                 >
                   <h4 className="text-xs font-bold text-blue-600 uppercase tracking-wider mb-2">
                     {outcome.code}: {outcome.title}
                   </h4>
                   <div className="space-y-3">
                     {outcome.activities.map((act, actIdx) => (
-                      <div key={actIdx} className="grid grid-cols-2 gap-3">
+                      <div key={actIdx} className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div className="space-y-1">
                           <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
                             Trainer Activity
@@ -1123,7 +1123,7 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
                                 outcomes: newOutcomes,
                               }));
                             }}
-                            className="w-full bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-xl p-3 text-xs leading-relaxed text-gray-900 dark:text-gray-100"
+                            className="w-full bg-white dark:bg-gray-900/80 border border-gray-200 dark:border-gray-600 rounded-xl p-3 text-xs leading-relaxed text-gray-900 dark:text-gray-100"
                             rows={3}
                           />
                         </div>
@@ -1146,7 +1146,7 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
                                 outcomes: newOutcomes,
                               }));
                             }}
-                            className="w-full bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-xl p-3 text-xs leading-relaxed text-gray-900 dark:text-gray-100"
+                            className="w-full bg-white dark:bg-gray-900/80 border border-gray-200 dark:border-gray-600 rounded-xl p-3 text-xs leading-relaxed text-gray-900 dark:text-gray-100"
                             rows={3}
                           />
                         </div>
@@ -1174,9 +1174,9 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
         };
         return (
           <div className="space-y-4 animate-in fade-in slide-in-from-right-2">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <label className="text-xs font-bold text-gray-400 uppercase">
+                <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
                   Trainer Activities <span className="text-red-400">*</span>
                 </label>
                 <textarea
@@ -1189,12 +1189,12 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
                     )
                   }
                   rows={6}
-                  className={`w-full bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-2xl px-5 py-3 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 dark:focus:border-blue-500 hover:border-gray-200 dark:hover:border-gray-600 transition-all ${requiredFieldClass(showRequiredError(conc.trainer_activities))}`}
+                  className={`w-full bg-white dark:bg-gray-900/80 border border-gray-200 dark:border-gray-600 rounded-2xl px-5 py-3 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 dark:focus:border-blue-500 hover:border-gray-300 dark:hover:border-gray-500 transition-all ${requiredFieldClass(showRequiredError(conc.trainer_activities))}`}
                 />
                 <RequiredHint show={showRequiredError(conc.trainer_activities)} />
               </div>
               <div className="space-y-2">
-                <label className="text-xs font-bold text-gray-400 uppercase">
+                <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
                   Learner Activities <span className="text-red-400">*</span>
                 </label>
                 <textarea
@@ -1207,14 +1207,14 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
                     )
                   }
                   rows={6}
-                  className={`w-full bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-2xl px-5 py-3 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 dark:focus:border-blue-500 hover:border-gray-200 dark:hover:border-gray-600 transition-all ${requiredFieldClass(showRequiredError(conc.learner_activities))}`}
+                  className={`w-full bg-white dark:bg-gray-900/80 border border-gray-200 dark:border-gray-600 rounded-2xl px-5 py-3 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 dark:focus:border-blue-500 hover:border-gray-300 dark:hover:border-gray-500 transition-all ${requiredFieldClass(showRequiredError(conc.learner_activities))}`}
                 />
                 <RequiredHint show={showRequiredError(conc.learner_activities)} />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <label className="text-xs font-bold text-gray-400 uppercase">
+                <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
                   Resources
                 </label>
                 <input
@@ -1227,11 +1227,11 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
                       e.target.value,
                     )
                   }
-                  className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-2xl px-5 py-3 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 dark:focus:border-blue-500 hover:border-gray-200 dark:hover:border-gray-600 transition-all"
+                  className="w-full bg-white dark:bg-gray-900/80 border border-gray-200 dark:border-gray-600 rounded-2xl px-5 py-3 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 dark:focus:border-blue-500 hover:border-gray-300 dark:hover:border-gray-500 transition-all"
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-xs font-bold text-gray-400 uppercase">
+                <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
                   Duration (mins)
                 </label>
                 <input
@@ -1244,7 +1244,7 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
                       parseInt(e.target.value) || 0,
                     )
                   }
-                  className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-2xl px-5 py-3 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 dark:focus:border-blue-500 hover:border-gray-200 dark:hover:border-gray-600 transition-all"
+                  className="w-full bg-white dark:bg-gray-900/80 border border-gray-200 dark:border-gray-600 rounded-2xl px-5 py-3 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 dark:focus:border-blue-500 hover:border-gray-300 dark:hover:border-gray-500 transition-all"
                 />
               </div>
             </div>
@@ -1260,12 +1260,12 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
           <div className="space-y-6 animate-in fade-in slide-in-from-right-2">
             <div>
               <div className="flex items-center justify-between mb-2">
-                <label className="text-xs font-bold text-gray-400 uppercase">
+                <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
                   Assignments / Homework
                 </label>
                 <button
                   onClick={addAssignment}
-                  className="text-xs font-bold text-blue-600 hover:text-blue-700"
+                  className="inline-flex items-center gap-1 text-xs font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/40 px-2.5 py-1 rounded-full transition-all"
                 >
                   + Add Assignment
                 </button>
@@ -1285,11 +1285,11 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
                         }));
                       }}
                       rows={1}
-                      className="flex-1 bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-xl px-4 py-2 text-xs text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 dark:focus:border-blue-500 hover:border-gray-200 dark:hover:border-gray-600 transition-all"
+                      className="flex-1 bg-white dark:bg-gray-900/80 border border-gray-200 dark:border-gray-600 rounded-xl px-4 py-2 text-xs text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 dark:focus:border-blue-500 hover:border-gray-300 dark:hover:border-gray-500 transition-all"
                     />
                     <button
                       onClick={() => removeAssignment(idx)}
-                      className="p-2 text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                      className="p-2 text-gray-400 hover:text-red-500 opacity-60 sm:opacity-0 group-hover:opacity-100 transition-opacity"
                     >
                       <X className="w-4 h-4" />
                     </button>
@@ -1299,7 +1299,7 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
             </div>
 
             <div className="space-y-2">
-              <label className="text-xs font-bold text-gray-400 uppercase">
+              <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
                 Teacher Notes / Evaluation
               </label>
               <textarea
@@ -1319,11 +1319,11 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
                   }))
                 }
                 rows={4}
-                className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-2xl px-5 py-3 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 dark:focus:border-blue-500 hover:border-gray-200 dark:hover:border-gray-600 transition-all"
+                className="w-full bg-white dark:bg-gray-900/80 border border-gray-200 dark:border-gray-600 rounded-2xl px-5 py-3 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 dark:focus:border-blue-500 hover:border-gray-300 dark:hover:border-gray-500 transition-all"
               />
             </div>
             <div className="space-y-2">
-              <label className="text-xs font-bold text-gray-400 uppercase">
+              <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
                 References
               </label>
               <textarea
@@ -1343,10 +1343,10 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
                   }))
                 }
                 rows={2}
-                className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-xl px-4 py-2 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 dark:focus:border-blue-500 hover:border-gray-200 dark:hover:border-gray-600 transition-all"
+                className="w-full bg-white dark:bg-gray-900/80 border border-gray-200 dark:border-gray-600 rounded-xl px-4 py-2 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 dark:focus:border-blue-500 hover:border-gray-300 dark:hover:border-gray-500 transition-all"
               />
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1">
                 <label className="text-[10px] font-bold text-gray-400 uppercase">
                   Prepared By
@@ -1369,7 +1369,7 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
                       } as any,
                     }))
                   }
-                  className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-xl px-4 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 dark:focus:border-blue-500 hover:border-gray-200 dark:hover:border-gray-600 transition-all"
+                  className="w-full bg-white dark:bg-gray-900/80 border border-gray-200 dark:border-gray-600 rounded-xl px-4 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 dark:focus:border-blue-500 hover:border-gray-300 dark:hover:border-gray-500 transition-all"
                 />
               </div>
               <div className="space-y-1">
@@ -1394,7 +1394,7 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
                       } as any,
                     }))
                   }
-                  className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-xl px-4 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 dark:focus:border-blue-500 hover:border-gray-200 dark:hover:border-gray-600 transition-all"
+                  className="w-full bg-white dark:bg-gray-900/80 border border-gray-200 dark:border-gray-600 rounded-xl px-4 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 dark:focus:border-blue-500 hover:border-gray-300 dark:hover:border-gray-500 transition-all"
                 />
               </div>
             </div>
@@ -1436,7 +1436,7 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
                   <h4 className="text-[10px] font-black text-blue-600 uppercase tracking-[0.2em]">
                     The Big Question
                   </h4>
-                  <div className="bg-gray-50 dark:bg-gray-900 p-4 rounded-2xl border border-gray-100 dark:border-gray-800 italic text-sm text-gray-700 dark:text-gray-300">
+                  <div className="bg-gray-50 dark:bg-gray-800/60 p-4 rounded-2xl border border-gray-200 dark:border-gray-700 italic text-sm text-gray-700 dark:text-gray-300">
                     "{formData.big_question}"
                   </div>
                 </div>
@@ -1449,7 +1449,7 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
                     {formData.outcomes?.map((out, i) => (
                       <div
                         key={i}
-                        className="bg-white dark:bg-gray-950 p-4 rounded-2xl border border-gray-100 dark:border-gray-800 flex gap-4"
+                        className="bg-white dark:bg-gray-800/60 p-4 rounded-2xl border border-gray-200 dark:border-gray-700 flex gap-4"
                       >
                         <div className="w-10 h-10 rounded-xl bg-green-500/10 flex items-center justify-center text-green-600 font-bold text-xs shrink-0">
                           {out.code}
@@ -1498,9 +1498,9 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
                     {formData.sections?.map((s, i) => (
                       <div
                         key={i}
-                        className="p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 space-y-2"
+                        className="p-4 bg-gray-50 dark:bg-gray-800/60 rounded-2xl border border-gray-200 dark:border-gray-700 space-y-2"
                       >
-                        <div className="flex justify-between items-center pb-2 border-b border-gray-100 dark:border-gray-800">
+                        <div className="flex justify-between items-center pb-2 border-b border-gray-200 dark:border-gray-700">
                           <span className="text-xs font-black text-orange-600 uppercase tracking-wider">
                             {s.section_type}
                           </span>
@@ -1508,7 +1508,7 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
                             {s.duration_minutes} min
                           </span>
                         </div>
-                        <div className="grid grid-cols-2 gap-4 pt-1">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
                           <div>
                             <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">
                               Trainer
@@ -1617,7 +1617,7 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
 
       {/* Modal Container */}
       <div className="flex min-h-full items-center justify-center p-4">
-        <div className="relative w-full max-w-6xl bg-white dark:bg-gray-950 rounded-2xl shadow-2xl overflow-hidden border border-gray-100 dark:border-gray-800 animate-in zoom-in-95 duration-300">
+        <div className="relative w-full max-w-6xl bg-white dark:bg-gray-950 rounded-2xl shadow-2xl overflow-hidden border border-gray-200 dark:border-gray-700 animate-in zoom-in-95 duration-300">
           {/* Header */}
           <div className="px-5 py-4 flex items-center justify-between border-b border-gray-50 dark:border-gray-900 bg-white dark:bg-gray-950">
             <div className="flex items-center gap-3">
@@ -1661,7 +1661,7 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
               )}
               {mode === "manual" && (
                 <label
-                  className={`cursor-pointer flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 hover:bg-gray-100 dark:bg-gray-900 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-400 rounded-full text-xs font-semibold border border-gray-100 dark:border-gray-800 transition-all ${loading ? "opacity-50 cursor-not-allowed" : ""}`}
+                  className={`cursor-pointer flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 hover:bg-gray-100 dark:bg-gray-900 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-400 rounded-full text-xs font-semibold border border-gray-200 dark:border-gray-700 transition-all ${loading ? "opacity-50 cursor-not-allowed" : ""}`}
                 >
                   {loading ? (
                     <div className="w-3.5 h-3.5 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
@@ -1736,9 +1736,9 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
 
                   <button
                     onClick={() => chooseFileInputRef.current?.click()}
-                    className="group text-left p-5 rounded-2xl bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 hover:border-blue-300 dark:hover:border-blue-600 hover:shadow-md hover:-translate-y-0.5 transition-all"
+                    className="group text-left p-5 rounded-2xl bg-white dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-600 hover:shadow-md hover:-translate-y-0.5 transition-all"
                   >
-                    <div className="w-9 h-9 rounded-xl bg-gray-100 dark:bg-slate-800 group-hover:bg-blue-50 dark:group-hover:bg-blue-900/20 flex items-center justify-center mb-3 transition-colors">
+                    <div className="w-9 h-9 rounded-xl bg-gray-100 dark:bg-gray-700 group-hover:bg-blue-50 dark:group-hover:bg-blue-900/20 flex items-center justify-center mb-3 transition-colors">
                       <CloudUpload className="w-4 h-4 text-gray-500 dark:text-gray-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors" />
                     </div>
                     <h4 className="text-sm font-bold text-gray-900 dark:text-white mb-1">
