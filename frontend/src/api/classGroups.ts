@@ -37,6 +37,7 @@ export interface UnassignedStudent {
   first_name: string | null;
   last_name: string | null;
   gender: string | null;
+  registration_number: string | null;
 }
 
 export interface UnassignedStudentsResponse {

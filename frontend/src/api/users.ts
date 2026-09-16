@@ -226,6 +226,7 @@ export interface UserSearchResult {
   address?: string;
   external_id?: string;
   user_type?: string;
+  registration_number?: string;
 }
 
 /** Free-text search across username, email, phone, and first/last/full name
@@ -712,6 +713,7 @@ export interface ScopedUser {
   last_name?: string | null;
   user_type?: string | null;
   gender?: string | null;
+  registration_number?: string | null;
   roles: { role_id: number; name: string; description?: string | null }[];
   role_name?: string | null;
   grades: { grade_id: number; name: string | null }[];

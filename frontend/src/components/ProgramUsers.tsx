@@ -92,6 +92,9 @@ const UserCard = ({ user, index }: { user: ProgramUser; index: number }) => (
           <p className="text-sm text-gray-500 dark:text-gray-400">
             {user.username} • {user.email}
           </p>
+          {user.registration_number && (
+            <p className="text-xs text-gray-400">{user.registration_number}</p>
+          )}
           <p className="text-xs text-gray-400">
             {user.grade_name} • {user.class_group_name}
           </p>

@@ -88,6 +88,11 @@ const UserCard = ({
               ? `${user.first_name ?? ""} ${user.last_name ?? ""}`.trim()
               : user.username}
           </h3>
+          {user.registration_number && (
+            <p className="text-xs text-gray-400 truncate">
+              {user.registration_number}
+            </p>
+          )}
           <p className="text-xs text-gray-500 dark:text-gray-400 truncate flex items-center gap-2">
             {user.email && (
               <span className="inline-flex items-center gap-1 truncate">

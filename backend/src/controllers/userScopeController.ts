@@ -1040,6 +1040,7 @@ export const getScopedUsers = asyncHandler(async (req: any, res: any) => {
             last_name: UserProfile.last_name,
             user_type: UserProfile.user_type,
             gender: UserProfile.gender,
+            registration_number: UserProfile.registration_number,
           })
           .from(User)
           .leftJoin(UserProfile, eq(User.user_id, UserProfile.user_id))

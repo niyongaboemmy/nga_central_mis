@@ -48,6 +48,7 @@ export const getStudents = async (req: Request, res: Response) => {
         relationship: Parenting.relationship,
         created_at: Parenting.created_at,
         user_type: UserProfile.user_type,
+        registration_number: UserProfile.registration_number,
       })
       .from(Parenting)
       .innerJoin(User, eq(Parenting.student_id, User.user_id))
@@ -180,6 +181,7 @@ export const searchPotentialRelations = async (req: Request, res: Response) => {
         last_name: UserProfile.last_name,
         email: User.email,
         user_type: UserProfile.user_type,
+        registration_number: UserProfile.registration_number,
       })
       .from(User)
       .leftJoin(UserProfile, eq(User.user_id, UserProfile.user_id))

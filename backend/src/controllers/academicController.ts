@@ -3348,6 +3348,7 @@ export const getSubjectEnrolledStudents = asyncHandler(
         first_name: UserProfile.first_name,
         last_name: UserProfile.last_name,
         gender: UserProfile.gender,
+        registration_number: UserProfile.registration_number,
         class_group_name: ClassGroup.name,
         grade_name: Grade.name,
         program_name: Program.name,
@@ -3419,6 +3420,7 @@ export const getSubjectEnrolledStudentsByTerm = asyncHandler(
         first_name: UserProfile.first_name,
         last_name: UserProfile.last_name,
         gender: UserProfile.gender,
+        registration_number: UserProfile.registration_number,
         class_group_name: ClassGroup.name,
         grade_name: Grade.name,
         program_name: Program.name,
@@ -3657,6 +3659,7 @@ export const getClassGroupStudents = asyncHandler(
         first_name: UserProfile.first_name,
         last_name: UserProfile.last_name,
         gender: UserProfile.gender,
+        registration_number: UserProfile.registration_number,
         academic_year_id: StudentClassGroup.academic_year_id,
         enrolled_at: StudentClassGroup.assigned_at,
       })
@@ -5467,6 +5470,7 @@ export const getClassGroupEnrollmentRoster = asyncHandler(
         first_name: UserProfile.first_name,
         last_name: UserProfile.last_name,
         gender: UserProfile.gender,
+        registration_number: UserProfile.registration_number,
       })
       .from(StudentClassGroup)
       .innerJoin(User, eq(StudentClassGroup.user_id, User.user_id))
@@ -5602,6 +5606,7 @@ export const getUsersByProgram = asyncHandler(async (req: any, res: any) => {
       first_name: UserProfile.first_name,
       last_name: UserProfile.last_name,
       user_type: UserProfile.user_type,
+      registration_number: UserProfile.registration_number,
       grade_name: Grade.name,
       class_group_name: ClassGroup.name,
     })
@@ -6282,6 +6287,7 @@ export const getUnassignedStudents = asyncHandler(
         first_name: UserProfile.first_name,
         last_name: UserProfile.last_name,
         gender: UserProfile.gender,
+        registration_number: UserProfile.registration_number,
       })
       .from(User)
       .innerJoin(UserProfile, eq(User.user_id, UserProfile.user_id))

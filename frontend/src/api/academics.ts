@@ -199,6 +199,7 @@ export interface ClassGroupStudent {
   first_name: string | null;
   last_name: string | null;
   gender: string | null;
+  registration_number: string | null;
   academic_year_id: number;
   enrolled_at: string | null;
 }
@@ -395,6 +396,7 @@ export interface EnrolledStudent {
   first_name: string;
   last_name: string;
   gender: string | null;
+  registration_number: string | null;
   class_group_name: string | null;
   grade_name: string | null;
   program_name: string | null;
@@ -421,6 +423,7 @@ export interface MyStudent {
   first_name: string;
   last_name: string;
   gender: string | null;
+  registration_number: string | null;
   class_group_id: number;
   class_group_name: string;
   grade_name: string;
@@ -535,6 +538,7 @@ export interface EnrollmentRosterStudent {
   first_name: string;
   last_name: string;
   gender: string | null;
+  registration_number: string | null;
   enrolled_subject_ids: number[];
   enrolled_count: number;
   total_subjects: number;
@@ -678,6 +682,7 @@ export interface ProgramUser {
   first_name?: string;
   last_name?: string;
   user_type?: string;
+  registration_number?: string | null;
   grade_name?: string;
   class_group_name?: string;
 }

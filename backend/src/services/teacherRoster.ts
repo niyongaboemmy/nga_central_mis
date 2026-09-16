@@ -48,6 +48,7 @@ export interface TeacherRosterRow {
   first_name: string | null;
   last_name: string | null;
   gender: string | null;
+  registration_number: string | null;
   class_group_id: number;
   class_group_name: string;
   grade_name: string;
@@ -117,6 +118,7 @@ export const getTeacherRosterRows = async (
       first_name: UserProfile.first_name,
       last_name: UserProfile.last_name,
       gender: UserProfile.gender,
+      registration_number: UserProfile.registration_number,
       class_group_id: StudentClassGroup.class_group_id,
       class_group_name: ClassGroup.name,
       grade_name: Grade.name,

@@ -1535,6 +1535,7 @@ export const searchUsers = asyncHandler(async (req: any, res: any) => {
       address: UserProfile.address,
       external_id: UserProfile.external_id,
       user_type: UserProfile.user_type,
+      registration_number: UserProfile.registration_number,
     })
     .from(User)
     .leftJoin(UserProfile, eq(User.user_id, UserProfile.user_id))
@@ -1551,6 +1552,7 @@ export const searchUsers = asyncHandler(async (req: any, res: any) => {
           sql`LOWER(${UserProfile.address}) LIKE LOWER(${searchTerm})`,
           sql`LOWER(${UserProfile.external_id}) LIKE LOWER(${searchTerm})`,
           sql`LOWER(${UserProfile.user_type}) LIKE LOWER(${searchTerm})`,
+          sql`LOWER(${UserProfile.registration_number}) LIKE LOWER(${searchTerm})`,
         ),
       ),
     )
@@ -2076,6 +2078,7 @@ export const getProgramUsersByRole = asyncHandler(
         first_name: UserProfile.first_name,
         last_name: UserProfile.last_name,
         user_type: UserProfile.user_type,
+        registration_number: UserProfile.registration_number,
       })
       .from(User)
       .leftJoin(UserProfile, eq(User.user_id, UserProfile.user_id))
@@ -2255,6 +2258,7 @@ export const getProgramUsers = asyncHandler(async (req: any, res: any) => {
       first_name: UserProfile.first_name,
       last_name: UserProfile.last_name,
       user_type: UserProfile.user_type,
+      registration_number: UserProfile.registration_number,
       role_name: Role.name,
     })
     .from(User)
@@ -3203,6 +3207,7 @@ export const getUsersByGrade = asyncHandler(async (req: any, res: any) => {
       first_name: UserProfile.first_name,
       last_name: UserProfile.last_name,
       user_type: UserProfile.user_type,
+      registration_number: UserProfile.registration_number,
       role_name: Role.name,
     })
     .from(User)

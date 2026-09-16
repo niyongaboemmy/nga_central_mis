@@ -33,6 +33,7 @@ interface SearchUser {
   first_name: string | null;
   last_name: string | null;
   user_type: string | null;
+  registration_number?: string | null;
 }
 
 type SortField = "name" | "username" | "class_group" | "grade" | "program" | "enrolled_date";
@@ -103,7 +104,8 @@ const EnrolledStudentsTab: React.FC<Props> = ({ subjectId, subjectName }) => {
         (s) =>
           s.first_name.toLowerCase().includes(q) ||
           s.last_name.toLowerCase().includes(q) ||
-          s.username.toLowerCase().includes(q)
+          s.username.toLowerCase().includes(q) ||
+          (s.registration_number ?? "").toLowerCase().includes(q)
       );
     }
     if (selectedGrade !== "all") list = list.filter((s) => s.grade_name === selectedGrade);
@@ -161,6 +163,7 @@ const EnrolledStudentsTab: React.FC<Props> = ({ subjectId, subjectName }) => {
   const exportToExcel = () => {
     const rows = filteredStudents.map((s, i) => ({
       "#": i + 1,
+      "Reg. No.": s.registration_number ?? "—",
       "Full Name": `${s.first_name} ${s.last_name}`,
       Username: s.username,
       Gender: s.gender ?? "—",
@@ -372,6 +375,7 @@ const EnrolledStudentsTab: React.FC<Props> = ({ subjectId, subjectName }) => {
                                 <p className="text-sm font-medium text-gray-900 dark:text-white">{name}</p>
                                 <p className="text-xs text-gray-500 dark:text-gray-400">
                                   @{u.username}
+                                  {u.registration_number && ` · ${u.registration_number}`}
                                   {u.user_type && (
                                     <span className="ml-2 px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700/50 rounded text-gray-500">
                                       {u.user_type}
@@ -534,6 +538,11 @@ const EnrolledStudentsTab: React.FC<Props> = ({ subjectId, subjectName }) => {
                             <p className="font-medium text-gray-900 dark:text-white leading-tight">
                               {s.first_name} {s.last_name}
                             </p>
+                            {s.registration_number && (
+                              <p className="text-xs text-gray-400 dark:text-slate-500">
+                                {s.registration_number}
+                              </p>
+                            )}
                             {s.gender && (
                               <p className="text-xs text-gray-400 dark:text-slate-500 capitalize">
                                 {s.gender.toLowerCase()}

@@ -72,7 +72,7 @@ const StudentsLens: React.FC = () => {
     const needle = filter.trim().toLowerCase();
     if (!needle) return roster.students;
     return roster.students.filter((s) =>
-      [s.first_name, s.last_name, s.username, s.email]
+      [s.first_name, s.last_name, s.username, s.email, s.registration_number]
         .filter(Boolean)
         .some((field) => String(field).toLowerCase().includes(needle)),
     );
@@ -159,6 +159,7 @@ const StudentsLens: React.FC = () => {
 
   const handleExport = () => {
     const rows = visible.map((s) => ({
+      "Reg. No.": s.registration_number ?? "",
       "First name": s.first_name ?? "",
       "Last name": s.last_name ?? "",
       Username: s.username,
@@ -361,6 +362,11 @@ const StudentsLens: React.FC = () => {
                               {fullName(student.first_name, student.last_name) ||
                                 student.username}
                             </p>
+                            {student.registration_number && (
+                              <p className="text-xs text-gray-400 truncate">
+                                {student.registration_number}
+                              </p>
+                            )}
                             <p className="text-xs text-gray-400 truncate md:hidden">
                               {student.email}
                             </p>
@@ -548,6 +554,7 @@ const AddStudentsModal: React.FC<{
           last_name: s.last_name,
           email: s.email,
           username: s.username,
+          registration_number: s.registration_number ?? null,
         }))
       : results.map((s) => ({
           user_id: s.user_id,
@@ -555,6 +562,7 @@ const AddStudentsModal: React.FC<{
           last_name: s.last_name ?? null,
           email: s.email,
           username: s.username,
+          registration_number: s.registration_number ?? null,
         }));
 
   const handleSave = async () => {
@@ -679,7 +687,11 @@ const AddStudentsModal: React.FC<{
                     <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
                       {fullName(row.first_name, row.last_name) || row.username}
                     </p>
-                    <p className="text-xs text-gray-400 truncate">{row.email}</p>
+                    <p className="text-xs text-gray-400 truncate">
+                      {row.registration_number
+                        ? `${row.registration_number} · ${row.email}`
+                        : row.email}
+                    </p>
                   </div>
                 </label>
               );

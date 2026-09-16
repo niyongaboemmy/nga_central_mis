@@ -140,6 +140,7 @@ export const getAssignedStudents = asyncHandler(async (req: any, res: any) => {
       class_group_name: ClassGroup.name,
       first_name: UserProfile.first_name,
       last_name: UserProfile.last_name,
+      registration_number: UserProfile.registration_number,
     })
     .from(StudentClassGroup)
     .innerJoin(ClassGroup, eq(StudentClassGroup.class_group_id, ClassGroup.class_group_id))
@@ -1190,6 +1191,7 @@ export const getConsolidatedReport = asyncHandler(async (req: any, res: any) => 
       first_name: UserProfile.first_name,
       last_name: UserProfile.last_name,
       date_of_birth: UserProfile.date_of_birth,
+      registration_number: UserProfile.registration_number,
     })
     .from(MentorAssignment)
     .innerJoin(UserProfile, eq(MentorAssignment.student_id, UserProfile.user_id))

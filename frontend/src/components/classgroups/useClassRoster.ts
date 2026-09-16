@@ -13,6 +13,7 @@ export interface RosterStudent {
   first_name: string | null;
   last_name: string | null;
   gender: string | null;
+  registration_number: string | null;
   /** Only populated when the enrollment roster was readable. */
   enrolled_subject_ids: number[] | null;
   enrolled_count: number | null;
@@ -84,6 +85,7 @@ export const useClassRoster = (): ClassRoster => {
               first_name: s.first_name,
               last_name: s.last_name,
               gender: s.gender,
+              registration_number: s.registration_number,
               enrolled_subject_ids: s.enrolled_subject_ids,
               enrolled_count: s.enrolled_count,
               total_subjects: s.total_subjects,
@@ -105,6 +107,7 @@ export const useClassRoster = (): ClassRoster => {
               first_name: s.first_name,
               last_name: s.last_name,
               gender: s.gender,
+              registration_number: s.registration_number,
               enrolled_subject_ids: null,
               enrolled_count: null,
               total_subjects: null,

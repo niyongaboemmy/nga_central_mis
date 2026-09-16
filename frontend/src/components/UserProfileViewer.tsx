@@ -292,6 +292,8 @@ const UserProfileViewer: React.FC<UserProfileViewerProps> = ({
     `${firstName ?? ""} ${lastName ?? ""}`.trim() || summary.username;
   const status = detail?.user?.status ?? summary.status;
   const userType = profile?.user_type ?? summary.user_type ?? undefined;
+  const registrationNumber =
+    profile?.registration_number ?? summary.registration_number ?? undefined;
   const roles = detail?.roles ?? summary.roles ?? [];
   const classGroups = detail?.classGroups ?? [];
   const assignedGrades = detail?.assignedGrades ?? [];
@@ -366,6 +368,7 @@ const UserProfileViewer: React.FC<UserProfileViewerProps> = ({
                 </h2>
                 <p className="text-sm text-white/80 truncate">
                   @{summary.username}
+                  {registrationNumber && ` · ${registrationNumber}`}
                 </p>
               </div>
             </div>

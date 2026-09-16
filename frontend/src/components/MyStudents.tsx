@@ -96,7 +96,8 @@ const MyStudents: React.FC = () => {
       (s) =>
         `${s.first_name} ${s.last_name}`.toLowerCase().includes(q) ||
         s.email?.toLowerCase().includes(q) ||
-        s.username?.toLowerCase().includes(q),
+        s.username?.toLowerCase().includes(q) ||
+        s.registration_number?.toLowerCase().includes(q),
     );
   }, [data.students, searchQuery]);
 
@@ -283,6 +284,11 @@ const StudentCard: React.FC<{ student: MyStudent }> = ({ student }) => (
         <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">
           {student.first_name} {student.last_name}
         </p>
+        {student.registration_number && (
+          <p className="text-xs text-gray-400 dark:text-gray-500 truncate">
+            {student.registration_number}
+          </p>
+        )}
         {student.email && (
           <p className="flex items-center gap-1 text-xs text-gray-400 dark:text-gray-500 truncate">
             <Mail className="w-3 h-3 flex-shrink-0" />

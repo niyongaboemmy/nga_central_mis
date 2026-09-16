@@ -130,7 +130,7 @@ const EnrollmentsLens: React.FC = () => {
     const needle = filter.trim().toLowerCase();
     if (!needle) return roster.students;
     return roster.students.filter((s) =>
-      [s.first_name, s.last_name, s.username, s.email]
+      [s.first_name, s.last_name, s.username, s.email, s.registration_number]
         .filter(Boolean)
         .some((v) => String(v).toLowerCase().includes(needle)),
     );
@@ -471,6 +471,11 @@ const EnrollmentsLens: React.FC = () => {
                               {fullName(student.first_name, student.last_name) ||
                                 student.username}
                             </span>
+                            {student.registration_number && (
+                              <span className="block text-xs text-gray-400 truncate max-w-[170px]">
+                                {student.registration_number}
+                              </span>
+                            )}
                           </button>
                         </th>
 

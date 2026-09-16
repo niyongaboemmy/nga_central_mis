@@ -10,6 +10,7 @@ import {
   CalendarDays,
   UserMinus,
   Loader2,
+  Hash,
 } from "lucide-react";
 import { EnrolledStudent } from "../../api/academics";
 
@@ -99,6 +100,13 @@ const StudentDetailsModal: React.FC<Props> = ({
 
             {/* Info cards */}
             <div className="px-6 pt-5 pb-6 space-y-2.5 overflow-y-auto">
+              {student.registration_number && (
+                <InfoRow
+                  icon={Hash}
+                  label="Registration Number"
+                  value={student.registration_number}
+                />
+              )}
               <InfoRow
                 icon={User}
                 label="Gender"
