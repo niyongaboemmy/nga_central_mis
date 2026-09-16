@@ -40,6 +40,7 @@ const LessonPlanAIGenerate: React.FC<Props> = ({ entryId, lessonId, weekLabel, t
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [jobStatus, setJobStatus] = useState<AILessonGenerationStatus | null>(null);
   const [sessionHours, setSessionHours] = useState("2");
+  const [customPrompt, setCustomPrompt] = useState("");
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
@@ -86,7 +87,13 @@ const LessonPlanAIGenerate: React.FC<Props> = ({ entryId, lessonId, weekLabel, t
     setJobStatus({ status: "loading", stepIndex: 1, totalSteps: 4, message: "Loading week context..." });
 
     try {
-      const resp = await lessonPlanApi.startAIGenerate(entryId, hours, lessonId, lessonDate);
+      const resp = await lessonPlanApi.startAIGenerate(
+        entryId,
+        hours,
+        lessonId,
+        lessonDate,
+        customPrompt.trim() || undefined,
+      );
       const { jobId } = resp.data.data;
       pollStatus(jobId);
     } catch (error: any) {
@@ -161,6 +168,23 @@ const LessonPlanAIGenerate: React.FC<Props> = ({ entryId, lessonId, weekLabel, t
                   />
                   <p className="text-[11px] text-gray-400 mt-1.5">
                     AI will distribute this time across the learning outcomes and lesson sections for you.
+                  </p>
+                </div>
+                <div className="w-full max-w-xs mb-5 text-left">
+                  <label className="flex items-center gap-1.5 text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1.5">
+                    Custom instructions
+                    <span className="text-gray-400 font-normal">(optional)</span>
+                  </label>
+                  <textarea
+                    value={customPrompt}
+                    onChange={(e) => setCustomPrompt(e.target.value)}
+                    maxLength={2000}
+                    rows={3}
+                    placeholder='e.g. "Focus more on group activities" or "This class struggles with fractions — add a recap"'
+                    className="w-full px-3 py-2 text-sm rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-gray-900 dark:text-white resize-none focus:outline-none focus:ring-2 focus:ring-violet-500"
+                  />
+                  <p className="text-[11px] text-gray-400 mt-1.5">
+                    Tell the AI anything specific for this lesson — it's applied on top of the scheme of work, not instead of it.
                   </p>
                 </div>
                 <button

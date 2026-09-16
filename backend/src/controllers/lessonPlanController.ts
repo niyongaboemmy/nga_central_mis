@@ -285,6 +285,25 @@ export const createOrUpdateLessonPlan = async (req: Request, res: Response) => {
       return res.status(401).json({ message: "User not authenticated" });
     }
 
+    // Editing an existing lesson plan is restricted to whoever created it —
+    // persistLessonPlan's update path otherwise trusts lesson_id blindly and
+    // will happily overwrite any row it's given, regardless of caller.
+    if (lesson_id) {
+      const [existing] = await db
+        .select({ user_id: LO_Lesson.user_id })
+        .from(LO_Lesson)
+        .where(eq(LO_Lesson.id, Number(lesson_id)))
+        .limit(1);
+      if (!existing) {
+        return res.status(404).json({ message: "Lesson plan not found" });
+      }
+      if (existing.user_id !== userId) {
+        return res.status(403).json({
+          message: "Only the teacher who created this lesson plan can edit it",
+        });
+      }
+    }
+
     const result = await db.transaction(async (tx) =>
       persistLessonPlan(tx, {
         entryId: Number(entry_id),
@@ -314,6 +333,22 @@ export const createOrUpdateLessonPlan = async (req: Request, res: Response) => {
 export const deleteLessonPlan = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
+    const userId = (req as any).user.userId;
+
+    const [existing] = await db
+      .select({ user_id: LO_Lesson.user_id })
+      .from(LO_Lesson)
+      .where(eq(LO_Lesson.id, Number(id)))
+      .limit(1);
+    if (!existing) {
+      return res.status(404).json({ message: "Lesson plan not found" });
+    }
+    if (existing.user_id !== userId) {
+      return res.status(403).json({
+        message: "Only the teacher who created this lesson plan can delete it",
+      });
+    }
+
     await db.delete(LO_Lesson).where(eq(LO_Lesson.id, Number(id)));
     res.json({ message: "Lesson plan deleted successfully" });
   } catch (error) {

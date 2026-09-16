@@ -103,6 +103,7 @@ export const lessonPlanApi = {
     sessionHours: number,
     lessonId?: number,
     lessonDate?: string,
+    customPrompt?: string,
   ) =>
     apiService.post<{ success: boolean; data: { jobId: string } }>(
       "/lesson-plans/ai-generate",
@@ -111,6 +112,7 @@ export const lessonPlanApi = {
         lesson_id: lessonId,
         session_hours: sessionHours,
         lesson_date: lessonDate,
+        custom_prompt: customPrompt,
       },
     ),
 

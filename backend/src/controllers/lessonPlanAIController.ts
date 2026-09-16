@@ -9,10 +9,15 @@ import {
   AcademicTerm,
   AcademicYear,
   UserProfile,
+  LO_Lesson,
 } from "../db/schema";
 import { asyncHandler } from "../middleware/asyncHandler";
 import { successResponse } from "../utils/response";
-import { NotFoundError, ValidationError } from "../errors/CustomError";
+import {
+  NotFoundError,
+  ValidationError,
+  AuthorizationError,
+} from "../errors/CustomError";
 import { recordActivity } from "../utils/activityLogger";
 import logger from "../utils/logger";
 import { createJob, getJob, updateJob } from "../services/aiLessonJobStore";
@@ -161,6 +166,7 @@ const generateLessonPlan = async (context: {
   observation: string;
   instructorName: string;
   totalMinutes: number;
+  customPrompt?: string;
 }) => {
   const hours = (context.totalMinutes / 60).toFixed(2).replace(/\.00$/, "");
 
@@ -203,7 +209,13 @@ invent unrelated content. Produce:
 - An evaluation with teacher_notes (how you'll assess understanding this lesson) and any references used.
 
 Keep every field specific and classroom-realistic — the way a teacher who actually teaches this subject would
-write it, not a vague summary. Get the minute-by-minute budgeting genuinely right; don't just fill in round numbers.`,
+write it, not a vague summary. Get the minute-by-minute budgeting genuinely right; don't just fill in round numbers.${
+      context.customPrompt
+        ? `\n\nThe teacher also gave these specific instructions for this lesson — follow them carefully,
+adjusting the plan above to honor them without ignoring the scheme-of-work content already given:
+"${context.customPrompt}"`
+        : ""
+    }`,
   });
 
   if (!parsed.outcomes || !Array.isArray(parsed.outcomes) || parsed.outcomes.length === 0) {
@@ -234,6 +246,10 @@ const processJob = async (
     // Falls back to the entry's own start date only when the caller never
     // sent one, so old clients still work.
     lessonDate?: string;
+    // Free-text steer from the teacher (e.g. "focus more on group work",
+    // "this class struggles with fractions, add a recap") — optional, added
+    // on top of the scheme-of-work-derived prompt rather than replacing it.
+    customPrompt?: string;
   },
 ) => {
   try {
@@ -288,6 +304,7 @@ const processJob = async (
       observation: entry.observation || "",
       instructorName,
       totalMinutes: params.totalMinutes,
+      customPrompt: params.customPrompt,
     });
 
     updateJob(jobId, { status: "structuring", message: "Structuring lesson plan..." });
@@ -373,10 +390,36 @@ export const startAILessonGeneration = asyncHandler(async (req: any, res: any) =
     );
   }
 
-  const { entry_id, lesson_id, session_hours, lesson_date } = req.body;
+  const { entry_id, lesson_id, session_hours, lesson_date, custom_prompt } =
+    req.body;
   if (!entry_id) {
     throw new ValidationError("entry_id is required");
   }
+
+  // Regenerating an existing lesson plan is restricted to whoever created
+  // it — without this, anyone able to reach this endpoint with an arbitrary
+  // lesson_id could overwrite someone else's plan (persistLessonPlan's
+  // update path trusts lessonId blindly once it gets this far).
+  if (lesson_id) {
+    const [existing] = await db
+      .select({ user_id: LO_Lesson.user_id })
+      .from(LO_Lesson)
+      .where(eq(LO_Lesson.id, parseInt(lesson_id, 10)))
+      .limit(1);
+    if (!existing) {
+      throw new NotFoundError("Lesson plan not found");
+    }
+    if (existing.user_id !== req.user.userId) {
+      throw new AuthorizationError(
+        "Only the teacher who created this lesson plan can regenerate it",
+      );
+    }
+  }
+
+  const customPrompt =
+    typeof custom_prompt === "string" && custom_prompt.trim()
+      ? custom_prompt.trim().slice(0, 2000)
+      : undefined;
   // Accept only a plain YYYY-MM-DD (or a "...T..." timestamp we trim down to
   // that) — never hand a raw Date-ish value to the AI job, since round-
   // tripping it through Date/toISOString is exactly what shifts it a day.
@@ -406,6 +449,7 @@ export const startAILessonGeneration = asyncHandler(async (req: any, res: any) =
     lessonId: lesson_id ? parseInt(lesson_id, 10) : undefined,
     totalMinutes,
     lessonDate,
+    customPrompt,
   });
 });
 

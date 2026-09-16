@@ -12,8 +12,12 @@ import {
   Layers,
   MapPin,
   Sparkles,
+  PenLine,
+  ArrowLeft,
 } from "lucide-react";
 import LessonPlanAIGenerate from "../LessonPlanAIGenerate";
+import LessonPlanEditForm from "../LessonPlanModal";
+import { useUser } from "../../contexts/UserContext";
 
 interface LessonPlanModalProps {
   showModal: boolean;
@@ -24,13 +28,16 @@ interface LessonPlanModalProps {
   onGenerated?: () => void;
 }
 
+type ViewMode = "preview" | "editChoice" | "ai" | "manual";
+
 const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
   showModal,
   lessonPlan,
   onClose,
   onGenerated,
 }) => {
-  const [mode, setMode] = useState<"preview" | "ai">("preview");
+  const { user } = useUser();
+  const [mode, setMode] = useState<ViewMode>("preview");
 
   if (!showModal) return null;
 
@@ -61,10 +68,42 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
     ? "This lesson plan is incomplete"
     : "No lesson plan yet";
 
+  // Editing an *existing* plan is restricted to whoever created it — the
+  // backend enforces this too (see startAILessonGeneration/
+  // createOrUpdateLessonPlan), this just keeps the UI from offering an
+  // action that would only 403 anyway.
+  const currentUserId: number | undefined = user?.user?.user_id;
+  const isOwner = !!currentUserId && lessonPlan?.user_id === currentUserId;
+  const canEdit = hasPlan && isOwner;
+
   const closeAndReset = () => {
     setMode("preview");
     onClose();
   };
+
+  // Reuses the full create/edit form used elsewhere (Scheme of Work
+  // calendar) so "Edit Manually" isn't a second implementation of the same
+  // form — it owns its own full-screen overlay, so this renders in place of
+  // (not nested inside) this modal's own chrome.
+  if (mode === "manual" && entryId) {
+    return (
+      <LessonPlanEditForm
+        isOpen={true}
+        onClose={() => setMode("preview")}
+        entryId={entryId}
+        initialData={lessonPlan}
+        onSaved={() => {
+          setMode("preview");
+          onGenerated?.();
+        }}
+      />
+    );
+  }
+
+  // First-time generation (no plan yet) is open to any full-access viewer
+  // tied to the entry; once a plan exists, only its creator may touch it.
+  const showHeaderAction =
+    mode === "preview" && ((!hasPlan && canGenerate) || canEdit);
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-[60] p-4">
@@ -80,9 +119,11 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
               <h3 className="text-xl font-bold text-gray-900 dark:text-white tracking-tight">
                 {mode === "ai"
                   ? "Generate with AI"
-                  : lessonPlan?.is_summary
-                    ? "Lesson Plan Summary"
-                    : "Detailed Lesson Plan"}
+                  : mode === "editChoice"
+                    ? "Edit Lesson Plan"
+                    : lessonPlan?.is_summary
+                      ? "Lesson Plan Summary"
+                      : "Detailed Lesson Plan"}
               </h3>
               <p className="text-sm text-gray-500 dark:text-gray-400">
                 {lessonPlan?.module_name || "Structured Pedagogical Guide"}
@@ -90,13 +131,17 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
             </div>
           </div>
           <div className="relative flex items-center gap-2">
-            {mode === "preview" && canGenerate && (
+            {showHeaderAction && (
               <button
-                onClick={() => setMode("ai")}
+                onClick={() => setMode(canEdit ? "editChoice" : "ai")}
                 className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-full shadow-sm shadow-blue-600/25 transition-all hover:-translate-y-0.5"
               >
-                <Sparkles className="w-3.5 h-3.5" />
-                {hasPlan ? "Regenerate with AI" : "Generate with AI"}
+                {canEdit ? (
+                  <PenLine className="w-3.5 h-3.5" />
+                ) : (
+                  <Sparkles className="w-3.5 h-3.5" />
+                )}
+                {canEdit ? "Edit" : "Generate with AI"}
               </button>
             )}
             <button
@@ -108,7 +153,52 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
           </div>
         </div>
 
-        {mode === "ai" && entryId ? (
+        {mode === "editChoice" ? (
+          <div className="flex-1 overflow-y-auto p-8 flex items-center justify-center">
+            <div className="w-full max-w-xl">
+              <p className="text-center text-sm text-gray-500 dark:text-gray-400 mb-6">
+                How would you like to edit this lesson plan?
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <button
+                  onClick={() => setMode("manual")}
+                  className="group p-6 text-left bg-white dark:bg-gray-800/60 border-2 border-gray-200 dark:border-gray-700 hover:border-blue-400 dark:hover:border-blue-500 rounded-2xl transition-all hover:-translate-y-0.5"
+                >
+                  <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/30 rounded-xl flex items-center justify-center mb-3">
+                    <PenLine className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                  </div>
+                  <h4 className="font-bold text-gray-900 dark:text-white mb-1">
+                    Edit Manually
+                  </h4>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    Open the full form and adjust every field yourself.
+                  </p>
+                </button>
+                <button
+                  onClick={() => setMode("ai")}
+                  className="group p-6 text-left bg-white dark:bg-gray-800/60 border-2 border-gray-200 dark:border-gray-700 hover:border-blue-400 dark:hover:border-blue-500 rounded-2xl transition-all hover:-translate-y-0.5"
+                >
+                  <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/30 rounded-xl flex items-center justify-center mb-3">
+                    <Sparkles className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                  </div>
+                  <h4 className="font-bold text-gray-900 dark:text-white mb-1">
+                    Edit by AI
+                  </h4>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    Regenerate the plan — optionally steer it with your own instructions.
+                  </p>
+                </button>
+              </div>
+              <button
+                onClick={() => setMode("preview")}
+                className="mt-6 mx-auto flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+              >
+                <ArrowLeft className="w-3.5 h-3.5" />
+                Back
+              </button>
+            </div>
+          </div>
+        ) : mode === "ai" && entryId ? (
           <div className="flex-1 overflow-y-auto p-8 flex items-center justify-center">
             <LessonPlanAIGenerate
               entryId={entryId}
@@ -120,7 +210,7 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
                 setMode("preview");
                 onGenerated?.();
               }}
-              onCancel={() => setMode("preview")}
+              onCancel={() => setMode(canEdit ? "editChoice" : "preview")}
             />
           </div>
         ) : (
