@@ -1,8 +1,9 @@
 import React from "react";
 import { motion } from "framer-motion";
-import { FiFolder, FiMoreVertical, FiUser } from "react-icons/fi";
+import { FiFolder, FiMoreVertical, FiUser, FiCornerDownRight } from "react-icons/fi";
 import { type Folder } from "../../api/documents";
 import ShareBadge from "./ShareBadge";
+import { getPermissionBadgeColor } from "./types";
 
 interface FolderItemProps {
   folder: Folder;
@@ -16,6 +17,30 @@ interface FolderItemProps {
   itemCount?: number;
 }
 
+const displayOwnerName = (owner: NonNullable<Folder["owner"]>) =>
+  owner.first_name && owner.last_name
+    ? `${owner.first_name} ${owner.last_name}`
+    : owner.username;
+
+const IncomingShareBadge: React.FC<{
+  permissionType?: string;
+  variant: "grid" | "list";
+}> = ({ permissionType, variant }) => (
+  <span
+    title={`Shared with you${permissionType ? ` — ${permissionType} access` : ""}`}
+    className={`flex items-center gap-1 rounded-full font-medium ${getPermissionBadgeColor(
+      permissionType || "VIEW",
+    )} ${
+      variant === "grid"
+        ? "absolute top-2 right-2 px-2 py-1 text-[11px] shadow-sm"
+        : "px-2 py-0.5 text-xs flex-shrink-0"
+    }`}
+  >
+    <FiCornerDownRight className="w-3 h-3" />
+    {permissionType || "VIEW"}
+  </span>
+);
+
 const FolderItem: React.FC<FolderItemProps> = ({
   folder,
   viewMode,
@@ -27,6 +52,13 @@ const FolderItem: React.FC<FolderItemProps> = ({
   ownerName,
   itemCount,
 }) => {
+  // A folder merged into "My Documents" because it (or an ancestor) is
+  // shared with the caller, rather than one they own — see is_shared on the
+  // backend's getFolders. Distinct from the ShareBadge avatar-stack, which
+  // is for folders *you* have shared out.
+  const isIncomingShare = folder.is_shared === true;
+  const incomingOwnerName =
+    isIncomingShare && folder.owner ? displayOwnerName(folder.owner) : null;
   if (viewMode === "grid") {
     return (
       <motion.div
@@ -38,14 +70,25 @@ const FolderItem: React.FC<FolderItemProps> = ({
           onContextMenu(e);
         }}
         onClick={onClick}
-        className="relative p-4 rounded-2xl border cursor-pointer transition-all hover:shadow-xl border-gray-200 dark:border-gray-700/20 bg-white dark:bg-gray-800/40 hover:border-blue-300 dark:hover:border-blue-500"
+        className={`relative p-4 rounded-2xl border cursor-pointer transition-all hover:shadow-xl bg-white dark:bg-gray-800/40 hover:border-blue-300 dark:hover:border-blue-500 ${
+          isIncomingShare
+            ? "border-purple-200 dark:border-purple-800/60"
+            : "border-gray-200 dark:border-gray-700/20"
+        }`}
       >
-        <ShareBadge
-          count={folder.share_count || 0}
-          sharedWith={folder.shared_with}
-          onClick={onShareBadgeClick}
-          variant="grid"
-        />
+        {isIncomingShare ? (
+          <IncomingShareBadge
+            permissionType={folder.permission_type}
+            variant="grid"
+          />
+        ) : (
+          <ShareBadge
+            count={folder.share_count || 0}
+            sharedWith={folder.shared_with}
+            onClick={onShareBadgeClick}
+            variant="grid"
+          />
+        )}
         <div className="flex flex-col items-center text-center">
           <motion.div
             whileHover={{ rotate: 5 }}
@@ -65,11 +108,24 @@ const FolderItem: React.FC<FolderItemProps> = ({
               {itemCount} item{itemCount !== 1 ? "s" : ""}
             </p>
           )}
-          {showOwner && ownerName && (
-            <div className="flex items-center gap-1 mt-1">
-              <FiUser className="w-3 h-3 text-gray-400" />
-              <span className="text-xs text-gray-400">{ownerName}</span>
+          {incomingOwnerName ? (
+            <div
+              className="flex items-center gap-1 mt-1"
+              title={`Shared by ${incomingOwnerName}`}
+            >
+              <FiUser className="w-3 h-3 text-purple-400" />
+              <span className="text-xs text-purple-500 dark:text-purple-400 truncate max-w-[140px]">
+                Shared by {incomingOwnerName}
+              </span>
             </div>
+          ) : (
+            showOwner &&
+            ownerName && (
+              <div className="flex items-center gap-1 mt-1">
+                <FiUser className="w-3 h-3 text-gray-400" />
+                <span className="text-xs text-gray-400">{ownerName}</span>
+              </div>
+            )
           )}
         </div>
       </motion.div>
@@ -87,7 +143,9 @@ const FolderItem: React.FC<FolderItemProps> = ({
         onContextMenu(e);
       }}
       onClick={onClick}
-      className="group cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/20 transition-colors duration-150"
+      className={`group cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/20 transition-colors duration-150 ${
+        isIncomingShare ? "bg-purple-50/40 dark:bg-purple-900/10" : ""
+      }`}
     >
       <div className="flex items-center px-4 py-2 min-h-[48px]">
         {/* Icon */}
@@ -107,13 +165,23 @@ const FolderItem: React.FC<FolderItemProps> = ({
               {folder.name}
             </span>
           </div>
-          {showOwner && ownerName && (
+          {incomingOwnerName ? (
             <div className="flex items-center gap-1 mt-0.5">
-              <FiUser className="w-3 h-3 text-gray-400" />
-              <span className="text-xs text-gray-500 dark:text-gray-400">
-                {ownerName}
+              <FiUser className="w-3 h-3 text-purple-400" />
+              <span className="text-xs text-purple-500 dark:text-purple-400">
+                Shared by {incomingOwnerName}
               </span>
             </div>
+          ) : (
+            showOwner &&
+            ownerName && (
+              <div className="flex items-center gap-1 mt-0.5">
+                <FiUser className="w-3 h-3 text-gray-400" />
+                <span className="text-xs text-gray-500 dark:text-gray-400">
+                  {ownerName}
+                </span>
+              </div>
+            )
           )}
         </div>
 
@@ -140,14 +208,21 @@ const FolderItem: React.FC<FolderItemProps> = ({
           </span>
         </div>
 
-        {/* Share count */}
+        {/* Share status */}
         <div className="flex-shrink-0 mr-1">
-          <ShareBadge
-            count={folder.share_count || 0}
-            sharedWith={folder.shared_with}
-            onClick={onShareBadgeClick}
-            variant="list"
-          />
+          {isIncomingShare ? (
+            <IncomingShareBadge
+              permissionType={folder.permission_type}
+              variant="list"
+            />
+          ) : (
+            <ShareBadge
+              count={folder.share_count || 0}
+              sharedWith={folder.shared_with}
+              onClick={onShareBadgeClick}
+              variant="list"
+            />
+          )}
         </div>
 
         {/* More actions */}

@@ -29,6 +29,12 @@ export interface Folder {
   share_count?: number;
   /** Up to 4 of the people it's shared with, for an avatar-stack preview. */
   shared_with?: ShareRecipient[];
+  /** True when this folder isn't owned by the caller but was merged into
+   * their root "My Documents" listing because it (or an ancestor) is shared
+   * with them — see getFolders' allFolders merge on the backend. */
+  is_shared?: boolean;
+  /** The caller's own access level, set alongside is_shared. */
+  permission_type?: "VIEW" | "EDIT" | "DOWNLOAD" | "SHARE";
 }
 
 export interface Document {

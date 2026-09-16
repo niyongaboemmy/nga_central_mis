@@ -109,7 +109,24 @@ const ContextMenu: React.FC<ContextMenuProps> = ({
       className="fixed bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 py-1 z-50 min-w-48 overflow-hidden"
       style={{ left: adjustedPosition.x, top: adjustedPosition.y }}
     >
-      {type === "folder" && item && (
+      {type === "folder" && item && (() => {
+        // isInSharedFolder only tells us whether we're currently *browsing
+        // inside* a shared folder — it says nothing about a shared folder
+        // sitting right in the root "My Documents" listing (merged in via
+        // is_shared) that the caller doesn't own but hasn't navigated into
+        // yet. Check the item itself too, or Rename/Delete/Share would show
+        // for a folder that isn't the caller's to rename, delete, or share.
+        const folderItem = item as Folder;
+        const isOthersFolder = isInSharedFolder || folderItem.is_shared === true;
+        const canEditThisFolder =
+          !isOthersFolder ||
+          folderItem.permission_type === "EDIT" ||
+          folderItem.permission_type === "SHARE";
+        // shareFolder is currently owner-only on the backend (a SHARE
+        // permission grant doesn't let its holder re-share yet), so don't
+        // offer a Share action here that would just fail server-side.
+        const canShareThisFolder = !isOthersFolder;
+        return (
         <>
           <motion.button
             whileHover={{ x: 5 }}
@@ -122,32 +139,32 @@ const ContextMenu: React.FC<ContextMenuProps> = ({
             <FiFolder className="w-4 h-4 text-blue-500" />
             Open
           </motion.button>
-          {!isInSharedFolder && (
-            <>
-              <motion.button
-                whileHover={{ x: 5 }}
-                onClick={() => {
-                  onOpenShareModal(item as Folder);
-                }}
-                className="w-full px-4 py-3 text-left text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-3 transition-colors"
-              >
-                <FiShare2 className="w-4 h-4 text-blue-500" />
-                Share
-              </motion.button>
-              <motion.button
-                whileHover={{ x: 5 }}
-                onClick={() => {
-                  onOpenRenameModal(item as Folder);
-                  onClose();
-                }}
-                className="w-full px-4 py-3 text-left text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-3 transition-colors"
-              >
-                <FiEdit2 className="w-4 h-4 text-gray-400" />
-                Rename
-              </motion.button>
-            </>
+          {canShareThisFolder && (
+            <motion.button
+              whileHover={{ x: 5 }}
+              onClick={() => {
+                onOpenShareModal(item as Folder);
+              }}
+              className="w-full px-4 py-3 text-left text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-3 transition-colors"
+            >
+              <FiShare2 className="w-4 h-4 text-blue-500" />
+              Share
+            </motion.button>
           )}
-          {!isInSharedFolder && (
+          {canEditThisFolder && (
+            <motion.button
+              whileHover={{ x: 5 }}
+              onClick={() => {
+                onOpenRenameModal(item as Folder);
+                onClose();
+              }}
+              className="w-full px-4 py-3 text-left text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-3 transition-colors"
+            >
+              <FiEdit2 className="w-4 h-4 text-gray-400" />
+              Rename
+            </motion.button>
+          )}
+          {!isOthersFolder && (
             <motion.button
               whileHover={{ x: 5 }}
               onClick={() => {
@@ -160,7 +177,8 @@ const ContextMenu: React.FC<ContextMenuProps> = ({
             </motion.button>
           )}
         </>
-      )}
+        );
+      })()}
       {type === "document" && item && (
         <>
           <motion.button

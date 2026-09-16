@@ -624,7 +624,16 @@ const Documents: React.FC = () => {
       return [...prev, { id: folder.folder_id, name: folder.name }];
     });
     setCurrentFolderId(folder.folder_id);
-    setCurrentSharedFolder(null);
+    // A folder merged into this "My Documents" listing via is_shared (shared
+    // with the caller, not owned by them) still needs its permission_type
+    // tracked as the active "shared folder" context — otherwise
+    // canUploadToCurrentFolder falls back to "not in a shared folder" and
+    // wrongly enables Upload for someone with only View/Download access.
+    setCurrentSharedFolder(
+      folder.is_shared
+        ? { folder, permission: { permission_type: folder.permission_type } }
+        : null,
+    );
     setSelectedItems([]);
 
     // Reset navigation flag after a short delay
