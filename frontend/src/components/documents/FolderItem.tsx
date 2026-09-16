@@ -1,8 +1,27 @@
 import React from "react";
 import { motion } from "framer-motion";
-import { FiFolder, FiMoreVertical, FiUser, FiShare2 } from "react-icons/fi";
+import {
+  FiFolder,
+  FiMoreVertical,
+  FiUser,
+  FiEye,
+  FiDownload,
+  FiEdit2,
+  FiShare2,
+} from "react-icons/fi";
 import { type Folder } from "../../api/documents";
 import ShareBadge from "./ShareBadge";
+import { getInitials, getAvatarColor } from "./types";
+
+// Same icon-per-level mapping as the Share modal's own permission selector
+// (ShareModal.tsx's PERMISSION_LEVELS) — a VIEW badge should look like VIEW
+// everywhere, not always show a generic "share" glyph regardless of level.
+const PERMISSION_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
+  VIEW: FiEye,
+  DOWNLOAD: FiDownload,
+  EDIT: FiEdit2,
+  SHARE: FiShare2,
+};
 
 interface FolderItemProps {
   folder: Folder;
@@ -21,41 +40,59 @@ const displayOwnerName = (owner: NonNullable<Folder["owner"]>) =>
     ? `${owner.first_name} ${owner.last_name}`
     : owner.username;
 
-// Incoming shares get their own consistent purple identity — same "share"
-// glyph as the outbound ShareBadge (blue), so the icon reads as one family
-// and only the color/position says which direction it goes.
+// Incoming shares get their own consistent purple identity, distinct from
+// the outbound ShareBadge's blue — the border is reserved for the card
+// itself; this badge stays borderless so it reads as a passive status label,
+// not another clickable button next to it.
 const INCOMING_SHARE_CLASSES =
-  "bg-purple-50 dark:bg-purple-500/15 text-purple-600 dark:text-purple-300 border border-purple-200/70 dark:border-purple-500/30";
+  "bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-300";
 
 const IncomingShareBadge: React.FC<{
   permissionType?: string;
   variant: "grid" | "list";
-}> = ({ permissionType, variant }) => (
-  <span
-    title={`Shared with you${permissionType ? ` — ${permissionType} access` : ""}`}
-    className={`flex items-center gap-1 rounded-full font-medium ${INCOMING_SHARE_CLASSES} ${
-      variant === "grid"
-        ? "absolute top-3 right-3 px-2.5 py-1 text-[11px] shadow-sm"
-        : "px-2.5 py-1 text-xs flex-shrink-0"
-    }`}
-  >
-    <FiShare2 className="w-3 h-3" />
-    {permissionType || "VIEW"}
-  </span>
-);
+}> = ({ permissionType, variant }) => {
+  const level = permissionType || "VIEW";
+  const Icon = PERMISSION_ICONS[level] || FiEye;
+  return (
+    <span
+      title={`Shared with you — ${level} access`}
+      className={`flex items-center gap-1 rounded-full font-medium ${INCOMING_SHARE_CLASSES} ${
+        variant === "grid"
+          ? "absolute top-3 right-3 px-2.5 py-1 text-[11px]"
+          : "px-2.5 py-1 text-xs flex-shrink-0"
+      }`}
+    >
+      <Icon className="w-3 h-3" />
+      {level}
+    </span>
+  );
+};
 
-const SharedByChip: React.FC<{ ownerName: string; className?: string }> = ({
-  ownerName,
-  className = "",
-}) => (
-  <div
-    title={`Shared by ${ownerName}`}
-    className={`inline-flex items-center gap-1 rounded-full ${INCOMING_SHARE_CLASSES} px-2 py-0.5 text-[11px] max-w-full ${className}`}
-  >
-    <FiUser className="w-2.5 h-2.5 flex-shrink-0" />
-    <span className="truncate">Shared by {ownerName}</span>
-  </div>
-);
+// Leads with a small avatar (same visual language as ShareBadge's outbound
+// avatar-stack) rather than spending most of the pill's width on the literal
+// words "Shared by" — that left almost no room for the actual name to show
+// before truncating to a couple of characters.
+const SharedByChip: React.FC<{
+  owner: NonNullable<Folder["owner"]>;
+  className?: string;
+}> = ({ owner, className = "" }) => {
+  const name = displayOwnerName(owner);
+  return (
+    <div
+      title={`Shared by ${name}`}
+      className={`inline-flex items-center gap-1.5 rounded-full ${INCOMING_SHARE_CLASSES} pl-0.5 pr-2.5 py-0.5 text-[11px] max-w-full ${className}`}
+    >
+      <span
+        className={`w-4 h-4 rounded-full flex items-center justify-center text-white text-[8px] font-bold flex-shrink-0 ${getAvatarColor(
+          owner.username,
+        )}`}
+      >
+        {getInitials(owner.first_name, owner.last_name, owner.username)}
+      </span>
+      <span className="truncate">{name}</span>
+    </div>
+  );
+};
 
 const FolderItem: React.FC<FolderItemProps> = ({
   folder,
@@ -73,8 +110,7 @@ const FolderItem: React.FC<FolderItemProps> = ({
   // backend's getFolders. Distinct from the ShareBadge avatar-stack, which
   // is for folders *you* have shared out.
   const isIncomingShare = folder.is_shared === true;
-  const incomingOwnerName =
-    isIncomingShare && folder.owner ? displayOwnerName(folder.owner) : null;
+  const incomingOwner = isIncomingShare ? folder.owner : undefined;
   if (viewMode === "grid") {
     return (
       <motion.div
@@ -124,8 +160,8 @@ const FolderItem: React.FC<FolderItemProps> = ({
               {itemCount} item{itemCount !== 1 ? "s" : ""}
             </p>
           )}
-          {incomingOwnerName ? (
-            <SharedByChip ownerName={incomingOwnerName} className="mt-2.5" />
+          {incomingOwner ? (
+            <SharedByChip owner={incomingOwner} className="mt-2.5" />
           ) : (
             showOwner &&
             ownerName && (
@@ -173,8 +209,8 @@ const FolderItem: React.FC<FolderItemProps> = ({
               {folder.name}
             </span>
           </div>
-          {incomingOwnerName ? (
-            <SharedByChip ownerName={incomingOwnerName} className="mt-1" />
+          {incomingOwner ? (
+            <SharedByChip owner={incomingOwner} className="mt-1" />
           ) : (
             showOwner &&
             ownerName && (
