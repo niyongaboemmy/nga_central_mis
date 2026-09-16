@@ -54,17 +54,18 @@ const IncomingShareBadge: React.FC<{
   const level = permissionType || "VIEW";
   const Icon = PERMISSION_ICONS[level] || FiEye;
   return (
-    <span
+    <motion.span
+      whileHover={{ scale: 1.15 }}
+      whileTap={{ scale: 0.95 }}
       title={`Shared with you — ${level} access`}
-      className={`flex items-center gap-1 rounded-full font-medium ${INCOMING_SHARE_CLASSES} ${
+      className={`flex items-center justify-center rounded-full ${INCOMING_SHARE_CLASSES} ${
         variant === "grid"
-          ? "absolute top-3 right-3 px-2.5 py-1 text-[11px]"
-          : "px-2.5 py-1 text-xs flex-shrink-0"
+          ? "absolute top-3 right-3 w-8 h-8"
+          : "w-7 h-7 flex-shrink-0"
       }`}
     >
-      <Icon className="w-3 h-3" />
-      {level}
-    </span>
+      <Icon className="w-3.5 h-3.5" />
+    </motion.span>
   );
 };
 
