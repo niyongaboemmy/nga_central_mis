@@ -47,6 +47,8 @@ interface DocumentsContentProps {
     type: "folder" | "document" | "shared-document" | "shared-folder"
   ) => void;
   onOpenShareModal: (item: Folder | Document) => void;
+  /** True when a non-"all" share filter is why the list looks empty. */
+  isShareFilterActive?: boolean;
 }
 
 const DocumentsContent: React.FC<DocumentsContentProps> = ({
@@ -67,6 +69,7 @@ const DocumentsContent: React.FC<DocumentsContentProps> = ({
   onPreview,
   onContextMenu,
   onOpenShareModal,
+  isShareFilterActive = false,
 }) => {
   // Sort items helper
   const getSortedItems = () => {
@@ -123,9 +126,15 @@ const DocumentsContent: React.FC<DocumentsContentProps> = ({
           <FiFolder className="w-20 h-20 mb-4 opacity-50" />
         </motion.div>
         <p className="text-xl font-medium text-gray-500">
-          This folder is empty
+          {isShareFilterActive
+            ? "No items match this filter"
+            : "This folder is empty"}
         </p>
-        <p className="text-sm mt-2">Upload files or create a new folder</p>
+        <p className="text-sm mt-2">
+          {isShareFilterActive
+            ? "Try a different sharing filter above"
+            : "Upload files or create a new folder"}
+        </p>
       </motion.div>
     );
   }

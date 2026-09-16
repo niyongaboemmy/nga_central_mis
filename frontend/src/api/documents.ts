@@ -1,5 +1,12 @@
 import { apiService } from "../services/api";
 
+export interface ShareRecipient {
+  user_id: number;
+  username: string;
+  first_name: string | null;
+  last_name: string | null;
+}
+
 // Types
 export interface Folder {
   folder_id: number;
@@ -20,6 +27,8 @@ export interface Folder {
   };
   /** How many people this folder is shared with (owner's own listing only). */
   share_count?: number;
+  /** Up to 4 of the people it's shared with, for an avatar-stack preview. */
+  shared_with?: ShareRecipient[];
 }
 
 export interface Document {
@@ -47,6 +56,8 @@ export interface Document {
   };
   /** How many people this document is shared with (owner's own listing only). */
   share_count?: number;
+  /** Up to 4 of the people it's shared with, for an avatar-stack preview. */
+  shared_with?: ShareRecipient[];
 }
 
 export interface DocumentVersion {

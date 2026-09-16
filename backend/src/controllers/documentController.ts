@@ -867,16 +867,24 @@ export const getFolders = asyncHandler(async (req: any, res: any) => {
     }
   }
 
-  // How many people each owned folder is shared with — lets the owner see
-  // at a glance who has access without opening the Share modal.
-  let folderShareCounts = new Map<number, number>();
+  // Who each owned folder is shared with — lets the owner see at a glance
+  // (avatar stack + count) who has access without opening the Share modal.
+  let folderShareSummaries = new Map<
+    number,
+    { count: number; users: { user_id: number; username: string; first_name: string | null; last_name: string | null }[] }
+  >();
   if (ownedFolders.length > 0) {
-    const counts = await db
+    const shares = await db
       .select({
         folder_id: FolderPermission.folder_id,
-        count: sql<number>`COUNT(*)`,
+        user_id: User.user_id,
+        username: User.username,
+        first_name: UserProfile.first_name,
+        last_name: UserProfile.last_name,
       })
       .from(FolderPermission)
+      .innerJoin(User, eq(FolderPermission.user_id, User.user_id))
+      .leftJoin(UserProfile, eq(User.user_id, UserProfile.user_id))
       .where(
         and(
           inArray(
@@ -888,22 +896,38 @@ export const getFolders = asyncHandler(async (req: any, res: any) => {
             gt(FolderPermission.expires_at, new Date()),
           ),
         ),
-      )
-      .groupBy(FolderPermission.folder_id);
-    folderShareCounts = new Map(
-      counts.map((c) => [c.folder_id, Number(c.count)]),
-    );
+      );
+    for (const s of shares) {
+      const existing = folderShareSummaries.get(s.folder_id) || {
+        count: 0,
+        users: [],
+      };
+      existing.count += 1;
+      if (existing.users.length < 4) {
+        existing.users.push({
+          user_id: s.user_id,
+          username: s.username,
+          first_name: s.first_name,
+          last_name: s.last_name,
+        });
+      }
+      folderShareSummaries.set(s.folder_id, existing);
+    }
   }
 
   // Combine owned and shared folders, removing duplicates
   const allFolders = [
-    ...ownedFolders.map((f) => ({
-      ...f,
-      folder: {
-        ...f.folder,
-        share_count: folderShareCounts.get(f.folder.folder_id) || 0,
-      },
-    })),
+    ...ownedFolders.map((f) => {
+      const summary = folderShareSummaries.get(f.folder.folder_id);
+      return {
+        ...f,
+        folder: {
+          ...f.folder,
+          share_count: summary?.count || 0,
+          shared_with: summary?.users || [],
+        },
+      };
+    }),
   ];
   const ownedFolderIds = new Set(ownedFolders.map((f) => f.folder.folder_id));
 
@@ -1833,16 +1857,21 @@ export const getDocuments = asyncHandler(async (req: any, res: any) => {
     .limit(limitNum)
     .offset(offset);
 
-  // How many people each of the caller's own documents is shared with — not
-  // meaningful (and not computed) when browsing someone else's shared folder.
+  // Who each of the caller's own documents is shared with — not meaningful
+  // (and not computed) when browsing someone else's shared folder.
   let documentsWithCounts = documents;
   if (!isSharedFolder && documents.length > 0) {
-    const counts = await db
+    const shares = await db
       .select({
         document_id: DocumentPermission.document_id,
-        count: sql<number>`COUNT(*)`,
+        user_id: User.user_id,
+        username: User.username,
+        first_name: UserProfile.first_name,
+        last_name: UserProfile.last_name,
       })
       .from(DocumentPermission)
+      .innerJoin(User, eq(DocumentPermission.user_id, User.user_id))
+      .leftJoin(UserProfile, eq(User.user_id, UserProfile.user_id))
       .where(
         and(
           inArray(
@@ -1854,18 +1883,38 @@ export const getDocuments = asyncHandler(async (req: any, res: any) => {
             gt(DocumentPermission.expires_at, new Date()),
           ),
         ),
-      )
-      .groupBy(DocumentPermission.document_id);
-    const documentShareCounts = new Map(
-      counts.map((c) => [c.document_id, Number(c.count)]),
-    );
-    documentsWithCounts = documents.map((d) => ({
-      ...d,
-      document: {
-        ...d.document,
-        share_count: documentShareCounts.get(d.document.document_id) || 0,
-      },
-    }));
+      );
+    const documentShareSummaries = new Map<
+      number,
+      { count: number; users: { user_id: number; username: string; first_name: string | null; last_name: string | null }[] }
+    >();
+    for (const s of shares) {
+      const existing = documentShareSummaries.get(s.document_id) || {
+        count: 0,
+        users: [],
+      };
+      existing.count += 1;
+      if (existing.users.length < 4) {
+        existing.users.push({
+          user_id: s.user_id,
+          username: s.username,
+          first_name: s.first_name,
+          last_name: s.last_name,
+        });
+      }
+      documentShareSummaries.set(s.document_id, existing);
+    }
+    documentsWithCounts = documents.map((d) => {
+      const summary = documentShareSummaries.get(d.document.document_id);
+      return {
+        ...d,
+        document: {
+          ...d.document,
+          share_count: summary?.count || 0,
+          shared_with: summary?.users || [],
+        },
+      };
+    });
   }
 
   paginatedResponse(res, "Documents retrieved successfully", documentsWithCounts, {

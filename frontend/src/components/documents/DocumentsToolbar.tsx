@@ -11,7 +11,13 @@ import {
   FiFolderPlus,
   FiUpload,
 } from "react-icons/fi";
-import type { BreadcrumbItem, TabType, ViewMode, SortOption } from "./types";
+import type {
+  BreadcrumbItem,
+  TabType,
+  ViewMode,
+  SortOption,
+  ShareFilter,
+} from "./types";
 import { Sidebar } from "lucide-react";
 
 interface DocumentsToolbarProps {
@@ -28,6 +34,10 @@ interface DocumentsToolbarProps {
   isUploading: boolean;
   canUpload?: boolean;
   canUploadReason?: string;
+  shareFilter?: ShareFilter;
+  onShareFilterChange?: (filter: ShareFilter) => void;
+  mySharedItemsCount?: number;
+  myTotalItemsCount?: number;
   onTabChange: (tab: TabType) => void;
   onBreadcrumbClick: (index: number) => void;
   onGoToRoot: () => void;
@@ -54,6 +64,10 @@ const DocumentsToolbar: React.FC<DocumentsToolbarProps> = ({
   isUploading,
   canUpload = true,
   canUploadReason,
+  shareFilter = "all",
+  onShareFilterChange,
+  mySharedItemsCount = 0,
+  myTotalItemsCount = 0,
   onTabChange,
   onBreadcrumbClick,
   onGoToRoot,
@@ -126,6 +140,26 @@ const DocumentsToolbar: React.FC<DocumentsToolbarProps> = ({
 
         {/* Controls */}
         <div className="flex items-center gap-2 flex-shrink-0">
+          {activeTab === "my-documents" && onShareFilterChange && (
+            <select
+              value={shareFilter}
+              onChange={(e) =>
+                onShareFilterChange(e.target.value as ShareFilter)
+              }
+              title="Filter by sharing status"
+              className={`px-2 py-1 text-xs border rounded-xl focus:outline-none focus:ring-1 focus:ring-blue-500 transition-colors ${
+                shareFilter !== "all"
+                  ? "border-blue-300 dark:border-blue-700 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"
+                  : "border-gray-200/50 dark:border-gray-700/50 bg-gray-50/50 dark:bg-gray-800/60 text-gray-700 dark:text-gray-200"
+              }`}
+            >
+              <option value="all">All ({myTotalItemsCount})</option>
+              <option value="shared">Shared only ({mySharedItemsCount})</option>
+              <option value="private">
+                Not shared ({myTotalItemsCount - mySharedItemsCount})
+              </option>
+            </select>
+          )}
           <select
             value={sortBy}
             onChange={(e) => onSortChange(e.target.value as SortOption)}

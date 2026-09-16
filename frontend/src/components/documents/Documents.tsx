@@ -35,6 +35,7 @@ import type {
   SortOption,
   ShareTabType,
   DocumentPermission,
+  ShareFilter,
 } from "./types";
 
 const Documents: React.FC = () => {
@@ -92,6 +93,7 @@ const Documents: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState<SortOption>("name");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
+  const [shareFilter, setShareFilter] = useState<ShareFilter>("all");
   const [isUploading, setIsUploading] = useState(false);
   const [_selectedItems, setSelectedItems] = useState<(Folder | Document)[]>(
     [],
@@ -824,6 +826,32 @@ const Documents: React.FC = () => {
     ? `You have ${currentSharedFolder?.permission?.permission_type || "VIEW"} access to this folder — ask the owner for Edit access to upload.`
     : undefined;
 
+  // Sharing-status filter for "My Documents" — meaningless (and not applied)
+  // inside a shared folder or on the "Shared with me" tab, where share_count
+  // isn't computed for the listed items in the first place.
+  const isOwnDocumentsView = activeTab === "my-documents" && !currentSharedFolder;
+  const myTotalItemsCount = isOwnDocumentsView
+    ? folders.length + filteredDocuments.length
+    : 0;
+  const mySharedItemsCount = isOwnDocumentsView
+    ? folders.filter((f) => (f.share_count || 0) > 0).length +
+      filteredDocuments.filter((d) => (d.share_count || 0) > 0).length
+    : 0;
+  const shareFilterPredicate = <T extends { share_count?: number }>(item: T) =>
+    shareFilter === "all"
+      ? true
+      : shareFilter === "shared"
+        ? (item.share_count || 0) > 0
+        : (item.share_count || 0) === 0;
+  const visibleFolders =
+    isOwnDocumentsView && shareFilter !== "all"
+      ? folders.filter(shareFilterPredicate)
+      : folders;
+  const visibleDocuments =
+    isOwnDocumentsView && shareFilter !== "all"
+      ? filteredDocuments.filter(shareFilterPredicate)
+      : filteredDocuments;
+
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
@@ -1487,6 +1515,10 @@ const Documents: React.FC = () => {
           sharedDocumentsCount={sharedDocuments.length}
           sharedFoldersCount={sharedFolders.length}
           unreadSharedCount={unreadSharedCount}
+          shareFilter={shareFilter}
+          onShareFilterChange={setShareFilter}
+          mySharedItemsCount={mySharedItemsCount}
+          myTotalItemsCount={myTotalItemsCount}
           showFolderTree={showFolderTree}
           isUploading={isUploading}
           // currentFolderId={currentFolderId}
@@ -1579,8 +1611,8 @@ const Documents: React.FC = () => {
               isLoadingShared={isLoadingShared}
               activeTab={activeTab}
               viewMode={viewMode}
-              folders={folders}
-              filteredDocuments={filteredDocuments}
+              folders={visibleFolders}
+              filteredDocuments={visibleDocuments}
               filteredSharedDocuments={filteredSharedDocuments}
               filteredSharedFolders={filteredSharedFolders}
               sortBy={sortBy}
@@ -1592,6 +1624,7 @@ const Documents: React.FC = () => {
               onContextMenu={handleContextMenu}
               onPreview={handlePreview}
               onOpenShareModal={handleOpenShareModal}
+              isShareFilterActive={isOwnDocumentsView && shareFilter !== "all"}
             />
           )}
         </div>

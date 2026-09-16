@@ -3,6 +3,7 @@ export type ViewMode = "grid" | "list";
 export type SortOption = "name" | "size" | "date" | "type";
 export type TabType = "my-documents" | "shared-with-me";
 export type ShareTabType = "people" | "roles" | "links";
+export type ShareFilter = "all" | "shared" | "private";
 
 export interface BreadcrumbItem {
   id: number | null;

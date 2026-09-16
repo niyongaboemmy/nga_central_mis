@@ -10,13 +10,13 @@ import {
   FiArchive,
   FiCode,
   FiFilePlus,
-  FiUsers,
 } from "react-icons/fi";
 import {
   formatFileSize,
   getFileTypeColor,
   type Document,
 } from "../../api/documents";
+import ShareBadge from "./ShareBadge";
 
 interface FileItemProps {
   document: Document;
@@ -28,33 +28,6 @@ interface FileItemProps {
   showOwner?: boolean;
   ownerName?: string;
 }
-
-const ShareCountBadge: React.FC<{
-  count: number;
-  onClick?: (e: React.MouseEvent) => void;
-  variant: "grid" | "list";
-}> = ({ count, onClick, variant }) => {
-  if (!count) return null;
-  const base =
-    "flex items-center gap-1 font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 hover:bg-blue-100 dark:hover:bg-blue-900/50 rounded-full transition-colors";
-  return (
-    <button
-      onClick={(e) => {
-        e.stopPropagation();
-        onClick?.(e);
-      }}
-      title={`Shared with ${count} ${count === 1 ? "person" : "people"} — click to manage`}
-      className={
-        variant === "grid"
-          ? `${base} absolute top-2 right-2 px-2 py-1 text-[11px] shadow-sm`
-          : `${base} px-2 py-0.5 text-xs flex-shrink-0`
-      }
-    >
-      <FiUsers className="w-3 h-3" />
-      {count}
-    </button>
-  );
-};
 
 // Get file icon component helper
 const getFileIconComponent = (doc: Document, size: number = 48) => {
@@ -113,8 +86,9 @@ const FileItem: React.FC<FileItemProps> = ({
         onClick={onClick}
         className="relative p-4 rounded-2xl border cursor-pointer transition-all hover:shadow-xl border-gray-200 dark:border-gray-700/20 bg-white dark:bg-gray-800/40 hover:border-blue-300 dark:hover:border-blue-500"
       >
-        <ShareCountBadge
+        <ShareBadge
           count={document.share_count || 0}
+          sharedWith={document.shared_with}
           onClick={onShareBadgeClick}
           variant="grid"
         />
@@ -196,8 +170,9 @@ const FileItem: React.FC<FileItemProps> = ({
 
         {/* Share count */}
         <div className="flex-shrink-0 mr-1">
-          <ShareCountBadge
+          <ShareBadge
             count={document.share_count || 0}
+            sharedWith={document.shared_with}
             onClick={onShareBadgeClick}
             variant="list"
           />
