@@ -30,6 +30,7 @@ import {
   removeGradeFromUser,
   UserGrade,
   updateUserProfile,
+  updateUser,
 } from "../api/users";
 import {
   programsApi,
@@ -114,7 +115,14 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
   const [loadingRoles, setLoadingRoles] = React.useState(false);
   const [isEditingInfo, setIsEditingInfo] = React.useState(false);
   const [isSavingInfo, setIsSavingInfo] = React.useState(false);
-  const [editedInfo, setEditedInfo] = React.useState<{
+  const [infoErrors, setInfoErrors] = React.useState<Record<string, string>>(
+    {},
+  );
+
+  type EditedInfo = {
+    username?: string;
+    email?: string;
+    status?: "ACTIVE" | "INACTIVE" | "SUSPENDED";
     first_name?: string;
     last_name?: string;
     gender?: "MALE" | "FEMALE" | "OTHER";
@@ -122,7 +130,32 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
     address?: string;
     external_id?: string;
     phone_number?: string;
-  }>({});
+    registration_number?: string;
+  };
+
+  const [editedInfo, setEditedInfo] = React.useState<EditedInfo>({});
+
+  // Shared by the initial load and by Cancel, so backing out of an edit
+  // always reverts to what the server actually holds -- otherwise Cancel
+  // left half-typed edits sitting in state for the next time Edit is opened.
+  const buildEditedInfo = React.useCallback(
+    (u: UserWithProfile): EditedInfo => ({
+      username: u.user.username || "",
+      email: u.user.email || "",
+      status: u.user.status as EditedInfo["status"],
+      first_name: u.profile?.first_name || "",
+      last_name: u.profile?.last_name || "",
+      gender: u.profile?.gender as any,
+      date_of_birth: u.profile?.date_of_birth
+        ? new Date(u.profile.date_of_birth).toISOString().split("T")[0]
+        : "",
+      address: u.profile?.address || "",
+      external_id: u.profile?.external_id || "",
+      phone_number: u.user.phone_number || "",
+      registration_number: u.profile?.registration_number || "",
+    }),
+    [],
+  );
 
   // Load user programs and grades when modal opens
   React.useEffect(() => {
@@ -139,19 +172,11 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
         );
       });
       // Initialize edited info when user changes or modal opens
-      setEditedInfo({
-        first_name: user.profile?.first_name || "",
-        last_name: user.profile?.last_name || "",
-        gender: user.profile?.gender as any,
-        date_of_birth: user.profile?.date_of_birth
-          ? new Date(user.profile.date_of_birth).toISOString().split("T")[0]
-          : "",
-        address: user.profile?.address || "",
-        external_id: user.profile?.external_id || "",
-        phone_number: user.user.phone_number || "",
-      });
+      setEditedInfo(buildEditedInfo(user));
+      setInfoErrors({});
       setIsEditingInfo(false);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, isOpen]);
 
   const loadUserPrograms = async () => {
@@ -184,11 +209,62 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
     }
   };
 
+  const canManageUsers = hasPermission(Permissions.MANAGE_USERS);
+  const isStudent = user?.profile?.user_type === "STUDENT";
+
+  const validateInfo = (): Record<string, string> => {
+    const errors: Record<string, string> = {};
+    if (canManageUsers) {
+      if (!editedInfo.username?.trim()) errors.username = "Username is required";
+      if (!editedInfo.email?.trim()) errors.email = "Email is required";
+      else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(editedInfo.email))
+        errors.email = "Enter a valid email address";
+    }
+    return errors;
+  };
+
+  const handleCancelInfo = () => {
+    if (user) setEditedInfo(buildEditedInfo(user));
+    setInfoErrors({});
+    setIsEditingInfo(false);
+  };
+
   const handleSaveInfo = async () => {
     if (!user) return;
+    const errors = validateInfo();
+    setInfoErrors(errors);
+    if (Object.keys(errors).length > 0) return;
+
     setIsSavingInfo(true);
     try {
-      await updateUserProfile(user.user.user_id, editedInfo);
+      const {
+        username,
+        email,
+        status,
+        registration_number,
+        ...profileFields
+      } = editedInfo;
+
+      await updateUserProfile(user.user.user_id, {
+        ...profileFields,
+        ...(isStudent ? { registration_number } : {}),
+      });
+
+      // Username/email/status live on the User row and require the broader
+      // MANAGE_USERS permission -- someone who can only edit profile info
+      // never sends these, so the endpoint that checks that permission is
+      // never even called for them.
+      if (canManageUsers) {
+        const original = buildEditedInfo(user);
+        const userChanges: Record<string, string> = {};
+        if (username !== original.username) userChanges.username = username!;
+        if (email !== original.email) userChanges.email = email!;
+        if (status !== original.status) userChanges.status = status!;
+        if (Object.keys(userChanges).length > 0) {
+          await updateUser(user.user.user_id, userChanges);
+        }
+      }
+
       showToast("Profile updated successfully", "success");
       setIsEditingInfo(false);
       // Refresh user data using parent's onViewUser
@@ -544,8 +620,9 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                           {isEditingInfo ? (
                             <>
                               <button
-                                onClick={() => setIsEditingInfo(false)}
-                                className="px-4 py-2 bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-gray-200 rounded-full text-sm font-medium hover:bg-gray-200 transition-colors"
+                                onClick={handleCancelInfo}
+                                disabled={isSavingInfo}
+                                className="px-4 py-2 bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-gray-200 rounded-full text-sm font-medium hover:bg-gray-200 dark:hover:bg-slate-600 transition-colors disabled:opacity-50"
                               >
                                 Cancel
                               </button>
@@ -616,6 +693,8 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                         isEditingInfo={isEditingInfo}
                         editedInfo={editedInfo}
                         setEditedInfo={setEditedInfo}
+                        errors={infoErrors}
+                        canManageUsers={canManageUsers}
                       />
                     )}
 
