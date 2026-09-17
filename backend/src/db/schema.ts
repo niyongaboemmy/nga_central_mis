@@ -621,6 +621,9 @@ export const School = mysqlTable("School", {
     .primaryKey()
     .autoincrement(),
   name: varchar("name", { length: 150 }).notNull().unique(),
+  // Prefix for student registration numbers, e.g. "120823" in
+  // "120823-0001" -- see utils/registrationNumber.ts.
+  school_code: varchar("school_code", { length: 20 }).unique(),
   address: varchar("address", { length: 255 }),
   contact_email: varchar("contact_email", { length: 150 }),
   contact_phone: varchar("contact_phone", { length: 50 }),

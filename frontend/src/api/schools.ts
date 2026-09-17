@@ -3,6 +3,7 @@ import api from "../services/api";
 export interface School {
   school_id: number;
   name: string;
+  school_code?: string;
   address?: string;
   contact_email?: string;
   contact_phone?: string;

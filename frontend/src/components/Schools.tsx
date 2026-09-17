@@ -100,6 +100,11 @@ const SchoolCard = ({
             <h3 className="font-bold text-lg text-gray-900 dark:text-white leading-tight mb-1">
               {school.name}
             </h3>
+            {school.school_code && (
+              <p className="text-xs text-gray-400 dark:text-gray-500 mb-1.5">
+                Code: {school.school_code}
+              </p>
+            )}
             <span
               className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                 school.status === "ACTIVE"
@@ -573,6 +578,7 @@ const SchoolModal = ({
 }) => {
   const [formData, setFormData] = useState<Partial<School>>({
     name: "",
+    school_code: "",
     address: "",
     contact_email: "",
     contact_phone: "",
@@ -588,6 +594,7 @@ const SchoolModal = ({
     } else {
       setFormData({
         name: "",
+        school_code: "",
         address: "",
         contact_email: "",
         contact_phone: "",
@@ -658,6 +665,25 @@ const SchoolModal = ({
               className="w-full px-4 py-3 bg-gray-50 dark:bg-slate-900/50 border border-gray-200 dark:border-slate-700/30 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all dark:text-white placeholder:text-gray-400"
               placeholder="e.g. Green Valley High"
             />
+          </div>
+
+          <div className="col-span-2">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 ml-1">
+              School Code
+            </label>
+            <input
+              type="text"
+              value={formData.school_code || ""}
+              onChange={(e) =>
+                setFormData({ ...formData, school_code: e.target.value })
+              }
+              className="w-full px-4 py-3 bg-gray-50 dark:bg-slate-900/50 border border-gray-200 dark:border-slate-700/30 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all dark:text-white placeholder:text-gray-400"
+              placeholder="e.g. 120823"
+            />
+            <p className="text-xs text-gray-400 mt-1 ml-1">
+              Used as the prefix for student registration numbers (e.g.
+              120823-0001).
+            </p>
           </div>
 
           <div className="col-span-2">

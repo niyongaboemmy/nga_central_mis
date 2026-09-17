@@ -5,7 +5,8 @@ import { eq } from "drizzle-orm";
 
 export const createSchool = async (req: Request, res: Response) => {
   try {
-    const { name, address, contact_email, contact_phone, logo } = req.body;
+    const { name, school_code, address, contact_email, contact_phone, logo } =
+      req.body;
 
     const existingSchool = await db
       .select()
@@ -18,8 +19,21 @@ export const createSchool = async (req: Request, res: Response) => {
         .json({ message: "School with this name already exists" });
     }
 
+    if (school_code) {
+      const codeCheck = await db
+        .select()
+        .from(School)
+        .where(eq(School.school_code, school_code));
+      if (codeCheck.length > 0) {
+        return res
+          .status(400)
+          .json({ message: "School with this school code already exists" });
+      }
+    }
+
     await db.insert(School).values({
       name,
+      school_code,
       address,
       contact_email,
       contact_phone,
@@ -65,8 +79,15 @@ export const getSchoolById = async (req: Request, res: Response) => {
 export const updateSchool = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { name, address, contact_email, contact_phone, logo, status } =
-      req.body;
+    const {
+      name,
+      school_code,
+      address,
+      contact_email,
+      contact_phone,
+      logo,
+      status,
+    } = req.body;
 
     const existingSchool = await db
       .select()
@@ -90,10 +111,24 @@ export const updateSchool = async (req: Request, res: Response) => {
       }
     }
 
+    // Check school code collision if it's changing
+    if (school_code && school_code !== existingSchool[0].school_code) {
+      const codeCheck = await db
+        .select()
+        .from(School)
+        .where(eq(School.school_code, school_code));
+      if (codeCheck.length > 0) {
+        return res
+          .status(400)
+          .json({ message: "School with this school code already exists" });
+      }
+    }
+
     await db
       .update(School)
       .set({
         name,
+        school_code,
         address,
         contact_email,
         contact_phone,

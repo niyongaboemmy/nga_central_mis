@@ -1,13 +1,11 @@
 /**
  * Student registration numbers.
  *
- * Format: "NGA-<admission year>-<5-digit sequence>" (e.g. NGA-2026-00001).
- * The year segment records when a student actually registered -- for a
- * brand-new student that's "now", but for backfilling existing students it's
- * their real `User.created_at` year, so a student admitted in 2025 gets
- * NGA-2025-xxxxx even if the backfill runs in 2026.
+ * Format: "<school code>-<4-digit sequence>" (e.g. 120823-0001). The school
+ * code comes from School (school details) rather than being hardcoded, so
+ * each deployment can set its own without a code change.
  *
- * The sequence itself is global and never resets per year: it comes from
+ * The sequence itself is global and never resets: it comes from
  * `RegistrationSequence`, a single-row counter claimed under a row lock
  * (inside a transaction) rather than derived from MAX() over UserProfile, so
  * concurrent student creations can never race each other into issuing the
@@ -16,24 +14,46 @@
 
 import { eq, sql } from "drizzle-orm";
 import { db } from "../db";
-import { RegistrationSequence } from "../db/schema";
+import { RegistrationSequence, School } from "../db/schema";
 
-const PREFIX = "NGA";
-const SEQUENCE_PAD = 5;
+const SEQUENCE_PAD = 4;
 const SEQUENCE_ROW_ID = 1;
 
-export const formatRegistrationNumber = (year: number, seq: number): string =>
-  `${PREFIX}-${year}-${String(seq).padStart(SEQUENCE_PAD, "0")}`;
+export const formatRegistrationNumber = (
+  schoolCode: string,
+  seq: number,
+): string => `${schoolCode}-${String(seq).padStart(SEQUENCE_PAD, "0")}`;
 
-const REGISTRATION_NUMBER_RE = /^[A-Z]+-(\d{4})-(\d+)$/;
+const REGISTRATION_NUMBER_RE = /^([A-Za-z0-9]+)-(\d+)$/;
 
 export const parseRegistrationNumber = (
   value?: string | null,
-): { year: number; seq: number } | null => {
+): { schoolCode: string; seq: number } | null => {
   if (!value) return null;
   const match = REGISTRATION_NUMBER_RE.exec(value.trim());
   if (!match) return null;
-  return { year: parseInt(match[1], 10), seq: parseInt(match[2], 10) };
+  return { schoolCode: match[1], seq: parseInt(match[2], 10) };
+};
+
+/**
+ * The active school's registration-number prefix, as set in School details.
+ * Throws if no school is configured with a code yet -- better to fail loudly
+ * than silently issue a malformed registration number.
+ */
+export const getSchoolCode = async (): Promise<string> => {
+  const [school] = await db
+    .select({ school_code: School.school_code })
+    .from(School)
+    .where(eq(School.status, "ACTIVE"))
+    .orderBy(School.school_id)
+    .limit(1);
+
+  if (!school?.school_code) {
+    throw new Error(
+      "No school code is set. Set one in School details before registering students.",
+    );
+  }
+  return school.school_code;
 };
 
 /** Atomically claims and returns the next value of the global sequence. */
@@ -53,10 +73,9 @@ export const nextRegistrationSequence = async (): Promise<number> => {
   });
 };
 
-/** The registration number a student admitted at `admittedAt` should get. */
-export const generateStudentRegistrationNumber = async (
-  admittedAt: Date = new Date(),
-): Promise<string> => {
+/** The registration number the next registered student should get. */
+export const generateStudentRegistrationNumber = async (): Promise<string> => {
+  const schoolCode = await getSchoolCode();
   const seq = await nextRegistrationSequence();
-  return formatRegistrationNumber(admittedAt.getFullYear(), seq);
+  return formatRegistrationNumber(schoolCode, seq);
 };

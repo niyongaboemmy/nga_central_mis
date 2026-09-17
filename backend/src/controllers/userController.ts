@@ -1346,8 +1346,6 @@ export const bulkCreateUsers = asyncHandler(async (req: any, res: any) => {
  * oldest first (by user_id, i.e. "first in"). New students already get a
  * number automatically at creation (see createUser / bulkCreateUsers above)
  * -- this is only for students that predate the feature or slipped through.
- * Each number's year segment is the student's own admission year
- * (`User.created_at`), not the year this endpoint happens to run in.
  */
 export const generateStudentRegistrationNumbers = asyncHandler(
   async (req: any, res: any) => {
@@ -1355,10 +1353,8 @@ export const generateStudentRegistrationNumbers = asyncHandler(
       .select({
         profile_id: UserProfile.profile_id,
         user_id: UserProfile.user_id,
-        created_at: User.created_at,
       })
       .from(UserProfile)
-      .innerJoin(User, eq(UserProfile.user_id, User.user_id))
       .where(
         and(
           eq(UserProfile.user_type, "STUDENT"),
@@ -1371,9 +1367,7 @@ export const generateStudentRegistrationNumbers = asyncHandler(
       [];
 
     for (const row of pending) {
-      const registrationNumber = await generateStudentRegistrationNumber(
-        row.created_at ? new Date(row.created_at) : new Date(),
-      );
+      const registrationNumber = await generateStudentRegistrationNumber();
       await db
         .update(UserProfile)
         .set({ registration_number: registrationNumber })
