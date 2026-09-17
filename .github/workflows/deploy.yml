@@ -5,6 +5,14 @@ on:
     branches: [main]
   workflow_dispatch: {}
 
+# Deploys share the EC2 box's checkout and node_modules dirs, so overlapping
+# runs can collide (e.g. two `npm ci`s racing on the same node_modules and
+# crashing with ENOTEMPTY). Queue instead of running in parallel; never
+# cancel a deploy that's already mid-flight on the server.
+concurrency:
+  group: deploy-nga_central_mis
+  cancel-in-progress: false
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
