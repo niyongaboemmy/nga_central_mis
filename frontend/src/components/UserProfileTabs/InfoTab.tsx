@@ -30,7 +30,6 @@ interface EditedInfo {
   address?: string;
   external_id?: string;
   phone_number?: string;
-  registration_number?: string;
 }
 
 interface InfoTabProps {
@@ -184,19 +183,13 @@ const InfoTab: React.FC<InfoTabProps> = ({
                 icon={Hash}
                 index={4}
                 className="md:col-span-2"
-                hint={
-                  canManageUsers
-                    ? "Leave blank to unassign; auto-generation stays available from Users Management"
-                    : undefined
-                }
+                hint="Assigned automatically on creation, or from the Generate Reg. Numbers action in Users Management -- not editable here"
               >
                 <input
                   type="text"
-                  value={editedInfo.registration_number || ""}
-                  disabled={!canManageUsers}
-                  placeholder="Not yet assigned"
-                  onChange={(e) => set({ registration_number: e.target.value })}
-                  className={`${inputBase} ${inputOk} ${!canManageUsers ? inputDisabled : ""} font-mono`}
+                  value={user.profile?.registration_number || "Not yet assigned"}
+                  disabled
+                  className={`${inputBase} ${inputOk} ${inputDisabled} font-mono`}
                 />
               </Field>
             )}

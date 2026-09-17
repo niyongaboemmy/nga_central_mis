@@ -4,7 +4,6 @@ import { db } from "../db";
 import {
   sql,
   eq,
-  ne,
   and,
   or,
   like,
@@ -228,7 +227,6 @@ export const updateUserProfile = asyncHandler(async (req: any, res: any) => {
     address,
     external_id,
     phone_number,
-    registration_number,
   } = req.body;
 
   logger.info("Updating user profile", {
@@ -244,36 +242,6 @@ export const updateUserProfile = asyncHandler(async (req: any, res: any) => {
 
   // Format date for MySQL
   const formattedDateOfBirth = formatDateForMySQL(date_of_birth);
-
-  // A blank string clears it back to unassigned (multiple NULLs are fine
-  // under the UNIQUE constraint); a non-blank one must not collide with
-  // another student's number -- checked up front so the error is a clean
-  // 409 rather than a raw ER_DUP_ENTRY surfacing from the write below.
-  let sanitizedRegistrationNumber: string | null | undefined = undefined;
-  if (registration_number !== undefined) {
-    const trimmed =
-      typeof registration_number === "string"
-        ? registration_number.trim()
-        : "";
-    sanitizedRegistrationNumber = trimmed ? sanitizeString(trimmed) : null;
-    if (sanitizedRegistrationNumber) {
-      const conflict = await db
-        .select({ user_id: UserProfile.user_id })
-        .from(UserProfile)
-        .where(
-          and(
-            eq(UserProfile.registration_number, sanitizedRegistrationNumber),
-            ne(UserProfile.user_id, userId),
-          ),
-        )
-        .limit(1);
-      if (conflict.length > 0) {
-        throw new ConflictError(
-          "That registration number is already assigned to another student",
-        );
-      }
-    }
-  }
 
   // Check if profile exists
   const existingProfile = await db
@@ -292,7 +260,6 @@ export const updateUserProfile = asyncHandler(async (req: any, res: any) => {
       date_of_birth: formattedDateOfBirth ? sql`${formattedDateOfBirth}` : null,
       address: address ? sanitizeString(address) : null,
       external_id: external_id ? sanitizeString(external_id) : null,
-      registration_number: sanitizedRegistrationNumber ?? null,
     });
   } else {
     // Update existing profile
@@ -320,8 +287,6 @@ export const updateUserProfile = asyncHandler(async (req: any, res: any) => {
       external_id.trim() !== ""
     )
       updateData.external_id = sanitizeString(external_id);
-    if (sanitizedRegistrationNumber !== undefined)
-      updateData.registration_number = sanitizedRegistrationNumber;
 
     await db
       .update(UserProfile)

@@ -130,7 +130,6 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
     address?: string;
     external_id?: string;
     phone_number?: string;
-    registration_number?: string;
   };
 
   const [editedInfo, setEditedInfo] = React.useState<EditedInfo>({});
@@ -152,7 +151,6 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
       address: u.profile?.address || "",
       external_id: u.profile?.external_id || "",
       phone_number: u.user.phone_number || "",
-      registration_number: u.profile?.registration_number || "",
     }),
     [],
   );
@@ -210,7 +208,6 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
   };
 
   const canManageUsers = hasPermission(Permissions.MANAGE_USERS);
-  const isStudent = user?.profile?.user_type === "STUDENT";
 
   const validateInfo = (): Record<string, string> => {
     const errors: Record<string, string> = {};
@@ -237,18 +234,9 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
 
     setIsSavingInfo(true);
     try {
-      const {
-        username,
-        email,
-        status,
-        registration_number,
-        ...profileFields
-      } = editedInfo;
+      const { username, email, status, ...profileFields } = editedInfo;
 
-      await updateUserProfile(user.user.user_id, {
-        ...profileFields,
-        ...(isStudent ? { registration_number } : {}),
-      });
+      await updateUserProfile(user.user.user_id, profileFields);
 
       // Username/email/status live on the User row and require the broader
       // MANAGE_USERS permission -- someone who can only edit profile info
