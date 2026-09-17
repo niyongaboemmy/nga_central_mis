@@ -313,6 +313,8 @@ const UsersManagement: React.FC<UsersManagementProps> = ({
   const [isGeneratingRegNumbers, setIsGeneratingRegNumbers] = useState(false);
   const [confirmGenerateRegNumbers, setConfirmGenerateRegNumbers] =
     useState(false);
+  const [forceRegenerateRegNumbers, setForceRegenerateRegNumbers] =
+    useState(false);
   const [total, setTotal] = useState(0);
   const [togglingUserId, setTogglingUserId] = useState<number | null>(null);
   const [isSwitchingUser, setIsSwitchingUser] = useState(false);
@@ -618,13 +620,15 @@ const UsersManagement: React.FC<UsersManagementProps> = ({
   };
 
   const handleGenerateRegNumbers = async () => {
+    const force = forceRegenerateRegNumbers;
     setConfirmGenerateRegNumbers(false);
+    setForceRegenerateRegNumbers(false);
     setIsGeneratingRegNumbers(true);
     try {
-      const result = await generateStudentRegistrationNumbers();
+      const result = await generateStudentRegistrationNumbers(force);
       if (result.updated > 0) {
         showToast(
-          `Generated ${result.updated} registration number${result.updated === 1 ? "" : "s"}`,
+          `${force ? "Regenerated" : "Generated"} ${result.updated} registration number${result.updated === 1 ? "" : "s"}`,
           "success",
         );
         pageRef.current = 1;
@@ -704,26 +708,48 @@ const UsersManagement: React.FC<UsersManagementProps> = ({
               <Hash className="w-6 h-6" />
             </div>
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-              Generate registration numbers?
+              {forceRegenerateRegNumbers
+                ? "Regenerate all registration numbers?"
+                : "Generate registration numbers?"}
             </h3>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
-              This assigns the next registration number to every student who
-              doesn't have one yet, starting with the earliest-registered
-              student. Students that already have a number are left
-              untouched.
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+              {forceRegenerateRegNumbers
+                ? "This replaces EVERY student's registration number, including ones that already have one, starting fresh from the earliest-registered student. Existing numbers are overwritten and cannot be recovered."
+                : "This assigns the next registration number to every student who doesn't have one yet, starting with the earliest-registered student. Students that already have a number are left untouched."}
             </p>
+            <label className="flex items-start gap-2 mb-6 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={forceRegenerateRegNumbers}
+                onChange={(e) =>
+                  setForceRegenerateRegNumbers(e.target.checked)
+                }
+                className="mt-0.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              />
+              <span className="text-sm text-gray-600 dark:text-gray-300">
+                Also regenerate for students who already have a registration
+                number (e.g. after changing the number format)
+              </span>
+            </label>
             <div className="flex justify-end gap-2">
               <button
-                onClick={() => setConfirmGenerateRegNumbers(false)}
+                onClick={() => {
+                  setConfirmGenerateRegNumbers(false);
+                  setForceRegenerateRegNumbers(false);
+                }}
                 className="px-4 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-full transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={handleGenerateRegNumbers}
-                className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white text-sm font-medium rounded-full transition-colors"
+                className={`px-4 py-2 text-sm font-medium rounded-full transition-colors text-white ${
+                  forceRegenerateRegNumbers
+                    ? "bg-red-500 hover:bg-red-600"
+                    : "bg-blue-500 hover:bg-blue-600"
+                }`}
               >
-                Generate
+                {forceRegenerateRegNumbers ? "Regenerate All" : "Generate"}
               </button>
             </div>
           </motion.div>

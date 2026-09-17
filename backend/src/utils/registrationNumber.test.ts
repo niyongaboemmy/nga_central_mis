@@ -7,6 +7,7 @@ import {
   parseRegistrationNumber,
   getSchoolCode,
   generateStudentRegistrationNumber,
+  resetRegistrationSequence,
 } from "./registrationNumber";
 
 const SCHOOL_ID = 1;
@@ -102,5 +103,18 @@ describe("generateStudentRegistrationNumber", () => {
       Array.from({ length: 10 }, () => generateStudentRegistrationNumber()),
     );
     expect(new Set(results).size).toBe(10);
+  });
+});
+
+describe("resetRegistrationSequence", () => {
+  it("restarts the next-issued number at 0001", async () => {
+    await setSchoolCode("120823");
+    await resetSequence(37);
+
+    await resetRegistrationSequence();
+
+    await expect(generateStudentRegistrationNumber()).resolves.toBe(
+      "120823-0001",
+    );
   });
 });

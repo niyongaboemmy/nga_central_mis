@@ -470,12 +470,12 @@ export interface GenerateRegistrationNumbersResult {
   assignments: RegistrationNumberAssignment[];
 }
 
-export const generateStudentRegistrationNumbers = async (): Promise<
-  GenerateRegistrationNumbersResult
-> => {
+export const generateStudentRegistrationNumbers = async (
+  force = false,
+): Promise<GenerateRegistrationNumbersResult> => {
   const response = await api.post<
     BackendResponse<GenerateRegistrationNumbersResult>
-  >("/users/students/generate-registration-numbers");
+  >("/users/students/generate-registration-numbers", { force });
   return response.data.data as GenerateRegistrationNumbersResult;
 };
 

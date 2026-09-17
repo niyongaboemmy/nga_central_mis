@@ -53,7 +53,10 @@ import * as fs from "fs";
 import * as path from "path";
 import { recordActivity } from "../utils/activityLogger";
 import { getCurrentAcademicYearId } from "../utils/academicYear";
-import { generateStudentRegistrationNumber } from "../utils/registrationNumber";
+import {
+  generateStudentRegistrationNumber,
+  resetRegistrationSequence,
+} from "../utils/registrationNumber";
 
 // Helper function to convert date to MySQL DATE format
 const formatDateForMySQL = (dateStr: string | undefined) => {
@@ -1346,9 +1349,21 @@ export const bulkCreateUsers = asyncHandler(async (req: any, res: any) => {
  * oldest first (by user_id, i.e. "first in"). New students already get a
  * number automatically at creation (see createUser / bulkCreateUsers above)
  * -- this is only for students that predate the feature or slipped through.
+ *
+ * Pass `force: true` in the body to instead regenerate EVERY student's
+ * number, including ones that already have one -- e.g. after changing the
+ * registration number format/school code, so existing students pick up the
+ * new format too. The sequence is reset to 0 first so the result is a clean
+ * 0001, 0002, ... run in oldest-first order.
  */
 export const generateStudentRegistrationNumbers = asyncHandler(
   async (req: any, res: any) => {
+    const force = req.body?.force === true;
+
+    if (force) {
+      await resetRegistrationSequence();
+    }
+
     const pending = await db
       .select({
         profile_id: UserProfile.profile_id,
@@ -1356,10 +1371,12 @@ export const generateStudentRegistrationNumbers = asyncHandler(
       })
       .from(UserProfile)
       .where(
-        and(
-          eq(UserProfile.user_type, "STUDENT"),
-          isNull(UserProfile.registration_number),
-        ),
+        force
+          ? eq(UserProfile.user_type, "STUDENT")
+          : and(
+              eq(UserProfile.user_type, "STUDENT"),
+              isNull(UserProfile.registration_number),
+            ),
       )
       .orderBy(asc(UserProfile.user_id));
 

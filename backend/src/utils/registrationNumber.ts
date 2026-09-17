@@ -56,6 +56,18 @@ export const getSchoolCode = async (): Promise<string> => {
   return school.school_code;
 };
 
+/**
+ * Resets the global sequence back to 0 -- used before a full regeneration
+ * so the renumbered students come out as a clean 0001, 0002, ... run rather
+ * than continuing from whatever value the counter was already at.
+ */
+export const resetRegistrationSequence = async (): Promise<void> => {
+  await db
+    .update(RegistrationSequence)
+    .set({ current_value: 0 })
+    .where(eq(RegistrationSequence.id, SEQUENCE_ROW_ID));
+};
+
 /** Atomically claims and returns the next value of the global sequence. */
 export const nextRegistrationSequence = async (): Promise<number> => {
   return await db.transaction(async (tx) => {
