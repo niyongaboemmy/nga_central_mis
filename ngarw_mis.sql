@@ -5021,7 +5021,6 @@ ALTER TABLE `StudentSubjectEnrollment`
 -- Constraints for table `Subject`
 --
 ALTER TABLE `Subject`
-  ADD CONSTRAINT `Subject_blooms_taxonomy_level_id_fk` FOREIGN KEY (`blooms_taxonomy_level_id`) REFERENCES `BloomsTaxonomyLevel` (`level_id`),
   ADD CONSTRAINT `Subject_course_category_id_CourseCategory_category_id_fk` FOREIGN KEY (`course_category_id`) REFERENCES `CourseCategory` (`category_id`);
 
 --
