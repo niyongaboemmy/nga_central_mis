@@ -11,6 +11,7 @@
     "test:watch": "vitest",
     "test:db:reset": "ts-node scripts/reset-test-db.ts",
     "test-email": "ts-node src/scripts/test-email.ts",
+    "db:setup": "ts-node scripts/setup-local-db.ts",
     "migrate": "ts-node scripts/run-migration.ts",
     "migrate:list": "ls -1 migrations/*.sql"
   },
