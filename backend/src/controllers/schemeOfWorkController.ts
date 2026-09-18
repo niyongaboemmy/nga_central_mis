@@ -5,6 +5,7 @@ import {
   SchemeOfWorkEntry,
   SchemeEntryCriteria,
   CompetencyPerformanceCriteria,
+  SubjectCompetency,
   Subject,
   ClassGroup,
   AcademicTerm,
@@ -54,6 +55,10 @@ interface AIExtractedEntry {
   duration?: string;
   learning_place?: string;
   observation?: string;
+  /** Learning Outcome ordinal this week belongs to, and its title, if the document groups weeks
+   * under LOs (e.g. "Learning outcome 2: ..."). Resolved into competency_id after extraction. */
+  lo_number?: number;
+  lo_title?: string;
 }
 
 const aiExtractedEntrySchema: JSONSchema = {
@@ -71,6 +76,8 @@ const aiExtractedEntrySchema: JSONSchema = {
     duration: { type: "string" },
     learning_place: { type: "string" },
     observation: { type: "string" },
+    lo_number: { type: "number" },
+    lo_title: { type: "string" },
   },
   required: ["week_number", "topic"],
 };
@@ -121,6 +128,9 @@ Identify every distinct week/session/lesson the document describes and, for each
 - duration: the time allocation for that week, if stated (e.g. "6 hours", "2 periods").
 - learning_place: where the session happens, if stated (e.g. classroom, workshop, computer lab).
 - observation: any notes, remarks, or comments attached to that week, if present.
+- lo_number / lo_title: if the document groups weeks under a "Learning Outcome" / "Competence" heading (e.g.
+  "Learning outcome 2: Describe computer programming languages"), record that heading's number and title for every
+  week that falls under it. Omit both if the document has no such grouping.
 
 Omit a field entirely when the document simply doesn't mention it for that week — never fabricate a value to fill a
 gap. Extract EVERY week you can find, even if some fields are sparse for it; do not skip a week just because most of
@@ -175,19 +185,79 @@ export const uploadAndExtractScheme = asyncHandler(
     const cleanText = (str: string) =>
       str ? str.replace(/\s+/g, " ").trim() : "";
 
+    // Preserves bullet/line structure (used for Indicative Content, which the correct template
+    // shows as a bulleted sub-list) instead of collapsing everything to one flat line.
+    const cleanMultilineText = (str: string) =>
+      str
+        ? str
+            .split("\n")
+            .map((line) => line.trim())
+            .filter(Boolean)
+            .join("\n")
+        : "";
+
+    // Extracts a cell's text, converting <br>/<p> breaks and <li> bullets into newlines so
+    // multi-line/bulleted cell content (e.g. Indicative Content) survives instead of being
+    // flattened into one run-on line.
+    const extractCellText = (td: any) => {
+      let cellHtml = $(td).html() || "";
+      cellHtml = cellHtml
+        .replace(/<br\s*\/?>/gi, "\n")
+        .replace(/<\/p>\s*<p[^>]*>/gi, "\n")
+        .replace(/<li[^>]*>/gi, "\n- ")
+        .replace(/<\/li>/gi, "");
+      return cheerio.load(cellHtml).text();
+    };
+
+    // Detects the correct template's grouped 2-row header ("Competence code and name" spanning
+    // Learning outcome (LO) / Duration / Indicative content sub-columns). Checked by header TEXT
+    // on <th> cells specifically (mammoth renders true header rows as <th>, confirmed against a
+    // real exported document) rather than relying on colspan/rowspan attributes surviving the
+    // DOCX->HTML conversion or assuming the header is near the top of the document -- a document
+    // can have an unrelated identification/cover table (Sector/Trainer/etc.) BEFORE the scheme
+    // table, which previously fooled a "check the first few <tr>s" heuristic into never finding
+    // the real header at all. When found, weekly rows are parsed with the LO/Duration-aware logic
+    // below instead of the legacy fixed 9-column mapping, so today's already-supported simple
+    // documents (no such header) are completely unaffected.
+    const hasGroupedHeader = $("th")
+      .toArray()
+      .some((cell) =>
+        /competence\s*code\s*and\s*name|learning\s*outcome\s*\(?lo\)?/i.test(
+          $(cell).text(),
+        ),
+      );
+
+    // Subject's existing Learning Outcomes (SubjectCompetency), used to resolve the grouped
+    // header's "Learning outcome N: <title>" text into a real competency_id link — only fetched
+    // when the richer format was actually detected.
+    let competencyIdByElement = new Map<number, number>();
+    if (hasGroupedHeader) {
+      const competencies = await db
+        .select({
+          competency_id: SubjectCompetency.competency_id,
+          element_number: SubjectCompetency.element_number,
+        })
+        .from(SubjectCompetency)
+        .where(eq(SubjectCompetency.subject_id, subjectId));
+      competencyIdByElement = new Map(
+        competencies.map((c) => [c.element_number, c.competency_id]),
+      );
+    }
+
+    // Carries the last-seen Learning Outcome group text/duration forward across rows, since the
+    // template's LO/Duration cells are row-spanned across every week belonging to that LO -- only
+    // the first row of the group has real <td> cells for them; mammoth simply omits the covered
+    // cells on subsequent rows rather than repeating them.
+    let carryLoText = "";
+    let carryDuration = "";
+
     // Parse DOCX table rows directly
     $("tr").each((i, tr) => {
       const tds = $(tr).find("td, th").toArray();
       if (tds.length === 0) return;
 
       // Extract text for each cell in this row, separated by newlines
-      const cells = tds.map((td) => {
-        let cellHtml = $(td).html() || "";
-        cellHtml = cellHtml
-          .replace(/<br\s*\/?>/gi, "\n")
-          .replace(/<\/p><p>/gi, "\n");
-        return cheerio.load(cellHtml).text().trim();
-      });
+      const cells = tds.map((td) => extractCellText(td).trim());
 
       // Usually Week is in the first column for SOW standard format
       const firstColumn = cells[0] || "";
@@ -198,8 +268,13 @@ export const uploadAndExtractScheme = asyncHandler(
 
       const weekNum = weekMatch[1];
 
-      // Format A: 05-09/1/2026 or 5-9/1/2026
-      // Format B: 30/3/2026 - 03/04/2026
+      // Format A: 05-09/1/2026 or 5-9/1/2026 (same month)
+      // Format B: 30/3/2026 - 03/04/2026 (full dates both sides)
+      // Format C: 30/11-04/12/2026 (cross-month day range, e.g. "Week 13" in the real reference
+      //   template -- found via testing against an actual exported document. Must be checked
+      //   before Format A, whose looser same-month pattern otherwise partial-matches just the
+      //   tail of a Format C string (e.g. matching "11-04/12/2026" out of "30/11-04/12/2026" and
+      //   silently producing an end date before the start date).
       let startDate: string | null = null;
       let endDate: string | null = null;
 
@@ -207,9 +282,18 @@ export const uploadAndExtractScheme = asyncHandler(
         /(\d{1,2})\/(\d{1,2})\/(\d{4})\s*-\s*(\d{1,2})\/(\d{1,2})\/(\d{4})/.exec(
           firstColumn,
         );
+      const formatCMatch =
+        !formatBMatch &&
+        /(\d{1,2})\/(\d{1,2})\s*-\s*(\d{1,2})\/(\d{1,2})\/(\d{4})/.exec(
+          firstColumn,
+        );
       if (formatBMatch) {
         startDate = `${formatBMatch[3]}-${formatBMatch[2].padStart(2, "0")}-${formatBMatch[1].padStart(2, "0")}`;
         endDate = `${formatBMatch[6]}-${formatBMatch[5].padStart(2, "0")}-${formatBMatch[4].padStart(2, "0")}`;
+      } else if (formatCMatch) {
+        const year = formatCMatch[5];
+        startDate = `${year}-${formatCMatch[2].padStart(2, "0")}-${formatCMatch[1].padStart(2, "0")}`;
+        endDate = `${year}-${formatCMatch[4].padStart(2, "0")}-${formatCMatch[3].padStart(2, "0")}`;
       } else {
         const formatAMatch =
           /(?<!\d)(\d{1,2})\s*-\s*(\d{1,2})\/(\d{1,2})\/(\d{4})/.exec(
@@ -225,28 +309,25 @@ export const uploadAndExtractScheme = asyncHandler(
         }
       }
 
-      if (startDate && endDate) {
-        // cells[0] is the Week/Date
-        // cells[1] is Learning Outcome (LO)
-        // cells[2] is Duration
-        // cells[3] is Indicative Content (IC) (Topic)
-        // cells[4] is Learning Activities / Methodology
-        // cells[5] is Resources
-        // cells[6] is Evidences / Evaluation
-        // cells[7] is Learning Place
-        // cells[8] is Observation
+      if (!startDate || !endDate) return;
 
+      if (!hasGroupedHeader) {
+        // Legacy fixed mapping, unchanged for backward compatibility with documents that don't
+        // use the grouped-header template:
+        // cells[0] Week/Date | cells[1] Learning Outcome (LO) | cells[2] Duration |
+        // cells[3] Indicative Content (Topic) | cells[4] Learning Activities/Methodology |
+        // cells[5] Resources | cells[6] Evidences/Evaluation | cells[7] Learning Place |
+        // cells[8] Observation
         let topic = cleanText(cells[3] || "");
         if (!topic && firstColumn.toLowerCase().includes("midterm")) {
           topic = "Midterm / Holidays";
         }
 
-        // Only add if it actually matched something substantive
         entries.push({
           week_number: `Week ${weekNum}`,
           start_date: startDate,
           end_date: endDate,
-          topic: topic,
+          topic,
           sub_topic: "",
           objective: cleanText(cells[1] || ""),
           duration: cleanText(cells[2] || ""),
@@ -256,7 +337,63 @@ export const uploadAndExtractScheme = asyncHandler(
           learning_place: cleanText(cells[7] || ""),
           observation: cleanText(cells[8] || ""),
         });
+        return;
       }
+
+      // Grouped-header (correct template) parsing: the trailing 6 columns (Indicative Content,
+      // Learning Activities, Resources, Evidences of formative assessment, Learning Place,
+      // Observation) are never row-spanned, so they're mapped end-anchored from the last cell
+      // backward -- robust regardless of exactly how many leading LO/Duration cells this
+      // particular row happens to carry.
+      const len = cells.length;
+      const observation = cleanText(cells[len - 1] || "");
+      const learningPlace = cleanText(cells[len - 2] || "");
+      const evaluation = cleanText(cells[len - 3] || "");
+      const resources = cleanText(cells[len - 4] || "");
+      const methodology = cleanText(cells[len - 5] || "");
+      const topicRaw = cleanMultilineText(cells[len - 6] || "");
+      let topic = topicRaw;
+      if (!topic && firstColumn.toLowerCase().includes("midterm")) {
+        topic = "Midterm / Holidays";
+      }
+
+      // Leading cells after Week (index 0) and before the 6 trailing columns: 0, 1, or 2 of
+      // them, depending on whether this row starts a new LO group (both present), is a mid-group
+      // continuation (both row-spanned away, 0 present), or only one survived.
+      const leadingCount = Math.max(0, len - 1 - 6);
+      if (leadingCount >= 2) {
+        carryLoText = cleanText(cells[1] || "");
+        carryDuration = cleanText(cells[2] || "");
+      } else if (leadingCount === 1) {
+        // Ambiguous single leading cell -- most commonly Duration survives alone when the LO text
+        // cell was merged upward; keep the LO text carried forward and take the fresh value as
+        // Duration, which matches the template's visual layout (LO first, Duration second).
+        carryDuration = cleanText(cells[1] || "");
+      }
+
+      const loNumberMatch = /Learning outcome\s+(\d+)/i.exec(carryLoText);
+      const competencyId = loNumberMatch
+        ? competencyIdByElement.get(parseInt(loNumberMatch[1], 10)) ?? null
+        : null;
+
+      entries.push({
+        week_number: `Week ${weekNum}`,
+        start_date: startDate,
+        end_date: endDate,
+        topic,
+        sub_topic: "",
+        // The grouped template has no separate free-text "objective" column distinct from the LO
+        // group name -- leave it blank instead of mis-mapping the LO text into it (that bug is
+        // what this branch exists to fix). The LO is now a real, queryable link instead.
+        objective: "",
+        competency_id: competencyId,
+        duration: carryDuration,
+        methodology,
+        resources,
+        evaluation,
+        learning_place: learningPlace,
+        observation,
+      });
     });
 
     let usedAIExtraction = false;
@@ -308,6 +445,19 @@ export const uploadAndExtractScheme = asyncHandler(
       const anchor = term?.start_date ? new Date(term.start_date) : new Date();
       const computedDates = computeWeekDates(anchor, aiEntries.length);
 
+      // Resolve any lo_number the AI attached against the subject's real Curriculum, same as the
+      // fixed-column grouped-header path above.
+      const aiCompetencies = await db
+        .select({
+          competency_id: SubjectCompetency.competency_id,
+          element_number: SubjectCompetency.element_number,
+        })
+        .from(SubjectCompetency)
+        .where(eq(SubjectCompetency.subject_id, subjectId));
+      const aiCompetencyIdByElement = new Map(
+        aiCompetencies.map((c) => [c.element_number, c.competency_id]),
+      );
+
       aiEntries.forEach((e, idx) => {
         const hasValidDates =
           !!e.start_date &&
@@ -328,6 +478,10 @@ export const uploadAndExtractScheme = asyncHandler(
           evaluation: e.evaluation || "",
           learning_place: e.learning_place || "",
           observation: e.observation || "",
+          competency_id:
+            typeof e.lo_number === "number"
+              ? aiCompetencyIdByElement.get(e.lo_number) ?? null
+              : null,
         });
       });
 
@@ -441,6 +595,20 @@ export const getSchemeEntries = asyncHandler(async (req: any, res: any) => {
       user_id: SchemeOfWork.user_id,
       created_at: SchemeOfWork.created_at,
       validation_status: SchemeOfWork.validation_status,
+      validation_comment: SchemeOfWork.validation_comment,
+      // Cover-page fields (migration 077) -- see updateSchemeCoverDetails below
+      sector: SchemeOfWork.sector,
+      trade: SchemeOfWork.trade,
+      qualification_title: SchemeOfWork.qualification_title,
+      rqf_level: SchemeOfWork.rqf_level,
+      module_code: SchemeOfWork.module_code,
+      learning_hours_per_week: SchemeOfWork.learning_hours_per_week,
+      number_of_classes: SchemeOfWork.number_of_classes,
+      scheme_date: SchemeOfWork.scheme_date,
+      approver_name: SchemeOfWork.approver_name,
+      approver_title: SchemeOfWork.approver_title,
+      trainer_signed: SchemeOfWork.trainer_signed,
+      approver_signed: SchemeOfWork.approver_signed,
       // Joined names
       subject_name: Subject.name,
       subject_code: Subject.code,
@@ -493,6 +661,24 @@ export const getSchemeEntries = asyncHandler(async (req: any, res: any) => {
         .where(inArray(SchemeEntryCriteria.entry_id, entryIds))
     : [];
 
+  // Attach the Learning Outcome (competency) each entry belongs to, if any, so the UI can show/
+  // edit the "Competence code and name" grouping without a second round trip.
+  const competencyIds = [
+    ...new Set(entries.map((e) => e.competency_id).filter((id): id is number => id != null)),
+  ];
+  const competencies = competencyIds.length
+    ? await db
+        .select({
+          competency_id: SubjectCompetency.competency_id,
+          element_number: SubjectCompetency.element_number,
+          title: SubjectCompetency.title,
+          learning_hours: SubjectCompetency.learning_hours,
+        })
+        .from(SubjectCompetency)
+        .where(inArray(SubjectCompetency.competency_id, competencyIds))
+    : [];
+  const competencyById = new Map(competencies.map((c) => [c.competency_id, c]));
+
   const entriesWithCriteria = entries.map((entry) => ({
     ...entry,
     criteria: links
@@ -502,6 +688,7 @@ export const getSchemeEntries = asyncHandler(async (req: any, res: any) => {
         criteria_number: l.criteria_number,
         description: l.description,
       })),
+    competency: entry.competency_id ? competencyById.get(entry.competency_id) || null : null,
   }));
 
   successResponse(res, "Scheme entries retrieved successfully", {
@@ -530,6 +717,7 @@ export const addSchemeEntry = asyncHandler(async (req: any, res: any) => {
     duration,
     learning_place,
     observation,
+    competency_id,
   } = req.body;
   const userId = req.user.userId;
 
@@ -592,6 +780,7 @@ export const addSchemeEntry = asyncHandler(async (req: any, res: any) => {
     duration: duration || null,
     learning_place: learning_place || null,
     observation: observation || null,
+    competency_id: competency_id ? parseInt(competency_id) : null,
   });
 
   const resultHeader = Array.isArray(result) ? result[0] : result;
@@ -627,6 +816,7 @@ export const insertSchemeEntry = asyncHandler(async (req: any, res: any) => {
     duration,
     learning_place,
     observation,
+    competency_id,
   } = req.body;
   const userId = req.user.userId;
 
@@ -728,6 +918,7 @@ export const insertSchemeEntry = asyncHandler(async (req: any, res: any) => {
           duration: duration || null,
           learning_place: learning_place || null,
           observation: observation || null,
+          competency_id: competency_id ? parseInt(competency_id) : null,
         };
         const result = await tx.insert(SchemeOfWorkEntry).values(newEntry);
         const resultHeader = Array.isArray(result) ? result[0] : result;
@@ -865,6 +1056,8 @@ export const updateSchemeEntry = asyncHandler(async (req: any, res: any) => {
     learning_place,
     observation,
     is_completed,
+    competency_id,
+    entry_status,
   } = req.body;
 
   const entryId = parseInt(id);
@@ -898,10 +1091,192 @@ export const updateSchemeEntry = asyncHandler(async (req: any, res: any) => {
       learning_place: learning_place !== undefined ? learning_place : existingEntry[0].learning_place,
       observation: observation !== undefined ? observation : existingEntry[0].observation,
       is_completed: is_completed ?? existingEntry[0].is_completed,
+      competency_id: competency_id !== undefined ? competency_id : existingEntry[0].competency_id,
+      entry_status: entry_status ?? existingEntry[0].entry_status,
     })
     .where(eq(SchemeOfWorkEntry.entry_id, entryId));
 
   successResponse(res, "Scheme entry updated successfully");
+});
+
+/**
+ * Sets or clears a single entry's Learning Outcome (competency) link -- used to manually correct
+ * AI/DOCX resolution that guessed wrong or left it unresolved (e.g. no matching Curriculum
+ * element_number was found at import/generation time).
+ */
+export const assignEntryCompetency = asyncHandler(async (req: any, res: any) => {
+  const entryId = parseInt(req.params.id);
+  const { competency_id } = req.body;
+
+  if (isNaN(entryId)) {
+    throw new ValidationError("Invalid entry ID");
+  }
+  if (competency_id !== null && competency_id !== undefined && isNaN(parseInt(competency_id))) {
+    throw new ValidationError("competency_id must be a number or null");
+  }
+
+  const [entry] = await db
+    .select({ entry_id: SchemeOfWorkEntry.entry_id, scheme_id: SchemeOfWorkEntry.scheme_id })
+    .from(SchemeOfWorkEntry)
+    .where(eq(SchemeOfWorkEntry.entry_id, entryId))
+    .limit(1);
+
+  if (!entry) {
+    throw new NotFoundError("Scheme entry not found");
+  }
+
+  const [scheme] = await db
+    .select()
+    .from(SchemeOfWork)
+    .where(eq(SchemeOfWork.scheme_id, entry.scheme_id))
+    .limit(1);
+  if (!scheme) {
+    throw new NotFoundError("Scheme of work not found");
+  }
+
+  await assertTeacherOwnsScheme(
+    req.user.userId,
+    scheme.subject_id,
+    scheme.class_group_id,
+    scheme.academic_term_id,
+  );
+
+  if (competency_id !== null && competency_id !== undefined) {
+    const [competency] = await db
+      .select({ competency_id: SubjectCompetency.competency_id })
+      .from(SubjectCompetency)
+      .where(
+        and(
+          eq(SubjectCompetency.competency_id, parseInt(competency_id)),
+          eq(SubjectCompetency.subject_id, scheme.subject_id),
+        ),
+      )
+      .limit(1);
+    if (!competency) {
+      throw new ValidationError("That Learning Outcome does not belong to this subject");
+    }
+  }
+
+  await db
+    .update(SchemeOfWorkEntry)
+    .set({
+      competency_id:
+        competency_id === null || competency_id === undefined
+          ? null
+          : parseInt(competency_id),
+    })
+    .where(eq(SchemeOfWorkEntry.entry_id, entryId));
+
+  successResponse(res, "Entry competency updated");
+});
+
+const COVER_DETAIL_FIELDS = [
+  "sector",
+  "trade",
+  "qualification_title",
+  "rqf_level",
+  "module_code",
+  "learning_hours_per_week",
+  "number_of_classes",
+  "scheme_date",
+  "approver_name",
+  "approver_title",
+  "trainer_signed",
+  "approver_signed",
+] as const;
+
+/**
+ * Updates a scheme's cover-page metadata (migration 077 fields) independently of its weekly
+ * entries -- backs the "Cover Page" editor panel so a teacher/admin can fill in
+ * sector/trade/qualification/etc. without touching content.
+ */
+export const updateSchemeCoverDetails = asyncHandler(async (req: any, res: any) => {
+  const schemeId = parseInt(req.params.schemeId);
+  if (isNaN(schemeId)) {
+    throw new ValidationError("Invalid scheme ID");
+  }
+
+  const [scheme] = await db
+    .select()
+    .from(SchemeOfWork)
+    .where(eq(SchemeOfWork.scheme_id, schemeId))
+    .limit(1);
+  if (!scheme) {
+    throw new NotFoundError("Scheme of work not found");
+  }
+
+  const userId = req.user.userId;
+  const isOwner = scheme.user_id === userId;
+  const canManageAny = (req.user.permissions || []).includes(
+    Permissions.VALIDATE_SCHEME_OF_WORK,
+  );
+  if (!isOwner && !canManageAny) {
+    throw new AuthorizationError(
+      "You do not have permission to edit this scheme of work",
+    );
+  }
+
+  const updates: Record<string, any> = {};
+  for (const field of COVER_DETAIL_FIELDS) {
+    if (req.body[field] !== undefined) {
+      updates[field] = req.body[field] === "" ? null : req.body[field];
+    }
+  }
+
+  if (Object.keys(updates).length === 0) {
+    throw new ValidationError("No cover-page fields provided");
+  }
+
+  await db.update(SchemeOfWork).set(updates).where(eq(SchemeOfWork.scheme_id, schemeId));
+
+  successResponse(res, "Cover page details updated");
+});
+
+/**
+ * Renders the Scheme of Work as a PDF (cover page + full weekly table), matching the correct
+ * printed template. Both preview (?mode=preview, streamed inline for an <iframe>) and download
+ * (?mode=download, forces Save As) call the exact same renderer, so what a teacher previews is
+ * always what they download -- see services/schemeReportPdf.ts.
+ */
+export const getSchemePdf = asyncHandler(async (req: any, res: any) => {
+  const schemeId = parseInt(req.params.schemeId);
+  if (isNaN(schemeId)) {
+    throw new ValidationError("Invalid scheme ID");
+  }
+
+  const [scheme] = await db
+    .select()
+    .from(SchemeOfWork)
+    .where(eq(SchemeOfWork.scheme_id, schemeId))
+    .limit(1);
+  if (!scheme) {
+    throw new NotFoundError("Scheme of work not found");
+  }
+
+  const userId = req.user.userId;
+  const isOwner = scheme.user_id === userId;
+  const canViewAny = (req.user.permissions || []).some((p: string) =>
+    [Permissions.VALIDATE_SCHEME_OF_WORK, Permissions.VIEW_ALL_TEACHERS_SCHEME_OF_WORK_LIST].includes(
+      p as any,
+    ),
+  );
+  if (!isOwner && !canViewAny) {
+    throw new AuthorizationError(
+      "You do not have permission to view this scheme of work",
+    );
+  }
+
+  const { renderSchemeOfWorkPdf } = await import("../services/schemeReportPdf");
+  const pdf = await renderSchemeOfWorkPdf(schemeId);
+
+  const mode = req.query.mode === "download" ? "download" : "preview";
+  const filename = `Scheme_of_Work_${schemeId}.pdf`;
+  res.setHeader("Content-Type", "application/pdf");
+  res.setHeader(
+    "Content-Disposition",
+    `${mode === "download" ? "attachment" : "inline"}; filename="${filename}"`,
+  );
+  res.send(pdf);
 });
 
 /**

@@ -244,16 +244,75 @@ export const resolveAndLinkCriteria = async (
 };
 
 /**
- * HTTP entry point for `resolveAndLinkCriteria`, used by the frontend once the subject's
- * Curriculum has been confirmed/saved after being proposed alongside AI generation (see
- * CURRICULUM_SCHEME_OF_WORK_INTEGRATION_IMPLEMENTATION_PLAN.md §4.1/§5.1).
+ * Resolves lo_number (Learning Outcome ordinal, e.g. "Learning Outcome 2") tags the AI attached to
+ * each generated week into real SchemeOfWorkEntry.competency_id links, keyed by week_number.
+ * Mirrors `resolveAndLinkCriteria` above, one grain up: an LO number maps to SubjectCompetency via
+ * its element_number, matching how `extractCurriculumStructure`/curriculum generation number LOs.
+ * Silently skips any week/lo_number combination that can't be resolved rather than failing the
+ * whole batch (e.g. the teacher edited the curriculum preview and an LO number no longer exists).
+ */
+export const resolveAndLinkCompetencies = async (
+  schemeId: number,
+  subjectId: number,
+  entryLoNumbers: Record<string, number>,
+): Promise<number> => {
+  const entries = await db
+    .select({
+      entry_id: SchemeOfWorkEntry.entry_id,
+      week_number: SchemeOfWorkEntry.week_number,
+    })
+    .from(SchemeOfWorkEntry)
+    .where(eq(SchemeOfWorkEntry.scheme_id, schemeId));
+
+  const entryIdByWeek = new Map(entries.map((e) => [e.week_number, e.entry_id]));
+
+  const competencies = await db
+    .select({
+      competency_id: SubjectCompetency.competency_id,
+      element_number: SubjectCompetency.element_number,
+    })
+    .from(SubjectCompetency)
+    .where(eq(SubjectCompetency.subject_id, subjectId));
+
+  const competencyIdByElement = new Map(
+    competencies.map((c) => [c.element_number, c.competency_id]),
+  );
+
+  let linkedCount = 0;
+  await db.transaction(async (tx) => {
+    for (const [weekNumber, loNumber] of Object.entries(entryLoNumbers)) {
+      const entryId = entryIdByWeek.get(weekNumber);
+      const competencyId = competencyIdByElement.get(Number(loNumber));
+      if (!entryId || !competencyId) continue;
+
+      await tx
+        .update(SchemeOfWorkEntry)
+        .set({ competency_id: competencyId })
+        .where(eq(SchemeOfWorkEntry.entry_id, entryId));
+      linkedCount++;
+    }
+  });
+
+  return linkedCount;
+};
+
+/**
+ * HTTP entry point for `resolveAndLinkCriteria`/`resolveAndLinkCompetencies`, used by the frontend
+ * once the subject's Curriculum has been confirmed/saved after being proposed alongside AI
+ * generation (see CURRICULUM_SCHEME_OF_WORK_INTEGRATION_IMPLEMENTATION_PLAN.md §4.1/§5.1).
  */
 export const linkSchemeCriteria = asyncHandler(async (req: any, res: any) => {
   const schemeId = parseInt(req.params.schemeId);
-  const { subjectId, entryCriteriaNumbers } = req.body;
+  const { subjectId, entryCriteriaNumbers, entryLoNumbers } = req.body;
 
-  if (!subjectId || !entryCriteriaNumbers || typeof entryCriteriaNumbers !== "object") {
-    throw new ValidationError("subjectId and entryCriteriaNumbers are required");
+  if (
+    !subjectId ||
+    ((!entryCriteriaNumbers || typeof entryCriteriaNumbers !== "object") &&
+      (!entryLoNumbers || typeof entryLoNumbers !== "object"))
+  ) {
+    throw new ValidationError(
+      "subjectId and at least one of entryCriteriaNumbers/entryLoNumbers are required",
+    );
   }
 
   const [scheme] = await db
@@ -276,13 +335,20 @@ export const linkSchemeCriteria = asyncHandler(async (req: any, res: any) => {
     scheme.academic_term_id,
   );
 
-  const linkedCount = await resolveAndLinkCriteria(
-    schemeId,
-    scheme.subject_id,
-    entryCriteriaNumbers,
-  );
+  const linkedCount =
+    entryCriteriaNumbers && typeof entryCriteriaNumbers === "object"
+      ? await resolveAndLinkCriteria(schemeId, scheme.subject_id, entryCriteriaNumbers)
+      : 0;
 
-  successResponse(res, "Criteria linked to scheme entries", { linkedCount });
+  const linkedCompetencyCount =
+    entryLoNumbers && typeof entryLoNumbers === "object"
+      ? await resolveAndLinkCompetencies(schemeId, scheme.subject_id, entryLoNumbers)
+      : 0;
+
+  successResponse(res, "Criteria linked to scheme entries", {
+    linkedCount,
+    linkedCompetencyCount,
+  });
 });
 
 const MAX_BULK_ENTRIES = 60;

@@ -628,6 +628,10 @@ export const School = mysqlTable("School", {
   contact_email: varchar("contact_email", { length: 150 }),
   contact_phone: varchar("contact_phone", { length: 50 }),
   logo: varchar("logo", { length: 500 }),
+  // Second logo slot for printed reports (e.g. Scheme of Work cover page)
+  // -- migration 078. `logo` is the primary/left mark, this is the
+  // secondary/right one (partner programme, etc.).
+  partner_logo: varchar("partner_logo", { length: 500 }),
   status: mysqlEnum("status", ["ACTIVE", "INACTIVE", "SUSPENDED"]).default(
     "ACTIVE",
   ),
@@ -743,6 +747,22 @@ export const SchemeOfWork = mysqlTable("SchemeOfWork", {
     "AI_GENERATED",
   ]).default("MANUAL"),
   ai_source_filename: varchar("ai_source_filename", { length: 255 }),
+  // Cover-page fields for the printed/PDF report (migration 077). Nullable:
+  // trainer/class/school-year/term are already derivable via user_id/
+  // class_group_id/academic_term_id and are joined at render time instead
+  // of duplicated here.
+  sector: varchar("sector", { length: 100 }),
+  trade: varchar("trade", { length: 150 }),
+  qualification_title: varchar("qualification_title", { length: 255 }),
+  rqf_level: varchar("rqf_level", { length: 50 }),
+  module_code: varchar("module_code", { length: 50 }),
+  learning_hours_per_week: int("learning_hours_per_week"),
+  number_of_classes: int("number_of_classes"),
+  scheme_date: date("scheme_date"),
+  approver_name: varchar("approver_name", { length: 150 }),
+  approver_title: varchar("approver_title", { length: 150 }),
+  trainer_signed: tinyint("trainer_signed").default(0),
+  approver_signed: tinyint("approver_signed").default(0),
   created_at: datetime("created_at").default(sql`CURRENT_TIMESTAMP`),
   updated_at: datetime("updated_at").default(
     sql`CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP`,
@@ -755,6 +775,13 @@ export const SchemeOfWorkEntry = mysqlTable("SchemeOfWorkEntry", {
   scheme_id: bigint("scheme_id", { mode: "number" })
     .notNull()
     .references(() => SchemeOfWork.scheme_id),
+  // Which Learning Outcome / Competence group (Curriculum's
+  // SubjectCompetency) this week belongs to -- migration 075. Nullable:
+  // old rows, and any scheme not linked to curriculum, have no group.
+  competency_id: bigint("competency_id", { mode: "number" }).references(
+    () => SubjectCompetency.competency_id,
+    { onDelete: "set null" },
+  ),
   week_number: varchar("week_number", { length: 50 }),
   start_date: date("start_date"),
   end_date: date("end_date"),
@@ -768,6 +795,16 @@ export const SchemeOfWorkEntry = mysqlTable("SchemeOfWorkEntry", {
   learning_place: varchar("learning_place", { length: 100 }).default(sql`NULL`),
   observation: text("observation").default(sql`NULL`),
   is_completed: tinyint("is_completed").default(0),
+  // Explicit per-week status (migration 076) -- SKIPPED marks an
+  // intentionally-empty holiday/break week so it still renders as a real,
+  // visible row instead of vanishing entirely from the calendar/PDF.
+  entry_status: mysqlEnum("entry_status", [
+    "PLANNED",
+    "SKIPPED",
+    "COMPLETED",
+  ])
+    .notNull()
+    .default("PLANNED"),
   validation_status: mysqlEnum("validation_status", [
     "PENDING",
     "APPROVED",

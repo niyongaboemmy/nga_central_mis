@@ -53,6 +53,11 @@ interface GeneratedWeek {
    * addresses, if any curriculum criteria (existing or freshly proposed) were available at
    * generation time to match against. */
   criteria_numbers?: string[];
+  /** Which Learning Outcome (element_number) this week belongs to, when a real LO structure was
+   * detected/available at generation time — resolved into SchemeOfWorkEntry.competency_id so the
+   * PDF/UI can group consecutive weeks under one "Competence code and name" header, matching the
+   * correct Scheme of Work template. */
+  lo_number?: number;
 }
 
 const computeMaxWeeks = (start: Date, end: Date): number => {
@@ -131,6 +136,8 @@ const buildTextFromExistingCurriculum = async (
 ): Promise<{
   rawText: string;
   criteriaForPrompt: { criteria_number: string; description: string }[];
+  loList: { loNumber: number; title: string }[];
+  competencyIdByElement: Map<number, number>;
 }> => {
   const elements = await db
     .select()
@@ -172,7 +179,15 @@ const buildTextFromExistingCurriculum = async (
     }
   }
 
-  return { rawText: blocks.join("\n\n"), criteriaForPrompt };
+  const loList = selectedElements.map((el) => ({
+    loNumber: el.element_number,
+    title: el.title,
+  }));
+  const competencyIdByElement = new Map(
+    selectedElements.map((el) => [el.element_number, el.competency_id]),
+  );
+
+  return { rawText: blocks.join("\n\n"), criteriaForPrompt, loList, competencyIdByElement };
 };
 
 const weekSchema: JSONSchema = {
@@ -189,6 +204,7 @@ const weekSchema: JSONSchema = {
     observation: { type: "string" },
     duration: { type: "string" },
     criteria_numbers: { type: "array", items: { type: "string" } },
+    lo_number: { type: "number" },
   },
   required: [
     "week_number",
@@ -206,6 +222,7 @@ const generateWeeks = async (
   subjectName: string,
   additionalInstructions?: string,
   criteriaList?: string[],
+  loList?: { loNumber: number; title: string }[],
 ): Promise<GeneratedWeek[]> => {
   const { data: parsed } = await generateStructuredContent<{ weeks?: GeneratedWeek[] }>({
     schemaName: "scheme_weeks",
@@ -273,6 +290,18 @@ ${criteriaList.join("\n")}
 """
 `
     : ""
+}${
+  loList && loList.length > 0
+    ? `
+This term's curriculum is organized into the following Learning Outcomes (number: title). Every week you plan
+belongs to exactly one of them — set "lo_number" to that Learning Outcome's number for every week. Group weeks
+so that all weeks covering the same Learning Outcome are planned consecutively (do not interleave them), the way
+a real Scheme of Work is laid out. Do NOT invent a Learning Outcome number that isn't in this list.
+"""
+${loList.map((lo) => `${lo.loNumber}: ${lo.title}`).join("\n")}
+"""
+`
+    : ""
 }
 CURRICULUM CONTENT:
 """
@@ -293,6 +322,124 @@ ${curriculumText}
   return weeks
     .sort((a, b) => (a.week_number || 0) - (b.week_number || 0))
     .slice(0, maxWeeks);
+};
+
+export interface BuiltWeekEntry {
+  week_number: string;
+  start_date: string;
+  end_date: string;
+  topic: string;
+  sub_topic: string;
+  objective: string;
+  methodology: string;
+  resources: string;
+  evaluation: string;
+  duration: string;
+  learning_place: string;
+  observation: string;
+  competency_id: number | null;
+  entry_status: "PLANNED" | "SKIPPED" | "COMPLETED";
+}
+
+const EMPTY_WEEK_FIELDS = {
+  topic: "",
+  sub_topic: "",
+  objective: "",
+  methodology: "",
+  resources: "",
+  evaluation: "",
+  duration: "",
+  learning_place: "",
+  observation: "",
+  competency_id: null as number | null,
+};
+
+/**
+ * Lays generated week content onto the full 1..totalWeeks timeline, one row per slot, with no
+ * omissions. This is the fix for the bug where skip weeks (and any shortfall in what the AI
+ * returned) used to be `continue`-d past entirely, leaving no database row at all for that week
+ * — which is why the calendar/timeline/PDF showed a blank, unlabeled gap instead of a visible
+ * placeholder (RealCalendarView.tsx can only render what exists in `entries`). Pulled out as a
+ * pure function (no I/O) so this exact layout logic is unit-testable without mocking the AI
+ * provider or the database.
+ */
+export const buildWeekEntries = (params: {
+  totalWeeks: number;
+  skipWeeks: Set<number>;
+  generatedWeeks: GeneratedWeek[];
+  weekDates: { start_date: string; end_date: string }[];
+  competencyIdByElement: Map<number, number>;
+}): {
+  entries: BuiltWeekEntry[];
+  entryCriteriaNumbers: Record<string, string[]>;
+  entryLoNumbers: Record<string, number>;
+} => {
+  const { totalWeeks, skipWeeks, generatedWeeks, weekDates, competencyIdByElement } = params;
+  const entries: BuiltWeekEntry[] = [];
+  const entryCriteriaNumbers: Record<string, string[]> = {};
+  const entryLoNumbers: Record<string, number> = {};
+  let contentIdx = 0;
+
+  for (let slot = 1; slot <= totalWeeks; slot++) {
+    const weekNumber = `Week ${slot}`;
+    const dates = weekDates[slot - 1];
+
+    if (skipWeeks.has(slot)) {
+      entries.push({
+        week_number: weekNumber,
+        start_date: dates.start_date,
+        end_date: dates.end_date,
+        ...EMPTY_WEEK_FIELDS,
+        entry_status: "SKIPPED",
+      });
+      continue;
+    }
+
+    if (contentIdx >= generatedWeeks.length) {
+      // AI returned fewer weeks than requested -- leave the remaining slots as empty, clearly
+      // PLANNED (not SKIPPED) rows for manual fill-in rather than truncating the timeline.
+      entries.push({
+        week_number: weekNumber,
+        start_date: dates.start_date,
+        end_date: dates.end_date,
+        ...EMPTY_WEEK_FIELDS,
+        entry_status: "PLANNED",
+      });
+      continue;
+    }
+
+    const w = generatedWeeks[contentIdx++];
+    const competencyId =
+      typeof w.lo_number === "number" ? competencyIdByElement.get(w.lo_number) ?? null : null;
+
+    entries.push({
+      week_number: weekNumber,
+      start_date: dates.start_date,
+      end_date: dates.end_date,
+      topic: w.topic || "",
+      sub_topic: w.sub_topic || "",
+      objective: w.objective || "",
+      methodology: w.methodology || "",
+      resources: w.resources || "",
+      evaluation: w.evaluation || "",
+      duration: w.duration || "",
+      learning_place: w.learning_place || "",
+      observation: w.observation || "",
+      competency_id: competencyId,
+      entry_status: "PLANNED",
+    });
+    if (Array.isArray(w.criteria_numbers) && w.criteria_numbers.length > 0) {
+      entryCriteriaNumbers[weekNumber] = w.criteria_numbers;
+    }
+    // Track the raw lo_number too (even when already resolved) so the deferred
+    // curriculum-confirmation path (proposedCurriculum, not yet persisted) can re-resolve it once
+    // real competency_ids exist, via /schemes/:schemeId/link-criteria.
+    if (typeof w.lo_number === "number") {
+      entryLoNumbers[weekNumber] = w.lo_number;
+    }
+  }
+
+  return { entries, entryCriteriaNumbers, entryLoNumbers };
 };
 
 const processJob = async (
@@ -371,6 +518,8 @@ const processJob = async (
     let rawText: string;
     let proposedCurriculum: ImportedElement[] | undefined;
     let criteriaForPrompt: { criteria_number: string; description: string }[] = [];
+    let loListForPrompt: { loNumber: number; title: string }[] = [];
+    let competencyIdByElement = new Map<number, number>();
 
     if (file) {
       const fullText = await extractTextFromFile(file);
@@ -379,6 +528,9 @@ const processJob = async (
       if (params.selectedContentRefs.size > 0) {
         const structure = extractCurriculumStructure(fullText);
         const blocks: string[] = [];
+        loListForPrompt = structure.los
+          .filter((lo) => params.selectedContentRefs.get(lo.loNumber)?.size)
+          .map((lo) => ({ loNumber: lo.loNumber, title: lo.title }));
 
         for (const lo of structure.los) {
           const selectedItemIndices = params.selectedContentRefs.get(
@@ -440,12 +592,40 @@ const processJob = async (
             description: c.description,
           })),
         );
+        // Curriculum isn't persisted yet — no real competency_id to resolve against. Still tag the
+        // AI's lo_number using the proposal's own numbering so entryLoNumbers can be resolved once
+        // the user confirms/saves the curriculum (see the "done" handler below).
+        if (loListForPrompt.length === 0) {
+          loListForPrompt = proposedCurriculum.map((el) => ({
+            loNumber: el.element_number,
+            title: el.title,
+          }));
+        }
       } else {
         const existingCriteria = await getSubjectCriteria(params.subjectId);
         criteriaForPrompt = existingCriteria.map((c) => ({
           criteria_number: c.criteria_number,
           description: c.description,
         }));
+        // Subject already has real Curriculum — resolve lo_number -> competency_id immediately
+        // once the AI responds, same as criteria_numbers below.
+        const existingCompetencies = await db
+          .select({
+            competency_id: SubjectCompetency.competency_id,
+            element_number: SubjectCompetency.element_number,
+            title: SubjectCompetency.title,
+          })
+          .from(SubjectCompetency)
+          .where(eq(SubjectCompetency.subject_id, params.subjectId));
+        competencyIdByElement = new Map(
+          existingCompetencies.map((c) => [c.element_number, c.competency_id]),
+        );
+        if (loListForPrompt.length === 0) {
+          loListForPrompt = existingCompetencies.map((c) => ({
+            loNumber: c.element_number,
+            title: c.title,
+          }));
+        }
       }
     } else {
       // No file — generating from the subject's already-saved Curriculum, scoped to whichever
@@ -456,6 +636,8 @@ const processJob = async (
       );
       rawText = built.rawText.slice(0, MAX_CURRICULUM_CHARS);
       criteriaForPrompt = built.criteriaForPrompt;
+      loListForPrompt = built.loList;
+      competencyIdByElement = built.competencyIdByElement;
 
       if (!rawText.trim()) {
         throw new ValidationError(
@@ -479,6 +661,7 @@ const processJob = async (
       criteriaForPrompt.length > 0
         ? criteriaForPrompt.map((c) => `${c.criteria_number}: ${c.description}`)
         : undefined,
+      loListForPrompt.length > 0 ? loListForPrompt : undefined,
     );
 
     updateJob(jobId, {
@@ -489,35 +672,13 @@ const processJob = async (
     });
 
     const weekDates = computeWeekDates(termStart, totalWeeks);
-    const entries: any[] = [];
-    const entryCriteriaNumbers: Record<string, string[]> = {};
-    let contentIdx = 0;
-    for (
-      let slot = 1;
-      slot <= totalWeeks && contentIdx < generatedWeeks.length;
-      slot++
-    ) {
-      if (skipWeeks.has(slot)) continue;
-      const w = generatedWeeks[contentIdx++];
-      const weekNumber = `Week ${slot}`;
-      entries.push({
-        week_number: weekNumber,
-        start_date: weekDates[slot - 1].start_date,
-        end_date: weekDates[slot - 1].end_date,
-        topic: w.topic || "",
-        sub_topic: w.sub_topic || "",
-        objective: w.objective || "",
-        methodology: w.methodology || "",
-        resources: w.resources || "",
-        evaluation: w.evaluation || "",
-        duration: w.duration || "",
-        learning_place: w.learning_place || "",
-        observation: w.observation || "",
-      });
-      if (Array.isArray(w.criteria_numbers) && w.criteria_numbers.length > 0) {
-        entryCriteriaNumbers[weekNumber] = w.criteria_numbers;
-      }
-    }
+    const { entries, entryCriteriaNumbers, entryLoNumbers } = buildWeekEntries({
+      totalWeeks,
+      skipWeeks,
+      generatedWeeks,
+      weekDates,
+      competencyIdByElement,
+    });
 
     updateJob(jobId, {
       status: "saving",
@@ -576,7 +737,7 @@ const processJob = async (
     for (const entry of entries) {
       await db.insert(SchemeOfWorkEntry).values({
         scheme_id: schemeId,
-        ...entry,
+        ...(entry as any),
       });
     }
 
@@ -615,6 +776,7 @@ const processJob = async (
             proposedCurriculum,
             curriculumSubjectHadNone: true,
             entryCriteriaNumbers,
+            entryLoNumbers,
           }
         : {}),
       ...(autoTaggedCriteriaCount !== undefined ? { autoTaggedCriteriaCount } : {}),
@@ -828,6 +990,7 @@ export const getAIGenerationStatus = asyncHandler(
       curriculumSubjectHadNone: job.curriculumSubjectHadNone,
       entryCriteriaNumbers: job.entryCriteriaNumbers,
       autoTaggedCriteriaCount: job.autoTaggedCriteriaCount,
+      entryLoNumbers: job.entryLoNumbers,
     });
   },
 );

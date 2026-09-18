@@ -2,6 +2,8 @@ import { Request, Response } from "express";
 import { db } from "../db";
 import { School } from "../db/schema";
 import { eq } from "drizzle-orm";
+import path from "path";
+import storageService from "../utils/fileServer";
 
 export const createSchool = async (req: Request, res: Response) => {
   try {
@@ -140,6 +142,48 @@ export const updateSchool = async (req: Request, res: Response) => {
     res.status(200).json({ message: "School updated successfully" });
   } catch (error) {
     console.error("Error updating school:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+/**
+ * Uploads a logo image and stores its file-server path on School.logo (`slot: "primary"`, the
+ * default) or School.partner_logo (`slot: "partner"`) -- used for the Scheme of Work PDF's two
+ * cover-page logo slots (both dynamic, per product decision). Stored as a remote file-server path
+ * (same convention as SubjectDocument.file_path elsewhere in the app), not a full URL --
+ * schemeReportPdf.ts resolves it at render time.
+ */
+export const uploadSchoolLogo = async (req: Request & { file?: Express.Multer.File }, res: Response) => {
+  try {
+    const { id } = req.params;
+    const slot = req.body.slot === "partner" ? "partner" : "primary";
+
+    if (!req.file) {
+      return res.status(400).json({ message: "No file uploaded" });
+    }
+
+    const existingSchool = await db
+      .select()
+      .from(School)
+      .where(eq(School.school_id, Number(id)));
+
+    if (existingSchool.length === 0) {
+      return res.status(404).json({ message: "School not found" });
+    }
+
+    const ext = path.extname(req.file.originalname).toLowerCase() || ".png";
+    const remotePath = `schools/${id}/logo-${slot}-${Date.now()}${ext}`;
+
+    await storageService.uploadFile(req.file.buffer, remotePath);
+
+    await db
+      .update(School)
+      .set(slot === "partner" ? { partner_logo: remotePath } : { logo: remotePath })
+      .where(eq(School.school_id, Number(id)));
+
+    res.status(200).json({ message: "Logo uploaded successfully", path: remotePath, slot });
+  } catch (error) {
+    console.error("Error uploading school logo:", error);
     res.status(500).json({ message: "Internal server error" });
   }
 };

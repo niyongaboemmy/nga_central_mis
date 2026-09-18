@@ -137,6 +137,10 @@ const RealCalendarView: React.FC<RealCalendarViewProps> = ({
     const usingRealTimetable = !!scheduledWeekdays && scheduledWeekdays.size > 0;
 
     for (const entry of entries) {
+      // A SKIPPED week (holiday/break, marked during AI generation) never expects a lesson plan
+      // — it must not be flagged "missing", only shown as skipped (see the cell rendering below).
+      if (entry.entry_status === "SKIPPED") continue;
+
       const start = new Date(entry.start_date);
       const end = new Date(entry.end_date);
       start.setHours(0, 0, 0, 0);
@@ -223,19 +227,22 @@ const RealCalendarView: React.FC<RealCalendarViewProps> = ({
     const status = dayStatus.get(dateStr);
     const isMissingPlan = status === "missing";
     const isDueSoon = status === "due-soon";
+    const isSkippedWeek = entry?.entry_status === "SKIPPED";
 
     days.push(
       <div
         key={d}
         onClick={() => onDayClick(date, entry?.entry_id || null)}
         className={`group relative min-h-[140px] p-2 border-b border-r transition-colors ${
-          isMissingPlan
-            ? "border-red-200 dark:border-red-900/40 bg-red-50/60 dark:bg-red-950/20 hover:bg-red-50 dark:hover:bg-red-950/30 cursor-pointer ring-1 ring-inset ring-red-200 dark:ring-red-900/40"
-            : isDueSoon
-              ? "border-amber-200 dark:border-amber-900/40 bg-amber-50/50 dark:bg-amber-950/10 hover:bg-amber-50 dark:hover:bg-amber-950/20 cursor-pointer"
-              : entry
-                ? "border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800/40 cursor-pointer"
-                : "border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-950"
+          isSkippedWeek
+            ? "border-amber-200 dark:border-amber-900/40 bg-amber-50/40 dark:bg-amber-950/10 hover:bg-amber-50/70 dark:hover:bg-amber-950/20 cursor-pointer"
+            : isMissingPlan
+              ? "border-red-200 dark:border-red-900/40 bg-red-50/60 dark:bg-red-950/20 hover:bg-red-50 dark:hover:bg-red-950/30 cursor-pointer ring-1 ring-inset ring-red-200 dark:ring-red-900/40"
+              : isDueSoon
+                ? "border-amber-200 dark:border-amber-900/40 bg-amber-50/50 dark:bg-amber-950/10 hover:bg-amber-50 dark:hover:bg-amber-950/20 cursor-pointer"
+                : entry
+                  ? "border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800/40 cursor-pointer"
+                  : "border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-950"
         }`}
       >
         <div className="flex justify-between items-start mb-2">
@@ -243,18 +250,30 @@ const RealCalendarView: React.FC<RealCalendarViewProps> = ({
             className={`text-sm font-medium w-8 h-8 flex items-center justify-center rounded-full ${
               isToday
                 ? "bg-blue-600 text-white shadow-md shadow-blue-200 dark:shadow-none"
-                : isMissingPlan
-                  ? "text-red-700 dark:text-red-300"
-                  : isDueSoon
-                    ? "text-amber-700 dark:text-amber-300"
-                    : entry
-                      ? "text-gray-900 dark:text-gray-100"
-                      : "text-gray-400 dark:text-gray-600"
+                : isSkippedWeek
+                  ? "text-amber-700 dark:text-amber-400"
+                  : isMissingPlan
+                    ? "text-red-700 dark:text-red-300"
+                    : isDueSoon
+                      ? "text-amber-700 dark:text-amber-300"
+                      : entry
+                        ? "text-gray-900 dark:text-gray-100"
+                        : "text-gray-400 dark:text-gray-600"
             }`}
           >
             {d}
           </span>
           <div className="flex items-center gap-1">
+            {isSkippedWeek && (
+              <div
+                className="group/tooltip relative flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/40"
+                title="Marked as skipped (holiday/break) — no lesson expected this week"
+              >
+                <span className="text-[9px] font-bold uppercase tracking-wide text-amber-700 dark:text-amber-400">
+                  Skipped
+                </span>
+              </div>
+            )}
             {isMissingPlan && (
               <div
                 className="group/tooltip relative flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-red-100 dark:bg-red-900/40"

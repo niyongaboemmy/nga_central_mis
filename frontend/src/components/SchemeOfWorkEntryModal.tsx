@@ -6,7 +6,7 @@ import {
   schemeOfWorkApi,
   DEFAULT_ENTRY_PROMPT_TEMPLATE,
 } from "../api/schemeOfWork";
-import { competenciesApi } from "../api/curriculum";
+import { competenciesApi, SubjectCompetency } from "../api/curriculum";
 import { useToast } from "../contexts/ToastContext";
 import {
   BookOpen,
@@ -51,6 +51,7 @@ const emptyForm: Partial<SchemeEntry> = {
   duration: "",
   learning_place: "",
   observation: "",
+  competency_id: null,
 };
 
 const SchemeOfWorkEntryModal: React.FC<SchemeOfWorkEntryModalProps> = ({
@@ -78,6 +79,11 @@ const SchemeOfWorkEntryModal: React.FC<SchemeOfWorkEntryModalProps> = ({
   const [selectedCriteriaIds, setSelectedCriteriaIds] = useState<Set<number>>(new Set());
   const [isSuggestingCriteria, setIsSuggestingCriteria] = useState(false);
 
+  // Which Learning Outcome (Curriculum SubjectCompetency) this week belongs to — the
+  // "Competence code and name" grouping the correct Scheme of Work template uses to merge
+  // consecutive weeks under one heading in the PDF/report.
+  const [availableCompetencies, setAvailableCompetencies] = useState<SubjectCompetency[]>([]);
+
   useEffect(() => {
     if (initialData) {
       setFormData({
@@ -97,6 +103,7 @@ const SchemeOfWorkEntryModal: React.FC<SchemeOfWorkEntryModalProps> = ({
         duration: initialData.duration || "",
         learning_place: initialData.learning_place || "",
         observation: initialData.observation || "",
+        competency_id: initialData.competency_id ?? null,
       });
       setSelectedCriteriaIds(
         new Set((initialData.criteria || []).map((c) => c.criteria_id)),
@@ -113,6 +120,7 @@ const SchemeOfWorkEntryModal: React.FC<SchemeOfWorkEntryModalProps> = ({
   useEffect(() => {
     if (!isOpen || !subjectId) {
       setAvailableCriteria([]);
+      setAvailableCompetencies([]);
       return;
     }
     let cancelled = false;
@@ -120,7 +128,8 @@ const SchemeOfWorkEntryModal: React.FC<SchemeOfWorkEntryModalProps> = ({
       .getAll(subjectId)
       .then((resp) => {
         if (cancelled) return;
-        const criteria: LinkedCriteria[] = (resp.data.data || []).flatMap((el) =>
+        const elements = resp.data.data || [];
+        const criteria: LinkedCriteria[] = elements.flatMap((el) =>
           el.criteria.map((c) => ({
             criteria_id: c.criteria_id,
             criteria_number: c.criteria_number,
@@ -128,9 +137,12 @@ const SchemeOfWorkEntryModal: React.FC<SchemeOfWorkEntryModalProps> = ({
           })),
         );
         setAvailableCriteria(criteria);
+        setAvailableCompetencies(
+          [...elements].sort((a, b) => a.element_number - b.element_number),
+        );
       })
       .catch(() => {
-        /* non-fatal: criteria linking simply won't be available for this entry */
+        /* non-fatal: criteria/competency linking simply won't be available for this entry */
       });
     return () => {
       cancelled = true;
@@ -407,6 +419,35 @@ const SchemeOfWorkEntryModal: React.FC<SchemeOfWorkEntryModalProps> = ({
                 className="w-full h-11 px-4 text-sm bg-gray-50 dark:bg-gray-900/50 border border-gray-100 dark:border-gray-800 rounded-full text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
               />
             </div>
+          </div>
+        )}
+
+        {/* Competence / Learning Outcome grouping — the correct template groups consecutive
+            weeks under one "Competence code and name" heading, driven by this link. */}
+        {subjectId != null && availableCompetencies.length > 0 && (
+          <div className="space-y-1.5">
+            <label className="flex items-center gap-1.5 text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider ml-1">
+              <BookOpen className="w-3 h-3" />
+              Competence / Learning Outcome
+            </label>
+            <select
+              value={formData.competency_id ?? ""}
+              onChange={(e) =>
+                setFormData((prev) => ({
+                  ...prev,
+                  competency_id: e.target.value ? parseInt(e.target.value) : null,
+                }))
+              }
+              className="w-full h-11 px-4 text-sm bg-gray-50 dark:bg-gray-900/50 border border-gray-100 dark:border-gray-800 rounded-full text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
+            >
+              <option value="">— Not linked —</option>
+              {availableCompetencies.map((c) => (
+                <option key={c.competency_id} value={c.competency_id}>
+                  Learning outcome {c.element_number}: {c.title}
+                  {c.learning_hours ? ` (${c.learning_hours}h)` : ""}
+                </option>
+              ))}
+            </select>
           </div>
         )}
 

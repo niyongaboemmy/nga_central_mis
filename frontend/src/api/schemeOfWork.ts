@@ -7,6 +7,13 @@ export interface LinkedCriteria {
   description: string;
 }
 
+export interface LinkedCompetency {
+  competency_id: number;
+  element_number: number;
+  title: string;
+  learning_hours: number | null;
+}
+
 export interface SchemeEntry {
   entry_id: number;
   scheme_id: number;
@@ -23,11 +30,46 @@ export interface SchemeEntry {
   resources: string;
   evaluation: string;
   is_completed: boolean | number;
+  /** SKIPPED marks an intentionally-empty holiday/break week (still a real row, just blank) --
+   * distinct from a week that simply hasn't been filled in yet (PLANNED). */
+  entry_status: "PLANNED" | "SKIPPED" | "COMPLETED";
   validation_status: "PENDING" | "APPROVED" | "REJECTED";
   validation_comment: string | null;
   created_at: string;
   /** Curriculum Performance Criteria this entry has been linked to (AI-suggested or manual). */
   criteria?: LinkedCriteria[];
+  /** Which Learning Outcome (Curriculum SubjectCompetency) this week belongs to, if any. */
+  competency_id?: number | null;
+  competency?: LinkedCompetency | null;
+}
+
+export interface SchemeHeader {
+  scheme_id: number;
+  subject_id: number;
+  class_group_id: number;
+  academic_term_id: number;
+  user_id: number;
+  created_at: string;
+  validation_status: "PENDING" | "APPROVED" | "REJECTED";
+  validation_comment?: string | null;
+  sector: string | null;
+  trade: string | null;
+  qualification_title: string | null;
+  rqf_level: string | null;
+  module_code: string | null;
+  learning_hours_per_week: number | null;
+  number_of_classes: number | null;
+  scheme_date: string | null;
+  approver_name: string | null;
+  approver_title: string | null;
+  trainer_signed: boolean | number;
+  approver_signed: boolean | number;
+  subject_name: string;
+  subject_code: string | null;
+  class_group_name: string;
+  academic_term_name: string;
+  academic_year_name: string;
+  teacher_name: string;
 }
 
 export interface TeacherSchemeRecord {
@@ -88,6 +130,9 @@ export interface AIGenerationStatus {
   entryCriteriaNumbers?: Record<string, string[]>;
   /** Set when the subject already had Curriculum — criteria links were resolved & saved already. */
   autoTaggedCriteriaCount?: number;
+  /** Learning Outcome numbers the AI attached to each generated week — resolve via
+   * schemeOfWorkApi.linkCriteria once a proposed curriculum is confirmed. */
+  entryLoNumbers?: Record<string, number>;
 }
 
 export interface DetectedContentItem {
@@ -231,12 +276,16 @@ export const schemeOfWorkApi = {
    * Curriculum has been confirmed/saved after being proposed alongside generation. */
   linkCriteria: (
     schemeId: number,
-    data: { subjectId: number; entryCriteriaNumbers: Record<string, string[]> },
+    data: {
+      subjectId: number;
+      entryCriteriaNumbers?: Record<string, string[]>;
+      entryLoNumbers?: Record<string, number>;
+    },
   ) =>
-    apiService.post<{ success: boolean; data: { linkedCount: number } }>(
-      `/scheme-of-work/schemes/${schemeId}/link-criteria`,
-      data,
-    ),
+    apiService.post<{
+      success: boolean;
+      data: { linkedCount: number; linkedCompetencyCount: number };
+    }>(`/scheme-of-work/schemes/${schemeId}/link-criteria`, data),
 
   /** On-demand bulk AI matching for an already-existing scheme — one Gemini call covers every
    * (by default, untagged) entry. Pass overwrite:true to re-match entries that already have links. */
@@ -268,4 +317,48 @@ export const schemeOfWorkApi = {
       status,
       comment,
     }),
+
+  /** Fetches the backend-rendered Scheme of Work PDF (cover page + full weekly table, matching
+   * the correct template) as a blob -- used for both the "Preview" iframe and the "Download"
+   * button, so both are always pixel-identical (one renderer, see schemeReportPdf.ts). Fetched via
+   * axios (not a plain <a href>/<iframe src>) because the endpoint requires the bearer auth
+   * header, which a plain URL can't carry. */
+  getSchemePdfBlob: (schemeId: number, mode: "preview" | "download" = "preview") =>
+    apiService.get<Blob>(`/scheme-of-work/schemes/${schemeId}/pdf`, {
+      params: { mode },
+      responseType: "blob",
+      timeout: 60000,
+    }),
+
+  /** Updates a scheme's cover-page metadata (sector, trade, qualification, RQF level, etc.)
+   * independently of its weekly entries. */
+  updateCoverDetails: (
+    schemeId: number,
+    data: Partial<{
+      sector: string | null;
+      trade: string | null;
+      qualification_title: string | null;
+      rqf_level: string | null;
+      module_code: string | null;
+      learning_hours_per_week: number | null;
+      number_of_classes: number | null;
+      scheme_date: string | null;
+      approver_name: string | null;
+      approver_title: string | null;
+      trainer_signed: boolean;
+      approver_signed: boolean;
+    }>,
+  ) =>
+    apiService.put<{ success: boolean }>(
+      `/scheme-of-work/schemes/${schemeId}/cover-details`,
+      data,
+    ),
+
+  /** Manually sets/clears a single entry's Learning Outcome (competency) link -- for correcting
+   * AI/DOCX resolution that guessed wrong or left it unresolved. */
+  assignEntryCompetency: (entryId: number, competencyId: number | null) =>
+    apiService.post<{ success: boolean }>(
+      `/scheme-of-work/entries/${entryId}/assign-competency`,
+      { competency_id: competencyId },
+    ),
 };

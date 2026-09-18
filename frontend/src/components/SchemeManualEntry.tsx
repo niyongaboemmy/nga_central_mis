@@ -19,6 +19,7 @@ import {
   X,
 } from "lucide-react";
 import { schemeOfWorkApi } from "../api/schemeOfWork";
+import { competenciesApi, SubjectCompetency } from "../api/curriculum";
 import { useToast } from "../contexts/ToastContext";
 
 /* ─── Types ─────────────────────────────────────────────────────────── */
@@ -42,6 +43,12 @@ interface LOGroup {
   objective: string;  // Learning Outcome (LO) — shared across all rows in this group
   collapsed: boolean;
   rows: WeekRow[];
+  // Optional link to the subject's real Curriculum Learning Outcome (SubjectCompetency) — sets
+  // competency_id on every row in this group, which is what the PDF/report's "Competence code
+  // and name" grouping and total-duration display key on. Independent of the free-text
+  // `objective` above (kept as-is for backward compatibility / documents that just want a
+  // written LO title with no Curriculum link).
+  competency_id: number | null;
 }
 
 interface Props {
@@ -78,6 +85,7 @@ const emptyGroup = (loNum = 1): LOGroup => ({
   objective: `Learning outcome ${loNum}: `,
   collapsed: false,
   rows: [emptyWeek()],
+  competency_id: null,
 });
 
 function nextWorkweek(endDate: string): { start: string; end: string } {
@@ -169,6 +177,28 @@ const SchemeManualEntry: React.FC<Props> = ({
   const { showToast } = useToast();
 
   const [groups, setGroups] = useState<LOGroup[]>([emptyGroup(1)]);
+  // The subject's existing Curriculum Learning Outcomes, offered as an optional link per group —
+  // fetched once per subject, not re-fetched on every group add/remove.
+  const [subjectCompetencies, setSubjectCompetencies] = useState<SubjectCompetency[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    competenciesApi
+      .getAll(subjectId)
+      .then((resp) => {
+        if (!cancelled) {
+          setSubjectCompetencies(
+            [...(resp.data.data || [])].sort((a, b) => a.element_number - b.element_number),
+          );
+        }
+      })
+      .catch(() => {
+        /* non-fatal: LO linking simply won't be offered */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [subjectId]);
   const [saving, setSaving] = useState(false);
   const [savedCount, setSavedCount] = useState(0);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
@@ -222,6 +252,13 @@ const SchemeManualEntry: React.FC<Props> = ({
   const updateGroupLO = (gid: string, value: string) =>
     setGroups((prev) => prev.map((g) => g.id === gid ? { ...g, objective: value } : g));
 
+  const updateGroupCompetency = (gid: string, value: string) =>
+    setGroups((prev) =>
+      prev.map((g) =>
+        g.id === gid ? { ...g, competency_id: value ? parseInt(value, 10) : null } : g,
+      ),
+    );
+
   const toggleCollapse = (gid: string) =>
     setGroups((prev) => prev.map((g) => g.id === gid ? { ...g, collapsed: !g.collapsed } : g));
 
@@ -235,7 +272,7 @@ const SchemeManualEntry: React.FC<Props> = ({
     setGroups((prev) => [
       ...prev,
       { id: uid(), objective: `Learning outcome ${loNum}: `, collapsed: false,
-        rows: [emptyWeek(wn, sd, ed)] },
+        rows: [emptyWeek(wn, sd, ed)], competency_id: null },
     ]);
     setTimeout(() => bodyRef.current?.scrollTo({ top: bodyRef.current.scrollHeight, behavior: "smooth" }), 80);
   };
@@ -348,6 +385,7 @@ const SchemeManualEntry: React.FC<Props> = ({
             start_date: row.start_date,
             end_date: row.end_date,
             objective: g.objective,   // LO from group header
+            competency_id: g.competency_id,
             duration: row.duration,
             topic: row.topic,
             sub_topic: row.sub_topic,
@@ -552,6 +590,24 @@ const SchemeManualEntry: React.FC<Props> = ({
                   placeholder="e.g. Learning outcome 2: Draw a digital sketch"
                   className="flex-1 bg-transparent text-sm font-semibold text-white placeholder-gray-600 focus:outline-none border-b border-transparent focus:border-blue-500/60 transition-colors pb-0.5"
                 />
+
+                {/* Optional link to a real Curriculum Learning Outcome — sets competency_id on
+                    every week in this group, which the PDF/report groups and totals duration by. */}
+                {subjectCompetencies.length > 0 && (
+                  <select
+                    value={group.competency_id ?? ""}
+                    onChange={(e) => updateGroupCompetency(group.id, e.target.value)}
+                    title="Link this group to a Curriculum Learning Outcome (optional)"
+                    className="shrink-0 max-w-[220px] bg-[#0d1117] border border-white/10 rounded-lg text-xs text-gray-300 px-2 py-1.5 focus:outline-none focus:border-blue-500/60 transition-colors"
+                  >
+                    <option value="">Not linked to Curriculum</option>
+                    {subjectCompetencies.map((c) => (
+                      <option key={c.competency_id} value={c.competency_id}>
+                        LO {c.element_number}: {c.title}
+                      </option>
+                    ))}
+                  </select>
+                )}
 
                 <div className="flex items-center gap-1 shrink-0">
                   <span className="text-xs text-gray-600 mr-1">

@@ -30,6 +30,13 @@ export interface AISchemeJobState {
   /** Set when the subject already had Curriculum at generation time — criteria links were
    * resolved and saved immediately, no confirmation step needed. */
   autoTaggedCriteriaCount?: number;
+  /** Learning Outcome numbers the AI attached to each generated week, keyed by week_number. Only
+   * present when proposedCurriculum also is — resolved into SchemeOfWorkEntry.competency_id by
+   * the frontend via /schemes/:schemeId/link-criteria once the curriculum proposal is confirmed. */
+  entryLoNumbers?: Record<string, number>;
+  /** Set when the subject already had Curriculum at generation time — competency links were
+   * resolved and saved immediately, no confirmation step needed. */
+  autoTaggedCompetencyCount?: number;
 }
 
 // Step numbering is intentionally NOT derived from this static map when curriculum generation is

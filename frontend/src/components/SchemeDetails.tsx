@@ -33,13 +33,7 @@ import RealCalendarView from "./RealCalendarView";
 import LessonPlanPreviewModal from "./LessonPlanPreviewModal";
 import SchemeOfWorkPreviewModal from "./SchemeOfWorkPreviewModal";
 import SchemeReportPreviewModal from "./SchemeReportPreviewModal";
-import {
-  SchemeReportService,
-  ReportMetadata,
-} from "../services/SchemeReportService";
-import { useMetadata } from "../contexts/MetadataContext";
-import reportLogo1 from "../assets/report_image1.png";
-import reportLogo2 from "../assets/report_image2.png";
+import { SchemeReportService } from "../services/SchemeReportService";
 
 type ViewTab = "timeline" | "calendar";
 type StatusFilter = "all" | "complete" | "incomplete" | "missing";
@@ -48,7 +42,6 @@ const SchemeDetails: React.FC = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { showToast } = useToast();
-  const { years } = useMetadata();
 
   const subjectId = parseInt(searchParams.get("subject_id") || "0");
   const classGroupId = parseInt(searchParams.get("class_group_id") || "0");
@@ -60,6 +53,7 @@ const SchemeDetails: React.FC = () => {
 
   const [isPreviewReportOpen, setIsPreviewReportOpen] = useState(false);
   const [reportPdfUrl, setReportPdfUrl] = useState<string | null>(null);
+  const [isGeneratingReport, setIsGeneratingReport] = useState(false);
 
   const [entries, setEntries] = useState<SchemeEntry[]>([]);
   const [lessonPlans, setLessonPlans] = useState<Record<number, LessonPlan[]>>(
@@ -244,100 +238,43 @@ const SchemeDetails: React.FC = () => {
     if (userId) loadTeacherSubjects();
   };
 
-  const handlePreviewReport = () => {
-    if (entries.length === 0) {
+  const handlePreviewReport = async () => {
+    const schemeId = entries[0]?.scheme_id;
+    if (!schemeId) {
       showToast("No data to export", "warning");
       return;
     }
-
-    const currentYear =
-      years.find(
-        (y) =>
-          y.academic_year_id ===
-          (teacherSubjects[0]?.academic_year_id || academicTermId),
-      )?.name || "N/A";
-
-    const metadata: ReportMetadata = {
-      teacherName:
-        teacherName ||
-        (user?.profile?.first_name
-          ? `${user.profile.first_name} ${user.profile.last_name || ""}`
-          : user?.user?.username || "Instructor"),
-      subjectName,
-      subjectCode: teacherSubjects.find((s) => s.subject_id === subjectId)
-        ?.subject_code,
-      classGroupName:
-        teacherSubjects.find((s) => s.subject_id === subjectId)
-          ?.class_group_name || `Class #${classGroupId}`,
-      academicYear: currentYear,
-      academicTerm:
-        teacherSubjects.find((s) => s.subject_id === subjectId)
-          ?.academic_term_name || `Term #${academicTermId}`,
-      sector: "ICT",
-      trade: "Software Programming and Embedded Systems (SPEs)",
-      qualificationTitle: "Software Programming and Embedded Systems (SPE)",
-      rqfLevel: "Level 3",
-      learningHours: "Total: 130",
-      className: "Year One",
-      schoolName: "NIYONGABO ACADEMY",
-      moduleCode:
-        teacherSubjects.find((s) => s.subject_id === subjectId)?.subject_code ||
-        "",
-      logo1: reportLogo1,
-      logo2: reportLogo2,
-    };
-
-    const pdfUrl = SchemeReportService.generateSOWReportBlobUrl(
-      entries,
-      metadata,
-    );
-    setReportPdfUrl(pdfUrl);
-    setIsPreviewReportOpen(true);
+    try {
+      setIsGeneratingReport(true);
+      const pdfUrl = await SchemeReportService.getPreviewBlobUrl(schemeId);
+      setReportPdfUrl(pdfUrl);
+      setIsPreviewReportOpen(true);
+    } catch (error: any) {
+      showToast(
+        error.response?.data?.message || "Failed to generate PDF report",
+        "error",
+      );
+    } finally {
+      setIsGeneratingReport(false);
+    }
   };
 
-  const handleActualDownload = () => {
-    if (entries.length === 0) return;
-
-    const currentYear =
-      years.find(
-        (y) =>
-          y.academic_year_id ===
-          (teacherSubjects[0]?.academic_year_id || academicTermId),
-      )?.name || "N/A";
-
-    const metadata: ReportMetadata = {
-      teacherName:
-        teacherName ||
-        (user?.profile?.first_name
-          ? `${user.profile.first_name} ${user.profile.last_name || ""}`
-          : user?.user?.username || "Instructor"),
-      subjectName,
-      subjectCode: teacherSubjects.find((s) => s.subject_id === subjectId)
-        ?.subject_code,
-      classGroupName:
-        teacherSubjects.find((s) => s.subject_id === subjectId)
-          ?.class_group_name || `Class #${classGroupId}`,
-      academicYear: currentYear,
-      academicTerm:
-        teacherSubjects.find((s) => s.subject_id === subjectId)
-          ?.academic_term_name || `Term #${academicTermId}`,
-      sector: "ICT",
-      trade: "Software Programming and Embedded Systems (SPEs)",
-      qualificationTitle: "Software Programming and Embedded Systems (SPE)",
-      rqfLevel: "Level 3",
-      learningHours: "Total: 130",
-      className: "Year One",
-      schoolName: "NIYONGABO ACADEMY",
-      moduleCode:
-        teacherSubjects.find((s) => s.subject_id === subjectId)?.subject_code ||
-        "",
-      logo1: reportLogo1,
-      logo2: reportLogo2,
-    };
-
-    SchemeReportService.generateSOWReport(entries, metadata);
-    showToast("PDF Report downloaded", "success");
-    setIsPreviewReportOpen(false);
+  const handleActualDownload = async () => {
+    const schemeId = entries[0]?.scheme_id;
+    if (!schemeId) return;
+    try {
+      await SchemeReportService.downloadPdf(
+        schemeId,
+        `Scheme_of_Work_${subjectName || schemeId}`,
+      );
+      showToast("PDF Report downloaded", "success");
+      setIsPreviewReportOpen(false);
+    } catch (error: any) {
+      showToast(
+        error.response?.data?.message || "Failed to download PDF report",
+        "error",
+      );
+    }
   };
 
   const handleValidate = async (status: "APPROVED" | "REJECTED") => {
@@ -893,11 +830,12 @@ const SchemeDetails: React.FC = () => {
         {/* Download Button moved here */}
         <button
           onClick={handlePreviewReport}
-          className="flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/30 dark:hover:bg-blue-800/40 text-blue-600 dark:text-blue-400 text-xs font-semibold transition-all"
+          disabled={isGeneratingReport}
+          className="flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/30 dark:hover:bg-blue-800/40 text-blue-600 dark:text-blue-400 text-xs font-semibold transition-all disabled:opacity-60"
           title="Download PDF Report"
         >
           <Download className="w-3.5 h-3.5" />
-          Download PDF
+          {isGeneratingReport ? "Generating..." : "Download PDF"}
         </button>
       </div>
 

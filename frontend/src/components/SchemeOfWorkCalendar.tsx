@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
-import { schemeOfWorkApi, SchemeEntry } from "../api/schemeOfWork";
+import { schemeOfWorkApi, SchemeEntry, SchemeHeader } from "../api/schemeOfWork";
+import SchemeCoverDetailsModal from "./SchemeCoverDetailsModal";
 import { useToast } from "../contexts/ToastContext";
 import { lessonPlanApi, LessonPlan } from "../api/lessonPlan";
 import { getMyCalendar } from "../api/calendar";
@@ -16,13 +17,8 @@ import LessonPlanModal from "./LessonPlanModal";
 import LessonPlanPreviewModal from "./LessonPlanPreviewModal";
 import SchemeOfWorkPreviewModal from "./SchemeOfWorkPreviewModal";
 import SchemeReportPreviewModal from "./SchemeReportPreviewModal";
-import {
-  SchemeReportService,
-  ReportMetadata,
-} from "../services/SchemeReportService";
+import { SchemeReportService } from "../services/SchemeReportService";
 import { useUser } from "../contexts/UserContext";
-import reportLogo1 from "../assets/report_image1.png";
-import reportLogo2 from "../assets/report_image2.png";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Plus,
@@ -52,6 +48,7 @@ import {
   PenLine,
   Sparkles,
   ListChecks,
+  Settings2,
 } from "lucide-react";
 import SchemeManualEntry from "./SchemeManualEntry";
 import SchemeAIGenerate from "./SchemeAIGenerate";
@@ -65,6 +62,7 @@ const SchemeOfWorkCalendar: React.FC = () => {
   const { selectedYearId, selectedTermId } = useAcademicPeriod();
   const [isPreviewReportOpen, setIsPreviewReportOpen] = useState(false);
   const [reportPdfUrl, setReportPdfUrl] = useState<string | null>(null);
+  const [isGeneratingReport, setIsGeneratingReport] = useState(false);
 
   const subjectId = parseInt(searchParams.get("subject_id") || "0");
   const classGroupId = parseInt(searchParams.get("class_group_id") || "0");
@@ -101,11 +99,10 @@ const SchemeOfWorkCalendar: React.FC = () => {
     academicYearName: string;
     academicYearId: number | null;
   } | null>(null);
-  const [schemeMetadata, setSchemeMetadata] = useState<{
-    validation_status: "PENDING" | "APPROVED" | "REJECTED";
-    validation_comment: string | null;
-    scheme_id: number;
-  } | null>(null);
+  const [schemeMetadata, setSchemeMetadata] = useState<SchemeHeader | null>(
+    null,
+  );
+  const [isCoverModalOpen, setIsCoverModalOpen] = useState(false);
 
   const [activeTab, setActiveTab] = useState<"timeline" | "calendar">(
     "calendar",
@@ -333,52 +330,43 @@ const SchemeOfWorkCalendar: React.FC = () => {
     }
   };
 
-  const buildReportMetadata = (): ReportMetadata => {
-    // Use the year the scheme's own class group belongs to, not whichever
-    // year happens to be flagged "current" — a teacher can view/download a
-    // report for a past term, and it must not be mislabeled with this year.
-    const schemeYear = subjectInfo?.academicYearName || "N/A";
-
-    return {
-      teacherName: user?.profile?.first_name
-        ? `${user.profile.first_name} ${user.profile.last_name || ""}`
-        : user?.user?.username || "Instructor",
-      subjectName: subjectInfo?.name || "Subject",
-      subjectCode: subjectInfo?.code,
-      classGroupName: subjectInfo?.classGroupName || `Class #${classGroupId}`,
-      academicYear: schemeYear,
-      academicTerm: subjectInfo?.termName || `Term #${academicTermId}`,
-      sector: "ICT",
-      trade: "Software Programming and Embedded Systems (SPEs)",
-      qualificationTitle: "Software Programming and Embedded Systems (SPE)",
-      rqfLevel: "Level 3",
-      learningHours: "Total: 130",
-      className: "Year One",
-      schoolName: "NIYONGABO ACADEMY",
-      moduleCode: subjectInfo?.code || "",
-      logo1: reportLogo1,
-      logo2: reportLogo2,
-    };
-  };
-
-  const handlePreviewReport = () => {
-    if (entries.length === 0) {
+  const handlePreviewReport = async () => {
+    if (!schemeMetadata?.scheme_id) {
       showToast("No data to export", "warning");
       return;
     }
-    const pdfUrl = SchemeReportService.generateSOWReportBlobUrl(
-      entries,
-      buildReportMetadata(),
-    );
-    setReportPdfUrl(pdfUrl);
-    setIsPreviewReportOpen(true);
+    try {
+      setIsGeneratingReport(true);
+      const pdfUrl = await SchemeReportService.getPreviewBlobUrl(
+        schemeMetadata.scheme_id,
+      );
+      setReportPdfUrl(pdfUrl);
+      setIsPreviewReportOpen(true);
+    } catch (error: any) {
+      showToast(
+        error.response?.data?.message || "Failed to generate PDF report",
+        "error",
+      );
+    } finally {
+      setIsGeneratingReport(false);
+    }
   };
 
-  const handleActualDownload = () => {
-    if (entries.length === 0) return;
-    SchemeReportService.generateSOWReport(entries, buildReportMetadata());
-    showToast("PDF Report downloaded", "success");
-    setIsPreviewReportOpen(false);
+  const handleActualDownload = async () => {
+    if (!schemeMetadata?.scheme_id) return;
+    try {
+      await SchemeReportService.downloadPdf(
+        schemeMetadata.scheme_id,
+        `Scheme_of_Work_${subjectInfo?.name || schemeMetadata.scheme_id}`,
+      );
+      showToast("PDF Report downloaded", "success");
+      setIsPreviewReportOpen(false);
+    } catch (error: any) {
+      showToast(
+        error.response?.data?.message || "Failed to download PDF report",
+        "error",
+      );
+    }
   };
 
   const handleSaveEntry = async (
@@ -1218,10 +1206,25 @@ const SchemeOfWorkCalendar: React.FC = () => {
               {/* Download PDF Action */}
               <button
                 onClick={handlePreviewReport}
-                className="hidden sm:flex items-center gap-2 px-3 py-2 text-sm font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800/50 rounded-full hover:bg-blue-100 dark:hover:bg-blue-800/40 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-blue-500 transition-all shadow-sm"
+                disabled={isGeneratingReport}
+                className="hidden sm:flex items-center gap-2 px-3 py-2 text-sm font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800/50 rounded-full hover:bg-blue-100 dark:hover:bg-blue-800/40 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-blue-500 transition-all shadow-sm disabled:opacity-60"
               >
-                <Download className="w-4 h-4" />
-                <span>Download PDF</span>
+                {isGeneratingReport ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Download className="w-4 h-4" />
+                )}
+                <span>{isGeneratingReport ? "Generating..." : "Download PDF"}</span>
+              </button>
+
+              {/* Cover Page details — sector/trade/qualification/etc. shown on the printed PDF */}
+              <button
+                onClick={() => setIsCoverModalOpen(true)}
+                title="Edit cover page details (sector, trade, qualification, approver, etc.)"
+                className="hidden sm:flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-gray-400 transition-all shadow-sm"
+              >
+                <Settings2 className="w-4 h-4" />
+                <span>Cover Page</span>
               </button>
 
               {/* Bulk AI Criteria Matching — for schemes/curricula that already existed before
@@ -1566,6 +1569,16 @@ const SchemeOfWorkCalendar: React.FC = () => {
           pdfUrl={reportPdfUrl}
           onDownload={handleActualDownload}
         />
+
+        {schemeMetadata && (
+          <SchemeCoverDetailsModal
+            isOpen={isCoverModalOpen}
+            onClose={() => setIsCoverModalOpen(false)}
+            schemeId={schemeMetadata.scheme_id}
+            scheme={schemeMetadata}
+            onSaved={loadData}
+          />
+        )}
 
         <ConfirmModal
           isOpen={isDeleteSchemeConfirmOpen}

@@ -11,6 +11,9 @@ import {
   deleteScheme,
   getAllTeachersSchemeOfWork,
   validateScheme,
+  assignEntryCompetency,
+  updateSchemeCoverDetails,
+  getSchemePdf,
 } from "../controllers/schemeOfWorkController";
 import {
   startAIGeneration,
@@ -95,8 +98,17 @@ router.post("/schemes/:schemeId/bulk-suggest-criteria", bulkSuggestCriteria);
 // the teacher can start over from the 3-option chooser
 router.delete("/schemes/:schemeId", deleteScheme);
 
+// Update a scheme's cover-page metadata (sector, trade, qualification, RQF level, etc.)
+router.put("/schemes/:schemeId/cover-details", updateSchemeCoverDetails);
+
+// Render/download the Scheme of Work PDF (?mode=preview|download)
+router.get("/schemes/:schemeId/pdf", getSchemePdf);
+
 // Update a single scheme entry
 router.patch("/entries/:id", updateSchemeEntry);
+
+// Manually set/clear a single entry's Learning Outcome (competency) link
+router.post("/entries/:id/assign-competency", assignEntryCompetency);
 
 // Delete a single scheme entry
 router.delete("/entries/:id", deleteSchemeEntry);
