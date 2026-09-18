@@ -52,13 +52,17 @@ export interface SchemeHeader {
   created_at: string;
   validation_status: "PENDING" | "APPROVED" | "REJECTED";
   validation_comment?: string | null;
+  // Read-only on this endpoint -- derived from School (sector/trade/qualification_title),
+  // Subject (rqf_level/learning_hours), and the subject's actual class-group assignments for the
+  // scheme's academic year (number_of_classes). Edit them via School/Subject settings instead of
+  // the scheme's own Cover Page editor.
   sector: string | null;
   trade: string | null;
   qualification_title: string | null;
   rqf_level: string | null;
+  learning_hours: string | null;
+  number_of_classes: number;
   module_code: string | null;
-  learning_hours_per_week: number | null;
-  number_of_classes: number | null;
   scheme_date: string | null;
   approver_name: string | null;
   approver_title: string | null;
@@ -330,18 +334,14 @@ export const schemeOfWorkApi = {
       timeout: 60000,
     }),
 
-  /** Updates a scheme's cover-page metadata (sector, trade, qualification, RQF level, etc.)
-   * independently of its weekly entries. */
+  /** Updates a scheme's own cover-page metadata (module code, date, approver, signatures)
+   * independently of its weekly entries. Sector/Trade/Qualification and RQF Level/Learning Hours
+   * are no longer set here -- edit them via School/Subject settings instead (see
+   * schoolApi.updateSchool / academicsApi's subject update). */
   updateCoverDetails: (
     schemeId: number,
     data: Partial<{
-      sector: string | null;
-      trade: string | null;
-      qualification_title: string | null;
-      rqf_level: string | null;
       module_code: string | null;
-      learning_hours_per_week: number | null;
-      number_of_classes: number | null;
       scheme_date: string | null;
       approver_name: string | null;
       approver_title: string | null;

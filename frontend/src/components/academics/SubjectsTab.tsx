@@ -52,6 +52,8 @@ interface SubjectFormData {
   course_category_id: number | null;
   max_marks: number | null;
   color: string;
+  rqf_level: string;
+  learning_hours: string;
 }
 
 interface GradeAssignment {
@@ -190,6 +192,27 @@ const SubjectDetailsForm: React.FC<{
       }
       placeholder="e.g., 100"
     />
+
+    <Input
+      label="RQF Level"
+      value={formData.rqf_level}
+      onChange={(e) =>
+        setFormData((prev) => ({ ...prev, rqf_level: e.target.value }))
+      }
+      placeholder="e.g., Level 3"
+    />
+
+    <Input
+      label="Learning Hours"
+      value={formData.learning_hours}
+      onChange={(e) =>
+        setFormData((prev) => ({ ...prev, learning_hours: e.target.value }))
+      }
+      placeholder="e.g., 5 (4 taught and 1 in self-study) per week"
+    />
+    <p className="text-xs text-text-secondary-light dark:text-text-secondary-dark/70 -mt-2">
+      RQF Level and Learning Hours appear on this subject's Scheme of Work printed cover page.
+    </p>
 
     <div className="space-y-1.5">
       <label className="block text-sm font-medium text-text-primary-light dark:text-text-primary-dark">
@@ -470,6 +493,8 @@ const SubjectsTab: React.FC<SubjectsTabProps> = ({
     course_category_id: null,
     max_marks: null,
     color: "#3B82F6",
+    rqf_level: "",
+    learning_hours: "",
   });
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
@@ -508,6 +533,8 @@ const SubjectsTab: React.FC<SubjectsTabProps> = ({
       course_category_id: null,
       max_marks: null,
       color: "#3B82F6",
+      rqf_level: "",
+      learning_hours: "",
     });
     setFormErrors({});
     setSubmitError(null);
@@ -644,6 +671,8 @@ const SubjectsTab: React.FC<SubjectsTabProps> = ({
           course_category_id: formData.course_category_id,
           max_marks: formData.max_marks,
           color: formData.color,
+          rqf_level: formData.rqf_level.trim() || null,
+          learning_hours: formData.learning_hours.trim() || null,
           grades: undefined,
           category_name: undefined,
         };
@@ -725,6 +754,8 @@ const SubjectsTab: React.FC<SubjectsTabProps> = ({
       course_category_id: subject.course_category_id,
       max_marks: subject.max_marks,
       color: subject.color || "#3B82F6",
+      rqf_level: subject.rqf_level || "",
+      learning_hours: subject.learning_hours || "",
     });
     setCurrentStep(1);
     setShowEditModal(true);
@@ -751,6 +782,8 @@ const SubjectsTab: React.FC<SubjectsTabProps> = ({
           course_category_id: formData.course_category_id,
           max_marks: formData.max_marks,
           color: formData.color,
+          rqf_level: formData.rqf_level.trim() || null,
+          learning_hours: formData.learning_hours.trim() || null,
         });
 
         // Handle grade assignment - assign/remove based on selections

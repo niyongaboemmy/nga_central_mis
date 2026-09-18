@@ -1,4 +1,4 @@
-import api from "../services/api";
+import api, { API_BASE_URL } from "../services/api";
 
 export interface School {
   school_id: number;
@@ -8,10 +8,37 @@ export interface School {
   contact_email?: string;
   contact_phone?: string;
   logo?: string;
+  partner_logo?: string;
+  // Scheme of Work PDF cover-page fields, shared by every scheme this school produces.
+  sector?: string;
+  trade?: string;
+  qualification_title?: string;
   status: "ACTIVE" | "INACTIVE" | "SUSPENDED";
   created_at?: string;
   updated_at?: string;
 }
+
+/** Public, unauthenticated image URL for a school's logo -- safe to use directly in <img src>.
+ * Appends a cache-busting param since a re-upload keeps the same URL shape otherwise. */
+export const getSchoolLogoUrl = (
+  schoolId: number,
+  slot: "primary" | "partner" = "primary",
+  cacheBust?: string | number,
+): string =>
+  `${API_BASE_URL}/schools/${schoolId}/logo/${slot}${cacheBust ? `?t=${cacheBust}` : ""}`;
+
+export const uploadSchoolLogo = async (
+  schoolId: number,
+  file: File,
+  slot: "primary" | "partner" = "primary",
+): Promise<void> => {
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("slot", slot);
+  await api.post(`/schools/${schoolId}/logo`, formData, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+};
 
 export const getSchools = async (
   onSuccess?: (schools: School[]) => void,

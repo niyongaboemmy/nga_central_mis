@@ -11,6 +11,7 @@ import {
   UserProfile,
   SubjectCompetency,
   School,
+  TeacherSubjectAssignment,
 } from "../db/schema";
 import storageService from "../utils/fileServer";
 import { NotFoundError } from "../errors/CustomError";
@@ -140,13 +141,8 @@ async function buildReportData(schemeId: number) {
       scheme_id: SchemeOfWork.scheme_id,
       subject_id: SchemeOfWork.subject_id,
       user_id: SchemeOfWork.user_id,
-      sector: SchemeOfWork.sector,
-      trade: SchemeOfWork.trade,
-      qualification_title: SchemeOfWork.qualification_title,
-      rqf_level: SchemeOfWork.rqf_level,
+      academic_year_id: AcademicTerm.academic_year_id,
       module_code: SchemeOfWork.module_code,
-      learning_hours_per_week: SchemeOfWork.learning_hours_per_week,
-      number_of_classes: SchemeOfWork.number_of_classes,
       scheme_date: SchemeOfWork.scheme_date,
       approver_name: SchemeOfWork.approver_name,
       approver_title: SchemeOfWork.approver_title,
@@ -154,6 +150,10 @@ async function buildReportData(schemeId: number) {
       approver_signed: SchemeOfWork.approver_signed,
       subject_name: Subject.name,
       subject_code: Subject.code,
+      // RQF Level and Learning Hours are Subject-level facts (shared by every scheme of this
+      // subject), not re-entered per scheme -- see migration 079.
+      rqf_level: Subject.rqf_level,
+      learning_hours: Subject.learning_hours,
       class_group_name: ClassGroup.name,
       term_name: AcademicTerm.name,
       year_name: AcademicYear.name,
@@ -173,7 +173,25 @@ async function buildReportData(schemeId: number) {
     throw new NotFoundError("Scheme of work not found");
   }
 
+  // Sector/Trade/Qualification Title are School-level facts (shared by every scheme this school
+  // produces) -- see migration 079. This app is single-tenant (one School row); if that ever
+  // changes, this needs to resolve the scheme's actual owning school instead of "the first one".
   const [school] = await db.select().from(School).limit(1);
+
+  // "Number of Classes" is derived, not stored: every class group this subject is actually
+  // being taught to in the scheme's academic year, via TeacherSubjectAssignment.
+  const classGroupRows = scheme.academic_year_id
+    ? await db
+        .selectDistinct({ class_group_id: TeacherSubjectAssignment.class_group_id })
+        .from(TeacherSubjectAssignment)
+        .where(
+          and(
+            eq(TeacherSubjectAssignment.subject_id, scheme.subject_id),
+            eq(TeacherSubjectAssignment.academic_year_id, scheme.academic_year_id),
+          ),
+        )
+    : [];
+  const numberOfClasses = classGroupRows.length;
 
   const rawEntries = await db
     .select()
@@ -227,11 +245,13 @@ async function buildReportData(schemeId: number) {
     });
   }
 
-  return { scheme, school, rows };
+  return { scheme, school, rows, numberOfClasses };
 }
 
 const buildHtml = (
   scheme: Awaited<ReturnType<typeof buildReportData>>["scheme"],
+  school: Awaited<ReturnType<typeof buildReportData>>["school"],
+  numberOfClasses: number,
   logo1: string | null,
   logo2: string | null,
   rows: SchemeReportRow[],
@@ -325,13 +345,13 @@ const buildHtml = (
     <div class="cover-subject">${escapeHtml(subjectLabel)}</div>
 
     <table class="detail-table">
-      ${detailRow("Sector", scheme.sector || "", "Trainer", trainerName)}
-      ${detailRow("Trade", scheme.trade || "", "School Year", scheme.year_name || "")}
-      ${detailRow("Qualification Title", scheme.qualification_title || "", "Term", scheme.term_name || "")}
+      ${detailRow("Sector", school?.sector || "", "Trainer", trainerName)}
+      ${detailRow("Trade", school?.trade || "", "School Year", scheme.year_name || "")}
+      ${detailRow("Qualification Title", school?.qualification_title || "", "Term", scheme.term_name || "")}
       <tr class="module-divider"><td colspan="4">Module details</td></tr>
       ${detailRow("RQF Level", scheme.rqf_level || "", "Module code and title", `${scheme.module_code || ""} ${scheme.module_code && scheme.subject_name ? "-" : ""} ${scheme.subject_name || ""}`.trim())}
-      ${detailRow("Learning hours", scheme.learning_hours_per_week ? `${scheme.learning_hours_per_week} hrs/week` : "", "Date", fmtDate(scheme.scheme_date))}
-      ${detailRow("Number of Classes", scheme.number_of_classes != null ? String(scheme.number_of_classes) : "", "Class Name", scheme.class_group_name || "")}
+      ${detailRow("Learning hours", scheme.learning_hours || "", "Date", fmtDate(scheme.scheme_date))}
+      ${detailRow("Number of Classes", String(numberOfClasses), "Class Name", scheme.class_group_name || "")}
     </table>
 
     <div class="signatures">
@@ -398,11 +418,11 @@ async function printHtmlToPdf(html: string): Promise<Buffer> {
  * both the preview (streamed inline) and download endpoints, so preview and export are always
  * pixel-identical -- there is exactly one renderer. */
 export async function renderSchemeOfWorkPdf(schemeId: number): Promise<Buffer> {
-  const { scheme, school, rows } = await buildReportData(schemeId);
+  const { scheme, school, rows, numberOfClasses } = await buildReportData(schemeId);
   const [logo1, logo2] = await Promise.all([
     resolveLogoSrc(school?.logo),
     resolveLogoSrc(school?.partner_logo),
   ]);
-  const html = buildHtml(scheme, logo1, logo2, rows);
+  const html = buildHtml(scheme, school, numberOfClasses, logo1, logo2, rows);
   return printHtmlToPdf(html);
 }

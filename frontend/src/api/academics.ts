@@ -41,6 +41,9 @@ export interface Subject {
   category_name?: string;
   max_marks: number | null;
   color?: string;
+  // Scheme of Work PDF cover-page fields, shared by every scheme of this subject.
+  rqf_level?: string | null;
+  learning_hours?: string | null;
   grades?: Array<{
     grade_id: number;
     grade_name: string;

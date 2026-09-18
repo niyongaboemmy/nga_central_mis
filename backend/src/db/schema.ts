@@ -215,6 +215,10 @@ export const Subject = mysqlTable("Subject", {
   max_marks: int("max_marks"),
   color: varchar("color", { length: 7 }).default("#3B82F6"),
   status: mysqlEnum("status", ["ACTIVE", "DISABLED"]).default("ACTIVE"),
+  // RTB/TVET report fields (migration 079) -- shown on the Scheme of Work PDF's cover page,
+  // shared by every scheme of this subject rather than re-entered per scheme.
+  rqf_level: varchar("rqf_level", { length: 50 }),
+  learning_hours: varchar("learning_hours", { length: 100 }),
 });
 
 // GradeSubject junction table
@@ -632,6 +636,11 @@ export const School = mysqlTable("School", {
   // -- migration 078. `logo` is the primary/left mark, this is the
   // secondary/right one (partner programme, etc.).
   partner_logo: varchar("partner_logo", { length: 500 }),
+  // Report/PDF cover-page fields (migration 079) -- Sector/Trade/Qualification are the same for
+  // every scheme this school produces, so they live here rather than being re-entered per scheme.
+  sector: varchar("sector", { length: 100 }),
+  trade: varchar("trade", { length: 150 }),
+  qualification_title: varchar("qualification_title", { length: 255 }),
   status: mysqlEnum("status", ["ACTIVE", "INACTIVE", "SUSPENDED"]).default(
     "ACTIVE",
   ),

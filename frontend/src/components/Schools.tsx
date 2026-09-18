@@ -25,6 +25,8 @@ import {
   createSchool,
   updateSchool,
   deleteSchool,
+  uploadSchoolLogo,
+  getSchoolLogoUrl,
   School,
 } from "../api/schools";
 import {
@@ -88,7 +90,7 @@ const SchoolCard = ({
           <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500 to-blue-500 flex items-center justify-center shrink-0 shadow-lg shadow-blue-500/20 text-white text-xl font-bold">
             {school.logo ? (
               <img
-                src={school.logo}
+                src={getSchoolLogoUrl(school.school_id, "primary")}
                 alt={school.name}
                 className="w-full h-full object-cover rounded-2xl"
               />
@@ -583,9 +585,16 @@ const SchoolModal = ({
     contact_email: "",
     contact_phone: "",
     logo: "",
+    sector: "",
+    trade: "",
+    qualification_title: "",
     status: "ACTIVE",
   });
   const [loading, setLoading] = useState(false);
+  const [uploadingSlot, setUploadingSlot] = useState<"primary" | "partner" | null>(null);
+  // Bumps whenever a logo is (re)uploaded so the <img> cache-busts instead of showing the old
+  // file at the same URL.
+  const [logoVersion, setLogoVersion] = useState(0);
   const { showToast } = useToast();
 
   useEffect(() => {
@@ -599,9 +608,13 @@ const SchoolModal = ({
         contact_email: "",
         contact_phone: "",
         logo: "",
+        sector: "",
+        trade: "",
+        qualification_title: "",
         status: "ACTIVE",
       });
     }
+    setLogoVersion(0);
   }, [school, isOpen]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -624,6 +637,23 @@ const SchoolModal = ({
       );
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleLogoFile = async (slot: "primary" | "partner", file: File | null) => {
+    if (!file || !school) return;
+    setUploadingSlot(slot);
+    try {
+      await uploadSchoolLogo(school.school_id, file, slot);
+      setLogoVersion((v) => v + 1);
+      showToast(`${slot === "primary" ? "Logo" : "Partner logo"} uploaded`, "success");
+    } catch (error: any) {
+      showToast(
+        error.response?.data?.message || "Failed to upload logo",
+        "error",
+      );
+    } finally {
+      setUploadingSlot(null);
     }
   };
 
@@ -686,19 +716,103 @@ const SchoolModal = ({
             </p>
           </div>
 
-          <div className="col-span-2">
+          <div className="col-span-2 grid grid-cols-2 gap-5">
+            {(["primary", "partner"] as const).map((slot) => (
+              <div key={slot}>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 ml-1">
+                  {slot === "primary" ? "Logo" : "Partner Logo"}
+                  <span className="text-gray-400 font-normal ml-1">
+                    {slot === "primary"
+                      ? "(cover page, left)"
+                      : "(cover page, right)"}
+                  </span>
+                </label>
+                <div className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-slate-900/50 border border-gray-200 dark:border-slate-700/30 rounded-xl">
+                  <div className="w-14 h-14 rounded-lg bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 flex items-center justify-center overflow-hidden shrink-0">
+                    {school &&
+                    (slot === "primary" ? formData.logo : formData.partner_logo) ? (
+                      <img
+                        src={getSchoolLogoUrl(school.school_id, slot, logoVersion || undefined)}
+                        alt={`${slot} logo`}
+                        className="w-full h-full object-contain"
+                      />
+                    ) : (
+                      <Building className="w-6 h-6 text-gray-300" />
+                    )}
+                  </div>
+                  <label className="flex-1 min-w-0">
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 rounded-full cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors">
+                      {uploadingSlot === slot ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : null}
+                      {!school
+                        ? "Save school first"
+                        : uploadingSlot === slot
+                          ? "Uploading..."
+                          : "Upload image"}
+                    </span>
+                    <input
+                      type="file"
+                      accept="image/png,image/jpeg,image/svg+xml,image/webp"
+                      disabled={!school || uploadingSlot !== null}
+                      onChange={(e) =>
+                        handleLogoFile(slot, e.target.files?.[0] || null)
+                      }
+                      className="hidden"
+                    />
+                  </label>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 ml-1">
-              Logo URL
+              Sector
             </label>
             <input
-              type="url"
-              value={formData.logo || ""}
+              type="text"
+              value={formData.sector || ""}
               onChange={(e) =>
-                setFormData({ ...formData, logo: e.target.value })
+                setFormData({ ...formData, sector: e.target.value })
               }
               className="w-full px-4 py-3 bg-gray-50 dark:bg-slate-900/50 border border-gray-200 dark:border-slate-700/30 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all dark:text-white placeholder:text-gray-400"
-              placeholder="https://..."
+              placeholder="e.g. ICT and Multimedia"
             />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 ml-1">
+              Trade
+            </label>
+            <input
+              type="text"
+              value={formData.trade || ""}
+              onChange={(e) =>
+                setFormData({ ...formData, trade: e.target.value })
+              }
+              className="w-full px-4 py-3 bg-gray-50 dark:bg-slate-900/50 border border-gray-200 dark:border-slate-700/30 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all dark:text-white placeholder:text-gray-400"
+              placeholder="e.g. Software Programming and Embedded Systems"
+            />
+          </div>
+
+          <div className="col-span-2">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 ml-1">
+              Qualification Title
+            </label>
+            <input
+              type="text"
+              value={formData.qualification_title || ""}
+              onChange={(e) =>
+                setFormData({ ...formData, qualification_title: e.target.value })
+              }
+              className="w-full px-4 py-3 bg-gray-50 dark:bg-slate-900/50 border border-gray-200 dark:border-slate-700/30 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all dark:text-white placeholder:text-gray-400"
+              placeholder="e.g. TVET Certificate 3 in Software Programming and Embedded Systems"
+            />
+            <p className="text-xs text-gray-400 mt-1 ml-1">
+              Sector, Trade, and Qualification Title appear on every Scheme of Work's printed
+              cover page.
+            </p>
           </div>
 
           <div>

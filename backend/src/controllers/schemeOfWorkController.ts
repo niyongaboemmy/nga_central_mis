@@ -16,6 +16,7 @@ import {
   Program,
   AcademicYear,
   LO_Lesson,
+  School,
 } from "../db/schema";
 import { asyncHandler } from "../middleware/asyncHandler";
 import { successResponse } from "../utils/response";
@@ -596,14 +597,10 @@ export const getSchemeEntries = asyncHandler(async (req: any, res: any) => {
       created_at: SchemeOfWork.created_at,
       validation_status: SchemeOfWork.validation_status,
       validation_comment: SchemeOfWork.validation_comment,
-      // Cover-page fields (migration 077) -- see updateSchemeCoverDetails below
-      sector: SchemeOfWork.sector,
-      trade: SchemeOfWork.trade,
-      qualification_title: SchemeOfWork.qualification_title,
-      rqf_level: SchemeOfWork.rqf_level,
+      // Cover-page fields (migration 077) that remain per-scheme -- see updateSchemeCoverDetails
+      // below. Sector/Trade/Qualification (School-level) and RQF Level/Learning Hours
+      // (Subject-level) are read from their real owning entities instead (migration 079).
       module_code: SchemeOfWork.module_code,
-      learning_hours_per_week: SchemeOfWork.learning_hours_per_week,
-      number_of_classes: SchemeOfWork.number_of_classes,
       scheme_date: SchemeOfWork.scheme_date,
       approver_name: SchemeOfWork.approver_name,
       approver_title: SchemeOfWork.approver_title,
@@ -612,8 +609,11 @@ export const getSchemeEntries = asyncHandler(async (req: any, res: any) => {
       // Joined names
       subject_name: Subject.name,
       subject_code: Subject.code,
+      rqf_level: Subject.rqf_level,
+      learning_hours: Subject.learning_hours,
       class_group_name: ClassGroup.name,
       academic_term_name: AcademicTerm.name,
+      academic_year_id: AcademicTerm.academic_year_id,
       academic_year_name: AcademicYear.name,
       teacher_name: sql<string>`CONCAT(${UserProfile.first_name}, ' ', ${UserProfile.last_name})`,
     })
@@ -691,8 +691,29 @@ export const getSchemeEntries = asyncHandler(async (req: any, res: any) => {
     competency: entry.competency_id ? competencyById.get(entry.competency_id) || null : null,
   }));
 
+  const [school] = await db.select().from(School).limit(1);
+
+  const schemeHeader = schemeWithNames[0];
+  const classGroupRows = schemeHeader.academic_year_id
+    ? await db
+        .selectDistinct({ class_group_id: TeacherSubjectAssignment.class_group_id })
+        .from(TeacherSubjectAssignment)
+        .where(
+          and(
+            eq(TeacherSubjectAssignment.subject_id, schemeHeader.subject_id),
+            eq(TeacherSubjectAssignment.academic_year_id, schemeHeader.academic_year_id),
+          ),
+        )
+    : [];
+
   successResponse(res, "Scheme entries retrieved successfully", {
-    scheme: schemeWithNames[0],
+    scheme: {
+      ...schemeHeader,
+      sector: school?.sector ?? null,
+      trade: school?.trade ?? null,
+      qualification_title: school?.qualification_title ?? null,
+      number_of_classes: classGroupRows.length,
+    },
     entries: entriesWithCriteria,
   });
 });
@@ -1170,14 +1191,12 @@ export const assignEntryCompetency = asyncHandler(async (req: any, res: any) => 
   successResponse(res, "Entry competency updated");
 });
 
+// Sector/Trade/Qualification Title (School-level) and RQF Level/Learning Hours (Subject-level)
+// are no longer edited per scheme -- see migration 079 -- so they're deliberately absent here.
+// "Number of Classes" was never a stored field; it's derived at PDF-render time from the class
+// groups this subject is actually taught to in the scheme's academic year.
 const COVER_DETAIL_FIELDS = [
-  "sector",
-  "trade",
-  "qualification_title",
-  "rqf_level",
   "module_code",
-  "learning_hours_per_week",
-  "number_of_classes",
   "scheme_date",
   "approver_name",
   "approver_title",

@@ -7,6 +7,7 @@ import {
   updateSchool,
   deleteSchool,
   uploadSchoolLogo,
+  getSchoolLogo,
 } from "../controllers/schoolController";
 import { authenticate, authorize } from "../middleware/auth";
 import { Permissions } from "../utils/permissions";
@@ -57,6 +58,10 @@ router.post(
   uploadLogo.single("file"),
   uploadSchoolLogo,
 );
+// Public image proxy (no auth) so a plain <img src> can load it -- logos are institutional
+// branding, not sensitive data. Registered before the authenticated ":id" routes above only
+// matters for path specificity, which Express already resolves correctly by method+pattern.
+router.get("/:id/logo/:slot", getSchoolLogo);
 router.delete(
   "/:id",
   authenticate,

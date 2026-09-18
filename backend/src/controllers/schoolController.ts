@@ -7,8 +7,17 @@ import storageService from "../utils/fileServer";
 
 export const createSchool = async (req: Request, res: Response) => {
   try {
-    const { name, school_code, address, contact_email, contact_phone, logo } =
-      req.body;
+    const {
+      name,
+      school_code,
+      address,
+      contact_email,
+      contact_phone,
+      logo,
+      sector,
+      trade,
+      qualification_title,
+    } = req.body;
 
     const existingSchool = await db
       .select()
@@ -40,6 +49,9 @@ export const createSchool = async (req: Request, res: Response) => {
       contact_email,
       contact_phone,
       logo,
+      sector: sector || null,
+      trade: trade || null,
+      qualification_title: qualification_title || null,
     });
 
     res.status(201).json({ message: "School created successfully" });
@@ -89,6 +101,9 @@ export const updateSchool = async (req: Request, res: Response) => {
       contact_phone,
       logo,
       status,
+      sector,
+      trade,
+      qualification_title,
     } = req.body;
 
     const existingSchool = await db
@@ -136,6 +151,10 @@ export const updateSchool = async (req: Request, res: Response) => {
         contact_phone,
         logo,
         status,
+        sector: sector !== undefined ? sector || null : undefined,
+        trade: trade !== undefined ? trade || null : undefined,
+        qualification_title:
+          qualification_title !== undefined ? qualification_title || null : undefined,
       })
       .where(eq(School.school_id, Number(id)));
 
@@ -184,6 +203,58 @@ export const uploadSchoolLogo = async (req: Request & { file?: Express.Multer.Fi
     res.status(200).json({ message: "Logo uploaded successfully", path: remotePath, slot });
   } catch (error) {
     console.error("Error uploading school logo:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+/**
+ * Public (unauthenticated) image proxy for a school's logo -- lets a plain <img src> tag load it
+ * directly (the admin form preview, or anywhere else in the app) without needing to attach a
+ * bearer token. Logos are institutional branding, not sensitive data. Streams the bytes from the
+ * file-server for a stored remote path; redirects straight through for a plain http(s) URL (the
+ * shape School.logo/partner_logo had before the upload endpoint existed).
+ */
+export const getSchoolLogo = async (req: Request, res: Response) => {
+  try {
+    const { id, slot } = req.params;
+    if (slot !== "primary" && slot !== "partner") {
+      return res.status(400).json({ message: "slot must be 'primary' or 'partner'" });
+    }
+
+    const [school] = await db
+      .select()
+      .from(School)
+      .where(eq(School.school_id, Number(id)));
+
+    if (!school) {
+      return res.status(404).json({ message: "School not found" });
+    }
+
+    const value = slot === "partner" ? school.partner_logo : school.logo;
+    if (!value) {
+      return res.status(404).json({ message: "No logo set for this slot" });
+    }
+
+    if (/^https?:\/\//i.test(value)) {
+      return res.redirect(value);
+    }
+
+    const ext = path.extname(value).toLowerCase();
+    const mime =
+      ext === ".jpg" || ext === ".jpeg"
+        ? "image/jpeg"
+        : ext === ".svg"
+          ? "image/svg+xml"
+          : ext === ".webp"
+            ? "image/webp"
+            : "image/png";
+
+    const buffer = await storageService.downloadToBuffer(value);
+    res.setHeader("Content-Type", mime);
+    res.setHeader("Cache-Control", "public, max-age=300");
+    res.send(buffer);
+  } catch (error) {
+    console.error("Error serving school logo:", error);
     res.status(500).json({ message: "Internal server error" });
   }
 };
