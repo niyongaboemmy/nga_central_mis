@@ -1,4 +1,5 @@
-import puppeteer from "puppeteer";
+/// <reference lib="dom" />
+import puppeteer, { Browser } from "puppeteer";
 import { db } from "../db";
 import { eq, and, inArray } from "drizzle-orm";
 import {
@@ -148,11 +149,10 @@ export interface SchemeReportRow {
   learning_place: string | null;
   observation: string | null;
   entry_status: string;
+  competencyId: number | null;
   competencyTitle: string | null;
   competencyElementNumber: number | null;
   competencyHours: number | null;
-  rowSpan: number;
-  isGroupStart: boolean;
 }
 
 async function buildReportData(schemeId: number) {
@@ -230,22 +230,13 @@ async function buildReportData(schemeId: number) {
     : [];
   const competencyById = new Map(competencies.map((c) => [c.competency_id, c]));
 
-  // Group consecutive rows sharing the same competency_id under one rowspan, matching the
-  // template's "Competence code and name" grouping -- the same rowspan-merge idea the old
-  // client-side jsPDF renderer implemented for rendering, now driven by a real FK instead of
-  // fragile string-equality on free-text fields.
-  const rows: SchemeReportRow[] = [];
-  for (let i = 0; i < rawEntries.length; i++) {
-    const e = rawEntries[i];
+  // Grouping consecutive rows sharing the same competency_id under one rowspan (the template's
+  // "Competence code and name" merge) happens later, in planPagination -- it has to be aware of
+  // where page breaks will actually fall, since a rowspan cell can't be split across a PDF page
+  // break (see the comment on planPagination for the full story).
+  const rows: SchemeReportRow[] = rawEntries.map((e) => {
     const competency = e.competency_id ? competencyById.get(e.competency_id) : undefined;
-    const isGroupStart = i === 0 || rawEntries[i - 1].competency_id !== e.competency_id;
-    let rowSpan = 1;
-    if (isGroupStart) {
-      for (let j = i + 1; j < rawEntries.length && rawEntries[j].competency_id === e.competency_id; j++) {
-        rowSpan++;
-      }
-    }
-    rows.push({
+    return {
       entry_id: e.entry_id,
       week_number: e.week_number,
       start_date: e.start_date,
@@ -257,83 +248,31 @@ async function buildReportData(schemeId: number) {
       learning_place: e.learning_place,
       observation: e.observation,
       entry_status: e.entry_status,
+      competencyId: e.competency_id,
       competencyTitle: competency?.title ?? null,
       competencyElementNumber: competency?.element_number ?? null,
       competencyHours: competency?.learning_hours ?? null,
-      rowSpan,
-      isGroupStart,
-    });
-  }
+    };
+  });
 
   return { scheme, school, rows, numberOfClasses };
 }
 
-const buildHtml = (
-  scheme: Awaited<ReturnType<typeof buildReportData>>["scheme"],
-  school: Awaited<ReturnType<typeof buildReportData>>["school"],
-  numberOfClasses: number,
-  logo1: string | null,
-  logo2: string | null,
-  rows: SchemeReportRow[],
-): string => {
-  const trainerName = `${scheme.first_name || ""} ${scheme.last_name || ""}`.trim() || "N/A";
-  const subjectLabel = scheme.subject_code
-    ? `${scheme.subject_code}: ${scheme.subject_name}`
-    : scheme.subject_name || "N/A";
+// ============================================================================
+// Page geometry -- must match the margins/format passed to page.pdf() below exactly, since the
+// pagination plan (planPagination) is computed by measuring real rendered row heights against
+// these same budgets. If the margins/format change, these constants must change with them.
+// ============================================================================
+const PX_PER_MM = 96 / 25.4;
+const PAGE_WIDTH_MM = 297; // A4 landscape
+const PAGE_HEIGHT_MM = 210;
+const MARGIN_TOP_MM = 16;
+const MARGIN_BOTTOM_MM = 14;
+const MARGIN_SIDE_MM = 10;
+const CONTENT_WIDTH_PX = Math.round((PAGE_WIDTH_MM - 2 * MARGIN_SIDE_MM) * PX_PER_MM);
+const CONTENT_HEIGHT_PX = (PAGE_HEIGHT_MM - MARGIN_TOP_MM - MARGIN_BOTTOM_MM) * PX_PER_MM;
 
-  const bodyRows = rows
-    .map((r) => {
-      // Repeated (not rowspan-merged) on every row of the group, deliberately: a true HTML
-      // rowspan cell can't be split across a PDF page break, so if a whole multi-week Learning
-      // Outcome group didn't fit in the space left on the current page, Chromium moved the
-      // ENTIRE group to the next page rather than splitting it -- leaving large blank gaps
-      // (confirmed directly against real content during testing). Repeating the text lets every
-      // row break independently; `isGroupStart` still gets a visual divider so groups remain
-      // easy to scan.
-      const rowClass = r.isGroupStart ? ' class="lo-group-start"' : "";
-      const competenceCell = `<td>
-             ${
-               r.competencyTitle
-                 ? `<div style="font-weight:700;color:${INK};margin-bottom:2px;">Learning outcome ${r.competencyElementNumber}: ${escapeHtml(r.competencyTitle)}</div>`
-                 : `<div style="color:${FAINT};font-style:italic;">No Learning Outcome linked</div>`
-             }
-             ${r.competencyHours ? `<div style="font-size:8px;color:${MUTED};">Duration: ${r.competencyHours} hours</div>` : ""}
-           </td>`;
-
-      if (r.entry_status === "SKIPPED") {
-        return `
-        <tr${rowClass}>
-          <td>${weekRangeLabel(r.week_number, r.start_date, r.end_date)}</td>
-          ${competenceCell}
-          <td colspan="5" style="text-align:center;color:${MUTED};font-style:italic;background:#fafafa;">
-            Skipped / Holiday &mdash; no lesson scheduled this week
-          </td>
-        </tr>`;
-      }
-
-      return `
-        <tr${rowClass}>
-          <td>${weekRangeLabel(r.week_number, r.start_date, r.end_date)}</td>
-          ${competenceCell}
-          <td>${multilineHtml(r.topic)}</td>
-          <td>${multilineHtml(r.methodology)}</td>
-          <td>${multilineHtml(r.resources)}</td>
-          <td>${multilineHtml(r.evaluation)}</td>
-          <td>${multilineHtml(r.learning_place)}</td>
-          <td>${multilineHtml(r.observation)}</td>
-        </tr>`;
-    })
-    .join("");
-
-  const moduleCodeAndTitle = [scheme.module_code, scheme.subject_name].filter(Boolean).join(": ");
-  const docTitle = `${escapeHtml(scheme.term_name)} Scheme of Work for ${escapeHtml(subjectLabel)}`;
-
-  return `
-<!doctype html>
-<html>
-<head>
-<meta charset="utf-8">
-<style>
+const PAGE_CSS = `
   * { box-sizing: border-box; }
   body { font-family: ${FONT}; color: ${BODY}; margin: 0; font-size: 10px; line-height: 1.3; }
   .doc-title { text-align: center; font-size: 14px; font-weight: 800; color: ${INK}; margin: 0 0 3px; }
@@ -347,14 +286,6 @@ const buildHtml = (
   .sig-label { font-weight: 700; color: ${INK}; }
   .sig-name { color: ${BODY}; }
   .sig-title { color: ${MUTED}; }
-  /* table-layout deliberately left as the default (auto), not fixed: fixed layout makes Chromium
-     pre-measure the whole table's height up front, which behaves worse with rowspan-merged cells
-     during pagination than letting it lay out row by row. Column widths are still steered via
-     the col-* percentage widths below, just as hints rather than hard constraints.
-     A rowspan cell (the "Competence code and name" grouping) can't be split across a page break,
-     so if a whole Learning-Outcome group doesn't fit in the remaining space on the current page,
-     Chromium moves that entire group to the next page -- by design, not a bug. Keeping the table
-     typography compact (small font/padding here) minimises how often that leaves a large gap. */
   table.report-table { width: 100%; border-collapse: collapse; font-size: 8.5px; line-height: 1.3; }
   table.report-table thead { display: table-header-group; }
   table.report-table th {
@@ -367,12 +298,34 @@ const buildHtml = (
   table.report-table tr:nth-child(even) td { background: #fbfbfd; }
   table.report-table tr { page-break-inside: avoid; }
   table.report-table tr.lo-group-start td { border-top: 2px solid ${INK}; }
+  table.report-table tr.page-break-before { page-break-before: always; }
   .col-week { width: 9%; } .col-comp { width: 20%; } .col-ic { width: 16%; }
   .col-act { width: 15%; } .col-res { width: 13%; } .col-eval { width: 13%; }
   .col-place { width: 7%; } .col-obs { width: 7%; }
-</style>
-</head>
-<body>
+`;
+
+const THEAD_HTML = `
+  <tr>
+    <th class="col-week">Weeks</th>
+    <th class="col-comp">Competence code and name</th>
+    <th class="col-ic">Indicative content (IC)</th>
+    <th class="col-act">Learning Activities</th>
+    <th class="col-res">Resources (Equipment, tools, materials)</th>
+    <th class="col-eval">Evidences of formative assessment</th>
+    <th class="col-place">Learning Place</th>
+    <th class="col-obs">Observation</th>
+  </tr>
+`;
+
+const buildTopBlockHtml = (
+  scheme: Awaited<ReturnType<typeof buildReportData>>["scheme"],
+  school: Awaited<ReturnType<typeof buildReportData>>["school"],
+  numberOfClasses: number,
+  docTitle: string,
+  trainerName: string,
+): string => {
+  const moduleCodeAndTitle = [scheme.module_code, scheme.subject_name].filter(Boolean).join(": ");
+  return `
   <h1 class="doc-title">${docTitle}</h1>
   <div class="doc-school">${escapeHtml(school?.name)}</div>
 
@@ -385,20 +338,229 @@ const buildHtml = (
     ${detailRow("Learning hours", scheme.learning_hours || "", "Date", fmtDate(scheme.scheme_date))}
     ${detailRow("Number of Classes", String(numberOfClasses), "Class Name", scheme.class_group_name || "")}
   </table>
+`;
+};
+
+const buildCompetenceCellContent = (r: SchemeReportRow): string => `
+  ${
+    r.competencyTitle
+      ? `<div style="font-weight:700;color:${INK};margin-bottom:2px;">Learning outcome ${r.competencyElementNumber}: ${escapeHtml(r.competencyTitle)}</div>`
+      : `<div style="color:${FAINT};font-style:italic;">No Learning Outcome linked</div>`
+  }
+  ${r.competencyHours ? `<div style="font-size:8px;color:${MUTED};">Duration: ${r.competencyHours} hours</div>` : ""}
+`;
+
+// The 8 header columns are: Weeks, Competence, IC, Activities, Resources, Evidence, Place,
+// Observation. A skipped week only shows 2 real cells (Weeks, Competence) plus one merged
+// message cell -- that message cell must span the remaining 6 columns (IC through Observation),
+// not 5 (a previous version's off-by-one silently dropped the Observation column and misaligned
+// every skipped row against the rest of the table).
+export const SKIPPED_MERGED_COLSPAN = 6;
+
+/** Builds one row's <td> cells only (no <tr> wrapper, no rowspan) -- used for the measurement
+ * pass, where every row is measured standalone so its real, final rendered height is known
+ * regardless of how it ends up grouped. Including the (usually short, 1-2 line) competence text
+ * on every measured row is a deliberately safe overestimate for continuation rows, where that
+ * cell won't actually be rendered (it's covered by a previous row's rowspan) -- overestimating a
+ * row's height risks wasting a little space, underestimating risks overflow, so this errs toward
+ * the safe side. */
+const buildMeasurementCellsHtml = (r: SchemeReportRow): string => {
+  const competenceCell = `<td>${buildCompetenceCellContent(r)}</td>`;
+  if (r.entry_status === "SKIPPED") {
+    return `
+      <td>${weekRangeLabel(r.week_number, r.start_date, r.end_date)}</td>
+      ${competenceCell}
+      <td colspan="${SKIPPED_MERGED_COLSPAN}" style="text-align:center;color:${MUTED};font-style:italic;background:#fafafa;">
+        Skipped / Holiday &mdash; no lesson scheduled this week
+      </td>`;
+  }
+  return `
+      <td>${weekRangeLabel(r.week_number, r.start_date, r.end_date)}</td>
+      ${competenceCell}
+      <td>${multilineHtml(r.topic)}</td>
+      <td>${multilineHtml(r.methodology)}</td>
+      <td>${multilineHtml(r.resources)}</td>
+      <td>${multilineHtml(r.evaluation)}</td>
+      <td>${multilineHtml(r.learning_place)}</td>
+      <td>${multilineHtml(r.observation)}</td>`;
+};
+
+export interface PlanEntry {
+  isGroupStart: boolean;
+  rowSpan: number;
+  pageBreakBefore: boolean;
+}
+
+/** Builds the final <tr> for one row, given its computed plan entry: a rowspan-merged
+ * "Competence code and name" cell on the group's first row (matching the correct template
+ * exactly), omitted entirely on continuation rows (standard HTML rowspan), and an explicit
+ * forced page break on rows where planPagination decided a new page must start. Because every
+ * page break is forced at a point planPagination chose specifically to be a group boundary, no
+ * rowspan cell here can ever straddle a page break. */
+const buildFinalRowHtml = (r: SchemeReportRow, plan: PlanEntry): string => {
+  const classes = [plan.isGroupStart ? "lo-group-start" : "", plan.pageBreakBefore ? "page-break-before" : ""]
+    .filter(Boolean)
+    .join(" ");
+  const rowAttr = classes ? ` class="${classes}"` : "";
+  const competenceCell = plan.isGroupStart
+    ? `<td rowspan="${plan.rowSpan}">${buildCompetenceCellContent(r)}</td>`
+    : "";
+
+  if (r.entry_status === "SKIPPED") {
+    return `
+        <tr${rowAttr}>
+          <td>${weekRangeLabel(r.week_number, r.start_date, r.end_date)}</td>
+          ${competenceCell}
+          <td colspan="${SKIPPED_MERGED_COLSPAN}" style="text-align:center;color:${MUTED};font-style:italic;background:#fafafa;">
+            Skipped / Holiday &mdash; no lesson scheduled this week
+          </td>
+        </tr>`;
+  }
+
+  return `
+        <tr${rowAttr}>
+          <td>${weekRangeLabel(r.week_number, r.start_date, r.end_date)}</td>
+          ${competenceCell}
+          <td>${multilineHtml(r.topic)}</td>
+          <td>${multilineHtml(r.methodology)}</td>
+          <td>${multilineHtml(r.resources)}</td>
+          <td>${multilineHtml(r.evaluation)}</td>
+          <td>${multilineHtml(r.learning_place)}</td>
+          <td>${multilineHtml(r.observation)}</td>
+        </tr>`;
+};
+
+/** Measures the real rendered height (in CSS px, at the exact content width page.pdf() will use)
+ * of the identification block, the table header, and every row -- by actually rendering them in
+ * a plain, unpaginated page with the identical CSS/markup the final PDF uses. This is what makes
+ * planPagination's page-break math trustworthy: it's working from real layout numbers, not
+ * estimates, for this exact content (variable-length real text, real fonts, real column widths). */
+async function measureLayout(
+  browser: Browser,
+  topBlockHtml: string,
+  rows: SchemeReportRow[],
+): Promise<{ topBlockHeight: number; theadHeight: number; rowHeights: number[] }> {
+  const page = await browser.newPage();
+  try {
+    await page.setViewport({ width: CONTENT_WIDTH_PX, height: 1600 });
+    const tbody = rows.map((r) => `<tr>${buildMeasurementCellsHtml(r)}</tr>`).join("");
+    const html = `<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>${PAGE_CSS}</style>
+</head>
+<body>
+  <div id="measure-topblock">${topBlockHtml}</div>
+  <table class="report-table">
+    <thead id="measure-thead">${THEAD_HTML}</thead>
+    <tbody id="measure-tbody">${tbody}</tbody>
+  </table>
+</body>
+</html>`;
+    await page.setContent(html, { waitUntil: "load" });
+    return await page.evaluate(() => {
+      const topBlockHeight = document.getElementById("measure-topblock")!.getBoundingClientRect().height;
+      const theadHeight = document.getElementById("measure-thead")!.getBoundingClientRect().height;
+      // Scoped to the measurement table's own tbody specifically -- a bare "tbody tr" selector
+      // also matches the identification block's <table class="detail-table"> rows, since a
+      // browser silently wraps any bare <tr>s in an implicit <tbody> even when none is written.
+      // That mismatch (more heights than rows) was found directly during testing: it silently
+      // shifted every row's height by one slot, corrupting the whole pagination plan.
+      const rowHeights = Array.from(document.querySelectorAll("#measure-tbody > tr")).map(
+        (el) => el.getBoundingClientRect().height,
+      );
+      return { topBlockHeight, theadHeight, rowHeights };
+    });
+  } finally {
+    await page.close();
+  }
+}
+
+/** Decides exactly where the printed table will break across pages, and only then groups
+ * consecutive same-Learning-Outcome rows into a real HTML rowspan (matching the correct
+ * template's "Competence code and name" merged cell) within each page -- never across one.
+ *
+ * A true rowspan cell cannot be split across a PDF page break: if a whole multi-week Learning
+ * Outcome group doesn't fit in the space left on the page, Chromium moves the ENTIRE group to
+ * the next page rather than splitting it. For a scheme where one Learning Outcome spans many
+ * consecutive weeks (seen directly in production: 12 weeks under one LO, spanning ~4 pages),
+ * naively rowspanning the whole group is not just ugly, it's impossible -- so page breaks are
+ * computed first, from real measured row heights against the same content-height budget
+ * page.pdf() uses, and a rowspan group is only ever allowed to span rows that land on one
+ * computed page together. Every forced page break is therefore also a guaranteed-safe group
+ * boundary. */
+export function planPagination(
+  rows: SchemeReportRow[],
+  heights: { topBlockHeight: number; theadHeight: number; rowHeights: number[] },
+): PlanEntry[] {
+  // Small safety cushion against sub-pixel rounding differences between this measurement pass
+  // and the actual print layout (different internal rounding for border/font metrics), so a row
+  // that measures as *just* fitting doesn't end up overflowing by a pixel or two in the real PDF.
+  const SAFETY_MARGIN_PX = 8;
+  const firstPageAvail = CONTENT_HEIGHT_PX - heights.topBlockHeight - heights.theadHeight - SAFETY_MARGIN_PX;
+  const laterPageAvail = CONTENT_HEIGHT_PX - heights.theadHeight - SAFETY_MARGIN_PX;
+
+  const plan: PlanEntry[] = rows.map(() => ({ isGroupStart: false, rowSpan: 1, pageBreakBefore: false }));
+
+  let remaining = firstPageAvail;
+  let groupStartIdx = -1;
+
+  for (let i = 0; i < rows.length; i++) {
+    const rowHeight = heights.rowHeights[i] || 0;
+    const sameGroupAsPrev = i > 0 && rows[i].competencyId === rows[i - 1].competencyId;
+
+    let pageBreakBefore = false;
+    if (i > 0 && rowHeight > remaining) {
+      // Doesn't fit in what's left on the current page -- start a fresh page here. This is also
+      // always a fresh rowspan group, even if the Learning Outcome is unchanged, since the
+      // previous group cannot be extended across the break.
+      pageBreakBefore = true;
+      remaining = laterPageAvail;
+    }
+
+    if (sameGroupAsPrev && !pageBreakBefore) {
+      plan[groupStartIdx].rowSpan++;
+    } else {
+      groupStartIdx = i;
+      plan[i] = { isGroupStart: true, rowSpan: 1, pageBreakBefore };
+    }
+
+    remaining -= rowHeight;
+  }
+
+  return plan;
+}
+
+const buildHtml = (
+  scheme: Awaited<ReturnType<typeof buildReportData>>["scheme"],
+  school: Awaited<ReturnType<typeof buildReportData>>["school"],
+  numberOfClasses: number,
+  logo1: string | null,
+  logo2: string | null,
+  rows: SchemeReportRow[],
+  plan: PlanEntry[],
+): string => {
+  const trainerName = `${scheme.first_name || ""} ${scheme.last_name || ""}`.trim() || "N/A";
+  const subjectLabel = scheme.subject_code
+    ? `${scheme.subject_code}: ${scheme.subject_name}`
+    : scheme.subject_name || "N/A";
+  const docTitle = `${escapeHtml(scheme.term_name)} Scheme of Work for ${escapeHtml(subjectLabel)}`;
+
+  const bodyRows = rows.map((r, i) => buildFinalRowHtml(r, plan[i])).join("");
+
+  return `
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>${PAGE_CSS}</style>
+</head>
+<body>
+  ${buildTopBlockHtml(scheme, school, numberOfClasses, docTitle, trainerName)}
 
   <table class="report-table">
-    <thead>
-      <tr>
-        <th class="col-week" rowspan="2">Weeks</th>
-        <th class="col-comp" rowspan="2">Competence code and name</th>
-        <th class="col-ic" rowspan="2">Indicative content (IC)</th>
-        <th class="col-act" rowspan="2">Learning Activities</th>
-        <th class="col-res" rowspan="2">Resources (Equipment, tools, materials)</th>
-        <th class="col-eval" rowspan="2">Evidences of formative assessment</th>
-        <th class="col-place" rowspan="2">Learning Place</th>
-        <th class="col-obs" rowspan="2">Observation</th>
-      </tr>
-    </thead>
+    <thead>${THEAD_HTML}</thead>
     <tbody>
       ${bodyRows || `<tr><td colspan="8" style="text-align:center;color:${MUTED};padding:20px;">No weekly entries yet</td></tr>`}
     </tbody>
@@ -420,30 +582,31 @@ const buildHtml = (
 };
 
 async function printHtmlToPdf(
+  browser: Browser,
   html: string,
   headerTemplate: string,
   footerTemplate: string,
 ): Promise<Buffer> {
-  const browser = await puppeteer.launch({
-    headless: true,
-    executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
-    args: ["--no-sandbox", "--disable-setuid-sandbox"],
-  });
+  const page = await browser.newPage();
   try {
-    const page = await browser.newPage();
     await page.setContent(html, { waitUntil: "load" });
     const pdf = await page.pdf({
       format: "a4",
       landscape: true,
       printBackground: true,
-      margin: { top: "16mm", bottom: "14mm", left: "10mm", right: "10mm" },
+      margin: {
+        top: `${MARGIN_TOP_MM}mm`,
+        bottom: `${MARGIN_BOTTOM_MM}mm`,
+        left: `${MARGIN_SIDE_MM}mm`,
+        right: `${MARGIN_SIDE_MM}mm`,
+      },
       displayHeaderFooter: true,
       headerTemplate,
       footerTemplate,
     });
     return Buffer.from(pdf);
   } finally {
-    await browser.close();
+    await page.close();
   }
 }
 
@@ -452,23 +615,44 @@ async function printHtmlToPdf(
  * by both the preview (streamed inline) and download endpoints, so preview and export are always
  * pixel-identical -- there is exactly one renderer. The school logo(s) repeat in a running header
  * and "{School} | {Module} — {Term} Scheme of Work | Page N" repeats in a running footer on every
- * page, matching the reference template exactly. */
+ * page, matching the reference template exactly. Learning Outcome groups are genuinely
+ * rowspan-merged (not just repeated), computed by planPagination so a merge never straddles a
+ * page break -- see its doc comment for why that matters. */
 export async function renderSchemeOfWorkPdf(schemeId: number): Promise<Buffer> {
   const { scheme, school, rows, numberOfClasses } = await buildReportData(schemeId);
   const [logo1, logo2] = await Promise.all([
     resolveLogoSrc(school?.logo),
     resolveLogoSrc(school?.partner_logo),
   ]);
-  const html = buildHtml(scheme, school, numberOfClasses, logo1, logo2, rows);
 
-  const footerLabel = [
-    school?.name,
-    [scheme.module_code, `${scheme.term_name} Scheme of Work`].filter(Boolean).join(" — "),
-  ]
-    .filter(Boolean)
-    .join(" | ");
-  const headerTemplate = buildHeaderTemplate(logo1, logo2, school?.name || "");
-  const footerTemplate = buildFooterTemplate(`${footerLabel}${footerLabel ? " | Page" : "Page"}`);
+  const trainerName = `${scheme.first_name || ""} ${scheme.last_name || ""}`.trim() || "N/A";
+  const subjectLabel = scheme.subject_code
+    ? `${scheme.subject_code}: ${scheme.subject_name}`
+    : scheme.subject_name || "N/A";
+  const docTitle = `${escapeHtml(scheme.term_name)} Scheme of Work for ${escapeHtml(subjectLabel)}`;
+  const topBlockHtml = buildTopBlockHtml(scheme, school, numberOfClasses, docTitle, trainerName);
 
-  return printHtmlToPdf(html, headerTemplate, footerTemplate);
+  const browser = await puppeteer.launch({
+    headless: true,
+    executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
+    args: ["--no-sandbox", "--disable-setuid-sandbox"],
+  });
+  try {
+    const heights = await measureLayout(browser, topBlockHtml, rows);
+    const plan = planPagination(rows, heights);
+    const html = buildHtml(scheme, school, numberOfClasses, logo1, logo2, rows, plan);
+
+    const footerLabel = [
+      school?.name,
+      [scheme.module_code, `${scheme.term_name} Scheme of Work`].filter(Boolean).join(" — "),
+    ]
+      .filter(Boolean)
+      .join(" | ");
+    const headerTemplate = buildHeaderTemplate(logo1, logo2, school?.name || "");
+    const footerTemplate = buildFooterTemplate(`${footerLabel}${footerLabel ? " | Page" : "Page"}`);
+
+    return await printHtmlToPdf(browser, html, headerTemplate, footerTemplate);
+  } finally {
+    await browser.close();
+  }
 }
