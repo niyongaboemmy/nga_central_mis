@@ -24,9 +24,7 @@ const INK = "#1a2333";
 const BODY = "#374151";
 const MUTED = "#6b7280";
 const FAINT = "#9ca3af";
-const ACCENT = "#1d4ed8";
 const RULE = "#e2e6ee";
-const TAN = "#b98f4b";
 const TAN_SOFT = "#f6efe0";
 const FONT = `"Segoe UI", Arial, Helvetica, sans-serif`;
 
@@ -97,14 +95,36 @@ async function resolveLogoSrc(value: string | null | undefined): Promise<string 
   }
 }
 
-const logoCell = (src: string | null, align: "left" | "right") => `
-  <div style="width:140px;height:56px;display:flex;align-items:center;justify-content:${align === "left" ? "flex-start" : "flex-end"};">
-    ${
-      src
-        ? `<img src="${src}" style="max-width:140px;max-height:56px;object-fit:contain;" />`
-        : `<span style="font-size:8px;color:${FAINT};font-style:italic;">${align === "left" ? "School logo not set" : "Partner logo not set"}</span>`
-    }
-  </div>
+// Puppeteer renders headerTemplate/footerTemplate in a constrained frame with no access to the
+// page's own <style> or external stylesheets, and only inline styles reliably apply there (same
+// constraint documented in pdfExport.ts for Lesson Notes) -- every rule below is inlined.
+const buildHeaderTemplate = (logo1: string | null, logo2: string | null, schoolName: string) => `
+  <table style="width:100%;font-family:${FONT};border-collapse:collapse;margin:0 10mm;">
+    <tr>
+      <td style="text-align:left;vertical-align:middle;">
+        ${
+          logo1
+            ? `<img src="${logo1}" style="height:20px;width:auto;vertical-align:middle;" />`
+            : schoolName
+              ? `<span style="font-size:9px;font-weight:700;color:${INK};">${escapeHtml(schoolName)}</span>`
+              : ""
+        }
+      </td>
+      <td style="text-align:right;vertical-align:middle;">
+        ${logo2 ? `<img src="${logo2}" style="height:20px;width:auto;vertical-align:middle;" />` : ""}
+      </td>
+    </tr>
+  </table>
+`;
+
+const buildFooterTemplate = (footerText: string) => `
+  <table style="width:100%;font-family:${FONT};border-collapse:collapse;margin:0 10mm;">
+    <tr>
+      <td style="text-align:center;">
+        <span style="font-size:8.5px;color:${MUTED};">${escapeHtml(footerText)} <span class="pageNumber"></span></span>
+      </td>
+    </tr>
+  </table>
 `;
 
 const detailRow = (label: string, value: string, label2: string, value2: string) => `
@@ -263,20 +283,26 @@ const buildHtml = (
 
   const bodyRows = rows
     .map((r) => {
-      const competenceCell = r.isGroupStart
-        ? `<td rowspan="${r.rowSpan}" style="vertical-align:top;">
+      // Repeated (not rowspan-merged) on every row of the group, deliberately: a true HTML
+      // rowspan cell can't be split across a PDF page break, so if a whole multi-week Learning
+      // Outcome group didn't fit in the space left on the current page, Chromium moved the
+      // ENTIRE group to the next page rather than splitting it -- leaving large blank gaps
+      // (confirmed directly against real content during testing). Repeating the text lets every
+      // row break independently; `isGroupStart` still gets a visual divider so groups remain
+      // easy to scan.
+      const rowClass = r.isGroupStart ? ' class="lo-group-start"' : "";
+      const competenceCell = `<td>
              ${
                r.competencyTitle
-                 ? `<div style="font-weight:700;color:${INK};margin-bottom:4px;">Learning outcome ${r.competencyElementNumber}: ${escapeHtml(r.competencyTitle)}</div>`
+                 ? `<div style="font-weight:700;color:${INK};margin-bottom:2px;">Learning outcome ${r.competencyElementNumber}: ${escapeHtml(r.competencyTitle)}</div>`
                  : `<div style="color:${FAINT};font-style:italic;">No Learning Outcome linked</div>`
              }
-             ${r.competencyHours ? `<div style="font-size:10px;color:${MUTED};">Duration: ${r.competencyHours} hours</div>` : ""}
-           </td>`
-        : "";
+             ${r.competencyHours ? `<div style="font-size:8px;color:${MUTED};">Duration: ${r.competencyHours} hours</div>` : ""}
+           </td>`;
 
       if (r.entry_status === "SKIPPED") {
         return `
-        <tr>
+        <tr${rowClass}>
           <td>${weekRangeLabel(r.week_number, r.start_date, r.end_date)}</td>
           ${competenceCell}
           <td colspan="5" style="text-align:center;color:${MUTED};font-style:italic;background:#fafafa;">
@@ -286,7 +312,7 @@ const buildHtml = (
       }
 
       return `
-        <tr>
+        <tr${rowClass}>
           <td>${weekRangeLabel(r.week_number, r.start_date, r.end_date)}</td>
           ${competenceCell}
           <td>${multilineHtml(r.topic)}</td>
@@ -299,6 +325,9 @@ const buildHtml = (
     })
     .join("");
 
+  const moduleCodeAndTitle = [scheme.module_code, scheme.subject_name].filter(Boolean).join(": ");
+  const docTitle = `${escapeHtml(scheme.term_name)} Scheme of Work for ${escapeHtml(subjectLabel)}`;
+
   return `
 <!doctype html>
 <html>
@@ -306,71 +335,56 @@ const buildHtml = (
 <meta charset="utf-8">
 <style>
   * { box-sizing: border-box; }
-  body { font-family: ${FONT}; color: ${BODY}; margin: 0; font-size: 11px; }
-  .cover { padding: 8px 4px 24px; }
-  .cover-rule { border: none; border-top: 2px solid ${TAN}; margin: 10px 0 18px; }
-  .cover-title { text-align: center; font-size: 24px; font-weight: 800; color: ${INK}; margin: 0; letter-spacing: 0.03em; }
-  .cover-term { text-align: center; font-size: 13px; color: ${MUTED}; text-transform: uppercase; letter-spacing: 0.06em; margin: 6px 0 4px; }
-  .cover-subject { text-align: center; font-size: 14px; color: ${ACCENT}; font-weight: 700; margin: 4px 0 20px; }
-  .detail-table { width: 100%; border-collapse: collapse; font-size: 11px; border: 1px solid ${RULE}; }
+  body { font-family: ${FONT}; color: ${BODY}; margin: 0; font-size: 10px; line-height: 1.3; }
+  .doc-title { text-align: center; font-size: 14px; font-weight: 800; color: ${INK}; margin: 0 0 3px; }
+  .doc-school { text-align: center; font-size: 11px; font-weight: 700; color: #b7472a; margin: 0 0 8px; }
+  .detail-table { width: 100%; border-collapse: collapse; font-size: 10px; border: 1px solid ${RULE}; margin-bottom: 10px; }
+  .detail-table td { padding: 3px 8px; }
   .detail-table tr:nth-child(even) { background: #fbfaf7; }
-  .module-divider td { text-align: center; background: ${TAN_SOFT}; color: ${INK}; font-weight: 700; padding: 6px; text-transform: uppercase; letter-spacing: 0.05em; font-size: 10.5px; }
-  .signatures { margin-top: 40px; display: flex; justify-content: space-between; }
-  .sig-block { width: 45%; }
-  .sig-line { border-top: 1px solid ${INK}; margin-top: 34px; padding-top: 4px; font-size: 10px; color: ${MUTED}; }
-  .sig-name { font-size: 12px; font-weight: 700; color: ${INK}; }
-  table.report-table { width: 100%; border-collapse: collapse; font-size: 9.5px; table-layout: fixed; }
+  .module-divider td { text-align: left; background: ${INK}; color: #fff; font-weight: 700; padding: 3px 8px; font-size: 10px; }
+  .signatures { margin-top: 18px; page-break-inside: avoid; }
+  .sig-block { margin-bottom: 12px; }
+  .sig-label { font-weight: 700; color: ${INK}; }
+  .sig-name { color: ${BODY}; }
+  .sig-title { color: ${MUTED}; }
+  /* table-layout deliberately left as the default (auto), not fixed: fixed layout makes Chromium
+     pre-measure the whole table's height up front, which behaves worse with rowspan-merged cells
+     during pagination than letting it lay out row by row. Column widths are still steered via
+     the col-* percentage widths below, just as hints rather than hard constraints.
+     A rowspan cell (the "Competence code and name" grouping) can't be split across a page break,
+     so if a whole Learning-Outcome group doesn't fit in the remaining space on the current page,
+     Chromium moves that entire group to the next page -- by design, not a bug. Keeping the table
+     typography compact (small font/padding here) minimises how often that leaves a large gap. */
+  table.report-table { width: 100%; border-collapse: collapse; font-size: 8.5px; line-height: 1.3; }
+  table.report-table thead { display: table-header-group; }
   table.report-table th {
     background: ${TAN_SOFT}; color: ${INK}; font-weight: 700; text-transform: uppercase;
-    font-size: 8.5px; letter-spacing: 0.02em; padding: 6px 8px; border: 1px solid ${RULE}; text-align: left;
+    font-size: 8px; letter-spacing: 0.02em; padding: 4px 6px; border: 1px solid ${RULE}; text-align: left;
   }
   table.report-table td {
-    border: 1px solid ${RULE}; padding: 6px 8px; vertical-align: top; word-wrap: break-word;
+    border: 1px solid ${RULE}; padding: 3px 6px; vertical-align: top; word-wrap: break-word;
   }
   table.report-table tr:nth-child(even) td { background: #fbfbfd; }
+  table.report-table tr { page-break-inside: avoid; }
+  table.report-table tr.lo-group-start td { border-top: 2px solid ${INK}; }
   .col-week { width: 9%; } .col-comp { width: 20%; } .col-ic { width: 16%; }
   .col-act { width: 15%; } .col-res { width: 13%; } .col-eval { width: 13%; }
   .col-place { width: 7%; } .col-obs { width: 7%; }
 </style>
 </head>
 <body>
-  <div class="cover">
-    <div style="display:flex;justify-content:space-between;align-items:center;">
-      ${logoCell(logo1, "left")}
-      ${logoCell(logo2, "right")}
-    </div>
-    <hr class="cover-rule" />
-    <h1 class="cover-title">SCHEME OF WORK</h1>
-    <div class="cover-term">${escapeHtml(scheme.term_name)} &middot; ${escapeHtml(scheme.year_name)}</div>
-    <div class="cover-subject">${escapeHtml(subjectLabel)}</div>
+  <h1 class="doc-title">${docTitle}</h1>
+  <div class="doc-school">${escapeHtml(school?.name)}</div>
 
-    <table class="detail-table">
-      ${detailRow("Sector", school?.sector || "", "Trainer", trainerName)}
-      ${detailRow("Trade", school?.trade || "", "School Year", scheme.year_name || "")}
-      ${detailRow("Qualification Title", school?.qualification_title || "", "Term", scheme.term_name || "")}
-      <tr class="module-divider"><td colspan="4">Module details</td></tr>
-      ${detailRow("RQF Level", scheme.rqf_level || "", "Module code and title", `${scheme.module_code || ""} ${scheme.module_code && scheme.subject_name ? "-" : ""} ${scheme.subject_name || ""}`.trim())}
-      ${detailRow("Learning hours", scheme.learning_hours || "", "Date", fmtDate(scheme.scheme_date))}
-      ${detailRow("Number of Classes", String(numberOfClasses), "Class Name", scheme.class_group_name || "")}
-    </table>
-
-    <div class="signatures">
-      <div class="sig-block">
-        <div class="sig-line">
-          <div class="sig-name">${escapeHtml(trainerName)}</div>
-          Trainer's name and signature ${scheme.trainer_signed ? "&mdash; Signed" : ""}
-        </div>
-      </div>
-      <div class="sig-block">
-        <div class="sig-line">
-          <div class="sig-name">${escapeHtml(scheme.approver_name || "N/A")}</div>
-          ${escapeHtml(scheme.approver_title || "Approved and signed by")} ${scheme.approver_signed ? "&mdash; Signed" : ""}
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <div style="page-break-before: always;"></div>
+  <table class="detail-table">
+    ${detailRow("Sector", school?.sector || "", "Trainer", trainerName)}
+    ${detailRow("Trade", school?.trade || "", "School Year", scheme.year_name || "")}
+    ${detailRow("Qualification Title", school?.qualification_title || "", "Term", scheme.term_name || "")}
+    <tr class="module-divider"><td colspan="4">Module details</td></tr>
+    ${detailRow("RQF Level", scheme.rqf_level || "", "Module code and title", moduleCodeAndTitle)}
+    ${detailRow("Learning hours", scheme.learning_hours || "", "Date", fmtDate(scheme.scheme_date))}
+    ${detailRow("Number of Classes", String(numberOfClasses), "Class Name", scheme.class_group_name || "")}
+  </table>
 
   <table class="report-table">
     <thead>
@@ -389,11 +403,27 @@ const buildHtml = (
       ${bodyRows || `<tr><td colspan="8" style="text-align:center;color:${MUTED};padding:20px;">No weekly entries yet</td></tr>`}
     </tbody>
   </table>
+
+  <div class="signatures">
+    <div class="sig-block">
+      <div class="sig-label">Trainer's name and Signature:</div>
+      <div class="sig-name">${escapeHtml(trainerName)}${scheme.trainer_signed ? " &mdash; Signed" : ""}</div>
+    </div>
+    <div class="sig-block">
+      <div class="sig-label">Verified and approved by:</div>
+      <div class="sig-name">${escapeHtml(scheme.approver_name || "N/A")}${scheme.approver_signed ? " &mdash; Signed" : ""}</div>
+      ${scheme.approver_title ? `<div class="sig-title">${escapeHtml(scheme.approver_title)}</div>` : ""}
+    </div>
+  </div>
 </body>
 </html>`;
 };
 
-async function printHtmlToPdf(html: string): Promise<Buffer> {
+async function printHtmlToPdf(
+  html: string,
+  headerTemplate: string,
+  footerTemplate: string,
+): Promise<Buffer> {
   const browser = await puppeteer.launch({
     headless: true,
     executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
@@ -406,7 +436,10 @@ async function printHtmlToPdf(html: string): Promise<Buffer> {
       format: "a4",
       landscape: true,
       printBackground: true,
-      margin: { top: "10mm", bottom: "10mm", left: "10mm", right: "10mm" },
+      margin: { top: "16mm", bottom: "14mm", left: "10mm", right: "10mm" },
+      displayHeaderFooter: true,
+      headerTemplate,
+      footerTemplate,
     });
     return Buffer.from(pdf);
   } finally {
@@ -414,9 +447,12 @@ async function printHtmlToPdf(html: string): Promise<Buffer> {
   }
 }
 
-/** Renders the full Scheme of Work report (cover page + weekly table) to a PDF buffer. Used by
- * both the preview (streamed inline) and download endpoints, so preview and export are always
- * pixel-identical -- there is exactly one renderer. */
+/** Renders the full Scheme of Work report (identification block, weekly table, and signatures --
+ * one continuous flowing document, matching the correct printed template) to a PDF buffer. Used
+ * by both the preview (streamed inline) and download endpoints, so preview and export are always
+ * pixel-identical -- there is exactly one renderer. The school logo(s) repeat in a running header
+ * and "{School} | {Module} — {Term} Scheme of Work | Page N" repeats in a running footer on every
+ * page, matching the reference template exactly. */
 export async function renderSchemeOfWorkPdf(schemeId: number): Promise<Buffer> {
   const { scheme, school, rows, numberOfClasses } = await buildReportData(schemeId);
   const [logo1, logo2] = await Promise.all([
@@ -424,5 +460,15 @@ export async function renderSchemeOfWorkPdf(schemeId: number): Promise<Buffer> {
     resolveLogoSrc(school?.partner_logo),
   ]);
   const html = buildHtml(scheme, school, numberOfClasses, logo1, logo2, rows);
-  return printHtmlToPdf(html);
+
+  const footerLabel = [
+    school?.name,
+    [scheme.module_code, `${scheme.term_name} Scheme of Work`].filter(Boolean).join(" — "),
+  ]
+    .filter(Boolean)
+    .join(" | ");
+  const headerTemplate = buildHeaderTemplate(logo1, logo2, school?.name || "");
+  const footerTemplate = buildFooterTemplate(`${footerLabel}${footerLabel ? " | Page" : "Page"}`);
+
+  return printHtmlToPdf(html, headerTemplate, footerTemplate);
 }
