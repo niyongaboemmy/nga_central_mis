@@ -31,6 +31,7 @@ import {
   getMyClassGroups,
 } from "../api/calendar";
 import type { AcademicCalendar } from "../api/calendar";
+import { exportTimetablePdf } from "../utils/timetablePdfExport";
 
 // Import calendar components
 import {
@@ -286,6 +287,46 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({
   const dateRangeString = useMemo(() => {
     return getDateRangeString(weekDates);
   }, [weekDates]);
+
+  // Whichever grid is actually on screen right now -- mirrors the same
+  // branching the render below uses, so the download button only ever
+  // appears once there is really something to export.
+  const currentClassGroupName = useMemo(() => {
+    if (isStudent) return slots[0]?.class_group_name;
+    if (!isBroadView) {
+      return myClassGroups.find(
+        (g) => g.class_group_id === selectedTeacherClassGroupId,
+      )?.name;
+    }
+    return selectedCalendar?.class_group_name;
+  }, [
+    isStudent,
+    isBroadView,
+    slots,
+    myClassGroups,
+    selectedTeacherClassGroupId,
+    selectedCalendar,
+  ]);
+
+  const canDownloadTimetable = useMemo(() => {
+    if (isStudent) return slots.length > 0;
+    if (!isBroadView) return Boolean(selectedTeacherClassGroupId);
+    return Boolean(selectedCalendar?.calendar_id);
+  }, [isStudent, isBroadView, slots.length, selectedTeacherClassGroupId, selectedCalendar]);
+
+  const handleDownloadPdf = () => {
+    const yearName = academicYears.find(
+      (y: any) => y.academic_year_id === selectedYear,
+    )?.name;
+    const termName = academicTerms.find(
+      (t) => t.academic_term_id === selectedTerm,
+    )?.name;
+    exportTimetablePdf(slots, filteredActivities, {
+      classGroupName: currentClassGroupName || "Class Timetable",
+      yearName,
+      termName,
+    });
+  };
 
   // Set current week start to today (Monday of current week) on mount
   useEffect(() => {
@@ -1102,6 +1143,8 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({
           onCreateCalendarClick={handleCreateCalendarClick}
           onAddSlotClick={handleAddSlotClick}
           onNotificationsClick={() => setShowNotificationSettings(true)}
+          onDownloadPdf={handleDownloadPdf}
+          canDownload={canDownloadTimetable}
           isCreatingCalendar={isLoadingClassGroups}
         />
       </div>

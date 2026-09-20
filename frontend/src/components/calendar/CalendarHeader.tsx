@@ -1,5 +1,5 @@
 import React from "react";
-import { Calendar, Bell } from "lucide-react";
+import { Calendar, Bell, Download } from "lucide-react";
 import { AcademicTerm } from "../../api/academics";
 import type { AcademicCalendar } from "../../api/calendar";
 
@@ -32,6 +32,11 @@ interface CalendarHeaderProps {
   onCreateCalendarClick: () => void;
   onAddSlotClick: () => void;
   onNotificationsClick: () => void;
+  /** Exports the currently displayed grid as a designed PDF. Omitted (or
+   *  `canDownload` false) hides the button rather than showing it disabled —
+   *  there's nothing useful to click before a grid has data. */
+  onDownloadPdf?: () => void;
+  canDownload?: boolean;
   canEdit?: boolean;
   canCreate?: boolean;
   isCreatingCalendar?: boolean;
@@ -55,6 +60,8 @@ const CalendarHeader: React.FC<CalendarHeaderProps> = ({
   onTeacherClassGroupChange,
   onCreateCalendarClick,
   onNotificationsClick,
+  onDownloadPdf,
+  canDownload = false,
   canEdit = false,
   canCreate = false,
   isCreatingCalendar,
@@ -216,6 +223,18 @@ const CalendarHeader: React.FC<CalendarHeaderProps> = ({
           >
             <Bell className="w-4 h-4 mr-2" />
             <span className="hidden sm:inline">Notifications</span>
+          </button>
+        )}
+
+        {/* Download PDF — only shown once there's an actual grid to export */}
+        {canDownload && onDownloadPdf && (
+          <button
+            onClick={onDownloadPdf}
+            className="flex items-center px-4 py-2 text-sm bg-gray-100 dark:bg-gray-700 rounded-full hover:bg-gray-200 dark:hover:bg-gray-600 transition-all duration-200"
+            title="Download this timetable as a PDF"
+          >
+            <Download className="w-4 h-4 mr-2" />
+            <span className="hidden sm:inline">Download PDF</span>
           </button>
         )}
       </div>
