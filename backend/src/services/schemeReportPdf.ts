@@ -199,15 +199,6 @@ const buildFooterTemplate = (footerText: string) => `
   </table>
 `;
 
-const detailRow = (label: string, value: string, label2: string, value2: string) => `
-  <tr>
-    <td style="padding:5px 10px;font-weight:700;color:${INK};width:16%;">${escapeHtml(label)}:</td>
-    <td style="padding:5px 10px;color:${BODY};width:34%;">${escapeHtml(value) || "N/A"}</td>
-    <td style="padding:5px 10px;font-weight:700;color:${INK};width:16%;">${escapeHtml(label2)}:</td>
-    <td style="padding:5px 10px;color:${BODY};width:34%;">${escapeHtml(value2) || "N/A"}</td>
-  </tr>
-`;
-
 export interface SchemeReportRow {
   entry_id: number;
   week_number: string | null;
@@ -348,10 +339,19 @@ const PAGE_CSS = `
   body { font-family: ${FONT}; color: ${BODY}; margin: 0; font-size: 10px; line-height: 1.3; }
   .doc-title { text-align: center; font-size: 14px; font-weight: 800; color: ${INK}; margin: 0 0 3px; }
   .doc-school { text-align: center; font-size: 11px; font-weight: 700; color: #b7472a; margin: 0 0 8px; }
-  .detail-table { width: 100%; border-collapse: collapse; font-size: 10px; border: 1px solid ${RULE}; margin-bottom: 10px; }
-  .detail-table td { padding: 3px 8px; }
-  .detail-table tr:nth-child(even) { background: #fbfaf7; }
-  .module-divider td { text-align: left; background: ${INK}; color: #fff; font-weight: 700; padding: 3px 8px; font-size: 10px; }
+  /* Identification block: two independently-lengthed columns side by side (not one grid where
+     every row is forced to pair up) -- the left column (Sector/Trade/Qualification/RQF
+     Level/Date) is naturally shorter than the right (Trainer/School Year/Term/Module
+     details/Module code/Learning hours/Number of Classes/Class Name), matching the reference
+     template's actual layout exactly rather than a single uniform 4-column grid. */
+  .detail-grid { display: flex; border: 1px solid ${RULE}; margin-bottom: 10px; }
+  .detail-col { flex: 1 1 50%; width: 50%; border-collapse: collapse; font-size: 10px; }
+  .detail-col:first-child { border-right: 1px solid ${RULE}; }
+  .detail-col td { padding: 4px 10px; }
+  .detail-col tr.detail-row:nth-of-type(even) { background: #fbfaf7; }
+  .dl-label { font-weight: 700; color: ${INK}; width: 40%; }
+  .dl-value { color: ${BODY}; }
+  .module-divider td { text-align: left; background: ${INK}; color: #fff; font-weight: 700; padding: 4px 10px; font-size: 10px; }
   .signatures { margin-top: 18px; page-break-inside: avoid; display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; }
   .sig-names { flex: 1; }
   .sig-block { margin-bottom: 12px; }
@@ -375,21 +375,35 @@ const PAGE_CSS = `
   table.report-table tr { page-break-inside: avoid; }
   table.report-table tr.lo-group-start td { border-top: 2px solid ${INK}; }
   table.report-table tr.page-break-before { page-break-before: always; }
-  .col-week { width: 9%; } .col-comp { width: 20%; } .col-ic { width: 16%; }
-  .col-act { width: 15%; } .col-res { width: 13%; } .col-eval { width: 13%; }
-  .col-place { width: 7%; } .col-obs { width: 7%; }
+  .col-week { width: 8%; } .col-lo { width: 14%; } .col-duration { width: 6%; text-align: center; }
+  .col-ic { width: 15%; } .col-act { width: 15%; } .col-res { width: 13%; } .col-eval { width: 13%; }
+  .col-place { width: 8%; } .col-obs { width: 8%; }
 `;
 
+// Two-row header: "Competence code and name" is a group heading over its own three real
+// sub-columns (Learning outcome, Duration, Indicative content), matching the reference
+// template's grouped header exactly rather than cramming all three into one wide free-text cell.
 const THEAD_HTML = `
   <tr>
-    <th class="col-week">Weeks</th>
-    <th class="col-comp">Competence code and name</th>
+    <th class="col-week" rowspan="2">Weeks</th>
+    <th colspan="3">Competence code and name</th>
+    <th class="col-act" rowspan="2">Learning Activities</th>
+    <th class="col-res" rowspan="2">Resources (Equipment, tools, materials)</th>
+    <th class="col-eval" rowspan="2">Evidences of formative assessment</th>
+    <th class="col-place" rowspan="2">Learning Place</th>
+    <th class="col-obs" rowspan="2">Observation</th>
+  </tr>
+  <tr>
+    <th class="col-lo">Learning outcome (LO)</th>
+    <th class="col-duration">Duration</th>
     <th class="col-ic">Indicative content (IC)</th>
-    <th class="col-act">Learning Activities</th>
-    <th class="col-res">Resources (Equipment, tools, materials)</th>
-    <th class="col-eval">Evidences of formative assessment</th>
-    <th class="col-place">Learning Place</th>
-    <th class="col-obs">Observation</th>
+  </tr>
+`;
+
+const dlRow = (label: string, value: string) => `
+  <tr class="detail-row">
+    <td class="dl-label">${escapeHtml(label)}:</td>
+    <td class="dl-value">${escapeHtml(value) || "N/A"}</td>
   </tr>
 `;
 
@@ -405,32 +419,53 @@ const buildTopBlockHtml = (
   <h1 class="doc-title">${docTitle}</h1>
   <div class="doc-school">${escapeHtml(school?.name)}</div>
 
-  <table class="detail-table">
-    ${detailRow("Sector", school?.sector || "", "Trainer", trainerName)}
-    ${detailRow("Trade", school?.trade || "", "School Year", scheme.year_name || "")}
-    ${detailRow("Qualification Title", school?.qualification_title || "", "Term", scheme.term_name || "")}
-    <tr class="module-divider"><td colspan="4">Module details</td></tr>
-    ${detailRow("RQF Level", scheme.rqf_level || "", "Module code and title", moduleCodeAndTitle)}
-    ${detailRow("Learning hours", scheme.learning_hours || "", "Date", fmtDate(scheme.scheme_date))}
-    ${detailRow("Number of Classes", String(numberOfClasses), "Class Name", scheme.class_group_name || "")}
-  </table>
+  <div class="detail-grid">
+    <table class="detail-col">
+      ${dlRow("Sector", school?.sector || "")}
+      ${dlRow("Trade", school?.trade || "")}
+      ${dlRow("Qualification Title", school?.qualification_title || "")}
+      ${dlRow("RQF Level", scheme.rqf_level || "")}
+      ${dlRow("Date", fmtDate(scheme.scheme_date))}
+    </table>
+    <table class="detail-col">
+      ${dlRow("Trainer", trainerName)}
+      ${dlRow("School Year", scheme.year_name || "")}
+      ${dlRow("Term", scheme.term_name || "")}
+      <tr class="module-divider"><td colspan="2">Module details</td></tr>
+      ${dlRow("Module code and title", moduleCodeAndTitle)}
+      ${dlRow("Learning hours", scheme.learning_hours || "")}
+      ${dlRow("Number of Classes", String(numberOfClasses))}
+      ${dlRow("Class Name", scheme.class_group_name || "")}
+    </table>
+  </div>
 `;
 };
 
-const buildCompetenceCellContent = (r: SchemeReportRow): string => `
-  ${
-    r.competencyTitle
-      ? `<div style="font-weight:700;color:${INK};margin-bottom:2px;">Learning outcome ${r.competencyElementNumber}: ${escapeHtml(r.competencyTitle)}</div>`
-      : `<div style="color:${FAINT};font-style:italic;">No Learning Outcome linked</div>`
-  }
-  ${r.competencyHours ? `<div style="font-size:8px;color:${MUTED};">Duration: ${r.competencyHours} hours</div>` : ""}
-`;
+const buildLoContent = (r: SchemeReportRow): string =>
+  r.competencyTitle
+    ? `<div style="font-weight:700;color:${INK};">Learning outcome ${r.competencyElementNumber}: ${escapeHtml(r.competencyTitle)}</div>`
+    : `<div style="color:${FAINT};font-style:italic;">No Learning Outcome linked</div>`;
 
-// The 8 header columns are: Weeks, Competence, IC, Activities, Resources, Evidence, Place,
-// Observation. A skipped week only shows 2 real cells (Weeks, Competence) plus one merged
-// message cell -- that message cell must span the remaining 6 columns (IC through Observation),
-// not 5 (a previous version's off-by-one silently dropped the Observation column and misaligned
-// every skipped row against the rest of the table).
+const buildDurationContent = (r: SchemeReportRow): string =>
+  r.competencyHours ? `${r.competencyHours} hours` : "&mdash;";
+
+/** The "Competence code and name" group's two real sub-columns (matching the reference
+ * template): "Learning outcome (LO)" and "Duration" are both Learning-Outcome-level facts, so
+ * they rowspan-merge together across a group exactly like the old single combined cell did. When
+ * there's no linked Learning Outcome at all, there's nothing to show in Duration either, so the
+ * "No Learning Outcome linked" message spans both sub-columns as one cell instead of leaving an
+ * empty Duration cell beside it. `rowSpanAttr` is empty for the unspanned measurement pass. */
+const buildLoDurationCells = (r: SchemeReportRow, rowSpanAttr: string): string =>
+  r.competencyId
+    ? `<td${rowSpanAttr} class="col-lo">${buildLoContent(r)}</td><td${rowSpanAttr} class="col-duration">${buildDurationContent(r)}</td>`
+    : `<td${rowSpanAttr} colspan="2">${buildLoContent(r)}</td>`;
+
+// The 9 leaf columns are: Weeks, Learning outcome, Duration, IC, Activities, Resources, Evidence,
+// Place, Observation. A skipped week only shows the Weeks cell and (on a group's first row) the
+// Learning-outcome/Duration cells, plus one merged message cell -- that message cell must span
+// the remaining 6 columns (IC through Observation), not 5 (a previous version's off-by-one
+// silently dropped the Observation column and misaligned every skipped row against the rest of
+// the table).
 export const SKIPPED_MERGED_COLSPAN = 6;
 
 /** Builds one row's <td> cells only (no <tr> wrapper, no rowspan) -- used for the measurement
@@ -441,18 +476,18 @@ export const SKIPPED_MERGED_COLSPAN = 6;
  * row's height risks wasting a little space, underestimating risks overflow, so this errs toward
  * the safe side. */
 const buildMeasurementCellsHtml = (r: SchemeReportRow): string => {
-  const competenceCell = `<td>${buildCompetenceCellContent(r)}</td>`;
+  const loDurationCells = buildLoDurationCells(r, "");
   if (r.entry_status === "SKIPPED") {
     return `
       <td>${weekRangeLabel(r.week_number, r.start_date, r.end_date)}</td>
-      ${competenceCell}
+      ${loDurationCells}
       <td colspan="${SKIPPED_MERGED_COLSPAN}" style="text-align:center;color:${MUTED};font-style:italic;background:#fafafa;">
         Skipped / Holiday &mdash; no lesson scheduled this week
       </td>`;
   }
   return `
       <td>${weekRangeLabel(r.week_number, r.start_date, r.end_date)}</td>
-      ${competenceCell}
+      ${loDurationCells}
       <td>${multilineHtml(r.topic)}</td>
       <td>${multilineHtml(r.methodology)}</td>
       <td>${multilineHtml(r.resources)}</td>
@@ -467,26 +502,24 @@ export interface PlanEntry {
   pageBreakBefore: boolean;
 }
 
-/** Builds the final <tr> for one row, given its computed plan entry: a rowspan-merged
- * "Competence code and name" cell on the group's first row (matching the correct template
- * exactly), omitted entirely on continuation rows (standard HTML rowspan), and an explicit
- * forced page break on rows where planPagination decided a new page must start. Because every
- * page break is forced at a point planPagination chose specifically to be a group boundary, no
- * rowspan cell here can ever straddle a page break. */
+/** Builds the final <tr> for one row, given its computed plan entry: rowspan-merged Learning
+ * Outcome/Duration cells on the group's first row (matching the correct template exactly),
+ * omitted entirely on continuation rows (standard HTML rowspan), and an explicit forced page
+ * break on rows where planPagination decided a new page must start. Because every page break is
+ * forced at a point planPagination chose specifically to be a group boundary, no rowspan cell
+ * here can ever straddle a page break. */
 const buildFinalRowHtml = (r: SchemeReportRow, plan: PlanEntry): string => {
   const classes = [plan.isGroupStart ? "lo-group-start" : "", plan.pageBreakBefore ? "page-break-before" : ""]
     .filter(Boolean)
     .join(" ");
   const rowAttr = classes ? ` class="${classes}"` : "";
-  const competenceCell = plan.isGroupStart
-    ? `<td rowspan="${plan.rowSpan}">${buildCompetenceCellContent(r)}</td>`
-    : "";
+  const loDurationCells = plan.isGroupStart ? buildLoDurationCells(r, ` rowspan="${plan.rowSpan}"`) : "";
 
   if (r.entry_status === "SKIPPED") {
     return `
         <tr${rowAttr}>
           <td>${weekRangeLabel(r.week_number, r.start_date, r.end_date)}</td>
-          ${competenceCell}
+          ${loDurationCells}
           <td colspan="${SKIPPED_MERGED_COLSPAN}" style="text-align:center;color:${MUTED};font-style:italic;background:#fafafa;">
             Skipped / Holiday &mdash; no lesson scheduled this week
           </td>
@@ -496,7 +529,7 @@ const buildFinalRowHtml = (r: SchemeReportRow, plan: PlanEntry): string => {
   return `
         <tr${rowAttr}>
           <td>${weekRangeLabel(r.week_number, r.start_date, r.end_date)}</td>
-          ${competenceCell}
+          ${loDurationCells}
           <td>${multilineHtml(r.topic)}</td>
           <td>${multilineHtml(r.methodology)}</td>
           <td>${multilineHtml(r.resources)}</td>
@@ -539,7 +572,7 @@ async function measureLayout(
       const topBlockHeight = document.getElementById("measure-topblock")!.getBoundingClientRect().height;
       const theadHeight = document.getElementById("measure-thead")!.getBoundingClientRect().height;
       // Scoped to the measurement table's own tbody specifically -- a bare "tbody tr" selector
-      // also matches the identification block's <table class="detail-table"> rows, since a
+      // also matches the identification block's <table class="detail-col"> rows, since a
       // browser silently wraps any bare <tr>s in an implicit <tbody> even when none is written.
       // That mismatch (more heights than rows) was found directly during testing: it silently
       // shifted every row's height by one slot, corrupting the whole pagination plan.
@@ -637,7 +670,7 @@ const buildHtml = (
   <table class="report-table">
     <thead>${THEAD_HTML}</thead>
     <tbody>
-      ${bodyRows || `<tr><td colspan="8" style="text-align:center;color:${MUTED};padding:20px;">No weekly entries yet</td></tr>`}
+      ${bodyRows || `<tr><td colspan="9" style="text-align:center;color:${MUTED};padding:20px;">No weekly entries yet</td></tr>`}
     </tbody>
   </table>
 
