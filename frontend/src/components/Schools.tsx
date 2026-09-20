@@ -684,8 +684,8 @@ const SchoolModal = ({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      size="lg"
-      contentClassName="p-8"
+      size="2xl"
+      contentClassName="p-5 sm:p-8"
       title={
         <div className="flex items-center gap-4">
           <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-2xl">
@@ -703,8 +703,8 @@ const SchoolModal = ({
       }
     >
       <form onSubmit={handleSubmit} className="space-y-5">
-        <div className="grid grid-cols-2 gap-5">
-          <div className="col-span-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+          <div className="sm:col-span-2">
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 ml-1">
               School Name <span className="text-red-500">*</span>
             </label>
@@ -720,7 +720,7 @@ const SchoolModal = ({
             />
           </div>
 
-          <div className="col-span-2">
+          <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 ml-1">
               School Code
             </label>
@@ -739,7 +739,7 @@ const SchoolModal = ({
             </p>
           </div>
 
-          <div className="col-span-2 grid grid-cols-1 sm:grid-cols-3 gap-5">
+          <div className="sm:col-span-2 lg:col-span-3 grid grid-cols-1 sm:grid-cols-3 gap-5">
             {LOGO_SLOT_CONFIG.map(({ slot, title, hint, field }) => (
               <div key={slot}>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 ml-1">
@@ -814,7 +814,7 @@ const SchoolModal = ({
             />
           </div>
 
-          <div className="col-span-2">
+          <div className="sm:col-span-2 lg:col-span-1">
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 ml-1">
               Qualification Title
             </label>
@@ -833,43 +833,45 @@ const SchoolModal = ({
             </p>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 ml-1">
-              Contact Email
-            </label>
-            <input
-              type="email"
-              value={formData.contact_email || ""}
-              onChange={(e) =>
-                setFormData({
-                  ...formData,
-                  contact_email: e.target.value,
-                })
-              }
-              className="w-full px-4 py-3 bg-gray-50 dark:bg-slate-900/50 border border-gray-200 dark:border-slate-700/30 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all dark:text-white placeholder:text-gray-400"
-              placeholder="admin@school.com"
-            />
+          <div className="sm:col-span-2 lg:col-span-3 grid grid-cols-1 sm:grid-cols-2 gap-5">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 ml-1">
+                Contact Email
+              </label>
+              <input
+                type="email"
+                value={formData.contact_email || ""}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    contact_email: e.target.value,
+                  })
+                }
+                className="w-full px-4 py-3 bg-gray-50 dark:bg-slate-900/50 border border-gray-200 dark:border-slate-700/30 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all dark:text-white placeholder:text-gray-400"
+                placeholder="admin@school.com"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 ml-1">
+                Contact Phone
+              </label>
+              <input
+                type="tel"
+                value={formData.contact_phone || ""}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    contact_phone: e.target.value,
+                  })
+                }
+                className="w-full px-4 py-3 bg-gray-50 dark:bg-slate-900/50 border border-gray-200 dark:border-slate-700/30 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all dark:text-white placeholder:text-gray-400"
+                placeholder="+1 234..."
+              />
+            </div>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 ml-1">
-              Contact Phone
-            </label>
-            <input
-              type="tel"
-              value={formData.contact_phone || ""}
-              onChange={(e) =>
-                setFormData({
-                  ...formData,
-                  contact_phone: e.target.value,
-                })
-              }
-              className="w-full px-4 py-3 bg-gray-50 dark:bg-slate-900/50 border border-gray-200 dark:border-slate-700/30 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all dark:text-white placeholder:text-gray-400"
-              placeholder="+1 234..."
-            />
-          </div>
-
-          <div className="col-span-2">
+          <div className="sm:col-span-2 lg:col-span-3">
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 ml-1">
               Address
             </label>
@@ -884,7 +886,7 @@ const SchoolModal = ({
             />
           </div>
 
-          <div className="col-span-2">
+          <div className="sm:col-span-2 lg:col-span-3">
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 ml-1">
               Status
             </label>
