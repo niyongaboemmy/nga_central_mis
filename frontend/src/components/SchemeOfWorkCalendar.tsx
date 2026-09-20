@@ -52,7 +52,9 @@ import {
 } from "lucide-react";
 import SchemeManualEntry from "./SchemeManualEntry";
 import SchemeAIGenerate from "./SchemeAIGenerate";
+import SchemeTableEditor from "./SchemeTableEditor";
 import ConfirmModal from "./ui/ConfirmModal";
+import { Table2 } from "lucide-react";
 
 const SchemeOfWorkCalendar: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -137,6 +139,12 @@ const SchemeOfWorkCalendar: React.FC = () => {
 
   // Entry mode for empty state
   const [entryMode, setEntryMode] = useState<"choose" | "manual" | "upload" | "ai">("choose");
+
+  // Table editor — a PDF-styled, inline-editable review screen. Opens automatically right after
+  // AI generation or a DOCX upload completes (so mistakes get caught before the scheme is treated
+  // as final), and is also reachable any time afterwards via the "Edit Table" toolbar button.
+  const [isTableEditorOpen, setIsTableEditorOpen] = useState(false);
+  const [tableEditorIntro, setTableEditorIntro] = useState<string | undefined>(undefined);
 
   useEffect(() => {
     if (subjectId && classGroupId && academicTermId) {
@@ -320,9 +328,13 @@ const SchemeOfWorkCalendar: React.FC = () => {
 
     try {
       await schemeOfWorkApi.upload(formData);
-      showToast("Scheme uploaded successfully", "success");
+      showToast("Scheme uploaded successfully — review it below before you're done", "success");
       setFile(null);
-      loadData();
+      await loadData();
+      setTableEditorIntro(
+        "We've imported your document. Double-check every week came through correctly before you continue.",
+      );
+      setIsTableEditorOpen(true);
     } catch (error: any) {
       showToast(error.response?.data?.message || "Upload failed", "error");
     } finally {
@@ -1217,6 +1229,20 @@ const SchemeOfWorkCalendar: React.FC = () => {
                 <span>{isGeneratingReport ? "Generating..." : "Download PDF"}</span>
               </button>
 
+              {/* Table editor — the same PDF-styled inline-editable review screen shown right
+                  after AI generation/upload, reachable here any time for later touch-ups. */}
+              <button
+                onClick={() => {
+                  setTableEditorIntro(undefined);
+                  setIsTableEditorOpen(true);
+                }}
+                title="Edit this scheme in a table that matches the printed PDF"
+                className="hidden sm:flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-gray-400 transition-all shadow-sm"
+              >
+                <Table2 className="w-4 h-4" />
+                <span>Edit Table</span>
+              </button>
+
               {/* Cover Page details — sector/trade/qualification/etc. shown on the printed PDF */}
               <button
                 onClick={() => setIsCoverModalOpen(true)}
@@ -1422,7 +1448,13 @@ const SchemeOfWorkCalendar: React.FC = () => {
                 subjectName={subjectInfo?.name}
                 classGroupName={subjectInfo?.classGroupName}
                 termName={subjectInfo?.termName}
-                onComplete={() => { loadData(); }}
+                onComplete={async () => {
+                  await loadData();
+                  setTableEditorIntro(
+                    "AI just generated this scheme. Give it a quick review and fix anything before you continue — AI can make mistakes.",
+                  );
+                  setIsTableEditorOpen(true);
+                }}
                 onCancel={() => setEntryMode("choose")}
               />
             )}
@@ -1579,6 +1611,22 @@ const SchemeOfWorkCalendar: React.FC = () => {
             onSaved={loadData}
           />
         )}
+
+        <SchemeTableEditor
+          isOpen={isTableEditorOpen}
+          entries={entries}
+          scheme={schemeMetadata}
+          subjectId={subjectId}
+          classGroupId={classGroupId}
+          academicTermId={academicTermId}
+          subjectName={subjectInfo?.name}
+          classGroupName={subjectInfo?.classGroupName}
+          introMessage={tableEditorIntro}
+          onClose={() => {
+            setIsTableEditorOpen(false);
+            loadData();
+          }}
+        />
 
         <ConfirmModal
           isOpen={isDeleteSchemeConfirmOpen}
