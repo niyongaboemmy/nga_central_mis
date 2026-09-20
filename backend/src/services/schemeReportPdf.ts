@@ -451,14 +451,13 @@ const buildDurationContent = (r: SchemeReportRow): string =>
 
 /** The "Competence code and name" group's two real sub-columns (matching the reference
  * template): "Learning outcome (LO)" and "Duration" are both Learning-Outcome-level facts, so
- * they rowspan-merge together across a group exactly like the old single combined cell did. When
- * there's no linked Learning Outcome at all, there's nothing to show in Duration either, so the
- * "No Learning Outcome linked" message spans both sub-columns as one cell instead of leaving an
- * empty Duration cell beside it. `rowSpanAttr` is empty for the unspanned measurement pass. */
+ * they rowspan-merge together across a group exactly like the old single combined cell did.
+ * Duration always renders as its own bordered cell -- even for an unlinked group, where it just
+ * shows the placeholder dash -- so the column stays visually present and consistent down the
+ * whole table instead of disappearing whenever a week has no Learning Outcome linked.
+ * `rowSpanAttr` is empty for the unspanned measurement pass. */
 const buildLoDurationCells = (r: SchemeReportRow, rowSpanAttr: string): string =>
-  r.competencyId
-    ? `<td${rowSpanAttr} class="col-lo">${buildLoContent(r)}</td><td${rowSpanAttr} class="col-duration">${buildDurationContent(r)}</td>`
-    : `<td${rowSpanAttr} colspan="2">${buildLoContent(r)}</td>`;
+  `<td${rowSpanAttr} class="col-lo">${buildLoContent(r)}</td><td${rowSpanAttr} class="col-duration">${buildDurationContent(r)}</td>`;
 
 // The 9 leaf columns are: Weeks, Learning outcome, Duration, IC, Activities, Resources, Evidence,
 // Place, Observation. A skipped week only shows the Weeks cell and (on a group's first row) the
