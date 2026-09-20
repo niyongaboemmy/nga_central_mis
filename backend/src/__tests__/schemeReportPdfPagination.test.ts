@@ -5,10 +5,10 @@ import { planPagination, SchemeReportRow, SKIPPED_MERGED_COLSPAN } from "../serv
 // PDF export:
 //
 // 1. Skipped weeks rendered their merged "Skipped / Holiday" message cell with colspan=5, but
-//    the table has 8 columns (Weeks, Competence, IC, Activities, Resources, Evidence, Place,
-//    Observation) -- after the 2 real cells (Weeks, Competence), the message must span the
-//    remaining 6, not 5. The old off-by-one silently dropped the Observation column and
-//    misaligned every skipped row against the rest of the table.
+//    the table has 9 leaf columns (Weeks, Learning outcome, Duration, IC, Activities, Resources,
+//    Evidence, Place, Observation) -- after the 3 real cells (Weeks, Learning outcome, Duration),
+//    the message must span the remaining 6, not 5. The old off-by-one silently dropped the
+//    Observation column and misaligned every skipped row against the rest of the table.
 //
 // 2. Consecutive weeks sharing one Learning Outcome used to repeat the LO text on every row
 //    instead of a real rowspan-merged cell (a deliberate earlier workaround for a Chromium PDF
@@ -18,8 +18,8 @@ import { planPagination, SchemeReportRow, SKIPPED_MERGED_COLSPAN } from "../serv
 //    from real measured row heights, then only ever grouping rows into one rowspan when they
 //    land on the same computed page -- so a rowspan can never straddle a break.
 describe("SKIPPED_MERGED_COLSPAN", () => {
-  it("spans exactly the 6 remaining columns after Weeks and Competence", () => {
-    // 8 total columns - Weeks - Competence = 6.
+  it("spans exactly the 6 remaining columns after Weeks, Learning outcome, and Duration", () => {
+    // 9 leaf columns - Weeks - Learning outcome - Duration = 6.
     expect(SKIPPED_MERGED_COLSPAN).toBe(6);
   });
 });
@@ -37,6 +37,7 @@ describe("planPagination", () => {
     learning_place: "Classroom",
     observation: null,
     entry_status: "PLANNED",
+    duration: null,
     competencyId: null,
     competencyTitle: null,
     competencyElementNumber: null,

@@ -211,6 +211,11 @@ export interface SchemeReportRow {
   learning_place: string | null;
   observation: string | null;
   entry_status: string;
+  // Per-week duration (e.g. "5 hours", "Approx. 9-10 hours") -- SchemeOfWorkEntry.duration, a
+  // free-text field the teacher/AI fills in per entry. Distinct from competencyHours below (the
+  // Learning Outcome's total hours across all its weeks): the "Duration" table column shows this
+  // per-week value, one per row, not the LO-level total.
+  duration: string | null;
   competencyId: number | null;
   competencyTitle: string | null;
   competencyElementNumber: number | null;
@@ -310,6 +315,7 @@ async function buildReportData(schemeId: number) {
       learning_place: e.learning_place,
       observation: e.observation,
       entry_status: e.entry_status,
+      duration: e.duration,
       competencyId: e.competency_id,
       competencyTitle: competency?.title ?? null,
       competencyElementNumber: competency?.element_number ?? null,
@@ -446,25 +452,24 @@ const buildLoContent = (r: SchemeReportRow): string =>
     ? `<div style="font-weight:700;color:${INK};">Learning outcome ${r.competencyElementNumber}: ${escapeHtml(r.competencyTitle)}</div>`
     : `<div style="color:${FAINT};font-style:italic;">No Learning Outcome linked</div>`;
 
-const buildDurationContent = (r: SchemeReportRow): string =>
-  r.competencyHours ? `${r.competencyHours} hours` : "&mdash;";
+/** "Learning outcome (LO)" is a Learning-Outcome-level fact, so it rowspan-merges across a group
+ * (only rendered on the group's first row; `rowSpanAttr` is empty for the unspanned measurement
+ * pass). */
+const buildLoCell = (r: SchemeReportRow, rowSpanAttr: string): string =>
+  `<td${rowSpanAttr} class="col-lo">${buildLoContent(r)}</td>`;
 
-/** The "Competence code and name" group's two real sub-columns (matching the reference
- * template): "Learning outcome (LO)" and "Duration" are both Learning-Outcome-level facts, so
- * they rowspan-merge together across a group exactly like the old single combined cell did.
- * Duration always renders as its own bordered cell -- even for an unlinked group, where it just
- * shows the placeholder dash -- so the column stays visually present and consistent down the
- * whole table instead of disappearing whenever a week has no Learning Outcome linked.
- * `rowSpanAttr` is empty for the unspanned measurement pass. */
-const buildLoDurationCells = (r: SchemeReportRow, rowSpanAttr: string): string =>
-  `<td${rowSpanAttr} class="col-lo">${buildLoContent(r)}</td><td${rowSpanAttr} class="col-duration">${buildDurationContent(r)}</td>`;
+/** "Duration" is per-week (SchemeOfWorkEntry.duration, e.g. "5 hours" or "Approx. 9-10 hours"),
+ * not a Learning-Outcome-level total -- unlike the LO cell above, it renders on every row, never
+ * rowspan-merged, showing a placeholder dash when a week hasn't had a duration filled in. */
+const buildDurationCell = (r: SchemeReportRow): string =>
+  `<td class="col-duration">${escapeHtml(r.duration) || "&mdash;"}</td>`;
 
 // The 9 leaf columns are: Weeks, Learning outcome, Duration, IC, Activities, Resources, Evidence,
-// Place, Observation. A skipped week only shows the Weeks cell and (on a group's first row) the
-// Learning-outcome/Duration cells, plus one merged message cell -- that message cell must span
-// the remaining 6 columns (IC through Observation), not 5 (a previous version's off-by-one
-// silently dropped the Observation column and misaligned every skipped row against the rest of
-// the table).
+// Place, Observation. A skipped week only shows the Weeks cell, the per-week Duration cell, and
+// (on a group's first row) the Learning-outcome cell, plus one merged message cell -- that
+// message cell must span the remaining 6 columns (IC through Observation), not 5 (a previous
+// version's off-by-one silently dropped the Observation column and misaligned every skipped row
+// against the rest of the table).
 export const SKIPPED_MERGED_COLSPAN = 6;
 
 /** Builds one row's <td> cells only (no <tr> wrapper, no rowspan) -- used for the measurement
@@ -475,18 +480,21 @@ export const SKIPPED_MERGED_COLSPAN = 6;
  * row's height risks wasting a little space, underestimating risks overflow, so this errs toward
  * the safe side. */
 const buildMeasurementCellsHtml = (r: SchemeReportRow): string => {
-  const loDurationCells = buildLoDurationCells(r, "");
+  const loCell = buildLoCell(r, "");
+  const durationCell = buildDurationCell(r);
   if (r.entry_status === "SKIPPED") {
     return `
       <td>${weekRangeLabel(r.week_number, r.start_date, r.end_date)}</td>
-      ${loDurationCells}
+      ${loCell}
+      ${durationCell}
       <td colspan="${SKIPPED_MERGED_COLSPAN}" style="text-align:center;color:${MUTED};font-style:italic;background:#fafafa;">
         Skipped / Holiday &mdash; no lesson scheduled this week
       </td>`;
   }
   return `
       <td>${weekRangeLabel(r.week_number, r.start_date, r.end_date)}</td>
-      ${loDurationCells}
+      ${loCell}
+      ${durationCell}
       <td>${multilineHtml(r.topic)}</td>
       <td>${multilineHtml(r.methodology)}</td>
       <td>${multilineHtml(r.resources)}</td>
@@ -512,13 +520,17 @@ const buildFinalRowHtml = (r: SchemeReportRow, plan: PlanEntry): string => {
     .filter(Boolean)
     .join(" ");
   const rowAttr = classes ? ` class="${classes}"` : "";
-  const loDurationCells = plan.isGroupStart ? buildLoDurationCells(r, ` rowspan="${plan.rowSpan}"`) : "";
+  // Learning outcome is rowspan-merged (group-level, omitted on continuation rows) while Duration
+  // is per-week and always rendered, on every row -- see their doc comments above.
+  const loCell = plan.isGroupStart ? buildLoCell(r, ` rowspan="${plan.rowSpan}"`) : "";
+  const durationCell = buildDurationCell(r);
 
   if (r.entry_status === "SKIPPED") {
     return `
         <tr${rowAttr}>
           <td>${weekRangeLabel(r.week_number, r.start_date, r.end_date)}</td>
-          ${loDurationCells}
+          ${loCell}
+          ${durationCell}
           <td colspan="${SKIPPED_MERGED_COLSPAN}" style="text-align:center;color:${MUTED};font-style:italic;background:#fafafa;">
             Skipped / Holiday &mdash; no lesson scheduled this week
           </td>
@@ -528,7 +540,8 @@ const buildFinalRowHtml = (r: SchemeReportRow, plan: PlanEntry): string => {
   return `
         <tr${rowAttr}>
           <td>${weekRangeLabel(r.week_number, r.start_date, r.end_date)}</td>
-          ${loDurationCells}
+          ${loCell}
+          ${durationCell}
           <td>${multilineHtml(r.topic)}</td>
           <td>${multilineHtml(r.methodology)}</td>
           <td>${multilineHtml(r.resources)}</td>
