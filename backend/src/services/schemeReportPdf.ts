@@ -129,16 +129,18 @@ async function resolveLogoForHeader(value: string | null | undefined): Promise<s
  * doesn't send either). Set FRONTEND_URL in production to the real public domain. */
 const FRONTEND_BASE_URL = (process.env.FRONTEND_URL || "http://localhost:5173").replace(/\/+$/, "");
 
-/** Generates the small QR code printed in the running header of every page, encoding a link to
- * the public (unauthenticated) verification endpoint -- lets anyone holding a printed copy
- * confirm it was genuinely produced by this system. Returns null (never blocks the PDF) if QR
- * generation fails for any reason. */
+/** Generates the verification QR code printed once, on the last page next to the signature
+ * block (not repeated on every page -- see buildHtml), encoding a link to the public
+ * (unauthenticated) verification endpoint. Sized generously (280px source) since it's now a
+ * document-level feature next to the signatures, not a small running-header mark, so it stays
+ * crisp and easy to scan off a printed page. Returns null (never blocks the PDF) if QR generation
+ * fails for any reason. */
 async function buildVerificationQr(schemeId: number): Promise<string | null> {
   try {
     const verifyUrl = `${FRONTEND_BASE_URL}/verify/${schemeId}`;
     return await QRCode.toDataURL(verifyUrl, {
       margin: 0,
-      width: 96,
+      width: 280,
       color: { dark: INK, light: "#ffffff" },
     });
   } catch (err) {
@@ -163,35 +165,24 @@ async function buildVerificationQr(schemeId: number): Promise<string | null> {
 // MARGIN_SIDE_MM as the body content below, so the header/footer visually lines up with the
 // page's actual side margins instead of sitting flush against the paper edge.
 //
-// The running header repeated on every page shows the school's mark top-left -- matching the
-// correct template (its header is one logo image with the academy's wordmark baked in, not two
-// side-by-side marks; that's only true of the cover page) -- and a verification QR code top-right
-// so a printed/scanned copy can be confirmed genuine. The logo is School.documents_logo
+// The running header repeated on every page shows the school's mark top-left, sized generously
+// (48px) to read as a real document header rather than a small watermark -- matching the correct
+// template (its header is one logo image with the academy's wordmark baked in, not two
+// side-by-side marks; that's only true of the cover page). This logo is School.documents_logo
 // specifically (a mark dedicated to reports/documents, distinct from the two cover-page logo
 // slots), falling back to School.logo so a school that hasn't set the new field yet doesn't lose
-// its header logo.
-const buildHeaderTemplate = (
-  documentsLogo: string | null,
-  schoolName: string,
-  verificationQr: string | null,
-) => `
+// its header logo. The verification QR code lives once in the document body next to the
+// signatures (see buildHtml), not repeated here on every page.
+const buildHeaderTemplate = (documentsLogo: string | null, schoolName: string) => `
   <table style="width:100%;box-sizing:border-box;padding:0 ${MARGIN_SIDE_MM}mm;font-family:${FONT};border-collapse:collapse;">
     <tr>
       <td style="text-align:left;vertical-align:middle;">
         ${
           documentsLogo
-            ? `<img src="${documentsLogo}" style="height:34px;width:auto;max-width:200px;vertical-align:middle;" />`
+            ? `<img src="${documentsLogo}" style="height:48px;width:auto;max-width:260px;vertical-align:middle;" />`
             : schoolName
-              ? `<span style="font-size:11px;font-weight:700;color:${INK};">${escapeHtml(schoolName)}</span>`
+              ? `<span style="font-size:13px;font-weight:700;color:${INK};">${escapeHtml(schoolName)}</span>`
               : ""
-        }
-      </td>
-      <td style="text-align:right;vertical-align:middle;white-space:nowrap;">
-        ${
-          verificationQr
-            ? `<img src="${verificationQr}" style="height:32px;width:32px;vertical-align:middle;" />
-               <div style="font-size:5.5px;color:${MUTED};letter-spacing:0.3px;text-transform:uppercase;margin-top:1px;">Scan to verify</div>`
-            : ""
         }
       </td>
     </tr>
@@ -346,7 +337,7 @@ async function buildReportData(schemeId: number) {
 const PX_PER_MM = 96 / 25.4;
 const PAGE_WIDTH_MM = 297; // A4 landscape
 const PAGE_HEIGHT_MM = 210;
-const MARGIN_TOP_MM = 16;
+const MARGIN_TOP_MM = 20; // roomier than the body's other margins so a professionally-sized header logo has space to breathe
 const MARGIN_BOTTOM_MM = 14;
 const MARGIN_SIDE_MM = 10;
 const CONTENT_WIDTH_PX = Math.round((PAGE_WIDTH_MM - 2 * MARGIN_SIDE_MM) * PX_PER_MM);
@@ -361,11 +352,16 @@ const PAGE_CSS = `
   .detail-table td { padding: 3px 8px; }
   .detail-table tr:nth-child(even) { background: #fbfaf7; }
   .module-divider td { text-align: left; background: ${INK}; color: #fff; font-weight: 700; padding: 3px 8px; font-size: 10px; }
-  .signatures { margin-top: 18px; page-break-inside: avoid; }
+  .signatures { margin-top: 18px; page-break-inside: avoid; display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; }
+  .sig-names { flex: 1; }
   .sig-block { margin-bottom: 12px; }
   .sig-label { font-weight: 700; color: ${INK}; }
   .sig-name { color: ${BODY}; }
   .sig-title { color: ${MUTED}; }
+  .verify-block { flex-shrink: 0; text-align: center; }
+  .verify-block img { width: 64px; height: 64px; display: block; margin: 0 auto 4px; }
+  .verify-block .verify-label { font-size: 8px; font-weight: 700; letter-spacing: 0.4px; text-transform: uppercase; color: ${MUTED}; }
+  .verify-block .verify-ref { font-size: 7px; color: ${FAINT}; margin-top: 1px; }
   table.report-table { width: 100%; border-collapse: collapse; font-size: 8.5px; line-height: 1.3; }
   table.report-table thead { display: table-header-group; }
   table.report-table th {
@@ -618,6 +614,7 @@ const buildHtml = (
   numberOfClasses: number,
   rows: SchemeReportRow[],
   plan: PlanEntry[],
+  verificationQr: string | null,
 ): string => {
   const trainerName = `${scheme.first_name || ""} ${scheme.last_name || ""}`.trim() || "N/A";
   const subjectLabel = scheme.subject_code
@@ -645,15 +642,26 @@ const buildHtml = (
   </table>
 
   <div class="signatures">
-    <div class="sig-block">
-      <div class="sig-label">Trainer's name and Signature:</div>
-      <div class="sig-name">${escapeHtml(trainerName)}${scheme.trainer_signed ? " &mdash; Signed" : ""}</div>
+    <div class="sig-names">
+      <div class="sig-block">
+        <div class="sig-label">Trainer's name and Signature:</div>
+        <div class="sig-name">${escapeHtml(trainerName)}${scheme.trainer_signed ? " &mdash; Signed" : ""}</div>
+      </div>
+      <div class="sig-block">
+        <div class="sig-label">Verified and approved by:</div>
+        <div class="sig-name">${escapeHtml(scheme.approver_name || "N/A")}${scheme.approver_signed ? " &mdash; Signed" : ""}</div>
+        ${scheme.approver_title ? `<div class="sig-title">${escapeHtml(scheme.approver_title)}</div>` : ""}
+      </div>
     </div>
-    <div class="sig-block">
-      <div class="sig-label">Verified and approved by:</div>
-      <div class="sig-name">${escapeHtml(scheme.approver_name || "N/A")}${scheme.approver_signed ? " &mdash; Signed" : ""}</div>
-      ${scheme.approver_title ? `<div class="sig-title">${escapeHtml(scheme.approver_title)}</div>` : ""}
-    </div>
+    ${
+      verificationQr
+        ? `<div class="verify-block">
+             <img src="${verificationQr}" />
+             <div class="verify-label">Scan to verify</div>
+             <div class="verify-ref">Ref #${scheme.scheme_id}</div>
+           </div>`
+        : ""
+    }
   </div>
 </body>
 </html>`;
@@ -694,9 +702,11 @@ async function printHtmlToPdf(
  * pixel-identical -- there is exactly one renderer. The school's documents_logo (or its primary
  * cover-page logo, as a fallback) repeats in a running header and "{School} | {Module} — {Term}
  * Scheme of Work | Page N" repeats in a running footer on every page, matching the reference
- * template exactly. Learning Outcome groups are genuinely
- * rowspan-merged (not just repeated), computed by planPagination so a merge never straddles a
- * page break -- see its doc comment for why that matters. */
+ * template exactly. A verification QR code appears once, next to the signature block at the end
+ * of the document (so only on the last page, since it's part of the flowing content rather than a
+ * repeating header/footer element) -- see buildVerificationQr. Learning Outcome groups are
+ * genuinely rowspan-merged (not just repeated), computed by planPagination so a merge never
+ * straddles a page break -- see its doc comment for why that matters. */
 export async function renderSchemeOfWorkPdf(schemeId: number): Promise<Buffer> {
   const { scheme, school, rows, numberOfClasses } = await buildReportData(schemeId);
   // Reports/documents header uses the dedicated documents_logo when a school has set one, and
@@ -722,7 +732,7 @@ export async function renderSchemeOfWorkPdf(schemeId: number): Promise<Buffer> {
   try {
     const heights = await measureLayout(browser, topBlockHtml, rows);
     const plan = planPagination(rows, heights);
-    const html = buildHtml(scheme, school, numberOfClasses, rows, plan);
+    const html = buildHtml(scheme, school, numberOfClasses, rows, plan, verificationQr);
 
     const footerLabel = [
       school?.name,
@@ -730,7 +740,7 @@ export async function renderSchemeOfWorkPdf(schemeId: number): Promise<Buffer> {
     ]
       .filter(Boolean)
       .join(" | ");
-    const headerTemplate = buildHeaderTemplate(headerLogo, school?.name || "", verificationQr);
+    const headerTemplate = buildHeaderTemplate(headerLogo, school?.name || "");
     const footerTemplate = buildFooterTemplate(`${footerLabel}${footerLabel ? " | Page" : "Page"}`);
 
     return await printHtmlToPdf(browser, html, headerTemplate, footerTemplate);
