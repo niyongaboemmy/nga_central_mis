@@ -668,6 +668,13 @@ const SchoolModal = ({
     setUploadingSlot(slot);
     try {
       await uploadSchoolLogo(school.school_id, file, slot);
+      const field = LOGO_SLOT_CONFIG.find((c) => c.slot === slot)!.field;
+      // formData[field] is what gates showing the <img> below vs. the placeholder icon --
+      // it was never set after a fresh upload (only logoVersion was bumped), so a school that
+      // didn't already have this slot filled in kept showing the empty-state icon until the
+      // whole modal was reopened. The actual image bytes come from getSchoolLogoUrl/logoVersion,
+      // not this value, so any truthy placeholder is enough to flip the gate.
+      setFormData((prev) => ({ ...prev, [field]: "uploaded" }));
       setLogoVersion((v) => v + 1);
       showToast(`${LOGO_SLOT_LABELS[slot]} uploaded`, "success");
     } catch (error: any) {
