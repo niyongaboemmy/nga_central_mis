@@ -636,6 +636,9 @@ export const School = mysqlTable("School", {
   // -- migration 078. `logo` is the primary/left mark, this is the
   // secondary/right one (partner programme, etc.).
   partner_logo: varchar("partner_logo", { length: 500 }),
+  // Dedicated logo for reports/documents (e.g. the Scheme of Work PDF's running header on every
+  // page) -- migration 080. Distinct from logo/partner_logo, which are the two cover-page slots.
+  documents_logo: varchar("documents_logo", { length: 500 }),
   // Report/PDF cover-page fields (migration 079) -- Sector/Trade/Qualification are the same for
   // every scheme this school produces, so they live here rather than being re-entered per scheme.
   sector: varchar("sector", { length: 100 }),

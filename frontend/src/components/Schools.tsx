@@ -28,6 +28,7 @@ import {
   uploadSchoolLogo,
   getSchoolLogoUrl,
   School,
+  SchoolLogoSlot,
 } from "../api/schools";
 import {
   getSystems,
@@ -591,7 +592,7 @@ const SchoolModal = ({
     status: "ACTIVE",
   });
   const [loading, setLoading] = useState(false);
-  const [uploadingSlot, setUploadingSlot] = useState<"primary" | "partner" | null>(null);
+  const [uploadingSlot, setUploadingSlot] = useState<SchoolLogoSlot | null>(null);
   // Bumps whenever a logo is (re)uploaded so the <img> cache-busts instead of showing the old
   // file at the same URL.
   const [logoVersion, setLogoVersion] = useState(0);
@@ -640,13 +641,35 @@ const SchoolModal = ({
     }
   };
 
-  const handleLogoFile = async (slot: "primary" | "partner", file: File | null) => {
+  const LOGO_SLOT_LABELS: Record<SchoolLogoSlot, string> = {
+    primary: "Logo",
+    partner: "Partner logo",
+    documents: "Documents logo",
+  };
+
+  const LOGO_SLOT_CONFIG: {
+    slot: SchoolLogoSlot;
+    title: string;
+    hint: string;
+    field: "logo" | "partner_logo" | "documents_logo";
+  }[] = [
+    { slot: "primary", title: "Logo", hint: "(cover page, left)", field: "logo" },
+    { slot: "partner", title: "Partner Logo", hint: "(cover page, right)", field: "partner_logo" },
+    {
+      slot: "documents",
+      title: "Documents Logo",
+      hint: "(reports & PDF header)",
+      field: "documents_logo",
+    },
+  ];
+
+  const handleLogoFile = async (slot: SchoolLogoSlot, file: File | null) => {
     if (!file || !school) return;
     setUploadingSlot(slot);
     try {
       await uploadSchoolLogo(school.school_id, file, slot);
       setLogoVersion((v) => v + 1);
-      showToast(`${slot === "primary" ? "Logo" : "Partner logo"} uploaded`, "success");
+      showToast(`${LOGO_SLOT_LABELS[slot]} uploaded`, "success");
     } catch (error: any) {
       showToast(
         error.response?.data?.message || "Failed to upload logo",
@@ -716,21 +739,16 @@ const SchoolModal = ({
             </p>
           </div>
 
-          <div className="col-span-2 grid grid-cols-2 gap-5">
-            {(["primary", "partner"] as const).map((slot) => (
+          <div className="col-span-2 grid grid-cols-1 sm:grid-cols-3 gap-5">
+            {LOGO_SLOT_CONFIG.map(({ slot, title, hint, field }) => (
               <div key={slot}>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 ml-1">
-                  {slot === "primary" ? "Logo" : "Partner Logo"}
-                  <span className="text-gray-400 font-normal ml-1">
-                    {slot === "primary"
-                      ? "(cover page, left)"
-                      : "(cover page, right)"}
-                  </span>
+                  {title}
+                  <span className="text-gray-400 font-normal ml-1">{hint}</span>
                 </label>
                 <div className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-slate-900/50 border border-gray-200 dark:border-slate-700/30 rounded-xl">
                   <div className="w-14 h-14 rounded-lg bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 flex items-center justify-center overflow-hidden shrink-0">
-                    {school &&
-                    (slot === "primary" ? formData.logo : formData.partner_logo) ? (
+                    {school && formData[field] ? (
                       <img
                         src={getSchoolLogoUrl(school.school_id, slot, logoVersion || undefined)}
                         alt={`${slot} logo`}

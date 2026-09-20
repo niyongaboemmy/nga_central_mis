@@ -17,6 +17,7 @@ export const createSchool = async (req: Request, res: Response) => {
       sector,
       trade,
       qualification_title,
+      documents_logo,
     } = req.body;
 
     const existingSchool = await db
@@ -52,6 +53,7 @@ export const createSchool = async (req: Request, res: Response) => {
       sector: sector || null,
       trade: trade || null,
       qualification_title: qualification_title || null,
+      documents_logo: documents_logo || null,
     });
 
     res.status(201).json({ message: "School created successfully" });
@@ -104,6 +106,7 @@ export const updateSchool = async (req: Request, res: Response) => {
       sector,
       trade,
       qualification_title,
+      documents_logo,
     } = req.body;
 
     const existingSchool = await db
@@ -155,6 +158,7 @@ export const updateSchool = async (req: Request, res: Response) => {
         trade: trade !== undefined ? trade || null : undefined,
         qualification_title:
           qualification_title !== undefined ? qualification_title || null : undefined,
+        documents_logo: documents_logo !== undefined ? documents_logo || null : undefined,
       })
       .where(eq(School.school_id, Number(id)));
 
@@ -165,17 +169,31 @@ export const updateSchool = async (req: Request, res: Response) => {
   }
 };
 
+type LogoSlot = "primary" | "partner" | "documents";
+
+const LOGO_SLOT_COLUMN: Record<LogoSlot, "logo" | "partner_logo" | "documents_logo"> = {
+  primary: "logo",
+  partner: "partner_logo",
+  documents: "documents_logo",
+};
+
+const parseLogoSlot = (value: unknown): LogoSlot =>
+  value === "partner" ? "partner" : value === "documents" ? "documents" : "primary";
+
 /**
  * Uploads a logo image and stores its file-server path on School.logo (`slot: "primary"`, the
- * default) or School.partner_logo (`slot: "partner"`) -- used for the Scheme of Work PDF's two
- * cover-page logo slots (both dynamic, per product decision). Stored as a remote file-server path
- * (same convention as SubjectDocument.file_path elsewhere in the app), not a full URL --
+ * default), School.partner_logo (`slot: "partner"`), or School.documents_logo
+ * (`slot: "documents"`). `logo`/`partner_logo` are the Scheme of Work PDF's two cover-page logo
+ * slots; `documents_logo` is the separate mark used in the running header repeated on every page
+ * of reports/documents (e.g. the Scheme of Work PDF header) -- schools may want a simplified
+ * version there rather than reusing a cover-page logo. Stored as a remote file-server path (same
+ * convention as SubjectDocument.file_path elsewhere in the app), not a full URL --
  * schemeReportPdf.ts resolves it at render time.
  */
 export const uploadSchoolLogo = async (req: Request & { file?: Express.Multer.File }, res: Response) => {
   try {
     const { id } = req.params;
-    const slot = req.body.slot === "partner" ? "partner" : "primary";
+    const slot = parseLogoSlot(req.body.slot);
 
     if (!req.file) {
       return res.status(400).json({ message: "No file uploaded" });
@@ -197,7 +215,7 @@ export const uploadSchoolLogo = async (req: Request & { file?: Express.Multer.Fi
 
     await db
       .update(School)
-      .set(slot === "partner" ? { partner_logo: remotePath } : { logo: remotePath })
+      .set({ [LOGO_SLOT_COLUMN[slot]]: remotePath })
       .where(eq(School.school_id, Number(id)));
 
     res.status(200).json({ message: "Logo uploaded successfully", path: remotePath, slot });
@@ -217,8 +235,8 @@ export const uploadSchoolLogo = async (req: Request & { file?: Express.Multer.Fi
 export const getSchoolLogo = async (req: Request, res: Response) => {
   try {
     const { id, slot } = req.params;
-    if (slot !== "primary" && slot !== "partner") {
-      return res.status(400).json({ message: "slot must be 'primary' or 'partner'" });
+    if (slot !== "primary" && slot !== "partner" && slot !== "documents") {
+      return res.status(400).json({ message: "slot must be 'primary', 'partner', or 'documents'" });
     }
 
     const [school] = await db
@@ -230,7 +248,7 @@ export const getSchoolLogo = async (req: Request, res: Response) => {
       return res.status(404).json({ message: "School not found" });
     }
 
-    const value = slot === "partner" ? school.partner_logo : school.logo;
+    const value = school[LOGO_SLOT_COLUMN[slot]];
     if (!value) {
       return res.status(404).json({ message: "No logo set for this slot" });
     }

@@ -9,6 +9,9 @@ export interface School {
   contact_phone?: string;
   logo?: string;
   partner_logo?: string;
+  // Dedicated logo for reports/documents (e.g. the Scheme of Work PDF's running header on every
+  // page) -- distinct from logo/partner_logo, which are the two cover-page slots.
+  documents_logo?: string;
   // Scheme of Work PDF cover-page fields, shared by every scheme this school produces.
   sector?: string;
   trade?: string;
@@ -18,11 +21,13 @@ export interface School {
   updated_at?: string;
 }
 
+export type SchoolLogoSlot = "primary" | "partner" | "documents";
+
 /** Public, unauthenticated image URL for a school's logo -- safe to use directly in <img src>.
  * Appends a cache-busting param since a re-upload keeps the same URL shape otherwise. */
 export const getSchoolLogoUrl = (
   schoolId: number,
-  slot: "primary" | "partner" = "primary",
+  slot: SchoolLogoSlot = "primary",
   cacheBust?: string | number,
 ): string =>
   `${API_BASE_URL}/schools/${schoolId}/logo/${slot}${cacheBust ? `?t=${cacheBust}` : ""}`;
@@ -30,7 +35,7 @@ export const getSchoolLogoUrl = (
 export const uploadSchoolLogo = async (
   schoolId: number,
   file: File,
-  slot: "primary" | "partner" = "primary",
+  slot: SchoolLogoSlot = "primary",
 ): Promise<void> => {
   const formData = new FormData();
   formData.append("file", file);

@@ -72,21 +72,23 @@ const weekRangeLabel = (weekNumber: string | null, start: unknown, end: unknown)
  * downloaded/base64-inlined, since Puppeteer's isolated page has no session/API-key context to
  * fetch it through the normal authenticated download flow. Returns null (never a bundled
  * fallback image) when there's nothing to show or the fetch fails. */
+function mimeFromExt(value: string): string {
+  const ext = value.split(".").pop()?.toLowerCase();
+  return ext === "jpg" || ext === "jpeg"
+    ? "image/jpeg"
+    : ext === "svg"
+      ? "image/svg+xml"
+      : ext === "webp"
+        ? "image/webp"
+        : "image/png";
+}
+
 async function resolveLogoSrc(value: string | null | undefined): Promise<string | null> {
   if (!value) return null;
   if (/^https?:\/\//i.test(value)) return value;
   try {
     const buffer = await storageService.downloadToBuffer(value);
-    const ext = value.split(".").pop()?.toLowerCase();
-    const mime =
-      ext === "jpg" || ext === "jpeg"
-        ? "image/jpeg"
-        : ext === "svg"
-          ? "image/svg+xml"
-          : ext === "webp"
-            ? "image/webp"
-            : "image/png";
-    return `data:${mime};base64,${buffer.toString("base64")}`;
+    return `data:${mimeFromExt(value)};base64,${buffer.toString("base64")}`;
   } catch (err) {
     logger.warn("Failed to resolve logo for Scheme of Work PDF", {
       value,
@@ -96,23 +98,51 @@ async function resolveLogoSrc(value: string | null | undefined): Promise<string 
   }
 }
 
+/* Puppeteer's headerTemplate/footerTemplate renders in an isolated frame that cannot fetch
+ * external resources -- a plain http(s) <img src> silently renders blank there (unlike the main
+ * page, which can load remote images fine). So the header logo specifically must always be a
+ * data: URI, even when the stored value is already a full external URL. */
+async function resolveLogoForHeader(value: string | null | undefined): Promise<string | null> {
+  if (!value) return null;
+  if (/^https?:\/\//i.test(value)) {
+    try {
+      const res = await fetch(value);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const buffer = Buffer.from(await res.arrayBuffer());
+      const contentType = res.headers.get("content-type") || mimeFromExt(value);
+      return `data:${contentType};base64,${buffer.toString("base64")}`;
+    } catch (err) {
+      logger.warn("Failed to fetch remote logo for Scheme of Work PDF header", {
+        value,
+        error: (err as Error).message,
+      });
+      return null;
+    }
+  }
+  return resolveLogoSrc(value);
+}
+
 // Puppeteer renders headerTemplate/footerTemplate in a constrained frame with no access to the
 // page's own <style> or external stylesheets, and only inline styles reliably apply there (same
 // constraint documented in pdfExport.ts for Lesson Notes) -- every rule below is inlined.
-const buildHeaderTemplate = (logo1: string | null, logo2: string | null, schoolName: string) => `
+//
+// The running header repeated on every page shows a single logo, top-left -- matching the
+// correct template exactly (its header is one logo image with the academy's wordmark baked in,
+// not two side-by-side marks; that's only true of the cover page). This logo is
+// School.documents_logo specifically (a mark dedicated to reports/documents, distinct from the
+// two cover-page logo slots), falling back to School.logo so a school that hasn't set the new
+// field yet doesn't lose its header logo.
+const buildHeaderTemplate = (documentsLogo: string | null, schoolName: string) => `
   <table style="width:100%;font-family:${FONT};border-collapse:collapse;margin:0 10mm;">
     <tr>
       <td style="text-align:left;vertical-align:middle;">
         ${
-          logo1
-            ? `<img src="${logo1}" style="height:20px;width:auto;vertical-align:middle;" />`
+          documentsLogo
+            ? `<img src="${documentsLogo}" style="height:20px;width:auto;vertical-align:middle;" />`
             : schoolName
               ? `<span style="font-size:9px;font-weight:700;color:${INK};">${escapeHtml(schoolName)}</span>`
               : ""
         }
-      </td>
-      <td style="text-align:right;vertical-align:middle;">
-        ${logo2 ? `<img src="${logo2}" style="height:20px;width:auto;vertical-align:middle;" />` : ""}
       </td>
     </tr>
   </table>
@@ -536,8 +566,6 @@ const buildHtml = (
   scheme: Awaited<ReturnType<typeof buildReportData>>["scheme"],
   school: Awaited<ReturnType<typeof buildReportData>>["school"],
   numberOfClasses: number,
-  logo1: string | null,
-  logo2: string | null,
   rows: SchemeReportRow[],
   plan: PlanEntry[],
 ): string => {
@@ -613,17 +641,20 @@ async function printHtmlToPdf(
 /** Renders the full Scheme of Work report (identification block, weekly table, and signatures --
  * one continuous flowing document, matching the correct printed template) to a PDF buffer. Used
  * by both the preview (streamed inline) and download endpoints, so preview and export are always
- * pixel-identical -- there is exactly one renderer. The school logo(s) repeat in a running header
- * and "{School} | {Module} — {Term} Scheme of Work | Page N" repeats in a running footer on every
- * page, matching the reference template exactly. Learning Outcome groups are genuinely
+ * pixel-identical -- there is exactly one renderer. The school's documents_logo (or its primary
+ * cover-page logo, as a fallback) repeats in a running header and "{School} | {Module} — {Term}
+ * Scheme of Work | Page N" repeats in a running footer on every page, matching the reference
+ * template exactly. Learning Outcome groups are genuinely
  * rowspan-merged (not just repeated), computed by planPagination so a merge never straddles a
  * page break -- see its doc comment for why that matters. */
 export async function renderSchemeOfWorkPdf(schemeId: number): Promise<Buffer> {
   const { scheme, school, rows, numberOfClasses } = await buildReportData(schemeId);
-  const [logo1, logo2] = await Promise.all([
-    resolveLogoSrc(school?.logo),
-    resolveLogoSrc(school?.partner_logo),
-  ]);
+  // Reports/documents header uses the dedicated documents_logo when a school has set one, and
+  // falls back to the primary cover-page logo otherwise (so nothing goes blank for a school that
+  // simply hasn't uploaded the new, more specific logo yet). Resolved via resolveLogoForHeader
+  // (always a data: URI), since Puppeteer's header/footer frame can't fetch external http(s)
+  // images the way the main page can.
+  const headerLogo = await resolveLogoForHeader(school?.documents_logo || school?.logo);
 
   const trainerName = `${scheme.first_name || ""} ${scheme.last_name || ""}`.trim() || "N/A";
   const subjectLabel = scheme.subject_code
@@ -640,7 +671,7 @@ export async function renderSchemeOfWorkPdf(schemeId: number): Promise<Buffer> {
   try {
     const heights = await measureLayout(browser, topBlockHtml, rows);
     const plan = planPagination(rows, heights);
-    const html = buildHtml(scheme, school, numberOfClasses, logo1, logo2, rows, plan);
+    const html = buildHtml(scheme, school, numberOfClasses, rows, plan);
 
     const footerLabel = [
       school?.name,
@@ -648,7 +679,7 @@ export async function renderSchemeOfWorkPdf(schemeId: number): Promise<Buffer> {
     ]
       .filter(Boolean)
       .join(" | ");
-    const headerTemplate = buildHeaderTemplate(logo1, logo2, school?.name || "");
+    const headerTemplate = buildHeaderTemplate(headerLogo, school?.name || "");
     const footerTemplate = buildFooterTemplate(`${footerLabel}${footerLabel ? " | Page" : "Page"}`);
 
     return await printHtmlToPdf(browser, html, headerTemplate, footerTemplate);
