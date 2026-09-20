@@ -14,6 +14,7 @@ import {
   assignEntryCompetency,
   updateSchemeCoverDetails,
   getSchemePdf,
+  getSchemeVerification,
 } from "../controllers/schemeOfWorkController";
 import {
   startAIGeneration,
@@ -45,7 +46,12 @@ const uploadCurriculum = multer({
   },
 });
 
-// All routes are protected
+// Public verification lookup for the QR code printed on every exported PDF -- must stay
+// unauthenticated (a scanner has no session) and registered before the blanket authenticate()
+// below, which protects every other route in this file.
+router.get("/verify/:schemeId", getSchemeVerification);
+
+// All other routes are protected
 router.use(authenticate);
 
 // Upload and extract scheme from DOCX

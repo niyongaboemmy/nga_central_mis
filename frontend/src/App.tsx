@@ -52,6 +52,7 @@ import SharedLessonNotesPage from "./components/lessonNotes/SharedLessonNotesPag
 import SharedLessonNoteViewPage from "./components/lessonNotes/SharedLessonNoteViewPage";
 import CombinedLessonNotesPage from "./components/lessonNotes/CombinedLessonNotesPage";
 import EnrollmentManager from "./components/enrollment/EnrollmentManager";
+import SchemeVerifyPage from "./components/SchemeVerifyPage";
 
 const LoginPage: React.FC = () => {
   const navigate = useNavigate();
@@ -294,6 +295,11 @@ function App() {
               path="/password-recovery"
               element={<Navigate to="/login" replace />}
             />
+
+            {/* Public Scheme of Work verification page — the destination of the QR code printed
+                on every exported PDF. Deliberately unwrapped (no ProtectedRoute/PublicRoute):
+                it must render identically for an anonymous scanner and a logged-in user. */}
+            <Route path="/verify/:schemeId" element={<SchemeVerifyPage />} />
 
             {/* Dashboard - protected with sidebar */}
             <Route

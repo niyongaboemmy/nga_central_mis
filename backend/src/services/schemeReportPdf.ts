@@ -1,5 +1,6 @@
 /// <reference lib="dom" />
 import puppeteer, { Browser } from "puppeteer";
+import QRCode from "qrcode";
 import { db } from "../db";
 import { eq, and, inArray } from "drizzle-orm";
 import {
@@ -122,26 +123,75 @@ async function resolveLogoForHeader(value: string | null | undefined): Promise<s
   return resolveLogoSrc(value);
 }
 
+/** Base URL of the deployed frontend, used only to build the verification link encoded in the
+ * QR code below -- falls back to the local dev server since this app has never needed a
+ * frontend-linking env var before now (unlike password-reset emails etc., which this codebase
+ * doesn't send either). Set FRONTEND_URL in production to the real public domain. */
+const FRONTEND_BASE_URL = (process.env.FRONTEND_URL || "http://localhost:5173").replace(/\/+$/, "");
+
+/** Generates the small QR code printed in the running header of every page, encoding a link to
+ * the public (unauthenticated) verification endpoint -- lets anyone holding a printed copy
+ * confirm it was genuinely produced by this system. Returns null (never blocks the PDF) if QR
+ * generation fails for any reason. */
+async function buildVerificationQr(schemeId: number): Promise<string | null> {
+  try {
+    const verifyUrl = `${FRONTEND_BASE_URL}/verify/${schemeId}`;
+    return await QRCode.toDataURL(verifyUrl, {
+      margin: 0,
+      width: 96,
+      color: { dark: INK, light: "#ffffff" },
+    });
+  } catch (err) {
+    logger.warn("Failed to generate verification QR code for Scheme of Work PDF", {
+      schemeId,
+      error: (err as Error).message,
+    });
+    return null;
+  }
+}
+
 // Puppeteer renders headerTemplate/footerTemplate in a constrained frame with no access to the
 // page's own <style> or external stylesheets, and only inline styles reliably apply there (same
 // constraint documented in pdfExport.ts for Lesson Notes) -- every rule below is inlined.
 //
-// The running header repeated on every page shows a single logo, top-left -- matching the
-// correct template exactly (its header is one logo image with the academy's wordmark baked in,
-// not two side-by-side marks; that's only true of the cover page). This logo is
-// School.documents_logo specifically (a mark dedicated to reports/documents, distinct from the
-// two cover-page logo slots), falling back to School.logo so a school that hasn't set the new
-// field yet doesn't lose its header logo.
-const buildHeaderTemplate = (documentsLogo: string | null, schoolName: string) => `
-  <table style="width:100%;font-family:${FONT};border-collapse:collapse;margin:0 10mm;">
+// Chromium's header/footer frame always spans the FULL page width, ignoring the left/right
+// margins passed to page.pdf() -- those only carve out the body content's margin, not the
+// header/footer's. Using CSS `margin` on the inner table (the previous approach) doesn't fix
+// this: width:100% plus an additional margin just pushes the box past the frame's right edge
+// instead of insetting it symmetrically. `padding` with `box-sizing:border-box` keeps the table
+// at exactly 100% of the frame while insetting its content on both sides -- using the same
+// MARGIN_SIDE_MM as the body content below, so the header/footer visually lines up with the
+// page's actual side margins instead of sitting flush against the paper edge.
+//
+// The running header repeated on every page shows the school's mark top-left -- matching the
+// correct template (its header is one logo image with the academy's wordmark baked in, not two
+// side-by-side marks; that's only true of the cover page) -- and a verification QR code top-right
+// so a printed/scanned copy can be confirmed genuine. The logo is School.documents_logo
+// specifically (a mark dedicated to reports/documents, distinct from the two cover-page logo
+// slots), falling back to School.logo so a school that hasn't set the new field yet doesn't lose
+// its header logo.
+const buildHeaderTemplate = (
+  documentsLogo: string | null,
+  schoolName: string,
+  verificationQr: string | null,
+) => `
+  <table style="width:100%;box-sizing:border-box;padding:0 ${MARGIN_SIDE_MM}mm;font-family:${FONT};border-collapse:collapse;">
     <tr>
       <td style="text-align:left;vertical-align:middle;">
         ${
           documentsLogo
-            ? `<img src="${documentsLogo}" style="height:20px;width:auto;vertical-align:middle;" />`
+            ? `<img src="${documentsLogo}" style="height:34px;width:auto;max-width:200px;vertical-align:middle;" />`
             : schoolName
-              ? `<span style="font-size:9px;font-weight:700;color:${INK};">${escapeHtml(schoolName)}</span>`
+              ? `<span style="font-size:11px;font-weight:700;color:${INK};">${escapeHtml(schoolName)}</span>`
               : ""
+        }
+      </td>
+      <td style="text-align:right;vertical-align:middle;white-space:nowrap;">
+        ${
+          verificationQr
+            ? `<img src="${verificationQr}" style="height:32px;width:32px;vertical-align:middle;" />
+               <div style="font-size:5.5px;color:${MUTED};letter-spacing:0.3px;text-transform:uppercase;margin-top:1px;">Scan to verify</div>`
+            : ""
         }
       </td>
     </tr>
@@ -149,7 +199,7 @@ const buildHeaderTemplate = (documentsLogo: string | null, schoolName: string) =
 `;
 
 const buildFooterTemplate = (footerText: string) => `
-  <table style="width:100%;font-family:${FONT};border-collapse:collapse;margin:0 10mm;">
+  <table style="width:100%;box-sizing:border-box;padding:0 ${MARGIN_SIDE_MM}mm;font-family:${FONT};border-collapse:collapse;">
     <tr>
       <td style="text-align:center;">
         <span style="font-size:8.5px;color:${MUTED};">${escapeHtml(footerText)} <span class="pageNumber"></span></span>
@@ -655,6 +705,7 @@ export async function renderSchemeOfWorkPdf(schemeId: number): Promise<Buffer> {
   // (always a data: URI), since Puppeteer's header/footer frame can't fetch external http(s)
   // images the way the main page can.
   const headerLogo = await resolveLogoForHeader(school?.documents_logo || school?.logo);
+  const verificationQr = await buildVerificationQr(schemeId);
 
   const trainerName = `${scheme.first_name || ""} ${scheme.last_name || ""}`.trim() || "N/A";
   const subjectLabel = scheme.subject_code
@@ -679,7 +730,7 @@ export async function renderSchemeOfWorkPdf(schemeId: number): Promise<Buffer> {
     ]
       .filter(Boolean)
       .join(" | ");
-    const headerTemplate = buildHeaderTemplate(headerLogo, school?.name || "");
+    const headerTemplate = buildHeaderTemplate(headerLogo, school?.name || "", verificationQr);
     const footerTemplate = buildFooterTemplate(`${footerLabel}${footerLabel ? " | Page" : "Page"}`);
 
     return await printHtmlToPdf(browser, html, headerTemplate, footerTemplate);
