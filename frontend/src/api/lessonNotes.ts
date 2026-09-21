@@ -136,16 +136,6 @@ export interface SharedNoteDetail {
   updated_at: string;
 }
 
-export interface CombinedNoteSection {
-  note_id: number;
-  title: string;
-  subject_name: string;
-  class_group_name?: string | null;
-  teacher_name?: string;
-  content_html: string;
-  updated_at: string;
-}
-
 export const lessonNotesApi = {
   list: (filters?: { subject_id?: number; class_group_id?: number; academic_term_id?: number; status?: string }) =>
     apiService.get<{ data: LessonNoteSummary[] }>("/lesson-notes", { params: filters }),
@@ -280,17 +270,6 @@ export const lessonNotesApi = {
 
   deletePromptPreset: (presetId: number) =>
     apiService.delete(`/lesson-notes/prompt-presets/${presetId}`),
-
-  getCombined: () => apiService.get<{ data: CombinedNoteSection[] }>("/lesson-notes/combined"),
-
-  exportCombinedPdf: () =>
-    apiService.get<Blob>("/lesson-notes/combined-pdf", { responseType: "blob" }),
-
-  getSharedCombined: () =>
-    apiService.get<{ data: CombinedNoteSection[] }>("/lesson-notes/shared-with-me/combined"),
-
-  exportSharedCombinedPdf: () =>
-    apiService.get<Blob>("/lesson-notes/shared-with-me/combined-pdf", { responseType: "blob" }),
 };
 
 /** Images are rendered via plain <img> tags, which can't carry an Authorization

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus, FileText, Sparkles, Trash2, FileStack } from "lucide-react";
+import { Plus, FileText, Sparkles, Trash2 } from "lucide-react";
 import { lessonNotesApi, LessonNoteSummary, isPdfBackedNote } from "../../api/lessonNotes";
 import { useToast } from "../../contexts/ToastContext";
 import NewLessonNoteModal from "./NewLessonNoteModal";
@@ -60,12 +60,6 @@ const LessonNotesListPage: React.FC = () => {
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <button
-            onClick={() => navigate("/lesson-notes/combined")}
-            className="flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium rounded-full border border-gray-200 dark:border-gray-700/50 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 shadow-sm"
-          >
-            <FileStack className="w-4 h-4" /> View All
-          </button>
           <button
             onClick={() => setShowNewModal(true)}
             className="flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium rounded-full bg-blue-600 text-white hover:bg-blue-700 shadow-sm"

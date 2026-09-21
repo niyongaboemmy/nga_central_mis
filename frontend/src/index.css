@@ -620,24 +620,6 @@ mark.note-find-hit-active {
     }
 }
 
-/* Each note in the combined reader starts on a fresh page. In a paginated (multi-column)
-   flow a "page" is a column, so the break must target columns, not printed pages. */
-.note-reader-section-break {
-    break-before: column;
-}
-
-/* Stacked-sheet (scroll) mode gives every note its own sheet, so its title block needs the
-   same breathing room the single-note reader's does. */
-.note-reader-sheet--scroll + .note-reader-sheet--scroll {
-    margin-top: 0;
-}
-
-@media print {
-    .note-reader-section-break {
-        break-before: page;
-    }
-}
-
 /* ==========================================================================
    PDF-backed lesson notes (react-pdf). Each page is a "sheet" styled like the
    HTML reader's paper so the two readers sit side by side without a seam. The

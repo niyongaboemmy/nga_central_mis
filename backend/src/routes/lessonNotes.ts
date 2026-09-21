@@ -22,10 +22,6 @@ import {
   revokeLessonNoteShare,
   listSharedWithMe,
   getSharedLessonNote,
-  getSharedCombinedNotes,
-  exportSharedCombinedPdf,
-  getMyCombinedNotes,
-  exportMyCombinedPdf,
   listPromptPresets,
   createPromptPreset,
   deletePromptPreset,
@@ -82,8 +78,6 @@ router.use(authenticate);
 
 // Student-facing (read-only, checked by permission + share resolution in the controller)
 router.get("/shared-with-me", authorize(Permissions.VIEW_SHARED_LESSON_NOTES), listSharedWithMe);
-router.get("/shared-with-me/combined", authorize(Permissions.VIEW_SHARED_LESSON_NOTES), getSharedCombinedNotes);
-router.get("/shared-with-me/combined-pdf", authorize(Permissions.VIEW_SHARED_LESSON_NOTES), exportSharedCombinedPdf);
 router.get("/shared-with-me/:id", authorize(Permissions.VIEW_SHARED_LESSON_NOTES), getSharedLessonNote);
 // Reader-side AI study assistant. Same permission + share gate as reading the note itself.
 router.post("/shared-with-me/:id/ask", authorize(Permissions.VIEW_SHARED_LESSON_NOTES), askAboutSharedNote);
@@ -104,9 +98,6 @@ router.post("/upload-pdf", uploadPdf, createLessonNoteFromPdf);
 router.get("/prompt-presets", listPromptPresets);
 router.post("/prompt-presets", createPromptPreset);
 router.delete("/prompt-presets/:presetId", deletePromptPreset);
-
-router.get("/combined", getMyCombinedNotes);
-router.get("/combined-pdf", exportMyCombinedPdf);
 
 router.post("/ai-generate", startAINoteGeneration);
 router.get("/ai-generate/:jobId/status", getAINoteGenerationStatus);

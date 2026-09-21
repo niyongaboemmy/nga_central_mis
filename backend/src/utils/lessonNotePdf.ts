@@ -3,9 +3,9 @@ import { PDFParse } from "pdf-parse";
 export const LESSON_NOTE_PDF_MAX_BYTES = 25 * 1024 * 1024;
 
 // Everything an uploaded lesson-note PDF yields that the platform stores: the page count
-// for the reader's "N pages" label, and the text as note HTML so the student AI tutor,
-// library excerpt / reading time and combined-notes packet all keep working exactly as
-// they do for a typed note (they only ever read content_html).
+// for the reader's "N pages" label, and the text as note HTML so the student AI tutor and
+// the library excerpt keep working exactly as they do for a typed note (they only ever
+// read content_html). The text is never displayed as the note — students read the PDF.
 export interface ExtractedPdfNote {
   pageCount: number;
   contentHtml: string;

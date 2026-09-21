@@ -97,8 +97,7 @@ const buildFooterTemplate = (footerLeft: string) => `
 `;
 
 // Shared print-optimized content styling — deliberately not the editor's own on-screen
-// CSS: generous margins, print-safe colors, no interactive chrome. Used by both the
-// single-note and combined-notes renderers so they stay visually consistent.
+// CSS: generous margins, print-safe colors, no interactive chrome.
 const CONTENT_CSS = `
   * { box-sizing: border-box; }
   body {
@@ -248,113 +247,4 @@ const buildPrintHtml = (data: LessonNotePdfData): string => `
 export async function renderLessonNotePdf(data: LessonNotePdfData): Promise<Buffer> {
   const footerLeft = `${escapeHtml(data.teacherName)} · ${escapeHtml(data.subjectName)}`;
   return printHtmlToPdf(buildPrintHtml(data), data.title, footerLeft);
-}
-
-export interface CombinedNoteSection {
-  title: string;
-  subjectName: string;
-  teacherName: string;
-  contentHtml: string;
-}
-
-export interface CombinedPdfOptions {
-  heading: string;
-  generatedFor: string;
-  /** When every section shares one author (a teacher's own combined packet), repeat their
-   * name in the footer too — matches the single-note export. Omitted for the student
-   * shared-notes combine, where sections can come from different teachers and a single
-   * running footer credit would misattribute some of them. */
-  singleAuthor?: string;
-}
-
-const buildCombinedPrintHtml = (sections: CombinedNoteSection[], opts: CombinedPdfOptions): string => `
-<!doctype html>
-<html>
-<head>
-<meta charset="utf-8">
-<style>${getInlineKatexCss()}</style>
-<style>${CONTENT_CSS}
-  .cover-title {
-    font-size: 28px;
-    font-weight: 700;
-    color: ${INK};
-    margin: 14px 0 6px;
-    line-height: 1.25;
-  }
-  .cover-meta {
-    font-size: 11px;
-    color: ${MUTED};
-    margin-bottom: 36px;
-  }
-  .toc-heading {
-    font-size: 10.5px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: ${MUTED};
-    margin-bottom: 14px;
-    padding-bottom: 8px;
-    border-bottom: 1px solid ${RULE};
-  }
-  .toc-row {
-    display: flex;
-    align-items: baseline;
-    gap: 12px;
-    padding: 11px 0;
-    border-bottom: 1px solid ${RULE};
-  }
-  .toc-num {
-    font-size: 11px;
-    font-weight: 700;
-    color: ${ACCENT};
-    min-width: 20px;
-  }
-  .toc-title { font-size: 13.5px; color: ${INK}; font-weight: 600; }
-  .toc-subject { font-size: 10.5px; color: ${MUTED}; margin-top: 1px; }
-  .note-section { page-break-before: always; }
-</style>
-</head>
-<body>
-  <div>
-    <span class="kicker">Combined Packet</span>
-    <h1 class="cover-title">${escapeHtml(opts.heading)}</h1>
-    <div class="cover-meta">${sections.length} note${sections.length === 1 ? "" : "s"} · Prepared for <b>${escapeHtml(opts.generatedFor)}</b> · ${today()}</div>
-    <div class="toc-heading">Contents</div>
-    <div>
-      ${sections
-        .map(
-          (s, i) => `
-        <div class="toc-row">
-          <span class="toc-num">${String(i + 1).padStart(2, "0")}</span>
-          <div>
-            <div class="toc-title">${escapeHtml(s.title)}</div>
-            <div class="toc-subject">${escapeHtml(s.subjectName)} · ${escapeHtml(s.teacherName)}</div>
-          </div>
-        </div>`,
-        )
-        .join("")}
-    </div>
-  </div>
-  ${sections
-    .map(
-      (s) => `
-    <div class="note-section">
-      <span class="kicker">${escapeHtml(s.subjectName)}</span>
-      <h1 class="doc-title">${escapeHtml(s.title)}</h1>
-      <div class="doc-meta">Prepared by <b>${escapeHtml(s.teacherName)}</b></div>
-      <div class="content">${renderMathInHtml(s.contentHtml)}</div>
-    </div>`,
-    )
-    .join("")}
-</body>
-</html>`;
-
-export async function renderCombinedLessonNotesPdf(
-  sections: CombinedNoteSection[],
-  opts: CombinedPdfOptions,
-): Promise<Buffer> {
-  const footerLeft = opts.singleAuthor
-    ? `${escapeHtml(opts.singleAuthor)} · ${sections.length} note${sections.length === 1 ? "" : "s"}`
-    : `Compiled for ${escapeHtml(opts.generatedFor)}`;
-  return printHtmlToPdf(buildCombinedPrintHtml(sections, opts), opts.heading, footerLeft);
 }

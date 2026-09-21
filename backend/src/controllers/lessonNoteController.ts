@@ -23,7 +23,7 @@ import { recordActivity } from "../utils/activityLogger";
 import { sanitizeNoteHtml } from "../utils/sanitizeNoteHtml";
 import storageService from "../utils/fileServer";
 import logger from "../utils/logger";
-import { renderLessonNotePdf, renderCombinedLessonNotesPdf } from "../services/pdfExport";
+import { renderLessonNotePdf } from "../services/pdfExport";
 import { extractLessonNotePdf, looksLikePdf } from "../utils/lessonNotePdf";
 
 // ======================
@@ -151,76 +151,6 @@ export const listMyLessonNotes = asyncHandler(async (req: any, res: any) => {
   successResponse(res, "Lesson notes", notes);
 });
 
-// ======================
-// COMBINED NOTES — a teacher's published notes stitched into one consolidated view/PDF,
-// for handing students a single packet instead of one file per week. Published-only,
-// same as everything else a student can ever see, so this can't leak an in-progress draft.
-// ======================
-
-async function loadMyPublishedNotesForCombine(userId: number, filters: { subject_id?: string; class_group_id?: string }) {
-  const conditions = [eq(LessonNote.user_id, userId), eq(LessonNote.status, "PUBLISHED")];
-  if (filters.subject_id) conditions.push(eq(LessonNote.subject_id, parseInt(filters.subject_id, 10)));
-  if (filters.class_group_id) conditions.push(eq(LessonNote.class_group_id, parseInt(filters.class_group_id, 10)));
-
-  return db
-    .select({
-      note_id: LessonNote.note_id,
-      title: LessonNote.title,
-      subject_name: Subject.name,
-      class_group_name: ClassGroup.name,
-      content_html: LessonNote.content_html,
-      updated_at: LessonNote.updated_at,
-    })
-    .from(LessonNote)
-    .innerJoin(Subject, eq(LessonNote.subject_id, Subject.subject_id))
-    .leftJoin(ClassGroup, eq(LessonNote.class_group_id, ClassGroup.class_group_id))
-    .leftJoin(SchemeOfWorkEntry, eq(LessonNote.scheme_entry_id, SchemeOfWorkEntry.entry_id))
-    .where(and(...conditions))
-    // Same curriculum ordering as listMyLessonNotes — subject, then Scheme of Work week
-    // order, so the combined packet/PDF reads in the order students actually cover it.
-    .orderBy(
-      asc(Subject.name),
-      sql`${SchemeOfWorkEntry.start_date} IS NULL`,
-      asc(SchemeOfWorkEntry.start_date),
-      asc(LessonNote.title),
-    );
-}
-
-export const getMyCombinedNotes = asyncHandler(async (req: any, res: any) => {
-  const { subject_id, class_group_id } = req.query;
-  const notes = await loadMyPublishedNotesForCombine(req.user.userId, { subject_id, class_group_id });
-  successResponse(res, "Combined lesson notes", notes);
-});
-
-export const exportMyCombinedPdf = asyncHandler(async (req: any, res: any) => {
-  const { subject_id, class_group_id } = req.query;
-  const notes = await loadMyPublishedNotesForCombine(req.user.userId, { subject_id, class_group_id });
-  if (notes.length === 0) {
-    throw new ValidationError("You have no published notes to combine yet.");
-  }
-
-  const [profile] = await db
-    .select({ first_name: UserProfile.first_name, last_name: UserProfile.last_name })
-    .from(UserProfile)
-    .where(eq(UserProfile.user_id, req.user.userId))
-    .limit(1);
-  const teacherName = profile ? `${profile.first_name || ""} ${profile.last_name || ""}`.trim() : "Teacher";
-
-  const pdf = await renderCombinedLessonNotesPdf(
-    notes.map((n) => ({
-      title: n.title,
-      subjectName: n.subject_name,
-      teacherName,
-      contentHtml: n.content_html || "",
-    })),
-    { heading: "Combined Lesson Notes", generatedFor: teacherName, singleAuthor: teacherName },
-  );
-
-  res.setHeader("Content-Type", "application/pdf");
-  res.setHeader("Content-Disposition", 'attachment; filename="combined-lesson-notes.pdf"');
-  res.send(pdf);
-});
-
 export const createLessonNote = asyncHandler(async (req: any, res: any) => {
   const { subject_id, class_group_id, scheme_entry_id, academic_term_id, title } = req.body;
   if (!subject_id || !title) {
@@ -257,8 +187,8 @@ export const createLessonNote = asyncHandler(async (req: any, res: any) => {
 // PDF-BACKED NOTES — the third way to create a note: upload a PDF prepared elsewhere.
 // The PDF is the note (read-only in the editor; students read the file itself), but it
 // goes through the exact same DRAFT -> PUBLISHED -> share lifecycle. Text is extracted on
-// upload into content_html so the student AI tutor, library excerpt/reading time and the
-// combined packet keep working without any special-casing downstream.
+// upload into content_html so the student AI tutor and the library excerpt keep working
+// without any special-casing downstream — it is never shown as the note itself.
 // ======================
 
 const pdfStoragePath = (noteId: number) => `/lesson-notes/${noteId}/source-${Date.now()}.pdf`;
@@ -901,7 +831,7 @@ export async function hasSharedAccessToNote(noteId: number, studentUserId: numbe
   return false;
 }
 
-// Shared by listSharedWithMe and the combined-notes endpoints — resolves which published
+// Used by listSharedWithMe — resolves which published
 // notes this student can read: every note written for a class group they're in or a subject
 // they're enrolled in (publication alone grants that — see hasNaturalAudienceAccess), plus
 // anything a teacher additionally shared with them through the three share filters. Deduped
@@ -994,7 +924,7 @@ async function resolveVisibleSharedNotes(studentId: number) {
       updated_at: v.updated_at,
       scheme_start_date: v.scheme_start_date,
     }))
-    // Same curriculum ordering as the teacher's own combined view: subject, then Scheme
+    // Same curriculum ordering as the teacher's own notes list: subject, then Scheme
     // of Work week order (notes with no scheme entry sort after every dated week).
     .sort((a, b) => {
       const subjectCmp = a.subject_name.localeCompare(b.subject_name);
@@ -1046,39 +976,6 @@ export const listSharedWithMe = asyncHandler(async (req: any, res: any) => {
       };
     }),
   );
-});
-
-export const getSharedCombinedNotes = asyncHandler(async (req: any, res: any) => {
-  const notes = await resolveVisibleSharedNotes(req.user.userId);
-  successResponse(res, "Combined shared notes", notes);
-});
-
-export const exportSharedCombinedPdf = asyncHandler(async (req: any, res: any) => {
-  const notes = await resolveVisibleSharedNotes(req.user.userId);
-  if (notes.length === 0) {
-    throw new ValidationError("No notes have been shared with you yet.");
-  }
-
-  const [profile] = await db
-    .select({ first_name: UserProfile.first_name, last_name: UserProfile.last_name })
-    .from(UserProfile)
-    .where(eq(UserProfile.user_id, req.user.userId))
-    .limit(1);
-  const studentName = profile ? `${profile.first_name || ""} ${profile.last_name || ""}`.trim() : "Student";
-
-  const pdf = await renderCombinedLessonNotesPdf(
-    notes.map((n) => ({
-      title: n.title,
-      subjectName: n.subject_name,
-      teacherName: n.teacher_name,
-      contentHtml: n.content_html || "",
-    })),
-    { heading: "Combined Lesson Notes", generatedFor: studentName },
-  );
-
-  res.setHeader("Content-Type", "application/pdf");
-  res.setHeader("Content-Disposition", 'attachment; filename="combined-lesson-notes.pdf"');
-  res.send(pdf);
 });
 
 export const getSharedLessonNote = asyncHandler(async (req: any, res: any) => {

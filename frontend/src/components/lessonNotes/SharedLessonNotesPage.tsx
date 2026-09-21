@@ -7,7 +7,6 @@ import {
   Check,
   ChevronRight,
   Clock,
-  FileStack,
   FileText,
   Search,
   SlidersHorizontal,
@@ -205,14 +204,6 @@ const SharedLessonNotesPage: React.FC = () => {
                   } · about ${totalMinutes} min of reading`}
           </p>
         </div>
-        {notes.length > 0 && (
-          <button
-            onClick={() => navigate("/shared-lesson-notes/combined")}
-            className="flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium rounded-full border border-gray-200 dark:border-gray-700/50 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 shadow-sm flex-shrink-0"
-          >
-            <FileStack className="w-4 h-4" /> Read all in one
-          </button>
-        )}
       </div>
 
       {/* Search + controls. Sticky so the search box stays reachable down a long library. */}

@@ -50,7 +50,6 @@ import LessonNotesListPage from "./components/lessonNotes/LessonNotesListPage";
 import LessonNoteEditorPage from "./components/lessonNotes/LessonNoteEditorPage";
 import SharedLessonNotesPage from "./components/lessonNotes/SharedLessonNotesPage";
 import SharedLessonNoteViewPage from "./components/lessonNotes/SharedLessonNoteViewPage";
-import CombinedLessonNotesPage from "./components/lessonNotes/CombinedLessonNotesPage";
 import EnrollmentManager from "./components/enrollment/EnrollmentManager";
 import SchemeVerifyPage from "./components/SchemeVerifyPage";
 
@@ -421,16 +420,6 @@ function App() {
               }
             />
             <Route
-              path="/lesson-notes/combined"
-              element={
-                <ProtectedRoute>
-                  <SystemLayoutWrapper>
-                    <CombinedLessonNotesPage mode="mine" />
-                  </SystemLayoutWrapper>
-                </ProtectedRoute>
-              }
-            />
-            <Route
               path="/lesson-notes/:id"
               element={
                 <ProtectedRoute>
@@ -448,16 +437,6 @@ function App() {
                 <ProtectedRoute>
                   <SystemLayoutWrapper>
                     <SharedLessonNotesPage />
-                  </SystemLayoutWrapper>
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/shared-lesson-notes/combined"
-              element={
-                <ProtectedRoute>
-                  <SystemLayoutWrapper>
-                    <CombinedLessonNotesPage mode="shared" />
                   </SystemLayoutWrapper>
                 </ProtectedRoute>
               }
