@@ -81,7 +81,12 @@ describe("Calendar activity assignees", () => {
         .post("/calendar/activities")
         .set("Authorization", `Bearer ${adminToken}`)
         .send(activityBody(body));
-    const own = await post({ activity_name: "Student Led clubs", day_of_week: 5 });
+    const own = await post({
+      activity_name: "Student Led clubs",
+      day_of_week: 5,
+      assigned_user_ids: [teacherAId],
+    });
+    const unassigned = await post({ activity_name: "Physical Education", day_of_week: 4 });
     const schoolWide = await post({
       class_group_id: null,
       activity_name: "Sports Afternoon",
@@ -102,11 +107,19 @@ describe("Calendar activity assignees", () => {
     expect(ids).toContain(schoolWide.body.data.activity_id);
     expect(ids).not.toContain(theirs.body.data.activity_id);
     expect(ids).not.toContain(otherTerm.body.data.activity_id);
-    // no staff assignment needed for a student to see it
+    // the student sees who runs it (name included), and an unassigned
+    // event is still shown — assignment is never required for visibility
     const clubs = res.body.data.activities.find(
       (a: any) => a.activity_id === own.body.data.activity_id,
     );
-    expect(clubs).toMatchObject({ activity_name: "Student Led clubs", assignees: [] });
+    expect(clubs.activity_name).toBe("Student Led clubs");
+    expect(clubs.assignees).toEqual([
+      expect.objectContaining({ user_id: teacherAId, first_name: "Test" }),
+    ]);
+    const pe = res.body.data.activities.find(
+      (a: any) => a.activity_id === unassigned.body.data.activity_id,
+    );
+    expect(pe).toMatchObject({ activity_name: "Physical Education", assignees: [] });
   });
 
   it("creates an activity with no assignees (assignment is optional)", async () => {
