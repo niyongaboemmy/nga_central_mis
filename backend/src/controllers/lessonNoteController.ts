@@ -45,10 +45,13 @@ export const isPublishable = (note: {
   source: string | null;
   file_path?: string | null;
   content_html?: string | null;
-}): boolean =>
-  note.source === "PDF_UPLOAD" ? !!note.file_path : hasVisibleContent(note.content_html);
+}): boolean => (isPdfNote(note) ? !!note.file_path : hasVisibleContent(note.content_html));
 
-const isPdfNote = (note: { source: string | null }) => note.source === "PDF_UPLOAD";
+// A stored file is the authoritative signal that a note is PDF-backed. `source` is
+// checked too, but a note whose PDF is in storage must never fall back to the rich
+// editor (which would show the extracted text as if it were editable content).
+export const isPdfNote = (note: { source: string | null; file_path?: string | null }) =>
+  note.source === "PDF_UPLOAD" || !!note.file_path;
 
 const safePdfFilename = (title: string) =>
   `${title.replace(/[^a-z0-9]+/gi, "-").replace(/^-+|-+$/g, "").slice(0, 80) || "lesson-note"}.pdf`;
@@ -390,7 +393,7 @@ export const streamLessonNotePdf = asyncHandler(async (req: any, res: any) => {
     .from(LessonNote)
     .where(eq(LessonNote.note_id, noteId))
     .limit(1);
-  if (!note || !isPdfNote(note) || !note.file_path) throw new NotFoundError("PDF not found");
+  if (!note || !note.file_path) throw new NotFoundError("PDF not found");
 
   const isOwner = note.user_id === req.user.userId;
   if (!isOwner) {

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Plus, FileText, Sparkles, Trash2, FileStack } from "lucide-react";
-import { lessonNotesApi, LessonNoteSummary } from "../../api/lessonNotes";
+import { lessonNotesApi, LessonNoteSummary, isPdfBackedNote } from "../../api/lessonNotes";
 import { useToast } from "../../contexts/ToastContext";
 import NewLessonNoteModal from "./NewLessonNoteModal";
 import ConfirmModal from "../ui/ConfirmModal";
@@ -91,7 +91,7 @@ const LessonNotesListPage: React.FC = () => {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {notes.map((note) => {
-            const source = sourceLabel[note.source] || sourceLabel.MANUAL;
+            const source = sourceLabel[isPdfBackedNote(note) ? "PDF_UPLOAD" : note.source] || sourceLabel.MANUAL;
             return (
               <div
                 key={note.note_id}
@@ -120,13 +120,13 @@ const LessonNotesListPage: React.FC = () => {
                     <LessonNoteShareBadge shareCount={note.share_count} />
                   )}
                   <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full flex items-center gap-1 ${source.className}`}>
-                    {note.source === "PDF_UPLOAD" ? (
+                    {isPdfBackedNote(note) ? (
                       <FileText className="w-2.5 h-2.5" />
                     ) : (
                       note.source !== "MANUAL" && <Sparkles className="w-2.5 h-2.5" />
                     )}
                     {source.label}
-                    {note.source === "PDF_UPLOAD" && note.page_count ? ` · ${note.page_count} p.` : ""}
+                    {isPdfBackedNote(note) && note.page_count ? ` · ${note.page_count} p.` : ""}
                   </span>
                 </div>
                 <p className="text-[11px] text-gray-400 mt-3">

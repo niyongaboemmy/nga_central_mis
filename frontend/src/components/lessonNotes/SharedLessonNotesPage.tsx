@@ -14,7 +14,7 @@ import {
   Sparkles,
   X,
 } from "lucide-react";
-import { lessonNotesApi, SharedNoteSummary } from "../../api/lessonNotes";
+import { lessonNotesApi, SharedNoteSummary, isPdfBackedNote } from "../../api/lessonNotes";
 import { useToast } from "../../contexts/ToastContext";
 
 type SortKey = "recent" | "title" | "length";
@@ -405,7 +405,7 @@ const SharedLessonNotesPage: React.FC = () => {
                             <Highlight text={n.teacher_name} tokens={tokens} />
                           </span>
                           <span aria-hidden>·</span>
-                          {n.source === "PDF_UPLOAD" ? (
+                          {isPdfBackedNote(n) ? (
                             <span className="inline-flex items-center gap-1 flex-shrink-0 text-rose-600 dark:text-rose-400">
                               <FileText className="w-3 h-3" /> PDF
                               {n.page_count ? ` · ${n.page_count} page${n.page_count === 1 ? "" : "s"}` : ""}

@@ -13,7 +13,7 @@ import {
   FileDown,
   FileText,
 } from "lucide-react";
-import { lessonNotesApi, LessonNoteDetail } from "../../api/lessonNotes";
+import { lessonNotesApi, LessonNoteDetail, isPdfBackedNote } from "../../api/lessonNotes";
 import { useToast } from "../../contexts/ToastContext";
 import LessonNoteRichEditor from "./LessonNoteRichEditor";
 import ShareLessonNoteModal from "./ShareLessonNoteModal";
@@ -64,7 +64,7 @@ const LessonNoteEditorPage: React.FC = () => {
         // A PDF note is publishable as soon as its file exists — even a scanned PDF with
         // no extractable text is something students can read (mirrors isPublishable()).
         setHasContent(
-          res.data.data.source === "PDF_UPLOAD"
+          isPdfBackedNote(res.data.data)
             ? !!res.data.data.file_path
             : hasVisibleContent(res.data.data.content_html),
         );
@@ -279,7 +279,7 @@ const LessonNoteEditorPage: React.FC = () => {
     );
   }
 
-  const isPdfNote = note.source === "PDF_UPLOAD";
+  const isPdfNote = isPdfBackedNote(note);
 
   return (
     <div

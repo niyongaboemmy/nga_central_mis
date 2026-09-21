@@ -2,6 +2,16 @@ import { apiService, API_BASE_URL } from "../services/api";
 
 export type LessonNoteSource = "MANUAL" | "AI_GENERATED" | "AI_ASSISTED" | "PDF_UPLOAD";
 
+/** A note is PDF-backed when it was created from an upload OR simply has a stored file —
+ *  the file is the authoritative signal, so a note whose PDF exists never falls back to
+ *  the rich editor / HTML reader showing its extracted text as if it were the note. */
+export const isPdfBackedNote = (note: {
+  source?: string | null;
+  file_path?: string | null;
+  file_name?: string | null;
+  page_count?: number | null;
+}): boolean => note.source === "PDF_UPLOAD" || !!note.file_path || !!note.file_name || !!note.page_count;
+
 export interface LessonNoteSummary {
   note_id: number;
   subject_id: number;

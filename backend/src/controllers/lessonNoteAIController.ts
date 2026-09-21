@@ -413,7 +413,7 @@ export const proposeAINoteEdit = asyncHandler(async (req: any, res: any) => {
   if (note.user_id !== req.user.userId) {
     throw new AuthorizationError("You do not have access to this lesson note");
   }
-  if (note.source === "PDF_UPLOAD") {
+  if (note.source === "PDF_UPLOAD" || note.file_path) {
     throw new ValidationError("This note was created from a PDF and is read-only — AI editing isn't available for it.");
   }
 

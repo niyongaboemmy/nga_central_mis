@@ -21,7 +21,7 @@ import {
   Sparkles,
   X,
 } from "lucide-react";
-import { lessonNotesApi, SharedNoteDetail } from "../../api/lessonNotes";
+import { lessonNotesApi, SharedNoteDetail, isPdfBackedNote } from "../../api/lessonNotes";
 import { useToast } from "../../contexts/ToastContext";
 import { attachImageTokenToHtml } from "../../utils/lessonNoteImages";
 import { useReaderPrefs, readingPositionKey } from "./reader/useReaderPrefs";
@@ -356,7 +356,7 @@ const SharedLessonNoteViewPage: React.FC = () => {
 
   // A PDF-backed note has real pages of its own — pdf.js renders them (with a selectable
   // text layer, so highlight-to-ask still works) instead of the HTML sheet below.
-  if (note.source === "PDF_UPLOAD") {
+  if (isPdfBackedNote(note)) {
     return <SharedPdfNoteReader note={note} />;
   }
 
