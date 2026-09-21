@@ -25,10 +25,31 @@ export interface LessonNoteSummary {
   /** PDF_UPLOAD notes only. */
   file_name: string | null;
   page_count: number | null;
+  /** Performance criteria this note covers (see curriculum_context on the detail). */
+  criteria_ids: number[];
   /** Active (unexpired) shares. 0 means no student can see this note, published or not. */
   share_count: number;
   created_at: string;
   updated_at: string;
+}
+
+export interface CurriculumCriterion {
+  criteria_id: number;
+  criteria_number: string;
+  description: string;
+}
+
+/** One Learning Outcome a note covers, with only the criteria that are in scope. */
+export interface CurriculumOutcome {
+  competency_id: number;
+  element_number: number;
+  title: string;
+  description: string | null;
+  indicative_content: string | null;
+  learning_hours: number | null;
+  /** Total criteria under the outcome, so the UI can tell "whole outcome" from "3 of 5". */
+  total_criteria: number;
+  criteria: CurriculumCriterion[];
 }
 
 export interface LessonNoteDetail {
@@ -53,6 +74,7 @@ export interface LessonNoteDetail {
   updated_at: string;
   /** Active (unexpired) shares. 0 means no student can see this note, published or not. */
   share_count: number;
+  /** Legacy: notes created before curriculum coverage were anchored to one Scheme of Work week. */
   scheme_context: {
     entry: {
       entry_id: number;
@@ -63,6 +85,7 @@ export interface LessonNoteDetail {
     };
     criteria: { criteria_id: number; criteria_number: string; description: string }[];
   } | null;
+  curriculum_context: { outcomes: CurriculumOutcome[]; criteria_ids: number[] } | null;
 }
 
 export interface LessonNoteVersion {
@@ -146,6 +169,7 @@ export const lessonNotesApi = {
     scheme_entry_id?: number;
     academic_term_id?: number;
     title: string;
+    criteria_ids?: number[];
   }) => apiService.post<{ data: { note_id: number } }>("/lesson-notes", data),
 
   /** Third creation path: a PDF prepared elsewhere becomes a read-only DRAFT note. */
@@ -156,13 +180,16 @@ export const lessonNotesApi = {
       scheme_entry_id?: number;
       academic_term_id?: number;
       title: string;
+      criteria_ids?: number[];
     },
     file: File,
     onProgress?: (fraction: number) => void,
   ) => {
     const form = new FormData();
     Object.entries(data).forEach(([k, v]) => {
-      if (v !== undefined && v !== null && v !== "") form.append(k, String(v));
+      if (v === undefined || v === null || v === "") return;
+      // Arrays travel as JSON in a multipart field; the backend parses either shape.
+      form.append(k, Array.isArray(v) ? JSON.stringify(v) : String(v));
     });
     form.append("file", file);
     return apiService.post<{ data: { note_id: number; page_count: number; is_textless: boolean } }>(
@@ -202,6 +229,7 @@ export const lessonNotesApi = {
       content_html: string;
       status: "DRAFT" | "PUBLISHED";
       snapshot_prompt: string;
+      criteria_ids: number[];
     }>,
   ) => apiService.patch(`/lesson-notes/${id}`, data),
 
@@ -220,7 +248,9 @@ export const lessonNotesApi = {
   startAIGenerate: (data: {
     entry_id?: number;
     competency_id?: number;
+    /** Performance criteria to ground the notes in -- may span several Learning Outcomes. */
     criteria_ids?: number[];
+    subject_id?: number;
     class_group_id?: number;
     academic_term_id?: number;
     extra_instructions?: string;

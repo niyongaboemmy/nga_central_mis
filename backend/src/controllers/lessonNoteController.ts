@@ -25,6 +25,13 @@ import storageService from "../utils/fileServer";
 import logger from "../utils/logger";
 import { renderLessonNotePdf } from "../services/pdfExport";
 import { extractLessonNotePdf, looksLikePdf, sanitizeShortText } from "../utils/lessonNotePdf";
+import {
+  parseCriteriaIds,
+  loadCurriculumSelection,
+  setNoteCriteria,
+  loadNoteCurriculumContext,
+} from "../services/lessonNoteCurriculum";
+import { LessonNoteCriteria } from "../db/schema";
 
 // ======================
 // STATUS MANAGEMENT
@@ -122,6 +129,13 @@ export const listMyLessonNotes = asyncHandler(async (req: any, res: any) => {
       page_count: LessonNote.page_count,
       created_at: LessonNote.created_at,
       updated_at: LessonNote.updated_at,
+      // Which performance criteria this note covers, so the "new note" picker can show
+      // which parts of the curriculum already have notes.
+      criteria_ids: sql<string | null>`(
+        SELECT GROUP_CONCAT(${LessonNoteCriteria.criteria_id})
+        FROM ${LessonNoteCriteria}
+        WHERE ${LessonNoteCriteria.note_id} = ${LessonNote.note_id}
+      )`,
       // Publishing a note does NOT make it visible to students -- it only makes it
       // shareable. Without this count the list gives a teacher no way to tell a note
       // students can actually read from one that is published but never shared, which
@@ -148,7 +162,14 @@ export const listMyLessonNotes = asyncHandler(async (req: any, res: any) => {
       asc(LessonNote.title),
     );
 
-  successResponse(res, "Lesson notes", notes);
+  successResponse(
+    res,
+    "Lesson notes",
+    notes.map((n) => ({
+      ...n,
+      criteria_ids: n.criteria_ids ? String(n.criteria_ids).split(",").map((id) => parseInt(id, 10)) : [],
+    })),
+  );
 });
 
 export const createLessonNote = asyncHandler(async (req: any, res: any) => {
@@ -158,6 +179,7 @@ export const createLessonNote = asyncHandler(async (req: any, res: any) => {
   }
 
   await assertTeacherOwnsSubject(req.user.userId, parseInt(subject_id, 10));
+  const selection = await loadCurriculumSelection(parseInt(subject_id, 10), parseCriteriaIds(req.body.criteria_ids));
 
   const [result] = await db.insert(LessonNote).values({
     user_id: req.user.userId,
@@ -171,6 +193,7 @@ export const createLessonNote = asyncHandler(async (req: any, res: any) => {
   });
 
   const noteId = (result as any).insertId as number;
+  await setNoteCriteria(noteId, selection.criteriaIds);
 
   await recordActivity(
     req.user.userId,
@@ -219,6 +242,7 @@ export const createLessonNoteFromPdf = asyncHandler(async (req: any, res: any) =
   }
 
   await assertTeacherOwnsSubject(req.user.userId, parseInt(subject_id, 10));
+  const selection = await loadCurriculumSelection(parseInt(subject_id, 10), parseCriteriaIds(req.body.criteria_ids));
   const extracted = await readUploadedPdf(req.file);
 
   const [result] = await db.insert(LessonNote).values({
@@ -250,6 +274,7 @@ export const createLessonNoteFromPdf = asyncHandler(async (req: any, res: any) =
     throw new ValidationError("The PDF could not be stored right now. Please try again.");
   }
   await db.update(LessonNote).set({ file_path: remotePath }).where(eq(LessonNote.note_id, noteId));
+  await setNoteCriteria(noteId, selection.criteriaIds);
 
   await recordActivity(
     req.user.userId,
@@ -381,9 +406,14 @@ export const getLessonNote = asyncHandler(async (req: any, res: any) => {
       ),
     );
 
+  const curriculumContext = await loadNoteCurriculumContext(noteId, note.subject_id);
+
   successResponse(res, "Lesson note", {
     ...note,
     scheme_context: schemeContext,
+    curriculum_context: curriculumContext
+      ? { outcomes: curriculumContext.outcomes, criteria_ids: curriculumContext.criteriaIds }
+      : null,
     share_count: activeShares.length,
   });
 });
@@ -457,7 +487,13 @@ export const updateLessonNote = asyncHandler(async (req: any, res: any) => {
   const noteId = parseInt(req.params.id, 10);
   const note = await loadOwnedNote(noteId, req.user.userId);
 
-  const { title, content_json, content_html, status, snapshot_prompt } = req.body;
+  const { title, content_json, content_html, status, snapshot_prompt, criteria_ids } = req.body;
+
+  // Coverage can be re-pointed at any time, for every kind of note (typed, AI, PDF).
+  if (criteria_ids !== undefined) {
+    const selection = await loadCurriculumSelection(note.subject_id, parseCriteriaIds(criteria_ids));
+    await setNoteCriteria(noteId, selection.criteriaIds);
+  }
 
   // The PDF is the note: its body can only change by replacing the file (POST /:id/pdf).
   // Title and status stay editable so publishing/renaming work exactly like any note.

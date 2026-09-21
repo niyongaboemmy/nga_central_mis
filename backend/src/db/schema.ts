@@ -1564,6 +1564,24 @@ export const LessonNote = mysqlTable("LessonNote", {
   ),
 });
 
+// LessonNoteCriteria — the performance criteria a note covers (a whole Learning Outcome is
+// simply all of its criteria). Replaces the single scheme_entry_id week link for new notes.
+export const LessonNoteCriteria = mysqlTable(
+  "LessonNoteCriteria",
+  {
+    note_id: bigint("note_id", { mode: "number" })
+      .notNull()
+      .references(() => LessonNote.note_id, { onDelete: "cascade" }),
+    criteria_id: bigint("criteria_id", { mode: "number" })
+      .notNull()
+      .references(() => CompetencyPerformanceCriteria.criteria_id, { onDelete: "cascade" }),
+    created_at: datetime("created_at").default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => ({
+    pk: primaryKey(table.note_id, table.criteria_id),
+  }),
+);
+
 // LessonNoteVersion — snapshot written before every AI-applied edit (and on publish),
 // so a teacher can always step back from an AI change.
 export const LessonNoteVersion = mysqlTable("LessonNoteVersion", {

@@ -5,7 +5,6 @@ import {
   FileText,
   Loader2,
   AlertTriangle,
-  BookOpen,
   CheckCircle2,
   RotateCcw,
   PencilLine,
@@ -16,8 +15,8 @@ import {
 } from "lucide-react";
 import Modal from "../ui/Modal";
 import { myAssignedSubjectsApi, MyAssignedSubject } from "../../api/academics";
-import { schemeOfWorkApi, SchemeEntry } from "../../api/schemeOfWork";
 import { competenciesApi, SubjectCompetency } from "../../api/curriculum";
+import CurriculumPicker from "./CurriculumPicker";
 import { lessonNotesApi, AINoteGenerationStatus } from "../../api/lessonNotes";
 import { useAcademicPeriod } from "../../contexts/AcademicPeriodContext";
 import { useToast } from "../../contexts/ToastContext";
@@ -45,15 +44,6 @@ const PDF_MAX_MB = 25;
 const formatBytes = (bytes: number) =>
   bytes < 1024 * 1024 ? `${Math.max(1, Math.round(bytes / 1024))} KB` : `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 
-// "Week 3" -> 3. Scheme entries generally come back ordered by start_date already, but
-// that's a second-hand guarantee (depends on every entry having a correct date) — parsing
-// the week label itself is a direct, defensive way to guarantee true numeric/sequential
-// order regardless of how the API sorted them.
-const weekNumberOf = (weekLabel: string): number => {
-  const match = /(\d+)/.exec(weekLabel || "");
-  return match ? parseInt(match[1], 10) : Number.MAX_SAFE_INTEGER;
-};
-
 const NewLessonNoteModal: React.FC<Props> = ({ isOpen, onClose, initialSubjectId }) => {
   const navigate = useNavigate();
   const { showToast } = useToast();
@@ -62,16 +52,16 @@ const NewLessonNoteModal: React.FC<Props> = ({ isOpen, onClose, initialSubjectId
   const [subjects, setSubjects] = useState<MyAssignedSubject[]>([]);
   const [subjectId, setSubjectId] = useState<number | "">("");
   const [classGroupId, setClassGroupId] = useState<number | "">("");
-  const [entries, setEntries] = useState<SchemeEntry[]>([]);
-  const [entriesLoaded, setEntriesLoaded] = useState(false);
-  const [entryId, setEntryId] = useState<number | "">("");
-  // Weeks this teacher already has a lesson note for, in this exact subject/class/term —
-  // offering them again would just invite duplicate notes for the same week.
-  const [coveredEntryIds, setCoveredEntryIds] = useState<Set<number>>(new Set());
+  // The subject's curriculum tree (Learning Outcomes -> performance criteria) and the
+  // criteria this note will cover. Criteria that already have a note are flagged in the
+  // picker so a teacher can see coverage gaps at a glance instead of duplicating work.
   const [competencies, setCompetencies] = useState<SubjectCompetency[]>([]);
-  const [competencyId, setCompetencyId] = useState<number | "">("");
+  const [curriculumLoading, setCurriculumLoading] = useState(false);
   const [selectedCriteriaIds, setSelectedCriteriaIds] = useState<number[]>([]);
+  const [coveredCriteriaIds, setCoveredCriteriaIds] = useState<Set<number>>(new Set());
   const [title, setTitle] = useState("");
+  // Once the teacher edits the title we stop suggesting one from the curriculum selection.
+  const [titleTouched, setTitleTouched] = useState(false);
   const [extraInstructions, setExtraInstructions] = useState("");
   const [creating, setCreating] = useState(false);
   const [jobStatus, setJobStatus] = useState<AINoteGenerationStatus | null>(null);
@@ -86,14 +76,11 @@ const NewLessonNoteModal: React.FC<Props> = ({ isOpen, onClose, initialSubjectId
     if (!isOpen) return;
     setSubjectId(initialSubjectId ?? "");
     setClassGroupId("");
-    setEntries([]);
-    setEntriesLoaded(false);
-    setEntryId("");
-    setCoveredEntryIds(new Set());
     setCompetencies([]);
-    setCompetencyId("");
     setSelectedCriteriaIds([]);
+    setCoveredCriteriaIds(new Set());
     setTitle("");
+    setTitleTouched(false);
     setExtraInstructions("");
     setJobStatus(null);
     setMode("blank");
@@ -110,85 +97,61 @@ const NewLessonNoteModal: React.FC<Props> = ({ isOpen, onClose, initialSubjectId
   const selectedSubject = subjects.find((s) => s.subject_id === subjectId);
 
   useEffect(() => {
-    setEntries([]);
-    setEntriesLoaded(false);
-    setEntryId("");
-    setCoveredEntryIds(new Set());
-    if (!subjectId || !classGroupId || !selectedTermId) return;
+    setCompetencies([]);
+    setSelectedCriteriaIds([]);
+    setCoveredCriteriaIds(new Set());
+    if (!subjectId) return;
 
     let cancelled = false;
-
+    setCurriculumLoading(true);
     Promise.all([
-      schemeOfWorkApi.getEntries(Number(subjectId), Number(classGroupId), selectedTermId),
-      // Existing notes for this exact subject/class/term, so weeks already covered can be
-      // taken off the "create new" list instead of inviting a duplicate note per week.
-      lessonNotesApi.list({
-        subject_id: Number(subjectId),
-        class_group_id: Number(classGroupId),
-        academic_term_id: selectedTermId,
-      }),
+      competenciesApi.getAll(Number(subjectId)),
+      // Every note this teacher already has for the subject (any class/term): the union
+      // of their criteria is what the picker flags as "has a note".
+      lessonNotesApi.list({ subject_id: Number(subjectId) }),
     ])
-      .then(([entriesRes, notesRes]: [any, any]) => {
+      .then(([compRes, notesRes]) => {
         if (cancelled) return;
-        // GET /scheme-of-work/entries returns a bare `[]` when no SchemeOfWork row
-        // exists yet for this subject/class/term, but `{ scheme, entries: [...] }`
-        // once one does (even with zero entries) — handle both shapes explicitly
-        // rather than assuming, which previously crashed the modal on the latter.
-        const payload = entriesRes.data?.data;
-        const list: SchemeEntry[] = Array.isArray(payload)
-          ? payload
-          : Array.isArray(payload?.entries)
-            ? payload.entries
-            : [];
-        // Defensive sequential ordering by the actual week number, regardless of how
-        // the API happened to sort them (it sorts by start_date, which only holds if
-        // every entry's date was entered correctly).
-        const sorted = [...list].sort((a, b) => weekNumberOf(a.week_number) - weekNumberOf(b.week_number));
-        setEntries(sorted);
-
-        const covered = new Set<number>(
-          (notesRes.data.data || [])
-            .map((n: { scheme_entry_id: number | null }) => n.scheme_entry_id)
-            .filter((id: number | null): id is number => id != null),
+        const list: SubjectCompetency[] = compRes.data.data || [];
+        setCompetencies(
+          [...list]
+            .sort((x, y) => x.sort_order - y.sort_order || x.element_number - y.element_number)
+            .map((c) => ({
+              ...c,
+              criteria: [...(c.criteria || [])].sort((x, y) => x.sort_order - y.sort_order),
+            })),
         );
-        setCoveredEntryIds(covered);
-
-        // Guide the teacher along the natural weekly sequence: default to the next
-        // week that doesn't have a note yet, rather than leaving them to scan for it.
-        const nextUncovered = sorted.find((e) => !covered.has(e.entry_id));
-        if (nextUncovered) {
-          setEntryId(nextUncovered.entry_id);
-          setTitle((prev) => prev || nextUncovered.topic);
-        }
+        const covered = new Set<number>();
+        (notesRes.data.data || []).forEach((n) => (n.criteria_ids || []).forEach((id) => covered.add(id)));
+        setCoveredCriteriaIds(covered);
       })
       .catch(() => {
-        if (!cancelled) setEntries([]);
+        if (!cancelled) setCompetencies([]);
       })
       .finally(() => {
-        if (!cancelled) setEntriesLoaded(true);
+        if (!cancelled) setCurriculumLoading(false);
       });
 
     return () => {
       cancelled = true;
     };
-  }, [subjectId, classGroupId, selectedTermId]);
+  }, [subjectId]);
 
-  // Fallback grounding source: when this subject/class/term has no Scheme of Work
-  // entries yet, let the teacher pick straight from the Curriculum instead.
+  const selectedOutcomes = competencies.filter((c) =>
+    c.criteria.some((cr) => selectedCriteriaIds.includes(cr.criteria_id)),
+  );
+
+  // Suggest a title from the selection while the teacher hasn't typed one: the outcome's
+  // title for a single outcome, or "A & B" for several. Only ever fills an empty box.
+  const suggestedTitle = selectedOutcomes.length
+    ? selectedOutcomes.length === 1
+      ? selectedOutcomes[0].title
+      : selectedOutcomes.map((o) => o.title).join(" & ")
+    : "";
   useEffect(() => {
-    setCompetencies([]);
-    setCompetencyId("");
-    setSelectedCriteriaIds([]);
-    if (!subjectId || !classGroupId || !entriesLoaded || entries.length > 0) return;
-    competenciesApi
-      .getAll(Number(subjectId))
-      .then((res) => setCompetencies(res.data.data))
-      .catch(() => setCompetencies([]));
-  }, [subjectId, classGroupId, entriesLoaded, entries.length]);
-
-  const selectedEntry = entries.find((e) => e.entry_id === entryId);
-  const selectedCompetency = competencies.find((c) => c.competency_id === competencyId);
-  const showCurriculumFallback = !!classGroupId && entriesLoaded && entries.length === 0;
+    if (!titleTouched) setTitle(suggestedTitle);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [suggestedTitle]);
 
   const createBlank = async () => {
     if (!subjectId || !title.trim()) {
@@ -200,9 +163,9 @@ const NewLessonNoteModal: React.FC<Props> = ({ isOpen, onClose, initialSubjectId
       const res = await lessonNotesApi.create({
         subject_id: Number(subjectId),
         class_group_id: classGroupId ? Number(classGroupId) : undefined,
-        scheme_entry_id: entryId ? Number(entryId) : undefined,
         academic_term_id: selectedTermId ?? undefined,
         title: title.trim(),
+        criteria_ids: selectedCriteriaIds,
       });
       onClose();
       navigate(`/lesson-notes/${res.data.data.note_id}`);
@@ -244,21 +207,15 @@ const NewLessonNoteModal: React.FC<Props> = ({ isOpen, onClose, initialSubjectId
   };
 
   const generateWithAI = async () => {
-    if (!entryId && !competencyId) {
-      showToast(
-        showCurriculumFallback
-          ? "Pick a Curriculum element to generate from"
-          : "Pick a Scheme of Work topic to generate from",
-        "error",
-      );
+    if (selectedCriteriaIds.length === 0) {
+      showToast("Pick at least one Learning Outcome or performance criterion to generate from", "error");
       return;
     }
     setCreating(true);
     try {
       const res = await lessonNotesApi.startAIGenerate({
-        ...(entryId
-          ? { entry_id: Number(entryId) }
-          : { competency_id: Number(competencyId), criteria_ids: selectedCriteriaIds }),
+        subject_id: Number(subjectId),
+        criteria_ids: selectedCriteriaIds,
         class_group_id: classGroupId ? Number(classGroupId) : undefined,
         academic_term_id: selectedTermId ?? undefined,
         extra_instructions: extraInstructions.trim() || undefined,
@@ -304,9 +261,9 @@ const NewLessonNoteModal: React.FC<Props> = ({ isOpen, onClose, initialSubjectId
         {
           subject_id: Number(subjectId),
           class_group_id: classGroupId ? Number(classGroupId) : undefined,
-          scheme_entry_id: entryId ? Number(entryId) : undefined,
           academic_term_id: selectedTermId ?? undefined,
           title: title.trim(),
+          criteria_ids: selectedCriteriaIds,
         },
         pdfFile,
         setUploadProgress,
@@ -334,14 +291,12 @@ const NewLessonNoteModal: React.FC<Props> = ({ isOpen, onClose, initialSubjectId
     (mode === "blank"
       ? !!title.trim()
       : mode === "ai"
-        ? !!(entryId || competencyId)
+        ? selectedCriteriaIds.length > 0
         : !!pdfFile && !!title.trim());
 
   const submitHint =
-    mode === "ai" && !(entryId || competencyId)
-      ? showCurriculumFallback
-        ? "Pick a Curriculum element first"
-        : "Pick a class and a Scheme of Work topic first"
+    mode === "ai" && selectedCriteriaIds.length === 0
+      ? "Pick at least one Learning Outcome or performance criterion first"
       : mode === "pdf" && !pdfFile
         ? "Choose a PDF file first"
         : !title.trim() && mode !== "ai"
@@ -468,101 +423,28 @@ const NewLessonNoteModal: React.FC<Props> = ({ isOpen, onClose, initialSubjectId
             </div>
           )}
 
-          {!!classGroupId && !showCurriculumFallback && (
+          {selectedSubject && (
             <div>
-              <label className="block text-xs font-medium text-gray-500 dark:text-gray-300 mb-1">
-                Scheme of Work topic <span className="text-gray-400">(optional — grounds AI generation in this week's curriculum)</span>
-              </label>
-              <select
-                value={entryId}
-                onChange={(e) => {
-                  const id = e.target.value ? Number(e.target.value) : "";
-                  setEntryId(id);
-                  const entry = entries.find((en) => en.entry_id === id);
-                  if (entry && !title) setTitle(entry.topic);
-                }}
-                className="w-full px-3 py-2 text-sm rounded-lg border border-gray-200 dark:border-gray-700/50 bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500"
-              >
-                <option value="">No specific topic (blank note)</option>
-                {entries.map((e) => (
-                  <option key={e.entry_id} value={e.entry_id} disabled={coveredEntryIds.has(e.entry_id)}>
-                    {e.week_number}: {e.topic}
-                    {coveredEntryIds.has(e.entry_id) ? " — note already exists" : ""}
-                  </option>
-                ))}
-              </select>
-              {selectedEntry && (
-                <p className="text-xs text-gray-400 mt-1.5">{selectedEntry.objective}</p>
-              )}
-              {coveredEntryIds.size > 0 && (
-                <p className="text-xs text-gray-400 mt-1.5">
-                  {coveredEntryIds.size} week{coveredEntryIds.size === 1 ? "" : "s"} already {coveredEntryIds.size === 1 ? "has" : "have"} a note — manage them from the notes list.
-                </p>
-              )}
-            </div>
-          )}
-
-          {showCurriculumFallback && (
-            <div>
-              <label className="flex text-xs font-medium text-gray-500 dark:text-gray-300 mb-1 items-center gap-1.5">
-                <BookOpen className="w-3.5 h-3.5 text-blue-500" />
-                Curriculum element
-                <span className="text-gray-400 font-normal">
-                  (no Scheme of Work found for this class/term — grounds AI generation in the Curriculum instead)
-                </span>
-              </label>
-              <select
-                value={competencyId}
-                onChange={(e) => {
-                  const id = e.target.value ? Number(e.target.value) : "";
-                  setCompetencyId(id);
-                  setSelectedCriteriaIds([]);
-                  const competency = competencies.find((c) => c.competency_id === id);
-                  if (competency && !title) setTitle(competency.title);
-                }}
-                className="w-full px-3 py-2 text-sm rounded-lg border border-gray-200 dark:border-gray-700/50 bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500"
-              >
-                <option value="">No specific element (blank note)</option>
-                {competencies.map((c) => (
-                  <option key={c.competency_id} value={c.competency_id}>
-                    {c.element_number}. {c.title}
-                  </option>
-                ))}
-              </select>
-
-              {selectedCompetency && (
-                <div className="mt-2.5">
-                  <p className="text-xs font-medium text-gray-500 dark:text-gray-300 mb-1.5">
-                    Performance criteria to prepare notes for
-                    <span className="text-gray-400 font-normal"> (leave unchecked to cover all of them)</span>
-                  </p>
-                  <div className="max-h-36 overflow-y-auto rounded-lg border border-gray-200 dark:border-gray-700/50 divide-y divide-gray-100 dark:divide-gray-700/40">
-                    {selectedCompetency.criteria.map((c) => (
-                      <label
-                        key={c.criteria_id}
-                        className="flex items-start gap-2 px-3 py-2 text-xs cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/40"
-                      >
-                        <input
-                          type="checkbox"
-                          className="mt-0.5"
-                          checked={selectedCriteriaIds.includes(c.criteria_id)}
-                          onChange={(e) =>
-                            setSelectedCriteriaIds((prev) =>
-                              e.target.checked
-                                ? [...prev, c.criteria_id]
-                                : prev.filter((id) => id !== c.criteria_id),
-                            )
-                          }
-                        />
-                        <span className="text-gray-600 dark:text-gray-300">
-                          <span className="font-medium text-gray-500 dark:text-gray-400">{c.criteria_number}:</span>{" "}
-                          {c.description}
-                        </span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-              )}
+              <div className="flex items-baseline justify-between gap-2 mb-1.5">
+                <label className="text-xs font-medium text-gray-500 dark:text-gray-300">
+                  Curriculum coverage{" "}
+                  <span className="text-gray-400 font-normal">
+                    {mode === "ai" ? "(what the AI writes about)" : "(optional — what this note covers)"}
+                  </span>
+                </label>
+              </div>
+              <CurriculumPicker
+                outcomes={competencies}
+                loading={curriculumLoading}
+                selectedIds={selectedCriteriaIds}
+                onChange={setSelectedCriteriaIds}
+                coveredIds={coveredCriteriaIds}
+                accent={mode === "ai" ? "violet" : mode === "pdf" ? "rose" : "blue"}
+              />
+              <p className="text-[11px] text-gray-400 mt-1.5">
+                Tick a Learning Outcome to cover all of it, or open it and pick specific performance criteria — across as
+                many outcomes as you need.
+              </p>
             </div>
           )}
 
@@ -570,7 +452,10 @@ const NewLessonNoteModal: React.FC<Props> = ({ isOpen, onClose, initialSubjectId
             <label className="block text-xs font-medium text-gray-500 dark:text-gray-300 mb-1">Title</label>
             <input
               value={title}
-              onChange={(e) => setTitle(e.target.value)}
+              onChange={(e) => {
+                setTitle(e.target.value);
+                setTitleTouched(true);
+              }}
               placeholder="e.g. Introduction to Graphic Design Basics"
               className="w-full px-3 py-2 text-sm rounded-lg border border-gray-200 dark:border-gray-700/50 bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500"
             />

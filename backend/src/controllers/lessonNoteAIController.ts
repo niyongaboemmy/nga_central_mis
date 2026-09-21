@@ -26,6 +26,14 @@ import { recordActivity } from "../utils/activityLogger";
 import { sanitizeNoteHtml } from "../utils/sanitizeNoteHtml";
 import { createJob, getJob, updateJob } from "../services/aiNotesJobStore";
 import {
+  parseCriteriaIds,
+  loadCurriculumSelection,
+  loadNoteCurriculumContext,
+  setNoteCriteria,
+  buildCurriculumBlockFromSelection,
+  CurriculumSelection,
+} from "../services/lessonNoteCurriculum";
+import {
   generateStructuredContent,
   isAnyProviderConfigured,
   friendlyAIErrorMessage,
@@ -101,56 +109,49 @@ ${
     : ""
 }`.trim();
 
-// Fallback grounding source for subjects/classes/terms with no Scheme of Work entries yet —
-// generate straight from the Curriculum instead: a competency ("Element") and, optionally, a
-// teacher-picked subset of its Performance Criteria (defaulting to all of them).
-async function loadCompetencyContext(competencyId: number, criteriaIds?: number[]) {
-  const [row] = await db
-    .select({
-      subjectId: Subject.subject_id,
-      subjectName: Subject.name,
-      competency: SubjectCompetency,
-    })
-    .from(SubjectCompetency)
-    .innerJoin(Subject, eq(SubjectCompetency.subject_id, Subject.subject_id))
-    .where(eq(SubjectCompetency.competency_id, competencyId))
-    .limit(1);
-  if (!row) throw new NotFoundError("Curriculum element not found");
-
-  const criteriaConditions = [eq(CompetencyPerformanceCriteria.competency_id, competencyId)];
-  if (criteriaIds && criteriaIds.length > 0) {
-    criteriaConditions.push(inArray(CompetencyPerformanceCriteria.criteria_id, criteriaIds));
+// Curriculum grounding: the teacher picks performance criteria straight from the
+// curriculum tree -- a whole Learning Outcome, a subset, or criteria across several
+// outcomes. The legacy `competency_id` request shape is folded into this too.
+async function loadCurriculumForGeneration(subjectIdHint: number | null, criteriaIds: number[], competencyId?: number) {
+  let ids = criteriaIds;
+  let subjectId = subjectIdHint;
+  if (competencyId) {
+    const [competency] = await db
+      .select({ subject_id: SubjectCompetency.subject_id })
+      .from(SubjectCompetency)
+      .where(eq(SubjectCompetency.competency_id, competencyId))
+      .limit(1);
+    if (!competency) throw new NotFoundError("Curriculum element not found");
+    subjectId = competency.subject_id;
+    if (ids.length === 0) {
+      const all = await db
+        .select({ criteria_id: CompetencyPerformanceCriteria.criteria_id })
+        .from(CompetencyPerformanceCriteria)
+        .where(eq(CompetencyPerformanceCriteria.competency_id, competencyId));
+      ids = all.map((c) => c.criteria_id);
+    }
   }
-  const criteria = await db
-    .select({
-      criteria_number: CompetencyPerformanceCriteria.criteria_number,
-      description: CompetencyPerformanceCriteria.description,
-    })
-    .from(CompetencyPerformanceCriteria)
-    .where(and(...criteriaConditions));
-
-  if (criteria.length === 0) {
-    throw new ValidationError("The selected performance criteria could not be found for this element");
+  if (!subjectId) {
+    // Derive the subject from the first criterion so the client needn't repeat it.
+    const [first] = await db
+      .select({ subject_id: SubjectCompetency.subject_id })
+      .from(CompetencyPerformanceCriteria)
+      .innerJoin(SubjectCompetency, eq(CompetencyPerformanceCriteria.competency_id, SubjectCompetency.competency_id))
+      .where(inArray(CompetencyPerformanceCriteria.criteria_id, ids.length ? ids : [-1]))
+      .limit(1);
+    if (!first) throw new ValidationError("Pick at least one performance criterion to generate from");
+    subjectId = first.subject_id;
   }
-
-  return { ...row, criteria };
+  const selection = await loadCurriculumSelection(subjectId, ids);
+  if (selection.outcomes.length === 0) {
+    throw new ValidationError("Pick at least one performance criterion to generate from");
+  }
+  return selection;
 }
-
-const buildCurriculumBlockFromCompetency = (context: {
-  subjectName: string;
-  competency: typeof SubjectCompetency.$inferSelect;
-  criteria: { criteria_number: string; description: string }[];
-}) => `
-Subject: ${context.subjectName}
-Curriculum element ${context.competency.element_number}: ${context.competency.title}
-${context.competency.description ? `Description: ${context.competency.description}` : ""}
-${context.competency.indicative_content ? `Indicative content: ${context.competency.indicative_content}` : ""}
-Performance criteria to prepare notes for:
-${context.criteria.map((c) => `- ${c.criteria_number}: ${c.description}`).join("\n")}`.trim();
 
 type GenerateSource =
   | { kind: "scheme"; entryId: number }
-  | { kind: "competency"; competencyId: number; criteriaIds: number[] };
+  | { kind: "curriculum"; selection: CurriculumSelection };
 
 const MAX_EXTRA_INSTRUCTIONS_LENGTH = 2000;
 
@@ -171,24 +172,24 @@ const processGenerateJob = async (
     const schemeContext = isScheme
       ? await loadSchemeContext((params.source as { entryId: number }).entryId)
       : null;
-    const competencyContext = !isScheme
-      ? await loadCompetencyContext(
-          (params.source as { competencyId: number; criteriaIds: number[] }).competencyId,
-          (params.source as { competencyId: number; criteriaIds: number[] }).criteriaIds,
-        )
-      : null;
+    const curriculum = !isScheme ? (params.source as { selection: CurriculumSelection }).selection : null;
 
-    const subjectId = (schemeContext ?? competencyContext)!.subjectId;
-    const subjectName = (schemeContext ?? competencyContext)!.subjectName;
+    const subjectId = (schemeContext ?? curriculum)!.subjectId;
+    const subjectName = (schemeContext ?? curriculum)!.subjectName;
     const classGroupName = schemeContext?.classGroupName;
     const fallbackClassGroupId = schemeContext?.classGroupId ?? null;
     const fallbackAcademicTermId = schemeContext?.academicTermId ?? null;
     const curriculumBlock = schemeContext
       ? buildCurriculumBlock(schemeContext)
-      : buildCurriculumBlockFromCompetency(competencyContext!);
+      : buildCurriculumBlockFromSelection(curriculum!);
     const fallbackTitle = schemeContext
       ? schemeContext.entry.topic
-      : competencyContext!.competency.title;
+      : curriculum!.outcomes.map((o) => o.title).join(" & ");
+    const scopeLabel = schemeContext
+      ? "this week's Scheme of Work topic"
+      : curriculum!.outcomes.length === 1
+        ? "this Learning Outcome and its listed performance criteria"
+        : "these Learning Outcomes and their listed performance criteria";
     const extraInstructionsBlock = params.extraInstructions
       ? `\n\nThe teacher who requested these notes also gave these additional instructions — follow them
 alongside everything above, but they can never override the curriculum grounding (topic, objective, and
@@ -211,7 +212,7 @@ ${params.extraInstructions}
       maxOutputTokens: 16000,
       prompt: `You are an experienced, highly detailed teacher of "${subjectName}" writing a comprehensive
 set of classroom lesson notes for students${classGroupName ? ` of class "${classGroupName}"` : ""} to read and
-study from independently, on ${isScheme ? "this week's Scheme of Work topic" : "this Curriculum element"}.
+study from independently, on ${scopeLabel}.
 
 ${curriculumBlock}
 
@@ -246,7 +247,7 @@ Structure the notes as a full document with this shape (adapt section names to t
 - A "Check your understanding" section at the very end with several review questions (no answers) that test
   the performance criteria covered.
 
-Stay grounded in exactly this topic and the listed performance criteria; do not introduce unrelated material
+Stay grounded in exactly the listed performance criteria${!isScheme && curriculum!.outcomes.length > 1 ? " -- cover every selected Learning Outcome, in order, each under its own major section" : ""}; do not introduce unrelated material
 just to hit length — go deeper on what's actually relevant instead. Also propose a concise, specific title for
 the notes (not just the topic name verbatim).${extraInstructionsBlock}`,
     });
@@ -280,18 +281,19 @@ the notes (not just the topic name verbatim).${extraInstructionsBlock}`,
       source: "AI_GENERATED",
     });
     const noteId = (result as any).insertId as number;
+    if (curriculum) await setNoteCriteria(noteId, curriculum.criteriaIds);
 
     await recordActivity(
       params.userId,
       "LESSON_NOTE_AI_GENERATE",
       isScheme
         ? `AI-generated lesson note for entry ID ${(params.source as { entryId: number }).entryId} (${schemeContext!.entry.week_number}) via ${providerUsed}`
-        : `AI-generated lesson note from Curriculum element "${competencyContext!.competency.title}" via ${providerUsed}`,
+        : `AI-generated lesson note covering ${curriculum!.criteriaIds.length} performance criteria across ${curriculum!.outcomes.length} learning outcome(s) via ${providerUsed}`,
       "LessonNote",
       noteId,
       isScheme
         ? { entry_id: (params.source as { entryId: number }).entryId, provider: providerUsed }
-        : { competency_id: (params.source as { competencyId: number }).competencyId, provider: providerUsed },
+        : { criteria_ids: curriculum!.criteriaIds, provider: providerUsed },
     );
 
     updateJob(jobId, { status: "done", message: "Lesson note generated!", noteId, providerUsed });
@@ -328,12 +330,13 @@ export const startAINoteGeneration = asyncHandler(async (req: any, res: any) => 
     );
   }
 
-  const { entry_id, competency_id, criteria_ids, class_group_id, academic_term_id, extra_instructions } = req.body;
-  if (!entry_id && !competency_id) {
-    throw new ValidationError("Either entry_id or competency_id is required");
+  const { entry_id, competency_id, criteria_ids, subject_id, class_group_id, academic_term_id, extra_instructions } = req.body;
+  const criteriaIds = parseCriteriaIds(criteria_ids);
+  if (!entry_id && !competency_id && criteriaIds.length === 0) {
+    throw new ValidationError("Pick at least one performance criterion (or a Scheme of Work entry) to generate from");
   }
-  if (entry_id && competency_id) {
-    throw new ValidationError("Provide either entry_id or competency_id, not both");
+  if (entry_id && (competency_id || criteriaIds.length)) {
+    throw new ValidationError("Provide either entry_id or curriculum criteria, not both");
   }
   if (extra_instructions != null && typeof extra_instructions !== "string") {
     throw new ValidationError("extra_instructions must be a string");
@@ -350,13 +353,13 @@ export const startAINoteGeneration = asyncHandler(async (req: any, res: any) => 
     await assertTeacherOwnsSubjectForAI(req.user.userId, context.subjectId);
     source = { kind: "scheme", entryId };
   } else {
-    const competencyId = parseInt(competency_id, 10);
-    const criteriaIds = Array.isArray(criteria_ids)
-      ? criteria_ids.map((id: any) => parseInt(id, 10)).filter((id: number) => !isNaN(id))
-      : [];
-    const context = await loadCompetencyContext(competencyId, criteriaIds);
-    await assertTeacherOwnsSubjectForAI(req.user.userId, context.subjectId);
-    source = { kind: "competency", competencyId, criteriaIds };
+    const selection = await loadCurriculumForGeneration(
+      subject_id ? parseInt(subject_id, 10) : null,
+      criteriaIds,
+      competency_id ? parseInt(competency_id, 10) : undefined,
+    );
+    await assertTeacherOwnsSubjectForAI(req.user.userId, selection.subjectId);
+    source = { kind: "curriculum", selection };
   }
 
   const userId = req.user.userId;
@@ -421,6 +424,11 @@ export const proposeAINoteEdit = asyncHandler(async (req: any, res: any) => {
   if (note.scheme_entry_id) {
     const context = await loadSchemeContext(note.scheme_entry_id);
     curriculumBlock = `\n\nStay grounded in the syllabus this note is for:\n${buildCurriculumBlock(context)}`;
+  } else {
+    const coverage = await loadNoteCurriculumContext(noteId, note.subject_id);
+    if (coverage) {
+      curriculumBlock = `\n\nStay grounded in the curriculum this note covers:\n${buildCurriculumBlockFromSelection(coverage)}`;
+    }
   }
 
   // For a whole-note edit, the client sends the editor's live, in-memory HTML

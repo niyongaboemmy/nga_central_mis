@@ -12,6 +12,8 @@ import {
   AlertCircle,
   FileDown,
   FileText,
+  ChevronDown,
+  GraduationCap,
 } from "lucide-react";
 import { lessonNotesApi, LessonNoteDetail, isPdfBackedNote } from "../../api/lessonNotes";
 import { useToast } from "../../contexts/ToastContext";
@@ -50,6 +52,7 @@ const LessonNoteEditorPage: React.FC = () => {
   const [hasContent, setHasContent] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
+  const [coverageOpen, setCoverageOpen] = useState(false);
 
   const pendingContent = useRef<{ json: any; html: string } | null>(null);
   const pendingAIPrompt = useRef<string | null>(null);
@@ -410,7 +413,59 @@ const LessonNoteEditorPage: React.FC = () => {
         </div>
       </div>
 
-      {note.scheme_context && (
+      {/* Curriculum coverage: the Learning Outcomes / performance criteria this note is for.
+          Collapsed to one line so the editor keeps its space; expand to read the criteria. */}
+      {note.curriculum_context && note.curriculum_context.outcomes.length > 0 && (
+        <div className="mb-3 rounded-xl bg-blue-50/70 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-900/30">
+          <button
+            type="button"
+            onClick={() => setCoverageOpen((o) => !o)}
+            className="w-full flex items-center gap-2 px-4 py-2.5 text-left"
+            aria-expanded={coverageOpen}
+          >
+            <GraduationCap className="w-4 h-4 text-blue-500 flex-shrink-0" />
+            <span className="text-xs text-blue-800 dark:text-blue-300 min-w-0 flex-1 truncate">
+              <span className="font-semibold">
+                {note.curriculum_context.criteria_ids.length} performance{" "}
+                {note.curriculum_context.criteria_ids.length === 1 ? "criterion" : "criteria"}
+              </span>{" "}
+              across {note.curriculum_context.outcomes.length} learning{" "}
+              {note.curriculum_context.outcomes.length === 1 ? "outcome" : "outcomes"}
+              <span className="opacity-80">
+                {" "}
+                — {note.curriculum_context.outcomes.map((o) => `LO ${o.element_number}: ${o.title}`).join(" · ")}
+              </span>
+            </span>
+            <ChevronDown
+              className={`w-4 h-4 text-blue-400 flex-shrink-0 transition-transform ${coverageOpen ? "rotate-180" : ""}`}
+            />
+          </button>
+          {coverageOpen && (
+            <div className="px-4 pb-3 grid gap-2 sm:grid-cols-2">
+              {note.curriculum_context.outcomes.map((o) => (
+                <div key={o.competency_id} className="rounded-lg bg-white/70 dark:bg-gray-900/40 px-3 py-2">
+                  <p className="text-xs font-semibold text-blue-900 dark:text-blue-200">
+                    LO {o.element_number}: {o.title}
+                    <span className="ml-1.5 font-normal text-blue-600/70 dark:text-blue-300/70">
+                      {o.criteria.length >= o.total_criteria ? "whole outcome" : `${o.criteria.length} of ${o.total_criteria}`}
+                    </span>
+                  </p>
+                  <ul className="mt-1 space-y-0.5">
+                    {o.criteria.map((c) => (
+                      <li key={c.criteria_id} className="text-[11px] text-blue-800/90 dark:text-blue-300/90 leading-snug">
+                        <span className="font-medium mr-1">{c.criteria_number}</span>
+                        {c.description}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {note.scheme_context && !note.curriculum_context && (
         <div className="mb-3 px-4 py-2.5 rounded-xl bg-blue-50/70 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-900/30 flex items-start gap-2">
           <BookOpen className="w-4 h-4 text-blue-500 flex-shrink-0 mt-0.5" />
           <div className="text-xs text-blue-800 dark:text-blue-300">
