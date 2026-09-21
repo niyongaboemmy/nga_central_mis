@@ -6,6 +6,7 @@ import { useAcademicPeriod } from "../../contexts/AcademicPeriodContext";
 import { Permissions } from "../../constants/permissions";
 import {
   CalendarSlot,
+  CalendarActivity,
   getMyCalendar,
   getStudentCalendar,
   getLessonPlanForSlot,
@@ -29,6 +30,7 @@ import { buildGridLayout, cellKey, type GridCell } from "./calendarLayout";
 import SlotTooltip, { useSlotTooltip } from "./SlotTooltip";
 import { useCurrentTime } from "./useCurrentTime";
 import { getSlotColor, slotSurface, hexToRgba } from "./slotColor";
+import { weeklyActivityEntries, type GridEntry } from "./activityEntry";
 import {
   subjectKey,
   highlightState,
@@ -58,6 +60,8 @@ const DashboardCalendarWidget: React.FC = () => {
 
   // State
   const [slots, setSlots] = useState<CalendarSlot[]>([]);
+  // Custom activities (non-subject events) the teacher is assigned to run.
+  const [activities, setActivities] = useState<CalendarActivity[]>([]);
   const [_upcomingLessons, setUpcomingLessons] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentWeekStart, setCurrentWeekStart] = useState<Date>(() =>
@@ -83,6 +87,8 @@ const DashboardCalendarWidget: React.FC = () => {
 
   // Modal State
   const [selectedSlot, setSelectedSlot] = useState<CalendarSlot | null>(null);
+  const [selectedActivity, setSelectedActivity] =
+    useState<CalendarActivity | null>(null);
   const [selectedSlotDate, setSelectedSlotDate] = useState<Date | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [showLessonPlan, setShowLessonPlan] = useState(false);
@@ -178,11 +184,13 @@ const DashboardCalendarWidget: React.FC = () => {
         if (isStudent) {
           const calendarData = await getStudentCalendar(params);
           setSlots(calendarData.slots || []);
+          setActivities([]);
           setUpcomingLessons(calendarData.upcoming || []);
         } else {
           // Teacher or generic authenticated user
           const calendarData = await getMyCalendar(params);
           setSlots(calendarData.slots || []);
+          setActivities(calendarData.activities || []);
           setUpcomingLessons(calendarData.upcoming || []);
         }
       } catch (err: any) {
@@ -242,9 +250,18 @@ const DashboardCalendarWidget: React.FC = () => {
     }
   }, [classGroupOptions, isStudent, selectedClassGroupId]);
 
-  // Handle slot click
+  // Handle slot click — an activity entry opens the read-only activity view
   const handleSlotClick = (slot: CalendarSlot, date: Date) => {
     setModalMode("details");
+    const activity = (slot as GridEntry).__activity;
+    if (activity) {
+      setSelectedSlot(null);
+      setSelectedActivity(activity);
+      setSelectedSlotDate(date);
+      setShowModal(true);
+      return;
+    }
+    setSelectedActivity(null);
     setSelectedSlot(slot);
     setSelectedSlotDate(date);
     setFormData({
@@ -304,6 +321,12 @@ const DashboardCalendarWidget: React.FC = () => {
   const goToToday = () => setCurrentWeekStart(getStartOfWeek(new Date()));
 
   const title = isStudent ? "My Class Schedule" : "My Teaching Schedule";
+
+  // Lessons plus the activities assigned to this teacher, drawn as one grid.
+  const gridEntries = useMemo<CalendarSlot[]>(
+    () => [...slots, ...weeklyActivityEntries(activities)],
+    [slots, activities],
+  );
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
@@ -385,7 +408,7 @@ const DashboardCalendarWidget: React.FC = () => {
       )}
 
       {/* Empty state */}
-      {!loading && slots.length === 0 && (
+      {!loading && gridEntries.length === 0 && (
         <div className="flex flex-col items-center justify-center h-40 text-center">
           <Calendar className="w-10 h-10 text-gray-300 dark:text-gray-600 mb-3" />
           <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
@@ -398,9 +421,9 @@ const DashboardCalendarWidget: React.FC = () => {
       )}
 
       {/* Calendar Grid */}
-      {!loading && slots.length > 0 && (
+      {!loading && gridEntries.length > 0 && (
         <ReadOnlyCalendarGrid
-          slots={slots}
+          slots={gridEntries}
           weekDates={weekDates}
           onSlotClick={handleSlotClick}
           showClassGroup={!isStudent}
@@ -417,7 +440,12 @@ const DashboardCalendarWidget: React.FC = () => {
           formData.class_group_id ? parseInt(formData.class_group_id) : null
         }
         setupData={null}
-        onClose={() => setShowModal(false)}
+        selectedActivity={selectedActivity}
+        canManageActivities={false}
+        onClose={() => {
+          setShowModal(false);
+          setSelectedActivity(null);
+        }}
         onSubmit={() => {}}
         onFormDataChange={setFormData as any}
         onErrorsChange={() => {}}
@@ -489,6 +517,8 @@ const ReadOnlyCalendarGrid: React.FC<ReadOnlyCalendarGridProps> = ({
       { key: string; name: string; color: string; periods: number }
     >();
     for (const s of slots) {
+      // Events are not subjects; they carry their own colour and label.
+      if ((s as GridEntry).__activity) continue;
       const key = subjectKey(s);
       const name = s.subject_name;
       if (!key || !name || seen.has(key)) continue;
@@ -773,6 +803,13 @@ const ReadOnlyCalendarGrid: React.FC<ReadOnlyCalendarGridProps> = ({
                               const color = getSlotColor(course);
                               const surface = slotSurface(color, isDark);
                               const isLive = progress !== null;
+                              const activity = (course as GridEntry).__activity;
+                              const isActivity = Boolean(activity);
+                              // Events show the class group they belong to
+                              // (or "School-wide") rather than the activity type.
+                              const activityGroup = activity
+                                ? activity.class_group_name || "School-wide"
+                                : null;
                               const highlight = highlightState(
                                 hoveredSubject,
                                 course,
@@ -827,10 +864,33 @@ const ReadOnlyCalendarGrid: React.FC<ReadOnlyCalendarGridProps> = ({
                                     className="h-full p-1.5 text-xs flex flex-col justify-start"
                                     style={{ color: surface.text }}
                                   >
-                                    <div className="font-semibold truncate text-[12px]">
-                                      {course.subject_name}
+                                    <div className="flex items-center gap-1 min-w-0">
+                                      {isActivity && (
+                                        <span
+                                          aria-hidden="true"
+                                          className="text-[9px] font-semibold uppercase tracking-wide px-1 py-px rounded flex-shrink-0"
+                                          style={{
+                                            backgroundColor: hexToRgba(color, 0.22),
+                                            color: surface.text,
+                                          }}
+                                        >
+                                          Event
+                                        </span>
+                                      )}
+                                      <span className="font-semibold truncate text-[12px]">
+                                        {course.subject_name}
+                                      </span>
                                     </div>
+                                    {isActivity && activityGroup && (
+                                      <div
+                                        className="truncate text-[10px]"
+                                        style={{ color: surface.meta }}
+                                      >
+                                        {activityGroup}
+                                      </div>
+                                    )}
                                     {showClassGroup &&
+                                      !isActivity &&
                                       course.class_group_name && (
                                         <div
                                           className="truncate text-[10px]"

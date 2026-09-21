@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor, within, act } from "@testing-library/react";
+import { render, screen, waitFor, within, act, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import DashboardCalendarWidget from "../DashboardCalendarWidget";
 
@@ -376,5 +376,107 @@ describe("DashboardCalendarWidget — subject hover highlight", () => {
 
     act(() => cell.blur());
     expect(byState("idle")).toHaveLength(5);
+  });
+});
+
+// Custom activities (non-subject events) an admin assigned to this teacher
+// come back from my-calendar and belong on the schedule next to lessons.
+describe("DashboardCalendarWidget — assigned activities", () => {
+  const lesson = {
+    slot_id: 1,
+    academic_term_id: 21,
+    subject_id: 9,
+    user_id: 11,
+    day_of_week: 1,
+    start_time: "08:00",
+    end_time: "08:50",
+    subject_name: "Web Application Development",
+    class_group_name: "L3. Class A",
+    class_group_id: 3,
+  };
+  const pe = {
+    activity_id: 42,
+    academic_term_id: 21,
+    class_group_id: 3,
+    class_group_name: "L3. Class A",
+    activity_name: "Physical Education",
+    activity_type: "Sports",
+    day_of_week: 4,
+    start_time: "15:30",
+    end_time: "16:20",
+    color: "#F59E0B",
+    is_recurring: 1,
+    assignees: [{ user_id: 11, first_name: "Jane", last_name: "Doe" }],
+  };
+
+  beforeEach(() => {
+    // mockReset (not mockClear) also drains any mockResolvedValueOnce queued
+    // by an earlier describe that never consumed it.
+    getMyCalendarMock.mockReset();
+    getStudentCalendarMock.mockReset();
+    getMyClassGroupsMock.mockReset();
+    // two groups, so the widget does not auto-select the only one and reload
+    getMyClassGroupsMock.mockResolvedValue([
+      { class_group_id: 3, name: "L3. Class A" },
+      { class_group_id: 4, name: "L4. Class A" },
+    ]);
+    periodMock = {
+      selectedTermId: 21,
+      selectedTerm: { academic_term_id: 21, name: "Term A" },
+      selectedYearId: 2025,
+    };
+  });
+
+  it("draws an assigned activity as an Event card on its day and time", async () => {
+    getMyCalendarMock.mockResolvedValue({
+      slots: [lesson],
+      activities: [pe],
+      upcoming: [],
+    });
+    render(<DashboardCalendarWidget />);
+
+    const grid = within(await screen.findByRole("grid"));
+    const cell = grid.getByRole("gridcell", { name: /Thursday.*Physical Education, Sports, 15:30 to 16:20/ });
+    expect(cell).toBeInTheDocument();
+    const card = within(cell).getByText("Physical Education").closest("[data-subject-key]")!;
+    expect(card).toHaveTextContent("Event");
+    expect(card).toHaveTextContent("L3. Class A");
+    expect(card).toHaveAttribute("data-subject-key", "activity:physical education");
+
+    // events are not subjects: the legend lists only real subjects
+    const legend = screen.getByRole("list", { name: /subjects on this/i });
+    expect(within(legend).getAllByRole("listitem")).toHaveLength(1);
+    expect(within(legend).queryByText("Physical Education")).not.toBeInTheDocument();
+  });
+
+  it("shows the schedule when the teacher has only activities and no lessons", async () => {
+    getMyCalendarMock.mockResolvedValue({ slots: [], activities: [pe], upcoming: [] });
+    render(<DashboardCalendarWidget />);
+    await screen.findByRole("grid");
+    expect(screen.queryByText("No subjects scheduled for this term")).not.toBeInTheDocument();
+    expect(screen.getByText("Physical Education")).toBeInTheDocument();
+  });
+
+  it("opens a read-only activity view with the assignees on click", async () => {
+    getMyCalendarMock.mockResolvedValue({
+      slots: [lesson],
+      activities: [pe],
+      upcoming: [],
+    });
+    render(<DashboardCalendarWidget />);
+    const grid = within(await screen.findByRole("grid"));
+    fireEvent.click(grid.getByText("Physical Education"));
+    expect(await screen.findByText("Activity Details")).toBeInTheDocument();
+    const assigned = screen.getByRole("list", { name: "Assigned staff" });
+    expect(assigned).toHaveTextContent("Jane Doe");
+    expect(screen.queryByRole("button", { name: /Edit Activity/ })).not.toBeInTheDocument();
+  });
+
+  it("tolerates an older backend that returns no activities field", async () => {
+    getMyCalendarMock.mockResolvedValue({ slots: [lesson], upcoming: [] });
+    render(<DashboardCalendarWidget />);
+    const grid = within(await screen.findByRole("grid"));
+    expect(grid.getByText("Web Application Development")).toBeInTheDocument();
+    expect(grid.queryByText("Event")).not.toBeInTheDocument();
   });
 });

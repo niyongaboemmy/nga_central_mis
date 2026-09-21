@@ -7,6 +7,7 @@ import { Permissions } from "../constants/permissions";
 import {
   CalendarSlot,
   CalendarActivity,
+  ActivityAssignee,
   CalendarNotification,
   UpcomingLesson,
   getCalendarSlots,
@@ -265,6 +266,7 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({
     location: "",
     description: "",
     color: "#10B981",
+    assignees: [] as ActivityAssignee[],
   };
   const [activityForm, setActivityForm] = useState(emptyActivityForm);
   const [activityErrors, setActivityErrors] = useState<{
@@ -623,6 +625,7 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({
       location: activity.location || "",
       description: activity.description || "",
       color: activity.color || "#10B981",
+      assignees: activity.assignees ?? [],
     });
     setShowModal(true);
   };
@@ -670,6 +673,8 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({
       location: activityForm.location || undefined,
       description: activityForm.description || undefined,
       color: activityForm.color,
+      // Always sent (possibly empty) so clearing every assignee on edit sticks.
+      assigned_user_ids: activityForm.assignees.map((u) => u.user_id),
     };
 
     try {

@@ -1041,6 +1041,26 @@ export const CalendarActivity = mysqlTable("CalendarActivity", {
   ),
 });
 
+// CalendarActivityAssignee: staff optionally assigned to run a custom
+// activity. An activity with no assignees is still a valid class-group /
+// school-wide event; assigned activities also surface on each assignee's own
+// teaching schedule (getMyCalendar).
+export const CalendarActivityAssignee = mysqlTable(
+  "CalendarActivityAssignee",
+  {
+    activity_id: bigint("activity_id", { mode: "number" })
+      .notNull()
+      .references(() => CalendarActivity.activity_id),
+    user_id: bigint("user_id", { mode: "number" })
+      .notNull()
+      .references(() => User.user_id),
+    created_at: datetime("created_at").default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.activity_id, table.user_id] }),
+  }),
+);
+
 // --- Reporting Module Tables ---
 
 // InstructorReport table: Central record for a weekly or daily report

@@ -15,6 +15,7 @@ import {
   CalendarSlot,
   CalendarNotification,
   CalendarActivity,
+  CalendarActivityAssignee,
   AcademicCalendar,
   AcademicTerm,
   AcademicYear,
@@ -985,8 +986,17 @@ export const getMyCalendar = asyncHandler(async (req: any, res: any) => {
     })
     .sort((a, b) => a.minutes_until_start - b.minutes_until_start);
 
+  // Custom activities (non-subject events) the caller has been assigned to
+  // run, so they sit on the teacher's own schedule next to their lessons.
+  const activities = await loadAssignedActivities({
+    userId,
+    termId,
+    classGroupId: class_group_id ? parseInt(class_group_id) : null,
+  });
+
   const response = {
     slots: filteredSlots,
+    activities,
     upcoming: upcomingSlots,
     term_id: termId,
   };
@@ -1134,6 +1144,159 @@ export const checkUpcomingLessons = asyncHandler(async (req: any, res: any) => {
 // Calendar Activities (Non-subject events)
 // ============================================
 
+export interface ActivityAssignee {
+  user_id: number;
+  first_name: string | null;
+  last_name: string | null;
+}
+
+/** The staff assigned to each of `activityIds`, keyed by activity id. */
+const loadActivityAssignees = async (
+  activityIds: number[],
+): Promise<Map<number, ActivityAssignee[]>> => {
+  const byActivity = new Map<number, ActivityAssignee[]>();
+  if (activityIds.length === 0) return byActivity;
+  const rows = await db
+    .select({
+      activity_id: CalendarActivityAssignee.activity_id,
+      user_id: CalendarActivityAssignee.user_id,
+      first_name: UserProfile.first_name,
+      last_name: UserProfile.last_name,
+    })
+    .from(CalendarActivityAssignee)
+    .leftJoin(
+      UserProfile,
+      eq(CalendarActivityAssignee.user_id, UserProfile.user_id),
+    )
+    .where(inArray(CalendarActivityAssignee.activity_id, activityIds))
+    .orderBy(UserProfile.first_name, UserProfile.last_name);
+  for (const row of rows) {
+    const list = byActivity.get(row.activity_id) ?? [];
+    list.push({
+      user_id: row.user_id,
+      first_name: row.first_name,
+      last_name: row.last_name,
+    });
+    byActivity.set(row.activity_id, list);
+  }
+  return byActivity;
+};
+
+/** Attach `assignees` to each activity row. */
+const withAssignees = async <T extends { activity_id: number }>(
+  activities: T[],
+): Promise<(T & { assignees: ActivityAssignee[] })[]> => {
+  const byActivity = await loadActivityAssignees(
+    activities.map((a) => a.activity_id),
+  );
+  return activities.map((a) => ({
+    ...a,
+    assignees: byActivity.get(a.activity_id) ?? [],
+  }));
+};
+
+/**
+ * Normalise the optional `assigned_user_ids` body field: `undefined` means
+ * "not sent, leave alone"; anything else becomes a de-duplicated list of
+ * positive integer user ids (an empty list clears the assignment).
+ */
+const parseAssignedUserIds = (raw: unknown): number[] | undefined => {
+  if (raw === undefined) return undefined;
+  if (raw === null) return [];
+  if (!Array.isArray(raw)) {
+    throw new ValidationError("assigned_user_ids must be an array of user ids");
+  }
+  const ids = new Set<number>();
+  for (const value of raw) {
+    const id = Number(value);
+    if (!Number.isInteger(id) || id <= 0) {
+      throw new ValidationError("assigned_user_ids must contain valid user ids");
+    }
+    ids.add(id);
+  }
+  return [...ids];
+};
+
+/** Every id must name a real user — checked before any write so a bad list
+ *  never leaves an orphaned activity or a half-written assignee set. */
+const assertUsersExist = async (userIds: number[]) => {
+  if (userIds.length === 0) return;
+  const found = await db
+    .select({ user_id: User.user_id })
+    .from(User)
+    .where(inArray(User.user_id, userIds));
+  if (found.length !== userIds.length) {
+    throw new ValidationError("One or more assigned users do not exist");
+  }
+};
+
+/** Replace an activity's assignee set (callers validate ids first). */
+const replaceActivityAssignees = async (
+  activityId: number,
+  userIds: number[],
+) => {
+  await db
+    .delete(CalendarActivityAssignee)
+    .where(eq(CalendarActivityAssignee.activity_id, activityId));
+  if (userIds.length > 0) {
+    await db.insert(CalendarActivityAssignee).values(
+      userIds.map((user_id) => ({ activity_id: activityId, user_id })),
+    );
+  }
+};
+
+/** Activities in `termId` assigned to `userId`, for their own schedule.
+ *  A class-group filter keeps that group's activities and school-wide ones. */
+export const loadAssignedActivities = async (params: {
+  userId: number;
+  termId: number;
+  classGroupId: number | null;
+}) => {
+  const filters: SQL[] = [
+    eq(CalendarActivity.is_active, 1),
+    eq(CalendarActivity.academic_term_id, params.termId),
+    eq(CalendarActivityAssignee.user_id, params.userId),
+  ];
+  if (params.classGroupId) {
+    filters.push(
+      or(
+        isNull(CalendarActivity.class_group_id),
+        eq(CalendarActivity.class_group_id, params.classGroupId),
+      )!,
+    );
+  }
+  const rows = await db
+    .select({
+      activity_id: CalendarActivity.activity_id,
+      academic_term_id: CalendarActivity.academic_term_id,
+      class_group_id: CalendarActivity.class_group_id,
+      activity_name: CalendarActivity.activity_name,
+      activity_type: CalendarActivity.activity_type,
+      day_of_week: CalendarActivity.day_of_week,
+      start_date: CalendarActivity.start_date,
+      end_date: CalendarActivity.end_date,
+      start_time: CalendarActivity.start_time,
+      end_time: CalendarActivity.end_time,
+      location: CalendarActivity.location,
+      description: CalendarActivity.description,
+      color: CalendarActivity.color,
+      is_recurring: CalendarActivity.is_recurring,
+      class_group_name: ClassGroup.name,
+    })
+    .from(CalendarActivity)
+    .innerJoin(
+      CalendarActivityAssignee,
+      eq(CalendarActivityAssignee.activity_id, CalendarActivity.activity_id),
+    )
+    .leftJoin(
+      ClassGroup,
+      eq(CalendarActivity.class_group_id, ClassGroup.class_group_id),
+    )
+    .where(and(...filters))
+    .orderBy(CalendarActivity.day_of_week, CalendarActivity.start_time);
+  return withAssignees(rows);
+};
+
 // Get calendar activities
 export const getCalendarActivities = asyncHandler(
   async (req: any, res: any) => {
@@ -1222,7 +1385,7 @@ export const getCalendarActivities = asyncHandler(
     successResponse(
       res,
       "Calendar activities retrieved successfully",
-      activities,
+      await withAssignees(activities),
     );
   },
 );
@@ -1244,6 +1407,7 @@ export const createCalendarActivity = asyncHandler(
       description,
       color,
       is_recurring,
+      assigned_user_ids,
     } = req.body;
 
     if (
@@ -1255,6 +1419,10 @@ export const createCalendarActivity = asyncHandler(
     ) {
       throw new ValidationError("Required fields must be provided");
     }
+    // Validated before the insert so a bad assignee list never leaves an
+    // orphaned activity behind.
+    const assigneeIds = parseAssignedUserIds(assigned_user_ids) ?? [];
+    await assertUsersExist(assigneeIds);
 
     const result = await db.insert(CalendarActivity).values({
       academic_term_id: sql`${academic_term_id}`,
@@ -1275,8 +1443,13 @@ export const createCalendarActivity = asyncHandler(
     const resultHeader = Array.isArray(result) ? result[0] : result;
     const activityId = (resultHeader as any).insertId;
 
+    if (assigneeIds.length > 0) {
+      await replaceActivityAssignees(activityId, assigneeIds);
+    }
+
     logger.info("Calendar activity created", {
       activityId,
+      assignees: assigneeIds,
       userId: req.user?.userId || req.user?.user_id || req.user?.id,
     });
 
@@ -1323,11 +1496,13 @@ export const updateCalendarActivity = asyncHandler(
       color,
       is_recurring,
       is_active,
+      assigned_user_ids,
     } = req.body;
 
-    await db
-      .update(CalendarActivity)
-      .set({
+    const assigneeIds = parseAssignedUserIds(assigned_user_ids);
+    if (assigneeIds) await assertUsersExist(assigneeIds);
+
+    const changes = {
         ...(class_group_id !== undefined && { class_group_id }),
         ...(activity_name && { activity_name }),
         ...(activity_type && { activity_type }),
@@ -1341,8 +1516,21 @@ export const updateCalendarActivity = asyncHandler(
         ...(color !== undefined && { color }),
         ...(is_recurring !== undefined && { is_recurring }),
         ...(is_active !== undefined && { is_active }),
-      })
-      .where(eq(CalendarActivity.activity_id, activityId));
+    };
+    // A request that only reassigns staff has no column changes; Drizzle
+    // refuses an empty SET, so skip the row update in that case.
+    if (Object.keys(changes).length > 0) {
+      await db
+        .update(CalendarActivity)
+        .set(changes)
+        .where(eq(CalendarActivity.activity_id, activityId));
+    }
+
+    // Only rewrite the assignee set when the client actually sent one, so a
+    // partial update (say, just a colour change) leaves assignments intact.
+    if (assigneeIds !== undefined) {
+      await replaceActivityAssignees(activityId, assigneeIds);
+    }
 
     logger.info("Calendar activity updated", {
       activityId,

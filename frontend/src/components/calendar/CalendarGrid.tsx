@@ -17,6 +17,7 @@ import SlotTooltip, { instructorOf, useSlotTooltip } from "./SlotTooltip";
 import { useCurrentTime } from "./useCurrentTime";
 import { getSlotColor, hexToRgba, slotSurface } from "./slotColor";
 import { useIsDark } from "./useIsDark";
+import { weeklyActivityEntries, type GridEntry } from "./activityEntry";
 import {
   subjectKey,
   highlightState,
@@ -39,38 +40,6 @@ interface CalendarGridProps {
   onActivityClick?: (activity: CalendarActivity) => void;
   canEdit?: boolean;
 }
-
-/**
- * A custom activity rendered on the weekly grid.
- *
- * Activities aren't tied to a subject or instructor, but they occupy a
- * day + time range exactly like a lesson does, so they're mapped onto the
- * same `CalendarSlot` shape the layout engine already understands (negative
- * `slot_id` keeps them from colliding with real slot ids) and tagged with
- * `__activity` so clicks route to the activity editor instead of the lesson one.
- */
-type GridEntry = CalendarSlot & { __activity?: CalendarActivity };
-
-const activityToEntry = (
-  a: CalendarActivity,
-  calendarId?: number,
-): GridEntry => ({
-  slot_id: -Math.abs(a.activity_id),
-  calendar_id: calendarId,
-  academic_term_id: a.academic_term_id,
-  class_group_id: a.class_group_id,
-  subject_id: 0,
-  user_id: 0,
-  day_of_week: Number(a.day_of_week ?? 0),
-  start_time: a.start_time,
-  end_time: a.end_time,
-  location: a.location,
-  color: a.color || "#10B981",
-  notes: a.description,
-  subject_name: a.activity_name,
-  class_group_name: a.activity_type,
-  __activity: a,
-});
 
 /** How far through a lesson we are, 0-1, or null when it isn't running. */
 const lessonProgress = (
@@ -103,16 +72,7 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
     const base = calendarId
       ? slots.filter((s) => s.calendar_id === calendarId)
       : slots;
-    const activityEntries = (activities ?? [])
-      .filter(
-        (a) =>
-          a.start_time &&
-          a.end_time &&
-          a.day_of_week !== null &&
-          a.day_of_week !== undefined,
-      )
-      .map((a) => activityToEntry(a, calendarId));
-    return [...base, ...activityEntries];
+    return [...base, ...weeklyActivityEntries(activities, calendarId)];
   }, [calendarId, slots, activities]);
 
   // Rows follow the data: a period outside the standard timetable still needs

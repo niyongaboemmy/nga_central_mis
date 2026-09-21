@@ -21,6 +21,13 @@ export interface CalendarSlot {
   class_group_name?: string;
 }
 
+/** A staff member assigned to run a custom activity. */
+export interface ActivityAssignee {
+  user_id: number;
+  first_name?: string | null;
+  last_name?: string | null;
+}
+
 export interface CalendarActivity {
   activity_id: number;
   academic_term_id: number;
@@ -37,6 +44,8 @@ export interface CalendarActivity {
   color?: string;
   is_recurring: number;
   class_group_name?: string;
+  /** Optional: who runs it. Empty/absent means an unassigned event. */
+  assignees?: ActivityAssignee[];
 }
 
 export interface CalendarNotification {
@@ -61,6 +70,8 @@ export interface UpcomingLesson {
 
 export interface MyCalendarResponse {
   slots: CalendarSlot[];
+  /** Custom activities (non-subject events) assigned to the caller. */
+  activities?: CalendarActivity[];
   upcoming: UpcomingLesson[];
   term_id: number;
 }
@@ -192,6 +203,8 @@ export const createCalendarActivity = async (data: {
   description?: string;
   color?: string;
   is_recurring?: number;
+  /** Optional staff to assign; omit or send [] for none. */
+  assigned_user_ids?: number[];
 }): Promise<{ activity_id: number }> => {
   const response = await api.post<{ data: { activity_id: number } }>(
     "/calendar/activities",
@@ -203,7 +216,7 @@ export const createCalendarActivity = async (data: {
 // Update calendar activity (admin)
 export const updateCalendarActivity = async (
   id: number,
-  data: Partial<CalendarActivity>,
+  data: Partial<CalendarActivity> & { assigned_user_ids?: number[] },
 ): Promise<{ activity_id: number }> => {
   const response = await api.put<{ data: { activity_id: number } }>(
     `/calendar/activities/${id}`,

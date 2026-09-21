@@ -1,5 +1,6 @@
 import React from "react";
-import { X, Clock, CalendarDays, Sparkles } from "lucide-react";
+import { X, Clock, CalendarDays, Sparkles, Users } from "lucide-react";
+import ActivityAssigneePicker, { assigneeLabel } from "./ActivityAssigneePicker";
 import SubjectSelect from "../ui/SubjectSelect";
 import { DAYS_FULL, backendDayToDisplay } from "./calendarConstants";
 import { getSlotColor, readableTextColor } from "./slotColor";
@@ -7,6 +8,7 @@ import type {
   CalendarSlot,
   CalendarActivity,
   CalendarSetupData,
+  ActivityAssignee,
 } from "../../api/calendar";
 
 interface FormData {
@@ -37,6 +39,8 @@ export interface ActivityFormData {
   location: string;
   description: string;
   color: string;
+  /** Optional staff who run the activity. */
+  assignees: ActivityAssignee[];
 }
 
 export interface ActivityFormErrors {
@@ -166,6 +170,7 @@ const CalendarSlotModal: React.FC<CalendarSlotModalProps> = ({
   const activityMode = isEditingActivity || entryKind === "activity";
 
   const af: ActivityFormData = activityForm ?? {
+    assignees: [],
     activity_name: "",
     activity_type: "",
     day_of_week: "",
@@ -255,6 +260,29 @@ const CalendarSlotModal: React.FC<CalendarSlotModalProps> = ({
                   <Clock className="w-4 h-4 text-orange-500" />
                   {selectedActivity.start_time} — {selectedActivity.end_time}
                 </p>
+              </div>
+              <div className="col-span-2 space-y-1 pt-2 border-t border-gray-200 dark:border-gray-700/50">
+                <p className="text-[10px] uppercase tracking-wider font-bold text-gray-400 dark:text-gray-500">
+                  Assigned to
+                </p>
+                {selectedActivity.assignees &&
+                selectedActivity.assignees.length > 0 ? (
+                  <ul className="flex flex-wrap gap-1.5" aria-label="Assigned staff">
+                    {selectedActivity.assignees.map((u) => (
+                      <li
+                        key={u.user_id}
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900/40 text-emerald-800 dark:text-emerald-200 text-xs font-medium"
+                      >
+                        <Users className="w-3 h-3" />
+                        {assigneeLabel(u)}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    Not assigned to anyone
+                  </p>
+                )}
               </div>
               {selectedActivity.description && (
                 <div className="col-span-2 space-y-1 pt-2 border-t border-gray-200 dark:border-gray-700/50">
@@ -627,6 +655,22 @@ const CalendarSlotModal: React.FC<CalendarSlotModalProps> = ({
                 rows={2}
                 placeholder="Optional"
                 className={inputCls(false)}
+              />
+            </div>
+
+            {/* Assigned to — optional; assigned staff see the activity on
+                their own teaching schedule. */}
+            <div>
+              <label className={labelCls}>
+                Assigned to{" "}
+                <span className="text-xs font-normal text-gray-400 dark:text-gray-500">
+                  (optional — shows on their teaching schedule)
+                </span>
+              </label>
+              <ActivityAssigneePicker
+                value={af.assignees ?? []}
+                onChange={(assignees) => setAf({ assignees })}
+                disabled={isSubmitting}
               />
             </div>
           </form>

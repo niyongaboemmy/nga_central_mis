@@ -139,6 +139,7 @@ describe("CalendarSlotModal — activity form", () => {
           location: "",
           description: "",
           color: "#10B981",
+          assignees: [],
         }}
         activityErrors={{}}
         onEntryKindChange={() => {}}
@@ -174,6 +175,7 @@ describe("CalendarSlotModal — activity form", () => {
           location: "",
           description: "",
           color: "#10B981",
+          assignees: [],
         }}
         activityErrors={{}}
         onEntryKindChange={() => {}}
