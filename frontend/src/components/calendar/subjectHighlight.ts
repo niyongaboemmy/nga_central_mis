@@ -11,11 +11,21 @@
 export interface SubjectLike {
   subject_id?: number | null;
   subject_name?: string | null;
+  /** Set on the admin grid's custom-activity pseudo-slots (see CalendarGrid). */
+  __activity?: { activity_name?: string | null } | null;
 }
 
 /** Stable identity for a subject. Prefers the id; falls back to the name so
- *  legacy slots with no id still group together. */
+ *  legacy slots with no id still group together. Custom activities (events)
+ *  have no real subject id, so they group by name instead — every recurring
+ *  "Supervised Self Study" lights up together, but never alongside a lesson. */
 export const subjectKey = (slot: SubjectLike): string | null => {
+  if (slot.__activity) {
+    const name = (slot.__activity.activity_name ?? slot.subject_name)
+      ?.trim()
+      .toLowerCase();
+    return name ? `activity:${name}` : null;
+  }
   if (slot.subject_id != null) return `id:${slot.subject_id}`;
   const name = slot.subject_name?.trim();
   return name ? `name:${name}` : null;

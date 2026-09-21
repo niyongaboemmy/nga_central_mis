@@ -16,6 +16,17 @@ describe("subjectKey", () => {
     );
   });
 
+  it("keys a custom activity by its name, case-insensitively, never by subject id", () => {
+    const a = { subject_id: 0, subject_name: "Supervised Self Study", __activity: { activity_name: "Supervised Self Study" } };
+    const b = { subject_id: 0, subject_name: "supervised self study", __activity: { activity_name: "supervised self study" } };
+    const c = { subject_id: 0, subject_name: "Student Led clubs", __activity: { activity_name: "Student Led clubs" } };
+    expect(subjectKey(a)).toBe("activity:supervised self study");
+    expect(subjectKey(a)).toBe(subjectKey(b));
+    expect(subjectKey(c)).not.toBe(subjectKey(a));
+    // a real lesson that happens to have subject_id 0 is still not an event
+    expect(subjectKey({ subject_id: 0, subject_name: "X" })).toBe("id:0");
+  });
+
   it("is null for a slot that names no subject at all", () => {
     expect(subjectKey({ subject_id: null, subject_name: "" })).toBeNull();
     expect(subjectKey({})).toBeNull();
