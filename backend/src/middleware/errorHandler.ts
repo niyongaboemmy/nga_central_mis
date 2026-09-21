@@ -60,6 +60,15 @@ export const errorHandler = (
     });
   }
 
+  // MySQL 1366: a 4-byte character (emoji, symbol-font glyph) hit a 3-byte `utf8` column.
+  // Without this it surfaced as a bare 500 with no hint of what was wrong with the input.
+  if (err.code === "ER_TRUNCATED_WRONG_VALUE_FOR_FIELD" || err.errno === 1366) {
+    return res.status(400).json({
+      success: false,
+      message: "The submitted text contains characters that can't be stored (for example emoji). Remove them and try again.",
+    });
+  }
+
   if (err.code === "ER_DATA_TOO_LONG") {
     return res.status(400).json({
       success: false,

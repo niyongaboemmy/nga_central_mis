@@ -24,7 +24,7 @@ import { sanitizeNoteHtml } from "../utils/sanitizeNoteHtml";
 import storageService from "../utils/fileServer";
 import logger from "../utils/logger";
 import { renderLessonNotePdf } from "../services/pdfExport";
-import { extractLessonNotePdf, looksLikePdf } from "../utils/lessonNotePdf";
+import { extractLessonNotePdf, looksLikePdf, sanitizeShortText } from "../utils/lessonNotePdf";
 
 // ======================
 // STATUS MANAGEMENT
@@ -210,7 +210,10 @@ async function readUploadedPdf(file: Express.Multer.File | undefined) {
 
 export const createLessonNoteFromPdf = asyncHandler(async (req: any, res: any) => {
   const { subject_id, class_group_id, scheme_entry_id, academic_term_id } = req.body;
-  const title = (req.body.title || "").trim() || (req.file?.originalname || "").replace(/\.pdf$/i, "").trim();
+  const title = sanitizeShortText(
+    (req.body.title || "").trim() || (req.file?.originalname || "").replace(/\.pdf$/i, ""),
+    255,
+  );
   if (!subject_id || !title) {
     throw new ValidationError("subject_id and title are required");
   }
@@ -224,12 +227,12 @@ export const createLessonNoteFromPdf = asyncHandler(async (req: any, res: any) =
     class_group_id: class_group_id ? parseInt(class_group_id, 10) : null,
     scheme_entry_id: scheme_entry_id ? parseInt(scheme_entry_id, 10) : null,
     academic_term_id: academic_term_id ? parseInt(academic_term_id, 10) : null,
-    title: title.slice(0, 255),
+    title,
     content_html: extracted.contentHtml,
     content_json: null,
     status: NEW_NOTE_STATUS,
     source: "PDF_UPLOAD",
-    file_name: req.file.originalname.slice(0, 255),
+    file_name: sanitizeShortText(req.file.originalname, 255) || "lesson-note.pdf",
     file_size: req.file.size,
     page_count: extracted.pageCount,
   });
@@ -281,7 +284,7 @@ export const replaceLessonNotePdf = asyncHandler(async (req: any, res: any) => {
     .update(LessonNote)
     .set({
       file_path: remotePath,
-      file_name: req.file.originalname.slice(0, 255),
+      file_name: sanitizeShortText(req.file.originalname, 255) || "lesson-note.pdf",
       file_size: req.file.size,
       page_count: extracted.pageCount,
       content_html: extracted.contentHtml,
