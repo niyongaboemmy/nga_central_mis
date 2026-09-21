@@ -1,5 +1,7 @@
 # NGA Central MIS
 
+> **Setting this up on your machine?** Start with **[LOCAL_SETUP.md](LOCAL_SETUP.md)** — it covers the whole local stack, including the Central MIS sign-in every module depends on.
+
 The core school MIS — users, academics, calendar, reporting, documents — and the
 **single sign-on provider** for the other NGA apps (TaskMentor, Tendo, Tupo). Those
 apps have no login of their own; they redirect here and exchange an SSO code with
