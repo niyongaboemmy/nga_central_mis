@@ -71,17 +71,58 @@ echo   - MySQL ready
 :: Dependencies come before the database here: db:setup is a TypeScript script
 :: run through the backend's own node_modules, so it cannot run until they exist.
 echo [4/5] Checking dependencies...
-if not exist "node_modules" (
+:: Test for the tool each dev script actually runs, not just the folder: an
+:: `npm install` cut off half-way (a dropped connection, a closed window)
+:: leaves node_modules present but without its .bin entries, and the app
+:: then dies with "'vite' is not recognized". Re-running npm install
+:: repairs such a folder, so that is the fix as well as the first-run path.
+if not exist "node_modules\.bin\concurrently.cmd" (
     echo   - Installing root packages...
     call npm install
+    if errorlevel 1 (
+        echo   - That did not finish ^(usually the connection^) - trying once more...
+        call npm install
+        if errorlevel 1 (
+            echo.
+            echo   [X] Installing root packages failed twice - see the error above.
+            echo       Check your connection and run start.bat again.
+            echo.
+            pause
+            exit /b 1
+        )
+    )
 )
-if not exist "backend\node_modules" (
+if not exist "backend\node_modules\.bin\ts-node.cmd" (
     echo   - Installing backend packages ^(first run, takes a few minutes^)...
     call npm install --prefix backend
+    if errorlevel 1 (
+        echo   - That did not finish ^(usually the connection^) - trying once more...
+        call npm install --prefix backend
+        if errorlevel 1 (
+            echo.
+            echo   [X] Installing backend packages failed twice - see the error above.
+            echo       Check your connection and run start.bat again.
+            echo.
+            pause
+            exit /b 1
+        )
+    )
 )
-if not exist "frontend\node_modules" (
+if not exist "frontend\node_modules\.bin\vite.cmd" (
     echo   - Installing frontend packages...
     call npm install --prefix frontend
+    if errorlevel 1 (
+        echo   - That did not finish ^(usually the connection^) - trying once more...
+        call npm install --prefix frontend
+        if errorlevel 1 (
+            echo.
+            echo   [X] Installing frontend packages failed twice - see the error above.
+            echo       Check your connection and run start.bat again.
+            echo.
+            pause
+            exit /b 1
+        )
+    )
 )
 echo   - Dependencies ready
 
