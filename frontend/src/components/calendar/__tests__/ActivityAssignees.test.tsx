@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import CalendarSlotModal from "../CalendarSlotModal";
+import CalendarGrid from "../CalendarGrid";
 import type { CalendarActivity } from "../../../api/calendar";
 
 const searchUsersMock = vi.fn((_q: string): Promise<any[]> => Promise.resolve([]));
@@ -242,5 +243,48 @@ describe("activity details view", () => {
       />,
     );
     expect(screen.getByText("Not assigned to anyone")).toBeInTheDocument();
+  });
+});
+
+describe("activity hover tooltip", () => {
+  const weekDates = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date("2026-09-07T00:00:00");
+    d.setDate(d.getDate() + i);
+    return d;
+  });
+  const renderGrid = (a: CalendarActivity) =>
+    render(
+      <CalendarGrid
+        calendarId={7}
+        classGroupName="L3. Class A"
+        slots={[]}
+        activities={[a]}
+        weekDates={weekDates}
+        onSlotClick={vi.fn()}
+        onEmptyCellClick={vi.fn()}
+      />,
+    );
+
+  it("names the assigned staff on hover", async () => {
+    renderGrid(
+      activity({
+        assignees: [
+          { user_id: 7, first_name: "Niyongabo", last_name: "Emmanuel" },
+          { user_id: 8, first_name: "Jane", last_name: "Doe" },
+        ],
+      }),
+    );
+    await userEvent.hover(within(screen.getByRole("grid")).getByText("Physical Education"));
+    const tip = await screen.findByRole("tooltip");
+    expect(tip).toHaveTextContent("Assigned to");
+    expect(tip).toHaveTextContent("Niyongabo Emmanuel, Jane Doe");
+    expect(tip).toHaveTextContent("15:30 - 16:20");
+  });
+
+  it("says when no one is assigned yet", async () => {
+    renderGrid(activity({ assignees: [] }));
+    await userEvent.hover(within(screen.getByRole("grid")).getByText("Physical Education"));
+    const tip = await screen.findByRole("tooltip");
+    expect(tip).toHaveTextContent(/Assigned to\s*no one yet/);
   });
 });

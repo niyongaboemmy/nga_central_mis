@@ -1,6 +1,7 @@
 import React, { useCallback, useState } from "react";
 import type { CalendarSlot } from "../../api/calendar";
 import { getSlotColor } from "./slotColor";
+import { assigneeNames, type GridEntry } from "./activityEntry";
 
 export const instructorOf = (slot: CalendarSlot): string =>
   [slot.instructor_name, slot.instructor_lastname].filter(Boolean).join(" ");
@@ -38,6 +39,9 @@ const SlotTooltip: React.FC<{ state: SlotTooltipState | null }> = ({
   const { slot } = state;
   const instructor = instructorOf(slot);
   const color = getSlotColor(slot);
+  // A custom activity (event) has no instructor; it may have assigned staff.
+  const activity = (slot as GridEntry).__activity;
+  const assigned = activity ? assigneeNames(activity) : "";
 
   return (
     <div
@@ -70,6 +74,18 @@ const SlotTooltip: React.FC<{ state: SlotTooltipState | null }> = ({
       </div>
       {instructor && (
         <div className="text-gray-500 dark:text-gray-400">{instructor}</div>
+      )}
+      {activity && (
+        <div className="mt-1 text-gray-500 dark:text-gray-400">
+          <span className="text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500">
+            Assigned to
+          </span>{" "}
+          {assigned ? (
+            <span className="text-gray-700 dark:text-gray-200">{assigned}</span>
+          ) : (
+            <span className="italic">no one yet</span>
+          )}
+        </div>
       )}
       {slot.location && (
         <div className="text-gray-400 dark:text-gray-500">📍 {slot.location}</div>
