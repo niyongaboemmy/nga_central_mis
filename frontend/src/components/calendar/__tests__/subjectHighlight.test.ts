@@ -42,9 +42,9 @@ describe("highlightState", () => {
     expect(highlightState(null, physics)).toBe("idle");
   });
 
-  it("matches only the hovered subject and dims every other one", () => {
+  it("matches only the hovered subject and marks every other one as other", () => {
     expect(highlightState("id:9", maths)).toBe("match");
-    expect(highlightState("id:9", physics)).toBe("dimmed");
+    expect(highlightState("id:9", physics)).toBe("other");
   });
 
   it("matches the same subject taught to a different class group", () => {
@@ -56,7 +56,7 @@ describe("highlightState", () => {
   it("does not match on name when ids differ", () => {
     expect(
       highlightState("id:9", { subject_id: 11, subject_name: "Maths" }),
-    ).toBe("dimmed");
+    ).toBe("other");
   });
 });
 

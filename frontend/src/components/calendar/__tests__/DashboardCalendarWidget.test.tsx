@@ -299,7 +299,7 @@ describe("DashboardCalendarWidget — subject hover highlight", () => {
     expect(byState("idle")).toHaveLength(5);
   });
 
-  it("highlights every period of the hovered subject and dims the others", async () => {
+  it("highlights every period of the hovered subject and leaves the others untouched", async () => {
     render(<DashboardCalendarWidget />);
     const [first] = await screen.findAllByText("Web Application Development");
 
@@ -308,7 +308,7 @@ describe("DashboardCalendarWidget — subject hover highlight", () => {
     // all three Web App Dev periods (both class groups) light up…
     expect(byState("match")).toEqual(["id:9", "id:9", "id:9"]);
     // …and nothing else does, even the subject sharing the same class group
-    expect(byState("dimmed").sort()).toEqual(["id:12", "id:13"]);
+    expect(byState("other").sort()).toEqual(["id:12", "id:13"]);
     expect(byState("idle")).toHaveLength(0);
 
     // the legend chip for that subject is the only one pressed
@@ -334,7 +334,7 @@ describe("DashboardCalendarWidget — subject hover highlight", () => {
     await userEvent.unhover(webApp);
     await userEvent.hover(web3);
     expect(byState("match")).toEqual(["id:12"]);
-    expect(byState("dimmed").sort()).toEqual(["id:13", "id:9", "id:9", "id:9"]);
+    expect(byState("other").sort()).toEqual(["id:13", "id:9", "id:9", "id:9"]);
   });
 
   it("clears the highlight when the pointer leaves", async () => {
@@ -359,7 +359,7 @@ describe("DashboardCalendarWidget — subject hover highlight", () => {
 
     await userEvent.hover(chip);
     expect(byState("match")).toEqual(["id:13"]);
-    expect(byState("dimmed")).toHaveLength(4);
+    expect(byState("other")).toHaveLength(4);
 
     await userEvent.unhover(chip);
     expect(byState("idle")).toHaveLength(5);
@@ -373,7 +373,7 @@ describe("DashboardCalendarWidget — subject hover highlight", () => {
     const cell = screen.getByRole("gridcell", { name: /Web3 Applications/ });
     act(() => cell.focus());
     expect(byState("match")).toEqual(["id:12"]);
-    expect(byState("dimmed")).toHaveLength(4);
+    expect(byState("other")).toHaveLength(4);
 
     act(() => cell.blur());
     expect(byState("idle")).toHaveLength(5);

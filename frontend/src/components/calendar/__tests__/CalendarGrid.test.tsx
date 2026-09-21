@@ -290,16 +290,16 @@ describe("calendar grid subject hover highlight", () => {
     expect(byState("idle")).toHaveLength(7);
   });
 
-  it("highlights only the hovered subject's periods and dims everything else", async () => {
+  it("highlights only the hovered subject's periods and marks everything else as other", async () => {
     renderGrid();
     const grid = within(screen.getByRole("grid"));
     const [math] = grid.getAllByText("Applied Math I");
 
     await userEvent.hover(math);
     expect(byState("match")).toEqual(["id:9", "id:9"]);
-    expect(byState("dimmed")).toHaveLength(5);
+    expect(byState("other")).toHaveLength(5);
     // the near-namesake "Applied Physics I" is not swept in
-    expect(byState("dimmed")).toContain("id:11");
+    expect(byState("other")).toContain("id:11");
 
     await userEvent.unhover(math);
     expect(byState("idle")).toHaveLength(7);
@@ -315,8 +315,8 @@ describe("calendar grid subject hover highlight", () => {
     expect(byState("match")).toEqual([
       "activity:supervised self study",
     ]);
-    expect(byState("dimmed")).toContain("activity:student led clubs");
-    expect(byState("dimmed")).toHaveLength(6);
+    expect(byState("other")).toContain("activity:student led clubs");
+    expect(byState("other")).toHaveLength(6);
   });
 
   it("highlights from the legend, which shows a period count per subject", async () => {
@@ -333,5 +333,52 @@ describe("calendar grid subject hover highlight", () => {
 
     await userEvent.unhover(chip);
     expect(byState("idle")).toHaveLength(7);
+  });
+});
+
+// The hovered subject gets a focus ring; every other card keeps its normal
+// look — no dimming, no fading — so the rest of the week stays readable.
+describe("subject highlight leaves other cards untouched", () => {
+  const weekDates = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date("2026-09-07T00:00:00");
+    d.setDate(d.getDate() + i);
+    return d;
+  });
+  const slot = (over: Partial<CalendarSlot>): CalendarSlot =>
+    ({
+      slot_id: 1, calendar_id: 7, academic_term_id: 3, class_group_id: 5,
+      subject_id: 9, user_id: 11, day_of_week: 1, start_time: "08:00",
+      end_time: "08:50", subject_name: "Advanced Database",
+      class_group_name: "L4. Class A", color: "#16A34A", ...over,
+    }) as CalendarSlot;
+
+  it("rings the match and changes nothing on the rest", async () => {
+    render(
+      <CalendarGrid
+        calendarId={7}
+        classGroupName="L4. Class A"
+        slots={[slot({}), slot({ slot_id: 2, day_of_week: 2, subject_id: 10, subject_name: "Advanced Java", color: "#DB2777" })]}
+        activities={[]}
+        weekDates={weekDates}
+        onSlotClick={vi.fn()}
+        onEmptyCellClick={vi.fn()}
+      />,
+    );
+    const grid = within(screen.getByRole("grid"));
+    const db = grid.getByText("Advanced Database").closest("[data-subject-key]") as HTMLElement;
+    const java = grid.getByText("Advanced Java").closest("[data-subject-key]") as HTMLElement;
+    const before = { bg: java.style.getPropertyValue("--slot-bg"), shadow: java.style.boxShadow, cls: java.className };
+
+    await userEvent.hover(db);
+
+    // the match wears the accent focus ring (5px ring in the subject colour)
+    expect(db.dataset.highlight).toBe("match");
+    expect(db.style.boxShadow).toContain("0 0 0 5px #16A34A");
+    // the other card is byte-for-byte as it was: same fill, no shadow, no opacity class
+    expect(java.dataset.highlight).toBe("other");
+    expect(java.style.getPropertyValue("--slot-bg")).toBe(before.bg);
+    expect(java.style.boxShadow).toBe(before.shadow);
+    expect(java.className).toBe(before.cls);
+    expect(java.className).not.toMatch(/opacity|saturate/);
   });
 });

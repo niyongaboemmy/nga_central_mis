@@ -31,7 +31,10 @@ export const subjectKey = (slot: SubjectLike): string | null => {
   return name ? `name:${name}` : null;
 };
 
-export type HighlightState = "match" | "dimmed" | "idle";
+/** "match": the hovered subject — gets the focus ring. "other": some other
+ *  subject while one is hovered — rendered exactly as normal. "idle": nothing
+ *  hovered. */
+export type HighlightState = "match" | "other" | "idle";
 
 /** How a slot should render while `hovered` (a subject key, or null when
  *  nothing is hovered) is active. */
@@ -40,7 +43,7 @@ export const highlightState = (
   slot: SubjectLike,
 ): HighlightState => {
   if (!hovered) return "idle";
-  return subjectKey(slot) === hovered ? "match" : "dimmed";
+  return subjectKey(slot) === hovered ? "match" : "other";
 };
 
 /** Number of lessons per subject key, for the legend counts. */

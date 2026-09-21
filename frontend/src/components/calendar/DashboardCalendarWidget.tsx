@@ -29,7 +29,7 @@ import {
 import { buildGridLayout, cellKey, type GridCell } from "./calendarLayout";
 import SlotTooltip, { useSlotTooltip } from "./SlotTooltip";
 import { useCurrentTime } from "./useCurrentTime";
-import { getSlotColor, slotSurface, hexToRgba } from "./slotColor";
+import { getSlotColor, slotSurface, hexToRgba, subjectFocusRing } from "./slotColor";
 import { weeklyActivityEntries, type GridEntry } from "./activityEntry";
 import {
   subjectKey,
@@ -829,22 +829,13 @@ const ReadOnlyCalendarGrid: React.FC<ReadOnlyCalendarGridProps> = ({
                                   `inset 0 0 0 1.5px ${surface.accent}`,
                                 );
                               if (isMatch)
-                                shadows.push(
-                                  `0 0 0 2px ${surface.accent}`,
-                                  `0 0 14px 2px ${hexToRgba(surface.accent, 0.55)}`,
-                                );
+                                shadows.push(subjectFocusRing(surface.accent, isDark));
                               return (
                                 <div
                                   key={course.slot_id}
                                   data-subject-key={subjectKey(course) ?? ""}
                                   data-highlight={highlight}
-                                  className={`relative flex-1 min-w-0 overflow-hidden rounded-md transition-[background-color,opacity,transform,box-shadow,filter] duration-200 ease-out bg-[var(--slot-bg)] hover:bg-[var(--slot-bg-hover)] ${
-                                    isMatch
-                                      ? "z-10 scale-[1.03]"
-                                      : highlight === "dimmed"
-                                        ? "opacity-30 saturate-50"
-                                        : ""
-                                  }`}
+                                  className={`relative flex-1 min-w-0 overflow-hidden rounded-md transition-[background-color,box-shadow] duration-200 ease-out bg-[var(--slot-bg)] hover:bg-[var(--slot-bg-hover)] ${isMatch ? "z-10" : ""}`}
                                   style={
                                     {
                                       "--slot-bg": isMatch
@@ -960,14 +951,13 @@ const ReadOnlyCalendarGrid: React.FC<ReadOnlyCalendarGridProps> = ({
         >
           {subjectLegend.map((s) => {
             const isMatch = hoveredSubject === s.key;
-            const isDimmed = hoveredSubject !== null && !isMatch;
             return (
               <button
                 type="button"
                 role="listitem"
                 key={s.key}
                 data-subject-key={s.key}
-                data-highlight={isMatch ? "match" : isDimmed ? "dimmed" : "idle"}
+                data-highlight={isMatch ? "match" : hoveredSubject ? "other" : "idle"}
                 aria-pressed={isMatch}
                 title={`${s.name}: ${s.periods} period${s.periods === 1 ? "" : "s"} this week`}
                 onMouseEnter={() => setHoveredSubject(s.key)}
@@ -978,7 +968,7 @@ const ReadOnlyCalendarGrid: React.FC<ReadOnlyCalendarGridProps> = ({
                   isMatch
                     ? "border-transparent text-gray-900 dark:text-white shadow-sm"
                     : "border-gray-200/80 dark:border-gray-700/40 text-gray-600 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600"
-                } ${isDimmed ? "opacity-40" : ""}`}
+                }`}
                 style={
                   isMatch
                     ? {

@@ -183,3 +183,17 @@ export const slotSurface = (color: string, isDark: boolean): SlotSurface => {
 };
 
 export type ColoredSlot = CalendarSlot;
+
+/**
+ * The "selected subject" treatment: a thick accent ring held off the card by
+ * a thin gap in the page colour (so it reads as a focus ring, not a thicker
+ * border), plus a soft tinted lift shadow. Other cards are left untouched.
+ */
+export const subjectFocusRing = (color: string, isDark: boolean): string => {
+  const gap = isDark ? "#0f172a" : "#ffffff";
+  return [
+    `0 0 0 2px ${gap}`,
+    `0 0 0 5px ${color}`,
+    `0 10px 24px -8px ${hexToRgba(color, isDark ? 0.7 : 0.55)}`,
+  ].join(", ");
+};
