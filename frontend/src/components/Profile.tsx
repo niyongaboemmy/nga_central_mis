@@ -12,6 +12,8 @@ import {
   Check,
   X,
   ChevronRight,
+  Hash,
+  Lock,
 } from "lucide-react";
 import { useUser } from "../contexts/UserContext";
 import { updateProfile, UserProfile } from "../api/users";
@@ -130,6 +132,7 @@ const InfoCard = ({
   editable,
   onChange,
   type = "text",
+  highlight,
 }: {
   icon: React.ElementType;
   label: string;
@@ -137,6 +140,8 @@ const InfoCard = ({
   editable?: boolean;
   onChange?: (value: string) => void;
   type?: string;
+  /** Read-only, visually emphasised (e.g. a system-assigned identifier). */
+  highlight?: boolean;
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState(value || "");
@@ -162,11 +167,21 @@ const InfoCard = ({
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       whileHover={{ scale: 1.01 }}
-      className="bg-white/60 dark:bg-slate-800/60 backdrop-blur-sm rounded-2xl p-4 shadow-sm border border-white/50 dark:border-slate-700/30"
+      className={
+        highlight
+          ? "bg-blue-50/80 dark:bg-blue-900/20 backdrop-blur-sm rounded-2xl p-4 shadow-sm border border-blue-300/60 dark:border-blue-500/40"
+          : "bg-white/60 dark:bg-slate-800/60 backdrop-blur-sm rounded-2xl p-4 shadow-sm border border-white/50 dark:border-slate-700/30"
+      }
     >
       <div className="flex items-center gap-3">
-        <div className="w-10 h-10 bg-gradient-to-br from-blue-400/10 to-blue-400/10 rounded-xl flex items-center justify-center flex-shrink-0">
-          <Icon className="w-5 h-5 text-blue-500" />
+        <div
+          className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
+            highlight
+              ? "bg-blue-500 text-white"
+              : "bg-gradient-to-br from-blue-400/10 to-blue-400/10 text-blue-500"
+          }`}
+        >
+          <Icon className="w-5 h-5" />
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-xs text-gray-400 mb-0.5">{label}</p>
@@ -196,9 +211,21 @@ const InfoCard = ({
             </div>
           ) : (
             <div className="flex items-center gap-2">
-              <p className="text-sm font-medium text-gray-700 dark:text-gray-200 truncate">
+              <p
+                className={`text-sm font-medium truncate ${
+                  highlight
+                    ? "font-mono tracking-wide text-blue-700 dark:text-blue-300"
+                    : "text-gray-700 dark:text-gray-200"
+                }`}
+              >
                 {value || "—"}
               </p>
+              {highlight && (
+                <Lock
+                  className="w-3.5 h-3.5 text-blue-400 flex-shrink-0"
+                  aria-label="Not editable"
+                />
+              )}
               {editable && (
                 <button
                   type="button"
@@ -525,6 +552,16 @@ const Profile: React.FC = () => {
                       Account Information
                     </h3>
                   </div>
+                  {profile?.user_type === "STUDENT" && (
+                    <div className="md:col-span-2">
+                      <InfoCard
+                        icon={Hash}
+                        label="Registration Number"
+                        value={profile.registration_number || undefined}
+                        highlight
+                      />
+                    </div>
+                  )}
                   <InfoCard
                     icon={User}
                     label="Username"

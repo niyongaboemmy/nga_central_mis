@@ -1010,6 +1010,7 @@ export const getScopedUsers = asyncHandler(async (req: any, res: any) => {
     last_name: UserProfile.last_name,
     user_type: UserProfile.user_type,
     gender: UserProfile.gender,
+    registration_number: UserProfile.registration_number,
     grade_id: ClassGroup.grade_id,
     grade_name: Grade.name,
     class_group_id: ClassGroup.class_group_id,
@@ -1111,6 +1112,7 @@ export const getScopedUsers = asyncHandler(async (req: any, res: any) => {
         last_name: row.last_name,
         user_type: row.user_type,
         gender: row.gender,
+        registration_number: row.registration_number ?? null,
         roles: [] as any[],
         grades: [] as any[],
         class_groups: [] as any[],
@@ -1152,6 +1154,7 @@ export const getScopedUsers = asyncHandler(async (req: any, res: any) => {
           u.first_name,
           u.last_name,
           u.phone_number,
+          u.registration_number,
         ) || u.roles.some((r: any) => matches(search, r.name)),
     );
   }

@@ -116,7 +116,14 @@ const UserItemCard: React.FC<UserItemCardProps> = ({
               }
             />
           </div>
-          <p className="text-xs text-gray-400 truncate">{user.user.email}</p>
+          <p className="text-xs text-gray-400 truncate">
+            {user.profile?.registration_number && (
+              <span className="font-mono mr-2">
+                {user.profile.registration_number}
+              </span>
+            )}
+            {user.user.email}
+          </p>
         </div>
 
         {/* Quick Stats */}
@@ -160,6 +167,11 @@ const UserItemCard: React.FC<UserItemCardProps> = ({
                   Contact
                 </span>
               </div>
+              {user.profile?.registration_number && (
+                <p className="text-gray-500 font-mono">
+                  {user.profile.registration_number}
+                </p>
+              )}
               <p className="text-gray-500 truncate">{user.user.email}</p>
               <p className="text-gray-500">
                 {user.user.phone_number || "No phone"}
