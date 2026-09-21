@@ -219,7 +219,7 @@ const CalendarHeader: React.FC<CalendarHeaderProps> = ({
         {!isAdmin && !isStudent && (
           <button
             onClick={onNotificationsClick}
-            className="flex items-center px-4 py-2 text-sm bg-gray-100 dark:bg-gray-700 rounded-full hover:bg-gray-200 dark:hover:bg-gray-600 transition-all duration-200"
+            className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-gray-700 rounded-full hover:bg-gray-200 dark:hover:bg-gray-600 transition-all duration-200"
           >
             <Bell className="w-4 h-4 mr-2" />
             <span className="hidden sm:inline">Notifications</span>
@@ -230,7 +230,7 @@ const CalendarHeader: React.FC<CalendarHeaderProps> = ({
         {canDownload && onDownloadPdf && (
           <button
             onClick={onDownloadPdf}
-            className="flex items-center px-4 py-2 text-sm bg-gray-100 dark:bg-gray-700 rounded-full hover:bg-gray-200 dark:hover:bg-gray-600 transition-all duration-200"
+            className="flex items-center px-4 py-2 text-sm text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-900/30 rounded-full hover:bg-blue-100 dark:hover:bg-blue-900/50 border border-blue-100 dark:border-blue-800/40 transition-all duration-200"
             title="Download this timetable as a PDF"
           >
             <Download className="w-4 h-4 mr-2" />
