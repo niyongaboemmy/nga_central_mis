@@ -139,6 +139,181 @@ const formatDateForMySQL = (dateStr: string | undefined) => {
 };
 
 // ============================================
+// Shared "what is a live lesson" rules
+// ============================================
+
+// A slot's term / class group are denormalised copies of its calendar's and
+// the two drift (see getCalendarSlots). Every read resolves them the same
+// way: the calendar's value wins, the slot's own copy is the fallback for
+// rows that predate calendars.
+const effectiveTermSql = sql`COALESCE(${AcademicCalendar.academic_term_id}, ${CalendarSlot.academic_term_id})`;
+const effectiveClassGroupSql = sql`COALESCE(${AcademicCalendar.class_group_id}, ${CalendarSlot.class_group_id})`;
+
+/**
+ * A lesson only exists on a timetable while everything it hangs off is still
+ * live: the slot itself, the calendar it sits on, and the subject it teaches.
+ * Disabling a subject (Subject.status = DISABLED) or a calendar leaves their
+ * slot rows in place, and every read used to keep showing them -- so a
+ * retired subject's lessons stayed on teacher and student timetables next to
+ * the subject that replaced them, which looked like duplication.
+ *
+ * Requires the query to have joined AcademicCalendar and Subject.
+ */
+const liveLessonFilters = (): SQL[] => [
+  eq(CalendarSlot.is_active, 1),
+  or(isNull(CalendarSlot.calendar_id), eq(AcademicCalendar.is_active, 1))!,
+  eq(Subject.status, "ACTIVE"),
+];
+
+/**
+ * The (subject, class group) pairs a teacher currently teaches in a year --
+ * TeacherSubjectAssignment is the source of truth for that, not the user_id
+ * stamped on a slot when it was created (see getMyCalendar).
+ */
+const teacherAssignmentKeys = async (
+  userId: number,
+  yearId: number,
+): Promise<Set<string>> => {
+  const assignments = await db
+    .select({
+      subject_id: TeacherSubjectAssignment.subject_id,
+      class_group_id: TeacherSubjectAssignment.class_group_id,
+    })
+    .from(TeacherSubjectAssignment)
+    .where(
+      and(
+        eq(TeacherSubjectAssignment.user_id, userId),
+        eq(TeacherSubjectAssignment.academic_year_id, yearId),
+      ),
+    );
+  return new Set(
+    assignments.map((a: any) => `${a.subject_id}:${a.class_group_id}`),
+  );
+};
+
+/**
+ * Collapse rows that resolve to the same lesson. The DB's unique_slot key is
+ * on the slot's *denormalised* term / class group, so two rows can coexist
+ * for one (class group, day, start) once one of them has drifted -- and both
+ * came back, drawing the same lesson twice. Prefer the row whose own columns
+ * still agree with its calendar (the one the write path's collision check
+ * will find), then the newest.
+ */
+const dedupeLessons = <
+  T extends {
+    slot_id: number;
+    calendar_id: number | null;
+    academic_term_id: number | null;
+    class_group_id: number | null;
+    own_term_id?: number | null;
+    own_class_group_id?: number | null;
+    day_of_week: number;
+    start_time: string;
+  },
+>(
+  slots: T[],
+): T[] => {
+  const consistent = (s: T) =>
+    (s.own_term_id ?? s.academic_term_id) === s.academic_term_id &&
+    (s.own_class_group_id ?? s.class_group_id) === s.class_group_id;
+  const byKey = new Map<string, T>();
+  for (const slot of slots) {
+    const key = `${slot.class_group_id}:${slot.day_of_week}:${slot.start_time}`;
+    const kept = byKey.get(key);
+    if (
+      !kept ||
+      (consistent(slot) && !consistent(kept)) ||
+      (consistent(slot) === consistent(kept) && slot.slot_id > kept.slot_id)
+    ) {
+      byKey.set(key, slot);
+    }
+  }
+  const keptIds = new Set(Array.from(byKey.values()).map((s) => s.slot_id));
+  return slots.filter((s) => keptIds.has(s.slot_id));
+};
+
+/** Strip the drift-detection columns dedupeLessons needs off the payload. */
+const stripOwnColumns = <T extends object>(slots: T[]) =>
+  slots.map(({ own_term_id, own_class_group_id, ...rest }: any) => rest);
+
+/**
+ * A teacher's live lessons for a term: slots stamped with their user_id,
+ * still backed by a current TeacherSubjectAssignment, on live calendars and
+ * subjects, de-duplicated. Shared by my-calendar and the upcoming-lesson
+ * notification check so the two can never disagree about what a teacher
+ * teaches.
+ */
+const loadTeacherLessons = async (params: {
+  userId: number;
+  termId: number;
+  yearId: number | null;
+  classGroupId?: number | null;
+  dayOfWeek?: number | null;
+}) => {
+  const { userId, termId, yearId, classGroupId, dayOfWeek } = params;
+
+  let assignmentKeys: Set<string> | null = null;
+  if (yearId) {
+    assignmentKeys = await teacherAssignmentKeys(userId, yearId);
+    if (assignmentKeys.size === 0) return [];
+  }
+
+  const filters: SQL[] = [
+    eq(CalendarSlot.user_id, userId),
+    sql`${effectiveTermSql} = ${termId}`,
+    ...liveLessonFilters(),
+  ];
+  if (classGroupId) {
+    filters.push(sql`${effectiveClassGroupSql} = ${classGroupId}`);
+  }
+  if (dayOfWeek !== undefined && dayOfWeek !== null) {
+    filters.push(eq(CalendarSlot.day_of_week, dayOfWeek));
+  }
+
+  const slots = await db
+    .select({
+      slot_id: CalendarSlot.slot_id,
+      calendar_id: CalendarSlot.calendar_id,
+      academic_term_id: sql<number>`${effectiveTermSql}`,
+      class_group_id: sql<number>`${effectiveClassGroupSql}`,
+      own_term_id: CalendarSlot.academic_term_id,
+      own_class_group_id: CalendarSlot.class_group_id,
+      subject_id: CalendarSlot.subject_id,
+      user_id: CalendarSlot.user_id,
+      day_of_week: CalendarSlot.day_of_week,
+      start_time: CalendarSlot.start_time,
+      end_time: CalendarSlot.end_time,
+      location: CalendarSlot.location,
+      color: Subject.color,
+      notes: CalendarSlot.notes,
+      // Related data
+      subject_name: Subject.name,
+      subject_code: Subject.code,
+      class_group_name: ClassGroup.name,
+    })
+    .from(CalendarSlot)
+    .leftJoin(
+      AcademicCalendar,
+      eq(CalendarSlot.calendar_id, AcademicCalendar.calendar_id),
+    )
+    .leftJoin(Subject, eq(CalendarSlot.subject_id, Subject.subject_id))
+    .leftJoin(
+      ClassGroup,
+      sql`${ClassGroup.class_group_id} = ${effectiveClassGroupSql}`,
+    )
+    .where(and(...filters))
+    .orderBy(CalendarSlot.day_of_week, CalendarSlot.start_time);
+
+  const assigned = assignmentKeys
+    ? slots.filter((slot: any) =>
+        assignmentKeys!.has(`${slot.subject_id}:${slot.class_group_id}`),
+      )
+    : slots;
+
+  return stripOwnColumns(dedupeLessons(assigned));
+};
+
+// ============================================
 // Calendar Slot Management (Admin functions)
 // ============================================
 
@@ -225,8 +400,12 @@ export const getCalendarSlots = asyncHandler(async (req: any, res: any) => {
     );
   }
 
-  // Only show active slots
-  filters.push(eq(CalendarSlot.is_active, 1));
+  // Only live lessons: active slot, on an active calendar, teaching an
+  // ACTIVE subject. This endpoint also feeds the attendance app's timetable
+  // sync, so a disabled subject's slots must not leak out here either. The
+  // write path treats such a slot as a tombstone (see createCalendarSlot),
+  // so hiding it cannot leave an invisible row blocking the timeslot.
+  filters.push(...liveLessonFilters());
 
   const slots = await db
     .select({
@@ -334,10 +513,19 @@ export const createCalendarSlot = asyncHandler(async (req: any, res: any) => {
   // slips past this check and the INSERT dies with a bare "Duplicate entry".
   // A live holder is a real duplicate; a soft-deleted one is just a tombstone
   // we revive with the new details.
+  //
+  // A slot whose subject has since been DISABLED is a tombstone too: no read
+  // shows it any more (liveLessonFilters), so refusing the timeslot on its
+  // account would leave the admin staring at an empty cell they can't fill.
   const termId = calendar[0].academic_term_id;
   const existingSlot = await db
-    .select()
+    .select({
+      slot_id: CalendarSlot.slot_id,
+      is_active: CalendarSlot.is_active,
+      subject_status: Subject.status,
+    })
     .from(CalendarSlot)
+    .leftJoin(Subject, eq(CalendarSlot.subject_id, Subject.subject_id))
     .where(
       and(
         termId === null
@@ -353,7 +541,10 @@ export const createCalendarSlot = asyncHandler(async (req: any, res: any) => {
     .limit(1);
 
   if (existingSlot.length > 0) {
-    if (existingSlot[0].is_active === 1) {
+    if (
+      existingSlot[0].is_active === 1 &&
+      existingSlot[0].subject_status !== "DISABLED"
+    ) {
       throw new ConflictError(
         "A slot already exists at this day and time for this class group",
       );
@@ -483,8 +674,10 @@ export const updateCalendarSlot = asyncHandler(async (req: any, res: any) => {
       .select({
         slot_id: CalendarSlot.slot_id,
         is_active: CalendarSlot.is_active,
+        subject_status: Subject.status,
       })
       .from(CalendarSlot)
+      .leftJoin(Subject, eq(CalendarSlot.subject_id, Subject.subject_id))
       .where(
         and(
           existingSlot[0].academic_term_id === null
@@ -503,7 +696,9 @@ export const updateCalendarSlot = asyncHandler(async (req: any, res: any) => {
       .limit(1);
 
     if (holder.length > 0 && holder[0].slot_id !== slotId) {
-      if (holder[0].is_active === 1) {
+      // Same tombstone rule as createCalendarSlot: a live holder on a
+      // DISABLED subject is invisible everywhere, so it gives way.
+      if (holder[0].is_active === 1 && holder[0].subject_status !== "DISABLED") {
         throw new ConflictError(
           "A slot already exists at this day and time for this class group",
         );
@@ -630,94 +825,15 @@ export const getMyCalendar = asyncHandler(async (req: any, res: any) => {
   // only rewrites TeacherSubjectAssignment) — so a slot can keep pointing at a
   // teacher who no longer actually teaches that class/subject. TeacherSubjectAssignment
   // is the real source of truth for "who currently teaches what" (it's what backs
-  // the dashboard's "Assigned Subjects" count), so cross-check against it the same
-  // way getStudentCalendar cross-checks slots against StudentSubjectEnrollment.
-  let currentAssignmentKeys: Set<string> | null = null;
-  if (yearId) {
-    const assignments = await db
-      .select({
-        subject_id: TeacherSubjectAssignment.subject_id,
-        class_group_id: TeacherSubjectAssignment.class_group_id,
-      })
-      .from(TeacherSubjectAssignment)
-      .where(
-        and(
-          eq(TeacherSubjectAssignment.user_id, userId),
-          eq(TeacherSubjectAssignment.academic_year_id, yearId),
-        ),
-      );
-
-    if (assignments.length === 0) {
-      return successResponse(res, "No assigned subjects for this term", {
-        slots: [],
-        upcoming: [],
-        term_id: termId,
-      });
-    }
-
-    currentAssignmentKeys = new Set(
-      assignments.map((a: any) => `${a.subject_id}:${a.class_group_id}`),
-    );
-  }
-
-  // Build filters. Match the term the *calendar* the slot belongs to declares,
-  // falling back to the slot's own denormalised copy — the two can drift, and
-  // filtering on CalendarSlot.academic_term_id alone silently dropped every
-  // lesson for a class group whose calendar term had moved on, so "My Teaching
-  // Schedule" showed only some of a teacher's class groups (or none).
-  const effectiveTerm = sql`COALESCE(${AcademicCalendar.academic_term_id}, ${CalendarSlot.academic_term_id})`;
-  const effectiveClassGroup = sql`COALESCE(${AcademicCalendar.class_group_id}, ${CalendarSlot.class_group_id})`;
-
-  const filters: SQL[] = [
-    eq(CalendarSlot.user_id, userId),
-    eq(CalendarSlot.is_active, 1),
-    sql`${effectiveTerm} = ${termId}`,
-  ];
-
-  if (class_group_id) {
-    filters.push(sql`${effectiveClassGroup} = ${parseInt(class_group_id)}`);
-  }
-
-  const slots = await db
-    .select({
-      slot_id: CalendarSlot.slot_id,
-      calendar_id: CalendarSlot.calendar_id,
-      academic_term_id: sql<number>`${effectiveTerm}`,
-      class_group_id: sql<number>`${effectiveClassGroup}`,
-      subject_id: CalendarSlot.subject_id,
-      user_id: CalendarSlot.user_id,
-      day_of_week: CalendarSlot.day_of_week,
-      start_time: CalendarSlot.start_time,
-      end_time: CalendarSlot.end_time,
-      location: CalendarSlot.location,
-      color: Subject.color,
-      notes: CalendarSlot.notes,
-      // Related data
-      subject_name: Subject.name,
-      subject_code: Subject.code,
-      class_group_name: ClassGroup.name,
-    })
-    .from(CalendarSlot)
-    .leftJoin(
-      AcademicCalendar,
-      eq(CalendarSlot.calendar_id, AcademicCalendar.calendar_id),
-    )
-    .leftJoin(Subject, eq(CalendarSlot.subject_id, Subject.subject_id))
-    .leftJoin(
-      ClassGroup,
-      sql`${ClassGroup.class_group_id} = ${effectiveClassGroup}`,
-    )
-    .where(and(...filters))
-    .orderBy(CalendarSlot.day_of_week, CalendarSlot.start_time);
-
-  // Drop any slot whose (subject, class group) isn't in this teacher's
-  // current TeacherSubjectAssignment set — see the comment above where
-  // currentAssignmentKeys is built.
-  const filteredSlots = currentAssignmentKeys
-    ? slots.filter((slot: any) =>
-        currentAssignmentKeys!.has(`${slot.subject_id}:${slot.class_group_id}`),
-      )
-    : slots;
+  // the dashboard's "Assigned Subjects" count), so loadTeacherLessons cross-checks
+  // against it the same way getStudentCalendar cross-checks slots against
+  // StudentSubjectEnrollment, and drops lessons on disabled subjects/calendars.
+  const filteredSlots = await loadTeacherLessons({
+    userId,
+    termId,
+    yearId,
+    classGroupId: class_group_id ? parseInt(class_group_id) : null,
+  });
 
   // Get upcoming lessons (lessons starting soon - within 30 mins)
   const now = new Date();
@@ -859,36 +975,20 @@ export const checkUpcomingLessons = asyncHandler(async (req: any, res: any) => {
 
   const termId = currentTerm[0].academic_term_id;
 
-  // Get today's slots for the user
+  // Today's live lessons for the user -- same rules as my-calendar, so a
+  // teacher is never reminded of a lesson their timetable doesn't show.
   const now = new Date();
   const currentDayOfWeek = now.getDay();
   const currentHour = now.getHours();
   const currentMinute = now.getMinutes();
   const currentTimeInMinutes = currentHour * 60 + currentMinute;
 
-  const todaySlots = await db
-    .select({
-      slot_id: CalendarSlot.slot_id,
-      start_time: CalendarSlot.start_time,
-      end_time: CalendarSlot.end_time,
-      subject_name: Subject.name,
-      class_group_name: ClassGroup.name,
-      location: CalendarSlot.location,
-    })
-    .from(CalendarSlot)
-    .leftJoin(Subject, eq(CalendarSlot.subject_id, Subject.subject_id))
-    .leftJoin(
-      ClassGroup,
-      eq(CalendarSlot.class_group_id, ClassGroup.class_group_id),
-    )
-    .where(
-      and(
-        eq(CalendarSlot.user_id, userId),
-        eq(CalendarSlot.academic_term_id, termId),
-        eq(CalendarSlot.day_of_week, currentDayOfWeek),
-        eq(CalendarSlot.is_active, 1),
-      ),
-    );
+  const todaySlots = await loadTeacherLessons({
+    userId,
+    termId,
+    yearId: currentTerm[0].academic_year_id,
+    dayOfWeek: currentDayOfWeek,
+  });
 
   // Filter lessons starting within notification window
   const upcomingLessons = [];
@@ -1553,7 +1653,11 @@ export const getStudentCalendar = asyncHandler(async (req: any, res: any) => {
 
   const subjectIds = enrollments.map((e: any) => e.subject_id);
 
-  // Get class groups for the student
+  // Get the student's class groups for this academic year. StudentClassGroup
+  // is keyed per year and ClassGroup rows are reused across years, so an
+  // unscoped lookup also matched the group the student sat in last year --
+  // and if that group's calendar teaches the same subject this term, the
+  // student's timetable drew the lesson twice (once per class group).
   const studentClassGroups = await db
     .select({
       class_group_id: StudentClassGroup.class_group_id,
@@ -1562,6 +1666,7 @@ export const getStudentCalendar = asyncHandler(async (req: any, res: any) => {
     .where(
       and(
         eq(StudentClassGroup.user_id, userId),
+        eq(StudentClassGroup.academic_year_id, yearId),
         eq(StudentClassGroup.status, "ACTIVE"),
       ),
     );
@@ -1580,12 +1685,12 @@ export const getStudentCalendar = asyncHandler(async (req: any, res: any) => {
   // denormalised copy — the two drift, and keying off CalendarSlot alone drops
   // lessons whose calendar term has moved on (same bug fixed for the admin and
   // teacher grids).
-  const effectiveTerm = sql`COALESCE(${AcademicCalendar.academic_term_id}, ${CalendarSlot.academic_term_id})`;
-  const effectiveClassGroup = sql`COALESCE(${AcademicCalendar.class_group_id}, ${CalendarSlot.class_group_id})`;
+  const effectiveTerm = effectiveTermSql;
+  const effectiveClassGroup = effectiveClassGroupSql;
 
   const filters: SQL[] = [
     sql`${effectiveTerm} = ${termId}`,
-    eq(CalendarSlot.is_active, 1),
+    ...liveLessonFilters(),
     sql`${effectiveClassGroup} IN (${sql.join(
       classGroupIds.map((id) => sql`${id}`),
       sql`, `,
@@ -1598,6 +1703,8 @@ export const getStudentCalendar = asyncHandler(async (req: any, res: any) => {
       calendar_id: CalendarSlot.calendar_id,
       academic_term_id: sql<number>`${effectiveTerm}`,
       class_group_id: sql<number>`${effectiveClassGroup}`,
+      own_term_id: CalendarSlot.academic_term_id,
+      own_class_group_id: CalendarSlot.class_group_id,
       subject_id: CalendarSlot.subject_id,
       user_id: CalendarSlot.user_id,
       day_of_week: CalendarSlot.day_of_week,
@@ -1628,9 +1735,12 @@ export const getStudentCalendar = asyncHandler(async (req: any, res: any) => {
     .where(and(...filters))
     .orderBy(CalendarSlot.day_of_week, CalendarSlot.start_time);
 
-  // Filter to only show slots for subjects the student is enrolled in
-  const filteredSlots = slots.filter((slot: any) =>
-    subjectIds.includes(slot.subject_id),
+  // Filter to only show slots for subjects the student is enrolled in, and
+  // collapse drift duplicates (see dedupeLessons).
+  const filteredSlots = stripOwnColumns(
+    dedupeLessons(
+      slots.filter((slot: any) => subjectIds.includes(slot.subject_id)),
+    ),
   );
 
   // Get upcoming lessons

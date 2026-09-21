@@ -2498,6 +2498,56 @@ export const updateTeacherSubjectAssignment = asyncHandler(
         class_group_id: newIds.classGroupId,
         academic_year_id: newIds.yearId,
       });
+
+      // Hand the timetable over with the assignment. CalendarSlot.user_id is
+      // stamped once at creation, and every timetable read (my-calendar,
+      // upcoming, the attendance app) only shows a teacher the slots that
+      // carry their id AND match a current assignment -- so leaving the old
+      // teacher's id on the rows made the lessons vanish from both teachers'
+      // schedules until an admin re-entered every slot by hand. Only the
+      // teacher changes here; if the subject or class group moved as well
+      // the old slots describe a different lesson and are left alone.
+      const onlyTeacherChanged =
+        oldIds.teacherId !== newIds.teacherId &&
+        oldIds.subjId === newIds.subjId &&
+        oldIds.classGroupId === newIds.classGroupId &&
+        oldIds.yearId === newIds.yearId;
+      if (onlyTeacherChanged) {
+        const yearCalendars = tx
+          .select({ calendar_id: AcademicCalendar.calendar_id })
+          .from(AcademicCalendar)
+          .where(
+            and(
+              eq(AcademicCalendar.academic_year_id, oldIds.yearId),
+              eq(AcademicCalendar.class_group_id, oldIds.classGroupId),
+            ),
+          );
+        const yearTerms = tx
+          .select({ academic_term_id: AcademicTerm.academic_term_id })
+          .from(AcademicTerm)
+          .where(eq(AcademicTerm.academic_year_id, oldIds.yearId));
+
+        await tx
+          .update(CalendarSlot)
+          .set({ user_id: newIds.teacherId })
+          .where(
+            and(
+              eq(CalendarSlot.user_id, oldIds.teacherId),
+              eq(CalendarSlot.subject_id, oldIds.subjId),
+              eq(CalendarSlot.is_active, 1),
+              or(
+                inArray(CalendarSlot.calendar_id, yearCalendars),
+                // Rows that predate calendars carry the term and class
+                // group themselves.
+                and(
+                  sql`${CalendarSlot.calendar_id} IS NULL`,
+                  eq(CalendarSlot.class_group_id, oldIds.classGroupId),
+                  inArray(CalendarSlot.academic_term_id, yearTerms),
+                ),
+              ),
+            ),
+          );
+      }
     });
 
     logger.info("Teacher assignment updated", { from: oldIds, to: newIds });
