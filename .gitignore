@@ -61,3 +61,8 @@ coverage/
 
 # Refact AI
 .refact/
+
+# Compiled copies of vite.config.ts (tsc emits for the tsconfig.node.json project). A
+# stale committed vite.config.js silently shadows vite.config.ts -- Vite loads .js first.
+frontend/vite.config.js
+frontend/vite.config.d.ts
