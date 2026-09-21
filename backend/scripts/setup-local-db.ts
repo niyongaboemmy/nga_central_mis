@@ -15,12 +15,17 @@
  *   2. import the snapshot
  *   3. apply migrations/NNN_*.sql for NNN > DUMP_MIGRATION_LEVEL, in order
  *   4. set the super-admin (user_id 1) password
- *   5. point the satellite SSO clients at their localhost callbacks
+ *   5. create one `dev.*` account per role, all with that same password
+ *   6. point the satellite SSO clients at their localhost callbacks
  *
  * Usage:
  *   npm run db:setup                              # password: Admin@1234
  *   npm run db:setup -- --admin-password='...'    # your own
  *   npm run db:setup -- --force                   # drop and rebuild an existing DB
+ *   npm run db:setup -- --refresh                 # existing DB: redo steps 4-6 only
+ *
+ * --refresh is what start.bat runs on every start once the database exists,
+ * so accounts and SSO clients added later reach databases built earlier.
  *
  * The DB_USERNAME in .env needs CREATE DATABASE rights (root on a dev machine).
  */
@@ -84,6 +89,41 @@ const LOCAL_SSO_CLIENTS = [
  */
 const localSecretFor = (clientId: string) => `local-dev-secret-${clientId}`;
 
+/**
+ * One sign-in per role, so a developer can see the MIS (and every satellite,
+ * which derives its own roles from these) as each kind of user without
+ * borrowing a real person's account from the snapshot. They share the
+ * super-admin's password. The `@nga.test` domain is reserved (RFC 2606) and
+ * can never receive mail, and `dev.` usernames cannot collide with the
+ * snapshot's real users.
+ *
+ * `links` attach the account to the current academic year's busiest class
+ * group and its subjects, looked up at run time, so a dev student has a
+ * register in Tendo and a dev teacher has subjects in TaskMentor.
+ */
+type DevLink = "class_teacher" | "teacher_subjects" | "student" | "parent_of_student" | "program_lead";
+type DevAccount = {
+  username: string;
+  role: string;
+  user_type: "STUDENT" | "TEACHER" | "ADMIN" | "PARENT" | "STAFF";
+  first_name: string;
+  last_name: string;
+  gender: "MALE" | "FEMALE";
+  links?: DevLink[];
+};
+const DEV_ACCOUNTS: DevAccount[] = [
+  { username: "dev.admin", role: "ADMIN", user_type: "ADMIN", first_name: "Dev", last_name: "Admin", gender: "FEMALE" },
+  { username: "dev.headteacher", role: "HEAD_TEACHER", user_type: "TEACHER", first_name: "Dev", last_name: "Head Teacher", gender: "MALE" },
+  { username: "dev.teacher", role: "TEACHER", user_type: "TEACHER", first_name: "Dev", last_name: "Teacher", gender: "FEMALE", links: ["teacher_subjects"] },
+  { username: "dev.classteacher", role: "CLASS_TEACHER", user_type: "TEACHER", first_name: "Dev", last_name: "Class Teacher", gender: "MALE", links: ["class_teacher", "teacher_subjects"] },
+  { username: "dev.student", role: "STUDENT", user_type: "STUDENT", first_name: "Dev", last_name: "Student", gender: "FEMALE", links: ["student"] },
+  { username: "dev.parent", role: "PARENT", user_type: "PARENT", first_name: "Dev", last_name: "Parent", gender: "MALE", links: ["parent_of_student"] },
+  { username: "dev.accountant", role: "ACCOUNTANT", user_type: "STAFF", first_name: "Dev", last_name: "Accountant", gender: "FEMALE" },
+  { username: "dev.staff", role: "STAFF", user_type: "STAFF", first_name: "Dev", last_name: "Staff", gender: "MALE" },
+  { username: "dev.programmanager", role: "PROGRAM_MANAGER", user_type: "STAFF", first_name: "Dev", last_name: "Program Manager", gender: "FEMALE", links: ["program_lead"] },
+];
+const devEmailFor = (username: string) => `${username}@nga.test`;
+
 function argOf(name: string): string | undefined {
   const hit = process.argv.find((a) => a.startsWith(`--${name}=`));
   return hit ? hit.slice(name.length + 3) : undefined;
@@ -137,6 +177,150 @@ function pendingMigrations(): string[] {
     .map((x) => x.f);
 }
 
+/**
+ * Where in the school the linked dev accounts go: the current academic year,
+ * the class group with the most students in it, that group's grade and
+ * program, and the subjects already taught in it. Everything is read from the
+ * database rather than hard-coded so a refreshed snapshot still works.
+ */
+async function findAcademicContext(db: mysql.Connection) {
+  const [[year]] = await db.query<any[]>(
+    "SELECT academic_year_id FROM AcademicYear ORDER BY is_current DESC, academic_year_id DESC LIMIT 1",
+  );
+  if (!year) return null;
+  const [[group]] = await db.query<any[]>(
+    `SELECT cg.class_group_id, cg.grade_id, g.program_id
+       FROM ClassGroup cg
+       JOIN Grade g ON g.grade_id = cg.grade_id
+       LEFT JOIN StudentClassGroup scg
+         ON scg.class_group_id = cg.class_group_id AND scg.academic_year_id = ?
+      GROUP BY cg.class_group_id, cg.grade_id, g.program_id
+      ORDER BY COUNT(scg.user_id) DESC, cg.class_group_id ASC
+      LIMIT 1`,
+    [year.academic_year_id],
+  );
+  if (!group) return null;
+  const [subjectRows] = await db.query<any[]>(
+    `SELECT DISTINCT subject_id FROM TeacherSubjectAssignment
+      WHERE class_group_id = ? AND academic_year_id = ? ORDER BY subject_id LIMIT 3`,
+    [group.class_group_id, year.academic_year_id],
+  );
+  return {
+    academic_year_id: year.academic_year_id as number,
+    class_group_id: group.class_group_id as number,
+    grade_id: group.grade_id as number,
+    program_id: group.program_id as number,
+    subject_ids: subjectRows.map((r) => r.subject_id as number),
+  };
+}
+
+/** Creates or refreshes the `dev.*` accounts. Idempotent: safe on every run. */
+async function ensureDevAccounts(db: mysql.Connection, passwordHash: string) {
+  const ctx = await findAcademicContext(db);
+  if (!ctx) console.log("  note: no academic year/class group in the snapshot; accounts are created without class links");
+
+  const [roleRows] = await db.query<any[]>("SELECT role_id, name FROM Role");
+  const roleId = new Map<string, number>(roleRows.map((r) => [r.name, r.role_id]));
+
+  const ids = new Map<string, number>();
+  for (const a of DEV_ACCOUNTS) {
+    const rid = roleId.get(a.role);
+    if (!rid) {
+      console.log(`  ${a.username} ... SKIPPED (role ${a.role} does not exist)`);
+      continue;
+    }
+    const [existing] = await db.query<any[]>("SELECT user_id FROM User WHERE username = ?", [a.username]);
+    let userId: number;
+    if (existing.length > 0) {
+      userId = existing[0].user_id;
+      await db.query("UPDATE User SET email = ?, status = 'ACTIVE' WHERE user_id = ?", [devEmailFor(a.username), userId]);
+    } else {
+      const [ins] = await db.query<any>("INSERT INTO User (username, email, status) VALUES (?, ?, 'ACTIVE')", [
+        a.username,
+        devEmailFor(a.username),
+      ]);
+      userId = ins.insertId;
+    }
+    ids.set(a.username, userId);
+
+    const [cred] = await db.query<any[]>("SELECT auth_id FROM AuthCredential WHERE user_id = ?", [userId]);
+    if (cred.length > 0) {
+      await db.query(
+        "UPDATE AuthCredential SET password_hash = ?, failed_attempts = 0, locked_until = NULL, force_password_change = 0 WHERE user_id = ?",
+        [passwordHash, userId],
+      );
+    } else {
+      await db.query("INSERT INTO AuthCredential (user_id, password_hash) VALUES (?, ?)", [userId, passwordHash]);
+    }
+
+    const [prof] = await db.query<any[]>("SELECT profile_id FROM UserProfile WHERE user_id = ?", [userId]);
+    if (prof.length === 0) {
+      await db.query(
+        "INSERT INTO UserProfile (user_id, first_name, last_name, gender, user_type, registration_number) VALUES (?, ?, ?, ?, ?, ?)",
+        [userId, a.first_name, a.last_name, a.gender, a.user_type, a.user_type === "STUDENT" ? "DEV-STU-001" : null],
+      );
+    }
+    await db.query("INSERT IGNORE INTO UserRole (user_id, role_id) VALUES (?, ?)", [userId, rid]);
+    // A class teacher is also a teacher; the app treats the roles as additive.
+    if (a.role === "CLASS_TEACHER" && roleId.has("TEACHER")) {
+      await db.query("INSERT IGNORE INTO UserRole (user_id, role_id) VALUES (?, ?)", [userId, roleId.get("TEACHER")]);
+    }
+    console.log(`  ${a.username} ... ${existing.length > 0 ? "refreshed" : "created"}`);
+  }
+
+  if (!ctx) return;
+  const { academic_year_id: yr, class_group_id: cg, grade_id, program_id, subject_ids } = ctx;
+  for (const a of DEV_ACCOUNTS) {
+    const userId = ids.get(a.username);
+    if (!userId || !a.links) continue;
+    for (const link of a.links) {
+      switch (link) {
+        case "teacher_subjects":
+          for (const subject of subject_ids) {
+            await db.query(
+              "INSERT IGNORE INTO TeacherSubjectAssignment (user_id, subject_id, class_group_id, academic_year_id) VALUES (?, ?, ?, ?)",
+              [userId, subject, cg, yr],
+            );
+          }
+          break;
+        case "class_teacher":
+          await db.query(
+            "INSERT IGNORE INTO UserGrade (user_id, grade_id, class_group_id, academic_year_id) VALUES (?, ?, ?, ?)",
+            [userId, grade_id, cg, yr],
+          );
+          break;
+        case "student":
+          await db.query(
+            "INSERT IGNORE INTO StudentClassGroup (user_id, class_group_id, academic_year_id, status) VALUES (?, ?, ?, 'ACTIVE')",
+            [userId, cg, yr],
+          );
+          for (const subject of subject_ids) {
+            await db.query(
+              "INSERT IGNORE INTO StudentSubjectEnrollment (user_id, subject_id, academic_year_id, status) VALUES (?, ?, ?, 'ACTIVE')",
+              [userId, subject, yr],
+            );
+          }
+          break;
+        case "parent_of_student": {
+          const studentId = ids.get("dev.student");
+          if (!studentId) break;
+          await db.query(
+            "INSERT INTO Parenting (student_id, parent_id, relationship) SELECT ?, ?, 'PARENT' FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM Parenting WHERE student_id = ? AND parent_id = ?)",
+            [studentId, userId, studentId, userId],
+          );
+          break;
+        }
+        case "program_lead":
+          await db.query(
+            "INSERT IGNORE INTO UserProgramLead (user_id, program_id, academic_year_id) VALUES (?, ?, ?)",
+            [userId, program_id, yr],
+          );
+          break;
+      }
+    }
+  }
+}
+
 async function main() {
   const host = process.env.DB_HOST || "localhost";
   const port = parseInt(process.env.DB_PORT || "3306", 10);
@@ -145,14 +329,16 @@ async function main() {
   const database = argOf("db") || process.env.DB_NAME;
   const adminPassword = argOf("admin-password") || DEFAULT_ADMIN_PASSWORD;
 
+  const refresh = hasFlag("refresh");
+
   if (!database) throw new Error("DB_NAME is not set in .env");
-  if (!fs.existsSync(DUMP_PATH)) throw new Error(`Snapshot not found: ${DUMP_PATH}`);
+  if (!refresh && !fs.existsSync(DUMP_PATH)) throw new Error(`Snapshot not found: ${DUMP_PATH}`);
 
   const server = await mysql.createConnection({ host, port, user, password, multipleStatements: true });
   const [[version]] = await server.query<any[]>("SELECT VERSION() AS v");
   const isMariaDB = /mariadb/i.test(version.v);
   console.log(`MySQL ${host}:${port} as ${user} (server ${version.v})`);
-  if (isMariaDB) {
+  if (isMariaDB && !refresh) {
     console.log(
       "  note: MariaDB detected. MySQL 8 collations will be mapped on import.\n" +
         "  Production runs MySQL 8 — prefer it locally if you can.",
@@ -164,7 +350,10 @@ async function main() {
     "SELECT COUNT(*) AS n FROM information_schema.tables WHERE table_schema = ?",
     [database],
   );
-  if (existing[0].n > 0) {
+  if (refresh) {
+    if (existing[0].n === 0) throw new Error(`Database \`${database}\` does not exist yet; run without --refresh to build it.`);
+    await server.end();
+  } else if (existing[0].n > 0) {
     if (!hasFlag("force")) {
       throw new Error(
         `Database \`${database}\` already has ${existing[0].n} tables. Re-run with --force to drop and rebuild it.`,
@@ -173,32 +362,38 @@ async function main() {
     console.log(`Dropping existing \`${database}\` (--force)`);
     await server.query(`DROP DATABASE \`${database}\``);
   }
-  await server.query(
-    `CREATE DATABASE IF NOT EXISTS \`${database}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`,
-  );
-  await server.end();
+  if (!refresh) {
+    await server.query(
+      `CREATE DATABASE IF NOT EXISTS \`${database}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`,
+    );
+    await server.end();
+  }
 
   const db = await mysql.createConnection({ host, port, user, password, database, multipleStatements: true });
 
-  // 2. snapshot
-  const { sql: stripped, removed } = stripDelimiterBlocks(fs.readFileSync(DUMP_PATH, "utf8"));
-  const { sql: dumpSql, replaced } = isMariaDB
-    ? portCollationsToMariaDB(stripped)
-    : { sql: stripped, replaced: 0 };
-  console.log(
-    `Importing ${path.basename(DUMP_PATH)} (${removed} stored-procedure block(s) skipped` +
-      (replaced > 0 ? `, ${replaced} collation(s) mapped` : "") +
-      ")...",
-  );
-  await db.query(dumpSql);
+  if (!refresh) {
+    // 2. snapshot
+    const { sql: stripped, removed } = stripDelimiterBlocks(fs.readFileSync(DUMP_PATH, "utf8"));
+    const { sql: dumpSql, replaced } = isMariaDB
+      ? portCollationsToMariaDB(stripped)
+      : { sql: stripped, replaced: 0 };
+    console.log(
+      `Importing ${path.basename(DUMP_PATH)} (${removed} stored-procedure block(s) skipped` +
+        (replaced > 0 ? `, ${replaced} collation(s) mapped` : "") +
+        ")...",
+    );
+    await db.query(dumpSql);
 
-  // 3. migrations newer than the snapshot
-  const files = pendingMigrations();
-  console.log(`Applying ${files.length} migrations newer than ${String(DUMP_MIGRATION_LEVEL).padStart(3, "0")}...`);
-  for (const f of files) {
-    process.stdout.write(`  ${f} ... `);
-    await db.query(fs.readFileSync(path.join(MIGRATIONS_DIR, f), "utf8"));
-    console.log("ok");
+    // 3. migrations newer than the snapshot
+    const files = pendingMigrations();
+    console.log(`Applying ${files.length} migrations newer than ${String(DUMP_MIGRATION_LEVEL).padStart(3, "0")}...`);
+    for (const f of files) {
+      process.stdout.write(`  ${f} ... `);
+      await db.query(fs.readFileSync(path.join(MIGRATIONS_DIR, f), "utf8"));
+      console.log("ok");
+    }
+  } else {
+    console.log(`Refreshing local accounts and SSO clients in \`${database}\` (--refresh)`);
   }
 
   // 4. a login you know
@@ -212,7 +407,11 @@ async function main() {
   if (res.affectedRows !== 1) throw new Error("Super-admin credential row (user_id 1) not found in snapshot");
   const [[admin]] = await db.query<any[]>("SELECT username, email FROM User WHERE user_id = 1");
 
-  // 5. SSO clients that point at localhost
+  // 5. one account per role, same password
+  console.log("Creating dev accounts (one per role)...");
+  await ensureDevAccounts(db, hash);
+
+  // 6. SSO clients that point at localhost
   console.log("Registering satellite SSO clients for localhost...");
   for (const client of LOCAL_SSO_CLIENTS) {
     const secret = localSecretFor(client.client_id);
@@ -264,11 +463,19 @@ async function main() {
       `    callback: ${c.redirect_uri}`,
   ).join("\n");
 
+  const width = Math.max(...DEV_ACCOUNTS.map((a) => a.username.length), admin.username.length);
+  const accounts = [
+    `  ${admin.username.padEnd(width)}  SUPER_ADMIN`,
+    ...DEV_ACCOUNTS.map((a) => `  ${a.username.padEnd(width)}  ${a.role}`),
+  ].join("\n");
+
   console.log(`
 Done. Database \`${database}\` is ready.
 
-  Login:    ${admin.username}  /  ${adminPassword}
-  OTP:      shown on the login page in development (no email is sent)
+  Password for every account below:  ${adminPassword}
+  OTP: shown on the login page in development (no email is sent)
+
+${accounts}
 
 Local SSO clients — copy the secret for your module into its .env,
 alongside NGA_MIS_BASE_URL=http://localhost:${process.env.PORT || 5001}:

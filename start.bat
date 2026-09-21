@@ -126,6 +126,9 @@ if not exist "frontend\node_modules\.bin\vite.cmd" (
 )
 echo   - Dependencies ready
 
+:: Once the database exists, only its accounts and SSO clients are refreshed:
+:: they are defined in the setup script and may gain entries after a database
+:: was first built, and --refresh re-applies just those (a few queries).
 "!MYSQL_CMD!" -u root -e "USE ngarw_mis; SELECT 1 FROM User LIMIT 1;" >nul 2>&1
 if errorlevel 1 (
     echo   - Building the database ^(first run, takes a few minutes^)...
@@ -143,7 +146,14 @@ if errorlevel 1 (
     )
     popd
 ) else (
-    echo   - Database ready
+    pushd backend
+    call npm run db:setup -- --refresh >nul 2>&1
+    if errorlevel 1 (
+        echo   - Database ready ^(could not refresh dev accounts - run: cd backend ^&^& npm run db:setup -- --refresh^)
+    ) else (
+        echo   - Database ready ^(dev accounts refreshed^)
+    )
+    popd
 )
 
 :: ----------------------------------------------------------------- 5. Launch
@@ -154,6 +164,10 @@ echo   Open:  http://localhost:5173
 echo   API:   http://localhost:5001
 echo.
 echo   Sign in as  superadmin  /  Admin@1234
+echo   or as any role:  dev.admin, dev.teacher,
+echo   dev.classteacher, dev.student, dev.parent ...
+echo   Same password for all. Full list: guides\START_HERE.pdf
+echo.
 echo   The 6-digit code is shown on the login page
 echo   itself - no email is sent in development.
 echo.
