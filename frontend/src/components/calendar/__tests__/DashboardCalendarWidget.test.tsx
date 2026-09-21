@@ -34,8 +34,9 @@ vi.mock("../../../contexts/ToastContext", () => ({
   useToast: () => ({ showToast: vi.fn() }),
 }));
 
+let userMock: any = { roles: [] };
 vi.mock("../../../contexts/UserContext", () => ({
-  useUser: () => ({ user: { roles: [] } }),
+  useUser: () => ({ user: userMock }),
 }));
 
 let periodMock: any = {
@@ -478,5 +479,140 @@ describe("DashboardCalendarWidget — assigned activities", () => {
     const grid = within(await screen.findByRole("grid"));
     expect(grid.getByText("Web Application Development")).toBeInTheDocument();
     expect(grid.queryByText("Event")).not.toBeInTheDocument();
+  });
+});
+
+// Switching term / class group used to collapse the widget to a spinner and
+// jump back; a placeholder timetable now holds the shape while loading.
+describe("DashboardCalendarWidget — loading skeleton", () => {
+  const lesson = {
+    slot_id: 1,
+    academic_term_id: 21,
+    subject_id: 9,
+    user_id: 11,
+    day_of_week: 1,
+    start_time: "08:00",
+    end_time: "08:50",
+    subject_name: "Web Application Development",
+    class_group_name: "L3. Class A",
+    class_group_id: 3,
+  };
+
+  beforeEach(() => {
+    getMyCalendarMock.mockReset();
+    getMyClassGroupsMock.mockReset();
+    getMyClassGroupsMock.mockResolvedValue([
+      { class_group_id: 3, name: "L3. Class A" },
+      { class_group_id: 4, name: "L4. Class A" },
+    ]);
+    periodMock = {
+      selectedTermId: 21,
+      selectedTerm: { academic_term_id: 21, name: "Term A" },
+      selectedYearId: 2025,
+    };
+  });
+
+  it("shows a placeholder timetable, not a spinner, until the schedule arrives", async () => {
+    let resolve: (v: any) => void = () => {};
+    getMyCalendarMock.mockReturnValue(new Promise((r) => (resolve = r)));
+    render(<DashboardCalendarWidget />);
+
+    const skeleton = screen.getByTestId("calendar-grid-skeleton");
+    expect(skeleton).toHaveAttribute("aria-busy", "true");
+    expect(skeleton).toHaveAccessibleName("Loading your teaching schedule");
+    // the header (title, week nav) stays put around it
+    expect(screen.getByText("My Teaching Schedule")).toBeInTheDocument();
+    expect(screen.queryByRole("grid")).not.toBeInTheDocument();
+
+    resolve({ slots: [lesson], upcoming: [] });
+    await screen.findByRole("grid");
+    expect(screen.queryByTestId("calendar-grid-skeleton")).not.toBeInTheDocument();
+  });
+
+  it("swaps the grid for the skeleton while a class-group switch is in flight", async () => {
+    getMyCalendarMock.mockResolvedValueOnce({ slots: [lesson], upcoming: [] });
+    render(<DashboardCalendarWidget />);
+    await screen.findByRole("grid");
+
+    let resolve: (v: any) => void = () => {};
+    getMyCalendarMock.mockReturnValueOnce(new Promise((r) => (resolve = r)));
+    const select = await screen.findByLabelText("Filter by class group");
+    await userEvent.selectOptions(select, "4");
+
+    expect(await screen.findByTestId("calendar-grid-skeleton")).toBeInTheDocument();
+    expect(screen.queryByRole("grid")).not.toBeInTheDocument();
+    // the control the user just used is still there
+    expect(select).toHaveValue("4");
+
+    resolve({ slots: [{ ...lesson, class_group_id: 4, class_group_name: "L4. Class A" }], upcoming: [] });
+    await screen.findByRole("grid");
+    expect(screen.queryByTestId("calendar-grid-skeleton")).not.toBeInTheDocument();
+  });
+});
+
+// A student's class timetable carries their class group's events too.
+describe("DashboardCalendarWidget — student events", () => {
+  beforeEach(() => {
+    getStudentCalendarMock.mockReset();
+    getMyCalendarMock.mockReset();
+    getMyClassGroupsMock.mockReset();
+    periodMock = {
+      selectedTermId: 21,
+      selectedTerm: { academic_term_id: 21, name: "Term A" },
+      selectedYearId: 2025,
+    };
+  });
+
+  it("draws the class group's events from the student calendar response", async () => {
+    userMock = {
+      roles: [{ permissions: [{ name: "VIEW_STUDENT_CALENDAR" }] }],
+    };
+    getStudentCalendarMock.mockResolvedValue({
+      slots: [
+        {
+          slot_id: 1,
+          academic_term_id: 21,
+          subject_id: 9,
+          user_id: 11,
+          day_of_week: 1,
+          start_time: "08:00",
+          end_time: "08:50",
+          subject_name: "Embedded Systems Software",
+          class_group_name: "L4. Class A",
+          class_group_id: 4,
+        },
+      ],
+      activities: [
+        {
+          activity_id: 7,
+          academic_term_id: 21,
+          class_group_id: 4,
+          class_group_name: "L4. Class A",
+          activity_name: "Student Led clubs",
+          activity_type: "Club",
+          day_of_week: 5,
+          start_time: "11:40",
+          end_time: "12:30",
+          color: "#F59E0B",
+          is_recurring: 1,
+          assignees: [],
+        },
+      ],
+      upcoming: [],
+    });
+
+    render(<DashboardCalendarWidget />);
+    expect(screen.getByTestId("calendar-grid-skeleton")).toHaveAccessibleName(
+      "Loading your class schedule",
+    );
+    const grid = within(await screen.findByRole("grid"));
+    expect(screen.getByText("My Class Schedule")).toBeInTheDocument();
+    expect(getMyCalendarMock).not.toHaveBeenCalled();
+
+    const cell = grid.getByRole("gridcell", { name: /Friday.*Student Led clubs/ });
+    const card = within(cell).getByText("Student Led clubs").closest("[data-subject-key]")!;
+    expect(card).toHaveTextContent("Event");
+    expect(card).toHaveTextContent("L4. Class A");
+    userMock = { roles: [] };
   });
 });

@@ -3,6 +3,7 @@ import request from "supertest";
 import app from "../app";
 import {
   createUser,
+  createStudentClassGroup,
   createAcademicPeriod,
   createProgramGradeClassGroupDetailed,
   createRoleWithPermissions,
@@ -20,6 +21,7 @@ describe("Calendar activity assignees", () => {
   let teacherBId: number;
   let teacherBToken: string;
   let academicTermId: number;
+  let academicYearId: number;
   let classGroupId: number;
 
   const activityBody = (over: Record<string, unknown> = {}) => ({
@@ -56,7 +58,55 @@ describe("Calendar activity assignees", () => {
 
     const period = await createAcademicPeriod();
     academicTermId = period.academicTermId;
+    academicYearId = period.academicYearId;
     classGroupId = (await createProgramGradeClassGroupDetailed()).classGroupId;
+  });
+
+  it("shows a student their class group's and school-wide events, not another group's", async () => {
+    const studentRole = await createRoleWithPermissions("activity-student", [
+      "VIEW_STUDENT_CALENDAR",
+    ]);
+    const studentId = await createUser({ userType: "STUDENT" });
+    await assignRole(studentId, studentRole);
+    await createStudentClassGroup({
+      userId: studentId,
+      classGroupId,
+      academicYearId,
+    });
+    const otherGroup = (await createProgramGradeClassGroupDetailed())
+      .classGroupId;
+
+    const post = (body: Record<string, unknown>) =>
+      request(app)
+        .post("/calendar/activities")
+        .set("Authorization", `Bearer ${adminToken}`)
+        .send(activityBody(body));
+    const own = await post({ activity_name: "Student Led clubs", day_of_week: 5 });
+    const schoolWide = await post({
+      class_group_id: null,
+      activity_name: "Sports Afternoon",
+      day_of_week: 3,
+    });
+    const theirs = await post({ class_group_id: otherGroup, day_of_week: 2 });
+    const otherTerm = await post({
+      academic_term_id: (await createAcademicPeriod()).academicTermId,
+    });
+
+    const res = await request(app)
+      .get("/calendar/student-calendar")
+      .set("Authorization", `Bearer ${studentId ? signToken(studentId) : ""}`)
+      .query({ academic_term_id: academicTermId });
+    expect(res.status).toBe(200);
+    const ids = res.body.data.activities.map((a: any) => a.activity_id);
+    expect(ids).toContain(own.body.data.activity_id);
+    expect(ids).toContain(schoolWide.body.data.activity_id);
+    expect(ids).not.toContain(theirs.body.data.activity_id);
+    expect(ids).not.toContain(otherTerm.body.data.activity_id);
+    // no staff assignment needed for a student to see it
+    const clubs = res.body.data.activities.find(
+      (a: any) => a.activity_id === own.body.data.activity_id,
+    );
+    expect(clubs).toMatchObject({ activity_name: "Student Led clubs", assignees: [] });
   });
 
   it("creates an activity with no assignees (assignment is optional)", async () => {

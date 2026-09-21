@@ -37,6 +37,7 @@ export default {
         "fade-in": "fadeIn 0.3s ease-in-out",
         "slide-up": "slideUp 0.3s ease-out",
         "grow-width": "growWidth 5s linear forwards",
+        shimmer: "shimmer 1.6s infinite",
       },
       fontFamily: {
         sans: [
@@ -71,7 +72,12 @@ export default {
           "0%": { width: "0%" },
           "100%": { width: "100%" },
         },
+        // Skeleton-loader highlight sweep (see CalendarGridSkeleton)
+        shimmer: {
+          "100%": { transform: "translateX(100%)" },
+        },
       },
+
     },
   },
   plugins: [require("@tailwindcss/typography")],

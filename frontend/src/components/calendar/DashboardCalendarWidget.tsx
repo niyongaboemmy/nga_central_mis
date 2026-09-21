@@ -38,6 +38,7 @@ import {
 } from "./subjectHighlight";
 import { useIsDark } from "./useIsDark";
 import CalendarSlotModal from "./CalendarSlotModal";
+import CalendarGridSkeleton from "./CalendarGridSkeleton";
 import LessonPlanModal from "./LessonPlanModal";
 
 // ─── DashboardCalendarWidget ───────────────────────────────────────────────
@@ -184,7 +185,8 @@ const DashboardCalendarWidget: React.FC = () => {
         if (isStudent) {
           const calendarData = await getStudentCalendar(params);
           setSlots(calendarData.slots || []);
-          setActivities([]);
+          // Events pinned to the student's class group (or school-wide)
+          setActivities(calendarData.activities || []);
           setUpcomingLessons(calendarData.upcoming || []);
         } else {
           // Teacher or generic authenticated user
@@ -400,11 +402,17 @@ const DashboardCalendarWidget: React.FC = () => {
         </div>
       </div>
 
-      {/* Loading */}
+      {/* Loading — a placeholder timetable keeps the widget's shape while a
+          term / class-group switch is in flight, instead of collapsing to a
+          spinner and jumping back. */}
       {loading && (
-        <div className="flex items-center justify-center h-40">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
-        </div>
+        <CalendarGridSkeleton
+          compact
+          showDates
+          label={
+            isStudent ? "Loading your class schedule" : "Loading your teaching schedule"
+          }
+        />
       )}
 
       {/* Empty state */}

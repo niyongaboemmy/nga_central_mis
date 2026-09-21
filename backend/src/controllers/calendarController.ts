@@ -1245,6 +1245,53 @@ const replaceActivityAssignees = async (
   }
 };
 
+const ACTIVITY_COLUMNS = {
+  activity_id: CalendarActivity.activity_id,
+  academic_term_id: CalendarActivity.academic_term_id,
+  class_group_id: CalendarActivity.class_group_id,
+  activity_name: CalendarActivity.activity_name,
+  activity_type: CalendarActivity.activity_type,
+  day_of_week: CalendarActivity.day_of_week,
+  start_date: CalendarActivity.start_date,
+  end_date: CalendarActivity.end_date,
+  start_time: CalendarActivity.start_time,
+  end_time: CalendarActivity.end_time,
+  location: CalendarActivity.location,
+  description: CalendarActivity.description,
+  color: CalendarActivity.color,
+  is_recurring: CalendarActivity.is_recurring,
+  class_group_name: ClassGroup.name,
+};
+
+/** Live activities in `termId` for any of `classGroupIds`, plus school-wide
+ *  ones (no class group) — what a student's class timetable shows. */
+export const loadClassGroupActivities = async (params: {
+  termId: number;
+  classGroupIds: number[];
+}) => {
+  const rows = await db
+    .select(ACTIVITY_COLUMNS)
+    .from(CalendarActivity)
+    .leftJoin(
+      ClassGroup,
+      eq(CalendarActivity.class_group_id, ClassGroup.class_group_id),
+    )
+    .where(
+      and(
+        eq(CalendarActivity.is_active, 1),
+        eq(CalendarActivity.academic_term_id, params.termId),
+        params.classGroupIds.length === 0
+          ? isNull(CalendarActivity.class_group_id)
+          : or(
+              isNull(CalendarActivity.class_group_id),
+              inArray(CalendarActivity.class_group_id, params.classGroupIds),
+            )!,
+      ),
+    )
+    .orderBy(CalendarActivity.day_of_week, CalendarActivity.start_time);
+  return withAssignees(rows);
+};
+
 /** Activities in `termId` assigned to `userId`, for their own schedule.
  *  A class-group filter keeps that group's activities and school-wide ones. */
 export const loadAssignedActivities = async (params: {
@@ -1266,23 +1313,7 @@ export const loadAssignedActivities = async (params: {
     );
   }
   const rows = await db
-    .select({
-      activity_id: CalendarActivity.activity_id,
-      academic_term_id: CalendarActivity.academic_term_id,
-      class_group_id: CalendarActivity.class_group_id,
-      activity_name: CalendarActivity.activity_name,
-      activity_type: CalendarActivity.activity_type,
-      day_of_week: CalendarActivity.day_of_week,
-      start_date: CalendarActivity.start_date,
-      end_date: CalendarActivity.end_date,
-      start_time: CalendarActivity.start_time,
-      end_time: CalendarActivity.end_time,
-      location: CalendarActivity.location,
-      description: CalendarActivity.description,
-      color: CalendarActivity.color,
-      is_recurring: CalendarActivity.is_recurring,
-      class_group_name: ClassGroup.name,
-    })
+    .select(ACTIVITY_COLUMNS)
     .from(CalendarActivity)
     .innerJoin(
       CalendarActivityAssignee,
@@ -1943,15 +1974,6 @@ export const getStudentCalendar = asyncHandler(async (req: any, res: any) => {
       ),
     );
 
-  if (enrollments.length === 0) {
-    return successResponse(res, "No enrolled subjects for this term", {
-      slots: [],
-      term_id: termId,
-    });
-  }
-
-  const subjectIds = enrollments.map((e: any) => e.subject_id);
-
   // Get the student's class groups for this academic year. StudentClassGroup
   // is keyed per year and ClassGroup rows are reused across years, so an
   // unscoped lookup also matched the group the student sat in last year --
@@ -1975,9 +1997,30 @@ export const getStudentCalendar = asyncHandler(async (req: any, res: any) => {
   if (classGroupIds.length === 0) {
     return successResponse(res, "No class group assigned", {
       slots: [],
+      activities: [],
+      upcoming: [],
       term_id: termId,
     });
   }
+
+  // Custom activities (non-subject events) pinned to the student's class
+  // group, or school-wide. They don't depend on subject enrolment, so a
+  // student not yet enrolled in anything still sees their class events.
+  const activities = await loadClassGroupActivities({
+    termId,
+    classGroupIds,
+  });
+
+  if (enrollments.length === 0) {
+    return successResponse(res, "No enrolled subjects for this term", {
+      slots: [],
+      activities,
+      upcoming: [],
+      term_id: termId,
+    });
+  }
+
+  const subjectIds = enrollments.map((e: any) => e.subject_id);
 
   // Get calendar slots for enrolled subjects in student's class groups.
   // Match the calendar's term/class group, falling back to the slot's own
@@ -2082,6 +2125,7 @@ export const getStudentCalendar = asyncHandler(async (req: any, res: any) => {
 
   const response = {
     slots: filteredSlots,
+    activities,
     upcoming: upcomingSlots,
     term_id: termId,
   };

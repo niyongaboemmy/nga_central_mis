@@ -41,6 +41,7 @@ import {
   UpcomingLessons,
   CalendarLegend,
   CalendarGrid,
+  CalendarGridSkeleton,
   CalendarSlotModal,
   AcademicCalendarModal,
   LessonPlanModal,
@@ -148,6 +149,10 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({
 
   // State
   const [loading, setLoading] = useState(true);
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
+  // Admin view: switching class group refetches only that calendar's slots
+  // (not everything loadData pulls), so it has its own in-flight flag.
+  const [slotsLoading, setSlotsLoading] = useState(false);
   const [slots, setSlots] = useState<CalendarSlot[]>([]);
   const [activities, setActivities] = useState<CalendarActivity[]>([]);
   const [upcomingLessons, setUpcomingLessons] = useState<UpcomingLesson[]>([]);
@@ -409,6 +414,7 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({
     const calendarId = selectedCalendar?.calendar_id;
     if (!isBroadView || !calendarId) return;
     let cancelled = false;
+    setSlotsLoading(true);
     getCalendarSlots({ calendar_id: calendarId })
       .then((data) => {
         if (!cancelled) setSlots(data);
@@ -417,6 +423,9 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({
         if (!cancelled) {
           showToast(error.message || "Failed to load calendar slots", "error");
         }
+      })
+      .finally(() => {
+        if (!cancelled) setSlotsLoading(false);
       });
     return () => {
       cancelled = true;
@@ -511,6 +520,9 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({
         // class group and enrolled subjects, so no group selector is needed.
         const calendarData = await getStudentCalendar(params);
         setSlots(calendarData.slots);
+        // Events pinned to the student's class group (or school-wide) come
+        // back with the schedule; nothing else to fetch.
+        setActivities(calendarData.activities ?? []);
       } else {
         // Instructor view — a teacher may teach in more than one class group,
         // so a specific one must be selected before a schedule loads (unless
@@ -553,6 +565,7 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({
       showToast(error.message || "Failed to load calendar data", "error");
     } finally {
       setLoading(false);
+      setHasLoadedOnce(true);
     }
   };
 
@@ -1115,10 +1128,16 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({
     setCalendarFormData((prev) => ({ ...prev, ...data }));
   };
 
-  if (loading) {
+  // Only the very first load has nothing to show around the grid. After
+  // that, switching year / term / class group keeps the header and selectors
+  // in place and swaps just the grid for a placeholder timetable, so the
+  // control the user just touched stays under their pointer.
+  const gridLoading = loading || slotsLoading;
+
+  if (loading && !hasLoadedOnce) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      <div className="bg-white dark:bg-gray-900/50 rounded-3xl p-6 m-3 md:m-6">
+        <CalendarGridSkeleton label="Loading calendar" />
       </div>
     );
   }
@@ -1166,8 +1185,11 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({
       {/* Upcoming Lessons Alert (for instructors) */}
       <UpcomingLessons lessons={upcomingLessons} />
 
+      {/* Reloading after a selector change: placeholder grid in place */}
+      {gridLoading && <CalendarGridSkeleton label="Loading calendar" />}
+
       {/* Student view: single personal grid, no class-group selection needed */}
-      {isStudent && (
+      {!gridLoading && isStudent && (
         <div className="space-y-8">
           <CalendarGrid
             classGroupName={slots[0]?.class_group_name}
@@ -1183,7 +1205,7 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({
       )}
 
       {/* Instructor view: single personal grid for the selected class group */}
-      {!isBroadView && !isStudent && selectedTeacherClassGroupId && (
+      {!gridLoading && !isBroadView && !isStudent && selectedTeacherClassGroupId && (
         <div className="space-y-8">
           <CalendarGrid
             classGroupName={
@@ -1203,7 +1225,7 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({
       )}
 
       {/* Instructor view: prompt to pick a class group (or notice none assigned) */}
-      {!isBroadView && !isStudent && !selectedTeacherClassGroupId && (
+      {!gridLoading && !isBroadView && !isStudent && !selectedTeacherClassGroupId && (
         <div className="flex flex-col items-center justify-center py-16 text-gray-400 dark:text-gray-500">
           <svg className="w-12 h-12 mb-4 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -1217,7 +1239,7 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({
       )}
 
       {/* Admin/manager view: exactly one class group's calendar at a time — there is no combined "all class groups" view */}
-      {isBroadView && selectedCalendar && (
+      {!gridLoading && isBroadView && selectedCalendar && (
         <div className="space-y-8">
           {calendarsToDisplay.map((calendar) => (
             <CalendarGrid
@@ -1244,7 +1266,7 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({
           the schedule entirely behind a text-only message; "Add Slot" stays
           disabled until a real calendar exists (CalendarGrid gates that on
           a truthy calendarId). */}
-      {isBroadView && selectedCalendar && !selectedCalendar.calendar_id && (
+      {!gridLoading && isBroadView && selectedCalendar && !selectedCalendar.calendar_id && (
         <div className="space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/40 rounded-2xl">
             <p className="text-sm text-amber-700 dark:text-amber-300">
@@ -1283,7 +1305,7 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({
       )}
 
       {/* Admin/manager view: prompt to select a class group */}
-      {isBroadView && !selectedCalendar && selectedYear && selectedTerm && (
+      {!gridLoading && isBroadView && !selectedCalendar && selectedYear && selectedTerm && (
         <div className="flex flex-col items-center justify-center py-16 text-gray-400 dark:text-gray-500">
           <svg className="w-12 h-12 mb-4 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />

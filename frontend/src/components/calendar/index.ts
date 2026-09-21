@@ -10,6 +10,7 @@ export { default as WeekNavigator } from "./WeekNavigator";
 export { default as UpcomingLessons } from "./UpcomingLessons";
 export { default as CalendarLegend } from "./CalendarLegend";
 export { default as CalendarGrid } from "./CalendarGrid";
+export { default as CalendarGridSkeleton } from "./CalendarGridSkeleton";
 export { default as CalendarSlotModal } from "./CalendarSlotModal";
 export { default as AcademicCalendarModal } from "./AcademicCalendarModal";
 export { default as LessonPlanModal } from "./LessonPlanModal";
