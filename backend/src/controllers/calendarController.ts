@@ -313,6 +313,80 @@ const loadTeacherLessons = async (params: {
   return stripOwnColumns(dedupeLessons(assigned));
 };
 
+/** "HH:MM" -> minutes since midnight, for interval comparisons. */
+const timeToMinutes = (time: string): number => {
+  const [h, m] = time.split(":").map(Number);
+  return h * 60 + m;
+};
+
+/**
+ * Refuse a lesson that would run at the same time as another live lesson of
+ * the same class group -- not only one that starts at the same minute.
+ *
+ * unique_slot (and the check above it in createCalendarSlot) only key on
+ * start_time, so a 10:50-12:30 lesson slipped in beside a 10:00-11:40 one.
+ * The class-group grid never drew the second (its start row sits under the
+ * first's rowSpan), so admins could neither see nor delete it, while the
+ * teacher whose only lesson there was the hidden one saw it on every
+ * timetable -- reported as a "duplicated" slot the calendar didn't have.
+ *
+ * Same tombstone rule as the start-time check: a soft-deleted row, or one
+ * teaching a DISABLED subject, shows nowhere and does not block.
+ */
+const assertNoOverlappingLesson = async (params: {
+  termId: number | null;
+  classGroupId: number | null;
+  dayOfWeek: number;
+  startTime: string;
+  endTime: string;
+  excludeSlotId?: number | null;
+}) => {
+  const { termId, classGroupId, dayOfWeek, startTime, endTime, excludeSlotId } =
+    params;
+  const start = timeToMinutes(startTime);
+  const end = timeToMinutes(endTime);
+  if (!(end > start)) {
+    throw new ValidationError("End time must be after start time");
+  }
+
+  const sameDay = await db
+    .select({
+      slot_id: CalendarSlot.slot_id,
+      start_time: CalendarSlot.start_time,
+      end_time: CalendarSlot.end_time,
+      subject_name: Subject.name,
+    })
+    .from(CalendarSlot)
+    .leftJoin(Subject, eq(CalendarSlot.subject_id, Subject.subject_id))
+    .where(
+      and(
+        termId === null
+          ? isNull(CalendarSlot.academic_term_id)
+          : eq(CalendarSlot.academic_term_id, termId),
+        classGroupId === null
+          ? isNull(CalendarSlot.class_group_id)
+          : eq(CalendarSlot.class_group_id, classGroupId),
+        eq(CalendarSlot.day_of_week, dayOfWeek),
+        eq(CalendarSlot.is_active, 1),
+        or(isNull(Subject.status), sql`${Subject.status} <> 'DISABLED'`)!,
+      ),
+    );
+
+  const clash = sameDay.find(
+    (s: any) =>
+      s.slot_id !== excludeSlotId &&
+      timeToMinutes(s.start_time) < end &&
+      timeToMinutes(s.end_time) > start,
+  );
+  if (clash) {
+    throw new ConflictError(
+      `This class group already has ${clash.subject_name ?? "a lesson"} ` +
+        `at ${clash.start_time}-${clash.end_time} on that day, which overlaps ` +
+        `${startTime}-${endTime}`,
+    );
+  }
+};
+
 // ============================================
 // Calendar Slot Management (Admin functions)
 // ============================================
@@ -551,6 +625,14 @@ export const createCalendarSlot = asyncHandler(async (req: any, res: any) => {
     }
 
     const slotId = existingSlot[0].slot_id;
+    await assertNoOverlappingLesson({
+      termId,
+      classGroupId: calendarClassGroupId,
+      dayOfWeek: day_of_week,
+      startTime: start_time,
+      endTime: end_time,
+      excludeSlotId: slotId,
+    });
     await db
       .update(CalendarSlot)
       .set({
@@ -577,6 +659,14 @@ export const createCalendarSlot = asyncHandler(async (req: any, res: any) => {
       201,
     );
   }
+
+  await assertNoOverlappingLesson({
+    termId,
+    classGroupId: calendarClassGroupId,
+    dayOfWeek: day_of_week,
+    startTime: start_time,
+    endTime: end_time,
+  });
 
   const result = await db.insert(CalendarSlot).values({
     calendar_id,
@@ -698,7 +788,10 @@ export const updateCalendarSlot = asyncHandler(async (req: any, res: any) => {
     if (holder.length > 0 && holder[0].slot_id !== slotId) {
       // Same tombstone rule as createCalendarSlot: a live holder on a
       // DISABLED subject is invisible everywhere, so it gives way.
-      if (holder[0].is_active === 1 && holder[0].subject_status !== "DISABLED") {
+      if (
+        holder[0].is_active === 1 &&
+        holder[0].subject_status !== "DISABLED"
+      ) {
         throw new ConflictError(
           "A slot already exists at this day and time for this class group",
         );
@@ -707,6 +800,24 @@ export const updateCalendarSlot = asyncHandler(async (req: any, res: any) => {
         .delete(CalendarSlot)
         .where(eq(CalendarSlot.slot_id, holder[0].slot_id));
     }
+  }
+
+  // Any change to when the lesson runs has to keep it clear of the class
+  // group's other lessons, not just off their start minutes.
+  const targetEnd = end_time || existingSlot[0].end_time;
+  const timeChanged =
+    targetDay !== existingSlot[0].day_of_week ||
+    targetStart !== existingSlot[0].start_time ||
+    targetEnd !== existingSlot[0].end_time;
+  if (timeChanged && (is_active === undefined || is_active === 1)) {
+    await assertNoOverlappingLesson({
+      termId: existingSlot[0].academic_term_id,
+      classGroupId: existingSlot[0].class_group_id,
+      dayOfWeek: targetDay,
+      startTime: targetStart,
+      endTime: targetEnd,
+      excludeSlotId: slotId,
+    });
   }
 
   await db

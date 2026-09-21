@@ -50,7 +50,9 @@ export const cellKey = (rowIndex: number, dayIndex: number): string =>
  * be focusable but unrendered (or vice versa), and the layout can be unit
  * tested without mounting a table.
  */
-export const buildGridLayout = <S extends { start_time: string; end_time: string }>(
+export const buildGridLayout = <
+  S extends { start_time: string; end_time: string },
+>(
   rows: readonly ScheduleRow[],
   dayCount: number,
   findSlots: (dayIndex: number, startTime: string) => S[],
@@ -64,15 +66,50 @@ export const buildGridLayout = <S extends { start_time: string; end_time: string
       if (ownerOf.has(key)) continue; // covered by an earlier rowSpan
 
       const row = rows[rowIndex];
-      const cellSlots = isTeachingRow(row) ? findSlots(dayIndex, row.start) : [];
+      const cellSlots: S[] = isTeachingRow(row)
+        ? [...findSlots(dayIndex, row.start)]
+        : [];
 
       // Co-starting lessons of different lengths share one cell, so the cell
       // has to be as tall as the longest of them.
-      const rowSpan = cellSlots.reduce(
+      let rowSpan = cellSlots.reduce(
         (max, s) =>
-          Math.max(max, countScheduleSlots(s.start_time, s.end_time, rows, rowIndex)),
+          Math.max(
+            max,
+            countScheduleSlots(s.start_time, s.end_time, rows, rowIndex),
+          ),
         1,
       );
+
+      // A lesson that starts on a row this cell's rowSpan swallows would
+      // otherwise never be looked up at all: the server only refuses a slot
+      // whose *start* is taken, so a stale row can sit at 10:50-12:30 under a
+      // live 10:00-11:40 one. On this calendar's grid it was invisible (and so
+      // undeletable), while a teacher whose only lesson here is the hidden
+      // one saw it plainly -- a lesson the admin swears doesn't exist. Pull
+      // such lessons into the covering cell, drawn side by side like
+      // co-starting ones, and grow the cell to fit the longest of them.
+      for (let r = 1; r < rowSpan; r++) {
+        const covered = rows[rowIndex + r];
+        if (!covered || !isTeachingRow(covered)) break;
+        const overlapping = findSlots(dayIndex, covered.start);
+        if (overlapping.length === 0) continue;
+        cellSlots.push(...overlapping);
+        rowSpan = overlapping.reduce(
+          (max, s) =>
+            Math.max(
+              max,
+              r +
+                countScheduleSlots(
+                  s.start_time,
+                  s.end_time,
+                  rows,
+                  rowIndex + r,
+                ),
+            ),
+          rowSpan,
+        );
+      }
 
       cells.set(key, {
         rowIndex,

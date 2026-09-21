@@ -118,6 +118,33 @@ describe("buildGridLayout", () => {
     expect(cell?.rowSpan).toBe(2);
   });
 
+  it("surfaces a lesson that starts under another lesson's rowspan", () => {
+    // Web3 at 10:50-12:30 (P4-P5) hidden beneath a 10:00-11:40 (P3-P4)
+    // lesson on the same day: the server's start-time-only check let both
+    // exist, and the grid never looked at P4 because P3's rowspan covered it.
+    const top = { start_time: "10:00", end_time: "11:40", id: "top" };
+    const under = { start_time: "10:50", end_time: "12:30", id: "under" };
+    const layout = buildGridLayout(rows, 7, (dayIdx, start) => {
+      if (dayIdx !== 2) return [];
+      if (start === "10:00") return [top];
+      if (start === "10:50") return [under];
+      return [];
+    });
+
+    const p3 = rows.findIndex((r) => r.start === "10:00");
+    const cell = layout.cells.get(cellKey(p3, 2));
+    expect(cell?.slots).toEqual([top, under]);
+    // P3 + P4 + P5: tall enough for the later lesson's end
+    expect(cell?.rowSpan).toBe(3);
+    expect(layout.cells.has(cellKey(p3 + 1, 2))).toBe(false);
+    expect(layout.cells.has(cellKey(p3 + 2, 2))).toBe(false);
+    expect(layout.ownerOf.get(cellKey(p3 + 2, 2))).toBe(cellKey(p3, 2));
+    // the lunch row after P5 is untouched
+    expect(layout.cells.get(cellKey(p3 + 3, 2))).toMatchObject({
+      type: "lunch",
+    });
+  });
+
   it("never looks for a course on a break or lunch row", () => {
     const seen: string[] = [];
     buildGridLayout(rows, 7, (_d, start) => {
