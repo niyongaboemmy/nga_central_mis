@@ -15,6 +15,7 @@ const sourceLabel: Record<string, { label: string; className: string }> = {
   MANUAL: { label: "Manual", className: "bg-gray-100 text-gray-600 dark:bg-gray-700/50 dark:text-gray-300" },
   AI_GENERATED: { label: "AI generated", className: "bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300" },
   AI_ASSISTED: { label: "AI assisted", className: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300" },
+  PDF_UPLOAD: { label: "PDF", className: "bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300" },
 };
 
 const SubjectLessonNotesTab: React.FC<Props> = ({ subjectId }) => {
@@ -88,8 +89,13 @@ const SubjectLessonNotesTab: React.FC<Props> = ({ subjectId }) => {
                     <LessonNoteShareBadge shareCount={note.share_count} />
                   )}
                   <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full flex items-center gap-1 ${source.className}`}>
-                    {note.source !== "MANUAL" && <Sparkles className="w-2.5 h-2.5" />}
+                    {note.source === "PDF_UPLOAD" ? (
+                      <FileText className="w-2.5 h-2.5" />
+                    ) : (
+                      note.source !== "MANUAL" && <Sparkles className="w-2.5 h-2.5" />
+                    )}
                     {source.label}
+                    {note.source === "PDF_UPLOAD" && note.page_count ? ` · ${note.page_count} p.` : ""}
                   </span>
                 </div>
                 <p className="text-[11px] text-gray-400 mt-3">

@@ -1,5 +1,7 @@
 import { apiService, API_BASE_URL } from "../services/api";
 
+export type LessonNoteSource = "MANUAL" | "AI_GENERATED" | "AI_ASSISTED" | "PDF_UPLOAD";
+
 export interface LessonNoteSummary {
   note_id: number;
   subject_id: number;
@@ -9,7 +11,10 @@ export interface LessonNoteSummary {
   scheme_entry_id: number | null;
   title: string;
   status: "DRAFT" | "PUBLISHED";
-  source: "MANUAL" | "AI_GENERATED" | "AI_ASSISTED";
+  source: LessonNoteSource;
+  /** PDF_UPLOAD notes only. */
+  file_name: string | null;
+  page_count: number | null;
   /** Active (unexpired) shares. 0 means no student can see this note, published or not. */
   share_count: number;
   created_at: string;
@@ -27,7 +32,13 @@ export interface LessonNoteDetail {
   content_json: any;
   content_html: string | null;
   status: "DRAFT" | "PUBLISHED";
-  source: "MANUAL" | "AI_GENERATED" | "AI_ASSISTED";
+  source: LessonNoteSource;
+  /** PDF_UPLOAD notes only — the stored file's display metadata. content_html then holds
+   *  the text extracted from it (feeds the student AI tutor), not editable HTML. */
+  file_path: string | null;
+  file_name: string | null;
+  file_size: number | null;
+  page_count: number | null;
   created_at: string;
   updated_at: string;
   /** Active (unexpired) shares. 0 means no student can see this note, published or not. */
@@ -85,6 +96,8 @@ export interface SharedNoteSummary {
   subject_name: string;
   teacher_name: string;
   updated_at: string;
+  source: LessonNoteSource;
+  page_count: number | null;
   /** Plain-text preview of the note body, computed server-side so the list stays light. */
   excerpt: string;
   word_count: number;
@@ -105,6 +118,9 @@ export interface SharedNoteDetail {
   title: string;
   content_html: string;
   status: "PUBLISHED";
+  source: LessonNoteSource;
+  file_name: string | null;
+  page_count: number | null;
   subject_id: number;
   subject_name: string;
   updated_at: string;
@@ -131,6 +147,50 @@ export const lessonNotesApi = {
     academic_term_id?: number;
     title: string;
   }) => apiService.post<{ data: { note_id: number } }>("/lesson-notes", data),
+
+  /** Third creation path: a PDF prepared elsewhere becomes a read-only DRAFT note. */
+  createFromPdf: (
+    data: {
+      subject_id: number;
+      class_group_id?: number;
+      scheme_entry_id?: number;
+      academic_term_id?: number;
+      title: string;
+    },
+    file: File,
+    onProgress?: (fraction: number) => void,
+  ) => {
+    const form = new FormData();
+    Object.entries(data).forEach(([k, v]) => {
+      if (v !== undefined && v !== null && v !== "") form.append(k, String(v));
+    });
+    form.append("file", file);
+    return apiService.post<{ data: { note_id: number; page_count: number; is_textless: boolean } }>(
+      "/lesson-notes/upload-pdf",
+      form,
+      {
+        headers: { "Content-Type": "multipart/form-data" },
+        onUploadProgress: (e: { loaded: number; total?: number }) => onProgress?.(e.total ? e.loaded / e.total : 0),
+      },
+    );
+  },
+
+  replacePdf: (id: number, file: File, onProgress?: (fraction: number) => void) => {
+    const form = new FormData();
+    form.append("file", file);
+    return apiService.post<{ data: { page_count: number; is_textless: boolean } }>(
+      `/lesson-notes/${id}/pdf`,
+      form,
+      {
+        headers: { "Content-Type": "multipart/form-data" },
+        onUploadProgress: (e: { loaded: number; total?: number }) => onProgress?.(e.total ? e.loaded / e.total : 0),
+      },
+    );
+  },
+
+  /** The stored PDF itself — works for the owning teacher and for students the note reaches. */
+  getPdfBlob: (id: number) =>
+    apiService.get<Blob>(`/lesson-notes/${id}/pdf/raw`, { responseType: "blob" }),
 
   get: (id: number) => apiService.get<{ data: LessonNoteDetail }>(`/lesson-notes/${id}`),
 

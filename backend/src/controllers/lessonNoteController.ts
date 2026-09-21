@@ -24,6 +24,7 @@ import { sanitizeNoteHtml } from "../utils/sanitizeNoteHtml";
 import storageService from "../utils/fileServer";
 import logger from "../utils/logger";
 import { renderLessonNotePdf, renderCombinedLessonNotesPdf } from "../services/pdfExport";
+import { extractLessonNotePdf, looksLikePdf } from "../utils/lessonNotePdf";
 
 // ======================
 // STATUS MANAGEMENT
@@ -36,6 +37,21 @@ export const NEW_NOTE_STATUS = "DRAFT" as const;
 
 export const hasVisibleContent = (html: string | null | undefined): boolean =>
   !!html && html.replace(/<[^>]*>/g, "").trim().length > 0;
+
+// A PDF-backed note is publishable as soon as its file is stored, even when text
+// extraction found nothing (a scanned PDF) — students read the PDF itself, and the
+// extracted text only feeds the AI tutor / excerpts, which degrade gracefully.
+export const isPublishable = (note: {
+  source: string | null;
+  file_path?: string | null;
+  content_html?: string | null;
+}): boolean =>
+  note.source === "PDF_UPLOAD" ? !!note.file_path : hasVisibleContent(note.content_html);
+
+const isPdfNote = (note: { source: string | null }) => note.source === "PDF_UPLOAD";
+
+const safePdfFilename = (title: string) =>
+  `${title.replace(/[^a-z0-9]+/gi, "-").replace(/^-+|-+$/g, "").slice(0, 80) || "lesson-note"}.pdf`;
 
 // ======================
 // ACCESS HELPERS
@@ -99,6 +115,8 @@ export const listMyLessonNotes = asyncHandler(async (req: any, res: any) => {
       title: LessonNote.title,
       status: LessonNote.status,
       source: LessonNote.source,
+      file_name: LessonNote.file_name,
+      page_count: LessonNote.page_count,
       created_at: LessonNote.created_at,
       updated_at: LessonNote.updated_at,
       // Publishing a note does NOT make it visible to students -- it only makes it
@@ -232,6 +250,161 @@ export const createLessonNote = asyncHandler(async (req: any, res: any) => {
   successResponse(res, "Lesson note created", { note_id: noteId }, 201);
 });
 
+// ======================
+// PDF-BACKED NOTES — the third way to create a note: upload a PDF prepared elsewhere.
+// The PDF is the note (read-only in the editor; students read the file itself), but it
+// goes through the exact same DRAFT -> PUBLISHED -> share lifecycle. Text is extracted on
+// upload into content_html so the student AI tutor, library excerpt/reading time and the
+// combined packet keep working without any special-casing downstream.
+// ======================
+
+const pdfStoragePath = (noteId: number) => `/lesson-notes/${noteId}/source-${Date.now()}.pdf`;
+
+async function readUploadedPdf(file: Express.Multer.File | undefined) {
+  if (!file) throw new ValidationError("A PDF file is required");
+  if (!looksLikePdf(file.buffer)) {
+    throw new ValidationError("That file doesn't look like a PDF. Only PDF files can be uploaded as a lesson note.");
+  }
+  try {
+    const extracted = await extractLessonNotePdf(file.buffer);
+    if (extracted.pageCount < 1) throw new Error("no pages");
+    return extracted;
+  } catch (err) {
+    logger.warn(`Lesson note PDF could not be parsed: ${err}`);
+    throw new ValidationError("This PDF couldn't be read. It may be corrupted or password-protected.");
+  }
+}
+
+export const createLessonNoteFromPdf = asyncHandler(async (req: any, res: any) => {
+  const { subject_id, class_group_id, scheme_entry_id, academic_term_id } = req.body;
+  const title = (req.body.title || "").trim() || (req.file?.originalname || "").replace(/\.pdf$/i, "").trim();
+  if (!subject_id || !title) {
+    throw new ValidationError("subject_id and title are required");
+  }
+
+  await assertTeacherOwnsSubject(req.user.userId, parseInt(subject_id, 10));
+  const extracted = await readUploadedPdf(req.file);
+
+  const [result] = await db.insert(LessonNote).values({
+    user_id: req.user.userId,
+    subject_id: parseInt(subject_id, 10),
+    class_group_id: class_group_id ? parseInt(class_group_id, 10) : null,
+    scheme_entry_id: scheme_entry_id ? parseInt(scheme_entry_id, 10) : null,
+    academic_term_id: academic_term_id ? parseInt(academic_term_id, 10) : null,
+    title: title.slice(0, 255),
+    content_html: extracted.contentHtml,
+    content_json: null,
+    status: NEW_NOTE_STATUS,
+    source: "PDF_UPLOAD",
+    file_name: req.file.originalname.slice(0, 255),
+    file_size: req.file.size,
+    page_count: extracted.pageCount,
+  });
+  const noteId = (result as any).insertId as number;
+
+  // The row is inserted first so the storage path can be keyed by note id (same layout
+  // as embedded images). If the upload itself fails we roll the row back rather than
+  // leave a PDF note that has no PDF.
+  const remotePath = pdfStoragePath(noteId);
+  try {
+    await storageService.uploadFile(req.file.buffer, remotePath);
+  } catch (err) {
+    await db.delete(LessonNote).where(eq(LessonNote.note_id, noteId));
+    logger.error(`Lesson note PDF upload failed for note ${noteId}: ${err}`);
+    throw new ValidationError("The PDF could not be stored right now. Please try again.");
+  }
+  await db.update(LessonNote).set({ file_path: remotePath }).where(eq(LessonNote.note_id, noteId));
+
+  await recordActivity(
+    req.user.userId,
+    "LESSON_NOTE_CREATE",
+    `Uploaded lesson note "${title}" (PDF, ${extracted.pageCount} page${extracted.pageCount === 1 ? "" : "s"})`,
+    "LessonNote",
+    noteId,
+  );
+
+  successResponse(
+    res,
+    "Lesson note created from PDF",
+    { note_id: noteId, page_count: extracted.pageCount, is_textless: extracted.isTextless },
+    201,
+  );
+});
+
+// Swap the PDF behind an existing PDF note (a corrected version, say) without losing its
+// status, shares or place in the notes list.
+export const replaceLessonNotePdf = asyncHandler(async (req: any, res: any) => {
+  const noteId = parseInt(req.params.id, 10);
+  const note = await loadOwnedNote(noteId, req.user.userId);
+  if (!isPdfNote(note)) {
+    throw new ValidationError("Only a note that was created from a PDF can have its PDF replaced");
+  }
+  const extracted = await readUploadedPdf(req.file);
+
+  const remotePath = pdfStoragePath(noteId);
+  await storageService.uploadFile(req.file.buffer, remotePath);
+
+  await db
+    .update(LessonNote)
+    .set({
+      file_path: remotePath,
+      file_name: req.file.originalname.slice(0, 255),
+      file_size: req.file.size,
+      page_count: extracted.pageCount,
+      content_html: extracted.contentHtml,
+      updated_at: new Date(),
+    })
+    .where(eq(LessonNote.note_id, noteId));
+
+  if (note.file_path) {
+    storageService
+      .deleteFile(note.file_path)
+      .catch((err) => logger.warn(`Could not delete replaced PDF ${note.file_path}: ${err}`));
+  }
+
+  await recordActivity(
+    req.user.userId,
+    "LESSON_NOTE_UPDATE",
+    `Replaced the PDF of lesson note "${note.title}"`,
+    "LessonNote",
+    noteId,
+  );
+
+  successResponse(res, "PDF replaced", { page_count: extracted.pageCount, is_textless: extracted.isTextless });
+});
+
+// Serves the stored PDF to its owner, or to a student the note reaches (published +
+// natural audience / share — the same gate as reading the note). Registered ahead of
+// the teacher-only gate in the router for that reason. Inline, not attachment: the
+// frontend viewers fetch it as a blob and render pages themselves.
+export const streamLessonNotePdf = asyncHandler(async (req: any, res: any) => {
+  const noteId = parseInt(req.params.id, 10);
+  const [note] = await db
+    .select({
+      user_id: LessonNote.user_id,
+      title: LessonNote.title,
+      status: LessonNote.status,
+      source: LessonNote.source,
+      file_path: LessonNote.file_path,
+    })
+    .from(LessonNote)
+    .where(eq(LessonNote.note_id, noteId))
+    .limit(1);
+  if (!note || !isPdfNote(note) || !note.file_path) throw new NotFoundError("PDF not found");
+
+  const isOwner = note.user_id === req.user.userId;
+  if (!isOwner) {
+    const allowed = note.status === "PUBLISHED" && (await hasSharedAccessToNote(noteId, req.user.userId));
+    if (!allowed) throw new AuthorizationError("This lesson note has not been shared with you");
+  }
+
+  const buffer = await storageService.downloadToBuffer(note.file_path);
+  res.setHeader("Content-Type", "application/pdf");
+  res.setHeader("Content-Disposition", `inline; filename="${safePdfFilename(note.title)}"`);
+  res.setHeader("Cache-Control", "private, max-age=3600");
+  res.send(buffer);
+});
+
 export const getLessonNote = asyncHandler(async (req: any, res: any) => {
   const noteId = parseInt(req.params.id, 10);
   const note = await loadOwnedNote(noteId, req.user.userId);
@@ -283,6 +456,16 @@ export const exportLessonNotePdf = asyncHandler(async (req: any, res: any) => {
   const noteId = parseInt(req.params.id, 10);
   const note = await loadOwnedNote(noteId, req.user.userId);
 
+  // A PDF note *is* a PDF already — hand back the teacher's original, byte for byte,
+  // rather than re-rendering the extracted text into a worse-looking copy.
+  if (isPdfNote(note) && note.file_path) {
+    const buffer = await storageService.downloadToBuffer(note.file_path);
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="${safePdfFilename(note.title)}"`);
+    res.send(buffer);
+    return;
+  }
+
   if (!hasVisibleContent(note.content_html)) {
     throw new ValidationError("Add some content before exporting this note.");
   }
@@ -329,9 +512,8 @@ export const exportLessonNotePdf = asyncHandler(async (req: any, res: any) => {
     contentHtml: note.content_html || "",
   });
 
-  const safeFilename = note.title.replace(/[^a-z0-9]+/gi, "-").replace(/^-+|-+$/g, "").slice(0, 80) || "lesson-note";
   res.setHeader("Content-Type", "application/pdf");
-  res.setHeader("Content-Disposition", `attachment; filename="${safeFilename}.pdf"`);
+  res.setHeader("Content-Disposition", `attachment; filename="${safePdfFilename(note.title)}"`);
   res.send(pdf);
 });
 
@@ -340,6 +522,12 @@ export const updateLessonNote = asyncHandler(async (req: any, res: any) => {
   const note = await loadOwnedNote(noteId, req.user.userId);
 
   const { title, content_json, content_html, status, snapshot_prompt } = req.body;
+
+  // The PDF is the note: its body can only change by replacing the file (POST /:id/pdf).
+  // Title and status stay editable so publishing/renaming work exactly like any note.
+  if (isPdfNote(note) && (content_json !== undefined || content_html !== undefined || snapshot_prompt !== undefined)) {
+    throw new ValidationError("This note was created from a PDF and is read-only — replace the PDF to change its content.");
+  }
 
   if (snapshot_prompt && note.content_json) {
     await db.insert(LessonNoteVersion).values({
@@ -363,7 +551,7 @@ export const updateLessonNote = asyncHandler(async (req: any, res: any) => {
       // covers "type then immediately hit Publish" in one call as well as publishing a
       // note that already has content from an earlier save.
       const effectiveHtml = content_html !== undefined ? updates.content_html : note.content_html;
-      if (!hasVisibleContent(effectiveHtml)) {
+      if (!isPublishable({ ...note, content_html: effectiveHtml })) {
         throw new ValidationError("Add some content before publishing this note.");
       }
     }
@@ -398,6 +586,14 @@ export const deleteLessonNote = asyncHandler(async (req: any, res: any) => {
     .where(eq(LessonNoteImage.note_id, noteId));
 
   await db.delete(LessonNote).where(eq(LessonNote.note_id, noteId));
+
+  if (note.file_path) {
+    try {
+      await storageService.deleteFile(note.file_path);
+    } catch (err) {
+      logger.warn(`Could not delete storage file ${note.file_path}: ${err}`);
+    }
+  }
 
   for (const img of images) {
     try {
@@ -505,6 +701,9 @@ export const restoreLessonNoteVersion = asyncHandler(async (req: any, res: any) 
   const noteId = parseInt(req.params.id, 10);
   const versionId = parseInt(req.params.versionId, 10);
   const note = await loadOwnedNote(noteId, req.user.userId);
+  if (isPdfNote(note)) {
+    throw new ValidationError("A note created from a PDF has no editable versions to restore");
+  }
 
   const [version] = await db
     .select()
@@ -733,6 +932,8 @@ async function resolveVisibleSharedNotes(studentId: number) {
       note_class_group_id: LessonNote.class_group_id,
       subject_name: Subject.name,
       content_html: LessonNote.content_html,
+      source: LessonNote.source,
+      page_count: LessonNote.page_count,
       updated_at: LessonNote.updated_at,
       teacher_id: LessonNote.user_id,
       scheme_start_date: SchemeOfWorkEntry.start_date,
@@ -784,6 +985,8 @@ async function resolveVisibleSharedNotes(studentId: number) {
       title: v.note_title,
       subject_name: v.subject_name,
       content_html: v.content_html,
+      source: v.source,
+      page_count: v.page_count,
       teacher_name: teacherName.get(v.teacher_id) || "",
       updated_at: v.updated_at,
       scheme_start_date: v.scheme_start_date,
@@ -888,6 +1091,9 @@ export const getSharedLessonNote = asyncHandler(async (req: any, res: any) => {
       title: LessonNote.title,
       content_html: LessonNote.content_html,
       status: LessonNote.status,
+      source: LessonNote.source,
+      file_name: LessonNote.file_name,
+      page_count: LessonNote.page_count,
       subject_id: LessonNote.subject_id,
       subject_name: Subject.name,
       updated_at: LessonNote.updated_at,

@@ -1547,8 +1547,15 @@ export const LessonNote = mysqlTable("LessonNote", {
   title: varchar("title", { length: 255 }).notNull(),
   content_json: json("content_json"),
   content_html: text("content_html"),
+  // PDF_UPLOAD notes only: where the teacher's original PDF lives in the file-server,
+  // plus the display metadata the editor/reader show. content_html then holds the
+  // text extracted from that PDF (see lessonNotePdf.ts), never teacher-edited HTML.
+  file_path: varchar("file_path", { length: 500 }),
+  file_name: varchar("file_name", { length: 255 }),
+  file_size: int("file_size"),
+  page_count: int("page_count"),
   status: mysqlEnum("status", ["DRAFT", "PUBLISHED"]).default("DRAFT"),
-  source: mysqlEnum("source", ["MANUAL", "AI_GENERATED", "AI_ASSISTED"]).default(
+  source: mysqlEnum("source", ["MANUAL", "AI_GENERATED", "AI_ASSISTED", "PDF_UPLOAD"]).default(
     "MANUAL",
   ),
   created_at: datetime("created_at").default(sql`CURRENT_TIMESTAMP`),

@@ -8,6 +8,7 @@ import {
   ChevronRight,
   Clock,
   FileStack,
+  FileText,
   Search,
   SlidersHorizontal,
   Sparkles,
@@ -404,9 +405,16 @@ const SharedLessonNotesPage: React.FC = () => {
                             <Highlight text={n.teacher_name} tokens={tokens} />
                           </span>
                           <span aria-hidden>·</span>
-                          <span className="inline-flex items-center gap-1 flex-shrink-0">
-                            <Clock className="w-3 h-3" /> {n.reading_minutes || 1} min
-                          </span>
+                          {n.source === "PDF_UPLOAD" ? (
+                            <span className="inline-flex items-center gap-1 flex-shrink-0 text-rose-600 dark:text-rose-400">
+                              <FileText className="w-3 h-3" /> PDF
+                              {n.page_count ? ` · ${n.page_count} page${n.page_count === 1 ? "" : "s"}` : ""}
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 flex-shrink-0">
+                              <Clock className="w-3 h-3" /> {n.reading_minutes || 1} min
+                            </span>
+                          )}
                           <span aria-hidden className="hidden sm:inline">
                             ·
                           </span>

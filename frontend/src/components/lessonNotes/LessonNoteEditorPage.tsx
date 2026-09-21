@@ -11,6 +11,7 @@ import {
   Minimize2,
   AlertCircle,
   FileDown,
+  FileText,
 } from "lucide-react";
 import { lessonNotesApi, LessonNoteDetail } from "../../api/lessonNotes";
 import { useToast } from "../../contexts/ToastContext";
@@ -19,6 +20,7 @@ import ShareLessonNoteModal from "./ShareLessonNoteModal";
 import VersionHistoryModal from "./VersionHistoryModal";
 import LessonNoteStatusBadge from "./LessonNoteStatusBadge";
 import LessonNoteShareBadge from "./LessonNoteShareBadge";
+import PdfNoteWorkspace from "./pdf/PdfNoteWorkspace";
 import {
   attachImageTokenToJson,
   attachImageTokenToHtml,
@@ -59,7 +61,13 @@ const LessonNoteEditorPage: React.FC = () => {
       .then((res) => {
         setNote(res.data.data);
         setTitle(res.data.data.title);
-        setHasContent(hasVisibleContent(res.data.data.content_html));
+        // A PDF note is publishable as soon as its file exists — even a scanned PDF with
+        // no extractable text is something students can read (mirrors isPublishable()).
+        setHasContent(
+          res.data.data.source === "PDF_UPLOAD"
+            ? !!res.data.data.file_path
+            : hasVisibleContent(res.data.data.content_html),
+        );
       })
       .catch((err: any) => {
         showToast(
@@ -271,6 +279,8 @@ const LessonNoteEditorPage: React.FC = () => {
     );
   }
 
+  const isPdfNote = note.source === "PDF_UPLOAD";
+
   return (
     <div
       className={
@@ -295,6 +305,14 @@ const LessonNoteEditorPage: React.FC = () => {
             className="flex-1 min-w-[6rem] text-lg font-semibold bg-transparent focus:outline-none focus:ring-0 text-gray-900 dark:text-gray-100 truncate"
           />
           <LessonNoteStatusBadge status={note.status} />
+          {isPdfNote && (
+            <span
+              title="Created from an uploaded PDF — read-only"
+              className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300"
+            >
+              <FileText className="w-2.5 h-2.5" /> PDF
+            </span>
+          )}
           {note.status === "PUBLISHED" && (
             <LessonNoteShareBadge shareCount={note.share_count} />
           )}
@@ -333,18 +351,24 @@ const LessonNoteEditorPage: React.FC = () => {
               <Maximize2 className="w-4 h-4" />
             )}
           </button>
-          <button
-            onClick={() => setShowVersions(true)}
-            title="Version history"
-            className="p-2 rounded-full text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800"
-          >
-            <History className="w-4 h-4" />
-          </button>
+          {!isPdfNote && (
+            <button
+              onClick={() => setShowVersions(true)}
+              title="Version history"
+              className="p-2 rounded-full text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800"
+            >
+              <History className="w-4 h-4" />
+            </button>
+          )}
           <button
             onClick={handleExportPdf}
             disabled={exportingPdf || !hasContent}
             title={
-              hasContent ? "Export as PDF" : "Add some content before exporting"
+              isPdfNote
+                ? "Download the original PDF"
+                : hasContent
+                  ? "Export as PDF"
+                  : "Add some content before exporting"
             }
             className="p-2 rounded-full text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-30"
           >
@@ -405,20 +429,30 @@ const LessonNoteEditorPage: React.FC = () => {
       )}
 
       <div className="flex-1 min-h-0 rounded-xl shadow-sm ring-1 ring-black/5 dark:ring-white/10 overflow-hidden">
-        <LessonNoteRichEditor
-          key={editorKey}
-          initialContent={
-            note.content_json
-              ? attachImageTokenToJson(note.content_json)
-              : attachImageTokenToHtml(note.content_html || "")
-          }
-          editable
-          onChange={handleContentChange}
-          onUploadImage={handleUploadImage}
-          onRequestAIEdit={handleRequestAIEdit}
-          onAIEditAccepted={handleAIEditAccepted}
-          isFullscreen={isFullscreen}
-        />
+        {isPdfNote ? (
+          <PdfNoteWorkspace
+            note={note}
+            onReplaced={(patch) => {
+              setNote((prev) => (prev ? { ...prev, ...patch } : prev));
+              setHasContent(true);
+            }}
+          />
+        ) : (
+          <LessonNoteRichEditor
+            key={editorKey}
+            initialContent={
+              note.content_json
+                ? attachImageTokenToJson(note.content_json)
+                : attachImageTokenToHtml(note.content_html || "")
+            }
+            editable
+            onChange={handleContentChange}
+            onUploadImage={handleUploadImage}
+            onRequestAIEdit={handleRequestAIEdit}
+            onAIEditAccepted={handleAIEditAccepted}
+            isFullscreen={isFullscreen}
+          />
+        )}
       </div>
 
       <ShareLessonNoteModal

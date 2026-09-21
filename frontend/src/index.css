@@ -637,3 +637,75 @@ mark.note-find-hit-active {
         break-before: page;
     }
 }
+
+/* ==========================================================================
+   PDF-backed lesson notes (react-pdf). Each page is a "sheet" styled like the
+   HTML reader's paper so the two readers sit side by side without a seam. The
+   text layer pdf.js lays over the canvas is what makes highlight-to-ask work.
+   ========================================================================== */
+
+.lesson-pdf-sheet {
+    position: relative;
+    border-radius: 4px;
+    background-color: #ffffff;
+    overflow: hidden;
+    box-shadow:
+        0 1px 2px rgba(15, 23, 42, 0.08),
+        0 12px 32px -12px rgba(15, 23, 42, 0.28);
+}
+
+.lesson-pdf-sheet .react-pdf__Page {
+    background-color: #ffffff;
+}
+
+.lesson-pdf-sheet .react-pdf__Page__canvas {
+    display: block;
+    transition: filter 0.2s ease;
+}
+
+.lesson-pdf-sheet__number {
+    position: absolute;
+    right: 10px;
+    bottom: 8px;
+    font-size: 10px;
+    line-height: 1;
+    padding: 3px 7px;
+    border-radius: 999px;
+    color: #6b7280;
+    background: rgba(255, 255, 255, 0.85);
+    pointer-events: none;
+}
+
+/* Selection highlight in the text layer: match the app's blue instead of the OS default,
+   so a highlighted sentence reads as "this is what I'm asking about". */
+.lesson-pdf-sheet .react-pdf__Page__textContent ::selection {
+    background: rgba(59, 130, 246, 0.35);
+}
+
+/* Paper themes: the canvas is a raster, so the reader's background choice is a filter. */
+.note-reader--sepia .lesson-pdf-sheet .react-pdf__Page__canvas {
+    filter: sepia(0.35) brightness(0.97);
+}
+
+.note-reader--night .lesson-pdf-sheet .react-pdf__Page__canvas {
+    filter: invert(0.88) hue-rotate(180deg) brightness(0.95);
+}
+
+.note-reader--night .lesson-pdf-sheet {
+    background-color: #14181f;
+    box-shadow:
+        0 1px 2px rgba(0, 0, 0, 0.4),
+        0 12px 32px -12px rgba(0, 0, 0, 0.7);
+}
+
+.note-reader--night .lesson-pdf-sheet__number {
+    color: #9ca3af;
+    background: rgba(20, 24, 31, 0.85);
+}
+
+@media print {
+    .lesson-pdf-sheet {
+        box-shadow: none;
+        border-radius: 0;
+    }
+}

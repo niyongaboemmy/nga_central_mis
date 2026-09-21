@@ -413,6 +413,9 @@ export const proposeAINoteEdit = asyncHandler(async (req: any, res: any) => {
   if (note.user_id !== req.user.userId) {
     throw new AuthorizationError("You do not have access to this lesson note");
   }
+  if (note.source === "PDF_UPLOAD") {
+    throw new ValidationError("This note was created from a PDF and is read-only — AI editing isn't available for it.");
+  }
 
   let curriculumBlock = "";
   if (note.scheme_entry_id) {
@@ -578,6 +581,7 @@ export const askAboutSharedNote = asyncHandler(async (req: any, res: any) => {
       content_html: LessonNote.content_html,
       subject_id: LessonNote.subject_id,
       status: LessonNote.status,
+      source: LessonNote.source,
     })
     .from(LessonNote)
     .where(eq(LessonNote.note_id, noteId))
@@ -592,7 +596,11 @@ export const askAboutSharedNote = asyncHandler(async (req: any, res: any) => {
 
   const fullText = stripHtmlToText(note.content_html || "");
   if (!fullText) {
-    throw new ValidationError("This note has no readable content to ask about yet.");
+    throw new ValidationError(
+      note.source === "PDF_UPLOAD"
+        ? "This PDF has no readable text (it may be a scanned document), so the AI can't read it yet. Ask your teacher for a text version."
+        : "This note has no readable content to ask about yet.",
+    );
   }
   const noteText =
     fullText.length > MAX_NOTE_CONTEXT_CHARS

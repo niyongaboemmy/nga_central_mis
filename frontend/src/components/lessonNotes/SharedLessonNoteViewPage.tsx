@@ -37,6 +37,7 @@ import {
   sheetScale,
 } from "./reader/pagination";
 import NoteAIPanel, { AskMode, AskRequest } from "./reader/NoteAIPanel";
+import SharedPdfNoteReader from "./pdf/SharedPdfNoteReader";
 
 interface TocItem {
   id: string;
@@ -351,6 +352,12 @@ const SharedLessonNoteViewPage: React.FC = () => {
         <p className="text-xs">Opening your note...</p>
       </div>
     );
+  }
+
+  // A PDF-backed note has real pages of its own — pdf.js renders them (with a selectable
+  // text layer, so highlight-to-ask still works) instead of the HTML sheet below.
+  if (note.source === "PDF_UPLOAD") {
+    return <SharedPdfNoteReader note={note} />;
   }
 
   const flowStyle: React.CSSProperties = bookMode ? bookFlowStyle(page) : {};
