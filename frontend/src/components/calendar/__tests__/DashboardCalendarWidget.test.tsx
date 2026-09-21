@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { render, screen, waitFor, within, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import DashboardCalendarWidget from "../DashboardCalendarWidget";
 
@@ -222,5 +222,159 @@ describe("DashboardCalendarWidget — class group filter", () => {
     expect(tip).toHaveTextContent("Develop Web Applications Using Frameworks");
     expect(tip).toHaveTextContent("L3. Class A");
     expect(tip).toHaveTextContent("08:00 - 08:50");
+  });
+});
+
+// Hovering a lesson picks out every period of that subject across the week
+// and fades the rest — and only that subject, never one that merely shares a
+// row or a class group.
+describe("DashboardCalendarWidget — subject hover highlight", () => {
+  const lesson = (over: any) => ({
+    slot_id: 1,
+    academic_term_id: 21,
+    subject_id: 9,
+    user_id: 11,
+    day_of_week: 1,
+    start_time: "08:00",
+    end_time: "08:50",
+    subject_name: "Web Application Development",
+    class_group_name: "L3. Class A",
+    class_group_id: 3,
+    ...over,
+  });
+
+  const week = [
+    lesson({}), // Mon 08:00 — Web App Dev, L3
+    lesson({ slot_id: 2, day_of_week: 3, start_time: "10:00", end_time: "10:50" }), // Wed — Web App Dev, L3
+    lesson({
+      slot_id: 3,
+      day_of_week: 5,
+      subject_id: 9,
+      class_group_id: 4,
+      class_group_name: "L4. Class A",
+    }), // Fri — Web App Dev, L4 (same subject, other group)
+    lesson({
+      slot_id: 4,
+      day_of_week: 2,
+      subject_id: 12,
+      subject_name: "Web3 Applications",
+    }), // Tue — different subject, same group
+    lesson({
+      slot_id: 5,
+      day_of_week: 4,
+      subject_id: 13,
+      subject_name: "Development of Web User Interfaces",
+      class_group_id: 4,
+      class_group_name: "L4. Class A",
+    }), // Thu — different subject, other group
+  ];
+
+  const cards = () =>
+    Array.from(
+      document.querySelectorAll<HTMLElement>(
+        "[role=grid] [data-subject-key]",
+      ),
+    );
+  const byState = (state: string) =>
+    cards()
+      .filter((c) => c.dataset.highlight === state)
+      .map((c) => c.dataset.subjectKey);
+
+  beforeEach(() => {
+    getMyCalendarMock.mockClear();
+    getMyClassGroupsMock.mockResolvedValue([]);
+    getMyCalendarMock.mockResolvedValue({ slots: week, upcoming: [] });
+    periodMock = {
+      selectedTermId: 21,
+      selectedTerm: { academic_term_id: 21, name: "Term A" },
+      selectedYearId: 2025,
+    };
+  });
+
+  it("renders every card idle until something is hovered", async () => {
+    render(<DashboardCalendarWidget />);
+    await screen.findAllByText("Web Application Development");
+    expect(cards()).toHaveLength(5);
+    expect(byState("idle")).toHaveLength(5);
+  });
+
+  it("highlights every period of the hovered subject and dims the others", async () => {
+    render(<DashboardCalendarWidget />);
+    const [first] = await screen.findAllByText("Web Application Development");
+
+    await userEvent.hover(first);
+
+    // all three Web App Dev periods (both class groups) light up…
+    expect(byState("match")).toEqual(["id:9", "id:9", "id:9"]);
+    // …and nothing else does, even the subject sharing the same class group
+    expect(byState("dimmed").sort()).toEqual(["id:12", "id:13"]);
+    expect(byState("idle")).toHaveLength(0);
+
+    // the legend chip for that subject is the only one pressed
+    const legend = screen.getByRole("list", { name: /subjects on this/i });
+    const pressed = within(legend)
+      .getAllByRole("listitem")
+      .filter((b) => b.getAttribute("aria-pressed") === "true");
+    expect(pressed).toHaveLength(1);
+    expect(pressed[0]).toHaveTextContent("Web Application Development");
+    expect(pressed[0]).toHaveTextContent("×3");
+  });
+
+  it("only ever highlights one subject — moving to another swaps the highlight", async () => {
+    render(<DashboardCalendarWidget />);
+    const [webApp] = await screen.findAllByText("Web Application Development");
+    const web3 = within(screen.getByRole("grid")).getByText(
+      "Web3 Applications",
+    );
+
+    await userEvent.hover(webApp);
+    expect(byState("match")).toEqual(["id:9", "id:9", "id:9"]);
+
+    await userEvent.unhover(webApp);
+    await userEvent.hover(web3);
+    expect(byState("match")).toEqual(["id:12"]);
+    expect(byState("dimmed").sort()).toEqual(["id:13", "id:9", "id:9", "id:9"]);
+  });
+
+  it("clears the highlight when the pointer leaves", async () => {
+    render(<DashboardCalendarWidget />);
+    const [first] = await screen.findAllByText("Web Application Development");
+
+    await userEvent.hover(first);
+    expect(byState("match")).toHaveLength(3);
+
+    await userEvent.unhover(first);
+    expect(byState("idle")).toHaveLength(5);
+    expect(byState("match")).toHaveLength(0);
+  });
+
+  it("highlights from the legend as well, so a subject can be found without a slot on screen", async () => {
+    render(<DashboardCalendarWidget />);
+    await screen.findAllByText("Web Application Development");
+    const legend = screen.getByRole("list", { name: /subjects on this/i });
+    const chip = within(legend).getByRole("listitem", {
+      name: /Development of Web User Interfaces/,
+    });
+
+    await userEvent.hover(chip);
+    expect(byState("match")).toEqual(["id:13"]);
+    expect(byState("dimmed")).toHaveLength(4);
+
+    await userEvent.unhover(chip);
+    expect(byState("idle")).toHaveLength(5);
+  });
+
+  it("highlights on keyboard focus too", async () => {
+    render(<DashboardCalendarWidget />);
+    await screen.findAllByText("Web Application Development");
+
+    // the Tuesday cell holds the lone Web3 lesson
+    const cell = screen.getByRole("gridcell", { name: /Web3 Applications/ });
+    act(() => cell.focus());
+    expect(byState("match")).toEqual(["id:12"]);
+    expect(byState("dimmed")).toHaveLength(4);
+
+    act(() => cell.blur());
+    expect(byState("idle")).toHaveLength(5);
   });
 });
