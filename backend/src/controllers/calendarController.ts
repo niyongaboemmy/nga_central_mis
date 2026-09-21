@@ -1,5 +1,16 @@
 import { db } from "../db";
-import { eq, and, or, sql, desc, lte, gte, isNull, SQL, inArray } from "drizzle-orm";
+import {
+  eq,
+  and,
+  or,
+  sql,
+  desc,
+  lte,
+  gte,
+  isNull,
+  SQL,
+  inArray,
+} from "drizzle-orm";
 import {
   CalendarSlot,
   CalendarNotification,
@@ -36,10 +47,7 @@ import {
 import { successResponse } from "../utils/response";
 import { asyncHandler } from "../middleware/asyncHandler";
 import logger from "../utils/logger";
-import {
-  resolveUserScope,
-  isClassGroupInScope,
-} from "../services/userScope";
+import { resolveUserScope, isClassGroupInScope } from "../services/userScope";
 
 /**
  * A calendar and every slot on it belong to exactly one class group. A scoped
@@ -319,29 +327,69 @@ export const createCalendarSlot = asyncHandler(async (req: any, res: any) => {
     calendar[0].academic_year_id,
   );
 
-  // Check if slot already exists at this time
+  // The DB enforces UNIQUE unique_slot (academic_term_id, class_group_id,
+  // day_of_week, start_time) with no is_active in it. Look the key up the
+  // same way -- ignoring calendar_id and is_active -- otherwise a
+  // soft-deleted slot (or one on a sibling calendar of the same class group)
+  // slips past this check and the INSERT dies with a bare "Duplicate entry".
+  // A live holder is a real duplicate; a soft-deleted one is just a tombstone
+  // we revive with the new details.
+  const termId = calendar[0].academic_term_id;
   const existingSlot = await db
     .select()
     .from(CalendarSlot)
     .where(
       and(
-        eq(CalendarSlot.calendar_id, calendar_id),
+        termId === null
+          ? isNull(CalendarSlot.academic_term_id)
+          : eq(CalendarSlot.academic_term_id, termId),
+        calendarClassGroupId === null
+          ? isNull(CalendarSlot.class_group_id)
+          : eq(CalendarSlot.class_group_id, calendarClassGroupId),
         eq(CalendarSlot.day_of_week, day_of_week),
         eq(CalendarSlot.start_time, start_time),
-        eq(CalendarSlot.is_active, 1),
       ),
     )
     .limit(1);
 
   if (existingSlot.length > 0) {
-    throw new ConflictError(
-      "A slot already exists at this time for this calendar",
+    if (existingSlot[0].is_active === 1) {
+      throw new ConflictError(
+        "A slot already exists at this day and time for this class group",
+      );
+    }
+
+    const slotId = existingSlot[0].slot_id;
+    await db
+      .update(CalendarSlot)
+      .set({
+        calendar_id,
+        subject_id,
+        user_id,
+        end_time,
+        location: location || null,
+        ...(color !== undefined && { color }),
+        notes: notes || null,
+        is_active: 1,
+      })
+      .where(eq(CalendarSlot.slot_id, slotId));
+
+    logger.info("Calendar slot created by reviving soft-deleted row", {
+      slotId,
+      userId: req.user?.userId || req.user?.user_id || req.user?.id,
+    });
+
+    return successResponse(
+      res,
+      "Calendar slot created successfully",
+      { slot_id: slotId },
+      201,
     );
   }
 
   const result = await db.insert(CalendarSlot).values({
     calendar_id,
-    academic_term_id: calendar[0].academic_term_id,
+    academic_term_id: termId,
     class_group_id: calendarClassGroupId,
     subject_id,
     user_id,
@@ -349,6 +397,7 @@ export const createCalendarSlot = asyncHandler(async (req: any, res: any) => {
     start_time,
     end_time,
     location: location || null,
+    ...(color !== undefined && { color }),
     notes: notes || null,
   });
 
@@ -418,6 +467,51 @@ export const updateCalendarSlot = asyncHandler(async (req: any, res: any) => {
     throw new ValidationError(
       "Day of week must be between 0-6 (Sunday-Saturday)",
     );
+  }
+
+  // Same unique_slot key as createCalendarSlot: if the slot is moving onto a
+  // (day, start_time) another row already holds, clear a soft-deleted holder
+  // out of the way, or refuse clearly when the holder is live.
+  const targetDay =
+    day_of_week !== undefined ? day_of_week : existingSlot[0].day_of_week;
+  const targetStart = start_time || existingSlot[0].start_time;
+  if (
+    targetDay !== existingSlot[0].day_of_week ||
+    targetStart !== existingSlot[0].start_time
+  ) {
+    const holder = await db
+      .select({
+        slot_id: CalendarSlot.slot_id,
+        is_active: CalendarSlot.is_active,
+      })
+      .from(CalendarSlot)
+      .where(
+        and(
+          existingSlot[0].academic_term_id === null
+            ? isNull(CalendarSlot.academic_term_id)
+            : eq(
+                CalendarSlot.academic_term_id,
+                existingSlot[0].academic_term_id,
+              ),
+          existingSlot[0].class_group_id === null
+            ? isNull(CalendarSlot.class_group_id)
+            : eq(CalendarSlot.class_group_id, existingSlot[0].class_group_id),
+          eq(CalendarSlot.day_of_week, targetDay),
+          eq(CalendarSlot.start_time, targetStart),
+        ),
+      )
+      .limit(1);
+
+    if (holder.length > 0 && holder[0].slot_id !== slotId) {
+      if (holder[0].is_active === 1) {
+        throw new ConflictError(
+          "A slot already exists at this day and time for this class group",
+        );
+      }
+      await db
+        .delete(CalendarSlot)
+        .where(eq(CalendarSlot.slot_id, holder[0].slot_id));
+    }
   }
 
   await db
@@ -1431,7 +1525,9 @@ export const getStudentCalendar = asyncHandler(async (req: any, res: any) => {
   }
 
   if (!yearId) {
-    throw new ValidationError("Could not resolve academic year for the specified term");
+    throw new ValidationError(
+      "Could not resolve academic year for the specified term",
+    );
   }
 
   // Get student's enrolled subjects for this academic year
@@ -1886,9 +1982,7 @@ export const getAcademicCalendars = asyncHandler(async (req: any, res: any) => {
         [],
       );
     }
-    filters.push(
-      inArray(AcademicCalendar.class_group_id, allowedClassGroups),
-    );
+    filters.push(inArray(AcademicCalendar.class_group_id, allowedClassGroups));
   }
 
   const calendars = await db
