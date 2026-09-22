@@ -26,6 +26,11 @@ const ACTIVITY_COLOR = "#10B981";
  * label text was hard-coded here and disappeared on every light subject. The
  * ink is picked from the fill's own relative luminance instead (WCAG 2.x
  * definition), which is exactly the comparison the contrast ratio is built on.
+ *
+ * The rail itself no longer needs this: it tints with the subject colour rather
+ * than filling with it, so labels use the app's ink tokens. Kept for anywhere a
+ * solid fill of an arbitrary hue is genuinely wanted — call it rather than
+ * guessing black or white.
  */
 export const readableInk = (hex: string): { ink: string; sub: string } => {
   const normalised = hex.replace("#", "").trim();
@@ -147,7 +152,6 @@ const DayRail: React.FC<{
         ))}
 
         {entries.map((entry) => {
-          const { ink, sub } = readableInk(entry.color);
           const widthPct = Math.max(pct(entry.end) - pct(entry.start), 2.5);
           // A label clipped to "Deve…" is worse than no label: below roughly
           // a tenth of the track there is no room for one, and the hover
@@ -167,30 +171,30 @@ const DayRail: React.FC<{
               onMouseLeave={() => setHovered(null)}
               onFocus={() => setHovered(entry.id)}
               onBlur={() => setHovered(null)}
-              className={`absolute top-2 bottom-2 rounded-xl px-2 text-left overflow-hidden transition-[transform,opacity,box-shadow] duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 ${
-                isPast ? "opacity-40" : "opacity-100"
+              className={`absolute top-2 bottom-2 rounded-xl pl-2.5 pr-2 text-left overflow-hidden border transition-[transform,opacity,box-shadow] duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 ${
+                isPast ? "opacity-50" : "opacity-100"
               } ${isLive ? "ring-2 ring-offset-1 ring-blue-500 ring-offset-slate-100 dark:ring-offset-slate-900 shadow-lg" : ""} hover:-translate-y-0.5`}
               style={{
                 left: `${pct(entry.start)}%`,
                 width: `${widthPct}%`,
-                backgroundColor: entry.color,
+                // The subject colour identifies the lesson; it does not fill it. A saturated
+                // slab meant every subject painted a different mood over the page (and a
+                // lime or pale hue fought both themes), so the hue is now a tint plus a
+                // spine and the text uses the app's ink — legible whatever colour is chosen.
+                background: `color-mix(in oklab, ${entry.color} 20%, transparent)`,
+                borderColor: `color-mix(in oklab, ${entry.color} 38%, transparent)`,
+                boxShadow: `inset 3px 0 0 0 ${entry.color}`,
               }}
               title={`${entry.name} · ${clock(entry.start)}–${clock(entry.end)}`}
               aria-label={`${entry.name}, ${clock(entry.start)} to ${clock(entry.end)}`}
             >
               {fitsLabel && (
-                <span
-                  className="block text-[11px] font-semibold leading-tight truncate"
-                  style={{ color: ink }}
-                >
+                <span className="block text-[11px] font-semibold leading-tight truncate text-slate-900 dark:text-white">
                   {entry.name}
                 </span>
               )}
               {fitsSubLabel && entry.sub && (
-                <span
-                  className="block text-[10px] leading-tight truncate"
-                  style={{ color: sub }}
-                >
+                <span className="block text-[10px] leading-tight truncate text-slate-600 dark:text-slate-300">
                   {entry.sub}
                 </span>
               )}
