@@ -12,6 +12,11 @@ interface SearchItem {
 
 const SEARCH_ITEMS: SearchItem[] = [
   { label: "Dashboard", path: "/dashboard" },
+  {
+    label: "Teacher Dashboard",
+    path: "/teacher-dashboard",
+    requiredPermission: Permissions.TEACHER_DASHBOARD,
+  },
   { label: "Profile", path: "/profile" },
   {
     label: "My Subjects",

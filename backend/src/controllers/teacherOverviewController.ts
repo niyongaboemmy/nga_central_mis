@@ -1,0 +1,489 @@
+import { db } from "../db";
+import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
+import {
+  AcademicTerm,
+  AcademicYear,
+  ClassGroup,
+  Course,
+  Grade,
+  LessonNote,
+  SchemeOfWork,
+  SchemeOfWorkEntry,
+  Subject,
+  TeacherSubjectAssignment,
+  UserProfile,
+} from "../db/schema";
+import { successResponse } from "../utils/response";
+import { asyncHandler } from "../middleware/asyncHandler";
+import { countTeacherStudents } from "../services/teacherRoster";
+import {
+  loadAssignedActivities,
+  loadTeacherLessons,
+} from "./calendarController";
+
+// ============================================================================
+// Teacher overview — everything the Teacher Dashboard shows, in one request.
+//
+// The page is a "what do I need to do today" board, so it deliberately mixes
+// three kinds of data that otherwise live in three modules: the timetable
+// (calendar), the paperwork that can fall behind (schemes of work, lesson
+// notes, e-learning courses), and the roster figures. Assembling it here
+// keeps the dashboard to a single round-trip and, more importantly, lets the
+// timetable slice reuse the calendar module's own "what is a live lesson"
+// rules (loadTeacherLessons) instead of inventing a second, divergent answer.
+// ============================================================================
+
+export interface TeacherLessonToday {
+  slot_id: number;
+  subject_id: number;
+  subject_name: string | null;
+  subject_code: string | null;
+  class_group_name: string | null;
+  start_time: string;
+  end_time: string;
+  location: string | null;
+  color: string | null;
+}
+
+export interface TeacherSchemeRow {
+  subject_id: number;
+  subject_name: string;
+  subject_code: string | null;
+  subject_color: string | null;
+  class_group_id: number;
+  class_group_name: string;
+  scheme_id: number | null;
+  /** "submitted" once a SchemeOfWork row exists for the assignment. */
+  status: "submitted" | "pending";
+  entries_count: number;
+  validation_status: "PENDING" | "APPROVED" | "REJECTED";
+  validation_comment: string | null;
+  updated_at: string | null;
+}
+
+/** Resolve the (year, term) the caller is looking at, honouring the top-nav switcher. */
+const resolvePeriod = async (queryYearId?: number, queryTermId?: number) => {
+  const [term] = queryTermId
+    ? await db
+        .select()
+        .from(AcademicTerm)
+        .where(eq(AcademicTerm.academic_term_id, queryTermId))
+        .limit(1)
+    : await db
+        .select()
+        .from(AcademicTerm)
+        .where(eq(AcademicTerm.is_current, 1))
+        .limit(1);
+
+  let yearId = queryYearId ?? term?.academic_year_id ?? undefined;
+  if (!yearId) {
+    const [currentYear] = await db
+      .select({ academic_year_id: AcademicYear.academic_year_id })
+      .from(AcademicYear)
+      .where(eq(AcademicYear.is_current, 1))
+      .limit(1);
+    yearId = currentYear?.academic_year_id;
+  }
+
+  const [year] = yearId
+    ? await db
+        .select()
+        .from(AcademicYear)
+        .where(eq(AcademicYear.academic_year_id, yearId))
+        .limit(1)
+    : [];
+
+  return { term: term ?? null, year: year ?? null };
+};
+
+/** "HH:MM[:SS]" -> minutes since midnight. */
+const timeToMinutes = (time: string): number => {
+  const [h, m] = time.split(":").map(Number);
+  return h * 60 + (m || 0);
+};
+
+/** Whole days from today to `date`, or null when there is no date. */
+const daysUntil = (date: Date | string | null): number | null => {
+  if (!date) return null;
+  const target = new Date(date);
+  if (Number.isNaN(target.getTime())) return null;
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+  target.setHours(0, 0, 0, 0);
+  return Math.round(
+    (target.getTime() - startOfToday.getTime()) / (24 * 60 * 60 * 1000),
+  );
+};
+
+export const getTeacherOverview = asyncHandler(async (req: any, res: any) => {
+  const teacherId = req.user.userId;
+  const queryYearId = req.query.academic_year_id
+    ? parseInt(req.query.academic_year_id)
+    : undefined;
+  const queryTermId = req.query.academic_term_id
+    ? parseInt(req.query.academic_term_id)
+    : undefined;
+
+  const { term, year } = await resolvePeriod(queryYearId, queryTermId);
+  const termId = term?.academic_term_id ?? null;
+  const yearId = year?.academic_year_id ?? null;
+
+  const [profile] = await db
+    .select({
+      first_name: UserProfile.first_name,
+      last_name: UserProfile.last_name,
+    })
+    .from(UserProfile)
+    .where(eq(UserProfile.user_id, teacherId))
+    .limit(1);
+
+  // ── Assignments: the source of truth for what this teacher teaches ──────
+  const assignments = yearId
+    ? await db
+        .select({
+          subject_id: TeacherSubjectAssignment.subject_id,
+          class_group_id: TeacherSubjectAssignment.class_group_id,
+          subject_name: Subject.name,
+          subject_code: Subject.code,
+          subject_color: Subject.color,
+          class_group_name: ClassGroup.name,
+          grade_name: Grade.name,
+        })
+        .from(TeacherSubjectAssignment)
+        .innerJoin(
+          Subject,
+          eq(TeacherSubjectAssignment.subject_id, Subject.subject_id),
+        )
+        .innerJoin(
+          ClassGroup,
+          eq(
+            TeacherSubjectAssignment.class_group_id,
+            ClassGroup.class_group_id,
+          ),
+        )
+        .leftJoin(Grade, eq(ClassGroup.grade_id, Grade.grade_id))
+        .where(
+          and(
+            eq(TeacherSubjectAssignment.user_id, teacherId),
+            eq(TeacherSubjectAssignment.academic_year_id, yearId),
+            eq(Subject.status, "ACTIVE"),
+          ),
+        )
+    : [];
+
+  const subjectIds = [...new Set(assignments.map((a) => a.subject_id))];
+  const classGroupIds = [...new Set(assignments.map((a) => a.class_group_id))];
+
+  const totalStudents =
+    assignments.length > 0 && yearId
+      ? await countTeacherStudents(teacherId, yearId)
+      : 0;
+
+  // ── Timetable slice ────────────────────────────────────────────────────
+  // Same rules the weekly grid uses, so the dashboard can never advertise a
+  // lesson the timetable itself no longer draws.
+  const weekLessons =
+    termId != null
+      ? await loadTeacherLessons({ userId: teacherId, termId, yearId })
+      : [];
+
+  const today = new Date();
+  const todayDow = today.getDay();
+  const nowMinutes = today.getHours() * 60 + today.getMinutes();
+
+  const sortByStart = <T extends { start_time: string }>(rows: T[]) =>
+    [...rows].sort(
+      (a, b) => timeToMinutes(a.start_time) - timeToMinutes(b.start_time),
+    );
+
+  const toLesson = (slot: any): TeacherLessonToday => ({
+    slot_id: slot.slot_id,
+    subject_id: slot.subject_id,
+    subject_name: slot.subject_name,
+    subject_code: slot.subject_code,
+    class_group_name: slot.class_group_name,
+    start_time: slot.start_time,
+    end_time: slot.end_time,
+    location: slot.location,
+    color: slot.color,
+  });
+
+  const todayLessons = sortByStart(
+    weekLessons.filter((s: any) => s.day_of_week === todayDow),
+  ).map(toLesson);
+
+  // Tomorrow wraps to the next weekday that actually has lessons, so a Friday
+  // afternoon shows Monday's load rather than an empty "tomorrow".
+  let nextTeachingDay: {
+    day_of_week: number;
+    lessons: TeacherLessonToday[];
+  } | null = null;
+  for (let offset = 1; offset <= 7; offset++) {
+    const dow = (todayDow + offset) % 7;
+    const lessons = sortByStart(
+      weekLessons.filter((s: any) => s.day_of_week === dow),
+    ).map(toLesson);
+    if (lessons.length > 0) {
+      nextTeachingDay = { day_of_week: dow, lessons };
+      break;
+    }
+  }
+
+  const currentLesson =
+    todayLessons.find(
+      (l) =>
+        timeToMinutes(l.start_time) <= nowMinutes &&
+        timeToMinutes(l.end_time) > nowMinutes,
+    ) ?? null;
+
+  const nextLessonToday =
+    todayLessons.find((l) => timeToMinutes(l.start_time) > nowMinutes) ?? null;
+
+  // Periods per weekday, for the "teaching load" strip.
+  const weekLoad = [0, 1, 2, 3, 4, 5, 6].map((dow) => ({
+    day_of_week: dow,
+    periods: weekLessons.filter((s: any) => s.day_of_week === dow).length,
+  }));
+
+  const weeklyMinutes = weekLessons.reduce(
+    (total: number, slot: any) =>
+      total +
+      Math.max(
+        0,
+        timeToMinutes(slot.end_time) - timeToMinutes(slot.start_time),
+      ),
+    0,
+  );
+
+  // Non-subject events (duties, meetings, exams) this teacher was assigned.
+  const activities =
+    termId != null
+      ? await loadAssignedActivities({
+          userId: teacherId,
+          termId,
+          classGroupId: null,
+        })
+      : [];
+  const todayActivities = activities.filter(
+    (a: any) => a.day_of_week === null || a.day_of_week === todayDow,
+  );
+
+  // ── Schemes of work ────────────────────────────────────────────────────
+  // One row per assignment; a missing SchemeOfWork is the thing the teacher
+  // has to act on, so the list is built from assignments outward, not from
+  // the schemes that happen to exist. The validation verdict lives on the
+  // scheme's first entry (see getAllTeachersSchemeOfWork) — mirrored here so
+  // the two screens can't disagree.
+  const schemes =
+    termId != null && classGroupIds.length > 0
+      ? await db
+          .select({
+            scheme_id: SchemeOfWork.scheme_id,
+            subject_id: SchemeOfWork.subject_id,
+            class_group_id: SchemeOfWork.class_group_id,
+            updated_at: SchemeOfWork.updated_at,
+          })
+          .from(SchemeOfWork)
+          .where(
+            and(
+              eq(SchemeOfWork.user_id, teacherId),
+              eq(SchemeOfWork.academic_term_id, termId),
+              inArray(SchemeOfWork.class_group_id, classGroupIds),
+            ),
+          )
+      : [];
+
+  const schemeIds = schemes.map((s) => s.scheme_id);
+
+  const entryCounts = schemeIds.length
+    ? await db
+        .select({
+          scheme_id: SchemeOfWorkEntry.scheme_id,
+          count: sql<number>`count(*)`,
+        })
+        .from(SchemeOfWorkEntry)
+        .where(inArray(SchemeOfWorkEntry.scheme_id, schemeIds))
+        .groupBy(SchemeOfWorkEntry.scheme_id)
+    : [];
+  const countByScheme = new Map(
+    entryCounts.map((r) => [r.scheme_id, Number(r.count)]),
+  );
+
+  const firstEntries = schemeIds.length
+    ? await db
+        .select({
+          scheme_id: SchemeOfWorkEntry.scheme_id,
+          entry_id: SchemeOfWorkEntry.entry_id,
+          validation_status: SchemeOfWorkEntry.validation_status,
+          validation_comment: SchemeOfWorkEntry.validation_comment,
+        })
+        .from(SchemeOfWorkEntry)
+        .where(inArray(SchemeOfWorkEntry.scheme_id, schemeIds))
+        .orderBy(asc(SchemeOfWorkEntry.entry_id))
+    : [];
+  const verdictByScheme = new Map<
+    number,
+    { status: "PENDING" | "APPROVED" | "REJECTED"; comment: string | null }
+  >();
+  for (const entry of firstEntries) {
+    if (verdictByScheme.has(entry.scheme_id)) continue; // lowest entry_id wins
+    verdictByScheme.set(entry.scheme_id, {
+      status: (entry.validation_status as any) ?? "PENDING",
+      comment: entry.validation_comment ?? null,
+    });
+  }
+
+  const schemeByKey = new Map(
+    schemes.map((s) => [`${s.subject_id}:${s.class_group_id}`, s]),
+  );
+
+  const schemeRows: TeacherSchemeRow[] = assignments.map((a) => {
+    const scheme = schemeByKey.get(`${a.subject_id}:${a.class_group_id}`);
+    const verdict = scheme ? verdictByScheme.get(scheme.scheme_id) : undefined;
+    return {
+      subject_id: a.subject_id,
+      subject_name: a.subject_name,
+      subject_code: a.subject_code,
+      subject_color: a.subject_color,
+      class_group_id: a.class_group_id,
+      class_group_name: a.class_group_name,
+      scheme_id: scheme?.scheme_id ?? null,
+      status: scheme ? "submitted" : "pending",
+      entries_count: scheme ? (countByScheme.get(scheme.scheme_id) ?? 0) : 0,
+      validation_status: verdict?.status ?? "PENDING",
+      validation_comment: verdict?.comment ?? null,
+      updated_at: (scheme?.updated_at as any) ?? null,
+    };
+  });
+
+  // ── Lesson notes ───────────────────────────────────────────────────────
+  const noteRows =
+    subjectIds.length > 0
+      ? await db
+          .select({
+            note_id: LessonNote.note_id,
+            title: LessonNote.title,
+            status: LessonNote.status,
+            updated_at: LessonNote.updated_at,
+            subject_name: Subject.name,
+            class_group_name: ClassGroup.name,
+          })
+          .from(LessonNote)
+          .leftJoin(Subject, eq(LessonNote.subject_id, Subject.subject_id))
+          .leftJoin(
+            ClassGroup,
+            eq(LessonNote.class_group_id, ClassGroup.class_group_id),
+          )
+          .where(
+            termId != null
+              ? and(
+                  eq(LessonNote.user_id, teacherId),
+                  eq(LessonNote.academic_term_id, termId),
+                )
+              : eq(LessonNote.user_id, teacherId),
+          )
+          .orderBy(desc(LessonNote.updated_at))
+      : [];
+
+  const draftNotes = noteRows.filter((n) => n.status === "DRAFT");
+
+  // ── E-learning courses ─────────────────────────────────────────────────
+  const courseRows =
+    termId != null
+      ? await db
+          .select({
+            course_id: Course.course_id,
+            title: Course.title,
+            status: Course.status,
+            updated_at: Course.updated_at,
+            subject_name: Subject.name,
+            class_group_name: ClassGroup.name,
+          })
+          .from(Course)
+          .leftJoin(Subject, eq(Course.subject_id, Subject.subject_id))
+          .leftJoin(
+            ClassGroup,
+            eq(Course.class_group_id, ClassGroup.class_group_id),
+          )
+          .where(
+            and(
+              eq(Course.owner_user_id, teacherId),
+              eq(Course.academic_term_id, termId),
+            ),
+          )
+          .orderBy(desc(Course.updated_at))
+      : [];
+
+  successResponse(res, "Teacher overview retrieved successfully", {
+    teacher: {
+      first_name: profile?.first_name ?? null,
+      last_name: profile?.last_name ?? null,
+    },
+    period: {
+      academic_year_id: yearId,
+      academic_year_name: year?.name ?? null,
+      academic_term_id: termId,
+      academic_term_name: term?.name ?? null,
+      term_start_date: term?.start_date ?? null,
+      term_end_date: term?.end_date ?? null,
+      days_remaining_in_term: daysUntil(term?.end_date ?? null),
+    },
+    kpis: {
+      assignedSubjects: subjectIds.length,
+      totalStudents,
+      assignedClassGroups: classGroupIds.length,
+      weeklyPeriods: weekLessons.length,
+      weeklyMinutes,
+    },
+    schedule: {
+      server_day_of_week: todayDow,
+      today: todayLessons,
+      today_activities: todayActivities,
+      current_lesson: currentLesson,
+      next_lesson_today: nextLessonToday,
+      next_teaching_day: nextTeachingDay,
+      week_load: weekLoad,
+    },
+    classes: assignments.map((a) => ({
+      subject_id: a.subject_id,
+      subject_name: a.subject_name,
+      subject_code: a.subject_code,
+      subject_color: a.subject_color,
+      class_group_id: a.class_group_id,
+      class_group_name: a.class_group_name,
+      grade_name: a.grade_name,
+      periods_per_week: weekLessons.filter(
+        (s: any) =>
+          s.subject_id === a.subject_id &&
+          s.class_group_id === a.class_group_id,
+      ).length,
+    })),
+    schemes: {
+      total: schemeRows.length,
+      submitted: schemeRows.filter((s) => s.status === "submitted").length,
+      pending: schemeRows.filter((s) => s.status === "pending").length,
+      approved: schemeRows.filter(
+        (s) => s.status === "submitted" && s.validation_status === "APPROVED",
+      ).length,
+      rejected: schemeRows.filter(
+        (s) => s.status === "submitted" && s.validation_status === "REJECTED",
+      ).length,
+      awaiting_validation: schemeRows.filter(
+        (s) => s.status === "submitted" && s.validation_status === "PENDING",
+      ).length,
+      rows: schemeRows,
+    },
+    lessonNotes: {
+      total: noteRows.length,
+      drafts: draftNotes.length,
+      published: noteRows.length - draftNotes.length,
+      recent_drafts: draftNotes.slice(0, 5),
+    },
+    courses: {
+      total: courseRows.length,
+      drafts: courseRows.filter((c) => c.status === "DRAFT").length,
+      published: courseRows.filter((c) => c.status === "PUBLISHED").length,
+      recent: courseRows.slice(0, 5),
+    },
+  });
+});

@@ -4,6 +4,7 @@ import {
   getTeacherDashboardStats,
   getBasicDashboardStats,
 } from "../controllers/dashboardController";
+import { getTeacherOverview } from "../controllers/teacherOverviewController";
 import { authenticate } from "../middleware/auth";
 
 const router = express.Router();
@@ -19,5 +20,8 @@ router.get("/basic-stats", getBasicDashboardStats);
 
 // Get teacher dashboard statistics
 router.get("/teacher-stats", getTeacherDashboardStats);
+
+// Everything the Teacher Dashboard renders, in one round-trip
+router.get("/teacher-overview", getTeacherOverview);
 
 export default router;

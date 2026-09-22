@@ -1,5 +1,5 @@
 import React from "react";
-import { School, Server, Activity, Database, GraduationCap, LayoutGrid, MonitorCheck } from "lucide-react";
+import { School, Server, Activity, Database, GraduationCap, LayoutGrid, MonitorCheck, LayoutDashboard } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useUser } from "../../contexts/UserContext";
 import { Permissions } from "../../constants/permissions";
@@ -36,9 +36,14 @@ const Sidebar: React.FC<SidebarProps> = ({
     );
   };
 
+  // For a teacher, /dashboard is the welcome page (greeting + weekly
+  // timetable) and the figures live on /teacher-dashboard, so the menu says
+  // so. Every other role still lands on a dashboard there.
+  const isTeacher = hasPermission(Permissions.TEACHER_DASHBOARD);
+
   const navItems: NavItem[] = [
     {
-      label: "Dashboard",
+      label: isTeacher ? "Welcome" : "Dashboard",
       path: "/dashboard",
       icon: (
         <svg
@@ -55,6 +60,17 @@ const Sidebar: React.FC<SidebarProps> = ({
           />
         </svg>
       ),
+    },
+    {
+      // The teacher's working board. "Dashboard" above it is the welcome page
+      // (greeting + weekly timetable); this is where the figures and reminders
+      // moved to.
+      label: "Teacher Dashboard",
+      path: "/teacher-dashboard",
+      icon: (
+        <LayoutDashboard className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />
+      ),
+      requiredPermission: Permissions.TEACHER_DASHBOARD,
     },
     {
       label: "Profile",

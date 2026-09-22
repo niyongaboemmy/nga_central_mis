@@ -11,7 +11,8 @@ import Login from "./components/Login";
 import Profile from "./components/Profile";
 import Dashboard from "./components/Dashboard";
 import SuperAdminDashboard from "./components/SuperAdminDashboard";
-import TeacherDashboard from "./components/TeacherDashboard";
+import TeacherWelcome from "./components/TeacherWelcome";
+import TeacherDashboard from "./components/teacher/TeacherDashboard";
 import Permissions from "./components/Permissions";
 import Users from "./components/Users";
 import SystemLayout from "./components/SystemLayout";
@@ -155,8 +156,10 @@ const DashboardPage: React.FC = () => {
     return <SuperAdminDashboard onLogout={handleLogout} />;
   }
 
+  // A teacher's landing page is the welcome page: a greeting and their weekly
+  // timetable. The figures and reminders live on /teacher-dashboard.
   if (hasTeacherDashboard) {
-    return <TeacherDashboard onLogout={handleLogout} />;
+    return <TeacherWelcome onLogout={handleLogout} />;
   }
 
   return <Dashboard onLogout={handleLogout} />;
@@ -314,6 +317,19 @@ function App() {
                 <ProtectedRoute>
                   <SystemLayoutWrapper>
                     <DashboardPage />
+                  </SystemLayoutWrapper>
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Teacher Dashboard - the teacher's working board (KPIs, today,
+                reminders). /dashboard stays the timetable welcome page. */}
+            <Route
+              path="/teacher-dashboard"
+              element={
+                <ProtectedRoute>
+                  <SystemLayoutWrapper>
+                    <TeacherDashboard />
                   </SystemLayoutWrapper>
                 </ProtectedRoute>
               }

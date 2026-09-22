@@ -244,7 +244,7 @@ const stripOwnColumns = <T extends object>(slots: T[]) =>
  * notification check so the two can never disagree about what a teacher
  * teaches.
  */
-const loadTeacherLessons = async (params: {
+export const loadTeacherLessons = async (params: {
   userId: number;
   termId: number;
   yearId: number | null;
