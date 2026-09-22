@@ -34,6 +34,8 @@ import {
 import {
   getCourseAnalytics,
   getCourseCoverage,
+  streamCourseLive,
+  getCourseLiveSnapshot,
   buildJourney,
   getCourseQuestions,
   overrideItemProgress,
@@ -116,6 +118,8 @@ router.put("/sections/:id/items/order", builder, reorderItems);
 router.get("/courses/:id/analytics", builder, getCourseAnalytics);
 router.get("/courses/:id/mastery", builder, teacherCourseMastery);
 router.get("/courses/:id/coverage", builder, getCourseCoverage);
+router.get("/courses/:id/live", builder, streamCourseLive);
+router.get("/courses/:id/live/snapshot", builder, getCourseLiveSnapshot);
 router.get("/courses/:id/report.csv", authorize([Permissions.MANAGE_COURSE_CONTENT, Permissions.VIEW_ALL_COURSES]), courseProgressReportCsv);
 router.post("/sections/:id/build-journey", builder, buildJourney);
 router.get("/courses/:id/questions", builder, getCourseQuestions);

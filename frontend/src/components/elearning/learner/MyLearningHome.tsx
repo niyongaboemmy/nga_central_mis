@@ -54,10 +54,20 @@ const MyLearningHome: React.FC = () => {
   }, [prefs.streak_enabled]);
 
   useEffect(() => {
-    elearningApi
-      .myCourses()
-      .then((r) => setCards(r.data.data))
-      .catch(() => setError(true));
+    const load = () =>
+      elearningApi
+        .myCourses()
+        .then((r) => setCards(r.data.data))
+        .catch(() => setError(true));
+    load();
+    // Coming back from a lesson (or another tab) must never show yesterday's progress.
+    const onVisible = () => document.visibilityState === "visible" && load();
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", load);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", load);
+    };
   }, []);
 
   const firstName = (user as any)?.profile?.first_name as string | undefined;

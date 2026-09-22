@@ -15,6 +15,7 @@ import {
   logLearningEvent,
 } from "../services/elearning/courseProgress";
 import { notifyNudge, notifyResultReceived } from "../services/elearning/courseNotifications";
+import { listRecent, listWatchers, subscribe } from "../services/elearning/livePresence";
 import { buildSectionJourney, courseCoverage } from "../services/elearning/courseCoverage";
 
 const parseId = (raw: unknown, label = "id"): number => {
@@ -137,6 +138,39 @@ export async function buildCourseAnalytics(course: CourseRow) {
     stuck: students.filter((s) => s.status === "behind" || s.status === "not_started").map((s) => ({ user_id: s.user_id, name: s.name, status: s.status })),
   };
 }
+
+/**
+ * `GET /courses/:id/live` — who is learning this course right now, as Server-Sent Events.
+ * EventSource can't set an Authorization header, so the shared `authenticate` middleware's
+ * `?token=` fallback carries the session. X-Accel-Buffering tells nginx not to buffer the
+ * stream, which would otherwise hold every event until the connection closed.
+ */
+export const streamCourseLive = asyncHandler(async (req: any, res: any) => {
+  const course = await loadCourse(parseId(req.params.id, "course id"));
+  await assertCanBuildCourse(course, req.user.userId);
+
+  res.writeHead(200, {
+    "Content-Type": "text/event-stream; charset=utf-8",
+    "Cache-Control": "no-cache, no-transform",
+    Connection: "keep-alive",
+    "X-Accel-Buffering": "no",
+  });
+  res.write("retry: 5000\n\n");
+  res.write(`data: ${JSON.stringify({ type: "presence", watchers: listWatchers(course.course_id), recent: listRecent(course.course_id), at: Date.now() })}\n\n`);
+
+  const detach = subscribe(course.course_id, res);
+  req.on("close", () => {
+    detach();
+    res.end();
+  });
+});
+
+/** Polling fallback for the same data (used when EventSource can't connect). */
+export const getCourseLiveSnapshot = asyncHandler(async (req: any, res: any) => {
+  const course = await loadCourse(parseId(req.params.id, "course id"));
+  await assertCanBuildCourse(course, req.user.userId);
+  successResponse(res, "Live", { watchers: listWatchers(course.course_id), recent: listRecent(course.course_id), at: Date.now() });
+});
 
 /** Curriculum coverage: targets per week vs items, gaps, course-wide element coverage. */
 export const getCourseCoverage = asyncHandler(async (req: any, res: any) => {

@@ -13,9 +13,11 @@ import { asyncHandler } from "../middleware/asyncHandler";
 import { successResponse } from "../utils/response";
 import { NotFoundError, ValidationError } from "../errors/CustomError";
 import storageService from "../utils/fileServer";
+import logger from "../utils/logger";
 import { listMemberCourseIds, loadMemberCourse, isCourseMember } from "../services/elearning/courseMembership";
 import { publishDueSections } from "../services/elearning/courseSeeding";
 import { loadCourseHeader, loadCourseTree, loadItemWithCourse } from "../services/elearning/courseTree";
+import { recordProgress, touch } from "../services/elearning/livePresence";
 import {
   applyAction,
   deriveLearnerSections,
@@ -26,6 +28,16 @@ import {
   recordHeartbeat,
   summariseCourse,
 } from "../services/elearning/courseProgress";
+
+/** The display name the teacher's live view shows. */
+async function learnerName(userId: number): Promise<string> {
+  const [p] = await db
+    .select({ first_name: UserProfile.first_name, last_name: UserProfile.last_name })
+    .from(UserProfile)
+    .where(eq(UserProfile.user_id, userId))
+    .limit(1);
+  return `${p?.first_name || ""} ${p?.last_name || ""}`.trim() || `Student #${userId}`;
+}
 
 const parseId = (raw: unknown, label = "id"): number => {
   const n = parseInt(String(raw), 10);
@@ -172,6 +184,35 @@ export const openMyItem = asyncHandler(async (req: any, res: any) => {
     });
   }
 
+  // Live: the teacher sees who is on which item, and the first open of an item lands as
+  // "started". Presence is best-effort — it must never fail opening a lesson.
+  try {
+    const name = await learnerName(userId);
+    touch(row.course.course_id, { user_id: userId, name }, {
+      item_id: itemId,
+      item_title: row.item.title,
+      item_type: row.item.item_type,
+      section_id: section.section_id,
+      section_title: section.title,
+      state: progress.state,
+      seconds_spent: progress.seconds_spent,
+    });
+    if (progress.view_count <= 1) {
+      recordProgress(row.course.course_id, {
+        user_id: userId, name, item_id: itemId, item_title: row.item.title, item_type: row.item.item_type,
+        section_id: section.section_id, section_title: section.title, verb: "started", at: Date.now(),
+      });
+    }
+    if (justCompleted) {
+      recordProgress(row.course.course_id, {
+        user_id: userId, name, item_id: itemId, item_title: row.item.title, item_type: row.item.item_type,
+        section_id: section.section_id, section_title: section.title, verb: "completed", at: Date.now(),
+      });
+    }
+  } catch (error) {
+    logger.warn("live presence failed on item open", { error, itemId });
+  }
+
   // Type-specific body. Notes go through the existing shared-note reader (by note_id);
   // documents stream through /file; pages/videos/links/checks carry their content here.
   let content: any = null;
@@ -288,6 +329,19 @@ export const heartbeatMyItem = asyncHandler(async (req: any, res: any) => {
   const seconds = Number(req.body?.seconds);
   if (!Number.isFinite(seconds) || seconds < 0) throw new ValidationError("seconds must be a non-negative number");
   const progress = await recordHeartbeat(row.item, req.user.userId, seconds, req.body?.position);
+  try {
+    touch(row.course.course_id, { user_id: req.user.userId, name: await learnerName(req.user.userId) }, {
+      item_id: itemId,
+      item_title: row.item.title,
+      item_type: row.item.item_type,
+      section_id: row.section.section_id,
+      section_title: row.section.title,
+      state: progress.state,
+      seconds_spent: progress.seconds_spent,
+    });
+  } catch (error) {
+    logger.warn("live presence failed on heartbeat", { error, itemId });
+  }
   successResponse(res, "ok", { seconds_spent: progress.seconds_spent, state: progress.state });
 });
 
@@ -320,6 +374,17 @@ export const markMyItemDone = asyncHandler(async (req: any, res: any) => {
       course_item_id: itemId,
       context: { course_id: row.course.course_id, section_id: section.section_id, via: "MARK_DONE" },
     });
+  }
+  if (justCompleted) {
+    try {
+      recordProgress(row.course.course_id, {
+        user_id: userId, name: await learnerName(userId), item_id: itemId, item_title: row.item.title,
+        item_type: row.item.item_type, section_id: section.section_id, section_title: section.title,
+        verb: "completed", at: Date.now(),
+      });
+    } catch (error) {
+      logger.warn("live progress failed on mark done", { error, itemId });
+    }
   }
   const after = await learnerCoursePayload(row.course.course_id, userId);
   const sectionAfter = after.sections.find((s) => s.section_id === section.section_id)!;

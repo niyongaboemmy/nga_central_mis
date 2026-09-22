@@ -61,6 +61,10 @@ const CoursePage: React.FC = () => {
 
   useEffect(() => {
     loadCourse();
+    // Same reason as the home screen: returning to the tab re-reads progress.
+    const onVisible = () => document.visibilityState === "visible" && loadCourse();
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
   }, [loadCourse]);
 
   // Open an item whenever the route's itemId changes.

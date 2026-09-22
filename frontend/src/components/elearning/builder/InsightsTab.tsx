@@ -8,6 +8,7 @@ import { useTheme } from "../../../contexts/ThemeContext";
 import { copy } from "../copy";
 import { EmptyState, ProgressBar, Skeleton } from "../ui/primitives";
 import MasteryHeatmap from "./MasteryHeatmap";
+import LiveNowPanel from "./LiveNowPanel";
 
 interface AnalyticsSection {
   section_id: number;
@@ -117,6 +118,9 @@ const InsightsTab: React.FC<{ courseId: number; course?: BuilderCourse; basePath
 
   return (
     <div className="mt-4 space-y-5">
+      {/* Who is in the course at this moment (teacher only) */}
+      {!readOnly && <LiveNowPanel courseId={courseId} />}
+
       {/* KPI row (bento) */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {[

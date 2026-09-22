@@ -49,6 +49,8 @@ if (config.nodeEnv !== "test") {
       logger.error("[elearning] sweep failed", { error });
     }
   };
+  // Live-presence sweep: expires watchers and keeps SSE streams warm.
+  import("./services/elearning/livePresence").then((m) => m.startLiveSweep()).catch(() => undefined);
   setTimeout(runSweeps, 30_000);
   setInterval(runSweeps, 6 * 60 * 60 * 1000).unref();
 }

@@ -20,6 +20,7 @@ import ItemSettingsDrawer from "./ItemSettingsDrawer";
 import InsightsTab from "./InsightsTab";
 import CoveragePanel from "./CoveragePanel";
 import NextStepBar, { NextStep } from "./NextStepBar";
+import { useCourseLive } from "./useCourseLive";
 import WeekList from "./WeekList";
 import WeekPeek from "./WeekPeek";
 import { usePrompt } from "../ui/PromptDialog";
@@ -126,6 +127,9 @@ const CourseBuilderPage: React.FC = () => {
   const [moreOpen, setMoreOpen] = useState(false);
   const [peek, setPeek] = useState<{ section: CourseSection; rect: DOMRect } | null>(null);
   const [ask, promptUI] = usePrompt();
+  // A published course is worth watching even while editing: the pill lights up the moment
+  // a student opens something, and takes the teacher to the live list.
+  const { watchers } = useCourseLive(cid, !!data && data.course.status === "PUBLISHED");
   const tab = (search.get("tab") as Tab) || "content";
   const setTab = (t: Tab) => setSearch((p) => { const n = new URLSearchParams(p); if (t === "content") n.delete("tab"); else n.set("tab", t); return n; });
 
@@ -433,6 +437,16 @@ const CourseBuilderPage: React.FC = () => {
           </p>
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
+          {watchers.length > 0 && (
+            <button
+              onClick={() => setTab("insights")}
+              className="inline-flex items-center gap-1.5 min-h-[44px] px-3 rounded-pill el-chip-success text-sm font-semibold"
+              title={`${watchers.map((w) => w.name).join(", ")} — learning now`}
+            >
+              <span className="w-2 h-2 rounded-full bg-success-500 animate-pulse" aria-hidden />
+              {watchers.length} learning now
+            </button>
+          )}
           <button onClick={() => setPreview(true)} className="inline-flex items-center gap-1.5 min-h-[44px] px-3 rounded-pill el-chip text-sm font-medium" title={copy.builder.previewAsStudent}>
             <Smartphone className="w-4 h-4" /> <span className="hidden lg:inline">Preview</span>
           </button>

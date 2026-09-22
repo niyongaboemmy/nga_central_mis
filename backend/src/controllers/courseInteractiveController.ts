@@ -12,6 +12,8 @@ import { sanitizeNoteHtml } from "../utils/sanitizeNoteHtml";
 import { loadItemWithCourse } from "../services/elearning/courseTree";
 import { applyAction, logLearningEvent } from "../services/elearning/courseProgress";
 import { notifyResultReceived } from "../services/elearning/courseNotifications";
+import { recordProgress } from "../services/elearning/livePresence";
+import { UserProfile } from "../db/schema";
 import { normaliseKnowledgeCheck } from "./courseController";
 
 const parseId = (raw: unknown, label = "id"): number => {
@@ -97,6 +99,18 @@ export const submitKnowledgeCheck = asyncHandler(async (req: any, res: any) => {
   if (justCompleted) {
     await logLearningEvent({ actor_user_id: userId, verb: "COMPLETED", object_type: "COURSE_ITEM", object_id: itemId, course_item_id: itemId, context: { via: "KNOWLEDGE_CHECK" } });
     await notifyResultReceived(row.course.course_id, itemId, userId, row.item.title, scorePct);
+  }
+  try {
+    const [p] = await db.select({ first_name: UserProfile.first_name, last_name: UserProfile.last_name }).from(UserProfile).where(eq(UserProfile.user_id, userId)).limit(1);
+    recordProgress(row.course.course_id, {
+      user_id: userId,
+      name: `${p?.first_name || ""} ${p?.last_name || ""}`.trim() || `Student #${userId}`,
+      item_id: itemId, item_title: row.item.title, item_type: row.item.item_type,
+      section_id: row.section.section_id, section_title: row.section.title,
+      verb: justCompleted ? "completed" : "scored", score_pct: scorePct, at: Date.now(),
+    });
+  } catch (err) {
+    logger.warn("live progress failed on knowledge check", { error: err, itemId });
   }
   const passed = row.item.completion_rule === "MIN_SCORE" ? scorePct >= (row.item.min_score_pct ?? 100) : true;
   successResponse(res, "Scored", {
