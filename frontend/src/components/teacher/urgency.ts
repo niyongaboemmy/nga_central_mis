@@ -41,8 +41,13 @@ export interface ActionItem {
   /** How many things this row stands for — drives the badge. */
   count: number;
   title: string;
-  /** Which subjects/classes, for the teacher to recognise it. */
-  detail: string;
+  /**
+   * The individual things this row stands for — one entry per subject/class
+   * or document. Kept as a list rather than a pre-joined sentence so the UI
+   * can render them as chips; joining them here produced a comma-spliced
+   * paragraph that truncated mid-item.
+   */
+  entities: string[];
   /** What actually happens if it is ignored. The "notifying" half. */
   why: string;
   to: string;
@@ -77,8 +82,8 @@ export const weekOfTerm = (
   return Math.floor(days / 7) + 1;
 };
 
-const list = (rows: { subject_name: string; class_group_name: string }[]) =>
-  rows.map((r) => `${r.subject_name} · ${r.class_group_name}`).join(", ");
+const named = (rows: { subject_name: string; class_group_name: string }[]) =>
+  rows.map((r) => `${r.subject_name} · ${r.class_group_name}`);
 
 const plural = (n: number, one: string, many: string) => (n === 1 ? one : many);
 
@@ -104,7 +109,7 @@ export const buildActionItems = (
       severity: "blocking",
       count: rejected.length,
       title: `${rejected.length} ${plural(rejected.length, "scheme", "schemes")} sent back for revision`,
-      detail: list(rejected),
+      entities: named(rejected),
       why:
         rejected[0].validation_comment?.trim() ||
         "Your validator is waiting on the revision before it can be approved.",
@@ -123,7 +128,7 @@ export const buildActionItems = (
       severity: started ? "blocking" : "slipping",
       count: missing.length,
       title: `${missing.length} ${plural(missing.length, "scheme", "schemes")} of work not submitted`,
-      detail: list(missing),
+      entities: named(missing),
       why: started
         ? `Teaching is in week ${week} — lesson notes, plans and courses all hang off the scheme.`
         : "Submit before teaching starts so lesson notes and courses can be built on it.",
@@ -141,7 +146,7 @@ export const buildActionItems = (
       severity: "slipping",
       count: empty.length,
       title: `${empty.length} ${plural(empty.length, "scheme has", "schemes have")} no weeks planned`,
-      detail: list(empty),
+      entities: named(empty),
       why: "An empty scheme cannot be validated and seeds no course content.",
       to: "/scheme-of-work",
       cta: "Add weeks",
@@ -166,12 +171,10 @@ export const buildActionItems = (
       severity: "slipping",
       count: behind.length,
       title: `${behind.length} ${plural(behind.length, "scheme is", "schemes are")} behind the calendar`,
-      detail: behind
-        .map(
-          (s) =>
-            `${s.subject_name} · ${s.class_group_name} (${s.entries_count}/${week} weeks)`,
-        )
-        .join(", "),
+      entities: behind.map(
+        (s) =>
+          `${s.subject_name} · ${s.class_group_name} (${s.entries_count}/${week} weeks)`,
+      ),
       why: `The term is in week ${week}; plan the weeks you have already taught.`,
       to: "/scheme-of-work",
       cta: "Plan",
@@ -184,11 +187,9 @@ export const buildActionItems = (
       severity: "slipping",
       count: data.courses.drafts,
       title: `${data.courses.drafts} e-learning ${plural(data.courses.drafts, "course is", "courses are")} unpublished`,
-      detail: data.courses.recent
+      entities: data.courses.recent
         .filter((c) => c.status === "DRAFT")
-        .map((c) => c.title)
-        .slice(0, 3)
-        .join(", "),
+        .map((c) => c.title),
       why: "Students cannot open the material until the course is published.",
       to: "/elearning/courses",
       cta: "Publish",
@@ -201,10 +202,7 @@ export const buildActionItems = (
       severity: "tidy",
       count: data.lessonNotes.drafts,
       title: `${data.lessonNotes.drafts} lesson ${plural(data.lessonNotes.drafts, "note is", "notes are")} still in draft`,
-      detail: data.lessonNotes.recent_drafts
-        .map((n) => n.title)
-        .slice(0, 3)
-        .join(", "),
+      entities: data.lessonNotes.recent_drafts.map((n) => n.title),
       why: "Drafts are private — publish to share them with your class.",
       to: "/lesson-notes",
       cta: "Finish",

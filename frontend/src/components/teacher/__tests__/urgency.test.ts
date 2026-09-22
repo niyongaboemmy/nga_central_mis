@@ -99,7 +99,11 @@ describe("buildActionItems", () => {
     const items = buildActionItems(overview([scheme({ entries_count: 2 })]), 5);
     const behind = items.find((i) => i.key === "scheme-behind");
     expect(behind?.severity).toBe("slipping");
-    expect(behind?.detail).toContain("2/5 weeks");
+    // One entry per affected class, not a pre-joined sentence — the panel
+    // renders them as chips.
+    expect(behind?.entities).toEqual([
+      "Web3 Applications · L4. Class A (2/5 weeks)",
+    ]);
   });
 
   it("judges nothing as behind when the term has no start date", () => {

@@ -209,24 +209,75 @@ describe("TeacherDashboard", () => {
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
-  it("filters the attention list by severity", async () => {
+  it("offers no tier filter when everything is the same severity", async () => {
+    // Week 3 of term, so both the rejected and the missing scheme are
+    // blocking. A control that can only ever select the one tier present is
+    // decoration, so it isn't rendered.
+    renderPage();
+    await screen.findByText("Needs your attention");
+    expect(
+      screen.queryByRole("button", { name: /^All 2$/ }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /^Blocking/ }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("filters by tier once more than one severity is in play", async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    getTeacherOverview.mockResolvedValue(
+      overview({
+        lessonNotes: {
+          total: 1,
+          drafts: 1,
+          published: 0,
+          recent_drafts: [
+            {
+              note_id: 3,
+              title: "JavaScript Execution",
+              status: "DRAFT",
+              updated_at: null,
+              subject_name: "Web3 Applications",
+              class_group_name: "L4. Class A",
+            },
+          ],
+        },
+      } as Partial<TeacherOverview>),
+    );
     renderPage();
 
-    // Week 3 of term, so the missing scheme is blocking too — and with
-    // nothing in the tidy tier that segment is not offered at all.
     const blockingTab = await screen.findByRole("button", {
       name: /^Blocking 2$/,
     });
     expect(
-      screen.queryByRole("button", { name: /^Tidy up/ }),
-    ).not.toBeInTheDocument();
+      screen.getByRole("button", { name: /^Tidy up 1$/ }),
+    ).toBeInTheDocument();
 
     await user.click(blockingTab);
     expect(blockingTab).toHaveAttribute("aria-pressed", "true");
+    // The tidy row is filtered out; the blocking ones stay.
+    expect(
+      screen.queryByText(/lesson note is still in draft/),
+    ).not.toBeInTheDocument();
     expect(
       screen.getAllByText(/scheme sent back for revision/).length,
     ).toBeGreaterThan(0);
+  });
+
+  it("shows the affected classes as chips, with an overflow count", async () => {
+    renderPage();
+    await screen.findByText("Needs your attention");
+    // Not a comma-spliced sentence that truncates mid-item.
+    expect(
+      screen.getByText("Web Application Development · L3. Class A"),
+    ).toBeInTheDocument();
+  });
+
+  it("renders each row's action without needing a hover", async () => {
+    // A hover-only affordance does not exist on a touch device.
+    renderPage();
+    await screen.findByText("Needs your attention");
+    expect(screen.getAllByText("Revise").length).toBeGreaterThan(0);
   });
 
   it("hides finished periods until asked for them", async () => {
@@ -309,9 +360,7 @@ describe("TeacherDashboard", () => {
   it("says so when nothing is outstanding, and raises no alert", async () => {
     getTeacherOverview.mockResolvedValue(allClear());
     renderPage();
-    expect(
-      await screen.findByText("You're all caught up."),
-    ).toBeInTheDocument();
+    expect(await screen.findByText("You're all caught up")).toBeInTheDocument();
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 

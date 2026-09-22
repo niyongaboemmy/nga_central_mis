@@ -45,14 +45,8 @@ import {
 } from "./TeacherCharts";
 import { coverageRows, subjectLoad, weeklyLoad } from "./analytics";
 import { describeLoadError, type LoadFailure } from "./loadError";
-import {
-  buildActionItems,
-  countsBySeverity,
-  SEVERITY_LABEL,
-  weekOfTerm,
-  type ActionItem,
-  type Severity,
-} from "./urgency";
+import AttentionPanel from "./AttentionPanel";
+import { buildActionItems, countsBySeverity, weekOfTerm } from "./urgency";
 
 // ─── Teacher Dashboard ──────────────────────────────────────────────────────
 // The teacher's working board. Three questions, in the order a teacher
@@ -113,27 +107,6 @@ const relativeDate = (value: string | null) => {
 };
 
 const fallbackColor = "#3B82F6";
-
-const SEVERITY_STYLE: Record<
-  Severity,
-  { chip: string; rail: string; row: string }
-> = {
-  blocking: {
-    chip: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300",
-    rail: "bg-red-500",
-    row: "border-red-200 dark:border-red-900/40 bg-red-50/60 dark:bg-red-900/10 hover:bg-red-50 dark:hover:bg-red-900/20",
-  },
-  slipping: {
-    chip: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300",
-    rail: "bg-amber-500",
-    row: "border-amber-200 dark:border-amber-900/40 bg-amber-50/60 dark:bg-amber-900/10 hover:bg-amber-50 dark:hover:bg-amber-900/20",
-  },
-  tidy: {
-    chip: "bg-slate-100 text-slate-600 dark:bg-slate-700/40 dark:text-slate-300",
-    rail: "bg-slate-400",
-    row: "border-border-light dark:border-border-dark/50 hover:bg-surface-light dark:hover:bg-surface-dark",
-  },
-};
 
 // ─── Building blocks ────────────────────────────────────────────────────────
 
@@ -355,38 +328,6 @@ const LessonRow: React.FC<{
   );
 };
 
-const ActionRow: React.FC<{ item: ActionItem }> = ({ item }) => {
-  const style = SEVERITY_STYLE[item.severity];
-  return (
-    <Link
-      to={item.to}
-      className={`group flex gap-3 rounded-2xl border p-3 transition-all duration-200 hover:-translate-y-0.5 ${style.row}`}
-    >
-      <span
-        className={`w-1 self-stretch rounded-full flex-shrink-0 ${style.rail}`}
-        aria-hidden
-      />
-      <div className="min-w-0 flex-1">
-        <div className="flex items-start justify-between gap-2">
-          <p className="text-sm font-semibold text-text-primary-light dark:text-text-primary-dark">
-            {item.title}
-          </p>
-          <span className="flex-shrink-0 inline-flex items-center gap-1 text-xs font-medium text-blue-600 dark:text-blue-400 opacity-0 transition-opacity group-hover:opacity-100">
-            {item.cta}
-            <ArrowRight className="w-3.5 h-3.5" />
-          </span>
-        </div>
-        <p className="mt-0.5 text-xs text-text-secondary-light dark:text-text-secondary-dark line-clamp-2">
-          {item.detail}
-        </p>
-        <p className="mt-1 text-[11px] italic text-text-secondary-light dark:text-text-secondary-dark line-clamp-2">
-          {item.why}
-        </p>
-      </div>
-    </Link>
-  );
-};
-
 // ─── Page ───────────────────────────────────────────────────────────────────
 
 const TeacherDashboard: React.FC = () => {
@@ -401,7 +342,6 @@ const TeacherDashboard: React.FC = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<LoadFailure | null>(null);
   const [loadedAt, setLoadedAt] = useState<Date | null>(null);
-  const [severityFilter, setSeverityFilter] = useState<Severity | "all">("all");
   const [showCompleted, setShowCompleted] = useState(false);
   const [alertDismissed, setAlertDismissed] = useState(false);
   const loadRef = useRef<(background?: boolean) => void>(() => {});
@@ -494,10 +434,6 @@ const TeacherDashboard: React.FC = () => {
   );
   const counts = useMemo(() => countsBySeverity(actionItems), [actionItems]);
   const blocking = actionItems.filter((i) => i.severity === "blocking");
-  const visibleItems =
-    severityFilter === "all"
-      ? actionItems
-      : actionItems.filter((i) => i.severity === severityFilter);
 
   const coverage = useMemo(
     () => (data ? coverageRows(data.schemes.rows, week) : []),
@@ -895,73 +831,7 @@ const TeacherDashboard: React.FC = () => {
           )}
         </Card>
 
-        {/* Needs your attention */}
-        <Card className="flex flex-col">
-          <CardHeader
-            icon={<AlertOctagon className="w-4 h-4" />}
-            title="Needs your attention"
-            subtitle={
-              actionItems.length === 0
-                ? "Nothing outstanding"
-                : `${counts.blocking} blocking · ${counts.slipping} slipping · ${counts.tidy} to tidy`
-            }
-          />
-
-          {actionItems.length > 0 && (
-            <div className="px-5 pb-3 flex flex-wrap gap-1.5">
-              {(["all", "blocking", "slipping", "tidy"] as const)
-                .filter(
-                  (key) =>
-                    key === "all" ||
-                    actionItems.some((i) => i.severity === key),
-                )
-                .map((key) => {
-                  const active = severityFilter === key;
-                  const count =
-                    key === "all"
-                      ? counts.blocking + counts.slipping + counts.tidy
-                      : counts[key];
-                  return (
-                    <button
-                      key={key}
-                      onClick={() => setSeverityFilter(key)}
-                      aria-pressed={active}
-                      className={`rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors ${
-                        active
-                          ? "bg-blue-600 text-white"
-                          : key === "all"
-                            ? "bg-surface-light dark:bg-surface-dark text-text-secondary-light dark:text-text-secondary-dark hover:text-text-primary-light dark:hover:text-text-primary-dark"
-                            : SEVERITY_STYLE[key].chip
-                      }`}
-                    >
-                      {key === "all" ? "All" : SEVERITY_LABEL[key]} {count}
-                    </button>
-                  );
-                })}
-            </div>
-          )}
-
-          <div className="px-5 pb-5 flex-1">
-            {actionItems.length === 0 ? (
-              <div className="h-full grid place-items-center py-8 text-center">
-                <div>
-                  <CheckCircle2 className="w-8 h-8 mx-auto text-green-500" />
-                  <p className="mt-2 text-sm text-text-secondary-light dark:text-text-secondary-dark">
-                    You're all caught up.
-                  </p>
-                </div>
-              </div>
-            ) : (
-              <ul className="space-y-2">
-                {visibleItems.map((item) => (
-                  <li key={item.key}>
-                    <ActionRow item={item} />
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-        </Card>
+        <AttentionPanel items={actionItems} counts={counts} />
       </div>
 
       {/* ── KPIs ───────────────────────────────────────────────────────── */}
