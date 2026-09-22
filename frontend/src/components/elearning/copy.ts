@@ -93,6 +93,10 @@ export const copy = {
     content: "Content",
     settings: "Settings",
     noteDraftHint: "Students can't open this note until it's published.",
+    // A lesson note's alignment is stored on the note (LessonNoteCriteria), and the course
+    // item API refuses to set it — so the brief's criteria are read-only for a note.
+    criteriaLockedOnNote:
+      "A lesson note carries its own performance criteria, so they can't be ticked here — set them on the note and they'll show up in this list.",
     publishNote: "Publish note",
     reseed: "Pull in new notes & materials",
     nudge: "Nudge",

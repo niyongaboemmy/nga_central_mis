@@ -52,6 +52,7 @@ import {
   displayDayToBackend,
   backendDayToDisplay,
 } from "./calendar";
+import { useConfirm } from "../contexts/ConfirmContext";
 
 interface AcademicCalendarProps {
   isAdminView?: boolean;
@@ -66,6 +67,7 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({
 }) => {
   const { user } = useUser();
   const { showToast } = useToast();
+  const confirm = useConfirm();
 
   // Check permissions
   const canManageCalendar = user?.roles?.some((role) =>
@@ -714,7 +716,14 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({
   };
 
   const handleActivityDelete = async (id: number) => {
-    if (!confirm("Are you sure you want to delete this activity?")) return;
+    if (
+      !(await confirm({
+        title: "Delete this activity?",
+        message: "It disappears from the academic calendar for everyone.",
+        confirmText: "Delete activity",
+      }))
+    )
+      return;
     try {
       setIsDeletingActivity(true);
       await deleteCalendarActivity(id);
@@ -899,7 +908,14 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({
 
   // Handle deleting slot
   const handleDelete = async (id: number) => {
-    if (!confirm("Are you sure you want to delete this slot?")) return;
+    if (
+      !(await confirm({
+        title: "Delete this calendar slot?",
+        message: "The lesson disappears from every timetable built on this slot.",
+        confirmText: "Delete slot",
+      }))
+    )
+      return;
     try {
       setIsDeletingSlot(true);
       await deleteCalendarSlot(id);

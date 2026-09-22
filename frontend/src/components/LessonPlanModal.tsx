@@ -29,6 +29,7 @@ import {
 import { LessonPlan, lessonPlanApi } from "../api/lessonPlan";
 import { useToast } from "../contexts/ToastContext";
 import LessonPlanAIGenerate from "./LessonPlanAIGenerate";
+import { useConfirm } from "../contexts/ConfirmContext";
 
 interface WeekdayDefault {
   start_time: string;
@@ -76,6 +77,7 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
   instructorName,
 }) => {
   const { showToast } = useToast();
+  const confirm = useConfirm();
   const [activeTab, setActiveTab] = useState<TabType>("Header");
   const [loading, setLoading] = useState(false);
   const [mode, setMode] = useState<ModalMode>(initialData ? "manual" : "choose");
@@ -251,12 +253,19 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
   // A close request (backdrop click, X button, Escape) checks for unsaved
   // work first — losing a half-written lesson plan silently is the single
   // most frustrating thing this modal could do to a teacher.
-  const requestClose = useCallback(() => {
-    if (isDirty && !window.confirm("You have unsaved changes. Discard them?")) {
-      return;
+  const requestClose = useCallback(async () => {
+    if (isDirty) {
+      const discard = await confirm({
+        title: "Discard your changes?",
+        message: "This lesson plan has edits that haven't been saved.",
+        confirmText: "Discard",
+        cancelText: "Keep editing",
+        tone: "warning",
+      });
+      if (!discard) return;
     }
     onClose();
-  }, [isDirty, onClose]);
+  }, [isDirty, onClose, confirm]);
 
   // Esc closes (with the unsaved-changes guard); Cmd/Ctrl+S saves without
   // needing to reach for the sidebar button.
@@ -430,7 +439,13 @@ const LessonPlanModal: React.FC<LessonPlanModalProps> = ({
 
   const handleDelete = async () => {
     if (!initialData?.id) return;
-    if (!window.confirm("Are you sure you want to delete this lesson plan?"))
+    if (
+      !(await confirm({
+        title: "Delete this lesson plan?",
+        message: "The plan and everything written in it are removed from this week.",
+        confirmText: "Delete plan",
+      }))
+    )
       return;
 
     setLoading(true);

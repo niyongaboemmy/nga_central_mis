@@ -27,6 +27,7 @@ import {
   attachImageTokenToJson,
   attachImageTokenToHtml,
 } from "../../utils/lessonNoteImages";
+import { useConfirm } from "../../contexts/ConfirmContext";
 
 const AUTOSAVE_DELAY_MS = 1500;
 
@@ -40,6 +41,7 @@ const LessonNoteEditorPage: React.FC = () => {
   const noteId = Number(id);
   const navigate = useNavigate();
   const { showToast } = useToast();
+  const askConfirm = useConfirm();
 
   const [note, setNote] = useState<LessonNoteDetail | null>(null);
   const [title, setTitle] = useState("");
@@ -213,12 +215,16 @@ const LessonNoteEditorPage: React.FC = () => {
     return () => window.removeEventListener("beforeunload", onBeforeUnload);
   }, []);
 
-  const handleBackToNotes = () => {
+  const handleBackToNotes = async () => {
     if (pendingContent.current) {
-      const confirmed = window.confirm(
-        "You have unsaved changes. Leave anyway?",
-      );
-      if (!confirmed) return;
+      const leave = await askConfirm({
+        title: "Leave without saving?",
+        message: "This note has edits that haven't been written yet.",
+        confirmText: "Leave",
+        cancelText: "Stay and save",
+        tone: "warning",
+      });
+      if (!leave) return;
     }
     navigate("/lesson-notes");
   };

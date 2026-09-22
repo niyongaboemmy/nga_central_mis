@@ -46,6 +46,7 @@ import {
   getServerStatus,
   generateSqlWithAI,
 } from "../api/database";
+import { useConfirm } from "../contexts/ConfirmContext";
 
 const ModernCard: React.FC<{ children: React.ReactNode; className?: string }> = ({
   children,
@@ -178,6 +179,7 @@ const DatabaseManagement: React.FC = () => {
   const { user, isLoading } = useUser();
   const { hasPermission } = usePermissions();
   const { showToast } = useToast();
+  const confirm = useConfirm();
 
   const [expiresAt, setExpiresAt] = useState<number | null>(null);
   const [now, setNow] = useState(Date.now());
@@ -310,7 +312,15 @@ const DatabaseManagement: React.FC = () => {
 
   const handleDeleteRow = async (row: any) => {
     if (!selectedTable || !primaryKeyColumn) return;
-    if (!window.confirm("Delete this row? This cannot be undone.")) return;
+    if (
+      !(await confirm({
+        title: "Delete this row?",
+        message: `This writes straight to the ${selectedTable} table.`,
+        details: ["There is no undo, and no backup is taken first."],
+        confirmText: "Delete row",
+      }))
+    )
+      return;
     try {
       await deleteRow(selectedTable, { [primaryKeyColumn]: row[primaryKeyColumn] });
       showToast("Row deleted", "success");

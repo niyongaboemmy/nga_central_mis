@@ -1,10 +1,23 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Info, Maximize2, Minimize2, Plus, Sparkles, Trash2, Wand2, X } from "lucide-react";
+import {
+  ChevronDown,
+  Eye,
+  EyeOff,
+  Info,
+  Maximize2,
+  Minimize2,
+  Plus,
+  Sparkles,
+  Trash2,
+  Wand2,
+  X,
+} from "lucide-react";
 import { CompletionRule, CourseItem, CurriculumOutcomePick, elearningApi, isTimeout } from "../../../api/elearning";
 import { lessonNotesApi } from "../../../api/lessonNotes";
 import { apiService } from "../../../services/api";
 import { useToast } from "../../../contexts/ToastContext";
+import { useConfirm } from "../../../contexts/ConfirmContext";
 import { copy } from "../copy";
 import { useMotion } from "../../../design/motion";
 import LessonNoteRichEditor from "../../lessonNotes/LessonNoteRichEditor";
@@ -55,12 +68,29 @@ const Field: React.FC<{ label: string; hint?: string; children: React.ReactNode 
 );
 const input = "el-input";
 
+/** The metadata fields a teacher can change here, as one comparable string. Page/quiz bodies
+ *  are deliberately left out: their editors emit an onChange on mount, which would report a
+ *  drawer as "changed" the moment it opened. */
+const metaSignature = (v: {
+  title: string;
+  description: string;
+  rule: CompletionRule;
+  minScore: number;
+  required: boolean;
+  published: boolean;
+  minutes: string;
+  dueAt: string;
+  criteriaIds: number[];
+  url: string;
+}) => JSON.stringify({ ...v, criteriaIds: [...v.criteriaIds].sort((a, b) => a - b) });
+
 /**
  * Right drawer: completion rule as plain words, required, due date, minutes, criteria chips;
  * type-specific bodies (page editor, video/link URL, knowledge-check questions).
  */
 const ItemSettingsDrawer: React.FC<Props> = ({ item, curriculum, onClose, onSave, onDelete, onNotePublished }) => {
   const { showToast } = useToast();
+  const confirm = useConfirm();
   const m = useMotion();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -84,6 +114,12 @@ const ItemSettingsDrawer: React.FC<Props> = ({ item, curriculum, onClose, onSave
   const [aiInstruction, setAiInstruction] = useState("");
   const [writingPage, setWritingPage] = useState(false);
   const [pageKey, setPageKey] = useState(0);
+  // Everything below "Basics" is optional and already has a sensible default, so a first-time
+  // teacher shouldn't have to read past it. It opens by itself when the item already carries a
+  // non-default setting, so existing configuration is never hidden from the person who set it.
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+  // The values as loaded, so the drawer can tell "changed" from "opened and read".
+  const [baseline, setBaseline] = useState<string>("");
 
   useEffect(() => {
     if (!item) return;
@@ -102,6 +138,27 @@ const ItemSettingsDrawer: React.FC<Props> = ({ item, curriculum, onClose, onSave
     setQuestions(item.content_json?.questions || []);
     setAiInstruction("");
     setContext(null);
+    const nonDefault =
+      (item.completion_rule !== "VIEW" && item.completion_rule !== "NONE") ||
+      !item.is_required ||
+      !!item.estimated_minutes ||
+      !!item.due_at ||
+      item.criteria.length > 0;
+    setAdvancedOpen(nonDefault);
+    setBaseline(
+      metaSignature({
+        title: item.title,
+        description: item.description || "",
+        rule: item.completion_rule === "NONE" ? "VIEW" : item.completion_rule,
+        minScore: item.min_score_pct ?? 70,
+        required: !!item.is_required,
+        published: !!item.is_published,
+        minutes: item.estimated_minutes ? String(item.estimated_minutes) : "",
+        dueAt: toLocalInput(item.due_at),
+        criteriaIds: item.criteria.map((c) => c.criteria_id),
+        url: item.content_json?.url || item.external_url || "",
+      }),
+    );
     apiService
       .get(`/elearning/items/${item.item_id}/context`)
       .then((r) => setContext(r.data.data))
@@ -113,6 +170,12 @@ const ItemSettingsDrawer: React.FC<Props> = ({ item, curriculum, onClose, onSave
     curriculum.forEach((o) => o.criteria.forEach((c) => map.set(c.criteria_id, { number: c.criteria_number, description: c.description, element: o.element_number })));
     return map;
   }, [curriculum]);
+
+  const current = metaSignature({ title, description, rule, minScore, required, published, minutes, dueAt, criteriaIds, url });
+  // A body editor (page, quick check) has no reliable dirty signal, so those types always
+  // allow a save rather than blocking one the teacher expects to work.
+  const hasBody = !!item && ["PAGE", "KNOWLEDGE_CHECK"].includes(item.item_type);
+  const isDirty = !!baseline && (current !== baseline || hasBody);
 
   if (!item) return null;
   const isHeader = item.item_type === "HEADER";
@@ -218,6 +281,56 @@ const ItemSettingsDrawer: React.FC<Props> = ({ item, curriculum, onClose, onSave
 
   const typeLabel = copy.builder.itemTypes[item.item_type];
 
+  /** Closing with unsaved edits used to discard them without a word. */
+  const requestClose = async () => {
+    if (!isDirty) return onClose();
+    const ok = await confirm({
+      title: "Discard your changes?",
+      message: `"${title || typeLabel}" has edits that haven't been saved.`,
+      confirmText: "Discard",
+      cancelText: "Keep editing",
+      tone: "warning",
+    });
+    if (ok) onClose();
+  };
+
+  const requestDelete = async () => {
+    const ok = await confirm({
+      title: `Remove "${title || typeLabel}"?`,
+      message: (
+        <>
+          This takes the {typeLabel.toLowerCase()} off{" "}
+          <strong>{context?.week_number || "this week"}</strong>. Students lose access to it and
+          any progress recorded against it.
+        </>
+      ),
+      details: isNote
+        ? ["The lesson note itself is kept — only its place on the course is removed."]
+        : ["The content is deleted with the item.", "This cannot be undone."],
+      confirmText: "Remove from the week",
+      tone: "danger",
+    });
+    if (!ok) return;
+    try {
+      await onDelete(item.item_id);
+      showToast(`"${title || typeLabel}" removed from ${context?.week_number || "the week"}`, "success");
+      onClose();
+    } catch (e: any) {
+      showToast(e?.response?.data?.message || "Couldn't remove this item", "error");
+    }
+  };
+
+  /** What the collapsed "More settings" block currently holds, in plain words. */
+  const advancedSummary = [
+    copy.builder.completionRules[rule],
+    required ? "required" : "optional",
+    minutes ? `${minutes} min` : null,
+    dueAt ? "has a due date" : null,
+    !isNote && criteriaIds.length ? `${criteriaIds.length} criteria` : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
   return (
     <AnimatePresence>
       <motion.div
@@ -225,7 +338,7 @@ const ItemSettingsDrawer: React.FC<Props> = ({ item, curriculum, onClose, onSave
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        onClick={onClose}
+        onClick={requestClose}
       >
         <motion.aside
           initial={{ y: 24, opacity: 0, scale: 0.99 }}
@@ -234,7 +347,7 @@ const ItemSettingsDrawer: React.FC<Props> = ({ item, curriculum, onClose, onSave
           transition={{ type: "spring", stiffness: 380, damping: 36 }}
           onClick={(e) => e.stopPropagation()}
           onKeyDown={(e) => {
-            if (e.key === "Escape") onClose();
+            if (e.key === "Escape") requestClose();
             if ((e.metaKey || e.ctrlKey) && e.key === "s") {
               e.preventDefault();
               save();
@@ -254,9 +367,16 @@ const ItemSettingsDrawer: React.FC<Props> = ({ item, curriculum, onClose, onSave
             </span>
             <div className="min-w-0 flex-1">
               <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">{title || typeLabel}</p>
-              <p className="text-[11px] text-gray-500 dark:text-gray-400">
-                {typeLabel}
-                {context?.week_number ? ` · ${context.week_number}` : ""}
+              <p className="text-[11px] text-gray-500 dark:text-gray-400 flex items-center gap-1.5">
+                <span className="truncate">
+                  {typeLabel}
+                  {context?.week_number ? ` · ${context.week_number}` : ""}
+                </span>
+                {isDirty && !hasBody && (
+                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-400/15 flex-shrink-0">
+                    Unsaved
+                  </span>
+                )}
               </p>
             </div>
             {context && (
@@ -272,7 +392,7 @@ const ItemSettingsDrawer: React.FC<Props> = ({ item, curriculum, onClose, onSave
             <button onClick={() => setWide((w) => !w)} className="hidden sm:flex w-10 h-10 items-center justify-center rounded-xl el-chip" aria-label={wide ? "Shrink" : "Full screen"}>
               {wide ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
             </button>
-            <button onClick={onClose} className="w-10 h-10 flex items-center justify-center rounded-xl text-gray-400 hover:bg-gray-100 dark:hover:bg-white/[0.06]" aria-label="Close">
+            <button onClick={requestClose} className="w-10 h-10 flex items-center justify-center rounded-xl text-gray-400 hover:bg-gray-100 dark:hover:bg-white/[0.06]" aria-label="Close">
               <X className="w-4 h-4" />
             </button>
           </div>
@@ -285,6 +405,9 @@ const ItemSettingsDrawer: React.FC<Props> = ({ item, curriculum, onClose, onSave
                 context={context}
                 selectedCriteria={criteriaIds}
                 onToggleCriterion={isNote ? undefined : (id) => setCriteriaIds((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]))}
+                lockedReason={isNote ? copy.builder.criteriaLockedOnNote : undefined}
+                onOpenSource={isNote && item.ref_id ? () => window.open(`/lesson-notes/${item.ref_id}`, "_blank", "noopener") : undefined}
+                openSourceLabel="Open the note to set them"
               />
             </aside>
           )}
@@ -301,6 +424,9 @@ const ItemSettingsDrawer: React.FC<Props> = ({ item, curriculum, onClose, onSave
                     context={context}
                     selectedCriteria={criteriaIds}
                     onToggleCriterion={isNote ? undefined : (id) => setCriteriaIds((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]))}
+                    lockedReason={isNote ? copy.builder.criteriaLockedOnNote : undefined}
+                    onOpenSource={isNote && item.ref_id ? () => window.open(`/lesson-notes/${item.ref_id}`, "_blank", "noopener") : undefined}
+                    openSourceLabel="Open the note to set them"
                   />
                 </div>
               </motion.div>
@@ -311,6 +437,50 @@ const ItemSettingsDrawer: React.FC<Props> = ({ item, curriculum, onClose, onSave
             <Field label="Title">
               <input className={input} value={title} onChange={(e) => setTitle(e.target.value)} />
             </Field>
+
+            {/* The one setting with a visible consequence, said in a sentence rather than
+                left as an unlabelled checkbox among five others. */}
+            <button
+              type="button"
+              onClick={() => setPublished((p) => !p)}
+              aria-pressed={published}
+              className={`w-full flex items-center gap-3 p-3 rounded-2xl border text-left transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/50 ${
+                published
+                  ? "border-success-500/40 bg-success-100/60 dark:bg-success-500/10"
+                  : "border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/[0.03]"
+              }`}
+            >
+              <span
+                className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                  published
+                    ? "bg-success-500/15 text-success-700 dark:text-success-500"
+                    : "bg-gray-200 dark:bg-white/[0.08] text-gray-500 dark:text-gray-400"
+                }`}
+              >
+                {published ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-semibold text-gray-900 dark:text-white">
+                  {published ? "Students can see this" : "Hidden from students"}
+                </span>
+                <span className="block text-[11px] text-gray-500 dark:text-gray-400">
+                  {published
+                    ? "It appears in the week as soon as the week is published."
+                    : "Only you can see it while you finish it off."}
+                </span>
+              </span>
+              <span
+                className={`w-11 h-6 rounded-full flex-shrink-0 relative transition-colors ${
+                  published ? "bg-success-500" : "bg-gray-300 dark:bg-white/20"
+                }`}
+              >
+                <span
+                  className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-all ${
+                    published ? "left-[22px]" : "left-0.5"
+                  }`}
+                />
+              </span>
+            </button>
 
             {isNote && item.ref?.status === "DRAFT" && (
               <div className="flex items-center gap-3 p-3 rounded-xl el-chip-warning text-sm">
@@ -446,7 +616,38 @@ const ItemSettingsDrawer: React.FC<Props> = ({ item, curriculum, onClose, onSave
             )}
 
             {!isHeader && (
-              <>
+              <div className="rounded-2xl border border-gray-200 dark:border-white/10 overflow-hidden">
+                {/* Every setting below has a working default. Collapsed, a first-time teacher
+                    sees Title → visibility → content and nothing else to decide. */}
+                <button
+                  type="button"
+                  onClick={() => setAdvancedOpen((o) => !o)}
+                  aria-expanded={advancedOpen}
+                  className="w-full flex items-center gap-2 px-3.5 py-3 text-left hover:bg-gray-50 dark:hover:bg-white/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/50 transition-colors"
+                >
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm font-semibold text-gray-800 dark:text-gray-100">
+                      More settings
+                    </span>
+                    <span className="block text-[11px] text-gray-500 dark:text-gray-400 truncate">
+                      {advancedSummary}
+                    </span>
+                  </span>
+                  <ChevronDown
+                    className={`w-4 h-4 text-gray-400 flex-shrink-0 transition-transform ${advancedOpen ? "rotate-180" : ""}`}
+                  />
+                </button>
+
+                <AnimatePresence initial={false}>
+                  {advancedOpen && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: "auto", opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+                      className="overflow-hidden"
+                    >
+                      <div className="px-3.5 pb-4 pt-1 space-y-4 border-t border-gray-100 dark:border-white/[0.06]">
                 <div>
                   <span className="block text-[11px] uppercase tracking-wider font-semibold text-gray-500 dark:text-gray-400 mb-1">Counts as done when the student…</span>
                   <div className="grid grid-cols-2 gap-1.5" role="radiogroup" aria-label="Completion rule">
@@ -481,19 +682,16 @@ const ItemSettingsDrawer: React.FC<Props> = ({ item, curriculum, onClose, onSave
                   </Field>
                 </div>
 
-                <label className="flex items-center justify-between min-h-[44px]">
-                  <span className="text-sm text-gray-800 dark:text-gray-100">Required to finish the week</span>
-                  <input type="checkbox" checked={required} onChange={(e) => setRequired(e.target.checked)} className="w-5 h-5 accent-brand-500" />
+                <label className="flex items-start justify-between gap-3 min-h-[44px] cursor-pointer">
+                  <span className="min-w-0">
+                    <span className="block text-sm text-gray-800 dark:text-gray-100">Required to finish the week</span>
+                    <span className="block text-[11px] text-gray-500 dark:text-gray-400">
+                      Untick for extra reading a student can skip.
+                    </span>
+                  </span>
+                  <input type="checkbox" checked={required} onChange={(e) => setRequired(e.target.checked)} className="w-5 h-5 accent-brand-500 flex-shrink-0 mt-0.5" />
                 </label>
-              </>
-            )}
 
-            <label className="flex items-center justify-between min-h-[44px]">
-              <span className="text-sm text-gray-800 dark:text-gray-100">Visible to students</span>
-              <input type="checkbox" checked={published} onChange={(e) => setPublished(e.target.checked)} className="w-5 h-5 accent-brand-500" />
-            </label>
-
-            {!isHeader && (
               <div>
                 <div className="flex items-center justify-between mb-1">
                   <span className="text-[11px] uppercase tracking-wider font-semibold text-gray-500 dark:text-gray-400">Performance criteria</span>
@@ -536,18 +734,34 @@ const ItemSettingsDrawer: React.FC<Props> = ({ item, curriculum, onClose, onSave
                   <p className="mt-1 text-[11px] text-gray-500">{criteriaIds.map((id) => criteriaById.get(id)?.number).filter(Boolean).join(", ")}</p>
                 )}
               </div>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
             )}
           </div>
 
           </div>
 
           <div className="flex items-center gap-2 px-4 py-3 border-t border-gray-100 dark:border-white/[0.06] flex-shrink-0">
-            <button onClick={() => onDelete(item.item_id).then(onClose)} className="inline-flex items-center gap-1 min-h-[44px] px-3 rounded-pill text-sm text-danger-700 dark:text-danger-500 hover:bg-danger-100">
+            <button
+              onClick={requestDelete}
+              className="inline-flex items-center gap-1 min-h-[44px] px-3 rounded-pill text-sm text-danger-700 dark:text-danger-500 hover:bg-danger-100 dark:hover:bg-danger-500/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-danger-500/50 transition-colors"
+            >
               <Trash2 className="w-4 h-4" /> Remove
             </button>
             <span className="flex-1" />
-            <button onClick={onClose} className="min-h-[44px] px-4 rounded-pill text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/[0.06]">Cancel</button>
-            <button onClick={save} disabled={saving} className="min-h-[44px] px-5 rounded-pill bg-brand-500 hover:bg-brand-600 text-white text-sm font-semibold shadow-soft disabled:opacity-50">
+            {isDirty && !hasBody && (
+              <span className="hidden sm:inline text-[11px] text-gray-400 mr-1">Unsaved changes</span>
+            )}
+            <button onClick={requestClose} className="min-h-[44px] px-4 rounded-pill text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-400/50 transition-colors">Cancel</button>
+            <button
+              onClick={save}
+              disabled={saving || !isDirty}
+              title={isDirty ? "Save (⌘S)" : "Nothing has changed yet"}
+              className="min-h-[44px] px-5 rounded-pill bg-brand-500 hover:bg-brand-600 text-white text-sm font-semibold shadow-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/50 transition-all disabled:opacity-50"
+            >
               {saving ? "Saving…" : "Save"}
             </button>
           </div>

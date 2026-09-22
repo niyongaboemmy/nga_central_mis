@@ -29,6 +29,7 @@ import usePermissions from "../../hooks/usePermissions";
 import { Permissions } from "../../constants/permissions";
 import CompetencyFormModal from "./CompetencyFormModal";
 import ImportCurriculumModal from "./ImportCurriculumModal";
+import { useConfirm } from "../../contexts/ConfirmContext";
 
 interface CurriculumTabProps {
   subjectId: number;
@@ -44,6 +45,7 @@ interface InlineCriteriaForm {
 
 const CurriculumTab: React.FC<CurriculumTabProps> = ({ subjectId, subjectName }) => {
   const { showToast } = useToast();
+  const askConfirm = useConfirm();
   const { hasPermission } = usePermissions();
   const canManage = hasPermission(Permissions.MANAGE_CURRICULUM);
   const { selectedYearId } = useAcademicPeriod();
@@ -113,7 +115,14 @@ const CurriculumTab: React.FC<CurriculumTabProps> = ({ subjectId, subjectName })
   };
 
   const handleDeleteCompetency = async (competency: SubjectCompetency) => {
-    if (!window.confirm(`Delete "${competency.title}" and all its criteria?`))
+    if (
+      !(await askConfirm({
+        title: `Delete "${competency.title}"?`,
+        message: "Every performance criterion under this learning outcome goes with it.",
+        details: ["Scheme weeks and course items aligned to those criteria lose the link."],
+        confirmText: "Delete outcome",
+      }))
+    )
       return;
     setDeletingCompetencyId(competency.competency_id);
     try {
@@ -221,7 +230,14 @@ const CurriculumTab: React.FC<CurriculumTabProps> = ({ subjectId, subjectName })
     competencyId: number,
     criteriaId: number,
   ) => {
-    if (!window.confirm("Delete this performance criteria?")) return;
+    if (
+      !(await askConfirm({
+        title: "Delete this performance criterion?",
+        message: "Anything currently aligned to it loses that alignment.",
+        confirmText: "Delete criterion",
+      }))
+    )
+      return;
     setDeletingCriteriaId(criteriaId);
     try {
       await criteriaApi.delete(criteriaId);

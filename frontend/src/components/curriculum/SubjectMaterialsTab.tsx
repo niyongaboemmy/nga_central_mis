@@ -30,6 +30,7 @@ import usePermissions from "../../hooks/usePermissions";
 import { Permissions } from "../../constants/permissions";
 import CategoryFormModal from "./CategoryFormModal";
 import DocumentPreviewModal from "../documents/DocumentPreviewModal";
+import { useConfirm } from "../../contexts/ConfirmContext";
 
 interface SubjectMaterialsTabProps {
   subjectId: number;
@@ -58,6 +59,7 @@ const SubjectMaterialsTab: React.FC<SubjectMaterialsTabProps> = ({
   subjectId,
 }) => {
   const { showToast } = useToast();
+  const confirm = useConfirm();
   const { hasPermission } = usePermissions();
   const canManage = hasPermission(Permissions.MANAGE_CURRICULUM);
   const canUpload = hasPermission(Permissions.UPLOAD_SUBJECT_DOCUMENTS);
@@ -149,9 +151,12 @@ const SubjectMaterialsTab: React.FC<SubjectMaterialsTabProps> = ({
 
   const handleDeleteCategory = async (cat: SubjectDocCategory) => {
     if (
-      !window.confirm(
-        `Delete category "${cat.name}" and all ${cat.document_count} document(s) inside?`,
-      )
+      !(await confirm({
+        title: `Delete the "${cat.name}" category?`,
+        message: `The ${cat.document_count} document${cat.document_count === 1 ? "" : "s"} inside go with it.`,
+        details: ["Students lose access to those files immediately."],
+        confirmText: "Delete category",
+      }))
     )
       return;
     setDeletingCatId(cat.category_id);
@@ -347,7 +352,14 @@ const SubjectMaterialsTab: React.FC<SubjectMaterialsTabProps> = ({
   };
 
   const handleDeleteDocument = async (doc: SubjectDoc) => {
-    if (!window.confirm(`Delete "${doc.original_name}"?`)) return;
+    if (
+      !(await confirm({
+        title: "Delete this material?",
+        message: `"${doc.original_name}" is removed from the subject and from any course that links to it.`,
+        confirmText: "Delete file",
+      }))
+    )
+      return;
     setDeletingDocId(doc.document_id);
     try {
       await subjectDocumentsApi.delete(doc.document_id);

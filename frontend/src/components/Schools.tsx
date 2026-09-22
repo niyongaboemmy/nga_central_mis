@@ -42,6 +42,7 @@ import {
   RoleAssignment,
 } from "../api/systems";
 import { getRoles, Role } from "../api/users";
+import { useConfirm } from "../contexts/ConfirmContext";
 
 // Modern School Card Component
 const SchoolCard = ({
@@ -961,6 +962,7 @@ const Schools = () => {
   const [configModalOpen, setConfigModalOpen] = useState(false);
   const [selectedSchool, setSelectedSchool] = useState<School | null>(null);
   const { showToast } = useToast();
+  const confirm = useConfirm();
   const { user } = useUser();
 
   // Basic permission check - ideally use MANAGE_SCHOOLS check
@@ -999,7 +1001,14 @@ const Schools = () => {
   };
 
   const handleDelete = async (id: number) => {
-    if (!window.confirm("Are you sure you want to deactivate this school?"))
+    if (
+      !(await confirm({
+        title: "Deactivate this school?",
+        message: "Its users lose access until it is reactivated. Nothing is deleted.",
+        confirmText: "Deactivate",
+        tone: "warning",
+      }))
+    )
       return;
     try {
       await deleteSchool(id);

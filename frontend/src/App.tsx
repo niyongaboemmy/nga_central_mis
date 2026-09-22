@@ -19,6 +19,7 @@ import SystemLayout from "./components/SystemLayout";
 import { useUser } from "./contexts/UserContext";
 import { ToastProvider, useToast } from "./contexts/ToastContext";
 import { NotificationProvider } from "./contexts/NotificationContext";
+import { ConfirmProvider } from "./contexts/ConfirmContext";
 import { ToastStore } from "./services/api";
 import "./App.css";
 import Documents from "./components/documents/Documents";
@@ -254,6 +255,7 @@ function App() {
     <ToastProvider>
       <ToastInitializer>
         <NotificationProvider>
+        <ConfirmProvider>
         <MetadataProvider>
           <AcademicPeriodProvider>
           <Router basename="/">
@@ -818,6 +820,7 @@ function App() {
         </Router>
         </AcademicPeriodProvider>
       </MetadataProvider>
+        </ConfirmProvider>
       </NotificationProvider>
     </ToastInitializer>
   </ToastProvider>
