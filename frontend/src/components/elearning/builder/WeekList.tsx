@@ -24,7 +24,7 @@ const WeekList: React.FC<{
   /** Pointer/keyboard focus moved to a row — the parent shows the hover preview. */
   onPeek?: (section: CourseSection | null, rect: DOMRect | null) => void;
 }> = ({ sections, selected, onSelect, todayIso, onPeek }) => (
-  <ul className="divide-y divide-gray-100 dark:divide-gray-800/80" role="list">
+  <ul className="divide-y divide-gray-100 dark:divide-white/[0.06]" role="list">
     {sections.map((s) => {
       const st = stateOf(s);
       const Icon = st.icon;
@@ -41,7 +41,7 @@ const WeekList: React.FC<{
             onBlur={() => onPeek?.(null, null)}
             aria-current={selected === s.section_id ? "true" : undefined}
             className={`w-full flex items-center gap-3 px-3 py-3 text-left min-h-[60px] transition-colors ${
-              selected === s.section_id ? "bg-brand-50 dark:bg-brand-700/15" : "hover:bg-gray-50 dark:hover:bg-white/5"
+              selected === s.section_id ? "bg-brand-50 dark:bg-brand-500/[0.12]" : "hover:bg-gray-50 dark:hover:bg-white/[0.04]"
             }`}
           >
             <Icon className={`w-4 h-4 flex-shrink-0 ${st.cls}`} aria-label={st.label} />
@@ -57,7 +57,7 @@ const WeekList: React.FC<{
             </span>
             <span className="flex items-center gap-2 flex-shrink-0 text-[11px] text-gray-400 tabular-nums">
               {gaps > 0 && s.status !== "HIDDEN" && (
-                <span className="inline-flex items-center gap-1 text-warning-700" title={`${gaps} planned criteri${gaps === 1 ? "on" : "a"} with no content yet`}>
+                <span className="inline-flex items-center gap-1 text-warning-700 dark:text-warning-500" title={`${gaps} planned criteri${gaps === 1 ? "on" : "a"} with no content yet`}>
                   <Circle className="w-2 h-2 fill-current" /> {gaps}
                 </span>
               )}

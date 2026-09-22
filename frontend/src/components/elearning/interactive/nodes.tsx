@@ -127,7 +127,7 @@ const InlineCheckView: React.FC<NodeViewProps> = ({ node, updateAttributes, edit
   const data = parseCheck(node.attrs.check);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<InlineCheckData>(data);
-  const inputCls = "w-full min-h-[36px] px-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm";
+  const inputCls = "w-full min-h-[36px] px-2 rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.05] text-sm";
 
   const save = () => {
     updateAttributes({ check: JSON.stringify({ ...draft, options: draft.options.map((o) => o.trim()).filter(Boolean) }) });
@@ -136,13 +136,13 @@ const InlineCheckView: React.FC<NodeViewProps> = ({ node, updateAttributes, edit
 
   return (
     <NodeViewWrapper className="my-3 el-card shadow-soft" contentEditable={false}>
-      <div className="flex items-center gap-2 px-3 py-2 border-b border-gray-100 dark:border-gray-800 text-[11px] uppercase tracking-wider font-semibold text-gray-500">
+      <div className="flex items-center gap-2 px-3 py-2 border-b border-gray-100 dark:border-white/[0.06] text-[11px] uppercase tracking-wider font-semibold text-gray-500">
         <HelpCircle className="w-3.5 h-3.5" /> Quick check
         <span className="flex-1" />
         {editor.isEditable && !editing && (
           <>
             <button type="button" onClick={() => { setDraft(data); setEditing(true); }} className="inline-flex items-center gap-1 text-brand-600 dark:text-brand-200 normal-case tracking-normal font-medium"><Pencil className="w-3 h-3" /> Edit</button>
-            <button type="button" onClick={() => deleteNode()} className="inline-flex items-center gap-1 text-danger-700 normal-case tracking-normal font-medium ml-2"><Trash2 className="w-3 h-3" /> Remove</button>
+            <button type="button" onClick={() => deleteNode()} className="inline-flex items-center gap-1 text-danger-700 dark:text-danger-500 normal-case tracking-normal font-medium ml-2"><Trash2 className="w-3 h-3" /> Remove</button>
           </>
         )}
       </div>
@@ -172,7 +172,7 @@ const InlineCheckView: React.FC<NodeViewProps> = ({ node, updateAttributes, edit
           <p className="text-sm font-medium text-gray-900 dark:text-white">{data.prompt}</p>
           <ol className="mt-2 space-y-1">
             {data.options.map((o, i) => (
-              <li key={i} className={`text-sm px-3 py-1.5 rounded-lg border ${i === data.correct ? "border-success-500 text-success-700" : "border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200"}`}>
+              <li key={i} className={`text-sm px-3 py-1.5 rounded-lg border ${i === data.correct ? "border-success-500 text-success-700 dark:text-success-500" : "border-gray-200 dark:border-white/10 text-gray-700 dark:text-gray-200"}`}>
                 {i + 1}. {o} {i === data.correct && editor.isEditable ? <span className="text-[10px] uppercase ml-1">correct</span> : null}
               </li>
             ))}

@@ -41,7 +41,7 @@ const MasteryHeatmap: React.FC<{ courseId: number; basePath?: string }> = ({ cou
 
   return (
     <div className="el-card">
-      <div className="flex flex-wrap items-center gap-3 p-4 border-b border-gray-100 dark:border-gray-800">
+      <div className="flex flex-wrap items-center gap-3 p-4 border-b border-gray-100 dark:border-white/[0.06]">
         <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100">Mastery per criterion</h3>
         <span className="text-[11px] text-gray-500">{data.criteria_total} criteria{data.unaligned_criteria ? ` · ${data.unaligned_criteria} with no aligned item yet` : ""}</span>
         <span className="flex-1" />

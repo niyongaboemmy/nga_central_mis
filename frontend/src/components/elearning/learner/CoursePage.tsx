@@ -195,17 +195,17 @@ const CoursePage: React.FC = () => {
 
       <main className="flex-1 min-w-0">
         {(!online || queued > 0) && (
-          <div className="mx-4 mt-3 flex items-center gap-2 px-3 py-2 rounded-xl bg-warning-100 text-warning-700 text-xs" role="status">
+          <div className="mx-4 mt-3 flex items-center gap-2 px-3 py-2 rounded-xl el-chip-warning text-xs" role="status">
             <WifiOff className="w-4 h-4" /> {!online ? copy.errors.offline : `Back online — syncing ${queued} saved action${queued === 1 ? "" : "s"}…`}
           </div>
         )}
         {/* Slim top bar (phone: index toggle; everyone: back to home) */}
         {!opened && (
           <div className="flex items-center gap-2 px-4 pt-3">
-            <button onClick={() => navigate(learnerRoutes.home)} className="inline-flex items-center gap-1 min-h-[40px] px-2 rounded-lg text-sm text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800">
+            <button onClick={() => navigate(learnerRoutes.home)} className="inline-flex items-center gap-1 min-h-[40px] px-2 rounded-lg text-sm text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-white/[0.06]">
               <ArrowLeft className="w-4 h-4" /> <span className="hidden sm:inline">{copy.home.title}</span>
             </button>
-            <button onClick={() => setIndexOpen(true)} className="lg:hidden inline-flex items-center gap-1 min-h-[40px] px-2 rounded-lg text-sm text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800" aria-label={copy.course.index}>
+            <button onClick={() => setIndexOpen(true)} className="lg:hidden inline-flex items-center gap-1 min-h-[40px] px-2 rounded-lg text-sm text-gray-500 hover:bg-gray-100 dark:hover:bg-white/[0.06]" aria-label={copy.course.index}>
               <List className="w-4 h-4" /> {copy.course.index}
             </button>
           </div>
@@ -241,7 +241,7 @@ const CoursePage: React.FC = () => {
                   </p>
                 </div>
                 {overviewSection.state !== "locked" && overviewSection.items.some((i) => ["LESSON_NOTE", "PAGE"].includes(i.item_type) && !i.locked) && (
-                  <button onClick={() => setReviewing(true)} className="inline-flex items-center gap-1.5 min-h-[40px] px-3 rounded-pill bg-gray-100 dark:bg-gray-800 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700">
+                  <button onClick={() => setReviewing(true)} className="inline-flex items-center gap-1.5 min-h-[40px] px-3 rounded-pill el-chip text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-white/[0.10]">
                     <Layers className="w-4 h-4" /> Review
                   </button>
                 )}
@@ -274,7 +274,7 @@ const CoursePage: React.FC = () => {
               })()}
 
               {overviewSection.state === "locked" ? (
-                <div className="mt-6 flex items-center gap-3 p-4 rounded-2xl bg-gray-50 dark:bg-gray-800">
+                <div className="mt-6 flex items-center gap-3 p-4 rounded-2xl el-subtle">
                   <Lock className="w-5 h-5 text-gray-400" />
                   <p className="text-sm text-gray-600 dark:text-gray-300">{copy.course.lockedBody(overviewSection.lock_reason)}</p>
                 </div>
@@ -283,20 +283,20 @@ const CoursePage: React.FC = () => {
               ) : (
                 <ol className="mt-6 relative" aria-label="Learning journey">
                   {/* The journey line — items are steps, in the order the teacher set */}
-                  <span className="absolute left-[19px] top-4 bottom-4 w-0.5 bg-gray-200 dark:bg-gray-800" aria-hidden />
+                  <span className="absolute left-[19px] top-4 bottom-4 w-0.5 bg-gray-200 dark:bg-white/[0.08]" aria-hidden />
                   {overviewSection.items.map((i, idx) =>
                     i.item_type === "HEADER" ? (
                       <li key={i.item_id} className="relative pl-12 pt-4 pb-1 text-[11px] uppercase tracking-wider font-semibold text-gray-500 dark:text-gray-400">{i.title}</li>
                     ) : (
                       <li key={i.item_id} className="relative py-1">
-                        <span className={`absolute left-2 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold ring-4 ring-gray-50 dark:ring-gray-950 ${i.state === "COMPLETED" ? "bg-success-500 text-white" : i.state === "IN_PROGRESS" ? "bg-brand-500 text-white" : "bg-white dark:bg-gray-900 border-2 border-gray-300 dark:border-gray-600 text-gray-500"}`} aria-hidden>
+                        <span className={`absolute left-2 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold ring-4 ring-gray-50 dark:ring-gray-950 ${i.state === "COMPLETED" ? "bg-success-500 text-white" : i.state === "IN_PROGRESS" ? "bg-brand-500 text-white" : "bg-white dark:bg-gray-900 border-2 border-gray-300 dark:border-white/20 text-gray-500"}`} aria-hidden>
                           {i.state === "COMPLETED" ? "✓" : overviewSection.items.slice(0, idx).filter((x) => x.item_type !== "HEADER").length + 1}
                         </span>
                         <motion.button
                           {...m("tap")}
                           disabled={i.locked}
                           onClick={() => goItem(i.item_id)}
-                          className={`ml-12 w-[calc(100%-3rem)] flex items-center gap-3 p-3 el-card el-card-hover text-left min-h-[56px] disabled:opacity-60 focus:outline-none focus-visible:shadow-glow ${i.state === "IN_PROGRESS" ? "border-brand-300 dark:border-brand-700" : "border-gray-200 dark:border-gray-800 hover:border-brand-200 dark:hover:border-brand-700"}`}
+                          className={`ml-12 w-[calc(100%-3rem)] flex items-center gap-3 p-3 el-card el-card-hover text-left min-h-[56px] disabled:opacity-60 focus:outline-none focus-visible:shadow-glow ${i.state === "IN_PROGRESS" ? "border-brand-300 dark:border-brand-700" : "border-gray-200 dark:border-white/[0.07] hover:border-brand-200 dark:hover:border-brand-700"}`}
                           style={{ marginLeft: `calc(3rem + ${i.indent * 16}px)` }}
                         >
                           <CompletionDot state={i.state} locked={i.locked} size={20} className="sr-only" />
@@ -315,7 +315,7 @@ const CoursePage: React.FC = () => {
                           {i.criteria.length > 0 && (
                             <span className="hidden sm:flex flex-wrap gap-1 max-w-[140px] justify-end">
                               {i.criteria.slice(0, 3).map((c) => (
-                                <span key={c.criteria_id} title={c.description} className="text-[10px] px-1.5 py-0.5 rounded-pill bg-brand-50 dark:bg-brand-700/20 text-brand-700 dark:text-brand-200">{c.criteria_number}</span>
+                                <span key={c.criteria_id} title={c.description} className="text-[10px] px-1.5 py-0.5 rounded-pill el-chip-brand">{c.criteria_number}</span>
                               ))}
                             </span>
                           )}
@@ -338,7 +338,7 @@ const CoursePage: React.FC = () => {
         <BottomActionBar>
           <button
             onClick={() => setIndexOpen(true)}
-            className="lg:hidden w-11 h-11 flex items-center justify-center rounded-pill text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
+            className="lg:hidden w-11 h-11 flex items-center justify-center rounded-pill text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/[0.06]"
             aria-label={copy.course.index}
           >
             <List className="w-5 h-5" />
@@ -346,7 +346,7 @@ const CoursePage: React.FC = () => {
           <button
             onClick={() => opened.prev && goItem(opened.prev.item_id)}
             disabled={!opened.prev}
-            className="w-11 h-11 flex items-center justify-center rounded-pill text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-30"
+            className="w-11 h-11 flex items-center justify-center rounded-pill text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/[0.06] disabled:opacity-30"
             aria-label={copy.course.prev}
             title={`${copy.course.prev} ([)`}
           >
@@ -358,21 +358,21 @@ const CoursePage: React.FC = () => {
               onClick={markDone}
               disabled={isDone || marking}
               className={`min-h-[44px] px-5 rounded-pill text-sm font-semibold inline-flex items-center gap-1.5 focus:outline-none focus-visible:shadow-glow ${
-                isDone ? "bg-success-100 text-success-700" : "bg-brand-500 hover:bg-brand-600 text-white shadow-soft"
+                isDone ? "el-chip-success" : "bg-brand-500 hover:bg-brand-600 text-white shadow-soft"
               }`}
               title="Mark as done (d)"
             >
               <Check className="w-4 h-4" /> {isDone ? copy.course.done : copy.course.markDone}
             </motion.button>
           ) : (
-            <span className={`min-h-[44px] px-4 inline-flex items-center gap-1.5 text-sm font-medium ${isDone ? "text-success-700" : "text-gray-500 dark:text-gray-400"}`}>
+            <span className={`min-h-[44px] px-4 inline-flex items-center gap-1.5 text-sm font-medium ${isDone ? "text-success-700 dark:text-success-500" : "text-gray-500 dark:text-gray-400"}`}>
               {isDone ? <><Check className="w-4 h-4" /> {copy.course.done}</> : <CompletionDot state={opened.item.state} size={14} />}
             </span>
           )}
           <button
             onClick={() => opened.next && !opened.next.locked && goItem(opened.next.item_id)}
             disabled={!opened.next || opened.next.locked}
-            className="w-11 h-11 flex items-center justify-center rounded-pill text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-30"
+            className="w-11 h-11 flex items-center justify-center rounded-pill text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/[0.06] disabled:opacity-30"
             aria-label={copy.course.next}
             title={`${copy.course.next} (])`}
           >
@@ -428,7 +428,7 @@ const CoursePage: React.FC = () => {
                     {copy.course.nextWeek}
                   </button>
                 )}
-                <button onClick={() => { setCelebrate(null); navigate(learnerRoutes.home); }} className="min-h-[44px] px-5 rounded-pill bg-gray-100 dark:bg-gray-800 text-sm font-medium text-gray-700 dark:text-gray-200">
+                <button onClick={() => { setCelebrate(null); navigate(learnerRoutes.home); }} className="min-h-[44px] px-5 rounded-pill el-chip text-sm font-medium text-gray-700 dark:text-gray-200">
                   {copy.course.backHome}
                 </button>
               </div>

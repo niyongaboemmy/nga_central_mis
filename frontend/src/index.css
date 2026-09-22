@@ -693,35 +693,56 @@ mark.note-find-hit-active {
 }
 
 /* ---------------------------------------------------------------------------
-   E-learning surfaces (components/elearning). One place for the module's
-   backgrounds so both themes match the rest of the app: the shell is pure
-   black in dark mode and every other page paints its cards as translucent
-   gray-900 over it — an opaque gray-900 read as a lighter navy block.
+   E-learning surfaces (components/elearning).
+
+   The app shell is pure black in dark mode. Tailwind's gray-900 (#111827) is a
+   blue-tinted grey, so a card painted with it reads as a navy block sitting on
+   the black rather than as the same material lifted slightly. Elevation is
+   therefore expressed the way macOS/iOS do it — a translucent white overlay on
+   whatever is beneath, plus a hairline border and a real shadow — which stays
+   neutral, keeps its relationship with the shell at any opacity, and works
+   unchanged in light mode.
    --------------------------------------------------------------------------- */
 @layer components {
   .el-card {
-    @apply bg-white dark:bg-gray-900/60 border border-gray-200/80 dark:border-gray-800/80 rounded-2xl;
+    @apply bg-white dark:bg-white/[0.03] border border-gray-200/80 dark:border-white/[0.07] rounded-2xl;
   }
   .el-card-hover {
-    @apply transition-[box-shadow,border-color] hover:border-brand-200 dark:hover:border-brand-700/60 hover:shadow-soft;
+    @apply transition-[box-shadow,border-color,background-color] hover:border-brand-200 dark:hover:border-brand-500/30 dark:hover:bg-white/[0.05] hover:shadow-soft;
   }
   .el-subtle {
-    @apply bg-gray-50 dark:bg-gray-800/40;
+    @apply bg-gray-50 dark:bg-white/[0.04];
   }
   .el-chip {
-    @apply bg-gray-100 dark:bg-gray-800/70 text-gray-600 dark:text-gray-300;
+    @apply bg-gray-100 dark:bg-white/[0.07] text-gray-600 dark:text-gray-300;
   }
   .el-input {
-    @apply w-full min-h-[44px] px-3 rounded-xl border border-gray-200 dark:border-gray-700/80 bg-white dark:bg-gray-900/70 text-sm text-gray-900 dark:text-white placeholder:text-gray-400 focus:outline-none focus:border-brand-500 focus:shadow-glow;
+    @apply w-full min-h-[44px] px-3 rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.04] text-sm text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus:border-brand-500 dark:focus:border-brand-500 focus:shadow-glow;
   }
   .el-segment {
-    @apply flex items-center p-0.5 rounded-pill bg-gray-100 dark:bg-gray-800/70;
+    @apply flex items-center p-0.5 rounded-pill bg-gray-100 dark:bg-white/[0.06];
   }
   .el-segment-on {
-    @apply bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm;
+    @apply bg-white dark:bg-white/[0.12] text-gray-900 dark:text-white shadow-sm;
   }
+  /* Floating chrome (menus, dialogs, the week preview): one step further from the
+     shell than a card, so it reads as detached without becoming a grey slab. */
   .el-float {
-    @apply bg-white/90 dark:bg-gray-900/90 backdrop-blur-md shadow-float border border-gray-200/70 dark:border-gray-700/60;
+    @apply bg-white/95 dark:bg-[#0b0d12]/95 backdrop-blur-xl border border-gray-200/70 dark:border-white/[0.10] shadow-float dark:shadow-[0_16px_50px_-12px_rgb(0_0_0/0.9)];
+  }
+  /* Status chips: a light wash in light mode, a dark wash with a bright label in
+     dark mode — dark-on-dark (e.g. text-success-700 on a dark tint) was unreadable. */
+  .el-chip-success {
+    @apply bg-success-100 text-success-700 dark:bg-success-500/15 dark:text-success-500;
+  }
+  .el-chip-warning {
+    @apply bg-warning-100 text-warning-700 dark:bg-warning-500/15 dark:text-warning-500;
+  }
+  .el-chip-danger {
+    @apply bg-danger-100 text-danger-700 dark:bg-danger-500/15 dark:text-danger-500;
+  }
+  .el-chip-brand {
+    @apply bg-brand-50 text-brand-700 dark:bg-brand-500/15 dark:text-brand-200;
   }
 }
 

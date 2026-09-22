@@ -130,7 +130,7 @@ const ReviewSheet: React.FC<Props> = ({ section, onClose }) => {
         <div className="flex items-center gap-2">
           <p className="text-sm font-semibold text-gray-800 dark:text-gray-100 flex-1 truncate">Review · {section.title.split(" — ")[0]}</p>
           {total > 0 && <span className="text-[11px] text-gray-500 tabular-nums">{index + 1}/{total} · {remaining} to go</span>}
-          <button onClick={onClose} className="w-10 h-10 flex items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800" aria-label="Close review"><X className="w-4 h-4" /></button>
+          <button onClick={onClose} className="w-10 h-10 flex items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 dark:hover:bg-white/[0.06]" aria-label="Close review"><X className="w-4 h-4" /></button>
         </div>
 
         {cards === null ? (
@@ -145,7 +145,7 @@ const ReviewSheet: React.FC<Props> = ({ section, onClose }) => {
             <button
               onClick={() => setFlipped((f) => !f)}
               aria-pressed={flipped}
-              className="mt-4 w-full min-h-[200px] rounded-2xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 p-5 text-left focus:outline-none focus-visible:shadow-glow"
+              className="mt-4 w-full min-h-[200px] rounded-2xl border border-gray-200 dark:border-white/10 el-subtle p-5 text-left focus:outline-none focus-visible:shadow-glow"
               style={{ perspective: 1000 }}
             >
               <AnimatePresence mode="wait">
@@ -157,12 +157,12 @@ const ReviewSheet: React.FC<Props> = ({ section, onClose }) => {
               </AnimatePresence>
             </button>
             <div className="mt-4 flex items-center justify-between gap-2">
-              <button onClick={() => { setFlipped(false); setIndex((i) => (i - 1 + total) % total); }} className="w-11 h-11 flex items-center justify-center rounded-pill text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800" aria-label="Previous card"><ChevronLeft className="w-5 h-5" /></button>
+              <button onClick={() => { setFlipped(false); setIndex((i) => (i - 1 + total) % total); }} className="w-11 h-11 flex items-center justify-center rounded-pill text-gray-500 hover:bg-gray-100 dark:hover:bg-white/[0.06]" aria-label="Previous card"><ChevronLeft className="w-5 h-5" /></button>
               <div className="flex gap-2">
-                <button onClick={() => next(false)} className="min-h-[44px] px-4 rounded-pill bg-gray-100 dark:bg-gray-800 text-sm font-medium text-gray-700 dark:text-gray-200 inline-flex items-center gap-1"><RotateCcw className="w-4 h-4" /> Again</button>
+                <button onClick={() => next(false)} className="min-h-[44px] px-4 rounded-pill el-chip text-sm font-medium text-gray-700 dark:text-gray-200 inline-flex items-center gap-1"><RotateCcw className="w-4 h-4" /> Again</button>
                 <button onClick={() => next(true)} className="min-h-[44px] px-5 rounded-pill bg-success-500 text-white text-sm font-semibold">Got it</button>
               </div>
-              <button onClick={() => next()} className="w-11 h-11 flex items-center justify-center rounded-pill text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800" aria-label="Next card"><ChevronRight className="w-5 h-5" /></button>
+              <button onClick={() => next()} className="w-11 h-11 flex items-center justify-center rounded-pill text-gray-500 hover:bg-gray-100 dark:hover:bg-white/[0.06]" aria-label="Next card"><ChevronRight className="w-5 h-5" /></button>
             </div>
           </>
         )}

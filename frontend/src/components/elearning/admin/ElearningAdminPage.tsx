@@ -73,7 +73,7 @@ const ElearningAdminPage: React.FC = () => {
         <h1 className="mt-1 text-xl font-bold text-gray-900 dark:text-white">{open.subject_name} · {open.class_group_name}</h1>
         <p className="text-sm text-gray-500">{open.program_name} · {open.grade_name} · {open.term_name} · {open.teacher_name}</p>
         <div className="mt-3 flex flex-wrap items-center gap-2">
-          <a href={`${API_BASE_URL}${elearningApi.progressReportUrl(open.course_id!)}?token=${getToken() || ""}`} className="inline-flex items-center gap-1.5 min-h-[36px] px-3 rounded-pill text-xs text-gray-600 dark:text-gray-300 el-chip hover:bg-gray-200 dark:hover:bg-gray-700"><Download className="w-3.5 h-3.5" /> Student progress report (CSV)</a>
+          <a href={`${API_BASE_URL}${elearningApi.progressReportUrl(open.course_id!)}?token=${getToken() || ""}`} className="inline-flex items-center gap-1.5 min-h-[36px] px-3 rounded-pill text-xs text-gray-600 dark:text-gray-300 el-chip hover:bg-gray-200 dark:hover:bg-white/[0.10]"><Download className="w-3.5 h-3.5" /> Student progress report (CSV)</a>
         </div>
         <h2 className="mt-6 text-sm font-semibold text-gray-800 dark:text-gray-100">Curriculum coverage</h2>
         <div className="mt-2"><CoveragePanel courseId={open.course_id!} basePath="/elearning/admin/courses" /></div>
@@ -90,7 +90,7 @@ const ElearningAdminPage: React.FC = () => {
           <h1 className="text-display text-gray-900 dark:text-white">E-Learning oversight</h1>
           <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Which schemes have a live course, how much is published, and who is learning.{data?.scoped ? " Showing your programmes / classes only." : ""}</p>
         </div>
-        <a href={exportUrl} className="inline-flex items-center gap-1.5 min-h-[40px] px-3 rounded-pill text-sm text-gray-600 dark:text-gray-300 el-chip hover:bg-gray-200 dark:hover:bg-gray-700"><Download className="w-4 h-4" /> Export CSV</a>
+        <a href={exportUrl} className="inline-flex items-center gap-1.5 min-h-[40px] px-3 rounded-pill text-sm text-gray-600 dark:text-gray-300 el-chip hover:bg-gray-200 dark:hover:bg-white/[0.10]"><Download className="w-4 h-4" /> Export CSV</a>
       </div>
 
       {data === undefined ? (
@@ -116,10 +116,10 @@ const ElearningAdminPage: React.FC = () => {
           </div>
 
           <div className="mt-5 el-card">
-            <div className="flex flex-wrap items-center gap-2 p-4 border-b border-gray-100 dark:border-gray-800">
+            <div className="flex flex-wrap items-center gap-2 p-4 border-b border-gray-100 dark:border-white/[0.06]">
               <div className="relative flex-1 min-w-[200px]">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search subject, class, teacher…" className="w-full min-h-[40px] pl-9 pr-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white focus:outline-none focus:border-brand-500" aria-label="Search register" />
+                <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search subject, class, teacher…" className="w-full min-h-[40px] pl-9 pr-3 rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.04] text-sm text-gray-900 dark:text-white focus:outline-none focus:border-brand-500" aria-label="Search register" />
               </div>
               <div className="el-segment" role="radiogroup" aria-label="Filter by course status">
                 {([["all", "All"], ["live", "Live"], ["draft", "Draft"], ["none", "No course"]] as const).map(([k, label]) => (
@@ -145,7 +145,7 @@ const ElearningAdminPage: React.FC = () => {
                 <tbody>
                   {rows.length === 0 && <tr><td colSpan={9} className="px-4 py-8 text-center text-gray-500">Nothing matches.</td></tr>}
                   {rows.map((r) => (
-                    <tr key={r.scheme_id} className={`border-t border-gray-100 dark:border-gray-800 ${r.course_id ? "hover:bg-gray-50 dark:hover:bg-gray-800/50 cursor-pointer" : ""}`} onClick={() => r.course_id && setOpen(r)}>
+                    <tr key={r.scheme_id} className={`border-t border-gray-100 dark:border-white/[0.06] ${r.course_id ? "hover:bg-gray-50 dark:hover:bg-gray-800/50 cursor-pointer" : ""}`} onClick={() => r.course_id && setOpen(r)}>
                       <td className="px-4 py-2">
                         <div className="flex items-center gap-2">
                           <span className="w-2 h-8 rounded-pill flex-shrink-0" style={{ background: r.subject_color || "#94a3b8" }} aria-hidden />
@@ -156,11 +156,11 @@ const ElearningAdminPage: React.FC = () => {
                         </div>
                       </td>
                       <td className="px-2 py-2 text-gray-700 dark:text-gray-200 whitespace-nowrap hidden lg:table-cell">{r.teacher_name || "—"}</td>
-                      <td className="px-2 py-2 hidden md:table-cell"><span className={`text-[11px] px-2 py-0.5 rounded-pill font-semibold ${r.scheme_validation_status === "APPROVED" ? "bg-success-100 text-success-700" : r.scheme_validation_status === "REJECTED" ? "bg-danger-100 text-danger-700" : "el-chip text-gray-500"}`}>{r.scheme_validation_status}</span></td>
-                      <td className="px-2 py-2"><span className={`text-[11px] px-2 py-0.5 rounded-pill font-semibold ${r.course_status === "PUBLISHED" ? "bg-success-100 text-success-700" : r.course_status ? "bg-warning-100 text-warning-700" : "el-chip text-gray-400"}`}>{r.course_status === "PUBLISHED" ? "Live" : r.course_status ? "Draft" : "None"}</span></td>
+                      <td className="px-2 py-2 hidden md:table-cell"><span className={`text-[11px] px-2 py-0.5 rounded-pill font-semibold ${r.scheme_validation_status === "APPROVED" ? "el-chip-success" : r.scheme_validation_status === "REJECTED" ? "el-chip-danger" : "el-chip text-gray-500"}`}>{r.scheme_validation_status}</span></td>
+                      <td className="px-2 py-2"><span className={`text-[11px] px-2 py-0.5 rounded-pill font-semibold ${r.course_status === "PUBLISHED" ? "el-chip-success" : r.course_status ? "el-chip-warning" : "el-chip text-gray-400"}`}>{r.course_status === "PUBLISHED" ? "Live" : r.course_status ? "Draft" : "None"}</span></td>
                       <td className="px-2 py-2"><div className="flex items-center gap-2"><ProgressBar value={r.published_pct} className="flex-1" ariaLabel={`${r.published_sections} of ${r.sections} weeks live`} /><span className="text-[11px] text-gray-500 tabular-nums w-10">{r.published_sections}/{r.sections}</span></div></td>
                       <td className="px-2 py-2 tabular-nums text-gray-700 dark:text-gray-200 hidden xl:table-cell">{r.items || "—"}</td>
-                      <td className="px-2 py-2">{r.course_id ? <span className={`text-[11px] px-2 py-0.5 rounded-pill font-semibold tabular-nums ${r.coverage_pct >= 80 ? "bg-success-100 text-success-700" : r.coverage_pct >= 40 ? "bg-warning-100 text-warning-700" : "el-chip text-gray-500"}`}>{r.coverage_pct}%</span> : "—"}</td>
+                      <td className="px-2 py-2">{r.course_id ? <span className={`text-[11px] px-2 py-0.5 rounded-pill font-semibold tabular-nums ${r.coverage_pct >= 80 ? "el-chip-success" : r.coverage_pct >= 40 ? "el-chip-warning" : "el-chip text-gray-500"}`}>{r.coverage_pct}%</span> : "—"}</td>
                       <td className="px-2 py-2 tabular-nums text-gray-700 dark:text-gray-200 hidden md:table-cell">{r.active_students || "—"}</td>
                       <td className="px-2 py-2 text-gray-500 whitespace-nowrap hidden xl:table-cell">{r.last_activity_at ? new Date(r.last_activity_at).toLocaleDateString("en-GB", { day: "numeric", month: "short" }) : "—"}</td>
                     </tr>

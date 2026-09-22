@@ -50,9 +50,9 @@ const SERIES = {
 
 const STATUS_LABEL: Record<AnalyticsStudent["status"], { label: string; cls: string }> = {
   not_started: { label: "Not started", cls: "el-chip text-gray-600 dark:text-gray-300" },
-  behind: { label: "Behind", cls: "bg-warning-100 text-warning-700" },
-  on_track: { label: "On track", cls: "bg-brand-50 dark:bg-brand-700/20 text-brand-700 dark:text-brand-200" },
-  done: { label: "Done", cls: "bg-success-100 text-success-700" },
+  behind: { label: "Behind", cls: "el-chip-warning" },
+  on_track: { label: "On track", cls: "el-chip-brand" },
+  done: { label: "Done", cls: "el-chip-success" },
 };
 
 const fmtMinutes = (s: number) => (s < 60 ? `${s}s` : `${Math.round(s / 60)} min`);
@@ -165,7 +165,7 @@ const InsightsTab: React.FC<{ courseId: number; course?: BuilderCourse; basePath
               <thead className="text-left text-gray-500"><tr><th className="py-1 pr-3">Week</th><th className="py-1 pr-3">Item</th><th className="py-1 pr-3">Opened</th><th className="py-1 pr-3">Done</th><th className="py-1 pr-3">Avg time</th><th className="py-1">Avg score</th></tr></thead>
               <tbody>
                 {data.sections.flatMap((s) => s.items.map((i) => (
-                  <tr key={i.item_id} className="border-t border-gray-100 dark:border-gray-800 text-gray-700 dark:text-gray-200">
+                  <tr key={i.item_id} className="border-t border-gray-100 dark:border-white/[0.06] text-gray-700 dark:text-gray-200">
                     <td className="py-1 pr-3 whitespace-nowrap">{s.week_number}</td>
                     <td className="py-1 pr-3">{i.title}</td>
                     <td className="py-1 pr-3 tabular-nums">{i.viewed_pct}%</td>
@@ -182,7 +182,7 @@ const InsightsTab: React.FC<{ courseId: number; course?: BuilderCourse; basePath
 
       {/* Students */}
       <div className="el-card">
-        <div className="flex flex-wrap items-center gap-2 p-4 border-b border-gray-100 dark:border-gray-800">
+        <div className="flex flex-wrap items-center gap-2 p-4 border-b border-gray-100 dark:border-white/[0.06]">
           <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100 flex items-center gap-1.5"><Users className="w-4 h-4" /> Students</h3>
           <div className="el-segment ml-2" role="radiogroup" aria-label="Filter students">
             {(["all", "not_started", "behind", "on_track", "done"] as const).map((f) => (
@@ -198,11 +198,11 @@ const InsightsTab: React.FC<{ courseId: number; course?: BuilderCourse; basePath
           </button>
           )}
           {!readOnly && data.stuck.length > 0 && (
-            <button onClick={() => nudge(data.stuck.map((s) => s.user_id))} disabled={sending} className="min-h-[36px] px-3 rounded-pill bg-gray-100 dark:bg-gray-800 text-xs font-semibold text-gray-700 dark:text-gray-200">
+            <button onClick={() => nudge(data.stuck.map((s) => s.user_id))} disabled={sending} className="min-h-[36px] px-3 rounded-pill el-chip text-xs font-semibold text-gray-700 dark:text-gray-200">
               Nudge everyone behind ({data.stuck.length})
             </button>
           )}
-          <button onClick={exportCsv} className="inline-flex items-center gap-1 min-h-[36px] px-3 rounded-pill text-xs text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800" title="Export CSV">
+          <button onClick={exportCsv} className="inline-flex items-center gap-1 min-h-[36px] px-3 rounded-pill text-xs text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/[0.06]" title="Export CSV">
             <Download className="w-3.5 h-3.5" /> CSV
           </button>
         </div>
@@ -222,7 +222,7 @@ const InsightsTab: React.FC<{ courseId: number; course?: BuilderCourse; basePath
             <tbody>
               {rows.length === 0 && <tr><td colSpan={7} className="px-4 py-6 text-center text-gray-500">Nobody matches this filter.</td></tr>}
               {rows.map((s) => (
-                <tr key={s.user_id} className="border-t border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                <tr key={s.user_id} className="border-t border-gray-100 dark:border-white/[0.06] hover:bg-gray-50 dark:hover:bg-gray-800/50">
                   <td className="px-4 py-2"><input type="checkbox" aria-label={`Select ${s.name}`} checked={selected.has(s.user_id)} onChange={(e) => setSelected((prev) => { const n = new Set(prev); if (e.target.checked) n.add(s.user_id); else n.delete(s.user_id); return n; })} className="accent-brand-500" /></td>
                   <td className="px-2 py-2 text-gray-800 dark:text-gray-100 whitespace-nowrap">{s.name}</td>
                   <td className="px-2 py-2"><span className={`text-[11px] px-2 py-0.5 rounded-pill font-semibold ${STATUS_LABEL[s.status].cls}`}>{STATUS_LABEL[s.status].label}</span></td>
@@ -246,7 +246,7 @@ const InsightsTab: React.FC<{ courseId: number; course?: BuilderCourse; basePath
             {questions.slice(0, 12).map((q, i) => (
               <li key={i} className="text-sm text-gray-700 dark:text-gray-200 flex items-start gap-2">
                 <span className={`mt-1.5 w-1.5 h-1.5 rounded-full flex-shrink-0 ${q.grounded === false ? "bg-warning-500" : "bg-gray-300"}`} aria-hidden />
-                <span>{q.question}{q.grounded === false && <span className="ml-1 text-[10px] text-warning-700">not in notes</span>}</span>
+                <span>{q.question}{q.grounded === false && <span className="ml-1 text-[10px] text-warning-700 dark:text-warning-500">not in notes</span>}</span>
               </li>
             ))}
           </ul>

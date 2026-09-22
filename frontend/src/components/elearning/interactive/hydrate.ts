@@ -37,9 +37,9 @@ export function hydrateInlineChecks(root: HTMLElement | null, onAnswer?: (correc
       btn.setAttribute("role", "radio");
       btn.setAttribute("aria-checked", "false");
       btn.className =
-        "w-full flex items-center gap-3 text-left min-h-[44px] px-4 py-2 rounded-xl border border-gray-200 dark:border-gray-700 text-sm text-gray-800 dark:text-gray-100 hover:border-brand-200 focus:outline-none focus-visible:shadow-glow";
+        "w-full flex items-center gap-3 text-left min-h-[44px] px-4 py-2 rounded-xl border border-gray-200 dark:border-white/10 text-sm text-gray-800 dark:text-gray-100 hover:border-brand-200 focus:outline-none focus-visible:shadow-glow";
       const badge = document.createElement("span");
-      badge.className = "w-6 h-6 rounded-md bg-gray-100 dark:bg-gray-800 text-[11px] font-semibold flex items-center justify-center flex-shrink-0 tabular-nums";
+      badge.className = "w-6 h-6 rounded-md el-chip text-[11px] font-semibold flex items-center justify-center flex-shrink-0 tabular-nums";
       badge.textContent = String(i + 1);
       const label = document.createElement("span");
       label.textContent = opt;
@@ -52,13 +52,13 @@ export function hydrateInlineChecks(root: HTMLElement | null, onAnswer?: (correc
         onAnswer?.(correct);
         if (correct) {
           answered = true;
-          btn.className += " !border-success-500 !bg-success-100 !text-success-700";
+          btn.className += " !border-success-500 !bg-success-100 !text-success-700 dark:!bg-success-500/15 dark:!text-success-500";
           badge.textContent = "✓";
           feedback.className = "mt-3 text-sm text-success-700 dark:text-success-500";
           feedback.textContent = data.explanation ? copy.check.correctWhy(data.explanation) : copy.check.correct;
           list.querySelectorAll("button").forEach((b) => (b as HTMLButtonElement).disabled === false && b !== btn && b.classList.add("opacity-60"));
         } else {
-          btn.className += " !border-warning-500 !bg-warning-100 !text-warning-700";
+          btn.className += " !border-warning-500 !bg-warning-100 !text-warning-700 dark:!bg-warning-500/15 dark:!text-warning-500";
           badge.textContent = "✕";
           feedback.className = "mt-3 text-sm text-warning-700 dark:text-warning-500";
           feedback.textContent = data.explanation ? copy.check.wrongHint(data.explanation) : copy.check.wrong;
@@ -66,7 +66,7 @@ export function hydrateInlineChecks(root: HTMLElement | null, onAnswer?: (correc
             list.animate([{ transform: "translateX(0)" }, { transform: "translateX(-4px)" }, { transform: "translateX(4px)" }, { transform: "translateX(-4px)" }, { transform: "translateX(4px)" }, { transform: "translateX(0)" }], { duration: 240 });
           }
           setTimeout(() => {
-            btn.className = btn.className.replace(" !border-warning-500 !bg-warning-100 !text-warning-700", "");
+            btn.className = btn.className.replace(" !border-warning-500 !bg-warning-100 !text-warning-700 dark:!bg-warning-500/15 dark:!text-warning-500", "");
             badge.textContent = String(i + 1);
           }, 1200);
         }

@@ -34,14 +34,14 @@ onOpenSection: (id: number) => void;
     <li data-section={s.section_id} className="rounded-xl">
       <div
         className={`flex items-center gap-2 px-2 py-2 rounded-xl min-h-[44px] ${
-          activeSectionId === s.section_id && !activeItemId ? "bg-brand-50 dark:bg-brand-700/20" : ""
+          activeSectionId === s.section_id && !activeItemId ? "el-chip-brand" : ""
         }`}
       >
         <button
           onClick={() => toggle(s.section_id)}
           aria-expanded={isOpen}
           aria-label={`${isOpen ? "Collapse" : "Expand"} ${s.title}`}
-          className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 flex-shrink-0"
+          className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-white/[0.06] flex-shrink-0"
         >
           <ChevronDown className={`w-4 h-4 transition-transform ${isOpen ? "" : "-rotate-90"}`} />
         </button>
@@ -77,8 +77,8 @@ onOpenSection: (id: number) => void;
                     aria-current={activeItemId === i.item_id ? "page" : undefined}
                     className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left min-h-[44px] ${
                       activeItemId === i.item_id
-                        ? "bg-brand-50 dark:bg-brand-700/20 text-brand-700 dark:text-brand-200"
-                        : "text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
+                        ? "el-chip-brand"
+                        : "text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-white/[0.06]"
                     } disabled:opacity-50`}
                     style={{ paddingLeft: `${12 + i.indent * 12}px` }}
                   >
@@ -138,7 +138,7 @@ const IndexDrawer: React.FC<Props> = ({ course, activeItemId, activeSectionId, o
             {course.summary.criteria_total > 0 ? ` · ${course.summary.criteria_covered}/${course.summary.criteria_total} criteria` : ""} · {course.teacher.name}
           </p>
         </div>
-        <button onClick={onClose} className="lg:hidden w-10 h-10 flex items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800" aria-label="Close index">
+        <button onClick={onClose} className="lg:hidden w-10 h-10 flex items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100 dark:hover:bg-white/[0.06]" aria-label="Close index">
           <X className="w-4 h-4" />
         </button>
       </div>

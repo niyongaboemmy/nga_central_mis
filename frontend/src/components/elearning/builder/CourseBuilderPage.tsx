@@ -53,7 +53,7 @@ const ItemRow: React.FC<{
         <button onPointerDown={(e) => controls.start(e)} className="w-8 h-10 flex items-center justify-center text-gray-300 hover:text-gray-500 cursor-grab active:cursor-grabbing touch-none" aria-label="Drag to reorder">
           <GripVertical className="w-4 h-4" />
         </button>
-        <span className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${item.item_type === "HEADER" ? "bg-transparent text-gray-400" : "bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-300"}`}>
+        <span className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${item.item_type === "HEADER" ? "bg-transparent text-gray-400" : "el-subtle text-gray-600 dark:text-gray-300"}`}>
           <ItemTypeIcon type={item.item_type} className="w-4 h-4" />
         </span>
         <div className="min-w-0 flex-1">
@@ -90,12 +90,12 @@ const ItemRow: React.FC<{
             {item.criteria.length ? ` · ${item.criteria.map((c) => c.criteria_number).join(", ")}` : ""}
           </p>
         </div>
-        {missing && <span className="text-[10px] px-1.5 py-0.5 rounded-pill bg-danger-100 text-danger-700">content deleted</span>}
-        {draftNote && <span className="text-[10px] px-1.5 py-0.5 rounded-pill bg-warning-100 text-warning-700">note is draft</span>}
-        <button onClick={onTogglePublished} className="w-10 h-10 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800" aria-label={item.is_published ? "Hide from students" : "Show to students"} title={item.is_published ? "Visible to students" : "Hidden from students"}>
+        {missing && <span className="text-[10px] px-1.5 py-0.5 rounded-pill el-chip-danger">content deleted</span>}
+        {draftNote && <span className="text-[10px] px-1.5 py-0.5 rounded-pill el-chip-warning">note is draft</span>}
+        <button onClick={onTogglePublished} className="w-10 h-10 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-white/[0.06]" aria-label={item.is_published ? "Hide from students" : "Show to students"} title={item.is_published ? "Visible to students" : "Hidden from students"}>
           {item.is_published ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
         </button>
-        <button onClick={onOpen} className="w-10 h-10 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800" aria-label="Item settings">
+        <button onClick={onOpen} className="w-10 h-10 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-white/[0.06]" aria-label="Item settings">
           <MoreHorizontal className="w-4 h-4" />
         </button>
       </div>
@@ -426,7 +426,7 @@ const CourseBuilderPage: React.FC = () => {
           <h1 className="text-xl md:text-2xl font-bold text-gray-900 dark:text-white leading-tight truncate">{data.subject.name}</h1>
           <p className="text-sm text-gray-500 dark:text-gray-400 flex flex-wrap items-center gap-x-2">
             <span>{data.class_group.name} · {data.term.name}</span>
-            <span className={`inline-flex items-center px-1.5 py-0.5 rounded-pill text-[11px] font-semibold ${isLive ? "bg-success-100 text-success-700" : "el-chip"}`}>
+            <span className={`inline-flex items-center px-1.5 py-0.5 rounded-pill text-[11px] font-semibold ${isLive ? "el-chip-success" : "el-chip"}`}>
               {isLive ? copy.builder.published : copy.builder.draft}
             </span>
             <span className="text-gray-400">· {liveWeeks}/{data.sections.length} weeks live · {courseCoveragePct}% of the curriculum</span>
@@ -498,7 +498,7 @@ const CourseBuilderPage: React.FC = () => {
         <div className="flex-1 min-h-0 mt-4 md:flex md:gap-5">
           {/* Weeks — the whole screen on a phone, a quiet column on desktop */}
           <aside className={`${showDetail ? "hidden" : "flex"} md:flex flex-col h-full md:w-[300px] lg:w-[320px] flex-shrink-0 el-card overflow-hidden`}>
-            <div className="flex items-center justify-between px-3 py-2.5 border-b border-gray-100 dark:border-gray-800/80">
+            <div className="flex items-center justify-between px-3 py-2.5 border-b border-gray-100 dark:border-white/[0.06]">
               <p className="text-[11px] uppercase tracking-wider font-semibold text-gray-500 dark:text-gray-400">{data.sections.length} weeks</p>
               <button
                 onClick={async () => {
@@ -571,7 +571,7 @@ const CourseBuilderPage: React.FC = () => {
                         <li
                           key={c.criteria_id}
                           title={`${c.criteria_number} ${c.description}${gap ? " — nothing covers this yet" : ""}`}
-                          className={`text-[11px] px-2 py-1 rounded-pill font-medium ${gap ? "bg-warning-100/70 dark:bg-warning-700/15 text-warning-700 border border-dashed border-warning-500/60" : "bg-success-100/70 dark:bg-success-700/15 text-success-700"}`}
+                          className={`text-[11px] px-2 py-1 rounded-pill font-medium ${gap ? "el-chip-warning border border-dashed border-warning-500/60" : "el-chip-success"}`}
                         >
                           {c.criteria_number}
                         </li>
@@ -581,7 +581,7 @@ const CourseBuilderPage: React.FC = () => {
                 )}
 
                 {section.items.length === 0 ? (
-                  <div className="mt-5 flex flex-col items-center text-center p-8 rounded-2xl border border-dashed border-gray-300 dark:border-gray-700/80">
+                  <div className="mt-5 flex flex-col items-center text-center p-8 rounded-2xl border border-dashed border-gray-300 dark:border-white/[0.12]">
                     <Mascot pose="nudge" size={56} />
                     <p className="mt-3 text-sm text-gray-500 dark:text-gray-400 max-w-xs">Nothing here yet — use the button above, or add something yourself.</p>
                     <motion.button {...m("tap")} onClick={() => setPaletteOpen(true)} className="mt-4 inline-flex items-center gap-1.5 min-h-[44px] px-4 rounded-pill el-chip text-sm font-semibold">
@@ -680,9 +680,9 @@ const CourseBuilderPage: React.FC = () => {
         {preview && previewCourse && (
           <motion.div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setPreview(false)}>
             <motion.div {...m("reveal")} onClick={(e) => e.stopPropagation()} className="w-[390px] max-w-full h-[80vh] rounded-[2rem] el-float overflow-hidden flex flex-col border-8 border-gray-900/90">
-              <div className="flex items-center justify-between px-3 py-2 border-b border-gray-100 dark:border-gray-800 text-xs text-gray-500">
+              <div className="flex items-center justify-between px-3 py-2 border-b border-gray-100 dark:border-white/[0.06] text-xs text-gray-500">
                 <span>Student view · structure only</span>
-                <button onClick={() => setPreview(false)} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800" aria-label="Close preview"><X className="w-4 h-4" /></button>
+                <button onClick={() => setPreview(false)} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 dark:hover:bg-white/[0.06]" aria-label="Close preview"><X className="w-4 h-4" /></button>
               </div>
               <div className="flex-1 overflow-y-auto">
                 {previewCourse.sections.length === 0 ? (
@@ -690,7 +690,7 @@ const CourseBuilderPage: React.FC = () => {
                 ) : (
                   <ul className="p-3 space-y-2">
                     {previewCourse.sections.map((s) => (
-                      <li key={s.section_id} className="rounded-2xl border border-gray-200 dark:border-gray-800 p-3">
+                      <li key={s.section_id} className="rounded-2xl border border-gray-200 dark:border-white/[0.07] p-3">
                         <WeekPill weekNumber={s.week_number || s.title.split(" — ")[0]} startDate={s.start_date} endDate={s.end_date} current={s.is_current_week} />
                         <p className="mt-1 text-sm font-semibold text-gray-800 dark:text-gray-100">{s.title.split(" — ").slice(1).join(" — ") || s.title}</p>
                         <ul className="mt-2 space-y-1">
@@ -733,7 +733,7 @@ const SettingsTab: React.FC<{ data: BuilderCourse; onChange: (patch: Record<stri
       <label className="block"><span className="text-[11px] uppercase tracking-wider font-semibold text-gray-500">Title</span><input className={`${input} mt-1`} value={title} onChange={(e) => setTitle(e.target.value)} onBlur={() => title !== data.course.title && onChange({ title })} /></label>
       <label className="block"><span className="text-[11px] uppercase tracking-wider font-semibold text-gray-500">Description</span><textarea className={`${input} mt-1 py-2 min-h-[80px]`} value={description} onChange={(e) => setDescription(e.target.value)} onBlur={() => description !== (data.course.description || "") && onChange({ description })} /></label>
       <label className="block"><span className="text-[11px] uppercase tracking-wider font-semibold text-gray-500">Cover emoji</span><input className={`${input} mt-1 w-24 text-center text-xl`} value={icon} maxLength={4} onChange={(e) => setIcon(e.target.value)} onBlur={() => icon !== (data.course.icon || "") && onChange({ icon: icon || null })} placeholder="🖥️" /></label>
-      <div className="divide-y divide-gray-100 dark:divide-gray-800 rounded-2xl border border-gray-200 dark:border-gray-800 px-4">
+      <div className="divide-y divide-gray-100 dark:divide-white/[0.06] rounded-2xl border border-gray-200 dark:border-white/[0.07] px-4">
         <Row label="Weeks publish themselves" hint="A week goes live when it starts, or when you mark it completed in the scheme." checked={!!data.course.auto_publish_from_scheme} onToggle={(v) => onChange({ auto_publish_from_scheme: v })} />
         <Row label="Sequential progress" hint="Students must finish items in order. Off by default — you pace the class." checked={!!data.course.require_sequential_progress} onToggle={(v) => onChange({ require_sequential_progress: v })} />
       </div>

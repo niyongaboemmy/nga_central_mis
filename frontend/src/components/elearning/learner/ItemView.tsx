@@ -105,7 +105,7 @@ const ItemFrame: React.FC<{ opened: OpenedItem; children: React.ReactNode; wide?
     {opened.item.criteria.length > 0 && (
       <ul className="mt-2 flex flex-wrap gap-1.5" aria-label="Performance criteria">
         {opened.item.criteria.map((c) => (
-          <li key={c.criteria_id} title={c.description} className="text-[11px] px-2 py-0.5 rounded-pill bg-brand-50 dark:bg-brand-700/20 text-brand-700 dark:text-brand-200 font-medium">
+          <li key={c.criteria_id} title={c.description} className="text-[11px] px-2 py-0.5 rounded-pill el-chip-brand font-medium">
             {c.criteria_number}
           </li>
         ))}
@@ -145,7 +145,7 @@ const DocumentView: React.FC<{ opened: OpenedItem }> = ({ opened }) => {
   return (
     <ItemFrame opened={opened} wide={isPdf}>
       <div className="el-card overflow-hidden">
-        <div className="flex items-center gap-3 p-4 border-b border-gray-100 dark:border-gray-800">
+        <div className="flex items-center gap-3 p-4 border-b border-gray-100 dark:border-white/[0.06]">
           <FileText className="w-5 h-5 text-brand-500" />
           <div className="min-w-0 flex-1">
             <p className="text-sm font-medium text-gray-800 dark:text-gray-100 truncate">{content?.original_name || item.title}</p>
@@ -154,7 +154,7 @@ const DocumentView: React.FC<{ opened: OpenedItem }> = ({ opened }) => {
           <button
             onClick={download}
             disabled={!blobUrl}
-            className="inline-flex items-center gap-1.5 min-h-[40px] px-4 rounded-pill el-chip hover:bg-gray-200 dark:hover:bg-gray-700 text-sm font-medium text-gray-700 dark:text-gray-200 disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 min-h-[40px] px-4 rounded-pill el-chip hover:bg-gray-200 dark:hover:bg-white/[0.10] text-sm font-medium text-gray-700 dark:text-gray-200 disabled:opacity-50"
           >
             <Download className="w-4 h-4" /> {copy.course.download}
           </button>

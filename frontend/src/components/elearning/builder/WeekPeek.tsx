@@ -44,7 +44,7 @@ const WeekPeek: React.FC<{ section: CourseSection | null; anchor: DOMRect | null
         key={section.section_id}
         {...m("fade")}
         style={{ left, top, width: PANEL_W }}
-        className="hidden md:block fixed z-50 rounded-2xl el-float p-3.5 pointer-events-none"
+        className="hidden md:block fixed z-50 rounded-2xl el-float p-3.5 pointer-events-none ring-1 ring-black/5 dark:ring-0"
         role="tooltip"
       >
         <p className="text-[11px] uppercase tracking-wider font-semibold text-gray-500 dark:text-gray-400 flex items-center gap-1.5">
@@ -69,7 +69,7 @@ const WeekPeek: React.FC<{ section: CourseSection | null; anchor: DOMRect | null
                 <li
                   key={c.criteria_id}
                   className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-pill font-medium ${
-                    covered.has(c.criteria_id) ? "bg-success-100/70 dark:bg-success-700/15 text-success-700" : "bg-warning-100/70 dark:bg-warning-700/15 text-warning-700"
+                    covered.has(c.criteria_id) ? "el-chip-success" : "el-chip-warning"
                   }`}
                 >
                   {covered.has(c.criteria_id) ? <Check className="w-2.5 h-2.5" /> : <CircleDashed className="w-2.5 h-2.5" />}

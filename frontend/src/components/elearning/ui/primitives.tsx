@@ -48,7 +48,7 @@ export const ProgressRing: React.FC<RingProps> = ({ value, size = 56, stroke = 6
       style={{ width: size, height: size }}
     >
       <svg width={size} height={size} className="-rotate-90">
-        <circle cx={size / 2} cy={size / 2} r={r} strokeWidth={stroke} className="fill-none stroke-gray-200 dark:stroke-gray-800" />
+        <circle cx={size / 2} cy={size / 2} r={r} strokeWidth={stroke} className="fill-none stroke-gray-200 dark:stroke-white/[0.10]" />
         <motion.circle
           cx={size / 2}
           cy={size / 2}
@@ -80,7 +80,7 @@ export const ProgressBar: React.FC<{ value: number; className?: string; color?: 
   const reduced = useReducedMotionPref();
   return (
     <div
-      className={`h-2 rounded-pill bg-gray-200 dark:bg-gray-700 overflow-hidden ${className}`}
+      className={`h-2 rounded-pill bg-gray-200 dark:bg-white/[0.10] overflow-hidden ${className}`}
       role="progressbar"
       aria-valuenow={clamped}
       aria-valuemin={0}
@@ -132,7 +132,7 @@ export const CompletionDot: React.FC<{ state: ProgressState; locked?: boolean; s
           style={{ width: size, height: size, background: "linear-gradient(90deg, #3b6cff 50%, transparent 50%)" }}
         />
       ) : (
-        <span className="rounded-full border-2 border-gray-300 dark:border-gray-600" style={{ width: size, height: size }} />
+        <span className="rounded-full border-2 border-gray-300 dark:border-white/20" style={{ width: size, height: size }} />
       )}
     </span>
   );
@@ -273,7 +273,7 @@ export const EmptyState: React.FC<{
 // ---------------------------------------------------------------- Skeleton
 
 export const Skeleton: React.FC<{ className?: string }> = ({ className = "" }) => (
-  <div className={`relative overflow-hidden rounded-xl bg-gray-200/70 dark:bg-gray-800 ${className}`} aria-hidden>
+  <div className={`relative overflow-hidden rounded-xl bg-gray-200/70 dark:bg-white/[0.06] ${className}`} aria-hidden>
     <div className="absolute inset-0 -translate-x-full animate-shimmer bg-gradient-to-r from-transparent via-white/40 dark:via-white/10 to-transparent" />
   </div>
 );

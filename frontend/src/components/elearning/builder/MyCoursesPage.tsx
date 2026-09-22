@@ -58,7 +58,7 @@ const MyCoursesPage: React.FC = () => {
                     <Link to={builderRoutes.build(c.course_id)} className="block">
                       <SubjectCover name={c.subject_name} code={c.subject_code} color={c.cover_color || c.subject_color} icon={c.icon} className="border shadow-soft hover:shadow-float transition-shadow">
                         <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">{c.subject_name}</p>
-                        <p className="text-[11px] text-gray-600 dark:text-gray-300">{c.class_group_name} · {c.term_name} · <span className={c.status === "PUBLISHED" ? "text-success-700 font-semibold" : "text-gray-500"}>{c.status === "PUBLISHED" ? copy.builder.published : copy.builder.draft}</span></p>
+                        <p className="text-[11px] text-gray-600 dark:text-gray-300">{c.class_group_name} · {c.term_name} · <span className={c.status === "PUBLISHED" ? "text-success-700 dark:text-success-500 font-semibold" : "text-gray-500"}>{c.status === "PUBLISHED" ? copy.builder.published : copy.builder.draft}</span></p>
                         <ProgressBar value={c.section_count ? (c.published_sections / c.section_count) * 100 : 0} className="mt-3" ariaLabel={`${c.published_sections} of ${c.section_count} weeks live`} />
                         <p className="mt-1 text-[11px] text-gray-500 flex items-center justify-between">{c.published_sections}/{c.section_count} weeks live <ArrowRight className="w-3.5 h-3.5" /></p>
                       </SubjectCover>
@@ -82,7 +82,7 @@ const MyCoursesPage: React.FC = () => {
                       <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">{s.subject_name}</p>
                       <p className="text-[11px] text-gray-500 dark:text-gray-400">
                         {s.class_group_name} · {s.term_name} · {s.entries} week{s.entries === 1 ? "" : "s"}
-                        {s.validation_status !== "APPROVED" && <span className="ml-1 text-warning-700">· scheme {s.validation_status.toLowerCase()}</span>}
+                        {s.validation_status !== "APPROVED" && <span className="ml-1 text-warning-700 dark:text-warning-500">· scheme {s.validation_status.toLowerCase()}</span>}
                       </p>
                     </div>
                     <button

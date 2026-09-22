@@ -182,12 +182,12 @@ const ItemSettingsDrawer: React.FC<Props> = ({ item, curriculum, onClose, onSave
           onClick={(e) => e.stopPropagation()}
           role="dialog"
           aria-label={`Settings for ${item.title}`}
-          className={`pointer-events-auto fixed top-16 right-0 bottom-0 bg-white dark:bg-gray-950 shadow-float border-l border-gray-200 dark:border-gray-800 flex flex-col ${item.item_type === "PAGE" ? "w-full lg:w-[720px]" : "w-full sm:w-[440px]"}`}
+          className={`pointer-events-auto fixed top-16 right-0 bottom-0 bg-white dark:bg-gray-950 shadow-float border-l border-gray-200 dark:border-white/[0.07] flex flex-col ${item.item_type === "PAGE" ? "w-full lg:w-[720px]" : "w-full sm:w-[440px]"}`}
         >
-          <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-100 dark:border-gray-800">
+          <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-100 dark:border-white/[0.06]">
             <ItemTypeIcon type={item.item_type} className="w-4 h-4 text-gray-500" />
             <p className="text-sm font-semibold text-gray-800 dark:text-gray-100 flex-1 truncate">{copy.builder.itemTypes[item.item_type]}</p>
-            <button onClick={onClose} className="w-10 h-10 flex items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800" aria-label="Close">
+            <button onClick={onClose} className="w-10 h-10 flex items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 dark:hover:bg-white/[0.06]" aria-label="Close">
               <X className="w-4 h-4" />
             </button>
           </div>
@@ -198,7 +198,7 @@ const ItemSettingsDrawer: React.FC<Props> = ({ item, curriculum, onClose, onSave
             </Field>
 
             {isNote && item.ref?.status === "DRAFT" && (
-              <div className="flex items-center gap-3 p-3 rounded-xl bg-warning-100 text-warning-700 text-sm">
+              <div className="flex items-center gap-3 p-3 rounded-xl el-chip-warning text-sm">
                 <span className="flex-1">{copy.builder.noteDraftHint}</span>
                 <button onClick={publishNote} className="min-h-[36px] px-3 rounded-pill bg-warning-500 text-white text-xs font-semibold">{copy.builder.publishNote}</button>
               </div>
@@ -219,7 +219,7 @@ const ItemSettingsDrawer: React.FC<Props> = ({ item, curriculum, onClose, onSave
             {item.item_type === "PAGE" && (
               <div>
                 <span className="block text-[11px] uppercase tracking-wider font-semibold text-gray-500 dark:text-gray-400 mb-1">Page content</span>
-                <div className="rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden min-h-[320px]">
+                <div className="rounded-xl border border-gray-200 dark:border-white/10 overflow-hidden min-h-[320px]">
                   <LessonNoteRichEditor
                     initialContent={item.content_json ?? null}
                     editable
@@ -252,7 +252,7 @@ const ItemSettingsDrawer: React.FC<Props> = ({ item, curriculum, onClose, onSave
                 </div>
                 <ul className="space-y-3">
                   {questions.map((q, qi) => (
-                    <li key={qi} className="rounded-xl border border-gray-200 dark:border-gray-700 p-3 space-y-2">
+                    <li key={qi} className="rounded-xl border border-gray-200 dark:border-white/10 p-3 space-y-2">
                       <div className="flex gap-2">
                         <input className={input} placeholder={`Question ${qi + 1}`} value={q.prompt} onChange={(e) => setQuestions((qs) => qs.map((x, i) => (i === qi ? { ...x, prompt: e.target.value } : x)))} />
                         <button onClick={() => setQuestions((qs) => qs.filter((_, i) => i !== qi))} className="w-10 h-10 flex items-center justify-center rounded-lg text-gray-400 hover:text-danger-500" aria-label="Remove question"><Trash2 className="w-4 h-4" /></button>
@@ -264,7 +264,7 @@ const ItemSettingsDrawer: React.FC<Props> = ({ item, curriculum, onClose, onSave
                             const type = e.target.value as KcQuestion["type"];
                             setQuestions((qs) => qs.map((x, i) => (i === qi ? { ...x, type, options: type === "TRUE_FALSE" ? ["True", "False"] : x.options.length >= 2 ? x.options : ["", ""], correct_index: 0 } : x)));
                           }}
-                          className="min-h-[36px] px-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100"
+                          className="min-h-[36px] px-2 rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.05] text-gray-800 dark:text-gray-100"
                         >
                           <option value="MCQ">Multiple choice</option>
                           <option value="TRUE_FALSE">True / false</option>
@@ -277,7 +277,7 @@ const ItemSettingsDrawer: React.FC<Props> = ({ item, curriculum, onClose, onSave
                             <button
                               onClick={() => setQuestions((qs) => qs.map((x, i) => (i === qi ? { ...x, correct_index: oi } : x)))}
                               aria-label={`Mark option ${oi + 1} correct`}
-                              className={`w-6 h-6 rounded-full border-2 flex-shrink-0 ${q.correct_index === oi ? "border-success-500 bg-success-500" : "border-gray-300 dark:border-gray-600"}`}
+                              className={`w-6 h-6 rounded-full border-2 flex-shrink-0 ${q.correct_index === oi ? "border-success-500 bg-success-500" : "border-gray-300 dark:border-white/20"}`}
                             />
                             <input
                               className={`${input} min-h-[36px]`}
@@ -299,7 +299,7 @@ const ItemSettingsDrawer: React.FC<Props> = ({ item, curriculum, onClose, onSave
                   ))}
                 </ul>
                 {questions.length < 10 && (
-                  <button onClick={() => setQuestions((qs) => [...qs, { type: "MCQ", prompt: "", options: ["", ""], correct_index: 0 }])} className="mt-2 inline-flex items-center gap-1 min-h-[40px] px-3 rounded-pill bg-gray-100 dark:bg-gray-800 text-sm text-gray-700 dark:text-gray-200">
+                  <button onClick={() => setQuestions((qs) => [...qs, { type: "MCQ", prompt: "", options: ["", ""], correct_index: 0 }])} className="mt-2 inline-flex items-center gap-1 min-h-[40px] px-3 rounded-pill el-chip text-sm text-gray-700 dark:text-gray-200">
                     <Plus className="w-4 h-4" /> Add question
                   </button>
                 )}
@@ -317,19 +317,19 @@ const ItemSettingsDrawer: React.FC<Props> = ({ item, curriculum, onClose, onSave
                         role="radio"
                         aria-checked={rule === r}
                         onClick={() => setRule(r)}
-                        className={`min-h-[44px] px-3 rounded-xl text-sm border text-left ${rule === r ? "border-brand-500 bg-brand-50 dark:bg-brand-700/20 text-brand-700 dark:text-brand-200" : "border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200"}`}
+                        className={`min-h-[44px] px-3 rounded-xl text-sm border text-left ${rule === r ? "border-brand-500 el-chip-brand" : "border-gray-200 dark:border-white/10 text-gray-700 dark:text-gray-200"}`}
                       >
                         {copy.builder.completionRules[r]}
                         {r === "MIN_SCORE" && rule === "MIN_SCORE" && (
                           <span className="inline-flex items-center gap-1 ml-1">
-                            <input type="number" min={1} max={100} value={minScore} onChange={(e) => setMinScore(Number(e.target.value))} onClick={(e) => e.stopPropagation()} className="w-14 px-1 rounded-md border border-brand-200 bg-white dark:bg-gray-800 text-center" aria-label="Minimum score percent" />%
+                            <input type="number" min={1} max={100} value={minScore} onChange={(e) => setMinScore(Number(e.target.value))} onClick={(e) => e.stopPropagation()} className="w-14 px-1 rounded-md border border-brand-200 bg-white dark:bg-white/[0.05] text-center" aria-label="Minimum score percent" />%
                           </span>
                         )}
                       </button>
                     ))}
                   </div>
                   {["SUBMIT", "MIN_SCORE"].includes(rule) && !["KNOWLEDGE_CHECK", "TASKMENTOR_QUIZ", "TASKMENTOR_ASSIGNMENT"].includes(item.item_type) && (
-                    <p className="mt-1 text-[11px] text-warning-700">Only a quick check or a Task Mentor result can satisfy this rule.</p>
+                    <p className="mt-1 text-[11px] text-warning-700 dark:text-warning-500">Only a quick check or a Task Mentor result can satisfy this rule.</p>
                   )}
                 </div>
 
@@ -382,7 +382,7 @@ const ItemSettingsDrawer: React.FC<Props> = ({ item, curriculum, onClose, onSave
                                 title={c.description}
                                 aria-pressed={on}
                                 onClick={() => setCriteriaIds((ids) => (on ? ids.filter((x) => x !== c.criteria_id) : [...ids, c.criteria_id]))}
-                                className={`text-[11px] px-2 py-1 rounded-pill border min-h-[28px] ${on ? "bg-brand-500 border-brand-500 text-white" : "border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300"}`}
+                                className={`text-[11px] px-2 py-1 rounded-pill border min-h-[28px] ${on ? "bg-brand-500 border-brand-500 text-white" : "border-gray-200 dark:border-white/10 text-gray-600 dark:text-gray-300"}`}
                               >
                                 {c.criteria_number}
                               </button>
@@ -400,12 +400,12 @@ const ItemSettingsDrawer: React.FC<Props> = ({ item, curriculum, onClose, onSave
             )}
           </div>
 
-          <div className="flex items-center gap-2 px-4 py-3 border-t border-gray-100 dark:border-gray-800">
-            <button onClick={() => onDelete(item.item_id).then(onClose)} className="inline-flex items-center gap-1 min-h-[44px] px-3 rounded-pill text-sm text-danger-700 hover:bg-danger-100">
+          <div className="flex items-center gap-2 px-4 py-3 border-t border-gray-100 dark:border-white/[0.06]">
+            <button onClick={() => onDelete(item.item_id).then(onClose)} className="inline-flex items-center gap-1 min-h-[44px] px-3 rounded-pill text-sm text-danger-700 dark:text-danger-500 hover:bg-danger-100">
               <Trash2 className="w-4 h-4" /> Remove
             </button>
             <span className="flex-1" />
-            <button onClick={onClose} className="min-h-[44px] px-4 rounded-pill text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800">Cancel</button>
+            <button onClick={onClose} className="min-h-[44px] px-4 rounded-pill text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/[0.06]">Cancel</button>
             <button onClick={save} disabled={saving} className="min-h-[44px] px-5 rounded-pill bg-brand-500 hover:bg-brand-600 text-white text-sm font-semibold shadow-soft disabled:opacity-50">
               {saving ? "Saving…" : "Save"}
             </button>

@@ -102,7 +102,7 @@ const KnowledgeCheckCard: React.FC<Props> = ({ itemId, questions, onResult }) =>
             setIndex(0);
             setAnswers({});
           }}
-          className="mt-4 inline-flex items-center gap-1.5 min-h-[44px] px-5 rounded-pill el-chip hover:bg-gray-200 dark:hover:bg-gray-700 text-sm font-medium text-gray-700 dark:text-gray-200"
+          className="mt-4 inline-flex items-center gap-1.5 min-h-[44px] px-5 rounded-pill el-chip hover:bg-gray-200 dark:hover:bg-white/[0.10] text-sm font-medium text-gray-700 dark:text-gray-200"
         >
           <RotateCcw className="w-4 h-4" /> {copy.check.retake}
         </button>
@@ -138,15 +138,15 @@ const KnowledgeCheckCard: React.FC<Props> = ({ itemId, questions, onResult }) =>
                     }}
                     className={`w-full flex items-center gap-3 text-left min-h-[48px] px-4 py-2.5 rounded-xl border text-sm transition-colors focus:outline-none focus-visible:shadow-glow ${
                       showCorrect
-                        ? "border-success-500 bg-success-100 text-success-700"
+                        ? "border-success-500 el-chip-success"
                         : showWrong
-                          ? "border-warning-500 bg-warning-100 text-warning-700"
+                          ? "border-warning-500 el-chip-warning"
                           : selected
-                            ? "border-brand-500 bg-brand-50 dark:bg-brand-700/20 text-gray-900 dark:text-white"
-                            : "border-gray-200 dark:border-gray-700 text-gray-800 dark:text-gray-100 hover:border-brand-200 dark:hover:border-brand-700"
+                            ? "border-brand-500 el-chip-brand text-gray-900 dark:text-white"
+                            : "border-gray-200 dark:border-white/10 text-gray-800 dark:text-gray-100 hover:border-brand-200 dark:hover:border-brand-700"
                     }`}
                   >
-                    <span className="w-6 h-6 rounded-md bg-gray-100 dark:bg-gray-800 text-[11px] font-semibold flex items-center justify-center flex-shrink-0 tabular-nums" aria-hidden>
+                    <span className="w-6 h-6 rounded-md el-chip text-[11px] font-semibold flex items-center justify-center flex-shrink-0 tabular-nums" aria-hidden>
                       {showCorrect ? <Check className="w-3.5 h-3.5" /> : showWrong ? <X className="w-3.5 h-3.5" /> : i + 1}
                     </span>
                     <span>{opt}</span>

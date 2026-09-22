@@ -117,9 +117,9 @@ const MePage: React.FC = () => {
                             title={`${c.criteria_number} ${c.description} — ${c.state === "DEMONSTRATED" ? copy.me.demonstrated : c.state === "COVERED" ? copy.me.covered : copy.me.notCovered}`}
                             className={`text-[10px] px-1.5 py-0.5 rounded-md font-medium ${
                               c.state === "DEMONSTRATED"
-                                ? "bg-success-100 text-success-700"
+                                ? "el-chip-success"
                                 : c.state === "COVERED"
-                                  ? "bg-brand-50 dark:bg-brand-700/20 text-brand-700 dark:text-brand-200"
+                                  ? "el-chip-brand"
                                   : "el-chip text-gray-400"
                             }`}
                           >
@@ -139,7 +139,7 @@ const MePage: React.FC = () => {
       {/* Preferences */}
       <section className="mt-8 el-card p-4">
         <h2 className="text-base font-semibold text-gray-900 dark:text-white">{copy.me.prefs}</h2>
-        <div className="mt-2 divide-y divide-gray-100 dark:divide-gray-800">
+        <div className="mt-2 divide-y divide-gray-100 dark:divide-white/[0.06]">
           <Toggle checked={prefs.celebrations_enabled} onChange={(v) => update({ celebrations_enabled: v })} label={copy.me.celebrations} />
           <Toggle checked={prefs.streak_enabled} onChange={(v) => update({ streak_enabled: v })} label={copy.me.streak} hint="Personal only — nobody else sees it. One rest day a week is fine." />
           <Toggle checked={!!prefs.reduced_motion} onChange={(v) => update({ reduced_motion: v })} label={copy.me.reducedMotion} hint="Fades instead of movement; no confetti." />

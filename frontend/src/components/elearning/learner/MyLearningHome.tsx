@@ -89,13 +89,13 @@ const MyLearningHome: React.FC = () => {
           )}
           <Link
             to="/shared-lesson-notes"
-            className="hidden sm:inline-flex items-center gap-1.5 min-h-[40px] px-3 rounded-pill text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
+            className="hidden sm:inline-flex items-center gap-1.5 min-h-[40px] px-3 rounded-pill text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/[0.06]"
           >
             <Library className="w-4 h-4" /> {copy.home.library}
           </Link>
           <Link
             to={learnerRoutes.me}
-            className="inline-flex items-center gap-1.5 min-h-[40px] px-3 rounded-pill text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
+            className="inline-flex items-center gap-1.5 min-h-[40px] px-3 rounded-pill text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/[0.06]"
             aria-label="Me"
           >
             <User className="w-4 h-4" /> <span className="hidden sm:inline">{copy.me.title}</span>
@@ -126,7 +126,7 @@ const MyLearningHome: React.FC = () => {
                 )}
                 {hero.next_item ? (
                   <div className="mt-4 flex flex-col sm:flex-row sm:items-center gap-3 p-3 rounded-xl bg-white/70 dark:bg-black/30">
-                    <span className="w-9 h-9 rounded-lg bg-white dark:bg-gray-800 flex items-center justify-center text-brand-600 dark:text-brand-200 shadow-soft">
+                    <span className="w-9 h-9 rounded-lg bg-white dark:bg-white/[0.08] flex items-center justify-center text-brand-600 dark:text-brand-200 shadow-soft">
                       <ItemTypeIcon type={hero.next_item.item_type} className="w-4 h-4" />
                     </span>
                     <div className="min-w-0 flex-1">
@@ -208,7 +208,7 @@ const MyLearningHome: React.FC = () => {
                       to={learnerRoutes.item(d.course_id, d.item_id)}
                       className="flex items-center gap-2 p-2 -mx-2 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 min-h-[44px]"
                     >
-                      <ItemTypeIcon type={d.item_type} className="w-4 h-4 text-warning-700" />
+                      <ItemTypeIcon type={d.item_type} className="w-4 h-4 text-warning-700 dark:text-warning-500" />
                       <div className="min-w-0 flex-1">
                         <p className="text-sm text-gray-800 dark:text-gray-100 truncate">{d.title}</p>
                         <p className="text-[11px] text-gray-500 dark:text-gray-400">
@@ -250,7 +250,7 @@ const MyLearningHome: React.FC = () => {
                 <li key={c.course_id}>
                   <Link
                     to={learnerRoutes.course(c.course_id)}
-                    className="flex items-center gap-3 p-3 rounded-xl border border-gray-100 dark:border-gray-800 hover:border-brand-200 dark:hover:border-brand-700 hover:shadow-soft transition-shadow min-h-[64px]"
+                    className="flex items-center gap-3 p-3 rounded-xl border border-gray-100 dark:border-white/[0.06] hover:border-brand-200 dark:hover:border-brand-700 hover:shadow-soft transition-shadow min-h-[64px]"
                   >
                     <ProgressRing value={c.percent} size={44} stroke={5} color={c.cover_color || undefined} ariaLabel={`${c.subject_name} ${c.percent}% complete`} />
                     <div className="min-w-0 flex-1">
@@ -258,7 +258,7 @@ const MyLearningHome: React.FC = () => {
                       <p className="text-[11px] text-gray-500 dark:text-gray-400 truncate">
                         {c.teacher_name || c.class_group_name}
                         {c.overdue_count > 0 && (
-                          <span className="ml-2 inline-flex items-center px-1.5 rounded-pill bg-danger-100 text-danger-700 font-semibold">
+                          <span className="ml-2 inline-flex items-center px-1.5 rounded-pill el-chip-danger font-semibold">
                             {c.overdue_count} overdue
                           </span>
                         )}

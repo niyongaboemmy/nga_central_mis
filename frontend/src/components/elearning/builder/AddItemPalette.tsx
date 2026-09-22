@@ -107,9 +107,9 @@ const AddItemPalette: React.FC<Props> = ({ courseId, sectionTitle, open, onClose
             onClick={(e) => e.stopPropagation()}
             role="dialog"
             aria-label={`Add to ${sectionTitle}`}
-            className="w-full max-w-xl rounded-2xl el-float border border-gray-200 dark:border-gray-800 overflow-hidden"
+            className="w-full max-w-xl rounded-2xl el-float border border-gray-200 dark:border-white/[0.07] overflow-hidden"
           >
-            <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-100 dark:border-gray-800">
+            <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-100 dark:border-white/[0.06]">
               <Search className="w-4 h-4 text-gray-400" />
               <input
                 ref={inputRef}
@@ -120,7 +120,7 @@ const AddItemPalette: React.FC<Props> = ({ courseId, sectionTitle, open, onClose
                 className="flex-1 bg-transparent text-sm outline-none text-gray-900 dark:text-white placeholder:text-gray-400"
                 aria-label="Search content to add"
               />
-              <button onClick={onClose} className="w-9 h-9 flex items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800" aria-label="Close">
+              <button onClick={onClose} className="w-9 h-9 flex items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 dark:hover:bg-white/[0.06]" aria-label="Close">
                 <X className="w-4 h-4" />
               </button>
             </div>
@@ -132,7 +132,7 @@ const AddItemPalette: React.FC<Props> = ({ courseId, sectionTitle, open, onClose
                   <button
                     onMouseEnter={() => setCursor(i)}
                     onClick={() => onPick(r.choice)}
-                    className={`w-full flex items-center gap-3 px-4 py-2.5 text-left min-h-[48px] ${i === cursor ? "bg-brand-50 dark:bg-brand-700/20" : ""}`}
+                    className={`w-full flex items-center gap-3 px-4 py-2.5 text-left min-h-[48px] ${i === cursor ? "el-chip-brand" : ""}`}
                   >
                     <span className="w-8 h-8 rounded-lg el-chip text-gray-600 dark:text-gray-300 flex items-center justify-center flex-shrink-0">
                       <r.icon className="w-4 h-4" />
@@ -142,12 +142,12 @@ const AddItemPalette: React.FC<Props> = ({ courseId, sectionTitle, open, onClose
                       <span className="block text-[11px] text-gray-500 dark:text-gray-400 truncate">{r.hint}</span>
                     </span>
                     {r.placed && <span className="text-[10px] px-1.5 py-0.5 rounded-pill el-chip text-gray-500">already in course</span>}
-                    {r.draft && <span className="text-[10px] px-1.5 py-0.5 rounded-pill bg-warning-100 text-warning-700">draft</span>}
+                    {r.draft && <span className="text-[10px] px-1.5 py-0.5 rounded-pill el-chip-warning">draft</span>}
                   </button>
                 </li>
               ))}
             </ul>
-            <div className="px-4 py-2 border-t border-gray-100 dark:border-gray-800 text-[11px] text-gray-400 flex gap-3">
+            <div className="px-4 py-2 border-t border-gray-100 dark:border-white/[0.06] text-[11px] text-gray-400 flex gap-3">
               <span>↑↓ move</span><span>↵ add</span><span>esc close</span>
             </div>
           </motion.div>

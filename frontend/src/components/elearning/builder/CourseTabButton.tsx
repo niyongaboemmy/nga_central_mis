@@ -51,7 +51,7 @@ const CourseTabButton: React.FC<{ schemeId: number | null | undefined; className
         live
           ? "text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-900/30 border-emerald-200 dark:border-emerald-800/50 hover:bg-emerald-100"
           : probe
-            ? "text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-800/60 border-gray-200 dark:border-gray-700 hover:bg-gray-100"
+            ? "text-gray-600 dark:text-gray-300 el-subtle/60 border-gray-200 dark:border-white/10 hover:bg-gray-100"
             : "text-white bg-gradient-to-r from-blue-600 to-indigo-600 border-transparent hover:from-blue-700 hover:to-indigo-700"
       } ${className}`}
     >
