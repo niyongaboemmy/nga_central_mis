@@ -933,12 +933,45 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
     setLoading(true);
     setAuthError("");
 
+    // Verifying the code and loading the account are reported separately on
+    // purpose. Both used to sit in one try/catch that blamed the code for
+    // everything, so a failure after the code had already been accepted (and
+    // consumed) told the user their code was wrong — and the screen kept that
+    // dead code auto-filled, so every retry failed the same way.
     try {
       await verifyOTP(otp, tempToken);
+    } catch (error: any) {
+      const message: string | undefined = error.response?.data?.message;
+      // Two different failures arrive here. A rejected *code* leaves this
+      // sign-in attempt usable: the correct code still works, so stay put and
+      // let them retype it. A rejected *token* (expired, or revoked by a
+      // logout elsewhere) means no code can be accepted any more, and only a
+      // new sign-in issues a new one.
+      const codeWasRejected = /otp|code/i.test(message ?? "");
+      setOtp("");
+      setDevOtp("");
+      if (codeWasRejected) {
+        setAuthError(message || "Invalid OTP code. Please try again.");
+      } else {
+        setStep("credentials");
+        setAuthError(
+          message
+            ? `${message} Please sign in again.`
+            : "This sign-in attempt expired. Please sign in again.",
+        );
+      }
+      setLoading(false);
+      return;
+    }
+
+    try {
       await completeSuccessfulLogin();
     } catch (error: any) {
+      // The code was accepted and is now spent; naming it here would send
+      // people back to retype something that can never work again.
       setAuthError(
-        error.response?.data?.message || "Invalid OTP code. Please try again.",
+        error.response?.data?.message ||
+          "Signed in, but your account could not be loaded. Please try again.",
       );
     } finally {
       setLoading(false);

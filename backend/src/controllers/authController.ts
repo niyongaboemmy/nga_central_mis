@@ -22,6 +22,7 @@ import {
 import { getUserPermissions } from "../utils/auth";
 import { sanitizeString, validateEmail } from "../utils/sanitization";
 import { sendOTPByEmail, verifyOTP as verifyOTPUtil } from "../utils/otp";
+import { getUserTokenVersion } from "../middleware/auth";
 import {
   AuthenticationError,
   ValidationError,
@@ -107,11 +108,27 @@ export const login = asyncHandler(async (req: any, res: any) => {
   // Send OTP for 2FA
   const otp = await sendOTPByEmail(user[0].user_id, user[0].email, "LOGIN_2FA");
 
-  // Generate temporary session token (short-lived)
+  // Generate temporary session token (short-lived).
+  //
+  // `tokenVersion` is not optional here: /auth/verify-otp runs through
+  // `authenticate`, which rejects any token whose claim does not equal the
+  // user's current `token_version`. A missing claim counts as 0, so once a
+  // user had logged out even once (logout increments the column) this token
+  // was refused and the OTP step failed forever — with the password already
+  // accepted, which reads as "the code is wrong".
+  //
+  // The lifetime matches the OTP's own validity: a shorter window left a gap
+  // in which the emailed code was still valid but this token was not, and the
+  // UI could only report that as a bad code.
   const tempToken = jwt.sign(
-    { userId: user[0].user_id, username: user[0].username, requiresOTP: true },
+    {
+      userId: user[0].user_id,
+      username: user[0].username,
+      requiresOTP: true,
+      tokenVersion: user[0].token_version || 0,
+    },
     config.jwtSecret,
-    { expiresIn: "5m" },
+    { expiresIn: `${config.otp.expiryMinutes}m` },
   );
 
   logger.info(`Password verified, OTP sent for user: ${user[0].username}`);
@@ -563,15 +580,18 @@ export const forgotPassword = asyncHandler(async (req: any, res: any) => {
   // Send OTP for password reset
   await sendOTPByEmail(user[0].user_id, user[0].email, "PASSWORD_RESET");
 
-  // Generate temporary token for password reset flow
+  // Generate temporary token for password reset flow. Carries tokenVersion
+  // for the same reason as the login temp token above: /auth/verify-reset-otp
+  // goes through `authenticate`.
   const tempToken = jwt.sign(
     {
       userId: user[0].user_id,
       email: user[0].email,
       purpose: "PASSWORD_RESET",
+      tokenVersion: user[0].token_version || 0,
     },
     config.jwtSecret,
-    { expiresIn: "10m" },
+    { expiresIn: `${Math.max(config.otp.expiryMinutes, 10)}m` },
   );
 
   logger.info(`Password reset OTP sent for user: ${user[0].username}`);
@@ -600,9 +620,10 @@ export const verifyResetOTP = asyncHandler(async (req: any, res: any) => {
     throw new AuthenticationError("Invalid or expired OTP");
   }
 
-  // Generate a new temporary token for password reset completion
+  // Generate a new temporary token for password reset completion. /auth/reset-password
+  // is behind `authenticate`, so this carries tokenVersion too.
   const resetToken = jwt.sign(
-    { userId, purpose: "PASSWORD_RESET_CONFIRM" },
+    { userId, purpose: "PASSWORD_RESET_CONFIRM", tokenVersion: (await getUserTokenVersion(userId)) ?? 0 },
     config.jwtSecret,
     { expiresIn: "10m" },
   );
@@ -761,8 +782,10 @@ export const confirmDbAccess = asyncHandler(async (req: any, res: any) => {
     throw new AuthenticationError("Incorrect password");
   }
 
+  // /auth/confirm-db-access and the step-up guard run through `authenticate`,
+  // so this carries tokenVersion as well.
   const dbAccessToken = jwt.sign(
-    { userId, dbAccess: true },
+    { userId, dbAccess: true, tokenVersion: (await getUserTokenVersion(userId)) ?? 0 },
     config.jwtSecret,
     { expiresIn: "20m" },
   );

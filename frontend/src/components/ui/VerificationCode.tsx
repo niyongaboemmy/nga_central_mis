@@ -26,11 +26,13 @@ const VerificationCode: React.FC<VerificationCodeProps> = ({
     inputRefs.current[0]?.focus();
   }, []);
 
-  // Auto-fill from an externally supplied code (e.g. dev-mode OTP)
+  // Auto-fill from an externally supplied code (e.g. dev-mode OTP). Clearing
+  // that value clears the boxes: after a rejected code the caller resets it,
+  // and leaving the old digits on screen invited a retry that could only fail.
   useEffect(() => {
-    if (!value) return;
+    if (value === undefined) return;
     const digits = value.replace(/\D/g, "").slice(0, length);
-    if (!digits || digits === values.join("")) return;
+    if (digits === values.join("")) return;
 
     const newValues = Array(length).fill("");
     digits.split("").forEach((digit, i) => {

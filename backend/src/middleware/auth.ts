@@ -20,8 +20,10 @@ const getUserRoles = async (userId: number): Promise<string[]> => {
 };
 
 /** Single indexed lookup backing the logout-revocation check below. Returns
- *  null if the user row is gone (deleted account) so callers can reject. */
-const getUserTokenVersion = async (userId: number): Promise<number | null> => {
+ *  null if the user row is gone (deleted account) so callers can reject.
+ *  Exported because every token that will later be presented to
+ *  `authenticate` has to carry this same value as its `tokenVersion` claim. */
+export const getUserTokenVersion = async (userId: number): Promise<number | null> => {
   const row = await db
     .select({ token_version: User.token_version })
     .from(User)
