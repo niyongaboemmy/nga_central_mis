@@ -55,6 +55,7 @@ import SchemeAIGenerate from "./SchemeAIGenerate";
 import SchemeTableEditor from "./SchemeTableEditor";
 import ConfirmModal from "./ui/ConfirmModal";
 import { Table2 } from "lucide-react";
+import CourseTabButton from "./elearning/builder/CourseTabButton";
 
 const SchemeOfWorkCalendar: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -105,6 +106,7 @@ const SchemeOfWorkCalendar: React.FC = () => {
     null,
   );
   const [isCoverModalOpen, setIsCoverModalOpen] = useState(false);
+  const [missingNoticeDismissed, setMissingNoticeDismissed] = useState(false);
 
   const [activeTab, setActiveTab] = useState<"timeline" | "calendar">(
     "calendar",
@@ -607,47 +609,43 @@ const SchemeOfWorkCalendar: React.FC = () => {
     return { total, complete, incomplete, missing, progress };
   }, [entries, lessonPlans]);
 
+  // One inline, dismissible notice with a single CTA (ELEARNING_MODULE_UX_IMPLEMENTATION_PLAN.md
+  // §3.3): the previous full-width red "Action Required" panel competed with the validation
+  // banner for attention and read as an alarm for what is a routine planning nudge.
   const MissingPlansBanner = () => {
-    if (stats.missing === 0 || schemeMetadata?.validation_status === "APPROVED")
+    if (stats.missing === 0 || schemeMetadata?.validation_status === "APPROVED" || missingNoticeDismissed)
       return null;
 
     return (
       <motion.div
-        initial={{ opacity: 0, y: -20 }}
+        initial={{ opacity: 0, y: -8 }}
         animate={{ opacity: 1, y: 0 }}
-        className="mb-6 p-1 bg-gradient-to-r from-red-500/10 via-red-500/5 to-transparent border border-red-500/20 rounded-2xl overflow-hidden"
+        role="status"
+        className="mb-4 flex flex-col sm:flex-row sm:items-center gap-3 px-4 py-3 rounded-2xl bg-amber-50 dark:bg-amber-900/15 border border-amber-200/70 dark:border-amber-800/40"
       >
-        <div className="flex flex-col md:flex-row items-center justify-between p-6 gap-4">
-          <div className="flex items-center gap-4">
-            <div className="w-14 h-14 rounded-2xl bg-red-500 flex items-center justify-center shadow-sm shadow-red-500/20 flex-shrink-0">
-              <AlertTriangle className="w-8 h-8 text-white animate-pulse" />
-            </div>
-            <div>
-              <h3 className="text-lg font-black text-gray-900 dark:text-white leading-tight">
-                Action Required: Missing Lesson Plans
-              </h3>
-              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1 max-w-md">
-                We've detected{" "}
-                <span className="font-bold text-red-500">
-                  {stats.missing} entries
-                </span>{" "}
-                from past weeks that don't have a defined lesson plan yet.
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => {
-                setActiveTab("timeline");
-                setFilterStatus("missing");
-                setSearchQuery("");
-              }}
-              className="px-6 py-3 bg-red-600 hover:bg-red-700 text-white rounded-full text-sm font-bold transition-all hover:scale-105 active:scale-95 shadow-red-600/20 flex items-center gap-2"
-            >
-              Fix Missing Plans
-              <ArrowRight className="w-4 h-4" />
-            </button>
-          </div>
+        <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0" />
+        <p className="text-sm text-gray-700 dark:text-gray-200 flex-1">
+          <span className="font-semibold">{stats.missing}</span> past week{stats.missing === 1 ? "" : "s"} still{" "}
+          {stats.missing === 1 ? "has" : "have"} no lesson plan.
+        </p>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => {
+              setActiveTab("timeline");
+              setFilterStatus("missing");
+              setSearchQuery("");
+            }}
+            className="min-h-[36px] px-4 rounded-full bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold flex items-center gap-1.5"
+          >
+            Add the plans <ArrowRight className="w-3.5 h-3.5" />
+          </button>
+          <button
+            onClick={() => setMissingNoticeDismissed(true)}
+            className="min-h-[36px] px-3 rounded-full text-xs text-gray-500 hover:bg-amber-100 dark:hover:bg-amber-900/30"
+            aria-label="Dismiss"
+          >
+            Later
+          </button>
         </div>
       </motion.div>
     );
@@ -1215,6 +1213,9 @@ const SchemeOfWorkCalendar: React.FC = () => {
         <div className="flex flex-row items-center gap-2 mb-4">
           {entries.length > 0 && (
             <div className="flex items-center gap-3">
+              {/* E-learning course built on this scheme */}
+              <CourseTabButton schemeId={schemeMetadata?.scheme_id} />
+
               {/* Download PDF Action */}
               <button
                 onClick={handlePreviewReport}
@@ -1633,7 +1634,7 @@ const SchemeOfWorkCalendar: React.FC = () => {
           onClose={() => setIsDeleteSchemeConfirmOpen(false)}
           onConfirm={handleDeleteScheme}
           title="Delete this scheme of work?"
-          message={`This permanently deletes all ${entries.length} weekly ${entries.length === 1 ? "entry" : "entries"} and their lesson plans for ${subjectInfo?.name || "this subject"} — ${subjectInfo?.classGroupName || ""}. This cannot be undone, and you'll start over from the create-scheme options.`}
+          message={`This permanently deletes all ${entries.length} weekly ${entries.length === 1 ? "entry" : "entries"} and their lesson plans for ${subjectInfo?.name || "this subject"} — ${subjectInfo?.classGroupName || ""}, along with the e-learning course built on this scheme and students' progress in it. This cannot be undone, and you'll start over from the create-scheme options.`}
           confirmText={isDeletingScheme ? "Deleting..." : "Delete Scheme"}
           isLoading={isDeletingScheme}
         />

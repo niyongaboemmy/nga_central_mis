@@ -252,3 +252,11 @@ This error occurs when Node.js version is too old (below 14). drizzle-orm requir
 - Namecheap Support: Available 24/7 via live chat
 - Node.js Documentation: nodejs.org
 - cPanel Documentation: docs.cpanel.net
+
+## E-Learning module (added 2026-09-22)
+
+1. Apply migrations in order: `085_elearning_courses.sql`, `086_elearning_progress.sql`, `087_elearning_interactive.sql`, `088_elearning_admin_oversight.sql` (and `064_integration_tokens.sql` if the `IntegrationToken` table is missing). They seed the permissions `MANAGE_COURSE_CONTENT`, `OVERRIDE_COURSE_PROGRESS` (TEACHER, CLASS_TEACHER), `VIEW_MY_COURSES` (STUDENT) and `VIEW_ALL_COURSES` (PROGRAM_MANAGER, CLASS_TEACHER, HEAD_TEACHER). SUPER_ADMIN gets everything automatically.
+2. Optional: `npx ts-node scripts/seedCoursesFromSchemes.ts` creates a DRAFT course for every approved scheme of the current term so teachers start from a filled builder.
+3. Background sweeps (auto-publish of scheduled weeks, "due soon" and "empty week" notifications) run inside the backend process every 6 h — nothing to schedule. Auto-publish is also applied lazily on every course read.
+4. Task Mentor / Tupo need an IntegrationToken with scope `learning-events:write` to report results: `npx ts-node scripts/create-integration-token.ts --name="Task Mentor" --scopes="sync:read learning-events:write"`.
+5. Frontend ships `public/elearning-sw.js` (learner offline cache); nginx must serve `/elearning-sw.js` from the site root with `Service-Worker-Allowed: /` semantics (default when served from `/`).

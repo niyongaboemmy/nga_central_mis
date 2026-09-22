@@ -24,6 +24,9 @@ import PdfPagesViewer from "./PdfPagesViewer";
 
 interface Props {
   note: SharedNoteDetail;
+  /** Embedded (course page) navigation — defaults to the shared-notes library. */
+  onBack?: () => void;
+  backLabel?: string;
 }
 
 // Same four quick actions as the HTML reader's highlight toolbar, so a student who has
@@ -48,7 +51,7 @@ const ZOOM_STEPS = [0.7, 0.85, 1, 1.2, 1.4];
  *  text layer, which is what makes "highlight a sentence → Ask AI" work on a PDF exactly
  *  the way it does on a typed note. Everything around the pages (toolbar, progress bar,
  *  highlight toolbar, AI panel) deliberately mirrors SharedLessonNoteViewPage. */
-const SharedPdfNoteReader: React.FC<Props> = ({ note }) => {
+const SharedPdfNoteReader: React.FC<Props> = ({ note, onBack, backLabel }) => {
   const navigate = useNavigate();
   const { prefs, update } = useReaderPrefs();
 
@@ -200,11 +203,11 @@ const SharedPdfNoteReader: React.FC<Props> = ({ note }) => {
           >
             <div className="max-w-[1400px] mx-auto px-3 sm:px-5 py-2 flex items-center gap-2">
               <button
-                onClick={() => navigate("/shared-lesson-notes")}
+                onClick={onBack || (() => navigate("/shared-lesson-notes"))}
                 className="flex items-center gap-1 px-2 py-2 rounded-lg text-sm text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 flex-shrink-0"
               >
                 <ArrowLeft className="w-4 h-4" />
-                <span className="hidden sm:inline">Library</span>
+                <span className="hidden sm:inline">{backLabel || "Library"}</span>
               </button>
 
               <div className="min-w-0 flex-1 hidden md:block">

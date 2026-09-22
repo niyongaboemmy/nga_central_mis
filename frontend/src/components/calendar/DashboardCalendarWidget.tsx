@@ -462,6 +462,7 @@ const DashboardCalendarWidget: React.FC = () => {
         canEdit={false}
         onEditClick={() => {}}
         onViewLessonPlan={handleViewLessonPlan}
+        selectedSlotDate={selectedSlotDate}
         canViewLessonPlan={Boolean(canViewSummaryLessonPlan)}
         isLoadingLessonPlan={isLoadingLessonPlan}
       />

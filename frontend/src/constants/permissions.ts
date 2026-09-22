@@ -118,6 +118,12 @@ export const Permissions = {
   MANAGE_LESSON_NOTES: "MANAGE_LESSON_NOTES",
   VIEW_SHARED_LESSON_NOTES: "VIEW_SHARED_LESSON_NOTES",
 
+  // E-Learning
+  MANAGE_COURSE_CONTENT: "MANAGE_COURSE_CONTENT",
+  VIEW_MY_COURSES: "VIEW_MY_COURSES",
+  VIEW_ALL_COURSES: "VIEW_ALL_COURSES",
+  OVERRIDE_COURSE_PROGRESS: "OVERRIDE_COURSE_PROGRESS",
+
   // Database Management
   DATABASE_MANAGEMENT: "DATABASE_MANAGEMENT",
 } as const;
@@ -242,6 +248,12 @@ export const permissionGroups = {
   lessonNotes: [
     Permissions.MANAGE_LESSON_NOTES,
     Permissions.VIEW_SHARED_LESSON_NOTES,
+  ],
+  elearning: [
+    Permissions.MANAGE_COURSE_CONTENT,
+    Permissions.VIEW_MY_COURSES,
+    Permissions.VIEW_ALL_COURSES,
+    Permissions.OVERRIDE_COURSE_PROGRESS,
   ],
   settings: [Permissions.MANAGE_SETTINGS],
   admin: [Permissions.ADMIN],

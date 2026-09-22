@@ -25,6 +25,7 @@ import lessonNoteRoutes from "./routes/lessonNotes";
 import databaseRoutes from "./routes/databaseRoutes";
 import integrationRoutes from "./routes/integrationRoutes";
 import notificationRoutes from "./routes/notifications";
+import elearningRoutes from "./routes/elearning";
 
 const app = express();
 
@@ -82,6 +83,7 @@ app.use("/reports", reportRoutes);
 app.use("/curriculum", curriculumRoutes);
 app.use("/mentorship", mentorshipRoutes);
 app.use("/lesson-notes", lessonNoteRoutes);
+app.use("/elearning", elearningRoutes);
 app.use("/database", databaseRoutes);
 app.use("/notifications", notificationRoutes);
 // Machine-to-machine, IntegrationToken-authenticated, read-only. Mounted last

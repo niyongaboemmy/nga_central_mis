@@ -61,10 +61,13 @@ import {
   ArrowRightToLine,
   PanelTop,
   Crop,
+  Eye,
+  HelpCircle,
 } from "lucide-react";
 import { useToast } from "../../contexts/ToastContext";
 import { lessonNotesApi, PromptPreset } from "../../api/lessonNotes";
 import { QUICK_PROMPTS } from "./quickPrompts";
+import { InlineCheck, Reveal } from "../elearning/interactive/nodes";
 
 interface Props {
   initialContent: any;
@@ -313,6 +316,9 @@ const LessonNoteRichEditor: React.FC<Props> = ({
       ShadedTableCell,
       CharacterCount,
       Mathematics,
+      // Interactive blocks for the e-learning reader (tap-to-reveal, inline quick check).
+      Reveal,
+      InlineCheck,
     ],
     content: initialContent || "",
     onUpdate: ({ editor: e }) => {
@@ -705,6 +711,20 @@ const LessonNoteRichEditor: React.FC<Props> = ({
         </ToolbarButton>
         <ToolbarButton title="Quote" active={editor.isActive("blockquote")} onClick={() => editor.chain().focus().toggleBlockquote().run()}>
           <Quote className="w-4 h-4" />
+        </ToolbarButton>
+        <div className="w-px h-5 bg-gray-200 dark:bg-gray-700 mx-1" />
+        <ToolbarButton
+          title="Tap to reveal — hide an answer or example until the student taps"
+          active={editor.isActive("reveal")}
+          onClick={() => {
+            const summary = window.prompt("What should the student tap? (e.g. 'Show the answer')", "Tap to reveal");
+            if (summary !== null) (editor.chain().focus() as any).insertReveal(summary.trim() || "Tap to reveal").run();
+          }}
+        >
+          <Eye className="w-4 h-4" />
+        </ToolbarButton>
+        <ToolbarButton title="Quick check — a question with instant feedback, inside the note" onClick={() => (editor.chain().focus() as any).insertInlineCheck().run()}>
+          <HelpCircle className="w-4 h-4" />
         </ToolbarButton>
         <div className="w-px h-5 bg-gray-200 dark:bg-gray-700 mx-1" />
         <ToolbarButton title="Align left" active={editor.isActive({ textAlign: "left" })} onClick={() => editor.chain().focus().setTextAlign("left").run()}>

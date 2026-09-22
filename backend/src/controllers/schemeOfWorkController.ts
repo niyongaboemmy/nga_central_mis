@@ -19,6 +19,7 @@ import {
   School,
 } from "../db/schema";
 import { asyncHandler } from "../middleware/asyncHandler";
+import { syncCourseForScheme, onSchemeEntryDeleted } from "../services/elearning/courseSeeding";
 import { successResponse } from "../utils/response";
 import {
   ValidationError,
@@ -807,6 +808,9 @@ export const addSchemeEntry = asyncHandler(async (req: any, res: any) => {
   const resultHeader = Array.isArray(result) ? result[0] : result;
   const entryId = (resultHeader as any).insertId;
 
+  // Keep the e-learning course (if one exists) in step with the scheme.
+  await syncCourseForScheme(schemeId);
+
   successResponse(
     res,
     "Scheme entry added successfully",
@@ -967,6 +971,8 @@ export const insertSchemeEntry = asyncHandler(async (req: any, res: any) => {
     userId,
   );
 
+  await syncCourseForScheme(schemeId);
+
   successResponse(
     res,
     "Entry inserted and schedule updated",
@@ -985,6 +991,10 @@ export const deleteSchemeEntry = asyncHandler(async (req: any, res: any) => {
   if (isNaN(entryId)) {
     throw new ValidationError("Invalid entry ID");
   }
+
+  // An empty course section goes with its week; a filled one is kept (hidden) — see
+  // services/elearning/courseSeeding.onSchemeEntryDeleted. Must run before the FK SET NULL.
+  await onSchemeEntryDeleted(entryId);
 
   const result = await db
     .delete(SchemeOfWorkEntry)
@@ -1116,6 +1126,9 @@ export const updateSchemeEntry = asyncHandler(async (req: any, res: any) => {
       entry_status: entry_status ?? existingEntry[0].entry_status,
     })
     .where(eq(SchemeOfWorkEntry.entry_id, entryId));
+
+  // Status/dates/competency changes flow into the course's section (auto-publish on COMPLETED).
+  await syncCourseForScheme(existingEntry[0].scheme_id);
 
   successResponse(res, "Scheme entry updated successfully");
 });

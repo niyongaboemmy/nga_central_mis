@@ -1,4 +1,5 @@
 import React from "react";
+import OpenLessonContentButton from "../elearning/learner/OpenLessonContentButton";
 import { X, Clock, CalendarDays, Sparkles, Users } from "lucide-react";
 import ActivityAssigneePicker, { assigneeLabel } from "./ActivityAssigneePicker";
 import SubjectSelect from "../ui/SubjectSelect";
@@ -94,6 +95,8 @@ interface CalendarSlotModalProps {
   canViewLessonPlan: boolean;
   onEditClick: () => void;
   onViewLessonPlan: (slot: CalendarSlot) => void;
+  /** The calendar day the slot was opened on — lets the e-learning link resolve the right week. */
+  selectedSlotDate?: Date | null;
   isSubmitting?: boolean;
   isDeleting?: boolean;
   isLoadingLessonPlan?: boolean;
@@ -147,6 +150,7 @@ const CalendarSlotModal: React.FC<CalendarSlotModalProps> = ({
   onEditClick,
   onViewLessonPlan,
   canViewLessonPlan,
+  selectedSlotDate,
   isSubmitting,
   isDeleting,
   isLoadingLessonPlan,
@@ -841,6 +845,10 @@ const CalendarSlotModal: React.FC<CalendarSlotModalProps> = ({
           ) : mode === "details" ? (
             <>
               <div className="flex items-center gap-3">
+                {/* E-learning: jump to the course week that covers this lesson (students only). */}
+                {selectedSlot && (
+                  <OpenLessonContentButton subjectId={selectedSlot.subject_id} classGroupId={selectedSlot.class_group_id} date={selectedSlotDate ?? null} />
+                )}
                 {canViewLessonPlan && (
                   <button
                     type="button"

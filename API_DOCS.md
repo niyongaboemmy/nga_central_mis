@@ -1995,3 +1995,68 @@ Remove a parent-student relationship.
 ### GET /parenting/search
 Search for potential relations.
 **Authentication:** Required
+
+## E-Learning Endpoints (`/elearning`)
+
+Student-facing, curriculum-aligned courses built on the Scheme of Work (see `ELEARNING_MODULE_IMPLEMENTATION_PLAN.md`). One `Course` per scheme (subject × class group × term); `CourseSection`s are seeded from weekly entries; `CourseItem`s reference existing lesson notes / materials or hold their own page, video, link or knowledge check. Membership is derived (student in the class group **and** enrolled in the subject for that year) — non-members receive `404`.
+
+### Learner — `VIEW_MY_COURSES`
+
+| Method | Path | Purpose |
+|---|---|---|
+| GET | `/elearning/my/courses` | Cards: progress %, this week, next item, due soon, near-goal nudges |
+| GET | `/elearning/my/courses/:id` | Course index: published sections with lock state, items with progress |
+| GET | `/elearning/my/items/:id` | Resolves an item (note → `note_id`, document → `file_url`, page → HTML, video → embed, check → questions without answers); records `VIEWED` and completes `VIEW` items |
+| GET | `/elearning/my/items/:id/file` | Streams a material / note PDF for a member (`?download=1` for attachment) |
+| POST | `/elearning/my/items/:id/heartbeat` | `{seconds, position}` every ~30 s; time capped at 2× the item's estimate |
+| POST | `/elearning/my/items/:id/done` | Mark done (`MARK_DONE`/`VIEW` rules); returns `section_just_completed` for celebrations |
+| POST | `/elearning/my/items/:id/knowledge-check/check` | `{question_id, answer_index}` → instant feedback (correct index revealed only when right) |
+| POST | `/elearning/my/items/:id/knowledge-check` | `{answers}` → scores the attempt, projects best score, completes `SUBMIT`/`MIN_SCORE` |
+| POST | `/elearning/my/courses/:id/ask` | Course-wide AI tutor `{question, section_id?, mode?}` → answer with citations; logs `ASKED_AI` |
+| GET | `/elearning/my/courses/:id/ask/suggestions` | Suggested questions from the week's criteria |
+| GET | `/elearning/my/section-for-date` | `?subject_id&class_group_id&date` → the published week covering a timetable slot |
+| GET | `/elearning/my/mastery` | Per subject → element → criteria: `NOT_COVERED` / `COVERED` / `DEMONSTRATED` |
+| GET | `/elearning/my/streak` | Consecutive active weeks (opt-in, personal) |
+| GET/PATCH | `/elearning/my/prefs` | `celebrations_enabled`, `streak_enabled`, `reduced_motion` |
+
+### Builder — `MANAGE_COURSE_CONTENT` (scoped to the teacher's subject × class group assignment)
+
+| Method | Path | Purpose |
+|---|---|---|
+| GET | `/elearning/courses/mine` | Courses the teacher can build |
+| GET | `/elearning/courses/by-scheme/:schemeId` | Probe: does this scheme have a course |
+| POST | `/elearning/courses/from-scheme/:schemeId` | Create + seed from the scheme (idempotent) |
+| GET / PATCH | `/elearning/courses/:id` | Builder tree / `title, description, status, require_sequential_progress, auto_publish_from_scheme, cover_color, icon` |
+| POST | `/elearning/courses/:id/reseed` | Pull in notes/materials created since set-up |
+| POST / PUT | `/elearning/courses/:id/sections`, `/elearning/courses/:id/sections/order` | Manual sections; ordering (scheme weeks keep scheme order) |
+| PATCH / DELETE | `/elearning/sections/:id` | `title, summary, status (HIDDEN\|SCHEDULED\|PUBLISHED), unlock_at, requirement_type (ALL\|ONE)`; only manual sections can be deleted |
+| PUT | `/elearning/sections/:id/prerequisites` | `{requires_section_ids}` |
+| POST / PUT | `/elearning/sections/:id/items`, `/elearning/sections/:id/items/order` | Add item (`item_type` + type-specific body), reorder/move |
+| PATCH / DELETE | `/elearning/items/:id` | Update item; body re-validated per type |
+| PUT | `/elearning/items/:id/criteria` | Criteria alignment (non-note items) |
+| POST | `/elearning/items/:id/suggest-criteria`, `/elearning/items/:id/generate-check` | AI proposals (provider fallback chain) |
+| GET | `/elearning/items/:id/knowledge-check/stats` | Attempts, average, most-missed question |
+| GET | `/elearning/courses/:id/pickers/lesson-notes` · `subject-documents` · `criteria` | Content pickers |
+| GET | `/elearning/courses/:id/analytics` · `mastery` · `questions` · `prerequisites` | Insights: funnel, per-student table, heat-map, anonymised tutor questions |
+| GET | `/elearning/courses/:id/coverage` | Curriculum coverage: each week's target criteria (from the scheme) vs items, gaps, per-element planned → content → live |
+| POST | `/elearning/sections/:id/build-journey` | Fills a week's gaps with the teacher's notes aligned to the missing criteria; reports what is still missing and whether the week has a check |
+| GET | `/elearning/courses/:id/report.csv` | Student progress report (completion, time, criteria covered/shown) — teacher or oversight |
+| POST | `/elearning/courses/:id/nudge` | `{student_ids, message?}` friendly notification |
+| POST | `/elearning/items/:id/progress/:userId/complete` | Teacher override (`OVERRIDE_COURSE_PROGRESS`, audited) |
+
+Item types: `HEADER`, `LESSON_NOTE` (`ref_id` = note; auto-creates a class-group share), `SUBJECT_DOCUMENT` (`ref_id`), `PAGE` (`content_json`, `content_html` sanitised), `VIDEO` (`url` — YouTube/Vimeo only), `LINK` (`url`), `KNOWLEDGE_CHECK` (`content_json.questions[]`, ≤ 10), `TASKMENTOR_QUIZ` / `TASKMENTOR_ASSIGNMENT` / `DISCUSSION` (`url`, `ref_id`). Completion rules: `NONE`, `VIEW`, `MARK_DONE`, `SUBMIT`, `MIN_SCORE` (+ `min_score_pct`).
+
+### Oversight — `VIEW_ALL_COURSES` (scoped via programme-lead / class-teacher assignments)
+
+| Method | Path | Purpose |
+|---|---|---|
+| GET | `/elearning/admin/courses` | Register: every scheme with course status, weeks live, engagement + KPIs (`?academic_year_id&academic_term_id&program_id&grade_id&subject_id`) |
+| GET | `/elearning/admin/courses/export.csv` | Same as CSV |
+| GET | `/elearning/admin/courses/:id/analytics` · `mastery` · `coverage` | Drill-down (register rows also carry `coverage_pct`) |
+
+### Integrations (IntegrationToken)
+
+| Method | Path | Scope | Purpose |
+|---|---|---|---|
+| POST | `/integrations/learning-events` | `learning-events:write` | Batch of xAPI-lite statements `{events:[{actor_user_id, verb, object_type, object_id, result?, context?, occurred_at?, idempotency_key?}]}`; idempotent per `(source, idempotency_key)`; `SCORED`/`SUBMITTED`/`PASSED` on a `TASKMENTOR_*` object completes the matching item |
+| GET | `/integrations/sync/courses` | `sync:read` | Published courses + items referencing partner objects, with `return_url` for deep links |

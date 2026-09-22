@@ -32,7 +32,25 @@ export default {
           light: "#e2e8f0",
           dark: "#475569",
         },
+        // E-learning design tokens (ELEARNING_MODULE_UX_IMPLEMENTATION_PLAN.md §2.1).
+        // brand = the existing blue family; accent = the warm "joy" colour reserved for
+        // celebrations, the streak flame and the mascot — never for everyday chrome.
+        brand: { 50: "#eef4ff", 100: "#d9e6ff", 200: "#b6ccff", 500: "#3b6cff", 600: "#2f56d9", 700: "#2444ad" },
+        accent: { 100: "#ffe9d6", 500: "#ff8a3d", 600: "#e5731f" },
+        success: { 100: "#dcfce7", 500: "#22c55e", 700: "#15803d" },
+        warning: { 100: "#fef3c7", 500: "#f59e0b", 700: "#b45309" },
+        danger: { 100: "#fee2e2", 500: "#ef4444", 700: "#b91c1c" },
       },
+      borderRadius: { pill: "9999px" },
+      boxShadow: {
+        soft: "0 1px 2px rgb(15 23 42 / .04), 0 8px 24px -12px rgb(15 23 42 / .12)",
+        float: "0 12px 40px -12px rgb(15 23 42 / .25)",
+        glow: "0 0 0 4px rgb(59 108 255 / .18)",
+      },
+      fontSize: {
+        display: ["2rem", { lineHeight: "1.15", letterSpacing: "-0.02em", fontWeight: "700" }],
+      },
+      transitionTimingFunction: { spring: "cubic-bezier(.2,.8,.2,1)" },
       animation: {
         "fade-in": "fadeIn 0.3s ease-in-out",
         "slide-up": "slideUp 0.3s ease-out",

@@ -18,6 +18,10 @@ export const sanitizeNoteHtml = (html: string): string =>
       // them here, a teacher's manual column-resize would silently vanish on save.
       "table", "thead", "tbody", "tr", "th", "td", "colgroup", "col",
       "img", "a", "span",
+      // E-learning interactive blocks (frontend/src/components/elearning/interactive/nodes.tsx):
+      // <details data-type="reveal"><summary>…</summary><div>…</div></details> and
+      // <div data-type="inline-check" data-check="{json}">…static fallback…</div>.
+      "details", "summary",
     ],
     allowedAttributes: {
       // width/height are the legacy Image-extension output; style carries the resize/
@@ -41,7 +45,9 @@ export const sanitizeNoteHtml = (html: string): string =>
       ul: ["data-type"],
       li: ["data-type", "data-checked"],
       input: [{ name: "type", values: ["checkbox"] }, "checked", "disabled"],
-      p: ["style"],
+      p: ["style", "class"],
+      details: ["data-type", "class"],
+      div: ["data-type", "data-check", "class"],
       h1: ["style"],
       h2: ["style"],
       h3: ["style"],

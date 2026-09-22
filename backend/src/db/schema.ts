@@ -1716,3 +1716,237 @@ export const IntegrationToken = mysqlTable(
     ),
   }),
 );
+
+// ============================================================================
+// E-LEARNING (migration 085+) — see ELEARNING_MODULE_IMPLEMENTATION_PLAN.md §3.1
+// ============================================================================
+
+// Course — the student-facing shape of one Scheme of Work (1:1 on scheme_id).
+// subject/class group/term are denormalised from the scheme for cheap listing.
+export const Course = mysqlTable("Course", {
+  course_id: bigint("course_id", { mode: "number" }).primaryKey().autoincrement(),
+  scheme_id: bigint("scheme_id", { mode: "number" })
+    .notNull()
+    .references(() => SchemeOfWork.scheme_id, { onDelete: "cascade" }),
+  subject_id: bigint("subject_id", { mode: "number" })
+    .notNull()
+    .references(() => Subject.subject_id),
+  class_group_id: bigint("class_group_id", { mode: "number" })
+    .notNull()
+    .references(() => ClassGroup.class_group_id),
+  academic_term_id: bigint("academic_term_id", { mode: "number" })
+    .notNull()
+    .references(() => AcademicTerm.academic_term_id),
+  owner_user_id: bigint("owner_user_id", { mode: "number" })
+    .notNull()
+    .references(() => User.user_id),
+  title: varchar("title", { length: 255 }).notNull(),
+  description: text("description"),
+  cover_color: varchar("cover_color", { length: 7 }),
+  icon: varchar("icon", { length: 16 }),
+  status: mysqlEnum("status", ["DRAFT", "PUBLISHED", "ARCHIVED"]).notNull().default("DRAFT"),
+  require_sequential_progress: tinyint("require_sequential_progress").notNull().default(0),
+  auto_publish_from_scheme: tinyint("auto_publish_from_scheme").notNull().default(1),
+  created_at: datetime("created_at").default(sql`CURRENT_TIMESTAMP`),
+  updated_at: datetime("updated_at").default(sql`CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP`),
+});
+
+// CourseSection — one per scheme week (seeded), plus optional manual sections.
+export const CourseSection = mysqlTable("CourseSection", {
+  section_id: bigint("section_id", { mode: "number" }).primaryKey().autoincrement(),
+  course_id: bigint("course_id", { mode: "number" })
+    .notNull()
+    .references(() => Course.course_id, { onDelete: "cascade" }),
+  scheme_entry_id: bigint("scheme_entry_id", { mode: "number" }).references(
+    () => SchemeOfWorkEntry.entry_id,
+    { onDelete: "set null" },
+  ),
+  competency_id: bigint("competency_id", { mode: "number" }).references(
+    () => SubjectCompetency.competency_id,
+    { onDelete: "set null" },
+  ),
+  title: varchar("title", { length: 255 }).notNull(),
+  summary: text("summary"),
+  position: int("position").notNull().default(0),
+  status: mysqlEnum("status", ["HIDDEN", "SCHEDULED", "PUBLISHED"]).notNull().default("HIDDEN"),
+  unlock_at: datetime("unlock_at"),
+  requirement_type: mysqlEnum("requirement_type", ["ALL", "ONE"]).notNull().default("ALL"),
+  created_at: datetime("created_at").default(sql`CURRENT_TIMESTAMP`),
+  updated_at: datetime("updated_at").default(sql`CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP`),
+});
+
+export const COURSE_ITEM_TYPES = [
+  "HEADER",
+  "LESSON_NOTE",
+  "SUBJECT_DOCUMENT",
+  "PAGE",
+  "VIDEO",
+  "LINK",
+  "TASKMENTOR_QUIZ",
+  "TASKMENTOR_ASSIGNMENT",
+  "KNOWLEDGE_CHECK",
+  "DISCUSSION",
+] as const;
+export type CourseItemType = (typeof COURSE_ITEM_TYPES)[number];
+
+export const COMPLETION_RULES = ["NONE", "VIEW", "MARK_DONE", "SUBMIT", "MIN_SCORE"] as const;
+export type CompletionRule = (typeof COMPLETION_RULES)[number];
+
+// CourseItem — polymorphic by item_type; ref_id points at existing content, content_json
+// only holds bytes for the types MIS itself authors (PAGE, VIDEO, LINK, KNOWLEDGE_CHECK).
+export const CourseItem = mysqlTable("CourseItem", {
+  item_id: bigint("item_id", { mode: "number" }).primaryKey().autoincrement(),
+  section_id: bigint("section_id", { mode: "number" })
+    .notNull()
+    .references(() => CourseSection.section_id, { onDelete: "cascade" }),
+  item_type: mysqlEnum("item_type", COURSE_ITEM_TYPES).notNull(),
+  ref_id: bigint("ref_id", { mode: "number" }),
+  title: varchar("title", { length: 255 }).notNull(),
+  description: text("description"),
+  content_json: json("content_json"),
+  content_html: text("content_html"),
+  external_url: varchar("external_url", { length: 1000 }),
+  position: int("position").notNull().default(0),
+  indent: tinyint("indent").notNull().default(0),
+  is_published: tinyint("is_published").notNull().default(1),
+  is_required: tinyint("is_required").notNull().default(1),
+  completion_rule: mysqlEnum("completion_rule", COMPLETION_RULES).notNull().default("VIEW"),
+  min_score_pct: tinyint("min_score_pct"),
+  estimated_minutes: int("estimated_minutes"),
+  due_at: datetime("due_at"),
+  created_by: bigint("created_by", { mode: "number" })
+    .notNull()
+    .references(() => User.user_id),
+  created_at: datetime("created_at").default(sql`CURRENT_TIMESTAMP`),
+  updated_at: datetime("updated_at").default(sql`CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP`),
+});
+
+// CourseItemCriteria — criteria alignment for non-note items (notes use LessonNoteCriteria).
+export const CourseItemCriteria = mysqlTable(
+  "CourseItemCriteria",
+  {
+    item_id: bigint("item_id", { mode: "number" })
+      .notNull()
+      .references(() => CourseItem.item_id, { onDelete: "cascade" }),
+    criteria_id: bigint("criteria_id", { mode: "number" })
+      .notNull()
+      .references(() => CompetencyPerformanceCriteria.criteria_id, { onDelete: "cascade" }),
+    created_at: datetime("created_at").default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => ({
+    pk: primaryKey(table.item_id, table.criteria_id),
+  }),
+);
+
+// CourseItemProgress — per-student projection of the LearningEvent log (migration 086).
+export const CourseItemProgress = mysqlTable(
+  "CourseItemProgress",
+  {
+    item_id: bigint("item_id", { mode: "number" })
+      .notNull()
+      .references(() => CourseItem.item_id, { onDelete: "cascade" }),
+    user_id: bigint("user_id", { mode: "number" })
+      .notNull()
+      .references(() => User.user_id, { onDelete: "cascade" }),
+    state: mysqlEnum("state", ["NOT_STARTED", "IN_PROGRESS", "COMPLETED"]).notNull().default("NOT_STARTED"),
+    first_viewed_at: datetime("first_viewed_at"),
+    last_viewed_at: datetime("last_viewed_at"),
+    completed_at: datetime("completed_at"),
+    completed_via: mysqlEnum("completed_via", ["VIEW", "MARK_DONE", "EVENT", "TEACHER"]),
+    view_count: int("view_count").notNull().default(0),
+    seconds_spent: int("seconds_spent").notNull().default(0),
+    best_score_pct: decimal("best_score_pct", { precision: 5, scale: 2 }),
+    last_position: json("last_position"),
+  },
+  (table) => ({
+    pk: primaryKey(table.item_id, table.user_id),
+  }),
+);
+
+export const LEARNING_VERBS = [
+  "VIEWED",
+  "PROGRESSED",
+  "COMPLETED",
+  "MARKED_DONE",
+  "ATTEMPTED",
+  "SCORED",
+  "PASSED",
+  "FAILED",
+  "SUBMITTED",
+  "COMMENTED",
+  "ASKED_AI",
+] as const;
+export type LearningVerb = (typeof LEARNING_VERBS)[number];
+
+export const LEARNING_OBJECT_TYPES = [
+  "COURSE_ITEM",
+  "COURSE_SECTION",
+  "COURSE",
+  "LESSON_NOTE",
+  "TASKMENTOR_QUIZ",
+  "TASKMENTOR_ASSIGNMENT",
+  "TUPO_THREAD",
+] as const;
+export type LearningObjectType = (typeof LEARNING_OBJECT_TYPES)[number];
+
+// LearningEvent — xAPI-shaped append-only log (actor, verb, object, result, context).
+export const LearningEvent = mysqlTable("LearningEvent", {
+  event_id: bigint("event_id", { mode: "number" }).primaryKey().autoincrement(),
+  actor_user_id: bigint("actor_user_id", { mode: "number" })
+    .notNull()
+    .references(() => User.user_id, { onDelete: "cascade" }),
+  verb: mysqlEnum("verb", LEARNING_VERBS).notNull(),
+  object_type: mysqlEnum("object_type", LEARNING_OBJECT_TYPES).notNull(),
+  object_id: bigint("object_id", { mode: "number" }).notNull(),
+  course_item_id: bigint("course_item_id", { mode: "number" }).references(() => CourseItem.item_id, {
+    onDelete: "set null",
+  }),
+  result_json: json("result_json"),
+  context_json: json("context_json"),
+  source_system: varchar("source_system", { length: 30 }).notNull().default("MIS"),
+  occurred_at: datetime("occurred_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  idempotency_key: varchar("idempotency_key", { length: 120 }),
+});
+
+// CourseSectionPrerequisite — Canvas prerequisite_module_ids.
+export const CourseSectionPrerequisite = mysqlTable(
+  "CourseSectionPrerequisite",
+  {
+    section_id: bigint("section_id", { mode: "number" })
+      .notNull()
+      .references(() => CourseSection.section_id, { onDelete: "cascade" }),
+    requires_section_id: bigint("requires_section_id", { mode: "number" })
+      .notNull()
+      .references(() => CourseSection.section_id, { onDelete: "cascade" }),
+  },
+  (table) => ({
+    pk: primaryKey(table.section_id, table.requires_section_id),
+  }),
+);
+
+// KnowledgeCheckAttempt — every attempt at a KNOWLEDGE_CHECK item (migration 087).
+export const KnowledgeCheckAttempt = mysqlTable("KnowledgeCheckAttempt", {
+  attempt_id: bigint("attempt_id", { mode: "number" }).primaryKey().autoincrement(),
+  item_id: bigint("item_id", { mode: "number" })
+    .notNull()
+    .references(() => CourseItem.item_id, { onDelete: "cascade" }),
+  user_id: bigint("user_id", { mode: "number" })
+    .notNull()
+    .references(() => User.user_id, { onDelete: "cascade" }),
+  answers_json: json("answers_json").notNull(),
+  correct: int("correct").notNull().default(0),
+  total: int("total").notNull().default(0),
+  score_pct: decimal("score_pct", { precision: 5, scale: 2 }).notNull().default("0"),
+  attempted_at: datetime("attempted_at").default(sql`CURRENT_TIMESTAMP`),
+});
+
+// UserLearningPrefs — per-account learning choices (UX plan §6.3).
+export const UserLearningPrefs = mysqlTable("UserLearningPrefs", {
+  user_id: bigint("user_id", { mode: "number" })
+    .primaryKey()
+    .references(() => User.user_id, { onDelete: "cascade" }),
+  streak_enabled: tinyint("streak_enabled").notNull().default(0),
+  celebrations_enabled: tinyint("celebrations_enabled").notNull().default(1),
+  reduced_motion: tinyint("reduced_motion"),
+  updated_at: datetime("updated_at").default(sql`CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP`),
+});

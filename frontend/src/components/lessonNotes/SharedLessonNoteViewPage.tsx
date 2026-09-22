@@ -38,6 +38,7 @@ import {
 } from "./reader/pagination";
 import NoteAIPanel, { AskMode, AskRequest } from "./reader/NoteAIPanel";
 import SharedPdfNoteReader from "./pdf/SharedPdfNoteReader";
+import { hydrateInlineChecks } from "../elearning/interactive/hydrate";
 
 interface TocItem {
   id: string;
@@ -52,9 +53,20 @@ const SELECTION_ACTIONS: { mode: AskMode; label: string; question: string }[] = 
   { mode: "define", label: "Define", question: "Define the key terms in this passage." },
 ];
 
-const SharedLessonNoteViewPage: React.FC = () => {
-  const { id } = useParams<{ id: string }>();
+interface Props {
+  /** Render a specific note instead of the route param — used when the reader is embedded
+   *  in the e-learning course page (My Learning). */
+  noteId?: number;
+  /** Where the back button goes when embedded. */
+  onBack?: () => void;
+  backLabel?: string;
+}
+
+const SharedLessonNoteViewPage: React.FC<Props> = ({ noteId, onBack, backLabel }) => {
+  const { id: routeId } = useParams<{ id: string }>();
+  const id = noteId ?? routeId;
   const navigate = useNavigate();
+  const goBack = onBack || (() => navigate("/shared-lesson-notes"));
   const { showToast } = useToast();
   const { prefs, update } = useReaderPrefs();
 
@@ -114,6 +126,8 @@ const SharedLessonNoteViewPage: React.FC = () => {
       delimiters: [{ left: "$", right: "$", display: false }],
       throwOnError: false,
     });
+    // Tap-to-reveal / inline quick-check blocks the teacher inserted from the editor.
+    hydrateInlineChecks(root);
 
     const headings = Array.from(root.querySelectorAll("h1, h2, h3")) as HTMLElement[];
     const items: TocItem[] = headings.map((h, i) => {
@@ -336,10 +350,10 @@ const SharedLessonNoteViewPage: React.FC = () => {
         <BookOpen className="w-10 h-10 text-gray-300 dark:text-gray-600 mb-3" />
         <p className="text-gray-500 dark:text-gray-400">This lesson note isn't available to you.</p>
         <button
-          onClick={() => navigate("/shared-lesson-notes")}
+          onClick={goBack}
           className="mt-4 px-4 py-2 text-sm font-medium rounded-full bg-blue-600 hover:bg-blue-700 text-white"
         >
-          Back to my library
+          {backLabel ? `Back to ${backLabel.toLowerCase()}` : "Back to my library"}
         </button>
       </div>
     );
@@ -357,7 +371,7 @@ const SharedLessonNoteViewPage: React.FC = () => {
   // A PDF-backed note has real pages of its own — pdf.js renders them (with a selectable
   // text layer, so highlight-to-ask still works) instead of the HTML sheet below.
   if (isPdfBackedNote(note)) {
-    return <SharedPdfNoteReader note={note} />;
+    return <SharedPdfNoteReader note={note} onBack={onBack} backLabel={backLabel} />;
   }
 
   const flowStyle: React.CSSProperties = bookMode ? bookFlowStyle(page) : {};
@@ -387,11 +401,11 @@ const SharedLessonNoteViewPage: React.FC = () => {
           >
             <div className="max-w-[1400px] mx-auto px-3 sm:px-5 py-2 flex items-center gap-2">
               <button
-                onClick={() => navigate("/shared-lesson-notes")}
+                onClick={goBack}
                 className="flex items-center gap-1 px-2 py-2 rounded-lg text-sm text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 flex-shrink-0"
               >
                 <ArrowLeft className="w-4 h-4" />
-                <span className="hidden sm:inline">Library</span>
+                <span className="hidden sm:inline">{backLabel || "Library"}</span>
               </button>
 
               <div className="min-w-0 flex-1 hidden md:block">

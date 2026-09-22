@@ -6,7 +6,13 @@ import logger from "./logger";
 export type NotificationKind =
   | "document_shared"
   | "folder_shared"
-  | "permission_revoked";
+  | "permission_revoked"
+  // E-learning (ELEARNING_MODULE_IMPLEMENTATION_PLAN.md §3.6)
+  | "course_section_published"
+  | "course_item_due_soon"
+  | "course_result_received"
+  | "course_section_empty"
+  | "course_nudge";
 
 export interface NotifyUserInput {
   userId: number;
@@ -14,7 +20,7 @@ export interface NotifyUserInput {
   title: string;
   body?: string;
   link?: string;
-  subjectType: "document" | "folder";
+  subjectType: "document" | "folder" | "course_section" | "course_item" | "course";
   subjectId: number;
   actorId?: number;
 }

@@ -1,5 +1,5 @@
 import React from "react";
-import { School, Server, Activity, Database } from "lucide-react";
+import { School, Server, Activity, Database, GraduationCap, LayoutGrid, MonitorCheck } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useUser } from "../../contexts/UserContext";
 import { Permissions } from "../../constants/permissions";
@@ -174,6 +174,24 @@ const Sidebar: React.FC<SidebarProps> = ({
         </svg>
       ),
       requiredPermission: Permissions.MANAGE_LESSON_NOTES,
+    },
+    {
+      label: "My Learning",
+      path: "/my-learning",
+      icon: <GraduationCap className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
+      requiredPermission: Permissions.VIEW_MY_COURSES,
+    },
+    {
+      label: "E-Learning",
+      path: "/elearning/courses",
+      icon: <LayoutGrid className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
+      requiredPermission: Permissions.MANAGE_COURSE_CONTENT,
+    },
+    {
+      label: "E-Learning Oversight",
+      path: "/admin/elearning",
+      icon: <MonitorCheck className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
+      requiredPermission: Permissions.VIEW_ALL_COURSES,
     },
     {
       label: "Shared Notes",
@@ -567,8 +585,12 @@ const Sidebar: React.FC<SidebarProps> = ({
     },
   ];
 
+  // Nested learner/builder routes keep their sidebar entry lit (e.g. /my-learning/courses/3).
   const isActive = (path?: string) =>
-    path ? location.pathname === path : false;
+    path
+      ? location.pathname === path ||
+        ((path === "/my-learning" || path === "/elearning/courses") && location.pathname.startsWith(path))
+      : false;
 
   return (
     <aside

@@ -6,15 +6,17 @@ import {
   syncPeople,
   syncReference,
 } from "../controllers/integrationController";
+import { ingestLearningEvents, syncCourses } from "../controllers/courseAnalyticsController";
 
 /**
  * Machine-to-machine integration surface.
  *
  * Every route here is authenticated by an IntegrationToken, never by a user
- * session, and every route is read-only. Nothing under /integrations may write
- * to the MIS — a partner pulling a copy should not be able to change the
- * system of record, and keeping that a property of the whole router (rather
- * than a per-handler promise) makes it hard to break by accident later.
+ * session. The sync routes are read-only under the `sync:read` scope. The one
+ * write is the e-learning event inbox (`learning-events:write`): an append-only
+ * log of "student X completed quiz Y" statements that only ever adds progress
+ * for the course items that reference the partner's own objects — it cannot
+ * touch the MIS system of record (roster, curriculum, notes).
  */
 const router = Router();
 
@@ -24,5 +26,9 @@ router.get("/ping", readOnly, ping);
 router.get("/sync/reference", readOnly, syncReference);
 router.get("/sync/people", readOnly, syncPeople);
 router.get("/sync/academics", readOnly, syncAcademics);
+
+// E-learning (ELEARNING_MODULE_IMPLEMENTATION_PLAN.md §3.3 Integrations)
+router.get("/sync/courses", readOnly, syncCourses);
+router.post("/learning-events", requireServiceToken("learning-events:write"), ingestLearningEvents);
 
 export default router;

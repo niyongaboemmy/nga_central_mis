@@ -52,6 +52,13 @@ import SharedLessonNotesPage from "./components/lessonNotes/SharedLessonNotesPag
 import SharedLessonNoteViewPage from "./components/lessonNotes/SharedLessonNoteViewPage";
 import EnrollmentManager from "./components/enrollment/EnrollmentManager";
 import SchemeVerifyPage from "./components/SchemeVerifyPage";
+import MyLearningHome from "./components/elearning/learner/MyLearningHome";
+import CoursePage from "./components/elearning/learner/CoursePage";
+import MePage from "./components/elearning/learner/MePage";
+import CourseBuilderPage from "./components/elearning/builder/CourseBuilderPage";
+import MyCoursesPage from "./components/elearning/builder/MyCoursesPage";
+import ElearningAdminPage from "./components/elearning/admin/ElearningAdminPage";
+import DevKitchenSink from "./components/elearning/DevKitchenSink";
 
 const LoginPage: React.FC = () => {
   const navigate = useNavigate();
@@ -451,6 +458,95 @@ function App() {
                 </ProtectedRoute>
               }
             />
+
+            {/* E-Learning — student (My Learning) */}
+            <Route
+              path="/my-learning"
+              element={
+                <ProtectedRoute>
+                  <SystemLayoutWrapper>
+                    <MyLearningHome />
+                  </SystemLayoutWrapper>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/my-learning/me"
+              element={
+                <ProtectedRoute>
+                  <SystemLayoutWrapper>
+                    <MePage />
+                  </SystemLayoutWrapper>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/my-learning/courses/:courseId"
+              element={
+                <ProtectedRoute>
+                  <SystemLayoutWrapper fullWidth>
+                    <CoursePage />
+                  </SystemLayoutWrapper>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/my-learning/courses/:courseId/items/:itemId"
+              element={
+                <ProtectedRoute>
+                  <SystemLayoutWrapper fullWidth>
+                    <CoursePage />
+                  </SystemLayoutWrapper>
+                </ProtectedRoute>
+              }
+            />
+
+            {/* E-Learning — teacher course builder */}
+            <Route
+              path="/elearning/courses"
+              element={
+                <ProtectedRoute>
+                  <SystemLayoutWrapper>
+                    <MyCoursesPage />
+                  </SystemLayoutWrapper>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/elearning/courses/:courseId/build"
+              element={
+                <ProtectedRoute>
+                  <SystemLayoutWrapper fullWidth>
+                    <CourseBuilderPage />
+                  </SystemLayoutWrapper>
+                </ProtectedRoute>
+              }
+            />
+
+            {/* E-Learning — admin oversight */}
+            <Route
+              path="/admin/elearning"
+              element={
+                <ProtectedRoute>
+                  <SystemLayoutWrapper fullWidth>
+                    <ElearningAdminPage />
+                  </SystemLayoutWrapper>
+                </ProtectedRoute>
+              }
+            />
+
+            {import.meta.env.DEV && (
+              <Route
+                path="/dev/elearning-ui"
+                element={
+                  <ProtectedRoute>
+                    <SystemLayoutWrapper>
+                      <DevKitchenSink />
+                    </SystemLayoutWrapper>
+                  </ProtectedRoute>
+                }
+              />
+            )}
 
             {/* Users page - protected with sidebar */}
             <Route
