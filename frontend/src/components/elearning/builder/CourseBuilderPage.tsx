@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { AnimatePresence, motion, Reorder, useDragControls } from "framer-motion";
-import { ArrowLeft, BarChart3, BookOpenCheck, Download, Eye, EyeOff, GripVertical, HelpCircle, LayoutList, MoreHorizontal, Plus, RefreshCw, Settings2, Smartphone, Wand2, X } from "lucide-react";
+import { ArrowLeft, BarChart3, BookOpenCheck, ChevronLeft, Download, Eye, EyeOff, GripVertical, HelpCircle, MoreHorizontal, Plus, RefreshCw, Settings2, Smartphone, Wand2, X } from "lucide-react";
 import {
   BuilderCourse,
   CourseItem,
@@ -19,21 +19,14 @@ import AddItemPalette from "./AddItemPalette";
 import ItemSettingsDrawer from "./ItemSettingsDrawer";
 import InsightsTab from "./InsightsTab";
 import CoveragePanel from "./CoveragePanel";
+import NextStepBar, { NextStep } from "./NextStepBar";
+import WeekList from "./WeekList";
 import { API_BASE_URL } from "../../../services/api";
 import { getToken } from "../../../utils/auth";
 import Mascot from "../ui/Mascot";
-import { CompletionDot, ItemTypeIcon, ProgressRing, Skeleton, SubjectCover, WeekPill } from "../ui/primitives";
+import { CompletionDot, ItemTypeIcon, Skeleton, WeekPill } from "../ui/primitives";
 
 type Tab = "content" | "curriculum" | "insights" | "settings";
-
-const statusPill = (s: CourseSection) => {
-  if (s.status === "PUBLISHED") return { label: copy.builder.published, cls: "bg-success-100 text-success-700" };
-  if (s.status === "SCHEDULED") {
-    const when = s.unlock_at ? new Date(s.unlock_at).toLocaleDateString("en-GB", { day: "numeric", month: "short" }) : "";
-    return { label: copy.builder.scheduled(when), cls: "bg-brand-50 dark:bg-brand-700/20 text-brand-700 dark:text-brand-200" };
-  }
-  return { label: copy.builder.hidden, cls: "el-chip text-gray-500" };
-};
 
 /** One draggable row in the week's item list. */
 const ItemRow: React.FC<{
@@ -128,6 +121,7 @@ const CourseBuilderPage: React.FC = () => {
   const [prereqs, setPrereqs] = useState<Record<string, number[]>>({});
   const [coverageKey, setCoverageKey] = useState(0);
   const [building, setBuilding] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
   const tab = (search.get("tab") as Tab) || "content";
   const setTab = (t: Tab) => setSearch((p) => { const n = new URLSearchParams(p); if (t === "content") n.delete("tab"); else n.set("tab", t); return n; });
 
@@ -320,253 +314,239 @@ const CourseBuilderPage: React.FC = () => {
     return <div className="space-y-3"><Skeleton className="h-28" /><div className="flex gap-4"><Skeleton className="w-72 h-96" /><Skeleton className="flex-1 h-96" /></div></div>;
   }
 
-  const emptyPublished = data.sections.filter((s) => s.status !== "HIDDEN" && s.items.filter((i) => i.is_published).length === 0);
   const isLive = data.course.status === "PUBLISHED";
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const liveWeeks = data.sections.filter((s) => s.status === "PUBLISHED").length;
+  const totalItems = data.sections.reduce((n, s) => n + s.items.length, 0);
+
+  /**
+   * The single next thing to do. Order matters: fill the week you are teaching, give it a
+   * check, put it in front of students, then publish the course. One sentence, one button —
+   * the teacher never has to read the whole screen to know what to do.
+   */
+  const nextStep: NextStep = (() => {
+    const current = data.sections.find((s) => s.start_date && s.end_date && s.start_date <= todayIso && s.end_date >= todayIso && s.status !== "HIDDEN");
+    const focus = section || current || data.sections.find((s) => s.status !== "HIDDEN") || null;
+    const weekName = focus?.week_number || "this week";
+    if (totalItems === 0) {
+      return {
+        id: "first-item",
+        title: `Put something in ${weekName}`,
+        detail: weekCoverage?.gaps.length
+          ? "Your notes that match this week's criteria can be added for you."
+          : "Add a lesson note, a material or a link — students see them in this order.",
+        action: weekCoverage?.gaps.length
+          ? { label: "Build it for me", icon: Wand2, onClick: buildJourney, busy: building }
+          : { label: "Add content", icon: Plus, onClick: () => setPaletteOpen(true) },
+        secondary: weekCoverage?.gaps.length ? { label: "Add it myself", onClick: () => setPaletteOpen(true) } : undefined,
+      };
+    }
+    if (focus && weekCoverage && weekCoverage.gaps.length > 0) {
+      return {
+        id: `gaps-${focus.section_id}`,
+        title: `${weekName} is missing ${weekCoverage.gaps.length} of its ${weekCoverage.targets.length} criteria`,
+        detail: `Nothing covers ${weekCoverage.gaps.map((c) => c.criteria_number).join(", ")} yet.`,
+        action: { label: "Build it for me", icon: Wand2, onClick: buildJourney, busy: building },
+        secondary: { label: "Add it myself", onClick: () => setPaletteOpen(true) },
+      };
+    }
+    if (focus && weekCoverage && !weekCoverage.hasCheck && focus.items.length > 0) {
+      return {
+        id: `check-${focus.section_id}`,
+        title: `Add a quick check to ${weekName}`,
+        detail: "A few questions with instant feedback — the AI can write them from your notes.",
+        action: { label: "Add a check", icon: HelpCircle, onClick: addAlignedCheck },
+      };
+    }
+    if (focus && focus.status !== "PUBLISHED" && focus.items.length > 0) {
+      return {
+        id: `publish-week-${focus.section_id}`,
+        title: `Make ${weekName} visible to students`,
+        detail: "It has content. Students can't open it until you make it live.",
+        action: { label: "Make it live", icon: Eye, onClick: () => setSectionStatus(focus, "PUBLISHED") },
+      };
+    }
+    if (!isLive) {
+      return {
+        id: "publish-course",
+        title: "Publish the course",
+        detail: `${liveWeeks} week${liveWeeks === 1 ? "" : "s"} ready. Students will see it under My Learning.`,
+        action: { label: copy.builder.publishCourse, onClick: togglePublishCourse, busy },
+      };
+    }
+    return {
+      id: "all-good",
+      title: "Everything is ready",
+      detail: `${liveWeeks} of ${data.sections.length} weeks are live for students.`,
+      tone: "done",
+      secondary: { label: "See who's learning", onClick: () => setTab("insights") },
+    };
+  })();
+
+  const showDetail = !!section && (!railOpen || !!selected);
 
   return (
-    <div className="pb-16">
-      {/* Header */}
+    <div className="pb-24 md:pb-16">
+      {/* Header — title, state, one primary action. Stats moved into the week list. */}
       <button onClick={() => navigate(-1)} className="inline-flex items-center gap-1 min-h-[40px] text-sm text-gray-500 hover:text-gray-800 dark:hover:text-gray-200">
         <ArrowLeft className="w-4 h-4" /> Back
       </button>
-      <SubjectCover name={data.subject.name} code={data.subject.code} color={data.course.cover_color || data.subject.color} icon={data.course.icon} size="lg" className="mt-2 border shadow-soft">
-        <div className="flex flex-col md:flex-row md:items-start gap-3">
-          <div className="min-w-0 flex-1">
-            <h1 className="text-xl font-bold text-gray-900 dark:text-white leading-tight truncate">{data.course.title}</h1>
-            <p className="text-sm text-gray-600 dark:text-gray-300 mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1">
-              <span>{data.class_group.name} · {data.term.name}</span>
-              <span className={`inline-flex items-center px-1.5 py-0.5 rounded-pill text-[11px] font-semibold ${isLive ? "bg-success-100 text-success-700" : "el-chip"}`}>{isLive ? copy.builder.published : copy.builder.draft}</span>
-            </p>
-            {/* Live stats — rings animate from their previous value, so publishing a week is felt, not just read */}
-            <div className="mt-3 flex flex-wrap items-center gap-4">
-              <button onClick={() => setTab("content")} className="flex items-center gap-2 text-left group" title="Weeks students can open">
-                <ProgressRing value={data.sections.length ? (data.sections.filter((s) => s.status === "PUBLISHED").length / data.sections.length) * 100 : 0} size={40} stroke={4} label={<span className="text-[10px]">{data.sections.filter((s) => s.status === "PUBLISHED").length}</span>} color="#22c55e" ariaLabel="Weeks live" />
-                <span className="text-xs text-gray-600 dark:text-gray-300 group-hover:text-gray-900 dark:group-hover:text-white"><span className="font-semibold">{data.sections.filter((s) => s.status === "PUBLISHED").length}/{data.sections.length}</span><br />weeks live</span>
-              </button>
-              <button onClick={() => setTab("curriculum")} className="flex items-center gap-2 text-left group" title="Planned criteria with content behind them">
-                <ProgressRing value={courseCoveragePct} size={40} stroke={4} color={data.course.cover_color || data.subject.color || undefined} ariaLabel="Curriculum coverage" />
-                <span className="text-xs text-gray-600 dark:text-gray-300 group-hover:text-gray-900 dark:group-hover:text-white"><span className="font-semibold">{courseCoveragePct}%</span><br />curriculum</span>
-              </button>
-              <button onClick={() => setTab("content")} className="flex items-center gap-2 text-left group" title="Items across all weeks">
-                <span className="w-10 h-10 rounded-full el-chip flex items-center justify-center text-sm font-bold tabular-nums">{data.sections.reduce((n, s) => n + s.items.length, 0)}</span>
-                <span className="text-xs text-gray-600 dark:text-gray-300 group-hover:text-gray-900 dark:group-hover:text-white"><span className="font-semibold">items</span><br />in the course</span>
-              </button>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 flex-shrink-0 w-full md:w-auto">
-            <button onClick={() => setPreview((p) => !p)} className="inline-flex items-center gap-1.5 min-h-[44px] px-3 rounded-pill bg-white/80 dark:bg-black/30 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-white dark:hover:bg-black/50">
-              <Smartphone className="w-4 h-4" /> <span className="hidden sm:inline">{preview ? copy.builder.exitPreview : copy.builder.previewAsStudent}</span>
-            </button>
-            <motion.button {...m("tap")} onClick={togglePublishCourse} disabled={busy} className={`flex-1 md:flex-none min-h-[44px] px-5 rounded-pill text-sm font-semibold shadow-soft focus:outline-none focus-visible:shadow-glow ${isLive ? "bg-white dark:bg-black/40 text-gray-700 dark:text-gray-200" : "bg-brand-500 hover:bg-brand-600 text-white"}`}>
-              {isLive ? copy.builder.unpublishCourse : copy.builder.publishCourse}
-            </motion.button>
-          </div>
+      <div className="mt-2 flex flex-col md:flex-row md:items-center gap-3">
+        <div className="min-w-0 flex-1">
+          <h1 className="text-xl md:text-2xl font-bold text-gray-900 dark:text-white leading-tight truncate">{data.subject.name}</h1>
+          <p className="text-sm text-gray-500 dark:text-gray-400 flex flex-wrap items-center gap-x-2">
+            <span>{data.class_group.name} · {data.term.name}</span>
+            <span className={`inline-flex items-center px-1.5 py-0.5 rounded-pill text-[11px] font-semibold ${isLive ? "bg-success-100 text-success-700" : "el-chip"}`}>
+              {isLive ? copy.builder.published : copy.builder.draft}
+            </span>
+            <span className="text-gray-400">· {liveWeeks}/{data.sections.length} weeks live · {courseCoveragePct}% of the curriculum</span>
+          </p>
         </div>
-      </SubjectCover>
-
-      {/* Single, inline, non-red notice (UX §3.2 fast path 3) */}
-      <AnimatePresence>
-        {isLive && emptyPublished.length > 0 && tab === "content" && (
-          <motion.div {...m("reveal")} className="mt-3 flex items-center gap-3 p-3 rounded-2xl bg-warning-100/70 dark:bg-warning-700/10 text-warning-700 text-sm">
-            <Mascot pose="nudge" size={32} />
-            <span className="flex-1">{copy.builder.emptyWeek(emptyPublished[0].week_number || emptyPublished[0].title.split(" — ")[0], emptyPublished[0].status === "SCHEDULED" && emptyPublished[0].unlock_at ? new Date(emptyPublished[0].unlock_at).toLocaleDateString("en-GB", { weekday: "long" }) : null)}</span>
-            <button onClick={() => { setSelected(emptyPublished[0].section_id); setPaletteOpen(true); }} className="min-h-[36px] px-3 rounded-pill bg-warning-500 text-white text-xs font-semibold">Add a note</button>
-            <button onClick={() => setSectionStatus(emptyPublished[0], "HIDDEN")} className="min-h-[36px] px-3 rounded-pill text-xs font-semibold">Hide week</button>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Tabs */}
-      <div className="mt-4 flex items-center gap-1 border-b border-gray-200 dark:border-gray-800 overflow-x-auto no-scrollbar -mx-4 px-4 md:mx-0 md:px-0">
-        {([["content", LayoutList, copy.builder.content], ["curriculum", BookOpenCheck, "Curriculum"], ["insights", BarChart3, copy.builder.insights], ["settings", Settings2, copy.builder.settings]] as [Tab, React.ElementType, string][]).map(([key, Icon, label]) => (
-          <button key={key} onClick={() => setTab(key)} className={`inline-flex items-center gap-1.5 min-h-[44px] px-3 text-sm font-medium border-b-2 -mb-px whitespace-nowrap ${tab === key ? "border-brand-500 text-brand-600 dark:text-brand-200" : "border-transparent text-gray-500 hover:text-gray-800 dark:hover:text-gray-200"}`}>
-            <Icon className="w-4 h-4" /> {label}
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <button onClick={() => setPreview(true)} className="inline-flex items-center gap-1.5 min-h-[44px] px-3 rounded-pill el-chip text-sm font-medium" title={copy.builder.previewAsStudent}>
+            <Smartphone className="w-4 h-4" /> <span className="hidden lg:inline">Preview</span>
           </button>
-        ))}
-      </div>
-
-      {tab === "curriculum" && (
-        <div className="mt-4">
-          <CoveragePanel courseId={cid} refreshKey={coverageKey} onJumpToWeek={(sid) => { setSelected(sid); setTab("content"); }} />
-        </div>
-      )}
-
-      {tab === "insights" && (
-        <>
-          <div className="mt-4 flex justify-end">
-            <a href={`${API_BASE_URL}${elearningApi.progressReportUrl(cid)}?token=${getToken() || ""}`} className="inline-flex items-center gap-1.5 min-h-[36px] px-3 rounded-pill text-xs text-gray-600 dark:text-gray-300 el-chip hover:bg-gray-200 dark:hover:bg-gray-700">
-              <Download className="w-3.5 h-3.5" /> Progress report (CSV)
-            </a>
-          </div>
-          <InsightsTab courseId={cid} course={data} />
-        </>
-      )}
-
-      {tab === "settings" && <SettingsTab data={data} onChange={(patch) => mutate((d) => ({ ...d, course: { ...d.course, ...patch } }), () => elearningApi.updateCourse(cid, patch), "Saved")} />}
-
-      {tab === "content" && (
-        <div className="mt-4 flex gap-4">
-          {/* Left rail — weeks */}
-          <aside className={`${railOpen ? "block" : "hidden"} md:block w-full md:w-72 flex-shrink-0`}>
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-[11px] uppercase tracking-wider font-semibold text-gray-500 dark:text-gray-400">Weeks</p>
-              <button onClick={() => elearningApi.reseed(cid).then((r) => { setData(r.data.data); showToast(r.data.data.created ? `Added ${r.data.data.created} item(s)` : "Nothing new to add", "info"); })} className="inline-flex items-center gap-1 text-[11px] text-brand-600 dark:text-brand-200" title={copy.builder.reseed}>
-                <RefreshCw className="w-3 h-3" /> Pull in new
-              </button>
-            </div>
-            <ul className="space-y-1">
-              {data.sections.map((s) => {
-                const pill = statusPill(s);
-                return (
-                  <li key={s.section_id}>
-                    <button
-                      onClick={() => { setSelected(s.section_id); setRailOpen(false); }}
-                      className={`w-full text-left p-2.5 rounded-xl min-h-[52px] ${selected === s.section_id ? "bg-brand-50 dark:bg-brand-700/20" : "hover:bg-gray-100 dark:hover:bg-gray-800"}`}
-                      aria-current={selected === s.section_id ? "true" : undefined}
-                    >
-                      <div className="flex items-center gap-2 min-w-0">
-                        <WeekPill weekNumber={s.week_number || s.title.split(" — ")[0]} startDate={s.start_date} endDate={s.end_date} />
-                        <span className={`ml-auto shrink-0 text-[10px] px-1.5 py-0.5 rounded-pill font-semibold whitespace-nowrap ${pill.cls}`}>{pill.label}</span>
-                      </div>
-                      <p className={`mt-1 text-[13px] truncate ${s.title.includes(" — ") ? "text-gray-800 dark:text-gray-100" : "text-gray-400 italic"}`}>
-                        {s.title.split(" — ").slice(1).join(" — ") || "No topic in the scheme yet"}
-                      </p>
-                      <p className="text-[11px] text-gray-400">
-                        {s.items.length} item{s.items.length === 1 ? "" : "s"}
-                        {s.criteria.length ? ` · ${s.criteria.length} criteria` : ""}
-                      </p>
-                    </button>
-                  </li>
-                );
-              })}
-              <li>
-                <button
-                  onClick={() => {
-                    const title = window.prompt("Section title", "Before you start");
-                    if (title) elearningApi.createSection(cid, { title }).then((r) => { setData(r.data.data); setSelected(r.data.data.section_id); });
-                  }}
-                  className="w-full inline-flex items-center gap-1 min-h-[44px] px-2.5 rounded-xl text-sm text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800"
-                >
-                  <Plus className="w-4 h-4" /> Add a section
-                </button>
-              </li>
-            </ul>
-          </aside>
-
-          {/* Main — selected week */}
-          <main className={`${railOpen ? "hidden" : "block"} md:block flex-1 min-w-0`}>
-            {!section ? (
-              <p className="text-sm text-gray-500">Pick a week on the left.</p>
-            ) : (
-              <>
-                <button onClick={() => setRailOpen(true)} className="md:hidden inline-flex items-center gap-1 mb-2 min-h-[40px] text-sm text-gray-500"><LayoutList className="w-4 h-4" /> All weeks</button>
-                <div className="flex flex-wrap items-start gap-3">
-                  <div className="min-w-0 flex-1">
-                    <h2 className="text-lg font-bold text-gray-900 dark:text-white leading-tight">
-                      {section.title.split(" — ").slice(1).join(" — ") || section.title}
-                      <span className="ml-2 text-sm font-medium text-gray-400">{section.title.includes(" — ") ? section.week_number : ""}</span>
-                    </h2>
-                    {section.summary && <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5 line-clamp-2">{section.summary}</p>}
-                  </div>
-                  <div className="el-segment" role="radiogroup" aria-label="Week visibility">
-                    {(["HIDDEN", "SCHEDULED", "PUBLISHED"] as SectionStatus[]).map((st) => (
-                      <button
-                        key={st}
-                        role="radio"
-                        aria-checked={section.status === st}
-                        onClick={() => setSectionStatus(section, st)}
-                        className={`min-h-[36px] px-3 rounded-pill text-xs font-semibold ${section.status === st ? "el-segment-on" : "text-gray-500"}`}
-                      >
-                        {st === "HIDDEN" ? copy.builder.hidden : st === "SCHEDULED" ? "Scheduled" : copy.builder.published}
+          <div className="relative">
+            <button onClick={() => setMoreOpen((o) => !o)} aria-expanded={moreOpen} className="inline-flex items-center gap-1.5 min-h-[44px] px-3 rounded-pill el-chip text-sm font-medium">
+              <MoreHorizontal className="w-4 h-4" /> <span className="hidden lg:inline">More</span>
+            </button>
+            <AnimatePresence>
+              {moreOpen && (
+                <>
+                  <div className="fixed inset-0 z-30" onClick={() => setMoreOpen(false)} />
+                  <motion.div {...m("reveal")} className="absolute right-0 top-full mt-2 z-40 w-60 rounded-2xl el-float p-1.5" role="menu">
+                    {([
+                      ["Curriculum coverage", BookOpenCheck, () => setTab("curriculum")],
+                      ["Who's learning", BarChart3, () => setTab("insights")],
+                      ["Course settings", Settings2, () => setTab("settings")],
+                      ["Pull in new notes", RefreshCw, () => elearningApi.reseed(cid).then((r) => { setData(r.data.data); showToast(r.data.data.created ? `Added ${r.data.data.created} item(s)` : "Nothing new to add", "info"); })],
+                      [isLive ? copy.builder.unpublishCourse : copy.builder.publishCourse, Eye, togglePublishCourse],
+                    ] as [string, React.ElementType, () => void][]).map(([label, Icon, fn]) => (
+                      <button key={label} role="menuitem" onClick={() => { setMoreOpen(false); fn(); }} className="w-full flex items-center gap-2.5 px-3 min-h-[44px] rounded-xl text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-white/5 text-left">
+                        <Icon className="w-4 h-4 text-gray-400" /> {label}
                       </button>
                     ))}
+                  </motion.div>
+                </>
+              )}
+            </AnimatePresence>
+          </div>
+        </div>
+      </div>
+
+      {/* One instruction at a time */}
+      {tab === "content" && <div className="mt-4"><AnimatePresence mode="wait"><NextStepBar key={nextStep.id} step={nextStep} /></AnimatePresence></div>}
+
+      {/* Secondary views open full-width with a way back to the weeks */}
+      {tab !== "content" && (
+        <div className="mt-4">
+          <button onClick={() => setTab("content")} className="inline-flex items-center gap-1 min-h-[40px] text-sm text-brand-600 dark:text-brand-200">
+            <ChevronLeft className="w-4 h-4" /> Back to weeks
+          </button>
+          <h2 className="mt-1 text-lg font-bold text-gray-900 dark:text-white">
+            {tab === "curriculum" ? "Curriculum coverage" : tab === "insights" ? "Who's learning" : "Course settings"}
+          </h2>
+          <div className="mt-3">
+            {tab === "curriculum" && <CoveragePanel courseId={cid} refreshKey={coverageKey} onJumpToWeek={(sid) => { setSelected(sid); setTab("content"); }} />}
+            {tab === "insights" && (
+              <>
+                <div className="flex justify-end">
+                  <a href={`${API_BASE_URL}${elearningApi.progressReportUrl(cid)}?token=${getToken() || ""}`} className="inline-flex items-center gap-1.5 min-h-[36px] px-3 rounded-pill text-xs text-gray-600 dark:text-gray-300 el-chip">
+                    <Download className="w-3.5 h-3.5" /> Progress report (CSV)
+                  </a>
+                </div>
+                <InsightsTab courseId={cid} course={data} />
+              </>
+            )}
+            {tab === "settings" && <SettingsTab data={data} onChange={(patch) => mutate((d) => ({ ...d, course: { ...d.course, ...patch } }), () => elearningApi.updateCourse(cid, patch), "Saved")} />}
+          </div>
+        </div>
+      )}
+
+      {tab === "content" && (
+        <div className="mt-4 md:flex md:gap-5 md:items-start">
+          {/* Weeks — the whole screen on a phone, a quiet column on desktop */}
+          <aside className={`${showDetail ? "hidden" : "block"} md:block md:w-[300px] lg:w-[320px] flex-shrink-0 el-card overflow-hidden md:sticky md:top-20`}>
+            <div className="flex items-center justify-between px-3 py-2.5 border-b border-gray-100 dark:border-gray-800/80">
+              <p className="text-[11px] uppercase tracking-wider font-semibold text-gray-500 dark:text-gray-400">{data.sections.length} weeks</p>
+              <button
+                onClick={() => {
+                  const title = window.prompt("Section title", "Before you start");
+                  if (title) elearningApi.createSection(cid, { title }).then((r) => { setData(r.data.data); setSelected(r.data.data.section_id); });
+                }}
+                className="inline-flex items-center gap-1 text-[11px] text-brand-600 dark:text-brand-200 min-h-[32px] px-1"
+              >
+                <Plus className="w-3.5 h-3.5" /> Section
+              </button>
+            </div>
+            <div className="max-h-none md:max-h-[calc(100vh-13rem)] overflow-y-auto">
+              <WeekList sections={data.sections} selected={selected} onSelect={(id) => { setSelected(id); setRailOpen(false); }} todayIso={todayIso} />
+            </div>
+          </aside>
+
+          {/* The week */}
+          <main className={`${showDetail ? "block" : "hidden"} md:block flex-1 min-w-0 mt-4 md:mt-0`}>
+            {!section ? (
+              <p className="text-sm text-gray-500">Choose a week.</p>
+            ) : (
+              <>
+                <button onClick={() => setRailOpen(true)} className="md:hidden inline-flex items-center gap-1 mb-3 min-h-[40px] text-sm text-brand-600 dark:text-brand-200">
+                  <ChevronLeft className="w-4 h-4" /> All weeks
+                </button>
+
+                <div className="flex flex-wrap items-start gap-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[11px] uppercase tracking-wider font-semibold text-gray-500 dark:text-gray-400">
+                      {section.week_number}
+                      {section.element_number ? ` · Element ${section.element_number}` : ""}
+                    </p>
+                    <h2 className="text-lg font-bold text-gray-900 dark:text-white leading-tight">
+                      {section.title.split(" — ").slice(1).join(" — ") || "No topic in the scheme yet"}
+                    </h2>
                   </div>
+                  {/* Visible / not visible: a switch, not three states. Skipping lives in More. */}
+                  <label className="flex items-center gap-2 cursor-pointer flex-shrink-0">
+                    <span className="text-xs font-medium text-gray-600 dark:text-gray-300">{section.status === "PUBLISHED" ? "Visible to students" : "Hidden"}</span>
+                    <button
+                      role="switch"
+                      aria-checked={section.status === "PUBLISHED"}
+                      aria-label="Visible to students"
+                      onClick={() => setSectionStatus(section, section.status === "PUBLISHED" ? "SCHEDULED" : "PUBLISHED")}
+                      className={`relative w-12 h-7 rounded-pill transition-colors ${section.status === "PUBLISHED" ? "bg-success-500" : "bg-gray-300 dark:bg-gray-700"}`}
+                    >
+                      <span className={`absolute top-0.5 left-0.5 w-6 h-6 rounded-full bg-white shadow transition-transform ${section.status === "PUBLISHED" ? "translate-x-5" : ""}`} />
+                    </button>
+                  </label>
                 </div>
 
-                {/* Curriculum alignment: what the scheme planned for this week vs what the items cover */}
-                {weekCoverage && (
-                  <div className="mt-3 el-card p-3">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <p className="text-[11px] uppercase tracking-wider font-semibold text-gray-500 dark:text-gray-400 flex-1">
-                        This week teaches{section.element_number ? ` · Element ${section.element_number}${section.competency_title ? ` — ${section.competency_title}` : ""}` : ""}
-                      </p>
-                      {weekCoverage.targets.length > 0 && (
-                        <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-pill ${weekCoverage.gaps.length === 0 ? "bg-success-100 text-success-700" : "bg-warning-100 text-warning-700"}`}>
-                          {weekCoverage.targets.length - weekCoverage.gaps.length}/{weekCoverage.targets.length} covered
-                        </span>
-                      )}
-                    </div>
-                    {weekCoverage.targets.length === 0 ? (
-                      <p className="mt-1 text-xs text-gray-400">No performance criteria are linked to this week in the scheme of work — link some there (or with "Match with AI") and the journey builder can work from them.</p>
-                    ) : (
-                      <ul className="mt-2 flex flex-wrap gap-1.5">
-                        {weekCoverage.targets.map((c) => {
-                          const gap = weekCoverage.gaps.some((g) => g.criteria_id === c.criteria_id);
-                          return (
-                            <li key={c.criteria_id} title={`${c.criteria_number} ${c.description}${gap ? " — no item yet" : ""}`} className={`text-[11px] px-2 py-1 rounded-pill font-medium ${gap ? "bg-warning-100 text-warning-700 border border-dashed border-warning-500" : "bg-success-100 text-success-700"}`}>
-                              {c.criteria_number}{gap ? " · gap" : ""}
-                            </li>
-                          );
-                        })}
-                      </ul>
-                    )}
-                    {(weekCoverage.gaps.length > 0 || !weekCoverage.hasCheck) && weekCoverage.targets.length > 0 && (
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        {weekCoverage.gaps.length > 0 && (
-                          <motion.button {...m("tap")} onClick={buildJourney} disabled={building} className="inline-flex items-center gap-1.5 min-h-[40px] px-4 rounded-pill bg-gradient-to-r from-violet-600 to-brand-600 text-white text-xs font-semibold shadow-soft disabled:opacity-60">
-                            <Wand2 className="w-3.5 h-3.5" /> {building ? "Building…" : "Build this week's journey"}
-                          </motion.button>
-                        )}
-                        {!weekCoverage.hasCheck && section.items.length > 0 && (
-                          <button onClick={addAlignedCheck} className="inline-flex items-center gap-1.5 min-h-[40px] px-4 rounded-pill bg-gray-100 dark:bg-gray-800 text-xs font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700">
-                            <HelpCircle className="w-3.5 h-3.5" /> Add a quick check for these criteria
-                          </button>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Opt-in locks: "Students must finish week X first" (Canvas prerequisites) */}
-                <details className="mt-3 text-xs">
-                  <summary className="cursor-pointer text-gray-500 hover:text-gray-800 dark:hover:text-gray-200">
-                    Requires {(prereqs[String(section.section_id)] || []).length ? `${(prereqs[String(section.section_id)] || []).length} earlier week(s)` : "nothing — students can open it any time"}
-                  </summary>
-                  <div className="mt-2 flex flex-wrap gap-1.5">
-                    {data.sections.filter((s) => s.section_id !== section.section_id && s.position < section.position).map((s) => {
-                      const on = (prereqs[String(section.section_id)] || []).includes(s.section_id);
+                {/* Criteria: chips only, no panel. The instruction above says what to do about gaps. */}
+                {section.criteria.length > 0 && (
+                  <ul className="mt-3 flex flex-wrap gap-1.5" aria-label="What this week teaches">
+                    {section.criteria.map((c) => {
+                      const gap = !section.items.some((i) => i.criteria.some((x) => x.criteria_id === c.criteria_id));
                       return (
-                        <button
-                          key={s.section_id}
-                          aria-pressed={on}
-                          onClick={() => {
-                            const next = on ? (prereqs[String(section.section_id)] || []).filter((x) => x !== s.section_id) : [...(prereqs[String(section.section_id)] || []), s.section_id];
-                            setPrereqs((p) => ({ ...p, [String(section.section_id)]: next }));
-                            elearningApi.setPrerequisites(section.section_id, next).catch(() => showToast(copy.errors.save, "error"));
-                          }}
-                          className={`min-h-[32px] px-2.5 rounded-pill border ${on ? "bg-brand-500 border-brand-500 text-white" : "border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300"}`}
+                        <li
+                          key={c.criteria_id}
+                          title={`${c.criteria_number} ${c.description}${gap ? " — nothing covers this yet" : ""}`}
+                          className={`text-[11px] px-2 py-1 rounded-pill font-medium ${gap ? "bg-warning-100/70 dark:bg-warning-700/15 text-warning-700 border border-dashed border-warning-500/60" : "bg-success-100/70 dark:bg-success-700/15 text-success-700"}`}
                         >
-                          {s.week_number || s.title.split(" — ")[0]}
-                        </button>
+                          {c.criteria_number}
+                        </li>
                       );
                     })}
-                    {data.sections.filter((s) => s.position < section.position).length === 0 && <span className="text-gray-400">This is the first week.</span>}
-                  </div>
-                </details>
+                  </ul>
+                )}
 
                 {section.items.length === 0 ? (
-                  <div className="mt-6 flex flex-col items-center text-center p-8 rounded-2xl border border-dashed border-gray-300 dark:border-gray-700/80 el-subtle">
+                  <div className="mt-5 flex flex-col items-center text-center p-8 rounded-2xl border border-dashed border-gray-300 dark:border-gray-700/80">
                     <Mascot pose="nudge" size={56} />
-                    <p className="mt-3 text-sm text-gray-600 dark:text-gray-300 max-w-sm">{copy.builder.emptyWeek(section.week_number || section.title.split(" — ")[0], null)}</p>
-                    <div className="mt-4 flex flex-wrap justify-center gap-2">
-                      <motion.button {...m("tap")} onClick={() => setPaletteOpen(true)} className="inline-flex items-center gap-1.5 min-h-[44px] px-4 rounded-pill bg-brand-500 hover:bg-brand-600 text-white text-sm font-semibold shadow-soft"><Plus className="w-4 h-4" /> Add a note or material</motion.button>
-                      {section.status !== "HIDDEN" && (
-                        <button onClick={() => setSectionStatus(section, "HIDDEN")} className="min-h-[44px] px-4 rounded-pill el-chip text-sm font-medium">Skip this week</button>
-                      )}
-                    </div>
+                    <p className="mt-3 text-sm text-gray-500 dark:text-gray-400 max-w-xs">Nothing here yet — use the button above, or add something yourself.</p>
+                    <motion.button {...m("tap")} onClick={() => setPaletteOpen(true)} className="mt-4 inline-flex items-center gap-1.5 min-h-[44px] px-4 rounded-pill el-chip text-sm font-semibold">
+                      <Plus className="w-4 h-4" /> Add content
+                    </motion.button>
                   </div>
                 ) : (
-                  <Reorder.Group axis="y" values={section.items} onReorder={reorder} className="mt-4 space-y-2" onPointerUp={commitOrder}>
+                  <Reorder.Group axis="y" values={section.items} onReorder={reorder} className="mt-5 space-y-2" onPointerUp={commitOrder}>
                     {section.items.map((i) => (
                       <ItemRow
                         key={i.item_id}
@@ -579,13 +559,60 @@ const CourseBuilderPage: React.FC = () => {
                   </Reorder.Group>
                 )}
 
-                <motion.button {...m("tap")} onClick={() => setPaletteOpen(true)} className="mt-4 inline-flex items-center gap-2 min-h-[48px] px-5 rounded-pill bg-brand-500 hover:bg-brand-600 text-white text-sm font-semibold shadow-soft focus:outline-none focus-visible:shadow-glow">
-                  <Plus className="w-4 h-4" /> {copy.builder.addItem}
-                </motion.button>
+                {/* Everything advanced, folded away until asked for */}
+                <details className="mt-5 group">
+                  <summary className="inline-flex items-center gap-1 cursor-pointer text-xs text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 min-h-[36px] list-none">
+                    <MoreHorizontal className="w-4 h-4" /> More options for this week
+                  </summary>
+                  <div className="mt-2 el-card p-3 space-y-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-xs text-gray-500 dark:text-gray-400 flex-1 min-w-[140px]">Not teaching this week?</span>
+                      <button onClick={() => setSectionStatus(section, section.status === "HIDDEN" ? "SCHEDULED" : "HIDDEN")} className="min-h-[36px] px-3 rounded-pill el-chip text-xs font-semibold">
+                        {section.status === "HIDDEN" ? "Un-skip this week" : "Skip this week"}
+                      </button>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                        Students must finish first: {(prereqs[String(section.section_id)] || []).length ? `${(prereqs[String(section.section_id)] || []).length} week(s)` : "nothing"}
+                      </p>
+                      <div className="mt-1.5 flex flex-wrap gap-1.5">
+                        {data.sections.filter((s) => s.section_id !== section.section_id && s.position < section.position).map((s) => {
+                          const on = (prereqs[String(section.section_id)] || []).includes(s.section_id);
+                          return (
+                            <button
+                              key={s.section_id}
+                              aria-pressed={on}
+                              onClick={() => {
+                                const next = on ? (prereqs[String(section.section_id)] || []).filter((x) => x !== s.section_id) : [...(prereqs[String(section.section_id)] || []), s.section_id];
+                                setPrereqs((p) => ({ ...p, [String(section.section_id)]: next }));
+                                elearningApi.setPrerequisites(section.section_id, next).catch(() => showToast(copy.errors.save, "error"));
+                              }}
+                              className={`min-h-[32px] px-2.5 rounded-pill text-xs ${on ? "bg-brand-500 text-white" : "el-chip"}`}
+                            >
+                              {s.week_number || s.title.split(" — ")[0]}
+                            </button>
+                          );
+                        })}
+                        {data.sections.filter((s) => s.position < section.position).length === 0 && <span className="text-xs text-gray-400">This is the first week.</span>}
+                      </div>
+                    </div>
+                  </div>
+                </details>
               </>
             )}
           </main>
         </div>
+      )}
+
+      {/* Add: always within thumb reach on a phone, inline on desktop */}
+      {tab === "content" && section && showDetail && (
+        <motion.button
+          {...m("tap")}
+          onClick={() => setPaletteOpen(true)}
+          className="fixed md:static bottom-5 right-5 md:mt-5 md:ml-[calc(300px+1.25rem)] lg:md:ml-[calc(320px+1.25rem)] z-30 inline-flex items-center gap-2 min-h-[52px] md:min-h-[44px] px-5 rounded-pill bg-brand-500 hover:bg-brand-600 text-white text-sm font-semibold shadow-float md:shadow-soft focus:outline-none focus-visible:shadow-glow"
+        >
+          <Plus className="w-5 h-5 md:w-4 md:h-4" /> {copy.builder.addItem}
+        </motion.button>
       )}
 
       {section && <AddItemPalette courseId={cid} sectionTitle={section.week_number || section.title} open={paletteOpen} onClose={() => setPaletteOpen(false)} onPick={addItem} />}

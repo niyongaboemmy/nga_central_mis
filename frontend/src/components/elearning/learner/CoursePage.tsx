@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowLeft, Check, ChevronLeft, ChevronRight, Layers, List, Lock, Sparkles, WifiOff } from "lucide-react";
+import { ArrowLeft, Check, ChevronDown, ChevronLeft, ChevronRight, Layers, List, Lock, Sparkles, Target, WifiOff } from "lucide-react";
 import { elearningApi, LearnerCourse, learnerRoutes, OpenedItem } from "../../../api/elearning";
 import { useToast } from "../../../contexts/ToastContext";
 import { useMotion } from "../../../design/motion";
@@ -234,7 +234,11 @@ const CoursePage: React.FC = () => {
               <div className="mt-4 flex items-end gap-3">
                 <div className="flex-1">
                   <ProgressBar value={overviewSection.required_total ? (overviewSection.required_done / overviewSection.required_total) * 100 : overviewSection.state === "completed" ? 100 : 0} color={course.course.cover_color || course.subject.color || undefined} />
-                  <p className="mt-1 text-[11px] text-gray-500 dark:text-gray-400">{overviewSection.required_done} of {overviewSection.required_total} done</p>
+                  <p className="mt-1 text-[11px] text-gray-500 dark:text-gray-400">
+                    {overviewSection.required_done === overviewSection.required_total && overviewSection.required_total > 0
+                      ? "Week complete"
+                      : `${overviewSection.required_done} of ${overviewSection.required_total} done`}
+                  </p>
                 </div>
                 {overviewSection.state !== "locked" && overviewSection.items.some((i) => ["LESSON_NOTE", "PAGE"].includes(i.item_type) && !i.locked) && (
                   <button onClick={() => setReviewing(true)} className="inline-flex items-center gap-1.5 min-h-[40px] px-3 rounded-pill bg-gray-100 dark:bg-gray-800 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700">
@@ -242,29 +246,32 @@ const CoursePage: React.FC = () => {
                   </button>
                 )}
               </div>
-              {/* "This week you'll be able to…" — the scheme's criteria, with the student's own state */}
-              {overviewSection.criteria_progress.length > 0 && (
-                <div className="mt-5 el-card p-4 shadow-soft">
-                  <p className="text-[11px] uppercase tracking-wider font-semibold text-gray-500 dark:text-gray-400">
-                    This week you'll be able to{overviewSection.element_number ? ` · Element ${overviewSection.element_number}` : ""}
-                  </p>
-                  {overviewSection.competency_title && <p className="mt-0.5 text-sm text-gray-700 dark:text-gray-200">{overviewSection.competency_title}</p>}
-                  <ul className="mt-2 space-y-1.5">
-                    {overviewSection.criteria_progress.map((c) => (
-                      <li key={c.criteria_id} className="flex items-start gap-2 text-sm">
-                        <CompletionDot state={c.state} size={16} className="mt-0.5" />
-                        <span className={c.state === "COMPLETED" ? "text-gray-500 dark:text-gray-400" : "text-gray-800 dark:text-gray-100"}>
-                          <span className="font-semibold mr-1">{c.criteria_number}</span>{c.description}
-                          {c.unplanned && <span className="ml-1 text-[10px] text-gray-400">(coming soon)</span>}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                  {overviewSection.criteria_progress.every((c) => c.state === "COMPLETED") && (
-                    <p className="mt-2 text-xs text-success-700 flex items-center gap-2"><Mascot pose="cheering" size={24} /> {copy.course.weekComplete(overviewSection.title.split(" — ")[0], [])}</p>
-                  )}
-                </div>
-              )}
+              {/* What this week is for — one line, expandable. Progressive disclosure over a panel. */}
+              {overviewSection.criteria_progress.length > 0 && (() => {
+                const done = overviewSection.criteria_progress.filter((c) => c.state === "COMPLETED").length;
+                const total = overviewSection.criteria_progress.length;
+                return (
+                  <details className="mt-4 group">
+                    <summary className="flex items-center gap-2 cursor-pointer list-none min-h-[44px] text-sm text-gray-600 dark:text-gray-300">
+                      <Target className="w-4 h-4 text-brand-500 flex-shrink-0" />
+                      <span className="flex-1">
+                        {done === total ? "You can do everything this week asks" : `What you'll be able to do · ${done} of ${total}`}
+                      </span>
+                      <ChevronDown className="w-4 h-4 text-gray-400 transition-transform group-open:rotate-180" />
+                    </summary>
+                    <ul className="mt-2 space-y-1.5 pl-6">
+                      {overviewSection.criteria_progress.map((c) => (
+                        <li key={c.criteria_id} className="flex items-start gap-2 text-sm">
+                          <CompletionDot state={c.state} size={16} className="mt-0.5" />
+                          <span className={c.state === "COMPLETED" ? "text-gray-400 line-through decoration-gray-300" : "text-gray-700 dark:text-gray-200"}>
+                            {c.description}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </details>
+                );
+              })()}
 
               {overviewSection.state === "locked" ? (
                 <div className="mt-6 flex items-center gap-3 p-4 rounded-2xl bg-gray-50 dark:bg-gray-800">
