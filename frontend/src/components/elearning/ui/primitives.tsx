@@ -18,6 +18,7 @@ import {
 import type { CourseItemType, ProgressState } from "../../../api/elearning";
 import { useMotion, useReducedMotionPref } from "../../../design/motion";
 import Mascot, { MascotPose } from "./Mascot";
+import SubjectIcon from "./subjectIcons";
 
 // ---------------------------------------------------------------- ProgressRing
 
@@ -185,25 +186,6 @@ export const WeekPill: React.FC<{
 
 // ---------------------------------------------------------------- SubjectCover
 
-const CATEGORY_ICON: [RegExp, string][] = [
-  [/ict|comput|software|web|program|coding|network|data/i, "🖥️"],
-  [/math|calcul|algebra|statis/i, "📐"],
-  [/physic|chem|bio|science/i, "🔬"],
-  [/english|french|kinyarwanda|language|literature|communication/i, "📝"],
-  [/entrepreneur|business|account|finance|economic/i, "💼"],
-  [/art|design|music|draw/i, "🎨"],
-  [/sport|physical|health/i, "⚽"],
-  [/history|geograph|civic|social/i, "🌍"],
-  [/electr|mechan|engineer|construct|build|weld|plumb/i, "🔧"],
-  [/agri|farm|food|hotel|culin|tour/i, "🌱"],
-];
-
-export const iconForSubject = (name: string, override?: string | null) => {
-  if (override) return override;
-  const hit = CATEGORY_ICON.find(([re]) => re.test(name));
-  return hit ? hit[1] : "📘";
-};
-
 /** Colour-tinted header. Subject colour tinted with color-mix so it works on both themes. */
 export const SubjectCover: React.FC<{
   name: string;
@@ -216,7 +198,8 @@ export const SubjectCover: React.FC<{
 }> = ({ name, code, color, icon, size = "md", children, className = "" }) => {
   const base = color || "#3b6cff";
   const pad = size === "lg" ? "p-5" : size === "sm" ? "p-3" : "p-4";
-  const iconSize = size === "lg" ? "text-4xl w-14 h-14" : size === "sm" ? "text-lg w-8 h-8" : "text-2xl w-11 h-11";
+  const tile = size === "lg" ? "w-14 h-14" : size === "sm" ? "w-8 h-8" : "w-11 h-11";
+  const glyph = size === "lg" ? "w-7 h-7" : size === "sm" ? "w-4 h-4" : "w-5 h-5";
   return (
     <div
       className={`rounded-2xl ${pad} ${className}`}
@@ -227,11 +210,15 @@ export const SubjectCover: React.FC<{
     >
       <div className="flex items-start gap-3">
         <span
-          className={`flex items-center justify-center rounded-xl ${iconSize} flex-shrink-0`}
-          style={{ background: `color-mix(in oklab, ${base} 24%, transparent)`, boxShadow: `inset 0 0 0 1px color-mix(in oklab, ${base} 30%, transparent)` }}
+          className={`flex items-center justify-center rounded-xl ${tile} flex-shrink-0`}
+          style={{
+            background: `color-mix(in oklab, ${base} 24%, transparent)`,
+            boxShadow: `inset 0 0 0 1px color-mix(in oklab, ${base} 30%, transparent)`,
+            color: base,
+          }}
           aria-hidden
         >
-          {iconForSubject(name, icon)}
+          <SubjectIcon subjectName={name} icon={icon} className={glyph} />
         </span>
         <div className="min-w-0 flex-1">
           {code && (

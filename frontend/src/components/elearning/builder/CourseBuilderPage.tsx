@@ -21,6 +21,7 @@ import InsightsTab from "./InsightsTab";
 import CoveragePanel from "./CoveragePanel";
 import NextStepBar, { NextStep } from "./NextStepBar";
 import { useCourseLive } from "./useCourseLive";
+import { SUBJECT_ICONS, resolveSubjectIcon } from "../ui/subjectIcons";
 import WeekList from "./WeekList";
 import WeekPeek from "./WeekPeek";
 import { usePrompt } from "../ui/PromptDialog";
@@ -746,7 +747,40 @@ const SettingsTab: React.FC<{ data: BuilderCourse; onChange: (patch: Record<stri
     <div className="mt-4 max-w-xl space-y-5">
       <label className="block"><span className="text-[11px] uppercase tracking-wider font-semibold text-gray-500">Title</span><input className={`${input} mt-1`} value={title} onChange={(e) => setTitle(e.target.value)} onBlur={() => title !== data.course.title && onChange({ title })} /></label>
       <label className="block"><span className="text-[11px] uppercase tracking-wider font-semibold text-gray-500">Description</span><textarea className={`${input} mt-1 py-2 min-h-[80px]`} value={description} onChange={(e) => setDescription(e.target.value)} onBlur={() => description !== (data.course.description || "") && onChange({ description })} /></label>
-      <label className="block"><span className="text-[11px] uppercase tracking-wider font-semibold text-gray-500">Cover emoji</span><input className={`${input} mt-1 w-24 text-center text-xl`} value={icon} maxLength={4} onChange={(e) => setIcon(e.target.value)} onBlur={() => icon !== (data.course.icon || "") && onChange({ icon: icon || null })} placeholder="🖥️" /></label>
+      {/* Pick from the set rather than typing a character nobody can guess. */}
+      <div>
+        <span className="text-[11px] uppercase tracking-wider font-semibold text-gray-500">Cover icon</span>
+        <p className="text-[11px] text-gray-400">Chosen from the subject name unless you pick one.</p>
+        <div className="mt-2 flex flex-wrap gap-1.5" role="radiogroup" aria-label="Cover icon">
+          <button
+            type="button"
+            role="radio"
+            aria-checked={!icon}
+            onClick={() => { setIcon(""); onChange({ icon: null }); }}
+            title={`Automatic — ${resolveSubjectIcon(data.subject.name, null).label}`}
+            className={`min-h-[44px] px-3 rounded-xl border text-xs font-medium ${!icon ? "border-brand-500 el-chip-brand" : "border-gray-200 dark:border-white/10 text-gray-600 dark:text-gray-300"}`}
+          >
+            Auto
+          </button>
+          {SUBJECT_ICONS.filter((i) => i.key !== "general").map(({ key, label, Icon }) => (
+            <button
+              key={key}
+              type="button"
+              role="radio"
+              aria-checked={icon === key}
+              aria-label={label}
+              title={label}
+              onClick={() => { setIcon(key); onChange({ icon: key }); }}
+              className={`w-11 h-11 flex items-center justify-center rounded-xl border transition-colors ${
+                icon === key ? "border-brand-500 el-chip-brand" : "border-gray-200 dark:border-white/10 text-gray-500 dark:text-gray-400 hover:border-brand-200 dark:hover:border-brand-500/40"
+              }`}
+              style={icon === key ? { color: data.course.cover_color || data.subject.color || undefined } : undefined}
+            >
+              <Icon className="w-5 h-5" strokeWidth={1.75} />
+            </button>
+          ))}
+        </div>
+      </div>
       <div className="divide-y divide-gray-100 dark:divide-white/[0.06] rounded-2xl border border-gray-200 dark:border-white/[0.07] px-4">
         <Row label="Weeks publish themselves" hint="A week goes live when it starts, or when you mark it completed in the scheme." checked={!!data.course.auto_publish_from_scheme} onToggle={(v) => onChange({ auto_publish_from_scheme: v })} />
         <Row label="Sequential progress" hint="Students must finish items in order. Off by default — you pace the class." checked={!!data.course.require_sequential_progress} onToggle={(v) => onChange({ require_sequential_progress: v })} />
