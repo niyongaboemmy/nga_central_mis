@@ -76,8 +76,10 @@ export const copy = {
     title: "Course builder",
     setUp: "Set up course",
     setUpBody: "Weeks come from your scheme of work, pre-filled with the notes and materials you already have.",
-    publishCourse: "Publish course",
-    unpublishCourse: "Back to draft",
+    // The course gate and the week gate are different scopes; the words have to say so,
+    // or a teacher switches a week on and wonders why students still see nothing.
+    publishCourse: "Publish the whole course",
+    unpublishCourse: "Move course back to draft",
     published: "Published",
     draft: "Draft",
     hidden: "Hidden",

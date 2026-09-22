@@ -392,16 +392,16 @@ const CourseBuilderPage: React.FC = () => {
     if (focus && focus.status !== "PUBLISHED" && focus.items.length > 0) {
       return {
         id: `publish-week-${focus.section_id}`,
-        title: `Make ${weekName} visible to students`,
-        detail: "It has content. Students can't open it until you make it live.",
-        action: { label: "Make it live", icon: Eye, onClick: () => setSectionStatus(focus, "PUBLISHED") },
+        title: `Switch ${weekName} on`,
+        detail: "It has content, but it is still off, so it isn't part of the course students see.",
+        action: { label: `Switch ${weekName} on`, icon: Eye, onClick: () => setSectionStatus(focus, "PUBLISHED") },
       };
     }
     if (!isLive) {
       return {
         id: "publish-course",
         title: "Publish the course",
-        detail: `${liveWeeks} week${liveWeeks === 1 ? "" : "s"} ready. Students will see it under My Learning.`,
+        detail: `${liveWeeks} week${liveWeeks === 1 ? "" : "s"} switched on. Publishing opens the course itself — until then students see nothing, however many weeks are on.`,
         action: { label: copy.builder.publishCourse, onClick: togglePublishCourse, busy },
       };
     }
@@ -431,8 +431,12 @@ const CourseBuilderPage: React.FC = () => {
           <h1 className="text-xl md:text-2xl font-bold text-gray-900 dark:text-white leading-tight truncate">{data.subject.name}</h1>
           <p className="text-sm text-gray-500 dark:text-gray-400 flex flex-wrap items-center gap-x-2">
             <span>{data.class_group.name} · {data.term.name}</span>
-            <span className={`inline-flex items-center px-1.5 py-0.5 rounded-pill text-[11px] font-semibold ${isLive ? "el-chip-success" : "el-chip"}`}>
-              {isLive ? copy.builder.published : copy.builder.draft}
+            <span
+              className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-pill text-[11px] font-semibold ${isLive ? "el-chip-success" : "el-chip-warning"}`}
+              title={isLive ? "Students can open this course" : "No week is visible to students while the course is a draft"}
+            >
+              {isLive ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
+              {isLive ? "Live for students" : "Draft — students see nothing"}
             </span>
             <span className="text-gray-400">· {liveWeeks}/{data.sections.length} weeks live · {courseCoveragePct}% of the curriculum</span>
           </p>
@@ -465,7 +469,7 @@ const CourseBuilderPage: React.FC = () => {
                       ["Who's learning", BarChart3, () => setTab("insights")],
                       ["Course settings", Settings2, () => setTab("settings")],
                       ["Pull in new notes", RefreshCw, () => elearningApi.reseed(cid).then((r) => { setData(r.data.data); showToast(r.data.data.created ? `Added ${r.data.data.created} item(s)` : "Nothing new to add", "info"); })],
-                      [isLive ? copy.builder.unpublishCourse : copy.builder.publishCourse, Eye, togglePublishCourse],
+                      [isLive ? "Move the whole course back to draft" : "Publish the whole course", isLive ? EyeOff : Eye, togglePublishCourse],
                     ] as [string, React.ElementType, () => void][]).map(([label, Icon, fn]) => (
                       <button key={label} role="menuitem" onClick={() => { setMoreOpen(false); fn(); }} className="w-full flex items-center gap-2.5 px-3 min-h-[44px] rounded-xl text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-white/5 text-left">
                         <Icon className="w-4 h-4 text-gray-400" /> {label}
@@ -562,19 +566,45 @@ const CourseBuilderPage: React.FC = () => {
                       {section.title.split(" — ").slice(1).join(" — ") || "No topic in the scheme yet"}
                     </h2>
                   </div>
-                  {/* Visible / not visible: a switch, not three states. Skipping lives in More. */}
-                  <label className="flex items-center gap-2 cursor-pointer flex-shrink-0">
-                    <span className="text-xs font-medium text-gray-600 dark:text-gray-300">{section.status === "PUBLISHED" ? "Visible to students" : "Hidden"}</span>
-                    <button
-                      role="switch"
-                      aria-checked={section.status === "PUBLISHED"}
-                      aria-label="Visible to students"
-                      onClick={() => setSectionStatus(section, section.status === "PUBLISHED" ? "SCHEDULED" : "PUBLISHED")}
-                      className={`relative w-12 h-7 rounded-pill transition-colors ${section.status === "PUBLISHED" ? "bg-success-500" : "bg-gray-300 dark:bg-gray-700"}`}
-                    >
-                      <span className={`absolute top-0.5 left-0.5 w-6 h-6 rounded-full bg-white shadow transition-transform ${section.status === "PUBLISHED" ? "translate-x-5" : ""}`} />
-                    </button>
-                  </label>
+                  {/*
+                    Two gates used to look like two unrelated switches ("Visible to students"
+                    here, "Publish course" in More), so a teacher could switch the week on and
+                    students would still see nothing. The control now states the *effective*
+                    result — the week is only open when the course is published too — and
+                    offers the course-level action right where the block actually is.
+                  */}
+                  <div className="flex flex-col items-start sm:items-end gap-1 flex-shrink-0">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <span className="text-xs font-medium text-gray-600 dark:text-gray-300">
+                        {section.status === "PUBLISHED" ? "This week is on" : "This week is off"}
+                      </span>
+                      <button
+                        role="switch"
+                        aria-checked={section.status === "PUBLISHED"}
+                        aria-label="Include this week"
+                        onClick={() => setSectionStatus(section, section.status === "PUBLISHED" ? "SCHEDULED" : "PUBLISHED")}
+                        className={`relative w-12 h-7 rounded-pill transition-colors ${section.status === "PUBLISHED" ? "bg-success-500" : "bg-gray-300 dark:bg-white/[0.15]"}`}
+                      >
+                        <span className={`absolute top-0.5 left-0.5 w-6 h-6 rounded-full bg-white shadow transition-transform ${section.status === "PUBLISHED" ? "translate-x-5" : ""}`} />
+                      </button>
+                    </label>
+                    {section.status !== "PUBLISHED" ? (
+                      <span className="text-[11px] text-gray-400">Students can't open this week</span>
+                    ) : isLive ? (
+                      <span className="text-[11px] text-success-700 dark:text-success-500 inline-flex items-center gap-1">
+                        <Eye className="w-3 h-3" /> Students can open it now
+                      </span>
+                    ) : (
+                      <button
+                        onClick={togglePublishCourse}
+                        disabled={busy}
+                        className="inline-flex items-center gap-1.5 text-[11px] font-semibold px-2 py-1 rounded-pill el-chip-warning"
+                        title="The whole course is still a draft, so no week is visible yet"
+                      >
+                        <EyeOff className="w-3 h-3" /> Course is a draft — publish it
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 {/* Criteria: chips only, no panel. The instruction above says what to do about gaps. */}

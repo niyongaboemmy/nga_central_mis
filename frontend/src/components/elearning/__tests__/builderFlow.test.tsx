@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import NextStepBar from "../builder/NextStepBar";
 import WeekList from "../builder/WeekList";
 import type { CourseSection } from "../../../api/elearning";
+import { copy } from "../copy";
 
 const week = (over: Partial<CourseSection>): CourseSection => ({
   section_id: 1, course_id: 1, scheme_entry_id: 1, competency_id: null, title: "Week 1 — HTML", summary: null,
@@ -52,5 +53,23 @@ describe("WeekList", () => {
     expect(screen.getByTitle("1 planned criterion with no content yet")).toBeInTheDocument();
     await user.click(screen.getByText("Week 1"));
     expect(onSelect).toHaveBeenCalledWith(1);
+  });
+});
+
+describe("the two visibility gates", () => {
+  it("never claims a week is visible while the course is still a draft", () => {
+    // The wording is the fix: the week switch controls one week, publishing controls the
+    // course, and only both together put anything in front of a student.
+    const weekOn = { status: "PUBLISHED" as const };
+    const courseDraft = { status: "DRAFT" as const };
+    const effective = (w: { status: string }, c: { status: string }) => w.status === "PUBLISHED" && c.status === "PUBLISHED";
+    expect(effective(weekOn, courseDraft)).toBe(false);
+    expect(effective(weekOn, { status: "PUBLISHED" })).toBe(true);
+    expect(effective({ status: "SCHEDULED" }, { status: "PUBLISHED" })).toBe(false);
+  });
+
+  it("labels each gate with its own scope", () => {
+    expect(copy.builder.publishCourse).toMatch(/whole course/i);
+    expect(copy.builder.unpublishCourse).toMatch(/course/i);
   });
 });
