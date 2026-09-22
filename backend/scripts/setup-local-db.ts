@@ -165,6 +165,48 @@ function portCollationsToMariaDB(sql: string): { sql: string; replaced: number }
   return { sql: cleaned, replaced };
 }
 
+/**
+ * Splits a migration into the statements the server must receive one by one.
+ *
+ * `DELIMITER` is a directive of the mysql command-line client, not SQL: it tells
+ * the client where a statement ends so that a stored procedure or trigger body,
+ * which contains its own semicolons, can be sent whole. mysql2 talks to the
+ * server directly and rejects the word outright, so a migration with such a
+ * block (083 is the first) failed here and left a half-migrated database.
+ * Honouring the directive the way the client does — track the current
+ * delimiter, cut on it, drop the directive lines — lets every migration run
+ * through the same driver without a mysql binary on the machine.
+ *
+ * Only whole-line `DELIMITER x` directives are recognised, which is how every
+ * migration (and mysqldump) writes them.
+ */
+function splitSqlStatements(sql: string): string[] {
+  const statements: string[] = [];
+  let delimiter = ";";
+  let current = "";
+  for (const rawLine of sql.split(/\r?\n/)) {
+    const directive = /^\s*DELIMITER\s+(\S+)\s*$/i.exec(rawLine);
+    if (directive) {
+      if (current.trim()) statements.push(current.trim());
+      current = "";
+      delimiter = directive[1];
+      continue;
+    }
+    current += rawLine + "\n";
+    // A statement ends when the delimiter closes a line (comments aside, that
+    // is where the client cuts too). Cutting mid-line is not attempted: a
+    // literal ';' inside a string would otherwise split a statement.
+    const trimmed = current.trimEnd();
+    if (trimmed.endsWith(delimiter)) {
+      const body = trimmed.slice(0, -delimiter.length).trim();
+      if (body) statements.push(body);
+      current = "";
+    }
+  }
+  if (current.trim()) statements.push(current.trim());
+  return statements;
+}
+
 /** Hand-written migrations newer than the snapshot, in numeric then name order. */
 function pendingMigrations(): string[] {
   return fs
@@ -372,25 +414,38 @@ async function main() {
   const db = await mysql.createConnection({ host, port, user, password, database, multipleStatements: true });
 
   if (!refresh) {
-    // 2. snapshot
-    const { sql: stripped, removed } = stripDelimiterBlocks(fs.readFileSync(DUMP_PATH, "utf8"));
-    const { sql: dumpSql, replaced } = isMariaDB
-      ? portCollationsToMariaDB(stripped)
-      : { sql: stripped, replaced: 0 };
-    console.log(
-      `Importing ${path.basename(DUMP_PATH)} (${removed} stored-procedure block(s) skipped` +
-        (replaced > 0 ? `, ${replaced} collation(s) mapped` : "") +
-        ")...",
-    );
-    await db.query(dumpSql);
+    try {
+      // 2. snapshot
+      const { sql: stripped, removed } = stripDelimiterBlocks(fs.readFileSync(DUMP_PATH, "utf8"));
+      const { sql: dumpSql, replaced } = isMariaDB
+        ? portCollationsToMariaDB(stripped)
+        : { sql: stripped, replaced: 0 };
+      console.log(
+        `Importing ${path.basename(DUMP_PATH)} (${removed} stored-procedure block(s) skipped` +
+          (replaced > 0 ? `, ${replaced} collation(s) mapped` : "") +
+          ")...",
+      );
+      await db.query(dumpSql);
 
-    // 3. migrations newer than the snapshot
-    const files = pendingMigrations();
-    console.log(`Applying ${files.length} migrations newer than ${String(DUMP_MIGRATION_LEVEL).padStart(3, "0")}...`);
-    for (const f of files) {
-      process.stdout.write(`  ${f} ... `);
-      await db.query(fs.readFileSync(path.join(MIGRATIONS_DIR, f), "utf8"));
-      console.log("ok");
+      // 3. migrations newer than the snapshot
+      const files = pendingMigrations();
+      console.log(`Applying ${files.length} migrations newer than ${String(DUMP_MIGRATION_LEVEL).padStart(3, "0")}...`);
+      for (const f of files) {
+        process.stdout.write(`  ${f} ... `);
+        for (const statement of splitSqlStatements(fs.readFileSync(path.join(MIGRATIONS_DIR, f), "utf8"))) {
+          await db.query(statement);
+        }
+        console.log("ok");
+      }
+    } catch (err) {
+      // DDL cannot be rolled back, and a database that stops half-way through
+      // its migrations is worse than none: start.bat sees its tables and calls
+      // it ready, the password gets set, sign-in works, and the first request
+      // that needs a missing column fails in a way that looks like a wrong OTP.
+      // Removing what this run created keeps the next run a clean rebuild.
+      console.log("\nBuild failed - removing the incomplete database so the next run starts clean.");
+      await db.query(`DROP DATABASE IF EXISTS \`${database}\``).catch(() => undefined);
+      throw err;
     }
   } else {
     console.log(`Refreshing local accounts and SSO clients in \`${database}\` (--refresh)`);
