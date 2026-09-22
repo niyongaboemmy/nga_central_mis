@@ -48,7 +48,7 @@ const TeacherWelcome: React.FC<TeacherWelcomeProps> = ({}) => {
             <h2 className="text-2xl font-bold text-text-primary-light dark:text-text-primary-dark">
               {greeting}, {firstName}
             </h2>
-            <p className="mt-1 text-sm text-text-secondary-light dark:text-text-secondary-dark/70">
+            <p className="mt-1 text-sm text-text-secondary-light dark:text-text-secondary-dark">
               {todayLabel}
               {selectedTerm?.name ? ` · ${selectedTerm.name}` : ""}
               {selectedYear?.name ? ` · ${selectedYear.name}` : ""}

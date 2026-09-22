@@ -48,7 +48,7 @@ const StatusPill: React.FC<{ status: StatusKey; label: string }> = ({
     style={{ color: STATUS[status] }}
   >
     {STATUS_ICON[status]}
-    <span className="text-text-secondary-light dark:text-text-secondary-dark/80">
+    <span className="text-text-secondary-light dark:text-text-secondary-dark">
       {label}
     </span>
   </span>
@@ -76,7 +76,7 @@ export const CoverageChart: React.FC<{
 
   if (rows.length === 0) {
     return (
-      <p className="py-8 text-center text-sm text-text-secondary-light dark:text-text-secondary-dark/70">
+      <p className="py-8 text-center text-sm text-text-secondary-light dark:text-text-secondary-dark">
         No schemes to track for this term.
       </p>
     );
@@ -122,7 +122,10 @@ export const CoverageChart: React.FC<{
                 fontSize: 12,
                 background: t.tooltipBg,
                 border: `1px solid ${t.tooltipBorder}`,
+                color: t.tooltipInk,
               }}
+              labelStyle={{ color: t.tooltipInk, fontWeight: 600 }}
+              itemStyle={{ color: t.tooltipInk }}
               formatter={(value: any, _n: any, entry: any) => [
                 `${value} of ${entry?.payload?.target || "—"} weeks · ${entry?.payload?.statusLabel}`,
                 entry?.payload?.classGroup || "Weeks planned",
@@ -166,7 +169,7 @@ export const CoverageChart: React.FC<{
 
       <TableToggle>
         <table className="w-full text-xs">
-          <thead className="text-text-secondary-light dark:text-text-secondary-dark/70">
+          <thead className="text-text-secondary-light dark:text-text-secondary-dark">
             <tr>
               <th className={th}>Subject</th>
               <th className={th}>Class</th>
@@ -231,7 +234,10 @@ export const WeeklyLoadChart: React.FC<{ points: LoadPoint[] }> = ({
                 fontSize: 12,
                 background: t.tooltipBg,
                 border: `1px solid ${t.tooltipBorder}`,
+                color: t.tooltipInk,
               }}
+              labelStyle={{ color: t.tooltipInk, fontWeight: 600 }}
+              itemStyle={{ color: t.tooltipInk }}
               formatter={(v: any) => [
                 `${v} ${v === 1 ? "period" : "periods"}`,
                 "Timetabled",
@@ -251,7 +257,7 @@ export const WeeklyLoadChart: React.FC<{ points: LoadPoint[] }> = ({
           </BarChart>
         </ResponsiveContainer>
       </div>
-      <p className="mt-1 text-[11px] text-text-secondary-light dark:text-text-secondary-dark/60">
+      <p className="mt-1 text-[11px] text-text-secondary-light dark:text-text-secondary-dark">
         <span
           className="inline-block w-2 h-2 rounded-sm align-middle mr-1"
           style={{ backgroundColor: t.accent }}
@@ -271,7 +277,7 @@ export const SubjectLoadChart: React.FC<{ points: SubjectLoadPoint[] }> = ({
 
   if (points.length === 0) {
     return (
-      <p className="py-8 text-center text-sm text-text-secondary-light dark:text-text-secondary-dark/70">
+      <p className="py-8 text-center text-sm text-text-secondary-light dark:text-text-secondary-dark">
         No periods timetabled yet.
       </p>
     );
@@ -313,7 +319,10 @@ export const SubjectLoadChart: React.FC<{ points: SubjectLoadPoint[] }> = ({
                 fontSize: 12,
                 background: t.tooltipBg,
                 border: `1px solid ${t.tooltipBorder}`,
+                color: t.tooltipInk,
               }}
+              labelStyle={{ color: t.tooltipInk, fontWeight: 600 }}
+              itemStyle={{ color: t.tooltipInk }}
               formatter={(v: any, _n: any, entry: any) => [
                 `${v} ${v === 1 ? "period" : "periods"} a week`,
                 entry?.payload?.classGroup || "Timetabled",
@@ -337,7 +346,7 @@ export const SubjectLoadChart: React.FC<{ points: SubjectLoadPoint[] }> = ({
 
       <TableToggle>
         <table className="w-full text-xs">
-          <thead className="text-text-secondary-light dark:text-text-secondary-dark/70">
+          <thead className="text-text-secondary-light dark:text-text-secondary-dark">
             <tr>
               <th className={th}>Subject</th>
               <th className={th}>Class</th>

@@ -241,6 +241,57 @@ describe("TeacherDashboard", () => {
     expect(screen.getByText("08:00 – 08:50")).toBeInTheDocument();
   });
 
+  it("labels the day rail with the weekday it actually draws", async () => {
+    // Mid-morning, a lesson still ahead: the rail is today's.
+    renderPage();
+    expect(await screen.findByText("Today · Monday")).toBeInTheDocument();
+  });
+
+  it("moves the rail to the next teaching day once today is finished", async () => {
+    // The heading has already moved on to Wednesday; a rail still drawing a
+    // finished Monday underneath it reads as Wednesday's and misinforms.
+    getTeacherOverview.mockResolvedValue(
+      overview({
+        schedule: {
+          server_day_of_week: 1,
+          today: [
+            lesson({
+              slot_id: 9,
+              start_time: "08:00:00",
+              end_time: "08:50:00",
+            }),
+          ],
+          today_activities: [],
+          current_lesson: null,
+          next_lesson_today: null,
+          next_teaching_day: {
+            day_of_week: 3,
+            lessons: [
+              lesson({
+                slot_id: 21,
+                start_time: "08:00:00",
+                end_time: "09:40:00",
+              }),
+            ],
+          },
+          week_load: [0, 1, 2, 3, 4, 5, 6].map((d) => ({
+            day_of_week: d,
+            periods: d === 1 ? 1 : 0,
+          })),
+        },
+      } as Partial<TeacherOverview>),
+    );
+    renderPage();
+
+    expect(
+      await screen.findByText("Wednesday at a glance"),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/^Today · /)).not.toBeInTheDocument();
+    // …and the figures under it describe that same day.
+    expect(screen.getByText("Wednesday")).toBeInTheDocument();
+    expect(screen.getByText("1 lesson")).toBeInTheDocument();
+  });
+
   it("reports term progress from the term's own dates", async () => {
     renderPage();
     expect(await screen.findByText(/Week 3 of 15/)).toBeInTheDocument();

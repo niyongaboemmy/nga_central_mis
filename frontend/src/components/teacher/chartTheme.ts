@@ -49,28 +49,36 @@ export interface ChartTheme {
   surface: string;
   tooltipBg: string;
   tooltipBorder: string;
+  /**
+   * Recharts gives its tooltip no text colour of its own, so the label
+   * inherits and turns near-black on a near-black panel in dark mode. Every
+   * tooltip sets this explicitly.
+   */
+  tooltipInk: string;
 }
 
 const LIGHT: ChartTheme = {
   accent: "#2a78d6", // blue 450
   muted: "#9ec5f4", // blue 200
-  track: "#e1e0d9",
-  grid: "#e1e0d9",
-  ink: "#898781",
+  track: "#e2e8f0", // border-light
+  grid: "#e2e8f0",
+  ink: "#64748b", // text-secondary-light — 4.8:1 on the light card
   surface: "#ffffff",
   tooltipBg: "#ffffff",
   tooltipBorder: "rgba(11,11,11,0.10)",
+  tooltipInk: "#1e293b", // text-primary-light
 };
 
 const DARK: ChartTheme = {
   accent: "#3987e5", // blue 400, stepped for the dark surface
   muted: "#184f95", // blue 600
-  track: "#2c2c2a",
-  grid: "#2c2c2a",
-  ink: "#898781",
+  track: "#334155",
+  grid: "#334155",
+  ink: "#94a3b8", // text-secondary-dark — 7.9:1 on the dark card
   surface: "#0f141a",
   tooltipBg: "#1e293b",
   tooltipBorder: "rgba(255,255,255,0.10)",
+  tooltipInk: "#f1f5f9", // text-primary-dark
 };
 
 export const useChartTheme = (): ChartTheme => (useIsDark() ? DARK : LIGHT);

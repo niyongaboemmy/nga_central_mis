@@ -130,7 +130,7 @@ const SEVERITY_STYLE: Record<
   tidy: {
     chip: "bg-slate-100 text-slate-600 dark:bg-slate-700/40 dark:text-slate-300",
     rail: "bg-slate-400",
-    row: "border-border-light dark:border-border-dark/30 hover:bg-surface-light dark:hover:bg-surface-dark",
+    row: "border-border-light dark:border-border-dark/50 hover:bg-surface-light dark:hover:bg-surface-dark",
   },
 };
 
@@ -141,7 +141,7 @@ const Card: React.FC<{ className?: string; children: React.ReactNode }> = ({
   children,
 }) => (
   <section
-    className={`bg-card-light dark:bg-card-dark/30 rounded-3xl border border-white dark:border-border-dark/30 shadow-sm ${className}`}
+    className={`bg-card-light dark:bg-card-dark/30 rounded-3xl border border-border-light dark:border-border-dark/50 shadow-sm ${className}`}
   >
     {children}
   </section>
@@ -155,7 +155,7 @@ const CardHeader: React.FC<{
 }> = ({ icon, title, subtitle, action }) => (
   <div className="flex items-start justify-between gap-3 px-5 pt-5 pb-3">
     <div className="flex items-center gap-3 min-w-0">
-      <span className="flex-shrink-0 grid place-items-center w-9 h-9 rounded-2xl bg-surface-light dark:bg-surface-dark text-text-secondary-light dark:text-text-secondary-dark/70">
+      <span className="flex-shrink-0 grid place-items-center w-9 h-9 rounded-2xl bg-surface-light dark:bg-surface-dark text-text-secondary-light dark:text-text-secondary-dark">
         {icon}
       </span>
       <div className="min-w-0">
@@ -163,7 +163,7 @@ const CardHeader: React.FC<{
           {title}
         </h3>
         {subtitle && (
-          <p className="text-xs text-text-secondary-light dark:text-text-secondary-dark/70 truncate">
+          <p className="text-xs text-text-secondary-light dark:text-text-secondary-dark truncate">
             {subtitle}
           </p>
         )}
@@ -262,7 +262,7 @@ const StatTile: React.FC<{
   return (
     <Link
       to={to}
-      className="group bg-card-light dark:bg-card-dark/30 rounded-3xl border border-white dark:border-border-dark/30 shadow-sm p-5 flex items-center gap-4 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:border-blue-200 dark:hover:border-blue-800/50"
+      className="group bg-card-light dark:bg-card-dark/30 rounded-3xl border border-border-light dark:border-border-dark/50 shadow-sm p-5 flex items-center gap-4 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:border-blue-200 dark:hover:border-blue-800/50"
     >
       <span
         className={`grid place-items-center w-11 h-11 rounded-2xl flex-shrink-0 transition-transform duration-200 group-hover:scale-105 ${tones[tone]}`}
@@ -270,19 +270,19 @@ const StatTile: React.FC<{
         {icon}
       </span>
       <div className="min-w-0 flex-1">
-        <p className="text-sm font-medium text-text-secondary-light dark:text-text-secondary-dark/70 truncate">
+        <p className="text-sm font-medium text-text-secondary-light dark:text-text-secondary-dark truncate">
           {label}
         </p>
         <p className="text-2xl font-bold text-text-primary-light dark:text-text-primary-dark leading-tight">
           {value}
         </p>
         {hint && (
-          <p className="text-xs text-text-secondary-light dark:text-text-secondary-dark/60 truncate">
+          <p className="text-xs text-text-secondary-light dark:text-text-secondary-dark truncate">
             {hint}
           </p>
         )}
       </div>
-      <ArrowRight className="w-4 h-4 flex-shrink-0 opacity-0 -translate-x-1 text-text-secondary-light dark:text-text-secondary-dark/70 transition-all duration-200 group-hover:opacity-100 group-hover:translate-x-0" />
+      <ArrowRight className="w-4 h-4 flex-shrink-0 opacity-0 -translate-x-1 text-text-secondary-light dark:text-text-secondary-dark transition-all duration-200 group-hover:opacity-100 group-hover:translate-x-0" />
     </Link>
   );
 };
@@ -294,9 +294,9 @@ const QuickAction: React.FC<{
 }> = ({ to, icon, label }) => (
   <Link
     to={to}
-    className="flex items-center gap-2 rounded-2xl border border-border-light dark:border-border-dark/30 bg-card-light dark:bg-card-dark/30 px-3.5 py-2.5 text-sm font-medium text-text-primary-light dark:text-text-primary-dark transition-all duration-200 hover:-translate-y-0.5 hover:border-blue-300 dark:hover:border-blue-800/60 hover:text-blue-600 dark:hover:text-blue-400"
+    className="flex items-center gap-2 rounded-2xl border border-border-light dark:border-border-dark/50 bg-card-light dark:bg-card-dark/30 px-3.5 py-2.5 text-sm font-medium text-text-primary-light dark:text-text-primary-dark transition-all duration-200 hover:-translate-y-0.5 hover:border-blue-300 dark:hover:border-blue-800/60 hover:text-blue-600 dark:hover:text-blue-400"
   >
-    <span className="text-text-secondary-light dark:text-text-secondary-dark/70">
+    <span className="text-text-secondary-light dark:text-text-secondary-dark">
       {icon}
     </span>
     {label}
@@ -323,14 +323,14 @@ const LessonRow: React.FC<{
         style={{ backgroundColor: color }}
         aria-hidden
       />
-      <div className="w-24 flex-shrink-0 text-xs font-medium tabular-nums text-text-secondary-light dark:text-text-secondary-dark/70">
+      <div className="w-24 flex-shrink-0 text-xs font-medium tabular-nums text-text-secondary-light dark:text-text-secondary-dark">
         {hhmm(lesson.start_time)} – {hhmm(lesson.end_time)}
       </div>
       <div className="min-w-0 flex-1">
         <p className="text-sm font-medium text-text-primary-light dark:text-text-primary-dark truncate">
           {lesson.subject_name || "Lesson"}
         </p>
-        <p className="text-xs text-text-secondary-light dark:text-text-secondary-dark/70 truncate">
+        <p className="text-xs text-text-secondary-light dark:text-text-secondary-dark truncate">
           {[lesson.class_group_name, lesson.location]
             .filter(Boolean)
             .join(" · ") || "—"}
@@ -343,7 +343,7 @@ const LessonRow: React.FC<{
         </span>
       )}
       {state === "upcoming" && (
-        <span className="flex-shrink-0 text-[11px] text-text-secondary-light dark:text-text-secondary-dark/70">
+        <span className="flex-shrink-0 text-[11px] text-text-secondary-light dark:text-text-secondary-dark">
           in <Countdown targetMinutes={toMinutes(lesson.start_time)} />
         </span>
       )}
@@ -375,10 +375,10 @@ const ActionRow: React.FC<{ item: ActionItem }> = ({ item }) => {
             <ArrowRight className="w-3.5 h-3.5" />
           </span>
         </div>
-        <p className="mt-0.5 text-xs text-text-secondary-light dark:text-text-secondary-dark/70 line-clamp-2">
+        <p className="mt-0.5 text-xs text-text-secondary-light dark:text-text-secondary-dark line-clamp-2">
           {item.detail}
         </p>
-        <p className="mt-1 text-[11px] italic text-text-secondary-light dark:text-text-secondary-dark/60 line-clamp-2">
+        <p className="mt-1 text-[11px] italic text-text-secondary-light dark:text-text-secondary-dark line-clamp-2">
           {item.why}
         </p>
       </div>
@@ -563,16 +563,57 @@ const TeacherDashboard: React.FC = () => {
   const { kpis, period, schedule, schemes, lessonNotes, courses, classes } =
     data;
 
-  const railDay = todayLessons.length > 0 ? "today" : "next";
-  const entries =
-    railDay === "today"
-      ? railEntries(todayLessons, schedule.today_activities)
-      : railEntries(schedule.next_teaching_day?.lessons ?? [], []);
-
   const taughtMinutes = doneToday.reduce(
     (total, l) => total + (toMinutes(l.end_time) - toMinutes(l.start_time)),
     0,
   );
+  const remainingToday = todayLessons.filter(
+    (l) => toMinutes(l.end_time) > nowMinutes,
+  );
+  const remainingMinutes = remainingToday.reduce(
+    (total, l) =>
+      total +
+      (toMinutes(l.end_time) - Math.max(nowMinutes, toMinutes(l.start_time))),
+    0,
+  );
+
+  // Which day the rail draws. Today, while any of it is still ahead; once the
+  // last period has ended it switches to the next teaching day, because the
+  // heading above it has already moved on too — a rail still showing a
+  // finished Tuesday under a "Next up: Wednesday" heading reads as Wednesday's
+  // and misinforms at a glance.
+  const railShowsToday = remainingToday.length > 0;
+  const railDayOfWeek = railShowsToday
+    ? now.getDay()
+    : (schedule.next_teaching_day?.day_of_week ?? now.getDay());
+  const entries = railShowsToday
+    ? railEntries(todayLessons, schedule.today_activities)
+    : railEntries(schedule.next_teaching_day?.lessons ?? [], []);
+
+  // Day figures for the strip under the rail — the hero card used to stretch
+  // to the height of the column beside it and show nothing but empty space.
+  const dayStats = railShowsToday
+    ? [
+        { label: "Taught", value: formatDuration(taughtMinutes) },
+        {
+          label: "Left today",
+          value: `${remainingToday.length} ${remainingToday.length === 1 ? "period" : "periods"}`,
+        },
+        { label: "Time in class", value: formatDuration(remainingMinutes) },
+      ]
+    : schedule.next_teaching_day
+      ? [
+          { label: "Taught today", value: formatDuration(taughtMinutes) },
+          {
+            label: DAY_NAMES[schedule.next_teaching_day.day_of_week],
+            value: `${schedule.next_teaching_day.lessons.length} ${schedule.next_teaching_day.lessons.length === 1 ? "lesson" : "lessons"}`,
+          },
+          {
+            label: "Starts",
+            value: hhmm(schedule.next_teaching_day.lessons[0].start_time),
+          },
+        ]
+      : [];
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
@@ -582,7 +623,7 @@ const TeacherDashboard: React.FC = () => {
           <h1 className="text-2xl font-bold text-text-primary-light dark:text-text-primary-dark">
             {greeting}, {firstName}
           </h1>
-          <p className="mt-1 text-sm text-text-secondary-light dark:text-text-secondary-dark/70">
+          <p className="mt-1 text-sm text-text-secondary-light dark:text-text-secondary-dark">
             {now.toLocaleDateString(undefined, {
               weekday: "long",
               day: "numeric",
@@ -595,7 +636,7 @@ const TeacherDashboard: React.FC = () => {
           {/* Term progress — "how far through am I" in one glance. */}
           {termProgress && (
             <div className="mt-3 max-w-sm">
-              <div className="flex items-center justify-between text-[11px] text-text-secondary-light dark:text-text-secondary-dark/70">
+              <div className="flex items-center justify-between text-[11px] text-text-secondary-light dark:text-text-secondary-dark">
                 <span>
                   {week ? `Week ${week} of ${termProgress.totalWeeks}` : "Term"}
                 </span>
@@ -616,7 +657,7 @@ const TeacherDashboard: React.FC = () => {
 
         <div className="flex items-center gap-2">
           {loadedAt && (
-            <span className="hidden sm:block text-[11px] text-text-secondary-light dark:text-text-secondary-dark/60">
+            <span className="hidden sm:block text-[11px] text-text-secondary-light dark:text-text-secondary-dark">
               Updated{" "}
               {loadedAt.toLocaleTimeString(undefined, {
                 hour: "2-digit",
@@ -626,7 +667,7 @@ const TeacherDashboard: React.FC = () => {
           )}
           <button
             onClick={() => load(true)}
-            className="inline-flex items-center gap-2 rounded-2xl border border-border-light dark:border-border-dark/30 px-3 py-2 text-sm text-text-secondary-light dark:text-text-secondary-dark/70 hover:bg-surface-light dark:hover:bg-surface-dark transition-colors"
+            className="inline-flex items-center gap-2 rounded-2xl border border-border-light dark:border-border-dark/50 px-3 py-2 text-sm text-text-secondary-light dark:text-text-secondary-dark hover:bg-surface-light dark:hover:bg-surface-dark transition-colors"
             title="Refresh"
           >
             <RefreshCw
@@ -699,7 +740,7 @@ const TeacherDashboard: React.FC = () => {
               <h2 className="mt-2 text-2xl font-bold text-text-primary-light dark:text-text-primary-dark">
                 {currentLesson.subject_name}
               </h2>
-              <p className="mt-1 text-sm text-text-secondary-light dark:text-text-secondary-dark/70">
+              <p className="mt-1 text-sm text-text-secondary-light dark:text-text-secondary-dark">
                 {currentLesson.class_group_name}
                 {currentLesson.location ? ` · ${currentLesson.location}` : ""}
                 {` · ${hhmm(currentLesson.start_time)}–${hhmm(currentLesson.end_time)}`}
@@ -722,7 +763,7 @@ const TeacherDashboard: React.FC = () => {
                         }}
                       />
                     </div>
-                    <p className="mt-2 text-xs text-text-secondary-light dark:text-text-secondary-dark/70">
+                    <p className="mt-2 text-xs text-text-secondary-light dark:text-text-secondary-dark">
                       {formatDuration(Math.max(0, end - nowMinutes))} remaining
                       {nextLesson &&
                         ` · then ${nextLesson.subject_name} at ${hhmm(nextLesson.start_time)}`}
@@ -733,18 +774,18 @@ const TeacherDashboard: React.FC = () => {
             </>
           ) : nextLesson ? (
             <>
-              <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-text-secondary-light dark:text-text-secondary-dark/70">
+              <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-text-secondary-light dark:text-text-secondary-dark">
                 <Clock className="w-3.5 h-3.5" /> Up next today
               </div>
               <h2 className="mt-2 text-2xl font-bold text-text-primary-light dark:text-text-primary-dark">
                 {nextLesson.subject_name}
               </h2>
-              <p className="mt-1 text-sm text-text-secondary-light dark:text-text-secondary-dark/70">
+              <p className="mt-1 text-sm text-text-secondary-light dark:text-text-secondary-dark">
                 {nextLesson.class_group_name}
                 {nextLesson.location ? ` · ${nextLesson.location}` : ""} ·
                 starts {hhmm(nextLesson.start_time)}
               </p>
-              <p className="mt-3 text-sm text-text-secondary-light dark:text-text-secondary-dark/70">
+              <p className="mt-3 text-sm text-text-secondary-light dark:text-text-secondary-dark">
                 Starts in{" "}
                 <Countdown targetMinutes={toMinutes(nextLesson.start_time)} />
               </p>
@@ -760,7 +801,7 @@ const TeacherDashboard: React.FC = () => {
               <h2 className="mt-2 text-2xl font-bold text-text-primary-light dark:text-text-primary-dark">
                 Next up: {DAY_NAMES[schedule.next_teaching_day.day_of_week]}
               </h2>
-              <p className="mt-1 text-sm text-text-secondary-light dark:text-text-secondary-dark/70">
+              <p className="mt-1 text-sm text-text-secondary-light dark:text-text-secondary-dark">
                 {schedule.next_teaching_day.lessons.length}{" "}
                 {schedule.next_teaching_day.lessons.length === 1
                   ? "lesson"
@@ -773,13 +814,13 @@ const TeacherDashboard: React.FC = () => {
             </>
           ) : (
             <>
-              <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-text-secondary-light dark:text-text-secondary-dark/70">
+              <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-text-secondary-light dark:text-text-secondary-dark">
                 <CalendarDays className="w-3.5 h-3.5" /> Schedule
               </div>
               <h2 className="mt-2 text-xl font-bold text-text-primary-light dark:text-text-primary-dark">
                 No lessons on your timetable yet
               </h2>
-              <p className="mt-1 text-sm text-text-secondary-light dark:text-text-secondary-dark/70">
+              <p className="mt-1 text-sm text-text-secondary-light dark:text-text-secondary-dark">
                 Once the academic calendar for this term is published, your
                 periods will appear here.
               </p>
@@ -787,18 +828,39 @@ const TeacherDashboard: React.FC = () => {
           )}
 
           {/* The day drawn to scale — where the double period is, where the
-              two-hour gap is, how much is left. */}
+              two-hour gap is, how much is left. Named by its actual weekday so
+              it can never be mistaken for the day the heading talks about. */}
           {entries.length > 0 && (
-            <div className="mt-5 pt-5 border-t border-border-light dark:border-border-dark/30">
-              <p className="mb-2 text-[11px] font-medium uppercase tracking-wide text-text-secondary-light dark:text-text-secondary-dark/60">
-                {railDay === "today"
-                  ? "Your day"
-                  : `${DAY_NAMES[schedule.next_teaching_day!.day_of_week]} at a glance`}
+            <div className="mt-5 pt-5 border-t border-border-light dark:border-border-dark/50">
+              <p className="mb-2 text-[11px] font-medium uppercase tracking-wide text-text-secondary-light dark:text-text-secondary-dark">
+                {railShowsToday
+                  ? `Today · ${DAY_NAMES[railDayOfWeek]}`
+                  : `${DAY_NAMES[railDayOfWeek]} at a glance`}
               </p>
               <DayRail
                 entries={entries}
-                nowMinutes={railDay === "today" ? nowMinutes : null}
+                nowMinutes={railShowsToday ? nowMinutes : null}
               />
+            </div>
+          )}
+
+          {/* Day figures, pinned to the bottom so the card fills its column
+              instead of trailing off into empty space. */}
+          {dayStats.length > 0 && (
+            <div className="mt-auto pt-5 grid grid-cols-3 gap-3">
+              {dayStats.map((stat) => (
+                <div
+                  key={stat.label}
+                  className="rounded-2xl bg-surface-light dark:bg-slate-800/40 px-3 py-2.5"
+                >
+                  <p className="text-[11px] uppercase tracking-wide text-text-secondary-light dark:text-text-secondary-dark truncate">
+                    {stat.label}
+                  </p>
+                  <p className="mt-0.5 text-sm font-semibold text-text-primary-light dark:text-text-primary-dark truncate">
+                    {stat.value}
+                  </p>
+                </div>
+              ))}
             </div>
           )}
         </Card>
@@ -838,7 +900,7 @@ const TeacherDashboard: React.FC = () => {
                         active
                           ? "bg-blue-600 text-white"
                           : key === "all"
-                            ? "bg-surface-light dark:bg-surface-dark text-text-secondary-light dark:text-text-secondary-dark/70 hover:text-text-primary-light dark:hover:text-text-primary-dark"
+                            ? "bg-surface-light dark:bg-surface-dark text-text-secondary-light dark:text-text-secondary-dark hover:text-text-primary-light dark:hover:text-text-primary-dark"
                             : SEVERITY_STYLE[key].chip
                       }`}
                     >
@@ -854,7 +916,7 @@ const TeacherDashboard: React.FC = () => {
               <div className="h-full grid place-items-center py-8 text-center">
                 <div>
                   <CheckCircle2 className="w-8 h-8 mx-auto text-green-500" />
-                  <p className="mt-2 text-sm text-text-secondary-light dark:text-text-secondary-dark/70">
+                  <p className="mt-2 text-sm text-text-secondary-light dark:text-text-secondary-dark">
                     You're all caught up.
                   </p>
                 </div>
@@ -904,7 +966,7 @@ const TeacherDashboard: React.FC = () => {
         />
         <Link
           to="/scheme-of-work"
-          className="group bg-card-light dark:bg-card-dark/30 rounded-3xl border border-white dark:border-border-dark/30 shadow-sm p-5 flex items-center gap-4 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:border-blue-200 dark:hover:border-blue-800/50"
+          className="group bg-card-light dark:bg-card-dark/30 rounded-3xl border border-border-light dark:border-border-dark/50 shadow-sm p-5 flex items-center gap-4 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:border-blue-200 dark:hover:border-blue-800/50"
         >
           <span className="relative flex-shrink-0">
             <ProgressRing
@@ -918,10 +980,10 @@ const TeacherDashboard: React.FC = () => {
                     : "stroke-green-500"
               }
             />
-            <ClipboardList className="absolute inset-0 m-auto w-4 h-4 text-text-secondary-light dark:text-text-secondary-dark/70" />
+            <ClipboardList className="absolute inset-0 m-auto w-4 h-4 text-text-secondary-light dark:text-text-secondary-dark" />
           </span>
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-medium text-text-secondary-light dark:text-text-secondary-dark/70 truncate">
+            <p className="text-sm font-medium text-text-secondary-light dark:text-text-secondary-dark truncate">
               Schemes Submitted
             </p>
             <p className="text-2xl font-bold text-text-primary-light dark:text-text-primary-dark leading-tight">
@@ -931,7 +993,7 @@ const TeacherDashboard: React.FC = () => {
               className={`text-xs truncate ${
                 schemes.rejected > 0
                   ? "text-red-600 dark:text-red-400 font-medium"
-                  : "text-text-secondary-light dark:text-text-secondary-dark/60"
+                  : "text-text-secondary-light dark:text-text-secondary-dark"
               }`}
             >
               {schemes.rejected > 0
@@ -1037,7 +1099,7 @@ const TeacherDashboard: React.FC = () => {
           <div className="px-3 pb-4">
             {todayLessons.length === 0 &&
             schedule.today_activities.length === 0 ? (
-              <p className="px-2 py-8 text-center text-sm text-text-secondary-light dark:text-text-secondary-dark/70">
+              <p className="px-2 py-8 text-center text-sm text-text-secondary-light dark:text-text-secondary-dark">
                 Nothing scheduled today.
               </p>
             ) : (
@@ -1048,7 +1110,7 @@ const TeacherDashboard: React.FC = () => {
                   <button
                     onClick={() => setShowCompleted((v) => !v)}
                     aria-expanded={showCompleted}
-                    className="mx-2 mb-1 flex items-center gap-1.5 rounded-xl px-2 py-1.5 text-xs text-text-secondary-light dark:text-text-secondary-dark/70 hover:bg-surface-light dark:hover:bg-surface-dark transition-colors"
+                    className="mx-2 mb-1 flex items-center gap-1.5 rounded-xl px-2 py-1.5 text-xs text-text-secondary-light dark:text-text-secondary-dark hover:bg-surface-light dark:hover:bg-surface-dark transition-colors"
                   >
                     <ChevronDown
                       className={`w-3.5 h-3.5 transition-transform ${showCompleted ? "rotate-180" : ""}`}
@@ -1076,20 +1138,20 @@ const TeacherDashboard: React.FC = () => {
                         style={{ backgroundColor: activity.color || "#10B981" }}
                         aria-hidden
                       />
-                      <div className="w-24 flex-shrink-0 text-xs font-medium tabular-nums text-text-secondary-light dark:text-text-secondary-dark/70">
+                      <div className="w-24 flex-shrink-0 text-xs font-medium tabular-nums text-text-secondary-light dark:text-text-secondary-dark">
                         {hhmm(activity.start_time)} – {hhmm(activity.end_time)}
                       </div>
                       <div className="min-w-0 flex-1">
                         <p className="text-sm font-medium text-text-primary-light dark:text-text-primary-dark truncate">
                           {activity.activity_name}
                         </p>
-                        <p className="text-xs text-text-secondary-light dark:text-text-secondary-dark/70 truncate">
+                        <p className="text-xs text-text-secondary-light dark:text-text-secondary-dark truncate">
                           {activity.activity_type}
                           {activity.location ? ` · ${activity.location}` : ""}
                         </p>
                       </div>
                       {activity.location && (
-                        <MapPin className="w-4 h-4 flex-shrink-0 text-text-secondary-light dark:text-text-secondary-dark/50" />
+                        <MapPin className="w-4 h-4 flex-shrink-0 text-text-secondary-light dark:text-text-secondary-dark" />
                       )}
                     </li>
                   ))}
@@ -1098,8 +1160,8 @@ const TeacherDashboard: React.FC = () => {
             )}
           </div>
 
-          <div className="border-t border-border-light dark:border-border-dark/30 px-5 py-4">
-            <p className="text-xs font-medium uppercase tracking-wide text-text-secondary-light dark:text-text-secondary-dark/70">
+          <div className="border-t border-border-light dark:border-border-dark/50 px-5 py-4">
+            <p className="text-xs font-medium uppercase tracking-wide text-text-secondary-light dark:text-text-secondary-dark">
               Weekly teaching load
             </p>
             <div className="mt-2">
@@ -1134,7 +1196,7 @@ const TeacherDashboard: React.FC = () => {
           />
           <div className="px-3 pb-4 flex-1">
             {notifications.length === 0 ? (
-              <p className="px-2 py-8 text-center text-sm text-text-secondary-light dark:text-text-secondary-dark/70">
+              <p className="px-2 py-8 text-center text-sm text-text-secondary-light dark:text-text-secondary-dark">
                 No notifications yet.
               </p>
             ) : (
@@ -1158,11 +1220,11 @@ const TeacherDashboard: React.FC = () => {
                             {notification.title}
                           </p>
                           {notification.body && (
-                            <p className="text-xs text-text-secondary-light dark:text-text-secondary-dark/70 line-clamp-2">
+                            <p className="text-xs text-text-secondary-light dark:text-text-secondary-dark line-clamp-2">
                               {notification.body}
                             </p>
                           )}
-                          <p className="mt-0.5 text-[11px] text-text-secondary-light dark:text-text-secondary-dark/60">
+                          <p className="mt-0.5 text-[11px] text-text-secondary-light dark:text-text-secondary-dark">
                             {relativeDate(notification.created_at)}
                           </p>
                         </div>
@@ -1219,7 +1281,7 @@ const TeacherDashboard: React.FC = () => {
           />
           <div className="px-5 pb-5">
             {classes.length === 0 ? (
-              <p className="py-8 text-center text-sm text-text-secondary-light dark:text-text-secondary-dark/70">
+              <p className="py-8 text-center text-sm text-text-secondary-light dark:text-text-secondary-dark">
                 You have no subject assignments for this academic year.
               </p>
             ) : (
@@ -1234,7 +1296,7 @@ const TeacherDashboard: React.FC = () => {
                     <Link
                       key={`${c.subject_id}-${c.class_group_id}`}
                       to={`/subjects/${c.subject_id}`}
-                      className="group relative overflow-hidden rounded-2xl border border-border-light dark:border-border-dark/30 p-4 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:bg-surface-light dark:hover:bg-surface-dark"
+                      className="group relative overflow-hidden rounded-2xl border border-border-light dark:border-border-dark/50 p-4 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:bg-surface-light dark:hover:bg-surface-dark"
                     >
                       {/* Subject colour as a spine — recognisable at a glance
                           against the timetable's own colours. */}
@@ -1249,13 +1311,13 @@ const TeacherDashboard: React.FC = () => {
                         <p className="text-sm font-semibold text-text-primary-light dark:text-text-primary-dark truncate">
                           {c.subject_name}
                         </p>
-                        <p className="text-xs text-text-secondary-light dark:text-text-secondary-dark/70 truncate">
+                        <p className="text-xs text-text-secondary-light dark:text-text-secondary-dark truncate">
                           {[c.grade_name, c.class_group_name]
                             .filter(Boolean)
                             .join(" · ")}
                         </p>
                         <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                          <span className="rounded-full bg-surface-light dark:bg-surface-dark px-2 py-0.5 text-[11px] text-text-secondary-light dark:text-text-secondary-dark/70">
+                          <span className="rounded-full bg-surface-light dark:bg-surface-dark px-2 py-0.5 text-[11px] text-text-secondary-light dark:text-text-secondary-dark">
                             {c.periods_per_week}{" "}
                             {c.periods_per_week === 1 ? "period" : "periods"}
                             /week
@@ -1308,7 +1370,7 @@ const TeacherDashboard: React.FC = () => {
             />
             <div className="px-5 pb-5">
               {lessonNotes.recent_drafts.length === 0 ? (
-                <p className="py-3 text-sm text-text-secondary-light dark:text-text-secondary-dark/70">
+                <p className="py-3 text-sm text-text-secondary-light dark:text-text-secondary-dark">
                   No drafts waiting.
                 </p>
               ) : (
@@ -1322,7 +1384,7 @@ const TeacherDashboard: React.FC = () => {
                         <p className="text-sm text-text-primary-light dark:text-text-primary-dark truncate">
                           {note.title}
                         </p>
-                        <p className="text-[11px] text-text-secondary-light dark:text-text-secondary-dark/70 truncate">
+                        <p className="text-[11px] text-text-secondary-light dark:text-text-secondary-dark truncate">
                           {[note.subject_name, note.class_group_name]
                             .filter(Boolean)
                             .join(" · ")}
@@ -1354,7 +1416,7 @@ const TeacherDashboard: React.FC = () => {
             />
             <div className="px-5 pb-5">
               {courses.recent.length === 0 ? (
-                <p className="py-3 text-sm text-text-secondary-light dark:text-text-secondary-dark/70">
+                <p className="py-3 text-sm text-text-secondary-light dark:text-text-secondary-dark">
                   No courses built for this term yet.
                 </p>
               ) : (
@@ -1369,7 +1431,7 @@ const TeacherDashboard: React.FC = () => {
                           <span className="block text-sm text-text-primary-light dark:text-text-primary-dark truncate">
                             {course.title}
                           </span>
-                          <span className="block text-[11px] text-text-secondary-light dark:text-text-secondary-dark/70 truncate">
+                          <span className="block text-[11px] text-text-secondary-light dark:text-text-secondary-dark truncate">
                             {[course.subject_name, course.class_group_name]
                               .filter(Boolean)
                               .join(" · ")}
