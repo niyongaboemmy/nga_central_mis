@@ -14,6 +14,9 @@ import {
   ExternalLink,
   CircleSlash,
   CheckCircle2,
+  Archive,
+  PenLine,
+  Layers,
 } from "lucide-react";
 import {
   lessonNotesApi,
@@ -24,6 +27,7 @@ import {
 import { elearningApi, builderRoutes } from "../../api/elearning";
 import { useToast } from "../../contexts/ToastContext";
 import { usePermissions } from "../../hooks/usePermissions";
+import { useAcademicPeriod } from "../../contexts/AcademicPeriodContext";
 import NewLessonNoteModal from "./NewLessonNoteModal";
 import ConfirmModal from "../ui/ConfirmModal";
 import LessonNoteStatusBadge from "./LessonNoteStatusBadge";
@@ -38,6 +42,7 @@ const sourceLabel: Record<string, { label: string; className: string }> = {
 
 type StatusFilter = "ALL" | "DRAFT" | "PUBLISHED";
 type ReachFilter = "ALL" | "ON_COURSE" | "OFF_COURSE";
+type SubjectFilter = "ALL" | "WITH_NOTES" | "EMPTY";
 
 /** A thin progress meter — how much of a subject's notes students can actually reach. */
 const CoverageBar: React.FC<{ done: number; total: number }> = ({ done, total }) => {
@@ -132,6 +137,9 @@ const LessonNotesListPage: React.FC = () => {
   const { showToast } = useToast();
   const { hasPermission } = usePermissions();
   const canBuild = hasPermission("MANAGE_COURSE_CONTENT");
+  // Subjects come from the teacher's assignments for the year the header is showing, rather
+  // than whichever year happens to be flagged current on the server.
+  const { selectedYearId } = useAcademicPeriod();
 
   // The chosen subject lives in the URL so Back returns to the subject picker rather than
   // leaving the page, and a teacher can bookmark the subject they work in every day.
@@ -142,6 +150,7 @@ const LessonNotesListPage: React.FC = () => {
   const [subjects, setSubjects] = useState<LessonNoteSubjectSummary[]>([]);
   const [subjectsLoading, setSubjectsLoading] = useState(true);
   const [subjectQuery, setSubjectQuery] = useState("");
+  const [subjectFilter, setSubjectFilter] = useState<SubjectFilter>("ALL");
 
   const [notes, setNotes] = useState<LessonNoteSummary[]>([]);
   const [notesLoading, setNotesLoading] = useState(false);
@@ -156,7 +165,7 @@ const LessonNotesListPage: React.FC = () => {
   const loadSubjects = () => {
     setSubjectsLoading(true);
     lessonNotesApi
-      .subjects()
+      .subjects(selectedYearId ? { academic_year_id: selectedYearId } : undefined)
       .then((res) => setSubjects(res.data.data))
       .catch(() => showToast("Failed to load subjects", "error"))
       .finally(() => setSubjectsLoading(false));
@@ -174,7 +183,7 @@ const LessonNotesListPage: React.FC = () => {
   useEffect(() => {
     loadSubjects();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [selectedYearId]);
 
   useEffect(() => {
     if (selectedSubjectId) {
@@ -195,13 +204,32 @@ const LessonNotesListPage: React.FC = () => {
 
   const visibleSubjects = useMemo(() => {
     const q = subjectQuery.trim().toLowerCase();
-    if (!q) return subjects;
-    return subjects.filter(
-      (s) =>
+    return subjects.filter((s) => {
+      if (subjectFilter === "WITH_NOTES" && s.note_count === 0) return false;
+      if (subjectFilter === "EMPTY" && s.note_count > 0) return false;
+      if (!q) return true;
+      return (
         s.subject_name.toLowerCase().includes(q) ||
-        (s.class_group_names || "").toLowerCase().includes(q),
-    );
-  }, [subjects, subjectQuery]);
+        (s.subject_code || "").toLowerCase().includes(q) ||
+        (s.class_group_names || "").toLowerCase().includes(q)
+      );
+    });
+  }, [subjects, subjectQuery, subjectFilter]);
+
+  /** Totals across every subject the teacher teaches — the "how am I doing" line. */
+  const totals = useMemo(
+    () =>
+      subjects.reduce(
+        (acc, s) => ({
+          notes: acc.notes + s.note_count,
+          drafts: acc.drafts + s.draft_count,
+          onCourse: acc.onCourse + s.on_course_count,
+          started: acc.started + (s.note_count > 0 ? 1 : 0),
+        }),
+        { notes: 0, drafts: 0, onCourse: 0, started: 0 },
+      ),
+    [subjects],
+  );
 
   const visibleNotes = useMemo(() => {
     const q = noteQuery.trim().toLowerCase();
@@ -273,8 +301,8 @@ const LessonNotesListPage: React.FC = () => {
           <div className="min-w-0">
             <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-50">Lesson Notes</h1>
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-              Pick a subject to open its notes — write, generate with AI, or upload a PDF, then put
-              them on the e-learning course students work through.
+              Your notes, grouped by the subjects you teach. Open one to write, generate with AI or
+              upload a PDF — then put it on the e-learning course students work through.
             </p>
           </div>
           <button
@@ -285,15 +313,47 @@ const LessonNotesListPage: React.FC = () => {
           </button>
         </div>
 
-        {subjects.length > 4 && (
-          <div className="relative mb-5 max-w-sm">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <input
-              value={subjectQuery}
-              onChange={(e) => setSubjectQuery(e.target.value)}
-              placeholder="Find a subject…"
-              className="w-full pl-9 pr-3 py-2.5 text-sm rounded-full bg-white dark:bg-white/[0.06] border border-gray-200 dark:border-white/10 text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
-            />
+        {!subjectsLoading && subjects.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2 mb-5">
+            {[
+              { icon: Layers, label: `${totals.started}/${subjects.length} subjects started` },
+              { icon: FileText, label: `${totals.notes} note${totals.notes === 1 ? "" : "s"}` },
+              ...(totals.drafts
+                ? [{ icon: PenLine, label: `${totals.drafts} draft${totals.drafts === 1 ? "" : "s"}` }]
+                : []),
+              { icon: GraduationCap, label: `${totals.onCourse} on e-learning` },
+            ].map(({ icon: Icon, label }) => (
+              <span
+                key={label}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-white/[0.06]"
+              >
+                <Icon className="w-3.5 h-3.5 text-gray-400 dark:text-gray-500" />
+                {label}
+              </span>
+            ))}
+          </div>
+        )}
+
+        {!subjectsLoading && subjects.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2 mb-5">
+            {subjects.length > 4 && (
+              <div className="relative flex-1 min-w-[200px] max-w-sm">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <input
+                  value={subjectQuery}
+                  onChange={(e) => setSubjectQuery(e.target.value)}
+                  placeholder="Find a subject or code…"
+                  className="w-full pl-9 pr-3 py-2 text-sm rounded-full bg-white dark:bg-white/[0.06] border border-gray-200 dark:border-white/10 text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
+                />
+              </div>
+            )}
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {(["ALL", "WITH_NOTES", "EMPTY"] as SubjectFilter[]).map((f) => (
+                <button key={f} onClick={() => setSubjectFilter(f)} className={filterPill(subjectFilter === f)}>
+                  {f === "ALL" ? "All subjects" : f === "WITH_NOTES" ? "With notes" : "Not started"}
+                </button>
+              ))}
+            </div>
           </div>
         )}
 
@@ -307,37 +367,69 @@ const LessonNotesListPage: React.FC = () => {
             ))}
           </div>
         ) : subjects.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-24 text-center rounded-2xl border border-dashed border-gray-200 dark:border-white/10">
-            <FileText className="w-10 h-10 text-gray-300 dark:text-gray-600 mb-3" />
-            <p className="text-gray-500 dark:text-gray-400">No lesson notes yet</p>
+          <div className="flex flex-col items-center justify-center py-24 text-center rounded-2xl border border-dashed border-gray-200 dark:border-white/10 px-6">
+            <BookOpen className="w-10 h-10 text-gray-300 dark:text-gray-600 mb-3" />
+            <p className="text-gray-700 dark:text-gray-200 font-semibold">No subjects assigned to you</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1 max-w-sm">
+              Lesson notes are grouped by the subjects you teach. Once an administrator assigns you
+              a subject for this academic year, it appears here.
+            </p>
             <button
               onClick={() => setShowNewModal(true)}
               className="mt-4 text-sm font-semibold text-blue-600 hover:text-blue-500"
             >
-              Create your first note
+              Start a note anyway
             </button>
           </div>
         ) : visibleSubjects.length === 0 ? (
-          <p className="py-16 text-center text-sm text-gray-500 dark:text-gray-400">
-            No subject matches “{subjectQuery}”.
-          </p>
+          <div className="py-16 text-center">
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              {subjectQuery
+                ? `No subject matches “${subjectQuery}”.`
+                : subjectFilter === "EMPTY"
+                  ? "Every subject you teach already has notes."
+                  : "None of your subjects have notes yet."}
+            </p>
+            <button
+              onClick={() => {
+                setSubjectQuery("");
+                setSubjectFilter("ALL");
+              }}
+              className="mt-3 text-xs font-semibold text-blue-600 hover:text-blue-500"
+            >
+              Show all subjects
+            </button>
+          </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {visibleSubjects.map((s) => (
+            {visibleSubjects.map((s) => {
+              const empty = s.note_count === 0;
+              return (
               <button
                 key={s.subject_id}
                 onClick={() => selectSubject(s.subject_id)}
-                className="group text-left rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.03] p-4 hover:border-blue-300 dark:hover:border-blue-400/40 hover:shadow-lg hover:shadow-blue-500/5 hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50 transition-all"
+                className={`group text-left rounded-2xl border p-4 hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50 transition-all ${
+                  empty
+                    ? "border-dashed border-gray-300 dark:border-white/15 bg-gray-50/60 dark:bg-white/[0.02] hover:border-blue-400 hover:bg-white dark:hover:bg-white/[0.05]"
+                    : "border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.03] hover:border-blue-300 dark:hover:border-blue-400/40 hover:shadow-lg hover:shadow-blue-500/5"
+                }`}
               >
                 <div className="flex items-start gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-400/10 flex items-center justify-center flex-shrink-0">
-                    <BookOpen className="w-5 h-5 text-blue-600 dark:text-blue-300" />
+                  <div
+                    className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 transition-colors ${
+                      empty
+                        ? "bg-gray-100 dark:bg-white/[0.06] text-gray-400 dark:text-gray-500 group-hover:bg-blue-50 dark:group-hover:bg-blue-400/10 group-hover:text-blue-600 dark:group-hover:text-blue-300"
+                        : "bg-blue-50 dark:bg-blue-400/10 text-blue-600 dark:text-blue-300"
+                    }`}
+                  >
+                    <BookOpen className="w-5 h-5" />
                   </div>
                   <div className="min-w-0 flex-1">
                     <h3 className="font-semibold text-gray-900 dark:text-gray-100 line-clamp-2">
                       {s.subject_name}
                     </h3>
                     <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 truncate">
+                      {s.subject_code ? `${s.subject_code} · ` : ""}
                       {s.class_group_names || "No class group"}
                     </p>
                   </div>
@@ -345,24 +437,56 @@ const LessonNotesListPage: React.FC = () => {
                 </div>
 
                 <div className="flex items-center gap-1.5 flex-wrap mt-3">
-                  <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 dark:bg-white/[0.07] dark:text-gray-300">
-                    {s.note_count} note{s.note_count === 1 ? "" : "s"}
-                  </span>
-                  {s.published_count > 0 && (
-                    <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-green-100 text-green-700 dark:bg-green-400/15 dark:text-green-300">
-                      {s.published_count} published
+                  {!s.is_assigned && (
+                    <span
+                      title="You no longer teach this subject — its notes are kept here."
+                      className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 dark:bg-white/[0.07] dark:text-gray-400"
+                    >
+                      <Archive className="w-2.5 h-2.5" /> Past subject
                     </span>
                   )}
-                  {s.draft_count > 0 && (
-                    <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-400/15 dark:text-amber-300">
-                      {s.draft_count} draft
+                  {empty ? (
+                    <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 dark:bg-blue-400/10 dark:text-blue-300">
+                      No notes yet — start one
                     </span>
+                  ) : (
+                    <>
+                      <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 dark:bg-white/[0.07] dark:text-gray-300">
+                        {s.note_count} note{s.note_count === 1 ? "" : "s"}
+                      </span>
+                      {s.published_count > 0 && (
+                        <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-green-100 text-green-700 dark:bg-green-400/15 dark:text-green-300">
+                          {s.published_count} published
+                        </span>
+                      )}
+                      {s.draft_count > 0 && (
+                        <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-400/15 dark:text-amber-300">
+                          {s.draft_count} draft
+                        </span>
+                      )}
+                    </>
                   )}
                 </div>
 
-                <CoverageBar done={s.on_course_count} total={s.note_count} />
+                {/* A meter of 0/0 says nothing — a subject with no notes shows its last-touched
+                    line instead, so the card still has a bottom edge that means something. */}
+                {empty ? (
+                  <p className="mt-3 text-[11px] text-gray-400 dark:text-gray-500">
+                    Open it to write the first note for this class.
+                  </p>
+                ) : (
+                  <>
+                    <CoverageBar done={s.on_course_count} total={s.note_count} />
+                    {s.last_updated && (
+                      <p className="mt-2 text-[11px] text-gray-400 dark:text-gray-500">
+                        Last edited {new Date(s.last_updated).toLocaleDateString()}
+                      </p>
+                    )}
+                  </>
+                )}
               </button>
-            ))}
+              );
+            })}
           </div>
         )}
 

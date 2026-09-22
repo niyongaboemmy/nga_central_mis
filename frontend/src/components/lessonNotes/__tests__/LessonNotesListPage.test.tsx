@@ -33,11 +33,18 @@ vi.mock("../../../hooks/usePermissions", () => ({
   usePermissions: () => ({ hasPermission: () => true }),
 }));
 
+// The page scopes subjects to the year the app header is showing.
+vi.mock("../../../contexts/AcademicPeriodContext", () => ({
+  useAcademicPeriod: () => ({ selectedYearId: 9 }),
+}));
+
 vi.mock("../NewLessonNoteModal", () => ({ default: () => null }));
 
 const subject = (over: Partial<any> = {}) => ({
   subject_id: 1,
   subject_name: "Web3 Applications",
+  subject_code: "SPEWI302",
+  is_assigned: true,
   note_count: 2,
   published_count: 1,
   draft_count: 1,
@@ -80,7 +87,11 @@ const renderPage = () =>
 describe("LessonNotesListPage — subject-first browsing and e-learning linkage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    subjectsMock.mockResolvedValue({ data: { data: [subject(), subject({ subject_id: 2, subject_name: "JavaScript", note_count: 1, on_course_count: 0 })] } });
+    subjectsMock.mockResolvedValue({
+      data: {
+        data: [subject(), subject({ subject_id: 2, subject_name: "JavaScript", note_count: 1, on_course_count: 0 })],
+      },
+    });
     listMock.mockResolvedValue({ data: { data: [] } });
   });
 
@@ -146,6 +157,60 @@ describe("LessonNotesListPage — subject-first browsing and e-learning linkage"
 
     expect(await screen.findByText("Week 3 — Wallets")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Add to e-learning" })).not.toBeInTheDocument();
+  });
+
+  it("lists an assigned subject that has no notes yet, as a way in", async () => {
+    subjectsMock.mockResolvedValue({
+      data: {
+        data: [
+          subject(),
+          subject({
+            subject_id: 3,
+            subject_name: "Database Systems",
+            subject_code: "SPDB201",
+            note_count: 0,
+            published_count: 0,
+            draft_count: 0,
+            on_course_count: 0,
+            last_updated: null,
+          }),
+        ],
+      },
+    });
+
+    renderPage();
+    expect(await screen.findByText("Database Systems")).toBeInTheDocument();
+    expect(screen.getByText("No notes yet — start one")).toBeInTheDocument();
+    // 1 of 2 subjects has notes.
+    expect(screen.getByText("1/2 subjects started")).toBeInTheDocument();
+  });
+
+  it("filters the subject grid down to the ones not started", async () => {
+    subjectsMock.mockResolvedValue({
+      data: {
+        data: [
+          subject(),
+          subject({ subject_id: 3, subject_name: "Database Systems", note_count: 0, draft_count: 0, published_count: 0, on_course_count: 0, last_updated: null }),
+        ],
+      },
+    });
+
+    renderPage();
+    await screen.findByText("Web3 Applications");
+
+    await userEvent.click(screen.getByRole("button", { name: "Not started" }));
+    expect(screen.queryByText("Web3 Applications")).not.toBeInTheDocument();
+    expect(screen.getByText("Database Systems")).toBeInTheDocument();
+  });
+
+  it("marks a subject the teacher no longer teaches, rather than hiding its notes", async () => {
+    subjectsMock.mockResolvedValue({
+      data: { data: [subject(), subject({ subject_id: 4, subject_name: "Legacy Subject", is_assigned: false })] },
+    });
+
+    renderPage();
+    expect(await screen.findByText("Legacy Subject")).toBeInTheDocument();
+    expect(screen.getByText("Past subject")).toBeInTheDocument();
   });
 
   it("filters the subject's notes down to the ones not yet on e-learning", async () => {

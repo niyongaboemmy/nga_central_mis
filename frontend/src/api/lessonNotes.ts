@@ -31,15 +31,20 @@ export interface LessonNoteCourseTarget {
   status: string;
 }
 
-/** One row per subject, for the subject-first landing step of the Lesson Notes page. */
+/** One row per subject the teacher can write notes for, for the subject-first landing step.
+ *  Driven by their subject assignments, so a subject with no notes yet still appears. */
 export interface LessonNoteSubjectSummary {
   subject_id: number;
   subject_name: string;
+  subject_code: string | null;
+  /** False for a subject that only exists through older notes (no current assignment). */
+  is_assigned: boolean;
   note_count: number;
   published_count: number;
   draft_count: number;
   on_course_count: number;
-  last_updated: string;
+  /** Null when the subject has no notes yet. */
+  last_updated: string | null;
   class_group_names: string | null;
 }
 
@@ -199,7 +204,7 @@ export const lessonNotesApi = {
     apiService.get<{ data: LessonNoteSummary[] }>("/lesson-notes", { params: filters }),
 
   /** Subjects the teacher has notes for, with counts — drives the "pick a subject first" step. */
-  subjects: (filters?: { academic_term_id?: number }) =>
+  subjects: (filters?: { academic_term_id?: number; academic_year_id?: number }) =>
     apiService.get<{ data: LessonNoteSubjectSummary[] }>("/lesson-notes/subjects", { params: filters }),
 
   create: (data: {

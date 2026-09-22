@@ -1,9 +1,15 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import request from "supertest";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import app from "../app";
 import { db } from "../db";
-import { CourseSection, LessonNote, LessonNoteShare, SchemeOfWorkEntry } from "../db/schema";
+import {
+  CourseSection,
+  LessonNote,
+  LessonNoteShare,
+  SchemeOfWorkEntry,
+  TeacherSubjectAssignment,
+} from "../db/schema";
 import {
   createUser,
   signToken,
@@ -94,12 +100,41 @@ describe("Lesson notes: subject summary and e-learning linkage", () => {
   let noteNoWeek: number;
   let noteOtherSubject: number;
 
+  it("lists every assigned subject, including one with no notes yet", async () => {
+    // A third subject the teacher is assigned to but has never written for: it must still be
+    // listed, or there is no way into it from this page.
+    const bareSubjectId = await createSubject();
+    await createTeacherSubjectAssignment({
+      userId: teacherId,
+      subjectId: bareSubjectId,
+      classGroupId,
+      academicYearId,
+    });
+
+    const res = await request(app)
+      .get("/lesson-notes/subjects")
+      .set(auth(teacherToken))
+      .query({ academic_year_id: academicYearId });
+    expect(res.status).toBe(200);
+
+    const bare = res.body.data.find((s: any) => s.subject_id === bareSubjectId);
+    expect(bare).toBeTruthy();
+    expect(bare.note_count).toBe(0);
+    expect(bare.is_assigned).toBe(true);
+    expect(bare.last_updated).toBeNull();
+    // The class group comes from the assignment, not from notes that don't exist.
+    expect(bare.class_group_names).toBeTruthy();
+  });
+
   it("summarises notes per subject so the page can ask which subject first", async () => {
     noteWeek2 = await createNote(subjectA, "Flexbox basics", entryIds[1]);
     noteNoWeek = await createNote(subjectA, "Loose revision sheet");
     noteOtherSubject = await createNote(subjectB, "Unrelated subject note");
 
-    const res = await request(app).get("/lesson-notes/subjects").set(auth(teacherToken));
+    const res = await request(app)
+      .get("/lesson-notes/subjects")
+      .set(auth(teacherToken))
+      .query({ academic_year_id: academicYearId });
     expect(res.status).toBe(200);
 
     const a = res.body.data.find((s: any) => s.subject_id === subjectA);
@@ -173,9 +208,51 @@ describe("Lesson notes: subject summary and e-learning linkage", () => {
     expect(note.elearning.section_title).toBe("Week 2 — Topic 2");
     expect(note.course_target).toBeNull();
 
-    const subjects = await request(app).get("/lesson-notes/subjects").set(auth(teacherToken));
+    const subjects = await request(app)
+      .get("/lesson-notes/subjects")
+      .set(auth(teacherToken))
+      .query({ academic_year_id: academicYearId });
     const a = subjects.body.data.find((s: any) => s.subject_id === subjectA);
     expect(a.on_course_count).toBe(2);
+  });
+
+  it("keeps a subject the teacher no longer teaches, flagged as unassigned", async () => {
+    // Write the note while still assigned, then have the assignment taken away — a handover.
+    const droppedSubjectId = await createSubject();
+    await createTeacherSubjectAssignment({
+      userId: teacherId,
+      subjectId: droppedSubjectId,
+      classGroupId,
+      academicYearId,
+    });
+    const created = await request(app)
+      .post("/lesson-notes")
+      .set(auth(teacherToken))
+      .send({ subject_id: droppedSubjectId, class_group_id: classGroupId, title: "Old handover note" });
+    expect(created.status).toBe(201);
+
+    await db
+      .delete(TeacherSubjectAssignment)
+      .where(
+        and(
+          eq(TeacherSubjectAssignment.user_id, teacherId),
+          eq(TeacherSubjectAssignment.subject_id, droppedSubjectId),
+        ),
+      );
+
+    const res = await request(app)
+      .get("/lesson-notes/subjects")
+      .set(auth(teacherToken))
+      .query({ academic_year_id: academicYearId });
+
+    const dropped = res.body.data.find((s: any) => s.subject_id === droppedSubjectId);
+    expect(dropped).toBeTruthy();
+    expect(dropped.is_assigned).toBe(false);
+    expect(dropped.note_count).toBe(1);
+    // Assigned subjects are listed before the leftovers.
+    const firstUnassigned = res.body.data.findIndex((s: any) => !s.is_assigned);
+    const lastAssigned = res.body.data.map((s: any) => s.is_assigned).lastIndexOf(true);
+    expect(firstUnassigned).toBeGreaterThan(lastAssigned);
   });
 
   it("refuses to place a note whose subject has no course", async () => {

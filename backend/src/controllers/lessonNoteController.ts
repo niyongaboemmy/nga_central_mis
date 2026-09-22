@@ -35,6 +35,7 @@ import {
   loadNoteCurriculumContext,
 } from "../services/lessonNoteCurriculum";
 import { LessonNoteCriteria } from "../db/schema";
+import { getCurrentAcademicYearId } from "../utils/academicYear";
 
 // ======================
 // STATUS MANAGEMENT
@@ -189,21 +190,53 @@ async function loadCourseTargets(
 }
 
 /**
- * One row per subject the teacher has notes for, so the list page can ask "which subject?"
- * before rendering anything — a teacher with a dozen subjects was previously handed every
- * note at once with no way in.
+ * One row per subject the teacher can write notes for, so the list page asks "which subject?"
+ * before rendering anything.
+ *
+ * Driven by the teacher's subject assignments, not by the notes that happen to exist: a
+ * subject you teach but haven't written for yet still needs a way in, and that is exactly the
+ * subject a teacher is looking for. Subjects with notes but no current assignment (last year's
+ * teaching, a handover) are appended and flagged, so nothing a teacher wrote can disappear
+ * from this page.
  */
 export const listMyLessonNoteSubjects = asyncHandler(async (req: any, res: any) => {
-  const { academic_term_id } = req.query;
-  const conditions = [eq(LessonNote.user_id, req.user.userId)];
+  const { academic_term_id, academic_year_id } = req.query;
+  const userId = req.user.userId;
+
+  const noteConditions = [eq(LessonNote.user_id, userId)];
   if (academic_term_id) {
-    conditions.push(eq(LessonNote.academic_term_id, parseInt(academic_term_id, 10)));
+    noteConditions.push(eq(LessonNote.academic_term_id, parseInt(academic_term_id, 10)));
   }
 
-  const rows = await db
+  const yearId = academic_year_id
+    ? parseInt(academic_year_id, 10)
+    : await getCurrentAcademicYearId();
+
+  const assignmentWhere = yearId
+    ? and(
+        eq(TeacherSubjectAssignment.user_id, userId),
+        eq(TeacherSubjectAssignment.academic_year_id, yearId),
+      )
+    : eq(TeacherSubjectAssignment.user_id, userId);
+
+  const assignments = await db
+    .select({
+      subject_id: TeacherSubjectAssignment.subject_id,
+      subject_name: Subject.name,
+      subject_code: Subject.code,
+      class_group_name: ClassGroup.name,
+    })
+    .from(TeacherSubjectAssignment)
+    .innerJoin(Subject, eq(Subject.subject_id, TeacherSubjectAssignment.subject_id))
+    .innerJoin(ClassGroup, eq(ClassGroup.class_group_id, TeacherSubjectAssignment.class_group_id))
+    .where(assignmentWhere)
+    .orderBy(asc(Subject.name), asc(ClassGroup.name));
+
+  const noteRows = await db
     .select({
       subject_id: LessonNote.subject_id,
       subject_name: Subject.name,
+      subject_code: Subject.code,
       note_count: sql<number>`COUNT(*)`,
       published_count: sql<number>`SUM(${LessonNote.status} = 'PUBLISHED')`,
       draft_count: sql<number>`SUM(${LessonNote.status} = 'DRAFT')`,
@@ -213,16 +246,17 @@ export const listMyLessonNoteSubjects = asyncHandler(async (req: any, res: any) 
     .from(LessonNote)
     .innerJoin(Subject, eq(LessonNote.subject_id, Subject.subject_id))
     .leftJoin(ClassGroup, eq(LessonNote.class_group_id, ClassGroup.class_group_id))
-    .where(and(...conditions))
-    .groupBy(LessonNote.subject_id, Subject.name)
+    .where(and(...noteConditions))
+    .groupBy(LessonNote.subject_id, Subject.name, Subject.code)
     .orderBy(asc(Subject.name));
+  const bySubject = new Map(noteRows.map((r) => [r.subject_id, r]));
 
   // How many of each subject's notes actually reach students through e-learning — the number
   // the teacher needs before picking a subject to work on.
   const ids = await db
     .select({ subject_id: LessonNote.subject_id, note_id: LessonNote.note_id })
     .from(LessonNote)
-    .where(and(...conditions));
+    .where(and(...noteConditions));
   const placements = await loadNotePlacements(ids.map((n) => n.note_id));
   const onCourse = new Map<number, number>();
   for (const n of ids) {
@@ -231,18 +265,54 @@ export const listMyLessonNoteSubjects = asyncHandler(async (req: any, res: any) 
     }
   }
 
-  successResponse(
-    res,
-    "Lesson note subjects",
-    rows.map((r) => ({
-      ...r,
-      note_count: Number(r.note_count),
-      published_count: Number(r.published_count || 0),
-      draft_count: Number(r.draft_count || 0),
-      on_course_count: onCourse.get(r.subject_id) || 0,
-      class_group_names: r.class_group_names || null,
-    })),
-  );
+  // Assigned subjects first (each once, with every class group it is taught to), then any
+  // subject that only exists through older notes.
+  const assignedGroups = new Map<number, { name: string; code: string | null; groups: string[] }>();
+  for (const a of assignments) {
+    const entry = assignedGroups.get(a.subject_id) || {
+      name: a.subject_name,
+      code: a.subject_code,
+      groups: [],
+    };
+    if (a.class_group_name && !entry.groups.includes(a.class_group_name)) {
+      entry.groups.push(a.class_group_name);
+    }
+    assignedGroups.set(a.subject_id, entry);
+  }
+
+  const shape = (
+    subjectId: number,
+    name: string,
+    code: string | null,
+    classGroups: string | null,
+    isAssigned: boolean,
+  ) => {
+    const n = bySubject.get(subjectId);
+    return {
+      subject_id: subjectId,
+      subject_name: name,
+      subject_code: code,
+      is_assigned: isAssigned,
+      note_count: Number(n?.note_count || 0),
+      published_count: Number(n?.published_count || 0),
+      draft_count: Number(n?.draft_count || 0),
+      on_course_count: onCourse.get(subjectId) || 0,
+      last_updated: n?.last_updated || null,
+      class_group_names: classGroups,
+    };
+  };
+
+  const assigned = [...assignedGroups.entries()]
+    .map(([subjectId, v]) =>
+      shape(subjectId, v.name, v.code, v.groups.join(", ") || bySubject.get(subjectId)?.class_group_names || null, true),
+    )
+    .sort((a, b) => a.subject_name.localeCompare(b.subject_name));
+
+  const unassigned = noteRows
+    .filter((r) => !assignedGroups.has(r.subject_id))
+    .map((r) => shape(r.subject_id, r.subject_name, r.subject_code, r.class_group_names, false));
+
+  successResponse(res, "Lesson note subjects", [...assigned, ...unassigned]);
 });
 
 export const listMyLessonNotes = asyncHandler(async (req: any, res: any) => {
