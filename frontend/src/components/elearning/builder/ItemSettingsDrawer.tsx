@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Info, Maximize2, Minimize2, Plus, Sparkles, Trash2, Wand2, X } from "lucide-react";
-import { CompletionRule, CourseItem, CurriculumOutcomePick } from "../../../api/elearning";
+import { CompletionRule, CourseItem, CurriculumOutcomePick, elearningApi, isTimeout } from "../../../api/elearning";
 import { lessonNotesApi } from "../../../api/lessonNotes";
 import { apiService } from "../../../services/api";
 import { useToast } from "../../../contexts/ToastContext";
@@ -22,6 +22,12 @@ interface Props {
 }
 
 const RULES: CompletionRule[] = ["VIEW", "MARK_DONE", "SUBMIT", "MIN_SCORE"];
+
+/** Say which of the three things went wrong — out of time, refused, or not configured. */
+const aiError = (e: any, what: string) => {
+  if (isTimeout(e)) return `The AI is taking longer than usual to ${what}. Try again in a moment.`;
+  return e?.response?.data?.message || `The AI couldn't ${what} just now.`;
+};
 
 const toLocalInput = (iso: string | null) => {
   if (!iso) return "";
@@ -146,16 +152,12 @@ const ItemSettingsDrawer: React.FC<Props> = ({ item, curriculum, onClose, onSave
   const suggestCriteria = async () => {
     setSuggesting(true);
     try {
-      const r = await apiService.post(`/elearning/items/${item.item_id}/suggest-criteria`, {
-        title,
-        description,
-        content_html: pageHtml || undefined,
-      });
+      const r = await elearningApi.suggestCriteria(item.item_id, { title, description, content_html: pageHtml || undefined });
       const ids: number[] = r.data.data?.criteria_ids || [];
       if (ids.length === 0) showToast("No matching criteria found — try adding a short description first", "info");
       setCriteriaIds((c) => [...new Set([...c, ...ids])]);
     } catch (e: any) {
-      showToast(e?.response?.data?.message || "AI suggestion isn't available right now", "error");
+      showToast(aiError(e, "match the criteria"), "error");
     } finally {
       setSuggesting(false);
     }
@@ -164,12 +166,12 @@ const ItemSettingsDrawer: React.FC<Props> = ({ item, curriculum, onClose, onSave
   const generateQuestions = async () => {
     setGeneratingKc(true);
     try {
-      const r = await apiService.post(`/elearning/items/${item.item_id}/generate-check`, { title, description, count: 5 });
+      const r = await elearningApi.generateCheck(item.item_id, { title, description, count: 5 });
       const qs: KcQuestion[] = r.data.data?.questions || [];
       if (qs.length === 0) showToast("The AI couldn't write questions from this — add a description or a source note", "info");
       setQuestions((q) => [...q, ...qs].slice(0, 10));
     } catch (e: any) {
-      showToast(e?.response?.data?.message || "AI generation isn't available right now", "error");
+      showToast(aiError(e, "write those questions"), "error");
     } finally {
       setGeneratingKc(false);
     }
@@ -180,7 +182,7 @@ const ItemSettingsDrawer: React.FC<Props> = ({ item, curriculum, onClose, onSave
     if (!item) return;
     setWritingPage(true);
     try {
-      const r = await apiService.post(`/elearning/items/${item.item_id}/generate-page`, {
+      const r = await elearningApi.generatePage(item.item_id, {
         instruction: aiInstruction || undefined,
         content_html: pageHtml || undefined,
       });
@@ -197,7 +199,7 @@ const ItemSettingsDrawer: React.FC<Props> = ({ item, curriculum, onClose, onSave
       setAiInstruction("");
       showToast("Draft written — edit anything before saving", "success");
     } catch (e: any) {
-      showToast(e?.response?.data?.message || "The AI couldn't write that page just now", "error");
+      showToast(aiError(e, "write that page"), "error");
     } finally {
       setWritingPage(false);
     }

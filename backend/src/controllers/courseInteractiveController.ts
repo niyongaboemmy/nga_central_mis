@@ -290,7 +290,10 @@ export const generatePageDraft = asyncHandler(async (req: any, res: any) => {
   const { data, providerUsed } = await generateStructuredContent<{ title?: string; content_html?: string; covered_criteria?: string[] }>({
     schemaName: "course_page_draft",
     schema: pageSchema,
-    maxOutputTokens: 3000,
+    // A page is 3-6 KB of HTML, and Gemini 2.5 spends part of this budget on its own
+    // reasoning before emitting anything — at 3000 the JSON came back truncated
+    // ("Unterminated string"), so the whole chain fell through to the slowest provider.
+    maxOutputTokens: 8000,
     prompt: `You are writing one page of learning content for TVET students in Rwanda (RTB competence-based curriculum). The page is read on a phone, so keep it tight and practical.
 
 ${curriculum ? `This is what the week must teach:\n"""\n${curriculum}\n"""\n` : ""}

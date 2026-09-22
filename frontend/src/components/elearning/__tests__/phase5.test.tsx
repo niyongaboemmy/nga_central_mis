@@ -3,6 +3,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { flushQueue, queuedCount, sendOrQueue } from "../learner/offline";
+import { AI_TIMEOUT_MS } from "../../../api/elearning";
 import AITutorSheet from "../learner/AITutorSheet";
 
 const post = vi.fn();
@@ -56,7 +57,15 @@ describe("AITutorSheet", () => {
       </MemoryRouter>,
     );
     await user.click(await screen.findByRole("button", { name: /Quiz me on this week/ }));
-    await waitFor(() => expect(post).toHaveBeenCalledWith("/elearning/my/courses/3/ask", { question: "Quiz me on this week", section_id: 1, mode: "quiz" }));
+    // The third argument is the long AI timeout: the shared 10s client abort was cutting
+    // provider fallback off mid-flight and surfacing as "I couldn't answer that".
+    await waitFor(() =>
+      expect(post).toHaveBeenCalledWith(
+        "/elearning/my/courses/3/ask",
+        { question: "Quiz me on this week", section_id: 1, mode: "quiz" },
+        expect.objectContaining({ timeout: AI_TIMEOUT_MS }),
+      ),
+    );
     expect(await screen.findByText("Flexbox lays items out on one axis.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Flexbox basics/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "What is justify-content?" })).toBeInTheDocument();

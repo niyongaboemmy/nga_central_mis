@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { BookOpen, Loader2, Send, Sparkles, X } from "lucide-react";
 import { apiService } from "../../../services/api";
-import { learnerRoutes } from "../../../api/elearning";
+import { elearningApi, isTimeout, learnerRoutes } from "../../../api/elearning";
 import { useNavigate } from "react-router-dom";
 import { useMotion } from "../../../design/motion";
 import Mascot from "../ui/Mascot";
@@ -53,11 +53,14 @@ const AITutorSheet: React.FC<Props> = ({ courseId, sectionId, open, onClose }) =
     setBusy(true);
     const mode = /quiz me/i.test(q) ? "quiz" : /simpler|simple words/i.test(q) ? "simpler" : /example/i.test(q) ? "example" : "";
     try {
-      const r = await apiService.post(`/elearning/my/courses/${courseId}/ask`, { question: q, section_id: sectionId, mode });
+      const r = await elearningApi.askTutor(courseId, { question: q, section_id: sectionId, mode });
       const d = r.data.data;
       setTurns((t) => [...t, { role: "assistant", html: d.answer_html, citations: d.citations, grounded: d.grounded, follow_ups: d.follow_ups }]);
     } catch (e: any) {
-      setTurns((t) => [...t, { role: "assistant", html: `<p>${e?.response?.data?.message || "I couldn't answer that just now. Try again in a moment."}</p>`, grounded: false }]);
+      const reason = isTimeout(e)
+        ? "I'm taking longer than usual to read your notes. Ask me again in a moment."
+        : e?.response?.data?.message || "I couldn't answer that just now. Try again in a moment.";
+      setTurns((t) => [...t, { role: "assistant", html: `<p>${reason}</p>`, grounded: false }]);
     } finally {
       setBusy(false);
     }
