@@ -311,7 +311,16 @@ const CourseBuilderPage: React.FC = () => {
   }, [data]);
 
   if (!data) {
-    return <div className="space-y-3"><Skeleton className="h-28" /><div className="flex gap-4"><Skeleton className="w-72 h-96" /><Skeleton className="flex-1 h-96" /></div></div>;
+    return (
+      <div className="flex flex-col h-[calc(100dvh-4rem)] overflow-hidden pt-1 gap-3">
+        <Skeleton className="h-16 flex-shrink-0" />
+        <Skeleton className="h-16 flex-shrink-0" />
+        <div className="flex-1 min-h-0 flex gap-5">
+          <Skeleton className="hidden md:block w-[300px] lg:w-[320px] h-full" />
+          <Skeleton className="flex-1 h-full" />
+        </div>
+      </div>
+    );
   }
 
   const isLive = data.course.status === "PUBLISHED";
@@ -386,8 +395,12 @@ const CourseBuilderPage: React.FC = () => {
   const showDetail = !!section && (!railOpen || !!selected);
 
   return (
-    <div className="pb-24 md:pb-16">
+    /* App-shell layout: the page is exactly the viewport minus the navbar, so the header and
+       the next step stay put and only the week list / week detail scroll. On a small laptop
+       the teacher never loses the instruction or the Publish menu while scrolling weeks. */
+    <div className="flex flex-col h-[calc(100dvh-4rem)] overflow-hidden">
       {/* Header — title, state, one primary action. Stats moved into the week list. */}
+      <div className="flex-shrink-0 pt-1">
       <button onClick={() => navigate(-1)} className="inline-flex items-center gap-1 min-h-[40px] text-sm text-gray-500 hover:text-gray-800 dark:hover:text-gray-200">
         <ArrowLeft className="w-4 h-4" /> Back
       </button>
@@ -435,11 +448,12 @@ const CourseBuilderPage: React.FC = () => {
       </div>
 
       {/* One instruction at a time */}
-      {tab === "content" && <div className="mt-4"><AnimatePresence mode="wait"><NextStepBar key={nextStep.id} step={nextStep} /></AnimatePresence></div>}
+      {tab === "content" && <div className="mt-3"><AnimatePresence mode="wait"><NextStepBar key={nextStep.id} step={nextStep} /></AnimatePresence></div>}
+      </div>
 
       {/* Secondary views open full-width with a way back to the weeks */}
       {tab !== "content" && (
-        <div className="mt-4">
+        <div className="flex-1 min-h-0 overflow-y-auto mt-4 pb-6">
           <button onClick={() => setTab("content")} className="inline-flex items-center gap-1 min-h-[40px] text-sm text-brand-600 dark:text-brand-200">
             <ChevronLeft className="w-4 h-4" /> Back to weeks
           </button>
@@ -464,9 +478,9 @@ const CourseBuilderPage: React.FC = () => {
       )}
 
       {tab === "content" && (
-        <div className="mt-4 md:flex md:gap-5 md:items-start">
+        <div className="flex-1 min-h-0 mt-4 md:flex md:gap-5">
           {/* Weeks — the whole screen on a phone, a quiet column on desktop */}
-          <aside className={`${showDetail ? "hidden" : "block"} md:block md:w-[300px] lg:w-[320px] flex-shrink-0 el-card overflow-hidden md:sticky md:top-20`}>
+          <aside className={`${showDetail ? "hidden" : "flex"} md:flex flex-col h-full md:w-[300px] lg:w-[320px] flex-shrink-0 el-card overflow-hidden`}>
             <div className="flex items-center justify-between px-3 py-2.5 border-b border-gray-100 dark:border-gray-800/80">
               <p className="text-[11px] uppercase tracking-wider font-semibold text-gray-500 dark:text-gray-400">{data.sections.length} weeks</p>
               <button
@@ -479,13 +493,13 @@ const CourseBuilderPage: React.FC = () => {
                 <Plus className="w-3.5 h-3.5" /> Section
               </button>
             </div>
-            <div className="max-h-none md:max-h-[calc(100vh-13rem)] overflow-y-auto">
+            <div className="flex-1 overflow-y-auto overscroll-contain">
               <WeekList sections={data.sections} selected={selected} onSelect={(id) => { setSelected(id); setRailOpen(false); }} todayIso={todayIso} />
             </div>
           </aside>
 
           {/* The week */}
-          <main className={`${showDetail ? "block" : "hidden"} md:block flex-1 min-w-0 mt-4 md:mt-0`}>
+          <main className={`${showDetail ? "flex" : "hidden"} md:flex flex-col h-full flex-1 min-w-0 mt-4 md:mt-0 overflow-y-auto overscroll-contain pr-0.5`}>
             {!section ? (
               <p className="text-sm text-gray-500">Choose a week.</p>
             ) : (
@@ -598,21 +612,21 @@ const CourseBuilderPage: React.FC = () => {
                     </div>
                   </div>
                 </details>
+
+                {/* Stays reachable however long the week gets */}
+                <div className="sticky bottom-0 mt-auto pt-4 pb-1 -mx-0.5 px-0.5 bg-gradient-to-t from-white via-white dark:from-black dark:via-black to-transparent">
+                  <motion.button
+                    {...m("tap")}
+                    onClick={() => setPaletteOpen(true)}
+                    className="inline-flex items-center gap-2 min-h-[48px] px-5 rounded-pill bg-brand-500 hover:bg-brand-600 text-white text-sm font-semibold shadow-soft focus:outline-none focus-visible:shadow-glow"
+                  >
+                    <Plus className="w-4 h-4" /> {copy.builder.addItem}
+                  </motion.button>
+                </div>
               </>
             )}
           </main>
         </div>
-      )}
-
-      {/* Add: always within thumb reach on a phone, inline on desktop */}
-      {tab === "content" && section && showDetail && (
-        <motion.button
-          {...m("tap")}
-          onClick={() => setPaletteOpen(true)}
-          className="fixed md:static bottom-5 right-5 md:mt-5 md:ml-[calc(300px+1.25rem)] lg:md:ml-[calc(320px+1.25rem)] z-30 inline-flex items-center gap-2 min-h-[52px] md:min-h-[44px] px-5 rounded-pill bg-brand-500 hover:bg-brand-600 text-white text-sm font-semibold shadow-float md:shadow-soft focus:outline-none focus-visible:shadow-glow"
-        >
-          <Plus className="w-5 h-5 md:w-4 md:h-4" /> {copy.builder.addItem}
-        </motion.button>
       )}
 
       {section && <AddItemPalette courseId={cid} sectionTitle={section.week_number || section.title} open={paletteOpen} onClose={() => setPaletteOpen(false)} onPick={addItem} />}
