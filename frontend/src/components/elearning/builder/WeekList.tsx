@@ -21,7 +21,9 @@ const WeekList: React.FC<{
   selected: number | null;
   onSelect: (sectionId: number) => void;
   todayIso: string;
-}> = ({ sections, selected, onSelect, todayIso }) => (
+  /** Pointer/keyboard focus moved to a row — the parent shows the hover preview. */
+  onPeek?: (section: CourseSection | null, rect: DOMRect | null) => void;
+}> = ({ sections, selected, onSelect, todayIso, onPeek }) => (
   <ul className="divide-y divide-gray-100 dark:divide-gray-800/80" role="list">
     {sections.map((s) => {
       const st = stateOf(s);
@@ -33,6 +35,10 @@ const WeekList: React.FC<{
         <li key={s.section_id}>
           <button
             onClick={() => onSelect(s.section_id)}
+            onMouseEnter={(e) => onPeek?.(s, e.currentTarget.getBoundingClientRect())}
+            onMouseLeave={() => onPeek?.(null, null)}
+            onFocus={(e) => onPeek?.(s, e.currentTarget.getBoundingClientRect())}
+            onBlur={() => onPeek?.(null, null)}
             aria-current={selected === s.section_id ? "true" : undefined}
             className={`w-full flex items-center gap-3 px-3 py-3 text-left min-h-[60px] transition-colors ${
               selected === s.section_id ? "bg-brand-50 dark:bg-brand-700/15" : "hover:bg-gray-50 dark:hover:bg-white/5"

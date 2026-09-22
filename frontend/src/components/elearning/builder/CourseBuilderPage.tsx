@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { AnimatePresence, motion, Reorder, useDragControls } from "framer-motion";
-import { ArrowLeft, BarChart3, BookOpenCheck, ChevronLeft, Download, Eye, EyeOff, GripVertical, HelpCircle, MoreHorizontal, Plus, RefreshCw, Settings2, Smartphone, Wand2, X } from "lucide-react";
+import { ArrowLeft, BarChart3, BookOpenCheck, ChevronLeft, Download, Eye, EyeOff, FolderPlus, GripVertical, HelpCircle, Link as LinkIcon, MoreHorizontal, PlayCircle, Plus, RefreshCw, Settings2, Smartphone, Wand2, X } from "lucide-react";
 import {
   BuilderCourse,
   CourseItem,
@@ -21,6 +21,8 @@ import InsightsTab from "./InsightsTab";
 import CoveragePanel from "./CoveragePanel";
 import NextStepBar, { NextStep } from "./NextStepBar";
 import WeekList from "./WeekList";
+import WeekPeek from "./WeekPeek";
+import { usePrompt } from "../ui/PromptDialog";
 import { API_BASE_URL } from "../../../services/api";
 import { getToken } from "../../../utils/auth";
 import Mascot from "../ui/Mascot";
@@ -122,6 +124,8 @@ const CourseBuilderPage: React.FC = () => {
   const [coverageKey, setCoverageKey] = useState(0);
   const [building, setBuilding] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
+  const [peek, setPeek] = useState<{ section: CourseSection; rect: DOMRect } | null>(null);
+  const [ask, promptUI] = usePrompt();
   const tab = (search.get("tab") as Tab) || "content";
   const setTab = (t: Tab) => setSearch((p) => { const n = new URLSearchParams(p); if (t === "content") n.delete("tab"); else n.set("tab", t); return n; });
 
@@ -263,7 +267,20 @@ const CourseBuilderPage: React.FC = () => {
       body.criteria_ids = section.criteria.map((c) => c.criteria_id);
     }
     if (choice.item_type === "LINK" || choice.item_type === "VIDEO") {
-      const url = window.prompt(choice.item_type === "VIDEO" ? "Paste a YouTube or Vimeo link" : "Paste the link");
+      const isVideo = choice.item_type === "VIDEO";
+      const url = await ask({
+        title: isVideo ? "Add a video" : "Add a link",
+        detail: isVideo ? "Paste a YouTube or Vimeo link — students watch it inside the course." : "Students open it in a new tab.",
+        placeholder: isVideo ? "https://youtu.be/…" : "https://…",
+        confirmLabel: isVideo ? "Add video" : "Add link",
+        icon: isVideo ? PlayCircle : LinkIcon,
+        inputMode: "url",
+        validate: (v) => {
+          if (!/^https?:\/\//i.test(v)) return "Start the address with http:// or https://";
+          if (isVideo && !/(youtube\.com|youtu\.be|vimeo\.com)/i.test(v)) return "Only YouTube and Vimeo links can be embedded.";
+          return null;
+        },
+      });
       if (!url) return;
       body.url = url;
       body.title = choice.item_type === "VIDEO" ? "Video" : url.replace(/^https?:\/\//, "").slice(0, 60);
@@ -484,8 +501,14 @@ const CourseBuilderPage: React.FC = () => {
             <div className="flex items-center justify-between px-3 py-2.5 border-b border-gray-100 dark:border-gray-800/80">
               <p className="text-[11px] uppercase tracking-wider font-semibold text-gray-500 dark:text-gray-400">{data.sections.length} weeks</p>
               <button
-                onClick={() => {
-                  const title = window.prompt("Section title", "Before you start");
+                onClick={async () => {
+                  const title = await ask({
+                    title: "Add a section",
+                    detail: "A section sits alongside the scheme's weeks — for revision, or things to do before you start.",
+                    placeholder: "Before you start",
+                    confirmLabel: "Add section",
+                    icon: FolderPlus,
+                  });
                   if (title) elearningApi.createSection(cid, { title }).then((r) => { setData(r.data.data); setSelected(r.data.data.section_id); });
                 }}
                 className="inline-flex items-center gap-1 text-[11px] text-brand-600 dark:text-brand-200 min-h-[32px] px-1"
@@ -494,7 +517,13 @@ const CourseBuilderPage: React.FC = () => {
               </button>
             </div>
             <div className="flex-1 overflow-y-auto overscroll-contain">
-              <WeekList sections={data.sections} selected={selected} onSelect={(id) => { setSelected(id); setRailOpen(false); }} todayIso={todayIso} />
+              <WeekList
+                sections={data.sections}
+                selected={selected}
+                onSelect={(id) => { setSelected(id); setRailOpen(false); }}
+                todayIso={todayIso}
+                onPeek={(s, rect) => setPeek(s && rect ? { section: s, rect } : null)}
+              />
             </div>
           </aside>
 
@@ -628,6 +657,9 @@ const CourseBuilderPage: React.FC = () => {
           </main>
         </div>
       )}
+
+      <WeekPeek section={peek?.section ?? null} anchor={peek?.rect ?? null} />
+      {promptUI}
 
       {section && <AddItemPalette courseId={cid} sectionTitle={section.week_number || section.title} open={paletteOpen} onClose={() => setPaletteOpen(false)} onPick={addItem} />}
 

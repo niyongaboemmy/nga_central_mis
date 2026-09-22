@@ -14,6 +14,7 @@ import { ChevronDown, HelpCircle, Pencil, Plus, Trash2 } from "lucide-react";
 
 const RevealView: React.FC<NodeViewProps> = ({ node, updateAttributes, editor }) => {
   const [open, setOpen] = useState(true);
+  const [editingSummary, setEditingSummary] = useState(false);
   const summary = (node.attrs.summary as string) || "Tap to reveal";
   return (
     <NodeViewWrapper className="my-3 rounded-xl border border-brand-200 dark:border-brand-700 bg-brand-50/50 dark:bg-brand-700/10">
@@ -21,14 +22,29 @@ const RevealView: React.FC<NodeViewProps> = ({ node, updateAttributes, editor })
         <button type="button" onClick={() => setOpen((o) => !o)} aria-label={open ? "Collapse" : "Expand"} className="w-6 h-6 flex items-center justify-center rounded-md hover:bg-brand-100 dark:hover:bg-brand-700/30">
           <ChevronDown className={`w-4 h-4 transition-transform ${open ? "" : "-rotate-90"}`} />
         </button>
-        <span className="flex-1">{summary}</span>
-        {editor.isEditable && (
+        {editingSummary ? (
+          <input
+            autoFocus
+            defaultValue={summary}
+            aria-label="Prompt students see before revealing"
+            onBlur={(e) => {
+              const next = e.target.value.trim();
+              if (next) updateAttributes({ summary: next.slice(0, 200) });
+              setEditingSummary(false);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+              if (e.key === "Escape") setEditingSummary(false);
+            }}
+            className="flex-1 bg-transparent outline-none border-b border-brand-500 text-sm"
+          />
+        ) : (
+          <span className="flex-1">{summary}</span>
+        )}
+        {editor.isEditable && !editingSummary && (
           <button
             type="button"
-            onClick={() => {
-              const next = window.prompt("Prompt students see before revealing", summary);
-              if (next !== null && next.trim()) updateAttributes({ summary: next.trim().slice(0, 200) });
-            }}
+            onClick={() => setEditingSummary(true)}
             className="w-6 h-6 flex items-center justify-center rounded-md hover:bg-brand-100 dark:hover:bg-brand-700/30"
             aria-label="Edit prompt"
           >
