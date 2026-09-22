@@ -177,7 +177,45 @@ export const DEFAULT_ENTRY_PROMPT_TEMPLATE =
   "Make sure to cover: the indicative content, a clear learning objective, the teaching methodology/activities, " +
   "resources needed, and how you'll evaluate understanding.";
 
+/** One row per (subject, class group) the teacher is assigned, with progress. */
+export interface SchemeProgressRow {
+  subject_id: number;
+  class_group_id: number;
+  subject_name: string;
+  subject_code: string | null;
+  subject_color: string | null;
+  class_group_name: string;
+  grade_name: string | null;
+  scheme_id: number | null;
+  status: "submitted" | "pending";
+  entries_count: number;
+  validation_status: "PENDING" | "APPROVED" | "REJECTED";
+  validation_comment: string | null;
+  updated_at: string | null;
+}
+
+export interface SchemeProgressResponse {
+  period: {
+    academic_year_id: number | null;
+    academic_term_id: number | null;
+    academic_term_name: string | null;
+    term_start_date: string | null;
+    term_end_date: string | null;
+  };
+  rows: SchemeProgressRow[];
+}
+
 export const schemeOfWorkApi = {
+  /** The signed-in teacher's coverage across every assigned subject/class. */
+  myProgress: (params?: {
+    academic_year_id?: number;
+    academic_term_id?: number;
+  }) =>
+    apiService.get<{ data: SchemeProgressResponse }>(
+      "/scheme-of-work/my-progress",
+      { params },
+    ),
+
   upload: (formData: FormData) =>
     // Non-standard documents fall back to a synchronous AI extraction call on the backend (see
     // uploadAndExtractScheme), which can take well over the default 10s timeout -- give it room.
@@ -297,12 +335,16 @@ export const schemeOfWorkApi = {
     apiService.post<{
       success: boolean;
       data: { taggedCount: number; entriesProcessed: number };
-    }>(`/scheme-of-work/schemes/${schemeId}/bulk-suggest-criteria`, { overwrite }),
+    }>(`/scheme-of-work/schemes/${schemeId}/bulk-suggest-criteria`, {
+      overwrite,
+    }),
 
   /** Permanently deletes an entire scheme of work — every weekly entry and their lesson plans —
    * so the teacher can start over from the 3-option chooser. */
   deleteScheme: (schemeId: number) =>
-    apiService.delete<{ success: boolean }>(`/scheme-of-work/schemes/${schemeId}`),
+    apiService.delete<{ success: boolean }>(
+      `/scheme-of-work/schemes/${schemeId}`,
+    ),
 
   getAllTeachers: (params: {
     academic_year_id: number;
@@ -315,7 +357,11 @@ export const schemeOfWorkApi = {
       "/scheme-of-work/all-teachers",
       { params },
     ),
-  validateScheme: (entry_ids: number[], status: "APPROVED" | "REJECTED", comment?: string) =>
+  validateScheme: (
+    entry_ids: number[],
+    status: "APPROVED" | "REJECTED",
+    comment?: string,
+  ) =>
     apiService.post("/scheme-of-work/validate", {
       entry_ids,
       status,
@@ -327,7 +373,10 @@ export const schemeOfWorkApi = {
    * button, so both are always pixel-identical (one renderer, see schemeReportPdf.ts). Fetched via
    * axios (not a plain <a href>/<iframe src>) because the endpoint requires the bearer auth
    * header, which a plain URL can't carry. */
-  getSchemePdfBlob: (schemeId: number, mode: "preview" | "download" = "preview") =>
+  getSchemePdfBlob: (
+    schemeId: number,
+    mode: "preview" | "download" = "preview",
+  ) =>
     apiService.get<Blob>(`/scheme-of-work/schemes/${schemeId}/pdf`, {
       params: { mode },
       responseType: "blob",

@@ -5,6 +5,7 @@ import { authenticate, authorize } from "../middleware/auth";
 import { Permissions } from "../utils/permissions";
 import {
   listMyLessonNotes,
+  listMyLessonNoteSubjects,
   createLessonNote,
   createLessonNoteFromPdf,
   replaceLessonNotePdf,
@@ -92,6 +93,8 @@ router.get("/:id/pdf/raw", streamLessonNotePdf);
 router.use(authorize(Permissions.MANAGE_LESSON_NOTES));
 
 router.get("/", listMyLessonNotes);
+// Subject-first entry point: the list page asks which subject before rendering any notes.
+router.get("/subjects", listMyLessonNoteSubjects);
 router.post("/", createLessonNote);
 router.post("/upload-pdf", uploadPdf, createLessonNoteFromPdf);
 

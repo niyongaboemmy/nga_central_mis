@@ -15,6 +15,9 @@ import {
   StudentSubjectEnrollment,
   StudentClassGroup,
   UserProfile,
+  Course,
+  CourseSection,
+  CourseItem,
 } from "../db/schema";
 import { asyncHandler } from "../middleware/asyncHandler";
 import { successResponse } from "../utils/response";
@@ -105,6 +108,143 @@ async function loadOwnedNote(noteId: number, userId: number) {
 // CRUD
 // ======================
 
+/**
+ * Where each of these notes sits in e-learning, if anywhere. A note reaches students through a
+ * CourseItem of type LESSON_NOTE (ref_id = note_id) inside a section of the subject's Course —
+ * being PUBLISHED and shared is not the same thing as being on the course, and the notes list
+ * had no way to tell the two apart. Returned per note so the UI can say "Week 3 of Web3
+ * Applications" rather than just "linked".
+ */
+type NotePlacement = {
+  item_id: number;
+  is_published: boolean;
+  section_id: number;
+  section_title: string;
+  course_id: number;
+  course_title: string;
+  course_status: "DRAFT" | "PUBLISHED" | "ARCHIVED";
+};
+
+async function loadNotePlacements(
+  noteIds: number[],
+): Promise<Map<number, NotePlacement>> {
+  const out = new Map<number, NotePlacement>();
+  if (noteIds.length === 0) return out;
+  const rows = await db
+    .select({
+      note_id: CourseItem.ref_id,
+      item_id: CourseItem.item_id,
+      is_published: CourseItem.is_published,
+      section_id: CourseSection.section_id,
+      section_title: CourseSection.title,
+      course_id: Course.course_id,
+      course_title: Course.title,
+      course_status: Course.status,
+    })
+    .from(CourseItem)
+    .innerJoin(CourseSection, eq(CourseSection.section_id, CourseItem.section_id))
+    .innerJoin(Course, eq(Course.course_id, CourseSection.course_id))
+    .where(and(eq(CourseItem.item_type, "LESSON_NOTE"), inArray(CourseItem.ref_id, noteIds)))
+    .orderBy(asc(CourseSection.position), asc(CourseItem.position));
+  for (const r of rows) {
+    if (r.note_id == null || out.has(r.note_id)) continue; // first placement wins
+    out.set(r.note_id, {
+      item_id: r.item_id,
+      is_published: !!r.is_published,
+      section_id: r.section_id,
+      section_title: r.section_title,
+      course_id: r.course_id,
+      course_title: r.course_title,
+      course_status: r.course_status as NotePlacement["course_status"],
+    });
+  }
+  return out;
+}
+
+/** The course a note could be placed into, keyed "subjectId:classGroupId". */
+async function loadCourseTargets(
+  pairs: { subject_id: number; class_group_id: number | null }[],
+): Promise<Map<string, { course_id: number; title: string; status: string }>> {
+  const out = new Map<string, { course_id: number; title: string; status: string }>();
+  const subjectIds = [...new Set(pairs.map((p) => p.subject_id))];
+  if (subjectIds.length === 0) return out;
+  const rows = await db
+    .select({
+      course_id: Course.course_id,
+      subject_id: Course.subject_id,
+      class_group_id: Course.class_group_id,
+      title: Course.title,
+      status: Course.status,
+    })
+    .from(Course)
+    .where(inArray(Course.subject_id, subjectIds));
+  for (const r of rows) {
+    out.set(`${r.subject_id}:${r.class_group_id}`, {
+      course_id: r.course_id,
+      title: r.title,
+      status: r.status,
+    });
+  }
+  return out;
+}
+
+/**
+ * One row per subject the teacher has notes for, so the list page can ask "which subject?"
+ * before rendering anything — a teacher with a dozen subjects was previously handed every
+ * note at once with no way in.
+ */
+export const listMyLessonNoteSubjects = asyncHandler(async (req: any, res: any) => {
+  const { academic_term_id } = req.query;
+  const conditions = [eq(LessonNote.user_id, req.user.userId)];
+  if (academic_term_id) {
+    conditions.push(eq(LessonNote.academic_term_id, parseInt(academic_term_id, 10)));
+  }
+
+  const rows = await db
+    .select({
+      subject_id: LessonNote.subject_id,
+      subject_name: Subject.name,
+      note_count: sql<number>`COUNT(*)`,
+      published_count: sql<number>`SUM(${LessonNote.status} = 'PUBLISHED')`,
+      draft_count: sql<number>`SUM(${LessonNote.status} = 'DRAFT')`,
+      last_updated: sql<string>`MAX(${LessonNote.updated_at})`,
+      class_group_names: sql<string | null>`GROUP_CONCAT(DISTINCT ${ClassGroup.name} ORDER BY ${ClassGroup.name} SEPARATOR ', ')`,
+    })
+    .from(LessonNote)
+    .innerJoin(Subject, eq(LessonNote.subject_id, Subject.subject_id))
+    .leftJoin(ClassGroup, eq(LessonNote.class_group_id, ClassGroup.class_group_id))
+    .where(and(...conditions))
+    .groupBy(LessonNote.subject_id, Subject.name)
+    .orderBy(asc(Subject.name));
+
+  // How many of each subject's notes actually reach students through e-learning — the number
+  // the teacher needs before picking a subject to work on.
+  const ids = await db
+    .select({ subject_id: LessonNote.subject_id, note_id: LessonNote.note_id })
+    .from(LessonNote)
+    .where(and(...conditions));
+  const placements = await loadNotePlacements(ids.map((n) => n.note_id));
+  const onCourse = new Map<number, number>();
+  for (const n of ids) {
+    if (placements.has(n.note_id)) {
+      onCourse.set(n.subject_id, (onCourse.get(n.subject_id) || 0) + 1);
+    }
+  }
+
+  successResponse(
+    res,
+    "Lesson note subjects",
+    rows.map((r) => ({
+      ...r,
+      note_count: Number(r.note_count),
+      published_count: Number(r.published_count || 0),
+      draft_count: Number(r.draft_count || 0),
+      on_course_count: onCourse.get(r.subject_id) || 0,
+      class_group_names: r.class_group_names || null,
+    })),
+  );
+});
+
 export const listMyLessonNotes = asyncHandler(async (req: any, res: any) => {
   const { subject_id, class_group_id, academic_term_id, status } = req.query;
 
@@ -162,12 +302,23 @@ export const listMyLessonNotes = asyncHandler(async (req: any, res: any) => {
       asc(LessonNote.title),
     );
 
+  const placements = await loadNotePlacements(notes.map((n) => n.note_id));
+  const courseTargets = await loadCourseTargets(
+    notes.map((n) => ({ subject_id: n.subject_id, class_group_id: n.class_group_id })),
+  );
+
   successResponse(
     res,
     "Lesson notes",
     notes.map((n) => ({
       ...n,
       criteria_ids: n.criteria_ids ? String(n.criteria_ids).split(",").map((id) => parseInt(id, 10)) : [],
+      elearning: placements.get(n.note_id) || null,
+      // Present even when the note isn't placed, so the UI can offer "Add to e-learning"
+      // instead of a dead end when a course does exist for this subject + class group.
+      course_target: placements.get(n.note_id)
+        ? null
+        : courseTargets.get(`${n.subject_id}:${n.class_group_id}`) || null,
     })),
   );
 });

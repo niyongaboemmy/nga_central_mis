@@ -19,6 +19,7 @@ import {
   reorderItems,
   setItemCriteriaHandler,
   pickLessonNotes,
+  placeLessonNoteOnCourse,
   pickSubjectDocuments,
   pickCriteria,
 } from "../controllers/courseController";
@@ -107,6 +108,8 @@ router.post("/courses/:id/reseed", builder, reseedCourse);
 router.post("/courses/:id/sections", builder, createSection);
 router.put("/courses/:id/sections/order", builder, reorderSections);
 router.get("/courses/:id/pickers/lesson-notes", builder, pickLessonNotes);
+// One-click placement from the Lesson Notes page — resolves the course and section itself.
+router.post("/notes/:noteId/place", builder, placeLessonNoteOnCourse);
 router.get("/courses/:id/pickers/subject-documents", builder, pickSubjectDocuments);
 router.get("/courses/:id/pickers/criteria", builder, pickCriteria);
 
