@@ -45,7 +45,7 @@ const Field: React.FC<{ label: string; hint?: string; children: React.ReactNode 
     <div className="mt-1">{children}</div>
   </label>
 );
-const input = "w-full min-h-[44px] px-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white focus:outline-none focus:border-brand-500 focus:shadow-glow";
+const input = "el-input";
 
 /**
  * Right drawer: completion rule as plain words, required, due date, minutes, criteria chips;
@@ -182,7 +182,7 @@ const ItemSettingsDrawer: React.FC<Props> = ({ item, curriculum, onClose, onSave
           onClick={(e) => e.stopPropagation()}
           role="dialog"
           aria-label={`Settings for ${item.title}`}
-          className={`pointer-events-auto fixed top-16 right-0 bottom-0 bg-white dark:bg-gray-900 shadow-float border-l border-gray-200 dark:border-gray-800 flex flex-col ${item.item_type === "PAGE" ? "w-full lg:w-[720px]" : "w-full sm:w-[440px]"}`}
+          className={`pointer-events-auto fixed top-16 right-0 bottom-0 bg-white dark:bg-gray-950 shadow-float border-l border-gray-200 dark:border-gray-800 flex flex-col ${item.item_type === "PAGE" ? "w-full lg:w-[720px]" : "w-full sm:w-[440px]"}`}
         >
           <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-100 dark:border-gray-800">
             <ItemTypeIcon type={item.item_type} className="w-4 h-4 text-gray-500" />

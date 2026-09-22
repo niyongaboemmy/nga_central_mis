@@ -107,7 +107,7 @@ const AddItemPalette: React.FC<Props> = ({ courseId, sectionTitle, open, onClose
             onClick={(e) => e.stopPropagation()}
             role="dialog"
             aria-label={`Add to ${sectionTitle}`}
-            className="w-full max-w-xl rounded-2xl bg-white dark:bg-gray-900 shadow-float border border-gray-200 dark:border-gray-800 overflow-hidden"
+            className="w-full max-w-xl rounded-2xl el-float border border-gray-200 dark:border-gray-800 overflow-hidden"
           >
             <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-100 dark:border-gray-800">
               <Search className="w-4 h-4 text-gray-400" />
@@ -134,14 +134,14 @@ const AddItemPalette: React.FC<Props> = ({ courseId, sectionTitle, open, onClose
                     onClick={() => onPick(r.choice)}
                     className={`w-full flex items-center gap-3 px-4 py-2.5 text-left min-h-[48px] ${i === cursor ? "bg-brand-50 dark:bg-brand-700/20" : ""}`}
                   >
-                    <span className="w-8 h-8 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 flex items-center justify-center flex-shrink-0">
+                    <span className="w-8 h-8 rounded-lg el-chip text-gray-600 dark:text-gray-300 flex items-center justify-center flex-shrink-0">
                       <r.icon className="w-4 h-4" />
                     </span>
                     <span className="min-w-0 flex-1">
                       <span className="block text-sm text-gray-900 dark:text-white truncate">{r.label}</span>
                       <span className="block text-[11px] text-gray-500 dark:text-gray-400 truncate">{r.hint}</span>
                     </span>
-                    {r.placed && <span className="text-[10px] px-1.5 py-0.5 rounded-pill bg-gray-100 dark:bg-gray-800 text-gray-500">already in course</span>}
+                    {r.placed && <span className="text-[10px] px-1.5 py-0.5 rounded-pill el-chip text-gray-500">already in course</span>}
                     {r.draft && <span className="text-[10px] px-1.5 py-0.5 rounded-pill bg-warning-100 text-warning-700">draft</span>}
                   </button>
                 </li>

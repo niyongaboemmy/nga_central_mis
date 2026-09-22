@@ -75,7 +75,7 @@ const AITutorSheet: React.FC<Props> = ({ courseId, sectionId, open, onClose }) =
             transition={{ type: "spring", stiffness: 320, damping: 32 }}
             role="dialog"
             aria-label="AI tutor"
-            className="fixed z-50 bottom-0 left-0 right-0 lg:left-auto lg:right-4 lg:bottom-4 lg:w-[420px] max-h-[80vh] flex flex-col rounded-t-3xl lg:rounded-3xl bg-white/95 dark:bg-gray-900/95 backdrop-blur-md shadow-float border border-gray-200/70 dark:border-gray-700/60"
+            className="fixed z-50 bottom-0 left-0 right-0 lg:left-auto lg:right-4 lg:bottom-4 lg:w-[420px] max-h-[80vh] flex flex-col rounded-t-3xl lg:rounded-3xl el-float"
           >
             <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-100 dark:border-gray-800">
               <Mascot pose={busy ? "thinking" : "book"} size={32} />
@@ -108,7 +108,7 @@ const AITutorSheet: React.FC<Props> = ({ courseId, sectionId, open, onClose }) =
                       <ul className="mt-2 flex flex-wrap gap-1.5" aria-label="Sources">
                         {t.citations.map((c) => (
                           <li key={c.item_id}>
-                            <button onClick={() => { onClose(); navigate(learnerRoutes.item(courseId, c.item_id)); }} className="inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-pill bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-brand-700 dark:text-brand-200">
+                            <button onClick={() => { onClose(); navigate(learnerRoutes.item(courseId, c.item_id)); }} className="inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-pill el-card text-brand-700 dark:text-brand-200">
                               <BookOpen className="w-3 h-3" /> {c.title}
                             </button>
                           </li>
@@ -118,7 +118,7 @@ const AITutorSheet: React.FC<Props> = ({ courseId, sectionId, open, onClose }) =
                     {t.follow_ups && t.follow_ups.length > 0 && (
                       <div className="mt-2 flex flex-wrap gap-1.5">
                         {t.follow_ups.map((f) => (
-                          <button key={f} onClick={() => ask(f)} className="text-[11px] px-2 py-1 rounded-pill bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300">{f}</button>
+                          <button key={f} onClick={() => ask(f)} className="text-[11px] px-2 py-1 rounded-pill el-card text-gray-600 dark:text-gray-300">{f}</button>
                         ))}
                       </div>
                     )}

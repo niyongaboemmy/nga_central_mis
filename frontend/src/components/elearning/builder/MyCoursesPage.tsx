@@ -76,7 +76,7 @@ const MyCoursesPage: React.FC = () => {
               </h2>
               <ul className="mt-3 space-y-2">
                 {pending.map((s) => (
-                  <li key={s.scheme_id} className="flex flex-col sm:flex-row sm:items-center gap-3 p-4 rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 shadow-soft">
+                  <li key={s.scheme_id} className="flex flex-col sm:flex-row sm:items-center gap-3 p-4 el-card">
                     <span className="w-2 h-10 rounded-pill flex-shrink-0 hidden sm:block" style={{ background: s.subject_color || "#3b6cff" }} aria-hidden />
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">{s.subject_name}</p>

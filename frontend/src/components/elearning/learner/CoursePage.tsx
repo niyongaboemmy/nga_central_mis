@@ -244,7 +244,7 @@ const CoursePage: React.FC = () => {
               </div>
               {/* "This week you'll be able to…" — the scheme's criteria, with the student's own state */}
               {overviewSection.criteria_progress.length > 0 && (
-                <div className="mt-5 rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 p-4 shadow-soft">
+                <div className="mt-5 el-card p-4 shadow-soft">
                   <p className="text-[11px] uppercase tracking-wider font-semibold text-gray-500 dark:text-gray-400">
                     This week you'll be able to{overviewSection.element_number ? ` · Element ${overviewSection.element_number}` : ""}
                   </p>
@@ -289,11 +289,11 @@ const CoursePage: React.FC = () => {
                           {...m("tap")}
                           disabled={i.locked}
                           onClick={() => goItem(i.item_id)}
-                          className={`ml-12 w-[calc(100%-3rem)] flex items-center gap-3 p-3 rounded-2xl bg-white dark:bg-gray-900 border shadow-soft text-left min-h-[56px] disabled:opacity-60 focus:outline-none focus-visible:shadow-glow ${i.state === "IN_PROGRESS" ? "border-brand-300 dark:border-brand-700" : "border-gray-200 dark:border-gray-800 hover:border-brand-200 dark:hover:border-brand-700"}`}
+                          className={`ml-12 w-[calc(100%-3rem)] flex items-center gap-3 p-3 el-card el-card-hover text-left min-h-[56px] disabled:opacity-60 focus:outline-none focus-visible:shadow-glow ${i.state === "IN_PROGRESS" ? "border-brand-300 dark:border-brand-700" : "border-gray-200 dark:border-gray-800 hover:border-brand-200 dark:hover:border-brand-700"}`}
                           style={{ marginLeft: `calc(3rem + ${i.indent * 16}px)` }}
                         >
                           <CompletionDot state={i.state} locked={i.locked} size={20} className="sr-only" />
-                          <span className="w-9 h-9 rounded-xl bg-gray-50 dark:bg-gray-800 flex items-center justify-center text-gray-500 dark:text-gray-300 flex-shrink-0">
+                          <span className="w-9 h-9 rounded-xl el-subtle flex items-center justify-center text-gray-500 dark:text-gray-300 flex-shrink-0">
                             <ItemTypeIcon type={i.item_type} className="w-4 h-4" />
                           </span>
                           <span className="min-w-0 flex-1">
@@ -411,7 +411,7 @@ const CoursePage: React.FC = () => {
               onClick={(e) => e.stopPropagation()}
               role="dialog"
               aria-label="Week complete"
-              className="w-full max-w-sm rounded-3xl bg-white dark:bg-gray-900 p-6 shadow-float text-center"
+              className="w-full max-w-sm rounded-3xl el-float p-6 text-center"
             >
               <Mascot pose="cheering" size={80} />
               <p className="mt-3 text-base font-semibold text-gray-900 dark:text-white">{celebrate.title}</p>

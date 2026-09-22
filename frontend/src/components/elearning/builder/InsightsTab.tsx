@@ -49,7 +49,7 @@ const SERIES = {
 };
 
 const STATUS_LABEL: Record<AnalyticsStudent["status"], { label: string; cls: string }> = {
-  not_started: { label: "Not started", cls: "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300" },
+  not_started: { label: "Not started", cls: "el-chip text-gray-600 dark:text-gray-300" },
   behind: { label: "Behind", cls: "bg-warning-100 text-warning-700" },
   on_track: { label: "On track", cls: "bg-brand-50 dark:bg-brand-700/20 text-brand-700 dark:text-brand-200" },
   done: { label: "Done", cls: "bg-success-100 text-success-700" },
@@ -125,7 +125,7 @@ const InsightsTab: React.FC<{ courseId: number; course?: BuilderCourse; basePath
           { label: "Median completion", value: `${data.median_percent}%` },
           { label: "Need a nudge", value: data.behind + data.not_started },
         ].map((k) => (
-          <div key={k.label} className="rounded-2xl p-4 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 shadow-soft">
+          <div key={k.label} className="el-card p-4">
             <p className="text-[11px] uppercase tracking-wider font-semibold text-gray-500 dark:text-gray-400">{k.label}</p>
             <p className="mt-1 text-2xl font-bold text-gray-900 dark:text-white tabular-nums">{k.value}</p>
           </div>
@@ -133,7 +133,7 @@ const InsightsTab: React.FC<{ courseId: number; course?: BuilderCourse; basePath
       </div>
 
       {/* Funnel per week */}
-      <div className="rounded-2xl p-4 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 shadow-soft">
+      <div className="el-card p-4">
         <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100">Who started and finished each week</h3>
         <p className="text-[11px] text-gray-500 dark:text-gray-400">% of students, live weeks only</p>
         {chart.length === 0 ? (
@@ -181,12 +181,12 @@ const InsightsTab: React.FC<{ courseId: number; course?: BuilderCourse; basePath
       </div>
 
       {/* Students */}
-      <div className="rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 shadow-soft">
+      <div className="el-card">
         <div className="flex flex-wrap items-center gap-2 p-4 border-b border-gray-100 dark:border-gray-800">
           <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100 flex items-center gap-1.5"><Users className="w-4 h-4" /> Students</h3>
-          <div className="flex items-center p-0.5 rounded-pill bg-gray-100 dark:bg-gray-800 ml-2" role="radiogroup" aria-label="Filter students">
+          <div className="el-segment ml-2" role="radiogroup" aria-label="Filter students">
             {(["all", "not_started", "behind", "on_track", "done"] as const).map((f) => (
-              <button key={f} role="radio" aria-checked={filter === f} onClick={() => setFilter(f)} className={`min-h-[32px] px-2.5 rounded-pill text-[11px] font-semibold ${filter === f ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm" : "text-gray-500"}`}>
+              <button key={f} role="radio" aria-checked={filter === f} onClick={() => setFilter(f)} className={`min-h-[32px] px-2.5 rounded-pill text-[11px] font-semibold ${filter === f ? "el-segment-on" : "text-gray-500"}`}>
                 {f === "all" ? "All" : STATUS_LABEL[f].label}
               </button>
             ))}
@@ -239,7 +239,7 @@ const InsightsTab: React.FC<{ courseId: number; course?: BuilderCourse; basePath
 
       {/* What students asked the AI (Phase 5) — anonymised, direct input for the next lesson */}
       {questions.length > 0 && (
-        <div className="rounded-2xl p-4 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 shadow-soft">
+        <div className="el-card p-4">
           <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100">What students asked the tutor</h3>
           <p className="text-[11px] text-gray-500">Anonymous. Questions the notes couldn't answer are flagged.</p>
           <ul className="mt-2 space-y-1">

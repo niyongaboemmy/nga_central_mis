@@ -48,7 +48,7 @@ export const ProgressRing: React.FC<RingProps> = ({ value, size = 56, stroke = 6
       style={{ width: size, height: size }}
     >
       <svg width={size} height={size} className="-rotate-90">
-        <circle cx={size / 2} cy={size / 2} r={r} strokeWidth={stroke} className="fill-none stroke-gray-200 dark:stroke-gray-700" />
+        <circle cx={size / 2} cy={size / 2} r={r} strokeWidth={stroke} className="fill-none stroke-gray-200 dark:stroke-gray-800" />
         <motion.circle
           cx={size / 2}
           cy={size / 2}
@@ -172,14 +172,12 @@ export const WeekPill: React.FC<{
   const range = startDate ? `${fmt(startDate)}${endDate ? ` – ${fmt(endDate)}` : ""}` : null;
   return (
     <span
-      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-pill text-[11px] font-semibold ${
-        current
-          ? "bg-brand-500 text-white shadow-glow"
-          : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300"
+      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-pill text-[11px] font-semibold whitespace-nowrap ${
+        current ? "bg-brand-500 text-white shadow-glow" : "el-chip"
       } ${className}`}
     >
       {weekNumber || "Week"}
-      {range && <span className={current ? "text-white/80 font-normal" : "text-gray-400 font-normal"}>· {range}</span>}
+      {range && <span className={`hidden sm:inline font-normal ${current ? "text-white/80" : "text-gray-400"}`}>· {range}</span>}
       {current && <span className="sr-only">(this week)</span>}
     </span>
   );
@@ -223,14 +221,14 @@ export const SubjectCover: React.FC<{
     <div
       className={`rounded-2xl ${pad} ${className}`}
       style={{
-        background: `linear-gradient(135deg, color-mix(in oklab, ${base} 18%, transparent), color-mix(in oklab, ${base} 6%, transparent))`,
-        borderColor: `color-mix(in oklab, ${base} 30%, transparent)`,
+        background: `linear-gradient(135deg, color-mix(in oklab, ${base} 16%, transparent), color-mix(in oklab, ${base} 4%, transparent))`,
+        borderColor: `color-mix(in oklab, ${base} 18%, transparent)`,
       }}
     >
       <div className="flex items-start gap-3">
         <span
           className={`flex items-center justify-center rounded-xl ${iconSize} flex-shrink-0`}
-          style={{ background: `color-mix(in oklab, ${base} 22%, white)` }}
+          style={{ background: `color-mix(in oklab, ${base} 24%, transparent)`, boxShadow: `inset 0 0 0 1px color-mix(in oklab, ${base} 30%, transparent)` }}
           aria-hidden
         >
           {iconForSubject(name, icon)}
@@ -349,7 +347,7 @@ export const BottomActionBar: React.FC<{ children: React.ReactNode; className?: 
           animate={{ y: 0, opacity: 1 }}
           exit={{ y: 24, opacity: 0 }}
           transition={{ duration: 0.2, ease: [0.2, 0.8, 0.2, 1] }}
-          className={`fixed bottom-4 left-1/2 -translate-x-1/2 z-40 flex items-center gap-2 px-2 py-2 rounded-pill bg-white/85 dark:bg-gray-900/85 backdrop-blur-md shadow-float border border-gray-200/70 dark:border-gray-700/60 print:hidden ${className}`}
+          className={`fixed bottom-4 left-1/2 -translate-x-1/2 z-40 flex items-center gap-2 px-2 py-2 rounded-pill el-float print:hidden ${className}`}
           role="toolbar"
           aria-label="Item actions"
         >

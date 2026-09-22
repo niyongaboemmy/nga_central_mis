@@ -98,7 +98,7 @@ const MePage: React.FC = () => {
         ) : (
           <div className="mt-3 space-y-4">
             {mastery.map((s) => (
-              <div key={s.subject_id} className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-4 shadow-soft">
+              <div key={s.subject_id} className="el-card p-4">
                 <p className="text-sm font-semibold text-gray-800 dark:text-gray-100">{s.subject_name}</p>
                 <ul className="mt-3 space-y-3">
                   {s.elements.map((e) => (
@@ -120,7 +120,7 @@ const MePage: React.FC = () => {
                                 ? "bg-success-100 text-success-700"
                                 : c.state === "COVERED"
                                   ? "bg-brand-50 dark:bg-brand-700/20 text-brand-700 dark:text-brand-200"
-                                  : "bg-gray-100 dark:bg-gray-800 text-gray-400"
+                                  : "el-chip text-gray-400"
                             }`}
                           >
                             {c.criteria_number}
@@ -137,7 +137,7 @@ const MePage: React.FC = () => {
       </section>
 
       {/* Preferences */}
-      <section className="mt-8 rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-4 shadow-soft">
+      <section className="mt-8 el-card p-4">
         <h2 className="text-base font-semibold text-gray-900 dark:text-white">{copy.me.prefs}</h2>
         <div className="mt-2 divide-y divide-gray-100 dark:divide-gray-800">
           <Toggle checked={prefs.celebrations_enabled} onChange={(v) => update({ celebrations_enabled: v })} label={copy.me.celebrations} />

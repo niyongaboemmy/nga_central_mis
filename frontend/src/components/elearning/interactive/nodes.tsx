@@ -119,7 +119,7 @@ const InlineCheckView: React.FC<NodeViewProps> = ({ node, updateAttributes, edit
   };
 
   return (
-    <NodeViewWrapper className="my-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-soft" contentEditable={false}>
+    <NodeViewWrapper className="my-3 el-card shadow-soft" contentEditable={false}>
       <div className="flex items-center gap-2 px-3 py-2 border-b border-gray-100 dark:border-gray-800 text-[11px] uppercase tracking-wider font-semibold text-gray-500">
         <HelpCircle className="w-3.5 h-3.5" /> Quick check
         <span className="flex-1" />

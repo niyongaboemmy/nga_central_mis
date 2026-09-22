@@ -92,7 +92,7 @@ const KnowledgeCheckCard: React.FC<Props> = ({ itemId, questions, onResult }) =>
   if (finished) {
     const perfect = finished.score === finished.total;
     return (
-      <motion.div {...m("reveal")} className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-6 shadow-soft flex flex-col items-center text-center">
+      <motion.div {...m("reveal")} className="el-card p-6 flex flex-col items-center text-center">
         <Mascot pose={perfect ? "cheering" : "nudge"} size={64} />
         <p className="mt-3 text-base font-semibold text-gray-800 dark:text-gray-100">{copy.check.finished(finished.score, finished.total)}</p>
         <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{finished.score_pct}%</p>
@@ -102,7 +102,7 @@ const KnowledgeCheckCard: React.FC<Props> = ({ itemId, questions, onResult }) =>
             setIndex(0);
             setAnswers({});
           }}
-          className="mt-4 inline-flex items-center gap-1.5 min-h-[44px] px-5 rounded-pill bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-sm font-medium text-gray-700 dark:text-gray-200"
+          className="mt-4 inline-flex items-center gap-1.5 min-h-[44px] px-5 rounded-pill el-chip hover:bg-gray-200 dark:hover:bg-gray-700 text-sm font-medium text-gray-700 dark:text-gray-200"
         >
           <RotateCcw className="w-4 h-4" /> {copy.check.retake}
         </button>
@@ -111,7 +111,7 @@ const KnowledgeCheckCard: React.FC<Props> = ({ itemId, questions, onResult }) =>
   }
 
   return (
-    <div className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 sm:p-6 shadow-soft">
+    <div className="el-card p-5 sm:p-6">
       <div className="flex items-center justify-between text-[11px] uppercase tracking-wider font-semibold text-gray-500 dark:text-gray-400">
         <span>{copy.check.title}</span>
         <span className="tabular-nums">

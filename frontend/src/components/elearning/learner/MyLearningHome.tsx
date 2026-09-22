@@ -125,7 +125,7 @@ const MyLearningHome: React.FC = () => {
                   <p className="text-sm text-gray-600 dark:text-gray-300 mt-0.5 truncate">{hero.current_section.title}</p>
                 )}
                 {hero.next_item ? (
-                  <div className="mt-4 flex items-center gap-3 p-3 rounded-xl bg-white/70 dark:bg-gray-900/50">
+                  <div className="mt-4 flex flex-col sm:flex-row sm:items-center gap-3 p-3 rounded-xl bg-white/70 dark:bg-black/30">
                     <span className="w-9 h-9 rounded-lg bg-white dark:bg-gray-800 flex items-center justify-center text-brand-600 dark:text-brand-200 shadow-soft">
                       <ItemTypeIcon type={hero.next_item.item_type} className="w-4 h-4" />
                     </span>
@@ -144,7 +144,7 @@ const MyLearningHome: React.FC = () => {
                     <motion.button
                       {...m("tap")}
                       onClick={() => navigate(learnerRoutes.item(hero.course_id, hero.next_item!.item_id))}
-                      className="min-h-[44px] px-5 rounded-pill bg-brand-500 hover:bg-brand-600 text-white text-sm font-semibold shadow-soft focus:outline-none focus-visible:shadow-glow inline-flex items-center gap-1.5"
+                      className="min-h-[44px] px-5 rounded-pill bg-brand-500 hover:bg-brand-600 text-white text-sm font-semibold shadow-soft focus:outline-none focus-visible:shadow-glow inline-flex items-center justify-center gap-1.5 w-full sm:w-auto"
                     >
                       {hero.next_item.state === "IN_PROGRESS" ? copy.home.continueBtn : copy.home.startBtn}
                       <ArrowRight className="w-4 h-4" />
@@ -161,7 +161,7 @@ const MyLearningHome: React.FC = () => {
           )}
 
           {/* 2. This week */}
-          <motion.section {...m("reveal")} className="rounded-2xl p-4 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 shadow-soft">
+          <motion.section {...m("reveal")} className="el-card p-4">
             <h3 className="text-[11px] uppercase tracking-wider font-semibold text-gray-500 dark:text-gray-400 flex items-center gap-1.5">
               <Sparkles className="w-3.5 h-3.5" /> {copy.home.thisWeek}
             </h3>
@@ -191,7 +191,7 @@ const MyLearningHome: React.FC = () => {
           </motion.section>
 
           {/* 3. Due soon */}
-          <motion.section {...m("reveal")} className="rounded-2xl p-4 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 shadow-soft">
+          <motion.section {...m("reveal")} className="el-card p-4">
             <h3 className="text-[11px] uppercase tracking-wider font-semibold text-gray-500 dark:text-gray-400 flex items-center gap-1.5">
               <CalendarClock className="w-3.5 h-3.5" /> {copy.home.dueSoon}
             </h3>
@@ -224,7 +224,7 @@ const MyLearningHome: React.FC = () => {
 
           {/* 5. Keep going — near-goal nudges only (Phase 2) */}
           {keepGoing.length > 0 && (
-            <motion.section {...m("reveal")} className="rounded-2xl p-4 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 shadow-soft">
+            <motion.section {...m("reveal")} className="el-card p-4">
               <h3 className="text-[11px] uppercase tracking-wider font-semibold text-gray-500 dark:text-gray-400">{copy.home.keepGoing}</h3>
               <ul className="mt-3 space-y-1">
                 {keepGoing.map((g) => (
@@ -243,7 +243,7 @@ const MyLearningHome: React.FC = () => {
           )}
 
           {/* 4. Subjects */}
-          <motion.section {...m("reveal")} className={`${keepGoing.length > 0 ? "md:col-span-3" : "md:col-span-2"} rounded-2xl p-4 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 shadow-soft`}>
+          <motion.section {...m("reveal")} className={`${keepGoing.length > 0 ? "md:col-span-3" : "md:col-span-2"} el-card p-4`}>
             <h3 className="text-[11px] uppercase tracking-wider font-semibold text-gray-500 dark:text-gray-400">{copy.home.subjects}</h3>
             <ul className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
               {cards.map((c) => (

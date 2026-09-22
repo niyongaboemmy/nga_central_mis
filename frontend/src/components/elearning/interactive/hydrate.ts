@@ -15,7 +15,7 @@ export function hydrateInlineChecks(root: HTMLElement | null, onAnswer?: (correc
     const data = parseCheck(block.getAttribute("data-check"));
     block.setAttribute("data-hydrated", "1");
     block.innerHTML = "";
-    block.className = "note-inline-check my-4 rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-4 shadow-soft not-prose";
+    block.className = "note-inline-check my-4 el-card p-4 shadow-soft not-prose";
 
     const head = document.createElement("p");
     head.className = "text-[11px] uppercase tracking-wider font-semibold text-gray-500 dark:text-gray-400";

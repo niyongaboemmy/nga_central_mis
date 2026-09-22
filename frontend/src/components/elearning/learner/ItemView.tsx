@@ -61,7 +61,7 @@ const ItemView: React.FC<Props> = ({ opened, onBack, onChecked }) => {
     case "DISCUSSION":
       return (
         <ItemFrame opened={opened}>
-          <motion.div {...m("reveal")} className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 shadow-soft">
+          <motion.div {...m("reveal")} className="el-card p-5">
             {item.description && <p className="text-sm text-gray-600 dark:text-gray-300 mb-4 whitespace-pre-line">{item.description}</p>}
             <a
               href={content?.external_url || item.external_url || "#"}
@@ -144,7 +144,7 @@ const DocumentView: React.FC<{ opened: OpenedItem }> = ({ opened }) => {
 
   return (
     <ItemFrame opened={opened} wide={isPdf}>
-      <div className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-soft overflow-hidden">
+      <div className="el-card overflow-hidden">
         <div className="flex items-center gap-3 p-4 border-b border-gray-100 dark:border-gray-800">
           <FileText className="w-5 h-5 text-brand-500" />
           <div className="min-w-0 flex-1">
@@ -154,7 +154,7 @@ const DocumentView: React.FC<{ opened: OpenedItem }> = ({ opened }) => {
           <button
             onClick={download}
             disabled={!blobUrl}
-            className="inline-flex items-center gap-1.5 min-h-[40px] px-4 rounded-pill bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-sm font-medium text-gray-700 dark:text-gray-200 disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 min-h-[40px] px-4 rounded-pill el-chip hover:bg-gray-200 dark:hover:bg-gray-700 text-sm font-medium text-gray-700 dark:text-gray-200 disabled:opacity-50"
           >
             <Download className="w-4 h-4" /> {copy.course.download}
           </button>

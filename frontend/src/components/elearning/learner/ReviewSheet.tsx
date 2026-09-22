@@ -125,7 +125,7 @@ const ReviewSheet: React.FC<Props> = ({ section, onClose }) => {
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-label={`Review ${section.title}`}
-        className="w-full max-w-lg rounded-3xl bg-white dark:bg-gray-900 shadow-float p-5"
+        className="w-full max-w-lg rounded-3xl el-float p-5"
       >
         <div className="flex items-center gap-2">
           <p className="text-sm font-semibold text-gray-800 dark:text-gray-100 flex-1 truncate">Review · {section.title.split(" — ")[0]}</p>

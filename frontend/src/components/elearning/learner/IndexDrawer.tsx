@@ -168,7 +168,7 @@ const IndexDrawer: React.FC<Props> = ({ course, activeItemId, activeSectionId, o
   return (
     <>
       {/* Desktop: persistent column */}
-      <aside className="hidden lg:block w-[320px] flex-shrink-0 sticky top-16 h-[calc(100vh-4rem)] border-r border-gray-200/70 dark:border-gray-800 bg-white/70 dark:bg-gray-900/60 backdrop-blur-sm">
+      <aside className="hidden lg:block w-[300px] xl:w-[340px] flex-shrink-0 sticky top-16 h-[calc(100vh-4rem)] border-r border-gray-200/70 dark:border-gray-800 bg-white/70 dark:bg-black/40 backdrop-blur-sm">
         {body}
       </aside>
       {/* Phone / tablet: sheet */}
@@ -183,7 +183,7 @@ const IndexDrawer: React.FC<Props> = ({ course, activeItemId, activeSectionId, o
               onClick={onClose}
             />
             <motion.aside
-              className="lg:hidden fixed top-16 bottom-0 left-0 z-50 w-[85vw] max-w-[360px] bg-white dark:bg-gray-900 shadow-float"
+              className="lg:hidden fixed top-16 bottom-0 left-0 z-50 w-[85vw] max-w-[360px] bg-white dark:bg-gray-950 shadow-float"
               initial={{ x: "-100%" }}
               animate={{ x: 0 }}
               exit={{ x: "-100%" }}
