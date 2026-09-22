@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import TeacherDashboard from "../teacher/TeacherDashboard";
 import type { TeacherOverview } from "../../api/dashboard";
@@ -44,9 +45,9 @@ const overview = (over: Partial<TeacherOverview> = {}): TeacherOverview =>
       academic_year_name: "2026 - 2027",
       academic_term_id: 6,
       academic_term_name: "Term 1",
-      term_start_date: null,
-      term_end_date: null,
-      days_remaining_in_term: 42,
+      term_start_date: "2026-09-07",
+      term_end_date: "2026-12-18",
+      days_remaining_in_term: 87,
     },
     kpis: {
       assignedSubjects: 4,
@@ -57,7 +58,10 @@ const overview = (over: Partial<TeacherOverview> = {}): TeacherOverview =>
     },
     schedule: {
       server_day_of_week: 1,
-      today: [lesson()],
+      today: [
+        lesson({ slot_id: 9, start_time: "08:00:00", end_time: "08:50:00" }),
+        lesson(),
+      ],
       today_activities: [],
       current_lesson: null,
       next_lesson_today: null,
@@ -111,6 +115,34 @@ const overview = (over: Partial<TeacherOverview> = {}): TeacherOverview =>
     ...over,
   }) as TeacherOverview;
 
+const allClear = () =>
+  overview({
+    schemes: {
+      total: 1,
+      submitted: 1,
+      pending: 0,
+      approved: 1,
+      rejected: 0,
+      awaiting_validation: 0,
+      rows: [
+        {
+          subject_id: 10,
+          subject_name: "Web3 Applications",
+          subject_code: "W3",
+          subject_color: "#A855F7",
+          class_group_id: 11,
+          class_group_name: "L4. Class A",
+          scheme_id: 5,
+          status: "submitted",
+          entries_count: 12,
+          validation_status: "APPROVED",
+          validation_comment: null,
+          updated_at: null,
+        },
+      ],
+    },
+  });
+
 const renderPage = () =>
   render(
     <MemoryRouter>
@@ -121,9 +153,10 @@ const renderPage = () =>
 describe("TeacherDashboard", () => {
   beforeEach(() => {
     // shouldAdvanceTime keeps testing-library's waitFor polling while the
-    // clock is frozen for the "in class now" assertions below.
+    // clock is pinned for the "in class now" assertions.
     vi.useFakeTimers({ shouldAdvanceTime: true });
-    // A Monday, 10:30 — inside the 10:00–11:40 lesson above.
+    // Monday 21 Sep 2026, 10:30 — inside the 10:00–11:40 lesson, and week 3
+    // of a term that started 7 Sep.
     vi.setSystemTime(new Date(2026, 8, 21, 10, 30, 0));
     notificationsMock = {
       notifications: [],
@@ -157,18 +190,61 @@ describe("TeacherDashboard", () => {
     expect(
       screen.getByRole("heading", { level: 2, name: "Web3 Applications" }),
     ).toBeInTheDocument();
-    expect(screen.getByText("1 hr 10 min remaining")).toBeInTheDocument();
+    expect(screen.getByText(/1 hr 10 min remaining/)).toBeInTheDocument();
   });
 
-  it("raises a scheme sent back for revision before one merely missing", async () => {
+  it("raises a blocking item into an alert bar, dismissible for the session", async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     renderPage();
-    const rejected = await screen.findByText("1 scheme sent back for revision");
-    const missing = screen.getByText("1 scheme of work not submitted");
-    // compareDocumentPosition: 4 === missing follows rejected in the DOM.
+
+    const alert = await screen.findByRole("alert");
+    // A rejected scheme is blocking; the bar leads with it and names the rest
+    // rather than stacking a second banner.
     expect(
-      rejected.compareDocumentPosition(missing) &
-        Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy();
+      within(alert).getByText(/scheme sent back for revision/),
+    ).toBeInTheDocument();
+    expect(within(alert).getByText("Add assessment weeks")).toBeInTheDocument();
+
+    await user.click(within(alert).getByRole("button", { name: "Later" }));
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("filters the attention list by severity", async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    renderPage();
+
+    // Week 3 of term, so the missing scheme is blocking too — and with
+    // nothing in the tidy tier that segment is not offered at all.
+    const blockingTab = await screen.findByRole("button", {
+      name: /^Blocking 2$/,
+    });
+    expect(
+      screen.queryByRole("button", { name: /^Tidy up/ }),
+    ).not.toBeInTheDocument();
+
+    await user.click(blockingTab);
+    expect(blockingTab).toHaveAttribute("aria-pressed", "true");
+    expect(
+      screen.getAllByText(/scheme sent back for revision/).length,
+    ).toBeGreaterThan(0);
+  });
+
+  it("hides finished periods until asked for them", async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    renderPage();
+
+    const toggle = await screen.findByRole("button", { name: /1 completed/ });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByText("08:00 – 08:50")).not.toBeInTheDocument();
+
+    await user.click(toggle);
+    expect(screen.getByText("08:00 – 08:50")).toBeInTheDocument();
+  });
+
+  it("reports term progress from the term's own dates", async () => {
+    renderPage();
+    expect(await screen.findByText(/Week 3 of 15/)).toBeInTheDocument();
+    expect(screen.getByText("87 days left")).toBeInTheDocument();
   });
 
   it("renders the headline figures", async () => {
@@ -179,44 +255,34 @@ describe("TeacherDashboard", () => {
     expect(screen.getByText("1 sent back")).toBeInTheDocument();
   });
 
-  it("says so when nothing is outstanding", async () => {
-    getTeacherOverview.mockResolvedValue(
-      overview({
-        schemes: {
-          total: 1,
-          submitted: 1,
-          pending: 0,
-          approved: 1,
-          rejected: 0,
-          awaiting_validation: 0,
-          rows: [
-            {
-              subject_id: 10,
-              subject_name: "Web3 Applications",
-              subject_code: "W3",
-              subject_color: "#A855F7",
-              class_group_id: 11,
-              class_group_name: "L4. Class A",
-              scheme_id: 5,
-              status: "submitted",
-              entries_count: 12,
-              validation_status: "APPROVED",
-              validation_comment: null,
-              updated_at: null,
-            },
-          ],
-        },
-      }),
-    );
+  it("says so when nothing is outstanding, and raises no alert", async () => {
+    getTeacherOverview.mockResolvedValue(allClear());
     renderPage();
     expect(
       await screen.findByText("You're all caught up."),
     ).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
   it("offers a retry when the overview fails to load", async () => {
     getTeacherOverview.mockRejectedValue(new Error("boom"));
     renderPage();
     expect(await screen.findByText("Try again")).toBeInTheDocument();
+  });
+
+  it("keeps the figures on screen when a background refresh fails", async () => {
+    renderPage();
+    await screen.findByText("Assigned Subjects");
+
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    getTeacherOverview.mockRejectedValueOnce(new Error("dropped"));
+    await user.click(screen.getByRole("button", { name: /Refresh/ }));
+
+    // Blanking the page over a dropped poll is worse than showing figures a
+    // few minutes old.
+    await waitFor(() =>
+      expect(screen.getByText("Assigned Subjects")).toBeInTheDocument(),
+    );
+    expect(screen.queryByText("Try again")).not.toBeInTheDocument();
   });
 });
