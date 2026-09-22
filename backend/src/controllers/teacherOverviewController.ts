@@ -16,6 +16,7 @@ import {
 import { successResponse } from "../utils/response";
 import { asyncHandler } from "../middleware/asyncHandler";
 import { countTeacherStudents } from "../services/teacherRoster";
+import logger from "../utils/logger";
 import {
   loadAssignedActivities,
   loadTeacherLessons,
@@ -96,6 +97,29 @@ const resolvePeriod = async (queryYearId?: number, queryTermId?: number) => {
   return { term: term ?? null, year: year ?? null };
 };
 
+/**
+ * An optional panel must not be able to take the whole board down.
+ *
+ * This endpoint fans out over six modules. Without this, one failing
+ * side-panel query — a table an environment hasn't migrated yet, a timeout on
+ * a slow join — turns the entire dashboard into an error page, including the
+ * timetable and the alerts that are the reason to open it. The core sections
+ * (period, assignments, schedule, schemes) stay fatal; the rest degrade to
+ * empty and say so in the log.
+ */
+const optional = <T>(
+  work: Promise<T>,
+  fallback: T,
+  panel: string,
+): Promise<T> =>
+  work.catch((error) => {
+    logger.warn("Teacher overview panel failed; serving it empty", {
+      panel,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return fallback;
+  });
+
 /** "HH:MM[:SS]" -> minutes since midnight. */
 const timeToMinutes = (time: string): number => {
   const [h, m] = time.split(":").map(Number);
@@ -128,64 +152,115 @@ export const getTeacherOverview = asyncHandler(async (req: any, res: any) => {
   const termId = term?.academic_term_id ?? null;
   const yearId = year?.academic_year_id ?? null;
 
-  const [profile] = await db
-    .select({
-      first_name: UserProfile.first_name,
-      last_name: UserProfile.last_name,
-    })
-    .from(UserProfile)
-    .where(eq(UserProfile.user_id, teacherId))
-    .limit(1);
-
-  // ── Assignments: the source of truth for what this teacher teaches ──────
-  const assignments = yearId
-    ? await db
+  // ── Wave 1: everything that needs only the resolved period ──────────────
+  //
+  // This endpoint is an aggregate of six modules, and awaiting each query in
+  // turn made it ~15 strictly serial round-trips. The API runs on a
+  // deliberately single-connection pool (see db/index.ts), so those round
+  // trips queue behind every other request on the box — the endpoint answered
+  // fine on an idle server and blew the client's 10s timeout on a busy one.
+  // Independent work is now issued in waves, each wave's queries dispatched
+  // together, so the driver can pipeline them instead of the controller
+  // idling between every await.
+  const [profileRows, assignments, weekLessons, activities, courseRows] =
+    await Promise.all([
+      db
         .select({
-          subject_id: TeacherSubjectAssignment.subject_id,
-          class_group_id: TeacherSubjectAssignment.class_group_id,
-          subject_name: Subject.name,
-          subject_code: Subject.code,
-          subject_color: Subject.color,
-          class_group_name: ClassGroup.name,
-          grade_name: Grade.name,
+          first_name: UserProfile.first_name,
+          last_name: UserProfile.last_name,
         })
-        .from(TeacherSubjectAssignment)
-        .innerJoin(
-          Subject,
-          eq(TeacherSubjectAssignment.subject_id, Subject.subject_id),
-        )
-        .innerJoin(
-          ClassGroup,
-          eq(
-            TeacherSubjectAssignment.class_group_id,
-            ClassGroup.class_group_id,
-          ),
-        )
-        .leftJoin(Grade, eq(ClassGroup.grade_id, Grade.grade_id))
-        .where(
-          and(
-            eq(TeacherSubjectAssignment.user_id, teacherId),
-            eq(TeacherSubjectAssignment.academic_year_id, yearId),
-            eq(Subject.status, "ACTIVE"),
-          ),
-        )
-    : [];
+        .from(UserProfile)
+        .where(eq(UserProfile.user_id, teacherId))
+        .limit(1),
 
-  const subjectIds = [...new Set(assignments.map((a) => a.subject_id))];
-  const classGroupIds = [...new Set(assignments.map((a) => a.class_group_id))];
+      // Assignments: the source of truth for what this teacher teaches.
+      yearId
+        ? db
+            .select({
+              subject_id: TeacherSubjectAssignment.subject_id,
+              class_group_id: TeacherSubjectAssignment.class_group_id,
+              subject_name: Subject.name,
+              subject_code: Subject.code,
+              subject_color: Subject.color,
+              class_group_name: ClassGroup.name,
+              grade_name: Grade.name,
+            })
+            .from(TeacherSubjectAssignment)
+            .innerJoin(
+              Subject,
+              eq(TeacherSubjectAssignment.subject_id, Subject.subject_id),
+            )
+            .innerJoin(
+              ClassGroup,
+              eq(
+                TeacherSubjectAssignment.class_group_id,
+                ClassGroup.class_group_id,
+              ),
+            )
+            .leftJoin(Grade, eq(ClassGroup.grade_id, Grade.grade_id))
+            .where(
+              and(
+                eq(TeacherSubjectAssignment.user_id, teacherId),
+                eq(TeacherSubjectAssignment.academic_year_id, yearId),
+                eq(Subject.status, "ACTIVE"),
+              ),
+            )
+        : Promise.resolve([] as any[]),
 
-  const totalStudents =
-    assignments.length > 0 && yearId
-      ? await countTeacherStudents(teacherId, yearId)
-      : 0;
+      // Timetable slice — the same rules the weekly grid uses, so the
+      // dashboard can never advertise a lesson the timetable no longer draws.
+      termId != null
+        ? loadTeacherLessons({ userId: teacherId, termId, yearId })
+        : Promise.resolve([] as any[]),
 
-  // ── Timetable slice ────────────────────────────────────────────────────
-  // Same rules the weekly grid uses, so the dashboard can never advertise a
-  // lesson the timetable itself no longer draws.
-  const weekLessons =
-    termId != null
-      ? await loadTeacherLessons({ userId: teacherId, termId, yearId })
-      : [];
+      // Non-subject events (duties, meetings, exams) assigned to this teacher.
+      termId != null
+        ? optional(
+            loadAssignedActivities({
+              userId: teacherId,
+              termId,
+              classGroupId: null,
+            }),
+            [] as any[],
+            "activities",
+          )
+        : Promise.resolve([] as any[]),
+
+      termId != null
+        ? optional(
+            db
+              .select({
+                course_id: Course.course_id,
+                title: Course.title,
+                status: Course.status,
+                updated_at: Course.updated_at,
+                subject_name: Subject.name,
+                class_group_name: ClassGroup.name,
+              })
+              .from(Course)
+              .leftJoin(Subject, eq(Course.subject_id, Subject.subject_id))
+              .leftJoin(
+                ClassGroup,
+                eq(Course.class_group_id, ClassGroup.class_group_id),
+              )
+              .where(
+                and(
+                  eq(Course.owner_user_id, teacherId),
+                  eq(Course.academic_term_id, termId),
+                ),
+              )
+              .orderBy(desc(Course.updated_at)),
+            [] as any[],
+            "courses",
+          )
+        : Promise.resolve([] as any[]),
+    ]);
+
+  const [profile] = profileRows;
+  const subjectIds = [...new Set(assignments.map((a: any) => a.subject_id))];
+  const classGroupIds = [
+    ...new Set(assignments.map((a: any) => a.class_group_id)),
+  ];
 
   const today = new Date();
   const todayDow = today.getDay();
@@ -255,28 +330,25 @@ export const getTeacherOverview = asyncHandler(async (req: any, res: any) => {
     0,
   );
 
-  // Non-subject events (duties, meetings, exams) this teacher was assigned.
-  const activities =
-    termId != null
-      ? await loadAssignedActivities({
-          userId: teacherId,
-          termId,
-          classGroupId: null,
-        })
-      : [];
   const todayActivities = activities.filter(
     (a: any) => a.day_of_week === null || a.day_of_week === todayDow,
   );
 
-  // ── Schemes of work ────────────────────────────────────────────────────
-  // One row per assignment; a missing SchemeOfWork is the thing the teacher
-  // has to act on, so the list is built from assignments outward, not from
-  // the schemes that happen to exist. The validation verdict lives on the
-  // scheme's first entry (see getAllTeachersSchemeOfWork) — mirrored here so
-  // the two screens can't disagree.
-  const schemes =
+  // ── Wave 2: everything that needed the assignments ──────────────────────
+  //
+  // Schemes of work: one row per assignment. A missing SchemeOfWork is the
+  // thing the teacher has to act on, so the list is built from assignments
+  // outward, not from the schemes that happen to exist. The validation
+  // verdict lives on the scheme's first entry (see
+  // getAllTeachersSchemeOfWork) — mirrored here so the two screens can't
+  // disagree.
+  const [totalStudents, schemes, noteRows] = await Promise.all([
+    assignments.length > 0 && yearId
+      ? countTeacherStudents(teacherId, yearId)
+      : Promise.resolve(0),
+
     termId != null && classGroupIds.length > 0
-      ? await db
+      ? db
           .select({
             scheme_id: SchemeOfWork.scheme_id,
             subject_id: SchemeOfWork.subject_id,
@@ -291,36 +363,72 @@ export const getTeacherOverview = asyncHandler(async (req: any, res: any) => {
               inArray(SchemeOfWork.class_group_id, classGroupIds),
             ),
           )
-      : [];
+      : Promise.resolve([] as any[]),
 
-  const schemeIds = schemes.map((s) => s.scheme_id);
+    subjectIds.length > 0
+      ? optional(
+          db
+            .select({
+              note_id: LessonNote.note_id,
+              title: LessonNote.title,
+              status: LessonNote.status,
+              updated_at: LessonNote.updated_at,
+              subject_name: Subject.name,
+              class_group_name: ClassGroup.name,
+            })
+            .from(LessonNote)
+            .leftJoin(Subject, eq(LessonNote.subject_id, Subject.subject_id))
+            .leftJoin(
+              ClassGroup,
+              eq(LessonNote.class_group_id, ClassGroup.class_group_id),
+            )
+            .where(
+              termId != null
+                ? and(
+                    eq(LessonNote.user_id, teacherId),
+                    eq(LessonNote.academic_term_id, termId),
+                  )
+                : eq(LessonNote.user_id, teacherId),
+            )
+            .orderBy(desc(LessonNote.updated_at)),
+          [] as any[],
+          "lesson-notes",
+        )
+      : Promise.resolve([] as any[]),
+  ]);
 
-  const entryCounts = schemeIds.length
-    ? await db
-        .select({
-          scheme_id: SchemeOfWorkEntry.scheme_id,
-          count: sql<number>`count(*)`,
-        })
-        .from(SchemeOfWorkEntry)
-        .where(inArray(SchemeOfWorkEntry.scheme_id, schemeIds))
-        .groupBy(SchemeOfWorkEntry.scheme_id)
-    : [];
+  const schemeIds = schemes.map((s: any) => s.scheme_id);
+
+  // ── Wave 3: the scheme entries, once we know which schemes exist ────────
+  const [entryCounts, firstEntries] = await Promise.all([
+    schemeIds.length
+      ? db
+          .select({
+            scheme_id: SchemeOfWorkEntry.scheme_id,
+            count: sql<number>`count(*)`,
+          })
+          .from(SchemeOfWorkEntry)
+          .where(inArray(SchemeOfWorkEntry.scheme_id, schemeIds))
+          .groupBy(SchemeOfWorkEntry.scheme_id)
+      : Promise.resolve([] as any[]),
+
+    schemeIds.length
+      ? db
+          .select({
+            scheme_id: SchemeOfWorkEntry.scheme_id,
+            entry_id: SchemeOfWorkEntry.entry_id,
+            validation_status: SchemeOfWorkEntry.validation_status,
+            validation_comment: SchemeOfWorkEntry.validation_comment,
+          })
+          .from(SchemeOfWorkEntry)
+          .where(inArray(SchemeOfWorkEntry.scheme_id, schemeIds))
+          .orderBy(asc(SchemeOfWorkEntry.entry_id))
+      : Promise.resolve([] as any[]),
+  ]);
+
   const countByScheme = new Map(
-    entryCounts.map((r) => [r.scheme_id, Number(r.count)]),
+    entryCounts.map((r: any) => [r.scheme_id, Number(r.count)]),
   );
-
-  const firstEntries = schemeIds.length
-    ? await db
-        .select({
-          scheme_id: SchemeOfWorkEntry.scheme_id,
-          entry_id: SchemeOfWorkEntry.entry_id,
-          validation_status: SchemeOfWorkEntry.validation_status,
-          validation_comment: SchemeOfWorkEntry.validation_comment,
-        })
-        .from(SchemeOfWorkEntry)
-        .where(inArray(SchemeOfWorkEntry.scheme_id, schemeIds))
-        .orderBy(asc(SchemeOfWorkEntry.entry_id))
-    : [];
   const verdictByScheme = new Map<
     number,
     { status: "PENDING" | "APPROVED" | "REJECTED"; comment: string | null }
@@ -356,63 +464,8 @@ export const getTeacherOverview = asyncHandler(async (req: any, res: any) => {
     };
   });
 
-  // ── Lesson notes ───────────────────────────────────────────────────────
-  const noteRows =
-    subjectIds.length > 0
-      ? await db
-          .select({
-            note_id: LessonNote.note_id,
-            title: LessonNote.title,
-            status: LessonNote.status,
-            updated_at: LessonNote.updated_at,
-            subject_name: Subject.name,
-            class_group_name: ClassGroup.name,
-          })
-          .from(LessonNote)
-          .leftJoin(Subject, eq(LessonNote.subject_id, Subject.subject_id))
-          .leftJoin(
-            ClassGroup,
-            eq(LessonNote.class_group_id, ClassGroup.class_group_id),
-          )
-          .where(
-            termId != null
-              ? and(
-                  eq(LessonNote.user_id, teacherId),
-                  eq(LessonNote.academic_term_id, termId),
-                )
-              : eq(LessonNote.user_id, teacherId),
-          )
-          .orderBy(desc(LessonNote.updated_at))
-      : [];
-
-  const draftNotes = noteRows.filter((n) => n.status === "DRAFT");
-
-  // ── E-learning courses ─────────────────────────────────────────────────
-  const courseRows =
-    termId != null
-      ? await db
-          .select({
-            course_id: Course.course_id,
-            title: Course.title,
-            status: Course.status,
-            updated_at: Course.updated_at,
-            subject_name: Subject.name,
-            class_group_name: ClassGroup.name,
-          })
-          .from(Course)
-          .leftJoin(Subject, eq(Course.subject_id, Subject.subject_id))
-          .leftJoin(
-            ClassGroup,
-            eq(Course.class_group_id, ClassGroup.class_group_id),
-          )
-          .where(
-            and(
-              eq(Course.owner_user_id, teacherId),
-              eq(Course.academic_term_id, termId),
-            ),
-          )
-          .orderBy(desc(Course.updated_at))
-      : [];
+  // Lesson notes and courses were both fetched in the waves above.
+  const draftNotes = noteRows.filter((n: any) => n.status === "DRAFT");
 
   successResponse(res, "Teacher overview retrieved successfully", {
     teacher: {

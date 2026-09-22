@@ -192,13 +192,22 @@ export interface TeacherOverview {
   };
 }
 
+/**
+ * The whole board in one request. It aggregates six modules, so it is
+ * legitimately heavier than the 10s the shared axios client allows by default
+ * — the same reason the scheme upload sets its own budget. Ten seconds was
+ * enough on an idle server and not on a busy one, which showed up as a
+ * dashboard that simply refused to load.
+ */
+export const TEACHER_OVERVIEW_TIMEOUT_MS = 30000;
+
 export const getTeacherOverview = async (params?: {
   academic_year_id?: number;
   academic_term_id?: number;
 }): Promise<TeacherOverview> => {
   const response = await api.get<{ data: TeacherOverview }>(
     "/dashboard/teacher-overview",
-    { params },
+    { params, timeout: TEACHER_OVERVIEW_TIMEOUT_MS },
   );
   return response.data.data;
 };

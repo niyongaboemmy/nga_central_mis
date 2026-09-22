@@ -44,6 +44,7 @@ import {
   WeeklyLoadChart,
 } from "./TeacherCharts";
 import { coverageRows, subjectLoad, weeklyLoad } from "./analytics";
+import { describeLoadError, type LoadFailure } from "./loadError";
 import {
   buildActionItems,
   countsBySeverity,
@@ -398,7 +399,7 @@ const TeacherDashboard: React.FC = () => {
   const [data, setData] = useState<TeacherOverview | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<LoadFailure | null>(null);
   const [loadedAt, setLoadedAt] = useState<Date | null>(null);
   const [severityFilter, setSeverityFilter] = useState<Severity | "all">("all");
   const [showCompleted, setShowCompleted] = useState(false);
@@ -422,7 +423,7 @@ const TeacherDashboard: React.FC = () => {
         // teacher is mid-glance, and blanking the page over a dropped poll is
         // worse than showing figures a few minutes old.
         if (!background) {
-          setError("We couldn't load your dashboard. Please try again.");
+          setError(describeLoadError(err));
         }
       } finally {
         setLoading(false);
@@ -547,15 +548,44 @@ const TeacherDashboard: React.FC = () => {
   }
 
   if (error || !data) {
+    const failure = error ?? {
+      message: "We couldn't load your dashboard.",
+      detail: "no data",
+      retryable: true,
+    };
     return (
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 text-center">
-        <p className="text-red-600 dark:text-red-400 mb-4">{error}</p>
-        <button
-          onClick={() => load()}
-          className="px-4 py-2 rounded-2xl bg-blue-600 text-white hover:bg-blue-700"
-        >
-          Try again
-        </button>
+      <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+        <div className="rounded-3xl border border-border-light dark:border-border-dark/50 bg-card-light dark:bg-card-dark/30 p-8 text-center">
+          <span className="grid place-items-center w-12 h-12 mx-auto rounded-2xl bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400">
+            <AlertOctagon className="w-6 h-6" />
+          </span>
+          <p className="mt-4 text-base font-medium text-text-primary-light dark:text-text-primary-dark">
+            {failure.message}
+          </p>
+          <p className="mt-1 text-xs text-text-secondary-light dark:text-text-secondary-dark">
+            {failure.detail}
+          </p>
+          <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
+            {failure.retryable && (
+              <button
+                onClick={() => load()}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl bg-blue-600 text-sm font-medium text-white hover:bg-blue-700 transition-colors"
+              >
+                <RefreshCw className="w-4 h-4" />
+                Try again
+              </button>
+            )}
+            {/* The timetable lives on its own endpoint, so it is still there
+                even when this aggregate is the thing that failed. */}
+            <Link
+              to="/dashboard"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl border border-border-light dark:border-border-dark/50 text-sm font-medium text-text-primary-light dark:text-text-primary-dark hover:bg-surface-light dark:hover:bg-surface-dark transition-colors"
+            >
+              <CalendarDays className="w-4 h-4" />
+              Go to my timetable
+            </Link>
+          </div>
+        </div>
       </div>
     );
   }
