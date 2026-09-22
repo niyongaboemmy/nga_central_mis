@@ -105,11 +105,28 @@ describe("E-learning Phase 1: courses, seeding, membership, visibility", () => {
     expect(again.body.data.sections).toHaveLength(12);
   });
 
-  it("lists the teacher's schemes with their course state, and the owner always sees the course", async () => {
-    const schemes = await request(app).get("/elearning/courses/schemes").set(auth(teacherToken)).query({ academic_year_id: academicYearId });
+  it("lists every subject the teacher is assigned, whatever stage it has reached", async () => {
+    // A second subject assigned to the same teacher, with no scheme of work at all: it must
+    // still be listed, or the teacher cannot tell it exists from the E-Learning page.
+    const bareSubjectId = await createSubject();
+    await createTeacherSubjectAssignment({ userId: teacherId, subjectId: bareSubjectId, classGroupId, academicYearId });
+
+    const schemes = await request(app)
+      .get("/elearning/courses/schemes")
+      .set(auth(teacherToken))
+      .query({ academic_year_id: academicYearId, academic_term_id: academicTermId });
     expect(schemes.status).toBe(200);
+
     const mine = schemes.body.data.find((s: any) => s.scheme_id === schemeId);
-    expect(mine).toMatchObject({ course_id: courseId, course_status: "DRAFT", entries: 12 });
+    expect(mine).toMatchObject({ course_id: courseId, course_status: "DRAFT", entries: 12, stage: "course" });
+
+    const bare = schemes.body.data.find((s: any) => s.subject_id === bareSubjectId);
+    expect(bare).toMatchObject({ stage: "nothing", scheme_id: null, course_id: null, entries: 0 });
+    expect(bare.class_group_id).toBe(classGroupId);
+
+    // One row per subject × class group, never one per term.
+    const keys = schemes.body.data.map((s: any) => `${s.subject_id}:${s.class_group_id}`);
+    expect(new Set(keys).size).toBe(keys.length);
     const courses = await request(app).get("/elearning/courses/mine").set(auth(teacherToken));
     expect(courses.body.data.map((c: any) => c.course_id)).toContain(courseId);
   });

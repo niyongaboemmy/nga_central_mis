@@ -407,50 +407,67 @@ export const listMyCourses = asyncHandler(async (req: any, res: any) => {
 });
 
 /**
- * The teacher's schemes of work with their course state — so the E-Learning page can offer
- * "Set up course" in place instead of sending the teacher back to the scheme list.
+ * Everything the teacher teaches this year/term, whether or not it has a scheme or a course
+ * yet — the E-Learning page is driven by the teaching assignment, not by what happens to
+ * exist already, so a subject can never be invisible there. Each row says how far along it
+ * is: no scheme → scheme but no course → course.
  */
 export const listMySchemesForCourses = asyncHandler(async (req: any, res: any) => {
   const userId = req.user.userId;
   const yearId = req.query.academic_year_id ? parseId(req.query.academic_year_id, "academic year") : null;
+  const termId = req.query.academic_term_id ? parseId(req.query.academic_term_id, "academic term") : null;
+
   const rows = await db
     .select({
-      scheme_id: SchemeOfWork.scheme_id,
-      validation_status: SchemeOfWork.validation_status,
       subject_id: Subject.subject_id,
       subject_name: Subject.name,
       subject_code: Subject.code,
       subject_color: Subject.color,
+      class_group_id: ClassGroup.class_group_id,
       class_group_name: ClassGroup.name,
+      academic_year_id: TeacherSubjectAssignment.academic_year_id,
+      scheme_id: SchemeOfWork.scheme_id,
+      validation_status: SchemeOfWork.validation_status,
+      scheme_term_id: SchemeOfWork.academic_term_id,
       term_name: AcademicTerm.name,
-      academic_year_id: AcademicTerm.academic_year_id,
       entries: sql<number>`(SELECT COUNT(*) FROM SchemeOfWorkEntry e WHERE e.scheme_id = ${SchemeOfWork.scheme_id})`,
       course_id: Course.course_id,
       course_status: Course.status,
     })
-    .from(SchemeOfWork)
-    .innerJoin(Subject, eq(Subject.subject_id, SchemeOfWork.subject_id))
-    .innerJoin(ClassGroup, eq(ClassGroup.class_group_id, SchemeOfWork.class_group_id))
-    .innerJoin(AcademicTerm, eq(AcademicTerm.academic_term_id, SchemeOfWork.academic_term_id))
-    .leftJoin(Course, eq(Course.scheme_id, SchemeOfWork.scheme_id))
+    .from(TeacherSubjectAssignment)
+    .innerJoin(Subject, eq(Subject.subject_id, TeacherSubjectAssignment.subject_id))
+    .innerJoin(ClassGroup, eq(ClassGroup.class_group_id, TeacherSubjectAssignment.class_group_id))
+    // The scheme (and therefore the course) is per term, so only join the selected one —
+    // otherwise a subject taught all year would appear three times.
     .leftJoin(
-      TeacherSubjectAssignment,
+      SchemeOfWork,
       and(
-        eq(TeacherSubjectAssignment.user_id, userId),
-        eq(TeacherSubjectAssignment.subject_id, SchemeOfWork.subject_id),
-        eq(TeacherSubjectAssignment.class_group_id, SchemeOfWork.class_group_id),
-        eq(TeacherSubjectAssignment.academic_year_id, AcademicTerm.academic_year_id),
+        eq(SchemeOfWork.subject_id, TeacherSubjectAssignment.subject_id),
+        eq(SchemeOfWork.class_group_id, TeacherSubjectAssignment.class_group_id),
+        termId ? eq(SchemeOfWork.academic_term_id, termId) : sql`1 = 0`,
       ),
     )
-    .where(
-      and(
-        or(eq(SchemeOfWork.user_id, userId), sql`${TeacherSubjectAssignment.user_id} IS NOT NULL`),
-        yearId ? eq(AcademicTerm.academic_year_id, yearId) : undefined,
-      ),
-    )
-    .orderBy(desc(AcademicTerm.academic_year_id), desc(SchemeOfWork.updated_at));
-  const seen = new Set<number>();
-  successResponse(res, "My schemes", rows.filter((r) => (seen.has(r.scheme_id) ? false : (seen.add(r.scheme_id), true))).map((r) => ({ ...r, entries: Number(r.entries) })));
+    .leftJoin(AcademicTerm, eq(AcademicTerm.academic_term_id, SchemeOfWork.academic_term_id))
+    .leftJoin(Course, eq(Course.scheme_id, SchemeOfWork.scheme_id))
+    .where(and(eq(TeacherSubjectAssignment.user_id, userId), yearId ? eq(TeacherSubjectAssignment.academic_year_id, yearId) : undefined))
+    .orderBy(Subject.name, ClassGroup.name);
+
+  // One row per (subject, class group): a teacher holds one assignment per year for each.
+  const seen = new Set<string>();
+  successResponse(
+    res,
+    "My teaching",
+    rows
+      .filter((r) => {
+        const key = `${r.subject_id}:${r.class_group_id}`;
+        return seen.has(key) ? false : (seen.add(key), true);
+      })
+      .map((r) => ({
+        ...r,
+        entries: Number(r.entries || 0),
+        stage: r.course_id ? "course" : r.scheme_id ? "scheme" : "nothing",
+      })),
+  );
 });
 
 export const getCourseBuilder = asyncHandler(async (req: any, res: any) => {

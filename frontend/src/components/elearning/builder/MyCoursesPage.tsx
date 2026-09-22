@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { ArrowRight, Loader2, Wand2 } from "lucide-react";
+import { ArrowRight, CalendarPlus, Loader2, Wand2 } from "lucide-react";
 import {
   builderRoutes,
   elearningApi,
@@ -11,6 +11,7 @@ import { useAcademicPeriod } from "../../../contexts/AcademicPeriodContext";
 import { useToast } from "../../../contexts/ToastContext";
 import { copy } from "../copy";
 import Mascot from "../ui/Mascot";
+import SubjectIcon from "../ui/subjectIcons";
 import {
   EmptyState,
   ProgressBar,
@@ -25,7 +26,7 @@ import {
 const MyCoursesPage: React.FC = () => {
   const navigate = useNavigate();
   const { showToast } = useToast();
-  const { selectedYearId } = useAcademicPeriod();
+  const { selectedYearId, selectedTermId } = useAcademicPeriod();
   const [rows, setRows] = useState<MyCourseRow[] | null>(null);
   const [schemes, setSchemes] = useState<MySchemeRow[] | null>(null);
   const [creating, setCreating] = useState<number | null>(null);
@@ -40,9 +41,10 @@ const MyCoursesPage: React.FC = () => {
       .then((r) => setSchemes(r.data.data))
       .catch(() => setSchemes([]));
   };
-  useEffect(load, [selectedYearId]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(load, [selectedYearId, selectedTermId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const setUp = async (scheme: MySchemeRow) => {
+    if (!scheme.scheme_id) return;
     setCreating(scheme.scheme_id);
     try {
       const r = await elearningApi.createFromScheme(scheme.scheme_id);
@@ -53,7 +55,12 @@ const MyCoursesPage: React.FC = () => {
     }
   };
 
-  const pending = (schemes || []).filter((s) => !s.course_id);
+  const pending = (schemes || []).filter((s) => s.stage === "scheme");
+  // Assigned subjects with no scheme of work for this term yet: a course is built on a
+  // scheme, so the honest next step is to write the scheme, not to hide the subject.
+  const noScheme = (schemes || []).filter((s) => s.stage === "nothing");
+  const schemeUrl = (s: MySchemeRow) =>
+    `/scheme-of-work/calendar?subject_id=${s.subject_id}&class_group_id=${s.class_group_id}${selectedTermId ? `&academic_term_id=${selectedTermId}` : ""}`;
   const loading = rows === null || schemes === null;
 
   return (
@@ -154,7 +161,7 @@ const MyCoursesPage: React.FC = () => {
                         {s.entries === 1 ? "" : "s"}
                         {s.validation_status !== "APPROVED" && (
                           <span className="ml-1 text-warning-700 dark:text-warning-500">
-                            · scheme {s.validation_status.toLowerCase()}
+                            · scheme {String(s.validation_status).toLowerCase()}
                           </span>
                         )}
                       </p>
@@ -182,11 +189,39 @@ const MyCoursesPage: React.FC = () => {
             </section>
           )}
 
-          {rows.length === 0 && pending.length === 0 && (
+          {noScheme.length > 0 && (
+            <section className="mt-8">
+              <h2 className="text-[11px] uppercase tracking-wider font-semibold text-gray-500 dark:text-gray-400">
+                Your other subjects{selectedTermId ? " this term" : ""}
+              </h2>
+              <p className="mt-1 text-[11px] text-gray-400">A course is built on a scheme of work — write the scheme and the weeks arrive here.</p>
+              <ul className="mt-3 space-y-2">
+                {noScheme.map((s) => (
+                  <li key={`${s.subject_id}-${s.class_group_id}`} className="flex flex-col sm:flex-row sm:items-center gap-3 p-4 el-card">
+                    <span className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: `color-mix(in oklab, ${s.subject_color || "#3b6cff"} 20%, transparent)`, color: s.subject_color || undefined }}>
+                      <SubjectIcon subjectName={s.subject_name} className="w-5 h-5" />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">{s.subject_name}</p>
+                      <p className="text-[11px] text-gray-500 dark:text-gray-400">{s.class_group_name} · no scheme of work yet</p>
+                    </div>
+                    <Link
+                      to={schemeUrl(s)}
+                      className="inline-flex items-center justify-center gap-1.5 min-h-[44px] px-4 rounded-pill el-chip text-sm font-semibold"
+                    >
+                      <CalendarPlus className="w-4 h-4" /> Create the scheme
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+
+          {rows.length === 0 && pending.length === 0 && noScheme.length === 0 && (
             <EmptyState
               pose="book"
-              title="No scheme of work for this year yet"
-              body="A course is built on a scheme of work. Create your scheme first and come back — the weeks will be waiting."
+              title="Nothing assigned to you this term"
+              body="Courses are built from the subjects you teach. Once a subject is assigned to you for this year, it appears here."
               action={{
                 label: "Go to Scheme of Work",
                 onClick: () => navigate("/scheme-of-work"),
