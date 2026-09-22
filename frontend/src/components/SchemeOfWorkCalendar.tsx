@@ -1623,6 +1623,11 @@ const SchemeOfWorkCalendar: React.FC = () => {
           subjectName={subjectInfo?.name}
           classGroupName={subjectInfo?.classGroupName}
           introMessage={tableEditorIntro}
+          onSchemeDeleted={() => {
+            setEntries([]);
+            setSchemeMetadata(null);
+            setEntryMode("choose");
+          }}
           onClose={() => {
             setIsTableEditorOpen(false);
             loadData();

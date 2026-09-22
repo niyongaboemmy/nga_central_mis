@@ -748,3 +748,82 @@ mark.note-find-hit-active {
 
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* ------------------------------------------------------------------
+   Scheme of Work sheet editor (SchemeTableEditor)
+   The editor deliberately mirrors the printed PDF, so its colours used
+   to be hardcoded hex applied via inline styles — which Tailwind's
+   class-based dark mode cannot reach, leaving dark ink on a dark sheet.
+   They now live here as tokens with a real dark counterpart: paper
+   becomes an elevated slate surface, the tan header becomes a warm
+   amber-tinted band, and the rules lift instead of disappearing.
+   ------------------------------------------------------------------ */
+.scheme-sheet {
+  --sheet-ink: #1a2333;
+  --sheet-muted: #6b7280;
+  --sheet-rule: #e2e6ee;
+  --sheet-rule-strong: #1a2333;
+  --sheet-head-bg: #f6efe0;
+  --sheet-head-ink: #1a2333;
+  --sheet-paper: #ffffff;
+  --sheet-paper-alt: #fbfbfd;
+  --sheet-row-hover: #f4f7ff;
+  --sheet-skip-bg: #fafafa;
+  --sheet-accent: #2563eb;
+  --sheet-accent-soft: rgb(37 99 235 / 0.10);
+  --sheet-shell: #ffffff;
+}
+.dark .scheme-sheet {
+  --sheet-ink: #e8ecf5;
+  --sheet-muted: #94a3b8;
+  --sheet-rule: rgb(255 255 255 / 0.09);
+  --sheet-rule-strong: rgb(255 255 255 / 0.28);
+  --sheet-head-bg: #1c2231;
+  --sheet-head-ink: #f0d9a8;
+  --sheet-paper: #111725;
+  --sheet-paper-alt: #141b2b;
+  --sheet-row-hover: #1a2334;
+  --sheet-skip-bg: #10151f;
+  --sheet-accent: #60a5fa;
+  --sheet-accent-soft: rgb(96 165 250 / 0.14);
+  --sheet-shell: #0b0f19;
+}
+
+/* Rows lift on hover and the cell you are editing gets a soft focus wash,
+   so a dense 9-column grid still tells you where you are. */
+.scheme-row {
+  transition: background-color 140ms ease;
+}
+.scheme-row:hover > td {
+  background-color: var(--sheet-row-hover);
+}
+.scheme-cell {
+  position: relative;
+  transition: background-color 140ms ease, box-shadow 140ms ease;
+}
+.scheme-cell:focus-within {
+  background-color: var(--sheet-accent-soft);
+  box-shadow: inset 0 0 0 1.5px var(--sheet-accent);
+  border-radius: 6px;
+}
+/* The group's Learning-Outcome cell carries a left accent so competence
+   blocks read as blocks rather than an accident of rowspan. */
+.scheme-group-start > td:first-child {
+  box-shadow: inset 3px 0 0 0 var(--sheet-accent);
+}
+.scheme-sheet ::-webkit-scrollbar-thumb {
+  background-color: var(--sheet-rule-strong);
+}
+
+/* A newly added/inserted week pulses so the action has a visible result
+   even when it lands far down a 15-week sheet. */
+@keyframes scheme-row-flash {
+  0%, 100% { background-color: transparent; }
+  25%      { background-color: var(--sheet-accent-soft); }
+}
+.scheme-row-flash > td {
+  animation: scheme-row-flash 1.1s ease-in-out 2;
+}
+@media (prefers-reduced-motion: reduce) {
+  .scheme-row-flash > td { animation: none; background-color: var(--sheet-accent-soft); }
+}
