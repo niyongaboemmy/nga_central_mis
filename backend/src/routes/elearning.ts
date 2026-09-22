@@ -46,6 +46,8 @@ import {
   submitKnowledgeCheck,
   knowledgeCheckStats,
   generateKnowledgeCheck,
+  generatePageDraft,
+  getItemContext,
   suggestItemCriteria,
   getMyLearningPrefs,
   updateMyLearningPrefs,
@@ -127,6 +129,8 @@ router.delete("/items/:id", builder, deleteItem);
 router.put("/items/:id/criteria", builder, setItemCriteriaHandler);
 router.post("/items/:id/suggest-criteria", builder, suggestItemCriteria);
 router.post("/items/:id/generate-check", builder, generateKnowledgeCheck);
+router.post("/items/:id/generate-page", builder, generatePageDraft);
+router.get("/items/:id/context", builder, getItemContext);
 router.get("/items/:id/knowledge-check/stats", builder, knowledgeCheckStats);
 
 // ---- Admin / oversight ----------------------------------------------------

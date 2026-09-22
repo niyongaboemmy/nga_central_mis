@@ -169,6 +169,26 @@ describe("E-learning workflows: instructor → student → admin, aligned to the
     expect(subject.elements.find((e: any) => e.element_number === 1).covered).toBe(1);
   });
 
+  it("instructor: the item studio shows the week's curriculum brief and AI grounds on it", async () => {
+    const created = await request(app).post(`/elearning/sections/${week1}/items`).set(auth(teacherToken)).send({ item_type: "PAGE", title: "New page" });
+    expect(created.status).toBe(201);
+    const itemId = created.body.data.item_id;
+
+    const ctx = await request(app).get(`/elearning/items/${itemId}/context`).set(auth(teacherToken));
+    expect(ctx.status).toBe(200);
+    // The brief is the scheme's own plan for the week, not free text on the course.
+    expect(ctx.body.data).toMatchObject({ week_number: "Week 1", topic: "HTML", element_number: 1, competency_title: "Structure a web page" });
+    expect(ctx.body.data.criteria.map((c: any) => c.criteria_number).sort()).toEqual(["1.1", "1.2"]);
+    // What is already in the week, so the teacher doesn't repeat it.
+    expect(ctx.body.data.siblings.map((s: any) => s.title)).toEqual(expect.arrayContaining(["HTML elements", "Semantic HTML"]));
+
+    // A student must never reach the studio's endpoints. (Generation itself calls a live
+    // provider, so it is exercised in elearningPhase5Tutor.test.ts with the chain mocked.)
+    expect((await request(app).get(`/elearning/items/${itemId}/context`).set(auth(studentToken))).status).toBe(403);
+    expect((await request(app).post(`/elearning/items/${itemId}/generate-page`).set(auth(studentToken)).send({})).status).toBe(403);
+    await request(app).delete(`/elearning/items/${itemId}`).set(auth(teacherToken));
+  });
+
   it("admin: register carries curriculum coverage, drill-down has coverage + mastery, reports export", async () => {
     const reg = await request(app).get("/elearning/admin/courses").set(auth(adminToken)).query({ academic_year_id: academicYearId });
     expect(reg.status).toBe(200);

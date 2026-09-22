@@ -1,13 +1,15 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Plus, Sparkles, Trash2, X } from "lucide-react";
+import { Info, Maximize2, Minimize2, Plus, Sparkles, Trash2, Wand2, X } from "lucide-react";
 import { CompletionRule, CourseItem, CurriculumOutcomePick } from "../../../api/elearning";
 import { lessonNotesApi } from "../../../api/lessonNotes";
 import { apiService } from "../../../services/api";
 import { useToast } from "../../../contexts/ToastContext";
 import { copy } from "../copy";
+import { useMotion } from "../../../design/motion";
 import LessonNoteRichEditor from "../../lessonNotes/LessonNoteRichEditor";
 import { ItemTypeIcon } from "../ui/primitives";
+import WeekContextPanel, { ItemContext } from "./WeekContextPanel";
 
 interface Props {
   item: CourseItem | null;
@@ -53,6 +55,7 @@ const input = "el-input";
  */
 const ItemSettingsDrawer: React.FC<Props> = ({ item, curriculum, onClose, onSave, onDelete, onNotePublished }) => {
   const { showToast } = useToast();
+  const m = useMotion();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [rule, setRule] = useState<CompletionRule>("VIEW");
@@ -69,6 +72,12 @@ const ItemSettingsDrawer: React.FC<Props> = ({ item, curriculum, onClose, onSave
   const [saving, setSaving] = useState(false);
   const [suggesting, setSuggesting] = useState(false);
   const [generatingKc, setGeneratingKc] = useState(false);
+  const [context, setContext] = useState<ItemContext | null>(null);
+  const [wide, setWide] = useState(true);
+  const [briefOpen, setBriefOpen] = useState(false);
+  const [aiInstruction, setAiInstruction] = useState("");
+  const [writingPage, setWritingPage] = useState(false);
+  const [pageKey, setPageKey] = useState(0);
 
   useEffect(() => {
     if (!item) return;
@@ -85,6 +94,12 @@ const ItemSettingsDrawer: React.FC<Props> = ({ item, curriculum, onClose, onSave
     setPageJson(item.content_json ?? null);
     setPageHtml("");
     setQuestions(item.content_json?.questions || []);
+    setAiInstruction("");
+    setContext(null);
+    apiService
+      .get(`/elearning/items/${item.item_id}/context`)
+      .then((r) => setContext(r.data.data))
+      .catch(() => setContext(null));
   }, [item]);
 
   const criteriaById = useMemo(() => {
@@ -160,6 +175,34 @@ const ItemSettingsDrawer: React.FC<Props> = ({ item, curriculum, onClose, onSave
     }
   };
 
+  /** Writes (or extends) the page from the week's topic, objective and criteria. */
+  const writePage = async () => {
+    if (!item) return;
+    setWritingPage(true);
+    try {
+      const r = await apiService.post(`/elearning/items/${item.item_id}/generate-page`, {
+        instruction: aiInstruction || undefined,
+        content_html: pageHtml || undefined,
+      });
+      const d = r.data.data;
+      setPageHtml(d.content_html);
+      setPageJson(null); // the editor re-seeds from HTML
+      setPageKey((k) => k + 1);
+      if (d.title && (!title || title === "New page")) setTitle(d.title);
+      // Tick the criteria the draft says it teaches, so alignment follows the content.
+      if (context && d.covered_criteria?.length) {
+        const matched = context.criteria.filter((c) => d.covered_criteria.includes(c.criteria_number)).map((c) => c.criteria_id);
+        if (matched.length) setCriteriaIds((ids) => [...new Set([...ids, ...matched])]);
+      }
+      setAiInstruction("");
+      showToast("Draft written — edit anything before saving", "success");
+    } catch (e: any) {
+      showToast(e?.response?.data?.message || "The AI couldn't write that page just now", "error");
+    } finally {
+      setWritingPage(false);
+    }
+  };
+
   const publishNote = async () => {
     if (!item.ref_id) return;
     try {
@@ -171,28 +214,98 @@ const ItemSettingsDrawer: React.FC<Props> = ({ item, curriculum, onClose, onSave
     }
   };
 
+  const typeLabel = copy.builder.itemTypes[item.item_type];
+
   return (
     <AnimatePresence>
-      <motion.div className="fixed inset-0 z-40 bg-black/30 lg:bg-transparent lg:pointer-events-none" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose}>
+      <motion.div
+        className="fixed inset-0 z-50 bg-black/50 backdrop-blur-[2px] flex items-stretch justify-end"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        onClick={onClose}
+      >
         <motion.aside
-          initial={{ x: 40, opacity: 0 }}
-          animate={{ x: 0, opacity: 1 }}
-          exit={{ x: 40, opacity: 0 }}
+          initial={{ y: 24, opacity: 0, scale: 0.99 }}
+          animate={{ y: 0, opacity: 1, scale: 1 }}
+          exit={{ y: 24, opacity: 0 }}
           transition={{ type: "spring", stiffness: 380, damping: 36 }}
           onClick={(e) => e.stopPropagation()}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") onClose();
+            if ((e.metaKey || e.ctrlKey) && e.key === "s") {
+              e.preventDefault();
+              save();
+            }
+          }}
           role="dialog"
-          aria-label={`Settings for ${item.title}`}
-          className={`pointer-events-auto fixed top-16 right-0 bottom-0 bg-white dark:bg-gray-950 shadow-float border-l border-gray-200 dark:border-white/[0.07] flex flex-col ${item.item_type === "PAGE" ? "w-full lg:w-[720px]" : "w-full sm:w-[440px]"}`}
+          aria-modal="true"
+          aria-label={`${typeLabel} — ${item.title}`}
+          className={`el-float flex flex-col overflow-hidden ${
+            wide ? "w-full h-full rounded-none" : "w-full sm:w-[560px] h-full rounded-none sm:rounded-l-3xl"
+          }`}
         >
-          <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-100 dark:border-white/[0.06]">
-            <ItemTypeIcon type={item.item_type} className="w-4 h-4 text-gray-500" />
-            <p className="text-sm font-semibold text-gray-800 dark:text-gray-100 flex-1 truncate">{copy.builder.itemTypes[item.item_type]}</p>
-            <button onClick={onClose} className="w-10 h-10 flex items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 dark:hover:bg-white/[0.06]" aria-label="Close">
+          {/* Title bar */}
+          <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-100 dark:border-white/[0.06] flex-shrink-0">
+            <span className="w-9 h-9 rounded-xl el-chip flex items-center justify-center flex-shrink-0">
+              <ItemTypeIcon type={item.item_type} className="w-4 h-4" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">{title || typeLabel}</p>
+              <p className="text-[11px] text-gray-500 dark:text-gray-400">
+                {typeLabel}
+                {context?.week_number ? ` · ${context.week_number}` : ""}
+              </p>
+            </div>
+            {context && (
+              <button
+                onClick={() => setBriefOpen((o) => !o)}
+                aria-pressed={briefOpen}
+                className="lg:hidden w-10 h-10 flex items-center justify-center rounded-xl el-chip"
+                aria-label="What this week teaches"
+              >
+                <Info className="w-4 h-4" />
+              </button>
+            )}
+            <button onClick={() => setWide((w) => !w)} className="hidden sm:flex w-10 h-10 items-center justify-center rounded-xl el-chip" aria-label={wide ? "Shrink" : "Full screen"}>
+              {wide ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+            </button>
+            <button onClick={onClose} className="w-10 h-10 flex items-center justify-center rounded-xl text-gray-400 hover:bg-gray-100 dark:hover:bg-white/[0.06]" aria-label="Close">
               <X className="w-4 h-4" />
             </button>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-4 space-y-5">
+          <div className="flex-1 min-h-0 flex">
+          {/* The brief: what the scheme says this week must teach */}
+          {context !== null && wide && (
+            <aside className="hidden lg:block w-[320px] flex-shrink-0 border-r border-gray-100 dark:border-white/[0.06] overflow-y-auto p-4 el-subtle">
+              <WeekContextPanel
+                context={context}
+                selectedCriteria={criteriaIds}
+                onToggleCriterion={isNote ? undefined : (id) => setCriteriaIds((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]))}
+              />
+            </aside>
+          )}
+
+          {/* Phone/tablet: the same brief as a sheet */}
+          <AnimatePresence>
+            {briefOpen && context && (
+              <motion.div {...m("reveal")} className="lg:hidden absolute inset-x-0 top-[57px] bottom-0 z-10 el-float p-4 overflow-y-auto">
+                <div className="flex items-center justify-end">
+                  <button onClick={() => setBriefOpen(false)} className="min-h-[36px] px-3 rounded-pill el-chip text-xs font-semibold">Close</button>
+                </div>
+                <div className="mt-2">
+                  <WeekContextPanel
+                    context={context}
+                    selectedCriteria={criteriaIds}
+                    onToggleCriterion={isNote ? undefined : (id) => setCriteriaIds((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]))}
+                  />
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          <div className="flex-1 min-w-0 overflow-y-auto p-4 md:p-5 space-y-5 max-w-3xl mx-auto w-full">
             <Field label="Title">
               <input className={input} value={title} onChange={(e) => setTitle(e.target.value)} />
             </Field>
@@ -218,10 +331,34 @@ const ItemSettingsDrawer: React.FC<Props> = ({ item, curriculum, onClose, onSave
 
             {item.item_type === "PAGE" && (
               <div>
-                <span className="block text-[11px] uppercase tracking-wider font-semibold text-gray-500 dark:text-gray-400 mb-1">Page content</span>
-                <div className="rounded-xl border border-gray-200 dark:border-white/10 overflow-hidden min-h-[320px]">
+                <div className="flex flex-wrap items-center gap-2 mb-2">
+                  <span className="text-[11px] uppercase tracking-wider font-semibold text-gray-500 dark:text-gray-400 flex-1">Page content</span>
+                </div>
+                {/* Write with AI, grounded in this week's topic, objective and criteria */}
+                <div className="mb-2 flex flex-col sm:flex-row gap-2 p-2 rounded-2xl el-subtle">
+                  <input
+                    value={aiInstruction}
+                    onChange={(e) => setAiInstruction(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); writePage(); } }}
+                    placeholder={pageHtml ? "Tell the AI what to change or add…" : "Optional: anything specific to cover?"}
+                    className="el-input flex-1 !min-h-[40px] !bg-transparent dark:!bg-transparent !border-transparent"
+                    aria-label="Instruction for the AI"
+                  />
+                  <motion.button
+                    {...m("tap")}
+                    type="button"
+                    onClick={writePage}
+                    disabled={writingPage}
+                    className="inline-flex items-center justify-center gap-1.5 min-h-[40px] px-4 rounded-pill bg-gradient-to-r from-violet-600 to-brand-600 text-white text-xs font-semibold shadow-soft disabled:opacity-60 flex-shrink-0"
+                  >
+                    <Wand2 className="w-3.5 h-3.5" />
+                    {writingPage ? "Writing…" : pageHtml ? "Improve with AI" : "Write it with AI"}
+                  </motion.button>
+                </div>
+                <div className={`rounded-xl border border-gray-200 dark:border-white/10 overflow-hidden ${wide ? "min-h-[520px]" : "min-h-[320px]"}`}>
                   <LessonNoteRichEditor
-                    initialContent={item.content_json ?? null}
+                    key={pageKey}
+                    initialContent={pageJson ?? (pageHtml || item.content_json) ?? null}
                     editable
                     onChange={(json, html) => {
                       setPageJson(json);
@@ -400,7 +537,9 @@ const ItemSettingsDrawer: React.FC<Props> = ({ item, curriculum, onClose, onSave
             )}
           </div>
 
-          <div className="flex items-center gap-2 px-4 py-3 border-t border-gray-100 dark:border-white/[0.06]">
+          </div>
+
+          <div className="flex items-center gap-2 px-4 py-3 border-t border-gray-100 dark:border-white/[0.06] flex-shrink-0">
             <button onClick={() => onDelete(item.item_id).then(onClose)} className="inline-flex items-center gap-1 min-h-[44px] px-3 rounded-pill text-sm text-danger-700 dark:text-danger-500 hover:bg-danger-100">
               <Trash2 className="w-4 h-4" /> Remove
             </button>

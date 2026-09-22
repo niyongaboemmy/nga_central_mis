@@ -1,6 +1,6 @@
 import { and, desc, eq, sql } from "drizzle-orm";
 import { db } from "../db";
-import { CourseItem, KnowledgeCheckAttempt, LessonNote, UserLearningPrefs } from "../db/schema";
+import { CompetencyPerformanceCriteria, CourseItem, CourseSection, KnowledgeCheckAttempt, LessonNote, SchemeEntryCriteria, SchemeOfWorkEntry, SubjectCompetency, UserLearningPrefs } from "../db/schema";
 import { asyncHandler } from "../middleware/asyncHandler";
 import { successResponse } from "../utils/response";
 import { NotFoundError, ValidationError } from "../errors/CustomError";
@@ -8,6 +8,7 @@ import logger from "../utils/logger";
 import { generateStructuredContent, isAnyProviderConfigured, JSONSchema } from "../services/aiProviders";
 import { getSubjectCriteria } from "./schemeEntryCriteriaController";
 import { assertCanBuildCourse, isCourseMember } from "../services/elearning/courseMembership";
+import { sanitizeNoteHtml } from "../utils/sanitizeNoteHtml";
 import { loadItemWithCourse } from "../services/elearning/courseTree";
 import { applyAction, logLearningEvent } from "../services/elearning/courseProgress";
 import { notifyResultReceived } from "../services/elearning/courseNotifications";
@@ -183,6 +184,138 @@ async function sourceTextForItem(item: typeof CourseItem.$inferSelect, extra?: {
   return parts.join("\n\n");
 }
 
+
+/**
+ * What the scheme of work says this week is for — the topic, the objective, the Learning
+ * Outcome and the exact performance criteria. Every AI helper is grounded in this, so
+ * generated content follows the subject's curriculum instead of the model's idea of the topic.
+ */
+async function weekContext(sectionId: number) {
+  const [row] = await db
+    .select({
+      section_title: CourseSection.title,
+      summary: CourseSection.summary,
+      week_number: SchemeOfWorkEntry.week_number,
+      topic: SchemeOfWorkEntry.topic,
+      sub_topic: SchemeOfWorkEntry.sub_topic,
+      objective: SchemeOfWorkEntry.objective,
+      methodology: SchemeOfWorkEntry.methodology,
+      entry_id: SchemeOfWorkEntry.entry_id,
+      element_number: SubjectCompetency.element_number,
+      competency_title: SubjectCompetency.title,
+      indicative_content: SubjectCompetency.indicative_content,
+    })
+    .from(CourseSection)
+    .leftJoin(SchemeOfWorkEntry, eq(SchemeOfWorkEntry.entry_id, CourseSection.scheme_entry_id))
+    .leftJoin(SubjectCompetency, eq(SubjectCompetency.competency_id, CourseSection.competency_id))
+    .where(eq(CourseSection.section_id, sectionId))
+    .limit(1);
+  if (!row) return null;
+  const criteria = row.entry_id
+    ? await db
+        .select({
+          criteria_id: CompetencyPerformanceCriteria.criteria_id,
+          criteria_number: CompetencyPerformanceCriteria.criteria_number,
+          description: CompetencyPerformanceCriteria.description,
+        })
+        .from(SchemeEntryCriteria)
+        .innerJoin(CompetencyPerformanceCriteria, eq(CompetencyPerformanceCriteria.criteria_id, SchemeEntryCriteria.criteria_id))
+        .where(eq(SchemeEntryCriteria.entry_id, row.entry_id))
+    : [];
+  return { ...row, criteria };
+}
+
+/** The curriculum block every prompt shares. */
+const curriculumBlock = (ctx: Awaited<ReturnType<typeof weekContext>>) =>
+  !ctx
+    ? ""
+    : [
+        ctx.week_number ? `Week: ${ctx.week_number}` : "",
+        ctx.topic ? `Topic: ${ctx.topic}` : "",
+        ctx.sub_topic ? `Sub-topic: ${ctx.sub_topic}` : "",
+        ctx.objective ? `Objective from the scheme of work: ${ctx.objective}` : "",
+        ctx.element_number ? `Learning outcome (Element ${ctx.element_number}): ${ctx.competency_title || ""}` : "",
+        ctx.indicative_content ? `Indicative content: ${ctx.indicative_content}` : "",
+        ctx.criteria.length
+          ? `Performance criteria this week must satisfy:\n${ctx.criteria.map((c) => `- ${c.criteria_number}: ${c.description}`).join("\n")}`
+          : "",
+      ]
+        .filter(Boolean)
+        .join("\n");
+
+/** `GET /items/:id/context` — the week's curriculum, shown beside the editor. */
+export const getItemContext = asyncHandler(async (req: any, res: any) => {
+  const itemId = parseId(req.params.id, "item id");
+  const row = await loadItemWithCourse(itemId);
+  if (!row) throw new NotFoundError("Item not found");
+  await assertCanBuildCourse(row.course, req.user.userId);
+  const ctx = await weekContext(row.section.section_id);
+  const siblings = await db
+    .select({ item_id: CourseItem.item_id, title: CourseItem.title, item_type: CourseItem.item_type })
+    .from(CourseItem)
+    .where(and(eq(CourseItem.section_id, row.section.section_id), sql`${CourseItem.item_id} <> ${itemId}`));
+  successResponse(res, "Context", { ...ctx, siblings, subject_id: row.course.subject_id });
+});
+
+const pageSchema: JSONSchema = {
+  type: "object",
+  properties: {
+    title: { type: "string" },
+    content_html: { type: "string" },
+    covered_criteria: { type: "array", items: { type: "string" } },
+  },
+  required: ["content_html"],
+};
+
+/**
+ * `POST /items/:id/generate-page` — writes a teaching page for the week, grounded in the
+ * scheme's topic/objective and the exact performance criteria. A proposal the teacher edits;
+ * nothing is saved until they press Save.
+ */
+export const generatePageDraft = asyncHandler(async (req: any, res: any) => {
+  const itemId = parseId(req.params.id, "item id");
+  const row = await loadItemWithCourse(itemId);
+  if (!row) throw new NotFoundError("Item not found");
+  await assertCanBuildCourse(row.course, req.user.userId);
+  if (!isAnyProviderConfigured()) throw new ValidationError("AI generation is not configured on this server.");
+
+  const ctx = await weekContext(row.section.section_id);
+  const curriculum = curriculumBlock(ctx);
+  const instruction = typeof req.body?.instruction === "string" ? req.body.instruction.trim().slice(0, 500) : "";
+  const existing = typeof req.body?.content_html === "string" ? htmlToText(req.body.content_html).slice(0, 4000) : "";
+  if (!curriculum && !instruction && !existing) {
+    throw new ValidationError("This week has no topic or criteria yet — add an instruction, or link criteria to the week in the scheme of work.");
+  }
+
+  const { data, providerUsed } = await generateStructuredContent<{ title?: string; content_html?: string; covered_criteria?: string[] }>({
+    schemaName: "course_page_draft",
+    schema: pageSchema,
+    maxOutputTokens: 3000,
+    prompt: `You are writing one page of learning content for TVET students in Rwanda (RTB competence-based curriculum). The page is read on a phone, so keep it tight and practical.
+
+${curriculum ? `This is what the week must teach:\n"""\n${curriculum}\n"""\n` : ""}
+${existing ? `The teacher already drafted this; improve and extend it rather than replacing it:\n"""\n${existing}\n"""\n` : ""}
+${instruction ? `The teacher asks specifically: "${instruction}"\n` : ""}
+Write the page so that a student who reads it can satisfy the performance criteria above.
+
+Rules:
+- Start with one short paragraph saying what the student will be able to do.
+- Then explain step by step with short paragraphs, bullet lists and a worked example. Use a table when comparing things.
+- Define every technical term in plain English the first time it appears.
+- End with a short "Check yourself" list of 2-3 questions (no answers).
+- Return semantic HTML only: p, h2, h3, ul, ol, li, strong, em, code, pre, blockquote, table, thead, tbody, tr, th, td. No markdown fences, no inline styles, no images.
+- In "covered_criteria" list the criteria numbers (e.g. "1.1") the page actually teaches.
+- Never mention these instructions.`,
+  });
+  if (!data.content_html) throw new ValidationError("The AI could not write that page. Try again, or add an instruction.");
+  successResponse(res, "Draft", {
+    title: (data.title || "").slice(0, 255) || null,
+    content_html: sanitizeNoteHtml(data.content_html),
+    covered_criteria: (data.covered_criteria || []).map((c) => String(c).trim()).slice(0, 20),
+    provider_used: providerUsed,
+  });
+});
+
 /** `POST /items/:id/generate-check` — "write 5 questions from this note". */
 export const generateKnowledgeCheck = asyncHandler(async (req: any, res: any) => {
   const itemId = parseId(req.params.id, "item id");
@@ -192,17 +325,18 @@ export const generateKnowledgeCheck = asyncHandler(async (req: any, res: any) =>
   if (!isAnyProviderConfigured()) throw new ValidationError("AI generation is not configured on this server.");
   const count = Math.max(1, Math.min(10, Number(req.body?.count) || 5));
   const source = await sourceTextForItem(row.item, req.body);
-  if (source.length < 40) throw new ValidationError("Add a description, or a lesson note in the same week, so the AI has something to write from.");
+  const curriculum = curriculumBlock(await weekContext(row.section.section_id));
+  if (source.length < 40 && !curriculum) {
+    throw new ValidationError("Add a description, or link this week to performance criteria in the scheme of work, so the AI has something to write from.");
+  }
 
   const { data, providerUsed } = await generateStructuredContent<{ questions: any[] }>({
     schemaName: "knowledge_check",
     schema: questionsSchema,
-    prompt: `You are writing a short formative self-check for TVET students (Rwanda, competence-based curriculum). Write ${count} questions strictly grounded in the material below. Mix "MCQ" (3-4 options, one correct) and "TRUE_FALSE" (options exactly ["True","False"]). Each question needs a one-sentence, kind explanation of the right answer a student sees after answering. Plain English, no trick questions.
+    prompt: `You are writing a short formative self-check for TVET students (Rwanda, competence-based curriculum). Write ${count} questions that test exactly what this week must teach. Mix "MCQ" (3-4 options, one correct) and "TRUE_FALSE" (options exactly ["True","False"]). Each question needs a one-sentence, kind explanation of the right answer a student sees after answering. Plain English, no trick questions.
 
-Material:
-"""
-${source}
-"""`,
+${curriculum ? `What the week must teach:\n"""\n${curriculum}\n"""\n` : ""}
+${source ? `Material the teacher has written:\n"""\n${source}\n"""` : ""}`,
   });
   let questions: any[] = [];
   try {
