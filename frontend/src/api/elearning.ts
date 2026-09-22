@@ -307,6 +307,21 @@ export interface MyCourseRow extends Course {
   published_sections: number;
 }
 
+export interface MySchemeRow {
+  scheme_id: number;
+  validation_status: "PENDING" | "APPROVED" | "REJECTED";
+  subject_id: number;
+  subject_name: string;
+  subject_code: string | null;
+  subject_color: string | null;
+  class_group_name: string;
+  term_name: string | null;
+  academic_year_id: number;
+  entries: number;
+  course_id: number | null;
+  course_status: CourseStatus | null;
+}
+
 type Data<T> = { data: T };
 
 // ---------------------------------------------------------------- client
@@ -329,6 +344,8 @@ export const elearningApi = {
 
   // Builder
   myBuiltCourses: () => apiService.get<Data<MyCourseRow[]>>("/elearning/courses/mine"),
+  mySchemes: (academicYearId?: number | null) =>
+    apiService.get<Data<MySchemeRow[]>>("/elearning/courses/schemes", { params: { academic_year_id: academicYearId || undefined } }),
   probeScheme: (schemeId: number) => apiService.get<Data<CourseProbe | null>>(`/elearning/courses/by-scheme/${schemeId}`),
   createFromScheme: (schemeId: number) => apiService.post<Data<BuilderCourse>>(`/elearning/courses/from-scheme/${schemeId}`),
   builder: (courseId: number) => apiService.get<Data<BuilderCourse>>(`/elearning/courses/${courseId}`),

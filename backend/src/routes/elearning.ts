@@ -5,6 +5,7 @@ import {
   createCourseFromScheme,
   getCourseForScheme,
   listMyCourses,
+  listMySchemesForCourses,
   getCourseBuilder,
   updateCourse,
   reseedCourse,
@@ -93,6 +94,7 @@ router.patch("/my/prefs", learner, updateMyLearningPrefs);
 // ---- Builder ---------------------------------------------------------------
 const builder = authorize(Permissions.MANAGE_COURSE_CONTENT);
 router.get("/courses/mine", builder, listMyCourses);
+router.get("/courses/schemes", builder, listMySchemesForCourses);
 router.get("/courses/by-scheme/:schemeId", builder, getCourseForScheme);
 router.post("/courses/from-scheme/:schemeId", builder, createCourseFromScheme);
 router.get("/courses/:id", builder, getCourseBuilder);

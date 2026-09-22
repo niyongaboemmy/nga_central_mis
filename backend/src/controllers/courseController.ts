@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, or, sql } from "drizzle-orm";
 import { db } from "../db";
 import {
   AcademicTerm,
@@ -363,7 +363,7 @@ export const listMyCourses = asyncHandler(async (req: any, res: any) => {
     .innerJoin(Subject, eq(Subject.subject_id, Course.subject_id))
     .innerJoin(ClassGroup, eq(ClassGroup.class_group_id, Course.class_group_id))
     .innerJoin(AcademicTerm, eq(AcademicTerm.academic_term_id, Course.academic_term_id))
-    .innerJoin(
+    .leftJoin(
       TeacherSubjectAssignment,
       and(
         eq(TeacherSubjectAssignment.user_id, userId),
@@ -372,6 +372,8 @@ export const listMyCourses = asyncHandler(async (req: any, res: any) => {
         eq(TeacherSubjectAssignment.academic_year_id, AcademicTerm.academic_year_id),
       ),
     )
+    // The owner always sees their course; colleagues assigned to the same subject × class see it too.
+    .where(or(eq(Course.owner_user_id, userId), sql`${TeacherSubjectAssignment.user_id} IS NOT NULL`))
     .orderBy(desc(Course.updated_at));
   const seen = new Set<number>();
   const courses = rows.filter((r) => (seen.has(r.course.course_id) ? false : (seen.add(r.course.course_id), true)));
@@ -402,6 +404,53 @@ export const listMyCourses = asyncHandler(async (req: any, res: any) => {
       published_sections: Number(countBy.get(r.course.course_id)?.published || 0),
     })),
   );
+});
+
+/**
+ * The teacher's schemes of work with their course state — so the E-Learning page can offer
+ * "Set up course" in place instead of sending the teacher back to the scheme list.
+ */
+export const listMySchemesForCourses = asyncHandler(async (req: any, res: any) => {
+  const userId = req.user.userId;
+  const yearId = req.query.academic_year_id ? parseId(req.query.academic_year_id, "academic year") : null;
+  const rows = await db
+    .select({
+      scheme_id: SchemeOfWork.scheme_id,
+      validation_status: SchemeOfWork.validation_status,
+      subject_id: Subject.subject_id,
+      subject_name: Subject.name,
+      subject_code: Subject.code,
+      subject_color: Subject.color,
+      class_group_name: ClassGroup.name,
+      term_name: AcademicTerm.name,
+      academic_year_id: AcademicTerm.academic_year_id,
+      entries: sql<number>`(SELECT COUNT(*) FROM SchemeOfWorkEntry e WHERE e.scheme_id = ${SchemeOfWork.scheme_id})`,
+      course_id: Course.course_id,
+      course_status: Course.status,
+    })
+    .from(SchemeOfWork)
+    .innerJoin(Subject, eq(Subject.subject_id, SchemeOfWork.subject_id))
+    .innerJoin(ClassGroup, eq(ClassGroup.class_group_id, SchemeOfWork.class_group_id))
+    .innerJoin(AcademicTerm, eq(AcademicTerm.academic_term_id, SchemeOfWork.academic_term_id))
+    .leftJoin(Course, eq(Course.scheme_id, SchemeOfWork.scheme_id))
+    .leftJoin(
+      TeacherSubjectAssignment,
+      and(
+        eq(TeacherSubjectAssignment.user_id, userId),
+        eq(TeacherSubjectAssignment.subject_id, SchemeOfWork.subject_id),
+        eq(TeacherSubjectAssignment.class_group_id, SchemeOfWork.class_group_id),
+        eq(TeacherSubjectAssignment.academic_year_id, AcademicTerm.academic_year_id),
+      ),
+    )
+    .where(
+      and(
+        or(eq(SchemeOfWork.user_id, userId), sql`${TeacherSubjectAssignment.user_id} IS NOT NULL`),
+        yearId ? eq(AcademicTerm.academic_year_id, yearId) : undefined,
+      ),
+    )
+    .orderBy(desc(AcademicTerm.academic_year_id), desc(SchemeOfWork.updated_at));
+  const seen = new Set<number>();
+  successResponse(res, "My schemes", rows.filter((r) => (seen.has(r.scheme_id) ? false : (seen.add(r.scheme_id), true))).map((r) => ({ ...r, entries: Number(r.entries) })));
 });
 
 export const getCourseBuilder = asyncHandler(async (req: any, res: any) => {
