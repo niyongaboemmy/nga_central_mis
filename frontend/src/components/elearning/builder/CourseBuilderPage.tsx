@@ -329,7 +329,7 @@ const CourseBuilderPage: React.FC = () => {
 
   if (!data) {
     return (
-      <div className="flex flex-col h-[calc(100dvh-4rem)] overflow-hidden pt-1 gap-3">
+      <div className="flex flex-col h-[calc(100dvh-4rem)] overflow-hidden pt-5 gap-3">
         <Skeleton className="h-16 flex-shrink-0" />
         <Skeleton className="h-16 flex-shrink-0" />
         <div className="flex-1 min-h-0 flex gap-5">
@@ -415,9 +415,9 @@ const CourseBuilderPage: React.FC = () => {
     /* App-shell layout: the page is exactly the viewport minus the navbar, so the header and
        the next step stay put and only the week list / week detail scroll. On a small laptop
        the teacher never loses the instruction or the Publish menu while scrolling weeks. */
-    <div className="flex flex-col h-[calc(100dvh-4rem)] overflow-hidden">
+    <div className="flex flex-col h-[calc(100dvh-4rem)] overflow-hidden pt-5">
       {/* Header — title, state, one primary action. Stats moved into the week list. */}
-      <div className="flex-shrink-0 pt-1">
+      <div className="flex-shrink-0">
       <button onClick={() => navigate(-1)} className="inline-flex items-center gap-1 min-h-[40px] text-sm text-gray-500 hover:text-gray-800 dark:hover:text-gray-200">
         <ArrowLeft className="w-4 h-4" /> Back
       </button>

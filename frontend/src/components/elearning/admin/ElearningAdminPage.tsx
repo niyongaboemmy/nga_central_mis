@@ -68,7 +68,7 @@ const ElearningAdminPage: React.FC = () => {
 
   if (open) {
     return (
-      <div className="pb-12">
+      <div className="pt-6 pb-12">
         <button onClick={() => setOpen(null)} className="inline-flex items-center gap-1 min-h-[40px] text-sm text-gray-500 hover:text-gray-800 dark:hover:text-gray-200"><ArrowLeft className="w-4 h-4" /> Register</button>
         <h1 className="mt-1 text-xl font-bold text-gray-900 dark:text-white">{open.subject_name} · {open.class_group_name}</h1>
         <p className="text-sm text-gray-500">{open.program_name} · {open.grade_name} · {open.term_name} · {open.teacher_name}</p>
@@ -84,7 +84,7 @@ const ElearningAdminPage: React.FC = () => {
   }
 
   return (
-    <div className="pb-12">
+    <div className="pt-6 pb-12">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-display text-gray-900 dark:text-white">E-Learning oversight</h1>

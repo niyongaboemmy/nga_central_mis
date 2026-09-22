@@ -70,7 +70,7 @@ const MePage: React.FC = () => {
   const firstName = (user as any)?.profile?.first_name as string | undefined;
 
   return (
-    <div className="pb-16 max-w-3xl">
+    <div className="pt-6 pb-16 max-w-3xl">
       <Link to={learnerRoutes.home} className="inline-flex items-center gap-1 min-h-[40px] text-sm text-gray-500 hover:text-gray-800 dark:hover:text-gray-200">
         <ArrowLeft className="w-4 h-4" /> {copy.home.title}
       </Link>

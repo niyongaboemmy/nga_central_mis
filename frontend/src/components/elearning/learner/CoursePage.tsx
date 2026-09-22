@@ -195,13 +195,13 @@ const CoursePage: React.FC = () => {
 
       <main className="flex-1 min-w-0">
         {(!online || queued > 0) && (
-          <div className="mx-4 mt-3 flex items-center gap-2 px-3 py-2 rounded-xl el-chip-warning text-xs" role="status">
+          <div className="mx-4 mt-5 flex items-center gap-2 px-3 py-2 rounded-xl el-chip-warning text-xs" role="status">
             <WifiOff className="w-4 h-4" /> {!online ? copy.errors.offline : `Back online — syncing ${queued} saved action${queued === 1 ? "" : "s"}…`}
           </div>
         )}
         {/* Slim top bar (phone: index toggle; everyone: back to home) */}
         {!opened && (
-          <div className="flex items-center gap-2 px-4 pt-3">
+          <div className="flex items-center gap-2 px-4 pt-5">
             <button onClick={() => navigate(learnerRoutes.home)} className="inline-flex items-center gap-1 min-h-[40px] px-2 rounded-lg text-sm text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-white/[0.06]">
               <ArrowLeft className="w-4 h-4" /> <span className="hidden sm:inline">{copy.home.title}</span>
             </button>
