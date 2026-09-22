@@ -109,6 +109,17 @@ describe("IndexDrawer", () => {
     expect(within(nav).getByRole("button", { name: /Cheat sheet/ })).toBeDisabled();
   });
 
+  it("shows each week's real progress instead of an ambiguous circle, and marks the current week", () => {
+    setup();
+    const nav = screen.getAllByRole("navigation", { name: "Course index" })[0];
+    // Week 1 is finished — a tick, not a ring.
+    expect(within(nav).getByLabelText("Week complete")).toBeInTheDocument();
+    // Week 2 is in progress — the ring says how much is left.
+    expect(within(nav).getByLabelText("Week 2 — CSS: 0 of 2 done")).toBeInTheDocument();
+    // The week being taught is called out in words, not by colour alone.
+    expect(within(nav).getByText("Now")).toBeInTheDocument();
+  });
+
   it("is keyboard operable: tab to a week, Enter expands it, Enter on an item opens it", async () => {
     const user = userEvent.setup();
     const { onOpenItem } = setup();
