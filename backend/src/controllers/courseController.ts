@@ -437,20 +437,34 @@ export const listMySchemesForCourses = asyncHandler(async (req: any, res: any) =
     .from(TeacherSubjectAssignment)
     .innerJoin(Subject, eq(Subject.subject_id, TeacherSubjectAssignment.subject_id))
     .innerJoin(ClassGroup, eq(ClassGroup.class_group_id, TeacherSubjectAssignment.class_group_id))
-    // The scheme (and therefore the course) is per term, so only join the selected one —
-    // otherwise a subject taught all year would appear three times.
+    // The scheme (and therefore the course) is per term, so prefer the selected one —
+    // otherwise a subject taught all year would appear three times. With no term selected
+    // this used to join `1 = 0`, i.e. never: every subject was then reported as having no
+    // scheme of work, including ones with a scheme and a live course already built on it.
+    // Join every term instead and let the ordering below pick the best row per subject.
     .leftJoin(
       SchemeOfWork,
       and(
         eq(SchemeOfWork.subject_id, TeacherSubjectAssignment.subject_id),
         eq(SchemeOfWork.class_group_id, TeacherSubjectAssignment.class_group_id),
-        termId ? eq(SchemeOfWork.academic_term_id, termId) : sql`1 = 0`,
+        termId ? eq(SchemeOfWork.academic_term_id, termId) : undefined,
       ),
     )
     .leftJoin(AcademicTerm, eq(AcademicTerm.academic_term_id, SchemeOfWork.academic_term_id))
     .leftJoin(Course, eq(Course.scheme_id, SchemeOfWork.scheme_id))
     .where(and(eq(TeacherSubjectAssignment.user_id, userId), yearId ? eq(TeacherSubjectAssignment.academic_year_id, yearId) : undefined))
-    .orderBy(Subject.name, ClassGroup.name);
+    // Within a (subject, class group) the furthest-along row wins the de-duplication below:
+    // one that already has a course, then one with a scheme (most weeks first), then bare.
+    // A scheme that is still PENDING or REJECTED counts exactly the same as an approved one —
+    // validation gates the printed document, not whether a teacher may build the course.
+    .orderBy(
+      Subject.name,
+      ClassGroup.name,
+      sql`${Course.course_id} IS NULL`,
+      sql`${SchemeOfWork.scheme_id} IS NULL`,
+      desc(sql`(SELECT COUNT(*) FROM SchemeOfWorkEntry e WHERE e.scheme_id = ${SchemeOfWork.scheme_id})`),
+      desc(SchemeOfWork.scheme_id),
+    );
 
   // One row per (subject, class group): a teacher holds one assignment per year for each.
   const seen = new Set<string>();
