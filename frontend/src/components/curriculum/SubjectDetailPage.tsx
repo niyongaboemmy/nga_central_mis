@@ -25,6 +25,7 @@ import CurriculumTab from "./CurriculumTab";
 import SubjectMaterialsTab from "./SubjectMaterialsTab";
 import EnrolledStudentsTab from "./EnrolledStudentsTab";
 import SubjectLessonNotesTab from "./SubjectLessonNotesTab";
+import SubjectElearningLink from "./SubjectElearningLink";
 
 type Tab = "overview" | "curriculum" | "materials" | "students" | "lessonNotes";
 
@@ -119,7 +120,8 @@ const SubjectDetailPage: React.FC = () => {
   }, [selectedTermId, id, isTeacherView]);
 
   useEffect(() => {
-    if (!id || selectedYearId == null || isTeacherView || !isStudentView) return;
+    if (!id || selectedYearId == null || isTeacherView || !isStudentView)
+      return;
     const prevYearId = prevYearIdRef.current;
     prevYearIdRef.current = selectedYearId;
     if (prevYearId == null || prevYearId === selectedYearId) return;
@@ -256,6 +258,10 @@ const SubjectDetailPage: React.FC = () => {
                   categor{subject.category_count === 1 ? "y" : "ies"}
                 </span>
               </div>
+            </div>
+            {/* Straight across to the same material as a course. */}
+            <div className="flex-shrink-0 self-center">
+              <SubjectElearningLink subjectId={id} />
             </div>
           </div>
 
