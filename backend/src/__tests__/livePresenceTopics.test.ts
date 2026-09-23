@@ -3,6 +3,7 @@ import {
   listTopics,
   listWatchers,
   touch,
+  updatePosition,
 } from "../services/elearning/livePresence";
 
 // A flat watcher list answers "who is here". The topic rollup answers "where is
@@ -67,7 +68,11 @@ describe("live topic presence", () => {
     // Two topics with one reader each: the one somebody has been stuck on for
     // twenty minutes outranks the one just opened.
     arrive(1, "Ada", { item_id: 10, item_title: "Just opened", seconds: 5 });
-    arrive(2, "Grace", { item_id: 11, item_title: "Stuck here", seconds: 1200 });
+    arrive(2, "Grace", {
+      item_id: 11,
+      item_title: "Stuck here",
+      seconds: 1200,
+    });
 
     expect(listTopics(COURSE).map((t) => t.item_title)).toEqual([
       "Stuck here",
@@ -113,5 +118,84 @@ describe("live topic presence", () => {
 
   it("is empty for a course nobody is in", () => {
     expect(listTopics(COURSE + 500)).toEqual([]);
+  });
+});
+
+describe("live reading position", () => {
+  // Own course-id range again — the suite shares one module registry.
+  let COURSE = 910_000;
+  beforeEach(() => {
+    COURSE += 1;
+  });
+
+  const arriveOn = (userId: number, itemId: number, seconds = 0) =>
+    touch(
+      COURSE,
+      { user_id: userId, name: `User ${userId}` },
+      {
+        item_id: itemId,
+        item_title: "Page",
+        item_type: "PAGE",
+        section_id: 5,
+        section_title: "Week 3 — Data Types",
+        state: "IN_PROGRESS",
+        seconds_spent: seconds,
+      },
+    );
+
+  it("records where in the page a student has scrolled to", () => {
+    arriveOn(1, 10);
+    expect(
+      updatePosition(COURSE, 1, 10, {
+        scroll_pct: 42,
+        heading: "1.2 JS in HTML",
+      }),
+    ).toBe(true);
+
+    const [topic] = listTopics(COURSE);
+    expect(topic.readers[0].position).toMatchObject({
+      scroll_pct: 42,
+      heading: "1.2 JS in HTML",
+    });
+  });
+
+  it("clamps a nonsense percentage instead of trusting the client", () => {
+    arriveOn(1, 10);
+    updatePosition(COURSE, 1, 10, { scroll_pct: 999, heading: null });
+    expect(listWatchers(COURSE)[0].position?.scroll_pct).toBe(100);
+    updatePosition(COURSE, 1, 10, { scroll_pct: -50, heading: null });
+    expect(listWatchers(COURSE)[0].position?.scroll_pct).toBe(0);
+  });
+
+  it("cannot fabricate presence for someone who is not in the course", () => {
+    // The endpoint behind this does no DB lookup, so refusing to create a
+    // watcher is the whole of its authorisation.
+    expect(
+      updatePosition(COURSE, 99, 10, { scroll_pct: 50, heading: null }),
+    ).toBe(false);
+    expect(listWatchers(COURSE)).toHaveLength(0);
+  });
+
+  it("refuses a position for a page the student is not actually on", () => {
+    arriveOn(1, 10);
+    expect(
+      updatePosition(COURSE, 1, 11, { scroll_pct: 50, heading: null }),
+    ).toBe(false);
+    expect(listWatchers(COURSE)[0].position).toBeNull();
+  });
+
+  it("keeps the position across a heartbeat on the same page", () => {
+    arriveOn(1, 10);
+    updatePosition(COURSE, 1, 10, { scroll_pct: 60, heading: "Section 2" });
+    arriveOn(1, 10, 120); // a later heartbeat carries no position
+    expect(listWatchers(COURSE)[0].position?.scroll_pct).toBe(60);
+  });
+
+  it("drops the position when the student moves to another page", () => {
+    // Keeping it would report them 60% down a page they are no longer reading.
+    arriveOn(1, 10);
+    updatePosition(COURSE, 1, 10, { scroll_pct: 60, heading: "Section 2" });
+    arriveOn(1, 11);
+    expect(listWatchers(COURSE)[0].position).toBeNull();
   });
 });

@@ -73,24 +73,55 @@ describe("Generate/regenerate student registration numbers", () => {
     expect(await regNumberOf(studentId)).toBe(assigned);
   });
 
-  it("force:true regenerates a number a student already has", async () => {
+  it("force:true rewrites a number a student already has, instead of skipping them", async () => {
     const studentId = await createUser({ userType: "STUDENT" });
 
-    await request(app)
+    const backfill = await request(app)
       .post("/users/students/generate-registration-numbers")
       .set("Authorization", `Bearer ${token}`)
       .send({});
-    const original = await regNumberOf(studentId);
-    expect(original).toMatch(/^120823-\d{4,}$/);
+    expect(backfill.status).toBe(200);
+    expect(await regNumberOf(studentId)).toMatch(/^120823-\d{4,}$/);
+
+    // Stand in for the thing force exists for: a number left over from an old school code.
+    await db
+      .update(UserProfile)
+      .set({ registration_number: "OLD-9999" })
+      .where(eq(UserProfile.user_id, studentId));
 
     const res = await request(app)
       .post("/users/students/generate-registration-numbers")
       .set("Authorization", `Bearer ${token}`)
       .send({ force: true });
+    expect(res.status).toBe(200);
+
+    // The point of force is that it does not skip students who already have a number.
+    // Asserting the *value* changed would be wrong: a stable oldest-first sequence is
+    // supposed to hand the same student the same number when nothing else moved.
+    expect(await regNumberOf(studentId)).toMatch(/^120823-\d{4,}$/);
+    expect(res.body.data.updated).toBe(res.body.data.total);
+    expect(res.body.data.updated).toBeGreaterThan(backfill.body.data.updated);
+  });
+
+  it("backfills after numbers were imported without the counter knowing", async () => {
+    // A restored database or an imported roster leaves numbers on disk that the counter
+    // has never seen; the next backfill used to re-issue one and die on the UNIQUE index.
+    const importedId = await createUser({ userType: "STUDENT" });
+    await db
+      .update(UserProfile)
+      .set({ registration_number: "120823-9001" })
+      .where(eq(UserProfile.user_id, importedId));
+
+    const freshId = await createUser({ userType: "STUDENT" });
+    const res = await request(app)
+      .post("/users/students/generate-registration-numbers")
+      .set("Authorization", `Bearer ${token}`)
+      .send({});
 
     expect(res.status).toBe(200);
-    const regenerated = await regNumberOf(studentId);
-    expect(regenerated).toMatch(/^120823-\d{4,}$/);
-    expect(regenerated).not.toBe(original);
+    const assigned = await regNumberOf(freshId);
+    expect(assigned).toBe("120823-9002");
+    // The imported number is left exactly as it was.
+    expect(await regNumberOf(importedId)).toBe("120823-9001");
   });
 });

@@ -55,7 +55,9 @@ import { recordActivity } from "../utils/activityLogger";
 import { getCurrentAcademicYearId } from "../utils/academicYear";
 import {
   generateStudentRegistrationNumber,
+  getSchoolCode,
   resetRegistrationSequence,
+  syncRegistrationSequenceToIssued,
 } from "../utils/registrationNumber";
 
 // Helper function to convert date to MySQL DATE format
@@ -1361,7 +1363,13 @@ export const generateStudentRegistrationNumbers = asyncHandler(
     const force = req.body?.force === true;
 
     if (force) {
+      // A full regeneration renumbers everyone, so starting from 0 is safe and gives a
+      // clean 0001, 0002, ... run.
       await resetRegistrationSequence();
+    } else {
+      // A backfill leaves existing numbers alone, so the counter has to know about them
+      // first — otherwise it re-issues one and the UNIQUE index rejects the whole request.
+      await syncRegistrationSequenceToIssued(await getSchoolCode());
     }
 
     const pending = await db

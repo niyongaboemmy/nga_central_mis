@@ -12,6 +12,8 @@ export const FONT_SCALE_MAX = 1.6;
 export const FONT_SCALE_STEP = 0.1;
 
 const PAPERS: { value: ReaderPaper; label: string; swatch: string }[] = [
+  // Auto first: it is the default, and it is what most readers should stay on.
+  { value: "auto", label: "Auto", swatch: "linear-gradient(135deg,#ffffff 50%,#14181f 50%)" },
   { value: "paper", label: "Paper", swatch: "#ffffff" },
   { value: "sepia", label: "Sepia", swatch: "#f6efe1" },
   { value: "night", label: "Night", swatch: "#14181f" },
@@ -99,11 +101,11 @@ const ReaderControls: React.FC<{
           <Settings2 className="w-4 h-4" />
         </button>
         {open && (
-          <div className="absolute right-0 top-full mt-2 z-50 w-56 p-3 rounded-2xl el-float">
+          <div className="absolute right-0 top-full mt-2 z-50 w-60 p-3 rounded-2xl el-float">
             <p className="text-[11px] uppercase tracking-wider font-semibold text-gray-500 dark:text-gray-400">
               Background
             </p>
-            <div className="mt-2 grid grid-cols-3 gap-1.5">
+            <div className="mt-2 grid grid-cols-4 gap-1.5">
               {PAPERS.map((p) => (
                 <button
                   key={p.value}
@@ -116,7 +118,7 @@ const ReaderControls: React.FC<{
                   }`}
                 >
                   <span
-                    className="w-6 h-6 rounded-md border border-black/10 dark:border-white/20"
+                    className="w-5 h-5 rounded-md border border-black/10 dark:border-white/20"
                     style={{ background: p.swatch }}
                     aria-hidden
                   />

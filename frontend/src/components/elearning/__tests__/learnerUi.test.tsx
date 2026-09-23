@@ -62,6 +62,51 @@ const course: LearnerCourse = {
 };
 
 describe("ProgressRing", () => {
+  /** The readout element, whatever form it took. */
+  const readout = (container: HTMLElement) =>
+    container.querySelector("span.tabular-nums") as HTMLElement | null;
+
+  it("scales the readout to the ring instead of a fixed size", () => {
+    const small = render(<ProgressRing value={42} size={44} stroke={4} />);
+    const smallPx = Number(readout(small.container)!.style.fontSize.replace("px", ""));
+    small.unmount();
+
+    const big = render(<ProgressRing value={42} size={80} stroke={6} />);
+    const bigPx = Number(readout(big.container)!.style.fontSize.replace("px", ""));
+
+    // A fixed 11px for every ring is what made "100%" span the whole interior of a 44px one.
+    expect(bigPx).toBeGreaterThan(smallPx);
+    expect(smallPx).toBeGreaterThanOrEqual(9);
+  });
+
+  it("keeps the number optically centred by shrinking the per-cent sign", () => {
+    const { container } = render(<ProgressRing value={42} size={80} stroke={6} />);
+    const span = readout(container)!;
+    const pct = span.querySelector("span") as HTMLElement;
+    expect(pct.textContent).toBe("%");
+    const base = Number(span.style.fontSize.replace("px", ""));
+    const sign = Number(pct.style.fontSize.replace("px", ""));
+    expect(sign).toBeLessThan(base);
+  });
+
+  it("shows a tick rather than cramming '100%' into a small ring", () => {
+    const { container } = render(<ProgressRing value={100} size={44} stroke={4} />);
+    expect(readout(container)).toBeNull();
+    expect(container.querySelector("svg.lucide-check")).toBeTruthy();
+  });
+
+  it("still prints the number at 100% when asked to", () => {
+    const { container } = render(
+      <ProgressRing value={100} size={44} stroke={4} alwaysShowValue />,
+    );
+    expect(readout(container)!.textContent).toContain("100");
+  });
+
+  it("lets a caller's own label win", () => {
+    render(<ProgressRing value={100} size={30} stroke={3} label={<span>3/3</span>} />);
+    expect(screen.getByText("3/3")).toBeInTheDocument();
+  });
+
   it("exposes its value to assistive tech and clamps out-of-range input", () => {
     render(<ProgressRing value={140} />);
     const bar = screen.getByRole("progressbar");

@@ -343,7 +343,23 @@ table th,
 }
 
 /* --- Paper themes. Applied to the sheet only: the surrounding app chrome keeps
-       following the platform's own light/dark setting. --- */
+       following the platform's own light/dark setting.
+
+       "auto" is the default: the sheet follows the app theme instead of being
+       pinned to white, so dark mode is dark all the way through. --- */
+.note-reader--auto .note-reader-sheet {
+    background-color: #ffffff;
+    color: #0f172a;
+}
+
+.dark .note-reader--auto .note-reader-sheet {
+    background-color: #0b0f19;
+    color: #e5e9f0;
+    box-shadow:
+        0 1px 2px rgba(0, 0, 0, 0.4),
+        0 12px 32px -12px rgba(0, 0, 0, 0.7);
+}
+
 .note-reader--sepia .note-reader-sheet {
     background-color: #f6efe1;
     color: #453a2b;
@@ -929,8 +945,43 @@ mark.note-find-hit-active {
   font-style: normal;
 }
 
-/* --- Reader backgrounds. The same three papers the lesson-note reader offers, so the
-       two readers agree, applied to the step's own surface rather than the app shell. --- */
+/* --- Reader backgrounds. The papers the lesson-note reader offers, so the two
+       readers agree, applied to the step's own surface rather than the app shell.
+
+       "auto" is the default and follows the app theme rather than inheriting a
+       surface by accident: white while the app is light, the app's own dark
+       plane while it is dark. "paper" stays white in both, for a reader who
+       wants white regardless. --- */
+.el-step--auto,
+.el-focus--auto {
+  background: #ffffff;
+  color: #0f172a;
+}
+.dark .el-step--auto,
+.dark .el-focus--auto {
+  background: #0b0f19;
+  color: #e5e9f0;
+}
+.el-step--auto .el-reader {
+  color: #0f172a;
+}
+.dark .el-step--auto .el-reader {
+  color: #e5e9f0;
+}
+.el-step--paper,
+.el-focus--paper {
+  background: #ffffff;
+  color: #0f172a;
+}
+.el-step--paper .el-reader,
+.el-focus--paper .el-reader {
+  color: #0f172a;
+}
+.el-step--auto,
+.el-step--paper {
+  border-radius: 1rem;
+}
+
 .el-step--sepia,
 .el-focus--sepia {
   background: #f6efe1;

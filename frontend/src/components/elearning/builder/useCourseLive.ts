@@ -2,9 +2,17 @@ import { useEffect, useRef, useState } from "react";
 import { API_BASE_URL, apiService } from "../../../services/api";
 import { getToken } from "../../../utils/auth";
 
+export interface ReadingPosition {
+  scroll_pct: number;
+  heading: string | null;
+  at: number;
+}
+
 export interface Watcher {
   user_id: number;
   name: string;
+  /** Where in the page they are, once their reader has reported it. */
+  position?: ReadingPosition | null;
   item_id: number | null;
   item_title: string | null;
   item_type: string | null;
@@ -29,7 +37,13 @@ export interface TopicPresence {
   section_title: string | null;
   viewers: number;
   active_viewers: number;
-  readers: { user_id: number; name: string; seconds_spent: number; active: boolean }[];
+  readers: {
+    user_id: number;
+    name: string;
+    seconds_spent: number;
+    active: boolean;
+    position?: ReadingPosition | null;
+  }[];
   max_seconds: number;
 }
 

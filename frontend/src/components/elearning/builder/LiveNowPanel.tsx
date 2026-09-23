@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Check, Radio, Trophy } from "lucide-react";
 import { useMotion } from "../../../design/motion";
@@ -6,6 +6,7 @@ import { ItemTypeIcon } from "../ui/primitives";
 import type { CourseItemType } from "../../../api/elearning";
 import { useCourseLive } from "./useCourseLive";
 import LiveTopics from "./LiveTopics";
+import FollowStudent from "./FollowStudent";
 
 const ago = (t: number) => {
   const s = Math.max(0, Math.round((Date.now() - t) / 1000));
@@ -49,6 +50,9 @@ const LiveNowPanel: React.FC<{
   const m = useMotion();
   const own = useCourseLive(courseId, enabled && !live);
   const { watchers, topics, recent, connected } = live ?? own;
+  // Following one student: the roster row is the switch.
+  const [followId, setFollowId] = useState<number | null>(null);
+  const followed = watchers.find((w) => w.user_id === followId);
 
   return (
     <div className="el-card p-4">
@@ -83,49 +87,70 @@ const LiveNowPanel: React.FC<{
         ) : (
           <motion.ul {...m("fade")} className="mt-3 space-y-2">
             {watchers.map((w) => (
-              <motion.li
-                key={w.user_id}
-                layout
-                {...m("reveal")}
-                className="flex items-center gap-3"
-              >
-                <span className="relative w-9 h-9 rounded-full bg-brand-500 text-white text-[11px] font-bold flex items-center justify-center flex-shrink-0">
-                  {initials(w.name)}
-                  <span
-                    className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-success-500 ring-2 ring-white dark:ring-black"
-                    aria-hidden
-                  />
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block text-sm font-medium text-gray-800 dark:text-gray-100 truncate">
-                    {w.name}
+              <motion.li key={w.user_id} layout {...m("reveal")}>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setFollowId(followId === w.user_id ? null : w.user_id)
+                  }
+                  aria-pressed={followId === w.user_id}
+                  title={`Follow ${w.name} — see where they are on the page`}
+                  className={`flex w-full items-center gap-3 rounded-xl px-2 py-1 text-left transition-colors ${
+                    followId === w.user_id
+                      ? "bg-brand-50 dark:bg-brand-500/10"
+                      : "hover:bg-gray-50 dark:hover:bg-white/[0.04]"
+                  }`}
+                >
+                  <span className="relative w-9 h-9 rounded-full bg-brand-500 text-white text-[11px] font-bold flex items-center justify-center flex-shrink-0">
+                    {initials(w.name)}
+                    <span
+                      className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-success-500 ring-2 ring-white dark:ring-black"
+                      aria-hidden
+                    />
                   </span>
-                  <span className="block text-[11px] text-gray-500 dark:text-gray-400 truncate flex items-center gap-1">
-                    {w.item_type && (
-                      <ItemTypeIcon
-                        type={w.item_type as CourseItemType}
-                        className="w-3 h-3 flex-shrink-0"
-                      />
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm font-medium text-gray-800 dark:text-gray-100 truncate">
+                      {w.name}
+                    </span>
+                    <span className="block text-[11px] text-gray-500 dark:text-gray-400 truncate flex items-center gap-1">
+                      {w.item_type && (
+                        <ItemTypeIcon
+                          type={w.item_type as CourseItemType}
+                          className="w-3 h-3 flex-shrink-0"
+                        />
+                      )}
+                      {w.item_title || "in the course"}
+                      {w.section_title
+                        ? ` · ${w.section_title.split(" — ")[0]}`
+                        : ""}
+                    </span>
+                  </span>
+                  <span className="flex flex-col items-end flex-shrink-0 text-[11px] tabular-nums">
+                    <span
+                      className={
+                        w.active
+                          ? "text-gray-400"
+                          : "text-warning-700 dark:text-warning-500"
+                      }
+                    >
+                      {w.active ? dwell(w.dwell_seconds) : awayFor(w.last_seen)}
+                    </span>
+                    {!w.active && (
+                      <span className="text-[10px] text-gray-400">
+                        last seen here
+                      </span>
                     )}
-                    {w.item_title || "in the course"}
-                    {w.section_title
-                      ? ` · ${w.section_title.split(" — ")[0]}`
-                      : ""}
                   </span>
-                </span>
-                <span className="flex flex-col items-end flex-shrink-0 text-[11px] tabular-nums">
-                  <span className={w.active ? "text-gray-400" : "text-warning-700 dark:text-warning-500"}>
-                    {w.active ? dwell(w.dwell_seconds) : awayFor(w.last_seen)}
-                  </span>
-                  {!w.active && (
-                    <span className="text-[10px] text-gray-400">last seen here</span>
-                  )}
-                </span>
+                </button>
               </motion.li>
             ))}
           </motion.ul>
         )}
       </AnimatePresence>
+
+      {followId !== null && (
+        <FollowStudent watcher={followed} onClose={() => setFollowId(null)} />
+      )}
 
       <LiveTopics topics={topics} />
 

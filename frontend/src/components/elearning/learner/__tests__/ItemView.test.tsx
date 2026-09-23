@@ -157,16 +157,16 @@ describe("ItemView — the lesson reader", () => {
     const { unmount } = render(<ItemView opened={opened()} onBack={vi.fn()} />);
 
     const smaller = screen.getByRole("button", { name: /Smaller text/i });
-    expect(screen.getByText("115%")).toBeInTheDocument();
+    expect(screen.getByText("100%")).toBeInTheDocument();
 
     await userEvent.click(smaller);
     await userEvent.click(smaller);
-    expect(screen.getByText("95%")).toBeInTheDocument();
+    expect(screen.getByText("80%")).toBeInTheDocument();
 
     // Preference is per-device and shared with the lesson-note reader.
     unmount();
     render(<ItemView opened={opened()} onBack={vi.fn()} />);
-    expect(screen.getByText("95%")).toBeInTheDocument();
+    expect(screen.getByText("80%")).toBeInTheDocument();
   });
 
   it("will not shrink the text past the floor", async () => {

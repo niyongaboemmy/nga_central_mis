@@ -26,9 +26,20 @@ const ACTIVE_MS = 45_000;
 const SWEEP_MS = 20_000;
 const MAX_RECENT = 30;
 
+/** Where in a page the student's viewport currently is. */
+export interface ReadingPosition {
+  /** 0-100 down the scrollable content. */
+  scroll_pct: number;
+  /** The nearest heading above the viewport, so a teacher reads a place, not a number. */
+  heading: string | null;
+  at: number;
+}
+
 export interface Watcher {
   user_id: number;
   name: string;
+  /** Live scroll position, present once the reader has reported one. */
+  position?: ReadingPosition | null;
   item_id: number | null;
   item_title: string | null;
   item_type: string | null;
@@ -65,7 +76,14 @@ export interface TopicPresence {
   /** Of those viewers, how many are pinging right now rather than idling away. */
   active_viewers: number;
   /** Who exactly, so a teacher can see which student is on which page. */
-  readers: { user_id: number; name: string; seconds_spent: number; active: boolean }[];
+  readers: {
+    user_id: number;
+    name: string;
+    seconds_spent: number;
+    active: boolean;
+    /** Where in the page they are, once the reader has reported it. */
+    position?: ReadingPosition | null;
+  }[];
   /** Longest dwell on this topic right now — the "someone is stuck" signal. */
   max_seconds: number;
 }
@@ -130,15 +148,20 @@ const prune = (courseId: number): Watcher[] => {
   if (map.size === 0) watchersByCourse.delete(courseId);
   void changed;
   const now = Date.now();
-  return [...(watchersByCourse.get(courseId)?.values() ?? [])]
-    // active/dwell are derived on read, never stored: a watcher that stops pinging has to
-    // decay on its own, without anything having to write to it again.
-    .map((w) => ({
-      ...w,
-      active: now - w.last_seen <= ACTIVE_MS,
-      dwell_seconds: Math.max(0, Math.round((w.last_seen - w.since) / 1000)),
-    }))
-    .sort((a, b) => Number(b.active) - Number(a.active) || b.last_seen - a.last_seen);
+  return (
+    [...(watchersByCourse.get(courseId)?.values() ?? [])]
+      // active/dwell are derived on read, never stored: a watcher that stops pinging has to
+      // decay on its own, without anything having to write to it again.
+      .map((w) => ({
+        ...w,
+        active: now - w.last_seen <= ACTIVE_MS,
+        dwell_seconds: Math.max(0, Math.round((w.last_seen - w.since) / 1000)),
+      }))
+      .sort(
+        (a, b) =>
+          Number(b.active) - Number(a.active) || b.last_seen - a.last_seen,
+      )
+  );
 };
 
 export function listWatchers(courseId: number): Watcher[] {
@@ -165,6 +188,7 @@ export function listTopics(courseId: number): TopicPresence[] {
         name: w.name,
         seconds_spent: seconds,
         active: w.active,
+        position: w.position ?? null,
       });
       existing.max_seconds = Math.max(existing.max_seconds, seconds);
       continue;
@@ -178,7 +202,13 @@ export function listTopics(courseId: number): TopicPresence[] {
       viewers: 1,
       active_viewers: w.active ? 1 : 0,
       readers: [
-        { user_id: w.user_id, name: w.name, seconds_spent: seconds, active: w.active },
+        {
+          user_id: w.user_id,
+          name: w.name,
+          seconds_spent: seconds,
+          active: w.active,
+          position: w.position ?? null,
+        },
       ],
       max_seconds: seconds,
     });
@@ -205,9 +235,18 @@ export function listRecent(courseId: number) {
 export function touch(
   courseId: number,
   who: { user_id: number; name: string },
-  where: { item_id: number | null; item_title: string | null; item_type: string | null; section_id: number | null; section_title: string | null; state: string; seconds_spent: number },
+  where: {
+    item_id: number | null;
+    item_title: string | null;
+    item_type: string | null;
+    section_id: number | null;
+    section_title: string | null;
+    state: string;
+    seconds_spent: number;
+  },
 ): void {
-  if (!watchersByCourse.has(courseId)) watchersByCourse.set(courseId, new Map());
+  if (!watchersByCourse.has(courseId))
+    watchersByCourse.set(courseId, new Map());
   const map = watchersByCourse.get(courseId)!;
   const existing = map.get(who.user_id);
   const now = Date.now();
@@ -216,6 +255,9 @@ export function touch(
     user_id: who.user_id,
     name: who.name,
     ...where,
+    // A heartbeat carries no scroll position, so keep the last one — unless the
+    // student has moved to a different page, where the old position is a lie.
+    position: existing && !movedItem ? (existing.position ?? null) : null,
     since: existing && !movedItem ? existing.since : now,
     last_seen: now,
   });
@@ -250,8 +292,43 @@ export function leave(courseId: number, userId: number): void {
   });
 }
 
+/**
+ * The student scrolled. Updates an existing watcher only — it is deliberately a
+ * no-op for a user who is not already present in this course, so the cheap
+ * no-DB endpoint behind it cannot be used to fabricate presence: the watcher it
+ * updates was created by an authenticated, DB-verified open or heartbeat.
+ *
+ * Returns whether anything was updated, so the route can answer honestly.
+ */
+export function updatePosition(
+  courseId: number,
+  userId: number,
+  itemId: number,
+  position: { scroll_pct: number; heading: string | null },
+): boolean {
+  const watcher = watchersByCourse.get(courseId)?.get(userId);
+  if (!watcher || watcher.item_id !== itemId) return false;
+  const now = Date.now();
+  watcher.position = {
+    scroll_pct: Math.max(0, Math.min(100, Math.round(position.scroll_pct))),
+    heading: position.heading,
+    at: now,
+  };
+  watcher.last_seen = now;
+  publish(courseId, {
+    type: "presence",
+    watchers: listWatchers(courseId),
+    topics: listTopics(courseId),
+    at: now,
+  });
+  return true;
+}
+
 /** A student finished or scored something — the teacher sees it land. */
-export function recordProgress(courseId: number, progress: NonNullable<LiveEvent["progress"]>): void {
+export function recordProgress(
+  courseId: number,
+  progress: NonNullable<LiveEvent["progress"]>,
+): void {
   const list = recentByCourse.get(courseId) || [];
   list.unshift(progress);
   recentByCourse.set(courseId, list.slice(0, MAX_RECENT));
@@ -266,7 +343,8 @@ export function recordProgress(courseId: number, progress: NonNullable<LiveEvent
 
 /** Attaches one teacher's SSE stream to a course. Returns the detach function. */
 export function subscribe(courseId: number, res: Response): () => void {
-  if (!subscribersByCourse.has(courseId)) subscribersByCourse.set(courseId, new Set());
+  if (!subscribersByCourse.has(courseId))
+    subscribersByCourse.set(courseId, new Set());
   subscribersByCourse.get(courseId)!.add(res);
   return () => {
     const subs = subscribersByCourse.get(courseId);

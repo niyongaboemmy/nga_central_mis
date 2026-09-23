@@ -28,7 +28,7 @@ import Mascot from "../ui/Mascot";
 import {
   EmptyState,
   ItemTypeIcon,
-  ProgressBar,
+  ProgressRing,
   Skeleton,
 } from "../ui/primitives";
 import { buildQueue, type QueueEntry, type QueueKind } from "./queue";
@@ -86,21 +86,24 @@ const RailStat: React.FC<{
   label: string;
   value: string;
   percent: number;
-}> = ({ label, value, percent }) => (
-  <div className="min-w-0 flex-1">
-    <div className="flex items-baseline justify-between gap-2">
-      <span className="truncate text-[11px] font-medium text-gray-500 dark:text-gray-400">
-        {label}
-      </span>
-      <span className="text-xs font-semibold tabular-nums text-gray-800 dark:text-gray-100">
-        {value}
-      </span>
-    </div>
-    <ProgressBar
+  color?: string;
+}> = ({ label, value, percent, color }) => (
+  // A ring per statistic, not a stack of bars. Six horizontal meters on one screen read as
+  // noise and none of them carried the number they measured.
+  <div className="flex min-w-0 flex-1 items-center gap-2.5">
+    <ProgressRing
       value={percent}
-      className="mt-1"
-      ariaLabel={`${label} ${value}`}
+      size={44}
+      stroke={4}
+      color={color}
+      ariaLabel={`${label}: ${value}`}
     />
+    <div className="min-w-0">
+      <p className="truncate text-[11px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+        {label}
+      </p>
+      <p className="text-sm font-bold tabular-nums text-gray-900 dark:text-white">{value}</p>
+    </div>
   </div>
 );
 
@@ -351,22 +354,27 @@ const MyLearningHome: React.FC = () => {
           {/* ── Progress rail: one North-Star number, two supporting meters ── */}
           <motion.div
             {...m("reveal")}
-            className="el-card flex flex-col gap-3 p-3 sm:flex-row sm:items-center sm:gap-5"
+            className="el-card grid grid-cols-1 gap-4 p-4 sm:grid-cols-3"
           >
-            <div className="flex items-center gap-3 sm:w-52 sm:flex-shrink-0">
-              <span className="text-[26px] font-bold leading-none tabular-nums text-gray-900 dark:text-white">
-                {totals.percent}%
-              </span>
+            <div className="flex min-w-0 items-center gap-3">
+              <ProgressRing
+                value={totals.percent}
+                size={56}
+                stroke={5}
+                alwaysShowValue
+                ariaLabel={`${copy.home.statOverall}: ${totals.percent}%`}
+              />
               <div className="min-w-0">
-                <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                <p className="truncate text-[11px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
                   {copy.home.statOverall}
                 </p>
-                <p className="truncate text-[11px] text-gray-500 dark:text-gray-400">
-                  {totals.requiredDone} of {totals.requiredTotal} required
+                <p className="truncate text-sm font-bold text-gray-900 dark:text-white">
+                  {totals.requiredDone} of {totals.requiredTotal}
                 </p>
+                <p className="truncate text-[11px] text-gray-500 dark:text-gray-400">required</p>
               </div>
             </div>
-            <div className="flex flex-1 items-center gap-4">
+            <>
               <RailStat
                 label={copy.home.statWeeks}
                 value={`${totals.sectionsDone}/${totals.sectionsTotal || 0}`}
@@ -377,6 +385,7 @@ const MyLearningHome: React.FC = () => {
                       )
                     : 0
                 }
+                color="#22c55e"
               />
               <RailStat
                 label={copy.home.statSkills}
@@ -388,8 +397,9 @@ const MyLearningHome: React.FC = () => {
                       )
                     : 0
                 }
+                color="#a855f7"
               />
-            </div>
+            </>
           </motion.div>
 
           <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
@@ -399,14 +409,19 @@ const MyLearningHome: React.FC = () => {
                 {...m("reveal")}
                 className="el-card relative overflow-hidden p-3 md:col-span-2"
               >
-                {/* Subject colour as a spine rather than a full pastel slab —
-                    the slab spent most of the card on decoration. */}
-                <span
-                  className="absolute inset-y-0 left-0 w-1"
-                  style={{ background: hero.cover_color || "#3b6cff" }}
-                  aria-hidden
-                />
-                <div className="pl-2">
+                {/* No colour spine: a bare 4px bar down the edge of every card read as
+                    decoration rather than information. The subject's colour now carries
+                    something — its progress ring. */}
+                <div className="flex items-start gap-3.5">
+                  <ProgressRing
+                    value={hero.required_total ? Math.round((hero.required_done / hero.required_total) * 100) : 0}
+                    size={52}
+                    stroke={5}
+                    color={hero.cover_color || undefined}
+                    className="mt-0.5"
+                    ariaLabel={`${hero.subject_name} ${hero.required_done} of ${hero.required_total} done`}
+                  />
+                  <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-1.5">
                     <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
                       {hero.next_item
@@ -431,20 +446,11 @@ const MyLearningHome: React.FC = () => {
                   )}
 
                   {hero.required_total > 0 && (
-                    <div className="mt-2 flex items-center gap-2">
-                      <ProgressBar
-                        value={Math.round(
-                          (hero.required_done / hero.required_total) * 100,
-                        )}
-                        color={hero.cover_color || undefined}
-                        className="flex-1"
-                        ariaLabel={`${hero.subject_name} ${hero.required_done} of ${hero.required_total} done`}
-                      />
-                      <span className="flex-shrink-0 text-[11px] tabular-nums text-gray-500 dark:text-gray-400">
-                        {hero.required_done}/{hero.required_total} done ·{" "}
-                        {hero.sections_completed}/{hero.sections_total} weeks
-                      </span>
-                    </div>
+                    // The ring already shows the proportion — this says what it counts.
+                    <p className="mt-1 text-[11px] tabular-nums text-gray-500 dark:text-gray-400">
+                      {hero.required_done}/{hero.required_total} done ·{" "}
+                      {hero.sections_completed}/{hero.sections_total} weeks
+                    </p>
                   )}
 
                   {hero.next_item ? (
@@ -529,6 +535,7 @@ const MyLearningHome: React.FC = () => {
                       </motion.button>
                     </div>
                   )}
+                  </div>
                 </div>
               </motion.section>
             )}
@@ -563,8 +570,8 @@ const MyLearningHome: React.FC = () => {
             </motion.section>
           </div>
 
-          {/* ── Subjects: compact rows, linear meters ──────────────────── */}
-          <motion.section {...m("reveal")} className="el-card p-3">
+          {/* ── Subjects: one ring each, no spine, no bar ───────────────── */}
+          <motion.section {...m("reveal")} className="el-card p-4">
             <h3 className="text-[11px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
               {copy.home.subjects}
             </h3>
@@ -577,29 +584,22 @@ const MyLearningHome: React.FC = () => {
                         ? learnerRoutes.item(c.course_id, c.next_item.item_id)
                         : learnerRoutes.course(c.course_id)
                     }
-                    className="group flex min-h-[56px] items-center gap-2.5 rounded-xl border border-gray-100 p-2.5 transition-all hover:-translate-y-0.5 hover:border-brand-300 hover:shadow-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/50 dark:border-white/[0.06] dark:hover:border-brand-500/40"
+                    className="group flex min-h-[64px] items-center gap-3 rounded-2xl border border-gray-100 p-3 transition-all hover:-translate-y-0.5 hover:border-brand-300 hover:shadow-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/50 dark:border-white/[0.06] dark:hover:border-brand-500/40"
                   >
-                    <span
-                      className="h-8 w-1 flex-shrink-0 rounded-pill"
-                      style={{ background: c.cover_color || "#3b6cff" }}
-                      aria-hidden
+                    {/* The ring carries the subject's colour and its progress at once —
+                        the old spine carried the colour and nothing else. */}
+                    <ProgressRing
+                      value={c.percent}
+                      size={44}
+                      stroke={4}
+                      color={c.cover_color || undefined}
+                      ariaLabel={`${c.subject_name} ${c.percent}% complete`}
                     />
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-baseline justify-between gap-2">
-                        <p className="truncate text-[13px] font-semibold text-gray-800 dark:text-gray-100">
-                          {c.subject_name}
-                        </p>
-                        <span className="flex-shrink-0 text-[11px] font-semibold tabular-nums text-gray-500 dark:text-gray-400">
-                          {c.percent}%
-                        </span>
-                      </div>
-                      <ProgressBar
-                        value={c.percent}
-                        color={c.cover_color || undefined}
-                        className="mt-1"
-                        ariaLabel={`${c.subject_name} ${c.percent}% complete`}
-                      />
-                      <p className="mt-1 flex items-center gap-1 truncate text-[11px] text-gray-500 dark:text-gray-400">
+                      <p className="truncate text-[13px] font-semibold text-gray-800 dark:text-gray-100">
+                        {c.subject_name}
+                      </p>
+                      <p className="mt-0.5 flex items-center gap-1 truncate text-[11px] text-gray-500 dark:text-gray-400">
                         {c.overdue_count > 0 ? (
                           <span className="inline-flex items-center gap-1 font-semibold text-danger-700 dark:text-danger-500">
                             <AlertTriangle className="w-2.5 h-2.5" />

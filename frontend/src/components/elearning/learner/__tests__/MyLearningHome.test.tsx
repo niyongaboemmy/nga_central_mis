@@ -135,8 +135,14 @@ describe("MyLearningHome — the page has to agree with itself", () => {
     });
     renderHome();
 
-    // 4 of 10 required done across both subjects = 40%.
-    expect(await screen.findByText("40%")).toBeInTheDocument();
+    // 4 of 10 required done across both subjects = 40%. The readout lives inside a
+    // ProgressRing now, so assert the value it exposes rather than its rendered glyphs.
+    await waitFor(() =>
+      expect(screen.getByRole("progressbar", { name: /Overall/i })).toHaveAttribute(
+        "aria-valuenow",
+        "40",
+      ),
+    );
     expect(screen.getByText("3/20")).toBeInTheDocument(); // weeks finished
     expect(screen.getByText("6/16")).toBeInTheDocument(); // skills covered
   });

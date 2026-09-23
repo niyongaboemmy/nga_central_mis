@@ -4,6 +4,8 @@ import { AlignLeft, Minus, Plus, Settings2 } from "lucide-react";
 import { ReaderPaper, ReaderPrefs } from "./useReaderPrefs";
 
 const PAPERS: { key: ReaderPaper; label: string; swatch: string }[] = [
+  // Auto first: it is the default, and follows the app's light/dark setting.
+  { key: "auto", label: "Auto", swatch: "bg-gradient-to-br from-white from-50% to-gray-900 to-50% border-gray-400" },
   { key: "paper", label: "Paper", swatch: "bg-white border-gray-300" },
   { key: "sepia", label: "Sepia", swatch: "bg-[#f4ecd8] border-amber-300" },
   { key: "night", label: "Night", swatch: "bg-gray-900 border-gray-600" },
