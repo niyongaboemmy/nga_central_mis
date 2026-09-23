@@ -47,7 +47,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       path: "/dashboard",
       icon: (
         <svg
-          className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`}
+          className={`w-5 h-5`}
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -68,7 +68,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       label: "Teacher Dashboard",
       path: "/teacher-dashboard",
       icon: (
-        <LayoutDashboard className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />
+        <LayoutDashboard className={`w-5 h-5`} />
       ),
       requiredPermission: Permissions.TEACHER_DASHBOARD,
     },
@@ -77,7 +77,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       path: "/profile",
       icon: (
         <svg
-          className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`}
+          className={`w-5 h-5`}
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -96,7 +96,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       path: "/my-subjects",
       icon: (
         <svg
-          className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`}
+          className={`w-5 h-5`}
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -116,7 +116,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       path: "/my-students",
       icon: (
         <svg
-          className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`}
+          className={`w-5 h-5`}
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -136,7 +136,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       path: "/my-enrolled-subjects",
       icon: (
         <svg
-          className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`}
+          className={`w-5 h-5`}
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -156,7 +156,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       path: "/scheme-of-work",
       icon: (
         <svg
-          className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`}
+          className={`w-5 h-5`}
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -176,7 +176,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       path: "/lesson-notes",
       icon: (
         <svg
-          className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`}
+          className={`w-5 h-5`}
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -194,19 +194,19 @@ const Sidebar: React.FC<SidebarProps> = ({
     {
       label: "My Learning",
       path: "/my-learning",
-      icon: <GraduationCap className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
+      icon: <GraduationCap className={`w-5 h-5`} />,
       requiredPermission: Permissions.VIEW_MY_COURSES,
     },
     {
       label: "E-Learning",
       path: "/elearning/courses",
-      icon: <LayoutGrid className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
+      icon: <LayoutGrid className={`w-5 h-5`} />,
       requiredPermission: Permissions.MANAGE_COURSE_CONTENT,
     },
     {
       label: "E-Learning Oversight",
       path: "/admin/elearning",
-      icon: <MonitorCheck className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
+      icon: <MonitorCheck className={`w-5 h-5`} />,
       requiredPermission: Permissions.VIEW_ALL_COURSES,
     },
     {
@@ -214,7 +214,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       path: "/shared-lesson-notes",
       icon: (
         <svg
-          className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`}
+          className={`w-5 h-5`}
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -234,7 +234,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       path: "/all-teachers-sow",
       icon: (
         <svg
-          className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`}
+          className={`w-5 h-5`}
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -254,7 +254,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       path: "/calendar",
       icon: (
         <svg
-          className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`}
+          className={`w-5 h-5`}
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -274,7 +274,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       path: "/reporting",
       icon: (
         <svg
-          className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`}
+          className={`w-5 h-5`}
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -294,7 +294,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       path: "/my-mentor",
       icon: (
         <svg
-          className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`}
+          className={`w-5 h-5`}
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -314,7 +314,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       path: "/admin/reports",
       icon: (
         <svg
-          className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`}
+          className={`w-5 h-5`}
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -334,7 +334,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       path: "/documents",
       icon: (
         <svg
-          className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`}
+          className={`w-5 h-5`}
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -354,7 +354,7 @@ const Sidebar: React.FC<SidebarProps> = ({
     //     "https://nga.ac.rw/public/report_card/auto_login.php?token=xxxxxxx",
     //   icon: (
     //     <svg
-    //       className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`}
+    //       className={`w-5 h-5`}
     //       fill="none"
     //       stroke="currentColor"
     //       viewBox="0 0 24 24"
@@ -374,7 +374,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       path: "/academics",
       icon: (
         <svg
-          className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`}
+          className={`w-5 h-5`}
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -394,7 +394,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       path: "/enrollment",
       icon: (
         <svg
-          className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`}
+          className={`w-5 h-5`}
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -414,7 +414,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       path: "/users",
       icon: (
         <svg
-          className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`}
+          className={`w-5 h-5`}
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -434,7 +434,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       path: "/program-users",
       icon: (
         <svg
-          className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`}
+          className={`w-5 h-5`}
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -454,7 +454,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       path: "/program-academics",
       icon: (
         <svg
-          className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`}
+          className={`w-5 h-5`}
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -474,7 +474,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       path: "/class-users",
       icon: (
         <svg
-          className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`}
+          className={`w-5 h-5`}
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -494,7 +494,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       path: "/class-subjects",
       icon: (
         <svg
-          className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`}
+          className={`w-5 h-5`}
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -514,7 +514,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       path: "/class-calendar",
       icon: (
         <svg
-          className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`}
+          className={`w-5 h-5`}
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -534,7 +534,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       path: "/permissions",
       icon: (
         <svg
-          className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`}
+          className={`w-5 h-5`}
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -554,7 +554,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       path: "/settings",
       icon: (
         <svg
-          className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`}
+          className={`w-5 h-5`}
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -578,25 +578,25 @@ const Sidebar: React.FC<SidebarProps> = ({
     {
       label: "Schools",
       path: "/schools",
-      icon: <School className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
+      icon: <School className={`w-5 h-5`} />,
       requiredPermission: Permissions.MANAGE_SCHOOLS,
     },
     {
       label: "Systems",
       path: "/systems",
-      icon: <Server className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
+      icon: <Server className={`w-5 h-5`} />,
       requiredPermission: Permissions.MANAGE_SYSTEMS,
     },
     {
       label: "Logs History",
       path: "/logs-history",
-      icon: <Activity className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
+      icon: <Activity className={`w-5 h-5`} />,
       requiredPermission: Permissions.VIEW_ALL_LOGS_HISTORY,
     },
     {
       label: "Database Management",
       path: "/database-management",
-      icon: <Database className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
+      icon: <Database className={`w-5 h-5`} />,
       requiredPermission: Permissions.DATABASE_MANAGEMENT,
     },
   ];
@@ -607,6 +607,38 @@ const Sidebar: React.FC<SidebarProps> = ({
       ? location.pathname === path ||
         ((path === "/my-learning" || path === "/elearning/courses") && location.pathname.startsWith(path))
       : false;
+
+  /** Profile is an account action, not a destination alongside Academics or
+   *  Documents — it sits at the foot of the rail where account controls live. */
+  const PROFILE_LABEL = "Profile";
+  const mainNavItems = navItems.filter((item) => item.label !== PROFILE_LABEL);
+  const profileItem = navItems.find((item) => item.label === PROFILE_LABEL);
+
+  const renderNavItem = (item: (typeof navItems)[number]) => (
+    <button
+      onClick={() => {
+        if (item.externalUrl) {
+          const token = getToken();
+          const url = item.externalUrl.replace("xxxxxxx", token || "");
+          window.open(url, "_blank");
+        } else if (item.path) {
+          navigate(item.path);
+        }
+        onMenuClick?.();
+      }}
+      className={`w-full flex items-center ${
+        isCollapsed ? "justify-center" : ""
+      } space-x-3.5 px-3.5 py-3 rounded-xl transition-all duration-200 ${
+        isActive(item.path)
+          ? "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"
+          : "font-light text-text-secondary-light dark:text-text-secondary-dark/70 hover:bg-surface-light dark:hover:bg-surface-dark hover:text-text-primary-light dark:hover:text-text-primary-dark"
+      }`}
+      title={item.label}
+    >
+      <span className="flex-shrink-0">{item.icon}</span>
+      {!isCollapsed && <span>{item.label}</span>}
+    </button>
+  );
 
   return (
     <aside
@@ -651,47 +683,21 @@ const Sidebar: React.FC<SidebarProps> = ({
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 py-3 overflow-y-auto text-sm">
-        <ul className="space-y-0.5 px-2.5">
-          {navItems
+      <nav className="flex-1 py-4 overflow-y-auto text-[15px]">
+        <ul className="space-y-1 px-3">
+          {mainNavItems
             .filter((item) => hasPermission(item.requiredPermission))
             .map((item, index) => (
-              <li key={item.path || item.label || `nav-${index}`}>
-                <button
-                  onClick={() => {
-                    if (item.externalUrl) {
-                      const token = getToken();
-                      const url = item.externalUrl.replace(
-                        "xxxxxxx",
-                        token || "",
-                      );
-                      window.open(url, "_blank");
-                    } else if (item.path) {
-                      navigate(item.path);
-                    }
-                    onMenuClick?.();
-                  }}
-                  className={`w-full flex items-center ${
-                    isCollapsed ? "justify-center" : ""
-                  } space-x-3 px-3 py-2.5 rounded-xl transition-all duration-200 ${
-                    isActive(item.path)
-                      ? "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"
-                      : "font-light text-text-secondary-light dark:text-text-secondary-dark/70 hover:bg-surface-light dark:hover:bg-surface-dark hover:text-text-primary-light dark:hover:text-text-primary-dark"
-                  }`}
-                  title={item.label}
-                >
-                  <span className={`flex-shrink-0`}>{item.icon}</span>
-                  {!isCollapsed && <span className="">{item.label}</span>}
-                </button>
-              </li>
+              <li key={item.path || item.label || `nav-${index}`}>{renderNavItem(item)}</li>
             ))}
         </ul>
       </nav>
 
       {/* Bottom section */}
-      <div className="p-4 border-t border-border-light dark:border-gray-700/30">
+      <div className="border-t border-border-light dark:border-gray-700/30 px-3 pt-2 pb-3 text-[15px]">
+        {profileItem && hasPermission(profileItem.requiredPermission) && renderNavItem(profileItem)}
         {!isCollapsed && (
-          <div className="text-xs text-text-secondary-light dark:text-text-secondary-dark/70 text-center">
+          <div className="mt-2 text-xs text-text-secondary-light dark:text-text-secondary-dark/70 text-center">
             NGA MIS v1.0
           </div>
         )}

@@ -9,10 +9,10 @@ import {
   BookOpen,
   ChevronLeft,
   ChevronRight,
+  Clock,
   Highlighter,
   Lightbulb,
   List,
-  Loader2,
   Maximize2,
   Minimize2,
   Printer,
@@ -21,13 +21,19 @@ import {
   Sparkles,
   X,
 } from "lucide-react";
-import { lessonNotesApi, SharedNoteDetail, isPdfBackedNote } from "../../api/lessonNotes";
+import {
+  lessonNotesApi,
+  SharedNoteDetail,
+  SharedNoteSummary,
+  isPdfBackedNote,
+} from "../../api/lessonNotes";
 import { useToast } from "../../contexts/ToastContext";
 import { attachImageTokenToHtml } from "../../utils/lessonNoteImages";
 import { useReaderPrefs, readingPositionKey } from "./reader/useReaderPrefs";
 import { useNoteFind } from "./reader/useNoteFind";
 import ReaderSettingsMenu from "./reader/ReaderSettingsMenu";
 import FindBar from "./reader/FindBar";
+import ContentsRail from "./reader/ContentsRail";
 import {
   A4_WIDTH,
   A4_HEIGHT,
@@ -38,6 +44,9 @@ import {
 } from "./reader/pagination";
 import NoteAIPanel, { AskMode, AskRequest } from "./reader/NoteAIPanel";
 import SharedPdfNoteReader from "./pdf/SharedPdfNoteReader";
+import { EmptyState } from "../elearning/ui/primitives";
+import { SubjectTile } from "./library/NoteCard";
+import { fullWhen, initialsOf, shortWhen } from "./library/noteVisuals";
 import { hydrateInlineChecks } from "../elearning/interactive/hydrate";
 
 interface TocItem {
@@ -72,6 +81,9 @@ const SharedLessonNoteViewPage: React.FC<Props> = ({ noteId, onBack, backLabel }
 
   const [note, setNote] = useState<SharedNoteDetail | null>(null);
   const [notFound, setNotFound] = useState(false);
+  /** The rest of the student's library, so the end of a note can offer the next
+   *  one instead of a dead stop. Cheap: the same list the library page loads. */
+  const [siblings, setSiblings] = useState<SharedNoteSummary[]>([]);
 
   const [toc, setToc] = useState<TocItem[]>([]);
   const [activeHeading, setActiveHeading] = useState<string | null>(null);
@@ -100,6 +112,13 @@ const SharedLessonNoteViewPage: React.FC<Props> = ({ noteId, onBack, backLabel }
   const askCounter = useRef(0);
 
   const bookMode = prefs.mode === "book";
+  /** The e-learning course page renders this component inline and brings its own
+   *  chrome; the route renders it as a full-screen reader that owns the viewport. */
+  const embedded = noteId !== undefined;
+  /** Chrome offsets: standalone sticks to the top of the window, embedded has to
+   *  clear the app navbar that is still above it. */
+  const topOffset = embedded ? "top-16" : "top-0";
+  const railTop = embedded ? "top-32" : "top-[4.5rem]";
 
   // ---------------------------------------------------------------- load
 
@@ -113,6 +132,13 @@ const SharedLessonNoteViewPage: React.FC<Props> = ({ noteId, onBack, backLabel }
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
+
+  useEffect(() => {
+    lessonNotesApi
+      .sharedWithMe()
+      .then((res) => setSiblings(res.data.data))
+      .catch(() => setSiblings([])); // a missing "next note" is not worth an error
+  }, []);
 
   // The teacher's editor renders $...$ as live KaTeX via a decoration plugin, but this page
   // renders raw saved HTML (no Tiptap instance) — without this pass, a student would just
@@ -136,6 +162,11 @@ const SharedLessonNoteViewPage: React.FC<Props> = ({ noteId, onBack, backLabel }
       return { id: slug, text: h.textContent?.trim() || `Section ${i + 1}`, level: Number(h.tagName[1]) };
     });
     setToc(items);
+    // Open the contents rail by default once we know the note has sections and
+    // there is room for it. Closed-by-default left the whole left third of a
+    // wide screen empty and hid the one control that makes a long note
+    // navigable. Narrow screens keep it as a drawer, opened on demand.
+    if (items.length > 1 && window.innerWidth >= 1024) setTocOpen(true);
   }, [note]);
 
   // ---------------------------------------------------------------- A4 scaling
@@ -346,24 +377,58 @@ const SharedLessonNoteViewPage: React.FC<Props> = ({ noteId, onBack, backLabel }
 
   if (notFound) {
     return (
-      <div className="flex flex-col items-center justify-center py-24 text-center">
-        <BookOpen className="w-10 h-10 text-gray-300 dark:text-gray-600 mb-3" />
-        <p className="text-gray-500 dark:text-gray-400">This lesson note isn't available to you.</p>
-        <button
-          onClick={goBack}
-          className="mt-4 px-4 py-2 text-sm font-medium rounded-full bg-blue-600 hover:bg-blue-700 text-white"
-        >
-          {backLabel ? `Back to ${backLabel.toLowerCase()}` : "Back to my library"}
-        </button>
-      </div>
+      <EmptyState
+        pose="thinking"
+        title="This note isn't available to you"
+        body="It may have been unpublished, or the share that gave you access has expired. Your teacher can share it again."
+        action={{
+          label: backLabel ? `Back to ${backLabel.toLowerCase()}` : "Back to my library",
+          onClick: goBack,
+        }}
+      />
     );
   }
 
+  // A skeleton in the shape of the real page, not a lone spinner: the toolbar and the
+  // sheet hold their positions, so opening a note reads as the paper arriving rather
+  // than the screen being replaced.
   if (!note) {
     return (
-      <div className="flex flex-col items-center justify-center py-24 text-gray-400 gap-3">
-        <Loader2 className="w-6 h-6 animate-spin" />
-        <p className="text-xs">Opening your note...</p>
+      <div className={`note-reader ${embedded ? "" : "min-h-screen bg-gray-100 dark:bg-black"}`}>
+        <div className={`sticky ${topOffset} z-20 border-b border-gray-200/70 bg-white/90 backdrop-blur-md dark:border-white/[0.07] dark:bg-[#0b0d12]/90`}>
+          <div className="mx-auto flex max-w-[1600px] items-center gap-3 px-4 py-2.5 sm:px-6">
+            <div className="h-7 w-20 animate-pulse rounded-lg bg-gray-200 dark:bg-gray-800" />
+            <div className="hidden min-w-0 flex-1 md:block">
+              <div className="mb-1.5 h-3.5 w-56 animate-pulse rounded bg-gray-200 dark:bg-gray-800" />
+              <div className="h-2.5 w-36 animate-pulse rounded bg-gray-100 dark:bg-gray-800/60" />
+            </div>
+            <div className="ml-auto flex gap-1.5">
+              {[0, 1, 2].map((i) => (
+                <div key={i} className="h-8 w-8 animate-pulse rounded-lg bg-gray-200 dark:bg-gray-800" />
+              ))}
+            </div>
+          </div>
+        </div>
+        <div className="mx-auto flex max-w-[1600px] justify-center px-4 py-8 sm:px-6">
+          <div
+            className="note-reader-sheet w-full animate-pulse"
+            style={{ maxWidth: A4_WIDTH }}
+            aria-label="Loading note"
+            role="status"
+          >
+            <div className="mb-6 border-b border-gray-200 pb-5 dark:border-gray-700/40">
+              <div className="mb-3 h-4 w-24 rounded-full bg-gray-200 dark:bg-gray-700" />
+              <div className="mb-2 h-7 w-3/4 rounded bg-gray-200 dark:bg-gray-700" />
+              <div className="h-3 w-40 rounded bg-gray-100 dark:bg-gray-700/60" />
+            </div>
+            {[
+              "w-full", "w-11/12", "w-full", "w-10/12", "w-full",
+              "w-9/12", "w-full", "w-11/12", "w-7/12",
+            ].map((w, i) => (
+              <div key={i} className={`mb-3 h-3.5 rounded bg-gray-100 dark:bg-gray-700/50 ${w}`} />
+            ))}
+          </div>
+        </div>
       </div>
     );
   }
@@ -374,59 +439,89 @@ const SharedLessonNoteViewPage: React.FC<Props> = ({ noteId, onBack, backLabel }
     return <SharedPdfNoteReader note={note} onBack={onBack} backLabel={backLabel} />;
   }
 
+  /** Next up: the newest unread-ish note in this subject, else anywhere. Falls
+   *  back to nothing, in which case the end of the note just offers the library. */
+  const nextNote = (() => {
+    const others = siblings.filter((n) => n.note_id !== note.note_id);
+    const byRecency = [...others].sort(
+      (a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime(),
+    );
+    return (
+      byRecency.find((n) => n.subject_name === note.subject_name) || byRecency[0] || null
+    );
+  })();
+
   const flowStyle: React.CSSProperties = bookMode ? bookFlowStyle(page) : {};
 
   return (
     <div
       className={`note-reader note-reader--${prefs.paper} ${focusMode ? "note-reader--focus" : ""} ${
         aiOpen ? "lg:pr-[420px]" : ""
-      } transition-[padding] duration-300`}
+      } ${embedded ? "" : "min-h-screen bg-gray-100 dark:bg-black"} transition-[padding] duration-300`}
     >
       {/* Reading progress — the one always-visible signal of how far in you are. */}
-      <div className="fixed top-16 left-0 right-0 h-0.5 z-30 bg-transparent print:hidden">
+      <div className={`fixed ${topOffset} left-0 right-0 h-1 z-30 bg-transparent print:hidden`}>
         <div
-          className="h-full bg-gradient-to-r from-blue-500 to-blue-600 transition-[width] duration-150"
+          className="h-full bg-brand-500 transition-[width] duration-150"
           style={{ width: `${Math.round(progress * 100)}%` }}
         />
       </div>
 
-      {/* Toolbar */}
+      {/* Toolbar. Painted in the page's own background, so no colour band shows
+          between the toolbar and the desk the sheet rests on. */}
       <AnimatePresence>
         {!focusMode && (
           <motion.div
             initial={{ y: -8, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: -8, opacity: 0 }}
-            className="sticky top-16 z-20 bg-gray-50/85 dark:bg-gray-900/85 backdrop-blur-md border-b border-gray-200/70 dark:border-gray-700/40 print:hidden"
+            className={`sticky ${topOffset} z-20 bg-white/90 dark:bg-[#0b0d12]/90 backdrop-blur-md border-b border-gray-200/80 dark:border-white/[0.07] print:hidden`}
           >
-            <div className="max-w-[1400px] mx-auto px-3 sm:px-5 py-2 flex items-center gap-2">
+            <div className="mx-auto flex max-w-[1600px] items-center gap-2 px-4 py-2.5 sm:px-6">
               <button
                 onClick={goBack}
-                className="flex items-center gap-1 px-2 py-2 rounded-lg text-sm text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 flex-shrink-0"
+                className="flex items-center gap-1.5 px-2.5 py-2 rounded-lg text-sm font-medium text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-gray-100 hover:bg-gray-200/70 dark:hover:bg-gray-800 flex-shrink-0 transition-colors"
               >
                 <ArrowLeft className="w-4 h-4" />
                 <span className="hidden sm:inline">{backLabel || "Library"}</span>
               </button>
 
-              <div className="min-w-0 flex-1 hidden md:block">
-                <p className="text-sm font-semibold text-gray-800 dark:text-gray-100 truncate leading-tight">
-                  {note.title}
-                </p>
-                <p className="text-[11px] text-gray-400 truncate">
-                  {note.subject_name}
-                  {bookMode ? ` · page ${page + 1} of ${totalPages}` : ` · ${Math.round(progress * 100)}% read`}
-                </p>
+              <span aria-hidden className="hidden md:block h-6 w-px bg-gray-300/70 dark:bg-gray-700 flex-shrink-0" />
+
+              {/* Who wrote it and how long it takes are the two facts the card promised;
+                  the reader keeps them in view rather than dropping them at the door. */}
+              <div className="min-w-0 flex-1 hidden md:flex items-center gap-2.5">
+                <SubjectTile subject={note.subject_name} size="sm" />
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-gray-800 dark:text-gray-100 truncate leading-tight">
+                    {note.title}
+                  </p>
+                  <p className="text-[11px] text-gray-500 dark:text-gray-400 truncate">
+                    {note.subject_name}
+                    {note.teacher_name ? ` · ${note.teacher_name}` : ""}
+                    {note.reading_minutes ? ` · ${note.reading_minutes} min read` : ""}
+                    <span className="text-gray-400 dark:text-gray-500">
+                      {bookMode
+                        ? ` · page ${page + 1} of ${totalPages}`
+                        : ` · ${Math.round(progress * 100)}% read`}
+                    </span>
+                  </p>
+                </div>
               </div>
 
-              <div className="flex items-center gap-1 ml-auto flex-shrink-0">
+              <div className="flex items-center gap-1.5 ml-auto flex-shrink-0">
+                {/* Grouped: navigate | read | output. Seven ungrouped icons in a
+                    row read as a debug bar, not a toolbar. */}
                 {toc.length > 1 && (
                   <button
                     onClick={() => setTocOpen((o) => !o)}
                     title="Contents"
-                    className={`p-2 rounded-lg transition-colors ${
+                    aria-label="Contents"
+                    aria-pressed={tocOpen}
+                    className={`grid h-9 w-9 place-items-center rounded-lg transition-colors ${
                       tocOpen
-                        ? "bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
-                        : "text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
+                        ? "el-chip-brand"
+                        : "text-gray-500 hover:bg-gray-200/70 hover:text-gray-800 dark:hover:bg-white/[0.08] dark:hover:text-gray-200"
                     }`}
                   >
                     <List className="w-4 h-4" />
@@ -438,13 +533,16 @@ const SharedLessonNoteViewPage: React.FC<Props> = ({ noteId, onBack, backLabel }
                     setTimeout(() => findInputRef.current?.focus(), 40);
                   }}
                   title="Find in note (Ctrl+F)"
-                  className="p-2 rounded-lg text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
+                  aria-label="Find in note"
+                  className="grid h-9 w-9 place-items-center rounded-lg text-gray-500 hover:bg-gray-200/70 hover:text-gray-800 dark:hover:bg-white/[0.08] dark:hover:text-gray-200"
                 >
                   <Search className="w-4 h-4" />
                 </button>
 
+                <span aria-hidden className="mx-0.5 h-5 w-px bg-gray-300/70 dark:bg-white/10" />
+
                 {/* Scroll / book toggle */}
-                <div className="flex items-center p-0.5 rounded-full bg-gray-100 dark:bg-gray-800">
+                <div className="el-segment" role="group" aria-label="Reading layout">
                   {([
                     { mode: "scroll" as const, Icon: ScrollText, label: "Scroll" },
                     { mode: "book" as const, Icon: BookOpen, label: "Book" },
@@ -453,10 +551,12 @@ const SharedLessonNoteViewPage: React.FC<Props> = ({ noteId, onBack, backLabel }
                       key={mode}
                       onClick={() => update("mode", mode)}
                       title={`${label} view`}
-                      className={`p-1.5 rounded-full transition-colors ${
+                      aria-label={`${label} view`}
+                      aria-pressed={prefs.mode === mode}
+                      className={`grid h-8 w-8 place-items-center rounded-pill transition-colors ${
                         prefs.mode === mode
-                          ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm"
-                          : "text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                          ? "el-segment-on"
+                          : "text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200"
                       }`}
                     >
                       <Icon className="w-4 h-4" />
@@ -471,27 +571,32 @@ const SharedLessonNoteViewPage: React.FC<Props> = ({ noteId, onBack, backLabel }
                   setOpen={setSettingsOpen}
                 />
 
+                <span aria-hidden className="mx-0.5 hidden h-5 w-px bg-gray-300/70 sm:block dark:bg-white/10" />
+
                 <button
                   onClick={() => window.print()}
                   title="Print / save as A4 PDF"
-                  className="hidden sm:block p-2 rounded-lg text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
+                  aria-label="Print or save as PDF"
+                  className="hidden h-9 w-9 place-items-center rounded-lg text-gray-500 hover:bg-gray-200/70 hover:text-gray-800 sm:grid dark:hover:bg-white/[0.08] dark:hover:text-gray-200"
                 >
                   <Printer className="w-4 h-4" />
                 </button>
                 <button
                   onClick={() => setFocusMode(true)}
                   title="Focus mode"
-                  className="hidden sm:block p-2 rounded-lg text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
+                  aria-label="Focus mode"
+                  className="hidden h-9 w-9 place-items-center rounded-lg text-gray-500 hover:bg-gray-200/70 hover:text-gray-800 sm:grid dark:hover:bg-white/[0.08] dark:hover:text-gray-200"
                 >
                   <Maximize2 className="w-4 h-4" />
                 </button>
 
                 <button
                   onClick={() => setAiOpen((o) => !o)}
-                  className={`flex items-center gap-1.5 px-3 py-2 rounded-full text-sm font-medium shadow-sm transition-opacity ${
+                  aria-pressed={aiOpen}
+                  className={`ml-1 inline-flex min-h-[38px] items-center gap-1.5 rounded-pill px-4 text-sm font-semibold transition-colors ${
                     aiOpen
-                      ? "bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
-                      : "bg-gradient-to-r from-blue-500 to-blue-600 text-white hover:opacity-90"
+                      ? "el-chip-brand"
+                      : "bg-brand-500 text-white shadow-soft hover:bg-brand-600"
                   }`}
                 >
                   <Sparkles className="w-4 h-4" />
@@ -531,35 +636,29 @@ const SharedLessonNoteViewPage: React.FC<Props> = ({ noteId, onBack, backLabel }
         </button>
       )}
 
-      <div className="max-w-[1400px] mx-auto px-3 sm:px-5 py-6 flex gap-6 items-start">
+      <div className="mx-auto flex max-w-[1180px] items-start gap-8 px-4 py-8 sm:px-6">
         {/* Contents rail — persistent on wide screens, drawer elsewhere */}
-        {toc.length > 1 && (
+        {toc.length > 1 && !focusMode && (
           <AnimatePresence>
             {tocOpen && (
               <motion.nav
                 initial={{ opacity: 0, x: -12 }}
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -12 }}
-                className="hidden lg:block sticky top-32 w-60 flex-shrink-0 max-h-[calc(100vh-10rem)] overflow-y-auto rounded-2xl border border-gray-200 dark:border-gray-700/40 bg-white dark:bg-gray-800/40 p-3 print:hidden"
+                /* top-32 clears the navbar (top-16, 64px) *and* the reader toolbar
+                   that sticks below it: at a smaller offset the rail's own header
+                   slides under the toolbar and disappears. */
+                className={`el-card hidden lg:flex flex-col sticky ${railTop} w-[272px] flex-shrink-0 max-h-[calc(100vh-6.5rem)] p-4 print:hidden`}
               >
-                <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400 px-2 mb-2">
-                  Contents
-                </p>
-                {toc.map((t) => (
-                  <button
-                    key={t.id}
-                    onClick={() => jumpToHeading(t.id)}
-                    className={`block w-full text-left px-2 py-1.5 rounded-lg text-[13px] leading-snug transition-colors ${
-                      t.level === 3 ? "pl-5 text-xs" : ""
-                    } ${
-                      activeHeading === t.id
-                        ? "bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 font-medium"
-                        : "text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/40"
-                    }`}
-                  >
-                    {t.text}
-                  </button>
-                ))}
+                <ContentsRail
+                  toc={toc}
+                  activeId={activeHeading}
+                  progress={progress}
+                  readingMinutes={note.reading_minutes}
+                  onJump={jumpToHeading}
+                  onAskAI={() => setAiOpen(true)}
+                  className="min-h-0 flex-1"
+                />
               </motion.nav>
             )}
           </AnimatePresence>
@@ -582,18 +681,42 @@ const SharedLessonNoteViewPage: React.FC<Props> = ({ noteId, onBack, backLabel }
                 : { width: "100%", maxWidth: A4_WIDTH }
             }
           >
-            {/* Title block — printed on the first sheet like a real hand-out cover. */}
+            {/* Title block — printed on the first sheet like a real hand-out cover.
+                In book mode it shrinks to a running head (see index.css), so the
+                byline row is hidden there rather than repeating on every page. */}
             <header className="note-reader-titleblock">
               <span className="note-reader-eyebrow">{note.subject_name}</span>
               <h1>{note.title}</h1>
-              <p>
-                Updated{" "}
-                {new Date(note.updated_at).toLocaleDateString(undefined, {
-                  day: "numeric",
-                  month: "long",
-                  year: "numeric",
-                })}
-              </p>
+              {bookMode ? (
+                <p>
+                  Updated{" "}
+                  {new Date(note.updated_at).toLocaleDateString(undefined, {
+                    day: "numeric",
+                    month: "long",
+                    year: "numeric",
+                  })}
+                </p>
+              ) : (
+                <div className="note-reader-byline">
+                  {note.teacher_name && (
+                    <span className="note-reader-byline-author">
+                      <span aria-hidden className="note-reader-byline-avatar">
+                        {initialsOf(note.teacher_name)}
+                      </span>
+                      {note.teacher_name}
+                    </span>
+                  )}
+                  {!!note.reading_minutes && (
+                    <span>
+                      <Clock aria-hidden className="inline h-3 w-3 -mt-px mr-1" />
+                      {note.reading_minutes} min read
+                    </span>
+                  )}
+                  <span title={fullWhen(note.updated_at)}>
+                    Updated {shortWhen(note.updated_at)}
+                  </span>
+                </div>
+              )}
             </header>
 
             <div className={bookMode ? "note-reader-window" : ""}>
@@ -653,11 +776,58 @@ const SharedLessonNoteViewPage: React.FC<Props> = ({ noteId, onBack, backLabel }
             </div>
           )}
 
-          <p className="flex items-center gap-1.5 text-[11px] text-gray-400 mt-5 text-center print:hidden">
-            <Highlighter className="w-3 h-3" />
-            Highlight any sentence to explain it with AI
-            {bookMode && <span className="hidden sm:inline">· use ← → to turn pages</span>}
+          {/* The reader's one discoverable trick. It was a grey line of small print that
+              nobody read; as a pill it looks like something you can use. */}
+          <p className="mt-6 inline-flex items-center gap-2 rounded-pill border border-gray-200 bg-white/70 px-3.5 py-1.5 text-[11px] text-gray-500 shadow-sm dark:border-white/10 dark:bg-white/[0.04] dark:text-gray-400 print:hidden">
+            <Highlighter className="h-3 w-3 flex-shrink-0 text-brand-500" />
+            <span>
+              Highlight any sentence to explain it with AI
+              {bookMode && <span className="hidden sm:inline"> · use ← → to turn pages</span>}
+            </span>
           </p>
+
+          {/* End of the note. Reaching the bottom used to be a dead stop — the
+              student's only move was the browser back button. */}
+          {!bookMode && (
+            <div className="mt-10 w-full max-w-[794px] print:hidden">
+              <div className="mb-4 flex items-center gap-3">
+                <span className="h-px flex-1 bg-gray-200 dark:bg-white/10" />
+                <span className="text-[11px] font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500">
+                  End of note
+                </span>
+                <span className="h-px flex-1 bg-gray-200 dark:bg-white/10" />
+              </div>
+
+              {nextNote ? (
+                <button
+                  onClick={() => navigate(`/shared-lesson-notes/${nextNote.note_id}`)}
+                  className="el-card el-card-hover group flex w-full items-center gap-4 p-4 text-left focus:outline-none focus-visible:shadow-glow"
+                >
+                  <SubjectTile subject={nextNote.subject_name} size="sm" />
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[11px] font-bold uppercase tracking-wider text-brand-600 dark:text-brand-200">
+                      Next up
+                    </span>
+                    <span className="mt-0.5 block truncate text-sm font-semibold text-gray-900 dark:text-white">
+                      {nextNote.title}
+                    </span>
+                    <span className="block truncate text-xs text-gray-500 dark:text-gray-400">
+                      {nextNote.subject_name}
+                      {nextNote.teacher_name ? ` · ${nextNote.teacher_name}` : ""}
+                    </span>
+                  </span>
+                  <ChevronRight className="h-5 w-5 flex-shrink-0 text-gray-300 transition-transform group-hover:translate-x-0.5 group-hover:text-brand-500 dark:text-gray-600" />
+                </button>
+              ) : null}
+
+              <button
+                onClick={goBack}
+                className="mt-3 inline-flex min-h-[40px] items-center gap-1.5 rounded-pill px-3 text-sm font-medium text-gray-600 hover:bg-gray-200/60 dark:text-gray-300 dark:hover:bg-white/[0.06]"
+              >
+                <ArrowLeft className="h-4 w-4" /> Back to {backLabel || "my library"}
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -677,29 +847,32 @@ const SharedLessonNoteViewPage: React.FC<Props> = ({ noteId, onBack, backLabel }
               animate={{ x: 0 }}
               exit={{ x: "-100%" }}
               transition={{ type: "spring", damping: 30, stiffness: 260 }}
-              className="fixed top-16 left-0 bottom-0 w-72 z-40 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-700/60 shadow-2xl overflow-y-auto p-4 lg:hidden"
+              className={`fixed ${embedded ? "top-16" : "top-0"} left-0 bottom-0 w-[300px] z-40 bg-white dark:bg-[#0b0d12] border-r border-gray-200 dark:border-white/[0.07] shadow-2xl p-4 lg:hidden flex flex-col`}
             >
-              <div className="flex items-center justify-between mb-3">
-                <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Contents</p>
-                <button onClick={() => setTocOpen(false)} className="p-1.5 rounded-lg text-gray-400">
+              <div className="mb-3 flex items-center justify-end">
+                <button
+                  onClick={() => setTocOpen(false)}
+                  aria-label="Close contents"
+                  className="grid h-9 w-9 place-items-center rounded-lg text-gray-400 hover:bg-gray-100 dark:hover:bg-white/[0.06]"
+                >
                   <X className="w-4 h-4" />
                 </button>
               </div>
-              {toc.map((t) => (
-                <button
-                  key={t.id}
-                  onClick={() => jumpToHeading(t.id)}
-                  className={`block w-full text-left px-2 py-2 rounded-lg text-[13px] leading-snug ${
-                    t.level === 3 ? "pl-5 text-xs" : ""
-                  } ${
-                    activeHeading === t.id
-                      ? "bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 font-medium"
-                      : "text-gray-600 dark:text-gray-300"
-                  }`}
-                >
-                  {t.text}
-                </button>
-              ))}
+              <ContentsRail
+                toc={toc}
+                activeId={activeHeading}
+                progress={progress}
+                readingMinutes={note.reading_minutes}
+                onJump={(id) => {
+                  jumpToHeading(id);
+                  setTocOpen(false);
+                }}
+                onAskAI={() => {
+                  setTocOpen(false);
+                  setAiOpen(true);
+                }}
+                className="min-h-0 flex-1"
+              />
             </motion.nav>
           </>
         )}
@@ -767,6 +940,7 @@ const SharedLessonNoteViewPage: React.FC<Props> = ({ noteId, onBack, backLabel }
         open={aiOpen}
         onClose={() => setAiOpen(false)}
         request={askRequest}
+        offsetTop={embedded}
       />
     </div>
   );
