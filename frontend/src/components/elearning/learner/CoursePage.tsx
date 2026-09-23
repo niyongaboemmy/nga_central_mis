@@ -222,6 +222,14 @@ const CoursePage: React.FC = () => {
               <ItemView
                 opened={opened}
                 onBack={() => navigate(learnerRoutes.course(cid, opened.section.section_id))}
+                onNext={opened.next && !opened.next.locked ? () => goItem(opened.next!.item_id) : undefined}
+                step={(() => {
+                  // "Step 2 of 5" — headers aren't steps, so they don't count.
+                  const steps = (course?.sections.find((s) => s.section_id === opened.section.section_id)?.items || [])
+                    .filter((i) => i.item_type !== "HEADER");
+                  const index = steps.findIndex((i) => i.item_id === opened.item.item_id);
+                  return index >= 0 ? { index: index + 1, total: steps.length } : undefined;
+                })()}
                 onChecked={(r) => {
                   loadCourse();
                   if (r.just_completed) setToastLine(copy.course.doneLast);

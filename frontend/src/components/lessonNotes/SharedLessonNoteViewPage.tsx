@@ -78,6 +78,31 @@ const SharedLessonNoteViewPage: React.FC<Props> = ({ noteId, onBack, backLabel }
   const [tocOpen, setTocOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [focusMode, setFocusMode] = useState(false);
+  const readerShellRef = useRef<HTMLDivElement>(null);
+
+  /** Focus mode used to only hide the toolbar — the app's navbar and sidebar stayed on
+   *  screen, so it was never actually focused. It now covers the viewport (CSS) and asks
+   *  the browser for real fullscreen where that's permitted. */
+  const enterFocus = useCallback(() => {
+    setFocusMode(true);
+    const el = readerShellRef.current;
+    if (el?.requestFullscreen) el.requestFullscreen().catch(() => undefined);
+  }, []);
+  const exitFocus = useCallback(() => {
+    setFocusMode(false);
+    if (document.fullscreenElement) document.exitFullscreen().catch(() => undefined);
+  }, []);
+
+  useEffect(() => {
+    if (!focusMode) return;
+    // F11 or the browser's own exit must drop the overlay too, or the reader gets stuck
+    // in a state the student already tried to leave.
+    const onFsChange = () => {
+      if (!document.fullscreenElement) setFocusMode(false);
+    };
+    document.addEventListener("fullscreenchange", onFsChange);
+    return () => document.removeEventListener("fullscreenchange", onFsChange);
+  }, [focusMode]);
 
   const [findOpen, setFindOpen] = useState(false);
   const [findQuery, setFindQuery] = useState("");
@@ -326,7 +351,7 @@ const SharedLessonNoteViewPage: React.FC<Props> = ({ noteId, onBack, backLabel }
         if (findOpen) setFindOpen(false);
         else if (tocOpen) setTocOpen(false);
         else if (settingsOpen) setSettingsOpen(false);
-        else if (focusMode) setFocusMode(false);
+        else if (focusMode) exitFocus();
         return;
       }
       if (typing) return;
@@ -378,6 +403,7 @@ const SharedLessonNoteViewPage: React.FC<Props> = ({ noteId, onBack, backLabel }
 
   return (
     <div
+      ref={readerShellRef}
       className={`note-reader note-reader--${prefs.paper} ${focusMode ? "note-reader--focus" : ""} ${
         aiOpen ? "lg:pr-[420px]" : ""
       } transition-[padding] duration-300`}
@@ -479,7 +505,7 @@ const SharedLessonNoteViewPage: React.FC<Props> = ({ noteId, onBack, backLabel }
                   <Printer className="w-4 h-4" />
                 </button>
                 <button
-                  onClick={() => setFocusMode(true)}
+                  onClick={enterFocus}
                   title="Focus mode"
                   className="hidden sm:block p-2 rounded-lg text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
                 >
@@ -523,7 +549,7 @@ const SharedLessonNoteViewPage: React.FC<Props> = ({ noteId, onBack, backLabel }
 
       {focusMode && (
         <button
-          onClick={() => setFocusMode(false)}
+          onClick={exitFocus}
           title="Exit focus mode (Esc)"
           className="fixed top-20 right-4 z-30 p-2.5 rounded-full bg-blue-600/90 text-white backdrop-blur shadow-lg print:hidden"
         >

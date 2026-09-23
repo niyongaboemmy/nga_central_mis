@@ -27,9 +27,12 @@ export const copy = {
       if (overdue > 0) {
         return `${timeOfDay()}${name}. ${overdue} thing${overdue === 1 ? " is" : "s are"} past due — best to clear ${overdue === 1 ? "it" : "them"} first.`;
       }
-      if (pending === 0) return `${timeOfDay()}${name}. Everything your teachers have set is done.`;
-      if (courseTitle && weekTitle) return `${timeOfDay()}${name}. ${weekTitle} of ${courseTitle} is waiting.`;
-      if (courseTitle) return `${timeOfDay()}${name}. ${courseTitle} is ready when you are.`;
+      if (pending === 0)
+        return `${timeOfDay()}${name}. Everything your teachers have set is done.`;
+      if (courseTitle && weekTitle)
+        return `${timeOfDay()}${name}. ${weekTitle} of ${courseTitle} is waiting.`;
+      if (courseTitle)
+        return `${timeOfDay()}${name}. ${courseTitle} is ready when you are.`;
       return `${timeOfDay()}${name}.`;
     },
     upNext: "Up next",
@@ -37,6 +40,8 @@ export const copy = {
     startBtn: "Start",
     thisWeek: "This week",
     dueSoon: "Due soon",
+    /** One ranked list replaced the separate This week / Due soon / Keep going cards. */
+    queue: "What's next",
     nothingDue: "Nothing due. Nice.",
     subjects: "Your subjects",
     keepGoing: "Keep going",
@@ -44,7 +49,8 @@ export const copy = {
       `${remaining} more to finish ${section}`,
     library: "All notes",
     emptyTitle: "Nothing here yet",
-    emptyBody: "Your teachers haven't published a course yet. Check back on Monday.",
+    emptyBody:
+      "Your teachers haven't published a course yet. Check back on Monday.",
     allCaughtUp: "You're all caught up for now.",
     // Caught-up hero
     caughtUpEyebrow: "Caught up",
@@ -74,9 +80,11 @@ export const copy = {
     index: "Course index",
     thisWeekPill: "This week",
     locked: "Locked",
-    lockedBody: (reason: string | null) => reason || "Finish the items before this one first.",
+    lockedBody: (reason: string | null) =>
+      reason || "Finish the items before this one first.",
     emptyStudent: "Your teacher hasn't published anything for this week yet.",
-    emptyCourse: "Your teacher hasn't published anything yet. Check back Monday.",
+    emptyCourse:
+      "Your teacher hasn't published anything yet. Check back Monday.",
     prev: "Previous",
     next: "Next",
     markDone: "Mark as done",
@@ -85,7 +93,9 @@ export const copy = {
       `Done. Next: ${title}${minutes ? ` (${minutes} min)` : ""}.`,
     doneLast: "Done. That was the last item here.",
     weekComplete: (week: string, criteria: string[]) =>
-      criteria.length ? `${week} done — you covered ${criteria.join(", ")}.` : `${week} done.`,
+      criteria.length
+        ? `${week} done — you covered ${criteria.join(", ")}.`
+        : `${week} done.`,
     nextWeek: "Next week",
     backHome: "Back home",
     awaitingResult: "Awaiting your result",
@@ -93,7 +103,25 @@ export const copy = {
     download: "Download",
     continueFromHere: "Continue from here",
     minutes: (m: number) => `${m} min`,
-    criteriaCovered: (n: number, total: number, element: string) => `You have covered ${n} of ${total} criteria of ${element}`,
+    criteriaCovered: (n: number, total: number, element: string) =>
+      `You have covered ${n} of ${total} criteria of ${element}`,
+    // --- lesson reader ---
+    stepOf: (n: number, total: number) => `Step ${n} of ${total}`,
+    readingTime: (m: number) => `${m} min read`,
+    teachesLabel: "What this teaches you",
+    endOfLesson: "End of this step",
+    upNextLabel: "Up next",
+    lastInWeek: "That was the last step of this week",
+    weekDoneCta: "See the week",
+    linkOpensElsewhere: (host: string) => `This opens ${host} in a new tab.`,
+    linkAfterOpening: "Come back here and mark it done when you've read it.",
+    backToWeek: "Back to the week",
+    scrollHint: "Scroll to read",
+    // --- focus mode ---
+    focusEnter: "Focus mode",
+    focusExit: "Leave focus mode",
+    focusHint: "Press Esc to leave focus mode",
+    focusOf: (n: number, total: number) => `${n} of ${total} in this week`,
   },
   check: {
     title: "Quick check",
@@ -105,13 +133,16 @@ export const copy = {
     wrong: "Not quite — try again.",
     wrongHint: (hint: string) => `Not quite — ${hint} Try again.`,
     finished: (score: number, total: number) =>
-      score === total ? `All ${total} right. That's a real skill now.` : `${score} of ${total} right. Have another go at the ones you missed.`,
+      score === total
+        ? `All ${total} right. That's a real skill now.`
+        : `${score} of ${total} right. Have another go at the ones you missed.`,
     retake: "Do it again",
   },
   builder: {
     title: "Course builder",
     setUp: "Set up course",
-    setUpBody: "Weeks come from your scheme of work, pre-filled with the notes and materials you already have.",
+    setUpBody:
+      "Weeks come from your scheme of work, pre-filled with the notes and materials you already have.",
     // The course gate and the week gate are different scopes; the words have to say so,
     // or a teacher switches a week on and wonders why students still see nothing.
     publishCourse: "Publish the whole course",
@@ -122,7 +153,9 @@ export const copy = {
     scheduled: (date: string) => `Scheduled ${date}`,
     addItem: "Add",
     emptyWeek: (week: string, when?: string | null) =>
-      when ? `${week} goes live ${when} and is still empty. Add a note or skip it.` : `${week} is still empty. Add a note or skip it.`,
+      when
+        ? `${week} goes live ${when} and is still empty. Add a note or skip it.`
+        : `${week} is still empty. Add a note or skip it.`,
     previewAsStudent: "Preview as student",
     exitPreview: "Exit preview",
     insights: "Insights",
@@ -136,7 +169,8 @@ export const copy = {
     publishNote: "Publish note",
     reseed: "Pull in new notes & materials",
     nudge: "Nudge",
-    nudged: (n: number) => `Sent a friendly nudge to ${n} student${n === 1 ? "" : "s"}.`,
+    nudged: (n: number) =>
+      `Sent a friendly nudge to ${n} student${n === 1 ? "" : "s"}.`,
     completionRules: {
       NONE: "Nothing to complete",
       VIEW: "Opens it",
@@ -168,7 +202,8 @@ export const copy = {
     covered: "Covered",
     demonstrated: "Shown",
     notCovered: "Not yet",
-    shown: (n: number, total: number, element: string) => `You've shown ${n} of ${total} criteria in ${element}`,
+    shown: (n: number, total: number, element: string) =>
+      `You've shown ${n} of ${total} criteria in ${element}`,
   },
   errors: {
     save: "That didn't save. We'll retry — or tap to try now.",
