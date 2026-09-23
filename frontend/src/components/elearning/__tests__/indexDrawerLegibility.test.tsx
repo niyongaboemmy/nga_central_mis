@@ -109,11 +109,28 @@ describe("IndexDrawer legibility", () => {
     );
   });
 
-  it("gives the open item a filled row the other rows do not have", () => {
+  it("gives the open item a tinted row and an accent bar the others lack", () => {
     renderDrawer({ activeItemId: 2 });
-    expect(itemButton("Data Types").className).toContain("bg-brand-500");
-    expect(itemButton("Lesson Introduction").className).not.toContain(
-      "bg-brand-500",
-    );
+    const open = itemButton("Data Types");
+    const other = itemButton("Lesson Introduction");
+
+    // Match the light-mode token exactly: a substring check for "bg-brand-500"
+    // also matches the dark variant "dark:bg-brand-500/[0.14]", so it passed
+    // even after the treatment changed.
+    expect(open.className.split(/\s+/)).toContain("bg-brand-50");
+    expect(other.className.split(/\s+/)).not.toContain("bg-brand-50");
+
+    // The accent bar is the second half of the signal.
+    expect(open.querySelector(".bg-brand-500")).not.toBeNull();
+    expect(other.querySelector(".bg-brand-500")).toBeNull();
+  });
+
+  it("keeps the selected row legible without inverting every glyph", () => {
+    // A saturated fill forced white text, which in turn forced the icon, the
+    // duration and the completion mark to be re-coloured to survive it.
+    renderDrawer({ activeItemId: 2 });
+    const open = itemButton("Data Types");
+    expect(open.className).not.toContain("text-white");
+    expect(open.innerHTML).not.toContain("text-white/");
   });
 });

@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import type { LearnerCourse, LearnerSection } from "../../../api/elearning";
 import { copy } from "../copy";
-import { CompletionDot, ItemTypeIcon, ProgressRing } from "../ui/primitives";
+import { ItemTypeIcon, ProgressRing } from "../ui/primitives";
 
 interface Props {
   course: LearnerCourse;
@@ -39,6 +39,37 @@ const fmtRange = (a: string | null, b: string | null) => {
       month: "short",
     });
   return b && b !== a ? `${d(a)} – ${d(b)}` : d(a);
+};
+
+const ItemMark: React.FC<{ state: string; locked?: boolean }> = ({
+  state,
+  locked,
+}) => {
+  if (locked)
+    return (
+      <Lock
+        className="h-3.5 w-3.5 flex-shrink-0 text-gray-400 dark:text-gray-500"
+        aria-label="Locked"
+      />
+    );
+  if (state === "COMPLETED")
+    return (
+      <Check
+        className="h-3.5 w-3.5 flex-shrink-0 text-success-600 dark:text-success-500"
+        strokeWidth={2.5}
+        aria-label="Done"
+      />
+    );
+  return (
+    <span
+      className={`h-[7px] w-[7px] flex-shrink-0 rounded-full ${
+        state === "IN_PROGRESS"
+          ? "bg-brand-500"
+          : "border border-gray-300 dark:border-gray-600"
+      }`}
+      aria-label={state === "IN_PROGRESS" ? "In progress" : "Not started"}
+    />
+  );
 };
 
 const SectionRow: React.FC<{
@@ -104,11 +135,7 @@ const SectionRow: React.FC<{
               // Completion is said by the tick, not by fading the label. Greying
               // done weeks turned the whole list unreadable the moment a student
               // finished the course — and gray-400 on white is 2.5:1 anyway.
-              className={`truncate text-[13px] font-semibold ${
-                active || s.is_current_week
-                  ? "text-brand-700 dark:text-brand-200"
-                  : "text-gray-900 dark:text-white"
-              }`}
+              className="truncate text-[13px] font-semibold text-gray-900 dark:text-white"
             >
               {topic}
             </span>
@@ -149,8 +176,8 @@ const SectionRow: React.FC<{
             an open one is its count with a hairline meter under the row. */}
         {done ? (
           <Check
-            className="w-4 h-4 flex-shrink-0 text-success-500"
-            strokeWidth={3}
+            className="h-3.5 w-3.5 flex-shrink-0 text-success-600 dark:text-success-500"
+            strokeWidth={2.5}
             aria-label="Week complete"
           />
         ) : s.required_total > 0 ? (
@@ -197,36 +224,27 @@ const SectionRow: React.FC<{
                     aria-current={
                       activeItemId === i.item_id ? "page" : undefined
                     }
-                    className={`relative my-px flex min-h-[36px] w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left transition-colors ${
+                    className={`relative my-px flex min-h-[34px] w-full items-center gap-2.5 rounded-lg py-1.5 pr-2.5 text-left transition-colors ${
                       activeItemId === i.item_id
-                        ? // The one row the reader is actually on: filled, ringed,
-                          // and carrying an accent bar, so it reads as selected at
-                          // a glance rather than as a slightly bluer row.
-                          "bg-brand-500 text-white shadow-soft dark:bg-brand-500 dark:text-white"
-                        : "text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-white/[0.06]"
+                        ? // Selected reads through one soft tint plus an accent
+                          // bar. A saturated fill with white text shouted over
+                          // the rest of the column and forced every glyph in
+                          // the row to be re-coloured to survive it.
+                          "bg-brand-50 font-semibold text-brand-800 dark:bg-brand-500/[0.14] dark:text-brand-100"
+                        : "text-gray-700 hover:bg-gray-100/80 dark:text-gray-200 dark:hover:bg-white/[0.05]"
                     } disabled:opacity-50`}
-                    style={{ paddingLeft: `${8 + i.indent * 12}px` }}
+                    style={{ paddingLeft: `${10 + i.indent * 12}px` }}
                   >
-                    <span
-                      className={
-                        activeItemId === i.item_id
-                          ? "flex-shrink-0 rounded-full ring-2 ring-white/70"
-                          : "flex-shrink-0"
-                      }
-                    >
-                      <CompletionDot
-                        state={i.state}
-                        locked={i.locked}
-                        size={14}
+                    {activeItemId === i.item_id && (
+                      <span
+                        className="absolute inset-y-1 left-0 w-[3px] rounded-pill bg-brand-500"
+                        aria-hidden
                       />
-                    </span>
+                    )}
+                    <ItemMark state={i.state} locked={i.locked} />
                     <ItemTypeIcon
                       type={i.item_type}
-                      className={`w-3.5 h-3.5 flex-shrink-0 ${
-                        activeItemId === i.item_id
-                          ? "text-white/90"
-                          : "text-gray-500 dark:text-gray-400"
-                      }`}
+                      className="h-3.5 w-3.5 flex-shrink-0 text-gray-500 dark:text-gray-400"
                     />
                     <span
                       className={`flex-1 truncate text-[13px] ${
@@ -236,13 +254,7 @@ const SectionRow: React.FC<{
                       {i.title}
                     </span>
                     {i.estimated_minutes ? (
-                      <span
-                        className={`flex-shrink-0 text-[10px] tabular-nums ${
-                          activeItemId === i.item_id
-                            ? "text-white/80"
-                            : "text-gray-500 dark:text-gray-400"
-                        }`}
-                      >
+                      <span className="flex-shrink-0 text-[10px] tabular-nums text-gray-500 dark:text-gray-400">
                         {i.estimated_minutes}m
                       </span>
                     ) : null}
