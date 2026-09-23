@@ -69,7 +69,7 @@ const SectionRow: React.FC<{
   return (
     <li data-section={s.section_id}>
       <div
-        className={`relative flex items-center gap-1 pl-1 pr-2 py-1 rounded-xl min-h-[40px] transition-colors ${
+        className={`relative flex items-center gap-1 rounded-xl py-1.5 pl-1 pr-2.5 transition-colors ${
           active
             ? "bg-brand-50 dark:bg-brand-500/[0.12]"
             : "hover:bg-gray-50 dark:hover:bg-white/[0.04]"
@@ -86,7 +86,7 @@ const SectionRow: React.FC<{
           onClick={() => toggle(s.section_id)}
           aria-expanded={isOpen}
           aria-label={`${isOpen ? "Collapse" : "Expand"} ${s.title}`}
-          className="w-6 h-6 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 flex-shrink-0"
+          className="w-6 h-6 flex items-center justify-center rounded-lg text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200 flex-shrink-0"
         >
           <ChevronDown
             className={`w-4 h-4 transition-transform ${isOpen ? "" : "-rotate-90"}`}
@@ -101,29 +101,30 @@ const SectionRow: React.FC<{
               is one quiet line under it. */}
           <span className="flex items-baseline gap-1.5">
             <span
-              className={`text-[13px] font-semibold truncate ${
-                done
-                  ? "text-gray-400 dark:text-gray-500"
-                  : active || s.is_current_week
-                    ? "text-brand-700 dark:text-brand-200"
-                    : "text-gray-900 dark:text-white"
+              // Completion is said by the tick, not by fading the label. Greying
+              // done weeks turned the whole list unreadable the moment a student
+              // finished the course — and gray-400 on white is 2.5:1 anyway.
+              className={`truncate text-[13px] font-semibold ${
+                active || s.is_current_week
+                  ? "text-brand-700 dark:text-brand-200"
+                  : "text-gray-900 dark:text-white"
               }`}
             >
               {topic}
             </span>
             {s.state === "locked" && (
               <Lock
-                className="w-3 h-3 flex-shrink-0 text-gray-400"
+                className="w-3 h-3 flex-shrink-0 text-gray-500 dark:text-gray-400"
                 aria-label={copy.course.locked}
               />
             )}
           </span>
-          <span className="mt-px flex items-center gap-1.5 text-[11px] text-gray-400">
+          <span className="mt-px flex items-center gap-1.5 text-[11px] text-gray-500 dark:text-gray-400">
             <span className="flex-shrink-0">
               {s.week_number || s.title.split(" — ")[0]}
             </span>
             {s.is_current_week && (
-              <span className="flex-shrink-0 rounded-pill bg-brand-500 px-1.5 text-[9px] font-bold uppercase tracking-wide text-white">
+              <span className="flex-shrink-0 rounded-pill bg-brand-50 px-1.5 py-px text-[10px] font-semibold text-brand-700 dark:bg-brand-500/15 dark:text-brand-200">
                 Now
               </span>
             )}
@@ -131,6 +132,17 @@ const SectionRow: React.FC<{
               {fmtRange(s.start_date, s.end_date)}
             </span>
           </span>
+          {!done && s.required_total > 0 && pct > 0 && (
+            <span
+              className="mt-1.5 block h-[3px] overflow-hidden rounded-pill bg-gray-200/80 dark:bg-white/[0.08]"
+              aria-hidden
+            >
+              <span
+                className="block h-full rounded-pill bg-brand-500 transition-[width] duration-500"
+                style={{ width: `${pct}%` }}
+              />
+            </span>
+          )}
         </button>
         {/* One signal per week. A filled ring beside a column of filled item
             dots read as two competing checklists; a done week is a small tick,
@@ -149,19 +161,8 @@ const SectionRow: React.FC<{
             {s.required_done}/{s.required_total}
           </span>
         ) : (
-          <span className="text-[11px] text-gray-400 tabular-nums flex-shrink-0">
+          <span className="text-[11px] text-gray-500 dark:text-gray-400 tabular-nums flex-shrink-0">
             {s.items.length || ""}
-          </span>
-        )}
-        {!done && s.required_total > 0 && pct > 0 && (
-          <span
-            className="pointer-events-none absolute bottom-0 left-8 right-2 h-px overflow-hidden rounded-pill bg-gray-200 dark:bg-white/[0.08]"
-            aria-hidden
-          >
-            <span
-              className="block h-full rounded-pill bg-brand-500"
-              style={{ width: `${pct}%` }}
-            />
           </span>
         )}
       </div>
@@ -172,10 +173,10 @@ const SectionRow: React.FC<{
             animate={{ height: "auto", opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
             transition={{ duration: 0.2 }}
-            className="overflow-hidden ml-[18px] pl-3 border-l border-gray-200 dark:border-white/[0.08]"
+            className="ml-[13px] overflow-hidden border-l border-gray-200 pl-2 dark:border-white/[0.08]"
           >
             {s.items.length === 0 && (
-              <li className="px-3 py-3 text-xs text-gray-400 flex items-start gap-2">
+              <li className="px-3 py-3 text-xs text-gray-500 dark:text-gray-400 flex items-start gap-2">
                 <Hourglass className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
                 <span>{copy.course.emptyStudent}</span>
               </li>
@@ -184,7 +185,7 @@ const SectionRow: React.FC<{
               i.item_type === "HEADER" ? (
                 <li
                   key={i.item_id}
-                  className="px-3 pt-3 pb-1 text-[10px] uppercase tracking-wider font-semibold text-gray-400"
+                  className="px-2 pb-1 pt-3 text-[10px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400"
                 >
                   {i.title}
                 </li>
@@ -196,29 +197,52 @@ const SectionRow: React.FC<{
                     aria-current={
                       activeItemId === i.item_id ? "page" : undefined
                     }
-                    className={`w-full flex items-center gap-2 px-2.5 py-1.5 my-px rounded-lg text-left min-h-[36px] transition-colors ${
+                    className={`relative my-px flex min-h-[36px] w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left transition-colors ${
                       activeItemId === i.item_id
-                        ? "el-chip-brand font-medium"
-                        : "text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-white/[0.06]"
+                        ? // The one row the reader is actually on: filled, ringed,
+                          // and carrying an accent bar, so it reads as selected at
+                          // a glance rather than as a slightly bluer row.
+                          "bg-brand-500 text-white shadow-soft dark:bg-brand-500 dark:text-white"
+                        : "text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-white/[0.06]"
                     } disabled:opacity-50`}
-                    style={{ paddingLeft: `${10 + i.indent * 12}px` }}
+                    style={{ paddingLeft: `${8 + i.indent * 12}px` }}
                   >
-                    <CompletionDot
-                      state={i.state}
-                      locked={i.locked}
-                      size={14}
-                    />
+                    <span
+                      className={
+                        activeItemId === i.item_id
+                          ? "flex-shrink-0 rounded-full ring-2 ring-white/70"
+                          : "flex-shrink-0"
+                      }
+                    >
+                      <CompletionDot
+                        state={i.state}
+                        locked={i.locked}
+                        size={14}
+                      />
+                    </span>
                     <ItemTypeIcon
                       type={i.item_type}
-                      className="w-3.5 h-3.5 text-gray-400 flex-shrink-0"
+                      className={`w-3.5 h-3.5 flex-shrink-0 ${
+                        activeItemId === i.item_id
+                          ? "text-white/90"
+                          : "text-gray-500 dark:text-gray-400"
+                      }`}
                     />
                     <span
-                      className={`text-[13px] truncate flex-1 ${i.state === "COMPLETED" ? "text-gray-400" : ""}`}
+                      className={`flex-1 truncate text-[13px] ${
+                        activeItemId === i.item_id ? "font-semibold" : ""
+                      }`}
                     >
                       {i.title}
                     </span>
                     {i.estimated_minutes ? (
-                      <span className="text-[10px] text-gray-400 tabular-nums flex-shrink-0">
+                      <span
+                        className={`flex-shrink-0 text-[10px] tabular-nums ${
+                          activeItemId === i.item_id
+                            ? "text-white/80"
+                            : "text-gray-500 dark:text-gray-400"
+                        }`}
+                      >
                         {i.estimated_minutes}m
                       </span>
                     ) : null}
@@ -307,7 +331,7 @@ const IndexDrawer: React.FC<Props> = ({
             )}
           </p>
           {course.teacher.name && (
-            <p className="text-[11px] text-gray-400 truncate">
+            <p className="text-[11px] text-gray-500 dark:text-gray-400 truncate">
               {course.teacher.name}
             </p>
           )}
@@ -395,7 +419,7 @@ const IndexDrawer: React.FC<Props> = ({
             />
             {/* The label stays readable sideways rather than disappearing. */}
             <span
-              className="mt-1 text-[10px] uppercase tracking-wider text-gray-400"
+              className="mt-1 text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400"
               style={{ writingMode: "vertical-rl" }}
             >
               {copy.course.index}
