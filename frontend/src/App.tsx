@@ -347,12 +347,14 @@ function App() {
               }
             />
 
-            {/* Documents - protected with sidebar */}
+            {/* Documents - protected with sidebar.
+                fullWidth: a file manager with its own tree rail was being
+                squeezed into the default max-w-7xl. */}
             <Route
               path="/documents"
               element={
                 <ProtectedRoute>
-                  <SystemLayoutWrapper>
+                  <SystemLayoutWrapper fullWidth>
                     <DocumentsPage />
                   </SystemLayoutWrapper>
                 </ProtectedRoute>

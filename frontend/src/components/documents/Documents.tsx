@@ -1504,7 +1504,9 @@ const Documents: React.FC = () => {
   };
 
   return (
-    <div className="flex bg-gray-50 dark:bg-black h-full">
+    // Owns the height it was given instead of guessing at it, so the file list
+    // reaches the bottom of the window on every screen.
+    <div className="-mx-4 flex h-[calc(100vh-4rem)] overflow-hidden border-t border-gray-200 bg-gray-50 dark:border-white/[0.07] dark:bg-black md:-mx-6">
       {/* Folder Tree Sidebar */}
       <AnimatePresence>
         {showFolderTree && activeTab === "my-documents" && (
@@ -1592,13 +1594,11 @@ const Documents: React.FC = () => {
 
         {/* Content Area */}
         <div
-          className="flex- overflow-auto p-4 w-full"
-          style={{
-            height:
-              activeTab === "shared-with-me"
-                ? "calc(100vh - 210px)"
-                : "calc(100vh - 210px)",
-          }}
+          /* `flex-` was a typo for `flex-1` and did nothing, so the area never
+             flexed; the inline calc(100vh - 210px) that compensated was a magic
+             number that did not track the real chrome height and produced a
+             second scrollbar on short screens. */
+          className="min-h-0 w-full flex-1 overflow-auto p-4"
           onContextMenu={(e) => {
             e.preventDefault();
             setContextMenu({
@@ -1652,10 +1652,10 @@ const Documents: React.FC = () => {
         {/* Status Bar */}
         <StatusBar
           activeTab={activeTab}
-          foldersCount={folders.length}
-          documentsCount={documents.length}
-          sharedDocumentsCount={sharedDocuments.length}
-          sharedFoldersCount={sharedFolders.length}
+          foldersCount={visibleFolders.length}
+          documentsCount={visibleDocuments.length}
+          sharedDocumentsCount={filteredSharedDocuments.length}
+          sharedFoldersCount={filteredSharedFolders.length}
           viewMode={viewMode}
           onGoBack={goBack}
           breadcrumbsLength={breadcrumbs.length}
