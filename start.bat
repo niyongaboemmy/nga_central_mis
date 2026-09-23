@@ -134,12 +134,23 @@ if errorlevel 1 (
     echo   - Building the database ^(first run, takes a few minutes^)...
     pushd backend
     call npm run db:setup
-    if errorlevel 1 (
+    set "DB_BUILD=!errorlevel!"
+    :: A failed build can leave a half-written database behind, and the normal
+    :: run refuses to touch one that already exists. Retrying with --force
+    :: wipes it and starts clean, which is what every developer was being told
+    :: to type by hand. Only ever on the failure path: --force on every start
+    :: would drop the database each time you launch the app.
+    if not "!DB_BUILD!"=="0" (
+        echo   - Build failed - wiping the partial database and retrying once...
+        call npm run db:setup -- --force
+        set "DB_BUILD=!errorlevel!"
+    )
+    if not "!DB_BUILD!"=="0" (
         popd
         echo.
         echo   [X] Database setup failed - see the error above.
-        echo       To wipe and rebuild an existing database:
-        echo           cd backend ^&^& npm run db:setup -- --force
+        echo       The retry with --force did not help either, so this is not
+        echo       a half-built database. Send the error above to the team.
         echo.
         pause
         exit /b 1
