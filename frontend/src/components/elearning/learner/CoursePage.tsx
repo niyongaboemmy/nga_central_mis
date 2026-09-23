@@ -345,7 +345,9 @@ const CoursePage: React.FC = () => {
         onToggleCollapsed={toggleIndexCollapsed}
       />
 
-      <main className="flex-1 min-w-0">
+      {/* The reader used to start flush against the app bar, so the title had
+          no air above it. */}
+      <main className="min-w-0 flex-1 pt-4 md:pt-6">
         {(!online || queued > 0) && (
           <div
             className="mx-4 mt-5 flex items-center gap-2 px-3 py-2 rounded-xl el-chip-warning text-xs"

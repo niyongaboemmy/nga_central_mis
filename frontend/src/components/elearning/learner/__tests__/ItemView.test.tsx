@@ -156,17 +156,18 @@ describe("ItemView — the lesson reader", () => {
     localStorage.clear();
     const { unmount } = render(<ItemView opened={opened()} onBack={vi.fn()} />);
 
-    const smaller = screen.getByRole("button", { name: /Smaller text/i });
-    expect(screen.getByText("100%")).toBeInTheDocument();
-
-    await userEvent.click(smaller);
-    await userEvent.click(smaller);
+    // The reader opens at 80% — a deliberate default, not the floor.
     expect(screen.getByText("80%")).toBeInTheDocument();
+
+    const bigger = screen.getByRole("button", { name: /Larger text/i });
+    await userEvent.click(bigger);
+    await userEvent.click(bigger);
+    expect(screen.getByText("100%")).toBeInTheDocument();
 
     // Preference is per-device and shared with the lesson-note reader.
     unmount();
     render(<ItemView opened={opened()} onBack={vi.fn()} />);
-    expect(screen.getByText("80%")).toBeInTheDocument();
+    expect(screen.getByText("100%")).toBeInTheDocument();
   });
 
   it("will not shrink the text past the floor", async () => {
@@ -176,7 +177,8 @@ describe("ItemView — the lesson reader", () => {
     for (let i = 0; i < 10; i += 1) {
       if (!(smaller as HTMLButtonElement).disabled) await userEvent.click(smaller);
     }
-    expect(screen.getByText("80%")).toBeInTheDocument();
+    // The floor sits below the 80% default, so A− still has somewhere to go.
+    expect(screen.getByText("70%")).toBeInTheDocument();
     expect(smaller).toBeDisabled();
   });
 

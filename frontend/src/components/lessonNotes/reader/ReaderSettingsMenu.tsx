@@ -5,7 +5,12 @@ import { ReaderPaper, ReaderPrefs } from "./useReaderPrefs";
 
 const PAPERS: { key: ReaderPaper; label: string; swatch: string }[] = [
   // Auto first: it is the default, and follows the app's light/dark setting.
-  { key: "auto", label: "Auto", swatch: "bg-gradient-to-br from-white from-50% to-gray-900 to-50% border-gray-400" },
+  {
+    key: "auto",
+    label: "Auto",
+    swatch:
+      "bg-gradient-to-br from-white from-50% to-gray-900 to-50% border-gray-400",
+  },
   { key: "paper", label: "Paper", swatch: "bg-white border-gray-300" },
   { key: "sepia", label: "Sepia", swatch: "bg-[#f4ecd8] border-amber-300" },
   { key: "night", label: "Night", swatch: "bg-gray-900 border-gray-600" },
@@ -23,13 +28,19 @@ interface Props {
 
 /** Text size / typeface / line spacing / paper. Shared by the single-note reader and the
  *  combined reader so both surfaces offer exactly the same reading controls. */
-const ReaderSettingsMenu: React.FC<Props> = ({ prefs, update, open, setOpen }) => {
+const ReaderSettingsMenu: React.FC<Props> = ({
+  prefs,
+  update,
+  open,
+  setOpen,
+}) => {
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!open) return;
     const onClick = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+      if (ref.current && !ref.current.contains(e.target as Node))
+        setOpen(false);
     };
     document.addEventListener("mousedown", onClick);
     return () => document.removeEventListener("mousedown", onClick);
@@ -57,10 +68,17 @@ const ReaderSettingsMenu: React.FC<Props> = ({ prefs, update, open, setOpen }) =
             transition={{ duration: 0.13 }}
             className="absolute right-0 mt-2 w-64 rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-xl p-3.5 z-40"
           >
-            <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400 mb-2">Text size</p>
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400 mb-2">
+              Text size
+            </p>
             <div className="flex items-center gap-2 mb-4">
               <button
-                onClick={() => update("fontScale", Math.max(MIN_SCALE, +(prefs.fontScale - 0.1).toFixed(2)))}
+                onClick={() =>
+                  update(
+                    "fontScale",
+                    Math.max(MIN_SCALE, +(prefs.fontScale - 0.1).toFixed(2)),
+                  )
+                }
                 aria-label="Smaller text"
                 className="p-1.5 rounded-lg border border-gray-200 dark:border-gray-600 text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700"
               >
@@ -75,7 +93,12 @@ const ReaderSettingsMenu: React.FC<Props> = ({ prefs, update, open, setOpen }) =
                 />
               </div>
               <button
-                onClick={() => update("fontScale", Math.min(MAX_SCALE, +(prefs.fontScale + 0.1).toFixed(2)))}
+                onClick={() =>
+                  update(
+                    "fontScale",
+                    Math.min(MAX_SCALE, +(prefs.fontScale + 0.1).toFixed(2)),
+                  )
+                }
                 aria-label="Larger text"
                 className="p-1.5 rounded-lg border border-gray-200 dark:border-gray-600 text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700"
               >
@@ -83,12 +106,20 @@ const ReaderSettingsMenu: React.FC<Props> = ({ prefs, update, open, setOpen }) =
               </button>
             </div>
 
-            <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400 mb-2">Typeface</p>
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400 mb-2">
+              Typeface
+            </p>
             <div className="grid grid-cols-2 gap-1.5 mb-4">
-              {([
+              {[
+                // Reading first: the default, and the most legible of the three.
+                {
+                  key: "reading" as const,
+                  label: "Reading",
+                  cls: "font-reading",
+                },
                 { key: "serif" as const, label: "Serif", cls: "font-serif" },
                 { key: "sans" as const, label: "Sans", cls: "font-sans" },
-              ]).map((f) => (
+              ].map((f) => (
                 <button
                   key={f.key}
                   onClick={() => update("font", f.key)}
@@ -103,7 +134,9 @@ const ReaderSettingsMenu: React.FC<Props> = ({ prefs, update, open, setOpen }) =
               ))}
             </div>
 
-            <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400 mb-2">Line spacing</p>
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400 mb-2">
+              Line spacing
+            </p>
             <div className="grid grid-cols-3 gap-1.5 mb-4">
               {[1.55, 1.75, 2.05].map((lh) => (
                 <button
@@ -116,12 +149,17 @@ const ReaderSettingsMenu: React.FC<Props> = ({ prefs, update, open, setOpen }) =
                       : "border-gray-200 dark:border-gray-600 text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700"
                   }`}
                 >
-                  <AlignLeft className="w-3.5 h-3.5" style={{ transform: `scaleY(${lh / 1.75})` }} />
+                  <AlignLeft
+                    className="w-3.5 h-3.5"
+                    style={{ transform: `scaleY(${lh / 1.75})` }}
+                  />
                 </button>
               ))}
             </div>
 
-            <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400 mb-2">Paper</p>
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400 mb-2">
+              Paper
+            </p>
             <div className="grid grid-cols-3 gap-1.5">
               {PAPERS.map((p) => (
                 <button
@@ -134,7 +172,9 @@ const ReaderSettingsMenu: React.FC<Props> = ({ prefs, update, open, setOpen }) =
                   }`}
                 >
                   <span className={`w-6 h-6 rounded-md border ${p.swatch}`} />
-                  <span className="text-[10px] text-gray-500 dark:text-gray-400">{p.label}</span>
+                  <span className="text-[10px] text-gray-500 dark:text-gray-400">
+                    {p.label}
+                  </span>
                 </button>
               ))}
             </div>

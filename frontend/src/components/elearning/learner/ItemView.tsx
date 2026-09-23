@@ -32,7 +32,11 @@ import { hydrateInlineChecks } from "../interactive/hydrate";
 interface Props {
   opened: OpenedItem;
   onBack: () => void;
-  onChecked?: (result: { score_pct: number; passed: boolean; just_completed: boolean }) => void;
+  onChecked?: (result: {
+    score_pct: number;
+    passed: boolean;
+    just_completed: boolean;
+  }) => void;
   /** Walk to the next step from the end-of-lesson card, rather than hunting for a chevron. */
   onNext?: () => void;
   /** Step position within the week, so the reader can say "Step 2 of 5". */
@@ -53,7 +57,11 @@ const ReadingProgress: React.FC<{
   // In focus mode the page itself doesn't scroll — the overlay does, so the bar has to
   // track that container instead of the window.
   const { scrollYProgress } = useScroll(container ? { container } : undefined);
-  const width = useSpring(scrollYProgress, { stiffness: 220, damping: 40, restDelta: 0.001 });
+  const width = useSpring(scrollYProgress, {
+    stiffness: 220,
+    damping: 40,
+    restDelta: 0.001,
+  });
   return (
     <motion.div
       aria-hidden
@@ -86,7 +94,8 @@ const useFocusMode = () => {
   };
   const leave = () => {
     setOn(false);
-    if (document.fullscreenElement) document.exitFullscreen().catch(() => undefined);
+    if (document.fullscreenElement)
+      document.exitFullscreen().catch(() => undefined);
   };
 
   useEffect(() => {
@@ -120,7 +129,14 @@ const formatBytes = (n?: number | null) => {
 };
 
 /** Dispatches on item_type — every type renders in the same right pane (UX plan §3.1). */
-const ItemView: React.FC<Props> = ({ opened, onBack, onChecked, onNext, step, onAskAI }) => {
+const ItemView: React.FC<Props> = ({
+  opened,
+  onBack,
+  onChecked,
+  onNext,
+  step,
+  onAskAI,
+}) => {
   const m = useMotion();
   const { item, content } = opened;
   const frame = { opened, onBack, onNext, step, onAskAI };
@@ -129,15 +145,25 @@ const ItemView: React.FC<Props> = ({ opened, onBack, onChecked, onNext, step, on
     return (
       <div className="flex flex-col items-center text-center py-16 px-6">
         <Lock className="w-8 h-8 text-gray-400" />
-        <h2 className="mt-3 text-base font-semibold text-gray-800 dark:text-gray-100">{copy.course.locked}</h2>
-        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400 max-w-sm">{copy.course.lockedBody(null)}</p>
+        <h2 className="mt-3 text-base font-semibold text-gray-800 dark:text-gray-100">
+          {copy.course.locked}
+        </h2>
+        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400 max-w-sm">
+          {copy.course.lockedBody(null)}
+        </p>
       </div>
     );
   }
 
   switch (item.item_type) {
     case "LESSON_NOTE":
-      return <SharedLessonNoteViewPage noteId={content?.note_id} onBack={onBack} backLabel={opened.section.title.split(" — ")[0] || "Course"} />;
+      return (
+        <SharedLessonNoteViewPage
+          noteId={content?.note_id}
+          onBack={onBack}
+          backLabel={opened.section.title.split(" — ")[0] || "Course"}
+        />
+      );
     case "SUBJECT_DOCUMENT":
       return <DocumentView {...frame} />;
     case "PAGE":
@@ -147,7 +173,11 @@ const ItemView: React.FC<Props> = ({ opened, onBack, onChecked, onNext, step, on
     case "KNOWLEDGE_CHECK":
       return (
         <ItemFrame {...frame}>
-          <KnowledgeCheckCard itemId={item.item_id} questions={content?.questions || []} onResult={onChecked} />
+          <KnowledgeCheckCard
+            itemId={item.item_id}
+            questions={content?.questions || []}
+            onResult={onChecked}
+          />
         </ItemFrame>
       );
     case "LINK":
@@ -157,7 +187,11 @@ const ItemView: React.FC<Props> = ({ opened, onBack, onChecked, onNext, step, on
       return (
         <ItemFrame {...frame}>
           <motion.div {...m("reveal")} className="el-card p-5">
-            {item.description && <p className="text-sm text-gray-600 dark:text-gray-300 mb-4 whitespace-pre-line">{item.description}</p>}
+            {item.description && (
+              <p className="text-sm text-gray-600 dark:text-gray-300 mb-4 whitespace-pre-line">
+                {item.description}
+              </p>
+            )}
             {/* Where you're actually going. A bare "Open in a new tab" button in an empty
                 card told a student nothing about the destination or why it was set. */}
             <ExternalDestination
@@ -172,22 +206,33 @@ const ItemView: React.FC<Props> = ({ opened, onBack, onChecked, onNext, step, on
             >
               <ExternalLink className="w-4 h-4" />
               {copy.course.openIn(
-                item.item_type === "LINK" ? "a new tab" : item.item_type === "DISCUSSION" ? "Tupo" : "Task Mentor",
+                item.item_type === "LINK"
+                  ? "a new tab"
+                  : item.item_type === "DISCUSSION"
+                    ? "Tupo"
+                    : "Task Mentor",
               )}
             </a>
-            {item.completion_rule === "MARK_DONE" && item.state !== "COMPLETED" && (
-              <p className="mt-3 text-xs text-gray-500 dark:text-gray-400">
-                {copy.course.linkAfterOpening}
-              </p>
-            )}
-            {["SUBMIT", "MIN_SCORE"].includes(item.completion_rule) && item.state !== "COMPLETED" && (
-              <p className="mt-4 text-xs text-gray-500 dark:text-gray-400 flex items-center gap-2">
-                <Loader2 className="w-3.5 h-3.5 animate-spin" /> {copy.course.awaitingResult}
-                {item.completion_rule === "MIN_SCORE" && item.min_score_pct ? ` — you need ${item.min_score_pct}%` : ""}
-              </p>
-            )}
+            {item.completion_rule === "MARK_DONE" &&
+              item.state !== "COMPLETED" && (
+                <p className="mt-3 text-xs text-gray-500 dark:text-gray-400">
+                  {copy.course.linkAfterOpening}
+                </p>
+              )}
+            {["SUBMIT", "MIN_SCORE"].includes(item.completion_rule) &&
+              item.state !== "COMPLETED" && (
+                <p className="mt-4 text-xs text-gray-500 dark:text-gray-400 flex items-center gap-2">
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />{" "}
+                  {copy.course.awaitingResult}
+                  {item.completion_rule === "MIN_SCORE" && item.min_score_pct
+                    ? ` — you need ${item.min_score_pct}%`
+                    : ""}
+                </p>
+              )}
             {item.best_score_pct !== null && (
-              <p className="mt-3 text-sm font-semibold text-gray-700 dark:text-gray-200">Best score: {Math.round(item.best_score_pct)}%</p>
+              <p className="mt-3 text-sm font-semibold text-gray-700 dark:text-gray-200">
+                Best score: {Math.round(item.best_score_pct)}%
+              </p>
             )}
           </motion.div>
         </ItemFrame>
@@ -202,10 +247,10 @@ const ItemView: React.FC<Props> = ({ opened, onBack, onChecked, onNext, step, on
 };
 
 /** The host of an external destination, said plainly. */
-const ExternalDestination: React.FC<{ url: string; itemType: OpenedItem["item"]["item_type"] }> = ({
-  url,
-  itemType,
-}) => {
+const ExternalDestination: React.FC<{
+  url: string;
+  itemType: OpenedItem["item"]["item_type"];
+}> = ({ url, itemType }) => {
   let host = "";
   try {
     host = new URL(url).hostname.replace(/^www\./, "");
@@ -219,9 +264,13 @@ const ExternalDestination: React.FC<{ url: string; itemType: OpenedItem["item"][
         <Globe className="w-4 h-4" />
       </span>
       <div className="min-w-0">
-        <p className="text-sm font-semibold text-gray-800 dark:text-gray-100 truncate">{host}</p>
+        <p className="text-sm font-semibold text-gray-800 dark:text-gray-100 truncate">
+          {host}
+        </p>
         <p className="text-[11px] text-gray-500 dark:text-gray-400">
-          {itemType === "LINK" ? copy.course.linkOpensElsewhere(host) : copy.builder.itemTypes[itemType]}
+          {itemType === "LINK"
+            ? copy.course.linkOpensElsewhere(host)
+            : copy.builder.itemTypes[itemType]}
         </p>
       </div>
     </div>
@@ -254,7 +303,10 @@ const ItemFrame: React.FC<{
   const body = (
     <div
       className={`el-step el-step--${prefs.paper} el-step--${prefs.font} mx-auto ${
-        wide ? "max-w-5xl" : "max-w-[46rem]"
+        // Wider measure: the column left a third of a desktop screen empty,
+        // and the 80% default body size fits more words per line than the old
+        // 46rem was sized for.
+        wide ? "max-w-[76rem]" : "max-w-[58rem]"
       } px-4 sm:px-6 py-6 pb-28`}
       style={
         {
@@ -263,100 +315,101 @@ const ItemFrame: React.FC<{
         } as React.CSSProperties
       }
     >
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] uppercase tracking-wider font-semibold text-gray-500 dark:text-gray-400">
-          <span className="flex items-center gap-1.5">
-            <ItemTypeIcon type={item.item_type} className="w-3.5 h-3.5" />
-            {copy.builder.itemTypes[item.item_type]}
-          </span>
-          <span aria-hidden>·</span>
-          <button
-            onClick={onBack}
-            className="hover:text-brand-600 dark:hover:text-brand-300 focus-visible:outline-none focus-visible:underline transition-colors uppercase"
-          >
-            {opened.section.title}
-          </button>
-          {step && step.total > 1 && (
-            <>
-              <span aria-hidden>·</span>
-              <span className="normal-case tracking-normal font-medium text-gray-400">
-                {copy.course.stepOf(step.index, step.total)}
-              </span>
-            </>
-          )}
-        </div>
-
-        <div className="mt-1.5 flex items-start justify-between gap-3">
-          <h1 className="text-2xl sm:text-[1.75rem] font-bold text-gray-900 dark:text-white leading-tight tracking-tight min-w-0">
-            {item.title}
-          </h1>
-          {!focus.on && (
-            <div className="hidden sm:block flex-shrink-0">
-              <ReaderControls
-                prefs={prefs}
-                update={update}
-                trailing={
-                  <button
-                    onClick={focus.enter}
-                    title={copy.course.focusEnter}
-                    aria-label={copy.course.focusEnter}
-                    className="w-9 h-9 flex items-center justify-center rounded-pill el-chip text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-white/[0.10] focus:outline-none focus-visible:shadow-glow transition-colors"
-                  >
-                    <Expand className="w-4 h-4" />
-                  </button>
-                }
-              />
-            </div>
-          )}
-        </div>
-
-        {/* Meta row: the small facts a reader wants before committing to a page. */}
-        <div className="mt-2.5 flex flex-wrap items-center gap-2">
-          {isDone && (
-            <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-pill el-chip-success">
-              <CheckCircle2 className="w-3 h-3" /> {copy.course.done}
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] uppercase tracking-wider font-semibold text-gray-500 dark:text-gray-400">
+        <span className="flex items-center gap-1.5">
+          <ItemTypeIcon type={item.item_type} className="w-3.5 h-3.5" />
+          {copy.builder.itemTypes[item.item_type]}
+        </span>
+        <span aria-hidden>·</span>
+        <button
+          onClick={onBack}
+          className="hover:text-brand-600 dark:hover:text-brand-300 focus-visible:outline-none focus-visible:underline transition-colors uppercase"
+        >
+          {opened.section.title}
+        </button>
+        {step && step.total > 1 && (
+          <>
+            <span aria-hidden>·</span>
+            <span className="normal-case tracking-normal font-medium text-gray-400">
+              {copy.course.stepOf(step.index, step.total)}
             </span>
-          )}
-          {item.estimated_minutes ? (
-            <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-pill el-chip text-gray-600 dark:text-gray-300">
-              <Clock className="w-3 h-3" /> {copy.course.readingTime(item.estimated_minutes)}
-            </span>
-          ) : null}
-          {item.criteria.length > 0 && (
-            <span
-              className="inline-flex items-center gap-1 text-[11px] font-medium text-gray-500 dark:text-gray-400"
-              title={copy.course.teachesLabel}
-            >
-              <Target className="w-3 h-3" />
-              {item.criteria.map((c) => c.criteria_number).join(", ")}
-            </span>
-          )}
-        </div>
-
-        {item.criteria.length > 0 && (
-          <ul
-            className="mt-3 space-y-1 p-3 rounded-xl el-subtle"
-            aria-label={copy.course.teachesLabel}
-          >
-            <li className="text-[11px] uppercase tracking-wider font-semibold text-gray-500 dark:text-gray-400">
-              {copy.course.teachesLabel}
-            </li>
-            {item.criteria.map((c) => (
-              <li
-                key={c.criteria_id}
-                className="flex items-start gap-2 text-[13px] text-gray-700 dark:text-gray-200 leading-snug"
-              >
-                <span className="mt-0.5 text-[11px] font-bold text-brand-600 dark:text-brand-300 flex-shrink-0">
-                  {c.criteria_number}
-                </span>
-                {c.description}
-              </li>
-            ))}
-          </ul>
+          </>
         )}
+      </div>
 
-        <div className="mt-6">{children}</div>
+      <div className="mt-1.5 flex items-start justify-between gap-3">
+        <h1 className="text-2xl sm:text-[1.75rem] font-bold text-gray-900 dark:text-white leading-tight tracking-tight min-w-0">
+          {item.title}
+        </h1>
+        {!focus.on && (
+          <div className="hidden sm:block flex-shrink-0">
+            <ReaderControls
+              prefs={prefs}
+              update={update}
+              trailing={
+                <button
+                  onClick={focus.enter}
+                  title={copy.course.focusEnter}
+                  aria-label={copy.course.focusEnter}
+                  className="w-9 h-9 flex items-center justify-center rounded-pill el-chip text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-white/[0.10] focus:outline-none focus-visible:shadow-glow transition-colors"
+                >
+                  <Expand className="w-4 h-4" />
+                </button>
+              }
+            />
+          </div>
+        )}
+      </div>
 
-        <EndOfLesson opened={opened} onNext={onNext} onBack={onBack} />
+      {/* Meta row: the small facts a reader wants before committing to a page. */}
+      <div className="mt-2.5 flex flex-wrap items-center gap-2">
+        {isDone && (
+          <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-pill el-chip-success">
+            <CheckCircle2 className="w-3 h-3" /> {copy.course.done}
+          </span>
+        )}
+        {item.estimated_minutes ? (
+          <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-pill el-chip text-gray-600 dark:text-gray-300">
+            <Clock className="w-3 h-3" />{" "}
+            {copy.course.readingTime(item.estimated_minutes)}
+          </span>
+        ) : null}
+        {item.criteria.length > 0 && (
+          <span
+            className="inline-flex items-center gap-1 text-[11px] font-medium text-gray-500 dark:text-gray-400"
+            title={copy.course.teachesLabel}
+          >
+            <Target className="w-3 h-3" />
+            {item.criteria.map((c) => c.criteria_number).join(", ")}
+          </span>
+        )}
+      </div>
+
+      {item.criteria.length > 0 && (
+        <ul
+          className="mt-3 space-y-1 p-3 rounded-xl el-subtle"
+          aria-label={copy.course.teachesLabel}
+        >
+          <li className="text-[11px] uppercase tracking-wider font-semibold text-gray-500 dark:text-gray-400">
+            {copy.course.teachesLabel}
+          </li>
+          {item.criteria.map((c) => (
+            <li
+              key={c.criteria_id}
+              className="flex items-start gap-2 text-[13px] text-gray-700 dark:text-gray-200 leading-snug"
+            >
+              <span className="mt-0.5 text-[11px] font-bold text-brand-600 dark:text-brand-300 flex-shrink-0">
+                {c.criteria_number}
+              </span>
+              {c.description}
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <div className="mt-6">{children}</div>
+
+      <EndOfLesson opened={opened} onNext={onNext} onBack={onBack} />
     </div>
   );
 
@@ -386,7 +439,9 @@ const ItemFrame: React.FC<{
               )}
             </p>
           </div>
-          <span className="hidden lg:inline text-[11px] text-gray-400">{copy.course.focusHint}</span>
+          <span className="hidden lg:inline text-[11px] text-gray-400">
+            {copy.course.focusHint}
+          </span>
           {/* Reading settings stay reachable: focus mode is exactly when a student
               adjusts size or background. */}
           <div className="hidden sm:block">
@@ -434,7 +489,9 @@ type FrameProps = {
 
 const DocumentView: React.FC<FrameProps> = ({ opened, ...frame }) => {
   const { content, item } = opened;
-  const isPdf = (content?.mime_type || "").includes("pdf") || (content?.file_extension || "").toLowerCase() === "pdf";
+  const isPdf =
+    (content?.mime_type || "").includes("pdf") ||
+    (content?.file_extension || "").toLowerCase() === "pdf";
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
   useEffect(() => {
@@ -465,8 +522,13 @@ const DocumentView: React.FC<FrameProps> = ({ opened, ...frame }) => {
         <div className="flex items-center gap-3 p-4 border-b border-gray-100 dark:border-white/[0.06]">
           <FileText className="w-5 h-5 text-brand-500" />
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-medium text-gray-800 dark:text-gray-100 truncate">{content?.original_name || item.title}</p>
-            <p className="text-[11px] text-gray-500 dark:text-gray-400">{formatBytes(content?.file_size)}{content?.description ? ` · ${content.description}` : ""}</p>
+            <p className="text-sm font-medium text-gray-800 dark:text-gray-100 truncate">
+              {content?.original_name || item.title}
+            </p>
+            <p className="text-[11px] text-gray-500 dark:text-gray-400">
+              {formatBytes(content?.file_size)}
+              {content?.description ? ` · ${content.description}` : ""}
+            </p>
           </div>
           <button
             onClick={download}
@@ -478,16 +540,26 @@ const DocumentView: React.FC<FrameProps> = ({ opened, ...frame }) => {
         </div>
         {isPdf ? (
           failed ? (
-            <p className="p-6 text-sm text-gray-500">This file couldn't be loaded. Try the download button.</p>
+            <p className="p-6 text-sm text-gray-500">
+              This file couldn't be loaded. Try the download button.
+            </p>
           ) : blobUrl ? (
-            <iframe title={item.title} src={blobUrl} className="w-full h-[70vh] bg-gray-50 dark:bg-gray-950" />
+            <iframe
+              title={item.title}
+              src={blobUrl}
+              className="w-full h-[70vh] bg-gray-50 dark:bg-gray-950"
+            />
           ) : (
-            <div className="flex items-center justify-center h-[40vh] text-gray-400"><Loader2 className="w-5 h-5 animate-spin" /></div>
+            <div className="flex items-center justify-center h-[40vh] text-gray-400">
+              <Loader2 className="w-5 h-5 animate-spin" />
+            </div>
           )
         ) : (
           <div className="p-6 flex items-center gap-3">
             <Mascot pose="book" size={40} />
-            <p className="text-sm text-gray-600 dark:text-gray-300">This file opens outside the browser — download it to read.</p>
+            <p className="text-sm text-gray-600 dark:text-gray-300">
+              This file opens outside the browser — download it to read.
+            </p>
           </div>
         )}
       </div>
@@ -499,7 +571,10 @@ const PageView: React.FC<FrameProps> = ({ opened, ...frame }) => {
   const ref = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
     if (ref.current) {
-      renderMathInElement(ref.current, { delimiters: [{ left: "$", right: "$", display: false }], throwOnError: false });
+      renderMathInElement(ref.current, {
+        delimiters: [{ left: "$", right: "$", display: false }],
+        throwOnError: false,
+      });
       hydrateInlineChecks(ref.current);
     }
   }, [opened.content?.content_html]);
@@ -508,7 +583,9 @@ const PageView: React.FC<FrameProps> = ({ opened, ...frame }) => {
       <article
         ref={ref}
         className="el-reader prose prose-slate dark:prose-invert prose-lg max-w-none prose-headings:font-semibold prose-headings:tracking-tight prose-img:rounded-xl prose-a:text-brand-600 dark:prose-a:text-brand-300"
-        dangerouslySetInnerHTML={{ __html: opened.content?.content_html || "<p></p>" }}
+        dangerouslySetInnerHTML={{
+          __html: opened.content?.content_html || "<p></p>",
+        }}
       />
     </ItemFrame>
   );
@@ -518,7 +595,10 @@ const VideoView: React.FC<FrameProps> = ({ opened, ...frame }) => {
   const src = opened.content?.embed_url as string | undefined;
   return (
     <ItemFrame opened={opened} {...frame} wide>
-      <div className="rounded-2xl overflow-hidden bg-black shadow-soft" style={{ aspectRatio: "16 / 9", maxWidth: "100%" }}>
+      <div
+        className="rounded-2xl overflow-hidden bg-black shadow-soft"
+        style={{ aspectRatio: "16 / 9", maxWidth: "100%" }}
+      >
         {src ? (
           <iframe
             title={opened.item.title}
@@ -529,12 +609,21 @@ const VideoView: React.FC<FrameProps> = ({ opened, ...frame }) => {
             loading="lazy"
           />
         ) : (
-          <a href={opened.content?.external_url} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center h-full text-white text-sm">
+          <a
+            href={opened.content?.external_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center justify-center h-full text-white text-sm"
+          >
             Open video
           </a>
         )}
       </div>
-      {opened.item.description && <p className="mt-4 text-sm text-gray-600 dark:text-gray-300 whitespace-pre-line">{opened.item.description}</p>}
+      {opened.item.description && (
+        <p className="mt-4 text-sm text-gray-600 dark:text-gray-300 whitespace-pre-line">
+          {opened.item.description}
+        </p>
+      )}
     </ItemFrame>
   );
 };

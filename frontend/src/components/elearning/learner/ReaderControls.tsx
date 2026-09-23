@@ -6,20 +6,27 @@ import {
   ReaderPrefs,
 } from "../../lessonNotes/reader/useReaderPrefs";
 
-/** The size range the A−/A+ buttons walk. 1 is the platform default body size. */
-export const FONT_SCALE_MIN = 0.8;
+/** The size range the A−/A+ buttons walk. 1 is the platform default body size.
+ *  The floor sits below the 0.8 default so A− still has somewhere to go. */
+export const FONT_SCALE_MIN = 0.7;
 export const FONT_SCALE_MAX = 1.6;
 export const FONT_SCALE_STEP = 0.1;
 
 const PAPERS: { value: ReaderPaper; label: string; swatch: string }[] = [
   // Auto first: it is the default, and it is what most readers should stay on.
-  { value: "auto", label: "Auto", swatch: "linear-gradient(135deg,#ffffff 50%,#14181f 50%)" },
+  {
+    value: "auto",
+    label: "Auto",
+    swatch: "linear-gradient(135deg,#ffffff 50%,#14181f 50%)",
+  },
   { value: "paper", label: "Paper", swatch: "#ffffff" },
   { value: "sepia", label: "Sepia", swatch: "#f6efe1" },
   { value: "night", label: "Night", swatch: "#14181f" },
 ];
 
 const FONTS: { value: ReaderFont; label: string; className: string }[] = [
+  // Reading first: it is the default and the most legible of the three.
+  { value: "reading", label: "Reading", className: "font-reading" },
   { value: "sans", label: "Sans", className: "font-sans" },
   { value: "serif", label: "Serif", className: "font-serif" },
 ];
@@ -45,7 +52,8 @@ const ReaderControls: React.FC<{
   useEffect(() => {
     if (!open) return;
     const onDown = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+      if (ref.current && !ref.current.contains(e.target as Node))
+        setOpen(false);
     };
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
     document.addEventListener("mousedown", onDown);
@@ -59,14 +67,21 @@ const ReaderControls: React.FC<{
   const setScale = (delta: number) =>
     update(
       "fontScale",
-      Math.min(FONT_SCALE_MAX, Math.max(FONT_SCALE_MIN, Number((prefs.fontScale + delta).toFixed(2)))),
+      Math.min(
+        FONT_SCALE_MAX,
+        Math.max(FONT_SCALE_MIN, Number((prefs.fontScale + delta).toFixed(2))),
+      ),
     );
 
   const pct = Math.round(prefs.fontScale * 100);
 
   return (
     <div className="flex items-center gap-1 flex-shrink-0">
-      <div className="flex items-center rounded-pill el-chip p-0.5" role="group" aria-label="Text size">
+      <div
+        className="flex items-center rounded-pill el-chip p-0.5"
+        role="group"
+        aria-label="Text size"
+      >
         <button
           onClick={() => setScale(-FONT_SCALE_STEP)}
           disabled={prefs.fontScale <= FONT_SCALE_MIN}

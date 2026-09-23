@@ -414,6 +414,11 @@ table th,
     font-family: Georgia, "Iowan Old Style", "Times New Roman", serif;
 }
 
+.note-reader-body--reading {
+    font-family: "Atkinson Hyperlegible", "Inter", ui-sans-serif, system-ui, sans-serif;
+    letter-spacing: 0.005em;
+}
+
 .note-reader-body--sans {
     font-family: inherit;
 }
@@ -864,6 +869,14 @@ mark.note-find-hit-active {
 }
 .el-step--serif .el-reader {
   font-family: Georgia, "Iowan Old Style", "Times New Roman", serif;
+}
+/* The default reading face. Atkinson Hyperlegible was drawn by the Braille
+   Institute for low-vision readers: unambiguous b/d, p/q, I/l/1 and O/0, and a
+   large x-height, which is what a page read for twenty minutes needs. */
+.el-step--reading .el-reader,
+.el-focus--reading .el-reader {
+  font-family: "Atkinson Hyperlegible", "Inter", ui-sans-serif, system-ui, sans-serif;
+  letter-spacing: 0.005em;
 }
 .el-reader h2 {
   margin-top: 1.8em;
