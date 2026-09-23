@@ -13,8 +13,21 @@ const timeOfDay = (d = new Date()) => {
 export const copy = {
   home: {
     title: "My Learning",
-    greeting: (firstName: string | undefined, courseTitle?: string | null, weekTitle?: string | null) => {
+    /** The greeting has to agree with the page under it: saying a week "is waiting" while
+     *  every ring reads 100% made the home screen argue with itself. `pending` is how many
+     *  required things are actually left across every subject. */
+    greeting: (
+      firstName: string | undefined,
+      courseTitle?: string | null,
+      weekTitle?: string | null,
+      pending = 1,
+      overdue = 0,
+    ) => {
       const name = firstName ? `, ${firstName}` : "";
+      if (overdue > 0) {
+        return `${timeOfDay()}${name}. ${overdue} thing${overdue === 1 ? " is" : "s are"} past due — best to clear ${overdue === 1 ? "it" : "them"} first.`;
+      }
+      if (pending === 0) return `${timeOfDay()}${name}. Everything your teachers have set is done.`;
       if (courseTitle && weekTitle) return `${timeOfDay()}${name}. ${weekTitle} of ${courseTitle} is waiting.`;
       if (courseTitle) return `${timeOfDay()}${name}. ${courseTitle} is ready when you are.`;
       return `${timeOfDay()}${name}.`;
@@ -33,6 +46,29 @@ export const copy = {
     emptyTitle: "Nothing here yet",
     emptyBody: "Your teachers haven't published a course yet. Check back on Monday.",
     allCaughtUp: "You're all caught up for now.",
+    // Caught-up hero
+    caughtUpEyebrow: "Caught up",
+    caughtUpTitle: "Nothing left to do right now",
+    caughtUpBody: (weeks: number) =>
+      weeks > 0
+        ? `You've finished every week your teachers have opened. ${weeks} more ${weeks === 1 ? "week is" : "weeks are"} still to come.`
+        : "You've finished every week your teachers have opened.",
+    reviewBtn: "Review what you've learnt",
+    browseBtn: "Browse the course",
+    resumeLabel: "Pick up where you left off",
+    // Stat strip
+    statOverall: "Overall",
+    statThisWeek: "Done this week",
+    statWeeks: "Weeks finished",
+    statSkills: "Skills covered",
+    streakLabel: (weeks: number) => `${weeks}-week streak`,
+    streakHint: "Weeks in a row you've studied — only you can see this.",
+    // Notifying strip
+    needsYou: "Needs you",
+    overdueOne: (n: number) => `${n} overdue`,
+    dueSoonCount: (n: number) => `${n} due soon`,
+    newWeek: (n: number) => `${n} new ${n === 1 ? "week" : "weeks"} open`,
+    allClear: "Nothing needs you right now",
   },
   course: {
     index: "Course index",
