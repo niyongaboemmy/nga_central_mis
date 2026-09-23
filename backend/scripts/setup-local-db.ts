@@ -179,31 +179,102 @@ function portCollationsToMariaDB(sql: string): { sql: string; replaced: number }
  *
  * Only whole-line `DELIMITER x` directives are recognised, which is how every
  * migration (and mysqldump) writes them.
+ *
+ * **A comment is not a statement terminator.** This used to cut wherever a line
+ * happened to end in `;`, comments included, so
+ *
+ *     -- PAGE: Tiptap doc; VIDEO: {provider,url,duration}; LINK: {url,new_tab};
+ *
+ * sitting in the middle of `CREATE TABLE CourseItem` (085) chopped the
+ * statement in half and sent an unterminated one. Every developer building a
+ * database from scratch met it as "check the manual that corresponds to your
+ * MariaDB server version ... near '' at line 10". Boundaries are decided on the
+ * *code* of each line instead, with comments and quoted strings excluded, and a
+ * chunk that turns out to be comments only is dropped rather than sent — an
+ * empty query is an error in its own right.
  */
+
+type Quote = "'" | '"' | "`" | null;
+
+/**
+ * The executable part of one line, given the quote state carried in from the
+ * line before. Everything from an unquoted `#`, or an unquoted `--` followed by
+ * whitespace or end-of-line (MySQL's rule), to the end of the line is comment.
+ */
+function lineCode(line: string, quote: Quote): { code: string; quote: Quote } {
+  let code = "";
+  let q = quote;
+  for (let i = 0; i < line.length; i += 1) {
+    const ch = line[i];
+    if (q) {
+      code += ch;
+      // Backslash escapes apply inside '' and "" but not inside `identifiers`.
+      if (ch === "\\" && q !== "`" && i + 1 < line.length) {
+        code += line[i + 1];
+        i += 1;
+        continue;
+      }
+      if (ch === q) {
+        if (line[i + 1] === q) {
+          code += line[i + 1]; // a doubled quote is a literal one, still open
+          i += 1;
+        } else {
+          q = null;
+        }
+      }
+      continue;
+    }
+    if (ch === "'" || ch === '"' || ch === "`") {
+      q = ch;
+      code += ch;
+      continue;
+    }
+    if (ch === "#") break;
+    if (ch === "-" && line[i + 1] === "-") {
+      const after = line[i + 2];
+      if (after === undefined || /\s/.test(after)) break;
+    }
+    code += ch;
+  }
+  return { code, quote: q };
+}
+
 function splitSqlStatements(sql: string): string[] {
   const statements: string[] = [];
   let delimiter = ";";
-  let current = "";
+  let code = "";
+  let quote: Quote = null;
+
+  // Only the code is sent on: comments mean nothing to the server, and leaving
+  // them out keeps the terminator trivially strippable from the end.
+  const flush = () => {
+    const body = code.trim();
+    if (body) statements.push(body);
+    code = "";
+  };
+
   for (const rawLine of sql.split(/\r?\n/)) {
-    const directive = /^\s*DELIMITER\s+(\S+)\s*$/i.exec(rawLine);
-    if (directive) {
-      if (current.trim()) statements.push(current.trim());
-      current = "";
-      delimiter = directive[1];
-      continue;
+    if (!quote) {
+      const directive = /^\s*DELIMITER\s+(\S+)\s*$/i.exec(rawLine);
+      if (directive) {
+        flush();
+        delimiter = directive[1];
+        continue;
+      }
     }
-    current += rawLine + "\n";
-    // A statement ends when the delimiter closes a line (comments aside, that
-    // is where the client cuts too). Cutting mid-line is not attempted: a
-    // literal ';' inside a string would otherwise split a statement.
-    const trimmed = current.trimEnd();
-    if (trimmed.endsWith(delimiter)) {
-      const body = trimmed.slice(0, -delimiter.length).trim();
-      if (body) statements.push(body);
-      current = "";
+
+    const scanned = lineCode(rawLine, quote);
+    quote = scanned.quote;
+    code += scanned.code + "\n";
+
+    const trimmed = code.trimEnd();
+    if (!quote && trimmed.endsWith(delimiter)) {
+      code = trimmed.slice(0, -delimiter.length);
+      flush();
     }
   }
-  if (current.trim()) statements.push(current.trim());
+
+  flush();
   return statements;
 }
 
