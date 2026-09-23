@@ -10,7 +10,7 @@ import IndexDrawer from "./IndexDrawer";
 import ItemView from "./ItemView";
 import ReviewSheet from "./ReviewSheet";
 import AITutorSheet from "./AITutorSheet";
-import { registerLearnerServiceWorker, sendOrQueue, useOffline } from "./offline";
+import { registerLearnerServiceWorker, sendDeparture, sendOrQueue, useOffline } from "./offline";
 import Mascot from "../ui/Mascot";
 import { BottomActionBar, Celebration, CompletionDot, EmptyState, ItemTypeIcon, ProgressBar, Skeleton, WeekPill } from "../ui/primitives";
 import { useLearningPrefs } from "./useLearningPrefs";
@@ -94,17 +94,37 @@ const CoursePage: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [iid]);
 
-  // Heartbeat while an item is open (fire-and-forget, one call per 30 s).
+  // Heartbeat while an item is open (fire-and-forget, one call per 30 s), plus an explicit
+  // departure so the teacher's "learning right now" empties the moment a student leaves
+  // rather than up to a stale window later. The two cover different exits: the heartbeat
+  // stops on its own, the beacon fires on the ones the student takes deliberately.
   const seconds = useRef(0);
   useEffect(() => {
     if (!opened || opened.locked) return;
+    const itemId = opened.item.item_id;
     seconds.current = 0;
     const tick = setInterval(() => {
       if (document.visibilityState !== "visible") return;
       seconds.current += HEARTBEAT_MS / 1000;
-      sendOrQueue(`/elearning/my/items/${opened.item.item_id}/heartbeat`, { seconds: HEARTBEAT_MS / 1000, position: { scrollY: window.scrollY } }).catch(() => undefined);
+      sendOrQueue(`/elearning/my/items/${itemId}/heartbeat`, { seconds: HEARTBEAT_MS / 1000, position: { scrollY: window.scrollY } }).catch(() => undefined);
     }, HEARTBEAT_MS);
-    return () => clearInterval(tick);
+
+    const depart = () => sendDeparture(`/elearning/my/items/${itemId}/leave`);
+    // Hiding the tab is a real departure here: a LINK item is *read* by leaving the tab,
+    // which is exactly the case that showed a student as present after they'd gone.
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") depart();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("pagehide", depart);
+
+    return () => {
+      clearInterval(tick);
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("pagehide", depart);
+      // Navigating to another item, back to the week, or out of the course entirely.
+      depart();
+    };
   }, [opened]);
 
   const goItem = useCallback((id: number) => navigate(learnerRoutes.item(cid, id)), [navigate, cid]);

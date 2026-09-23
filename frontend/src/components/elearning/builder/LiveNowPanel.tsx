@@ -13,8 +13,17 @@ const ago = (t: number) => {
   const m = Math.round(s / 60);
   return m < 60 ? `${m}m ago` : `${Math.round(m / 60)}h ago`;
 };
-const mins = (s: number) =>
-  s < 60 ? "just arrived" : `${Math.round(s / 60)} min on this`;
+/** How long this visit has lasted. Previously this read the lifetime `seconds_spent`, so
+ *  a student who had opened the page for the first time always showed "just arrived",
+ *  whatever they were actually doing. */
+const dwell = (s: number) =>
+  s < 60 ? "under a minute" : `${Math.round(s / 60)} min on this`;
+/** When the pings stopped. A watcher inside the stale window but no longer pinging is
+ *  away, not learning — saying otherwise is the whole complaint. */
+const awayFor = (lastSeen: number) => {
+  const s = Math.max(0, Math.round((Date.now() - lastSeen) / 1000));
+  return s < 60 ? `away ${s}s` : `away ${Math.round(s / 60)}m`;
+};
 const initials = (n: string) =>
   n
     .split(/\s+/)
@@ -104,8 +113,13 @@ const LiveNowPanel: React.FC<{
                       : ""}
                   </span>
                 </span>
-                <span className="text-[11px] text-gray-400 flex-shrink-0 tabular-nums">
-                  {mins(w.seconds_spent)}
+                <span className="flex flex-col items-end flex-shrink-0 text-[11px] tabular-nums">
+                  <span className={w.active ? "text-gray-400" : "text-warning-700 dark:text-warning-500"}>
+                    {w.active ? dwell(w.dwell_seconds) : awayFor(w.last_seen)}
+                  </span>
+                  {!w.active && (
+                    <span className="text-[10px] text-gray-400">last seen here</span>
+                  )}
                 </span>
               </motion.li>
             ))}

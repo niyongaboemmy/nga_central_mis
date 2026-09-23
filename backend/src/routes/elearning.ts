@@ -29,6 +29,7 @@ import {
   openMyItem,
   streamMyItemFile,
   heartbeatMyItem,
+  leaveMyItem,
   markMyItemDone,
   findMySectionForDate,
 } from "../controllers/learnerCourseController";
@@ -86,6 +87,9 @@ router.get("/my/section-for-date", learner, findMySectionForDate);
 router.get("/my/items/:id", learner, openMyItem);
 router.get("/my/items/:id/file", learner, streamMyItemFile);
 router.post("/my/items/:id/heartbeat", learner, heartbeatMyItem);
+// Sent as a beacon when the student leaves an item, so presence drops immediately
+// instead of lingering for the whole stale window.
+router.post("/my/items/:id/leave", learner, leaveMyItem);
 router.post("/my/items/:id/done", learner, markMyItemDone);
 router.post("/my/items/:id/knowledge-check/check", learner, checkKnowledgeAnswer);
 router.post("/my/items/:id/knowledge-check", learner, submitKnowledgeCheck);

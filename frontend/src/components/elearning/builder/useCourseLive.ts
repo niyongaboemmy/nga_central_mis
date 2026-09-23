@@ -14,6 +14,10 @@ export interface Watcher {
   seconds_spent: number;
   since: number;
   last_seen: number;
+  /** Pings are current — they really are on this page now, not idling in another tab. */
+  active: boolean;
+  /** Seconds on this item in this visit (lifetime total is `seconds_spent`). */
+  dwell_seconds: number;
 }
 
 /** Watchers rolled up by the page they are on — see the backend's TopicPresence. */
@@ -24,7 +28,8 @@ export interface TopicPresence {
   section_id: number | null;
   section_title: string | null;
   viewers: number;
-  readers: { user_id: number; name: string; seconds_spent: number }[];
+  active_viewers: number;
+  readers: { user_id: number; name: string; seconds_spent: number; active: boolean }[];
   max_seconds: number;
 }
 

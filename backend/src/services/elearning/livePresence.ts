@@ -16,6 +16,13 @@ import logger from "../../utils/logger";
  */
 
 const STALE_MS = 75_000; // ~2.5 missed heartbeats
+/**
+ * A watcher is only "on this page right now" while its pings are current. Between one
+ * missed heartbeat and the stale cutoff it is still listed — the student may just have
+ * switched tabs — but it is reported as away, because a teacher reading "learning now"
+ * needs that to mean now. 45 s = one missed 30 s heartbeat plus slack.
+ */
+const ACTIVE_MS = 45_000;
 const SWEEP_MS = 20_000;
 const MAX_RECENT = 30;
 
@@ -31,6 +38,11 @@ export interface Watcher {
   seconds_spent: number;
   since: number;
   last_seen: number;
+  /** Pings are current — the student really is on this page. */
+  active: boolean;
+  /** Seconds on this item in this visit, as opposed to the lifetime total in
+   *  `seconds_spent`, which counts every previous visit too. */
+  dwell_seconds: number;
 }
 
 /**
@@ -50,8 +62,10 @@ export interface TopicPresence {
   section_id: number | null;
   section_title: string | null;
   viewers: number;
+  /** Of those viewers, how many are pinging right now rather than idling away. */
+  active_viewers: number;
   /** Who exactly, so a teacher can see which student is on which page. */
-  readers: { user_id: number; name: string; seconds_spent: number }[];
+  readers: { user_id: number; name: string; seconds_spent: number; active: boolean }[];
   /** Longest dwell on this topic right now — the "someone is stuck" signal. */
   max_seconds: number;
 }
@@ -79,7 +93,11 @@ export interface LiveEvent {
   at: number;
 }
 
-const watchersByCourse = new Map<number, Map<number, Watcher>>();
+/** What is actually stored. `active` and `dwell_seconds` are derived on read so a watcher
+ *  decays by itself, without anything having to write to it again. */
+type StoredWatcher = Omit<Watcher, "active" | "dwell_seconds">;
+
+const watchersByCourse = new Map<number, Map<number, StoredWatcher>>();
 const recentByCourse = new Map<number, NonNullable<LiveEvent["progress"]>[]>();
 const subscribersByCourse = new Map<number, Set<Response>>();
 
@@ -111,7 +129,16 @@ const prune = (courseId: number): Watcher[] => {
   }
   if (map.size === 0) watchersByCourse.delete(courseId);
   void changed;
-  return [...(watchersByCourse.get(courseId)?.values() ?? [])].sort((a, b) => b.last_seen - a.last_seen);
+  const now = Date.now();
+  return [...(watchersByCourse.get(courseId)?.values() ?? [])]
+    // active/dwell are derived on read, never stored: a watcher that stops pinging has to
+    // decay on its own, without anything having to write to it again.
+    .map((w) => ({
+      ...w,
+      active: now - w.last_seen <= ACTIVE_MS,
+      dwell_seconds: Math.max(0, Math.round((w.last_seen - w.since) / 1000)),
+    }))
+    .sort((a, b) => Number(b.active) - Number(a.active) || b.last_seen - a.last_seen);
 };
 
 export function listWatchers(courseId: number): Watcher[] {
@@ -132,10 +159,12 @@ export function listTopics(courseId: number): TopicPresence[] {
     const existing = byItem.get(key);
     if (existing) {
       existing.viewers += 1;
+      if (w.active) existing.active_viewers += 1;
       existing.readers.push({
         user_id: w.user_id,
         name: w.name,
         seconds_spent: seconds,
+        active: w.active,
       });
       existing.max_seconds = Math.max(existing.max_seconds, seconds);
       continue;
@@ -147,8 +176,9 @@ export function listTopics(courseId: number): TopicPresence[] {
       section_id: w.section_id,
       section_title: w.section_title,
       viewers: 1,
+      active_viewers: w.active ? 1 : 0,
       readers: [
-        { user_id: w.user_id, name: w.name, seconds_spent: seconds },
+        { user_id: w.user_id, name: w.name, seconds_spent: seconds, active: w.active },
       ],
       max_seconds: seconds,
     });
@@ -160,7 +190,10 @@ export function listTopics(courseId: number): TopicPresence[] {
       readers: topic.readers.sort((a, b) => b.seconds_spent - a.seconds_spent),
     }))
     .sort(
-      (a, b) => b.viewers - a.viewers || b.max_seconds - a.max_seconds,
+      (a, b) =>
+        b.active_viewers - a.active_viewers ||
+        b.viewers - a.viewers ||
+        b.max_seconds - a.max_seconds,
     );
 }
 
@@ -195,6 +228,26 @@ export function touch(
       topics: listTopics(courseId),
       at: now,
     });
+}
+
+/**
+ * A student left the item (navigated away, closed the tab, or backgrounded it). Without
+ * this the teacher's list kept them on the page for the whole STALE_MS window — which is
+ * most visible on LINK items, where reading the material *requires* leaving the tab.
+ *
+ * Idempotent: a beacon that arrives twice, or after the sweep already dropped the
+ * watcher, is a no-op.
+ */
+export function leave(courseId: number, userId: number): void {
+  const map = watchersByCourse.get(courseId);
+  if (!map?.delete(userId)) return;
+  if (map.size === 0) watchersByCourse.delete(courseId);
+  publish(courseId, {
+    type: "presence",
+    watchers: listWatchers(courseId),
+    topics: listTopics(courseId),
+    at: Date.now(),
+  });
 }
 
 /** A student finished or scored something — the teacher sees it land. */

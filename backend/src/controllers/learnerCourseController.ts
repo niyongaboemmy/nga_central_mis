@@ -17,7 +17,7 @@ import logger from "../utils/logger";
 import { listMemberCourseIds, loadMemberCourse, isCourseMember } from "../services/elearning/courseMembership";
 import { publishDueSections } from "../services/elearning/courseSeeding";
 import { loadCourseHeader, loadCourseTree, loadItemWithCourse } from "../services/elearning/courseTree";
-import { recordProgress, touch } from "../services/elearning/livePresence";
+import { leave, recordProgress, touch } from "../services/elearning/livePresence";
 import {
   applyAction,
   deriveLearnerSections,
@@ -322,6 +322,26 @@ export const streamMyItemFile = asyncHandler(async (req: any, res: any) => {
 });
 
 /** {seconds, position} every ~30 s while an item is open. Fire-and-forget on the client. */
+/**
+ * The student is no longer on this item — sent as a beacon when the reader unmounts, the
+ * tab is hidden, or the page unloads. Presence otherwise lingered for the whole stale
+ * window, which is most wrong on LINK items: reading the material *requires* leaving the
+ * tab, so the teacher saw "learning right now" for someone who had gone.
+ *
+ * Deliberately cheap and forgiving: no body, no DB write, and an unknown item or a
+ * duplicate beacon is still a 200 — a departure signal must never fail noisily on unload.
+ */
+export const leaveMyItem = asyncHandler(async (req: any, res: any) => {
+  const itemId = parseId(req.params.id, "item id");
+  try {
+    const { row } = await findLearnerItem(itemId, req.user.userId);
+    leave(row.course.course_id, req.user.userId);
+  } catch (error) {
+    logger.warn("live presence failed on leave", { error, itemId });
+  }
+  successResponse(res, "ok", null);
+});
+
 export const heartbeatMyItem = asyncHandler(async (req: any, res: any) => {
   const itemId = parseId(req.params.id, "item id");
   const { row, item } = await findLearnerItem(itemId, req.user.userId);
