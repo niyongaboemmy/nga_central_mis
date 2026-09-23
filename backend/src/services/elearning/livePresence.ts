@@ -33,6 +33,29 @@ export interface Watcher {
   last_seen: number;
 }
 
+/**
+ * The same watchers, rolled up by the thing they are reading.
+ *
+ * A flat list of names answers "who is here"; it does not answer "where is the
+ * class right now", which is the question a teacher actually asks mid-lesson —
+ * are they all still on the video, has anyone reached the quiz, is someone
+ * stuck on one page. Grouping is done here rather than in the browser so the
+ * SSE payload carries the answer and every client agrees on it.
+ */
+export interface TopicPresence {
+  /** null = in the course but not on any item yet. */
+  item_id: number | null;
+  item_title: string | null;
+  item_type: string | null;
+  section_id: number | null;
+  section_title: string | null;
+  viewers: number;
+  /** Who exactly, so a teacher can see which student is on which page. */
+  readers: { user_id: number; name: string; seconds_spent: number }[];
+  /** Longest dwell on this topic right now — the "someone is stuck" signal. */
+  max_seconds: number;
+}
+
 export type LiveEventType = "presence" | "progress";
 
 export interface LiveEvent {
@@ -51,6 +74,8 @@ export interface LiveEvent {
     at: number;
   };
   watchers?: Watcher[];
+  /** Watchers grouped by item — see TopicPresence. */
+  topics?: TopicPresence[];
   at: number;
 }
 
@@ -93,6 +118,52 @@ export function listWatchers(courseId: number): Watcher[] {
   return prune(courseId);
 }
 
+/**
+ * Current watchers grouped by item, busiest first. A tie is broken by the
+ * longest dwell, so of two topics with one reader each the one somebody has
+ * been sitting on for twenty minutes sorts above the one just opened.
+ */
+export function listTopics(courseId: number): TopicPresence[] {
+  const byItem = new Map<string, TopicPresence>();
+
+  for (const w of listWatchers(courseId)) {
+    const key = w.item_id === null ? "browsing" : String(w.item_id);
+    const seconds = w.seconds_spent || 0;
+    const existing = byItem.get(key);
+    if (existing) {
+      existing.viewers += 1;
+      existing.readers.push({
+        user_id: w.user_id,
+        name: w.name,
+        seconds_spent: seconds,
+      });
+      existing.max_seconds = Math.max(existing.max_seconds, seconds);
+      continue;
+    }
+    byItem.set(key, {
+      item_id: w.item_id,
+      item_title: w.item_title,
+      item_type: w.item_type,
+      section_id: w.section_id,
+      section_title: w.section_title,
+      viewers: 1,
+      readers: [
+        { user_id: w.user_id, name: w.name, seconds_spent: seconds },
+      ],
+      max_seconds: seconds,
+    });
+  }
+
+  return [...byItem.values()]
+    .map((topic) => ({
+      ...topic,
+      readers: topic.readers.sort((a, b) => b.seconds_spent - a.seconds_spent),
+    }))
+    .sort(
+      (a, b) => b.viewers - a.viewers || b.max_seconds - a.max_seconds,
+    );
+}
+
 export function listRecent(courseId: number) {
   return (recentByCourse.get(courseId) || []).slice(0, MAX_RECENT);
 }
@@ -117,7 +188,13 @@ export function touch(
   });
   // Only wake the teachers' screens when someone arrives or changes item; a plain heartbeat
   // on the same item is just a liveness renewal and the sweep already refreshes the list.
-  if (!existing || movedItem) publish(courseId, { type: "presence", watchers: listWatchers(courseId), at: now });
+  if (!existing || movedItem)
+    publish(courseId, {
+      type: "presence",
+      watchers: listWatchers(courseId),
+      topics: listTopics(courseId),
+      at: now,
+    });
 }
 
 /** A student finished or scored something — the teacher sees it land. */
@@ -125,7 +202,13 @@ export function recordProgress(courseId: number, progress: NonNullable<LiveEvent
   const list = recentByCourse.get(courseId) || [];
   list.unshift(progress);
   recentByCourse.set(courseId, list.slice(0, MAX_RECENT));
-  publish(courseId, { type: "progress", progress, watchers: listWatchers(courseId), at: progress.at });
+  publish(courseId, {
+    type: "progress",
+    progress,
+    watchers: listWatchers(courseId),
+    topics: listTopics(courseId),
+    at: progress.at,
+  });
 }
 
 /** Attaches one teacher's SSE stream to a course. Returns the detach function. */
@@ -154,7 +237,13 @@ export function startLiveSweep(): void {
     for (const courseId of [...subscribersByCourse.keys()]) {
       const before = watchersByCourse.get(courseId)?.size ?? 0;
       const watchers = listWatchers(courseId);
-      if (watchers.length !== before) publish(courseId, { type: "presence", watchers, at: Date.now() });
+      if (watchers.length !== before)
+        publish(courseId, {
+          type: "presence",
+          watchers,
+          topics: listTopics(courseId),
+          at: Date.now(),
+        });
       // Comment frame: keeps proxies and browsers from closing an idle stream.
       for (const res of subscribersByCourse.get(courseId) || []) {
         try {

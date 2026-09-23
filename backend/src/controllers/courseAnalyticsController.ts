@@ -15,7 +15,7 @@ import {
   logLearningEvent,
 } from "../services/elearning/courseProgress";
 import { notifyNudge, notifyResultReceived } from "../services/elearning/courseNotifications";
-import { listRecent, listWatchers, subscribe } from "../services/elearning/livePresence";
+import { listRecent, listTopics, listWatchers, subscribe } from "../services/elearning/livePresence";
 import { buildSectionJourney, courseCoverage } from "../services/elearning/courseCoverage";
 
 const parseId = (raw: unknown, label = "id"): number => {
@@ -156,7 +156,15 @@ export const streamCourseLive = asyncHandler(async (req: any, res: any) => {
     "X-Accel-Buffering": "no",
   });
   res.write("retry: 5000\n\n");
-  res.write(`data: ${JSON.stringify({ type: "presence", watchers: listWatchers(course.course_id), recent: listRecent(course.course_id), at: Date.now() })}\n\n`);
+  res.write(
+    `data: ${JSON.stringify({
+      type: "presence",
+      watchers: listWatchers(course.course_id),
+      topics: listTopics(course.course_id),
+      recent: listRecent(course.course_id),
+      at: Date.now(),
+    })}\n\n`,
+  );
 
   const detach = subscribe(course.course_id, res);
   req.on("close", () => {
@@ -169,7 +177,12 @@ export const streamCourseLive = asyncHandler(async (req: any, res: any) => {
 export const getCourseLiveSnapshot = asyncHandler(async (req: any, res: any) => {
   const course = await loadCourse(parseId(req.params.id, "course id"));
   await assertCanBuildCourse(course, req.user.userId);
-  successResponse(res, "Live", { watchers: listWatchers(course.course_id), recent: listRecent(course.course_id), at: Date.now() });
+  successResponse(res, "Live", {
+    watchers: listWatchers(course.course_id),
+    topics: listTopics(course.course_id),
+    recent: listRecent(course.course_id),
+    at: Date.now(),
+  });
 });
 
 /** Curriculum coverage: targets per week vs items, gaps, course-wide element coverage. */

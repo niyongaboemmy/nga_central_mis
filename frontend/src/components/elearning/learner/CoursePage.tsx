@@ -230,6 +230,7 @@ const CoursePage: React.FC = () => {
                   const index = steps.findIndex((i) => i.item_id === opened.item.item_id);
                   return index >= 0 ? { index: index + 1, total: steps.length } : undefined;
                 })()}
+                onAskAI={() => setTutorOpen(true)}
                 onChecked={(r) => {
                   loadCourse();
                   if (r.just_completed) setToastLine(copy.course.doneLast);

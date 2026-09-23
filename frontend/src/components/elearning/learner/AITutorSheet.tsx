@@ -70,7 +70,7 @@ const AITutorSheet: React.FC<Props> = ({ courseId, sectionId, open, onClose }) =
     <AnimatePresence>
       {open && (
         <>
-          <motion.div className="fixed inset-0 z-40 bg-black/30 lg:bg-transparent lg:pointer-events-none" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose} />
+          <motion.div className="fixed inset-0 z-[65] bg-black/30 lg:bg-transparent lg:pointer-events-none" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose} />
           <motion.aside
             initial={{ y: "100%" }}
             animate={{ y: 0 }}
@@ -78,7 +78,7 @@ const AITutorSheet: React.FC<Props> = ({ courseId, sectionId, open, onClose }) =
             transition={{ type: "spring", stiffness: 320, damping: 32 }}
             role="dialog"
             aria-label="AI tutor"
-            className="fixed z-50 bottom-0 left-0 right-0 lg:left-auto lg:right-4 lg:bottom-4 lg:w-[420px] max-h-[80vh] flex flex-col rounded-t-3xl lg:rounded-3xl el-float"
+            className="fixed z-[70] bottom-0 left-0 right-0 lg:left-auto lg:right-4 lg:bottom-4 lg:w-[420px] max-h-[80vh] flex flex-col rounded-t-3xl lg:rounded-3xl el-float"
           >
             <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-100 dark:border-white/[0.06]">
               <Mascot pose={busy ? "thinking" : "book"} size={32} />

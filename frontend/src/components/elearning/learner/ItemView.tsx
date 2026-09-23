@@ -5,6 +5,7 @@ import {
   Clock,
   Expand,
   Minimize2,
+  Sparkles,
   Download,
   ExternalLink,
   FileText,
@@ -23,6 +24,8 @@ import { useMotion } from "../../../design/motion";
 import Mascot from "../ui/Mascot";
 import { ItemTypeIcon } from "../ui/primitives";
 import EndOfLesson from "./EndOfLesson";
+import ReaderControls from "./ReaderControls";
+import { useReaderPrefs } from "../../lessonNotes/reader/useReaderPrefs";
 import KnowledgeCheckCard from "./KnowledgeCheckCard";
 import { hydrateInlineChecks } from "../interactive/hydrate";
 
@@ -34,6 +37,9 @@ interface Props {
   onNext?: () => void;
   /** Step position within the week, so the reader can say "Step 2 of 5". */
   step?: { index: number; total: number };
+  /** The AI tutor lives above the reader in CoursePage; focus mode covers it, so the
+   *  overlay needs its own way to open it. */
+  onAskAI?: () => void;
 }
 
 /**
@@ -114,10 +120,10 @@ const formatBytes = (n?: number | null) => {
 };
 
 /** Dispatches on item_type — every type renders in the same right pane (UX plan §3.1). */
-const ItemView: React.FC<Props> = ({ opened, onBack, onChecked, onNext, step }) => {
+const ItemView: React.FC<Props> = ({ opened, onBack, onChecked, onNext, step, onAskAI }) => {
   const m = useMotion();
   const { item, content } = opened;
-  const frame = { opened, onBack, onNext, step };
+  const frame = { opened, onBack, onNext, step, onAskAI };
 
   if (opened.locked) {
     return (
@@ -234,14 +240,29 @@ const ItemFrame: React.FC<{
   onBack: () => void;
   onNext?: () => void;
   step?: { index: number; total: number };
-}> = ({ opened, children, wide, onBack, onNext, step }) => {
+  onAskAI?: () => void;
+}> = ({ opened, children, wide, onBack, onNext, step, onAskAI }) => {
   const { item } = opened;
   const isDone = item.state === "COMPLETED";
   const focus = useFocusMode();
   const scrollRef = useRef<HTMLDivElement>(null);
+  const { prefs, update } = useReaderPrefs();
 
+  // One measure for the whole step: the eyebrow, title, meta, body and end card all share
+  // a left edge. The article used to centre itself inside the frame at a narrower width,
+  // which is what made the page read as two mismatched columns.
   const body = (
-    <div className={`mx-auto ${wide ? "max-w-5xl" : "max-w-3xl"} px-4 sm:px-6 py-6 pb-28`}>
+    <div
+      className={`el-step el-step--${prefs.paper} el-step--${prefs.font} mx-auto ${
+        wide ? "max-w-5xl" : "max-w-[46rem]"
+      } px-4 sm:px-6 py-6 pb-28`}
+      style={
+        {
+          "--reader-font-scale": prefs.fontScale,
+          "--reader-line-height": prefs.lineHeight,
+        } as React.CSSProperties
+      }
+    >
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] uppercase tracking-wider font-semibold text-gray-500 dark:text-gray-400">
           <span className="flex items-center gap-1.5">
             <ItemTypeIcon type={item.item_type} className="w-3.5 h-3.5" />
@@ -264,9 +285,29 @@ const ItemFrame: React.FC<{
           )}
         </div>
 
-        <h1 className="mt-1.5 text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white leading-tight tracking-tight">
-          {item.title}
-        </h1>
+        <div className="mt-1.5 flex items-start justify-between gap-3">
+          <h1 className="text-2xl sm:text-[1.75rem] font-bold text-gray-900 dark:text-white leading-tight tracking-tight min-w-0">
+            {item.title}
+          </h1>
+          {!focus.on && (
+            <div className="hidden sm:block flex-shrink-0">
+              <ReaderControls
+                prefs={prefs}
+                update={update}
+                trailing={
+                  <button
+                    onClick={focus.enter}
+                    title={copy.course.focusEnter}
+                    aria-label={copy.course.focusEnter}
+                    className="w-9 h-9 flex items-center justify-center rounded-pill el-chip text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-white/[0.10] focus:outline-none focus-visible:shadow-glow transition-colors"
+                  >
+                    <Expand className="w-4 h-4" />
+                  </button>
+                }
+              />
+            </div>
+          )}
+        </div>
 
         {/* Meta row: the small facts a reader wants before committing to a page. */}
         <div className="mt-2.5 flex flex-wrap items-center gap-2">
@@ -322,7 +363,7 @@ const ItemFrame: React.FC<{
   if (focus.on) {
     return (
       <div
-        className="fixed inset-0 z-[60] bg-white dark:bg-[#0b0f19] flex flex-col"
+        className={`el-focus el-focus--${prefs.paper} fixed inset-0 z-[60] flex flex-col`}
         role="region"
         aria-label={`${item.title} — ${copy.course.focusEnter}`}
       >
@@ -345,7 +386,22 @@ const ItemFrame: React.FC<{
               )}
             </p>
           </div>
-          <span className="hidden sm:inline text-[11px] text-gray-400">{copy.course.focusHint}</span>
+          <span className="hidden lg:inline text-[11px] text-gray-400">{copy.course.focusHint}</span>
+          {/* Reading settings stay reachable: focus mode is exactly when a student
+              adjusts size or background. */}
+          <div className="hidden sm:block">
+            <ReaderControls prefs={prefs} update={update} />
+          </div>
+          {onAskAI && (
+            <button
+              onClick={onAskAI}
+              title={copy.course.askAI}
+              aria-label={copy.course.askAI}
+              className="w-10 h-10 flex items-center justify-center rounded-pill bg-gradient-to-r from-brand-500 to-brand-600 text-white shadow-soft focus:outline-none focus-visible:shadow-glow flex-shrink-0"
+            >
+              <Sparkles className="w-4 h-4" />
+            </button>
+          )}
           <button
             onClick={focus.leave}
             className="inline-flex items-center gap-1.5 min-h-[40px] px-3 rounded-pill el-chip text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-white/[0.10] focus:outline-none focus-visible:shadow-glow flex-shrink-0"
@@ -364,14 +420,6 @@ const ItemFrame: React.FC<{
   return (
     <>
       <ReadingProgress />
-      <button
-        onClick={focus.enter}
-        title={copy.course.focusEnter}
-        className="hidden sm:inline-flex items-center gap-1.5 fixed z-30 right-4 top-20 min-h-[40px] px-3 rounded-pill el-float text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-white/[0.08] focus:outline-none focus-visible:shadow-glow"
-      >
-        <Expand className="w-4 h-4" />
-        {copy.course.focusEnter}
-      </button>
       {body}
     </>
   );

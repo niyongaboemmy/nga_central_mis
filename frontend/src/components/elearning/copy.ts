@@ -122,6 +122,8 @@ export const copy = {
     focusExit: "Leave focus mode",
     focusHint: "Press Esc to leave focus mode",
     focusOf: (n: number, total: number) => `${n} of ${total} in this week`,
+    askAI: "Ask the AI tutor",
+    readerSettings: "Reading settings",
   },
   check: {
     title: "Quick check",

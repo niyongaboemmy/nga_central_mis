@@ -835,14 +835,22 @@ mark.note-find-hit-active {
    read as data rather than as more prose. Tailwind's `prose` gives the
    first; these rules give the other two in both themes.
    ------------------------------------------------------------------ */
+/* One measure for the whole step. The article used to re-centre itself at 70ch inside a
+   wider frame, so the title and the body had different left edges — the single biggest
+   reason the reader looked unaligned. The frame owns the width now; the article fills it. */
 .el-reader {
-  /* A readable measure, centred, rather than prose's own max-width which
-     left long lines on a wide two-pane layout. */
-  max-width: 70ch;
-  margin-inline: auto;
+  max-width: none;
+  margin-inline: 0;
+  /* Size is the reader's choice (A- / A+), not a fixed prose step. `prose-lg` was pinning
+     every lesson at 18px with no way down. */
+  font-size: calc(1rem * var(--reader-font-scale, 1));
+  line-height: var(--reader-line-height, 1.7);
+}
+.el-step--serif .el-reader {
+  font-family: Georgia, "Iowan Old Style", "Times New Roman", serif;
 }
 .el-reader h2 {
-  margin-top: 2em;
+  margin-top: 1.8em;
   padding-top: 0.6em;
   border-top: 1px solid rgb(0 0 0 / 0.07);
 }
@@ -880,7 +888,7 @@ mark.note-find-hit-active {
   padding: 0;
   font-size: 0.88em;
 }
-/* Tables: zebra rows and a sticky-feeling header beat four hairlines. */
+/* Tables: zebra rows and a clear header beat four hairlines. */
 .el-reader table {
   width: 100%;
   font-size: 0.92em;
@@ -920,10 +928,48 @@ mark.note-find-hit-active {
   padding-left: 1em;
   font-style: normal;
 }
+
+/* --- Reader backgrounds. The same three papers the lesson-note reader offers, so the
+       two readers agree, applied to the step's own surface rather than the app shell. --- */
+.el-step--sepia,
+.el-focus--sepia {
+  background: #f6efe1;
+  color: #453a2b;
+}
+.el-step--sepia .el-reader,
+.el-focus--sepia .el-reader {
+  color: #453a2b;
+}
+.el-step--night,
+.el-focus--night {
+  background: #14181f;
+  color: #d5dae2;
+}
+.el-step--night .el-reader,
+.el-focus--night .el-reader {
+  color: #d5dae2;
+}
+.el-step--sepia,
+.el-step--night {
+  border-radius: 1rem;
+}
+.el-focus {
+  background: #ffffff;
+}
+.dark .el-focus {
+  background: #0b0f19;
+}
+.el-focus--sepia {
+  background: #f6efe1;
+}
+.el-focus--night,
+.dark .el-focus--night {
+  background: #14181f;
+}
+
 @media (max-width: 640px) {
   .el-reader {
-    max-width: 100%;
-    font-size: 1.02rem;
+    font-size: calc(1.02rem * var(--reader-font-scale, 1));
   }
 }
 

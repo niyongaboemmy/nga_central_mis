@@ -16,6 +16,18 @@ export interface Watcher {
   last_seen: number;
 }
 
+/** Watchers rolled up by the page they are on — see the backend's TopicPresence. */
+export interface TopicPresence {
+  item_id: number | null;
+  item_title: string | null;
+  item_type: string | null;
+  section_id: number | null;
+  section_title: string | null;
+  viewers: number;
+  readers: { user_id: number; name: string; seconds_spent: number }[];
+  max_seconds: number;
+}
+
 export interface LiveProgress {
   user_id: number;
   name: string;
@@ -37,6 +49,7 @@ export interface LiveProgress {
  */
 export function useCourseLive(courseId: number, enabled: boolean) {
   const [watchers, setWatchers] = useState<Watcher[]>([]);
+  const [topics, setTopics] = useState<TopicPresence[]>([]);
   const [recent, setRecent] = useState<LiveProgress[]>([]);
   const [connected, setConnected] = useState(false);
   const sourceRef = useRef<EventSource | null>(null);
@@ -52,6 +65,7 @@ export function useCourseLive(courseId: number, enabled: boolean) {
         .then((r) => {
           if (closed) return;
           setWatchers(r.data.data.watchers || []);
+          setTopics(r.data.data.topics || []);
           setRecent(r.data.data.recent || []);
         })
         .catch(() => undefined);
@@ -66,7 +80,9 @@ export function useCourseLive(courseId: number, enabled: boolean) {
     // the auth middleware already allows for <img>/<a> style GETs).
     const token = getToken();
     if (typeof EventSource !== "undefined" && token) {
-      const es = new EventSource(`${API_BASE_URL}/elearning/courses/${courseId}/live?token=${encodeURIComponent(token)}`);
+      const es = new EventSource(
+        `${API_BASE_URL}/elearning/courses/${courseId}/live?token=${encodeURIComponent(token)}`,
+      );
       sourceRef.current = es;
       es.onopen = () => {
         if (closed) return;
@@ -81,8 +97,22 @@ export function useCourseLive(courseId: number, enabled: boolean) {
         try {
           const d = JSON.parse(e.data);
           if (Array.isArray(d.watchers)) setWatchers(d.watchers);
+          if (Array.isArray(d.topics)) setTopics(d.topics);
           if (Array.isArray(d.recent)) setRecent(d.recent);
-          if (d.progress) setRecent((r) => [d.progress, ...r.filter((x) => !(x.item_id === d.progress.item_id && x.user_id === d.progress.user_id && x.at === d.progress.at))].slice(0, 30));
+          if (d.progress)
+            setRecent((r) =>
+              [
+                d.progress,
+                ...r.filter(
+                  (x) =>
+                    !(
+                      x.item_id === d.progress.item_id &&
+                      x.user_id === d.progress.user_id &&
+                      x.at === d.progress.at
+                    ),
+                ),
+              ].slice(0, 30),
+            );
         } catch {
           /* ignore a malformed frame */
         }
@@ -106,5 +136,5 @@ export function useCourseLive(courseId: number, enabled: boolean) {
     };
   }, [courseId, enabled]);
 
-  return { watchers, recent, connected };
+  return { watchers, topics, recent, connected };
 }

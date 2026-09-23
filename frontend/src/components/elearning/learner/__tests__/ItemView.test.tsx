@@ -152,6 +152,56 @@ describe("ItemView — the lesson reader", () => {
     expect(screen.getByRole("region", { name: /Focus mode/i })).toBeInTheDocument();
   });
 
+  it("lets the reader resize the text, and remembers it", async () => {
+    localStorage.clear();
+    const { unmount } = render(<ItemView opened={opened()} onBack={vi.fn()} />);
+
+    const smaller = screen.getByRole("button", { name: /Smaller text/i });
+    expect(screen.getByText("115%")).toBeInTheDocument();
+
+    await userEvent.click(smaller);
+    await userEvent.click(smaller);
+    expect(screen.getByText("95%")).toBeInTheDocument();
+
+    // Preference is per-device and shared with the lesson-note reader.
+    unmount();
+    render(<ItemView opened={opened()} onBack={vi.fn()} />);
+    expect(screen.getByText("95%")).toBeInTheDocument();
+  });
+
+  it("will not shrink the text past the floor", async () => {
+    localStorage.clear();
+    render(<ItemView opened={opened()} onBack={vi.fn()} />);
+    const smaller = screen.getByRole("button", { name: /Smaller text/i });
+    for (let i = 0; i < 10; i += 1) {
+      if (!(smaller as HTMLButtonElement).disabled) await userEvent.click(smaller);
+    }
+    expect(screen.getByText("80%")).toBeInTheDocument();
+    expect(smaller).toBeDisabled();
+  });
+
+  it("offers a reading background, and applies it to the step", async () => {
+    localStorage.clear();
+    const { container } = render(<ItemView opened={opened()} onBack={vi.fn()} />);
+
+    await userEvent.click(screen.getByRole("button", { name: /Reading settings/i }));
+    await userEvent.click(screen.getByRole("button", { name: /Sepia/i }));
+
+    expect(container.querySelector(".el-step--sepia")).toBeTruthy();
+  });
+
+  it("keeps the AI tutor reachable inside focus mode", async () => {
+    localStorage.clear();
+    (document.documentElement as any).requestFullscreen = vi.fn().mockResolvedValue(undefined);
+    const onAskAI = vi.fn();
+    render(<ItemView opened={opened()} onBack={vi.fn()} onAskAI={onAskAI} />);
+
+    await userEvent.click(screen.getByRole("button", { name: /Focus mode/i }));
+    // The overlay covers the page-level tutor button, so the overlay carries its own.
+    await userEvent.click(screen.getByRole("button", { name: /Ask the AI tutor/i }));
+    expect(onAskAI).toHaveBeenCalled();
+  });
+
   it("marks a finished step as done in the header", () => {
     render(<ItemView opened={opened({ item: item({ state: "COMPLETED" }) })} onBack={vi.fn()} />);
     expect(screen.getByText("Done")).toBeInTheDocument();
