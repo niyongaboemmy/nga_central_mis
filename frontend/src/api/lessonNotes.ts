@@ -175,6 +175,17 @@ export interface SharedNoteSummary {
   excerpt: string;
   word_count: number;
   reading_minutes: number;
+  /**
+   * Where this note sits on a course the student is a member of, when it does.
+   * Reading it there counts towards the week; reading it in the standalone
+   * reader does not. Null for a note that was only ever shared.
+   */
+  placement: {
+    course_id: number;
+    item_id: number;
+    section_id: number;
+    section_title: string;
+  } | null;
 }
 
 export interface NoteAskAnswer {

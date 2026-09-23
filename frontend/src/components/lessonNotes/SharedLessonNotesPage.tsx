@@ -1,4 +1,10 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { formatDistanceToNow } from "date-fns";
@@ -8,12 +14,18 @@ import {
   ChevronRight,
   Clock,
   FileText,
+  GraduationCap,
   Search,
   SlidersHorizontal,
   Sparkles,
   X,
 } from "lucide-react";
-import { lessonNotesApi, SharedNoteSummary, isPdfBackedNote } from "../../api/lessonNotes";
+import {
+  lessonNotesApi,
+  SharedNoteSummary,
+  isPdfBackedNote,
+} from "../../api/lessonNotes";
+import { learnerRoutes } from "../../api/elearning";
 import { useToast } from "../../contexts/ToastContext";
 
 type SortKey = "recent" | "title" | "length";
@@ -50,9 +62,14 @@ const scoreNote = (note: SharedNoteSummary, tokens: string[]): number => {
 };
 
 /** Splits text into matched/unmatched runs so search hits can be visibly highlighted. */
-const Highlight: React.FC<{ text: string; tokens: string[] }> = ({ text, tokens }) => {
+const Highlight: React.FC<{ text: string; tokens: string[] }> = ({
+  text,
+  tokens,
+}) => {
   if (tokens.length === 0 || !text) return <>{text}</>;
-  const escaped = tokens.map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).filter(Boolean);
+  const escaped = tokens
+    .map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+    .filter(Boolean);
   if (escaped.length === 0) return <>{text}</>;
   const parts = text.split(new RegExp(`(${escaped.join("|")})`, "gi"));
   const lowered = tokens.map((t) => t.toLowerCase());
@@ -107,11 +124,18 @@ const SharedLessonNotesPage: React.FC = () => {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const el = e.target as HTMLElement | null;
-      const typing = el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable);
+      const typing =
+        el &&
+        (el.tagName === "INPUT" ||
+          el.tagName === "TEXTAREA" ||
+          el.isContentEditable);
       if (e.key === "/" && !typing) {
         e.preventDefault();
         searchRef.current?.focus();
-      } else if (e.key === "Escape" && document.activeElement === searchRef.current) {
+      } else if (
+        e.key === "Escape" &&
+        document.activeElement === searchRef.current
+      ) {
         setQuery("");
         searchRef.current?.blur();
       }
@@ -123,18 +147,26 @@ const SharedLessonNotesPage: React.FC = () => {
   useEffect(() => {
     if (!sortOpen) return;
     const onClick = (e: MouseEvent) => {
-      if (sortMenuRef.current && !sortMenuRef.current.contains(e.target as Node)) setSortOpen(false);
+      if (
+        sortMenuRef.current &&
+        !sortMenuRef.current.contains(e.target as Node)
+      )
+        setSortOpen(false);
     };
     document.addEventListener("mousedown", onClick);
     return () => document.removeEventListener("mousedown", onClick);
   }, [sortOpen]);
 
-  const tokens = useMemo(() => query.trim().toLowerCase().split(/\s+/).filter(Boolean), [query]);
+  const tokens = useMemo(
+    () => query.trim().toLowerCase().split(/\s+/).filter(Boolean),
+    [query],
+  );
   const searching = tokens.length > 0;
 
   const subjects = useMemo(() => {
     const counts = new Map<string, number>();
-    for (const n of notes) counts.set(n.subject_name, (counts.get(n.subject_name) || 0) + 1);
+    for (const n of notes)
+      counts.set(n.subject_name, (counts.get(n.subject_name) || 0) + 1);
     return [...counts.entries()].sort((a, b) => a[0].localeCompare(b[0]));
   }, [notes]);
 
@@ -153,7 +185,10 @@ const SharedLessonNotesPage: React.FC = () => {
         case "length":
           return (b.note.word_count || 0) - (a.note.word_count || 0);
         default:
-          return new Date(b.note.updated_at).getTime() - new Date(a.note.updated_at).getTime();
+          return (
+            new Date(b.note.updated_at).getTime() -
+            new Date(a.note.updated_at).getTime()
+          );
       }
     });
     return filtered.map((r) => r.note);
@@ -176,7 +211,26 @@ const SharedLessonNotesPage: React.FC = () => {
     [notes],
   );
 
-  const openNote = useCallback((id: number) => navigate(`/shared-lesson-notes/${id}`), [navigate]);
+  const openNote = useCallback(
+    (id: number) => navigate(`/shared-lesson-notes/${id}`),
+    [navigate],
+  );
+
+  /**
+   * The note's home. A note placed on a course is coursework — opening it there
+   * records the view, ticks the item off the week and keeps the student inside
+   * the course flow. The standalone reader shows the same words and counts for
+   * nothing, so it becomes the secondary action rather than the only one.
+   */
+  const openNoteBest = useCallback(
+    (n: SharedNoteSummary) =>
+      n.placement
+        ? navigate(
+            learnerRoutes.item(n.placement.course_id, n.placement.item_id),
+          )
+        : navigate(`/shared-lesson-notes/${n.note_id}`),
+    [navigate],
+  );
 
   const onSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     // Enter from the search box opens the top hit — search then read, no mouse needed.
@@ -244,7 +298,9 @@ const SharedLessonNotesPage: React.FC = () => {
                 className="flex items-center gap-1.5 px-3.5 py-2.5 text-sm rounded-full border border-gray-200 dark:border-gray-700/60 bg-white dark:bg-gray-800/60 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 shadow-sm"
               >
                 <SlidersHorizontal className="w-4 h-4" />
-                <span className="hidden sm:inline">{SORTS.find((s) => s.key === sort)!.label}</span>
+                <span className="hidden sm:inline">
+                  {SORTS.find((s) => s.key === sort)!.label}
+                </span>
               </button>
               <AnimatePresence>
                 {sortOpen && (
@@ -323,16 +379,23 @@ const SharedLessonNotesPage: React.FC = () => {
       ) : notes.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-24 text-center rounded-2xl border border-dashed border-gray-200 dark:border-gray-700/50">
           <BookOpen className="w-10 h-10 text-gray-300 dark:text-gray-600 mb-3" />
-          <p className="text-gray-500 dark:text-gray-400">No notes have been shared with you yet</p>
+          <p className="text-gray-500 dark:text-gray-400">
+            No notes have been shared with you yet
+          </p>
           <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-            They'll show up here as soon as a teacher publishes one for your class.
+            They'll show up here as soon as a teacher publishes one for your
+            class.
           </p>
         </div>
       ) : results.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-center rounded-2xl border border-dashed border-gray-200 dark:border-gray-700/50">
           <Search className="w-9 h-9 text-gray-300 dark:text-gray-600 mb-3" />
-          <p className="text-gray-600 dark:text-gray-300 font-medium">No notes match "{query}"</p>
-          <p className="text-xs text-gray-400 mt-1">Try a different word, or clear your filters.</p>
+          <p className="text-gray-600 dark:text-gray-300 font-medium">
+            No notes match "{query}"
+          </p>
+          <p className="text-xs text-gray-400 mt-1">
+            Try a different word, or clear your filters.
+          </p>
           <button
             onClick={() => {
               setQuery("");
@@ -367,55 +430,95 @@ const SharedLessonNotesPage: React.FC = () => {
                 )}
                 <div className="rounded-xl border border-gray-200 dark:border-gray-700/40 bg-white dark:bg-gray-800/30 divide-y divide-gray-100 dark:divide-gray-700/40 overflow-hidden">
                   {items.map((n) => (
-                    <button
-                      key={n.note_id}
-                      onClick={() => openNote(n.note_id)}
-                      className="group w-full flex items-center gap-3 px-4 py-3.5 text-left hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors"
-                    >
-                      <div className="min-w-0 flex-1">
-                        <p className="font-medium text-gray-900 dark:text-gray-100 truncate">
-                          <Highlight text={n.title} tokens={tokens} />
-                        </p>
-                        {n.excerpt && (
-                          <p className="text-xs text-gray-500 dark:text-gray-400 truncate mt-0.5">
-                            <Highlight text={n.excerpt} tokens={tokens} />
+                    <div key={n.note_id}>
+                      <button
+                        onClick={() => openNoteBest(n)}
+                        className="group flex w-full items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-gray-50 dark:hover:bg-gray-700/30"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <p className="font-medium text-gray-900 dark:text-gray-100 truncate">
+                            <Highlight text={n.title} tokens={tokens} />
                           </p>
-                        )}
-                        <div className="flex items-center gap-2 text-[11px] text-gray-400 mt-1.5">
-                          {/* Only worth naming the subject on a row when the group header
+                          {n.excerpt && (
+                            <p className="text-xs text-gray-500 dark:text-gray-400 truncate mt-0.5">
+                              <Highlight text={n.excerpt} tokens={tokens} />
+                            </p>
+                          )}
+                          <div className="flex items-center gap-2 text-[11px] text-gray-400 mt-1.5">
+                            {/* Only worth naming the subject on a row when the group header
                               isn't already doing it — i.e. in search results. */}
-                          {searching && (
-                            <>
-                              <span className="truncate">
-                                <Highlight text={n.subject_name} tokens={tokens} />
+                            {searching && (
+                              <>
+                                <span className="truncate">
+                                  <Highlight
+                                    text={n.subject_name}
+                                    tokens={tokens}
+                                  />
+                                </span>
+                                <span aria-hidden>·</span>
+                              </>
+                            )}
+                            <span className="truncate">
+                              <Highlight
+                                text={n.teacher_name}
+                                tokens={tokens}
+                              />
+                            </span>
+                            <span aria-hidden>·</span>
+                            {isPdfBackedNote(n) ? (
+                              <span className="inline-flex items-center gap-1 flex-shrink-0 text-rose-600 dark:text-rose-400">
+                                <FileText className="w-3 h-3" /> PDF
+                                {n.page_count
+                                  ? ` · ${n.page_count} page${n.page_count === 1 ? "" : "s"}`
+                                  : ""}
                               </span>
-                              <span aria-hidden>·</span>
-                            </>
-                          )}
-                          <span className="truncate">
-                            <Highlight text={n.teacher_name} tokens={tokens} />
-                          </span>
-                          <span aria-hidden>·</span>
-                          {isPdfBackedNote(n) ? (
-                            <span className="inline-flex items-center gap-1 flex-shrink-0 text-rose-600 dark:text-rose-400">
-                              <FileText className="w-3 h-3" /> PDF
-                              {n.page_count ? ` · ${n.page_count} page${n.page_count === 1 ? "" : "s"}` : ""}
+                            ) : (
+                              <span className="inline-flex items-center gap-1 flex-shrink-0">
+                                <Clock className="w-3 h-3" />{" "}
+                                {n.reading_minutes || 1} min
+                              </span>
+                            )}
+                            <span aria-hidden className="hidden sm:inline">
+                              ·
                             </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 flex-shrink-0">
-                              <Clock className="w-3 h-3" /> {n.reading_minutes || 1} min
+                            <span className="hidden sm:inline flex-shrink-0">
+                              {formatDistanceToNow(new Date(n.updated_at), {
+                                addSuffix: true,
+                              })}
+                            </span>
+                          </div>
+                          {/* Says where the note lives before the click, so the
+                            destination is never a surprise. */}
+                          {n.placement && (
+                            <span className="mt-1.5 inline-flex items-center gap-1 rounded-pill bg-blue-50 px-2 py-0.5 text-[11px] font-medium text-blue-700 dark:bg-blue-500/15 dark:text-blue-300">
+                              <GraduationCap className="h-3 w-3" />
+                              {n.placement.section_title.split(" — ")[0]} ·
+                              counts towards your progress
                             </span>
                           )}
-                          <span aria-hidden className="hidden sm:inline">
-                            ·
-                          </span>
-                          <span className="hidden sm:inline flex-shrink-0">
-                            {formatDistanceToNow(new Date(n.updated_at), { addSuffix: true })}
-                          </span>
                         </div>
-                      </div>
-                      <ChevronRight className="w-4 h-4 text-gray-300 dark:text-gray-600 group-hover:text-gray-500 dark:group-hover:text-gray-400 group-hover:translate-x-0.5 transition-all flex-shrink-0" />
-                    </button>
+                        {n.placement ? (
+                          <span className="hidden flex-shrink-0 items-center gap-1 rounded-pill bg-blue-600 px-2.5 py-1 text-[11px] font-semibold text-white sm:inline-flex">
+                            Open in e-learning
+                            <ChevronRight className="h-3 w-3" />
+                          </span>
+                        ) : (
+                          <ChevronRight className="h-4 w-4 flex-shrink-0 text-gray-300 transition-all group-hover:translate-x-0.5 group-hover:text-gray-500 dark:text-gray-600 dark:group-hover:text-gray-400" />
+                        )}
+                      </button>
+                      {/* Reading it outside the course is still allowed; it just
+                        isn't the default, because it earns nothing. */}
+                      {n.placement && (
+                        <div className="-mt-2 px-4 pb-2.5">
+                          <button
+                            onClick={() => openNote(n.note_id)}
+                            className="text-[11px] text-gray-500 underline-offset-2 hover:underline dark:text-gray-400"
+                          >
+                            Just read the note
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   ))}
                 </div>
               </section>
@@ -423,7 +526,8 @@ const SharedLessonNotesPage: React.FC = () => {
           </div>
 
           <p className="flex items-center justify-center gap-1.5 text-[11px] text-gray-400 mt-8">
-            <Sparkles className="w-3 h-3" /> Open any note to read it as a book and ask the AI tutor about it.
+            <Sparkles className="w-3 h-3" /> Open any note to read it as a book
+            and ask the AI tutor about it.
           </p>
         </>
       )}
