@@ -22,16 +22,22 @@ if errorlevel 1 (
 for /f "tokens=*" %%V in ('node -v') do echo   - Node %%V
 
 :: -------------------------------------------------------- 2. .env from template
+:: Creating .env only when it is missing never repairs one, and an .env written
+:: during an earlier setup keeps pointing wherever it pointed then - which for
+:: most people is the deployed MIS, so the app runs locally but signs in
+:: against production and rejects the local accounts. The script below fills in
+:: a missing file and, in one that exists, replaces only the settings that wire
+:: the modules on this machine together. Your own keys are left alone.
 echo [2/5] Checking configuration...
-if not exist "backend\.env" (
-    copy "backend\.env.example" "backend\.env" >nul
-    echo   - Created backend\.env
+node scripts\sync-local-env.cjs backend frontend
+if errorlevel 1 (
+    echo.
+    echo   [X] Could not write backend\.env or frontend\.env - see the error above.
+    echo.
+    pause
+    exit /b 1
 )
-if not exist "frontend\.env" (
-    copy "frontend\.env.example" "frontend\.env" >nul
-    echo   - Created frontend\.env
-)
-:: backend\.env is git-ignored: your local settings can never be pushed.
+:: Both files are git-ignored: your local settings can never be pushed.
 echo   - Configuration present
 
 :: --------------------------------------------------------------- 3. Database
