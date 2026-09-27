@@ -28,6 +28,7 @@ jobs:
           envs: MIGRATION_FILE
           script: |
             set -e
+            set -o pipefail
             cd /opt/apps/nga_central_mis/backend
 
             if [ ! -f "migrations/$MIGRATION_FILE" ]; then
@@ -44,6 +45,15 @@ jobs:
             DB_USERNAME_VAL=$(migration_db_val DB_USERNAME)
             DB_PASSWORD_VAL=$(migration_db_val DB_PASSWORD)
             DB_NAME_VAL=$(migration_db_val DB_NAME)
+
+            # Back up the whole database first, so any migration can be rolled
+            # back by restoring this file. Kept in ~/db-backups on the box.
+            BACKUP_DIR="$HOME/db-backups/nga_central_mis"
+            mkdir -p "$BACKUP_DIR"
+            BACKUP_FILE="$BACKUP_DIR/$(date -u +%Y%m%dT%H%M%SZ)-before-${MIGRATION_FILE%.sql}.sql.gz"
+            mysqldump --single-transaction --no-tablespaces -h "$DB_HOST_VAL" -u "$DB_USERNAME_VAL" -p"$DB_PASSWORD_VAL" "$DB_NAME_VAL" | gzip > "$BACKUP_FILE"
+            test -s "$BACKUP_FILE" || { echo "Backup is empty -- not migrating."; exit 1; }
+            echo "Backup written: $BACKUP_FILE ($(du -h "$BACKUP_FILE" | cut -f1))"
 
             echo "Applying migrations/$MIGRATION_FILE to $DB_NAME_VAL..."
             mysql -h "$DB_HOST_VAL" -u "$DB_USERNAME_VAL" -p"$DB_PASSWORD_VAL" "$DB_NAME_VAL" < "migrations/$MIGRATION_FILE"
