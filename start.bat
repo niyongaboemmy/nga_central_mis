@@ -22,16 +22,22 @@ if errorlevel 1 (
 for /f "tokens=*" %%V in ('node -v') do echo   - Node %%V
 
 :: -------------------------------------------------------- 2. .env from template
+:: Creating .env only when it is missing never repairs one, and an .env written
+:: during an earlier setup keeps pointing wherever it pointed then - which for
+:: most people is the deployed MIS, so the app runs locally but signs in
+:: against production and rejects the local accounts. The script below fills in
+:: a missing file and, in one that exists, replaces only the settings that wire
+:: the modules on this machine together. Your own keys are left alone.
 echo [2/5] Checking configuration...
-if not exist "backend\.env" (
-    copy "backend\.env.example" "backend\.env" >nul
-    echo   - Created backend\.env
+node scripts\sync-local-env.cjs backend frontend
+if errorlevel 1 (
+    echo.
+    echo   [X] Could not write backend\.env or frontend\.env - see the error above.
+    echo.
+    pause
+    exit /b 1
 )
-if not exist "frontend\.env" (
-    copy "frontend\.env.example" "frontend\.env" >nul
-    echo   - Created frontend\.env
-)
-:: backend\.env is git-ignored: your local settings can never be pushed.
+:: Both files are git-ignored: your local settings can never be pushed.
 echo   - Configuration present
 
 :: --------------------------------------------------------------- 3. Database
@@ -129,17 +135,39 @@ echo   - Dependencies ready
 :: Once the database exists, only its accounts and SSO clients are refreshed:
 :: they are defined in the setup script and may gain entries after a database
 :: was first built, and --refresh re-applies just those (a few queries).
-"!MYSQL_CMD!" -u root -e "USE ngarw_mis; SELECT 1 FROM User LIMIT 1;" >nul 2>&1
-if errorlevel 1 (
+::
+:: What counts as "exists" is the super-admin's credential row, not the User
+:: table. A build that stopped part-way leaves the tables of a database nobody
+:: can sign in to, and testing for the table called that ready: the app then
+:: started and rejected the documented logins as wrong credentials. There is
+:: nothing to keep in a database you cannot sign in to, so treat it as absent
+:: and let the build below rebuild it.
+set "SEEDED_OUT=%TEMP%\mis-db-seeded.txt"
+"!MYSQL_CMD!" -u root -N -B -e "SELECT 1 FROM ngarw_mis.AuthCredential WHERE user_id = 1 LIMIT 1;" > "!SEEDED_OUT!" 2>nul
+set "DB_SEEDED="
+for %%F in ("!SEEDED_OUT!") do if %%~zF GTR 0 set "DB_SEEDED=1"
+del "!SEEDED_OUT!" >nul 2>&1
+if not defined DB_SEEDED (
     echo   - Building the database ^(first run, takes a few minutes^)...
     pushd backend
     call npm run db:setup
-    if errorlevel 1 (
+    set "DB_BUILD=!errorlevel!"
+    :: A failed build can leave a half-written database behind, and the normal
+    :: run refuses to touch one that already exists. Retrying with --force
+    :: wipes it and starts clean, which is what every developer was being told
+    :: to type by hand. Only ever on the failure path: --force on every start
+    :: would drop the database each time you launch the app.
+    if not "!DB_BUILD!"=="0" (
+        echo   - Build failed - wiping the partial database and retrying once...
+        call npm run db:setup -- --force
+        set "DB_BUILD=!errorlevel!"
+    )
+    if not "!DB_BUILD!"=="0" (
         popd
         echo.
         echo   [X] Database setup failed - see the error above.
-        echo       To wipe and rebuild an existing database:
-        echo           cd backend ^&^& npm run db:setup -- --force
+        echo       The retry with --force did not help either, so this is not
+        echo       a half-built database. Send the error above to the team.
         echo.
         pause
         exit /b 1
@@ -147,9 +175,20 @@ if errorlevel 1 (
     popd
 ) else (
     pushd backend
-    call npm run db:setup -- --refresh >nul 2>&1
+    :: The output is kept rather than discarded: when this step fails it is the
+    :: dev logins that are stale, so the next thing that happens is someone
+    :: being told their correct password is wrong. Print the reason instead.
+    call npm run db:setup -- --refresh > "%TEMP%\mis-db-refresh.log" 2>&1
     if errorlevel 1 (
-        echo   - Database ready ^(could not refresh dev accounts - run: cd backend ^&^& npm run db:setup -- --refresh^)
+        echo.
+        echo   [warn] The dev accounts could not be refreshed, so the logins below
+        echo          may not work yet. The setup script said:
+        echo.
+        type "%TEMP%\mis-db-refresh.log"
+        echo.
+        echo          To rebuild the database from scratch:
+        echo              cd backend ^&^& npm run db:setup -- --force
+        echo.
     ) else (
         echo   - Database ready ^(dev accounts refreshed^)
     )
