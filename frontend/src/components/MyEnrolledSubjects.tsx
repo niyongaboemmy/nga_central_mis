@@ -125,14 +125,21 @@ const MyEnrolledSubjects: React.FC = () => {
   const all = subjects ?? [];
   const filtered = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
-    if (!q) return all;
-    return all.filter(
-      (s) =>
-        s.name.toLowerCase().includes(q) ||
-        (s.code || "").toLowerCase().includes(q) ||
-        (s.category_name || "").toLowerCase().includes(q),
+    const matched = !q
+      ? all
+      : all.filter(
+          (s) =>
+            s.name.toLowerCase().includes(q) ||
+            (s.code || "").toLowerCase().includes(q) ||
+            (s.category_name || "").toLowerCase().includes(q),
+        );
+    // New notes first, then A-Z: with many subjects, the ones that changed this
+    // week should not be somewhere in row four.
+    const fresh = (s: MyEnrolledSubject) => noteStats.get(s.name)?.fresh || 0;
+    return [...matched].sort(
+      (a, b) => Number(fresh(b) > 0) - Number(fresh(a) > 0) || a.name.localeCompare(b.name),
     );
-  }, [all, searchQuery]);
+  }, [all, searchQuery, noteStats]);
 
   const totalNotes = useMemo(
     () => all.reduce((sum, s) => sum + (noteStats.get(s.name)?.total || 0), 0),
@@ -156,12 +163,12 @@ const MyEnrolledSubjects: React.FC = () => {
         {...m("reveal")}
         onClick={() => open(s.subject_id)}
         aria-label={`Open ${s.name}`}
-        className="el-card el-card-hover group flex h-full flex-col p-5 text-left focus:outline-none focus-visible:shadow-glow"
+        className="el-card el-card-hover group flex h-full flex-col p-4 text-left focus:outline-none focus-visible:shadow-glow"
       >
-        <div className="mb-3.5 flex items-start gap-3">
-          <SubjectTile subject={s.name} />
+        <div className="mb-3 flex items-start gap-3">
+          <SubjectTile subject={s.name} size="sm" />
           <div className="min-w-0 flex-1">
-            <h3 className="line-clamp-2 text-base font-semibold leading-snug text-gray-900 dark:text-white">
+            <h3 className="line-clamp-2 text-[15px] font-semibold leading-snug text-gray-900 dark:text-white">
               {s.name}
             </h3>
             <div className="mt-1 flex flex-wrap items-center gap-1.5">
@@ -185,12 +192,12 @@ const MyEnrolledSubjects: React.FC = () => {
         </div>
 
         {s.description && (
-          <p className="line-clamp-2 text-[13px] leading-relaxed text-gray-500 dark:text-gray-400">
+          <p className="line-clamp-2 text-xs leading-relaxed text-gray-500 dark:text-gray-400">
             {s.description}
           </p>
         )}
 
-        <div className="mt-auto flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-gray-100 pt-3.5 dark:border-white/[0.06]">
+        <div className="mt-auto flex flex-wrap items-center gap-x-3 gap-y-1.5 border-t border-gray-100 pt-3 dark:border-white/[0.06]">
           <Metric
             icon={<Library className="h-3.5 w-3.5" />}
             value={stat?.total || 0}
@@ -267,7 +274,7 @@ const MyEnrolledSubjects: React.FC = () => {
   /* ----------------------------------------------------------------- render */
 
   return (
-    <div className="pt-6 pb-16">
+    <div className="px-4 pt-6 pb-16 md:px-6">
       {/* Same header shape as My Library — these are the two pages a student
           lives in, and they should read as one product. */}
       <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
@@ -324,9 +331,9 @@ const MyEnrolledSubjects: React.FC = () => {
       </header>
 
       {subjects === null ? (
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
-          {[0, 1, 2, 3, 4, 5].map((i) => (
-            <Skeleton key={i} className="h-44" />
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(15rem,1fr))] gap-4">
+          {[0, 1, 2, 3, 4, 5, 6, 7].map((i) => (
+            <Skeleton key={i} className="h-36" />
           ))}
         </div>
       ) : all.length === 0 ? (
@@ -393,7 +400,7 @@ const MyEnrolledSubjects: React.FC = () => {
               action={{ label: "Clear search", onClick: () => setSearchQuery("") }}
             />
           ) : view === "grid" ? (
-            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(15rem,1fr))] gap-4">
               {filtered.map((s) => (
                 <Card key={s.subject_id} s={s} />
               ))}
