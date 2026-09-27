@@ -1,0 +1,156 @@
+/* Real user workflows in Access Studio / Insights, driven through the browser. */
+const path = require("path");
+const B = path.resolve(__dirname, "../..");
+require(path.join(B, "node_modules/dotenv")).config({ path: path.join(B, ".env") });
+const jwt = require(path.join(B, "node_modules/jsonwebtoken"));
+const mysql = require(path.join(B, "node_modules/mysql2/promise"));
+const puppeteer = require(path.join(B, "node_modules/puppeteer"));
+const OUT = process.argv[2];
+let pass = 0, fail = 0;
+const ok = (c, m, x) => { if (c) { pass++; console.log("  ✓", m); } else { fail++; console.log("  ✗", m, x ? JSON.stringify(x).slice(0, 300) : ""); } };
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+(async () => {
+  const db = await mysql.createConnection({ host: "127.0.0.1", port: 8889, user: process.env.DB_USERNAME, password: process.env.DB_PASSWORD, database: "nga_central_mis" });
+  const tokenFor = async (id) => { const [[u]] = await db.query("SELECT token_version FROM User WHERE user_id=?", [id]); return jwt.sign({ userId: id, tokenVersion: u.token_version ?? 0 }, process.env.JWT_SECRET, { expiresIn: "2h" }); };
+  const browser = await puppeteer.launch({ headless: true, args: ["--no-sandbox"] });
+  const open = async (userId, route, theme = "light") => {
+    const page = await browser.newPage();
+    await page.setViewport({ width: 1366, height: 900 });
+    const errors = [];
+    page.on("pageerror", (e) => errors.push(e.message));
+    const tok = await tokenFor(userId);
+    await page.evaluateOnNewDocument((t, th) => { localStorage.setItem("token", t); localStorage.setItem("theme", th); }, tok, theme);
+    await page.goto("http://localhost:5173" + route, { waitUntil: "networkidle0", timeout: 60000 });
+    await sleep(800);
+    return { page, errors };
+  };
+  const click = (page, sel, text) => page.evaluate((s, t) => { const el = [...document.querySelectorAll(s)].find((e) => e.offsetParent !== null && (e.textContent.trim() === t || e.getAttribute("aria-label") === t)); if (el) el.click(); return !!el; }, sel, text);
+  const text = (page) => page.evaluate(() => document.body.innerText);
+  const typeInto = async (page, selector, value) => { await page.click(selector, { clickCount: 3 }); await page.type(selector, value); };
+  const tab = async (page, name) => { await click(page, '[role="tab"]', name); await sleep(900); };
+
+  const depCode = `UX${Date.now() % 100000}`;
+  let depId = null;
+
+  console.log("1) Departments: create one and give it a subject");
+  let { page, errors } = await open(1, "/access-studio");
+  await tab(page, "Departments");
+  await typeInto(page, 'input[aria-label="Department code"]', depCode);
+  await typeInto(page, 'input[aria-label="Department name"]', "UX Flow Sciences");
+  ok(await click(page, "button", "Add"), "Add clicked");
+  await sleep(1200);
+  ok((await text(page)).includes("UX Flow Sciences"), "department appears in the list");
+  [[{ department_id: depId }]] = await db.query("SELECT department_id FROM Department WHERE code=?", [depCode]);
+  await page.evaluate((name) => { const li = [...document.querySelectorAll("li")].find((l) => l.textContent.includes(name)); [...li.querySelectorAll("button")].find((b) => b.textContent.includes("Edit subjects")).click(); }, "UX Flow Sciences");
+  await sleep(500);
+  const picked = await page.evaluate(() => { const box = [...document.querySelectorAll('input[type="checkbox"]')].find((c) => !c.disabled && !c.checked && c.closest("label")); if (box) { box.click(); return box.closest("label").textContent.trim(); } return null; });
+  ok(!!picked, "picked a free subject", picked);
+  await click(page, "button", "Save");
+  await sleep(1200);
+  const [[{ n: linked }]] = await db.query("SELECT COUNT(*) AS n FROM DepartmentSubject WHERE department_id=?", [depId]);
+  ok(Number(linked) === 1, "subject saved to the department (DB)");
+  await page.close();
+
+  console.log("2) Positions: assign a Head of Department through the dialog");
+  ({ page, errors } = await open(1, "/access-studio"));
+  await tab(page, "Positions");
+  await click(page, "button", "Assign a position");
+  await sleep(600);
+  const dialogFocused = await page.evaluate(() => document.querySelector('[role="dialog"]')?.contains(document.activeElement));
+  ok(dialogFocused, "focus moved into the dialog");
+  await page.type('[role="dialog"] input[aria-label="Search people"]', "Tuyishimire");
+  await sleep(1200);
+  const choseUser = await page.evaluate(() => { const b = [...document.querySelectorAll('[role="dialog"] ul button')][0]; if (b) b.click(); return b?.textContent; });
+  ok(!!choseUser, "picked a person from the search", choseUser);
+  await sleep(300);
+  const [[hod]] = await db.query("SELECT role_id FROM Role WHERE preset_key='head_of_department'");
+  await page.select('[role="dialog"] select', String(hod.role_id));
+  await sleep(300);
+  await page.evaluate((id) => { const sels = [...document.querySelectorAll('[role="dialog"] select')]; const nodeSel = sels.find((s) => s.getAttribute("aria-label") === "Choose a department"); nodeSel.value = String(id); nodeSel.dispatchEvent(new Event("change", { bubbles: true })); }, depId);
+  // React needs a proper change: use puppeteer select as well
+  await page.select('[role="dialog"] select[aria-label="Choose a department"]', String(depId));
+  await typeInto(page, '[role="dialog"] input[placeholder^="e.g."]', "HOD — UX Sciences");
+  await click(page, '[role="dialog"] button', "Assign");
+  await sleep(1500);
+  const [grantRows] = await db.query("SELECT grant_id, user_id FROM AccessGrant WHERE scope_type='DEPARTMENT' AND scope_id=? AND status='ACTIVE'", [depId]);
+  ok(grantRows.length === 1, "grant created (DB)", grantRows);
+  const hodUser = grantRows[0]?.user_id;
+  ok(!(await page.$('[role="dialog"]')), "dialog closed after success");
+  ok((await text(page)).includes("HOD — UX Sciences"), "new position listed with its title");
+  await page.close();
+
+  console.log("3) Explorer: the new HOD's access is visible and explained");
+  ({ page, errors } = await open(1, "/access-studio"));
+  await tab(page, "Explorer");
+  await page.type('input[aria-label="Search people"]', "Tuyishimire");
+  await sleep(1200);
+  await page.evaluate(() => { const b = [...document.querySelectorAll("[data-testid=access-studio] ul button")][0]; b && b.click(); });
+  await sleep(1500);
+  const exText = await text(page);
+  ok(/HOD — UX Sciences/.test(exText), "explorer lists the HOD position");
+  ok(/VIEW_RESULTS/.test(exText), "explorer shows the HOD's capabilities");
+  await page.close();
+
+  console.log("4) End the position through the confirmation dialog");
+  ({ page, errors } = await open(1, "/access-studio", "dark"));
+  await tab(page, "Positions");
+  await page.evaluate(() => { const b = [...document.querySelectorAll('button[aria-label^="End Head"], button[aria-label^="End HEAD"]')].find((x) => x.offsetParent); b && b.click(); });
+  await sleep(700);
+  ok(/End this position\?/.test(await text(page)), "confirmation explains the consequence");
+  await click(page, '[role="dialog"] button', "End position");
+  await sleep(500);
+  ok(/Please give a reason/.test(await text(page)), "empty reason is refused inline (no request sent)");
+  await page.type('[role="dialog"] textarea', "UX flow test clean-up");
+  await click(page, '[role="dialog"] button', "End position");
+  await sleep(1500);
+  const [[{ status }]] = await db.query("SELECT status FROM AccessGrant WHERE grant_id=?", [grantRows[0]?.grant_id ?? 0]);
+  ok(status === "ENDED", "grant ended (DB)");
+  const [[aud]] = await db.query("SELECT reason FROM AccessAudit WHERE action='grant.end' ORDER BY audit_id DESC LIMIT 1");
+  ok(aud?.reason === "UX flow test clean-up", "reason recorded in the audit log");
+  await page.close();
+
+  console.log("5) Role editor: depth change, unsaved-changes guard, Escape");
+  ({ page, errors } = await open(1, "/access-studio"));
+  await tab(page, "Roles");
+  await click(page, "[data-testid=access-studio] button", "Academic Insights Viewer");
+  await page.evaluate(() => [...document.querySelectorAll("[data-testid=access-studio] button")].find((b) => /Academic Insights Viewer/.test(b.textContent))?.click());
+  await sleep(900);
+  const saveDisabledBefore = await page.evaluate(() => [...document.querySelectorAll("button")].find((b) => b.textContent === "Save role")?.disabled);
+  ok(saveDisabledBefore === true, "Save is disabled until something changes");
+  await page.select('select[aria-label="Depth for VIEW_RESULTS"]', "detail");
+  const saveDisabledAfter = await page.evaluate(() => [...document.querySelectorAll("button")].find((b) => b.textContent === "Save role")?.disabled);
+  ok(saveDisabledAfter === false, "Save enabled after a change");
+  await click(page, "button", "Cancel");
+  await sleep(500);
+  ok(/Discard your changes\?/.test(await text(page)) && !!(await page.$('[role="alertdialog"]')), "leaving with unsaved changes asks (themed dialog)");
+  await click(page, "button", "Keep editing");
+  await sleep(400);
+  ok((await text(page)).includes("Role: Academic Insights Viewer"), "…and dismissing keeps the editor open");
+  await page.close();
+
+  console.log("6) Insights drill-down for the programme lead");
+  ({ page, errors } = await open(19, "/insights"));
+  await click(page, "[data-testid=insights-hub] button", "Coding - 1");
+  await page.evaluate(() => [...document.querySelectorAll("[data-testid=insights-hub] button")].find((b) => b.textContent.startsWith("Coding - 1"))?.click());
+  await sleep(1500);
+  const bc = await page.evaluate(() => document.querySelector('nav[aria-label="Breadcrumb"]')?.innerText);
+  ok(/Coding - 1/.test(bc || ""), "breadcrumb shows the drilled grade", bc);
+  await page.evaluate(() => [...document.querySelectorAll('nav[aria-label="Breadcrumb"] button')][0].click());
+  await sleep(1200);
+  const bc2 = await page.evaluate(() => document.querySelector('nav[aria-label="Breadcrumb"]')?.innerText);
+  ok(!/Coding - 1/.test(bc2 || ""), "breadcrumb navigates back up", bc2);
+  ok(errors.length === 0, "no page errors", errors);
+  await page.screenshot({ path: `${OUT}/flow-insights.png` });
+  await page.close();
+
+  // clean-up
+  await db.query("DELETE FROM AccessGrant WHERE scope_type='DEPARTMENT' AND scope_id=?", [depId]);
+  await db.query("DELETE FROM DepartmentSubject WHERE department_id=?", [depId]);
+  await db.query("DELETE FROM Department WHERE department_id=?", [depId]);
+  if (hodUser) await db.query("UPDATE User SET access_version = access_version + 1 WHERE user_id=?", [hodUser]);
+  await browser.close();
+  await db.end();
+  console.log(`UI flows: ${pass} passed, ${fail} failed`);
+  process.exit(fail ? 1 : 0);
+})().catch((e) => { console.error(e); process.exit(2); });

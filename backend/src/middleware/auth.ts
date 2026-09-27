@@ -1,23 +1,10 @@
 import jwt from "jsonwebtoken";
 import { db } from "../db";
-import { eq, and } from "drizzle-orm";
-import { UserRole, Role, User } from "../db/schema";
+import { eq } from "drizzle-orm";
+import { User } from "../db/schema";
 import { ValidationError } from "../errors/CustomError";
-import { ALL_PERMISSIONS } from "../utils/permissions";
-
-const SUPER_ADMIN_ROLE = "SUPER_ADMIN";
-
-const getUserRoles = async (userId: number): Promise<string[]> => {
-  const roles = await db
-    .select({ name: Role.name })
-    .from(UserRole)
-    .innerJoin(
-      Role,
-      and(eq(UserRole.role_id, Role.role_id), eq(Role.status, "ACTIVE")),
-    )
-    .where(eq(UserRole.user_id, userId));
-  return roles.map((r) => r.name);
-};
+import { getEffectivePermissions } from "../utils/auth";
+import { shadowCompareLegacy } from "../services/access/policy";
 
 /** Single indexed lookup backing the logout-revocation check below. Returns
  *  null if the user row is gone (deleted account) so callers can reject.
@@ -76,16 +63,8 @@ export const authenticate = async (req: any, res: any, next: any) => {
         .json({ message: "Session expired, please log in again." });
     }
 
-    // Check if user has SUPER_ADMIN role - grant all permissions
-    const userRoles = await getUserRoles(decoded.userId);
-    if (userRoles.includes(SUPER_ADMIN_ROLE)) {
-      // SUPER_ADMIN gets all permissions
-      req.user.permissions = ALL_PERMISSIONS;
-    } else {
-      // Regular users get permissions from their roles
-      const { getUserPermissions } = await import("../utils/auth");
-      req.user.permissions = await getUserPermissions(decoded.userId);
-    }
+    // Same resolver as GET /users/me and the SSO token (utils/auth.ts).
+    req.user.permissions = await getEffectivePermissions(req.user.userId);
 
     next();
   } catch (error) {
@@ -101,6 +80,10 @@ export const authorize =
     const hasPermission = permissions.some((perm) =>
       req.user.permissions.includes(perm),
     );
+    // Access control v2 shadow mode: the legacy check above still decides;
+    // v2's answer is compared and any disagreement recorded for review.
+    // No-op unless ACCESS_V2_MIS_MODE=shadow (the non-test default).
+    void shadowCompareLegacy(req, permissions, hasPermission);
     if (!hasPermission) {
       return res.status(403).json({ message: "Forbidden" });
     }

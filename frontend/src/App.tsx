@@ -61,13 +61,18 @@ import CourseBuilderPage from "./components/elearning/builder/CourseBuilderPage"
 import MyCoursesPage from "./components/elearning/builder/MyCoursesPage";
 import ElearningAdminPage from "./components/elearning/admin/ElearningAdminPage";
 import DevKitchenSink from "./components/elearning/DevKitchenSink";
+import AccessStudio from "./components/access/AccessStudio";
+import InsightsHub from "./components/access/InsightsHub";
+import HomePage from "./components/home/HomePage";
 
 const LoginPage: React.FC = () => {
   const navigate = useNavigate();
   return (
     <Login
       onLoginSuccess={() => {
-        navigate("/dashboard");
+        // Home is the post-login landing page for every user
+        // (HOME_OVERVIEW_IMPLEMENTATION_PLAN.md).
+        navigate("/home");
       }}
     />
   );
@@ -113,7 +118,7 @@ const PublicRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   // If logged in and NOT an SSO request, redirect to dashboard
   // If it IS an SSO request, let them through to the Login page which handles the consent UI
   if (isAuthenticated && !isSSORequest) {
-    return <Navigate to="/dashboard" replace />;
+    return <Navigate to="/home" replace />;
   }
 
   return <>{children}</>;
@@ -313,6 +318,19 @@ function App() {
             <Route path="/verify/:schemeId" element={<SchemeVerifyPage />} />
 
             {/* Dashboard - protected with sidebar */}
+            {/* Home -- what needs me across every module, today, and how my
+                areas are doing. The post-login landing page for everyone. */}
+            <Route
+              path="/home"
+              element={
+                <ProtectedRoute>
+                  <SystemLayoutWrapper>
+                    <HomePage />
+                  </SystemLayoutWrapper>
+                </ProtectedRoute>
+              }
+            />
+
             <Route
               path="/dashboard"
               element={
@@ -667,6 +685,31 @@ function App() {
                         This page is under construction
                       </p>
                     </div>
+                  </SystemLayoutWrapper>
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Leadership & Access (access control v2 Access Studio). The page
+                gates each tab on the viewer's v2 capabilities itself. */}
+            <Route
+              path="/access-studio"
+              element={
+                <ProtectedRoute>
+                  <SystemLayoutWrapper>
+                    <AccessStudio />
+                  </SystemLayoutWrapper>
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Leadership Insights -- aggregates only, gated per widget by v2 access. */}
+            <Route
+              path="/insights"
+              element={
+                <ProtectedRoute>
+                  <SystemLayoutWrapper>
+                    <InsightsHub />
                   </SystemLayoutWrapper>
                 </ProtectedRoute>
               }

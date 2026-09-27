@@ -11,6 +11,7 @@ interface SearchItem {
 }
 
 const SEARCH_ITEMS: SearchItem[] = [
+  { label: "Home", path: "/home" },
   { label: "Dashboard", path: "/dashboard" },
   {
     label: "Teacher Dashboard",

@@ -1,4 +1,5 @@
 import jwt from "jsonwebtoken";
+import { getPublicSystems } from "../utils/publicSystems";
 import crypto from "crypto";
 import { db } from "../db";
 import { eq, and } from "drizzle-orm";
@@ -12,7 +13,8 @@ import {
   Program,
   Grade,
 } from "../db/schema";
-import { getUserPermissions } from "../utils/auth";
+import { getEffectivePermissions } from "../utils/auth";
+import { verifyClientSecret } from "../utils/ssoClientSecret";
 import {
   AuthenticationError,
   ValidationError,
@@ -100,19 +102,20 @@ export const getSSOToken = asyncHandler(async (req: any, res: any) => {
     );
   }
 
-  // Verify client (via System table)
+  // Verify client (via System table). The secret is compared in constant
+  // time and may be stored either as a bcrypt hash or (legacy) in plaintext
+  // -- see utils/ssoClientSecret.ts.
   const client = await db
     .select()
     .from(System)
-    .where(
-      and(
-        eq(System.client_id, client_id),
-        eq(System.client_secret, client_secret),
-      ),
-    )
+    .where(eq(System.client_id, client_id))
     .limit(1);
 
-  if (client.length === 0) {
+  if (
+    client.length === 0 ||
+    client[0].status !== "ACTIVE" ||
+    !(await verifyClientSecret(client_secret, client[0].client_secret))
+  ) {
     throw new AuthenticationError("Invalid client credentials");
   }
 
@@ -152,7 +155,14 @@ export const getSSOToken = asyncHandler(async (req: any, res: any) => {
     .from(User)
     .where(eq(User.user_id, userId))
     .limit(1);
-  const permissions = await getUserPermissions(userId);
+
+  // A user disabled (or deleted) between /sso/authorize and this exchange
+  // must not walk away with a fresh 24h token.
+  if (user.length === 0 || user[0].status !== "ACTIVE") {
+    throw new AuthenticationError("User account is not active");
+  }
+
+  const permissions = await getEffectivePermissions(userId);
 
   // Get current academic data (copied logic from authController)
   const academicYears = await db
@@ -182,10 +192,8 @@ export const getSSOToken = asyncHandler(async (req: any, res: any) => {
   const allGrades = await db.select().from(Grade).orderBy(Grade.level_order);
 
   // Get all active systems
-  const systems = await db
-    .select()
-    .from(System)
-    .where(eq(System.status, "ACTIVE"));
+  // No client_secret -- see utils/publicSystems.ts.
+  const systems = await getPublicSystems();
 
   // Generate JWT
   const token = jwt.sign(
@@ -205,15 +213,29 @@ export const getSSOToken = asyncHandler(async (req: any, res: any) => {
       tokenVersion: user[0].token_version || 0,
     },
     config.jwtSecret,
-    { expiresIn: "24h" },
+    // iss/aud identify who minted the token and which client it was minted
+    // for. `authenticate` does not pin an audience, because every spoke app
+    // calls MIS APIs with this same token.
+    { expiresIn: "24h", issuer: "nga-mis", audience: client_id },
   );
 
   logger.info(`SSO Token generated for user ${userId} via client ${client_id}`);
+
+  // Apps drop a cached access snapshot at sign-in when this moved (fail-safe:
+  // null on a server without migration 090).
+  let accessVersion: number | null = null;
+  try {
+    const { currentAccessVersion } = await import("../services/access/compile");
+    accessVersion = await currentAccessVersion(userId);
+  } catch {
+    accessVersion = null;
+  }
 
   successResponse(res, "Token generated successfully", {
     token,
     user: user[0],
     permissions,
+    access_version: accessVersion,
   });
 });
 

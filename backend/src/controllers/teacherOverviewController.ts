@@ -1,8 +1,6 @@
 import { db } from "../db";
 import { and, desc, eq } from "drizzle-orm";
 import {
-  AcademicTerm,
-  AcademicYear,
   ClassGroup,
   Course,
   LessonNote,
@@ -17,6 +15,7 @@ import {
   loadTeacherAssignments,
 } from "../services/teacherSchemes";
 import logger from "../utils/logger";
+import { resolvePeriod } from "../services/academicPeriod";
 import {
   loadAssignedActivities,
   loadTeacherLessons,
@@ -45,41 +44,6 @@ export interface TeacherLessonToday {
   location: string | null;
   color: string | null;
 }
-
-/** Resolve the (year, term) the caller is looking at, honouring the top-nav switcher. */
-const resolvePeriod = async (queryYearId?: number, queryTermId?: number) => {
-  const [term] = queryTermId
-    ? await db
-        .select()
-        .from(AcademicTerm)
-        .where(eq(AcademicTerm.academic_term_id, queryTermId))
-        .limit(1)
-    : await db
-        .select()
-        .from(AcademicTerm)
-        .where(eq(AcademicTerm.is_current, 1))
-        .limit(1);
-
-  let yearId = queryYearId ?? term?.academic_year_id ?? undefined;
-  if (!yearId) {
-    const [currentYear] = await db
-      .select({ academic_year_id: AcademicYear.academic_year_id })
-      .from(AcademicYear)
-      .where(eq(AcademicYear.is_current, 1))
-      .limit(1);
-    yearId = currentYear?.academic_year_id;
-  }
-
-  const [year] = yearId
-    ? await db
-        .select()
-        .from(AcademicYear)
-        .where(eq(AcademicYear.academic_year_id, yearId))
-        .limit(1)
-    : [];
-
-  return { term: term ?? null, year: year ?? null };
-};
 
 /**
  * An optional panel must not be able to take the whole board down.

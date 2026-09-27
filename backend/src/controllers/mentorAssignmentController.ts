@@ -8,6 +8,7 @@ import {
   StudentClassGroup,
   ClassGroup,
 } from "../db/schema";
+import { applyPlacementChange } from "../services/access/ruleEngine";
 import { asyncHandler } from "../middleware/asyncHandler";
 import { successResponse } from "../utils/response";
 import { ValidationError, ConflictError, NotFoundError } from "../errors/CustomError";
@@ -154,7 +155,7 @@ export const createAssignment = asyncHandler(async (req: any, res: any) => {
   }
 
   const existing = await db
-    .select({ assignment_id: MentorAssignment.assignment_id })
+    .select({ assignment_id: MentorAssignment.assignment_id, mentor_id: MentorAssignment.mentor_id })
     .from(MentorAssignment)
     .where(
       and(
@@ -164,6 +165,8 @@ export const createAssignment = asyncHandler(async (req: any, res: any) => {
       ),
     );
 
+  // Mentors whose mentee list this changes (their access snapshots list mentees).
+  const touchedMentors: number[] = [mentorIdNum];
   if (existing.length > 0) {
     if (!reassign) {
       throw new ConflictError(
@@ -190,6 +193,10 @@ export const createAssignment = asyncHandler(async (req: any, res: any) => {
     assigned_by: adminId,
     notes: notes ?? null,
   });
+  await applyPlacementChange(
+    [...touchedMentors, ...existing.map((e) => e.mentor_id)],
+    adminId,
+  );
 
   return successResponse(
     res,
@@ -253,6 +260,17 @@ export const bulkAssign = asyncHandler(async (req: any, res: any) => {
       );
   }
 
+  const previousMentors = alreadyAssigned.size
+    ? await db
+        .selectDistinct({ mentor_id: MentorAssignment.mentor_id })
+        .from(MentorAssignment)
+        .where(
+          and(
+            inArray(MentorAssignment.student_id, [...alreadyAssigned]),
+            eq(MentorAssignment.academic_year_id, yearId),
+          ),
+        )
+    : [];
   await db.insert(MentorAssignment).values(
     studentIds.map((sid: number) => ({
       mentor_id: mentorIdNum,
@@ -263,6 +281,8 @@ export const bulkAssign = asyncHandler(async (req: any, res: any) => {
       notes: notes ?? null,
     })),
   );
+
+  await applyPlacementChange([mentorIdNum, ...previousMentors.map((m) => m.mentor_id)], adminId);
 
   return successResponse(res, "Bulk assignment complete", { assigned: studentIds.length }, 201);
 });
@@ -275,7 +295,7 @@ export const endAssignment = asyncHandler(async (req: any, res: any) => {
   if (!id || isNaN(id)) throw new ValidationError("Invalid assignment ID");
 
   const existing = await db
-    .select({ assignment_id: MentorAssignment.assignment_id })
+    .select({ assignment_id: MentorAssignment.assignment_id, mentor_id: MentorAssignment.mentor_id })
     .from(MentorAssignment)
     .where(eq(MentorAssignment.assignment_id, id))
     .limit(1);
@@ -286,6 +306,7 @@ export const endAssignment = asyncHandler(async (req: any, res: any) => {
     .update(MentorAssignment)
     .set({ status: "ENDED", ended_at: sql`CURRENT_TIMESTAMP` })
     .where(eq(MentorAssignment.assignment_id, id));
+  await applyPlacementChange([existing[0].mentor_id], req.user?.userId);
 
   return successResponse(res, "Assignment ended", { assignment_id: id });
 });

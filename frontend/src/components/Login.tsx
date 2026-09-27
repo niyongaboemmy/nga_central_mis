@@ -1346,7 +1346,7 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                     transition={{ delay: 0.6 }}
                   >
                     <p className="text-sm text-gray-500 dark:text-gray-400">
-                      Redirecting to dashboard...
+                      Redirecting to your Home...
                     </p>
                   </motion.div>
                 </motion.div>

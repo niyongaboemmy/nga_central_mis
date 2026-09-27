@@ -2,6 +2,7 @@ import crypto from "crypto";
 import { and, eq, isNull, or, gt, sql } from "drizzle-orm";
 import { db } from "../db";
 import { IntegrationToken, System } from "../db/schema";
+import { verifyClientSecret } from "../utils/ssoClientSecret";
 
 /**
  * Authentication for machine-to-machine integration clients.
@@ -89,14 +90,10 @@ async function clientCredentials(
   const system = rows[0];
   if (!system || system.status !== "ACTIVE") return null;
 
-  // Constant-time compare. Lengths are compared first because timingSafeEqual
-  // throws on a mismatch, and that difference is itself observable — so an
-  // equal-length wrong secret and a wrong-length one must both take the same
-  // path out.
-  const given = Buffer.from(clientSecret, "utf8");
-  const known = Buffer.from(String(system.client_secret ?? ""), "utf8");
-  if (known.length === 0 || given.length !== known.length) return null;
-  if (!crypto.timingSafeEqual(given, known)) return null;
+  // Same check as the SSO token exchange: bcrypt when the stored secret is
+  // hashed, otherwise a constant-time compare over fixed-length digests (so
+  // a wrong-length secret takes the same path as an equal-length one).
+  if (!(await verifyClientSecret(clientSecret, system.client_secret))) return null;
 
   return {
     // Negative, so it can never collide with an IntegrationToken id in a log.
