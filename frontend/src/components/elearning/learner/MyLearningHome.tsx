@@ -254,7 +254,9 @@ const MyLearningHome: React.FC = () => {
   }[tone];
 
   return (
-    <div className="pt-5 pb-24 sm:pb-8">
+    // Own side padding: the shell's default container has none, so the page
+    // sat flush against the sidebar.
+    <div className="px-4 pt-5 pb-24 sm:pb-8 md:px-6">
       {/* ── Header: title, greeting, status and tools on one line ────────── */}
       <div className="mb-4 flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
         <div className="min-w-0">
