@@ -35,6 +35,12 @@ export default defineConfig({
   server: {
     port: 5173,
     host: true,
+    // Without this, a 5173 left running by an earlier `npm run dev` makes Vite
+    // silently move to 5174 -- which is TaskMentor's port. You then have two
+    // frontends up, the stale one still answering on 5173, and the SSO redirect
+    // (registered against 5173) breaks in a way that reads as a login bug.
+    // Fail loudly instead: the port is part of the contract, not a preference.
+    strictPort: true,
   },
   build: {
     outDir: "dist",

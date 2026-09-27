@@ -7,6 +7,7 @@ import { useNotifications } from "../../contexts/NotificationContext";
 import { useCurrentTime } from "../calendar/useCurrentTime";
 import { useHomeData } from "./useHomeData";
 import { useAppSummaries } from "./useAppSummaries";
+import { HOME_DEMO, demoAppStates, withDemoOverview } from "./demoData";
 import {
   audienceOf,
   EVERYTHING,
@@ -37,6 +38,8 @@ import { Skeleton } from "./ui";
 // ─────────────────────────────────────────────────────────────────────────────
 
 const LENS_STORAGE_KEY = "home.lens";
+/** Below this many items there is nothing worth filtering, so no focus tabs. */
+const LENS_MIN_ITEMS = 4;
 
 const readLens = (): string => {
   try {
@@ -131,12 +134,15 @@ const HomePage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const previewAs = Number(searchParams.get("as")) || undefined;
 
-  const { data, loading, refreshing, fromSnapshot, error, fetchedAt, refresh } = useHomeData({
+  const { data: liveData, loading, refreshing, fromSnapshot, error, fetchedAt, refresh } = useHomeData({
     userId: user?.user?.user_id,
     yearId: selectedYearId,
     termId: selectedTermId,
     as: previewAs,
   });
+
+  // Local demo mode only (see demoData.ts): a production build never takes this branch.
+  const data = useMemo(() => (HOME_DEMO && liveData ? withDemoOverview(liveData) : liveData), [liveData]);
 
   const [lens, setLens] = useState<string>(readLens);
   // A remembered lens the user no longer has falls back to Everything.
@@ -149,7 +155,11 @@ const HomePage: React.FC = () => {
   };
 
   // Other apps (Task Mentor, Attendance, Tupo) answer independently of the MIS.
-  const appStates = useAppSummaries(data, selectedYearId);
+  const liveAppStates = useAppSummaries(HOME_DEMO ? null : data, selectedYearId);
+  const appStates = useMemo(
+    () => (HOME_DEMO && data ? demoAppStates(data) : liveAppStates),
+    [data, liveAppStates],
+  );
   const apps = useMemo(() => mergeApps(appStates), [appStates]);
 
   const ranked = useMemo(
@@ -225,6 +235,11 @@ const HomePage: React.FC = () => {
     (!lensIsFocused || lens === "TEACHING" || lens === "SELF");
   const hero = pickHero(visibleItems, showToday ? data.today.lessons : [], nowMinutes, data.today.next_teaching_day);
   const insightsTile = tiles.find((t) => t.metric);
+  // "Next up" already shows its item in full; listing it again below was the
+  // same card twice.
+  const heroItemId = hero.kind === "item" ? hero.item.id : null;
+  const listItems = heroItemId ? visibleItems.filter((i) => i.id !== heroItemId) : visibleItems;
+  const showList = !(listItems.length === 0 && hero.kind === "clear");
   const p = data.period;
   const termPct =
     p.week_of_term && p.weeks_in_term ? Math.min(100, Math.round((p.week_of_term / p.weeks_in_term) * 100)) : null;
@@ -256,9 +271,6 @@ const HomePage: React.FC = () => {
               ? ` · Week ${p.week_of_term} of ${p.weeks_in_term}`
               : ""}
           </p>
-          <div className="mt-2">
-            <SourceHealth states={appStates} />
-          </div>
           {termPct !== null && termPct < 100 && (
             <div className="mt-2 h-1.5 w-56 max-w-full rounded-full bg-surface-light dark:bg-surface-dark" aria-hidden>
               <div className="h-full rounded-full bg-blue-500" style={{ width: `${termPct}%` }} />
@@ -266,6 +278,8 @@ const HomePage: React.FC = () => {
           )}
         </div>
         <div className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
+          <SourceHealth states={appStates} />
+          {appStates.length > 0 && <span aria-hidden>·</span>}
           <span aria-live="polite">
             {refreshing ? "Updating…" : fromSnapshot ? "Showing your last visit" : fetchedAt ? `Updated ${fetchedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : ""}
           </span>
@@ -286,7 +300,7 @@ const HomePage: React.FC = () => {
       </p>
 
       {/* ② Lenses */}
-      {lenses.length > 0 && <LensSwitcher lenses={lenses} value={lens} pressure={pressure} onChange={chooseLens} />}
+      {lenses.length > 0 && (ranked.length >= LENS_MIN_ITEMS || lensIsFocused) && <LensSwitcher lenses={lenses} value={lens} pressure={pressure} onChange={chooseLens} />}
 
       {error && (
         <p className="rounded-2xl bg-amber-50 px-4 py-2 text-xs text-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
@@ -298,6 +312,8 @@ const HomePage: React.FC = () => {
           Some sections couldn't load ({data.degraded.join(", ")}). Everything else is up to date.
         </p>
       )}
+
+      <GlanceTiles tiles={tiles} insightsHref={insightsTile ? "/insights" : undefined} wide />
 
       {/* ③ Next up */}
       <NextUpHero hero={hero} audience={audience} />
@@ -313,13 +329,16 @@ const HomePage: React.FC = () => {
               <TodayCard today={data.today} nowMinutes={nowMinutes} teaching={teaching} registerMarks={apps.registerMarks} />
             </div>
           )}
-          <NeedsYouList
-            items={visibleItems}
-            lenses={data.lenses}
-            audience={audience}
-            showLens={!lensIsFocused && lenses.length > 0}
-            quietWhenEmpty={hero.kind === "clear"}
-          />
+          {showList && (
+            <NeedsYouList
+              items={listItems}
+              lenses={data.lenses}
+              audience={audience}
+              showLens={!lensIsFocused && lenses.length > 0}
+              quietWhenEmpty={hero.kind === "clear" || !!heroItemId}
+              heroTaken={!!heroItemId}
+            />
+          )}
           {showToday && !teaching && (
             <div className="hidden lg:block">
               <TodayCard today={data.today} nowMinutes={nowMinutes} teaching={teaching} registerMarks={apps.registerMarks} />
@@ -327,7 +346,6 @@ const HomePage: React.FC = () => {
           )}
         </div>
         <aside className="min-w-0 space-y-5 lg:col-span-4" aria-label="Summary">
-          <GlanceTiles tiles={tiles} insightsHref={insightsTile ? "/insights" : undefined} />
           {(!lensIsFocused || lens === "SELF") && <CommsCard comms={apps.comms} now={now} />}
           <QuickActions actions={actions.slice(0, 6)} />
           <UpdatesCard entries={updates} unreadCount={unreadTotal} onMarkAll={() => void markAllRead()} />

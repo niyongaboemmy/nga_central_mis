@@ -34,7 +34,11 @@ const STATUS_DOT = {
 
 const TILE_CAP = 6;
 
-export const GlanceTiles: React.FC<{ tiles: GlanceTile[]; insightsHref?: string }> = ({ tiles, insightsHref }) => {
+export const GlanceTiles: React.FC<{ tiles: GlanceTile[]; insightsHref?: string; wide?: boolean }> = ({
+  tiles,
+  insightsHref,
+  wide = false,
+}) => {
   const [all, setAll] = React.useState(false);
   if (tiles.length === 0) return null;
   // Critical first, then warning, so a capped grid never hides the red one.
@@ -55,7 +59,11 @@ export const GlanceTiles: React.FC<{ tiles: GlanceTile[]; insightsHref?: string 
           ) : undefined
         }
       />
-      <ul className="grid grid-cols-2 gap-2 px-4 pb-4">
+      {/* wide: a full-width row under the greeting, so the facts are read first
+          and the two columns below are left for what to do about them. The
+          tiles share the row whatever their number (auto-fit), so two tiles do
+          not sit in the left third of an empty card. */}
+      <ul className={`grid gap-2 px-4 pb-4 ${wide ? "grid-cols-2 sm:grid-cols-[repeat(auto-fit,minmax(10rem,1fr))]" : "grid-cols-2"}`}>
         {shown.map((t) => {
           const body = (
             <>
@@ -298,9 +306,21 @@ const HEALTH: Record<string, { dot: string; text: string }> = {
 export const SourceHealth: React.FC<{ states: AppState[] }> = ({ states }) => {
   if (states.length === 0) return null;
   const down = states.filter((s) => s.status === "unavailable" || s.status === "unauthorized").map((s) => s.name);
+  const sentence =
+    down.length > 0
+      ? `${down.join(", ")} ${down.length === 1 ? "isn't" : "aren't"} answering right now — ${down.length === 1 ? "its" : "their"} items aren't shown here yet.`
+      : "All connected apps are answering.";
+  // A status line, not a warning under the greeting: it sits beside "Updated"
+  // as one short phrase, with the full sentence on hover and for screen readers.
   return (
-    <div>
-    <ul className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-600 dark:text-slate-300" aria-label="Connected apps">
+    <div className="relative" title={sentence}>
+      <span aria-hidden className="inline-flex items-center gap-1.5">
+        <span className={`w-2 h-2 rounded-full ${down.length > 0 ? "bg-amber-500" : "bg-green-500"}`} />
+        {down.length > 0
+          ? `${down.length} ${down.length === 1 ? "app" : "apps"} offline`
+          : "All apps connected"}
+      </span>
+    <ul className="sr-only" aria-label="Connected apps">
       <li className="inline-flex items-center gap-1.5">
         <span className="w-2 h-2 rounded-full bg-green-500" aria-hidden /> MIS
       </li>
@@ -316,11 +336,7 @@ export const SourceHealth: React.FC<{ states: AppState[] }> = ({ states }) => {
         );
       })}
     </ul>
-    {down.length > 0 && (
-      <p className="mt-1 text-xs text-amber-800 dark:text-amber-200">
-        {down.join(", ")} {down.length === 1 ? "isn't" : "aren't"} answering right now — {down.length === 1 ? "its" : "their"} items aren't shown here yet.
-      </p>
-    )}
+    {down.length > 0 && <p className="sr-only">{sentence}</p>}
     </div>
   );
 };

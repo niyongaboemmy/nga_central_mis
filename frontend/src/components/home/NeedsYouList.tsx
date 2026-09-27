@@ -107,8 +107,11 @@ const TierGroup: React.FC<{
   lensByKey: Map<string, HomeLens>;
   showLens: boolean;
   defaultOpen: boolean;
-}> = ({ tier, label, items, lensByKey, showLens, defaultOpen }) => {
-  const [open, setOpen] = useState(defaultOpen);
+  /** The only group in the card: the card header already names it, so no
+   *  second header and nothing to collapse. */
+  bare?: boolean;
+}> = ({ tier, label, items, lensByKey, showLens, defaultOpen, bare = false }) => {
+  const [open, setOpen] = useState(defaultOpen || bare);
   const [all, setAll] = useState(false);
   // Nothing that needs you now is ever tucked behind "show more"; only the
   // calmer tiers are capped.
@@ -117,6 +120,7 @@ const TierGroup: React.FC<{
   const headingId = useId();
   return (
     <div className="px-2 pb-2">
+      {!bare && (
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
@@ -131,6 +135,7 @@ const TierGroup: React.FC<{
         </span>
         <ChevronDown className={`ml-auto w-4 h-4 transition-transform ${open ? "" : "-rotate-90"}`} aria-hidden />
       </button>
+      )}
       {open && (
         <ul id={headingId} className="space-y-1">
           {visible.map((i) => (
@@ -160,7 +165,10 @@ export const NeedsYouList: React.FC<{
   showLens: boolean;
   /** The hero above already says "all caught up" -- don't say it twice. */
   quietWhenEmpty?: boolean;
-}> = ({ items, lenses, audience, showLens, quietWhenEmpty = false }) => {
+  /** The most urgent item is shown in "Next up" and left out of this list. */
+  heroTaken?: boolean;
+}> = ({ items, lenses, audience, showLens, quietWhenEmpty = false, heroTaken = false }) => {
+  const shownGroups = TIERS.filter((t) => groupByTier(items)[t].length > 0);
   const groups = groupByTier(items);
   const lensByKey = new Map(lenses.map((l) => [l.key, l]));
   const urgent = groups.blocking.length + groups.slipping.length;
@@ -172,7 +180,9 @@ export const NeedsYouList: React.FC<{
         title={audience === "learner" ? "Your to-do" : "Needs you"}
         subtitle={
           items.length === 0
-            ? "Nothing waiting on you"
+            ? heroTaken
+              ? "Nothing else waiting on you"
+              : "Nothing waiting on you"
             : urgent === 0
               ? "Nothing urgent — just housekeeping"
               : `${urgent} ${urgent === 1 ? "thing" : "things"} to act on`
@@ -191,7 +201,7 @@ export const NeedsYouList: React.FC<{
           </p>
         </div>
       ) : (
-        TIERS.filter((t) => groups[t].length > 0).map((t) => (
+        shownGroups.map((t) => (
           <TierGroup
             key={t}
             tier={t}
@@ -200,6 +210,7 @@ export const NeedsYouList: React.FC<{
             lensByKey={lensByKey}
             showLens={showLens}
             defaultOpen={t !== "tidy" || urgent === 0}
+            bare={shownGroups.length === 1}
           />
         ))
       )}

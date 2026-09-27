@@ -367,12 +367,14 @@ function App() {
               }
             />
 
-            {/* Documents - protected with sidebar */}
+            {/* Documents - protected with sidebar.
+                fullWidth: a file manager with its own tree rail was being
+                squeezed into the default max-w-7xl. */}
             <Route
               path="/documents"
               element={
                 <ProtectedRoute>
-                  <SystemLayoutWrapper>
+                  <SystemLayoutWrapper fullWidth>
                     <DocumentsPage />
                   </SystemLayoutWrapper>
                 </ProtectedRoute>
@@ -439,12 +441,16 @@ function App() {
               }
             />
 
-            {/* Subject Detail page - curriculum & materials */}
+            {/* Subject Detail page - curriculum & materials.
+                fullWidth: the page has its own edge-to-edge sticky header, and
+                the default max-w-7xl centred it inside `main`, leaving an 80px
+                dead gutter hard against the sidebar with the white header bar
+                stopping short of it. */}
             <Route
               path="/subjects/:subjectId"
               element={
                 <ProtectedRoute>
-                  <SystemLayoutWrapper>
+                  <SystemLayoutWrapper fullWidth>
                     <SubjectDetailPage />
                   </SystemLayoutWrapper>
                 </ProtectedRoute>
@@ -484,13 +490,16 @@ function App() {
                 </ProtectedRoute>
               }
             />
+            {/* Reading a note is a full-screen job, so this one route renders
+                without the app shell. Inside it, the sidebar (256px) and navbar
+                competed with the contents rail and the AI panel and left the
+                note itself a ~480px column of six-word lines. The page carries
+                its own header and its own way back to the library. */}
             <Route
               path="/shared-lesson-notes/:id"
               element={
                 <ProtectedRoute>
-                  <SystemLayoutWrapper>
-                    <SharedLessonNoteViewPage />
-                  </SystemLayoutWrapper>
+                  <SharedLessonNoteViewPage />
                 </ProtectedRoute>
               }
             />

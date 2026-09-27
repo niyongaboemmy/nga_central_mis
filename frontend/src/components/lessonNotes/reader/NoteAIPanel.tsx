@@ -48,6 +48,9 @@ interface Props {
   open: boolean;
   onClose: () => void;
   request: AskRequest | null;
+  /** The standalone reader owns the whole viewport, so the panel runs floor to
+   *  ceiling. Embedded in the course page it must clear the app navbar. */
+  offsetTop?: boolean;
 }
 
 const STARTERS = [
@@ -78,7 +81,15 @@ const AssistantBody: React.FC<{ html: string }> = ({ html }) => {
   );
 };
 
-const NoteAIPanel: React.FC<Props> = ({ noteId, noteTitle, subjectName, open, onClose, request }) => {
+const NoteAIPanel: React.FC<Props> = ({
+  noteId,
+  noteTitle,
+  subjectName,
+  open,
+  onClose,
+  request,
+  offsetTop = true,
+}) => {
   const [messages, setMessages] = useState<Message[]>(() => {
     try {
       const raw = sessionStorage.getItem(historyKey(noteId));
@@ -209,7 +220,7 @@ const NoteAIPanel: React.FC<Props> = ({ noteId, noteTitle, subjectName, open, on
             animate={{ x: 0 }}
             exit={{ x: "100%" }}
             transition={{ type: "spring", damping: 30, stiffness: 260 }}
-            className="fixed top-16 right-0 bottom-0 z-40 w-full sm:w-[420px] flex flex-col bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-700/60 shadow-2xl"
+            className={`fixed ${offsetTop ? "top-16" : "top-0"} right-0 bottom-0 z-40 w-full sm:w-[420px] flex flex-col bg-white dark:bg-[#0b0d12] border-l border-gray-200 dark:border-white/[0.07] shadow-2xl`}
           >
             {/* Header */}
             <div className="flex items-center justify-between gap-2 px-4 py-3 border-b border-gray-100 dark:border-gray-800 flex-shrink-0">

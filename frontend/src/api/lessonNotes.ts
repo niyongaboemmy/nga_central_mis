@@ -208,6 +208,10 @@ export interface SharedNoteDetail {
   subject_id: number;
   subject_name: string;
   updated_at: string;
+  /** Credited in the reader header, so opening a note keeps the facts the card showed. */
+  teacher_name: string;
+  word_count: number;
+  reading_minutes: number;
 }
 
 export const lessonNotesApi = {

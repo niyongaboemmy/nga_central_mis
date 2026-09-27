@@ -107,7 +107,10 @@ describe("My Library — routing a student to where the reading counts", () => {
     expect(screen.queryByText("Just read the note")).not.toBeInTheDocument();
   });
 
-  it("keeps notes grouped under their subject", async () => {
+  // Levi's library is one flat, sorted grid rather than sections per subject
+  // (sections left holes beside short groups). What it keeps: every note names
+  // its subject, and the subject chips narrow the list to one subject.
+  it("names each note's subject and filters by it", async () => {
     sharedWithMe.mockResolvedValue({
       data: {
         data: [
@@ -117,14 +120,12 @@ describe("My Library — routing a student to where the reading counts", () => {
       },
     });
     renderLibrary();
+    await screen.findByText("Mastering PHP Fundamentals");
+    expect(screen.getAllByText("PHP").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("JavaScript").length).toBeGreaterThan(0);
 
-    // Subject names also appear on the filter chips, so assert the group
-    // headings specifically.
-    expect(
-      await screen.findByRole("heading", { name: "PHP" }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("heading", { name: "JavaScript" }),
-    ).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /^PHP\s*1$/ }));
+    expect(screen.getByText("Mastering PHP Fundamentals")).toBeInTheDocument();
+    expect(screen.queryByText("Data Types and Type Conversion")).not.toBeInTheDocument();
   });
 });

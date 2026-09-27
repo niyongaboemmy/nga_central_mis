@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { motion } from "framer-motion";
 import { FiFolder, FiHome, FiChevronRight } from "react-icons/fi";
+import { FolderPlus } from "lucide-react";
 import type { Folder } from "../../api/documents";
 
 interface FolderTreeNode {
@@ -23,6 +24,7 @@ interface FolderTreeProps {
   isLoading?: boolean;
   onNavigateToFolder: (folder: Folder) => void;
   onGoToRoot: () => void;
+  onCreateFolder?: () => void;
 }
 
 const FolderNode: React.FC<{
@@ -42,41 +44,50 @@ const FolderNode: React.FC<{
         animate={{ opacity: 1, x: 0 }}
         whileHover={{ scale: 1.02 }}
         whileTap={{ scale: 0.98 }}
-        onClick={() => {
-          onNavigateToFolder(node as Folder);
-          if (hasChildren) {
-            setIsExpanded(!isExpanded);
-          }
-        }}
-        className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left text-sm transition-all ${
+        onClick={() => onNavigateToFolder(node as Folder)}
+        className={`flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-[13px] transition-colors ${
           currentFolderId === node.folder_id
-            ? "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 shadow-sm"
-            : "text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-900"
+            ? "el-chip-brand font-semibold"
+            : "text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-white/[0.06]"
         }`}
         style={{ paddingLeft: `${12 + level * 16}px` }}
       >
+        {/* Its own hit target: clicking the row navigates, the chevron only
+            expands. Sharing one handler meant you could not open a folder
+            without collapsing it, or peek inside without leaving where you
+            were. */}
         {hasChildren ? (
-          <motion.div
-            animate={{ rotate: isExpanded ? 90 : 0 }}
-            transition={{ duration: 0.2 }}
+          <span
+            role="button"
+            tabIndex={0}
+            aria-label={isExpanded ? "Collapse" : "Expand"}
+            aria-expanded={isExpanded}
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsExpanded((v) => !v);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                e.stopPropagation();
+                setIsExpanded((v) => !v);
+              }
+            }}
+            className="grid h-5 w-5 flex-shrink-0 place-items-center rounded transition-colors hover:bg-gray-200/70 dark:hover:bg-white/[0.10]"
           >
-            <FiChevronRight className="w-4 h-4 flex-shrink-0" />
-          </motion.div>
+            <motion.span animate={{ rotate: isExpanded ? 90 : 0 }} transition={{ duration: 0.18 }}>
+              <FiChevronRight className="h-3.5 w-3.5" />
+            </motion.span>
+          </span>
         ) : (
-          <div className="w-4 h-4 flex-shrink-0" />
+          <span className="w-5 flex-shrink-0" />
         )}
-        <motion.div
-          whileHover={{ rotate: hasChildren ? 0 : 10 }}
-          transition={{ type: "spring", stiffness: 300 }}
-        >
-          <FiFolder
-            className="w-4 h-4 flex-shrink-0"
-            style={{ color: node.color }}
-          />
-        </motion.div>
+        <FiFolder className="h-4 w-4 flex-shrink-0" style={{ color: node.color }} />
         <span className="truncate">{node.name}</span>
         {node.is_shared && (
-          <span className="text-xs text-orange-500 ml-auto">shared</span>
+          <span className="el-chip ml-auto rounded-pill px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider">
+            Shared
+          </span>
         )}
       </motion.button>
 
@@ -109,35 +120,43 @@ const FolderTree: React.FC<FolderTreeProps> = ({
   isLoading,
   onNavigateToFolder,
   onGoToRoot,
+  onCreateFolder,
 }) => {
   return (
     <motion.div
       initial={{ width: 0, opacity: 0 }}
       animate={{
-        width: showFolderTree ? 320 : 0,
+        width: showFolderTree ? 264 : 0,
         opacity: showFolderTree ? 1 : 0,
       }}
       exit={{ width: 0, opacity: 0 }}
       transition={{ duration: 0.2 }}
-      className="hidden bg-white dark:bg-gray-800/40 border-r border-gray-200 dark:border-gray-700/30 lg:flex flex-col overflow-hidden"
+      className="hidden flex-col overflow-hidden border-r border-gray-200 bg-white dark:border-white/[0.07] dark:bg-transparent lg:flex"
     >
-      <div className="p-4 border-b border-gray-200 dark:border-gray-700/40 bg-gray-50 dark:bg-gray-800/40">
-        <h3 className="font-semibold text-gray-700 dark:text-gray-200 flex items-center gap-2">
-          <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.95 }}>
-            <FiFolder className="w-5 h-5 text-blue-500" />
-          </motion.div>
-          Quick Access
+      <div className="flex flex-shrink-0 items-center justify-between border-b border-gray-200 py-2.5 pl-4 pr-2 dark:border-white/[0.07]">
+        <h3 className="text-[11px] font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+          Folders
         </h3>
+        {onCreateFolder && (
+          <button
+            onClick={onCreateFolder}
+            title="New folder"
+            aria-label="New folder"
+            className="grid h-8 w-8 place-items-center rounded-lg text-brand-600 transition-colors hover:bg-brand-50 dark:text-brand-200 dark:hover:bg-brand-500/15"
+          >
+            <FolderPlus className="h-4 w-4" />
+          </button>
+        )}
       </div>
       <div className="flex-1 overflow-y-auto p-2">
         <motion.button
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
           onClick={onGoToRoot}
-          className={`w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-left text-sm transition-all mb-2 ${
+          className={`mb-1 flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-[13px] font-medium transition-colors ${
             currentFolderId === null
-              ? "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 shadow-sm"
-              : "text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-900"
+              ? "el-chip-brand"
+              : "text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-white/[0.06]"
           }`}
         >
           <FiHome className="w-4 h-4" />
@@ -145,12 +164,26 @@ const FolderTree: React.FC<FolderTreeProps> = ({
         </motion.button>
 
         {isLoading ? (
-          <div className="flex items-center justify-center py-4">
-            <div className="w-5 h-5 border-2 border-blue-200 border-t-blue-500 rounded-full animate-spin" />
+          <div className="space-y-1.5 px-1 py-2">
+            {[0, 1, 2, 3].map((i) => (
+              <div
+                key={i}
+                className="h-8 animate-pulse rounded-lg bg-gray-100 dark:bg-white/[0.06]"
+              />
+            ))}
           </div>
         ) : folderTree.length === 0 ? (
-          <div className="text-center py-4 text-gray-400 text-sm">
-            No folders yet
+          <div className="px-3 py-6 text-center">
+            <p className="text-xs text-gray-400 dark:text-gray-500">No folders yet.</p>
+            {onCreateFolder && (
+              <button
+                onClick={onCreateFolder}
+                className="mt-2 inline-flex items-center gap-1.5 rounded-pill px-3 py-1.5 text-xs font-semibold text-brand-600 transition-colors hover:bg-brand-50 dark:text-brand-200 dark:hover:bg-brand-500/15"
+              >
+                <FolderPlus className="h-3.5 w-3.5" />
+                Create a folder
+              </button>
+            )}
           </div>
         ) : (
           <div className="space-y-1">

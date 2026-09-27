@@ -1,4 +1,5 @@
 import logger from "./logger";
+import { AppError } from "../middleware/errorHandler";
 
 // Drop-in replacement for the old FTP-backed utils/ftp.ts, same method
 // names/signatures, so every caller (documentController, curriculumController,
@@ -10,6 +11,13 @@ import logger from "./logger";
 const FILE_SERVER_URL =
   process.env.FILE_SERVER_URL || "http://127.0.0.1:5004";
 const FILE_SERVER_API_KEY = process.env.FILE_SERVER_API_KEY || "";
+// Upper bound on any single file-server call. Without it a stalled
+// file-server leaves the API request (and the user's preview modal) hanging
+// until the browser gives up; with it the caller gets a 504 it can show.
+const FILE_SERVER_TIMEOUT_MS = parseInt(
+  process.env.FILE_SERVER_TIMEOUT_MS || "30000",
+  10,
+);
 
 // Every path this backend passes to the file-server is namespaced under
 // its own app folder so it can never collide with another app's files in
@@ -23,15 +31,26 @@ function namespaced(remotePath: string): string {
 async function request(
   urlPath: string,
   init: RequestInit = {},
+  { timeout = true }: { timeout?: boolean } = {},
 ): Promise<Response> {
-  const res = await fetch(`${FILE_SERVER_URL}${urlPath}`, {
-    ...init,
-    headers: {
-      ...(init.headers || {}),
-      "X-API-Key": FILE_SERVER_API_KEY,
-    },
-  });
-  return res;
+  try {
+    return await fetch(`${FILE_SERVER_URL}${urlPath}`, {
+      ...init,
+      signal: timeout ? AbortSignal.timeout(FILE_SERVER_TIMEOUT_MS) : undefined,
+      headers: {
+        ...(init.headers || {}),
+        "X-API-Key": FILE_SERVER_API_KEY,
+      },
+    });
+  } catch (err: any) {
+    if (err?.name === "TimeoutError" || err?.name === "AbortError") {
+      logger.error(
+        `file-server did not respond within ${FILE_SERVER_TIMEOUT_MS}ms: ${urlPath}`,
+      );
+      throw new AppError("File storage did not respond in time", 504);
+    }
+    throw err;
+  }
 }
 
 class FileServerService {
@@ -57,7 +76,11 @@ class FileServerService {
     form.append("path", namespaced(remotePath));
     form.append("file", filePart, remotePath.split("/").pop());
 
-    const res = await request("/files", { method: "POST", body: form });
+    const res = await request(
+      "/files",
+      { method: "POST", body: form },
+      { timeout: false },
+    );
     if (!res.ok) {
       const body = await res.text().catch(() => "");
       logger.error("file-server upload failed:", body);
@@ -123,6 +146,7 @@ class FileServerService {
       const data = (await res.json()) as { exists: boolean };
       return data.exists;
     } catch (error) {
+      if (error instanceof AppError) throw error;
       logger.error("file-server exists check failed:", error);
       return false;
     }

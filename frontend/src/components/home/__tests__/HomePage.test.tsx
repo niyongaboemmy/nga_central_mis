@@ -154,7 +154,11 @@ describe("Home", () => {
   });
 
   it("focuses on one position when a lens is chosen", async () => {
-    api.getHomeOverview.mockResolvedValue(overview());
+    // Four items: below that there is nothing worth filtering and no switcher.
+    const base = overview();
+    api.getHomeOverview.mockResolvedValue(
+      overview({ items: [...base.items, item({ id: "d", tier: "tidy", title: "2 notes to tidy", lens: "TEACHING" })] }),
+    );
     renderHome();
     await screen.findByRole("group", { name: "Focus" });
     const sciences = screen.getByRole("button", { name: /Sciences/ });
@@ -162,7 +166,15 @@ describe("Home", () => {
     expect(sciences).toHaveAttribute("aria-pressed", "true");
     const list = screen.getByRole("region", { name: "Needs you" });
     expect(within(list).queryByText("1 scheme of work not submitted")).not.toBeInTheDocument();
-    expect(within(list).getByText("3 schemes waiting for your validation")).toBeInTheDocument();
+    // Shown once: as Next up for this focus, not repeated in the list.
+    expect(screen.getAllByText("3 schemes waiting for your validation")).toHaveLength(1);
+  });
+
+  it("hides the focus switcher when there is too little to filter", async () => {
+    api.getHomeOverview.mockResolvedValue(overview());
+    renderHome();
+    await screen.findByRole("region", { name: "Next up" });
+    expect(screen.queryByRole("group", { name: "Focus" })).not.toBeInTheDocument();
   });
 
   it("never renders names on a summary-depth item", async () => {
@@ -186,7 +198,10 @@ describe("Home", () => {
     api.getHomeOverview.mockResolvedValue(overview({ items: [...many, ...calm] }));
     renderHome();
     const list = await screen.findByRole("region", { name: "Needs you" });
-    for (let i = 0; i < 7; i++) expect(within(list).getByText(`Blocking thing ${i}`)).toBeInTheDocument();
+    // The first one leads as Next up; every other one is in the list, none capped.
+    expect(within(screen.getByRole("region", { name: "Next up" })).getByText("Blocking thing 0")).toBeInTheDocument();
+    expect(within(list).queryByText("Blocking thing 0")).not.toBeInTheDocument();
+    for (let i = 1; i < 7; i++) expect(within(list).getByText(`Blocking thing ${i}`)).toBeInTheDocument();
     expect(within(list).queryByText("Slipping thing 6")).not.toBeInTheDocument();
     expect(within(list).getByRole("button", { name: "Show 3 more" })).toBeInTheDocument();
   });
@@ -292,7 +307,7 @@ describe("Home", () => {
       ),
     );
     renderHome();
-    // Hero and list both offer it; every copy opens the app in a new tab.
+    // Every link to it opens the app in a new tab.
     const links = await screen.findAllByRole("link", { name: /Take register/ });
     for (const link of links) {
       expect(link).toHaveAttribute("target", "_blank");
@@ -304,6 +319,7 @@ describe("Home", () => {
     expect(screen.getByText("Sports day on Friday")).toBeInTheDocument();
     expect(screen.getByRole("list", { name: "Connected apps" })).toHaveTextContent("Task Mentor");
     expect(screen.getByTitle("Task Mentor took too long to answer")).toBeInTheDocument();
-    expect(screen.getByRole("region", { name: "Needs you" })).toHaveTextContent("1 register not taken today");
+    // Shown exactly once across Next up and the list.
+    expect(screen.getAllByText("1 register not taken today")).toHaveLength(1);
   });
 });

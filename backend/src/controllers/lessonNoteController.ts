@@ -1522,16 +1522,29 @@ export const getSharedLessonNote = asyncHandler(async (req: any, res: any) => {
       subject_id: LessonNote.subject_id,
       subject_name: Subject.name,
       updated_at: LessonNote.updated_at,
+      teacher_first_name: UserProfile.first_name,
+      teacher_last_name: UserProfile.last_name,
     })
     .from(LessonNote)
     .innerJoin(Subject, eq(LessonNote.subject_id, Subject.subject_id))
-    .where(
-      and(eq(LessonNote.note_id, noteId), eq(LessonNote.status, "PUBLISHED")),
-    )
+    .leftJoin(UserProfile, eq(LessonNote.user_id, UserProfile.user_id))
+    .where(and(eq(LessonNote.note_id, noteId), eq(LessonNote.status, "PUBLISHED")))
     .limit(1);
   if (!note) throw new NotFoundError("Lesson note not found");
 
-  successResponse(res, "Lesson note", note);
+  // The reader's header credits the teacher and states how long the note takes to
+  // read -- the same two facts the library card already shows, so opening a note
+  // doesn't lose information the student just saw. Derived here from content_html
+  // exactly as the list does, rather than making the client count words.
+  const { teacher_first_name, teacher_last_name, ...rest } = note;
+  const wordCount = htmlToPlainText(note.content_html).split(" ").filter(Boolean).length;
+
+  successResponse(res, "Lesson note", {
+    ...rest,
+    teacher_name: `${teacher_first_name || ""} ${teacher_last_name || ""}`.trim(),
+    word_count: wordCount,
+    reading_minutes: Math.max(1, Math.round(wordCount / WORDS_PER_MINUTE)),
+  });
 });
 
 // ======================

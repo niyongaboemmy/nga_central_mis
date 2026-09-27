@@ -406,6 +406,17 @@ table th,
     --reader-line-height: 1.75;
     font-size: calc(1rem * var(--reader-font-scale));
     line-height: var(--reader-line-height);
+    /* Ragged right, not justified. Justification without a real typesetter opens
+       rivers of whitespace between words and forces breaks like "be-cause" —
+       which is exactly what it looked like on screen. Justify still applies to
+       the paginated book view and to print, where the column is fixed and the
+       even edge is worth the trade. */
+    text-align: left;
+    hyphens: manual;
+    text-wrap: pretty;
+}
+
+.note-reader-sheet--book .note-reader-body {
     text-align: justify;
     hyphens: auto;
 }
@@ -516,6 +527,38 @@ table th,
     margin: 0;
     font-size: 0.6875rem;
     opacity: 0.55;
+}
+
+/* Byline row on the cover sheet: who wrote it, how long it takes, when it changed.
+   Sits on the paper, so it takes the sheet's own ink at reduced opacity rather than
+   a UI grey that would fight the sepia and night papers. */
+.note-reader-byline {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.4rem 0.9rem;
+    font-size: 0.75rem;
+    opacity: 0.6;
+}
+
+.note-reader-byline-author {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-weight: 600;
+    opacity: 0.85;
+}
+
+.note-reader-byline-avatar {
+    display: grid;
+    place-items: center;
+    width: 1.25rem;
+    height: 1.25rem;
+    border-radius: 999px;
+    font-size: 0.5rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    background-color: rgba(148, 163, 184, 0.25);
 }
 
 /* In book mode the title block repeats on every sheet, so it shrinks to a running head. */

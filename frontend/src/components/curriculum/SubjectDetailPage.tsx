@@ -3,11 +3,13 @@ import { useParams, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowLeft,
+  ArrowRight,
   BookOpen,
   FolderOpen,
   LayoutGrid,
   FileText,
   Loader2,
+  Target,
   Users,
   PencilLine,
 } from "lucide-react";
@@ -25,14 +27,18 @@ import CurriculumTab from "./CurriculumTab";
 import SubjectMaterialsTab from "./SubjectMaterialsTab";
 import EnrolledStudentsTab from "./EnrolledStudentsTab";
 import SubjectLessonNotesTab from "./SubjectLessonNotesTab";
+import SubjectSharedNotesTab from "./SubjectSharedNotesTab";
+import { lessonNotesApi, SharedNoteSummary } from "../../api/lessonNotes";
+import SubjectIcon from "../elearning/ui/subjectIcons";
 import SubjectElearningLink from "./SubjectElearningLink";
 
-type Tab = "overview" | "curriculum" | "materials" | "students" | "lessonNotes";
+type Tab = "overview" | "curriculum" | "materials" | "students" | "lessonNotes" | "myNotes";
 
 const tabs: { id: Tab; label: string; icon: React.ElementType }[] = [
   { id: "overview", label: "Overview", icon: LayoutGrid },
   { id: "curriculum", label: "Curriculum", icon: BookOpen },
   { id: "materials", label: "Materials", icon: FolderOpen },
+  { id: "myNotes", label: "Lesson notes", icon: BookOpen },
   { id: "lessonNotes", label: "Notes", icon: PencilLine },
   { id: "students", label: "Students", icon: Users },
 ];
@@ -45,7 +51,9 @@ const SubjectDetailPage: React.FC = () => {
 
   const [subject, setSubject] = useState<SubjectDetail | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<Tab>("curriculum");
+  const [activeTab, setActiveTab] = useState<Tab>("overview");
+  /** The student's own library, narrowed to this subject. null while loading. */
+  const [myNotes, setMyNotes] = useState<SharedNoteSummary[] | null>(null);
 
   const id = parseInt(subjectId || "0");
 
@@ -69,16 +77,38 @@ const SubjectDetailPage: React.FC = () => {
   // Lesson Notes is a teacher-authoring surface — a student has their own
   // cross-subject "Shared Notes" page instead of a per-subject tab here.
   const canManageLessonNotes = hasPermission(Permissions.MANAGE_LESSON_NOTES);
+  // A student gets the read-only "Lesson notes" tab instead of the authoring one.
+  const canReadSharedNotes = hasPermission(Permissions.VIEW_SHARED_LESSON_NOTES);
   const visibleTabs = tabs.filter(
     (tab) =>
       (tab.id !== "students" || canViewStudents) &&
-      (tab.id !== "lessonNotes" || canManageLessonNotes),
+      (tab.id !== "lessonNotes" || canManageLessonNotes) &&
+      (tab.id !== "myNotes" || canReadSharedNotes),
   );
+
+  /** Counts beside the tab labels, so it is obvious where the content is. */
+  const tabCount = (tab: Tab): number | null => {
+    if (!subject) return null;
+    if (tab === "curriculum") return subject.competency_count;
+    if (tab === "materials") return subject.document_count;
+    if (tab === "myNotes") return myNotes?.length ?? null;
+    return null;
+  };
 
   useEffect(() => {
     if (!id) return;
     loadSubject();
   }, [id]);
+
+  useEffect(() => {
+    if (!canReadSharedNotes || !subject) return;
+    lessonNotesApi
+      .sharedWithMe()
+      .then((res) =>
+        setMyNotes((res.data.data || []).filter((n) => n.subject_name === subject.name)),
+      )
+      .catch(() => setMyNotes([])); // an empty notes tab beats an error here
+  }, [canReadSharedNotes, subject]);
 
   // The Subject itself (and its Curriculum/Materials data) is year-independent,
   // but which subjects a teacher is assigned to is scoped to the selected
@@ -183,7 +213,11 @@ const SubjectDetailPage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-black pb-12">
+    // Bleeds past the shell's fullWidth padding so the sticky header runs
+    // edge to edge, flush against the sidebar; inner containers pad themselves.
+    // min-h is viewport minus the 64px navbar -- min-h-screen inside a pt-16
+    // main adds a navbar's worth of empty scroll at the bottom.
+    <div className="-mx-4 min-h-[calc(100vh-4rem)] bg-gray-50 pb-12 dark:bg-black md:-mx-6">
       {/* Top bar */}
       <div className="bg-white/80 dark:bg-gray-800/30 backdrop-blur-md border-b border-gray-200 dark:border-gray-700/20 sticky top-0 z-10">
         <div className="w-full mx-auto px-4 sm:px-6">
@@ -204,15 +238,21 @@ const SubjectDetailPage: React.FC = () => {
 
           {/* Subject header */}
           <div className="flex items-start gap-4 pb-4">
+            {/* The subject's own icon, not a generic book on a colour block —
+                same glyph it carries on the subject list and in the library. */}
             <div
-              className="w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-sm"
-              style={{ backgroundColor: subject.color || "#3B82F6" }}
+              className="flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-2xl shadow-sm"
+              style={{
+                background: `color-mix(in oklab, ${subject.color || "#3b6cff"} 18%, transparent)`,
+                color: subject.color || "#3b6cff",
+                boxShadow: `inset 0 0 0 1px color-mix(in oklab, ${subject.color || "#3b6cff"} 28%, transparent)`,
+              }}
             >
-              <BookOpen className="w-6 h-6 text-white" />
+              <SubjectIcon subjectName={subject.name} className="h-7 w-7" />
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex flex-wrap items-center gap-2 mb-1">
-                <h1 className="text-xl font-bold text-gray-900 dark:text-white truncate">
+                <h1 className="truncate text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
                   {subject.name}
                 </h1>
                 {subject.code && (
@@ -227,7 +267,7 @@ const SubjectDetailPage: React.FC = () => {
                 )}
               </div>
               {subject.description && (
-                <p className="text-sm text-gray-500 dark:text-gray-400 line-clamp-1">
+                <p className="max-w-3xl text-sm leading-relaxed text-gray-500 line-clamp-2 dark:text-gray-400">
                   {subject.description}
                 </p>
               )}
@@ -257,6 +297,17 @@ const SubjectDetailPage: React.FC = () => {
                   </span>{" "}
                   categor{subject.category_count === 1 ? "y" : "ies"}
                 </span>
+                {canReadSharedNotes && myNotes !== null && (
+                  <>
+                    <span className="text-gray-300 dark:text-gray-600 text-xs">•</span>
+                    <span className="text-xs text-gray-500 dark:text-gray-400">
+                      <span className="font-semibold text-gray-800 dark:text-gray-200">
+                        {myNotes.length}
+                      </span>{" "}
+                      lesson {myNotes.length === 1 ? "note" : "notes"}
+                    </span>
+                  </>
+                )}
               </div>
             </div>
             {/* Straight across to the same material as a course. */}
@@ -282,6 +333,17 @@ const SubjectDetailPage: React.FC = () => {
                 >
                   <Icon className="w-4 h-4" />
                   {tab.label}
+                  {tabCount(tab.id) !== null && (
+                    <span
+                      className={`rounded-pill px-1.5 py-0.5 text-[10px] font-bold tabular-nums ${
+                        active
+                          ? "bg-brand-500 text-white"
+                          : "bg-gray-100 text-gray-500 dark:bg-white/[0.08] dark:text-gray-400"
+                      }`}
+                    >
+                      {tabCount(tab.id)}
+                    </span>
+                  )}
                   {active && (
                     <motion.div
                       layoutId="tab-underline"
@@ -306,13 +368,21 @@ const SubjectDetailPage: React.FC = () => {
             transition={{ duration: 0.18 }}
           >
             {activeTab === "overview" && (
-              <OverviewTab subject={subject} onTabChange={setActiveTab} />
+              <OverviewTab
+                subject={subject}
+                onTabChange={setActiveTab}
+                noteCount={myNotes?.length ?? null}
+                showNotes={canReadSharedNotes}
+              />
             )}
             {activeTab === "curriculum" && (
               <CurriculumTab subjectId={id} subjectName={subject?.name} />
             )}
             {activeTab === "materials" && (
               <SubjectMaterialsTab subjectId={id} />
+            )}
+            {activeTab === "myNotes" && (
+              <SubjectSharedNotesTab notes={myNotes} subjectName={subject?.name || ""} />
             )}
             {activeTab === "lessonNotes" && (
               <SubjectLessonNotesTab subjectId={id} />
@@ -330,61 +400,90 @@ const SubjectDetailPage: React.FC = () => {
 interface OverviewTabProps {
   subject: SubjectDetail;
   onTabChange: (tab: Tab) => void;
+  noteCount: number | null;
+  showNotes: boolean;
 }
 
-const OverviewTab: React.FC<OverviewTabProps> = ({ subject, onTabChange }) => (
-  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-    <button
-      onClick={() => onTabChange("curriculum")}
-      className="bg-white dark:bg-gray-800/30 dark:backdrop-blur-sm rounded-2xl p-6 border border-gray-200 dark:border-gray-700/20 text-left hover:border-blue-300 dark:hover:border-blue-600/50 hover:shadow-md transition-all group"
+/** One route into the subject: a number, what it is, and where it goes. */
+const OverviewCard: React.FC<{
+  icon: React.ReactNode;
+  value: number | null;
+  label: string;
+  hint: string;
+  onClick: () => void;
+  accent?: boolean;
+}> = ({ icon, value, label, hint, onClick, accent }) => (
+  <button
+    onClick={onClick}
+    className="el-card el-card-hover group flex flex-col p-5 text-left focus:outline-none focus-visible:shadow-glow"
+  >
+    <span
+      className={`mb-3 flex h-11 w-11 items-center justify-center rounded-xl ${
+        accent
+          ? "bg-brand-50 text-brand-600 dark:bg-brand-500/15 dark:text-brand-200"
+          : "el-chip"
+      }`}
     >
-      <div className="w-10 h-10 rounded-xl bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
-        <BookOpen className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-      </div>
-      <div className="text-2xl font-bold text-gray-900 dark:text-white mb-1">
-        {subject.competency_count}
-      </div>
-      <div className="text-sm text-gray-500 dark:text-gray-400">
-        Elements of Competency
-      </div>
-    </button>
+      {icon}
+    </span>
+    <span className="text-3xl font-bold leading-none tabular-nums text-gray-900 dark:text-white">
+      {value === null ? "—" : value}
+    </span>
+    <span className="mt-1.5 text-sm font-semibold text-gray-800 dark:text-gray-100">{label}</span>
+    <span className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">{hint}</span>
+    <span className="mt-auto pt-4 inline-flex items-center gap-1 text-xs font-semibold text-gray-400 transition-colors group-hover:text-brand-600 dark:group-hover:text-brand-200">
+      Open <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
+    </span>
+  </button>
+);
 
-    <button
-      onClick={() => onTabChange("materials")}
-      className="bg-white dark:bg-gray-800/30 dark:backdrop-blur-sm rounded-2xl p-6 border border-gray-200 dark:border-gray-700/20 text-left hover:border-blue-300 dark:hover:border-blue-600/50 hover:shadow-md transition-all group"
-    >
-      <div className="w-10 h-10 rounded-xl bg-green-100 dark:bg-green-900/30 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
-        <FolderOpen className="w-5 h-5 text-green-600 dark:text-green-400" />
-      </div>
-      <div className="text-2xl font-bold text-gray-900 dark:text-white mb-1">
-        {subject.category_count}
-      </div>
-      <div className="text-sm text-gray-500 dark:text-gray-400">
-        Document Categories
-      </div>
-    </button>
-
-    <button
-      onClick={() => onTabChange("materials")}
-      className="bg-white dark:bg-gray-800/30 dark:backdrop-blur-sm rounded-2xl p-6 border border-gray-200 dark:border-gray-700/20 text-left hover:border-blue-300 dark:hover:border-blue-600/50 hover:shadow-md transition-all group"
-    >
-      <div className="w-10 h-10 rounded-xl bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
-        <FileText className="w-5 h-5 text-purple-600 dark:text-purple-400" />
-      </div>
-      <div className="text-2xl font-bold text-gray-900 dark:text-white mb-1">
-        {subject.document_count}
-      </div>
-      <div className="text-sm text-gray-500 dark:text-gray-400">
-        Uploaded Documents
-      </div>
-    </button>
+const OverviewTab: React.FC<OverviewTabProps> = ({
+  subject,
+  onTabChange,
+  noteCount,
+  showNotes,
+}) => (
+  <div className="space-y-5">
+    <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4">
+      {showNotes && (
+        <OverviewCard
+          accent
+          icon={<BookOpen className="h-5 w-5" />}
+          value={noteCount}
+          label="Lesson notes"
+          hint="Shared with you by your teacher"
+          onClick={() => onTabChange("myNotes")}
+        />
+      )}
+      <OverviewCard
+        icon={<Target className="h-5 w-5" />}
+        value={subject.competency_count}
+        label="Learning outcomes"
+        hint="What you are expected to master"
+        onClick={() => onTabChange("curriculum")}
+      />
+      <OverviewCard
+        icon={<FileText className="h-5 w-5" />}
+        value={subject.document_count}
+        label="Materials"
+        hint="Files uploaded for this subject"
+        onClick={() => onTabChange("materials")}
+      />
+      <OverviewCard
+        icon={<FolderOpen className="h-5 w-5" />}
+        value={subject.category_count}
+        label="Categories"
+        hint="How those materials are filed"
+        onClick={() => onTabChange("materials")}
+      />
+    </div>
 
     {subject.description && (
-      <div className="sm:col-span-3 bg-white dark:bg-gray-800/30 dark:backdrop-blur-sm rounded-2xl p-6 border border-gray-200 dark:border-gray-700/20">
-        <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-          Description
+      <div className="el-card p-5">
+        <h3 className="text-[11px] font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+          About this subject
         </h3>
-        <p className="text-sm text-gray-600 dark:text-gray-400">
+        <p className="mt-2 max-w-3xl text-sm leading-relaxed text-gray-600 dark:text-gray-300">
           {subject.description}
         </p>
       </div>
