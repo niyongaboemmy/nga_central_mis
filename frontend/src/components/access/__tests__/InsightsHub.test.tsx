@@ -58,6 +58,32 @@ describe("Insights hub", () => {
   it("says so when there is nothing to show", async () => {
     api.insightWidgets.mockResolvedValue([]);
     render(<InsightsHub />);
-    expect(await screen.findByText(/No insights for you at this level/)).toBeInTheDocument();
+    // A school-wide viewer has no other area to try, so the page says what to do instead.
+    expect(await screen.findByText(/None of your positions include summaries yet/)).toBeInTheDocument();
+  });
+
+  it("opens a class teacher at their own class, not at a school level where they hold nothing", async () => {
+    api.me.mockResolvedValue({
+      ...snap,
+      home: "teacher-dashboard",
+      caps: { VIEW_ALL_COURSES: [{ depth: "detail", scope: { class_groups: [9] }, via: [4] }] },
+      grants: { "4": { role: "Class Teacher", role_id: 11, title: null, scope_type: "CLASS_GROUP", scope_id: 9, scope_id2: null, valid_until: null } },
+    });
+    api.insightWidgets.mockImplementation((node: string) =>
+      Promise.resolve(node === "CLASS_GROUP:9" ? [{ app: "mis", app_label: "Central MIS", metric: "elearning.progress", label: "E-learning courses published", source: "mis" }] : []),
+    );
+    api.insight.mockResolvedValue({ ...result("CLASS_GROUP:9", "SUBJECT", [{ key: 1, label: "Maths", value: 50, n: 6, suppressed: false }]), metric: "elearning.progress", label: "E-learning courses published" });
+    render(<InsightsHub />);
+    expect(await screen.findByText("E-learning courses published")).toBeInTheDocument();
+    expect(api.insightWidgets).toHaveBeenCalledWith("CLASS_GROUP:9");
+    expect(api.insightWidgets).not.toHaveBeenCalledWith("SCHOOL");
+  });
+
+  it("keeps a way back to a single area after drilling elsewhere, and explains an empty page honestly", async () => {
+    api.me.mockResolvedValue({ ...snap, home: "teacher-dashboard", grants: {}, caps: {} });
+    api.insightWidgets.mockResolvedValue([]);
+    render(<InsightsHub />);
+    expect(await screen.findByText(/None of your positions include summaries yet/)).toBeInTheDocument();
+    expect(screen.queryByText(/Choose one of your areas above/)).not.toBeInTheDocument();
   });
 });

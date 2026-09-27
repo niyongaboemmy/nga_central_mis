@@ -70,25 +70,44 @@ const Bars: React.FC<{ data: InsightResult; onDrill: (node: string, label: strin
   );
 };
 
+/** "CLASS_TEACHER" -> "Class teacher"; preset names ("Class Teacher") pass through. */
+const roleName = (role: string) =>
+  /^[A-Z0-9_]+$/.test(role) ? role.charAt(0) + role.slice(1).toLowerCase().replace(/_/g, " ") : role;
+
+/** Widest first: the natural place to start looking at the school. */
+const NODE_RANK: Record<string, number> = { SCHOOL: 5, PROGRAM: 4, DEPARTMENT: 3, GRADE: 2, CLASS_GROUP: 1 };
+
 export default function InsightsHub() {
   const { snapshot, loading } = useAccess();
-  const start = snapshot?.home?.startsWith("insights:") ? snapshot.home.slice("insights:".length) : "SCHOOL";
   const [trail, setTrail] = useState<string[]>([]);
   const [names, setNames] = useState<Record<string, string>>({});
-  const node = trail[trail.length - 1] ?? start;
   const [widgets, setWidgets] = useState<InsightWidget[] | null>(null);
   const [data, setData] = useState<Record<string, InsightResult | "error">>({});
 
-  // Nodes the viewer holds positions at -- quick starting points.
+  // Nodes the viewer holds positions at -- quick starting points, widest first.
   const starts = useMemo(() => {
     const out = new Map<string, string>();
     for (const g of Object.values(snapshot?.grants ?? {})) {
       if (["SCHOOL", "PLATFORM"].includes(g.scope_type)) out.set("SCHOOL", "Whole school");
       else if (["PROGRAM", "GRADE", "CLASS_GROUP", "DEPARTMENT"].includes(g.scope_type) && g.scope_id)
-        out.set(`${g.scope_type}:${g.scope_id}`, g.title || `${LEVEL_NAME[g.scope_type] ?? g.scope_type} #${g.scope_id} (${g.role})`);
+        out.set(`${g.scope_type}:${g.scope_id}`, g.title || `${LEVEL_NAME[g.scope_type] ?? g.scope_type} #${g.scope_id} (${roleName(g.role)})`);
     }
-    return out;
+    return new Map(
+      [...out.entries()].sort(([a], [b]) => (NODE_RANK[b.split(":")[0]] ?? 0) - (NODE_RANK[a.split(":")[0]] ?? 0)),
+    );
   }, [snapshot]);
+
+  // Where the page opens. The snapshot's `home` names an insights node only
+  // for programme/grade/school leaders; a class teacher's home is their
+  // teaching board, and opening them at "Whole school" -- where they hold
+  // nothing -- left them on an empty page with no way in. So: the snapshot's
+  // insights home if it has one, else the viewer's own widest area, else the
+  // whole school.
+  const start = snapshot?.home?.startsWith("insights:")
+    ? snapshot.home.slice("insights:".length)
+    : ([...starts.keys()][0] ?? "SCHOOL");
+  const node = trail[trail.length - 1] ?? start;
+  const otherAreas = [...starts.keys()].filter((k) => k !== node);
 
   useEffect(() => {
     if (loading) return;
@@ -119,7 +138,7 @@ export default function InsightsHub() {
   };
 
   return (
-    <div className="space-y-4 px-3 sm:px-0" data-testid="insights-hub">
+    <div className="mx-auto w-full max-w-7xl space-y-4 px-4 py-6 sm:px-6" data-testid="insights-hub">
       <header className="flex items-center gap-3">
         <div className="w-10 h-10 rounded-xl bg-brand-100 dark:bg-slate-700 flex items-center justify-center">
           <BarChart3 className="w-5 h-5 text-brand-600 dark:text-brand-200" />
@@ -133,7 +152,9 @@ export default function InsightsHub() {
       </header>
 
       <div className="flex flex-wrap items-center gap-2 text-sm">
-        {starts.size > 1 &&
+        {/* Every area the viewer leads, whenever there is somewhere else to go --
+            a single area still needs its button when the page is elsewhere. */}
+        {(starts.size > 1 || otherAreas.length > 0) &&
           [...starts.entries()].map(([k, label]) => (
             <button
               key={k}
@@ -164,7 +185,13 @@ export default function InsightsHub() {
       {widgets === null ? (
         <Panel><Empty>Loading…</Empty></Panel>
       ) : widgets.length === 0 ? (
-        <Panel><Empty>No insights for you at this level. Choose one of your areas above.</Empty></Panel>
+        <Panel>
+          <Empty>
+            {otherAreas.length > 0
+              ? "No insights for you at this level. Choose one of your areas above."
+              : "None of your positions include summaries yet. Whoever manages your access in Leadership & Access can add them."}
+          </Empty>
+        </Panel>
       ) : (
         <>
         <div className="grid gap-3 lg:grid-cols-2">
