@@ -59,12 +59,33 @@ export const CourseTag: React.FC<{ note: SharedNoteSummary; className?: string }
     </span>
   ) : null;
 
+/** For a note that opens in its course: reading it outside the course earns
+ *  nothing, so this is the quiet secondary way — but a student who only wants
+ *  to re-read it must not be forced through the course. (From main's e-learning
+ *  work.) Rendered beside, never inside, the card's own button. */
+export const ReadHereLink: React.FC<{
+  note: SharedNoteSummary;
+  onReadHere?: (id: number) => void;
+  className?: string;
+}> = ({ note, onReadHere, className = "" }) =>
+  note.placement && onReadHere ? (
+    <button
+      type="button"
+      onClick={() => onReadHere(note.note_id)}
+      className={`text-[11px] text-gray-500 underline-offset-2 hover:text-gray-800 hover:underline dark:text-gray-400 dark:hover:text-gray-200 ${className}`}
+    >
+      Just read the note
+    </button>
+  ) : null;
+
 /* ------------------------------------------------------------------ the card */
 
 interface CardProps {
   note: SharedNoteSummary;
   tokens: string[];
   onOpen: (id: number) => void;
+  /** Standalone reader, offered only for a note that otherwise opens in its course. */
+  onReadHere?: (id: number) => void;
 }
 
 /**
@@ -73,19 +94,20 @@ interface CardProps {
  * Reads top to bottom the way a student scans: which subject, is it new, what
  * is it called, what is it about, who set it and how long it will take.
  */
-const NoteCard: React.FC<CardProps> = ({ note, tokens, onOpen }) => {
+const NoteCard: React.FC<CardProps> = ({ note, tokens, onOpen, onReadHere }) => {
   const m = useMotion();
   const fresh = isRecent(note.updated_at);
   const excerpt = cleanExcerpt(note.excerpt);
+  const readHere = !!(note.placement && onReadHere);
 
-  return (
+  const card = (
     <motion.button
       type="button"
       layout
       {...m("reveal")}
       onClick={() => onOpen(note.note_id)}
       aria-label={`Open ${note.title}`}
-      className="el-card el-card-hover group flex h-full flex-col p-5 text-left focus:outline-none focus-visible:shadow-glow"
+      className={`el-card el-card-hover group flex flex-col p-5 text-left focus:outline-none focus-visible:shadow-glow ${readHere ? "flex-1" : "h-full"}`}
     >
       {/* The subject gets the whole first line. Sharing it with the reading time and
           a badge truncated names like "Web Application Development Using JavaS…". */}
@@ -135,6 +157,14 @@ const NoteCard: React.FC<CardProps> = ({ note, tokens, onOpen }) => {
       </div>
     </motion.button>
   );
+
+  if (!readHere) return card;
+  return (
+    <div className="flex h-full flex-col gap-1.5">
+      {card}
+      <ReadHereLink note={note} onReadHere={onReadHere} className="self-start px-2" />
+    </div>
+  );
 };
 
 /* ------------------------------------------------------------------ list row */
@@ -146,11 +176,11 @@ const NoteCard: React.FC<CardProps> = ({ note, tokens, onOpen }) => {
  * you are looking for. List is for finding: four times as many notes on screen,
  * titles aligned in one column so the eye scans straight down.
  */
-export const NoteListRow: React.FC<CardProps> = ({ note, tokens, onOpen }) => {
+export const NoteListRow: React.FC<CardProps> = ({ note, tokens, onOpen, onReadHere }) => {
   const fresh = isRecent(note.updated_at);
   const excerpt = cleanExcerpt(note.excerpt);
 
-  return (
+  const row = (
     <button
       type="button"
       onClick={() => onOpen(note.note_id)}
@@ -204,6 +234,14 @@ export const NoteListRow: React.FC<CardProps> = ({ note, tokens, onOpen }) => {
       <ArrowRight className="h-4 w-4 flex-shrink-0 text-gray-300 transition-all group-hover:translate-x-0.5 group-hover:text-brand-500 dark:text-gray-600" />
     </button>
   );
+
+  if (!(note.placement && onReadHere)) return row;
+  return (
+    <div>
+      {row}
+      <ReadHereLink note={note} onReadHere={onReadHere} className="-mt-1.5 mb-2 ml-[4.25rem]" />
+    </div>
+  );
 };
 
 /* ------------------------------------------------------------------ the hero */
@@ -218,7 +256,8 @@ export const HeroNoteCard: React.FC<{
   note: SharedNoteSummary;
   eyebrow: string;
   onOpen: (id: number) => void;
-}> = ({ note, eyebrow, onOpen }) => {
+  onReadHere?: (id: number) => void;
+}> = ({ note, eyebrow, onOpen, onReadHere }) => {
   const m = useMotion();
   const excerpt = cleanExcerpt(note.excerpt);
 
@@ -233,8 +272,15 @@ export const HeroNoteCard: React.FC<{
           <p className="text-[11px] font-bold uppercase tracking-wider text-brand-600 dark:text-brand-200">
             {eyebrow}
           </p>
+          {/* The title opens the note as well: it is where people click first. */}
           <h2 className="mt-1 line-clamp-2 text-2xl font-bold leading-tight tracking-tight text-gray-900 dark:text-white">
-            {note.title}
+            <button
+              type="button"
+              onClick={() => onOpen(note.note_id)}
+              className="text-left hover:text-brand-700 focus:outline-none focus-visible:underline dark:hover:text-brand-200"
+            >
+              {note.title}
+            </button>
           </h2>
           {excerpt && (
             <p className="mt-1.5 line-clamp-2 max-w-3xl text-sm leading-relaxed text-gray-600 dark:text-gray-300">
@@ -257,13 +303,16 @@ export const HeroNoteCard: React.FC<{
           <CourseTag note={note} className="mt-2" />
         </div>
 
-        <motion.button
-          {...m("tap")}
-          onClick={() => onOpen(note.note_id)}
-          className="inline-flex min-h-[46px] flex-shrink-0 items-center justify-center gap-1.5 rounded-pill bg-brand-500 px-7 text-sm font-semibold text-white shadow-soft hover:bg-brand-600 focus:outline-none focus-visible:shadow-glow"
-        >
-          {note.placement ? "Open in e-learning" : "Read note"} <ArrowRight className="h-4 w-4" />
-        </motion.button>
+        <div className="flex flex-shrink-0 flex-col items-stretch gap-1.5 md:items-center">
+          <motion.button
+            {...m("tap")}
+            onClick={() => onOpen(note.note_id)}
+            className="inline-flex min-h-[46px] items-center justify-center gap-1.5 rounded-pill bg-brand-500 px-7 text-sm font-semibold text-white shadow-soft hover:bg-brand-600 focus:outline-none focus-visible:shadow-glow"
+          >
+            {note.placement ? "Open in e-learning" : "Read note"} <ArrowRight className="h-4 w-4" />
+          </motion.button>
+          <ReadHereLink note={note} onReadHere={onReadHere} />
+        </div>
       </div>
     </motion.section>
   );

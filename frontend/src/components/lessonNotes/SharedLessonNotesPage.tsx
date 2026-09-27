@@ -8,6 +8,7 @@ import { EmptyState, Skeleton } from "../elearning/ui/primitives";
 import SubjectIcon from "../elearning/ui/subjectIcons";
 import NoteCard, { HeroNoteCard, NoteListRow } from "./library/NoteCard";
 import { isRecent } from "./library/noteVisuals";
+import MoreSubjectsMenu from "./library/MoreSubjectsMenu";
 
 type SortKey = "recent" | "title" | "length";
 type ViewMode = "grid" | "list";
@@ -116,6 +117,19 @@ const SharedLessonNotesPage: React.FC = () => {
     return [...counts.entries()].sort((a, b) => a[0].localeCompare(b[0]));
   }, [all]);
 
+  /** The chip row shows a handful of subjects — the chosen one, then those with
+   *  the most notes — kept in A–Z order; the rest go behind "+N more". */
+  const CHIP_LIMIT = 5;
+  const [chipSubjects, moreSubjects] = useMemo(() => {
+    if (subjects.length <= CHIP_LIMIT + 1) return [subjects, [] as [string, number][]];
+    const picked = new Set<string>(subjectFilter ? [subjectFilter] : []);
+    for (const [s] of [...subjects].sort((a, b) => b[1] - a[1])) {
+      if (picked.size >= CHIP_LIMIT) break;
+      picked.add(s);
+    }
+    return [subjects.filter(([s]) => picked.has(s)), subjects.filter(([s]) => !picked.has(s))];
+  }, [subjects, subjectFilter]);
+
   /** One flat, sorted grid. Grouping by subject sounded tidy but produced rows of two
    *  cards with a hole beside them; the subject is on every card and in the filter bar,
    *  which is where a student looks for it anyway. */
@@ -170,6 +184,7 @@ const SharedLessonNotesPage: React.FC = () => {
     },
     [navigate, all],
   );
+  const readHere = useCallback((id: number) => navigate(`/shared-lesson-notes/${id}`), [navigate]);
 
   const onSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     // Enter from the search box opens the top hit — search then read, no mouse needed.
@@ -269,6 +284,7 @@ const SharedLessonNotesPage: React.FC = () => {
                 note={hero}
                 eyebrow={isRecent(hero.updated_at) ? "Newest note" : "Start here"}
                 onOpen={openNote}
+                onReadHere={readHere}
               />
             </div>
           )}
@@ -350,7 +366,7 @@ const SharedLessonNotesPage: React.FC = () => {
             </div>
 
             {subjects.length > 1 && (
-              <div className="no-scrollbar mt-2.5 flex items-center gap-1.5 overflow-x-auto">
+              <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
                 <button
                   onClick={() => setSubjectFilter(null)}
                   aria-pressed={subjectFilter === null}
@@ -362,7 +378,7 @@ const SharedLessonNotesPage: React.FC = () => {
                 >
                   All {all.length}
                 </button>
-                {subjects.map(([subject, count]) => {
+                {chipSubjects.map(([subject, count]) => {
                   const active = subjectFilter === subject;
                   return (
                     <button
@@ -381,6 +397,9 @@ const SharedLessonNotesPage: React.FC = () => {
                     </button>
                   );
                 })}
+                {moreSubjects.length > 0 && (
+                  <MoreSubjectsMenu subjects={moreSubjects} onPick={setSubjectFilter} />
+                )}
               </div>
             )}
           </div>
@@ -422,13 +441,13 @@ const SharedLessonNotesPage: React.FC = () => {
               {view === "grid" ? (
                 <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
                   {gridNotes.map((n) => (
-                    <NoteCard key={n.note_id} note={n} tokens={tokens} onOpen={openNote} />
+                    <NoteCard key={n.note_id} note={n} tokens={tokens} onOpen={openNote} onReadHere={readHere} />
                   ))}
                 </div>
               ) : (
                 <div className="el-card divide-y divide-gray-100 overflow-hidden dark:divide-white/[0.06]">
                   {gridNotes.map((n) => (
-                    <NoteListRow key={n.note_id} note={n} tokens={tokens} onOpen={openNote} />
+                    <NoteListRow key={n.note_id} note={n} tokens={tokens} onOpen={openNote} onReadHere={readHere} />
                   ))}
                 </div>
               )}
