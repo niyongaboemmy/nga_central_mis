@@ -172,7 +172,7 @@ const DocumentsToolbar: React.FC<DocumentsToolbarProps> = ({
         </div>
 
         {/* Breadcrumb */}
-        <nav aria-label="Breadcrumb" className="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto">
+        <nav aria-label="Breadcrumb" className="no-scrollbar flex min-w-[140px] flex-1 items-center gap-0.5 overflow-x-auto">
           <IconButton label="Go to root" onClick={onGoToRoot}>
             <Home className="h-4 w-4" />
           </IconButton>
@@ -193,8 +193,38 @@ const DocumentsToolbar: React.FC<DocumentsToolbarProps> = ({
           ))}
         </nav>
 
+        {/* The two things you come here to do. Both always carry their label:
+            New folder was an unlabelled white outline beside a solid blue
+            Upload, and below md it shrank to a bare icon, so people did not
+            find it. It is now a brand-tinted button of the same size. */}
+        {isMine && (
+          <div className="flex flex-shrink-0 items-center gap-2">
+            <button
+              onClick={onCreateFolder}
+              className="inline-flex min-h-[38px] items-center gap-1.5 rounded-pill border border-brand-200 bg-brand-50 px-4 text-sm font-semibold text-brand-700 transition-colors hover:border-brand-500 hover:bg-brand-100 focus:outline-none focus-visible:shadow-glow dark:border-brand-500/30 dark:bg-brand-500/10 dark:text-brand-200 dark:hover:bg-brand-500/20"
+            >
+              <FolderPlus className="h-4 w-4" />
+              New folder
+            </button>
+            <motion.button
+              whileTap={canUpload ? { scale: 0.97 } : undefined}
+              onClick={onUploadClick}
+              disabled={isUploading || !canUpload}
+              title={!canUpload ? canUploadReason : undefined}
+              className="inline-flex min-h-[38px] items-center gap-1.5 rounded-pill bg-brand-500 px-4 text-sm font-semibold text-white shadow-soft transition-colors hover:bg-brand-600 focus:outline-none focus-visible:shadow-glow disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Upload className="h-4 w-4" />
+              {isUploading ? "Uploading..." : "Upload"}
+            </motion.button>
+          </div>
+        )}
+      </div>
+
+      {/* Row 2 — what is listed and how. Search moved here from row 1, where it
+          left the breadcrumb a single letter wide on a 1024px screen. */}
+      <div className="mt-2.5 flex flex-wrap items-center gap-2">
         {/* Search */}
-        <div className="relative w-full flex-shrink-0 sm:w-56">
+        <div className="relative w-full sm:w-60">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
           <input
             type="search"
@@ -202,7 +232,7 @@ const DocumentsToolbar: React.FC<DocumentsToolbarProps> = ({
             placeholder={isMine ? "Search this folder..." : "Search shared..."}
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
-            className="el-input min-h-[36px] rounded-pill pl-9 pr-8 text-sm"
+            className="el-input min-h-[36px] rounded-pill pl-9 pr-8 text-sm [&::-webkit-search-cancel-button]:hidden"
           />
           {searchQuery && (
             <button
@@ -215,33 +245,6 @@ const DocumentsToolbar: React.FC<DocumentsToolbarProps> = ({
           )}
         </div>
 
-        {isMine && (
-          <div className="flex flex-shrink-0 items-center gap-2">
-            <button
-              onClick={onCreateFolder}
-              className="inline-flex min-h-[36px] items-center gap-1.5 rounded-pill border border-gray-200 px-3.5 text-xs font-semibold text-gray-700 transition-colors hover:bg-gray-50 dark:border-white/10 dark:text-gray-200 dark:hover:bg-white/[0.06]"
-            >
-              <FolderPlus className="h-4 w-4" />
-              <span className="hidden md:inline">New folder</span>
-            </button>
-            <motion.button
-              whileTap={canUpload ? { scale: 0.97 } : undefined}
-              onClick={onUploadClick}
-              disabled={isUploading || !canUpload}
-              title={!canUpload ? canUploadReason : undefined}
-              className="inline-flex min-h-[36px] items-center gap-1.5 rounded-pill bg-brand-500 px-4 text-xs font-semibold text-white shadow-soft transition-colors hover:bg-brand-600 focus:outline-none focus-visible:shadow-glow disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              <Upload className="h-4 w-4" />
-              <span className="hidden md:inline">
-                {isUploading ? "Uploading..." : "Upload"}
-              </span>
-            </motion.button>
-          </div>
-        )}
-      </div>
-
-      {/* Row 2 — how the list is shown. Quiet, because it is changed rarely. */}
-      <div className="mt-2.5 flex flex-wrap items-center gap-2">
         {isMine && onShareFilterChange && (
           <div className="el-segment" role="group" aria-label="Filter by sharing">
             {filters.map((f) => (
@@ -262,7 +265,7 @@ const DocumentsToolbar: React.FC<DocumentsToolbarProps> = ({
           </div>
         )}
 
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex flex-wrap items-center gap-2">
           <div className="el-segment" role="group" aria-label="Sort by">
             {SORTS.map((s) => (
               <button

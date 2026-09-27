@@ -1525,6 +1525,15 @@ const Documents: React.FC = () => {
     return "Processing...";
   };
 
+  // One gate for every upload entry point: toolbar, empty folder, context menu.
+  const handleUploadClick = () => {
+    if (!canUploadToCurrentFolder) {
+      showToast(canUploadReason || "You do not have permission to upload here", "error");
+      return;
+    }
+    fileInputRef.current?.click();
+  };
+
   return (
     // Owns the height it was given instead of guessing at it, so the file list
     // reaches the bottom of the window on every screen.
@@ -1542,6 +1551,7 @@ const Documents: React.FC = () => {
               setBreadcrumbs([{ id: null, name: "My Documents" }]);
               setCurrentFolderId(null);
             }}
+            onCreateFolder={() => setIsCreateFolderModalOpen(true)}
           />
         )}
       </AnimatePresence>
@@ -1600,16 +1610,7 @@ const Documents: React.FC = () => {
           }
           onToggleFolderTree={toggleFolderTree}
           onCreateFolder={() => setIsCreateFolderModalOpen(true)}
-          onUploadClick={() => {
-            if (!canUploadToCurrentFolder) {
-              showToast(
-                canUploadReason || "You do not have permission to upload here",
-                "error",
-              );
-              return;
-            }
-            fileInputRef.current?.click();
-          }}
+          onUploadClick={handleUploadClick}
           canUpload={canUploadToCurrentFolder}
           canUploadReason={canUploadReason}
         />
@@ -1667,6 +1668,9 @@ const Documents: React.FC = () => {
               onPreview={handlePreview}
               onOpenShareModal={handleOpenShareModal}
               isShareFilterActive={isOwnDocumentsView && shareFilter !== "all"}
+              onCreateFolder={() => setIsCreateFolderModalOpen(true)}
+              onUploadClick={handleUploadClick}
+              canUpload={canUploadToCurrentFolder}
             />
           )}
         </div>
@@ -1821,16 +1825,7 @@ const Documents: React.FC = () => {
           onRemoveSharedAccess={handleRemoveSharedAccess}
           onRemoveSharedFolderAccess={handleRemoveSharedFolderAccess}
           onCreateFolder={() => setIsCreateFolderModalOpen(true)}
-          onUploadFiles={() => {
-            if (!canUploadToCurrentFolder) {
-              showToast(
-                canUploadReason || "You do not have permission to upload here",
-                "error",
-              );
-              return;
-            }
-            fileInputRef.current?.click();
-          }}
+          onUploadFiles={handleUploadClick}
           onClose={() => setContextMenu(null)}
         />
       </div>

@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { motion } from "framer-motion";
 import { FiFolder, FiHome, FiChevronRight } from "react-icons/fi";
+import { FolderPlus } from "lucide-react";
 import type { Folder } from "../../api/documents";
 
 interface FolderTreeNode {
@@ -23,6 +24,7 @@ interface FolderTreeProps {
   isLoading?: boolean;
   onNavigateToFolder: (folder: Folder) => void;
   onGoToRoot: () => void;
+  onCreateFolder?: () => void;
 }
 
 const FolderNode: React.FC<{
@@ -118,6 +120,7 @@ const FolderTree: React.FC<FolderTreeProps> = ({
   isLoading,
   onNavigateToFolder,
   onGoToRoot,
+  onCreateFolder,
 }) => {
   return (
     <motion.div
@@ -130,10 +133,20 @@ const FolderTree: React.FC<FolderTreeProps> = ({
       transition={{ duration: 0.2 }}
       className="hidden flex-col overflow-hidden border-r border-gray-200 bg-white dark:border-white/[0.07] dark:bg-transparent lg:flex"
     >
-      <div className="flex-shrink-0 border-b border-gray-200 px-4 py-3.5 dark:border-white/[0.07]">
+      <div className="flex flex-shrink-0 items-center justify-between border-b border-gray-200 py-2.5 pl-4 pr-2 dark:border-white/[0.07]">
         <h3 className="text-[11px] font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
           Folders
         </h3>
+        {onCreateFolder && (
+          <button
+            onClick={onCreateFolder}
+            title="New folder"
+            aria-label="New folder"
+            className="grid h-8 w-8 place-items-center rounded-lg text-brand-600 transition-colors hover:bg-brand-50 dark:text-brand-200 dark:hover:bg-brand-500/15"
+          >
+            <FolderPlus className="h-4 w-4" />
+          </button>
+        )}
       </div>
       <div className="flex-1 overflow-y-auto p-2">
         <motion.button
@@ -160,10 +173,18 @@ const FolderTree: React.FC<FolderTreeProps> = ({
             ))}
           </div>
         ) : folderTree.length === 0 ? (
-          <p className="px-3 py-6 text-center text-xs text-gray-400 dark:text-gray-500">
-            No folders yet. Use <span className="font-semibold">New folder</span> to
-            make one.
-          </p>
+          <div className="px-3 py-6 text-center">
+            <p className="text-xs text-gray-400 dark:text-gray-500">No folders yet.</p>
+            {onCreateFolder && (
+              <button
+                onClick={onCreateFolder}
+                className="mt-2 inline-flex items-center gap-1.5 rounded-pill px-3 py-1.5 text-xs font-semibold text-brand-600 transition-colors hover:bg-brand-50 dark:text-brand-200 dark:hover:bg-brand-500/15"
+              >
+                <FolderPlus className="h-3.5 w-3.5" />
+                Create a folder
+              </button>
+            )}
+          </div>
         ) : (
           <div className="space-y-1">
             {folderTree.map((node) => (

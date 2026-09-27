@@ -1,6 +1,7 @@
 import React from "react";
 import { motion } from "framer-motion";
 import { FiUsers, FiFolder } from "react-icons/fi";
+import { FolderPlus, Upload } from "lucide-react";
 import {
   type Folder,
   type Document,
@@ -49,6 +50,11 @@ interface DocumentsContentProps {
   onOpenShareModal: (item: Folder | Document) => void;
   /** True when a non-"all" share filter is why the list looks empty. */
   isShareFilterActive?: boolean;
+  /** An empty folder offers the two ways to fill it, not just a sentence
+   *  pointing at buttons somewhere else on the screen. */
+  onCreateFolder?: () => void;
+  onUploadClick?: () => void;
+  canUpload?: boolean;
 }
 
 const DocumentsContent: React.FC<DocumentsContentProps> = ({
@@ -70,6 +76,9 @@ const DocumentsContent: React.FC<DocumentsContentProps> = ({
   onContextMenu,
   onOpenShareModal,
   isShareFilterActive = false,
+  onCreateFolder,
+  onUploadClick,
+  canUpload = true,
 }) => {
   // Sort items helper
   const getSortedItems = () => {
@@ -135,6 +144,29 @@ const DocumentsContent: React.FC<DocumentsContentProps> = ({
             ? "Try a different sharing filter above"
             : "Upload files or create a new folder"}
         </p>
+        {!isShareFilterActive && (onUploadClick || onCreateFolder) && (
+          <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
+            {onUploadClick && (
+              <button
+                onClick={onUploadClick}
+                disabled={!canUpload}
+                className="inline-flex min-h-[40px] items-center gap-2 rounded-pill bg-brand-500 px-5 text-sm font-semibold text-white shadow-soft transition-colors hover:bg-brand-600 focus:outline-none focus-visible:shadow-glow disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <Upload className="h-4 w-4" />
+                Upload files
+              </button>
+            )}
+            {onCreateFolder && (
+              <button
+                onClick={onCreateFolder}
+                className="inline-flex min-h-[40px] items-center gap-2 rounded-pill px-5 text-sm font-semibold border border-brand-200 bg-brand-50 text-brand-700 transition-colors hover:border-brand-500 hover:bg-brand-100 focus:outline-none focus-visible:shadow-glow dark:border-brand-500/30 dark:bg-brand-500/10 dark:text-brand-200 dark:hover:bg-brand-500/20"
+              >
+                <FolderPlus className="h-4 w-4" />
+                New folder
+              </button>
+            )}
+          </div>
+        )}
       </motion.div>
     );
   }
