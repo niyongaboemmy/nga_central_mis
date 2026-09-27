@@ -27,6 +27,11 @@ interface Props {
   /** Embedded (course page) navigation — defaults to the shared-notes library. */
   onBack?: () => void;
   backLabel?: string;
+  /** Inside the app shell (the e-learning course page), below its 4rem navbar.
+   *  The /shared-lesson-notes/:id route renders without the shell, so there the
+   *  chrome sits at the top of the window -- with the old fixed top-16 it floated
+   *  under an empty 64px strip. Mirrors the HTML reader's `embedded`. */
+  embedded?: boolean;
 }
 
 // Same four quick actions as the HTML reader's highlight toolbar, so a student who has
@@ -51,7 +56,7 @@ const ZOOM_STEPS = [0.7, 0.85, 1, 1.2, 1.4];
  *  text layer, which is what makes "highlight a sentence → Ask AI" work on a PDF exactly
  *  the way it does on a typed note. Everything around the pages (toolbar, progress bar,
  *  highlight toolbar, AI panel) deliberately mirrors SharedLessonNoteViewPage. */
-const SharedPdfNoteReader: React.FC<Props> = ({ note, onBack, backLabel }) => {
+const SharedPdfNoteReader: React.FC<Props> = ({ note, onBack, backLabel, embedded = false }) => {
   const navigate = useNavigate();
   const { prefs, update } = useReaderPrefs();
 
@@ -183,10 +188,10 @@ const SharedPdfNoteReader: React.FC<Props> = ({ note, onBack, backLabel }) => {
     <div
       className={`note-reader note-reader--${prefs.paper} ${focusMode ? "note-reader--focus" : ""} ${
         aiOpen ? "lg:pr-[420px]" : ""
-      } transition-[padding] duration-300`}
+      } ${embedded ? "" : "min-h-screen bg-gray-100 dark:bg-black"} transition-[padding] duration-300`}
     >
       {/* Reading progress — page-based here, since a PDF has real pages. */}
-      <div className="fixed top-16 left-0 right-0 h-0.5 z-30 bg-transparent print:hidden">
+      <div className={`fixed ${embedded ? "top-16" : "top-0"} left-0 right-0 h-0.5 z-30 bg-transparent print:hidden`}>
         <div
           className="h-full bg-gradient-to-r from-blue-500 to-blue-600 transition-[width] duration-150"
           style={{ width: `${Math.round(progress * 100)}%` }}
@@ -199,7 +204,7 @@ const SharedPdfNoteReader: React.FC<Props> = ({ note, onBack, backLabel }) => {
             initial={{ y: -8, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: -8, opacity: 0 }}
-            className="sticky top-16 z-20 bg-gray-50/85 dark:bg-gray-900/85 backdrop-blur-md border-b border-gray-200/70 dark:border-gray-700/40 print:hidden"
+            className={`sticky ${embedded ? "top-16" : "top-0"} z-20 bg-gray-50/85 dark:bg-gray-900/85 backdrop-blur-md border-b border-gray-200/70 dark:border-gray-700/40 print:hidden`}
           >
             <div className="max-w-[1400px] mx-auto px-3 sm:px-5 py-2 flex items-center gap-2">
               <button
@@ -297,7 +302,7 @@ const SharedPdfNoteReader: React.FC<Props> = ({ note, onBack, backLabel }) => {
         <button
           onClick={() => setFocusMode(false)}
           title="Exit focus mode (Esc)"
-          className="fixed top-20 right-4 z-30 p-2.5 rounded-full bg-blue-600/90 text-white backdrop-blur shadow-lg print:hidden"
+          className={`fixed ${embedded ? "top-20" : "top-4"} right-4 z-30 p-2.5 rounded-full bg-blue-600/90 text-white backdrop-blur shadow-lg print:hidden`}
         >
           <Minimize2 className="w-4 h-4" />
         </button>
@@ -424,6 +429,7 @@ const SharedPdfNoteReader: React.FC<Props> = ({ note, onBack, backLabel }) => {
       )}
 
       <NoteAIPanel
+        offsetTop={embedded}
         noteId={note.note_id}
         noteTitle={note.title}
         subjectName={note.subject_name}

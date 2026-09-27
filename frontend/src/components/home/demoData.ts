@@ -48,7 +48,8 @@ const lessonsAroundNow = (kind: "teaching" | "learning"): TodayLesson[] => {
     ["Web Application Development", "L5 SOD", 150, 230, "done", "upcoming"],
   ];
   return plan
-    .filter(([, , start]) => now + start < 24 * 60 - 20)
+    // Only lessons that fit inside today: near midnight a clamped time would read 00:00 – 00:00.
+    .filter(([, , start, end]) => now + start >= 0 && now + end < 24 * 60)
     .map(([subject, group, start, end, p, r], i) => ({
       lesson_key: `demo-${i}`,
       kind,

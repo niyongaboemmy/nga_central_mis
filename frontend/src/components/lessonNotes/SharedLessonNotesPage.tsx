@@ -208,7 +208,11 @@ const SharedLessonNotesPage: React.FC = () => {
   }
 
   return (
-    <div className="pt-6 pb-16">
+    // Own side padding: the shell's default container has none, so without it
+    // the page sat flush against the sidebar, and the sticky toolbar's
+    // -mx-4/md:-mx-6 bleed (written to cancel exactly this padding) made the
+    // page wider than the window.
+    <div className="px-4 pt-6 pb-16 md:px-6">
       {/* ------------------------------------------------------------- header */}
       <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div className="min-w-0">

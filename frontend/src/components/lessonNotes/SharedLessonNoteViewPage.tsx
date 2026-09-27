@@ -461,7 +461,7 @@ const SharedLessonNoteViewPage: React.FC<Props> = ({ noteId, onBack, backLabel }
   // A PDF-backed note has real pages of its own — pdf.js renders them (with a selectable
   // text layer, so highlight-to-ask still works) instead of the HTML sheet below.
   if (isPdfBackedNote(note)) {
-    return <SharedPdfNoteReader note={note} onBack={onBack} backLabel={backLabel} />;
+    return <SharedPdfNoteReader note={note} onBack={onBack} backLabel={backLabel} embedded={embedded} />;
   }
 
   /** Next up: the newest unread-ish note in this subject, else anywhere. Falls
