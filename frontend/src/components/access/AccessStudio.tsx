@@ -12,7 +12,8 @@ import {
 import { useAccess } from "../../hooks/useAccess";
 import { PositionsTab } from "./PositionsTab";
 import { RolesTab } from "./RolesTab";
-import { AuditTab, DepartmentsTab, ExplorerTab, RulesTab, StructureTab } from "./OtherTabs";
+import { AuditTab, DepartmentsTab, ExplorerTab, RulesTab } from "./OtherTabs";
+import { StructureTab } from "./StructureTab";
 import { Empty, Panel } from "./shared";
 
 /**
@@ -78,12 +79,12 @@ export default function AccessStudio() {
     void refresh(); // my own access may have changed
   };
 
-  if (loading) return <div data-testid="access-studio"><Panel><Empty>Loading access…</Empty></Panel></div>;
-  if (unavailable) return <div data-testid="access-studio"><Panel><Empty>Access Studio is not installed on this server yet.</Empty></Panel></div>;
-  if (!tabs.length) return <div data-testid="access-studio"><Panel><Empty>You do not have access to Access Studio.</Empty></Panel></div>;
+  if (loading) return <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6" data-testid="access-studio"><Panel><Empty>Loading access…</Empty></Panel></div>;
+  if (unavailable) return <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6" data-testid="access-studio"><Panel><Empty>Access Studio is not installed on this server yet.</Empty></Panel></div>;
+  if (!tabs.length) return <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6" data-testid="access-studio"><Panel><Empty>You do not have access to Access Studio.</Empty></Panel></div>;
 
   return (
-    <div className="space-y-4 px-3 sm:px-0" data-testid="access-studio">
+    <div className="mx-auto w-full max-w-7xl space-y-4 px-4 py-6 sm:px-6" data-testid="access-studio">
       <header className="flex items-center gap-3">
         <div className="w-10 h-10 rounded-xl bg-brand-100 dark:bg-slate-700 flex items-center justify-center">
           <ShieldCheck className="w-5 h-5 text-brand-600 dark:text-brand-200" />
@@ -138,7 +139,14 @@ export default function AccessStudio() {
       </div>
 
       <div id={`access-panel-${current}`} role="tabpanel" aria-labelledby={`access-tab-${current}`} tabIndex={0} className="focus:outline-none">
-        {current === "structure" && <StructureTab positions={positions} nodes={nodes} />}
+        {current === "structure" && (
+          <StructureTab
+            positions={positions}
+            nodes={nodes}
+            // Vacancies offer a shortcut to assigning, for those who may.
+            onAssign={studio && can("ACCESS_GRANTS_MANAGE") ? () => setTab("positions") : undefined}
+          />
+        )}
         {current === "positions" && (
           <PositionsTab grants={grants} roles={roles} nodes={nodes} canManage={can("ACCESS_GRANTS_MANAGE")} onChanged={onChanged} />
         )}

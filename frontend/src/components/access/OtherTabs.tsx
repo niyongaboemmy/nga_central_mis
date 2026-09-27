@@ -8,124 +8,13 @@ import {
   AuditRow,
   Decision,
   DepartmentRow,
-  GrantRow,
   Nodes,
   RuleRow,
   ShadowDiffRow,
 } from "../../api/access";
 import type { UserSearchResult } from "../../api/users";
 import type { AccessSnapshot, ScopeEntry } from "../../vendor/nga-access";
-import { btnGhost, btnPrimary, DepthPill, Empty, inputCls, mutedCls, nodeLabel, Panel, UserPicker } from "./shared";
-
-// ---------------------------------------------------------------------------
-// Structure: who holds which position where (organisation chart)
-// ---------------------------------------------------------------------------
-
-/** Key school posts: shown even when vacant, so gaps are visible. */
-const KEY_SCHOOL_POSTS: Array<{ preset: string; label: string }> = [
-  { preset: "head_teacher", label: "Head Teacher" },
-  { preset: "deputy_head_academics", label: "Deputy Head — Academics" },
-  { preset: "deputy_head_discipline", label: "Deputy Head — Discipline" },
-];
-
-const Holder: React.FC<{ p: GrantRow }> = ({ p }) => (
-  <span className="rounded-full bg-brand-50 text-brand-700 dark:bg-slate-700/70 dark:text-slate-100 px-2 py-0.5 text-xs">
-    {p.title || p.role_name}: <strong className="font-semibold">{p.full_name}</strong>
-    {p.valid_until ? ` (until ${p.valid_until})` : ""}
-  </span>
-);
-const Vacant: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <span className="rounded-full border border-dashed border-amber-400 text-amber-800 dark:border-amber-500 dark:text-amber-200 px-2 py-0.5 text-xs">
-    {children}
-  </span>
-);
-
-export const StructureTab: React.FC<{ positions: GrantRow[]; nodes: Nodes | null }> = ({ positions, nodes }) => {
-  const at = (type: string, id: number | null) =>
-    positions.filter((p) => p.scope_type === type && (id === null || p.scope_id === id));
-  const school = at("SCHOOL", null);
-  const platform = at("PLATFORM", null);
-  const Holders: React.FC<{ list: GrantRow[]; empty?: string }> = ({ list, empty }) =>
-    list.length === 0 ? (empty ? <span className={`text-xs ${mutedCls}`}>{empty}</span> : null) : (
-      <span className="flex flex-wrap gap-1">
-        {list.map((p) => (
-          <Holder key={p.grant_id} p={p} />
-        ))}
-      </span>
-    );
-
-  return (
-    <div className="space-y-3">
-      <Panel title="School leadership">
-        <div className="flex flex-wrap gap-1.5">
-          {KEY_SCHOOL_POSTS.map((post) => {
-            const held = school.filter((p) => p.preset_key === post.preset);
-            return held.length ? held.map((p) => <Holder key={p.grant_id} p={p} />) : <Vacant key={post.preset}>{post.label}: vacant</Vacant>;
-          })}
-          {school
-            .filter((p) => !KEY_SCHOOL_POSTS.some((k) => k.preset === p.preset_key))
-            .map((p) => (
-              <Holder key={p.grant_id} p={p} />
-            ))}
-        </div>
-      </Panel>
-      {platform.length > 0 && (
-        <Panel title="Platform administration">
-          <Holders list={platform} />
-        </Panel>
-      )}
-      <Panel title="Programmes, grades and classes">
-        {(nodes?.programs ?? []).length === 0 && <Empty>No programmes.</Empty>}
-        <ul className="space-y-3">
-          {(nodes?.programs ?? []).map((p) => (
-            <li key={p.id} className="rounded-xl border border-border-light dark:border-slate-700/60 p-3">
-              <div className="flex flex-wrap items-center gap-2">
-                <strong>{p.name}</strong>
-                {at("PROGRAM", p.id).length ? <Holders list={at("PROGRAM", p.id)} /> : <Vacant>No programme lead yet</Vacant>}
-              </div>
-              <ul className="mt-2 ml-4 space-y-1.5">
-                {(nodes?.grades ?? [])
-                  .filter((g) => g.program_id === p.id)
-                  .map((g) => (
-                    <li key={g.id} className="text-sm">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="font-medium">{g.name}</span>
-                        <Holders list={at("GRADE", g.id)} />
-                      </div>
-                      <ul className="ml-4">
-                        {(nodes?.classGroups ?? [])
-                          .filter((c) => c.grade_id === g.id)
-                          .map((c) => (
-                            <li key={c.id} className="flex flex-wrap items-center gap-2 text-xs py-0.5">
-                              <span>{c.name}</span>
-                              <Holders list={at("CLASS_GROUP", c.id)} empty="No class teacher" />
-                            </li>
-                          ))}
-                      </ul>
-                    </li>
-                  ))}
-              </ul>
-            </li>
-          ))}
-        </ul>
-      </Panel>
-      <Panel title="Departments">
-        {(nodes?.departments ?? []).length === 0 ? (
-          <Empty>No departments yet -- create them in the Departments tab.</Empty>
-        ) : (
-          <ul className="space-y-1.5">
-            {(nodes?.departments ?? []).map((d) => (
-              <li key={d.id} className="flex flex-wrap items-center gap-2 text-sm">
-                <strong>{d.name}</strong>
-                {at("DEPARTMENT", d.id).length ? <Holders list={at("DEPARTMENT", d.id)} /> : <Vacant>No head of department yet</Vacant>}
-              </li>
-            ))}
-          </ul>
-        )}
-      </Panel>
-    </div>
-  );
-};
+import { btnGhost, btnPrimary, DepthPill, Empty, inputCls, nodeLabel, Panel, UserPicker } from "./shared";
 
 // ---------------------------------------------------------------------------
 // Auto-assignment rules
