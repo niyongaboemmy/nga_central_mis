@@ -5,6 +5,7 @@ import { userApi } from "../../api/documents";
 import { MentorshipReportService } from "../../services/MentorshipReportService";
 import { useAcademicPeriod } from "../../contexts/AcademicPeriodContext";
 import { useToast } from "../../contexts/ToastContext";
+import { useConfirm } from "../../contexts/ConfirmContext";
 
 interface SearchResultUser {
   user_id: number;
@@ -18,6 +19,7 @@ interface SearchResultUser {
 const AdminMentorAssignments: React.FC = () => {
   const { years, selectedYearId } = useAcademicPeriod();
   const { showToast } = useToast();
+  const confirm = useConfirm();
 
   const [yearFilter, setYearFilter] = useState<number | "">(selectedYearId ?? "");
   const [assignments, setAssignments] = useState<MentorAssignmentRecord[]>([]);
@@ -77,7 +79,15 @@ const AdminMentorAssignments: React.FC = () => {
   }, [load, loadUnassigned]);
 
   const handleEnd = async (assignmentId: number) => {
-    if (!window.confirm("End this mentor assignment?")) return;
+    if (
+      !(await confirm({
+        title: "End this mentor assignment?",
+        message: "The mentor stops seeing this student. Past sessions are kept.",
+        confirmText: "End assignment",
+        tone: "warning",
+      }))
+    )
+      return;
     try {
       await mentorshipApi.endAssignment(assignmentId);
       showToast("Assignment ended", "success");

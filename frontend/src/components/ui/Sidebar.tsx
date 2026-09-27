@@ -4,6 +4,9 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { useUser } from "../../contexts/UserContext";
 import { Permissions } from "../../constants/permissions";
 import { getToken } from "../../utils/auth";
+import { useAccess } from "../../hooks/useAccess";
+import { BarChart3, ShieldCheck } from "lucide-react";
+import { CalendarDays, House } from "lucide-react";
 
 interface SidebarProps {
   isCollapsed?: boolean;
@@ -17,6 +20,8 @@ interface NavItem {
   externalUrl?: string;
   icon: React.ReactNode;
   requiredPermission?: string | string[];
+  /** Access control v2 capability (any of) -- see hooks/useAccess. */
+  requiredCapability?: string | string[];
 }
 
 const Sidebar: React.FC<SidebarProps> = ({
@@ -27,6 +32,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   const location = useLocation();
   const navigate = useNavigate();
   const { user } = useUser();
+  const access = useAccess();
 
   const hasPermission = (perm?: string | string[]) => {
     if (!perm) return true;
@@ -43,9 +49,17 @@ const Sidebar: React.FC<SidebarProps> = ({
 
   const navItems: NavItem[] = [
     {
-      label: isTeacher ? "Welcome" : "Dashboard",
+      // Home: what needs me across every module (HOME_OVERVIEW_IMPLEMENTATION_PLAN.md).
+      label: "Home",
+      path: "/home",
+      icon: <House className="w-5 h-5" />,
+    },
+    {
+      label: isTeacher ? "My Timetable" : "Dashboard",
       path: "/dashboard",
-      icon: (
+      icon: isTeacher ? (
+        <CalendarDays className="w-5 h-5" />
+      ) : (
         <svg
           className={`w-5 h-5`}
           fill="none"
@@ -530,6 +544,19 @@ const Sidebar: React.FC<SidebarProps> = ({
       requiredPermission: Permissions.VIEW_CALENDAR_BY_CLASS_TEACHER_GRADE,
     },
     {
+      label: "Insights",
+      path: "/insights",
+      icon: <BarChart3 className="w-5 h-5" />,
+      // Anyone holding an insight capability somewhere (the page lists what they can open).
+      requiredCapability: ["VIEW_ALL_TEACHERS_SCHEME_OF_WORK_LIST", "VIEW_REPORTS", "VIEW_ALL_COURSES"],
+    },
+    {
+      label: "Leadership & Access",
+      path: "/access-studio",
+      icon: <ShieldCheck className="w-5 h-5" />,
+      requiredCapability: ["ACCESS_STUDIO_VIEW", "VIEW_LEADERSHIP_STRUCTURE"],
+    },
+    {
       label: "Permissions",
       path: "/permissions",
       icon: (
@@ -614,6 +641,11 @@ const Sidebar: React.FC<SidebarProps> = ({
   const mainNavItems = navItems.filter((item) => item.label !== PROFILE_LABEL);
   const profileItem = navItems.find((item) => item.label === PROFILE_LABEL);
 
+  /** Both gates: the v1 permission and, where set, an access-control v2 capability. */
+  const isVisible = (item: NavItem) =>
+    hasPermission(item.requiredPermission) &&
+    (!item.requiredCapability || access.can(item.requiredCapability));
+
   const renderNavItem = (item: (typeof navItems)[number]) => (
     <button
       onClick={() => {
@@ -631,7 +663,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       } space-x-3.5 px-3.5 py-3 rounded-xl transition-all duration-200 ${
         isActive(item.path)
           ? "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"
-          : "font-light text-text-secondary-light dark:text-text-secondary-dark/70 hover:bg-surface-light dark:hover:bg-surface-dark hover:text-text-primary-light dark:hover:text-text-primary-dark"
+          : "font-light text-text-secondary-light dark:text-slate-300 hover:bg-surface-light dark:hover:bg-surface-dark hover:text-text-primary-light dark:hover:text-text-primary-dark"
       }`}
       title={item.label}
     >
@@ -662,6 +694,8 @@ const Sidebar: React.FC<SidebarProps> = ({
         )}
         <button
           onClick={onToggle}
+          aria-label={isCollapsed ? "Expand menu" : "Collapse menu"}
+          aria-expanded={!isCollapsed}
           className="p-2 rounded-lg hover:bg-surface-light dark:hover:bg-surface-dark transition-colors"
         >
           <svg
@@ -686,7 +720,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       <nav className="flex-1 py-4 overflow-y-auto text-[15px]">
         <ul className="space-y-1 px-3">
           {mainNavItems
-            .filter((item) => hasPermission(item.requiredPermission))
+            .filter(isVisible)
             .map((item, index) => (
               <li key={item.path || item.label || `nav-${index}`}>{renderNavItem(item)}</li>
             ))}
@@ -695,9 +729,9 @@ const Sidebar: React.FC<SidebarProps> = ({
 
       {/* Bottom section */}
       <div className="border-t border-border-light dark:border-gray-700/30 px-3 pt-2 pb-3 text-[15px]">
-        {profileItem && hasPermission(profileItem.requiredPermission) && renderNavItem(profileItem)}
+        {profileItem && isVisible(profileItem) && renderNavItem(profileItem)}
         {!isCollapsed && (
-          <div className="mt-2 text-xs text-text-secondary-light dark:text-text-secondary-dark/70 text-center">
+          <div className="mt-2 text-xs text-text-secondary-light dark:text-slate-300 text-center">
             NGA MIS v1.0
           </div>
         )}

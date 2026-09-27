@@ -12,6 +12,7 @@ import {
 } from "../db/schema";
 import { eq, and, desc, gte, lte, like } from "drizzle-orm";
 import crypto from "crypto";
+import { isHashedClientSecret } from "../utils/ssoClientSecret";
 
 export const createSystem = async (req: Request, res: Response) => {
   try {
@@ -152,7 +153,12 @@ export const updateSystem = async (req: Request, res: Response) => {
 
     res.status(200).json({
       message: "System updated successfully",
-      data: { client_id, client_secret },
+      // A hashed secret (scripts/hash-sso-client-secrets.ts) is not the
+      // secret itself -- never echo it back as if it were.
+      data: {
+        client_id,
+        client_secret: isHashedClientSecret(client_secret) ? null : client_secret,
+      },
     });
   } catch (error) {
     console.error("Error updating system:", error);

@@ -437,20 +437,34 @@ export const listMySchemesForCourses = asyncHandler(async (req: any, res: any) =
     .from(TeacherSubjectAssignment)
     .innerJoin(Subject, eq(Subject.subject_id, TeacherSubjectAssignment.subject_id))
     .innerJoin(ClassGroup, eq(ClassGroup.class_group_id, TeacherSubjectAssignment.class_group_id))
-    // The scheme (and therefore the course) is per term, so only join the selected one —
-    // otherwise a subject taught all year would appear three times.
+    // The scheme (and therefore the course) is per term, so prefer the selected one —
+    // otherwise a subject taught all year would appear three times. With no term selected
+    // this used to join `1 = 0`, i.e. never: every subject was then reported as having no
+    // scheme of work, including ones with a scheme and a live course already built on it.
+    // Join every term instead and let the ordering below pick the best row per subject.
     .leftJoin(
       SchemeOfWork,
       and(
         eq(SchemeOfWork.subject_id, TeacherSubjectAssignment.subject_id),
         eq(SchemeOfWork.class_group_id, TeacherSubjectAssignment.class_group_id),
-        termId ? eq(SchemeOfWork.academic_term_id, termId) : sql`1 = 0`,
+        termId ? eq(SchemeOfWork.academic_term_id, termId) : undefined,
       ),
     )
     .leftJoin(AcademicTerm, eq(AcademicTerm.academic_term_id, SchemeOfWork.academic_term_id))
     .leftJoin(Course, eq(Course.scheme_id, SchemeOfWork.scheme_id))
     .where(and(eq(TeacherSubjectAssignment.user_id, userId), yearId ? eq(TeacherSubjectAssignment.academic_year_id, yearId) : undefined))
-    .orderBy(Subject.name, ClassGroup.name);
+    // Within a (subject, class group) the furthest-along row wins the de-duplication below:
+    // one that already has a course, then one with a scheme (most weeks first), then bare.
+    // A scheme that is still PENDING or REJECTED counts exactly the same as an approved one —
+    // validation gates the printed document, not whether a teacher may build the course.
+    .orderBy(
+      Subject.name,
+      ClassGroup.name,
+      sql`${Course.course_id} IS NULL`,
+      sql`${SchemeOfWork.scheme_id} IS NULL`,
+      desc(sql`(SELECT COUNT(*) FROM SchemeOfWorkEntry e WHERE e.scheme_id = ${SchemeOfWork.scheme_id})`),
+      desc(SchemeOfWork.scheme_id),
+    );
 
   // One row per (subject, class group): a teacher holds one assignment per year for each.
   const seen = new Set<string>();
@@ -739,6 +753,127 @@ export const setItemCriteriaHandler = asyncHandler(async (req: any, res: any) =>
   }
   await setItemCriteria(item.item_id, course.subject_id, Array.isArray(req.body.criteria_ids) ? req.body.criteria_ids : []);
   successResponse(res, "Criteria updated", await builderPayload(course));
+});
+
+/**
+ * Places a lesson note onto its subject's course in one call, so a teacher working in Lesson
+ * Notes never has to go hunting for the right section in the course builder. The target section
+ * is the one seeded from the note's Scheme of Work week when the note has one, otherwise the
+ * last section of the course. Idempotent: a note already on the course returns its existing
+ * placement rather than being added twice.
+ */
+export const placeLessonNoteOnCourse = asyncHandler(async (req: any, res: any) => {
+  const noteId = parseId(req.params.noteId, "note id");
+  const [note] = await db
+    .select({
+      note_id: LessonNote.note_id,
+      title: LessonNote.title,
+      subject_id: LessonNote.subject_id,
+      class_group_id: LessonNote.class_group_id,
+      scheme_entry_id: LessonNote.scheme_entry_id,
+      user_id: LessonNote.user_id,
+    })
+    .from(LessonNote)
+    .where(eq(LessonNote.note_id, noteId))
+    .limit(1);
+  if (!note) throw new NotFoundError("Lesson note not found");
+  if (!note.class_group_id) {
+    throw new ValidationError(
+      "This note isn't tied to a class group, so there's no course to place it on. Open it in the course builder to choose one.",
+    );
+  }
+
+  const [courseRow] = await db
+    .select({ course_id: Course.course_id })
+    .from(Course)
+    .where(and(eq(Course.subject_id, note.subject_id), eq(Course.class_group_id, note.class_group_id)))
+    .limit(1);
+  if (!courseRow) {
+    throw new NotFoundError(
+      "No e-learning course exists for this subject and class group yet — create one from E-Learning first.",
+    );
+  }
+  const course = await loadBuildableCourse(courseRow.course_id, req.user.userId);
+
+  const sections = await db
+    .select({
+      section_id: CourseSection.section_id,
+      title: CourseSection.title,
+      position: CourseSection.position,
+      scheme_entry_id: CourseSection.scheme_entry_id,
+    })
+    .from(CourseSection)
+    .where(eq(CourseSection.course_id, course.course_id))
+    .orderBy(asc(CourseSection.position));
+  if (sections.length === 0) {
+    throw new ValidationError("This course has no sections yet — add one in the course builder first.");
+  }
+
+  // Already there? Say where, and change nothing.
+  const [existing] = await db
+    .select({ item_id: CourseItem.item_id, section_id: CourseItem.section_id })
+    .from(CourseItem)
+    .innerJoin(CourseSection, eq(CourseSection.section_id, CourseItem.section_id))
+    .where(
+      and(
+        eq(CourseSection.course_id, course.course_id),
+        eq(CourseItem.item_type, "LESSON_NOTE"),
+        eq(CourseItem.ref_id, noteId),
+      ),
+    )
+    .limit(1);
+  if (existing) {
+    const section = sections.find((s) => s.section_id === existing.section_id);
+    successResponse(res, "This note is already on the course", {
+      item_id: existing.item_id,
+      section_id: existing.section_id,
+      section_title: section?.title || "",
+      course_id: course.course_id,
+      already_placed: true,
+    });
+    return;
+  }
+
+  const requestedSectionId = req.body?.section_id ? parseId(req.body.section_id, "section id") : null;
+  const target =
+    (requestedSectionId && sections.find((s) => s.section_id === requestedSectionId)) ||
+    (note.scheme_entry_id && sections.find((s) => s.scheme_entry_id === note.scheme_entry_id)) ||
+    sections[sections.length - 1];
+  if (requestedSectionId && target.section_id !== requestedSectionId) {
+    throw new ValidationError("That section belongs to a different course");
+  }
+
+  const body = await buildItemBody(course, req.user.userId, "LESSON_NOTE", { ref_id: noteId });
+  const [{ max }] = await db
+    .select({ max: sql<number>`COALESCE(MAX(${CourseItem.position}), -1)` })
+    .from(CourseItem)
+    .where(eq(CourseItem.section_id, target.section_id));
+
+  const [ins] = (await db.insert(CourseItem).values({
+    section_id: target.section_id,
+    item_type: "LESSON_NOTE",
+    title: body.title!,
+    ...body,
+    position: Number(max) + 1,
+    created_by: req.user.userId,
+  })) as any;
+
+  // Placing a note on a course is what makes students able to open it — mirror createItem
+  // so it doesn't land on the course as an unreadable link.
+  await ensureClassGroupShare(noteId, course.class_group_id, req.user.userId);
+
+  successResponse(
+    res,
+    `Added to "${target.title}"`,
+    {
+      item_id: ins.insertId as number,
+      section_id: target.section_id,
+      section_title: target.title,
+      course_id: course.course_id,
+      already_placed: false,
+    },
+    201,
+  );
 });
 
 // ======================

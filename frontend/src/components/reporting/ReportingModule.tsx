@@ -21,9 +21,13 @@ import { useUser } from "../../contexts/UserContext";
 // components themselves are intentionally left on disk (not deleted) per
 // the Phase 5 rollback plan — a git revert of this change restores the tabs.
 const ReportingModule: React.FC = () => {
+  // `?tab=` lets other pages (Home) open a specific tab directly.
   const [activeTab, setActiveTab] = useState<
     "lesson-reports" | "mentoring" | "dashboard"
-  >("lesson-reports");
+  >(() => {
+    const tab = new URLSearchParams(window.location.search).get("tab");
+    return tab === "mentoring" || tab === "dashboard" ? tab : "lesson-reports";
+  });
   const [dashboardSubTab, setDashboardSubTab] = useState<"lesson" | "mentorship">("lesson");
 
   const {

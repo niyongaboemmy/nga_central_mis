@@ -3,7 +3,7 @@ import request from "supertest";
 import { eq } from "drizzle-orm";
 import app from "../app";
 import { db } from "../db";
-import { CourseSection, LessonNoteShare, SchemeOfWorkEntry } from "../db/schema";
+import { CourseSection, LessonNoteShare, SchemeOfWork, SchemeOfWorkEntry } from "../db/schema";
 import {
   createUser,
   signToken,
@@ -129,6 +129,62 @@ describe("E-learning Phase 1: courses, seeding, membership, visibility", () => {
     expect(new Set(keys).size).toBe(keys.length);
     const courses = await request(app).get("/elearning/courses/mine").set(auth(teacherToken));
     expect(courses.body.data.map((c: any) => c.course_id)).toContain(courseId);
+  });
+
+  it("still finds the scheme when no term is given, instead of reporting every subject as bare", async () => {
+    // The term-scoped join used to fall back to `1 = 0` with no academic_term_id, so a
+    // subject with a scheme — and even a live course — came back as stage "nothing", and the
+    // E-Learning page offered "Create the scheme" for a course it was already showing above.
+    const schemes = await request(app)
+      .get("/elearning/courses/schemes")
+      .set(auth(teacherToken))
+      .query({ academic_year_id: academicYearId });
+    expect(schemes.status).toBe(200);
+
+    const mine = schemes.body.data.find((s: any) => s.subject_id === subjectId && s.class_group_id === classGroupId);
+    expect(mine).toBeTruthy();
+    expect(mine.stage).toBe("course");
+    expect(mine.scheme_id).toBe(schemeId);
+
+    // Still one row per subject × class group, even with every term joined.
+    const keys = schemes.body.data.map((s: any) => `${s.subject_id}:${s.class_group_id}`);
+    expect(new Set(keys).size).toBe(keys.length);
+  });
+
+  it("offers a scheme that has not been validated yet — approval gates the document, not the course", async () => {
+    const pendingSubjectId = await createSubject();
+    await createTeacherSubjectAssignment({ userId: teacherId, subjectId: pendingSubjectId, classGroupId, academicYearId });
+    const pendingSchemeId = await createSchemeOfWork({
+      userId: teacherId,
+      subjectId: pendingSubjectId,
+      classGroupId,
+      academicTermId,
+    });
+    await db.insert(SchemeOfWorkEntry).values({
+      scheme_id: pendingSchemeId,
+      week_number: "Week 1",
+      topic: "Pending topic",
+      start_date: isoDaysFromNow(0),
+      end_date: isoDaysFromNow(4),
+      entry_status: "PLANNED",
+    } as any);
+    await db
+      .update(SchemeOfWork)
+      .set({ validation_status: "PENDING" })
+      .where(eq(SchemeOfWork.scheme_id, pendingSchemeId));
+
+    const schemes = await request(app)
+      .get("/elearning/courses/schemes")
+      .set(auth(teacherToken))
+      .query({ academic_year_id: academicYearId, academic_term_id: academicTermId });
+    const row = schemes.body.data.find((s: any) => s.subject_id === pendingSubjectId);
+    expect(row).toMatchObject({ stage: "scheme", validation_status: "PENDING", entries: 1 });
+
+    // And it can actually be built, which is what "available" has to mean.
+    const created = await request(app)
+      .post(`/elearning/courses/from-scheme/${pendingSchemeId}`)
+      .set(auth(teacherToken));
+    expect(created.status).toBe(201);
   });
 
   it("refuses to build a course for a scheme the teacher does not teach", async () => {

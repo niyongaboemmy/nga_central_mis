@@ -36,8 +36,11 @@ const MyCoursesPage: React.FC = () => {
       .myBuiltCourses()
       .then((r) => setRows(r.data.data))
       .catch(() => setRows([]));
+    // The term matters: the scheme (and the course built on it) is per term, and the API
+    // scopes the scheme lookup to it. Omitting it reported every subject as having no
+    // scheme of work, even ones with a course already live.
     elearningApi
-      .mySchemes(selectedYearId)
+      .mySchemes(selectedYearId, selectedTermId)
       .then((r) => setSchemes(r.data.data))
       .catch(() => setSchemes([]));
   };
@@ -55,10 +58,16 @@ const MyCoursesPage: React.FC = () => {
     }
   };
 
-  const pending = (schemes || []).filter((s) => s.stage === "scheme");
+  // A subject whose course is already listed above must never also be offered as "no scheme
+  // of work yet" — the two lists come from different endpoints, and a disagreement between
+  // them reads as the page being broken.
+  const built = new Set((rows || []).map((c) => `${c.subject_id}:${c.class_group_id}`));
+  const key = (s: MySchemeRow) => `${s.subject_id}:${s.class_group_id}`;
+
+  const pending = (schemes || []).filter((s) => s.stage === "scheme" && !built.has(key(s)));
   // Assigned subjects with no scheme of work for this term yet: a course is built on a
   // scheme, so the honest next step is to write the scheme, not to hide the subject.
-  const noScheme = (schemes || []).filter((s) => s.stage === "nothing");
+  const noScheme = (schemes || []).filter((s) => s.stage === "nothing" && !built.has(key(s)));
   const schemeUrl = (s: MySchemeRow) =>
     `/scheme-of-work/calendar?subject_id=${s.subject_id}&class_group_id=${s.class_group_id}${selectedTermId ? `&academic_term_id=${selectedTermId}` : ""}`;
   const loading = rows === null || schemes === null;

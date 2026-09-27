@@ -4,6 +4,7 @@ import { Parenting, User, UserProfile } from "../db/schema";
 import { eq, and, sql } from "drizzle-orm";
 import { AppError } from "../middleware/errorHandler";
 import { recordActivity } from "../utils/activityLogger";
+import { applyPlacementChange } from "../services/access/ruleEngine";
 
 export const getParents = async (req: Request, res: Response) => {
   const { studentId } = req.params;
@@ -104,6 +105,7 @@ export const assignParent = async (req: Request, res: Response) => {
       parent_id,
       relationship: relationship || "PARENT",
     });
+    await applyPlacementChange([parent_id], (req as any).user?.userId);
 
     // Record activity for student
     await recordActivity(
@@ -151,6 +153,7 @@ export const removeRelationship = async (req: Request, res: Response) => {
           eq(Parenting.parent_id, parent_id),
         ),
       );
+    await applyPlacementChange([parent_id], (req as any).user?.userId);
 
     res.json({
       success: true,

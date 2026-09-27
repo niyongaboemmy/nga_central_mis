@@ -398,6 +398,18 @@ export const elearningApi = {
   setItemCriteria: (itemId: number, criteriaIds: number[]) =>
     apiService.put<Data<BuilderCourse>>(`/elearning/items/${itemId}/criteria`, { criteria_ids: criteriaIds }),
   pickNotes: (courseId: number) => apiService.get<Data<PickerNote[]>>(`/elearning/courses/${courseId}/pickers/lesson-notes`),
+  /** Places a lesson note onto its subject's course from outside the builder (Lesson Notes page).
+   *  The server resolves the course and the section (the note's scheme week, else the last one). */
+  placeNoteOnCourse: (noteId: number, sectionId?: number) =>
+    apiService.post<
+      Data<{
+        item_id: number;
+        section_id: number;
+        section_title: string;
+        course_id: number;
+        already_placed: boolean;
+      }>
+    >(`/elearning/notes/${noteId}/place`, sectionId ? { section_id: sectionId } : {}),
   pickDocuments: (courseId: number) =>
     apiService.get<Data<PickerDocument[]>>(`/elearning/courses/${courseId}/pickers/subject-documents`),
   // --- AI (long-running; see AI_TIMEOUT_MS) ---

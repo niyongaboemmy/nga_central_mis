@@ -47,10 +47,15 @@ command -v node >/dev/null 2>&1 || die "Node.js is not installed, or not on your
     "Install the LTS build from https://nodejs.org/ and run this again."
 say "Node $(node -v)"
 
+# Creating .env only when it is missing never repairs one, and an .env written
+# during an earlier setup keeps pointing wherever it pointed then - for most
+# people the deployed MIS, so the app runs locally but signs in against
+# production and rejects the local accounts. The script fills in a missing file
+# and, in one that exists, replaces only the settings that wire the modules on
+# this machine together. Your own keys are left alone.
 echo "[2/5] Checking configuration..."
-[ -f "backend/.env" ]  || { cp "backend/.env.example" "backend/.env" && say "Created backend/.env"; }
-[ -f "frontend/.env" ] || { cp "frontend/.env.example" "frontend/.env" && say "Created frontend/.env"; }
-# backend/.env is git-ignored: your local settings can never be pushed.
+node scripts/sync-local-env.cjs backend frontend     || die "Could not write backend/.env or frontend/.env - see the error above."
+# Both files are git-ignored: your local settings can never be pushed.
 say "Configuration present"
 
 # --------------------------------------------------------------- 3. Database

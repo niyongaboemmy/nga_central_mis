@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import AcademicCalendar from "../AcademicCalendar";
+import { ConfirmProvider } from "../../contexts/ConfirmContext";
 
 const deferred = <T,>() => {
   let resolve: (v: T) => void = () => {};
@@ -91,7 +92,7 @@ describe("AcademicCalendar — loading skeleton on class-group switch", () => {
       { class_group_id: 3, name: "L3. Class A" },
       { class_group_id: 4, name: "L4. Class A" },
     ]);
-    render(<AcademicCalendar title="Class Calendar" />);
+    render(<ConfirmProvider><AcademicCalendar title="Class Calendar" /></ConfirmProvider>);
 
     // first load: nothing to frame yet, so a full-width skeleton
     expect(screen.getByTestId("calendar-grid-skeleton")).toBeInTheDocument();
@@ -156,7 +157,7 @@ describe("AcademicCalendar — student class schedule", () => {
       upcoming: [],
     });
 
-    render(<AcademicCalendar />);
+    render(<ConfirmProvider><AcademicCalendar /></ConfirmProvider>);
     const grid = await screen.findByRole("grid");
     expect(within(grid).getByText("Embedded Systems Software")).toBeInTheDocument();
     const cell = within(grid).getByRole("gridcell", { name: /Wednesday.*Supervised Self Study/ });

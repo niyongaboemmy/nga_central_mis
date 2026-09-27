@@ -53,6 +53,31 @@ if (config.nodeEnv !== "test") {
   import("./services/elearning/livePresence").then((m) => m.startLiveSweep()).catch(() => undefined);
   setTimeout(runSweeps, 30_000);
   setInterval(runSweeps, 6 * 60 * 60 * 1000).unref();
+
+  // Access control v2 (ACCESS_LEVELS_RBAC_IMPLEMENTATION_PLAN.md): register
+  // the MIS capability manifest, seed presets/rules (insert-only), then keep
+  // rule-owned grants converged with placements once a day. Never throws;
+  // ACCESS_V2_BOOTSTRAP=false switches it off.
+  import("./services/access/registry")
+    .then(async ({ ensureAccessRegistry, accessTablesPresent }) => {
+      await ensureAccessRegistry();
+      if (process.env.ACCESS_V2_BOOTSTRAP === "false") return;
+      const reconcile = async () => {
+        try {
+          if (!(await accessTablesPresent())) return;
+          const { syncRuleGrants } = await import("./services/access/ruleEngine");
+          const r = await syncRuleGrants();
+          if (r.created + r.ended + r.reactivated + r.repointed > 0) {
+            logger.info(`[access] reconcile: +${r.created} ~${r.reactivated + r.repointed} -${r.ended}`);
+          }
+        } catch (error) {
+          logger.error("[access] reconcile failed", { error });
+        }
+      };
+      setTimeout(reconcile, 60_000);
+      setInterval(reconcile, 24 * 60 * 60 * 1000).unref();
+    })
+    .catch(() => undefined);
 }
 server.headersTimeout = 60000;
 server.keepAliveTimeout = 65000;

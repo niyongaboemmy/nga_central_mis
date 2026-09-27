@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { useToast } from "../../contexts/ToastContext";
 import { motion, AnimatePresence } from "framer-motion";
+import { useConfirm } from "../../contexts/ConfirmContext";
 
 interface FamilyTabProps {
   user: UserWithProfile;
@@ -23,6 +24,7 @@ interface FamilyTabProps {
 
 const FamilyTab: React.FC<FamilyTabProps> = ({ user, onViewUser }) => {
   const { showToast } = useToast();
+  const confirm = useConfirm();
   const [parents, setParents] = useState<ParentingRelation[]>([]);
   const [students, setStudents] = useState<ParentingRelation[]>([]);
   const [loading, setLoading] = useState(false);
@@ -128,7 +130,14 @@ const FamilyTab: React.FC<FamilyTabProps> = ({ user, onViewUser }) => {
     relation: ParentingRelation,
     type: "parent" | "student",
   ) => {
-    if (!confirm("Are you sure you want to remove this relationship?")) return;
+    if (
+      !(await confirm({
+        title: "Remove this relationship?",
+        message: "The two profiles stay — only the link between them is removed.",
+        confirmText: "Remove link",
+      }))
+    )
+      return;
 
     try {
       if (type === "parent") {

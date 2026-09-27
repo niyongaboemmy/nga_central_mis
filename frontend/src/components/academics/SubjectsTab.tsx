@@ -32,6 +32,7 @@ import {
 import CurriculumTab from "../curriculum/CurriculumTab";
 import SubjectMaterialsTab from "../curriculum/SubjectMaterialsTab";
 import { useToast } from "../../contexts/ToastContext";
+import { useConfirm } from "../../contexts/ConfirmContext";
 
 interface SubjectsTabProps {
   data: Subject[];
@@ -444,6 +445,7 @@ const SubjectsTab: React.FC<SubjectsTabProps> = ({
   onDelete,
 }) => {
   const { showToast } = useToast();
+  const confirm = useConfirm();
   const [assigningColors, setAssigningColors] = useState(false);
 
   // Give every subject a distinct calendar colour in one pass. Subjects with a
@@ -452,10 +454,14 @@ const SubjectsTab: React.FC<SubjectsTabProps> = ({
   // spreads the timetable across the palette.
   const handleAssignColors = async () => {
     if (
-      !window.confirm(
-        "Give every subject still on the default colour a distinct one? " +
-          "Colours you picked by hand are kept.",
-      )
+      !(await confirm({
+        title: "Recolour the subjects?",
+        message:
+          "Every subject still on the default colour gets a distinct one, so the timetable stops looking like one block.",
+        details: ["Colours you picked by hand are kept."],
+        confirmText: "Assign colours",
+        tone: "info",
+      }))
     )
       return;
     try {

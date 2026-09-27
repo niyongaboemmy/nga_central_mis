@@ -25,6 +25,8 @@ import lessonNoteRoutes from "./routes/lessonNotes";
 import databaseRoutes from "./routes/databaseRoutes";
 import integrationRoutes from "./routes/integrationRoutes";
 import notificationRoutes from "./routes/notifications";
+import accessRoutes from "./routes/access";
+import homeRoutes from "./routes/home";
 import elearningRoutes from "./routes/elearning";
 
 const app = express();
@@ -86,6 +88,11 @@ app.use("/lesson-notes", lessonNoteRoutes);
 app.use("/elearning", elearningRoutes);
 app.use("/database", databaseRoutes);
 app.use("/notifications", notificationRoutes);
+// Access control v2 (ACCESS_LEVELS_RBAC_IMPLEMENTATION_PLAN.md) -- snapshot,
+// Access Studio and app-to-MIS endpoints.
+app.use("/access", accessRoutes);
+// Home -- the post-login overview across every module (HOME_OVERVIEW_IMPLEMENTATION_PLAN.md).
+app.use("/home", homeRoutes);
 // Machine-to-machine, IntegrationToken-authenticated, read-only. Mounted last
 // among the API routers so it is obvious it shares no middleware with the
 // user-session routes above it.

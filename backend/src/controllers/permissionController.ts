@@ -1,5 +1,5 @@
 import { db } from "../db";
-import { eq, and, or } from "drizzle-orm";
+import { eq, and, or, inArray, notInArray, notLike } from "drizzle-orm";
 import { Role, Permission, RolePermission, UserRole } from "../db/schema";
 import {
   ValidationError,
@@ -11,6 +11,19 @@ import { asyncHandler } from "../middleware/asyncHandler";
 import { recordActivity } from "../utils/activityLogger";
 import { sanitizeString } from "../utils/sanitization";
 import logger from "../utils/logger";
+import { isV2OnlyCapability, V2_ONLY_CAPABILITIES } from "../access/v2Only";
+
+/**
+ * This legacy Roles & Permissions screen manages legacy MIS permissions only.
+ * Access control v2 capabilities (access/v2Only.ts) share the same tables but
+ * are managed in Access Studio, so they are hidden here and never touched by
+ * a save from this screen.
+ */
+const legacyOnly = () =>
+  and(
+    notLike(Permission.name, "%:%"),
+    notInArray(Permission.name, [...V2_ONLY_CAPABILITIES]),
+  );
 
 // ==================== Role Management ====================
 
@@ -58,7 +71,7 @@ export const getRole = asyncHandler(async (req: any, res: any) => {
     })
     .from(RolePermission)
     .innerJoin(Permission, eq(RolePermission.perm_id, Permission.perm_id))
-    .where(eq(RolePermission.role_id, roleId));
+    .where(and(eq(RolePermission.role_id, roleId), legacyOnly()));
 
   successResponse(res, "Role retrieved successfully", {
     ...role[0],
@@ -258,10 +271,14 @@ export const getPermissions = asyncHandler(async (req: any, res: any) => {
     permissions = await db
       .select()
       .from(Permission)
-      .where(eq(Permission.status, status))
+      .where(and(eq(Permission.status, status), legacyOnly()))
       .orderBy(Permission.name);
   } else {
-    permissions = await db.select().from(Permission).orderBy(Permission.name);
+    permissions = await db
+      .select()
+      .from(Permission)
+      .where(legacyOnly())
+      .orderBy(Permission.name);
   }
 
   successResponse(res, "Permissions retrieved successfully", permissions);
@@ -492,16 +509,47 @@ export const assignPermissionsToRole = asyncHandler(
       throw new NotFoundError("Role not found");
     }
 
-    // Delete existing permissions
-    await db.delete(RolePermission).where(eq(RolePermission.role_id, role_id));
+    // Apply the submitted legacy set as a diff: only legacy links that were
+    // removed are deleted and only new ones inserted. Links that stay keep
+    // their row (and any read depth set in Access Studio), and access control
+    // v2 capabilities on the role are never touched from this screen.
+    const requested = Array.from(
+      new Set(
+        permissionIds
+          .map((id: any) => parseInt(id))
+          .filter((id: number) => Number.isInteger(id) && id > 0),
+      ),
+    ) as number[];
+    const requestedRows = requested.length
+      ? await db
+          .select({ perm_id: Permission.perm_id, name: Permission.name })
+          .from(Permission)
+          .where(inArray(Permission.perm_id, requested))
+      : [];
+    const wanted = new Set(
+      requestedRows.filter((p) => !isV2OnlyCapability(p.name)).map((p) => p.perm_id),
+    );
+    const current = await db
+      .select({ perm_id: RolePermission.perm_id })
+      .from(RolePermission)
+      .innerJoin(Permission, eq(RolePermission.perm_id, Permission.perm_id))
+      .where(and(eq(RolePermission.role_id, role_id), legacyOnly()));
+    const have = new Set(current.map((c) => c.perm_id));
 
-    // Insert new permissions
-    if (permissionIds.length > 0) {
-      for (const permId of permissionIds) {
-        await db.insert(RolePermission).values({
-          role_id,
-          perm_id: parseInt(permId),
-        });
+    const toRemove = [...have].filter((id) => !wanted.has(id));
+    if (toRemove.length > 0) {
+      await db
+        .delete(RolePermission)
+        .where(
+          and(
+            eq(RolePermission.role_id, role_id),
+            inArray(RolePermission.perm_id, toRemove),
+          ),
+        );
+    }
+    for (const permId of wanted) {
+      if (!have.has(permId)) {
+        await db.insert(RolePermission).values({ role_id, perm_id: permId });
       }
     }
 
@@ -551,7 +599,7 @@ export const getRolePermissions = asyncHandler(async (req: any, res: any) => {
     })
     .from(RolePermission)
     .innerJoin(Permission, eq(RolePermission.perm_id, Permission.perm_id))
-    .where(eq(RolePermission.role_id, role_id));
+    .where(and(eq(RolePermission.role_id, role_id), legacyOnly()));
 
   successResponse(res, "Role permissions retrieved successfully", permissions);
 });

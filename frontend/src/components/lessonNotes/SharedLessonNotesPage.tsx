@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Link, useNavigate } from "react-router-dom";
 import { GraduationCap, LayoutGrid, List, Search, Sparkles, X } from "lucide-react";
 import { lessonNotesApi, SharedNoteSummary } from "../../api/lessonNotes";
+import { learnerRoutes } from "../../api/elearning";
 import { useToast } from "../../contexts/ToastContext";
 import { EmptyState, Skeleton } from "../elearning/ui/primitives";
 import SubjectIcon from "../elearning/ui/subjectIcons";
@@ -155,7 +156,20 @@ const SharedLessonNotesPage: React.FC = () => {
   );
   const newCount = useMemo(() => all.filter((n) => isRecent(n.updated_at)).length, [all]);
 
-  const openNote = useCallback((id: number) => navigate(`/shared-lesson-notes/${id}`), [navigate]);
+  /** A note placed on a course is coursework: opening it there records the view
+   *  and ticks it off the week, so that is where it opens. Unplaced notes open in
+   *  the standalone reader. (Carried over from main's e-learning work.) */
+  const openNote = useCallback(
+    (id: number) => {
+      const placement = all.find((n) => n.note_id === id)?.placement;
+      navigate(
+        placement
+          ? learnerRoutes.item(placement.course_id, placement.item_id)
+          : `/shared-lesson-notes/${id}`,
+      );
+    },
+    [navigate, all],
+  );
 
   const onSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     // Enter from the search box opens the top hit — search then read, no mouse needed.

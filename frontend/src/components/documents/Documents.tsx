@@ -37,9 +37,11 @@ import type {
   DocumentPermission,
   ShareFilter,
 } from "./types";
+import { useConfirm } from "../../contexts/ConfirmContext";
 
 const Documents: React.FC = () => {
   const { showToast } = useToast();
+  const askConfirm = useConfirm();
   const { selectedYearId } = useAcademicPeriod();
   const { notifications: appNotifications } = useNotifications();
   const unreadSharedCount = appNotifications.filter(
@@ -1057,13 +1059,19 @@ const Documents: React.FC = () => {
   // Delete item
   const handleDelete = async (item: Folder | Document) => {
     const isDocument = (item as Document).document_id !== undefined;
-    const confirmMessage = isDocument
-      ? `Are you sure you want to delete "${(item as Document).original_name}"?`
-      : `Are you sure you want to delete folder "${
-          (item as Folder).name
-        }" and all its contents?`;
-
-    if (!window.confirm(confirmMessage)) return;
+    const ok = isDocument
+      ? await askConfirm({
+          title: "Delete this file?",
+          message: `"${(item as Document).original_name}" is removed for everyone it was shared with.`,
+          confirmText: "Delete file",
+        })
+      : await askConfirm({
+          title: `Delete the "${(item as Folder).name}" folder?`,
+          message: "Everything inside it is deleted too.",
+          details: ["People it was shared with lose access immediately."],
+          confirmText: "Delete folder",
+        });
+    if (!ok) return;
 
     setIsDeleting(true);
     setDeletingItem(item);
@@ -1091,8 +1099,15 @@ const Documents: React.FC = () => {
 
   // Remove shared document access
   const handleRemoveSharedAccess = async (sharedDoc: SharedDocument) => {
-    const confirmMessage = `Are you sure you want to remove access to "${sharedDoc.document.original_name}"?`;
-    if (!window.confirm(confirmMessage)) return;
+    if (
+      !(await askConfirm({
+        title: "Remove your access to this file?",
+        message: `"${sharedDoc.document.original_name}" disappears from your shared list. The owner keeps it.`,
+        confirmText: "Remove access",
+        tone: "warning",
+      }))
+    )
+      return;
 
     setIsRemovingAccess(true);
     try {
@@ -1112,8 +1127,15 @@ const Documents: React.FC = () => {
 
   // Remove shared folder access
   const handleRemoveSharedFolderAccess = async (sharedFolder: any) => {
-    const confirmMessage = `Are you sure you want to remove access to "${sharedFolder.folder.name}"?`;
-    if (!window.confirm(confirmMessage)) return;
+    if (
+      !(await askConfirm({
+        title: "Remove your access to this folder?",
+        message: `"${sharedFolder.folder.name}" disappears from your shared list. The owner keeps it.`,
+        confirmText: "Remove access",
+        tone: "warning",
+      }))
+    )
+      return;
 
     setIsRemovingAccess(true);
     try {

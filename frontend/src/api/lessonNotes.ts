@@ -12,6 +12,42 @@ export const isPdfBackedNote = (note: {
   page_count?: number | null;
 }): boolean => note.source === "PDF_UPLOAD" || !!note.file_path || !!note.file_name || !!note.page_count;
 
+/** Where a note sits in e-learning. Null when it isn't on any course — being PUBLISHED and
+ *  shared is not the same as being part of the course students work through. */
+export interface LessonNotePlacement {
+  item_id: number;
+  is_published: boolean;
+  section_id: number;
+  section_title: string;
+  course_id: number;
+  course_title: string;
+  course_status: "DRAFT" | "PUBLISHED" | "ARCHIVED";
+}
+
+/** The course an unplaced note could be added to, when one exists for its subject + class group. */
+export interface LessonNoteCourseTarget {
+  course_id: number;
+  title: string;
+  status: string;
+}
+
+/** One row per subject the teacher can write notes for, for the subject-first landing step.
+ *  Driven by their subject assignments, so a subject with no notes yet still appears. */
+export interface LessonNoteSubjectSummary {
+  subject_id: number;
+  subject_name: string;
+  subject_code: string | null;
+  /** False for a subject that only exists through older notes (no current assignment). */
+  is_assigned: boolean;
+  note_count: number;
+  published_count: number;
+  draft_count: number;
+  on_course_count: number;
+  /** Null when the subject has no notes yet. */
+  last_updated: string | null;
+  class_group_names: string | null;
+}
+
 export interface LessonNoteSummary {
   note_id: number;
   subject_id: number;
@@ -31,6 +67,10 @@ export interface LessonNoteSummary {
   share_count: number;
   created_at: string;
   updated_at: string;
+  /** Present on the teacher's own list; null when the note isn't on a course. */
+  elearning?: LessonNotePlacement | null;
+  /** Only set when `elearning` is null and a course does exist to place the note into. */
+  course_target?: LessonNoteCourseTarget | null;
 }
 
 export interface CurriculumCriterion {
@@ -135,6 +175,17 @@ export interface SharedNoteSummary {
   excerpt: string;
   word_count: number;
   reading_minutes: number;
+  /**
+   * Where this note sits on a course the student is a member of, when it does.
+   * Reading it there counts towards the week; reading it in the standalone
+   * reader does not. Null for a note that was only ever shared.
+   */
+  placement: {
+    course_id: number;
+    item_id: number;
+    section_id: number;
+    section_title: string;
+  } | null;
 }
 
 export interface NoteAskAnswer {
@@ -166,6 +217,10 @@ export interface SharedNoteDetail {
 export const lessonNotesApi = {
   list: (filters?: { subject_id?: number; class_group_id?: number; academic_term_id?: number; status?: string }) =>
     apiService.get<{ data: LessonNoteSummary[] }>("/lesson-notes", { params: filters }),
+
+  /** Subjects the teacher has notes for, with counts — drives the "pick a subject first" step. */
+  subjects: (filters?: { academic_term_id?: number; academic_year_id?: number }) =>
+    apiService.get<{ data: LessonNoteSubjectSummary[] }>("/lesson-notes/subjects", { params: filters }),
 
   create: (data: {
     subject_id: number;

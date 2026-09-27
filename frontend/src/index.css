@@ -343,7 +343,23 @@ table th,
 }
 
 /* --- Paper themes. Applied to the sheet only: the surrounding app chrome keeps
-       following the platform's own light/dark setting. --- */
+       following the platform's own light/dark setting.
+
+       "auto" is the default: the sheet follows the app theme instead of being
+       pinned to white, so dark mode is dark all the way through. --- */
+.note-reader--auto .note-reader-sheet {
+    background-color: #ffffff;
+    color: #0f172a;
+}
+
+.dark .note-reader--auto .note-reader-sheet {
+    background-color: #0b0f19;
+    color: #e5e9f0;
+    box-shadow:
+        0 1px 2px rgba(0, 0, 0, 0.4),
+        0 12px 32px -12px rgba(0, 0, 0, 0.7);
+}
+
 .note-reader--sepia .note-reader-sheet {
     background-color: #f6efe1;
     color: #453a2b;
@@ -407,6 +423,11 @@ table th,
 
 .note-reader-body--serif {
     font-family: Georgia, "Iowan Old Style", "Times New Roman", serif;
+}
+
+.note-reader-body--reading {
+    font-family: "Atkinson Hyperlegible", "Inter", ui-sans-serif, system-ui, sans-serif;
+    letter-spacing: 0.005em;
 }
 
 .note-reader-body--sans {
@@ -869,4 +890,242 @@ mark.note-find-hit-active {
 }
 @media (prefers-reduced-motion: reduce) {
   .scheme-row-flash > td { animation: none; background-color: var(--sheet-accent-soft); }
+}
+
+/* ------------------------------------------------------------------
+   Lesson reader (ItemView / PageView)
+   Research on modern e-learning readers is consistent on three things:
+   a comfortable measure, unmistakable structure, and code/tables that
+   read as data rather than as more prose. Tailwind's `prose` gives the
+   first; these rules give the other two in both themes.
+   ------------------------------------------------------------------ */
+/* One measure for the whole step. The article used to re-centre itself at 70ch inside a
+   wider frame, so the title and the body had different left edges — the single biggest
+   reason the reader looked unaligned. The frame owns the width now; the article fills it. */
+.el-reader {
+  max-width: none;
+  margin-inline: 0;
+  /* Size is the reader's choice (A- / A+), not a fixed prose step. `prose-lg` was pinning
+     every lesson at 18px with no way down. */
+  font-size: calc(1rem * var(--reader-font-scale, 1));
+  line-height: var(--reader-line-height, 1.7);
+}
+.el-step--serif .el-reader {
+  font-family: Georgia, "Iowan Old Style", "Times New Roman", serif;
+}
+/* The default reading face. Atkinson Hyperlegible was drawn by the Braille
+   Institute for low-vision readers: unambiguous b/d, p/q, I/l/1 and O/0, and a
+   large x-height, which is what a page read for twenty minutes needs. */
+.el-step--reading .el-reader,
+.el-focus--reading .el-reader {
+  font-family: "Atkinson Hyperlegible", "Inter", ui-sans-serif, system-ui, sans-serif;
+  letter-spacing: 0.005em;
+}
+.el-reader h2 {
+  margin-top: 1.8em;
+  padding-top: 0.6em;
+  border-top: 1px solid rgb(0 0 0 / 0.07);
+}
+.dark .el-reader h2 {
+  border-top-color: rgb(255 255 255 / 0.08);
+}
+.el-reader h2:first-child {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}
+/* Code: a tinted block with a real monospace stack — inline samples used to
+   fall back to body text, so `let info = 25` read as a sentence. */
+.el-reader code {
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.9em;
+  padding: 0.15em 0.4em;
+  border-radius: 6px;
+  background: rgb(15 23 42 / 0.06);
+  color: inherit;
+}
+.dark .el-reader code {
+  background: rgb(255 255 255 / 0.09);
+}
+.el-reader pre {
+  border-radius: 14px;
+  padding: 1em 1.15em;
+  background: #0f172a;
+  color: #e2e8f0;
+  overflow-x: auto;
+  border: 1px solid rgb(255 255 255 / 0.08);
+}
+.el-reader pre code {
+  background: transparent;
+  padding: 0;
+  font-size: 0.88em;
+}
+/* Tables: zebra rows and a clear header beat four hairlines. */
+.el-reader table {
+  width: 100%;
+  font-size: 0.92em;
+  border-collapse: collapse;
+  display: block;
+  overflow-x: auto;
+}
+.el-reader thead th {
+  text-align: left;
+  font-size: 0.82em;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: rgb(100 116 139);
+  border-bottom: 2px solid rgb(15 23 42 / 0.12);
+  padding: 0.5em 0.75em;
+}
+.dark .el-reader thead th {
+  color: rgb(148 163 184);
+  border-bottom-color: rgb(255 255 255 / 0.18);
+}
+.el-reader tbody td {
+  padding: 0.6em 0.75em;
+  border-bottom: 1px solid rgb(15 23 42 / 0.06);
+  vertical-align: top;
+}
+.dark .el-reader tbody td {
+  border-bottom-color: rgb(255 255 255 / 0.06);
+}
+.el-reader tbody tr:nth-child(even) {
+  background: rgb(15 23 42 / 0.025);
+}
+.dark .el-reader tbody tr:nth-child(even) {
+  background: rgb(255 255 255 / 0.025);
+}
+.el-reader blockquote {
+  border-left: 3px solid rgb(59 108 255 / 0.5);
+  padding-left: 1em;
+  font-style: normal;
+}
+
+/* --- Reader backgrounds. The papers the lesson-note reader offers, so the two
+       readers agree, applied to the step's own surface rather than the app shell.
+
+       "auto" is the default and follows the app theme rather than inheriting a
+       surface by accident: white while the app is light, the app's own dark
+       plane while it is dark. "paper" stays white in both, for a reader who
+       wants white regardless. --- */
+.el-step--auto,
+.el-focus--auto {
+  background: #ffffff;
+  color: #0f172a;
+}
+.dark .el-step--auto,
+.dark .el-focus--auto {
+  background: #0b0f19;
+  color: #e5e9f0;
+}
+.el-step--auto .el-reader {
+  color: #0f172a;
+}
+.dark .el-step--auto .el-reader {
+  color: #e5e9f0;
+}
+.el-step--paper,
+.el-focus--paper {
+  background: #ffffff;
+  color: #0f172a;
+}
+.el-step--paper .el-reader,
+.el-focus--paper .el-reader {
+  color: #0f172a;
+}
+.el-step--auto,
+.el-step--paper {
+  border-radius: 1rem;
+}
+
+.el-step--sepia,
+.el-focus--sepia {
+  background: #f6efe1;
+  color: #453a2b;
+}
+.el-step--sepia .el-reader,
+.el-focus--sepia .el-reader {
+  color: #453a2b;
+}
+.el-step--night,
+.el-focus--night {
+  background: #14181f;
+  color: #d5dae2;
+}
+.el-step--night .el-reader,
+.el-focus--night .el-reader {
+  color: #d5dae2;
+}
+.el-step--sepia,
+.el-step--night {
+  border-radius: 1rem;
+}
+.el-focus {
+  background: #ffffff;
+}
+.dark .el-focus {
+  background: #0b0f19;
+}
+.el-focus--sepia {
+  background: #f6efe1;
+}
+.el-focus--night,
+.dark .el-focus--night {
+  background: #14181f;
+}
+
+@media (max-width: 640px) {
+  .el-reader {
+    font-size: calc(1.02rem * var(--reader-font-scale, 1));
+  }
+}
+
+/* ------------------------------------------------------------------
+   Focus mode (SharedLessonNoteViewPage)
+   The `note-reader--focus` class existed but styled nothing, so "focus
+   mode" only hid the reader's own toolbar while the app navbar and
+   sidebar stayed on screen. It now genuinely covers the viewport, with
+   its own scroll, and works whether or not the browser granted real
+   fullscreen (iOS Safari and embedded frames refuse it).
+   ------------------------------------------------------------------ */
+.note-reader--focus {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: #f8fafc;
+  padding-top: 0;
+}
+.dark .note-reader--focus {
+  background: #0b0f19;
+}
+/* The surround follows the chosen paper, so a sepia or night sheet isn't framed by a
+   bright app background once it fills the screen. */
+.note-reader--focus.note-reader--sepia,
+.note-reader--focus.note-reader--sepia:fullscreen {
+  background: #efe6d5;
+}
+.note-reader--focus.note-reader--night,
+.note-reader--focus.note-reader--night:fullscreen,
+.dark .note-reader--focus.note-reader--night {
+  background: #0d1117;
+}
+/* The progress bar sits under the app navbar normally; in focus mode there is
+   no navbar to sit under. */
+.note-reader--focus > .fixed.top-16 {
+  top: 0;
+}
+/* Native fullscreen paints its own backdrop — keep it the reader's surround, not black. */
+.note-reader--focus:fullscreen {
+  background: #f8fafc;
+}
+.dark .note-reader--focus:fullscreen {
+  background: #0b0f19;
+}
+@media print {
+  .note-reader--focus {
+    position: static;
+    overflow: visible;
+  }
 }

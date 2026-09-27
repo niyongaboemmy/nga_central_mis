@@ -41,12 +41,50 @@ describe("LiveNowPanel", () => {
     FakeES.last!.onopen?.();
     FakeES.last!.push({
       type: "presence",
-      watchers: [{ user_id: 5, name: "Aline Uwase", item_id: 9, item_title: "CSS selectors", item_type: "LESSON_NOTE", section_id: 2, section_title: "Week 2 — CSS", state: "IN_PROGRESS", seconds_spent: 120, since: Date.now(), last_seen: Date.now() }],
+      watchers: [{ user_id: 5, name: "Aline Uwase", item_id: 9, item_title: "CSS selectors", item_type: "LESSON_NOTE", section_id: 2, section_title: "Week 2 — CSS", state: "IN_PROGRESS", seconds_spent: 3000, since: Date.now(), last_seen: Date.now(), active: true, dwell_seconds: 120 }],
     });
     expect(await screen.findByText("Aline Uwase")).toBeInTheDocument();
     expect(screen.getByText("1 online")).toBeInTheDocument();
     expect(screen.getByText(/CSS selectors/)).toBeInTheDocument();
+    // The label reports this visit (dwell_seconds), not the lifetime total on the item —
+    // a student returning to a page they already spent 50 minutes in has not been sitting
+    // there for 50 minutes now.
     expect(screen.getByText("2 min on this")).toBeInTheDocument();
+  });
+
+  it("reports a student whose pings have stopped as away, not as learning now", async () => {
+    render(<LiveNowPanel courseId={7} />);
+    await waitFor(() => expect(FakeES.last).toBeTruthy());
+    FakeES.last!.onopen?.();
+
+    // Inside the stale window but no longer pinging: still listed, never called present.
+    const stale = Date.now() - 62_000;
+    FakeES.last!.push({
+      type: "presence",
+      watchers: [
+        {
+          user_id: 7,
+          name: "Gone Student",
+          item_id: 9,
+          item_title: "javascript.info/",
+          item_type: "LINK",
+          section_id: 3,
+          section_title: "Week 3 — Data Types",
+          state: "IN_PROGRESS",
+          seconds_spent: 20,
+          since: stale,
+          last_seen: stale,
+          active: false,
+          dwell_seconds: 0,
+        },
+      ],
+      recent: [],
+      at: Date.now(),
+    });
+
+    expect(await screen.findByText("Gone Student")).toBeInTheDocument();
+    expect(screen.getByText(/away 1m/i)).toBeInTheDocument();
+    expect(screen.queryByText(/under a minute|min on this/)).not.toBeInTheDocument();
 
     FakeES.last!.push({
       type: "progress",
@@ -56,7 +94,7 @@ describe("LiveNowPanel", () => {
   });
 
   it("falls back to polling the snapshot when the stream can't connect", async () => {
-    get.mockResolvedValue({ data: { data: { watchers: [{ user_id: 6, name: "Eric M", item_id: 1, item_title: "Intro", item_type: "PAGE", section_id: 1, section_title: "Week 1", state: "IN_PROGRESS", seconds_spent: 30, since: Date.now(), last_seen: Date.now() }], recent: [] } } });
+    get.mockResolvedValue({ data: { data: { watchers: [{ user_id: 6, name: "Eric M", item_id: 1, item_title: "Intro", item_type: "PAGE", section_id: 1, section_title: "Week 1", state: "IN_PROGRESS", seconds_spent: 30, since: Date.now(), last_seen: Date.now(), active: true, dwell_seconds: 30 }], recent: [] } } });
     render(<LiveNowPanel courseId={7} />);
     await waitFor(() => expect(FakeES.last).toBeTruthy());
     FakeES.last!.onerror?.();

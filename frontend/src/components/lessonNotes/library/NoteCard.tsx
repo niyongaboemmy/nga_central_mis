@@ -1,6 +1,6 @@
 import React from "react";
 import { motion } from "framer-motion";
-import { ArrowRight, Clock, FileText } from "lucide-react";
+import { ArrowRight, Clock, FileText, GraduationCap } from "lucide-react";
 import { SharedNoteSummary, isPdfBackedNote } from "../../../api/lessonNotes";
 import { useMotion } from "../../../design/motion";
 import SubjectIcon from "../../elearning/ui/subjectIcons";
@@ -41,6 +41,23 @@ const SubjectTile: React.FC<{ subject: string; size?: "sm" | "md" | "lg" }> = ({
 };
 
 export { SubjectTile };
+
+/** Says, before the click, that this note opens inside its course and counts
+ *  towards the student's progress there. */
+export const CourseTag: React.FC<{ note: SharedNoteSummary; className?: string }> = ({
+  note,
+  className = "",
+}) =>
+  note.placement ? (
+    <span
+      className={`el-chip-brand inline-flex max-w-full items-center gap-1 rounded-pill px-2 py-0.5 text-[11px] font-medium ${className}`}
+    >
+      <GraduationCap className="h-3 w-3 flex-shrink-0" aria-hidden />
+      <span className="truncate">
+        {note.placement.section_title.split(" — ")[0]} · counts towards your progress
+      </span>
+    </span>
+  ) : null;
 
 /* ------------------------------------------------------------------ the card */
 
@@ -93,6 +110,8 @@ const NoteCard: React.FC<CardProps> = ({ note, tokens, onOpen }) => {
           <Highlight text={excerpt} tokens={tokens} />
         </p>
       )}
+
+      <CourseTag note={note} className="mt-3 self-start" />
 
       {/* Pinned, so every card in a row ends on the same line whatever the title length. */}
       <div className="mt-auto flex items-center gap-2 border-t border-gray-100 pt-3.5 dark:border-white/[0.06]">
@@ -154,6 +173,7 @@ export const NoteListRow: React.FC<CardProps> = ({ note, tokens, onOpen }) => {
         <span className="mt-0.5 block truncate text-xs text-gray-500 dark:text-gray-400">
           <Highlight text={note.subject_name} tokens={tokens} />
         </span>
+        <CourseTag note={note} className="mt-1" />
       </span>
 
       <span className="hidden min-w-0 flex-1 truncate text-[13px] text-gray-500 dark:text-gray-400 md:block">
@@ -234,6 +254,7 @@ export const HeroNoteCard: React.FC<{
             <span aria-hidden>·</span>
             <span title={fullWhen(note.updated_at)}>{shortWhen(note.updated_at)}</span>
           </p>
+          <CourseTag note={note} className="mt-2" />
         </div>
 
         <motion.button
@@ -241,7 +262,7 @@ export const HeroNoteCard: React.FC<{
           onClick={() => onOpen(note.note_id)}
           className="inline-flex min-h-[46px] flex-shrink-0 items-center justify-center gap-1.5 rounded-pill bg-brand-500 px-7 text-sm font-semibold text-white shadow-soft hover:bg-brand-600 focus:outline-none focus-visible:shadow-glow"
         >
-          Read note <ArrowRight className="h-4 w-4" />
+          {note.placement ? "Open in e-learning" : "Read note"} <ArrowRight className="h-4 w-4" />
         </motion.button>
       </div>
     </motion.section>

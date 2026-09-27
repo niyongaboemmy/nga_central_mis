@@ -1,4 +1,5 @@
 import bcrypt from "bcryptjs";
+import { getPublicSystems } from "../utils/publicSystems";
 import jwt from "jsonwebtoken";
 import { OAuth2Client } from "google-auth-library";
 import { db } from "../db";
@@ -19,7 +20,7 @@ import {
   Grade,
   System,
 } from "../db/schema";
-import { getUserPermissions } from "../utils/auth";
+import { getEffectivePermissions } from "../utils/auth";
 import { sanitizeString, validateEmail } from "../utils/sanitization";
 import { sendOTPByEmail, verifyOTP as verifyOTPUtil } from "../utils/otp";
 import { getUserTokenVersion } from "../middleware/auth";
@@ -157,7 +158,7 @@ const completeLogin = async (
   loginMethod: "OTP_EMAIL" | "GOOGLE_OAUTH",
 ) => {
   // Get user permissions
-  const permissions = await getUserPermissions(userId);
+  const permissions = await getEffectivePermissions(userId);
 
   // Get user data
   const user = await db
@@ -286,10 +287,8 @@ const completeLogin = async (
     .orderBy(Grade.level_order);
 
   // Get all active systems
-  const systems = await db
-    .select()
-    .from(System)
-    .where(eq(System.status, "ACTIVE"));
+  // No client_secret -- see utils/publicSystems.ts.
+  const systems = await getPublicSystems();
 
   // Generate final JWT token
   const token = jwt.sign(
@@ -464,7 +463,7 @@ export const getSession = asyncHandler(async (req: any, res: any) => {
     .where(eq(UserProfile.user_id, userId))
     .limit(1);
 
-  const permissions = await getUserPermissions(userId);
+  const permissions = await getEffectivePermissions(userId);
 
   // Get user roles with permissions
   const userRoleIds = await db
@@ -505,10 +504,8 @@ export const getSession = asyncHandler(async (req: any, res: any) => {
   }
 
   // Get all active systems
-  const systems = await db
-    .select()
-    .from(System)
-    .where(eq(System.status, "ACTIVE"));
+  // No client_secret -- see utils/publicSystems.ts.
+  const systems = await getPublicSystems();
 
   successResponse(res, "Session retrieved", {
     user: user[0],
@@ -523,7 +520,20 @@ export const getSession = asyncHandler(async (req: any, res: any) => {
  *  work (signature, expiry, and the logout-revocation tokenVersion check)
  *  by the time this runs, so there's nothing left to do but confirm it. */
 export const verifySession = asyncHandler(async (req: any, res: any) => {
-  successResponse(res, "Token valid", { userId: req.user.userId });
+  // Every spoke app polls this every few minutes; access_version tells them
+  // when to re-fetch their access snapshot (GET /access/me). Best-effort: a
+  // server without migration 090 answers exactly as before.
+  let accessVersion: number | null = null;
+  try {
+    const { currentAccessVersion } = await import("../services/access/compile");
+    accessVersion = await currentAccessVersion(req.user.userId);
+  } catch {
+    accessVersion = null;
+  }
+  successResponse(res, "Token valid", {
+    userId: req.user.userId,
+    access_version: accessVersion,
+  });
 });
 
 export const logout = asyncHandler(async (req: any, res: any) => {

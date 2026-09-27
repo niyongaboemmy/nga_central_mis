@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useId, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   BookOpen,
@@ -30,17 +30,67 @@ interface RingProps {
   color?: string; // CSS colour for the arc; defaults to brand
   className?: string;
   ariaLabel?: string;
+  /** Keep printing the number at 100% instead of the completion tick. */
+  alwaysShowValue?: boolean;
 }
 
-/** SVG ring that animates from its previous value, never from 0 on re-render (UX plan `fill`). */
-export const ProgressRing: React.FC<RingProps> = ({ value, size = 56, stroke = 6, label, color, className = "", ariaLabel }) => {
+/**
+ * Fits the readout to the hole in the middle of the ring.
+ *
+ * The label used to be a fixed 11px whatever the ring's size, so "100%" — the widest
+ * string it can ever show — spanned almost the whole 36px interior of a 44px ring and read
+ * as off-centre and cramped. Everything here is derived from the usable inner diameter
+ * instead, and the widest cases degrade in order: full size → smaller → drop the per-cent
+ * sign → a tick.
+ */
+const fitRingLabel = (innerDiameter: number, digits: number, complete: boolean) => {
+  const fontSize = Math.round(Math.max(9, Math.min(18, innerDiameter * 0.32)));
+  // Semibold tabular digits run ~0.58em wide; the per-cent glyph ~0.72em of its own size.
+  const pctSize = Math.round(fontSize * 0.66);
+  const budget = innerDiameter * 0.94;
+  const withPct = digits * fontSize * 0.58 + pctSize * 0.72;
+  if (withPct <= budget) return { fontSize, pctSize, showPct: true, tick: false };
+  const bare = digits * fontSize * 0.58;
+  if (bare <= budget) return { fontSize, pctSize, showPct: false, tick: false };
+  // Nothing legible fits: a finished ring says so with a tick, an unfinished one shrinks.
+  if (complete) return { fontSize, pctSize, showPct: false, tick: true };
+  const small = Math.max(8, Math.floor(budget / (digits * 0.58)));
+  return { fontSize: small, pctSize: Math.round(small * 0.66), showPct: false, tick: false };
+};
+
+/**
+ * SVG ring that animates from its previous value, never from 0 on re-render (UX plan `fill`).
+ *
+ * The arc is a gradient from the given colour into a lighter tint of itself, which reads as
+ * a lit arc rather than a flat band, and a completed ring gains a soft halo — the one state
+ * worth celebrating on a page full of rings.
+ */
+export const ProgressRing: React.FC<RingProps> = ({
+  value,
+  size = 56,
+  stroke = 6,
+  label,
+  color,
+  className = "",
+  ariaLabel,
+  alwaysShowValue,
+}) => {
   const clamped = Math.max(0, Math.min(100, Math.round(value)));
   const r = (size - stroke) / 2;
   const c = 2 * Math.PI * r;
   const reduced = useReducedMotionPref();
+  const gradientId = useId();
+  const arc = color || "#3b6cff";
+  const complete = clamped === 100;
+  const inner = size - stroke * 2;
+  const fit = fitRingLabel(inner, String(clamped).length, complete);
+  // Below roughly a 44px interior, "100%" is technically legible but busy — a finished
+  // ring reads better as a tick. Larger rings keep the number.
+  const showTick = complete && !alwaysShowValue && (fit.tick || inner < 44);
+
   return (
     <div
-      className={`relative inline-flex items-center justify-center ${className}`}
+      className={`relative inline-flex items-center justify-center flex-shrink-0 ${className}`}
       role="progressbar"
       aria-valuenow={clamped}
       aria-valuemin={0}
@@ -48,8 +98,27 @@ export const ProgressRing: React.FC<RingProps> = ({ value, size = 56, stroke = 6
       aria-label={ariaLabel || `${clamped}% complete`}
       style={{ width: size, height: size }}
     >
-      <svg width={size} height={size} className="-rotate-90">
-        <circle cx={size / 2} cy={size / 2} r={r} strokeWidth={stroke} className="fill-none stroke-gray-200 dark:stroke-white/[0.10]" />
+      {complete && (
+        <span
+          aria-hidden
+          className="absolute inset-0 rounded-full"
+          style={{ boxShadow: `0 0 0 ${Math.max(2, stroke * 0.6)}px ${arc}1f` }}
+        />
+      )}
+      <svg width={size} height={size} className="-rotate-90 overflow-visible">
+        <defs>
+          <linearGradient id={gradientId} x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor={arc} />
+            <stop offset="100%" stopColor={arc} stopOpacity={0.55} />
+          </linearGradient>
+        </defs>
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={r}
+          strokeWidth={stroke}
+          className="fill-none stroke-gray-200/90 dark:stroke-white/[0.10]"
+        />
         <motion.circle
           cx={size / 2}
           cy={size / 2}
@@ -57,15 +126,38 @@ export const ProgressRing: React.FC<RingProps> = ({ value, size = 56, stroke = 6
           strokeWidth={stroke}
           strokeLinecap="round"
           className="fill-none"
-          style={{ stroke: color || "#3b6cff" }}
+          style={{ stroke: `url(#${gradientId})` }}
           strokeDasharray={c}
           initial={false}
           animate={{ strokeDashoffset: c - (c * clamped) / 100 }}
-          transition={{ duration: reduced ? 0.12 : 0.4, ease: "easeOut" }}
+          transition={{ duration: reduced ? 0.12 : 0.45, ease: [0.16, 1, 0.3, 1] }}
         />
       </svg>
-      <div className="absolute inset-0 flex items-center justify-center text-[11px] font-semibold text-gray-700 dark:text-gray-200 tabular-nums">
-        {label ?? `${clamped}%`}
+      <div className="absolute inset-0 flex items-center justify-center">
+        {label ?? (
+          showTick ? (
+            <Check
+              className="text-success-600 dark:text-success-500"
+              style={{ width: inner * 0.55, height: inner * 0.55 }}
+              strokeWidth={3}
+              aria-hidden
+            />
+          ) : (
+            // baseline alignment, not a raised per-cent sign: a full-size "%" drags the
+            // numerals off the optical centre, which is what made this look misaligned.
+            <span
+              className="inline-flex items-baseline font-semibold tabular-nums leading-none text-gray-700 dark:text-gray-200"
+              style={{ fontSize: fit.fontSize }}
+            >
+              {clamped}
+              {fit.showPct && (
+                <span style={{ fontSize: fit.pctSize }} className="ml-[0.5px] opacity-70">
+                  %
+                </span>
+              )}
+            </span>
+          )
+        )}
       </div>
     </div>
   );

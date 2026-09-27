@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useId, useRef } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { X } from "lucide-react";
@@ -30,6 +30,38 @@ const Modal: React.FC<ModalProps> = ({
     "2xl": "max-w-5xl",
   };
 
+  // Accessibility (WAI-ARIA dialog pattern): announced as a labelled modal
+  // dialog, Escape closes it, focus moves into it on open and goes back to
+  // whatever opened it on close. No visual change.
+  const titleId = useId();
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+  useEffect(() => {
+    if (!isOpen) return;
+    const opener = document.activeElement as HTMLElement | null;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        onCloseRef.current();
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    const t = window.setTimeout(() => {
+      const root = dialogRef.current;
+      if (!root || root.contains(document.activeElement)) return;
+      const first = root.querySelector<HTMLElement>(
+        'input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"]), button:not([disabled])',
+      );
+      (first ?? root).focus();
+    }, 50);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      window.clearTimeout(t);
+      opener?.focus?.();
+    };
+  }, [isOpen]);
+
   // Portaled to document.body so the modal always sits above page-level
   // stacking contexts (e.g. a page wrapper's `relative z-10`) rather than
   // being trapped behind the fixed Navbar/Sidebar chrome (both z-50).
@@ -53,12 +85,17 @@ const Modal: React.FC<ModalProps> = ({
               duration: 0.3,
               ease: [0.16, 1, 0.3, 1],
             }}
-            className={`relative w-full ${sizeClasses[size]} max-h-[90vh] bg-white dark:bg-gray-800/30 dark:backdrop-blur-xl rounded-3xl shadow-2xl border border-white/20 dark:border-gray-700/20 overflow-hidden flex flex-col`}
+            ref={dialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={titleId}
+            tabIndex={-1}
+            className={`relative w-full ${sizeClasses[size]} max-h-[90vh] bg-white dark:bg-gray-800/30 dark:backdrop-blur-xl rounded-3xl shadow-2xl border border-white/20 dark:border-gray-700/20 overflow-hidden flex flex-col focus:outline-none`}
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
             <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700/20 flex-shrink-0">
-              <div className="text-xl font-bold text-gray-900 dark:text-white w-full">
+              <div id={titleId} className="text-xl font-bold text-gray-900 dark:text-white w-full">
                 {title}
               </div>
               {showCloseButton && (
@@ -66,6 +103,8 @@ const Modal: React.FC<ModalProps> = ({
                   whileHover={{ scale: 1.1, rotate: 90 }}
                   whileTap={{ scale: 0.9 }}
                   onClick={onClose}
+                  aria-label="Close"
+                  type="button"
                   className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 dark:bg-gray-800/60 hover:bg-gray-200 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400 transition-colors ml-4 flex-shrink-0"
                 >
                   <X className="w-5 h-5" />

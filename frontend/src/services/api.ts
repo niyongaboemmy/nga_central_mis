@@ -20,8 +20,22 @@ class ToastStore {
   }
 }
 
-export const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || "https://ngamisapi.vms.rw";
+// The API this build talks to. It comes from VITE_API_BASE_URL, which the
+// deploy workflow sets for production builds and frontend/.env sets for local
+// ones. The fallback used to be a hostname that no longer resolves, so a build
+// that lost the variable failed as a pile of network errors pointing nowhere;
+// falling back to the local API instead keeps that failure on this machine and
+// readable. A production build reaching this line is misconfigured - say so.
+const configuredApiBaseUrl = (import.meta.env.VITE_API_BASE_URL ?? "").trim();
+
+if (!configuredApiBaseUrl && !import.meta.env.DEV) {
+  console.error(
+    "VITE_API_BASE_URL is not set in this build - falling back to " +
+      "http://localhost:5001, which will not work outside a developer machine.",
+  );
+}
+
+export const API_BASE_URL = configuredApiBaseUrl || "http://localhost:5001";
 
 // Create axios instance with default config
 const api: AxiosInstance = axios.create({

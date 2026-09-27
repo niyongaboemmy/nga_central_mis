@@ -1911,55 +1911,22 @@ export const getLessonPlanForSlot = asyncHandler(async (req: any, res: any) => {
 // ============================================
 
 // Get student's enrolled subjects calendar
-export const getStudentCalendar = asyncHandler(async (req: any, res: any) => {
-  const { academic_term_id, academic_year_id } = req.query;
-  const userId = req.user?.userId || req.user?.user_id || req.user?.id;
-
-  logger.info("Fetching student calendar", {
-    userId,
-    academic_term_id,
-    academic_year_id,
-  });
-
-  // Get the current or specified academic term
-  let termId = academic_term_id ? parseInt(academic_term_id) : null;
-  let yearId: number | null = null;
-
-  if (!termId) {
-    const currentTerm = await db
-      .select({
-        academic_term_id: AcademicTerm.academic_term_id,
-        academic_year_id: AcademicTerm.academic_year_id,
-      })
-      .from(AcademicTerm)
-      .where(eq(AcademicTerm.is_current, 1))
-      .limit(1);
-
-    if (currentTerm.length > 0) {
-      termId = currentTerm[0].academic_term_id;
-      yearId = currentTerm[0].academic_year_id;
-    }
-  } else {
-    const termRecord = await db
-      .select({ academic_year_id: AcademicTerm.academic_year_id })
-      .from(AcademicTerm)
-      .where(eq(AcademicTerm.academic_term_id, termId))
-      .limit(1);
-    if (termRecord.length > 0) {
-      yearId = termRecord[0].academic_year_id;
-    }
-  }
-
-  if (!termId) {
-    throw new ValidationError("No academic term specified or found");
-  }
-
-  if (!yearId) {
-    throw new ValidationError(
-      "Could not resolve academic year for the specified term",
-    );
-  }
-
+/**
+ * A student's live timetable for one term: the slots of the subjects they are
+ * enrolled in, in the class groups they sit in that year, plus the custom
+ * activities pinned to those class groups. Shared by the student calendar and
+ * the Home page so both apply the same live-lesson rules.
+ */
+export const loadStudentLessons = async (params: {
+  userId: number;
+  termId: number;
+  yearId: number;
+}): Promise<{
+  slots: any[];
+  activities: any[];
+  reason: "no_class_group" | "no_enrollments" | null;
+}> => {
+  const { userId, termId, yearId } = params;
   // Get student's enrolled subjects for this academic year
   const enrollments = await db
     .select({
@@ -1995,12 +1962,7 @@ export const getStudentCalendar = asyncHandler(async (req: any, res: any) => {
   const classGroupIds = studentClassGroups.map((c: any) => c.class_group_id);
 
   if (classGroupIds.length === 0) {
-    return successResponse(res, "No class group assigned", {
-      slots: [],
-      activities: [],
-      upcoming: [],
-      term_id: termId,
-    });
+    return { slots: [], activities: [], reason: "no_class_group" as const };
   }
 
   // Custom activities (non-subject events) pinned to the student's class
@@ -2012,12 +1974,7 @@ export const getStudentCalendar = asyncHandler(async (req: any, res: any) => {
   });
 
   if (enrollments.length === 0) {
-    return successResponse(res, "No enrolled subjects for this term", {
-      slots: [],
-      activities,
-      upcoming: [],
-      term_id: termId,
-    });
+    return { slots: [], activities, reason: "no_enrollments" as const };
   }
 
   const subjectIds = enrollments.map((e: any) => e.subject_id);
@@ -2084,6 +2041,82 @@ export const getStudentCalendar = asyncHandler(async (req: any, res: any) => {
       slots.filter((slot: any) => subjectIds.includes(slot.subject_id)),
     ),
   );
+
+  return { slots: filteredSlots, activities, reason: null };
+};
+
+export const getStudentCalendar = asyncHandler(async (req: any, res: any) => {
+  const { academic_term_id, academic_year_id } = req.query;
+  const userId = req.user?.userId || req.user?.user_id || req.user?.id;
+
+  logger.info("Fetching student calendar", {
+    userId,
+    academic_term_id,
+    academic_year_id,
+  });
+
+  // Get the current or specified academic term
+  let termId = academic_term_id ? parseInt(academic_term_id) : null;
+  let yearId: number | null = null;
+
+  if (!termId) {
+    const currentTerm = await db
+      .select({
+        academic_term_id: AcademicTerm.academic_term_id,
+        academic_year_id: AcademicTerm.academic_year_id,
+      })
+      .from(AcademicTerm)
+      .where(eq(AcademicTerm.is_current, 1))
+      .limit(1);
+
+    if (currentTerm.length > 0) {
+      termId = currentTerm[0].academic_term_id;
+      yearId = currentTerm[0].academic_year_id;
+    }
+  } else {
+    const termRecord = await db
+      .select({ academic_year_id: AcademicTerm.academic_year_id })
+      .from(AcademicTerm)
+      .where(eq(AcademicTerm.academic_term_id, termId))
+      .limit(1);
+    if (termRecord.length > 0) {
+      yearId = termRecord[0].academic_year_id;
+    }
+  }
+
+  if (!termId) {
+    throw new ValidationError("No academic term specified or found");
+  }
+
+  if (!yearId) {
+    throw new ValidationError(
+      "Could not resolve academic year for the specified term",
+    );
+  }
+
+  const { slots: filteredSlots, activities, reason } = await loadStudentLessons({
+    userId,
+    termId,
+    yearId,
+  });
+
+  if (reason === "no_class_group") {
+    return successResponse(res, "No class group assigned", {
+      slots: [],
+      activities: [],
+      upcoming: [],
+      term_id: termId,
+    });
+  }
+
+  if (reason === "no_enrollments") {
+    return successResponse(res, "No enrolled subjects for this term", {
+      slots: [],
+      activities,
+      upcoming: [],
+      term_id: termId,
+    });
+  }
 
   // Get upcoming lessons
   const now = new Date();

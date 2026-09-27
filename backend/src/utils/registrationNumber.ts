@@ -12,9 +12,9 @@
  * same number.
  */
 
-import { eq, sql } from "drizzle-orm";
+import { eq, isNotNull, sql } from "drizzle-orm";
 import { db } from "../db";
-import { RegistrationSequence, School } from "../db/schema";
+import { RegistrationSequence, School, UserProfile } from "../db/schema";
 
 const SEQUENCE_PAD = 4;
 const SEQUENCE_ROW_ID = 1;
@@ -83,6 +83,47 @@ export const nextRegistrationSequence = async (): Promise<number> => {
 
     return row.value;
   });
+};
+
+/**
+ * Pulls the counter up to the highest number already issued for this school code.
+ *
+ * The counter is the only source of new numbers, but it is not the only way numbers get
+ * into UserProfile: a restored database, an imported roster, or a `force` regeneration that
+ * reset the counter all leave numbers on disk that the counter knows nothing about. The next
+ * backfill then re-issues one of them and dies on the UNIQUE index — surfacing to an admin
+ * as a bare 409 with nothing to act on.
+ *
+ * Never moves the counter down, so it can't hand out a number twice.
+ */
+export const syncRegistrationSequenceToIssued = async (
+  schoolCode: string,
+): Promise<number> => {
+  const rows = await db
+    .select({ registration_number: UserProfile.registration_number })
+    .from(UserProfile)
+    .where(isNotNull(UserProfile.registration_number));
+
+  let highest = 0;
+  for (const row of rows) {
+    const parsed = parseRegistrationNumber(row.registration_number);
+    if (parsed && parsed.schoolCode === schoolCode && parsed.seq > highest) {
+      highest = parsed.seq;
+    }
+  }
+
+  const [current] = await db
+    .select({ value: RegistrationSequence.current_value })
+    .from(RegistrationSequence)
+    .where(eq(RegistrationSequence.id, SEQUENCE_ROW_ID));
+
+  if (highest > (current?.value ?? 0)) {
+    await db
+      .update(RegistrationSequence)
+      .set({ current_value: highest })
+      .where(eq(RegistrationSequence.id, SEQUENCE_ROW_ID));
+  }
+  return highest;
 };
 
 /** The registration number the next registered student should get. */

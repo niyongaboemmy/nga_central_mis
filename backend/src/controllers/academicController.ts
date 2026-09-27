@@ -39,6 +39,12 @@ import { successResponse } from "../utils/response";
 import { asyncHandler } from "../middleware/asyncHandler";
 import { recordActivity } from "../utils/activityLogger";
 import logger from "../utils/logger";
+import {
+  applyPlacementChange,
+  bumpStructuralHolders,
+  onNodeDeleted,
+  touchLearners,
+} from "../services/access/ruleEngine";
 import { getCurrentAcademicYearId } from "../utils/academicYear";
 import {
   assignUniqueSubjectColors,
@@ -733,6 +739,7 @@ export const deleteProgram = asyncHandler(async (req: any, res: any) => {
   await db.delete(Program).where(eq(Program.program_id, programId));
 
   logger.info("Program deleted", { programId });
+  await onNodeDeleted("PROGRAM", programId, req.user?.userId);
 
   // Record activity
   if (req.user?.userId) {
@@ -873,6 +880,7 @@ export const createGrade = asyncHandler(async (req: any, res: any) => {
 
   const gradeId = (result as any).insertId;
 
+  await bumpStructuralHolders();
   logger.info("Grade created", { name: sanitizedName, programId: progId });
 
   // Record activity
@@ -946,6 +954,7 @@ export const updateGrade = asyncHandler(async (req: any, res: any) => {
 
   await db.update(Grade).set(updateData).where(eq(Grade.grade_id, gradeId));
 
+  await bumpStructuralHolders();
   logger.info("Grade updated", { gradeId });
 
   // Record activity
@@ -995,6 +1004,7 @@ export const deleteGrade = asyncHandler(async (req: any, res: any) => {
   await db.delete(Grade).where(eq(Grade.grade_id, gradeId));
 
   logger.info("Grade deleted", { gradeId });
+  await onNodeDeleted("GRADE", gradeId, req.user?.userId);
 
   // Record activity
   if (req.user?.userId) {
@@ -1875,6 +1885,7 @@ export const assignSubjectToGrade = asyncHandler(async (req: any, res: any) => {
     subject_id: subjectId,
   });
 
+  await bumpStructuralHolders();
   logger.info("Subject assigned to grade", { gradeId, subjectId });
 
   // Record activity
@@ -1929,6 +1940,7 @@ export const removeSubjectFromGrade = asyncHandler(
         ),
       );
 
+    await bumpStructuralHolders();
     logger.info("Subject removed from grade", { gradeId, subjectId });
 
     // Record activity
@@ -2236,6 +2248,7 @@ export const assignTeacherToSubject = asyncHandler(
     });
 
     logger.info(`Teacher ID: ${teacherId} assigned to subject ID: ${subjId}`);
+    await applyPlacementChange([teacherId], req.user?.userId, { structural: true });
 
     // Record activity for teacher
     await recordActivity(
@@ -2315,6 +2328,8 @@ export const removeTeacherFromSubject = asyncHandler(
           eq(TeacherSubjectAssignment.academic_year_id, yearId),
         ),
       );
+
+    await applyPlacementChange([teacherId], req.user?.userId, { structural: true });
 
     logger.info("Teacher removed from subject", {
       teacherId,
@@ -2551,6 +2566,7 @@ export const updateTeacherSubjectAssignment = asyncHandler(
     });
 
     logger.info("Teacher assignment updated", { from: oldIds, to: newIds });
+    await applyPlacementChange([oldIds.teacherId, newIds.teacherId], req.user?.userId, { structural: true });
 
     if (oldIds.teacherId !== newIds.teacherId) {
       await recordActivity(
@@ -2682,6 +2698,7 @@ export const copyTeacherSubjectAssignments = asyncHandler(
     if (toInsert.length > 0) {
       await db.insert(TeacherSubjectAssignment).values(toInsert);
     }
+    await applyPlacementChange(toInsert.map((a: any) => a.user_id), req.user?.userId, { structural: true });
 
     const skipped = sourceAssignments.length - toInsert.length;
 
@@ -2848,6 +2865,7 @@ export const createClassGroup = asyncHandler(async (req: any, res: any) => {
 
   const classGroupId = (result as any).insertId;
 
+  await bumpStructuralHolders();
   logger.info("Class group created", {
     name: sanitizedName,
     gradeId: grdId,
@@ -2922,6 +2940,7 @@ export const updateClassGroup = asyncHandler(async (req: any, res: any) => {
     .set(updateData)
     .where(eq(ClassGroup.class_group_id, classGroupId));
 
+  await bumpStructuralHolders();
   logger.info("Class group updated", { classGroupId });
 
   // Record activity
@@ -3208,6 +3227,8 @@ export const deleteClassGroup = asyncHandler(async (req: any, res: any) => {
 
     await tx.delete(ClassGroup).where(eq(ClassGroup.class_group_id, classGroupId));
   });
+
+  await onNodeDeleted("CLASS_GROUP", classGroupId, req.user?.userId);
 
   logger.info("Class group deleted", {
     classGroupId,
@@ -4489,6 +4510,7 @@ export const assignStudentToClassGroup = asyncHandler(
               eq(StudentClassGroup.academic_year_id, yearId),
             ),
           );
+        await touchLearners([studentId]);
 
         logger.info("Student class group assignment reactivated", {
           studentId,
@@ -4513,6 +4535,7 @@ export const assignStudentToClassGroup = asyncHandler(
       academic_year_id: yearId,
       status: "ACTIVE",
     });
+    await touchLearners([studentId]);
 
     logger.info("Student assigned to class group", {
       studentId,
@@ -4596,6 +4619,7 @@ export const removeStudentFromClassGroup = asyncHandler(
           eq(StudentClassGroup.academic_year_id, yearId),
         ),
       );
+    await touchLearners([studentId]);
 
     // Disable this student's subject enrollments for that same academic
     // year only — enrollments from other academic years must be left alone.
@@ -4772,6 +4796,7 @@ export const promoteStudentsToClassGroup = asyncHandler(
         })),
       );
     }
+    await touchLearners(toInsert.map((s) => s.user_id));
 
     logger.info("Students promoted to new class group", {
       sourceClassGroupId,
@@ -5136,6 +5161,7 @@ export const promoteStudentsForYear = asyncHandler(
           })),
         );
       }
+      await touchLearners(toInsert.map((s) => s.user_id));
 
       promotedGrades.push({
         source_grade_name: gradePlan.source_grade_name,
@@ -5318,6 +5344,7 @@ export const bulkAssignStudentsToClassGroup = asyncHandler(
           ),
         );
     }
+    await touchLearners(validStudentIds);
 
     let subjectsEnrolled = 0;
     try {
@@ -5804,6 +5831,8 @@ export const assignUserToProgram = asyncHandler(async (req: any, res: any) => {
     academic_year_id: yearId,
   });
 
+  await applyPlacementChange([userId], req.user?.userId);
+
   logger.info("User assigned to program as lead", {
     userId,
     programId,
@@ -5873,6 +5902,8 @@ export const removeUserFromProgram = asyncHandler(
           eq(UserProgramLead.academic_year_id, yearId),
         ),
       );
+
+    await applyPlacementChange([userId], req.user?.userId);
 
     logger.info("User removed from program lead", {
       userId,
@@ -6031,6 +6062,8 @@ export const copyProgramLeads = asyncHandler(async (req: any, res: any) => {
       })),
     );
   }
+
+  await applyPlacementChange(toInsert.map((l: any) => l.user_id), req.user?.userId);
 
   logger.info("Program leads copied", {
     sourceYearId,
@@ -6492,6 +6525,7 @@ export const bulkAssignTeacherToSubjects = asyncHandler(
     if (toInsert.length > 0) {
       await db.insert(TeacherSubjectAssignment).values(toInsert);
     }
+    await applyPlacementChange(toInsert.map((a: any) => a.user_id), req.user?.userId, { structural: true });
 
     const result = {
       assigned: toInsert.length,

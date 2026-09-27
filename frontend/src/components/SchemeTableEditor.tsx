@@ -16,11 +16,11 @@ import {
   Save,
   Trash,
   CornerDownRight,
-  AlertTriangle,
 } from "lucide-react";
 import { schemeOfWorkApi, SchemeEntry, SchemeHeader } from "../api/schemeOfWork";
 import { competenciesApi, SubjectCompetency } from "../api/curriculum";
 import { useToast } from "../contexts/ToastContext";
+import { useConfirm } from "../contexts/ConfirmContext";
 import { SchemeReportService } from "../services/SchemeReportService";
 import SchemeReportPreviewModal from "./SchemeReportPreviewModal";
 
@@ -229,6 +229,7 @@ const SchemeTableEditor: React.FC<Props> = ({
   onClose,
 }) => {
   const { showToast } = useToast();
+  const confirm = useConfirm();
   const [rows, setRows] = useState<SchemeEntry[]>(initialEntries);
   const [competencies, setCompetencies] = useState<SubjectCompetency[]>([]);
   const [savingIds, setSavingIds] = useState<Set<number>>(new Set());
@@ -238,9 +239,8 @@ const SchemeTableEditor: React.FC<Props> = ({
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isGeneratingPreview, setIsGeneratingPreview] = useState(false);
   const [isAddingWeek, setIsAddingWeek] = useState(false);
-  const [removeConfirmId, setRemoveConfirmId] = useState<number | null>(null);
+  const [isRemovingWeek, setIsRemovingWeek] = useState(false);
   const [insertingAfterId, setInsertingAfterId] = useState<number | null>(null);
-  const [isDeleteSchemeOpen, setIsDeleteSchemeOpen] = useState(false);
   const [isDeletingScheme, setIsDeletingScheme] = useState(false);
   const [flashRowId, setFlashRowId] = useState<number | null>(null);
   const rowRefs = useRef<Record<number, HTMLTableRowElement | null>>({});
@@ -357,14 +357,24 @@ const SchemeTableEditor: React.FC<Props> = ({
     }
   };
 
-  const handleRemoveWeek = async (entryId: number) => {
-    setRemoveConfirmId(null);
+  const handleRemoveWeek = async (entry: SchemeEntry) => {
+    const ok = await confirm({
+      title: `Remove ${weekLabel(entry.week_number)}?`,
+      message: "This permanently deletes the week and any lesson plans logged against it.",
+      details: ["The following weeks keep their own numbers and dates."],
+      confirmText: "Remove week",
+    });
+    if (!ok) return;
+    const entryId = entry.entry_id;
+    setIsRemovingWeek(true);
     try {
       await schemeOfWorkApi.deleteEntry(entryId);
       setRows((prev) => prev.filter((r) => r.entry_id !== entryId));
       showToast("Week removed", "success");
     } catch (error: any) {
       showToast(error.response?.data?.message || "Couldn't remove this week", "error");
+    } finally {
+      setIsRemovingWeek(false);
     }
   };
 
@@ -418,14 +428,26 @@ const SchemeTableEditor: React.FC<Props> = ({
   const handleDeleteScheme = async () => {
     if (!scheme?.scheme_id) {
       showToast("There's no saved scheme to delete yet", "warning");
-      setIsDeleteSchemeOpen(false);
       return;
     }
+    const ok = await confirm({
+      title: "Discard this scheme of work?",
+      message: `This permanently deletes all ${rows.length} weekly ${
+        rows.length === 1 ? "entry" : "entries"
+      } for ${subjectName || "this subject"}${classGroupName ? ` — ${classGroupName}` : ""}.`,
+      details: [
+        "Their lesson plans go with them.",
+        "The e-learning course built on this scheme is deleted, along with students' progress in it.",
+        "You'll start over from the create options. This cannot be undone.",
+      ],
+      confirmText: "Delete scheme",
+      confirmationPhrase: "delete",
+    });
+    if (!ok) return;
     setIsDeletingScheme(true);
     try {
       await schemeOfWorkApi.deleteScheme(scheme.scheme_id);
       showToast("Scheme of work deleted — start over whenever you're ready", "success");
-      setIsDeleteSchemeOpen(false);
       setRows([]);
       onSchemeDeleted?.();
       onClose();
@@ -804,7 +826,8 @@ const SchemeTableEditor: React.FC<Props> = ({
                                 )}
                               </button>
                               <button
-                                onClick={() => setRemoveConfirmId(entry.entry_id)}
+                                onClick={() => handleRemoveWeek(entry)}
+                                disabled={isRemovingWeek}
                                 title="Remove this week"
                                 className="p-1 rounded-md text-gray-400 dark:text-gray-500 hover:text-red-600 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-400/15 hover:scale-110 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/50 transition-all"
                               >
@@ -854,7 +877,8 @@ const SchemeTableEditor: React.FC<Props> = ({
             Every change is saved instantly — there's nothing to submit.
           </p>
           <button
-            onClick={() => setIsDeleteSchemeOpen(true)}
+            onClick={handleDeleteScheme}
+            disabled={isDeletingScheme}
             className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-red-600 dark:text-red-300 bg-red-50 dark:bg-red-400/10 border border-red-200 dark:border-red-400/25 rounded-full hover:bg-red-100 dark:hover:bg-red-400/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/50 transition-all"
           >
             <Trash className="w-3.5 h-3.5" />
@@ -878,55 +902,6 @@ const SchemeTableEditor: React.FC<Props> = ({
         </div>
       </div>
 
-      {isDeleteSchemeOpen && (
-        <div
-          className="fixed inset-0 z-[110] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
-          onClick={() => !isDeletingScheme && setIsDeleteSchemeOpen(false)}
-        >
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="w-full max-w-md bg-white dark:bg-[#111725] border border-gray-200 dark:border-white/10 rounded-2xl shadow-2xl p-5"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-start gap-3">
-              <div className="w-9 h-9 rounded-xl bg-red-100 dark:bg-red-400/15 flex items-center justify-center flex-shrink-0">
-                <AlertTriangle className="w-4 h-4 text-red-600 dark:text-red-300" />
-              </div>
-              <div className="min-w-0">
-                <h3 className="text-sm font-bold text-gray-900 dark:text-white mb-1">
-                  Discard this scheme of work?
-                </h3>
-                <p className="text-xs text-gray-500 dark:text-gray-400">
-                  This permanently deletes all {rows.length} weekly{" "}
-                  {rows.length === 1 ? "entry" : "entries"} for{" "}
-                  {subjectName || "this subject"}
-                  {classGroupName ? ` — ${classGroupName}` : ""}, their lesson plans, and the
-                  e-learning course built on this scheme. You'll start over from the create
-                  options. This cannot be undone.
-                </p>
-              </div>
-            </div>
-            <div className="flex justify-end gap-2 mt-5">
-              <button
-                onClick={() => setIsDeleteSchemeOpen(false)}
-                disabled={isDeletingScheme}
-                className="px-4 py-2 text-xs font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/[0.07] rounded-full transition-colors disabled:opacity-60"
-              >
-                Keep it
-              </button>
-              <button
-                onClick={handleDeleteScheme}
-                disabled={isDeletingScheme}
-                className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-500 rounded-full transition-colors disabled:opacity-60"
-              >
-                {isDeletingScheme ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
-                {isDeletingScheme ? "Deleting…" : "Delete scheme"}
-              </button>
-            </div>
-          </motion.div>
-        </div>
-      )}
 
       <SchemeReportPreviewModal
         isOpen={isPreviewOpen}
@@ -935,38 +910,6 @@ const SchemeTableEditor: React.FC<Props> = ({
         onDownload={handleDownload}
       />
 
-      {removeConfirmId !== null && (
-        <div
-          className="fixed inset-0 z-[110] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
-          onClick={() => setRemoveConfirmId(null)}
-        >
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="w-full max-w-sm bg-white dark:bg-[#111725] border border-gray-200 dark:border-white/10 rounded-2xl shadow-2xl p-5"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h3 className="text-sm font-bold text-gray-900 dark:text-white mb-1">Remove this week?</h3>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
-              This permanently deletes the week and any lesson plans logged against it.
-            </p>
-            <div className="flex justify-end gap-2">
-              <button
-                onClick={() => setRemoveConfirmId(null)}
-                className="px-4 py-2 text-xs font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => handleRemoveWeek(removeConfirmId)}
-                className="px-4 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-full transition-colors"
-              >
-                Remove
-              </button>
-            </div>
-          </motion.div>
-        </div>
-      )}
     </div>
   );
 };

@@ -67,6 +67,15 @@ export default {
           '"Segoe UI"',
           'sans-serif',
         ],
+        // Atkinson Hyperlegible — drawn for low-vision readers, so b/d, p/q,
+        // I/l/1 and O/0 are all distinct. The reader's default body face.
+        reading: [
+          '"Atkinson Hyperlegible"',
+          '"Inter"',
+          'ui-sans-serif',
+          'system-ui',
+          'sans-serif',
+        ],
         mono: [
           '"JetBrains Mono"',
           'ui-monospace',

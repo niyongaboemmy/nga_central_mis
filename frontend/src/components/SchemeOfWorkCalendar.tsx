@@ -56,11 +56,13 @@ import SchemeTableEditor from "./SchemeTableEditor";
 import ConfirmModal from "./ui/ConfirmModal";
 import { Table2 } from "lucide-react";
 import CourseTabButton from "./elearning/builder/CourseTabButton";
+import { useConfirm } from "../contexts/ConfirmContext";
 
 const SchemeOfWorkCalendar: React.FC = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { showToast } = useToast();
+  const confirm = useConfirm();
   const { user } = useUser();
   const { selectedYearId, selectedTermId } = useAcademicPeriod();
   const [isPreviewReportOpen, setIsPreviewReportOpen] = useState(false);
@@ -477,14 +479,18 @@ const SchemeOfWorkCalendar: React.FC = () => {
   };
 
   const handleRemoveEntry = async (id: number) => {
-    if (window.confirm("Delete this week?")) {
-      try {
-        await schemeOfWorkApi.deleteEntry(id);
-        showToast("Deleted", "success");
-        loadData();
-      } catch (error: any) {
-        showToast("Delete failed", "error");
-      }
+    const ok = await confirm({
+      title: "Delete this week?",
+      message: "The week and any lesson plans logged against it are removed from the scheme.",
+      confirmText: "Delete week",
+    });
+    if (!ok) return;
+    try {
+      await schemeOfWorkApi.deleteEntry(id);
+      showToast("Week deleted", "success");
+      loadData();
+    } catch (error: any) {
+      showToast(error?.response?.data?.message || "Delete failed", "error");
     }
   };
 
@@ -530,7 +536,13 @@ const SchemeOfWorkCalendar: React.FC = () => {
   };
 
   const handleDeleteLessonPlan = async (id: number) => {
-    if (!window.confirm("Are you sure you want to delete this lesson plan?"))
+    if (
+      !(await confirm({
+        title: "Delete this lesson plan?",
+        message: "The plan is removed from this week. The week itself stays.",
+        confirmText: "Delete plan",
+      }))
+    )
       return;
 
     try {

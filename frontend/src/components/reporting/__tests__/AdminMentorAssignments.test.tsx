@@ -3,6 +3,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import AdminMentorAssignments from "../AdminMentorAssignments";
 import type { MentorAssignmentRecord } from "../../../api/mentorship";
+import { ConfirmProvider } from "../../../contexts/ConfirmContext";
 
 const activeAssignment: MentorAssignmentRecord = {
   assignment_id: 1,
@@ -74,8 +75,8 @@ vi.mock("../../../contexts/ToastContext", () => ({
   useToast: () => ({ showToast: showToastMock }),
 }));
 
-// window.confirm is used before ending an assignment
-vi.stubGlobal("confirm", vi.fn(() => true));
+// Ending an assignment now goes through the app's own ConfirmDialog (ConfirmProvider),
+// not window.confirm — the test clicks through the real dialog.
 
 describe("AdminMentorAssignments", () => {
   beforeEach(() => {
@@ -88,7 +89,7 @@ describe("AdminMentorAssignments", () => {
   });
 
   it("lists active mentor assignments", async () => {
-    render(<AdminMentorAssignments />);
+    render(<ConfirmProvider><AdminMentorAssignments /></ConfirmProvider>);
     await waitFor(() => expect(screen.getAllByText("Jean Bosco").length).toBeGreaterThan(0));
     expect(screen.getByText("Ada Lovelace")).toBeInTheDocument();
     expect(screen.getByText(/1 active assignment/)).toBeInTheDocument();
@@ -96,7 +97,7 @@ describe("AdminMentorAssignments", () => {
 
   it("shows the unassigned-students gap flag and reveals the panel on click", async () => {
     const user = userEvent.setup();
-    render(<AdminMentorAssignments />);
+    render(<ConfirmProvider><AdminMentorAssignments /></ConfirmProvider>);
 
     await waitFor(() => expect(screen.getByText(/1 unassigned/)).toBeInTheDocument());
     expect(screen.queryByText("Grace Hopper")).not.toBeInTheDocument();
@@ -107,10 +108,13 @@ describe("AdminMentorAssignments", () => {
 
   it("ends an assignment after confirming, then refetches the list", async () => {
     const user = userEvent.setup();
-    render(<AdminMentorAssignments />);
+    render(<ConfirmProvider><AdminMentorAssignments /></ConfirmProvider>);
     await waitFor(() => expect(screen.getAllByText("Jean Bosco").length).toBeGreaterThan(0));
 
-    await user.click(screen.getByRole("button", { name: /End/i }));
+    await user.click(screen.getByRole("button", { name: /^End$/i }));
+
+    await screen.findByRole("alertdialog");
+    await user.click(screen.getByRole("button", { name: "End assignment" }));
 
     await waitFor(() => expect(endAssignmentMock).toHaveBeenCalledWith(1));
     await waitFor(() => expect(listAssignmentsMock).toHaveBeenCalledTimes(2));
@@ -118,7 +122,7 @@ describe("AdminMentorAssignments", () => {
 
   it("downloads a mentor's consolidated report from the searchable download menu", async () => {
     const user = userEvent.setup();
-    render(<AdminMentorAssignments />);
+    render(<ConfirmProvider><AdminMentorAssignments /></ConfirmProvider>);
     await waitFor(() => expect(screen.getByRole("button", { name: /Download Report/i })).toBeInTheDocument());
 
     await user.click(screen.getByRole("button", { name: /Download Report/i }));
@@ -139,7 +143,7 @@ describe("AdminMentorAssignments", () => {
 
   it("opens the Assign Mentor modal", async () => {
     const user = userEvent.setup();
-    render(<AdminMentorAssignments />);
+    render(<ConfirmProvider><AdminMentorAssignments /></ConfirmProvider>);
     await waitFor(() => expect(listAssignmentsMock).toHaveBeenCalled());
 
     await user.click(screen.getAllByRole("button", { name: /Assign Mentor/i })[0]);

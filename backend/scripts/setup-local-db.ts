@@ -444,6 +444,19 @@ async function main() {
 
   const refresh = hasFlag("refresh");
 
+  // Every mode of this script is destructive somewhere else: --force drops the
+  // database, and --refresh (which start.bat runs on every start) resets the
+  // super-admin password and creates dev.* accounts with a published password.
+  // Pointed at a shared server by a stale backend/.env, that is an outage or an
+  // open door, so it only ever runs against this machine.
+  if (!["localhost", "127.0.0.1", "::1"].includes(host) && !hasFlag("allow-remote-host")) {
+    throw new Error(
+      `DB_HOST is "${host}", not this machine. This script resets passwords and can drop the database, ` +
+        `so it only runs against a local MySQL. Set DB_HOST=localhost in backend/.env ` +
+        `(or pass --allow-remote-host if that server really is a disposable dev database).`,
+    );
+  }
+
   if (!database) throw new Error("DB_NAME is not set in .env");
   if (!refresh && !fs.existsSync(DUMP_PATH)) throw new Error(`Snapshot not found: ${DUMP_PATH}`);
 

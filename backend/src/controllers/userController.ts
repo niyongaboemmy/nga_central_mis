@@ -1,4 +1,5 @@
 import bcrypt from "bcryptjs";
+import { getPublicSystems } from "../utils/publicSystems";
 import crypto from "crypto";
 import { db } from "../db";
 import {
@@ -7,6 +8,8 @@ import {
   and,
   or,
   like,
+  notLike,
+  notInArray,
   desc,
   asc,
   isNull,
@@ -15,7 +18,9 @@ import {
   sql as drizzleSql,
   SQL,
 } from "drizzle-orm";
-import { ALL_PERMISSIONS } from "../utils/permissions";
+import { getEffectivePermissions } from "../utils/auth";
+import { V2_ONLY_CAPABILITIES } from "../access/v2Only";
+import { applyPlacementChange } from "../services/access/ruleEngine";
 import {
   User,
   UserProfile,
@@ -55,7 +60,9 @@ import { recordActivity } from "../utils/activityLogger";
 import { getCurrentAcademicYearId } from "../utils/academicYear";
 import {
   generateStudentRegistrationNumber,
+  getSchoolCode,
   resetRegistrationSequence,
+  syncRegistrationSequenceToIssued,
 } from "../utils/registrationNumber";
 
 // Helper function to convert date to MySQL DATE format
@@ -374,9 +381,6 @@ export const getCurrentUser = asyncHandler(async (req: any, res: any) => {
     .innerJoin(Role, eq(UserRole.role_id, Role.role_id))
     .where(eq(UserRole.user_id, userId));
 
-  // Check if user is SUPER_ADMIN
-  const isSuperAdmin = userRoles.some((r) => r.name === "SUPER_ADMIN");
-
   // Get permissions for each role
   const rolesWithPermissions = await Promise.all(
     userRoles.map(async (role) => {
@@ -393,6 +397,9 @@ export const getCurrentUser = asyncHandler(async (req: any, res: any) => {
           and(
             eq(RolePermission.perm_id, Permission.perm_id),
             eq(Permission.status, "ACTIVE"),
+            // Legacy MIS permissions only -- see getUserPermissions (utils/auth.ts).
+            notLike(Permission.name, "%:%"),
+            notInArray(Permission.name, [...V2_ONLY_CAPABILITIES]),
           ),
         )
         .where(eq(RolePermission.role_id, role.role_id));
@@ -401,17 +408,9 @@ export const getCurrentUser = asyncHandler(async (req: any, res: any) => {
     }),
   );
 
-  // Get flat list of permission names
-  let permissions: string[];
-
-  if (isSuperAdmin) {
-    // SUPER_ADMIN gets all permissions
-    permissions = ALL_PERMISSIONS as string[];
-  } else {
-    permissions = rolesWithPermissions.flatMap((r) =>
-      r.permissions.map((p: any) => p.name),
-    );
-  }
+  // Flat list of permission names -- the same resolver the API middleware and
+  // the SSO token use, so the three always agree (utils/auth.ts).
+  const permissions = await getEffectivePermissions(userId);
 
   // Program-lead and class-teacher-of-grade roles are year-scoped; only the
   // current year's assignments should be reflected on the profile.
@@ -515,10 +514,8 @@ export const getCurrentUser = asyncHandler(async (req: any, res: any) => {
     .orderBy(Grade.level_order);
 
   // Get all active systems
-  const systems = await db
-    .select()
-    .from(System)
-    .where(eq(System.status, "ACTIVE"));
+  // No client_secret -- see utils/publicSystems.ts.
+  const systems = await getPublicSystems();
 
   successResponse(res, "User profile retrieved successfully", {
     user: user[0],
@@ -954,6 +951,8 @@ export const createUser = asyncHandler(async (req: any, res: any) => {
     }));
     await db.insert(UserRole).values(roleInserts);
   }
+  // Persona grant (from user_type) via the auto-assignment rules.
+  await applyPlacementChange([newUserId], req.user?.userId);
 
   // Record activity
   if (req.user?.userId) {
@@ -1308,6 +1307,7 @@ export const bulkCreateUsers = asyncHandler(async (req: any, res: any) => {
           role_id: parseInt(role_id),
         });
       }
+      await applyPlacementChange([newUserId], req.user?.userId);
 
       successCount++;
     } catch (error: any) {
@@ -1361,7 +1361,13 @@ export const generateStudentRegistrationNumbers = asyncHandler(
     const force = req.body?.force === true;
 
     if (force) {
+      // A full regeneration renumbers everyone, so starting from 0 is safe and gives a
+      // clean 0001, 0002, ... run.
       await resetRegistrationSequence();
+    } else {
+      // A backfill leaves existing numbers alone, so the counter has to know about them
+      // first — otherwise it re-issues one and the UNIQUE index rejects the whole request.
+      await syncRegistrationSequenceToIssued(await getSchoolCode());
     }
 
     const pending = await db
@@ -1756,6 +1762,8 @@ export const disableUser = asyncHandler(async (req: any, res: any) => {
     .update(User)
     .set({ status: "INACTIVE" })
     .where(eq(User.user_id, userId));
+  // Persona grants follow the account status (rules only cover ACTIVE users).
+  await applyPlacementChange([userId], req.user?.userId);
 
   // Record activity
   if (req.user?.userId) {
@@ -1803,6 +1811,7 @@ export const enableUser = asyncHandler(async (req: any, res: any) => {
     .update(User)
     .set({ status: "ACTIVE" })
     .where(eq(User.user_id, userId));
+  await applyPlacementChange([userId], req.user?.userId);
 
   // Record activity
   if (req.user?.userId) {
@@ -2634,6 +2643,7 @@ export const assignGradeToUser = asyncHandler(async (req: any, res: any) => {
     class_group_id: classGroupId,
     academic_year_id: yearId,
   });
+  await applyPlacementChange([userId], req.user?.userId);
 
   // Record activity
   if (req.user?.userId) {
@@ -2714,6 +2724,7 @@ export const removeGradeFromUser = asyncHandler(async (req: any, res: any) => {
         eq(UserGrade.academic_year_id, yearIdNum),
       ),
     );
+  await applyPlacementChange([userId], req.user?.userId);
 
   // Record activity
   if (req.user?.userId) {
@@ -2966,6 +2977,7 @@ export const updateGradeAssignment = asyncHandler(
         assigned_at: existingAssignment[0].assigned_at ?? undefined,
       });
     });
+    await applyPlacementChange([currentUserId, nextUserId], req.user?.userId);
 
     if (req.user?.userId) {
       await recordActivity(
@@ -3086,6 +3098,8 @@ export const copyGradeAssignments = asyncHandler(async (req: any, res: any) => {
       })),
     );
   }
+
+  await applyPlacementChange(toInsert.map((a) => a.user_id), req.user?.userId);
 
   logger.info("Grade assignments copied", {
     sourceYearId,

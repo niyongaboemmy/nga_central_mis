@@ -1,22 +1,21 @@
 import { db } from "../db";
-import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import {
-  AcademicTerm,
-  AcademicYear,
   ClassGroup,
   Course,
-  Grade,
   LessonNote,
-  SchemeOfWork,
-  SchemeOfWorkEntry,
   Subject,
-  TeacherSubjectAssignment,
   UserProfile,
 } from "../db/schema";
 import { successResponse } from "../utils/response";
 import { asyncHandler } from "../middleware/asyncHandler";
 import { countTeacherStudents } from "../services/teacherRoster";
+import {
+  loadSchemeStatus,
+  loadTeacherAssignments,
+} from "../services/teacherSchemes";
 import logger from "../utils/logger";
+import { resolvePeriod } from "../services/academicPeriod";
 import {
   loadAssignedActivities,
   loadTeacherLessons,
@@ -45,57 +44,6 @@ export interface TeacherLessonToday {
   location: string | null;
   color: string | null;
 }
-
-export interface TeacherSchemeRow {
-  subject_id: number;
-  subject_name: string;
-  subject_code: string | null;
-  subject_color: string | null;
-  class_group_id: number;
-  class_group_name: string;
-  scheme_id: number | null;
-  /** "submitted" once a SchemeOfWork row exists for the assignment. */
-  status: "submitted" | "pending";
-  entries_count: number;
-  validation_status: "PENDING" | "APPROVED" | "REJECTED";
-  validation_comment: string | null;
-  updated_at: string | null;
-}
-
-/** Resolve the (year, term) the caller is looking at, honouring the top-nav switcher. */
-const resolvePeriod = async (queryYearId?: number, queryTermId?: number) => {
-  const [term] = queryTermId
-    ? await db
-        .select()
-        .from(AcademicTerm)
-        .where(eq(AcademicTerm.academic_term_id, queryTermId))
-        .limit(1)
-    : await db
-        .select()
-        .from(AcademicTerm)
-        .where(eq(AcademicTerm.is_current, 1))
-        .limit(1);
-
-  let yearId = queryYearId ?? term?.academic_year_id ?? undefined;
-  if (!yearId) {
-    const [currentYear] = await db
-      .select({ academic_year_id: AcademicYear.academic_year_id })
-      .from(AcademicYear)
-      .where(eq(AcademicYear.is_current, 1))
-      .limit(1);
-    yearId = currentYear?.academic_year_id;
-  }
-
-  const [year] = yearId
-    ? await db
-        .select()
-        .from(AcademicYear)
-        .where(eq(AcademicYear.academic_year_id, yearId))
-        .limit(1)
-    : [];
-
-  return { term: term ?? null, year: year ?? null };
-};
 
 /**
  * An optional panel must not be able to take the whole board down.
@@ -174,38 +122,7 @@ export const getTeacherOverview = asyncHandler(async (req: any, res: any) => {
         .limit(1),
 
       // Assignments: the source of truth for what this teacher teaches.
-      yearId
-        ? db
-            .select({
-              subject_id: TeacherSubjectAssignment.subject_id,
-              class_group_id: TeacherSubjectAssignment.class_group_id,
-              subject_name: Subject.name,
-              subject_code: Subject.code,
-              subject_color: Subject.color,
-              class_group_name: ClassGroup.name,
-              grade_name: Grade.name,
-            })
-            .from(TeacherSubjectAssignment)
-            .innerJoin(
-              Subject,
-              eq(TeacherSubjectAssignment.subject_id, Subject.subject_id),
-            )
-            .innerJoin(
-              ClassGroup,
-              eq(
-                TeacherSubjectAssignment.class_group_id,
-                ClassGroup.class_group_id,
-              ),
-            )
-            .leftJoin(Grade, eq(ClassGroup.grade_id, Grade.grade_id))
-            .where(
-              and(
-                eq(TeacherSubjectAssignment.user_id, teacherId),
-                eq(TeacherSubjectAssignment.academic_year_id, yearId),
-                eq(Subject.status, "ACTIVE"),
-              ),
-            )
-        : Promise.resolve([] as any[]),
+      loadTeacherAssignments(teacherId, yearId),
 
       // Timetable slice — the same rules the weekly grid uses, so the
       // dashboard can never advertise a lesson the timetable no longer draws.
@@ -347,23 +264,7 @@ export const getTeacherOverview = asyncHandler(async (req: any, res: any) => {
       ? countTeacherStudents(teacherId, yearId)
       : Promise.resolve(0),
 
-    termId != null && classGroupIds.length > 0
-      ? db
-          .select({
-            scheme_id: SchemeOfWork.scheme_id,
-            subject_id: SchemeOfWork.subject_id,
-            class_group_id: SchemeOfWork.class_group_id,
-            updated_at: SchemeOfWork.updated_at,
-          })
-          .from(SchemeOfWork)
-          .where(
-            and(
-              eq(SchemeOfWork.user_id, teacherId),
-              eq(SchemeOfWork.academic_term_id, termId),
-              inArray(SchemeOfWork.class_group_id, classGroupIds),
-            ),
-          )
-      : Promise.resolve([] as any[]),
+    loadSchemeStatus({ teacherId, termId, assignments }),
 
     subjectIds.length > 0
       ? optional(
@@ -397,72 +298,10 @@ export const getTeacherOverview = asyncHandler(async (req: any, res: any) => {
       : Promise.resolve([] as any[]),
   ]);
 
-  const schemeIds = schemes.map((s: any) => s.scheme_id);
-
-  // ── Wave 3: the scheme entries, once we know which schemes exist ────────
-  const [entryCounts, firstEntries] = await Promise.all([
-    schemeIds.length
-      ? db
-          .select({
-            scheme_id: SchemeOfWorkEntry.scheme_id,
-            count: sql<number>`count(*)`,
-          })
-          .from(SchemeOfWorkEntry)
-          .where(inArray(SchemeOfWorkEntry.scheme_id, schemeIds))
-          .groupBy(SchemeOfWorkEntry.scheme_id)
-      : Promise.resolve([] as any[]),
-
-    schemeIds.length
-      ? db
-          .select({
-            scheme_id: SchemeOfWorkEntry.scheme_id,
-            entry_id: SchemeOfWorkEntry.entry_id,
-            validation_status: SchemeOfWorkEntry.validation_status,
-            validation_comment: SchemeOfWorkEntry.validation_comment,
-          })
-          .from(SchemeOfWorkEntry)
-          .where(inArray(SchemeOfWorkEntry.scheme_id, schemeIds))
-          .orderBy(asc(SchemeOfWorkEntry.entry_id))
-      : Promise.resolve([] as any[]),
-  ]);
-
-  const countByScheme = new Map(
-    entryCounts.map((r: any) => [r.scheme_id, Number(r.count)]),
-  );
-  const verdictByScheme = new Map<
-    number,
-    { status: "PENDING" | "APPROVED" | "REJECTED"; comment: string | null }
-  >();
-  for (const entry of firstEntries) {
-    if (verdictByScheme.has(entry.scheme_id)) continue; // lowest entry_id wins
-    verdictByScheme.set(entry.scheme_id, {
-      status: (entry.validation_status as any) ?? "PENDING",
-      comment: entry.validation_comment ?? null,
-    });
-  }
-
-  const schemeByKey = new Map(
-    schemes.map((s) => [`${s.subject_id}:${s.class_group_id}`, s]),
-  );
-
-  const schemeRows: TeacherSchemeRow[] = assignments.map((a) => {
-    const scheme = schemeByKey.get(`${a.subject_id}:${a.class_group_id}`);
-    const verdict = scheme ? verdictByScheme.get(scheme.scheme_id) : undefined;
-    return {
-      subject_id: a.subject_id,
-      subject_name: a.subject_name,
-      subject_code: a.subject_code,
-      subject_color: a.subject_color,
-      class_group_id: a.class_group_id,
-      class_group_name: a.class_group_name,
-      scheme_id: scheme?.scheme_id ?? null,
-      status: scheme ? "submitted" : "pending",
-      entries_count: scheme ? (countByScheme.get(scheme.scheme_id) ?? 0) : 0,
-      validation_status: verdict?.status ?? "PENDING",
-      validation_comment: verdict?.comment ?? null,
-      updated_at: (scheme?.updated_at as any) ?? null,
-    };
-  });
+  // `schemes` already carries entry counts and validation verdicts — the
+  // shared service resolves both, so the dashboard and the Scheme of Work
+  // list can never report a different figure for the same scheme.
+  const schemeRows = schemes;
 
   // Lesson notes and courses were both fetched in the waves above.
   const draftNotes = noteRows.filter((n: any) => n.status === "DRAFT");

@@ -19,6 +19,7 @@ import {
   reorderItems,
   setItemCriteriaHandler,
   pickLessonNotes,
+  placeLessonNoteOnCourse,
   pickSubjectDocuments,
   pickCriteria,
 } from "../controllers/courseController";
@@ -28,6 +29,8 @@ import {
   openMyItem,
   streamMyItemFile,
   heartbeatMyItem,
+  updateMyPosition,
+  leaveMyItem,
   markMyItemDone,
   findMySectionForDate,
 } from "../controllers/learnerCourseController";
@@ -65,7 +68,10 @@ import {
   exportRegisterCsv,
   courseProgressReportCsv,
 } from "../controllers/courseAdminController";
-import { askCourseTutor, suggestedTutorQuestions } from "../controllers/courseTutorController";
+import {
+  askCourseTutor,
+  suggestedTutorQuestions,
+} from "../controllers/courseTutorController";
 
 /**
  * E-learning module (ELEARNING_MODULE_IMPLEMENTATION_PLAN.md §3.3).
@@ -85,8 +91,17 @@ router.get("/my/section-for-date", learner, findMySectionForDate);
 router.get("/my/items/:id", learner, openMyItem);
 router.get("/my/items/:id/file", learner, streamMyItemFile);
 router.post("/my/items/:id/heartbeat", learner, heartbeatMyItem);
+// Scroll position — several times a minute, in memory only (see updateMyPosition).
+router.post("/my/items/:id/position", learner, updateMyPosition);
+// Sent as a beacon when the student leaves an item, so presence drops immediately
+// instead of lingering for the whole stale window.
+router.post("/my/items/:id/leave", learner, leaveMyItem);
 router.post("/my/items/:id/done", learner, markMyItemDone);
-router.post("/my/items/:id/knowledge-check/check", learner, checkKnowledgeAnswer);
+router.post(
+  "/my/items/:id/knowledge-check/check",
+  learner,
+  checkKnowledgeAnswer,
+);
 router.post("/my/items/:id/knowledge-check", learner, submitKnowledgeCheck);
 router.post("/my/courses/:id/ask", learner, askCourseTutor);
 router.get("/my/courses/:id/ask/suggestions", learner, suggestedTutorQuestions);
@@ -107,7 +122,13 @@ router.post("/courses/:id/reseed", builder, reseedCourse);
 router.post("/courses/:id/sections", builder, createSection);
 router.put("/courses/:id/sections/order", builder, reorderSections);
 router.get("/courses/:id/pickers/lesson-notes", builder, pickLessonNotes);
-router.get("/courses/:id/pickers/subject-documents", builder, pickSubjectDocuments);
+// One-click placement from the Lesson Notes page — resolves the course and section itself.
+router.post("/notes/:noteId/place", builder, placeLessonNoteOnCourse);
+router.get(
+  "/courses/:id/pickers/subject-documents",
+  builder,
+  pickSubjectDocuments,
+);
 router.get("/courses/:id/pickers/criteria", builder, pickCriteria);
 
 router.patch("/sections/:id", builder, updateSection);
@@ -120,13 +141,21 @@ router.get("/courses/:id/mastery", builder, teacherCourseMastery);
 router.get("/courses/:id/coverage", builder, getCourseCoverage);
 router.get("/courses/:id/live", builder, streamCourseLive);
 router.get("/courses/:id/live/snapshot", builder, getCourseLiveSnapshot);
-router.get("/courses/:id/report.csv", authorize([Permissions.MANAGE_COURSE_CONTENT, Permissions.VIEW_ALL_COURSES]), courseProgressReportCsv);
+router.get(
+  "/courses/:id/report.csv",
+  authorize([Permissions.MANAGE_COURSE_CONTENT, Permissions.VIEW_ALL_COURSES]),
+  courseProgressReportCsv,
+);
 router.post("/sections/:id/build-journey", builder, buildJourney);
 router.get("/courses/:id/questions", builder, getCourseQuestions);
 router.get("/courses/:id/prerequisites", builder, getSectionPrerequisites);
 router.post("/courses/:id/nudge", builder, nudgeStudents);
 router.put("/sections/:id/prerequisites", builder, setSectionPrerequisites);
-router.post("/items/:id/progress/:userId/complete", authorize(Permissions.OVERRIDE_COURSE_PROGRESS), overrideItemProgress);
+router.post(
+  "/items/:id/progress/:userId/complete",
+  authorize(Permissions.OVERRIDE_COURSE_PROGRESS),
+  overrideItemProgress,
+);
 
 router.patch("/items/:id", builder, updateItem);
 router.delete("/items/:id", builder, deleteItem);

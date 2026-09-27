@@ -19,6 +19,9 @@ backend/storage/
 .env.production.local
 .env.production
 *.env
+# the copy scripts/sync-local-env.cjs keeps before it repairs one
+.env.bak
+*.env.bak
 
 # Logs
 logs/

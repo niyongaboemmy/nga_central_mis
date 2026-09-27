@@ -3,6 +3,7 @@ import multer from "multer";
 import { authenticate, authorize } from "../middleware/auth";
 import {
   uploadAndExtractScheme,
+  getMySchemeProgress,
   getSchemeEntries,
   addSchemeEntry,
   insertSchemeEntry,
@@ -74,6 +75,10 @@ router.post(
 router.get("/ai-generate/:jobId/status", getAIGenerationStatus);
 
 // Get scheme entries by subject/group/term
+// The signed-in teacher's own progress across every assigned subject/class —
+// backs the Scheme of Work list's coverage bars and comparison view.
+router.get("/my-progress", getMySchemeProgress);
+
 router.get("/entries", getSchemeEntries);
 
 // Add a single scheme entry (appended, uses caller-supplied week/dates)

@@ -20,6 +20,10 @@ import {
 } from "../db/schema";
 import { asyncHandler } from "../middleware/asyncHandler";
 import { syncCourseForScheme, onSchemeEntryDeleted } from "../services/elearning/courseSeeding";
+import {
+  loadSchemeStatus,
+  loadTeacherAssignments,
+} from "../services/teacherSchemes";
 import { successResponse } from "../utils/response";
 import {
   ValidationError,
@@ -1669,4 +1673,62 @@ export const validateScheme = asyncHandler(async (req: any, res: any) => {
   }
 
   successResponse(res, `Selected scheme entries ${status.toLowerCase()} successfully`);
+});
+
+/**
+ * The signed-in teacher's scheme-of-work progress for a term — one row per
+ * (subject, class group), with the weeks planned, the validation verdict and
+ * the term's own calendar so the client can say how far behind a scheme is.
+ *
+ * Shares loadSchemeStatus with the Teacher Dashboard, so the coverage bars on
+ * this page and the coverage chart on the dashboard cannot disagree.
+ */
+export const getMySchemeProgress = asyncHandler(async (req: any, res: any) => {
+  const teacherId = req.user.userId;
+  const queryYearId = req.query.academic_year_id
+    ? parseInt(req.query.academic_year_id)
+    : undefined;
+  const queryTermId = req.query.academic_term_id
+    ? parseInt(req.query.academic_term_id)
+    : undefined;
+
+  const [term] = queryTermId
+    ? await db
+        .select()
+        .from(AcademicTerm)
+        .where(eq(AcademicTerm.academic_term_id, queryTermId))
+        .limit(1)
+    : await db
+        .select()
+        .from(AcademicTerm)
+        .where(eq(AcademicTerm.is_current, 1))
+        .limit(1);
+
+  let yearId = queryYearId ?? term?.academic_year_id ?? undefined;
+  if (!yearId) {
+    const [currentYear] = await db
+      .select({ academic_year_id: AcademicYear.academic_year_id })
+      .from(AcademicYear)
+      .where(eq(AcademicYear.is_current, 1))
+      .limit(1);
+    yearId = currentYear?.academic_year_id;
+  }
+
+  const assignments = await loadTeacherAssignments(teacherId, yearId ?? null);
+  const rows = await loadSchemeStatus({
+    teacherId,
+    termId: term?.academic_term_id ?? null,
+    assignments,
+  });
+
+  successResponse(res, "Scheme progress retrieved successfully", {
+    period: {
+      academic_year_id: yearId ?? null,
+      academic_term_id: term?.academic_term_id ?? null,
+      academic_term_name: term?.name ?? null,
+      term_start_date: term?.start_date ?? null,
+      term_end_date: term?.end_date ?? null,
+    },
+    rows,
+  });
 });

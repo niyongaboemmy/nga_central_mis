@@ -49,7 +49,12 @@ type MainTab = "lesson" | "mentorship" | "dashboard" | "missing" | "mentoring-lo
 type PresetType = "today" | "week" | "month" | "all" | "custom";
 
 const AdminReporting: React.FC = () => {
-  const [activeTab,      setActiveTab]      = useState<MainTab>("lesson");
+  // `?tab=` lets other pages (Home) open a specific tab directly.
+  const [activeTab,      setActiveTab]      = useState<MainTab>(() => {
+    const tab = new URLSearchParams(window.location.search).get("tab");
+    const known: MainTab[] = ["lesson", "mentorship", "dashboard", "missing", "mentoring-log", "mentorship-dashboard"];
+    return known.includes(tab as MainTab) ? (tab as MainTab) : "lesson";
+  });
 
   // Data states
   const [reports,         setReports]         = useState<InstructorReport[]>([]);

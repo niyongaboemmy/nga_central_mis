@@ -41,6 +41,24 @@ vi.mock("../../../contexts/AcademicPeriodContext", () => ({
   }),
 }));
 
+// The navbar renders NotificationBell, whose useNotifications() throws outside a provider.
+// Mocked rather than wrapped in the real NotificationProvider: that one fetches on mount and
+// polls, which this test has no business exercising — the same approach the rest of the
+// contexts above take.
+vi.mock("../../../contexts/NotificationContext", () => ({
+  useNotifications: () => ({
+    notifications: [],
+    unreadCount: 0,
+    isLoading: false,
+    refresh: vi.fn(),
+    markRead: vi.fn(),
+    markAllRead: vi.fn(),
+    remove: vi.fn(),
+    isSubjectUnread: () => false,
+    markSubjectRead: vi.fn(),
+  }),
+}));
+
 const renderNavbar = () =>
   render(
     <MemoryRouter>

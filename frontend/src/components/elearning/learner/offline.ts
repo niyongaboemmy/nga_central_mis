@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { apiService } from "../../../services/api";
+import { API_BASE_URL, apiService } from "../../../services/api";
+import { getToken } from "../../../utils/auth";
 
 /**
  * Offline support for the learner (plan Phase 5): progress actions taken while offline are
@@ -33,6 +34,30 @@ const write = (q: QueuedAction[]) => {
 };
 
 export const isOnline = () => (typeof navigator === "undefined" ? true : navigator.onLine !== false);
+
+/**
+ * Fire-and-forget signal that must survive the page going away (unload, tab close,
+ * bfcache). `fetch` with `keepalive` is the transport the browser is required to flush
+ * after the document is gone — a normal fetch gets cancelled.
+ *
+ * Deliberately NOT `sendBeacon`: it cannot set an Authorization header, and the only way
+ * to authenticate it would be a JWT in the query string, which this app's auth middleware
+ * accepts on GET only — and which would end up in every access log. A missed departure is
+ * harmless anyway: presence then expires on the server's own stale timer instead.
+ */
+export function sendDeparture(url: string): void {
+  const token = getToken();
+  if (!token) return;
+  try {
+    void fetch(`${API_BASE_URL}${url}`, {
+      method: "POST",
+      keepalive: true,
+      headers: { Authorization: `Bearer ${token}` },
+    }).catch(() => undefined);
+  } catch {
+    /* the server's stale sweep is the backstop */
+  }
+}
 
 /** Sends now, or queues when offline / the network fails. Resolves true when sent immediately. */
 export async function sendOrQueue(url: string, body?: unknown): Promise<boolean> {

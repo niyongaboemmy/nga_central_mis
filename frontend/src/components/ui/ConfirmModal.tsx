@@ -1,54 +1,48 @@
 import React from "react";
-import Modal from "./Modal";
-import Button from "./Button";
+import ConfirmDialog, { ConfirmTone } from "./ConfirmDialog";
 
 interface ConfirmModalProps {
   isOpen: boolean;
   onClose: () => void;
   onConfirm: () => void;
   title: string;
-  message: string;
+  message: React.ReactNode;
+  details?: string[];
   confirmText?: string;
   cancelText?: string;
+  tone?: ConfirmTone;
   isLoading?: boolean;
 }
 
+/**
+ * Declarative wrapper over ConfirmDialog, for the call sites that keep the open/closed state
+ * themselves (usually because the confirm drives a loading spinner). Callers that just need a
+ * yes/no before acting should use `useConfirm()` instead — same dialog, one line.
+ */
 const ConfirmModal: React.FC<ConfirmModalProps> = ({
   isOpen,
   onClose,
   onConfirm,
   title,
   message,
+  details,
   confirmText = "Confirm",
   cancelText = "Cancel",
+  tone = "danger",
   isLoading = false,
-}) => {
-  const handleConfirm = () => {
-    onConfirm();
-  };
-
-  return (
-    <Modal isOpen={isOpen} onClose={onClose} title={title}>
-      <div className="space-y-4">
-        <p className="text-text-secondary-light dark:text-text-secondary-dark/70">
-          {message}
-        </p>
-        <div className="flex justify-end space-x-3">
-          <Button variant="secondary" onClick={onClose} disabled={isLoading}>
-            {cancelText}
-          </Button>
-          <Button
-            variant="danger"
-            onClick={handleConfirm}
-            disabled={isLoading}
-            isLoading={isLoading}
-          >
-            {confirmText}
-          </Button>
-        </div>
-      </div>
-    </Modal>
-  );
-};
+}) => (
+  <ConfirmDialog
+    isOpen={isOpen}
+    title={title}
+    message={message}
+    details={details}
+    confirmText={confirmText}
+    cancelText={cancelText}
+    tone={tone}
+    isLoading={isLoading}
+    onConfirm={onConfirm}
+    onCancel={onClose}
+  />
+);
 
 export default ConfirmModal;

@@ -30,6 +30,7 @@ import SubjectLessonNotesTab from "./SubjectLessonNotesTab";
 import SubjectSharedNotesTab from "./SubjectSharedNotesTab";
 import { lessonNotesApi, SharedNoteSummary } from "../../api/lessonNotes";
 import SubjectIcon from "../elearning/ui/subjectIcons";
+import SubjectElearningLink from "./SubjectElearningLink";
 
 type Tab = "overview" | "curriculum" | "materials" | "students" | "lessonNotes" | "myNotes";
 
@@ -149,7 +150,8 @@ const SubjectDetailPage: React.FC = () => {
   }, [selectedTermId, id, isTeacherView]);
 
   useEffect(() => {
-    if (!id || selectedYearId == null || isTeacherView || !isStudentView) return;
+    if (!id || selectedYearId == null || isTeacherView || !isStudentView)
+      return;
     const prevYearId = prevYearIdRef.current;
     prevYearIdRef.current = selectedYearId;
     if (prevYearId == null || prevYearId === selectedYearId) return;
@@ -307,6 +309,10 @@ const SubjectDetailPage: React.FC = () => {
                   </>
                 )}
               </div>
+            </div>
+            {/* Straight across to the same material as a course. */}
+            <div className="flex-shrink-0 self-center">
+              <SubjectElearningLink subjectId={id} />
             </div>
           </div>
 
