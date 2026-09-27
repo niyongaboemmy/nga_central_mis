@@ -7,6 +7,7 @@ import { useNotifications } from "../../contexts/NotificationContext";
 import { useCurrentTime } from "../calendar/useCurrentTime";
 import { useHomeData } from "./useHomeData";
 import { useAppSummaries } from "./useAppSummaries";
+import { HOME_DEMO, demoAppStates, withDemoOverview } from "./demoData";
 import {
   audienceOf,
   EVERYTHING,
@@ -133,12 +134,15 @@ const HomePage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const previewAs = Number(searchParams.get("as")) || undefined;
 
-  const { data, loading, refreshing, fromSnapshot, error, fetchedAt, refresh } = useHomeData({
+  const { data: liveData, loading, refreshing, fromSnapshot, error, fetchedAt, refresh } = useHomeData({
     userId: user?.user?.user_id,
     yearId: selectedYearId,
     termId: selectedTermId,
     as: previewAs,
   });
+
+  // Local demo mode only (see demoData.ts): a production build never takes this branch.
+  const data = useMemo(() => (HOME_DEMO && liveData ? withDemoOverview(liveData) : liveData), [liveData]);
 
   const [lens, setLens] = useState<string>(readLens);
   // A remembered lens the user no longer has falls back to Everything.
@@ -151,7 +155,11 @@ const HomePage: React.FC = () => {
   };
 
   // Other apps (Task Mentor, Attendance, Tupo) answer independently of the MIS.
-  const appStates = useAppSummaries(data, selectedYearId);
+  const liveAppStates = useAppSummaries(HOME_DEMO ? null : data, selectedYearId);
+  const appStates = useMemo(
+    () => (HOME_DEMO && data ? demoAppStates(data) : liveAppStates),
+    [data, liveAppStates],
+  );
   const apps = useMemo(() => mergeApps(appStates), [appStates]);
 
   const ranked = useMemo(
