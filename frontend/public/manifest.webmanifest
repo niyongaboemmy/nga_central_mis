@@ -1,0 +1,45 @@
+{
+  "id": "/",
+  "name": "NGA — New Generation Academy",
+  "short_name": "NGA",
+  "description": "Your timetable, lessons, deadlines and reminders at New Generation Academy.",
+  "lang": "en",
+  "dir": "ltr",
+  "start_url": "/home?source=pwa",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone"],
+  "orientation": "any",
+  "theme_color": "#2f56d9",
+  "background_color": "#ffffff",
+  "categories": ["education", "productivity"],
+  "launch_handler": { "client_mode": ["focus-existing", "auto"] },
+  "icons": [
+    { "src": "/android-chrome-192x192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/android-chrome-512x512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/maskable-192x192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "/maskable-512x512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "/badge-96x96.png", "sizes": "96x96", "type": "image/png", "purpose": "monochrome" }
+  ],
+  "shortcuts": [
+    {
+      "name": "Today",
+      "short_name": "Today",
+      "description": "Now & Next and today's reminders",
+      "url": "/reminders?source=shortcut",
+      "icons": [{ "src": "/android-chrome-192x192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "My timetable",
+      "short_name": "Timetable",
+      "url": "/dashboard?source=shortcut",
+      "icons": [{ "src": "/android-chrome-192x192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Home",
+      "short_name": "Home",
+      "url": "/home?source=shortcut",
+      "icons": [{ "src": "/android-chrome-192x192.png", "sizes": "192x192" }]
+    }
+  ]
+}

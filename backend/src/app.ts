@@ -28,6 +28,7 @@ import notificationRoutes from "./routes/notifications";
 import accessRoutes from "./routes/access";
 import homeRoutes from "./routes/home";
 import elearningRoutes from "./routes/elearning";
+import reminderRoutes from "./routes/reminders";
 
 const app = express();
 
@@ -93,6 +94,9 @@ app.use("/notifications", notificationRoutes);
 app.use("/access", accessRoutes);
 // Home -- the post-login overview across every module (HOME_OVERVIEW_IMPLEMENTATION_PLAN.md).
 app.use("/home", homeRoutes);
+// Reminder Hub -- timetable/deadline reminders by Web Push, in-app and
+// calendar feed (REMINDERS_SOLUTION_PROPOSAL.md).
+app.use("/reminders", reminderRoutes);
 // Machine-to-machine, IntegrationToken-authenticated, read-only. Mounted last
 // among the API routers so it is obvious it shares no middleware with the
 // user-session routes above it.

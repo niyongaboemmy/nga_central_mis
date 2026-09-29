@@ -10,6 +10,25 @@ import { getCurrentUser, UserWithProfile, UserRole } from "../api/users";
 import { logout as apiLogout, checkSession } from "../api/auth";
 import { removeToken, getToken } from "../utils/auth";
 
+/** Last profile seen on this device -- only ever used while offline (refreshUser). */
+const USER_CACHE_KEY = "nga.user.offlineCache";
+const rememberUser = (value: unknown) => {
+  try {
+    if (value) localStorage.setItem(USER_CACHE_KEY, JSON.stringify(value));
+    else localStorage.removeItem(USER_CACHE_KEY);
+  } catch {
+    /* private mode / quota: offline start just won't be available */
+  }
+};
+const recalledUser = () => {
+  try {
+    const raw = localStorage.getItem(USER_CACHE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+};
+
 interface UserContextType {
   user: UserWithProfile | null;
   isLoading: boolean;
@@ -55,9 +74,19 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({
       }
 
       setUser(userData || null);
-    } catch (error) {
-      console.error("Failed to fetch user:", error);
-      setUser(null);
+      rememberUser(userData || null);
+    } catch (error: any) {
+      // Offline (no response at all) with a session token: open with the
+      // profile last seen on this device, so the installed app and its cached
+      // agenda still work without signal. The server still authorises every
+      // API call; a real 401 keeps logging the user out as before.
+      const cached = !error?.response && getToken() ? recalledUser() : null;
+      if (cached) {
+        setUser(cached);
+      } else {
+        console.error("Failed to fetch user:", error);
+        setUser(null);
+      }
     } finally {
       setIsLoading(false);
       isRefreshingRef.current = false;
@@ -78,6 +107,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({
   const logout = () => {
     apiLogout();
     removeToken();
+    rememberUser(null);
     setUser(null);
   };
 

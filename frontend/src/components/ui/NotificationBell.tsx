@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Bell, Check, FolderOpen, FileText, ShieldOff, X } from "lucide-react";
+import { AlarmClock, Bell, Check, FolderOpen, FileText, ShieldOff, X } from "lucide-react";
 import { useNotifications } from "../../contexts/NotificationContext";
 import type { AppNotification } from "../../api/notifications";
 
@@ -10,6 +10,8 @@ const kindIcon = (kind: string) => {
       return <FolderOpen className="w-4 h-4 text-blue-500" />;
     case "permission_revoked":
       return <ShieldOff className="w-4 h-4 text-red-500" />;
+    case "reminder":
+      return <AlarmClock className="w-4 h-4 text-amber-500" />;
     case "document_shared":
     default:
       return <FileText className="w-4 h-4 text-blue-500" />;

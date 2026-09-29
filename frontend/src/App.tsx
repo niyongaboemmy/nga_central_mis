@@ -64,6 +64,7 @@ import DevKitchenSink from "./components/elearning/DevKitchenSink";
 import AccessStudio from "./components/access/AccessStudio";
 import InsightsHub from "./components/access/InsightsHub";
 import HomePage from "./components/home/HomePage";
+import RemindersPage from "./components/reminders/RemindersPage";
 
 const LoginPage: React.FC = () => {
   const navigate = useNavigate();
@@ -326,6 +327,19 @@ function App() {
                 <ProtectedRoute>
                   <SystemLayoutWrapper>
                     <HomePage />
+                  </SystemLayoutWrapper>
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Reminders -- set up this device, Now & Next, what to be
+                reminded of (REMINDERS_SOLUTION_PROPOSAL.md). Everyone. */}
+            <Route
+              path="/reminders"
+              element={
+                <ProtectedRoute>
+                  <SystemLayoutWrapper fullWidth>
+                    <RemindersPage />
                   </SystemLayoutWrapper>
                 </ProtectedRoute>
               }

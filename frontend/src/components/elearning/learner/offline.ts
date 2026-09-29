@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { API_BASE_URL, apiService } from "../../../services/api";
 import { getToken } from "../../../utils/auth";
+import { registerAppServiceWorker } from "../../../reminders/pwa";
 
 /**
  * Offline support for the learner (plan Phase 5): progress actions taken while offline are
@@ -119,9 +120,12 @@ export function useOffline(): { online: boolean; queued: number } {
   return { online, queued };
 }
 
-/** Registers the learner service worker once (no-op in dev / unsupported browsers). */
+/**
+ * The learner offline cache now lives inside the app-wide worker (public/sw.js
+ * importScripts elearning-sw.js): only one service worker can control "/", and
+ * the installable NGA app needs it for reminders too. Kept as a named entry
+ * point so learner pages still make sure it is registered.
+ */
 export function registerLearnerServiceWorker() {
-  if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) return;
-  if (import.meta.env.DEV) return;
-  navigator.serviceWorker.register("/elearning-sw.js", { scope: "/" }).catch(() => undefined);
+  void registerAppServiceWorker();
 }

@@ -79,5 +79,14 @@ if (config.nodeEnv !== "test") {
     })
     .catch(() => undefined);
 }
+// Reminder Hub (REMINDERS_SOLUTION_PROPOSAL.md §4): a one-minute dispatcher
+// plus a half-hourly re-plan of everyone who has reminders on. Both are
+// idempotent and claim-guarded, so an overlapping tick or a second process
+// can't double-send. REMINDERS_SCHEDULER=false switches both off.
+if (config.nodeEnv !== "test" && process.env.REMINDERS_SCHEDULER !== "false") {
+  import("./services/reminders/scheduler")
+    .then(({ startReminderScheduler }) => startReminderScheduler())
+    .catch((error) => logger.error("[reminders] scheduler failed to start", { error }));
+}
 server.headersTimeout = 60000;
 server.keepAliveTimeout = 65000;
