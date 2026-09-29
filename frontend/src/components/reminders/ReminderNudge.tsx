@@ -4,7 +4,15 @@ import { BellRing, Download, ShieldAlert, X } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { remindersApi } from "../../api/reminders";
 import { pushHealthCheck, enablePush, type PushStatus } from "../../reminders/push";
-import { countVisit, installPromptSnoozed, promptInstall, snoozeInstallPrompt, usePwa } from "../../reminders/pwa";
+import {
+  countVisit,
+  installPromptSnoozed,
+  markLaunchInstallAsked,
+  promptInstall,
+  shouldAskInstallFromLaunch,
+  snoozeInstallPrompt,
+  usePwa,
+} from "../../reminders/pwa";
 import { InstallSheet } from "./InstallGuide";
 
 type Nudge = "blocked" | "enable-device" | "install" | "try-reminders" | null;
@@ -60,6 +68,15 @@ export const ReminderNudge: React.FC = () => {
   const [installOpen, setInstallOpen] = useState(false);
   const [dismissed, setDismissed] = useState(false);
   const [busy, setBusy] = useState(false);
+
+  // Opened from another installed NGA app but not installed here: ask now.
+  useEffect(() => {
+    if (!pwa.installed && pwa.platform.installMethod !== "none" && shouldAskInstallFromLaunch()) {
+      markLaunchInstallAsked();
+      setInstallOpen(true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     let alive = true;
