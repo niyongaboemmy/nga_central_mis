@@ -4,6 +4,7 @@ import Sidebar from "./ui/Sidebar";
 import WelcomePopup from "./WelcomePopup";
 import ChangePasswordModal from "./ChangePasswordModal";
 import { useUser } from "../contexts/UserContext";
+import { ReminderNudge } from "./reminders/ReminderNudge";
 
 interface SystemLayoutProps {
   children: React.ReactNode;
@@ -122,6 +123,10 @@ const SystemLayout: React.FC<SystemLayoutProps> = ({
           {children}
         </div>
       </main>
+
+      {/* Install / notification nudges + the permission health check that
+          runs on every app open (REMINDERS_SOLUTION_PROPOSAL.md §7.5). */}
+      {showSidebar && user && <ReminderNudge />}
 
       {/* Welcome Popup */}
       {showWelcomePopup && (

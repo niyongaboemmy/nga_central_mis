@@ -12,7 +12,9 @@ export type NotificationKind =
   | "course_item_due_soon"
   | "course_result_received"
   | "course_section_empty"
-  | "course_nudge";
+  | "course_nudge"
+  // Reminder Hub (REMINDERS_SOLUTION_PROPOSAL.md)
+  | "reminder";
 
 export interface NotifyUserInput {
   userId: number;
@@ -20,7 +22,7 @@ export interface NotifyUserInput {
   title: string;
   body?: string;
   link?: string;
-  subjectType: "document" | "folder" | "course_section" | "course_item" | "course";
+  subjectType: "document" | "folder" | "course_section" | "course_item" | "course" | "reminder";
   subjectId: number;
   actorId?: number;
 }

@@ -6,7 +6,7 @@ import { Permissions } from "../../constants/permissions";
 import { getToken } from "../../utils/auth";
 import { useAccess } from "../../hooks/useAccess";
 import { BarChart3, ShieldCheck } from "lucide-react";
-import { CalendarDays, House } from "lucide-react";
+import { BellRing, CalendarDays, House } from "lucide-react";
 
 interface SidebarProps {
   isCollapsed?: boolean;
@@ -74,6 +74,12 @@ const Sidebar: React.FC<SidebarProps> = ({
         <LayoutDashboard className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />
       ),
       requiredPermission: Permissions.TEACHER_DASHBOARD,
+    },
+    {
+      // Reminder Hub: set up this device, Now & Next, reminder preferences.
+      label: "Reminders",
+      path: "/reminders",
+      icon: <BellRing className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
     },
     {
       label: "Profile",
