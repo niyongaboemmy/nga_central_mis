@@ -43,7 +43,7 @@ What was built from `REMINDERS_SOLUTION_PROPOSAL.md` (repo root of `nga-mis-full
 1. Apply the migration on the server by piping the SQL, as with every other migration. `npm run migrate` does not work there (see the production notes):
    `mysql … "$DB_NAME" < migrations/092_reminders_hub.sql`. It is idempotent.
 2. Add the environment variables above to `/opt/apps/nga_central_mis/backend/.env`, then run `pm2 restart mis-backend`.
-3. Frontend: nothing new in the build environment. For nginx on the app host:
+3. Frontend: nothing new in the build environment. The nginx rules below are in `deploy/nginx-mis.conf` and were applied to production on 2026-09-30. For nginx on the app host:
    - Serve `/sw.js` with `Cache-Control: no-cache` so updates reach users.
    - Map `.webmanifest` to `application/manifest+json`. Browsers tolerate other types, but that is the correct one.
 4. Check the result:
