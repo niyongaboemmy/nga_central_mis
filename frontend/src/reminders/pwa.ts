@@ -111,6 +111,7 @@ let started = false;
 export const initPwa = () => {
   if (started || typeof window === "undefined") return;
   started = true;
+  captureLaunchMarker();
   window.addEventListener("beforeinstallprompt", (event) => {
     // Keep Chromium's mini-infobar away; we show our own, better-timed card.
     event.preventDefault();
@@ -123,7 +124,38 @@ export const initPwa = () => {
     emit();
   });
   window.matchMedia?.("(display-mode: standalone)").addEventListener?.("change", emit);
+  consumeLaunches();
   void registerAppServiceWorker();
+};
+
+/**
+ * Links into MIS that Chrome captures into the installed app window
+ * (manifest launch_handler: focus-existing) only *focus* that window; the
+ * target URL arrives through the Launch Handler API. Route it inside the SPA
+ * -- pushState + popstate is what React Router's BrowserRouter listens to.
+ */
+export const routeLaunch = (targetURL: string | undefined, loc: Location = window.location) => {
+  if (!targetURL) return false;
+  let url: URL;
+  try {
+    url = new URL(targetURL);
+  } catch {
+    return false;
+  }
+  if (url.origin !== loc.origin) return false;
+  const next = url.pathname + url.search + url.hash;
+  if (next === loc.pathname + loc.search + loc.hash) return false;
+  window.history.pushState(null, "", next);
+  window.dispatchEvent(new PopStateEvent("popstate"));
+  return true;
+};
+
+const consumeLaunches = () => {
+  const queue = (window as any).launchQueue;
+  if (!queue?.setConsumer) return;
+  queue.setConsumer((params: { targetURL?: string }) => {
+    routeLaunch(params?.targetURL);
+  });
 };
 
 let registering: Promise<ServiceWorkerRegistration | null> | null = null;
@@ -182,6 +214,42 @@ export const promptInstall = async (): Promise<InstallOutcome> => {
   else snoozeInstallPrompt();
   emit();
   return outcome;
+};
+
+// ─── "opened from another installed NGA app" ─────────────────────────────────
+// Other apps' launchers add `nga_launch=app` when they run installed
+// (docs/APP_LAUNCH.md). If MIS then lands in a browser tab, it asks to be
+// installed right away instead of waiting for the usual second-visit nudge.
+const LAUNCHED_FROM_APP_KEY = "nga.launchedFromApp";
+const LAUNCH_ASK_DONE_KEY = "nga.launchInstallAsked";
+
+export const captureLaunchMarker = () => {
+  const url = new URL(window.location.href);
+  if (url.searchParams.get("nga_launch") !== "app") return;
+  try {
+    sessionStorage.setItem(LAUNCHED_FROM_APP_KEY, "1");
+  } catch {
+    /* ignore */
+  }
+  url.searchParams.delete("nga_launch");
+  if (!url.searchParams.has("code")) window.history.replaceState(window.history.state, "", url.toString());
+};
+
+/** True once per session when MIS was opened from another installed NGA app. */
+export const shouldAskInstallFromLaunch = () => {
+  try {
+    return sessionStorage.getItem(LAUNCHED_FROM_APP_KEY) === "1" && sessionStorage.getItem(LAUNCH_ASK_DONE_KEY) !== "1";
+  } catch {
+    return false;
+  }
+};
+
+export const markLaunchInstallAsked = () => {
+  try {
+    sessionStorage.setItem(LAUNCH_ASK_DONE_KEY, "1");
+  } catch {
+    /* ignore */
+  }
 };
 
 /** Refresh the snapshot, e.g. after returning from the Share sheet. */

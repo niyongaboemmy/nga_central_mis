@@ -2,6 +2,7 @@ import React, { useRef, useEffect, useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Search, X, Grid, ArrowRight, LayoutGrid } from "lucide-react";
 import { authorizeSSO } from "../../api/auth";
+import { buildLaunchHref, buildLoginHref, resolveRedirectUri, useLaunchLinks } from "./appLaunch";
 import { useToast } from "../../contexts/ToastContext";
 import { System } from "../../api/systems";
 
@@ -46,70 +47,71 @@ const SystemsMenu: React.FC<SystemsMenuProps> = ({
     );
   }, [systems, searchQuery]);
 
-  const handleSystemClick = async (system: System) => {
-    const callbacks = system.allowed_redirect_uris
-      ? system.allowed_redirect_uris.split(",").map((s) => s.trim())
-      : [];
+  const { links, consume } = useLaunchLinks(systems, isOpen);
 
-    const currentOrigin = window.location.origin;
-    const matchingCallback = callbacks.find((cb) =>
-      cb.startsWith(currentOrigin),
-    );
-    const redirectUri = matchingCallback || callbacks[0] || system.home_url;
-
+  /**
+   * Tiles are real links so Chrome can open an app in its installed window
+   * (see appLaunch.ts). This handler only covers the moments no link is
+   * ready yet -- the code is still being minted -- by falling back to the
+   * scripted flow, which always works but opens in a browser tab.
+   */
+  const fallbackLaunch = async (system: System) => {
+    const redirectUri = resolveRedirectUri(system, window.location.origin);
     if (!redirectUri) {
       showToast("No callback or home URL configured for this system", "error");
       return;
     }
-
     const newWindow = window.open("about:blank", "_blank");
     if (!newWindow) {
       showToast("Popup blocked! Please allow popups for this site.", "error");
       return;
     }
-
     if (!system.client_id) {
       newWindow.location.href = redirectUri;
       return;
     }
-
     const state = Math.random().toString(36).substring(2, 15);
-
     try {
-      showToast(`Authenticating with ${system.name}...`, "info");
-      const result = await authorizeSSO(
-        system.client_id!,
-        redirectUri,
-        "code",
-        state,
-      );
-      if (result && result.code) {
-        const targetUrl = new URL(redirectUri);
-        targetUrl.searchParams.append("code", result.code);
-        if (result.state) {
-          targetUrl.searchParams.append("state", result.state);
-        }
-        newWindow.location.href = targetUrl.toString();
-      } else {
-        newWindow.location.href = redirectUri;
-      }
+      const result = await authorizeSSO(system.client_id, redirectUri, "code", state);
+      newWindow.location.href = result && result.code ? buildLaunchHref(redirectUri, result.code, result.state) : redirectUri;
     } catch (error: any) {
       if (error.response?.status === 401) {
         newWindow.close();
-        const loginUrl = new URL("/login", window.location.origin);
-        loginUrl.searchParams.set("client_id", system.client_id!);
-        loginUrl.searchParams.set("redirect_uri", redirectUri);
-        loginUrl.searchParams.set("response_type", "code");
-        loginUrl.searchParams.set("state", state);
-        window.location.href = loginUrl.toString();
+        window.location.href = buildLoginHref(window.location.origin, system.client_id, redirectUri, state);
         return;
       }
-      showToast(
-        error.response?.data?.message || "SSO Authentication failed",
-        "error",
-      );
+      showToast(error.response?.data?.message || "SSO Authentication failed", "error");
       newWindow.location.href = redirectUri;
     }
+  };
+
+  const linkProps = (system: System) => {
+    const link = links[system.system_id];
+    if (link?.status === "ready" || link?.status === "error") {
+      return {
+        href: link.href,
+        target: "_blank",
+        rel: "noopener noreferrer",
+        onClick: () => {
+          consume(system.system_id);
+          // After the browser has followed the link: a link removed from
+          // the page mid-click can't navigate.
+          window.setTimeout(onClose, 0);
+        },
+      };
+    }
+    if (link?.status === "signed-out") {
+      // MIS session expired: sign in here first, then continue to the app.
+      return { href: link.loginHref, onClick: () => window.setTimeout(onClose, 0) };
+    }
+    return {
+      href: resolveRedirectUri(system, window.location.origin) || undefined,
+      "aria-busy": true,
+      onClick: (e: React.MouseEvent) => {
+        e.preventDefault();
+        void fallbackLaunch(system);
+      },
+    };
   };
 
   return (
@@ -177,13 +179,14 @@ const SystemsMenu: React.FC<SystemsMenuProps> = ({
             ) : (
               <div className="grid grid-cols-4 gap-1">
                 {filteredSystems.map((system, idx) => (
-                  <motion.button
+                  <motion.a
                     key={system.system_id}
                     initial={{ opacity: 0, y: 8 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: idx * 0.03 }}
-                    onClick={() => handleSystemClick(system)}
-                    className="group relative flex flex-col items-center p-1.5 pt-2 rounded-xl hover:bg-blue-50 dark:hover:bg-blue-600/10 transition-all duration-200 text-center"
+                    {...linkProps(system)}
+                    title={`Open ${system.name}`}
+                    className="group relative flex flex-col items-center p-1.5 pt-2 rounded-xl hover:bg-blue-50 dark:hover:bg-blue-600/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50 transition-all duration-200 text-center"
                   >
                     <div className="relative mb-1.5">
                       <div className="w-10 h-10 rounded-lg bg-white dark:bg-white/[0.06] shadow-[0_4px_10px_rgba(0,0,0,0.06)] dark:shadow-[0_4px_14px_rgba(0,0,0,0.3)] group-hover:shadow-[0_6px_16px_rgba(37,99,235,0.18)] group-hover:scale-105 flex items-center justify-center border border-black/5 dark:border-white/10 group-hover:border-blue-200 dark:group-hover:border-blue-500/30 transition-all duration-200 overflow-hidden">
@@ -204,7 +207,7 @@ const SystemsMenu: React.FC<SystemsMenuProps> = ({
                     <span className="text-[10px] font-bold text-slate-700 dark:text-slate-300 group-hover:text-blue-600 dark:group-hover:text-blue-400 truncate w-full px-0.5">
                       {system.name}
                     </span>
-                  </motion.button>
+                  </motion.a>
                 ))}
               </div>
             )}
