@@ -39,6 +39,7 @@ import {
   nextStep,
   readInstallReport,
   readReportCookies,
+  reconcileSelfStatus,
   saveProgress,
   startUrl,
   webInstall,
@@ -195,11 +196,14 @@ const AppsInstallerPage: React.FC = () => {
     return () => window.removeEventListener("message", onMessage);
   }, [applyReport]);
 
-  // This app installed (now or earlier) counts as installed.
+  // This app's own status follows the browser's live answer, both ways: a
+  // saved "installed" must not outlive an uninstall.
   useEffect(() => {
     const self = NGA_APPS.find((a) => a.origin === here);
-    if (self && pwa.installed && !isInstalled(progress[self.key])) set(self.key, "already");
-  }, [pwa.installed, here, progress, set]);
+    if (!self) return;
+    const next = reconcileSelfStatus(progress[self.key], pwa);
+    if (next !== progress[self.key]) set(self.key, next);
+  }, [pwa, here, progress, set]);
 
   useEffect(() => saveProgress(progress), [progress]);
 
@@ -292,7 +296,7 @@ const AppsInstallerPage: React.FC = () => {
   };
 
   const restart = () => {
-    setProgress(NGA_APPS.reduce((p, a) => markStep(p, a.key, a.origin === here && pwa.installed ? "already" : "todo"), emptyProgress()));
+    setProgress(NGA_APPS.reduce((p, a) => markStep(p, a.key, a.origin === here ? reconcileSelfStatus("todo", pwa) : "todo"), emptyProgress()));
     setRunning(true);
   };
 
