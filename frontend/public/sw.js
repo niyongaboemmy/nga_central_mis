@@ -12,6 +12,33 @@
 importScripts("/elearning-sw.js");
 
 const APP_CACHE = "nga-app-v1";
+const SW_VERSION = "nga-sw-v2";
+
+// When this version takes over, refresh open tabs sitting on a safe landing
+// page so they run the current release at once (an old page could be reused
+// from the HTTP cache before the HTML got no-cache headers). Pages where
+// someone could be mid-task are never reloaded.
+const SAFE_TO_REFRESH = new Set(["/", "/home", "/dashboard", "/login", "/reminders", "/apps"]);
+self.addEventListener("activate", (event) => {
+  event.waitUntil(
+    (async () => {
+      await self.clients.claim();
+      const windows = await self.clients.matchAll({ type: "window" });
+      // Deliberately NOT awaited: the reload's own page request is held until
+      // this activation finishes, so waiting for it here would deadlock the
+      // worker in "activating" (seen in testing).
+      windows.forEach((client) => {
+        try {
+          const url = new URL(client.url);
+          if (url.origin !== self.location.origin || !SAFE_TO_REFRESH.has(url.pathname)) return;
+          if ("navigate" in client) client.navigate(client.url).catch(() => null);
+        } catch (e) {
+          /* ignore */
+        }
+      });
+    })(),
+  );
+});
 const AGENDA_KEY = "/__nga/agenda.json";
 
 const showFromPayload = async (payload) => {
