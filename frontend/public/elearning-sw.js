@@ -32,7 +32,9 @@ self.addEventListener("fetch", (event) => {
 
   // Navigations: network, falling back to the cached shell.
   if (req.mode === "navigate") {
-    event.respondWith(fetch(req).then((res) => { caches.open(SHELL).then((c) => c.put("/", res.clone())); return res; }).catch(() => caches.match("/")));
+    // Always revalidate the page with the server (the HTML used to be served
+    // without cache headers, so a plain fetch could hand back an old release).
+    event.respondWith(fetch(req, { cache: "no-cache" }).then((res) => { caches.open(SHELL).then((c) => c.put("/", res.clone())); return res; }).catch(() => caches.match("/")));
     return;
   }
 
