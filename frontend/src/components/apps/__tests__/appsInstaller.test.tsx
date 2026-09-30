@@ -8,6 +8,7 @@ import {
   manifestId,
   loadProgress,
   markStep,
+  readReportCookies,
   NGA_APPS,
   nextStep,
   readInstallReport,
@@ -59,6 +60,14 @@ describe("NGA app list", () => {
     expect(readInstallReport({ ...ok, origin: "https://evil.example" })).toBeNull();
     expect(readInstallReport({ ...ok, data: { ...ok.data, status: "hacked" } })).toBeNull();
     expect(readInstallReport({ ...ok, data: "nga-install" })).toBeNull();
+  });
+
+  it("reads the apps' report cookies (the channel that works without an opener)", () => {
+    const found = readReportCookies("theme=dark; nga_inst_taskmentor=installed.1700000000000; nga_inst_tupo=already.5; nga_inst_evil=installed.1; nga_inst_tendo=hacked.1");
+    expect(found).toEqual([
+      { key: "taskmentor", status: "done", at: 1700000000000 },
+      { key: "tupo", status: "already", at: 5 },
+    ]);
   });
 
   it("walks the steps in order, skipping done and skipped apps", () => {
@@ -135,27 +144,32 @@ describe("/apps installer page", () => {
 
   const card = (name: string) => screen.getByText(name, { selector: "p" }).closest("[id^='app-']") as HTMLElement;
 
-  it("lists every app and walks 'Install all' as honest one-click steps", async () => {
+  it("lists every app and walks 'Install all' as real links -- installed apps open straight in their window", async () => {
     render(<AppsInstallerPage />);
     for (const app of NGA_APPS) expect(screen.getByText(app.name, { selector: "p" })).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: /Install all apps/ }));
-    // In jsdom this page isn't an NGA origin and has no Web Install API, so the
-    // step opens the app in a tab with its install card and a way back.
-    const url = new URL(open.mock.calls[0][0] as string);
+    // In jsdom this page isn't an NGA origin and has no Web Install API, so
+    // every app is reached by a real link (Chrome sends a clicked link into an
+    // installed app's window -- only without an opener; window.open never
+    // is). The app reports back through a short .amashuri.com cookie.
+    const start = screen.getByRole("link", { name: /Install all apps/ });
+    const url = new URL(start.getAttribute("href")!);
     expect(url.searchParams.get("nga_install")).toBe("1");
     expect(url.searchParams.get("return")).toBe(`${window.location.origin}/apps?done=mis`);
-    expect(open.mock.calls[0][1]).toBe("_blank");
+    expect(start).toHaveAttribute("target", "_blank");
+    expect(start).toHaveAttribute("rel", "noopener");
+    expect(open).not.toHaveBeenCalled();
 
-    // Opening a tab is NOT installing: it waits for the app to report back.
+    fireEvent.click(start);
+    // Opening is NOT installing: it waits for the app to report back.
     expect(within(card("NGA MIS")).getByText("Waiting…")).toBeInTheDocument();
-    expect(screen.getByText("Finish in the NGA MIS tab")).toBeInTheDocument();
+    expect(screen.getByText("Finish in NGA MIS")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Skip" }));
-    // The step panel animates out before the next one comes in.
     expect(await screen.findByText("Step 2 of 4")).toBeInTheDocument();
     expect(screen.getByText("Install Task Mentor", { selector: "p" })).toBeInTheDocument();
     expect(within(card("NGA MIS")).getByText("Skipped")).toBeInTheDocument();
+    expect(within(card("Task Mentor")).getByRole("link", { name: /Install & open/ })).toHaveAttribute("rel", "noopener");
   });
 
   it("updates live when an app's install card reports back", () => {
@@ -166,11 +180,29 @@ describe("/apps installer page", () => {
       );
     });
     expect(within(card("Task Mentor")).getByText("Installed")).toBeInTheDocument();
-    expect(screen.getByText("Task Mentor is installed")).toBeInTheDocument();
+    expect(screen.getByText("Task Mentor is installed and open")).toBeInTheDocument();
 
     // A forged message from elsewhere changes nothing.
     act(() => {
       window.dispatchEvent(new MessageEvent("message", { origin: "https://evil.example", data: { type: "nga-install", app: "tendo", status: "installed" } }));
+    });
+    expect(within(card("Tendo")).getByText("Not installed")).toBeInTheDocument();
+  });
+
+  it("updates from an app's report cookie when you come back to this tab, and clears it", () => {
+    render(<AppsInstallerPage />);
+    document.cookie = `nga_inst_tupo=already.${Date.now()}; path=/`;
+    act(() => {
+      window.dispatchEvent(new Event("focus"));
+    });
+    expect(within(card("Tupo")).getByText("Already installed")).toBeInTheDocument();
+    expect(screen.getByText("Tupo is installed — opened in its own window")).toBeInTheDocument();
+    expect(document.cookie).not.toContain("nga_inst_tupo=already");
+
+    // A report left over from long before this visit is ignored.
+    document.cookie = `nga_inst_tendo=installed.${Date.now() - 3_600_000}; path=/`;
+    act(() => {
+      window.dispatchEvent(new Event("focus"));
     });
     expect(within(card("Tendo")).getByText("Not installed")).toBeInTheDocument();
   });
@@ -183,12 +215,19 @@ describe("/apps installer page", () => {
     expect(within(card("Tupo")).getByText("Skipped")).toBeInTheDocument();
   });
 
-  it("says so when the browser blocks the new tab, with a link instead", () => {
-    open.mockReturnValue(null);
+  it("back on this tab with no report: asks whether the app opened as an app, in one click", async () => {
     render(<AppsInstallerPage />);
-    fireEvent.click(screen.getByRole("button", { name: /Install all apps/ }));
-    expect(screen.getByRole("alert")).toHaveTextContent("Your browser blocked the new tab");
-    expect(within(card("NGA MIS")).getByText("Not installed")).toBeInTheDocument();
+    const now = Date.now();
+    const clock = vi.spyOn(Date, "now").mockReturnValue(now);
+    fireEvent.click(screen.getByRole("link", { name: /Install all apps/ }));
+    clock.mockReturnValue(now + 5000);
+    act(() => {
+      window.dispatchEvent(new Event("focus"));
+    });
+    expect(await screen.findByText(/Did NGA MIS open in its own app window/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Yes, it opened as an app" }));
+    expect(within(card("NGA MIS")).getByText("Already installed")).toBeInTheDocument();
+    clock.mockRestore();
   });
 
   it("has a Back button that leaves for NGA MIS when there's nowhere to go back to", () => {
