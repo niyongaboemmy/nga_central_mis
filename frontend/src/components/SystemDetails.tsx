@@ -334,6 +334,12 @@ const SystemDetails = () => {
             icon={<Globe className="w-3.5 h-3.5" />}
             mono={false}
           />
+          <CredentialField
+            label="Back-channel logout URL"
+            value={system.backchannel_logout_uri || "Not set — signing out of MIS won't sign users out of this app"}
+            icon={<Globe className="w-3.5 h-3.5" />}
+            mono={false}
+          />
           <div>
             <label className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500 mb-2">
               <Calendar className="w-3.5 h-3.5" />

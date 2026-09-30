@@ -666,6 +666,9 @@ export const System = mysqlTable("System", {
   allowed_redirect_uris: text("allowed_redirect_uris"),
   icon_url: varchar("icon_url", { length: 255 }).notNull(),
   home_url: varchar("home_url", { length: 255 }).notNull(),
+  // OpenID Connect Back-Channel Logout: where MIS POSTs a logout_token when a
+  // user signs out, so this app ends their sessions too (migration 094).
+  backchannel_logout_uri: varchar("backchannel_logout_uri", { length: 500 }),
   status: mysqlEnum("status", ["ACTIVE", "DISABLED"]).default("ACTIVE"),
   created_at: datetime("created_at").default(sql`CURRENT_TIMESTAMP`),
 });

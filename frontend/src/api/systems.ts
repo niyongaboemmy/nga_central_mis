@@ -7,6 +7,8 @@ export interface System {
   client_id?: string;
   client_secret?: string;
   allowed_redirect_uris?: string;
+  /** OpenID Connect Back-Channel Logout endpoint (single sign-out). */
+  backchannel_logout_uri?: string | null;
   icon_url: string;
   home_url: string;
   status: "ACTIVE" | "DISABLED";

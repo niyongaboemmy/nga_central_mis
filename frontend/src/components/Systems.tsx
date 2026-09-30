@@ -365,6 +365,26 @@ const SystemModal = ({
                 placeholder="https://app.example.com/callback, http://localhost:3000/callback"
               />
             </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 ml-1">
+                Back-channel logout URL <span className="font-normal text-gray-500 dark:text-gray-400">(optional)</span>
+              </label>
+              <input
+                type="url"
+                value={formData.backchannel_logout_uri || ""}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    backchannel_logout_uri: e.target.value,
+                  })
+                }
+                className="w-full px-4 py-3 bg-gray-50 dark:bg-slate-900/50 border border-gray-200 dark:border-slate-700/30 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all dark:text-white placeholder:text-gray-400"
+                placeholder="https://app.example.com/api/sso/backchannel-logout"
+              />
+              <p className="mt-1 ml-1 text-xs text-gray-600 dark:text-gray-300">
+                When someone signs out of MIS, MIS tells this app to sign them out too (OpenID Connect Back-Channel Logout).
+              </p>
+            </div>
           </div>
         </div>
 
