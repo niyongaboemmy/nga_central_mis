@@ -34,6 +34,7 @@ import { asyncHandler } from "../middleware/asyncHandler";
 import config from "../config";
 import logger from "../utils/logger";
 import { recordActivity } from "../utils/activityLogger";
+import { notifyLogout } from "../services/sso/backchannelLogout";
 import { getCurrentAcademicYearId } from "../utils/academicYear";
 
 export const login = asyncHandler(async (req: any, res: any) => {
@@ -552,6 +553,12 @@ export const logout = asyncHandler(async (req: any, res: any) => {
     domain: config.cookieDomain,
     path: "/",
   });
+
+  // Single sign-out: tell every connected app (Task Mentor, Tendo, Tupo, ...)
+  // to end this user's sessions too -- OIDC Back-Channel Logout, in the
+  // background so signing out never waits on another app.
+  void notifyLogout(req.user.userId).catch(() => undefined);
+
   successResponse(res, "Logged out successfully");
 });
 

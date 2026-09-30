@@ -29,6 +29,7 @@ import accessRoutes from "./routes/access";
 import homeRoutes from "./routes/home";
 import elearningRoutes from "./routes/elearning";
 import reminderRoutes from "./routes/reminders";
+import { jwks, ssoIssuer } from "./services/sso/signingKey";
 
 const app = express();
 
@@ -59,6 +60,28 @@ app.use(requestLogger);
 
 // Health check routes (no auth required)
 app.use("/health", healthRoutes);
+
+// SSO discovery + signing keys (public). Apps verify single-sign-out
+// logout tokens against the JWKS (services/sso/backchannelLogout.ts).
+app.get("/.well-known/jwks.json", (_req, res) => {
+  res.set("Cache-Control", "public, max-age=3600");
+  res.json(jwks());
+});
+app.get("/.well-known/openid-configuration", (_req, res) => {
+  const issuer = ssoIssuer();
+  res.set("Cache-Control", "public, max-age=3600");
+  res.json({
+    issuer,
+    authorization_endpoint: `${issuer}/sso/authorize`,
+    token_endpoint: `${issuer}/sso/token`,
+    jwks_uri: `${issuer}/.well-known/jwks.json`,
+    backchannel_logout_supported: true,
+    backchannel_logout_session_supported: false,
+    response_types_supported: ["code"],
+    subject_types_supported: ["public"],
+    id_token_signing_alg_values_supported: ["RS256"],
+  });
+});
 
 // API routes
 app.get("/", (req, res) => {

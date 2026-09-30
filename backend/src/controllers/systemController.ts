@@ -12,6 +12,7 @@ import {
 } from "../db/schema";
 import { eq, and, desc, gte, lte, like } from "drizzle-orm";
 import crypto from "crypto";
+import { validBackchannelUri } from "../services/sso/backchannelLogout";
 import { isHashedClientSecret } from "../utils/ssoClientSecret";
 
 export const createSystem = async (req: Request, res: Response) => {
@@ -24,6 +25,13 @@ export const createSystem = async (req: Request, res: Response) => {
       icon_url,
       home_url,
     } = req.body;
+
+    let backchannel_logout_uri: string | null | undefined;
+    try {
+      backchannel_logout_uri = validBackchannelUri(req.body.backchannel_logout_uri);
+    } catch (e: any) {
+      return res.status(400).json({ message: e.message });
+    }
 
     if (!icon_url || !home_url) {
       return res
@@ -56,6 +64,7 @@ export const createSystem = async (req: Request, res: Response) => {
       allowed_redirect_uris,
       icon_url,
       home_url,
+      backchannel_logout_uri: backchannel_logout_uri ?? null,
     });
 
     res.status(201).json({
@@ -110,6 +119,13 @@ export const updateSystem = async (req: Request, res: Response) => {
       home_url,
     } = req.body;
 
+    let backchannel_logout_uri: string | null | undefined;
+    try {
+      backchannel_logout_uri = validBackchannelUri(req.body.backchannel_logout_uri);
+    } catch (e: any) {
+      return res.status(400).json({ message: e.message });
+    }
+
     const existingSystem = await db
       .select()
       .from(System)
@@ -148,6 +164,8 @@ export const updateSystem = async (req: Request, res: Response) => {
         allowed_redirect_uris,
         icon_url,
         home_url,
+        // Left untouched when the form doesn't send it.
+        ...(backchannel_logout_uri === undefined ? {} : { backchannel_logout_uri }),
       })
       .where(eq(System.system_id, Number(id)));
 
