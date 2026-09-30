@@ -3,7 +3,7 @@ import { useLocation } from "react-router-dom";
 import { ArrowLeft, LayoutGrid } from "lucide-react";
 import Modal from "../ui/Modal";
 import { InstallGuide } from "../reminders/InstallGuide";
-import RepairChromeApp from "./RepairChromeApp";
+import OpenInAppGuide from "./OpenInAppGuide";
 import {
   autoPromptSnoozed,
   checkInstalledHere,
@@ -89,8 +89,15 @@ export const AutoInstallPrompt: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if (pwa.installed && open && !returnUrl) setOpen(false);
-  }, [pwa.installed, open, returnUrl]);
+    if (pwa.installed && !pwa.linksOpenInBrowser && open && !returnUrl) setOpen(false);
+  }, [pwa.installed, pwa.linksOpenInBrowser, open, returnUrl]);
+
+  // "Open app" landed in this tab although MIS is installed: Chrome opens its
+  // links in the browser. Explain the one switch that fixes it.
+  useEffect(() => {
+    if (pwa.installed && pwa.linksOpenInBrowser && installRequested() && !open && !closedThisLoad) setOpen(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pwa.installed, pwa.linksOpenInBrowser]);
 
   // The browser's "installable, not installed" signal (beforeinstallprompt)
   // often arrives after the first render: open then too.
@@ -122,11 +129,11 @@ export const AutoInstallPrompt: React.FC = () => {
     <Modal
       isOpen={open}
       onClose={close}
-      title={pwa.notOpenable && !pwa.canPrompt ? "NGA MIS couldn't open as an app" : pwa.installed ? "NGA MIS is installed" : "Install NGA MIS as an app"}
+      title={pwa.installed && pwa.linksOpenInBrowser ? "Open NGA MIS as an app" : pwa.installed ? "NGA MIS is installed" : "Install NGA MIS as an app"}
       size="md"
     >
       <div className="space-y-4">
-        {pwa.notOpenable && !pwa.canPrompt ? <RepairChromeApp /> : <InstallGuide />}
+        {pwa.installed && pwa.linksOpenInBrowser ? <OpenInAppGuide /> : <InstallGuide />}
         <div className="flex flex-col gap-2 border-t border-slate-100 pt-4 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between">
           {returnUrl ? (
             <a href={returnUrl} className="inline-flex items-center gap-1.5 text-sm font-semibold text-brand-700 hover:underline dark:text-brand-200">

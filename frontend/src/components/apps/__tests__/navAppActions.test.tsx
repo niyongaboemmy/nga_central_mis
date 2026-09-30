@@ -80,7 +80,7 @@ describe("a leftover record: listed as installed, but Chrome offers to install i
   });
 });
 
-describe("'Open app' proves it: landing in a browser tab means not installed here", () => {
+describe("'Open app' landing in a browser tab", () => {
   const setStandalone = (on: boolean) =>
     Object.defineProperty(window, "matchMedia", {
       configurable: true,
@@ -95,56 +95,52 @@ describe("'Open app' proves it: landing in a browser tab means not installed her
     window.history.replaceState(null, "", "/");
   });
 
-  it("the link lands in a tab: not installed (even if Chrome's list says so), and the install sheet is requested", async () => {
+  it("installed (Chrome lists it, no install offer): stays installed, flagged 'links open in the browser', sheet requested", async () => {
     const { captureLaunchMarker, installRequested, clearInstallRequest } = await import("../../../reminders/pwa");
-    setRelatedApps([{ platform: "webapp", id: "https://mis.amashuri.com/" }]); // Chrome's list: "installed"
+    setRelatedApps([{ platform: "webapp", id: "https://mis.amashuri.com/" }]);
     setStandalone(false);
     window.history.replaceState(null, "", "/home?source=pwa&nga_open=1");
     captureLaunchMarker();
     expect(window.location.search).toBe("?source=pwa");
-    expect(await refreshInstallCheck()).toBe("no");
-    expect(getPwaState().installed).toBe(false);
+    expect(await refreshInstallCheck()).toBe("yes");
+    expect(getPwaState().installed).toBe(true);
+    expect(getPwaState().linksOpenInBrowser).toBe(true);
     expect(installRequested()).toBe(true);
     clearInstallRequest();
-    renderAt();
-    expect(screen.queryByRole("link", { name: "Open the NGA MIS app" })).toBeNull();
   });
 
-  it("the link opens the app window: installed, and the old verdict is cleared", async () => {
+  it("not installed (Chrome no longer lists it): the flag clears -- it's a plain install", async () => {
+    localStorage.setItem("nga.pwa.linksOpenInBrowser", "1");
+    setRelatedApps([]);
+    expect(await refreshInstallCheck()).toBe("no");
+    expect(localStorage.getItem("nga.pwa.linksOpenInBrowser")).toBeNull();
+    expect(getPwaState().linksOpenInBrowser).toBe(false);
+  });
+
+  it("opened in the app window: the flag clears", async () => {
     const { captureLaunchMarker, getInstallDiagnostics } = await import("../../../reminders/pwa");
-    localStorage.setItem("nga.pwa.notOpenable", "1");
+    localStorage.setItem("nga.pwa.linksOpenInBrowser", "1");
     setStandalone(true);
     window.history.replaceState(null, "", "/home?source=pwa&nga_open=1");
     captureLaunchMarker();
-    expect(getInstallDiagnostics().notOpenableSince).toBeNull();
-    expect(await refreshInstallCheck()).toBe("yes");
+    expect(getInstallDiagnostics().linksOpenInBrowserSince).toBeNull();
   });
 
-  it("a real install clears the verdict", async () => {
+  it("a fresh install clears it (new installs open links in the app)", async () => {
     const { initPwa } = await import("../../../reminders/pwa");
     initPwa();
-    localStorage.setItem("nga.pwa.notOpenable", "1");
-    await refreshInstallCheck();
-    expect(getPwaState().installed).toBe(false);
+    localStorage.setItem("nga.pwa.linksOpenInBrowser", "1");
     act(() => {
       window.dispatchEvent(new Event("appinstalled"));
     });
-    expect(localStorage.getItem("nga.pwa.notOpenable")).toBeNull();
-    expect(getPwaState().installed).toBe(true);
+    expect(localStorage.getItem("nga.pwa.linksOpenInBrowser")).toBeNull();
   });
 
-  it("stuck record (can't open, Chrome won't offer install) -> flagged for the repair guide; cleared once Chrome drops it", async () => {
-    const { getPwaState: state } = await import("../../../reminders/pwa");
+  it("an old 'not openable' marker from the previous release is dropped", async () => {
+    const { captureLaunchMarker } = await import("../../../reminders/pwa");
     localStorage.setItem("nga.pwa.notOpenable", "1");
-    setRelatedApps([{ platform: "webapp" }]); // Chrome still lists it
-    await refreshInstallCheck();
-    expect(state().notOpenable).toBe(true);
-    expect(state().canPrompt).toBe(false);
-    setRelatedApps([]); // removed in chrome://apps
-    await refreshInstallCheck();
+    captureLaunchMarker();
     expect(localStorage.getItem("nga.pwa.notOpenable")).toBeNull();
-    expect(state().notOpenable).toBe(false);
-    expect(state().installed).toBe(false);
   });
 
   it("'Open app' links carry the probe", async () => {
