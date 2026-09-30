@@ -1,21 +1,12 @@
 import React, { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { BellRing, Download, ShieldAlert, X } from "lucide-react";
+import { BellRing, ShieldAlert, X } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { remindersApi } from "../../api/reminders";
 import { pushHealthCheck, enablePush, type PushStatus } from "../../reminders/push";
-import {
-  countVisit,
-  installPromptSnoozed,
-  markLaunchInstallAsked,
-  promptInstall,
-  shouldAskInstallFromLaunch,
-  snoozeInstallPrompt,
-  usePwa,
-} from "../../reminders/pwa";
-import { InstallSheet } from "./InstallGuide";
+import { countVisit } from "../../reminders/pwa";
 
-type Nudge = "blocked" | "enable-device" | "install" | "try-reminders" | null;
+type Nudge = "blocked" | "enable-device" | "try-reminders" | null;
 
 const REMINDER_NUDGE_KEY = "nga.reminders.nudgeSnoozedUntil";
 const snoozed = (key: string) => {
@@ -33,22 +24,20 @@ const snooze = (key: string, days: number) => {
   }
 };
 
-/** Picks at most one, most useful card (pure, unit-tested). */
+/**
+ * Picks at most one, most useful card (pure, unit-tested). Installing the
+ * app is asked on load by AutoInstallPrompt, so it isn't repeated here.
+ */
 export const chooseNudge = (input: {
   remindersOn: boolean | null;
   pushStatus: PushStatus | null;
-  installed: boolean;
-  installMethod: string;
   visits: number;
-  installSnoozed: boolean;
   reminderNudgeSnoozed: boolean;
   onRemindersPage: boolean;
 }): Nudge => {
   if (input.onRemindersPage || input.remindersOn === null || input.pushStatus === null) return null;
   if (input.remindersOn && input.pushStatus === "blocked" && !input.reminderNudgeSnoozed) return "blocked";
   if (input.remindersOn && input.pushStatus === "off" && !input.reminderNudgeSnoozed) return "enable-device";
-  const installable = ["prompt", "ios", "mac-dock"].includes(input.installMethod);
-  if (!input.installed && installable && input.visits >= 2 && !input.installSnoozed) return "install";
   if (!input.remindersOn && input.visits >= 3 && !input.reminderNudgeSnoozed) return "try-reminders";
   return null;
 };
@@ -59,24 +48,13 @@ export const chooseNudge = (input: {
  * never on the first visit, never twice in a fortnight once dismissed.
  */
 export const ReminderNudge: React.FC = () => {
-  const pwa = usePwa();
   const location = useLocation();
   const navigate = useNavigate();
   const [remindersOn, setRemindersOn] = useState<boolean | null>(null);
   const [pushStatus, setPushStatus] = useState<PushStatus | null>(null);
   const [visits] = useState(() => countVisit());
-  const [installOpen, setInstallOpen] = useState(false);
   const [dismissed, setDismissed] = useState(false);
   const [busy, setBusy] = useState(false);
-
-  // Opened from another installed NGA app but not installed here: ask now.
-  useEffect(() => {
-    if (!pwa.installed && pwa.platform.installMethod !== "none" && shouldAskInstallFromLaunch()) {
-      markLaunchInstallAsked();
-      setInstallOpen(true);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   useEffect(() => {
     let alive = true;
@@ -108,30 +86,20 @@ export const ReminderNudge: React.FC = () => {
     : chooseNudge({
         remindersOn,
         pushStatus,
-        installed: pwa.installed,
-        installMethod: pwa.platform.installMethod,
         visits,
-        installSnoozed: installPromptSnoozed(),
         reminderNudgeSnoozed: snoozed(REMINDER_NUDGE_KEY),
         onRemindersPage: location.pathname.startsWith("/reminders"),
       });
 
   const close = () => {
-    if (nudge === "install") snoozeInstallPrompt();
-    else snooze(REMINDER_NUDGE_KEY, nudge === "try-reminders" ? 14 : 3);
+    snooze(REMINDER_NUDGE_KEY, nudge === "try-reminders" ? 14 : 3);
     setDismissed(true);
   };
 
   const primary = async () => {
     setBusy(true);
     try {
-      if (nudge === "install") {
-        if (pwa.platform.installMethod === "prompt") {
-          const outcome = await promptInstall();
-          if (outcome !== "unavailable") setDismissed(true);
-          else setInstallOpen(true);
-        } else setInstallOpen(true);
-      } else if (nudge === "enable-device") {
+      if (nudge === "enable-device") {
         const result = await enablePush();
         setPushStatus(result === "on" ? "on" : result === "blocked" ? "blocked" : "off");
         if (result === "on") setDismissed(true);
@@ -156,15 +124,6 @@ export const ReminderNudge: React.FC = () => {
       title: "Get reminders on this device too",
       body: "You have reminders on — allow notifications here so they arrive even when NGA is closed.",
       cta: "Turn on",
-    },
-    install: {
-      icon: <Download className="h-5 w-5" />,
-      title: "Install the NGA app",
-      body:
-        pwa.platform.installMethod === "ios"
-          ? "Add NGA to your Home Screen — iPhone only sends reminders to installed apps."
-          : "One tap: its own window, faster start, and reminders even when the browser is closed.",
-      cta: pwa.platform.installMethod === "prompt" ? "Install" : "Show me how",
     },
     "try-reminders": {
       icon: <BellRing className="h-5 w-5" />,
@@ -227,7 +186,6 @@ export const ReminderNudge: React.FC = () => {
           </motion.aside>
         )}
       </AnimatePresence>
-      <InstallSheet isOpen={installOpen} onClose={() => { setInstallOpen(false); setDismissed(true); }} />
     </>
   );
 };

@@ -65,6 +65,8 @@ import AccessStudio from "./components/access/AccessStudio";
 import InsightsHub from "./components/access/InsightsHub";
 import HomePage from "./components/home/HomePage";
 import RemindersPage from "./components/reminders/RemindersPage";
+import AppsInstallerPage from "./components/apps/AppsInstallerPage";
+import { AutoInstallPrompt } from "./components/apps/AutoInstallPrompt";
 
 const LoginPage: React.FC = () => {
   const navigate = useNavigate();
@@ -265,6 +267,8 @@ function App() {
         <MetadataProvider>
           <AcademicPeriodProvider>
           <Router basename="/">
+            {/* Asks to install the app on load when it isn't installed here. */}
+            <AutoInstallPrompt />
             <Routes>
 
             {/* Landing page */}
@@ -331,6 +335,10 @@ function App() {
                 </ProtectedRoute>
               }
             />
+
+            {/* Install every NGA app from one place. Public on purpose: a new
+                device can be set up before anyone signs in (docs/APP_LAUNCH.md). */}
+            <Route path="/apps" element={<AppsInstallerPage />} />
 
             {/* Reminders -- set up this device, Now & Next, what to be
                 reminded of (REMINDERS_SOLUTION_PROPOSAL.md). Everyone. */}

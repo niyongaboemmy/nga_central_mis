@@ -71,10 +71,7 @@ describe("chooseNudge", () => {
   const base = {
     remindersOn: false,
     pushStatus: "off" as const,
-    installed: false,
-    installMethod: "prompt",
-    visits: 2,
-    installSnoozed: false,
+    visits: 3,
     reminderNudgeSnoozed: false,
     onRemindersPage: false,
   };
@@ -89,13 +86,12 @@ describe("chooseNudge", () => {
   });
 
   it("asks a second device to join when reminders are on elsewhere", () => {
-    expect(chooseNudge({ ...base, remindersOn: true, pushStatus: "off", installed: true })).toBe("enable-device");
+    expect(chooseNudge({ ...base, remindersOn: true, pushStatus: "off" })).toBe("enable-device");
   });
 
-  it("offers install from the second visit, not the first, and respects the snooze", () => {
-    expect(chooseNudge({ ...base, visits: 1 })).toBeNull();
-    expect(chooseNudge(base)).toBe("install");
-    expect(chooseNudge({ ...base, installSnoozed: true })).toBeNull();
-    expect(chooseNudge({ ...base, installMethod: "none", visits: 3 })).toBe("try-reminders");
+  it("suggests reminders from the third visit and respects the snooze", () => {
+    expect(chooseNudge({ ...base, visits: 2 })).toBeNull();
+    expect(chooseNudge(base)).toBe("try-reminders");
+    expect(chooseNudge({ ...base, reminderNudgeSnoozed: true })).toBeNull();
   });
 });
