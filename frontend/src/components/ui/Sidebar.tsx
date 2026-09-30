@@ -82,6 +82,12 @@ const Sidebar: React.FC<SidebarProps> = ({
       icon: <BellRing className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
     },
     {
+      // Install every NGA app on this device from one place.
+      label: "Get the apps",
+      path: "/apps",
+      icon: <LayoutGrid className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
+    },
+    {
       label: "Profile",
       path: "/profile",
       icon: (

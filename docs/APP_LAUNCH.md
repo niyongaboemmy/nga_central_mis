@@ -40,3 +40,31 @@ Users can switch apps from any app, so all four behave the same:
 - **The user can turn capturing off.** Each installed app has an "Open supported links" setting (`chrome://apps` → the app → App settings).
 - **Ganzaa is external:** it opens in its app only if its own site is installable.
 - **Next:** the Web Install API (`navigator.install`, planned for Chrome 156) will let the MIS tile itself install, or open, the target app in one step. Add it as a progressive enhancement once it ships.
+
+## Automatic install prompt on load (2026-09-30)
+
+Every app now asks to be installed as soon as it loads in a browser tab where it isn't installed:
+- **MIS:** `AutoInstallPrompt`, including the public login page.
+- **Task Mentor, Tendo and Tupo:** `ngaInstall.tsx`.
+
+The browser's own install dialog still needs one click on the card's button; no site can open it without a gesture. The card:
+- **Stays quiet** when the app runs installed, or when the browser reports it installed on this device. Each manifest lists itself in `related_applications`, and `getInstalledRelatedApps()` confirms it.
+- **Skips browsers that can't install web apps:** desktop Firefox outside Windows.
+- **"Not now" waits 24 hours.**
+- **The installer overrides the snooze:** `nga_install=1`, plus `return=<https://*.amashuri.com …>`, validated.
+
+## Install all NGA apps: `mis.amashuri.com/apps`
+
+A public page, so a new device can be set up before signing in:
+
+- **Personal devices: "Install all apps".** A guided flow with one click per app, because every browser dialog needs its own gesture.
+  - MIS installs with the browser's dialog on the spot.
+  - Each other app is installed straight from the page with `navigator.install()` (Web Install API, Chrome/Edge 156+). Otherwise it opens with `nga_install=1`, so its install card appears at once and links back to `/apps?done=<app>`.
+  - Progress is kept for a day across the hops.
+- **School-managed devices: one step for everything.** Downloadable policy files install every app silently and allow notifications:
+  - `.reg` for Chrome and Edge
+  - `.mobileconfig` for Chrome on Mac
+
+  Deploy them through GPO/Intune or MDM. Chrome and Edge ignore `WebAppInstallForceList` on unmanaged Windows for sites outside their stores.
+
+Code: `frontend/src/components/apps/{ngaApps.ts, AppsInstallerPage.tsx, AutoInstallPrompt.tsx}`.
