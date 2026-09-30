@@ -9,6 +9,7 @@ import {
   loadProgress,
   markStep,
   readReportCookies,
+  reconcileSelfStatus,
   NGA_APPS,
   nextStep,
   readInstallReport,
@@ -68,6 +69,16 @@ describe("NGA app list", () => {
       { key: "taskmentor", status: "done", at: 1700000000000 },
       { key: "tupo", status: "already", at: 5 },
     ]);
+  });
+
+  it("NGA MIS's own status follows the browser live -- a saved 'installed' can't outlive an uninstall", () => {
+    const removed = { installed: false, installCheck: "no" as const, canPrompt: true };
+    expect(reconcileSelfStatus("already", removed)).toBe("todo");
+    expect(reconcileSelfStatus("done", { ...removed, canPrompt: false })).toBe("todo");
+    expect(reconcileSelfStatus("todo", { installed: true, installCheck: "yes", canPrompt: false })).toBe("already");
+    // Can't tell (Safari/Firefox): keep what we have; skipped stays skipped.
+    expect(reconcileSelfStatus("already", { installed: false, installCheck: "unknown", canPrompt: false })).toBe("already");
+    expect(reconcileSelfStatus("skipped", removed)).toBe("skipped");
   });
 
   it("walks the steps in order, skipping done and skipped apps", () => {

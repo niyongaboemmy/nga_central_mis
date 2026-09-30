@@ -108,6 +108,22 @@ export const markStep = (progress: Progress, key: NgaApp["key"], status: StepSta
 
 export const installedCount = (progress: Progress, apps: NgaApp[] = NGA_APPS) => apps.filter((a) => isInstalled(progress[a.key])).length;
 
+/**
+ * The status of the app this installer page belongs to (NGA MIS) follows the
+ * browser's live answer both ways: a saved "installed" from an earlier visit
+ * must not outlive an uninstall (the install icon in the address bar and
+ * beforeinstallprompt both mean "not installed here").
+ */
+export const reconcileSelfStatus = (
+  current: StepStatus,
+  live: { installed: boolean; installCheck: "yes" | "no" | "unknown"; canPrompt: boolean },
+): StepStatus => {
+  const notInstalled = !live.installed && (live.installCheck === "no" || live.canPrompt);
+  if (live.installed && !isInstalled(current)) return "already";
+  if (notInstalled && isInstalled(current)) return "todo";
+  return current;
+};
+
 // ─── Live reports from the apps' install cards ───────────────────────────────
 
 /**
