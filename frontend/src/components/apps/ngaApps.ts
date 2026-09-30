@@ -110,6 +110,35 @@ export const installedCount = (progress: Progress, apps: NgaApp[] = NGA_APPS) =>
 
 // ─── Live reports from the apps' install cards ───────────────────────────────
 
+/**
+ * Report cookies (ngaInstall.tsx `writeReportCookie`): `nga_inst_<key>=<status>.<ms>`
+ * on .amashuri.com. The main channel, because the links that let Chrome open
+ * an installed app in its own window can't keep an opener to message.
+ */
+export const readReportCookies = (cookie: string, apps: NgaApp[] = NGA_APPS) => {
+  const found: Array<InstallReport & { at: number }> = [];
+  for (const part of cookie.split(";")) {
+    const [name, value = ""] = part.trim().split("=");
+    const app = apps.find((a) => name === `nga_inst_${a.key}`);
+    if (!app) continue;
+    const [raw, ts] = value.split(".");
+    const status = raw === "installed" ? "done" : raw === "already" ? "already" : raw === "skipped" ? "skipped" : null;
+    const at = Number(ts);
+    if (status && Number.isFinite(at)) found.push({ key: app.key, status, at });
+  }
+  return found;
+};
+
+export const clearReportCookie = (key: NgaApp["key"], host = typeof window !== "undefined" ? window.location.hostname : "") => {
+  const domain = host === "amashuri.com" || host.endsWith(".amashuri.com") ? "; domain=.amashuri.com; secure" : "";
+  try {
+    document.cookie = `nga_inst_${key}=; path=/; max-age=0; samesite=lax${domain}`;
+  } catch {
+    /* ignore */
+  }
+};
+
+
 export interface InstallReport {
   key: NgaApp["key"];
   status: "done" | "already" | "skipped";

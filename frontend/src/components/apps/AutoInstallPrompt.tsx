@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
-import { ArrowLeft, Download, LayoutGrid, X } from "lucide-react";
+import { ArrowLeft, Download, ExternalLink, LayoutGrid, X } from "lucide-react";
 import Modal from "../ui/Modal";
 import { InstallGuide } from "../reminders/InstallGuide";
 import {
@@ -125,8 +125,26 @@ export const AutoInstallPrompt: React.FC = () => {
     onInstallerPage: location.pathname.startsWith("/apps"),
   });
 
+  // Installed, but this is a browser tab: one click into the app window.
+  // A real link -- Chrome sends a clicked link into the installed app.
+  const inTab = !window.matchMedia?.("(display-mode: standalone)").matches;
+  const showOpenApp =
+    inTab && pwa.installed && !pwa.canPrompt && !buttonHidden && !open && !location.pathname.startsWith("/apps");
+
   return (
     <>
+    {showOpenApp && (
+      <a
+        href={`${window.location.origin}/home?source=pwa`}
+        target="_blank"
+        rel="noopener"
+        onClick={() => window.setTimeout(() => window.close(), 600)}
+        className="fixed bottom-4 left-4 z-40 inline-flex items-center gap-1.5 rounded-full bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-float transition hover:bg-brand-700 focus:outline-none focus-visible:ring-4 focus-visible:ring-brand-200"
+        style={{ marginBottom: "env(safe-area-inset-bottom)" }}
+      >
+        <ExternalLink className="h-4 w-4" /> Open in the NGA MIS app
+      </a>
+    )}
     {showButton && (
       <div className="fixed bottom-4 left-4 z-40 flex items-center gap-0.5 rounded-full bg-brand-600 p-1 text-white shadow-float" style={{ marginBottom: "env(safe-area-inset-bottom)" }}>
         <button

@@ -32,11 +32,13 @@ import {
   installHandoffUrl,
   isFinished,
   isInstalled,
+  clearReportCookie,
   loadProgress,
   markStep,
   NGA_APPS,
   nextStep,
   readInstallReport,
+  readReportCookies,
   saveProgress,
   startUrl,
   webInstall,
@@ -105,8 +107,10 @@ const AppsInstallerPage: React.FC = () => {
   const [guideOpen, setGuideOpen] = useState(false);
   const [notice, setNotice] = useState<{ text: string; tone: "ok" | "info" | "warn" } | null>(null);
   const [helpFor, setHelpFor] = useState<NgaApp["key"] | null>(null);
-  const [blocked, setBlocked] = useState<NgaApp["key"] | null>(null);
-  const tabs = useRef<Partial<Record<NgaApp["key"], Window | null>>>({});
+  // Came back to this tab while an app was "waiting" with no report: it most
+  // likely opened straight in its installed window (which can't message us).
+  const [askOpened, setAskOpened] = useState<NgaApp["key"] | null>(null);
+  const lastOpened = useRef<{ key: NgaApp["key"]; at: number } | null>(null);
   const here = typeof window !== "undefined" ? window.location.origin : "";
   const canWebInstall = webInstallSupported();
 
@@ -136,27 +140,60 @@ const AppsInstallerPage: React.FC = () => {
     if (changed) window.history.replaceState(window.history.state, "", url.toString());
   }, [set]);
 
-  // Live reports from the app tabs this page opened.
+  const applyReport = useCallback(
+    (report: { key: NgaApp["key"]; status: "done" | "already" | "skipped" }) => {
+      set(report.key, report.status);
+      setRunning(true);
+      setAskOpened((k) => (k === report.key ? null : k));
+      say(
+        report.status === "done"
+          ? `${nameOf(report.key)} is installed and open`
+          : report.status === "already"
+            ? `${nameOf(report.key)} is installed — opened in its own window`
+            : `${nameOf(report.key)} skipped`,
+        report.status === "skipped" ? "info" : "ok",
+      );
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [set, say],
+  );
+
+  // Reports through the shared .amashuri.com cookie: on return to this tab,
+  // and every 1.5 s while an app is being installed or opened.
+  const pageStart = useRef(Date.now());
+  const checkCookies = useCallback(() => {
+    for (const r of readReportCookies(document.cookie)) {
+      clearReportCookie(r.key);
+      // Ignore leftovers from before this visit.
+      if (r.at < pageStart.current - 60_000) continue;
+      applyReport(r);
+    }
+  }, [applyReport]);
+  const anyWaiting = NGA_APPS.some((a) => progress[a.key] === "waiting");
+  useEffect(() => {
+    checkCookies();
+    const onBack = () => document.visibilityState === "visible" && checkCookies();
+    document.addEventListener("visibilitychange", onBack);
+    window.addEventListener("focus", onBack);
+    const id = anyWaiting ? window.setInterval(checkCookies, 1500) : undefined;
+    return () => {
+      document.removeEventListener("visibilitychange", onBack);
+      window.removeEventListener("focus", onBack);
+      if (id) window.clearInterval(id);
+    };
+  }, [checkCookies, anyWaiting]);
+
+  // Live messages from a card that does have an opener (older links).
   useEffect(() => {
     const onMessage = (event: MessageEvent) => {
       const report = readInstallReport(event);
       if (!report) return;
-      set(report.key, report.status);
-      setRunning(true);
-      say(
-        report.status === "done"
-          ? `${nameOf(report.key)} is installed`
-          : report.status === "already"
-            ? `${nameOf(report.key)} was already installed`
-            : `${nameOf(report.key)} skipped`,
-        report.status === "skipped" ? "info" : "ok",
-      );
+      applyReport(report);
       window.focus();
     };
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [set, say]);
+  }, [applyReport]);
 
   // This app installed (now or earlier) counts as installed.
   useEffect(() => {
@@ -171,17 +208,53 @@ const AppsInstallerPage: React.FC = () => {
   const finished = NGA_APPS.every((a) => isFinished(progress[a.key]));
   const returnUrl = (app: NgaApp) => `${here}/apps?done=${app.key}`;
 
-  /** Open another app's tab with its install card; it reports back. */
-  const handOff = (app: NgaApp) => {
-    setBlocked(null);
-    const tab = window.open(installHandoffUrl(app, returnUrl(app)), "_blank");
-    if (!tab) {
-      setBlocked(app.key);
-      return;
-    }
-    tabs.current[app.key] = tab;
+  /**
+   * Other apps are opened with a REAL link (see AppAction), never
+   * window.open: Chrome sends a clicked link straight into an installed
+   * app's window ("navigation capturing"), so an installed app just opens,
+   * and one that isn't shows its one-click "Install & open" card. Chrome
+   * only does that for links WITHOUT an opener, so apps report back through
+   * a short cookie on .amashuri.com (read below), not postMessage.
+   */
+  const usesLink = (app: NgaApp) => app.origin !== here && !canWebInstall;
+  const opened = (app: NgaApp) => {
+    setRunning(true);
+    setAskOpened(null);
+    lastOpened.current = { key: app.key, at: Date.now() };
     set(app.key, "waiting");
   };
+
+  // Back on this tab with no report after a while: ask, in one click.
+  useEffect(() => {
+    const onVisible = () => {
+      const last = lastOpened.current;
+      if (document.visibilityState !== "visible" || !last) return;
+      window.setTimeout(() => {
+        setProgress((p) => {
+          if (p[last.key] === "waiting" && Date.now() - last.at > 1500) setAskOpened(last.key);
+          return p;
+        });
+      }, 400);
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", onVisible);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", onVisible);
+    };
+  }, []);
+
+  /** An install/open control for `app`: a real link for other apps, else a button. */
+  const appAction = (app: NgaApp, className: string, children: React.ReactNode, disabled = false) =>
+    usesLink(app) ? (
+      <a href={installHandoffUrl(app, returnUrl(app))} target="_blank" rel="noopener" onClick={() => opened(app)} className={className}>
+        {children}
+      </a>
+    ) : (
+      <button type="button" onClick={() => void installApp(app)} disabled={disabled || busy !== null} className={className}>
+        {children}
+      </button>
+    );
 
   /** One click = one app. Must run inside the click (browser rule). */
   const installApp = async (app: NgaApp) => {
@@ -216,20 +289,6 @@ const AppsInstallerPage: React.FC = () => {
         setBusy(null);
       }
     }
-    handOff(app);
-  };
-
-  const reopen = (app: NgaApp) => {
-    const tab = tabs.current[app.key];
-    if (tab && !tab.closed) tab.focus();
-    else handOff(app);
-  };
-
-  const startAll = () => {
-    setRunning(true);
-    // The first app installs inside this very click (browser rule); the
-    // others follow as one-click steps.
-    if (next) void installApp(next);
   };
 
   const restart = () => {
@@ -265,13 +324,13 @@ const AppsInstallerPage: React.FC = () => {
   const outlineBtn =
     "inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800";
 
-  const installLabel = (app: NgaApp) => (busy === app.key ? "Waiting for the browser…" : `Install ${app.name}`);
+  const installLabel = (app: NgaApp) => (busy === app.key ? "Waiting for the browser…" : `Install & open ${app.name}`);
   const stepHint = (app: NgaApp) =>
     app.origin === here
       ? "Your browser shows its install dialog — confirm it."
       : canWebInstall
         ? "Your browser installs it straight from here — confirm in its dialog."
-        : `${app.name} opens in a new tab with its install button. This page updates by itself when you're done.`;
+        : `Already installed? It opens straight in its own window. If not, its tab asks once — “Install & open”. This page updates by itself.`;
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
@@ -306,15 +365,19 @@ const AppsInstallerPage: React.FC = () => {
               </p>
               <div className="mt-5 flex flex-wrap gap-2">
                 {!finished && next ? (
-                  <button
-                    type="button"
-                    onClick={running ? () => void installApp(next) : startAll}
-                    disabled={busy !== null || progress[next.key] === "waiting"}
-                    className="inline-flex items-center justify-center gap-2 rounded-xl bg-white px-5 py-3 text-sm font-bold text-brand-700 shadow-soft transition hover:bg-brand-50 focus:outline-none focus-visible:ring-4 focus-visible:ring-white/40 disabled:opacity-70"
-                  >
-                    {progress[next.key] === "waiting" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}{" "}
-                    {progress[next.key] === "waiting" ? `Waiting for ${next.name}…` : running ? `Continue: install ${next.name}` : "Install all apps"}
-                  </button>
+                  progress[next.key] === "waiting" ? (
+                    <span className="inline-flex items-center justify-center gap-2 rounded-xl bg-white/20 px-5 py-3 text-sm font-bold">
+                      <Loader2 className="h-4 w-4 animate-spin" /> Waiting for {next.name}…
+                    </span>
+                  ) : (
+                    appAction(
+                      next,
+                      "inline-flex items-center justify-center gap-2 rounded-xl bg-white px-5 py-3 text-sm font-bold text-brand-700 shadow-soft transition hover:bg-brand-50 focus:outline-none focus-visible:ring-4 focus-visible:ring-white/40 disabled:opacity-70",
+                      <>
+                        <Download className="h-4 w-4" /> {running ? `Continue: ${next.name}` : "Install all apps"}
+                      </>,
+                    )
+                  )
                 ) : (
                   <button
                     type="button"
@@ -413,9 +476,9 @@ const AppsInstallerPage: React.FC = () => {
                 </p>
                 {progress[next.key] === "waiting" ? (
                   <>
-                    <p className="text-lg font-bold text-slate-900 dark:text-white">Finish in the {next.name} tab</p>
+                    <p className="text-lg font-bold text-slate-900 dark:text-white">Finish in {next.name}</p>
                     <p className="text-sm text-slate-600 dark:text-slate-300">
-                      Press <strong>Install {next.name}</strong> there and confirm. This page updates by itself as soon as it's done.
+                      Press <strong>Install &amp; open {next.name}</strong> there and confirm — it opens in its own window. If it opened as an app straight away, it's already installed.
                     </p>
                   </>
                 ) : (
@@ -424,30 +487,47 @@ const AppsInstallerPage: React.FC = () => {
                     <p className="text-sm text-slate-600 dark:text-slate-300">{stepHint(next)}</p>
                   </>
                 )}
-                {blocked === next.key && (
-                  <p className="mt-2 text-sm font-medium text-amber-700 dark:text-amber-300" role="alert">
-                    Your browser blocked the new tab.{" "}
-                    <a href={installHandoffUrl(next, returnUrl(next))} className="underline">
-                      Open {next.name} here
-                    </a>{" "}
-                    — you'll come back after.
-                  </p>
+                {askOpened === next.key && (
+                  <motion.p
+                    initial={{ opacity: 0, y: 4 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="mt-2 rounded-xl bg-brand-50 px-3 py-2 text-sm font-medium text-brand-800 dark:bg-brand-600/15 dark:text-brand-100"
+                    role="status"
+                  >
+                    Did {next.name} open in its own app window? Then it's already installed — confirm below.
+                  </motion.p>
                 )}
               </div>
               <div className="flex flex-wrap gap-2">
                 {progress[next.key] === "waiting" ? (
                   <>
-                    <button type="button" onClick={() => reopen(next)} className={primaryBtn}>
-                      <ExternalLink className="h-4 w-4" /> Go to {next.name}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        set(next.key, "already");
+                        setAskOpened(null);
+                        say(`${next.name} is installed`);
+                      }}
+                      className={askOpened === next.key ? primaryBtn : outlineBtn}
+                    >
+                      <Check className="h-4 w-4" /> {askOpened === next.key ? "Yes, it opened as an app" : "It's installed"}
                     </button>
-                    <button type="button" onClick={() => set(next.key, "done")} className={outlineBtn}>
-                      <Check className="h-4 w-4" /> It's installed
-                    </button>
+                    {appAction(
+                      next,
+                      askOpened === next.key ? outlineBtn : primaryBtn,
+                      <>
+                        <ExternalLink className="h-4 w-4" /> Open {next.name} again
+                      </>,
+                    )}
                   </>
                 ) : (
-                  <button type="button" onClick={() => void installApp(next)} disabled={busy !== null} className={primaryBtn}>
-                    {busy === next.key ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />} {installLabel(next)}
-                  </button>
+                  appAction(
+                    next,
+                    primaryBtn,
+                    <>
+                      {busy === next.key ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />} {installLabel(next)}
+                    </>,
+                  )
                 )}
                 <button
                   type="button"
@@ -513,23 +593,21 @@ const AppsInstallerPage: React.FC = () => {
                     <p className="mt-0.5 text-sm text-slate-600 dark:text-slate-300">{app.description}</p>
                     <div className="mt-3 flex flex-wrap gap-2">
                       {!isInstalled(status) &&
-                        (status === "waiting" ? (
-                          <button type="button" onClick={() => reopen(app)} className={outlineBtn}>
-                            <ExternalLink className="h-4 w-4" /> Go to tab
-                          </button>
-                        ) : (
-                          <button type="button" onClick={() => void installApp(app)} disabled={busy !== null} className={outlineBtn}>
-                            {status === "skipped" ? <RotateCcw className="h-4 w-4" /> : <Download className="h-4 w-4" />}
-                            {status === "skipped" ? "Install now" : "Install"}
-                          </button>
-                        ))}
+                        appAction(
+                          app,
+                          outlineBtn,
+                          <>
+                            {status === "waiting" ? <ExternalLink className="h-4 w-4" /> : status === "skipped" ? <RotateCcw className="h-4 w-4" /> : <Download className="h-4 w-4" />}
+                            {status === "waiting" ? "Open again" : status === "skipped" ? "Install now" : "Install & open"}
+                          </>,
+                        )}
                       <a
                         href={startUrl(app)}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold text-brand-700 transition hover:bg-brand-50 dark:text-brand-200 dark:hover:bg-brand-600/15"
                       >
-                        <ExternalLink className="h-4 w-4" /> Open
+                        <ExternalLink className="h-4 w-4" /> Open app
                       </a>
                       {!isInstalled(status) && (
                         <button
