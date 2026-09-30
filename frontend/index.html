@@ -37,123 +37,35 @@
     </script>
   </head>
   <body class="bg-gray-100 dark:bg-black">
-    <!-- First paint, before the app's JavaScript: a brand splash that the app
-         replaces on load. If loading takes longer than ~1.5 s (slow network),
-         a short landing page presenting the NGA apps fades in. Crawlers and
-         Google's OAuth brand check read it too (privacy/terms links). All
-         styles are scoped under .ngl and removed with it when React mounts. -->
+    <!-- First paint, before the app's JavaScript: a plain loading screen in the
+         brand colours that stays until the app replaces it (React mounts into
+         #root). The small footer keeps the privacy/terms links in the page
+         for crawlers and Google's OAuth brand check. Styles are scoped under
+         .ngl and removed with it. -->
     <div id="root">
       <style>
-        .ngl{--bg:#f4f6fb;--card:#fff;--ink:#0f172a;--muted:#475569;--line:#e2e8f0;--brand:#2f56d9;--brand2:#6d28d9;--chip:#eef2ff;
-          min-height:100vh;min-height:100dvh;background:radial-gradient(1200px 600px at 10% -10%,rgba(47,86,217,.16),transparent 60%),radial-gradient(900px 500px at 110% 10%,rgba(109,40,217,.14),transparent 60%),var(--bg);
-          color:var(--ink);font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;display:flex;flex-direction:column;overflow-x:hidden}
-        @media (prefers-color-scheme:dark){.ngl{--bg:#060a14;--card:#0f172a;--ink:#e2e8f0;--muted:#94a3b8;--line:#1e293b;--chip:#1e1b4b}}
-        .ngl *{box-sizing:border-box}
-        .ngl a{color:inherit;text-decoration:none}
-        .ngl-splash{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;animation:ngl-out .4s ease 1.5s forwards;z-index:2}
-        .ngl-logo{width:84px;height:84px;border-radius:24px;box-shadow:0 18px 50px -12px rgba(47,86,217,.55);animation:ngl-pulse 1.6s ease-in-out infinite}
-        .ngl-bar{width:160px;height:4px;border-radius:99px;background:var(--line);overflow:hidden}
-        .ngl-bar::after{content:"";display:block;width:40%;height:100%;border-radius:99px;background:linear-gradient(90deg,var(--brand),var(--brand2));animation:ngl-load 1.1s ease-in-out infinite}
-        .ngl-splash p{margin:0;font-size:14px;font-weight:600;color:var(--muted);letter-spacing:.02em}
-        .ngl-page{opacity:0;animation:ngl-in .6s ease 1.6s forwards;width:100%;max-width:1080px;margin:0 auto;padding:20px 16px 32px;flex:1;display:flex;flex-direction:column}
-        .ngl-top{display:flex;align-items:center;justify-content:space-between;gap:12px}
-        .ngl-brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:16px}
-        .ngl-brand img{width:36px;height:36px;border-radius:10px}
-        .ngl-btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border-radius:14px;padding:12px 20px;font-size:15px;font-weight:700;transition:transform .15s ease,box-shadow .15s ease,background .15s ease;white-space:nowrap}
-        .ngl-btn:focus-visible{outline:3px solid rgba(47,86,217,.45);outline-offset:2px}
-        .ngl-primary{background:linear-gradient(135deg,var(--brand),var(--brand2));color:#fff !important;box-shadow:0 12px 30px -10px rgba(47,86,217,.7)}
-        .ngl-primary:hover{transform:translateY(-1px);box-shadow:0 16px 36px -10px rgba(47,86,217,.8)}
-        .ngl-ghost{border:1px solid var(--line);background:var(--card)}
-        .ngl-ghost:hover{transform:translateY(-1px);border-color:var(--brand)}
-        .ngl-sm{padding:9px 14px;font-size:14px}
-        .ngl-hero{text-align:center;padding:56px 0 36px}
-        .ngl-chip{display:inline-flex;align-items:center;gap:8px;padding:6px 12px;border-radius:99px;background:var(--chip);color:var(--brand);font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
-        @media (prefers-color-scheme:dark){.ngl-chip{color:#c7d2fe}}
-        .ngl-hero h1{margin:18px auto 12px;max-width:760px;font-size:clamp(30px,5.2vw,52px);line-height:1.08;letter-spacing:-.02em;font-weight:800}
-        .ngl-grad{background:linear-gradient(135deg,var(--brand),var(--brand2));-webkit-background-clip:text;background-clip:text;color:transparent}
-        .ngl-hero p{margin:0 auto;max-width:620px;font-size:clamp(15px,2vw,18px);line-height:1.6;color:var(--muted)}
-        .ngl-cta{display:flex;flex-wrap:wrap;gap:12px;justify-content:center;margin-top:28px}
-        .ngl-apps{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
-        @media (max-width:900px){.ngl-apps{grid-template-columns:repeat(2,1fr)}}
-        @media (max-width:520px){.ngl-apps{grid-template-columns:1fr}.ngl-hero{padding:36px 0 28px}}
-        .ngl-app{position:relative;display:flex;flex-direction:column;gap:12px;padding:20px;border-radius:22px;background:var(--card);border:1px solid var(--line);box-shadow:0 10px 30px -18px rgba(15,23,42,.35);transition:transform .2s ease,box-shadow .2s ease,border-color .2s ease;opacity:0;animation:ngl-up .5s ease forwards}
-        .ngl-app:nth-child(1){animation-delay:1.75s}.ngl-app:nth-child(2){animation-delay:1.85s}.ngl-app:nth-child(3){animation-delay:1.95s}.ngl-app:nth-child(4){animation-delay:2.05s}
-        .ngl-app:hover,.ngl-app:focus-visible{transform:translateY(-4px);border-color:var(--c);box-shadow:0 22px 40px -20px var(--c);outline:none}
-        .ngl-app img{width:52px;height:52px;border-radius:14px;background:var(--bg);padding:6px}
-        .ngl-app b{font-size:17px}
-        .ngl-app span{font-size:14px;line-height:1.5;color:var(--muted)}
-        .ngl-app i{margin-top:auto;font-style:normal;font-size:13px;font-weight:700;color:var(--c)}
-        .ngl-app i::after{content:" →";display:inline-block;transition:transform .2s ease}
-        .ngl-app:hover i::after{transform:translateX(4px)}
-        .ngl-foot{margin-top:40px;padding-top:20px;border-top:1px solid var(--line);display:flex;flex-wrap:wrap;gap:10px 18px;justify-content:space-between;font-size:13px;color:var(--muted)}
-        .ngl-foot nav{display:flex;gap:18px}
-        .ngl-foot a:hover{color:var(--brand)}
-        @keyframes ngl-out{to{opacity:0;visibility:hidden}}
-        @keyframes ngl-in{to{opacity:1}}
-        @keyframes ngl-up{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
-        @keyframes ngl-pulse{50%{transform:scale(1.05)}}
+        .ngl{--bg:#f8fafc;--ink:#0f172a;--muted:#64748b;--track:#e2e8f0;--brand:#2f56d9;--brand2:#3b6cff;
+          position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;
+          background:var(--bg);color:var(--ink);font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif}
+        @media (prefers-color-scheme:dark){.ngl{--bg:#0b1220;--ink:#e2e8f0;--muted:#94a3b8;--track:#1e293b}}
+        .ngl img{width:72px;height:72px;border-radius:20px;animation:ngl-breathe 1.8s ease-in-out infinite}
+        .ngl-bar{width:140px;height:4px;border-radius:99px;background:var(--track);overflow:hidden}
+        .ngl-bar::after{content:"";display:block;width:40%;height:100%;border-radius:99px;background:var(--brand);animation:ngl-load 1.1s ease-in-out infinite}
+        .ngl p{margin:0;font-size:14px;font-weight:600;color:var(--muted)}
+        .ngl nav{position:absolute;bottom:calc(16px + env(safe-area-inset-bottom));display:flex;gap:14px;font-size:12px}
+        .ngl nav a{color:var(--muted);text-decoration:none}
+        .ngl nav a:hover{color:var(--brand2)}
         @keyframes ngl-load{0%{transform:translateX(-100%)}100%{transform:translateX(260%)}}
-        @media (prefers-reduced-motion:reduce){.ngl *,.ngl{animation-duration:.01s !important;animation-delay:0s !important;animation-iteration-count:1 !important}.ngl-splash{display:none}.ngl-page,.ngl-app{opacity:1}}
+        @keyframes ngl-breathe{50%{transform:scale(1.04)}}
+        @media (prefers-reduced-motion:reduce){.ngl img,.ngl-bar::after{animation:none}}
       </style>
-      <div class="ngl">
-        <div class="ngl-splash" aria-hidden="true">
-          <img class="ngl-logo" src="/android-chrome-512x512.png" alt="" />
-          <div class="ngl-bar"></div>
-          <p>Loading NGA MIS…</p>
-        </div>
-
-        <div class="ngl-page">
-          <header class="ngl-top">
-            <a class="ngl-brand" href="/"><img src="/android-chrome-192x192.png" alt="" /> NGA MIS</a>
-            <a class="ngl-btn ngl-ghost ngl-sm" href="/login">Sign in</a>
-          </header>
-
-          <main>
-            <section class="ngl-hero">
-              <span class="ngl-chip">New Generation Academy</span>
-              <h1>One school, <span class="ngl-grad">four connected apps</span></h1>
-              <p>Timetables, learning, results, attendance, messages and reminders — for students, parents, teachers and staff, with one sign-in.</p>
-              <div class="ngl-cta">
-                <a class="ngl-btn ngl-primary" href="/login">Sign in to NGA MIS</a>
-                <a class="ngl-btn ngl-ghost" href="/apps">Install the apps</a>
-              </div>
-            </section>
-
-            <section class="ngl-apps" aria-label="NGA apps">
-              <a class="ngl-app" style="--c:#2f56d9" href="/login">
-                <img src="/android-chrome-192x192.png" alt="" />
-                <b>NGA MIS</b>
-                <span>Timetables, lesson plans, reports, calendar and reminders for the whole school.</span>
-                <i>Open NGA MIS</i>
-              </a>
-              <a class="ngl-app" style="--c:#3b82f6" href="https://taskmentor.amashuri.com/">
-                <img src="https://taskmentor.amashuri.com/android-chrome-192x192.png" alt="" />
-                <b>Task Mentor</b>
-                <span>Quizzes, assignments, marks and report cards.</span>
-                <i>Open Task Mentor</i>
-              </a>
-              <a class="ngl-app" style="--c:#1e6fd9" href="https://tendo.amashuri.com/">
-                <img src="https://tendo.amashuri.com/pwa-192x192.png" alt="" />
-                <b>Tendo</b>
-                <span>Attendance and discipline, marked from the timetable.</span>
-                <i>Open Tendo</i>
-              </a>
-              <a class="ngl-app" style="--c:#005ef9" href="https://tupo.amashuri.com/app">
-                <img src="https://tupo.amashuri.com/icon-192.png" alt="" />
-                <b>Tupo</b>
-                <span>Chat, meetings, mail and the school feed.</span>
-                <i>Open Tupo</i>
-              </a>
-            </section>
-          </main>
-
-          <footer class="ngl-foot">
-            <span>© New Generation Academy · Rwanda</span>
-            <nav aria-label="Legal"><a href="/privacy/">Privacy Policy</a><a href="/terms/">Terms of Service</a><a href="/apps">Get the apps</a></nav>
-          </footer>
-          <noscript><p style="text-align:center;margin-top:16px">Please enable JavaScript to sign in.</p></noscript>
-        </div>
-      </div>
+      <main class="ngl" aria-busy="true" aria-label="Loading NGA MIS">
+        <img src="/android-chrome-512x512.png" alt="NGA MIS" />
+        <div class="ngl-bar" role="progressbar" aria-label="Loading"></div>
+        <p>Loading NGA MIS…</p>
+        <noscript><p>Please enable JavaScript to use NGA MIS.</p></noscript>
+        <nav aria-label="Legal"><a href="/privacy/">Privacy Policy</a><a href="/terms/">Terms of Service</a></nav>
+      </main>
     </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
