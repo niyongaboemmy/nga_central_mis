@@ -12,9 +12,21 @@ interface BeforeInstallPromptEvent extends Event {
   userChoice: Promise<{ outcome: "accepted" | "dismissed"; platform: string }>;
 }
 
+/**
+ * The browser's own answer to "is NGA MIS installed here right now?"
+ * (navigator.getInstalledRelatedApps + manifest related_applications with
+ * the app id; desktop Chrome 140+, Android). "unknown" where the browser
+ * can't say (Safari, Firefox) -- then a remembered note is the fallback.
+ */
+export type InstallCheck = "yes" | "no" | "unknown";
+
 interface PwaState {
   platform: PlatformInfo;
   installed: boolean;
+  /** Live, browser-confirmed install state (see InstallCheck). */
+  installCheck: InstallCheck;
+  /** Running in a browser tab (not the installed app window). */
+  inBrowser: boolean;
   /** Chromium handed us its install prompt. */
   canPrompt: boolean;
   /** <install> element (origin trial, Chrome/Edge 148+). */
@@ -23,13 +35,18 @@ interface PwaState {
 }
 
 let deferredPrompt: BeforeInstallPromptEvent | null = null;
+let installCheck: InstallCheck = "unknown";
 const listeners = new Set<() => void>();
 
 const compute = (): PwaState => {
   const env = readEnv(Boolean(deferredPrompt));
   return {
     platform: describePlatform(env),
-    installed: env.standalone || readFlag(INSTALLED_KEY),
+    // A remembered note is only trusted when the browser can't answer: it
+    // goes stale when the app is uninstalled (no event for that).
+    installed: env.standalone || installCheck === "yes" || (installCheck === "unknown" && readFlag(INSTALLED_KEY)),
+    installCheck: env.standalone ? "yes" : installCheck,
+    inBrowser: !env.standalone,
     canPrompt: Boolean(deferredPrompt),
     hasInstallElement: typeof window !== "undefined" && "HTMLInstallElement" in window,
     registration: currentRegistration,
@@ -103,6 +120,47 @@ export const countVisit = () => {
   }
 };
 
+// ─── live install check ──────────────────────────────────────────────────────
+
+const setInstallCheck = (next: InstallCheck) => {
+  if (next === "yes") writeItem(INSTALLED_KEY, "1");
+  if (next === "no") {
+    try {
+      localStorage.removeItem(INSTALLED_KEY);
+    } catch {
+      /* ignore */
+    }
+  }
+  if (next === installCheck) return;
+  installCheck = next;
+  emit();
+};
+
+/** Ask the browser again (on load, on return to the tab, after installing). */
+export const refreshInstallCheck = async (): Promise<InstallCheck> => {
+  if (typeof window === "undefined") return "unknown";
+  if (window.matchMedia?.("(display-mode: standalone)").matches) {
+    setInstallCheck("yes");
+    return "yes";
+  }
+  const fn = (navigator as any).getInstalledRelatedApps;
+  if (typeof fn !== "function") return installCheck;
+  try {
+    const apps: Array<{ platform?: string }> = await fn.call(navigator);
+    const next: InstallCheck = Array.isArray(apps) && apps.some((a) => a?.platform === "webapp") ? "yes" : "no";
+    setInstallCheck(next);
+    return next;
+  } catch {
+    return installCheck;
+  }
+};
+
+/** Test hook. */
+export const resetInstallCheckForTests = () => {
+  installCheck = "unknown";
+  emit();
+};
+
 // ─── lifecycle ───────────────────────────────────────────────────────────────
 
 let started = false;
@@ -125,14 +183,23 @@ export const initPwa = () => {
     } catch {
       /* ignore */
     }
+    installCheck = "no";
     emit();
   });
   window.addEventListener("appinstalled", () => {
     deferredPrompt = null;
-    writeItem(INSTALLED_KEY, "1");
+    setInstallCheck("yes");
     emit();
   });
   window.matchMedia?.("(display-mode: standalone)").addEventListener?.("change", emit);
+  // Installed or removed while this page was open elsewhere: re-ask when
+  // the person comes back to it.
+  void refreshInstallCheck();
+  const recheck = () => {
+    if (document.visibilityState === "visible") void refreshInstallCheck();
+  };
+  document.addEventListener("visibilitychange", recheck);
+  window.addEventListener("focus", recheck);
   consumeLaunches();
   void registerAppServiceWorker();
 };
@@ -328,25 +395,8 @@ export const clearLegacySnooze = () => {
   }
 };
 
-/**
- * Does the browser say MIS is installed on this device? (manifest
- * related_applications + getInstalledRelatedApps). Remembers a yes.
- */
-export const checkInstalledHere = async (): Promise<boolean> => {
-  const fn = (navigator as any).getInstalledRelatedApps;
-  if (typeof fn !== "function") return false;
-  try {
-    const apps = await fn.call(navigator);
-    const yes = Array.isArray(apps) && apps.some((a: any) => a?.platform === "webapp");
-    if (yes) {
-      writeItem(INSTALLED_KEY, "1");
-      emit();
-    }
-    return yes;
-  } catch {
-    return false;
-  }
-};
+/** Does the browser say MIS is installed on this device right now? (see refreshInstallCheck) */
+export const checkInstalledHere = async (): Promise<boolean> => (await refreshInstallCheck()) === "yes";
 
 /** True once per session when MIS was opened from another installed NGA app. */
 export const shouldAskInstallFromLaunch = () => {
