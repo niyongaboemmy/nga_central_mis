@@ -28,11 +28,12 @@ interface PwaState {
   /** Running in a browser tab (not the installed app window). */
   inBrowser: boolean;
   /**
-   * "Open app" landed in a browser tab: Chrome could not open NGA MIS as an
-   * app. With no install offer (canPrompt false) Chrome still believes it is
-   * installed -- a stuck record only the person can clear in chrome://apps.
+   * NGA MIS is installed, but "Open app" landed in a browser tab: Chrome's
+   * per-app "Open supported links" is off (Chrome 139+ turns it on by default
+   * only for new installs). A page can't change it -- the person switches it
+   * once in the app's Chrome settings, or uses the address bar's "Open in app".
    */
-  notOpenable: boolean;
+  linksOpenInBrowser: boolean;
   /** Chromium handed us its install prompt. */
   canPrompt: boolean;
   /** <install> element (origin trial, Chrome/Edge 148+). */
@@ -51,7 +52,7 @@ let installCheck: InstallCheck = "unknown";
 const diag = { lastRelated: "not asked yet", sawNotInstalled: false, bipAt: 0 as number, leftoverRecord: false, checks: 0 };
 export const getInstallDiagnostics = () => ({
   ...diag,
-  notOpenableSince: readRaw(NOT_OPENABLE_KEY),
+  linksOpenInBrowserSince: readRaw(LINKS_IN_BROWSER_KEY),
   installCheck,
   canPrompt: Boolean(deferredPrompt),
   standalone: typeof window !== "undefined" && Boolean(window.matchMedia?.("(display-mode: standalone)").matches),
@@ -63,19 +64,6 @@ const listeners = new Set<() => void>();
 
 const compute = (): PwaState => {
   const env = readEnv(Boolean(deferredPrompt));
-  const notOpenable = !env.standalone && Boolean(readRaw(NOT_OPENABLE_KEY));
-  if (notOpenable) {
-    return {
-      platform: describePlatform(env),
-      installed: false,
-      installCheck: "no",
-      inBrowser: true,
-      notOpenable: true,
-      canPrompt: Boolean(deferredPrompt),
-      hasInstallElement: typeof window !== "undefined" && "HTMLInstallElement" in window,
-      registration: currentRegistration,
-    };
-  }
   return {
     platform: describePlatform(env),
     // A remembered note is only trusted when the browser can't answer: it
@@ -86,7 +74,8 @@ const compute = (): PwaState => {
       env.standalone || installCheck === "yes" || (installCheck === "unknown" && !deferredPrompt && readFlag(INSTALLED_KEY)),
     installCheck: env.standalone ? "yes" : installCheck === "unknown" && deferredPrompt ? "no" : installCheck,
     inBrowser: !env.standalone,
-    notOpenable: false,
+    // Only meaningful while installed: an install offer means not installed.
+    linksOpenInBrowser: !env.standalone && !deferredPrompt && Boolean(readRaw(LINKS_IN_BROWSER_KEY)),
     canPrompt: Boolean(deferredPrompt),
     hasInstallElement: typeof window !== "undefined" && "HTMLInstallElement" in window,
     registration: currentRegistration,
@@ -117,13 +106,15 @@ export const usePwa = () => useSyncExternalStore(subscribePwa, getPwaState, getP
 
 const INSTALLED_KEY = "nga.pwa.installed";
 /**
- * Proof from the real world: an "Open app" link (…&nga_open=1) that lands in
- * a browser TAB means Chrome could not open NGA MIS as an app -- it is not
- * installed on this device, whatever Chrome's installed list says (it can
- * keep a record after the app is gone, and then fires no install event).
- * Cleared by a real install (appinstalled) or MIS running as the app.
+ * An "Open app" link (…&nga_open=1) that lands in a browser TAB means Chrome
+ * did not open NGA MIS in its app window: either it isn't installed (then
+ * Chrome offers installation) or it is installed with "Open supported links"
+ * off. Cleared when MIS runs as the app, on a fresh install, or once Chrome
+ * no longer lists the app.
  */
-const NOT_OPENABLE_KEY = "nga.pwa.notOpenable";
+const LINKS_IN_BROWSER_KEY = "nga.pwa.linksOpenInBrowser";
+/** Superseded marker from an earlier release (misread the tab as "not installed"). */
+const LEGACY_NOT_OPENABLE_KEY = "nga.pwa.notOpenable";
 const readRaw = (key: string) => {
   try {
     return localStorage.getItem(key);
@@ -204,31 +195,11 @@ const setInstallCheck = (next: InstallCheck) => {
 export const refreshInstallCheck = async (): Promise<InstallCheck> => {
   if (typeof window === "undefined") return "unknown";
   if (window.matchMedia?.("(display-mode: standalone)").matches) {
-    dropKey(NOT_OPENABLE_KEY);
+    dropKey(LINKS_IN_BROWSER_KEY);
     setInstallCheck("yes");
     return "yes";
   }
   const fn = (navigator as any).getInstalledRelatedApps;
-  // Chrome already failed to open it as an app: that outranks its list --
-  // until the list drops it too (the stuck record was removed in
-  // chrome://apps), which clears the verdict.
-  if (readRaw(NOT_OPENABLE_KEY)) {
-    if (typeof fn === "function") {
-      try {
-        const apps: Array<{ platform?: string }> = await fn.call(navigator);
-        diag.lastRelated = JSON.stringify(apps);
-        if (!(Array.isArray(apps) && apps.some((a) => a?.platform === "webapp"))) {
-          dropKey(NOT_OPENABLE_KEY);
-          diag.sawNotInstalled = true;
-        }
-      } catch {
-        /* keep the verdict */
-      }
-    }
-    setInstallCheck("no");
-    emit();
-    return "no";
-  }
   if (typeof fn !== "function") return installCheck;
   try {
     const apps: Array<{ platform?: string }> = await fn.call(navigator);
@@ -237,6 +208,7 @@ export const refreshInstallCheck = async (): Promise<InstallCheck> => {
     const listed = Array.isArray(apps) && apps.some((a) => a?.platform === "webapp");
     if (!listed) {
       diag.sawNotInstalled = true;
+      dropKey(LINKS_IN_BROWSER_KEY);
       diag.leftoverRecord = false;
       setInstallCheck("no");
       return "no";
@@ -266,7 +238,7 @@ export const resetInstallCheckForTests = () => {
   installCheck = "unknown";
   deferredPrompt = null;
   Object.assign(diag, { lastRelated: "not asked yet", sawNotInstalled: false, bipAt: 0, leftoverRecord: false, checks: 0 });
-  dropKey(NOT_OPENABLE_KEY);
+  dropKey(LINKS_IN_BROWSER_KEY);
   emit();
 };
 
@@ -298,7 +270,8 @@ export const initPwa = () => {
   });
   window.addEventListener("appinstalled", () => {
     deferredPrompt = null;
-    dropKey(NOT_OPENABLE_KEY);
+    // A fresh install gets Chrome's default: links open in the app.
+    dropKey(LINKS_IN_BROWSER_KEY);
     setInstallCheck("yes");
     emit();
   });
@@ -313,7 +286,7 @@ export const initPwa = () => {
   window.addEventListener("focus", recheck);
   // Another MIS tab learned something (e.g. "Open app" landed in a tab).
   window.addEventListener("storage", (e) => {
-    if (e.key === NOT_OPENABLE_KEY || e.key === INSTALLED_KEY) void refreshInstallCheck().then(emit);
+    if (e.key === LINKS_IN_BROWSER_KEY || e.key === INSTALLED_KEY) void refreshInstallCheck().then(emit);
   });
   // Installed or removed while this page stays on screen (Chrome's own
   // dialog, chrome://apps): a cheap re-check every 10 s while visible.
@@ -443,12 +416,14 @@ export const captureLaunchMarker = () => {
     }
     // "Open app" probe: in the app window = installed; in a tab = Chrome
     // couldn't open the app, so it isn't installed here -- say so and ask.
+    localStorage.removeItem(LEGACY_NOT_OPENABLE_KEY);
     if (url.searchParams.get("nga_open") === "1") {
       const standalone = Boolean(window.matchMedia?.("(display-mode: standalone)").matches);
-      if (standalone) localStorage.removeItem(NOT_OPENABLE_KEY);
+      if (standalone) localStorage.removeItem(LINKS_IN_BROWSER_KEY);
       else {
-        localStorage.setItem(NOT_OPENABLE_KEY, String(Date.now()));
-        localStorage.removeItem(INSTALLED_KEY);
+        // Landed in a tab: show the sheet -- it offers the install when MIS
+        // isn't installed, or how to open it as an app when it is.
+        localStorage.setItem(LINKS_IN_BROWSER_KEY, String(Date.now()));
         sessionStorage.setItem(INSTALL_REQUESTED_KEY, "1");
       }
       url.searchParams.delete("nga_open");
