@@ -3,6 +3,7 @@ import { useLocation } from "react-router-dom";
 import { ArrowLeft, LayoutGrid } from "lucide-react";
 import Modal from "../ui/Modal";
 import { InstallGuide } from "../reminders/InstallGuide";
+import RepairChromeApp from "./RepairChromeApp";
 import {
   autoPromptSnoozed,
   checkInstalledHere,
@@ -118,9 +119,14 @@ export const AutoInstallPrompt: React.FC = () => {
     <>
     {/* The install/open controls live in the top bar (NavAppActions):
         floating pills covered the sidebar. */}
-    <Modal isOpen={open} onClose={close} title={pwa.installed ? "NGA MIS is installed" : "Install NGA MIS as an app"} size="md">
+    <Modal
+      isOpen={open}
+      onClose={close}
+      title={pwa.notOpenable && !pwa.canPrompt ? "NGA MIS couldn't open as an app" : pwa.installed ? "NGA MIS is installed" : "Install NGA MIS as an app"}
+      size="md"
+    >
       <div className="space-y-4">
-        <InstallGuide />
+        {pwa.notOpenable && !pwa.canPrompt ? <RepairChromeApp /> : <InstallGuide />}
         <div className="flex flex-col gap-2 border-t border-slate-100 pt-4 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between">
           {returnUrl ? (
             <a href={returnUrl} className="inline-flex items-center gap-1.5 text-sm font-semibold text-brand-700 hover:underline dark:text-brand-200">

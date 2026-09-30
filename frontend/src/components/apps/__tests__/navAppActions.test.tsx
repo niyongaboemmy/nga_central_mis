@@ -133,6 +133,20 @@ describe("'Open app' proves it: landing in a browser tab means not installed her
     expect(getPwaState().installed).toBe(true);
   });
 
+  it("stuck record (can't open, Chrome won't offer install) -> flagged for the repair guide; cleared once Chrome drops it", async () => {
+    const { getPwaState: state } = await import("../../../reminders/pwa");
+    localStorage.setItem("nga.pwa.notOpenable", "1");
+    setRelatedApps([{ platform: "webapp" }]); // Chrome still lists it
+    await refreshInstallCheck();
+    expect(state().notOpenable).toBe(true);
+    expect(state().canPrompt).toBe(false);
+    setRelatedApps([]); // removed in chrome://apps
+    await refreshInstallCheck();
+    expect(localStorage.getItem("nga.pwa.notOpenable")).toBeNull();
+    expect(state().notOpenable).toBe(false);
+    expect(state().installed).toBe(false);
+  });
+
   it("'Open app' links carry the probe", async () => {
     setRelatedApps([{ platform: "webapp" }]);
     await act(async () => {

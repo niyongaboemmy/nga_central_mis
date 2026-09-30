@@ -27,6 +27,12 @@ interface PwaState {
   installCheck: InstallCheck;
   /** Running in a browser tab (not the installed app window). */
   inBrowser: boolean;
+  /**
+   * "Open app" landed in a browser tab: Chrome could not open NGA MIS as an
+   * app. With no install offer (canPrompt false) Chrome still believes it is
+   * installed -- a stuck record only the person can clear in chrome://apps.
+   */
+  notOpenable: boolean;
   /** Chromium handed us its install prompt. */
   canPrompt: boolean;
   /** <install> element (origin trial, Chrome/Edge 148+). */
@@ -64,6 +70,7 @@ const compute = (): PwaState => {
       installed: false,
       installCheck: "no",
       inBrowser: true,
+      notOpenable: true,
       canPrompt: Boolean(deferredPrompt),
       hasInstallElement: typeof window !== "undefined" && "HTMLInstallElement" in window,
       registration: currentRegistration,
@@ -79,6 +86,7 @@ const compute = (): PwaState => {
       env.standalone || installCheck === "yes" || (installCheck === "unknown" && !deferredPrompt && readFlag(INSTALLED_KEY)),
     installCheck: env.standalone ? "yes" : installCheck === "unknown" && deferredPrompt ? "no" : installCheck,
     inBrowser: !env.standalone,
+    notOpenable: false,
     canPrompt: Boolean(deferredPrompt),
     hasInstallElement: typeof window !== "undefined" && "HTMLInstallElement" in window,
     registration: currentRegistration,
@@ -200,12 +208,27 @@ export const refreshInstallCheck = async (): Promise<InstallCheck> => {
     setInstallCheck("yes");
     return "yes";
   }
-  // Chrome already failed to open it as an app: that outranks its list.
+  const fn = (navigator as any).getInstalledRelatedApps;
+  // Chrome already failed to open it as an app: that outranks its list --
+  // until the list drops it too (the stuck record was removed in
+  // chrome://apps), which clears the verdict.
   if (readRaw(NOT_OPENABLE_KEY)) {
+    if (typeof fn === "function") {
+      try {
+        const apps: Array<{ platform?: string }> = await fn.call(navigator);
+        diag.lastRelated = JSON.stringify(apps);
+        if (!(Array.isArray(apps) && apps.some((a) => a?.platform === "webapp"))) {
+          dropKey(NOT_OPENABLE_KEY);
+          diag.sawNotInstalled = true;
+        }
+      } catch {
+        /* keep the verdict */
+      }
+    }
     setInstallCheck("no");
+    emit();
     return "no";
   }
-  const fn = (navigator as any).getInstalledRelatedApps;
   if (typeof fn !== "function") return installCheck;
   try {
     const apps: Array<{ platform?: string }> = await fn.call(navigator);

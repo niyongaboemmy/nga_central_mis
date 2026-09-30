@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { getInstallDiagnostics, openAppUrl, promptInstall, refreshInstallCheck, usePwa } from "../../reminders/pwa";
 import { InstallGuide } from "../reminders/InstallGuide";
+import RepairChromeApp from "./RepairChromeApp";
 import Modal from "../ui/Modal";
 import {
   buildMobileConfig,
@@ -113,6 +114,8 @@ const AppsInstallerPage: React.FC = () => {
   const [askOpened, setAskOpened] = useState<NgaApp["key"] | null>(null);
   const lastOpened = useRef<{ key: NgaApp["key"]; at: number } | null>(null);
   const here = typeof window !== "undefined" ? window.location.origin : "";
+  // Chrome keeps a broken NGA MIS entry: it can't open it, won't install it.
+  const stuck = pwa.notOpenable && !pwa.canPrompt;
   // /apps?diag=1 shows the raw install signals of this browser.
   const showDiag = typeof window !== "undefined" && new URLSearchParams(window.location.search).has("diag");
   const [diagTick, setDiagTick] = useState(0);
@@ -268,6 +271,11 @@ const AppsInstallerPage: React.FC = () => {
     setRunning(true);
     if (app.origin === here) {
       if (pwa.installed) return set(app.key, "already");
+      if (stuck) {
+        say("Chrome needs a quick repair first — follow the steps on the NGA MIS card", "warn");
+        document.getElementById(`app-${app.key}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+        return;
+      }
       setBusy(app.key);
       try {
         // Removed while this page was open: Chrome hands out its install
@@ -618,8 +626,13 @@ const AppsInstallerPage: React.FC = () => {
                       </span>
                     </div>
                     <p className="mt-0.5 text-sm text-slate-600 dark:text-slate-300">{app.description}</p>
+                    {app.origin === here && stuck && (
+                      <div className="mt-3">
+                        <RepairChromeApp compact />
+                      </div>
+                    )}
                     <div className="mt-3 flex flex-wrap gap-2">
-                      {!isInstalled(status) &&
+                      {!isInstalled(status) && !(app.origin === here && stuck) &&
                         appAction(
                           app,
                           outlineBtn,
