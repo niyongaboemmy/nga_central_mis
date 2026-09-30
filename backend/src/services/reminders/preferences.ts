@@ -28,8 +28,30 @@ export interface KindSetting {
 
 export type ReminderSettings = Record<ReminderKind, KindSetting>;
 
+/** Extra delivery channels (in-app and Web Push are always on). */
+export interface ChannelChoices {
+  /** Telegram messages, once the chat is linked. */
+  telegram: boolean;
+  /** Email for critical reminders nobody acknowledged (opt-in). */
+  email: boolean;
+  /** Mirror into the connected Google Calendar. */
+  googleCalendar: boolean;
+}
+
+export const DEFAULT_CHANNELS: ChannelChoices = { telegram: true, email: false, googleCalendar: true };
+
+export const normalizeChannels = (raw: unknown): ChannelChoices => {
+  const src = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
+  return {
+    telegram: src.telegram === undefined ? DEFAULT_CHANNELS.telegram : Boolean(src.telegram),
+    email: src.email === undefined ? DEFAULT_CHANNELS.email : Boolean(src.email),
+    googleCalendar: src.googleCalendar === undefined ? DEFAULT_CHANNELS.googleCalendar : Boolean(src.googleCalendar),
+  };
+};
+
 export interface ReminderPreferences {
   enabled: boolean;
+  channels: ChannelChoices;
   settings: ReminderSettings;
   quietStart: string;
   quietEnd: string;
@@ -54,6 +76,7 @@ const MAX_OFFSETS_PER_KIND = 3;
 
 export const DEFAULT_PREFERENCES: ReminderPreferences = {
   enabled: false,
+  channels: DEFAULT_CHANNELS,
   settings: DEFAULT_SETTINGS,
   quietStart: "21:00",
   quietEnd: "06:00",
@@ -116,9 +139,10 @@ const loadStored = async (userId: number) => {
 
 export const getPreferences = async (userId: number): Promise<ReminderPreferences> => {
   const { row, overrides } = await loadStored(userId);
-  if (!row) return { ...DEFAULT_PREFERENCES, settings: normalizeSettings(null), lessonCustomized: false };
+  if (!row) return { ...DEFAULT_PREFERENCES, channels: { ...DEFAULT_CHANNELS }, settings: normalizeSettings(null), lessonCustomized: false };
   return {
     enabled: Number(row.enabled) === 1,
+    channels: normalizeChannels(parseSettingsColumn(row.channels)),
     settings: normalizeSettings(overrides),
     lessonCustomized: Array.isArray((overrides as any).lesson?.offsets),
     quietStart: row.quiet_start,
@@ -129,6 +153,7 @@ export const getPreferences = async (userId: number): Promise<ReminderPreference
 
 export interface PreferencesPatch {
   enabled?: unknown;
+  channels?: unknown;
   settings?: unknown;
   quietStart?: unknown;
   quietEnd?: unknown;
@@ -166,6 +191,10 @@ export const savePreferences = async (
 
   const next: ReminderPreferences = {
     enabled: patch.enabled === undefined ? current.enabled : Boolean(patch.enabled),
+    channels:
+      patch.channels === undefined
+        ? current.channels
+        : normalizeChannels({ ...current.channels, ...(patch.channels as object) }),
     settings: normalizeSettings(nextOverrides),
     lessonCustomized: Array.isArray((nextOverrides as any).lesson?.offsets),
     quietStart: patch.quietStart === undefined ? current.quietStart : validClock(patch.quietStart, "quietStart"),
@@ -176,6 +205,7 @@ export const savePreferences = async (
 
   const values = {
     enabled: next.enabled ? 1 : 0,
+    channels: next.channels,
     settings: nextOverrides,
     quiet_start: next.quietStart,
     quiet_end: next.quietEnd,

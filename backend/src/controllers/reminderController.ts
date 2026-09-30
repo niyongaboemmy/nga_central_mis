@@ -5,7 +5,8 @@ import { asyncHandler } from "../middleware/asyncHandler";
 import { NotFoundError, ValidationError } from "../errors/CustomError";
 import { successResponse } from "../utils/response";
 import logger from "../utils/logger";
-import { collectOccurrences } from "../services/reminders/occurrences";
+import { collectOccurrences, loadCurrentTerm } from "../services/reminders/occurrences";
+import { StudentSubjectEnrollment } from "../db/schema";
 import {
   getPreferences,
   REMINDER_KINDS,
@@ -123,6 +124,7 @@ export const updatePreferences = asyncHandler(async (req: any, res: any) => {
   const body = req.body ?? {};
   const preferences = await savePreferences(userId, {
     enabled: body.enabled,
+    channels: body.channels,
     settings: body.settings,
     quietStart: body.quietStart,
     quietEnd: body.quietEnd,
@@ -333,6 +335,23 @@ export const serveFeed = asyncHandler(async (req: any, res: any) => {
 
 // ─── Source API (other NGA apps) ────────────────────────────────────────────
 
+/** Students actively enrolled in `subjectId` this academic year. */
+const enrolledStudentIds = async (subjectId: number): Promise<number[]> => {
+  const term = await loadCurrentTerm();
+  if (!term) return [];
+  const rows = await db
+    .select({ user_id: StudentSubjectEnrollment.user_id })
+    .from(StudentSubjectEnrollment)
+    .where(
+      and(
+        eq(StudentSubjectEnrollment.subject_id, subjectId),
+        eq(StudentSubjectEnrollment.academic_year_id, term.yearId),
+        eq(StudentSubjectEnrollment.status, "ACTIVE"),
+      ),
+    );
+  return rows.map((r: any) => Number(r.user_id));
+};
+
 const SOURCE_KINDS = new Set<ReminderKind>(["quiz_open", "quiz_close", "assignment_due", "meeting", "event"]);
 const APP_KEY = /^[a-z][a-z0-9_-]{1,29}$/;
 
@@ -361,7 +380,13 @@ export const upsertSource = asyncHandler(async (req: any, res: any) => {
   const audience: number[] = Array.isArray(b.audience_user_ids)
     ? Array.from(new Set(b.audience_user_ids.map(Number).filter((n: number) => Number.isInteger(n) && n > 0)))
     : [];
-  if (audience.length === 0) throw new ValidationError("audience_user_ids must list at least one MIS user id");
+  const subjectId = b.audience_subject_id === undefined || b.audience_subject_id === null ? null : Number(b.audience_subject_id);
+  if (subjectId !== null && (!Number.isInteger(subjectId) || subjectId <= 0)) {
+    throw new ValidationError("audience_subject_id must be an MIS subject id");
+  }
+  if (audience.length === 0 && subjectId === null) {
+    throw new ValidationError("Give audience_user_ids (MIS user ids), audience_subject_id (its enrolled students), or both");
+  }
   if (audience.length > 5000) throw new ValidationError("audience_user_ids is limited to 5000 users per item");
   const link = typeof b.link === "string" && b.link.length <= 500 ? b.link : null;
 
@@ -377,6 +402,7 @@ export const upsertSource = asyncHandler(async (req: any, res: any) => {
     ends_at: endsAt,
     critical: b.critical ? 1 : 0,
     audience_user_ids: audience,
+    audience_subject_id: subjectId,
     cancelled_at: null,
   };
   await db
@@ -392,6 +418,7 @@ export const upsertSource = asyncHandler(async (req: any, res: any) => {
         ends_at: values.ends_at,
         critical: values.critical,
         audience_user_ids: values.audience_user_ids,
+        audience_subject_id: values.audience_subject_id,
         cancelled_at: null,
       },
     });
@@ -414,7 +441,8 @@ export const upsertSource = asyncHandler(async (req: any, res: any) => {
         .from(ReminderJob)
         .where(and(sql`${ReminderJob.dedupe_key} LIKE ${`src:${existing.source_id}:%`}`, eq(ReminderJob.status, "pending")))
     : [];
-  expandUsersSoon([...audience, ...holders.map((h: any) => h.user_id)]);
+  const enrolled = subjectId ? await enrolledStudentIds(subjectId) : [];
+  expandUsersSoon([...audience, ...enrolled, ...holders.map((h: any) => h.user_id)]);
   successResponse(res, "Reminder source saved", { source_id: existing?.source_id ?? null, audience: audience.length });
 });
 
