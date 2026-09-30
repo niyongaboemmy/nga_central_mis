@@ -84,23 +84,62 @@ export const installHandoffUrl = (app: NgaApp, returnUrl: string) => {
 
 // ─── Guided "install all" progress ───────────────────────────────────────────
 
-export type StepStatus = "todo" | "done" | "skipped";
+/**
+ * - todo: not installed yet
+ * - waiting: the app's tab is open with its install card; we wait for it to
+ *   report back (desktop browsers never tell one site whether another site's
+ *   app is installed -- only the app itself can)
+ * - done: installed now; already: it reported it was installed before
+ * - skipped: the person chose not to
+ */
+export type StepStatus = "todo" | "waiting" | "done" | "already" | "skipped";
 export type Progress = Record<NgaApp["key"], StepStatus>;
 
 export const emptyProgress = (): Progress => ({ mis: "todo", taskmentor: "todo", tendo: "todo", tupo: "todo" });
 
-/** The next app still to install, in list order; null when finished. */
+export const isInstalled = (s: StepStatus) => s === "done" || s === "already";
+export const isFinished = (s: StepStatus) => isInstalled(s) || s === "skipped";
+
+/** The app to work on now, in list order (a waiting one stays current); null when finished. */
 export const nextStep = (progress: Progress, apps: NgaApp[] = NGA_APPS): NgaApp | null =>
-  apps.find((a) => progress[a.key] === "todo") ?? null;
+  apps.find((a) => !isFinished(progress[a.key])) ?? null;
 
 export const markStep = (progress: Progress, key: NgaApp["key"], status: StepStatus): Progress => ({ ...progress, [key]: status });
+
+export const installedCount = (progress: Progress, apps: NgaApp[] = NGA_APPS) => apps.filter((a) => isInstalled(progress[a.key])).length;
+
+// ─── Live reports from the apps' install cards ───────────────────────────────
+
+export interface InstallReport {
+  key: NgaApp["key"];
+  status: "done" | "already" | "skipped";
+}
+
+/**
+ * Validate a postMessage from an app's install card (ngaInstall.tsx in each
+ * app). Accepted only from that app's own origin, for its own key.
+ */
+export const readInstallReport = (event: { origin: string; data: unknown }, apps: NgaApp[] = NGA_APPS): InstallReport | null => {
+  const data = event.data as { type?: unknown; app?: unknown; status?: unknown } | null;
+  if (!data || data.type !== "nga-install") return null;
+  const app = apps.find((a) => a.key === data.app);
+  if (!app || app.origin !== event.origin) return null;
+  const status = data.status === "installed" ? "done" : data.status === "already" ? "already" : data.status === "skipped" ? "skipped" : null;
+  return status ? { key: app.key, status } : null;
+};
 
 const PROGRESS_KEY = "nga.installer.progress";
 /** Progress survives the hops to other apps and back (a day at most). */
 export const loadProgress = (now = Date.now()): Progress => {
   try {
     const raw = JSON.parse(localStorage.getItem(PROGRESS_KEY) || "null");
-    if (raw && raw.at && now - raw.at < 86_400_000) return { ...emptyProgress(), ...raw.progress };
+    if (raw && raw.at && now - raw.at < 86_400_000) {
+      const progress: Progress = { ...emptyProgress(), ...raw.progress };
+      // A tab we were waiting on may be long gone: ask again rather than
+      // pretend it finished.
+      for (const k of Object.keys(progress) as NgaApp["key"][]) if (progress[k] === "waiting") progress[k] = "todo";
+      return progress;
+    }
   } catch {
     /* ignore */
   }

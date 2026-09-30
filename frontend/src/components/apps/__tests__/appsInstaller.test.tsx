@@ -1,14 +1,17 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import {
   buildMobileConfig,
   buildRegFile,
   emptyProgress,
   installHandoffUrl,
   manifestId,
+  loadProgress,
   markStep,
   NGA_APPS,
   nextStep,
+  readInstallReport,
+  saveProgress,
   startUrl,
 } from "../ngaApps";
 import { shouldAutoOffer, shouldShowInstallButton } from "../AutoInstallPrompt";
@@ -32,6 +35,30 @@ describe("NGA app list", () => {
     expect(url.origin).toBe("https://taskmentor.amashuri.com");
     expect(url.searchParams.get("nga_install")).toBe("1");
     expect(url.searchParams.get("return")).toBe("https://mis.amashuri.com/apps?done=taskmentor");
+  });
+
+  it("keeps a waiting app as the current step; only installed/skipped move on", () => {
+    let p = markStep(emptyProgress(), "mis", "already");
+    p = markStep(p, "taskmentor", "waiting");
+    expect(nextStep(p)?.key).toBe("taskmentor");
+    expect(nextStep(markStep(p, "taskmentor", "done"))?.key).toBe("tendo");
+  });
+
+  it("forgets a stale 'waiting' on reload (the tab may be gone) instead of calling it done", () => {
+    saveProgress(markStep(emptyProgress(), "tupo", "waiting"));
+    expect(loadProgress().tupo).toBe("todo");
+  });
+
+  it("accepts an install report only from the app's own origin, for its own key", () => {
+    const ok = { origin: "https://taskmentor.amashuri.com", data: { type: "nga-install", app: "taskmentor", status: "installed" } };
+    expect(readInstallReport(ok)).toEqual({ key: "taskmentor", status: "done" });
+    expect(readInstallReport({ ...ok, data: { ...ok.data, status: "already" } })).toEqual({ key: "taskmentor", status: "already" });
+    expect(readInstallReport({ ...ok, data: { ...ok.data, status: "skipped" } })).toEqual({ key: "taskmentor", status: "skipped" });
+    // Another NGA app can't report for Task Mentor, and strangers can't at all.
+    expect(readInstallReport({ ...ok, origin: "https://tupo.amashuri.com" })).toBeNull();
+    expect(readInstallReport({ ...ok, origin: "https://evil.example" })).toBeNull();
+    expect(readInstallReport({ ...ok, data: { ...ok.data, status: "hacked" } })).toBeNull();
+    expect(readInstallReport({ ...ok, data: "nga-install" })).toBeNull();
   });
 
   it("walks the steps in order, skipping done and skipped apps", () => {
@@ -94,6 +121,7 @@ describe("automatic install prompt on load", () => {
 });
 
 describe("/apps installer page", () => {
+  let open: ReturnType<typeof vi.spyOn>;
   beforeEach(() => {
     try {
       localStorage.removeItem("nga.installer.progress");
@@ -101,32 +129,79 @@ describe("/apps installer page", () => {
       /* ignore */
     }
     window.history.replaceState(null, "", "/apps");
+    open = vi.spyOn(window, "open").mockImplementation(() => ({ focus: vi.fn(), closed: false }) as unknown as Window);
   });
+  afterEach(() => open.mockRestore());
 
-  it("lists every app and walks 'Install all' as one-click steps", () => {
+  const card = (name: string) => screen.getByText(name, { selector: "p" }).closest("[id^='app-']") as HTMLElement;
+
+  it("lists every app and walks 'Install all' as honest one-click steps", async () => {
     render(<AppsInstallerPage />);
     for (const app of NGA_APPS) expect(screen.getByText(app.name, { selector: "p" })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /Install all apps/ }));
-    // In jsdom this page isn't one of the NGA origins and there is no Web
-    // Install API, so each step hands off to the app with its install card.
-    const step = screen.getByText("Step 1 of 4").closest("section")!;
-    const link = step.querySelector("a[href*='nga_install=1']") as HTMLAnchorElement;
-    expect(link).not.toBeNull();
-    expect(link.target).toBe("_blank");
-    expect(new URL(link.href).searchParams.get("return")).toBe(`${window.location.origin}/apps?done=mis`);
+    // In jsdom this page isn't an NGA origin and has no Web Install API, so the
+    // step opens the app in a tab with its install card and a way back.
+    const url = new URL(open.mock.calls[0][0] as string);
+    expect(url.searchParams.get("nga_install")).toBe("1");
+    expect(url.searchParams.get("return")).toBe(`${window.location.origin}/apps?done=mis`);
+    expect(open.mock.calls[0][1]).toBe("_blank");
+
+    // Opening a tab is NOT installing: it waits for the app to report back.
+    expect(within(card("NGA MIS")).getByText("Waiting…")).toBeInTheDocument();
+    expect(screen.getByText("Finish in the NGA MIS tab")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Skip" }));
-    expect(screen.getByText("Step 2 of 4")).toBeInTheDocument();
+    // The step panel animates out before the next one comes in.
+    expect(await screen.findByText("Step 2 of 4")).toBeInTheDocument();
     expect(screen.getByText("Install Task Mentor", { selector: "p" })).toBeInTheDocument();
+    expect(within(card("NGA MIS")).getByText("Skipped")).toBeInTheDocument();
   });
 
-  it("marks an app done when its install card sends the user back", () => {
-    window.history.replaceState(null, "", "/apps?done=tendo");
+  it("updates live when an app's install card reports back", () => {
+    render(<AppsInstallerPage />);
+    act(() => {
+      window.dispatchEvent(
+        new MessageEvent("message", { origin: "https://taskmentor.amashuri.com", data: { type: "nga-install", app: "taskmentor", status: "installed" } }),
+      );
+    });
+    expect(within(card("Task Mentor")).getByText("Installed")).toBeInTheDocument();
+    expect(screen.getByText("Task Mentor is installed")).toBeInTheDocument();
+
+    // A forged message from elsewhere changes nothing.
+    act(() => {
+      window.dispatchEvent(new MessageEvent("message", { origin: "https://evil.example", data: { type: "nga-install", app: "tendo", status: "installed" } }));
+    });
+    expect(within(card("Tendo")).getByText("Not installed")).toBeInTheDocument();
+  });
+
+  it("marks an app installed -- or skipped -- when its card sends the user back here", () => {
+    window.history.replaceState(null, "", "/apps?done=tendo&skipped=tupo");
     render(<AppsInstallerPage />);
     expect(window.location.search).toBe("");
-    const tendoCard = screen.getByText("Tendo", { selector: "p" }).closest("div")!;
-    expect(tendoCard.textContent).toContain("Done");
+    expect(within(card("Tendo")).getByText("Installed")).toBeInTheDocument();
+    expect(within(card("Tupo")).getByText("Skipped")).toBeInTheDocument();
+  });
+
+  it("says so when the browser blocks the new tab, with a link instead", () => {
+    open.mockReturnValue(null);
+    render(<AppsInstallerPage />);
+    fireEvent.click(screen.getByRole("button", { name: /Install all apps/ }));
+    expect(screen.getByRole("alert")).toHaveTextContent("Your browser blocked the new tab");
+    expect(within(card("NGA MIS")).getByText("Not installed")).toBeInTheDocument();
+  });
+
+  it("has a Back button that leaves for NGA MIS when there's nowhere to go back to", () => {
+    const assign = vi.fn();
+    const original = window.location;
+    Object.defineProperty(window, "location", { value: { ...original, assign, origin: original.origin, href: original.href }, configurable: true });
+    try {
+      render(<AppsInstallerPage />);
+      fireEvent.click(screen.getByRole("button", { name: "Back" }));
+      expect(assign).toHaveBeenCalledWith("/home");
+    } finally {
+      Object.defineProperty(window, "location", { value: original, configurable: true });
+    }
   });
 
   it("offers the managed-device files", () => {
