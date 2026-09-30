@@ -11,7 +11,7 @@ import {
   nextStep,
   startUrl,
 } from "../ngaApps";
-import { shouldAutoOffer } from "../AutoInstallPrompt";
+import { shouldAutoOffer, shouldShowInstallButton } from "../AutoInstallPrompt";
 import AppsInstallerPage from "../AppsInstallerPage";
 import { safeReturnUrl } from "../../../reminders/pwa";
 
@@ -151,5 +151,33 @@ describe("a stale 'installed' note can't hide the prompt", () => {
     window.dispatchEvent(e);
     expect(getPwaState().installed).toBe(false);
     expect(getPwaState().canPrompt).toBe(true);
+  });
+});
+
+describe("an install button is always within reach", () => {
+  const base = { installed: false, canPrompt: true, installMethod: "prompt", sheetOpen: false, hidden: false, onInstallerPage: false };
+  it("shows whenever the browser says MIS is installable and the sheet is closed", () => {
+    expect(shouldShowInstallButton(base)).toBe(true);
+    expect(shouldShowInstallButton({ ...base, sheetOpen: true })).toBe(false);
+    expect(shouldShowInstallButton({ ...base, hidden: true })).toBe(false);
+    expect(shouldShowInstallButton({ ...base, installed: true })).toBe(false);
+    expect(shouldShowInstallButton({ ...base, onInstallerPage: true })).toBe(false);
+  });
+  it("on Chromium waits for the browser's own signal; elsewhere shows until installed", () => {
+    expect(shouldShowInstallButton({ ...base, canPrompt: false, installMethod: "manual" })).toBe(false);
+    expect(shouldShowInstallButton({ ...base, canPrompt: false, installMethod: "ios" })).toBe(true);
+    expect(shouldShowInstallButton({ ...base, canPrompt: false, installMethod: "mac-dock" })).toBe(true);
+    expect(shouldShowInstallButton({ ...base, canPrompt: false, installMethod: "none" })).toBe(false);
+  });
+  it("an old 24-hour snooze no longer hides anything", async () => {
+    const { clearLegacySnooze, autoPromptSnoozed } = await import("../../../reminders/pwa");
+    try {
+      localStorage.setItem("nga.pwa.autoPromptSnoozedUntil", String(Date.now() + 3_600_000));
+      sessionStorage.removeItem("nga.pwa.autoPromptDismissedThisSession");
+    } catch {
+      /* ignore */
+    }
+    clearLegacySnooze();
+    expect(autoPromptSnoozed()).toBe(false);
   });
 });
