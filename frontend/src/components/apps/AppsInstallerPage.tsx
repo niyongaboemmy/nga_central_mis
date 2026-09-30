@@ -267,6 +267,26 @@ const AppsInstallerPage: React.FC = () => {
       if (pwa.installed) return set(app.key, "already");
       setBusy(app.key);
       try {
+        // Removed while this page was open: Chrome hands out its install
+        // dialog only on page load -- reload once to get it back.
+        const chromium = ["chrome", "edge", "brave", "opera", "samsung"].includes(pwa.platform.browser);
+        const reloadedOnce = (() => {
+          try {
+            return sessionStorage.getItem("nga.installer.reloadedForPrompt") === "1";
+          } catch {
+            return true;
+          }
+        })();
+        if (!pwa.canPrompt && pwa.installCheck === "no" && chromium && !reloadedOnce) {
+          try {
+            sessionStorage.setItem("nga.installer.reloadedForPrompt", "1");
+          } catch {
+            /* ignore */
+          }
+          say("Getting the install ready…", "info");
+          window.setTimeout(() => window.location.reload(), 500);
+          return;
+        }
         if (pwa.canPrompt || (navigator as any).install) {
           const outcome = await promptInstall();
           if (outcome === "accepted") {
