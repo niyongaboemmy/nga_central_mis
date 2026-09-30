@@ -7,6 +7,7 @@ import SystemsMenu from "./SystemsMenu";
 import AcademicPeriodSelector from "./AcademicPeriodSelector";
 import NavSearch from "./NavSearch";
 import NotificationBell from "./NotificationBell";
+import NavAppActions from "../apps/NavAppActions";
 import { LayoutGrid } from "lucide-react";
 
 interface NavbarProps {
@@ -196,6 +197,7 @@ const Navbar: React.FC<NavbarProps> = ({
             <div className="hidden md:flex items-center space-x-3">
               {user && <AcademicPeriodSelector />}
               {user && <NavSearch />}
+              {user && <NavAppActions />}
               {user && <NotificationBell />}
               <ThemeToggle />
 
@@ -340,6 +342,7 @@ const Navbar: React.FC<NavbarProps> = ({
             {/* Mobile Menu Button */}
             <div className="flex md:hidden items-center space-x-2">
               {user && <NavSearch />}
+              {user && <NavAppActions compact />}
               {user && <NotificationBell />}
               <ThemeToggle />
               <button

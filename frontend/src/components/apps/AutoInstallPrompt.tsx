@@ -1,14 +1,12 @@
 import React, { useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
-import { ArrowLeft, Download, ExternalLink, LayoutGrid, X } from "lucide-react";
+import { ArrowLeft, LayoutGrid } from "lucide-react";
 import Modal from "../ui/Modal";
 import { InstallGuide } from "../reminders/InstallGuide";
 import {
   autoPromptSnoozed,
   checkInstalledHere,
   clearInstallRequest,
-  hideInstallButton,
-  installButtonHidden,
   installRequested,
   installReturnUrl,
   markLaunchInstallAsked,
@@ -63,7 +61,6 @@ export const AutoInstallPrompt: React.FC = () => {
   const location = useLocation();
   const [open, setOpen] = useState(false);
   const [closedThisLoad, setClosedThisLoad] = useState(false);
-  const [buttonHidden, setButtonHidden] = useState(() => installButtonHidden());
   const returnUrl = installReturnUrl();
 
   useEffect(() => {
@@ -116,57 +113,11 @@ export const AutoInstallPrompt: React.FC = () => {
     setOpen(false);
   };
 
-  const showButton = shouldShowInstallButton({
-    installed: pwa.installed && !pwa.canPrompt,
-    canPrompt: pwa.canPrompt,
-    installMethod: pwa.platform.installMethod,
-    sheetOpen: open,
-    hidden: buttonHidden,
-    onInstallerPage: location.pathname.startsWith("/apps"),
-  });
-
-  // Installed, but this is a browser tab: one click into the app window.
-  // A real link -- Chrome sends a clicked link into the installed app.
-  const inTab = !window.matchMedia?.("(display-mode: standalone)").matches;
-  const showOpenApp =
-    inTab && pwa.installed && !pwa.canPrompt && !buttonHidden && !open && !location.pathname.startsWith("/apps");
 
   return (
     <>
-    {showOpenApp && (
-      <a
-        href={`${window.location.origin}/home?source=pwa`}
-        target="_blank"
-        rel="noopener"
-        onClick={() => window.setTimeout(() => window.close(), 600)}
-        className="fixed bottom-4 left-4 z-40 inline-flex items-center gap-1.5 rounded-full bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-float transition hover:bg-brand-700 focus:outline-none focus-visible:ring-4 focus-visible:ring-brand-200"
-        style={{ marginBottom: "env(safe-area-inset-bottom)" }}
-      >
-        <ExternalLink className="h-4 w-4" /> Open in the NGA MIS app
-      </a>
-    )}
-    {showButton && (
-      <div className="fixed bottom-4 left-4 z-40 flex items-center gap-0.5 rounded-full bg-brand-600 p-1 text-white shadow-float" style={{ marginBottom: "env(safe-area-inset-bottom)" }}>
-        <button
-          type="button"
-          onClick={() => setOpen(true)}
-          className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-semibold transition hover:bg-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
-        >
-          <Download className="h-4 w-4" /> Install NGA MIS
-        </button>
-        <button
-          type="button"
-          aria-label="Hide the install button"
-          onClick={() => {
-            hideInstallButton();
-            setButtonHidden(true);
-          }}
-          className="flex h-7 w-7 items-center justify-center rounded-full bg-white/15 transition hover:bg-white/25"
-        >
-          <X className="h-3.5 w-3.5" />
-        </button>
-      </div>
-    )}
+    {/* The install/open controls live in the top bar (NavAppActions):
+        floating pills covered the sidebar. */}
     <Modal isOpen={open} onClose={close} title={pwa.installed ? "NGA MIS is installed" : "Install NGA MIS as an app"} size="md">
       <div className="space-y-4">
         <InstallGuide />
