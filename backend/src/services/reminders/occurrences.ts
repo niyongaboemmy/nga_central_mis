@@ -1,6 +1,6 @@
-import { and, eq, gte, isNull, lte, sql } from "drizzle-orm";
+import { and, eq, gte, inArray, isNull, lte, or, sql } from "drizzle-orm";
 import { db } from "../../db";
-import { AcademicTerm } from "../../db/schema";
+import { AcademicTerm, StudentSubjectEnrollment } from "../../db/schema";
 import { ReminderSource } from "../../db/reminderSchema";
 import {
   loadAssignedActivities,
@@ -173,7 +173,23 @@ export const collectOccurrences = async (
     }
   }
 
-  // Items the other apps registered through the Source API.
+  // Items the other apps registered through the Source API: addressed to
+  // this user directly, or to a subject they're actively enrolled in.
+  const enrolledSubjectIds = term
+    ? (
+        await db
+          .select({ subject_id: StudentSubjectEnrollment.subject_id })
+          .from(StudentSubjectEnrollment)
+          .where(
+            and(
+              eq(StudentSubjectEnrollment.user_id, userId),
+              eq(StudentSubjectEnrollment.academic_year_id, term.yearId),
+              eq(StudentSubjectEnrollment.status, "ACTIVE"),
+            ),
+          )
+      ).map((r: any) => Number(r.subject_id))
+    : [];
+  const addressedToMe = sql`JSON_CONTAINS(${ReminderSource.audience_user_ids}, CAST(${String(userId)} AS JSON))`;
   const external = await db
     .select()
     .from(ReminderSource)
@@ -182,7 +198,9 @@ export const collectOccurrences = async (
         isNull(ReminderSource.cancelled_at),
         gte(ReminderSource.starts_at, from),
         lte(ReminderSource.starts_at, to),
-        sql`JSON_CONTAINS(${ReminderSource.audience_user_ids}, CAST(${String(userId)} AS JSON))`,
+        enrolledSubjectIds.length
+          ? or(addressedToMe, inArray(ReminderSource.audience_subject_id, enrolledSubjectIds))!
+          : addressedToMe,
       ),
     );
   for (const source of external) {

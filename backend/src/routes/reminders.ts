@@ -4,6 +4,13 @@ import { requireServiceToken } from "../middleware/serviceAuth";
 import { Permissions } from "../utils/permissions";
 import {
   ackMyJob,
+  createTelegramLink,
+  deleteTelegramLink,
+  googleCallback,
+  googleConnectUrl,
+  googleDisconnect,
+  googleSyncNow,
+  telegramWebhook,
   cancelSource,
   createFeed,
   deleteFeed,
@@ -20,6 +27,7 @@ import {
   unsubscribePush,
   updatePreferences,
   upsertSource,
+  upsertSourcesBatch,
 } from "../controllers/reminderController";
 
 /**
@@ -36,8 +44,11 @@ const router = Router();
 // Public, token-in-URL routes -- registered before authenticate.
 router.get("/feed/:token", serveFeed);
 router.post("/actions/:id/:action", notificationAction);
+router.post("/telegram/webhook", telegramWebhook);
+router.get("/google/callback", googleCallback);
 
 // Source API for Task Mentor, Tupo, ... (scope reminders:write).
+router.put("/sources/batch", requireServiceToken("reminders:write"), upsertSourcesBatch);
 router.put("/sources", requireServiceToken("reminders:write"), upsertSource);
 router.delete("/sources/:app/:type/:externalId", requireServiceToken("reminders:write"), cancelSource);
 
@@ -56,6 +67,12 @@ router.post("/test", sendTest);
 
 router.post("/jobs/:id/ack", ackMyJob);
 router.post("/jobs/:id/snooze", snoozeMyJob);
+
+router.post("/telegram/link", createTelegramLink);
+router.delete("/telegram", deleteTelegramLink);
+router.get("/google/connect", googleConnectUrl);
+router.post("/google/sync", googleSyncNow);
+router.delete("/google", googleDisconnect);
 
 router.post("/feed", createFeed);
 router.delete("/feed", deleteFeed);

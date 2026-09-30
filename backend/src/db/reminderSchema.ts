@@ -29,6 +29,7 @@ export const ReminderPreference = mysqlTable("ReminderPreference", {
   quiet_start: varchar("quiet_start", { length: 5 }).notNull().default("21:00"),
   quiet_end: varchar("quiet_end", { length: 5 }).notNull().default("06:00"),
   morning_briefing: tinyint("morning_briefing").notNull().default(1),
+  channels: json("channels"),
   created_at: datetime("created_at").default(sql`CURRENT_TIMESTAMP`),
   updated_at: datetime("updated_at").default(sql`CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP`),
 });
@@ -63,6 +64,8 @@ export const ReminderSource = mysqlTable("ReminderSource", {
   ends_at: datetime("ends_at"),
   critical: tinyint("critical").notNull().default(0),
   audience_user_ids: json("audience_user_ids").notNull(),
+  /** Students enrolled in this MIS subject (current year) are in the audience too. */
+  audience_subject_id: bigint("audience_subject_id", { mode: "number" }),
   cancelled_at: datetime("cancelled_at"),
   created_at: datetime("created_at").default(sql`CURRENT_TIMESTAMP`),
   updated_at: datetime("updated_at").default(sql`CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP`),
@@ -90,6 +93,7 @@ export const ReminderJob = mysqlTable("ReminderJob", {
   claimed_at: datetime("claimed_at"),
   sent_at: datetime("sent_at"),
   acked_at: datetime("acked_at"),
+  escalated_at: datetime("escalated_at"),
   last_error: varchar("last_error", { length: 500 }),
   created_at: datetime("created_at").default(sql`CURRENT_TIMESTAMP`),
   updated_at: datetime("updated_at").default(sql`CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP`),
@@ -100,4 +104,38 @@ export const CalendarFeedToken = mysqlTable("CalendarFeedToken", {
   token: varchar("token", { length: 64 }).notNull(),
   created_at: datetime("created_at").default(sql`CURRENT_TIMESTAMP`),
   last_fetched_at: datetime("last_fetched_at"),
+});
+
+// ─── Channels (migration 093) ───────────────────────────────────────────────
+
+export const TelegramLink = mysqlTable("TelegramLink", {
+  user_id: bigint("user_id", { mode: "number" }).primaryKey(),
+  chat_id: bigint("chat_id", { mode: "number" }).notNull(),
+  username: varchar("username", { length: 64 }),
+  linked_at: datetime("linked_at").default(sql`CURRENT_TIMESTAMP`),
+});
+
+export const TelegramLinkCode = mysqlTable("TelegramLinkCode", {
+  code: varchar("code", { length: 64 }).primaryKey(),
+  user_id: bigint("user_id", { mode: "number" }).notNull(),
+  expires_at: datetime("expires_at").notNull(),
+});
+
+export const GoogleCalendarLink = mysqlTable("GoogleCalendarLink", {
+  user_id: bigint("user_id", { mode: "number" }).primaryKey(),
+  google_email: varchar("google_email", { length: 255 }),
+  refresh_token_enc: text("refresh_token_enc").notNull(),
+  calendar_id: varchar("calendar_id", { length: 255 }),
+  status: varchar("status", { length: 20 }).notNull().default("active"),
+  last_sync_at: datetime("last_sync_at"),
+  last_error: varchar("last_error", { length: 500 }),
+  created_at: datetime("created_at").default(sql`CURRENT_TIMESTAMP`),
+});
+
+export const GoogleCalendarEvent = mysqlTable("GoogleCalendarEvent", {
+  user_id: bigint("user_id", { mode: "number" }).notNull(),
+  occurrence_key: varchar("occurrence_key", { length: 191 }).notNull(),
+  event_id: varchar("event_id", { length: 255 }).notNull(),
+  content_hash: varchar("content_hash", { length: 40 }).notNull(),
+  starts_at: datetime("starts_at").notNull(),
 });

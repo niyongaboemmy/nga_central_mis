@@ -13,6 +13,14 @@ import { CalendarPanel } from "./CalendarPanel";
 import { ReliabilityCheck } from "./ReliabilityCheck";
 import { UpcomingList } from "./UpcomingList";
 import { AdminDeliveryPanel } from "./AdminDeliveryPanel";
+import { ChannelsPanel } from "./ChannelsPanel";
+
+/** What Google's redirect back to /reminders?google=… means. */
+const GOOGLE_RESULT: Record<string, [string, "success" | "info" | "error"]> = {
+  connected: ["Google Calendar connected — your timetable is syncing", "success"],
+  denied: ["Google Calendar wasn't connected — access was declined", "info"],
+  error: ["Couldn't connect Google Calendar — please try again", "error"],
+};
 
 /** sha256(endpoint) -- how the server names this browser's subscription. */
 const hashEndpoint = async (endpoint: string) => {
@@ -43,6 +51,19 @@ const RemindersPage: React.FC = () => {
       alive = false;
     };
   }, [r.pushStatus, r.overview?.devices.length]);
+
+  // Back from Google's consent screen: say how it went, then tidy the URL.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const result = params.get("google");
+    if (!result) return;
+    const [message, tone] = GOOGLE_RESULT[result] ?? GOOGLE_RESULT.error;
+    showToast(message, tone);
+    params.delete("google");
+    const query = params.toString();
+    window.history.replaceState(null, "", `${window.location.pathname}${query ? `?${query}` : ""}${window.location.hash}`);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const refresh = async () => {
     await Promise.all([r.reload(), r.refreshPush()]);
@@ -107,6 +128,16 @@ const RemindersPage: React.FC = () => {
             platform={r.pwa.platform}
             onChanged={(feed) => r.setOverview((o) => (o ? { ...o, feed } : o))}
           />
+          {prefs && (
+            <ChannelsPanel
+              config={r.config}
+              connections={r.overview?.connections}
+              preferences={prefs}
+              remindersOn={remindersOn}
+              onSave={r.savePreferences}
+              onChanged={() => void r.reload()}
+            />
+          )}
           {(r.pwa.platform.mobile || r.pushStatus === "on") && (
             <ReliabilityCheck platform={r.pwa.platform} pushOn={r.pushStatus === "on"} />
           )}

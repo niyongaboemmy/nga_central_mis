@@ -1,4 +1,5 @@
 import { and, eq, gte, inArray, notInArray, sql } from "drizzle-orm";
+import { syncGoogleSoon } from "./channels";
 import { db } from "../../db";
 import { ReminderJob, ReminderPreference } from "../../db/reminderSchema";
 import logger from "../../utils/logger";
@@ -211,7 +212,7 @@ export const expandForUser = async (
     eq(ReminderJob.status, "pending"),
     gte(ReminderJob.fire_at, new Date(now.getTime() - LATE_GRACE_MS)),
     // Snoozed copies and test pings are not part of the plan -- never touch them.
-    notInArray(ReminderJob.source_type, ["test"]),
+    notInArray(ReminderJob.source_type, ["test", "change"]),
     sql`${ReminderJob.dedupe_key} NOT LIKE '%:snooze:%'`,
   ];
   if (keep.length > 0) staleFilters.push(notInArray(ReminderJob.dedupe_key, keep));
@@ -244,6 +245,8 @@ export const expandAll = async (now: Date = new Date()) => {
 export const expandUsersSoon = (userIds: number[]) => {
   const unique = Array.from(new Set(userIds)).filter((id) => Number.isInteger(id) && id > 0);
   if (unique.length === 0) return;
+  // Connected Google calendars mirror the plan (independent of push opt-in).
+  syncGoogleSoon(unique);
   setImmediate(async () => {
     try {
       const enabled = await db
