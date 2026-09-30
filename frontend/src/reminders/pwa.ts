@@ -116,6 +116,14 @@ export const initPwa = () => {
     // Keep Chromium's mini-infobar away; we show our own, better-timed card.
     event.preventDefault();
     deferredPrompt = event as BeforeInstallPromptEvent;
+    // Chromium fires this only when MIS is NOT installed here -- the
+    // authoritative answer. Drop a stale "installed" note (installed once,
+    // later uninstalled), or the install prompt never comes back.
+    try {
+      localStorage.removeItem(INSTALLED_KEY);
+    } catch {
+      /* ignore */
+    }
     emit();
   });
   window.addEventListener("appinstalled", () => {
