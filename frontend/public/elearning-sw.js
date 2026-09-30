@@ -30,6 +30,10 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
+  // Standalone public pages (privacy policy, terms) are not the app shell:
+  // let the browser load them untouched, and never cache them as "/".
+  if (url.origin === self.location.origin && /^\/(privacy|terms)(\/|\/index\.html)?$/.test(url.pathname)) return;
+
   // Navigations: network, falling back to the cached shell.
   if (req.mode === "navigate") {
     // Always revalidate the page with the server (the HTML used to be served

@@ -2293,17 +2293,13 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
           <div className="mt-6 flex items-center justify-center gap-4 text-xs text-gray-400 dark:text-gray-500">
             <span>© {new Date().getFullYear()} NGA Central MIS</span>
             <a
-              href={WEBSITE_URL}
-              target="_blank"
-              rel="noopener noreferrer"
+              href="/privacy/"
               className="hover:text-blue-500 dark:hover:text-blue-400 transition-colors"
             >
               Privacy
             </a>
             <a
-              href={WEBSITE_URL}
-              target="_blank"
-              rel="noopener noreferrer"
+              href="/terms/"
               className="hover:text-blue-500 dark:hover:text-blue-400 transition-colors"
             >
               Terms

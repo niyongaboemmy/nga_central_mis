@@ -1,0 +1,77 @@
+/* Public legal pages (/privacy, /terms): standalone HTML, readable without
+   JavaScript or sign-in, so Google's OAuth reviewers and crawlers see them. */
+:root {
+  --bg: #f8fafc;
+  --card: #ffffff;
+  --ink: #0f172a;
+  --muted: #475569;
+  --line: #e2e8f0;
+  --brand: #b91c1c;
+  --link: #1d4ed8;
+  --note: #eff6ff;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #020617;
+    --card: #0f172a;
+    --ink: #e2e8f0;
+    --muted: #94a3b8;
+    --line: #1e293b;
+    --brand: #f87171;
+    --link: #93c5fd;
+    --note: #172554;
+    color-scheme: dark;
+  }
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 16px/1.65 system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+}
+a { color: var(--link); text-underline-offset: 2px; }
+.top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 20px 16px;
+}
+.brand { display: flex; align-items: center; gap: 10px; color: var(--ink); text-decoration: none; font-weight: 700; }
+.brand img { width: 36px; height: 36px; border-radius: 8px; }
+.top nav { display: flex; gap: 16px; font-size: 14px; }
+main {
+  max-width: 860px;
+  margin: 0 auto 48px;
+  padding: 32px 20px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 20px;
+}
+@media (min-width: 900px) { main { padding: 48px 56px; } }
+@media (max-width: 899px) { main { margin: 0 16px 32px; } }
+h1 { font-size: clamp(1.75rem, 4vw, 2.25rem); line-height: 1.2; margin: 0 0 8px; }
+h2 { font-size: 1.2rem; margin: 2.2em 0 0.5em; padding-top: 1em; border-top: 1px solid var(--line); }
+h3 { font-size: 1rem; margin: 1.4em 0 0.3em; }
+.updated { color: var(--muted); margin: 0 0 24px; font-size: 14px; }
+.note { background: var(--note); border-radius: 12px; padding: 14px 18px; margin: 20px 0; }
+.toc { columns: 2 220px; padding-left: 1.2em; margin: 0; }
+.toc li { break-inside: avoid; }
+ul { padding-left: 1.2em; }
+li + li { margin-top: 4px; }
+table { width: 100%; border-collapse: collapse; font-size: 15px; margin: 12px 0; display: block; overflow-x: auto; }
+th, td { text-align: left; vertical-align: top; padding: 8px 10px; border-bottom: 1px solid var(--line); }
+th { color: var(--muted); font-weight: 600; white-space: nowrap; }
+footer { max-width: 860px; margin: 0 auto 32px; padding: 0 16px; color: var(--muted); font-size: 14px; text-align: center; }
+main { overflow-wrap: anywhere; }
+code { font-size: 0.9em; word-break: break-all; }
+.top nav a { white-space: nowrap; }
+@media (max-width: 480px) {
+  .brand { font-size: 15px; }
+  .top nav { gap: 12px; font-size: 13px; }
+}
