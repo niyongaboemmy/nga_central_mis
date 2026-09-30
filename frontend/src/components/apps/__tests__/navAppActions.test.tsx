@@ -54,6 +54,27 @@ describe("live install detection", () => {
   });
 });
 
+describe("an app synced to the Chrome account but not installed on this device", () => {
+  afterEach(() => {
+    setRelatedApps(null);
+    resetInstallCheckForTests();
+  });
+
+  it("Chrome offering to install wins over a synced 'installed' answer", async () => {
+    // getInstalledRelatedApps reports the synced app...
+    setRelatedApps([{ platform: "webapp", id: "https://mis.amashuri.com/" }]);
+    const { initPwa } = await import("../../../reminders/pwa");
+    initPwa();
+    // ...while Chrome says this device can install it.
+    act(() => {
+      window.dispatchEvent(Object.assign(new Event("beforeinstallprompt", { cancelable: true }), { prompt: async () => undefined, userChoice: Promise.resolve({ outcome: "dismissed" }) }));
+    });
+    expect(await refreshInstallCheck()).toBe("no");
+    expect(getPwaState().installed).toBe(false);
+    expect(getPwaState().installCheck).toBe("no");
+  });
+});
+
 describe("top-bar app controls", () => {
   afterEach(() => {
     setRelatedApps(null);
