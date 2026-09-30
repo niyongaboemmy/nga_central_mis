@@ -45,6 +45,7 @@ let installCheck: InstallCheck = "unknown";
 const diag = { lastRelated: "not asked yet", sawNotInstalled: false, bipAt: 0 as number, leftoverRecord: false, checks: 0 };
 export const getInstallDiagnostics = () => ({
   ...diag,
+  notOpenableSince: readRaw(NOT_OPENABLE_KEY),
   installCheck,
   canPrompt: Boolean(deferredPrompt),
   standalone: typeof window !== "undefined" && Boolean(window.matchMedia?.("(display-mode: standalone)").matches),
@@ -56,6 +57,18 @@ const listeners = new Set<() => void>();
 
 const compute = (): PwaState => {
   const env = readEnv(Boolean(deferredPrompt));
+  const notOpenable = !env.standalone && Boolean(readRaw(NOT_OPENABLE_KEY));
+  if (notOpenable) {
+    return {
+      platform: describePlatform(env),
+      installed: false,
+      installCheck: "no",
+      inBrowser: true,
+      canPrompt: Boolean(deferredPrompt),
+      hasInstallElement: typeof window !== "undefined" && "HTMLInstallElement" in window,
+      registration: currentRegistration,
+    };
+  }
   return {
     platform: describePlatform(env),
     // A remembered note is only trusted when the browser can't answer: it
@@ -95,6 +108,30 @@ export const usePwa = () => useSyncExternalStore(subscribePwa, getPwaState, getP
 // ─── storage helpers (per-viewer conveniences only) ─────────────────────────
 
 const INSTALLED_KEY = "nga.pwa.installed";
+/**
+ * Proof from the real world: an "Open app" link (…&nga_open=1) that lands in
+ * a browser TAB means Chrome could not open NGA MIS as an app -- it is not
+ * installed on this device, whatever Chrome's installed list says (it can
+ * keep a record after the app is gone, and then fires no install event).
+ * Cleared by a real install (appinstalled) or MIS running as the app.
+ */
+const NOT_OPENABLE_KEY = "nga.pwa.notOpenable";
+const readRaw = (key: string) => {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+};
+const dropKey = (key: string) => {
+  try {
+    localStorage.removeItem(key);
+  } catch {
+    /* ignore */
+  }
+};
+/** The link that opens NGA MIS in its app window, and proves whether it can. */
+export const openAppUrl = () => `${window.location.origin}/home?source=pwa&nga_open=1`;
 const INSTALL_SNOOZE_KEY = "nga.pwa.installSnoozedUntil";
 const VISITS_KEY = "nga.pwa.visits";
 
@@ -159,8 +196,14 @@ const setInstallCheck = (next: InstallCheck) => {
 export const refreshInstallCheck = async (): Promise<InstallCheck> => {
   if (typeof window === "undefined") return "unknown";
   if (window.matchMedia?.("(display-mode: standalone)").matches) {
+    dropKey(NOT_OPENABLE_KEY);
     setInstallCheck("yes");
     return "yes";
+  }
+  // Chrome already failed to open it as an app: that outranks its list.
+  if (readRaw(NOT_OPENABLE_KEY)) {
+    setInstallCheck("no");
+    return "no";
   }
   const fn = (navigator as any).getInstalledRelatedApps;
   if (typeof fn !== "function") return installCheck;
@@ -200,6 +243,7 @@ export const resetInstallCheckForTests = () => {
   installCheck = "unknown";
   deferredPrompt = null;
   Object.assign(diag, { lastRelated: "not asked yet", sawNotInstalled: false, bipAt: 0, leftoverRecord: false, checks: 0 });
+  dropKey(NOT_OPENABLE_KEY);
   emit();
 };
 
@@ -231,6 +275,7 @@ export const initPwa = () => {
   });
   window.addEventListener("appinstalled", () => {
     deferredPrompt = null;
+    dropKey(NOT_OPENABLE_KEY);
     setInstallCheck("yes");
     emit();
   });
@@ -243,6 +288,10 @@ export const initPwa = () => {
   };
   document.addEventListener("visibilitychange", recheck);
   window.addEventListener("focus", recheck);
+  // Another MIS tab learned something (e.g. "Open app" landed in a tab).
+  window.addEventListener("storage", (e) => {
+    if (e.key === NOT_OPENABLE_KEY || e.key === INSTALLED_KEY) void refreshInstallCheck().then(emit);
+  });
   // Installed or removed while this page stays on screen (Chrome's own
   // dialog, chrome://apps): a cheap re-check every 10 s while visible.
   window.setInterval(recheck, 10_000);
@@ -367,6 +416,19 @@ export const captureLaunchMarker = () => {
     if (url.searchParams.get("nga_launch") === "app") {
       sessionStorage.setItem(LAUNCHED_FROM_APP_KEY, "1");
       url.searchParams.delete("nga_launch");
+      changed = true;
+    }
+    // "Open app" probe: in the app window = installed; in a tab = Chrome
+    // couldn't open the app, so it isn't installed here -- say so and ask.
+    if (url.searchParams.get("nga_open") === "1") {
+      const standalone = Boolean(window.matchMedia?.("(display-mode: standalone)").matches);
+      if (standalone) localStorage.removeItem(NOT_OPENABLE_KEY);
+      else {
+        localStorage.setItem(NOT_OPENABLE_KEY, String(Date.now()));
+        localStorage.removeItem(INSTALLED_KEY);
+        sessionStorage.setItem(INSTALL_REQUESTED_KEY, "1");
+      }
+      url.searchParams.delete("nga_open");
       changed = true;
     }
     // Sent by the NGA installer (/apps on this or another app): always ask.

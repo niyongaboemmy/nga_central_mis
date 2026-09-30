@@ -19,7 +19,7 @@ import {
   SkipForward,
   Sparkles,
 } from "lucide-react";
-import { getInstallDiagnostics, promptInstall, refreshInstallCheck, usePwa } from "../../reminders/pwa";
+import { getInstallDiagnostics, openAppUrl, promptInstall, refreshInstallCheck, usePwa } from "../../reminders/pwa";
 import { InstallGuide } from "../reminders/InstallGuide";
 import Modal from "../ui/Modal";
 import {
@@ -629,9 +629,9 @@ const AppsInstallerPage: React.FC = () => {
                           </>,
                         )}
                       <a
-                        href={startUrl(app)}
+                        href={app.origin === here ? openAppUrl() : startUrl(app)}
                         target="_blank"
-                        rel="noopener noreferrer"
+                        rel="noopener"
                         className="inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold text-brand-700 transition hover:bg-brand-50 dark:text-brand-200 dark:hover:bg-brand-600/15"
                       >
                         <ExternalLink className="h-4 w-4" /> Open app
