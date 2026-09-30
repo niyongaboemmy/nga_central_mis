@@ -119,7 +119,7 @@ Content-Type: application/json
 - **Too late:** a reminder whose event already started is expired, not sent.
 - **Push settings:** `Urgency: high`, TTL equal to the time left before the event, and a topic that collapses stale copies.
 - **Notification buttons** "Got it" and "Snooze 5 min" call `POST /reminders/actions/:id/:action?sig=…`, a per-job HMAC, because the service worker has no session.
-- **Telegram** (when linked and switched on): every reminder, with the same Got it and Snooze buttons. The push cap doesn't apply. A chat that blocks the bot is unlinked automatically.
+- **Telegram** (when linked and switched on): every reminder, with the same Got it and Snooze buttons. The push cap doesn't apply. Sending follows the [Bot API](https://core.telegram.org/bots/api) and [FAQ](https://core.telegram.org/bots/faq) limits: about 22 messages/s overall (free limit about 30), at least 1 s apart per chat, and one wait for `retry_after` on a 429 (up to 30 s). A chat that blocks the bot is unlinked automatically.
 - **Email escalation** (opt-in, per person): a *critical* reminder still not acknowledged 10 min after it was sent, before the event starts, is emailed once through the MIS SMTP settings.
 - **Google Calendar:** the next 21 days are mirrored into a calendar the app creates, "NGA · My Timetable". Only the `calendar.app.created` scope is used, so NGA never sees the person's own events. It re-syncs 20 s after any change affecting the person and on a full pass every 2 h. Unchanged events are skipped (content hash). An `invalid_grant` marks the link revoked, and the UI offers to reconnect.
 - **Times** are computed in Africa/Kigali (UTC+2, no DST). Scheduling columns hold UTC. Raw SQL must bind `toDbUtc(date)`, never a bare `Date` (see the comment in `reminderSchema.ts`).
@@ -168,7 +168,11 @@ The e2e drives a real Chrome and checks:
 ## Setting up Telegram (free, about 5 minutes)
 
 1. In Telegram, open **@BotFather** → `/newbot`. Name it, for example "NGA Reminders", and give it a username such as `nga_reminders_bot`. Copy the token.
-2. Optionally, in BotFather: `/setuserpic`, and `/setdescription` "Reminders from New Generation Academy".
+2. Optionally, polish the profile in BotFather:
+   - `/setuserpic`: the NGA logo.
+   - `/setdescription` (max 512 chars, shown before Start): "Reminders from New Generation Academy: lessons, quiz and assignment deadlines, meetings."
+   - `/setabouttext` (max 120 chars): "NGA school reminders".
+   - The `/start` and `/stop` commands are registered by the API itself, so there's no need for `/setcommands`.
 3. Add to the API `.env`, then run `pm2 restart mis-backend`:
    ```
    TELEGRAM_BOT_TOKEN=<token from BotFather>

@@ -26,7 +26,7 @@ import { deliverJob, describeJob, dispatchDue } from "../services/reminders/disp
 import { getPreferences, savePreferences } from "../services/reminders/preferences";
 import { cancelSourceItem, describeWhen, parseSourceItem, saveSource } from "../services/reminders/sources";
 import { escalateUnacked, escalationEmail, setEmailSender } from "../services/reminders/channels";
-import { handleTelegramUpdate, setTelegramTransport, createLinkCode } from "../services/reminders/telegram";
+import { handleTelegramUpdate, setTelegramTransport, createLinkCode, sendTelegramReminder } from "../services/reminders/telegram";
 import { eventBody, setGoogleTransport, syncGoogleCalendar, buildAuthUrl } from "../services/reminders/googleCalendar";
 import { seal, signState, verifyState } from "../services/reminders/secretBox";
 import { kigaliInstant } from "../services/reminders/time";
@@ -297,6 +297,9 @@ describe("Reminder Hub: integrations and channels", () => {
       expect(report.channels).toContain("telegram");
       const sent = calls.find((c) => c.method === "sendMessage" && c.body.chat_id === 777001 && c.body.reply_markup);
       expect(sent!.body.text).toContain("<b>Quiz closes in 1 h: Algebra quiz</b>");
+      // Current Bot API field, not the deprecated disable_web_page_preview.
+      expect(sent!.body.link_preview_options).toEqual({ is_disabled: true });
+      expect(sent!.body.disable_web_page_preview).toBeUndefined();
       expect(sent!.body.reply_markup.inline_keyboard[0].map((b: any) => b.callback_data)).toEqual([`ack:${job.job_id}`, `snooze:${job.job_id}`]);
       expect(sent!.body.reply_markup.inline_keyboard[1][0].url).toBe("https://taskmentor.example/quizzes/9/take");
 
@@ -332,6 +335,45 @@ describe("Reminder Hub: integrations and channels", () => {
       expect(report.errors.join()).toMatch(/blocked/);
       expect(await db.select().from(TelegramLink).where(eq(TelegramLink.user_id, otherStudentId))).toHaveLength(0);
     });
+
+    it("waits out a 429 once, and keeps one message per second per chat", async () => {
+      configure();
+      const times: number[] = [];
+      let limited = false;
+      setTelegramTransport(async (method, body) => {
+        if (method !== "sendMessage") return {};
+        times.push(Date.now());
+        if (!limited) {
+          limited = true;
+          const err: any = new Error("Too Many Requests: retry after 1");
+          err.code = 429;
+          err.retryAfter = 1;
+          throw err;
+        }
+        return { message_id: 2, chat: body.chat_id };
+      });
+      const job = { job_id: 7, link: null, source_type: "meeting" };
+      const first = await sendTelegramReminder(555001, job, { title: "A", body: "" });
+      expect(first.ok).toBe(true);
+      expect(times).toHaveLength(2);
+      expect(times[1] - times[0]).toBeGreaterThanOrEqual(990);
+
+      // A second reminder to the same chat right away is spaced ≥ 1 s.
+      const before = Date.now();
+      await sendTelegramReminder(555001, job, { title: "B", body: "" });
+      expect(times[2] - times[1]).toBeGreaterThanOrEqual(1000);
+      expect(Date.now() - before).toBeLessThan(2500);
+
+      // A long back-off is not waited for inline.
+      setTelegramTransport(async () => {
+        const err: any = new Error("Too Many Requests: retry after 120");
+        err.code = 429;
+        err.retryAfter = 120;
+        throw err;
+      });
+      const late = await sendTelegramReminder(555002, job, { title: "C", body: "" });
+      expect(late).toMatchObject({ ok: false, gone: false });
+    }, 15_000);
 
     it("an expired or unknown link code is answered politely", async () => {
       configure();

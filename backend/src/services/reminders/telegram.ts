@@ -59,16 +59,27 @@ export const setTelegramTransport = (fn: TelegramCall | null) => {
   call = fn ?? callTelegram;
 };
 
-// ─── pacing: stay under Telegram's ~30 messages/second free limit ───────────
-const MIN_GAP_MS = 45; // ≈ 22 msg/s
+// ─── pacing (https://core.telegram.org/bots/faq) ────────────────────────────
+// Free bots may send about 30 messages/second overall and at most one per
+// second to a single chat; stay under both.
+const MIN_GAP_MS = 45; // ≈ 22 msg/s overall
+const PER_CHAT_GAP_MS = 1100;
 let nextSlot = 0;
-const paced = async <T>(fn: () => Promise<T>): Promise<T> => {
+const nextChatSlot = new Map<number, number>();
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+const paced = async <T>(chatId: number, fn: () => Promise<T>): Promise<T> => {
   const now = Date.now();
-  const wait = Math.max(0, nextSlot - now);
-  nextSlot = Math.max(now, nextSlot) + MIN_GAP_MS;
-  if (wait) await new Promise((r) => setTimeout(r, wait));
+  const chatReady = nextChatSlot.get(chatId) ?? 0;
+  const at = Math.max(now, nextSlot, chatReady);
+  nextSlot = at + MIN_GAP_MS;
+  nextChatSlot.set(chatId, at + PER_CHAT_GAP_MS);
+  if (nextChatSlot.size > 5000) for (const [id, t] of nextChatSlot) if (t < now) nextChatSlot.delete(id);
+  if (at > now) await sleep(at - now);
   return fn();
 };
+
+/** Longest 429 back-off we wait for inline before giving up on this reminder. */
+const MAX_RETRY_AFTER_S = 30;
 
 // ─── linking ─────────────────────────────────────────────────────────────────
 const LINK_TTL_MS = 15 * 60_000;
@@ -121,15 +132,23 @@ export const sendTelegramReminder = async (
       : [[{ text: "✅ Got it", callback_data: `ack:${job.job_id}` }, { text: "⏰ Snooze 5 min", callback_data: `snooze:${job.job_id}` }]];
   const open = [{ text: "Open in NGA", url: appUrl(job.link) }];
   try {
-    await paced(() =>
-      call("sendMessage", {
-        chat_id: chatId,
-        text: `<b>${escapeHtml(text.title)}</b>${text.body ? `\n${escapeHtml(text.body)}` : ""}`,
-        parse_mode: "HTML",
-        disable_web_page_preview: true,
-        reply_markup: { inline_keyboard: [...buttons, open] },
-      }),
-    );
+    const message = {
+      chat_id: chatId,
+      text: `<b>${escapeHtml(text.title)}</b>${text.body ? `\n${escapeHtml(text.body)}` : ""}`,
+      parse_mode: "HTML",
+      // Bot API 7.0+: replaces the deprecated disable_web_page_preview.
+      link_preview_options: { is_disabled: true },
+      reply_markup: { inline_keyboard: [...buttons, open] },
+    };
+    try {
+      await paced(chatId, () => call("sendMessage", message));
+    } catch (error: any) {
+      // 429 Too Many Requests: Telegram says how long to wait -- once.
+      const wait = Number(error?.retryAfter);
+      if (error?.code !== 429 || !Number.isFinite(wait) || wait > MAX_RETRY_AFTER_S) throw error;
+      await sleep(wait * 1000);
+      await paced(chatId, () => call("sendMessage", message));
+    }
     return { ok: true, gone: false };
   } catch (error: any) {
     // 403: the user blocked the bot or deleted the chat -- stop trying.
