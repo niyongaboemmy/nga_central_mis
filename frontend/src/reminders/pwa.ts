@@ -111,6 +111,7 @@ let started = false;
 export const initPwa = () => {
   if (started || typeof window === "undefined") return;
   started = true;
+  clearLegacySnooze();
   captureLaunchMarker();
   window.addEventListener("beforeinstallprompt", (event) => {
     // Keep Chromium's mini-infobar away; we show our own, better-timed card.
@@ -293,15 +294,37 @@ export const clearInstallRequest = () => {
 };
 
 // ─── automatic prompt on load (not installed here) ───────────────────────────
-const AUTO_SNOOZE_KEY = "nga.pwa.autoPromptSnoozedUntil";
-export const AUTO_SNOOZE_MS = 24 * 3_600_000;
+// "Not now" hides the sheet until the browser is reopened; the corner
+// Install button stays available. (A 24 h snooze used to hide the only way
+// to install for a day -- it is cleared on start.)
+const LEGACY_AUTO_SNOOZE_KEY = "nga.pwa.autoPromptSnoozedUntil";
+const AUTO_DISMISS_KEY = "nga.pwa.autoPromptDismissedThisSession";
+const INSTALL_BUTTON_HIDDEN_KEY = "nga.pwa.installButtonHidden";
 
-export const snoozeAutoPrompt = (now = Date.now()) => writeItem(AUTO_SNOOZE_KEY, String(now + AUTO_SNOOZE_MS));
-export const autoPromptSnoozed = (now = Date.now()) => {
+const sessionFlag = (key: string) => {
   try {
-    return Number(localStorage.getItem(AUTO_SNOOZE_KEY) || 0) > now;
+    return sessionStorage.getItem(key) === "1";
   } catch {
     return false;
+  }
+};
+const setSessionFlag = (key: string) => {
+  try {
+    sessionStorage.setItem(key, "1");
+  } catch {
+    /* ignore */
+  }
+};
+
+export const snoozeAutoPrompt = () => setSessionFlag(AUTO_DISMISS_KEY);
+export const autoPromptSnoozed = () => sessionFlag(AUTO_DISMISS_KEY);
+export const hideInstallButton = () => setSessionFlag(INSTALL_BUTTON_HIDDEN_KEY);
+export const installButtonHidden = () => sessionFlag(INSTALL_BUTTON_HIDDEN_KEY);
+export const clearLegacySnooze = () => {
+  try {
+    localStorage.removeItem(LEGACY_AUTO_SNOOZE_KEY);
+  } catch {
+    /* ignore */
   }
 };
 

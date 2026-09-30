@@ -1,12 +1,14 @@
 import React, { useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
-import { ArrowLeft, LayoutGrid } from "lucide-react";
+import { ArrowLeft, Download, LayoutGrid, X } from "lucide-react";
 import Modal from "../ui/Modal";
 import { InstallGuide } from "../reminders/InstallGuide";
 import {
   autoPromptSnoozed,
   checkInstalledHere,
   clearInstallRequest,
+  hideInstallButton,
+  installButtonHidden,
   installRequested,
   installReturnUrl,
   markLaunchInstallAsked,
@@ -29,16 +31,39 @@ export const shouldAutoOffer = (s: {
 };
 
 /**
+ * Pure decision (unit-tested): show the small always-available Install
+ * button? On Chromium only when the browser says MIS is installable
+ * (beforeinstallprompt) -- so never for an installed app. iPhone/iPad,
+ * Safari on Mac and Firefox on Windows have no such signal: shown unless
+ * running installed.
+ */
+export const shouldShowInstallButton = (s: {
+  installed: boolean;
+  canPrompt: boolean;
+  installMethod: string;
+  sheetOpen: boolean;
+  hidden: boolean;
+  onInstallerPage: boolean;
+}) => {
+  if (s.installed || s.sheetOpen || s.hidden || s.onInstallerPage) return false;
+  if (s.canPrompt) return true;
+  return s.installMethod === "ios" || s.installMethod === "mac-dock" || s.installMethod === "firefox-taskbar";
+};
+
+/**
  * Opens the install sheet automatically when MIS loads in a browser tab and
  * isn't installed on this device (docs/APP_LAUNCH.md). The browser's own
  * install dialog still needs one click (a gesture) -- the sheet's button.
- * "Not now" waits a day; the NGA installer (`nga_install=1`) always asks.
+ * "Not now" hides it until the browser is reopened, and a corner Install
+ * button stays available, so nobody is ever left without a way to install.
+ * The NGA installer (`nga_install=1`) always asks.
  */
 export const AutoInstallPrompt: React.FC = () => {
   const pwa = usePwa();
   const location = useLocation();
   const [open, setOpen] = useState(false);
   const [closedThisLoad, setClosedThisLoad] = useState(false);
+  const [buttonHidden, setButtonHidden] = useState(() => installButtonHidden());
   const returnUrl = installReturnUrl();
 
   useEffect(() => {
@@ -91,7 +116,39 @@ export const AutoInstallPrompt: React.FC = () => {
     setOpen(false);
   };
 
+  const showButton = shouldShowInstallButton({
+    installed: pwa.installed && !pwa.canPrompt,
+    canPrompt: pwa.canPrompt,
+    installMethod: pwa.platform.installMethod,
+    sheetOpen: open,
+    hidden: buttonHidden,
+    onInstallerPage: location.pathname.startsWith("/apps"),
+  });
+
   return (
+    <>
+    {showButton && (
+      <div className="fixed bottom-4 left-4 z-40 flex items-center gap-0.5 rounded-full bg-brand-600 p-1 text-white shadow-float" style={{ marginBottom: "env(safe-area-inset-bottom)" }}>
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-semibold transition hover:bg-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+        >
+          <Download className="h-4 w-4" /> Install NGA MIS
+        </button>
+        <button
+          type="button"
+          aria-label="Hide the install button"
+          onClick={() => {
+            hideInstallButton();
+            setButtonHidden(true);
+          }}
+          className="flex h-7 w-7 items-center justify-center rounded-full bg-white/15 transition hover:bg-white/25"
+        >
+          <X className="h-3.5 w-3.5" />
+        </button>
+      </div>
+    )}
     <Modal isOpen={open} onClose={close} title={pwa.installed ? "NGA MIS is installed" : "Install NGA MIS as an app"} size="md">
       <div className="space-y-4">
         <InstallGuide />
@@ -115,5 +172,6 @@ export const AutoInstallPrompt: React.FC = () => {
         </div>
       </div>
     </Modal>
+    </>
   );
 };
