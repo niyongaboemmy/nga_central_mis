@@ -2,11 +2,11 @@ import { and, desc, eq, gte, sql } from "drizzle-orm";
 import { db } from "../db";
 import { PushSubscription, ReminderJob, ReminderPreference, ReminderSource } from "../db/reminderSchema";
 import { asyncHandler } from "../middleware/asyncHandler";
-import { NotFoundError, ValidationError } from "../errors/CustomError";
+import { AuthorizationError, NotFoundError, ValidationError } from "../errors/CustomError";
 import { successResponse } from "../utils/response";
 import logger from "../utils/logger";
-import { collectOccurrences, loadCurrentTerm } from "../services/reminders/occurrences";
-import { StudentSubjectEnrollment } from "../db/schema";
+import { collectOccurrences } from "../services/reminders/occurrences";
+import { cancelSourceItem, parseSourceItem, saveSource, saveSources } from "../services/reminders/sources";
 import {
   getPreferences,
   REMINDER_KINDS,
@@ -22,7 +22,25 @@ import {
   snoozeJob,
 } from "../services/reminders/dispatcher";
 import {
+  createLinkCode,
+  getTelegramLink,
+  handleTelegramUpdate,
+  telegramConfig,
+  unlinkTelegram,
+  verifyWebhookSecret,
+} from "../services/reminders/telegram";
+import {
+  buildAuthUrl,
+  completeConnect,
+  disconnectGoogle,
+  getGoogleLink,
+  googleConfig,
+  syncGoogleCalendar,
+} from "../services/reminders/googleCalendar";
+import { ESCALATE_AFTER_MS } from "../services/reminders/channels";
+import {
   apiUrl,
+  appUrl,
   endpointHash,
   loadVapidKeys,
   verifyAction,
@@ -82,8 +100,12 @@ const B64URL = /^[A-Za-z0-9_-]+={0,2}$/;
 
 export const getReminderConfig = asyncHandler(async (_req: any, res: any) => {
   const keys = loadVapidKeys();
+  const telegram = telegramConfig();
   successResponse(res, "Reminder configuration", {
     push: { enabled: Boolean(keys), publicKey: keys?.publicKey ?? null },
+    telegram: { enabled: Boolean(telegram), bot: telegram?.username ?? null },
+    googleCalendar: { enabled: Boolean(googleConfig()) },
+    email: { enabled: true, escalateAfterMinutes: ESCALATE_AFTER_MS / 60_000 },
     dailyPushCap: DAILY_PUSH_CAP,
     kinds: REMINDER_KINDS,
   });
@@ -91,7 +113,7 @@ export const getReminderConfig = asyncHandler(async (_req: any, res: any) => {
 
 export const getMyReminders = asyncHandler(async (req: any, res: any) => {
   const userId = userIdOf(req);
-  const [preferences, devices, jobs, token] = await Promise.all([
+  const [preferences, devices, jobs, token, telegram, google] = await Promise.all([
     getPreferences(userId),
     db
       .select({
@@ -110,12 +132,20 @@ export const getMyReminders = asyncHandler(async (req: any, res: any) => {
       .orderBy(desc(PushSubscription.created_at)),
     listUserJobs(userId),
     getFeedToken(userId),
+    getTelegramLink(userId),
+    getGoogleLink(userId),
   ]);
   successResponse(res, "Reminder settings", {
     preferences,
     devices,
     jobs,
     feed: token ? feedUrls(token) : null,
+    connections: {
+      telegram: telegram ? { username: telegram.username, linked_at: telegram.linked_at } : null,
+      googleCalendar: google
+        ? { email: google.google_email, status: google.status, last_sync_at: google.last_sync_at, last_error: google.last_error }
+        : null,
+    },
   });
 });
 
@@ -132,7 +162,75 @@ export const updatePreferences = asyncHandler(async (req: any, res: any) => {
   });
   if (preferences.enabled) replanSoon(userId);
   else await cancelPendingJobs(userId);
+  if (body.channels !== undefined || body.settings !== undefined) void syncGoogleCalendar(userId);
   successResponse(res, "Reminder preferences saved", preferences);
+});
+
+// ─── Telegram ────────────────────────────────────────────────────────────────
+
+/** POST /reminders/telegram/link -- a one-time t.me deep link (15 min). */
+export const createTelegramLink = asyncHandler(async (req: any, res: any) => {
+  const link = await createLinkCode(userIdOf(req));
+  if (!link) return res.status(503).json({ success: false, message: "Telegram reminders aren't set up on this server yet." });
+  successResponse(res, "Open this link in Telegram", { url: link.url, expiresAt: link.expiresAt }, 201);
+});
+
+export const deleteTelegramLink = asyncHandler(async (req: any, res: any) => {
+  const removed = await unlinkTelegram(userIdOf(req));
+  successResponse(res, removed ? "Telegram disconnected" : "Telegram wasn't connected", { removed });
+});
+
+/**
+ * POST /reminders/telegram/webhook -- updates from Telegram, authenticated by
+ * the secret Telegram echoes in X-Telegram-Bot-Api-Secret-Token. Always 200
+ * for a genuine call (Telegram retries anything else).
+ */
+export const telegramWebhook = async (req: any, res: any) => {
+  if (!verifyWebhookSecret(req.header("X-Telegram-Bot-Api-Secret-Token"))) return res.status(401).end();
+  await handleTelegramUpdate(req.body, { ack: ackJob, snooze: snoozeJob });
+  res.status(200).json({ ok: true });
+};
+
+// ─── Google Calendar ─────────────────────────────────────────────────────────
+
+/** GET /reminders/google/connect -- the Google consent URL for this user. */
+export const googleConnectUrl = asyncHandler(async (req: any, res: any) => {
+  const url = buildAuthUrl(userIdOf(req));
+  if (!url) return res.status(503).json({ success: false, message: "Google Calendar isn't set up on this server yet." });
+  successResponse(res, "Continue with Google", { url });
+});
+
+/**
+ * GET /reminders/google/callback -- Google redirects the browser here; the
+ * signed `state` names the user (no session on this hop). Back to /reminders.
+ */
+export const googleCallback = async (req: any, res: any) => {
+  const back = (result: string) => res.redirect(302, appUrl(`/reminders?google=${result}`));
+  if (req.query?.error) return back(req.query.error === "access_denied" ? "denied" : "error");
+  try {
+    await completeConnect(String(req.query?.code || ""), String(req.query?.state || ""));
+    return back("connected");
+  } catch (error: any) {
+    logger.warn("[reminders] google connect failed", { data: { error: String(error?.message || error) } });
+    return back("error");
+  }
+};
+
+export const googleDisconnect = asyncHandler(async (req: any, res: any) => {
+  const removed = await disconnectGoogle(userIdOf(req));
+  successResponse(res, removed ? "Google Calendar disconnected" : "Google Calendar wasn't connected", { removed });
+});
+
+export const googleSyncNow = asyncHandler(async (req: any, res: any) => {
+  const result = await syncGoogleCalendar(userIdOf(req));
+  const link = await getGoogleLink(userIdOf(req));
+  if (!link) throw new NotFoundError("Google Calendar isn't connected");
+  successResponse(res, result ? "Google Calendar is up to date" : "Couldn't sync Google Calendar", {
+    result,
+    status: link.status,
+    last_sync_at: link.last_sync_at,
+    last_error: link.last_error,
+  });
 });
 
 // ─── Push subscriptions ──────────────────────────────────────────────────────
@@ -335,133 +433,54 @@ export const serveFeed = asyncHandler(async (req: any, res: any) => {
 
 // ─── Source API (other NGA apps) ────────────────────────────────────────────
 
-/** Students actively enrolled in `subjectId` this academic year. */
-const enrolledStudentIds = async (subjectId: number): Promise<number[]> => {
-  const term = await loadCurrentTerm();
-  if (!term) return [];
-  const rows = await db
-    .select({ user_id: StudentSubjectEnrollment.user_id })
-    .from(StudentSubjectEnrollment)
-    .where(
-      and(
-        eq(StudentSubjectEnrollment.subject_id, subjectId),
-        eq(StudentSubjectEnrollment.academic_year_id, term.yearId),
-        eq(StudentSubjectEnrollment.status, "ACTIVE"),
-      ),
-    );
-  return rows.map((r: any) => Number(r.user_id));
-};
-
-const SOURCE_KINDS = new Set<ReminderKind>(["quiz_open", "quiz_close", "assignment_due", "meeting", "event"]);
-const APP_KEY = /^[a-z][a-z0-9_-]{1,29}$/;
-
-const parseInstant = (value: unknown, field: string): Date => {
-  const d = new Date(String(value ?? ""));
-  if (Number.isNaN(d.getTime())) throw new ValidationError(`${field} must be an ISO date-time`);
-  return d;
+/**
+ * Reminders reach people's phones, so writing them is narrower than reading
+ * the roster: a System authenticating with its client credentials must be
+ * one of the NGA apps (REMINDERS_SOURCE_CLIENTS). An external partner needs
+ * a deliberately minted IntegrationToken with `reminders:write`.
+ */
+const SOURCE_CLIENTS = () =>
+  new Set(
+    (process.env.REMINDERS_SOURCE_CLIENTS || "taskmentor_app,tupo,discipline_attendance")
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean),
+  );
+const assertSourceWriter = (req: any) => {
+  const clientId = req.service?.clientId;
+  if (clientId && !SOURCE_CLIENTS().has(clientId)) {
+    throw new AuthorizationError("This system may not send reminders. Ask an administrator for a reminders:write token.");
+  }
 };
 
 /**
  * PUT /reminders/sources -- create or replace one item, e.g. a quiz closing
- * time, for a list of MIS user ids. Idempotent on (app, type, external_id).
+ * time, for MIS user ids and/or a subject's enrolled students. Idempotent on
+ * (app, type, external_id). Logic lives in services/reminders/sources.ts.
  */
 export const upsertSource = asyncHandler(async (req: any, res: any) => {
-  const b = req.body ?? {};
-  if (!APP_KEY.test(String(b.source_app || ""))) throw new ValidationError("source_app is required (e.g. taskmentor)");
-  if (!SOURCE_KINDS.has(b.source_type)) {
-    throw new ValidationError(`source_type must be one of ${Array.from(SOURCE_KINDS).join(", ")}`);
-  }
-  const externalId = String(b.external_id ?? "").trim();
-  if (!externalId || externalId.length > 100) throw new ValidationError("external_id is required");
-  const title = String(b.title ?? "").trim();
-  if (!title) throw new ValidationError("title is required");
-  const startsAt = parseInstant(b.starts_at, "starts_at");
-  const endsAt = b.ends_at ? parseInstant(b.ends_at, "ends_at") : null;
-  const audience: number[] = Array.isArray(b.audience_user_ids)
-    ? Array.from(new Set(b.audience_user_ids.map(Number).filter((n: number) => Number.isInteger(n) && n > 0)))
-    : [];
-  const subjectId = b.audience_subject_id === undefined || b.audience_subject_id === null ? null : Number(b.audience_subject_id);
-  if (subjectId !== null && (!Number.isInteger(subjectId) || subjectId <= 0)) {
-    throw new ValidationError("audience_subject_id must be an MIS subject id");
-  }
-  if (audience.length === 0 && subjectId === null) {
-    throw new ValidationError("Give audience_user_ids (MIS user ids), audience_subject_id (its enrolled students), or both");
-  }
-  if (audience.length > 5000) throw new ValidationError("audience_user_ids is limited to 5000 users per item");
-  const link = typeof b.link === "string" && b.link.length <= 500 ? b.link : null;
+  assertSourceWriter(req);
+  const saved = await saveSource(parseSourceItem(req.body));
+  successResponse(res, "Reminder source saved", saved);
+});
 
-  const values = {
-    source_app: b.source_app,
-    source_type: b.source_type,
-    external_id: externalId,
-    title: title.slice(0, 255),
-    body: typeof b.body === "string" ? b.body.slice(0, 500) : null,
-    link,
-    location: typeof b.location === "string" ? b.location.slice(0, 150) : null,
-    starts_at: startsAt,
-    ends_at: endsAt,
-    critical: b.critical ? 1 : 0,
-    audience_user_ids: audience,
-    audience_subject_id: subjectId,
-    cancelled_at: null,
-  };
-  await db
-    .insert(ReminderSource)
-    .values(values)
-    .onDuplicateKeyUpdate({
-      set: {
-        title: values.title,
-        body: values.body,
-        link: values.link,
-        location: values.location,
-        starts_at: values.starts_at,
-        ends_at: values.ends_at,
-        critical: values.critical,
-        audience_user_ids: values.audience_user_ids,
-        audience_subject_id: values.audience_subject_id,
-        cancelled_at: null,
-      },
-    });
-  // Anyone removed from the audience still has pending jobs for this item:
-  // re-plan the old audience as well as the new one.
-  const [existing] = await db
-    .select({ source_id: ReminderSource.source_id })
-    .from(ReminderSource)
-    .where(
-      and(
-        eq(ReminderSource.source_app, values.source_app),
-        eq(ReminderSource.source_type, values.source_type),
-        eq(ReminderSource.external_id, externalId),
-      ),
-    )
-    .limit(1);
-  const holders = existing
-    ? await db
-        .selectDistinct({ user_id: ReminderJob.user_id })
-        .from(ReminderJob)
-        .where(and(sql`${ReminderJob.dedupe_key} LIKE ${`src:${existing.source_id}:%`}`, eq(ReminderJob.status, "pending")))
-    : [];
-  const enrolled = subjectId ? await enrolledStudentIds(subjectId) : [];
-  expandUsersSoon([...audience, ...enrolled, ...holders.map((h: any) => h.user_id)]);
-  successResponse(res, "Reminder source saved", { source_id: existing?.source_id ?? null, audience: audience.length });
+/** PUT /reminders/sources/batch -- up to 200 items; each succeeds or fails on its own. */
+export const upsertSourcesBatch = asyncHandler(async (req: any, res: any) => {
+  assertSourceWriter(req);
+  const results = await saveSources(req.body?.items);
+  successResponse(res, "Reminder sources saved", {
+    results,
+    saved: results.filter((r) => r.ok).length,
+    failed: results.filter((r) => !r.ok).length,
+  });
 });
 
 export const cancelSource = asyncHandler(async (req: any, res: any) => {
+  assertSourceWriter(req);
   const { app, type, externalId } = req.params;
-  const [source] = await db
-    .select()
-    .from(ReminderSource)
-    .where(
-      and(eq(ReminderSource.source_app, app), eq(ReminderSource.source_type, type), eq(ReminderSource.external_id, externalId)),
-    )
-    .limit(1);
-  if (!source) throw new NotFoundError("Reminder source not found");
-  await db.update(ReminderSource).set({ cancelled_at: new Date() }).where(eq(ReminderSource.source_id, source.source_id));
-  const [result] = (await db
-    .update(ReminderJob)
-    .set({ status: "cancelled" })
-    .where(and(sql`${ReminderJob.dedupe_key} LIKE ${`src:${source.source_id}:%`}`, eq(ReminderJob.status, "pending")))) as any;
-  successResponse(res, "Reminder source cancelled", { cancelledJobs: Number(result?.affectedRows ?? 0) });
+  const result = await cancelSourceItem(app, type, externalId);
+  if (!result) throw new NotFoundError("Reminder source not found");
+  successResponse(res, "Reminder source cancelled", result);
 });
 
 // ─── Admin delivery dashboard ────────────────────────────────────────────────

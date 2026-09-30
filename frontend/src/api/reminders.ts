@@ -14,8 +14,17 @@ export interface KindSetting {
   offsets: number[];
 }
 
+/** Extra channels on top of in-app + Web Push. */
+export interface ChannelChoices {
+  telegram: boolean;
+  /** Email a critical reminder nobody opened. */
+  email: boolean;
+  googleCalendar: boolean;
+}
+
 export interface ReminderPreferences {
   enabled: boolean;
+  channels: ChannelChoices;
   settings: Record<ReminderKind, KindSetting>;
   quietStart: string;
   quietEnd: string;
@@ -76,11 +85,30 @@ export interface FeedUrls {
   webcal: string;
 }
 
+export interface ReminderConnections {
+  telegram: { username: string | null; linked_at: string | null } | null;
+  googleCalendar: {
+    email: string | null;
+    status: "active" | "revoked" | string;
+    last_sync_at: string | null;
+    last_error: string | null;
+  } | null;
+}
+
+export interface ReminderConfig {
+  push: { enabled: boolean; publicKey: string | null };
+  dailyPushCap: number;
+  telegram?: { enabled: boolean; bot: string | null };
+  googleCalendar?: { enabled: boolean };
+  email?: { enabled: boolean; escalateAfterMinutes: number };
+}
+
 export interface ReminderOverview {
   preferences: ReminderPreferences;
   devices: ReminderDevice[];
   jobs: ReminderJob[];
   feed: FeedUrls | null;
+  connections?: ReminderConnections;
 }
 
 export interface DeliveryReport {
@@ -106,10 +134,7 @@ export interface AdminOverview {
 const data = <T>(p: Promise<{ data: { data: T } }>) => p.then((r) => r.data.data);
 
 export const remindersApi = {
-  config: () =>
-    data<{ push: { enabled: boolean; publicKey: string | null }; dailyPushCap: number }>(
-      apiService.get("/reminders/config"),
-    ),
+  config: () => data<ReminderConfig>(apiService.get("/reminders/config")),
   me: () => data<ReminderOverview>(apiService.get("/reminders/me")),
   savePreferences: (patch: Partial<ReminderPreferences>) =>
     data<ReminderPreferences>(apiService.put("/reminders/preferences", patch)),
@@ -131,5 +156,11 @@ export const remindersApi = {
   snooze: (jobId: number) => data<{ ok: boolean }>(apiService.post(`/reminders/jobs/${jobId}/snooze`)),
   createFeed: () => data<FeedUrls>(apiService.post("/reminders/feed")),
   deleteFeed: () => data<{ ok: boolean }>(apiService.delete("/reminders/feed")),
+  telegramLink: () => data<{ url: string; expiresAt: string }>(apiService.post("/reminders/telegram/link")),
+  telegramUnlink: () => data<{ removed: boolean }>(apiService.delete("/reminders/telegram")),
+  googleConnectUrl: () => data<{ url: string }>(apiService.get("/reminders/google/connect")),
+  googleSync: () =>
+    data<{ status: string; last_sync_at: string | null; last_error: string | null }>(apiService.post("/reminders/google/sync")),
+  googleDisconnect: () => data<{ removed: boolean }>(apiService.delete("/reminders/google")),
   adminOverview: () => data<AdminOverview>(apiService.get("/reminders/admin/overview")),
 };

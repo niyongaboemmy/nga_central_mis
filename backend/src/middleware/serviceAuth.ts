@@ -25,6 +25,8 @@ export interface ServiceClient {
   name: string;
   scopes: string[];
   schoolId: number | null;
+  /** Set when the caller authenticated with a System's client credentials. */
+  clientId?: string;
 }
 
 declare global {
@@ -104,6 +106,7 @@ async function clientCredentials(
     // being asked for is the access the route already demands — never more.
     scopes: [scope],
     schoolId: null,
+    clientId,
   };
 }
 

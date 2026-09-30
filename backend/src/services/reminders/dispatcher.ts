@@ -13,6 +13,7 @@ import {
   type PushSender,
 } from "./webPush";
 import { describeLead, formatClock, kigaliInstant, kigaliParts } from "./time";
+import { deliverTelegram, escalateUnacked } from "./channels";
 
 /**
  * The once-a-minute dispatcher (REMINDERS_SOLUTION_PROPOSAL.md §4).
@@ -51,7 +52,7 @@ const LABELS: Record<string, (title: string, lead: string) => string> = {
 
 /** The notification text, worded at send time so "in 10 min" is true. */
 export const describeJob = (job: Pick<JobRow, "source_type" | "title" | "body" | "event_start">, now: Date) => {
-  if (job.source_type === "briefing" || job.source_type === "test") {
+  if (job.source_type === "briefing" || job.source_type === "test" || job.source_type === "change") {
     return { title: job.title, body: job.body ?? "" };
   }
   const start = new Date(job.event_start as any);
@@ -196,6 +197,12 @@ export const deliverJob = async (job: JobRow, deps: DispatchDeps = {}): Promise<
       if (report.pushDelivered > 0) report.channels.push("push");
     }
   }
+
+  // Telegram (when linked): not subject to the push cap -- it's the person's
+  // own chat, and they chose it.
+  const telegram = await deliverTelegram(job, text);
+  report.channels.push(...telegram.channels);
+  report.errors.push(...telegram.errors);
   return report;
 };
 
@@ -285,7 +292,12 @@ export const dispatchDue = async (deps: DispatchDeps = {}) => {
         .where(eq(ReminderJob.job_id, job.job_id));
     }
   }
-  return { claimed: claimed.length, sent };
+  // Important reminders nobody opened: one email, for those who opted in.
+  const escalated = await escalateUnacked(describeJob, now).catch((error) => {
+    logger.error("[reminders] escalation tick failed", { error });
+    return 0;
+  });
+  return { claimed: claimed.length, sent, escalated };
 };
 
 /** "Got it": the user saw it. */

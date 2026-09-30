@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { remindersApi, type Agenda, type ReminderOverview, type ReminderPreferences } from "../../api/reminders";
+import { remindersApi, type Agenda, type ReminderConfig, type ReminderOverview, type ReminderPreferences } from "../../api/reminders";
 import { getPushStatus, type PushStatus } from "../../reminders/push";
 import { usePwa } from "../../reminders/pwa";
 import { API_BASE_URL } from "../../services/api";
@@ -40,6 +40,7 @@ export const useReminders = () => {
   const [agenda, setAgenda] = useState<Agenda | null>(null);
   const [pushStatus, setPushStatus] = useState<PushStatus | null>(null);
   const [pushEnabledOnServer, setPushEnabledOnServer] = useState(true);
+  const [config, setConfig] = useState<ReminderConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [offline, setOffline] = useState(false);
@@ -63,6 +64,7 @@ export const useReminders = () => {
       setOverview(me);
       setAgenda(ag);
       setPushEnabledOnServer(config.push.enabled);
+      setConfig(config);
       setOffline(false);
       void shareAgendaSource(ag);
     } catch (e: any) {
@@ -115,6 +117,7 @@ export const useReminders = () => {
     agenda,
     pushStatus,
     pushEnabledOnServer,
+    config,
     loading,
     error,
     offline,

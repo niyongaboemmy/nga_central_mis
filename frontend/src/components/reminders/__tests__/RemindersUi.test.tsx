@@ -6,6 +6,7 @@ import { NowNextCard } from "../NowNextCard";
 
 const prefs = (): ReminderPreferences => ({
   enabled: true,
+  channels: { telegram: true, email: false, googleCalendar: true },
   quietStart: "21:00",
   quietEnd: "06:00",
   morningBriefing: true,
