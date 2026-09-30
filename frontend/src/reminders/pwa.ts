@@ -44,8 +44,11 @@ const compute = (): PwaState => {
     platform: describePlatform(env),
     // A remembered note is only trusted when the browser can't answer: it
     // goes stale when the app is uninstalled (no event for that).
-    installed: env.standalone || installCheck === "yes" || (installCheck === "unknown" && readFlag(INSTALLED_KEY)),
-    installCheck: env.standalone ? "yes" : installCheck,
+    // Chrome offering to install (beforeinstallprompt) outranks everything:
+    // an app synced from the Chrome account but not installed on THIS device
+    // still answers "yes" to getInstalledRelatedApps.
+    installed: env.standalone || (!deferredPrompt && (installCheck === "yes" || (installCheck === "unknown" && readFlag(INSTALLED_KEY)))),
+    installCheck: env.standalone ? "yes" : deferredPrompt ? "no" : installCheck,
     inBrowser: !env.standalone,
     canPrompt: Boolean(deferredPrompt),
     hasInstallElement: typeof window !== "undefined" && "HTMLInstallElement" in window,
@@ -143,10 +146,19 @@ export const refreshInstallCheck = async (): Promise<InstallCheck> => {
     setInstallCheck("yes");
     return "yes";
   }
+  // Installable here = not installed here (see compute).
+  if (deferredPrompt) {
+    setInstallCheck("no");
+    return "no";
+  }
   const fn = (navigator as any).getInstalledRelatedApps;
   if (typeof fn !== "function") return installCheck;
   try {
     const apps: Array<{ platform?: string }> = await fn.call(navigator);
+    if (deferredPrompt) {
+      setInstallCheck("no");
+      return "no";
+    }
     const next: InstallCheck = Array.isArray(apps) && apps.some((a) => a?.platform === "webapp") ? "yes" : "no";
     setInstallCheck(next);
     return next;
@@ -158,6 +170,7 @@ export const refreshInstallCheck = async (): Promise<InstallCheck> => {
 /** Test hook. */
 export const resetInstallCheckForTests = () => {
   installCheck = "unknown";
+  deferredPrompt = null;
   emit();
 };
 
