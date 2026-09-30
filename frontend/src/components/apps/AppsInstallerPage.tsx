@@ -270,7 +270,14 @@ const AppsInstallerPage: React.FC = () => {
   const installApp = async (app: NgaApp) => {
     setRunning(true);
     if (app.origin === here) {
-      if (pwa.installed) return set(app.key, "already");
+      if (pwa.installed && !pwa.canPrompt) {
+        // Reinstall asked, but Chrome won't offer an install for an app it
+        // has: explain how (remove in chrome://apps, then install here).
+        set(app.key, "already");
+        setHelpFor(app.key);
+        say(`${app.name} is installed. To reinstall, remove it in chrome://apps first — steps below`, "info");
+        return;
+      }
       setBusy(app.key);
       try {
         // Removed while this page was open: Chrome hands out its install
@@ -379,11 +386,10 @@ const AppsInstallerPage: React.FC = () => {
 
       <main className="mx-auto max-w-5xl space-y-6 px-4 py-6 sm:px-6 sm:py-8">
         {/* Hero */}
-        <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-brand-600 via-brand-600 to-indigo-700 p-6 text-white shadow-float sm:p-8">
+        <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-brand-600 to-brand-700 p-5 text-white shadow-float sm:p-8">
           <div className="pointer-events-none absolute -right-16 -top-16 h-56 w-56 rounded-full bg-white/10 blur-2xl" aria-hidden />
-          <div className="pointer-events-none absolute -bottom-20 left-1/3 h-48 w-48 rounded-full bg-indigo-400/20 blur-3xl" aria-hidden />
-          <div className="relative flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
-            <div className="max-w-xl">
+          <div className="relative grid gap-6 md:grid-cols-[1fr_auto] md:items-center">
+            <div className="min-w-0 max-w-xl">
               <p className="inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-xs font-semibold uppercase tracking-wider">
                 <Sparkles className="h-3.5 w-3.5" /> New Generation Academy
               </p>
@@ -423,16 +429,16 @@ const AppsInstallerPage: React.FC = () => {
           </div>
 
           {/* Stepper */}
-          <ol className="relative mt-6 grid grid-cols-4 gap-2" aria-label="Install steps">
+          <ol className="relative -mx-1 mt-6 flex gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none]" aria-label="Install steps">
             {NGA_APPS.map((app, i) => {
               const status = progress[app.key];
               const current = next?.key === app.key && running;
               return (
-                <li key={app.key} className="min-w-0">
+                <li key={app.key} className="flex-shrink-0">
                   <a
                     href={`#app-${app.key}`}
-                    className={`flex items-center gap-2 rounded-2xl px-2.5 py-2 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60 ${
-                      current ? "bg-white/20" : "hover:bg-white/10"
+                    className={`flex items-center gap-2 rounded-full py-1.5 pl-1.5 pr-3.5 ring-1 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60 ${
+                      current ? "bg-white/20 ring-white/40" : "ring-white/15 hover:bg-white/10"
                     }`}
                     aria-current={current ? "step" : undefined}
                   >
@@ -451,7 +457,7 @@ const AppsInstallerPage: React.FC = () => {
                         i + 1
                       )}
                     </span>
-                    <span className="hidden truncate text-sm font-semibold sm:inline">{app.name}</span>
+                    <span className="whitespace-nowrap text-sm font-semibold">{app.name}</span>
                   </a>
                 </li>
               );
@@ -489,46 +495,48 @@ const AppsInstallerPage: React.FC = () => {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
-              className="flex flex-col gap-4 rounded-3xl border border-brand-200 bg-white p-5 shadow-soft dark:border-brand-600/40 dark:bg-slate-900 sm:flex-row sm:items-center"
+              className="rounded-3xl border border-brand-200 bg-white p-5 shadow-soft dark:border-brand-600/40 dark:bg-slate-900 sm:p-6"
             >
-              <div className="relative flex-shrink-0">
-                <img src={iconUrl(next)} alt="" className="h-16 w-16 rounded-2xl bg-slate-100 object-contain p-2 dark:bg-slate-800" />
-                {progress[next.key] === "waiting" && (
-                  <span className="absolute -right-1 -top-1 flex h-4 w-4">
-                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-75" />
-                    <span className="relative inline-flex h-4 w-4 rounded-full bg-amber-500" />
-                  </span>
-                )}
+              <div className="flex items-start gap-4">
+                <div className="relative flex-shrink-0">
+                  <img src={iconUrl(next)} alt="" className="h-14 w-14 rounded-2xl bg-slate-100 object-contain p-2 dark:bg-slate-800 sm:h-16 sm:w-16" />
+                  {progress[next.key] === "waiting" && (
+                    <span className="absolute -right-1 -top-1 flex h-4 w-4">
+                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-75" />
+                      <span className="relative inline-flex h-4 w-4 rounded-full bg-amber-500" />
+                    </span>
+                  )}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-brand-700 dark:text-brand-200">
+                    Step {NGA_APPS.indexOf(next) + 1} of {NGA_APPS.length}
+                  </p>
+                  <p className="mt-0.5 text-lg font-bold text-slate-900 dark:text-white">
+                    {progress[next.key] === "waiting" ? `Finish in ${next.name}` : `Install ${next.name}`}
+                  </p>
+                  <p className="mt-1 text-sm leading-relaxed text-slate-600 dark:text-slate-300">
+                    {progress[next.key] === "waiting" ? (
+                      <>
+                        Press <strong>Install &amp; open {next.name}</strong> there and confirm — it opens in its own window. If it opened as an app straight
+                        away, it's already installed.
+                      </>
+                    ) : (
+                      stepHint(next)
+                    )}
+                  </p>
+                </div>
               </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-xs font-semibold uppercase tracking-wider text-brand-700 dark:text-brand-200">
-                  Step {NGA_APPS.indexOf(next) + 1} of {NGA_APPS.length}
-                </p>
-                {progress[next.key] === "waiting" ? (
-                  <>
-                    <p className="text-lg font-bold text-slate-900 dark:text-white">Finish in {next.name}</p>
-                    <p className="text-sm text-slate-600 dark:text-slate-300">
-                      Press <strong>Install &amp; open {next.name}</strong> there and confirm — it opens in its own window. If it opened as an app straight away, it's already installed.
-                    </p>
-                  </>
-                ) : (
-                  <>
-                    <p className="text-lg font-bold text-slate-900 dark:text-white">Install {next.name}</p>
-                    <p className="text-sm text-slate-600 dark:text-slate-300">{stepHint(next)}</p>
-                  </>
-                )}
-                {askOpened === next.key && (
-                  <motion.p
-                    initial={{ opacity: 0, y: 4 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="mt-2 rounded-xl bg-brand-50 px-3 py-2 text-sm font-medium text-brand-800 dark:bg-brand-600/15 dark:text-brand-100"
-                    role="status"
-                  >
-                    Did {next.name} open in its own app window? Then it's already installed — confirm below.
-                  </motion.p>
-                )}
-              </div>
-              <div className="flex flex-wrap gap-2">
+              {askOpened === next.key && (
+                <motion.p
+                  initial={{ opacity: 0, y: 4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="mt-4 rounded-2xl bg-brand-50 px-4 py-3 text-sm font-medium text-brand-800 dark:bg-brand-600/15 dark:text-brand-100"
+                  role="status"
+                >
+                  Did {next.name} open in its own app window? Then it's already installed — confirm below.
+                </motion.p>
+              )}
+              <div className="mt-5 flex flex-col gap-2 border-t border-slate-100 pt-4 dark:border-slate-800 sm:flex-row sm:flex-wrap sm:items-center">
                 {progress[next.key] === "waiting" ? (
                   <>
                     <button
@@ -566,7 +574,7 @@ const AppsInstallerPage: React.FC = () => {
                     setBusy(null);
                     set(next.key, "skipped");
                   }}
-                  className={ghostBtn}
+                  className={`${ghostBtn} sm:ml-auto`}
                 >
                   <SkipForward className="h-4 w-4" /> Skip
                 </button>
@@ -596,90 +604,122 @@ const AppsInstallerPage: React.FC = () => {
         </AnimatePresence>
 
         {/* Apps */}
-        <section aria-label="NGA apps" className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <section aria-label="NGA apps" className="grid grid-cols-1 gap-4 md:grid-cols-2">
           {NGA_APPS.map((app) => {
             const status = progress[app.key];
             const chip = STATUS_CHIP[status];
             const current = running && next?.key === app.key;
+            const installedHere = isInstalled(status);
+            const openHref = app.origin === here ? openAppUrl() : startUrl(app);
+            const iconBtn =
+              "inline-flex h-10 w-10 items-center justify-center rounded-xl text-slate-500 transition hover:bg-slate-100 hover:text-brand-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-brand-200";
             return (
-              <motion.div
+              <motion.article
                 layout
                 id={`app-${app.key}`}
                 key={app.key}
-                className={`scroll-mt-24 rounded-3xl border bg-white p-5 shadow-soft transition dark:bg-slate-900 ${
+                className={`flex h-full scroll-mt-24 flex-col rounded-3xl border bg-white p-5 shadow-soft transition dark:bg-slate-900 ${
                   current ? "border-brand-300 ring-2 ring-brand-200 dark:border-brand-600/60 dark:ring-brand-600/30" : "border-slate-200 dark:border-slate-700/60"
                 }`}
               >
                 <div className="flex items-start gap-4">
                   <img src={iconUrl(app)} alt="" className="h-14 w-14 flex-shrink-0 rounded-2xl bg-slate-100 object-contain p-1.5 dark:bg-slate-800" />
                   <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <p className="font-semibold text-slate-900 dark:text-white">{app.name}</p>
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                      <h2 className="text-base font-semibold text-slate-900 dark:text-white">{app.name}</h2>
                       <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ${chip.className}`}>
-                        {isInstalled(status) ? <Check className="h-3 w-3" /> : status === "waiting" ? <Loader2 className="h-3 w-3 animate-spin" /> : <CircleDashed className="h-3 w-3" />}
+                        {installedHere ? <Check className="h-3 w-3" /> : status === "waiting" ? <Loader2 className="h-3 w-3 animate-spin" /> : <CircleDashed className="h-3 w-3" />}
                         {chip.label}
                       </span>
                     </div>
-                    <p className="mt-0.5 text-sm text-slate-600 dark:text-slate-300">{app.description}</p>
-                    {app.origin === here && linksInBrowser && (
-                      <div className="mt-3">
-                        <OpenInAppGuide compact />
-                      </div>
-                    )}
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {!isInstalled(status) &&
-                        appAction(
-                          app,
-                          outlineBtn,
-                          <>
-                            {status === "waiting" ? <ExternalLink className="h-4 w-4" /> : status === "skipped" ? <RotateCcw className="h-4 w-4" /> : <Download className="h-4 w-4" />}
-                            {status === "waiting" ? "Open again" : status === "skipped" ? "Install now" : "Install & open"}
-                          </>,
-                        )}
-                      <a
-                        href={app.origin === here ? openAppUrl() : startUrl(app)}
-                        target="_blank"
-                        rel="noopener"
-                        className="inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold text-brand-700 transition hover:bg-brand-50 dark:text-brand-200 dark:hover:bg-brand-600/15"
-                      >
-                        <ExternalLink className="h-4 w-4" /> Open app
-                      </a>
-                      {!isInstalled(status) && (
-                        <button
-                          type="button"
-                          onClick={() => setHelpFor((k) => (k === app.key ? null : app.key))}
-                          aria-expanded={helpFor === app.key}
-                          className={ghostBtn}
-                        >
-                          <HelpCircle className="h-4 w-4" /> Trouble?
-                        </button>
-                      )}
-                    </div>
-                    <AnimatePresence initial={false}>
-                      {helpFor === app.key && (
-                        <motion.ul
-                          initial={{ height: 0, opacity: 0 }}
-                          animate={{ height: "auto", opacity: 1 }}
-                          exit={{ height: 0, opacity: 0 }}
-                          className="mt-3 space-y-1.5 overflow-hidden rounded-2xl bg-slate-50 p-3 text-sm text-slate-600 dark:bg-slate-800/60 dark:text-slate-300"
-                        >
-                          <li>• In the {app.name} tab, use the install icon at the right of the address bar, or menu ⋮ → “Install {app.name}”.</li>
-                          <li>• No install option? An older copy may be installed: open <code className="text-xs">chrome://apps</code>, remove “{app.name}”, then try again.</li>
-                          <li>• Install every app in the same browser and profile you use for NGA.</li>
-                          {status === "waiting" && (
-                            <li>
-                              • Installed already?{" "}
-                              <button type="button" className="font-semibold text-brand-700 underline dark:text-brand-200" onClick={() => set(app.key, "done")}>
-                                Mark {app.name} as installed
-                              </button>
-                            </li>
-                          )}
-                        </motion.ul>
-                      )}
-                    </AnimatePresence>
+                    <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">{app.description}</p>
                   </div>
                 </div>
-              </motion.div>
+
+                {app.origin === here && linksInBrowser && (
+                  <div className="mt-4">
+                    <OpenInAppGuide compact />
+                  </div>
+                )}
+
+                <div className="min-h-4 flex-1" aria-hidden />
+                <div className="flex items-center gap-2 border-t border-slate-100 pt-4 dark:border-slate-800">
+                  <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+                    {installedHere ? (
+                      <>
+                        <a href={openHref} target="_blank" rel="noopener" className={`${primaryBtn} px-4 py-2.5`}>
+                          <ExternalLink className="h-4 w-4" /> Open app
+                        </a>
+                        {appAction(
+                          app,
+                          `${ghostBtn} px-3 py-2.5`,
+                          <>
+                            <RotateCcw className="h-4 w-4" /> Reinstall
+                          </>,
+                        )}
+                      </>
+                    ) : (
+                      appAction(
+                        app,
+                        `${primaryBtn} px-4 py-2.5`,
+                        <>
+                          {busy === app.key ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : status === "waiting" ? (
+                            <ExternalLink className="h-4 w-4" />
+                          ) : (
+                            <Download className="h-4 w-4" />
+                          )}
+                          {status === "waiting" ? "Open again" : "Install & open"}
+                        </>,
+                      )
+                    )}
+                  </div>
+                  {!installedHere && (
+                    <a href={openHref} target="_blank" rel="noopener" className={iconBtn} title={`Open ${app.name}`} aria-label={`Open ${app.name}`}>
+                      <ExternalLink className="h-4 w-4" />
+                    </a>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setHelpFor((k) => (k === app.key ? null : app.key))}
+                    aria-expanded={helpFor === app.key}
+                    title="Trouble installing or opening?"
+                    aria-label={`Help with ${app.name}`}
+                    className={`${iconBtn} ${helpFor === app.key ? "bg-slate-100 text-brand-700 dark:bg-slate-800 dark:text-brand-200" : ""}`}
+                  >
+                    <HelpCircle className="h-4 w-4" />
+                  </button>
+                </div>
+
+                <AnimatePresence initial={false}>
+                  {helpFor === app.key && (
+                    <motion.ul
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: "auto", opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      className="mt-3 space-y-1.5 overflow-hidden rounded-2xl bg-slate-50 p-3 text-sm text-slate-600 dark:bg-slate-800/60 dark:text-slate-300"
+                    >
+                      <li>• Install: the install icon at the right of the address bar, or menu ⋮ → “Install {app.name}”.</li>
+                      <li>
+                        • Opens in a browser tab although installed? In <code className="text-xs">chrome://apps</code> right-click it → App settings → turn on “Open
+                        supported links”.
+                      </li>
+                      <li>
+                        • Reinstall: remove it in <code className="text-xs">chrome://apps</code>, then press Install &amp; open here.
+                      </li>
+                      {status === "waiting" && (
+                        <li>
+                          • Installed already?{" "}
+                          <button type="button" className="font-semibold text-brand-700 underline dark:text-brand-200" onClick={() => set(app.key, "done")}>
+                            Mark {app.name} as installed
+                          </button>
+                        </li>
+                      )}
+                    </motion.ul>
+                  )}
+                </AnimatePresence>
+              </motion.article>
             );
           })}
         </section>

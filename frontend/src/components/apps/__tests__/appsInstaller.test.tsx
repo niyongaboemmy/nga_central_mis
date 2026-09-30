@@ -153,11 +153,11 @@ describe("/apps installer page", () => {
   });
   afterEach(() => open.mockRestore());
 
-  const card = (name: string) => screen.getByText(name, { selector: "p" }).closest("[id^='app-']") as HTMLElement;
+  const card = (name: string) => screen.getByRole("heading", { name }).closest("[id^='app-']") as HTMLElement;
 
   it("lists every app and walks 'Install all' as real links -- installed apps open straight in their window", async () => {
     render(<AppsInstallerPage />);
-    for (const app of NGA_APPS) expect(screen.getByText(app.name, { selector: "p" })).toBeInTheDocument();
+    for (const app of NGA_APPS) expect(screen.getByRole("heading", { name: app.name })).toBeInTheDocument();
 
     // In jsdom this page isn't an NGA origin and has no Web Install API, so
     // every app is reached by a real link (Chrome sends a clicked link into an
@@ -252,6 +252,17 @@ describe("/apps installer page", () => {
     } finally {
       Object.defineProperty(window, "location", { value: original, configurable: true });
     }
+  });
+
+  it("every card has an install control: installed -> Open app + Reinstall; not installed -> Install & open", () => {
+    window.history.replaceState(null, "", "/apps?done=tendo");
+    render(<AppsInstallerPage />);
+    const tendo = card("Tendo");
+    expect(within(tendo).getByRole("link", { name: /Open app/ })).toBeInTheDocument();
+    expect(within(tendo).getByRole("link", { name: /Reinstall/ })).toBeInTheDocument();
+    const tupo = card("Tupo");
+    expect(within(tupo).getByRole("link", { name: /Install & open/ })).toBeInTheDocument();
+    expect(within(tupo).getByRole("button", { name: "Help with Tupo" })).toBeInTheDocument();
   });
 
   it("offers the managed-device files", () => {
