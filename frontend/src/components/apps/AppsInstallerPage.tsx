@@ -449,7 +449,15 @@ const AppsInstallerPage: React.FC = () => {
                     {busy === next.key ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />} {installLabel(next)}
                   </button>
                 )}
-                <button type="button" onClick={() => set(next.key, "skipped")} className={ghostBtn}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    // Also releases a browser dialog that never answered.
+                    setBusy(null);
+                    set(next.key, "skipped");
+                  }}
+                  className={ghostBtn}
+                >
                   <SkipForward className="h-4 w-4" /> Skip
                 </button>
               </div>
