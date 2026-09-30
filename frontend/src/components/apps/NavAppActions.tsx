@@ -1,7 +1,7 @@
 import React from "react";
 import { Link, useLocation } from "react-router-dom";
 import { AppWindow, Download } from "lucide-react";
-import { usePwa } from "../../reminders/pwa";
+import { openAppUrl, usePwa } from "../../reminders/pwa";
 
 /**
  * Two small top-bar controls (docs/APP_LAUNCH.md):
@@ -22,7 +22,7 @@ export const NavAppActions: React.FC<{ compact?: boolean }> = ({ compact = false
     <div className="flex items-center gap-1.5">
       {showOpen && (
         <a
-          href={`${window.location.origin}/home?source=pwa`}
+          href={openAppUrl()}
           target="_blank"
           rel="noopener"
           title="Open NGA MIS in its app window"

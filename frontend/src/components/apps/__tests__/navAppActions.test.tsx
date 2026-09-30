@@ -80,6 +80,69 @@ describe("a leftover record: listed as installed, but Chrome offers to install i
   });
 });
 
+describe("'Open app' proves it: landing in a browser tab means not installed here", () => {
+  const setStandalone = (on: boolean) =>
+    Object.defineProperty(window, "matchMedia", {
+      configurable: true,
+      writable: true,
+      value: (q: string) => ({ matches: on && q.includes("standalone"), media: q, addEventListener: () => undefined, removeEventListener: () => undefined }),
+    });
+  const original = window.matchMedia;
+  afterEach(() => {
+    Object.defineProperty(window, "matchMedia", { configurable: true, writable: true, value: original });
+    setRelatedApps(null);
+    resetInstallCheckForTests();
+    window.history.replaceState(null, "", "/");
+  });
+
+  it("the link lands in a tab: not installed (even if Chrome's list says so), and the install sheet is requested", async () => {
+    const { captureLaunchMarker, installRequested, clearInstallRequest } = await import("../../../reminders/pwa");
+    setRelatedApps([{ platform: "webapp", id: "https://mis.amashuri.com/" }]); // Chrome's list: "installed"
+    setStandalone(false);
+    window.history.replaceState(null, "", "/home?source=pwa&nga_open=1");
+    captureLaunchMarker();
+    expect(window.location.search).toBe("?source=pwa");
+    expect(await refreshInstallCheck()).toBe("no");
+    expect(getPwaState().installed).toBe(false);
+    expect(installRequested()).toBe(true);
+    clearInstallRequest();
+    renderAt();
+    expect(screen.queryByRole("link", { name: "Open the NGA MIS app" })).toBeNull();
+  });
+
+  it("the link opens the app window: installed, and the old verdict is cleared", async () => {
+    const { captureLaunchMarker, getInstallDiagnostics } = await import("../../../reminders/pwa");
+    localStorage.setItem("nga.pwa.notOpenable", "1");
+    setStandalone(true);
+    window.history.replaceState(null, "", "/home?source=pwa&nga_open=1");
+    captureLaunchMarker();
+    expect(getInstallDiagnostics().notOpenableSince).toBeNull();
+    expect(await refreshInstallCheck()).toBe("yes");
+  });
+
+  it("a real install clears the verdict", async () => {
+    const { initPwa } = await import("../../../reminders/pwa");
+    initPwa();
+    localStorage.setItem("nga.pwa.notOpenable", "1");
+    await refreshInstallCheck();
+    expect(getPwaState().installed).toBe(false);
+    act(() => {
+      window.dispatchEvent(new Event("appinstalled"));
+    });
+    expect(localStorage.getItem("nga.pwa.notOpenable")).toBeNull();
+    expect(getPwaState().installed).toBe(true);
+  });
+
+  it("'Open app' links carry the probe", async () => {
+    setRelatedApps([{ platform: "webapp" }]);
+    await act(async () => {
+      await refreshInstallCheck();
+    });
+    renderAt();
+    expect(screen.getByRole("link", { name: "Open the NGA MIS app" })).toHaveAttribute("href", `${window.location.origin}/home?source=pwa&nga_open=1`);
+  });
+});
+
 describe("installed or removed outside the installer", () => {
   afterEach(() => {
     setRelatedApps(null);
@@ -124,7 +187,7 @@ describe("top-bar app controls", () => {
     });
     renderAt();
     const open = screen.getByRole("link", { name: "Open the NGA MIS app" });
-    expect(open).toHaveAttribute("href", `${window.location.origin}/home?source=pwa`);
+    expect(open).toHaveAttribute("href", `${window.location.origin}/home?source=pwa&nga_open=1`);
     expect(open).toHaveAttribute("target", "_blank");
     expect(open).toHaveAttribute("rel", "noopener"); // required for Chrome to open it in the app
     expect(screen.getByRole("link", { name: "Install the NGA apps" })).toHaveAttribute("href", "/apps");
