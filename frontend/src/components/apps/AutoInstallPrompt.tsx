@@ -38,6 +38,7 @@ export const AutoInstallPrompt: React.FC = () => {
   const pwa = usePwa();
   const location = useLocation();
   const [open, setOpen] = useState(false);
+  const [closedThisLoad, setClosedThisLoad] = useState(false);
   const returnUrl = installReturnUrl();
 
   useEffect(() => {
@@ -68,9 +69,25 @@ export const AutoInstallPrompt: React.FC = () => {
     if (pwa.installed && open && !returnUrl) setOpen(false);
   }, [pwa.installed, open, returnUrl]);
 
+  // The browser's "installable, not installed" signal (beforeinstallprompt)
+  // often arrives after the first render: open then too.
+  useEffect(() => {
+    if (!pwa.canPrompt || open || closedThisLoad) return;
+    const ok = shouldAutoOffer({
+      installed: false,
+      installMethod: pwa.platform.installMethod,
+      forced: installRequested() || shouldAskInstallFromLaunch(),
+      snoozed: autoPromptSnoozed(),
+      onInstallerPage: location.pathname.startsWith("/apps"),
+    });
+    if (ok) setOpen(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pwa.canPrompt]);
+
   const close = () => {
     if (!installRequested()) snoozeAutoPrompt();
     clearInstallRequest();
+    setClosedThisLoad(true);
     setOpen(false);
   };
 

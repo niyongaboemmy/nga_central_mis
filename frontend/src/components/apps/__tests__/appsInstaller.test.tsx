@@ -137,3 +137,19 @@ describe("/apps installer page", () => {
     create.mockRestore();
   });
 });
+
+describe("a stale 'installed' note can't hide the prompt", () => {
+  it("MIS forgets it as soon as the browser says the app is installable", async () => {
+    const { initPwa, getPwaState } = await import("../../../reminders/pwa");
+    try {
+      localStorage.setItem("nga.pwa.installed", "1");
+    } catch {
+      /* ignore */
+    }
+    initPwa();
+    const e = Object.assign(new Event("beforeinstallprompt", { cancelable: true }), { prompt: vi.fn(), userChoice: Promise.resolve({ outcome: "dismissed" }) });
+    window.dispatchEvent(e);
+    expect(getPwaState().installed).toBe(false);
+    expect(getPwaState().canPrompt).toBe(true);
+  });
+});
