@@ -44,11 +44,11 @@ const compute = (): PwaState => {
     platform: describePlatform(env),
     // A remembered note is only trusted when the browser can't answer: it
     // goes stale when the app is uninstalled (no event for that).
-    // Chrome offering to install (beforeinstallprompt) outranks everything:
-    // an app synced from the Chrome account but not installed on THIS device
-    // still answers "yes" to getInstalledRelatedApps.
-    installed: env.standalone || (!deferredPrompt && (installCheck === "yes" || (installCheck === "unknown" && readFlag(INSTALLED_KEY)))),
-    installCheck: env.standalone ? "yes" : deferredPrompt ? "no" : installCheck,
+    // The browser's live answer decides; a remembered note only where the
+    // browser can't answer (and never while Chrome offers to install).
+    installed:
+      env.standalone || installCheck === "yes" || (installCheck === "unknown" && !deferredPrompt && readFlag(INSTALLED_KEY)),
+    installCheck: env.standalone ? "yes" : installCheck === "unknown" && deferredPrompt ? "no" : installCheck,
     inBrowser: !env.standalone,
     canPrompt: Boolean(deferredPrompt),
     hasInstallElement: typeof window !== "undefined" && "HTMLInstallElement" in window,
@@ -146,19 +146,13 @@ export const refreshInstallCheck = async (): Promise<InstallCheck> => {
     setInstallCheck("yes");
     return "yes";
   }
-  // Installable here = not installed here (see compute).
-  if (deferredPrompt) {
-    setInstallCheck("no");
-    return "no";
-  }
   const fn = (navigator as any).getInstalledRelatedApps;
   if (typeof fn !== "function") return installCheck;
   try {
     const apps: Array<{ platform?: string }> = await fn.call(navigator);
-    if (deferredPrompt) {
-      setInstallCheck("no");
-      return "no";
-    }
+    // Installed since this page loaded (Chrome menu, address bar, another
+    // tab): the old install offer is dead.
+    if (Array.isArray(apps) && apps.some((a) => a?.platform === "webapp")) deferredPrompt = null;
     const next: InstallCheck = Array.isArray(apps) && apps.some((a) => a?.platform === "webapp") ? "yes" : "no";
     setInstallCheck(next);
     return next;
@@ -213,6 +207,9 @@ export const initPwa = () => {
   };
   document.addEventListener("visibilitychange", recheck);
   window.addEventListener("focus", recheck);
+  // Installed or removed while this page stays on screen (Chrome's own
+  // dialog, chrome://apps): a cheap re-check every 10 s while visible.
+  window.setInterval(recheck, 10_000);
   consumeLaunches();
   void registerAppServiceWorker();
 };

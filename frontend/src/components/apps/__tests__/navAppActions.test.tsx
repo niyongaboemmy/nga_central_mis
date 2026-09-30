@@ -54,24 +54,34 @@ describe("live install detection", () => {
   });
 });
 
-describe("an app synced to the Chrome account but not installed on this device", () => {
+describe("installed or removed outside the installer", () => {
   afterEach(() => {
     setRelatedApps(null);
     resetInstallCheckForTests();
   });
 
-  it("Chrome offering to install wins over a synced 'installed' answer", async () => {
-    // getInstalledRelatedApps reports the synced app...
-    setRelatedApps([{ platform: "webapp", id: "https://mis.amashuri.com/" }]);
+  it("installed from Chrome's menu after the page offered it: the live answer wins, the old offer is dropped", async () => {
     const { initPwa } = await import("../../../reminders/pwa");
     initPwa();
-    // ...while Chrome says this device can install it.
     act(() => {
       window.dispatchEvent(Object.assign(new Event("beforeinstallprompt", { cancelable: true }), { prompt: async () => undefined, userChoice: Promise.resolve({ outcome: "dismissed" }) }));
     });
+    setRelatedApps([]);
+    expect(await refreshInstallCheck()).toBe("no");
+    expect(getPwaState().canPrompt).toBe(true);
+
+    setRelatedApps([{ platform: "webapp", id: "https://mis.amashuri.com/" }]);
+    expect(await refreshInstallCheck()).toBe("yes");
+    expect(getPwaState().installed).toBe(true);
+    expect(getPwaState().canPrompt).toBe(false);
+  });
+
+  it("removed via chrome://apps while the page is open: goes back to not installed", async () => {
+    setRelatedApps([{ platform: "webapp" }]);
+    expect(await refreshInstallCheck()).toBe("yes");
+    setRelatedApps([]);
     expect(await refreshInstallCheck()).toBe("no");
     expect(getPwaState().installed).toBe(false);
-    expect(getPwaState().installCheck).toBe("no");
   });
 });
 
