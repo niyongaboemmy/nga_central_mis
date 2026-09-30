@@ -143,9 +143,28 @@ export const cancelPendingJobs = async (userId: number, now = new Date()) => {
     .where(and(eq(ReminderJob.user_id, userId), eq(ReminderJob.status, "pending"), gte(ReminderJob.fire_at, now)));
 };
 
-export const expandForUser = async (
+/**
+ * Plans for one user never overlap: a plan that started before a newer
+ * change (a source saved a moment later) would otherwise see a stale world
+ * and cancel the reminder the newer plan just made. Calls queue per user;
+ * each runs on the database as it is when its turn comes.
+ */
+const planning = new Map<number, Promise<unknown>>();
+export const expandForUser = (userId: number, now?: Date): Promise<{ planned: number; cancelled: number }> => {
+  const previous = planning.get(userId) ?? Promise.resolve();
+  const run = previous.catch(() => undefined).then(() => planForUser(userId, now ?? new Date()));
+  planning.set(userId, run);
+  run
+    .finally(() => {
+      if (planning.get(userId) === run) planning.delete(userId);
+    })
+    .catch(() => undefined);
+  return run;
+};
+
+const planForUser = async (
   userId: number,
-  now: Date = new Date(),
+  now: Date,
 ): Promise<{ planned: number; cancelled: number }> => {
   const prefs = await getPreferences(userId);
   if (!prefs.enabled) {
@@ -170,9 +189,12 @@ export const expandForUser = async (
   });
 
   for (const job of jobs) {
-    // Refresh a pending row in place (time moved, title changed); leave any
-    // row that already went out alone.
-    const pending = sql`${ReminderJob.status} = 'pending'`;
+    // Refresh a pending row in place (time moved, title changed), and bring
+    // back one the planner itself set aside as "cancelled" (reminders
+    // switched off and on again, a kind re-enabled): the plan wants it, so
+    // it's due again. Rows that went out (sent/acked), expired, or were
+    // "withdrawn" because their item was cancelled are left alone.
+    const pending = sql`${ReminderJob.status} IN ('pending', 'cancelled')`;
     await db
       .insert(ReminderJob)
       .values({
@@ -201,6 +223,8 @@ export const expandForUser = async (
           event_end: sql`IF(${pending}, VALUES(${ReminderJob.event_end}), ${ReminderJob.event_end})`,
           fire_at: sql`IF(${pending}, VALUES(${ReminderJob.fire_at}), ${ReminderJob.fire_at})`,
           critical: sql`IF(${pending}, VALUES(${ReminderJob.critical}), ${ReminderJob.critical})`,
+          // Last, so the conditions above still see the old status.
+          status: sql`IF(${pending}, 'pending', ${ReminderJob.status})`,
         },
       });
   }
@@ -241,10 +265,20 @@ export const expandAll = async (now: Date = new Date()) => {
   return { users: users.length, planned };
 };
 
+let soonHook: ((userIds: number[]) => void) | null = null;
+/**
+ * Test hook: record who would be re-planned instead of planning in the
+ * background (the suite shares one module registry, so vi.mock can't).
+ */
+export const setExpandSoonHook = (fn: ((userIds: number[]) => void) | null) => {
+  soonHook = fn;
+};
+
 /** Re-plan a set of users in the background (e.g. after a Source API write). */
 export const expandUsersSoon = (userIds: number[]) => {
   const unique = Array.from(new Set(userIds)).filter((id) => Number.isInteger(id) && id > 0);
   if (unique.length === 0) return;
+  if (soonHook) return soonHook(unique);
   // Connected Google calendars mirror the plan (independent of push opt-in).
   syncGoogleSoon(unique);
   setImmediate(async () => {

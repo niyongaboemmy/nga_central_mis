@@ -445,7 +445,7 @@ describe("Reminder Hub", () => {
         .select()
         .from(ReminderJob)
         .where(and(eq(ReminderJob.user_id, studentId), like(ReminderJob.dedupe_key, `src:${sourceId}:%`)));
-      expect(after.every((j) => j.status === "cancelled")).toBe(true);
+      expect(after.every((j) => j.status === "withdrawn")).toBe(true);
     });
   });
 });
