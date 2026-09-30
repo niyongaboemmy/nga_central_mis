@@ -36,6 +36,22 @@ interface PwaState {
 
 let deferredPrompt: BeforeInstallPromptEvent | null = null;
 let installCheck: InstallCheck = "unknown";
+/**
+ * Raw signals, kept for the rule below and for /apps?diag=1:
+ * - lastRelated: what getInstalledRelatedApps last returned
+ * - sawNotInstalled: it answered "not installed" at least once this visit
+ * - bipAt: when Chrome offered installation (beforeinstallprompt)
+ */
+const diag = { lastRelated: "not asked yet", sawNotInstalled: false, bipAt: 0 as number, leftoverRecord: false, checks: 0 };
+export const getInstallDiagnostics = () => ({
+  ...diag,
+  installCheck,
+  canPrompt: Boolean(deferredPrompt),
+  standalone: typeof window !== "undefined" && Boolean(window.matchMedia?.("(display-mode: standalone)").matches),
+  rememberedNote: readFlag(INSTALLED_KEY),
+  api: typeof navigator !== "undefined" && typeof (navigator as any).getInstalledRelatedApps === "function",
+  userAgent: typeof navigator !== "undefined" ? navigator.userAgent : "",
+});
 const listeners = new Set<() => void>();
 
 const compute = (): PwaState => {
@@ -150,12 +166,30 @@ export const refreshInstallCheck = async (): Promise<InstallCheck> => {
   if (typeof fn !== "function") return installCheck;
   try {
     const apps: Array<{ platform?: string }> = await fn.call(navigator);
-    // Installed since this page loaded (Chrome menu, address bar, another
-    // tab): the old install offer is dead.
-    if (Array.isArray(apps) && apps.some((a) => a?.platform === "webapp")) deferredPrompt = null;
-    const next: InstallCheck = Array.isArray(apps) && apps.some((a) => a?.platform === "webapp") ? "yes" : "no";
-    setInstallCheck(next);
-    return next;
+    diag.checks += 1;
+    diag.lastRelated = JSON.stringify(apps);
+    const listed = Array.isArray(apps) && apps.some((a) => a?.platform === "webapp");
+    if (!listed) {
+      diag.sawNotInstalled = true;
+      diag.leftoverRecord = false;
+      setInstallCheck("no");
+      return "no";
+    }
+    // Listed as installed while Chrome also offers to install it here, and
+    // it never answered "not installed" this visit: a leftover record (app
+    // removed from this device, e.g. its launcher deleted, while Chrome's
+    // list still has it). It can't be opened as an app -- not installed here.
+    if (deferredPrompt && !diag.sawNotInstalled) {
+      diag.leftoverRecord = true;
+      setInstallCheck("no");
+      return "no";
+    }
+    // Installed (or installed since this page loaded, e.g. from Chrome's
+    // menu): any old install offer is dead.
+    diag.leftoverRecord = false;
+    deferredPrompt = null;
+    setInstallCheck("yes");
+    return "yes";
   } catch {
     return installCheck;
   }
@@ -165,6 +199,7 @@ export const refreshInstallCheck = async (): Promise<InstallCheck> => {
 export const resetInstallCheckForTests = () => {
   installCheck = "unknown";
   deferredPrompt = null;
+  Object.assign(diag, { lastRelated: "not asked yet", sawNotInstalled: false, bipAt: 0, leftoverRecord: false, checks: 0 });
   emit();
 };
 
@@ -191,6 +226,7 @@ export const initPwa = () => {
       /* ignore */
     }
     installCheck = "no";
+    diag.bipAt = Date.now();
     emit();
   });
   window.addEventListener("appinstalled", () => {

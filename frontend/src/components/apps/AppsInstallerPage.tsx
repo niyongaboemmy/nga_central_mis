@@ -19,7 +19,7 @@ import {
   SkipForward,
   Sparkles,
 } from "lucide-react";
-import { promptInstall, usePwa } from "../../reminders/pwa";
+import { getInstallDiagnostics, promptInstall, refreshInstallCheck, usePwa } from "../../reminders/pwa";
 import { InstallGuide } from "../reminders/InstallGuide";
 import Modal from "../ui/Modal";
 import {
@@ -113,6 +113,9 @@ const AppsInstallerPage: React.FC = () => {
   const [askOpened, setAskOpened] = useState<NgaApp["key"] | null>(null);
   const lastOpened = useRef<{ key: NgaApp["key"]; at: number } | null>(null);
   const here = typeof window !== "undefined" ? window.location.origin : "";
+  // /apps?diag=1 shows the raw install signals of this browser.
+  const showDiag = typeof window !== "undefined" && new URLSearchParams(window.location.search).has("diag");
+  const [diagTick, setDiagTick] = useState(0);
   const canWebInstall = webInstallSupported();
 
   const set = useCallback((key: NgaApp["key"], status: StepStatus) => setProgress((p) => markStep(p, key, status)), []);
@@ -702,6 +705,27 @@ const AppsInstallerPage: React.FC = () => {
             </li>
           </ul>
         </details>
+
+        {showDiag && (
+          <section aria-label="Install diagnostics" className="rounded-3xl border border-dashed border-slate-300 bg-white p-5 text-sm dark:border-slate-700 dark:bg-slate-900">
+            <div className="flex items-center justify-between gap-2">
+              <h2 className="font-semibold text-slate-900 dark:text-white">Install diagnostics (this browser)</h2>
+              <button
+                type="button"
+                className={outlineBtn}
+                onClick={async () => {
+                  await refreshInstallCheck();
+                  setDiagTick((n) => n + 1);
+                }}
+              >
+                <RotateCcw className="h-4 w-4" /> Re-check now
+              </button>
+            </div>
+            <pre className="mt-3 overflow-x-auto whitespace-pre-wrap break-all rounded-2xl bg-slate-50 p-3 text-xs text-slate-700 dark:bg-slate-800/60 dark:text-slate-200">
+              {JSON.stringify({ ...getInstallDiagnostics(), tick: diagTick, misStatusOnThisPage: progress.mis }, null, 2)}
+            </pre>
+          </section>
+        )}
 
         <p className="text-center text-xs text-slate-500 dark:text-slate-400">
           {canWebInstall ? "Your browser can install the NGA apps directly from this page." : "Tip: Chrome and Edge 156+ install each app straight from this page."}

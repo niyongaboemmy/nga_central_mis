@@ -54,6 +54,32 @@ describe("live install detection", () => {
   });
 });
 
+describe("a leftover record: listed as installed, but Chrome offers to install it here", () => {
+  afterEach(() => {
+    setRelatedApps(null);
+    resetInstallCheckForTests();
+  });
+
+  it("counts as NOT installed -- no 'Open app' that would just open a browser tab", async () => {
+    // The removed app is still in Chrome's list...
+    setRelatedApps([{ platform: "webapp", id: "https://mis.amashuri.com/" }]);
+    const { initPwa, getInstallDiagnostics } = await import("../../../reminders/pwa");
+    initPwa();
+    // ...and Chrome offers to install it on this device.
+    act(() => {
+      window.dispatchEvent(Object.assign(new Event("beforeinstallprompt", { cancelable: true }), { prompt: async () => undefined, userChoice: Promise.resolve({ outcome: "dismissed" }) }));
+    });
+    expect(await refreshInstallCheck()).toBe("no");
+    expect(getPwaState().installed).toBe(false);
+    expect(getPwaState().canPrompt).toBe(true);
+    expect(getInstallDiagnostics().leftoverRecord).toBe(true);
+    renderAt();
+    expect(screen.queryByRole("link", { name: "Open the NGA MIS app" })).toBeNull();
+    // Stays that way on the periodic re-check.
+    expect(await refreshInstallCheck()).toBe("no");
+  });
+});
+
 describe("installed or removed outside the installer", () => {
   afterEach(() => {
     setRelatedApps(null);
