@@ -48,6 +48,12 @@ import {
 import { successResponse } from "../utils/response";
 import { asyncHandler } from "../middleware/asyncHandler";
 import logger from "../utils/logger";
+import {
+  activityPeople,
+  afterResponse,
+  onActivityChanged,
+  onSlotChanged,
+} from "../services/reminders/timetableChanges";
 import { resolveUserScope, isClassGroupInScope } from "../services/userScope";
 
 /**
@@ -648,6 +654,9 @@ export const createCalendarSlot = asyncHandler(async (req: any, res: any) => {
       })
       .where(eq(CalendarSlot.slot_id, slotId));
 
+    // Reminders + Google Calendar pick the lesson up within a minute.
+    afterResponse("timetable sync", () => onSlotChanged(slotId, null));
+
     logger.info("Calendar slot created by reviving soft-deleted row", {
       slotId,
       userId: req.user?.userId || req.user?.user_id || req.user?.id,
@@ -685,6 +694,8 @@ export const createCalendarSlot = asyncHandler(async (req: any, res: any) => {
 
   const resultHeader = Array.isArray(result) ? result[0] : result;
   const slotId = (resultHeader as any).insertId;
+
+  afterResponse("timetable sync", () => onSlotChanged(slotId, null));
 
   logger.info("Calendar slot created", {
     slotId,
@@ -836,6 +847,10 @@ export const updateCalendarSlot = asyncHandler(async (req: any, res: any) => {
     })
     .where(eq(CalendarSlot.slot_id, slotId));
 
+  // Moved / re-roomed / reassigned: notices, fresh reminders, calendar sync.
+  const slotBefore = existingSlot[0];
+  afterResponse("timetable sync", () => onSlotChanged(slotId, slotBefore));
+
   logger.info("Calendar slot updated", {
     slotId,
     userId: req.user?.userId || req.user?.user_id || req.user?.id,
@@ -875,6 +890,9 @@ export const deleteCalendarSlot = asyncHandler(async (req: any, res: any) => {
     .update(CalendarSlot)
     .set({ is_active: 0 })
     .where(eq(CalendarSlot.slot_id, slotId));
+
+  const removedSlot = existingSlot[0];
+  afterResponse("timetable sync", () => onSlotChanged(slotId, removedSlot));
 
   logger.info("Calendar slot deleted", {
     slotId,
@@ -1478,6 +1496,8 @@ export const createCalendarActivity = asyncHandler(
       await replaceActivityAssignees(activityId, assigneeIds);
     }
 
+    afterResponse("timetable sync", () => onActivityChanged(activityId, null));
+
     logger.info("Calendar activity created", {
       activityId,
       assignees: assigneeIds,
@@ -1512,6 +1532,10 @@ export const updateCalendarActivity = asyncHandler(
     if (existingActivity.length === 0) {
       throw new NotFoundError("Calendar activity not found");
     }
+    // Who it concerned before the edit: people taken off it still hold
+    // reminders that must be withdrawn.
+    const activityBefore = existingActivity[0];
+    const peopleBefore = await activityPeople(activityBefore);
 
     const {
       class_group_id,
@@ -1563,6 +1587,10 @@ export const updateCalendarActivity = asyncHandler(
       await replaceActivityAssignees(activityId, assigneeIds);
     }
 
+    afterResponse("timetable sync", () =>
+      onActivityChanged(activityId, activityBefore, peopleBefore),
+    );
+
     logger.info("Calendar activity updated", {
       activityId,
       userId: req.user?.userId || req.user?.user_id || req.user?.id,
@@ -1598,6 +1626,11 @@ export const deleteCalendarActivity = asyncHandler(
       .update(CalendarActivity)
       .set({ is_active: 0 })
       .where(eq(CalendarActivity.activity_id, activityId));
+
+    const removedActivity = existingActivity[0];
+    afterResponse("timetable sync", () =>
+      onActivityChanged(activityId, removedActivity),
+    );
 
     logger.info("Calendar activity deleted", {
       activityId,

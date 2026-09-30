@@ -39,6 +39,7 @@ import { successResponse } from "../utils/response";
 import { asyncHandler } from "../middleware/asyncHandler";
 import { recordActivity } from "../utils/activityLogger";
 import logger from "../utils/logger";
+import { afterResponse, onSubjectStatusChanged } from "../services/reminders/timetableChanges";
 import {
   applyPlacementChange,
   bumpStructuralHolders,
@@ -1638,6 +1639,12 @@ export const updateSubject = asyncHandler(async (req: any, res: any) => {
     .set(updateData)
     .where(eq(Subject.subject_id, subjectId));
 
+  // Renamed / re-enabled / disabled: lesson reminders and synced calendars
+  // follow within a minute.
+  if (updateData.name !== undefined || updateData.status !== undefined) {
+    afterResponse("subject sync", () => onSubjectStatusChanged(subjectId));
+  }
+
   logger.info("Subject updated", { subjectId });
 
   // Record activity
@@ -1679,6 +1686,8 @@ export const deleteSubject = asyncHandler(async (req: any, res: any) => {
     .update(Subject)
     .set({ status: "DISABLED" })
     .where(eq(Subject.subject_id, subjectId));
+
+  afterResponse("subject sync", () => onSubjectStatusChanged(subjectId));
 
   logger.info("Subject disabled", { subjectId });
 

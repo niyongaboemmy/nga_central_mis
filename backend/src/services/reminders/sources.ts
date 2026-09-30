@@ -7,6 +7,7 @@ import logger from "../../utils/logger";
 import { loadCurrentTerm } from "./occurrences";
 import type { ReminderKind } from "./preferences";
 import { expandUsersSoon } from "./expander";
+import { releaseDeliveredJobs } from "./timetableChanges";
 import { addDaysYmd, formatClock, kigaliParts } from "./time";
 
 /**
@@ -238,6 +239,12 @@ export const saveSource = async (item: SourceItem, now = new Date()): Promise<Sa
     }
   }
 
+  // A new time needs fresh reminders: ones already delivered for the old
+  // time would otherwise hold the same dedupe keys and block them.
+  if (before && new Date(before.starts_at as any).getTime() !== item.starts_at.getTime()) {
+    await releaseDeliveredJobs(`src:${sourceId}:`, now);
+  }
+
   expandUsersSoon([...item.audience_user_ids, ...enrolled, ...holders]);
   return { source_id: sourceId, created: !before, changed: true, noticed };
 };
@@ -254,7 +261,10 @@ export const cancelSourceItem = async (app: string, type: string, externalId: st
   await db.update(ReminderSource).set({ cancelled_at: now }).where(eq(ReminderSource.source_id, source.source_id));
   const [result] = (await db
     .update(ReminderJob)
-    .set({ status: "cancelled" })
+    // "withdrawn", not "cancelled": the planner revives cancelled rows it
+    // plans again, and a plan racing this cancellation must not bring back
+    // a reminder for an item that no longer exists.
+    .set({ status: "withdrawn" })
     .where(and(sql`${ReminderJob.dedupe_key} LIKE ${`src:${source.source_id}:%`}`, eq(ReminderJob.status, "pending")))) as any;
 
   const label = NOTICE_LABEL[source.source_type] ?? "Event";
