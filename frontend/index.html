@@ -37,7 +37,17 @@
     </script>
   </head>
   <body class="bg-gray-100 dark:bg-black">
-    <div id="root"></div>
+    <!-- Server-rendered fallback, replaced by the app on load. It gives
+         crawlers and Google's OAuth brand check a readable home page with
+         links to the privacy policy and terms (they don't run the app). -->
+    <div id="root">
+      <main style="font-family:system-ui,sans-serif;max-width:640px;margin:15vh auto;padding:0 16px;text-align:center;color:#334155">
+        <h1 style="font-size:1.5rem;color:#0f172a">NGA MIS · New Generation Academy</h1>
+        <p>The school management system for New Generation Academy's students, parents, teachers and staff: timetables, learning, results, attendance and reminders.</p>
+        <noscript><p>Please enable JavaScript to sign in.</p></noscript>
+        <p style="font-size:14px"><a href="/privacy/">Privacy Policy</a> · <a href="/terms/">Terms of Service</a></p>
+      </main>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
