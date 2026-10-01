@@ -244,21 +244,23 @@ export const RecipeBuilder: React.FC<{
 };
 
 /** What a week will look like on a student's phone — no AI call, just the recipe (§9.2 step 3). */
-export const PhonePreview: React.FC<{ blueprint: Blueprint; title: string; week?: string | null; features?: { flashcards: boolean; exit_ticket: boolean } }> = ({ blueprint, title, week, features }) => {
+export const PhonePreview: React.FC<{ blueprint: Blueprint; title: string; week?: string | null; features?: { flashcards: boolean; exit_ticket: boolean }; large?: boolean }> = ({ blueprint, title, week, features, large }) => {
   const blocks = previewBlocks(blueprint, features);
   const m = useMotion();
+  // large: real phone size, for reading in the "Enlarge" dialog.
+  const t = large ? { w: "w-[360px]", min: "min-h-[600px]", week: "text-xs", title: "text-lg", label: "text-sm", detail: "text-xs", pad: "p-3.5" } : { w: "w-[260px]", min: "min-h-[420px]", week: "text-[10px]", title: "text-sm", label: "text-xs", detail: "text-[11px]", pad: "p-2.5" };
   return (
-    <div className="mx-auto w-[260px] rounded-[2rem] border-[6px] border-gray-900 dark:border-white/15 bg-white dark:bg-[#0b0b0f] shadow-soft overflow-hidden" aria-label="Preview of a week on a student's phone">
+    <div className={`mx-auto ${t.w} rounded-[2rem] border-[6px] border-gray-900 dark:border-white/15 bg-white dark:bg-[#0b0b0f] shadow-soft overflow-hidden`} aria-label="Preview of a week on a student's phone">
       <div className="h-5 flex justify-center items-end"><span className="w-16 h-1.5 rounded-full bg-gray-200 dark:bg-white/15" /></div>
-      <div className="px-3 pb-4 pt-2 min-h-[420px]">
-        <p className="text-[10px] uppercase tracking-wider font-semibold text-slate-600 dark:text-slate-300">{week || "This week"}</p>
-        <p className="text-sm font-bold text-gray-900 dark:text-white leading-snug">{title}</p>
+      <div className={`px-3 pb-4 pt-2 ${t.min}`}>
+        <p className={`${t.week} uppercase tracking-wider font-semibold text-slate-600 dark:text-slate-300`}>{week || "This week"}</p>
+        <p className={`${t.title} font-bold text-gray-900 dark:text-white leading-snug`}>{title}</p>
         <ul className="mt-3 space-y-2">
           <AnimatePresence initial={false}>
             {blocks.map((blk) => (
-              <motion.li key={blk.key} layout {...m("reveal")} className="rounded-xl el-subtle p-2.5">
-                <p className="text-xs font-semibold text-gray-900 dark:text-white">{blk.label}</p>
-                <p className="text-[11px] text-slate-600 dark:text-slate-300">{blk.detail}</p>
+              <motion.li key={blk.key} layout {...m("reveal")} className={`rounded-xl el-subtle ${t.pad}`}>
+                <p className={`${t.label} font-semibold text-gray-900 dark:text-white`}>{blk.label}</p>
+                <p className={`${t.detail} text-slate-600 dark:text-slate-300`}>{blk.detail}</p>
                 <div className="mt-1.5 space-y-1" aria-hidden>
                   <div className="h-1.5 rounded bg-gray-200 dark:bg-white/10 w-full" />
                   <div className="h-1.5 rounded bg-gray-200 dark:bg-white/10 w-4/5" />
@@ -266,7 +268,7 @@ export const PhonePreview: React.FC<{ blueprint: Blueprint; title: string; week?
               </motion.li>
             ))}
           </AnimatePresence>
-          {blocks.length === 0 && <li className="text-xs text-slate-600 dark:text-slate-300">Turn on at least one block.</li>}
+          {blocks.length === 0 && <li className={`${t.detail} text-slate-600 dark:text-slate-300`}>Turn on at least one block.</li>}
         </ul>
       </div>
     </div>

@@ -68,12 +68,21 @@ export function currentWeek(weeks: WeekBundle[], today = new Date()): WeekBundle
   );
 }
 
+/** One lifecycle, said in words (never colour alone): no topic → needs content → ready, not live → live. */
 export const WEEK_STATE_LABEL: Record<WeekBundle["readiness"]["state"], string> = {
   EMPTY: "No topic yet",
   TODO: "Needs content",
-  DRAFTED: "Has material",
-  LIVE: "Live",
+  DRAFTED: "Ready · not live",
+  LIVE: "Live for students",
 };
+
+/** How ready the term is: weeks with a topic that are live, and that are ready but still off. */
+export function termReadiness(weeks: WeekBundle[]): { plannable: number; live: number; ready: number; pct: number } {
+  const plannable = weeks.filter(weekSelectable);
+  const live = plannable.filter((w) => w.readiness.state === "LIVE").length;
+  const ready = plannable.filter((w) => w.readiness.state === "DRAFTED").length;
+  return { plannable: plannable.length, live, ready, pct: plannable.length ? Math.round((live / plannable.length) * 100) : 0 };
+}
 
 // ---------------------------------------------------------------- estimate & quota
 
