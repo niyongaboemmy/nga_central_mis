@@ -234,6 +234,7 @@ const waitFor = async (fn, timeoutMs, everyMs = 500) => {
       ["/analytics/retention", "Retention", 820, 1180], ["/analytics/locations", "Locations", 1440, 900],
       ["/analytics/technology", "Technology", 390, 844],
       ["/analytics/explore", "Explore", 1440, 900], ["/analytics/explore", "Explore", 390, 844],
+      ["/analytics/audit-log", "Audit log", 1440, 900], ["/analytics/audit-log", "Audit log", 390, 844], ["/analytics/audit-log?view=log", "Audit log", 1440, 900],
     ]) {
       await a.p.setViewport({ width: w, height: h });
       await a.p.goto(`${APP}${path2}`, { waitUntil: "networkidle2" });

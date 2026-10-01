@@ -4,6 +4,7 @@ import { Activity, ArrowLeft } from "lucide-react";
 import { useAccess } from "../../hooks/useAccess";
 import { RefreshBar } from "./Skeleton";
 import { ANALYTICS_TABS } from "./nav";
+import { useLegacyPermission } from "./useLegacyPermission";
 
 export { ANALYTICS_TABS } from "./nav";
 export type { AnalyticsTab } from "./nav";
@@ -43,7 +44,8 @@ export const AnalyticsShell: React.FC<{
   children: React.ReactNode;
 }> = ({ title, subtitle, actions, tabs, back, hideTabs, refreshing = false, eyebrow, children }) => {
   const { can } = useAccess();
-  const visible = ANALYTICS_TABS.filter((t) => (!tabs || tabs.includes(t.to)) && can(t.caps));
+  const hasPerm = useLegacyPermission();
+  const visible = ANALYTICS_TABS.filter((t) => (!tabs || tabs.includes(t.to)) && (can(t.caps) || hasPerm(t.perms)));
   return (
     <div className="space-y-4 max-w-[1500px] mx-auto pt-5 sm:pt-7 pb-10">
       {back && <BackButton fallback={back.fallback} label={back.label} />}

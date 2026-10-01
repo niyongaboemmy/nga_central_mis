@@ -38,7 +38,6 @@ import SystemDetails from "./components/SystemDetails";
 import SchemeOfWorkList from "./components/SchemeOfWorkList";
 import SchemeOfWorkCalendar from "./components/SchemeOfWorkCalendar";
 import AcademicCalendar from "./components/AcademicCalendar";
-import LogsHistory from "./components/LogsHistory";
 import DatabaseManagement from "./components/DatabaseManagement";
 import AllTeachersSchemeOfWork from "./components/AllTeachersSchemeOfWork";
 import SchemeDetails from "./components/SchemeDetails";
@@ -884,17 +883,8 @@ function App() {
               }
             />
 
-            {/* Logs History - protected with sidebar */}
-            <Route
-              path="/logs-history"
-              element={
-                <ProtectedRoute>
-                  <SystemLayoutWrapper>
-                    <LogsHistory />
-                  </SystemLayoutWrapper>
-                </ProtectedRoute>
-              }
-            />
+            {/* Logs History moved into Usage & Monitoring → Audit log; keep old links working. */}
+            <Route path="/logs-history" element={<Navigate to="/analytics/audit-log" replace />} />
 
             {/* Database Management - protected with sidebar, further gated by permission + step-up auth inside the page */}
             <Route

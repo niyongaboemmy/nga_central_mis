@@ -32,6 +32,10 @@ The MIS must run as **one** pm2 process: live presence and the dedupe set live i
    | ADMIN (school administrator) | `ANALYTICS_VIEW`, `_LIVE_VIEW`, `_USER_VIEW` (a person's page and live activity), `_LOCATION_VIEW`, `USAGE_INSIGHTS_VIEW`. Not control or settings. |
    | IT Support | `ANALYTICS_VIEW`, `ANALYTICS_LIVE_VIEW` |
 
+   **101 (audit log index).** Adds `ix_activitylog_created` and `ix_activitylog_action_created` to `ActivityLog`, guarded so it can run again. Apply it the same way.
+
+   **Audit log** (`/analytics/audit-log`; the old `/logs-history` redirects there) reads `ActivityLog` through `GET /systems/logs`, `/systems/logs/summary` and `/systems/logs/export.csv` (`VIEW_ALL_LOGS_HISTORY`). All figures cover the whole filtered range, and times are converted to Kigali time in SQL, whatever the database session's time zone is.
+
 2. **Environment** (`backend/.env`; all optional except where noted):
 
    | Variable | Default | Purpose |

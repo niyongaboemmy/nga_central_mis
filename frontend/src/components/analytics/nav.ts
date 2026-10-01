@@ -3,6 +3,7 @@ import {
   Compass,
   Cpu,
   Eye,
+  ScrollText,
   Globe2,
   LayoutDashboard,
   LogIn,
@@ -25,6 +26,8 @@ export interface AnalyticsTab {
   to: string;
   label: string;
   caps: string[];
+  /** Legacy (v1) permissions that also open the page, for pages older than RBAC v2. */
+  perms?: string[];
   icon: LucideIcon;
 }
 
@@ -40,6 +43,7 @@ export const ANALYTICS_TABS: AnalyticsTab[] = [
   { to: "/analytics/locations", label: "Locations", caps: ["ANALYTICS_VIEW"], icon: MapPin },
   { to: "/analytics/technology", label: "Technology", caps: ["ANALYTICS_VIEW"], icon: Cpu },
   { to: "/analytics/explore", label: "Explore", caps: ["ANALYTICS_VIEW"], icon: Compass },
+  { to: "/analytics/audit-log", label: "Audit log", caps: ["VIEW_ALL_LOGS_HISTORY"], perms: ["VIEW_ALL_LOGS_HISTORY"], icon: ScrollText },
   { to: "/analytics/watchlist", label: "Watchlist", caps: ["ANALYTICS_USER_CONTROL"], icon: Eye },
   { to: "/analytics/settings", label: "Settings", caps: ["ANALYTICS_CONFIGURE"], icon: Settings2 },
 ];

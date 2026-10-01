@@ -109,7 +109,7 @@ const SCAN = () => {
       const f = await p.evaluate(SCAN);
       for (const x of f) findings.push({ where, ...x });
     };
-    const routes = ["/analytics", "/analytics/realtime", "/analytics/access", "/analytics/audience", "/analytics/visitors", "/analytics/engagement", "/analytics/apps", "/analytics/retention", "/analytics/locations", "/analytics/technology", "/analytics/explore", "/analytics/watchlist", "/analytics/settings", "/analytics/users/13", "/analytics/ip/::1", "/me/activity"];
+    const routes = ["/analytics", "/analytics/realtime", "/analytics/access", "/analytics/audience", "/analytics/visitors", "/analytics/engagement", "/analytics/apps", "/analytics/retention", "/analytics/locations", "/analytics/technology", "/analytics/explore", "/analytics/watchlist", "/analytics/settings", "/analytics/audit-log", "/analytics/audit-log?view=log", "/analytics/users/13", "/analytics/ip/::1", "/me/activity"];
     if (dev?.h) routes.push(`/analytics/visitors/${dev.h}`);
     for (const r of routes) {
       await p.goto(APP + r, { waitUntil: "networkidle2", timeout: 30000 }).catch(() => {});
@@ -137,8 +137,8 @@ const SCAN = () => {
         await p.keyboard.press("Escape");
       }
       // Dialog buttons on the person pages.
-      if (/users|visitors\/|watchlist/.test(r)) {
-        for (const label of ["Watch", "Message", "Sign out everywhere", "Block device", "New watch"]) {
+      if (/users|visitors\/|watchlist|view=log/.test(r)) {
+        for (const label of ["Watch", "Message", "Sign out everywhere", "Block device", "New watch", "Details"]) {
           const btn = await p.$$("xpath/" + `//button[normalize-space(.)="${label}"]`);
           if (!btn[0]) continue;
           await btn[0].click().catch(() => {});

@@ -26,6 +26,8 @@ interface NavItem {
   requiredCapability?: string | string[];
   /** Submenu. The group shows when any child is visible. */
   children?: NavItem[];
+  /** Legacy permissions that open the item even without `requiredCapability`. */
+  orPermission?: string[];
 }
 
 const Sidebar: React.FC<SidebarProps> = ({
@@ -568,12 +570,13 @@ const Sidebar: React.FC<SidebarProps> = ({
       label: "Usage & Monitoring",
       path: "/analytics",
       icon: <Activity className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
-      requiredCapability: ["ANALYTICS_VIEW", "ANALYTICS_LIVE_VIEW"],
+      // No gate of its own: the group shows when any page in it is open to the viewer.
       children: ANALYTICS_TABS.map((t) => ({
         label: t.label,
         path: t.to,
         icon: <t.icon className="w-3.5 h-3.5" />,
         requiredCapability: t.caps,
+        orPermission: t.perms,
       })),
     },
     {
@@ -641,12 +644,6 @@ const Sidebar: React.FC<SidebarProps> = ({
       requiredPermission: Permissions.MANAGE_SYSTEMS,
     },
     {
-      label: "Logs History",
-      path: "/logs-history",
-      icon: <Activity className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
-      requiredPermission: Permissions.VIEW_ALL_LOGS_HISTORY,
-    },
-    {
       label: "Database Management",
       path: "/database-management",
       icon: <Database className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
@@ -670,7 +667,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   /** Both gates: the v1 permission and, where set, an access-control v2 capability. */
   const isVisible = (item: NavItem): boolean =>
     !!hasPermission(item.requiredPermission) &&
-    (!item.requiredCapability || access.can(item.requiredCapability)) &&
+    (!item.requiredCapability || access.can(item.requiredCapability) || (!!item.orPermission?.length && !!hasPermission(item.orPermission))) &&
     (!item.children || item.children.some(isVisible));
 
   /** A group is "in" when the current page is one of its children (or below one). */

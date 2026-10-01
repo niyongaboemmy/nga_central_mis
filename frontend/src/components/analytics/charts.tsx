@@ -606,9 +606,11 @@ export const Sparkline: React.FC<{ values: number[]; color?: string; height?: nu
 // Heatmap (hour × weekday): sequential, one hue
 // ---------------------------------------------------------------------------
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-export const Heatmap: React.FC<{ grid: { users: number; visitors: number; logins: number; failed: number }[][]; metric: "users" | "logins" | "visitors" }> = ({ grid, metric }) => {
+type HeatCell = number | { users: number; visitors: number; logins: number; failed: number };
+export const Heatmap: React.FC<{ grid: HeatCell[][]; metric: string; onSelect?: (day: number, hour: number) => void }> = ({ grid, metric, onSelect }) => {
   const ink = useInk();
-  const max = Math.max(1, ...grid.flat().map((c) => c[metric]));
+  const val = (c: HeatCell) => (typeof c === "number" ? c : (c as any)[metric] ?? 0);
+  const max = Math.max(1, ...grid.flat().map(val));
   return (
     <div className="overflow-x-auto">
       <table className="text-[10px] border-separate" style={{ borderSpacing: 2 }} aria-label={`${metric} by hour and weekday`}>
@@ -625,12 +627,13 @@ export const Heatmap: React.FC<{ grid: { users: number; visitors: number; logins
             <tr key={d}>
               <th className="font-normal text-slate-600 dark:text-slate-300 pr-1 text-right">{DAYS[d]}</th>
               {row.map((c, h) => {
-                const v = c[metric];
+                const v = val(c);
                 const a = v ? 0.12 + 0.88 * (v / max) : 0;
                 return (
                   <td
                     key={h}
                     title={`${DAYS[d]} ${String(h).padStart(2, "0")}:00 — ${v} ${metric}`}
+                    onClick={onSelect && v ? () => onSelect(d, h) : undefined}
                     className="w-6 h-5 rounded transition-transform hover:scale-125 hover:ring-2 hover:ring-slate-500/60"
                     style={{ background: v ? `rgba(${ink.seq},${a.toFixed(2)})` : ink.dark ? "#1e293b" : "#f1f5f9" }}
                   />

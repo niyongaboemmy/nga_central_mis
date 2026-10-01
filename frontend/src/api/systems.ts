@@ -269,3 +269,57 @@ export const getLogsHistory = async (
     throw error;
   }
 };
+
+// ---------------------------------------------------------------------------
+// Audit log (Usage & Monitoring → Audit log): GET /systems/logs, /logs/summary,
+// /logs/export.csv. Figures always cover the whole filtered range.
+// ---------------------------------------------------------------------------
+export type AuditVerb = "CREATE" | "UPDATE" | "DELETE" | "PUBLISH" | "LOGIN" | "SECURITY" | "AI" | "OTHER";
+
+export interface AuditRow {
+  activity_id: number;
+  user_id: number;
+  actor_id: number | null;
+  action_type: string;
+  verb: AuditVerb;
+  description: string;
+  entity_type: string | null;
+  entity_id: number | null;
+  metadata: string | null;
+  /** Wall-clock time as stored, "YYYY-MM-DD HH:MM:SS". */
+  created_at: string;
+  user_name: string | null;
+  user_username: string | null;
+  actor_name: string | null;
+  actor_username: string | null;
+}
+
+export interface AuditSummary {
+  total: number;
+  people: number;
+  gran: "hour" | "day";
+  series: { bucket: string; count: number }[];
+  verbs: { verb: AuditVerb; count: number }[];
+  actions: { action: string; verb: AuditVerb; count: number }[];
+  entities: { entity: string | null; count: number }[];
+  users: { user_id: number; name: string; username: string | null; count: number; last_at: string }[];
+  heatmap: number[][];
+  busiest: { bucket: string; count: number } | null;
+  facets: { actions: { value: string; verb: AuditVerb; count: number }[]; entities: { value: string; count: number }[] };
+  dateRange: { start_date: string; end_date: string };
+}
+
+export const auditApi = {
+  list: async (qs: string) =>
+    (await api.get<{ logs: AuditRow[]; pagination: { total: number; limit: number; offset: number; hasMore: boolean } }>(`/systems/logs?${qs}`)).data,
+  summary: async (qs: string) => (await api.get<AuditSummary>(`/systems/logs/summary?${qs}`)).data,
+  csv: async (qs: string, filename: string) => {
+    const r = await api.get(`/systems/logs/export.csv?${qs}`, { responseType: "blob" });
+    const url = URL.createObjectURL(r.data as Blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 2_000);
+  },
+};

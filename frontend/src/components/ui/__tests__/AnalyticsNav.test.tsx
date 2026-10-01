@@ -12,9 +12,10 @@ import { ThemeProvider } from "../../../contexts/ThemeContext";
  * expandable menu, gated per page by capability, and selects are searchable.
  */
 let caps: string[] = [];
+let legacyPerms: string[] = [];
 
 vi.mock("../../../contexts/UserContext", () => ({
-  useUser: () => ({ user: { user: { user_id: 1 }, roles: [] }, logout: vi.fn() }),
+  useUser: () => ({ user: { user: { user_id: 1 }, roles: [{ permissions: legacyPerms.map((name) => ({ name })) }] }, logout: vi.fn() }),
 }));
 vi.mock("../../../hooks/useAccess", () => ({
   useAccess: () => ({
@@ -32,6 +33,7 @@ const renderSidebar = (path: string) =>
 
 beforeEach(() => {
   caps = [];
+  legacyPerms = [];
   localStorage.clear();
 });
 
@@ -62,6 +64,20 @@ describe("Usage & Monitoring sidebar group", () => {
     expect(within(list).getAllByRole("button")).toHaveLength(13);
     await userEvent.click(screen.getByRole("button", { name: /Usage & Monitoring/ }));
     expect(screen.getByRole("button", { name: /Usage & Monitoring/ })).toHaveAttribute("aria-expanded", "false");
+  });
+});
+
+describe("Audit log in the group", () => {
+  it("opens the group for someone who may only read the audit log", () => {
+    legacyPerms = ["VIEW_ALL_LOGS_HISTORY"];
+    renderSidebar("/analytics/audit-log");
+    const list = screen.getByRole("list", { name: "Usage & Monitoring" });
+    const items = within(list).getAllByRole("button");
+    expect(items).toHaveLength(1);
+    expect(items[0]).toHaveTextContent("Audit log");
+    expect(items[0]).toHaveAttribute("aria-current", "page");
+    // The old top-level entry is gone.
+    expect(screen.queryByRole("button", { name: /Logs History/ })).toBeNull();
   });
 });
 
