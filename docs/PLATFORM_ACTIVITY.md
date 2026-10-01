@@ -60,6 +60,14 @@ The MIS must run as **one** pm2 process: live presence and the dedupe set live i
    ```
    The MIS picks up new files within a minute without a restart. Settings → Health shows the database age. Without the files, places show as "Unknown" and nothing else is affected.
 
+   IPs seen while the files were missing stay "Unknown" until they are resolved again. Run this once after the first install, and again after changing provider (idempotent; `--dry-run` only reports):
+   ```bash
+   node dist/scripts/activityRegeo.js            # dev: npx ts-node src/scripts/activityRegeo.ts
+   ```
+   It updates the place of every known IP everywhere it is stored (events, sessions, sign-ins, devices, people), then rebuilds the daily rollups from the earliest affected day.
+
+   **Page names.** Each app publishes its page catalog to `PUT /monitor/catalog/:app` when it starts, and the relay retries until the MIS accepts it. Until a catalog arrives, the console shows a readable form of the page key ("Attendance calendar").
+
 6. **Backfill sign-in history** (once, idempotent):
    ```bash
    node dist/scripts/activityBackfill.js        # dev: npx ts-node src/scripts/activityBackfill.ts

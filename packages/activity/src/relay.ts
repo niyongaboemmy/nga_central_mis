@@ -35,7 +35,7 @@ export interface RelayOptions {
   maxQueue?: number;
   timeoutMs?: number;
   fetchImpl?: typeof fetch;
-  logger?: { warn: (...a: any[]) => void; error: (...a: any[]) => void };
+  logger?: { warn: (...a: any[]) => void; error: (...a: any[]) => void; info?: (...a: any[]) => void };
 }
 
 interface Batch {
@@ -230,20 +230,36 @@ export const createActivityRelay = (opts: RelayOptions) => {
     if (serverEvents.length > maxQueue) serverEvents.shift();
   };
 
-  /** Publish this app's feature catalog (call once on boot; failures are only logged). */
-  const pushCatalog = async (catalog: { version?: string; features: unknown[] }) => {
+  /**
+   * Publish this app's feature catalog (call once on boot). A failed push -- the MIS
+   * restarting, or not yet running a build that accepts catalogs -- is retried with
+   * backoff (30 s, 1, 2, 5 min, then every 15 min) until it succeeds, so the order in
+   * which apps are deployed never leaves the console showing raw page keys.
+   */
+  const CATALOG_RETRY_MS = [30_000, 60_000, 120_000, 300_000];
+  const pushCatalog = async (catalog: { version?: string; features: unknown[] }, attempt = 0): Promise<boolean> => {
+    let ok = false;
     try {
       const r = await doFetch(`${base}/monitor/catalog/${opts.app}`, {
         method: "PUT",
         headers: { Authorization: auth, "Content-Type": "application/json" },
         body: JSON.stringify(catalog),
       } as any);
-      if (!r.ok) log.warn(`[activity-relay] catalog push answered ${r.status}`);
-      return r.ok;
+      ok = r.ok;
+      // 403 means this client may not publish this app's catalog: retrying cannot help.
+      if (!ok) log.warn(`[activity-relay] catalog push answered ${r.status}${r.status === 403 ? "" : "; will retry"}`);
+      if (!ok && r.status === 403) return false;
     } catch (err: any) {
-      log.warn(`[activity-relay] catalog push failed: ${err?.message ?? err}`);
-      return false;
+      log.warn(`[activity-relay] catalog push failed: ${err?.message ?? err}; will retry`);
     }
+    if (!ok) {
+      const delay = CATALOG_RETRY_MS[attempt] ?? 900_000;
+      const t = setTimeout(() => void pushCatalog(catalog, attempt + 1), delay);
+      (t as any).unref?.();
+    } else if (attempt > 0) {
+      log.info?.(`[activity-relay] catalog published after ${attempt + 1} attempts`);
+    }
+    return ok;
   };
 
   /** The device id a request carries (shared cookie or SDK header), for server-side `track`. */

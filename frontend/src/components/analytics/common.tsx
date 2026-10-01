@@ -72,7 +72,8 @@ export const timeAgo = (iso: string | number, now = Date.now()) => {
   const t = typeof iso === "number" ? iso : new Date(iso).getTime();
   const s = Math.max(0, Math.round((now - t) / 1000));
   if (s < 60) return `${s}s`;
-  const m = Math.round(s / 60);
+  // Whole minutes elapsed (90 s is "1 min", not "2 min"), like any clock.
+  const m = Math.floor(s / 60);
   if (m < 60) return `${m} min`;
   const h = Math.floor(m / 60);
   if (h < 24) return `${h} h ${m % 60} min`;
@@ -110,8 +111,21 @@ export const useFeatureLabels = () => {
     if (!key) return route ?? "—";
     if (labels[key]) return labels[key].label;
     if (key.endsWith(".other")) return route ? `Other: ${route}` : "Other page";
-    return key;
+    return humanizeFeature(key);
   };
+};
+
+/**
+ * A readable name for a page key the catalog doesn't (yet) describe:
+ * "tendo.attendance_calendar" → "Attendance calendar". The app itself is shown
+ * next to it by its colour, so the prefix is dropped.
+ */
+export const humanizeFeature = (key: string) => {
+  const parts = key.split(".");
+  const rest = (APPS as string[]).includes(parts[0]) && parts.length > 1 ? parts.slice(1) : parts;
+  const words = rest.join(" ").replace(/[_-]+/g, " ").replace(/([a-z])([A-Z])/g, "$1 $2").trim().toLowerCase();
+  const fixed = words.replace(/\b(sso|ai|otp|pdf|id|ui|mis|lo)\b/g, (w) => w.toUpperCase());
+  return fixed ? fixed.charAt(0).toUpperCase() + fixed.slice(1) : key;
 };
 
 // ---------------------------------------------------------------------------

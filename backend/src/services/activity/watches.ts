@@ -8,6 +8,7 @@ import { activityBus, ActivitySignal, clock, TZ_OFFSET_MS } from "./runtime";
 import { getSettings } from "./settings";
 import { visitorCode } from "./tokens";
 import { holdersOf } from "./userMonitor";
+import { lookupGeo } from "./geoip";
 
 /**
  * Watchlist and alerts (plan §10.4).
@@ -278,7 +279,27 @@ export const fireAlert = async (a: AlertInput) => {
     });
   }
   await exec(`UPDATE AnalyticsAlert SET delivered = CAST(? AS JSON) WHERE id = ?`, [JSON.stringify(delivered), id]);
-  activityBus.emitSignal({ type: "live_event", event: { at: new Date(now).toISOString(), kind: "alert", app: "mis", user_id: a.targetUserId ?? null, user_name: null, user_type: null, device_id: a.targetDeviceId ?? null, visitor_code: null, ip: a.ip ?? null, place: null, isp: null, detail: { title: a.title, severity: a.severity } } });
+  // Same who / where as every other live event, so the console can say whose alert it is.
+  if (a.targetUserId) await loadUsers([a.targetUserId]).catch(() => undefined);
+  const who = cachedUser(a.targetUserId);
+  const geo = lookupGeo(a.ip ?? null);
+  activityBus.emitSignal({
+    type: "live_event",
+    event: {
+      at: new Date(now).toISOString(),
+      kind: "alert",
+      app: (a.payload?.app as string) ?? "mis",
+      user_id: a.targetUserId ?? null,
+      user_name: who?.name ?? null,
+      user_type: who?.userType ?? null,
+      device_id: a.targetDeviceId ?? null,
+      visitor_code: a.targetDeviceId ? visitorCode(a.targetDeviceId) : null,
+      ip: a.ip ?? null,
+      place: [geo.city, geo.country_code].filter(Boolean).join(", ") || null,
+      isp: geo.isp,
+      detail: { title: a.title, severity: a.severity, rule: a.rule, alert_id: id },
+    },
+  });
   return id;
 };
 

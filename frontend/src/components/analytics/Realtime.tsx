@@ -1,7 +1,7 @@
-import React, { lazy, Suspense, useMemo, useState } from "react";
+import React, { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { ChevronDown, ChevronRight, Radio, Search, Table2, BarChart3, LogIn, LogOut, ShieldAlert, AppWindow, Star, UserX } from "lucide-react";
+import { ChevronDown, ChevronRight, Radio, Search, Table2, BarChart3, LogIn, LogOut, ShieldAlert, AppWindow, Star, UserX, BellRing, Pause, Play } from "lucide-react";
 import { useLiveStream } from "../../hooks/useLiveStream";
 import { useAccess } from "../../hooks/useAccess";
 import { useTheme } from "../../contexts/ThemeContext";
@@ -396,8 +396,12 @@ const Roster: React.FC<{ people: LivePerson[]; label: (k: string | null, r?: str
 };
 
 // ---------------------------------------------------------------------------
-// Live events
+// Live events: filterable, pausable, every row links to who / where it came from
 // ---------------------------------------------------------------------------
+type EventGroup = "all" | "signin" | "failed" | "alert" | "launch" | "other";
+const groupOf = (k: string): EventGroup =>
+  k === "alert" ? "alert" : k === "login_failed" || k === "password_reset_requested" ? "failed" : k === "login_success" || k === "logout" || k === "otp_sent" ? "signin" : k === "app_launch" ? "launch" : "other";
+
 const EVENT_TEXT: Record<string, { icon: React.ElementType; text: (e: LiveEvent) => string; tone?: string }> = {
   login_success: { icon: LogIn, text: () => "signed in" },
   login_failed: { icon: ShieldAlert, text: (e) => `failed sign-in${e.detail?.username_attempted ? ` as “${e.detail.username_attempted}”` : ""}${e.detail?.reason ? ` (${String(e.detail.reason).replace(/_/g, " ")})` : ""}`, tone: "text-rose-700 dark:text-rose-300" },
@@ -407,33 +411,118 @@ const EVENT_TEXT: Record<string, { icon: React.ElementType; text: (e: LiveEvent)
   password_reset_requested: { icon: ShieldAlert, text: () => "asked for a password reset" },
   account_suspended: { icon: UserX, text: () => "was suspended" },
 };
+const SEVERITY: Record<string, { label: string; cls: string }> = {
+  critical: { label: "Critical", cls: "bg-rose-100 text-rose-800 ring-rose-600/20 dark:bg-rose-900/40 dark:text-rose-100 dark:ring-rose-400/30" },
+  warning: { label: "Warning", cls: "bg-amber-100 text-amber-900 ring-amber-600/25 dark:bg-amber-900/40 dark:text-amber-100 dark:ring-amber-400/30" },
+  info: { label: "Info", cls: "bg-sky-100 text-sky-900 ring-sky-600/20 dark:bg-sky-900/40 dark:text-sky-100 dark:ring-sky-400/30" },
+};
 
-const EventFeed: React.FC<{ events: LiveEvent[] }> = ({ events }) => {
-  if (!events.length) return <Empty>Sign-ins, app launches and key actions appear here as they happen.</Empty>;
+export const EventFeed: React.FC<{ events: LiveEvent[] }> = ({ events }) => {
+  const [group, setGroup] = useState<EventGroup>("all");
+  const [paused, setPaused] = useState<LiveEvent[] | null>(null);
+  const [, tick] = useState(0);
+  useEffect(() => {
+    const t = window.setInterval(() => tick((n) => n + 1), 15_000);
+    return () => window.clearInterval(t);
+  }, []);
+  const source = paused ?? events;
+  const waiting = paused ? Math.max(0, events.length - paused.length) : 0;
+  const counts = useMemo(() => {
+    const c: Record<EventGroup, number> = { all: source.length, signin: 0, failed: 0, alert: 0, launch: 0, other: 0 };
+    for (const e of source) c[groupOf(e.kind)]++;
+    return c;
+  }, [source]);
+  const shown = group === "all" ? source : source.filter((e) => groupOf(e.kind) === group);
+  const chips: { key: EventGroup; label: string }[] = [
+    { key: "all", label: "All" },
+    { key: "signin", label: "Sign-ins" },
+    { key: "failed", label: "Failed" },
+    { key: "alert", label: "Alerts" },
+    { key: "launch", label: "App launches" },
+    { key: "other", label: "Other" },
+  ];
+  const now = Date.now();
+
   return (
-    <ol className="space-y-2 max-h-[420px] overflow-auto focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-600 rounded" aria-live="polite" aria-label="Live events" tabIndex={0}>
-      {events.map((e, i) => {
-        const def = EVENT_TEXT[e.kind] ?? { icon: Star, text: () => e.kind.replace(/[._]/g, " ") };
-        const Icon = def.icon;
-        const who = e.user_name ?? (e.visitor_code ? `Visitor ${e.visitor_code}` : "Someone");
-        return (
-          <li key={`${e.at}-${i}`} className="flex gap-2 text-sm an-rise">
-            <Icon className={`w-4 h-4 mt-0.5 shrink-0 ${def.tone ?? "text-slate-500"}`} aria-hidden />
-            <div className="min-w-0">
-              <div className={def.tone}>
-                <span className="font-medium">{who}</span> {def.text(e)}
-              </div>
-              <div className="text-xs text-slate-600 dark:text-slate-300 truncate">
-                {new Date(e.at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
-                {e.ip ? ` · ${e.ip}` : ""}
-                {e.place ? ` · ≈ ${e.place}` : ""}
-                {e.isp ? ` · ${e.isp}` : ""}
-              </div>
-            </div>
-          </li>
-        );
-      })}
-    </ol>
+    <div className="space-y-2">
+      <div className="flex flex-wrap items-center gap-1.5">
+        <div role="radiogroup" aria-label="Show events" className="flex flex-wrap gap-1">
+          {chips.filter((c) => c.key === "all" || counts[c.key] > 0).map((c) => (
+            <button
+              key={c.key}
+              role="radio"
+              aria-checked={group === c.key}
+              onClick={() => setGroup(c.key)}
+              className={`inline-flex items-center gap-1 rounded-lg px-2 py-0.5 text-[11px] font-medium border transition-colors ${
+                group === c.key ? "border-brand-600 bg-brand-50 dark:bg-slate-700 text-text-primary-light dark:text-text-primary-dark" : "border-border-light dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-surface-light dark:hover:bg-slate-800"
+              }`}
+            >
+              {c.label}{" "}
+              <span className="tabular-nums text-slate-600 dark:text-slate-300">{counts[c.key]}</span>
+            </button>
+          ))}
+        </div>
+        <button
+          className="ml-auto inline-flex items-center gap-1 rounded-lg px-2 py-0.5 text-[11px] font-medium border border-border-light dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-surface-light dark:hover:bg-slate-800"
+          onClick={() => setPaused((p) => (p ? null : events))}
+          aria-pressed={!!paused}
+        >
+          {paused ? <Play className="w-3 h-3" aria-hidden /> : <Pause className="w-3 h-3" aria-hidden />}
+          {paused ? `Resume${waiting ? ` (${waiting} new)` : ""}` : "Pause"}
+        </button>
+      </div>
+      {!shown.length ? (
+        <Empty>{source.length ? "No events of this kind yet." : "Sign-ins, app launches, alerts and key actions appear here as they happen."}</Empty>
+      ) : (
+        <ol className="space-y-1 max-h-[420px] overflow-auto pr-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-600 rounded" aria-live={paused ? "off" : "polite"} aria-label="Live events" tabIndex={0}>
+          {shown.map((e, i) => {
+            const isAlert = e.kind === "alert";
+            const def = isAlert ? { icon: BellRing, text: () => "", tone: "" } : EVENT_TEXT[e.kind] ?? { icon: Star, text: () => e.kind.replace(/[._]/g, " ") };
+            const Icon = def.icon;
+            const sev = SEVERITY[String(e.detail?.severity ?? "info")] ?? SEVERITY.info;
+            const who = e.user_name ?? (e.visitor_code ? `Visitor ${e.visitor_code}` : e.user_id ? `User ${e.user_id}` : "Someone");
+            const href = e.user_id ? `/analytics/users/${e.user_id}` : e.device_id ? `/analytics/visitors/${e.device_id}` : e.ip ? `/analytics/ip/${e.ip}` : null;
+            const body = (
+              <>
+                <span className={`mt-0.5 shrink-0 inline-flex items-center justify-center w-6 h-6 rounded-lg ${isAlert ? sev.cls : "bg-slate-100 dark:bg-slate-800"} ${def.tone ?? "text-slate-600 dark:text-slate-300"}`} aria-hidden>
+                  <Icon className="w-3.5 h-3.5" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  {isAlert ? (
+                    <span className="block">
+                      <span className={`mr-1.5 inline-flex rounded-full px-1.5 py-px text-[10px] font-semibold ring-1 ring-inset align-middle ${sev.cls}`}>{sev.label}</span>
+                      <span className="font-medium">{String(e.detail?.title ?? "Watch alert")}</span>
+                    </span>
+                  ) : (
+                    <span className={`block ${def.tone ?? ""}`}>
+                      <span className="font-medium">{who}</span> {def.text(e)}
+                    </span>
+                  )}
+                  <span className="block text-xs text-slate-600 dark:text-slate-300 truncate">
+                    <time dateTime={e.at} title={new Date(e.at).toLocaleString()}>{timeAgo(e.at, now)} ago</time>
+                    {e.app && e.app !== "mis" ? ` · ${APP_META[e.app]?.label ?? e.app}` : ""}
+                    {e.ip ? ` · ${e.ip}` : ""}
+                    {e.place ? ` · ≈ ${e.place}` : ""}
+                    {e.isp ? ` · ${e.isp}` : ""}
+                  </span>
+                </span>
+              </>
+            );
+            return (
+              <li key={`${e.at}-${e.kind}-${i}`} className="an-rise">
+                {href ? (
+                  <Link to={href} className="flex gap-2 text-sm rounded-lg px-1.5 py-1.5 -mx-1.5 transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/60">
+                    {body}
+                  </Link>
+                ) : (
+                  <div className="flex gap-2 text-sm px-1.5 py-1.5 -mx-1.5">{body}</div>
+                )}
+              </li>
+            );
+          })}
+        </ol>
+      )}
+    </div>
   );
 };
 
