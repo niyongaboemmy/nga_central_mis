@@ -13,21 +13,12 @@ import { Skeleton } from "../ui/primitives";
 import WeekRail from "./WeekRail";
 import RecipeBuilder from "./RecipeBuilder";
 import StudentPreview from "./StudentPreview";
+import { useViewportFit } from "../ui/useViewportFit";
 import SourcesStep from "./SourcesStep";
 import GenerationBoard from "./GenerationBoard";
 import ReviewWorkspace from "./ReviewWorkspace";
 import { useRunStream } from "./useRunStream";
-import {
-  cloneBlueprint,
-  currentWeek,
-  formatEstimate,
-  isRunActive,
-  quotaLeftPct,
-  selectWeeks,
-  StepId,
-  STEPS,
-  WeekFilter,
-} from "./studioModel";
+import { cloneBlueprint, currentWeek, formatEstimate, isRunActive, quotaLeftPct, selectWeeks, StepId, STEPS, WeekFilter, weekIsDone } from "./studioModel";
 
 const DRAFT_KEY = (courseId: number) => `studio:blueprint:${courseId}`;
 const readDraft = (courseId: number): Blueprint | null => {
@@ -73,6 +64,10 @@ const LessonStudioPage: React.FC = () => {
   const [estimating, setEstimating] = useState(false);
   const [busy, setBusy] = useState(false);
   const runId = params.get("run") ? Number(params.get("run")) : null;
+  // A fixed frame under the app bar: only the week list, the step content and the preview
+  // scroll — never the page (the header and stepper stay in view).
+  const [frameEl, setFrameEl] = useState<HTMLDivElement | null>(null);
+  const frameHeight = useViewportFit(frameEl, { gap: 8 });
   const stepperRef = useRef<HTMLElement>(null);
   // On a phone the stepper scrolls sideways: keep the current step in view.
   useEffect(() => {
@@ -170,6 +165,17 @@ const LessonStudioPage: React.FC = () => {
     } finally {
       setBusy(false);
     }
+  };
+
+  // A finished round: forget it and go back to choosing weeks (the recipe is kept).
+  const startAgain = async () => {
+    setParams((p) => { p.delete("run"); return p; }, { replace: true });
+    const d = await load();
+    if (d) {
+      setFilter("gaps");
+      setSelected(new Set(selectWeeks(d.weeks, "gaps")));
+    }
+    setStep("weeks");
   };
 
   const control = async (action: "pause" | "resume" | "cancel" | "retry-failed") => {
@@ -303,7 +309,7 @@ const LessonStudioPage: React.FC = () => {
   })();
 
   return (
-    <div className="flex flex-col h-[calc(100dvh-4rem)] overflow-hidden pt-4">
+    <div ref={setFrameEl} className="flex flex-col overflow-hidden pt-4" style={{ height: frameHeight ?? "calc(100dvh - 4rem)" }}>
       {promptUI}
       {/* Header */}
       <div className="flex-shrink-0">
@@ -360,7 +366,7 @@ const LessonStudioPage: React.FC = () => {
                     <span className={on ? "sm:hidden" : ""}>{s.short}</span>
                     {s.id === "review" && reviewCount > 0 && <span className="px-1.5 rounded-pill bg-success-700 hover:brightness-110 text-white text-[10px]">{reviewCount}</span>}
                   </button>
-                  {i < STEPS.length - 1 && <span className={`w-3 h-px ${done ? "bg-brand-300 dark:bg-brand-500/40" : "bg-gray-200 dark:bg-white/10"}`} aria-hidden />}
+                  {i < STEPS.length - 1 && <span className={`w-3 h-px ${done ? "bg-brand-200 dark:bg-brand-500/40" : "bg-gray-200 dark:bg-white/10"}`} aria-hidden />}
                 </li>
               );
             })}
@@ -424,6 +430,23 @@ const LessonStudioPage: React.FC = () => {
                       </div>
                     ))}
                   </div>
+                  {(() => {
+                    const updates = selectedWeeks.filter(weekIsDone);
+                    if (!updates.length) return null;
+                    return (
+                      <div className="mt-4 el-card p-3 flex items-start gap-3" role="note">
+                        <RotateCcw className="w-5 h-5 mt-0.5 flex-shrink-0 text-warning-700 dark:text-warning-500" aria-hidden />
+                        <div className="text-sm">
+                          <p className="font-semibold text-gray-900 dark:text-white">
+                            {updates.length} chosen week{updates.length === 1 ? " is" : "s are"} already done — {updates.length === 1 ? "it" : "they"} will be updated
+                          </p>
+                          <p className="text-slate-600 dark:text-slate-300">
+                            The AI drafts a fresh version of {updates.map((w) => w.entry.week_number).filter(Boolean).join(", ")}. Students keep the current content until you approve the update; approving it replaces the AI-made parts (your own notes stay, and students' past work is kept).
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })()}
                   {estimate && estimate.skipped.length > 0 && (
                     <p className="mt-3 text-sm text-warning-700 dark:text-warning-500">{estimate.skipped.length} chosen week(s) have no topic or criteria and will be skipped.</p>
                   )}
@@ -513,6 +536,9 @@ const LessonStudioPage: React.FC = () => {
                       </div>
                     </div>
                   )}
+                  {run && run.run.mode !== "PREVIEW" && !runActive && (
+                    <RoundDone show compact pending={reviewCount} status={run.run.status} onStartAgain={startAgain} onOpenBuilder={() => navigate(builderRoutes.build(cid))} onReview={() => goto("review")} />
+                  )}
                   {run && run.run.mode !== "PREVIEW" && (
                     <GenerationBoard run={run} connected={connected} busy={busy} onControl={control} onReviewWeek={(sid) => { setFocused(sid); goto("review"); }} onLeave={() => navigate(builderRoutes.build(cid))} />
                   )}
@@ -527,7 +553,10 @@ const LessonStudioPage: React.FC = () => {
                   ) : (
                     <p className="text-sm text-slate-600 dark:text-slate-300">Start a run to review drafts.</p>
                   )}
-                  <button onClick={() => navigate(builderRoutes.build(cid))} className="min-h-[44px] px-4 rounded-pill el-chip text-sm font-medium">Open the course builder</button>
+                  <RoundDone show={!!run && !runActive && reviewCount === 0} status={run?.run.status} onStartAgain={startAgain} onOpenBuilder={() => navigate(builderRoutes.build(cid))} />
+                  {!(run && !runActive && reviewCount === 0) && (
+                    <button onClick={() => navigate(builderRoutes.build(cid))} className="min-h-[44px] px-4 rounded-pill el-chip text-sm font-medium">Open the course builder</button>
+                  )}
                 </section>
               )}
             </motion.div>
@@ -555,6 +584,34 @@ const LessonStudioPage: React.FC = () => {
           </button>
         </div>
       )}
+    </div>
+  );
+};
+
+/** The end of a round: everything drafted was dealt with (or the run ended) — start a new one. */
+const RoundDone: React.FC<{ show: boolean; compact?: boolean; pending?: number; status?: string; onStartAgain: () => void; onOpenBuilder: () => void; onReview?: () => void }> = ({ show, compact, pending = 0, status, onStartAgain, onOpenBuilder, onReview }) => {
+  if (!show) return null;
+  return (
+    <div className={`el-card ${compact ? "p-3" : "p-4"} flex flex-wrap items-center gap-3`} role="status">
+      <RotateCcw className="w-5 h-5 text-brand-600 dark:text-brand-200 flex-shrink-0" aria-hidden />
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-semibold text-gray-900 dark:text-white">
+          {status === "CANCELLED" ? "This run was stopped" : status === "FAILED" ? "This run couldn't draft anything" : pending > 0 ? "This run has finished" : "This round is complete"}
+        </p>
+        <p className="text-xs text-slate-600 dark:text-slate-300">
+          {pending > 0 ? `${pending} draft${pending === 1 ? "" : "s"} still wait for your review. ` : status === "CANCELLED" || status === "FAILED" ? "" : "Everything drafted has been reviewed. "}
+          Start again to draft or update more weeks — your recipe is kept.
+        </p>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {pending > 0 && onReview && (
+          <button onClick={onReview} className="min-h-[44px] px-4 rounded-pill el-chip text-sm font-semibold">Review {pending}</button>
+        )}
+        <button onClick={onOpenBuilder} className="min-h-[44px] px-4 rounded-pill el-chip text-sm font-medium">Open the course builder</button>
+        <button onClick={onStartAgain} className="inline-flex items-center gap-1.5 min-h-[44px] px-4 rounded-pill bg-brand-600 hover:bg-brand-700 text-white text-sm font-semibold shadow-soft">
+          <RotateCcw className="w-4 h-4" aria-hidden /> Start again
+        </button>
+      </div>
     </div>
   );
 };

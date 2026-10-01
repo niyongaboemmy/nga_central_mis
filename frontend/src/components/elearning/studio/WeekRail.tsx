@@ -1,7 +1,7 @@
 import React from "react";
 import { Check, Target } from "lucide-react";
 import type { WeekBundle } from "../../../api/studio";
-import { termReadiness, WEEK_STATE_LABEL, WeekFilter, weekSelectable } from "./studioModel";
+import { termReadiness, WEEK_STATE_LABEL, WeekFilter, weekIsDone, weekSelectable } from "./studioModel";
 
 const STATE_DOT: Record<WeekBundle["readiness"]["state"], string> = {
   EMPTY: "bg-gray-300 dark:bg-white/20",
@@ -89,7 +89,9 @@ export const WeekRail: React.FC<{
         </div>
       )}
       </div>
-      <ul className="flex-1 overflow-y-auto p-1.5 space-y-0.5" aria-label="Weeks of the scheme of work">
+      {/* relative: the rows' sr-only text is absolutely positioned — without a positioned
+          ancestor inside this scroller it escaped the clipping and made the whole page scroll. */}
+      <ul className="relative flex-1 overflow-y-auto p-1.5 space-y-0.5" aria-label="Weeks of the scheme of work">
         {weeks.map((w) => {
           const sid = w.section?.section_id ?? null;
           const can = weekSelectable(w);
@@ -117,6 +119,11 @@ export const WeekRail: React.FC<{
                   <span className="flex items-center gap-1.5">
                     <span className="text-sm font-semibold text-gray-900 dark:text-white">{w.entry.week_number || "Week"}</span>
                     {sid === nowSectionId && <span className="px-1.5 rounded-pill bg-brand-600 text-white text-[10px] font-semibold">This week</span>}
+                    {!readOnly && isSel && weekIsDone(w) && (
+                      <span className="px-1.5 rounded-pill el-chip-warning text-[10px] font-semibold" title="Already done: the AI drafts an updated version that replaces the current one when you approve it">
+                        Update
+                      </span>
+                    )}
                     <span className="flex-1" />
                     {sid !== null && badge?.(sid)}
                   </span>

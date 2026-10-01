@@ -142,8 +142,11 @@ const SharedLessonNoteViewPage: React.FC<Props> = ({ noteId, onBack, backLabel }
   const embedded = noteId !== undefined;
   /** Chrome offsets: standalone sticks to the top of the window, embedded has to
    *  clear the app navbar that is still above it. */
-  const topOffset = embedded ? "top-16" : "top-0";
-  const railTop = embedded ? "top-32" : "top-[4.5rem]";
+  // Embedded in a course: on phones the window scrolls (sticky under the 4rem app bar);
+  // from lg the course page scrolls its own centre column, so sticky is relative to that.
+  const topOffset = embedded ? "top-16 lg:top-0" : "top-0";
+  const progressTop = embedded ? "top-16" : "top-0";
+  const railTop = embedded ? "top-16" : "top-[4.5rem]";
 
   // ---------------------------------------------------------------- load
 
@@ -486,7 +489,7 @@ const SharedLessonNoteViewPage: React.FC<Props> = ({ noteId, onBack, backLabel }
       } ${embedded ? "" : "min-h-screen bg-gray-100 dark:bg-black"} transition-[padding] duration-300`}
     >
       {/* Reading progress — the one always-visible signal of how far in you are. */}
-      <div className={`fixed ${topOffset} left-0 right-0 h-1 z-30 bg-transparent print:hidden`}>
+      <div className={`fixed ${progressTop} left-0 right-0 h-1 z-30 bg-transparent print:hidden`}>
         <div
           className="h-full bg-brand-500 transition-[width] duration-150"
           style={{ width: `${Math.round(progress * 100)}%` }}
@@ -506,7 +509,8 @@ const SharedLessonNoteViewPage: React.FC<Props> = ({ noteId, onBack, backLabel }
             <div className="mx-auto flex max-w-[1600px] items-center gap-2 px-4 py-2.5 sm:px-6">
               <button
                 onClick={goBack}
-                className="flex items-center gap-1.5 px-2.5 py-2 rounded-lg text-sm font-medium text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-gray-100 hover:bg-gray-200/70 dark:hover:bg-gray-800 flex-shrink-0 transition-colors"
+                aria-label={`Back to ${backLabel || "Library"}`}
+                className="flex items-center gap-1.5 min-h-[44px] min-w-[44px] px-2.5 py-2 rounded-lg text-sm font-medium text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-gray-100 hover:bg-gray-200/70 dark:hover:bg-gray-800 flex-shrink-0 transition-colors"
               >
                 <ArrowLeft className="w-4 h-4" />
                 <span className="hidden sm:inline">{backLabel || "Library"}</span>
@@ -526,7 +530,7 @@ const SharedLessonNoteViewPage: React.FC<Props> = ({ noteId, onBack, backLabel }
                     {note.subject_name}
                     {note.teacher_name ? ` · ${note.teacher_name}` : ""}
                     {note.reading_minutes ? ` · ${note.reading_minutes} min read` : ""}
-                    <span className="text-gray-400 dark:text-gray-500">
+                    <span className="text-slate-600 dark:text-slate-300">
                       {bookMode
                         ? ` · page ${page + 1} of ${totalPages}`
                         : ` · ${Math.round(progress * 100)}% read`}
@@ -619,10 +623,11 @@ const SharedLessonNoteViewPage: React.FC<Props> = ({ noteId, onBack, backLabel }
                 <button
                   onClick={() => setAiOpen((o) => !o)}
                   aria-pressed={aiOpen}
+                  aria-label="Ask AI about this lesson"
                   className={`ml-1 inline-flex min-h-[38px] items-center gap-1.5 rounded-pill px-4 text-sm font-semibold transition-colors ${
                     aiOpen
                       ? "el-chip-brand"
-                      : "bg-brand-500 text-white shadow-soft hover:bg-brand-600"
+                      : "bg-brand-600 text-white shadow-soft hover:bg-brand-700"
                   }`}
                 >
                   <Sparkles className="w-4 h-4" />
@@ -818,7 +823,7 @@ const SharedLessonNoteViewPage: React.FC<Props> = ({ noteId, onBack, backLabel }
             <div className="mt-10 w-full max-w-[794px] print:hidden">
               <div className="mb-4 flex items-center gap-3">
                 <span className="h-px flex-1 bg-gray-200 dark:bg-white/10" />
-                <span className="text-[11px] font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300">
                   End of note
                 </span>
                 <span className="h-px flex-1 bg-gray-200 dark:bg-white/10" />

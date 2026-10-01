@@ -58,7 +58,7 @@ const FollowStudent: React.FC<{
       layout
       initial={{ opacity: 0, y: -4 }}
       animate={{ opacity: 1, y: 0 }}
-      className="mt-3 rounded-2xl border border-brand-300 bg-brand-50/60 p-3 dark:border-brand-500/40 dark:bg-brand-500/10"
+      className="mt-3 rounded-2xl border border-brand-200 bg-brand-50/60 p-3 dark:border-brand-500/40 dark:bg-brand-500/10"
     >
       <div className="flex items-start gap-2">
         <div className="min-w-0 flex-1">

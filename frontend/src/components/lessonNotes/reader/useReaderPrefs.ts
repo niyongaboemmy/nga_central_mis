@@ -30,7 +30,9 @@ const DEFAULTS: ReaderPrefs = {
   // 1 = the platform body size. The reader used to open at 1.15, so the size
   // control read "115%" before anyone had touched it — a default should read
   // as 100%, and a student who wants larger text can still walk it up.
-  fontScale: 0.8,
+  // 100%: body text at the platform size (16px). 80% (v4) read as ~12.8px on desktop — below
+  // a comfortable floor for long lessons; students can still step it down with A−.
+  fontScale: 1,
   lineHeight: 1.75,
   font: "reading",
   paper: "auto",

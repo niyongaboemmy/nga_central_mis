@@ -91,7 +91,7 @@ const ReaderControls: React.FC<{
         >
           <AArrowDown className="w-4 h-4" />
         </button>
-        <span className="px-1 text-[11px] font-semibold tabular-nums text-gray-500 dark:text-gray-400 w-10 text-center">
+        <span className="px-1 text-[11px] font-semibold tabular-nums text-slate-600 dark:text-slate-300 w-10 text-center">
           {pct}%
         </span>
         <button
@@ -117,7 +117,7 @@ const ReaderControls: React.FC<{
         </button>
         {open && (
           <div className="absolute right-0 top-full mt-2 z-50 w-60 p-3 rounded-2xl el-float">
-            <p className="text-[11px] uppercase tracking-wider font-semibold text-gray-500 dark:text-gray-400">
+            <p className="text-[11px] uppercase tracking-wider font-semibold text-slate-600 dark:text-slate-300">
               Background
             </p>
             <div className="mt-2 grid grid-cols-4 gap-1.5">
@@ -128,7 +128,7 @@ const ReaderControls: React.FC<{
                   aria-pressed={prefs.paper === p.value}
                   className={`flex flex-col items-center gap-1 p-2 rounded-xl border text-[11px] font-medium transition-all ${
                     prefs.paper === p.value
-                      ? "border-brand-500 text-brand-700 dark:text-brand-300"
+                      ? "border-brand-500 text-brand-700 dark:text-brand-200"
                       : "border-gray-200 dark:border-white/10 text-gray-600 dark:text-gray-300 hover:border-gray-300"
                   }`}
                 >
@@ -142,7 +142,7 @@ const ReaderControls: React.FC<{
               ))}
             </div>
 
-            <p className="mt-3 text-[11px] uppercase tracking-wider font-semibold text-gray-500 dark:text-gray-400">
+            <p className="mt-3 text-[11px] uppercase tracking-wider font-semibold text-slate-600 dark:text-slate-300">
               Typeface
             </p>
             <div className="mt-2 grid grid-cols-2 gap-1.5">
@@ -153,7 +153,7 @@ const ReaderControls: React.FC<{
                   aria-pressed={prefs.font === f.value}
                   className={`flex items-center justify-center gap-1 p-2 rounded-xl border text-sm transition-all ${f.className} ${
                     prefs.font === f.value
-                      ? "border-brand-500 text-brand-700 dark:text-brand-300"
+                      ? "border-brand-500 text-brand-700 dark:text-brand-200"
                       : "border-gray-200 dark:border-white/10 text-gray-600 dark:text-gray-300 hover:border-gray-300"
                   }`}
                 >
@@ -163,7 +163,7 @@ const ReaderControls: React.FC<{
               ))}
             </div>
 
-            <p className="mt-3 text-[11px] uppercase tracking-wider font-semibold text-gray-500 dark:text-gray-400">
+            <p className="mt-3 text-[11px] uppercase tracking-wider font-semibold text-slate-600 dark:text-slate-300">
               Line spacing
             </p>
             <input

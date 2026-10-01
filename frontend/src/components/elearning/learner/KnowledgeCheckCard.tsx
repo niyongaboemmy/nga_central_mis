@@ -95,7 +95,7 @@ const KnowledgeCheckCard: React.FC<Props> = ({ itemId, questions, onResult }) =>
       <motion.div {...m("reveal")} className="el-card p-6 flex flex-col items-center text-center">
         <Mascot pose={perfect ? "cheering" : "nudge"} size={64} />
         <p className="mt-3 text-base font-semibold text-gray-800 dark:text-gray-100">{copy.check.finished(finished.score, finished.total)}</p>
-        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{finished.score_pct}%</p>
+        <p className="text-sm text-slate-600 dark:text-slate-300 mt-1">{finished.score_pct}%</p>
         <button
           onClick={() => {
             setFinished(null);
@@ -112,22 +112,27 @@ const KnowledgeCheckCard: React.FC<Props> = ({ itemId, questions, onResult }) =>
 
   return (
     <div className="el-card p-5 sm:p-6">
-      <div className="flex items-center justify-between text-[11px] uppercase tracking-wider font-semibold text-gray-500 dark:text-gray-400">
-        <span>{copy.check.title}</span>
-        <span className="tabular-nums">
-          {index + 1} / {questions.length}
+      {/* Where you are in the check: words for the screen reader, a segment per question for the eye. */}
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-xs font-semibold text-slate-600 dark:text-slate-300 tabular-nums">
+          Question {index + 1} of {questions.length}
+        </p>
+        <span className="flex gap-1" aria-hidden>
+          {questions.map((qq, i) => (
+            <span key={qq.id ?? i} className={`h-1.5 rounded-full transition-all ${i < index ? "w-4 bg-success-500" : i === index ? "w-6 bg-brand-600 dark:bg-brand-200" : "w-2 bg-gray-200 dark:bg-white/15"}`} />
+          ))}
         </span>
       </div>
       <AnimatePresence mode="wait">
         <motion.div key={q.id} {...m("reveal")}>
           <p className="mt-3 text-base font-medium text-gray-900 dark:text-white leading-snug">{q.prompt}</p>
-          <motion.ul key={wrongTick} {...(feedback && !feedback.correct ? m("shake") : {})} className="mt-4 space-y-2" role="radiogroup" aria-label="Answer options">
+          <motion.div key={wrongTick} {...(feedback && !feedback.correct ? m("shake") : {})} className="mt-4 space-y-2" role="radiogroup" aria-label="Answer options">
             {q.options.map((opt, i) => {
               const selected = chosen === i;
               const showCorrect = feedback?.correct && selected;
               const showWrong = feedback && !feedback.correct && selected;
               return (
-                <li key={i}>
+                <div key={i}>
                   <button
                     role="radio"
                     aria-checked={selected}
@@ -151,10 +156,10 @@ const KnowledgeCheckCard: React.FC<Props> = ({ itemId, questions, onResult }) =>
                     </span>
                     <span>{opt}</span>
                   </button>
-                </li>
+                </div>
               );
             })}
-          </motion.ul>
+          </motion.div>
         </motion.div>
       </AnimatePresence>
 
@@ -176,9 +181,12 @@ const KnowledgeCheckCard: React.FC<Props> = ({ itemId, questions, onResult }) =>
         )}
       </AnimatePresence>
 
-      <div className="mt-5 flex justify-end gap-2">
+      <div className="mt-5 flex items-center justify-end gap-3">
+        <p className="hidden lg:block mr-auto text-xs text-slate-600 dark:text-slate-300">
+          Press <kbd className="px-1 rounded el-chip font-mono">1</kbd>–<kbd className="px-1 rounded el-chip font-mono">{q.options.length}</kbd> to choose, <kbd className="px-1 rounded el-chip font-mono">Enter</kbd> to check
+        </p>
         {feedback?.correct ? (
-          <motion.button {...m("tap")} onClick={next} className="min-h-[44px] px-5 rounded-pill bg-brand-500 hover:bg-brand-600 text-white text-sm font-semibold shadow-soft focus:outline-none focus-visible:shadow-glow">
+          <motion.button {...m("tap")} onClick={next} className="w-full sm:w-auto min-h-[48px] sm:min-h-[44px] px-5 rounded-pill bg-brand-600 hover:bg-brand-700 text-white text-sm font-semibold shadow-soft focus:outline-none focus-visible:shadow-glow">
             {index + 1 < questions.length ? copy.check.nextQuestion : copy.course.done}
           </motion.button>
         ) : (
@@ -186,7 +194,7 @@ const KnowledgeCheckCard: React.FC<Props> = ({ itemId, questions, onResult }) =>
             {...m("tap")}
             onClick={check}
             disabled={chosen === null || checking}
-            className="min-h-[44px] px-5 rounded-pill bg-brand-500 hover:bg-brand-600 text-white text-sm font-semibold shadow-soft disabled:opacity-50 focus:outline-none focus-visible:shadow-glow"
+            className="w-full sm:w-auto min-h-[48px] sm:min-h-[44px] px-5 rounded-pill bg-brand-600 hover:bg-brand-700 text-white text-sm font-semibold shadow-soft disabled:opacity-50 focus:outline-none focus-visible:shadow-glow"
           >
             {feedback && !feedback.correct ? copy.check.tryAgain : copy.check.submit}
           </motion.button>

@@ -1,4 +1,4 @@
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, ne } from "drizzle-orm";
 import { db } from "../../../db";
 import { CourseGenerationRun, CourseGenerationTask, CourseItem, CourseSection, LessonNote } from "../../../db/schema";
 import { NotFoundError, ValidationError } from "../../../errors/CustomError";
@@ -35,6 +35,7 @@ export async function approveSectionDrafts(
   if (opts.itemIds?.length) drafts = drafts.filter((d) => opts.itemIds!.includes(d.item_id));
 
   const approved: number[] = [];
+  const retired: number[] = [];
   const needsAttention: { item_id: number; title: string; reason: string }[] = [];
   for (const item of drafts) {
     if (isVideoPlaceholder(item)) {
@@ -61,6 +62,21 @@ export async function approveSectionDrafts(
     }
     await db.update(CourseItem).set({ is_published: 1, review_state: "ACCEPTED" }).where(eq(CourseItem.item_id, item.item_id));
     approved.push(item.item_id);
+    // An update replaces the current version: it takes the old item's place, and the old one
+    // is retired (unpublished + DISMISSED, hidden from the builder) — never deleted, because
+    // a delete would cascade away students' progress, attempts and submissions.
+    const replaces = ((item.source_refs as any)?.replaces as number[] | undefined) ?? [];
+    if (replaces.length) {
+      const olds = await db
+        .select({ item_id: CourseItem.item_id, position: CourseItem.position })
+        .from(CourseItem)
+        .where(and(inArray(CourseItem.item_id, replaces), eq(CourseItem.section_id, sectionId), ne(CourseItem.review_state, "DISMISSED")));
+      if (olds.length) {
+        await db.update(CourseItem).set({ position: Math.min(...olds.map((o) => o.position)) }).where(eq(CourseItem.item_id, item.item_id));
+        await db.update(CourseItem).set({ is_published: 0, review_state: "DISMISSED" }).where(inArray(CourseItem.item_id, olds.map((o) => o.item_id)));
+        retired.push(...olds.map((o) => o.item_id));
+      }
+    }
   }
 
   let sectionStatus = section.status;
@@ -77,7 +93,7 @@ export async function approveSectionDrafts(
       course_id: course.course_id,
     });
   }
-  return { approved, needs_attention: needsAttention, section_status: sectionStatus };
+  return { approved, retired, needs_attention: needsAttention, section_status: sectionStatus };
 }
 
 /** Removes one Studio draft (and its AI note, if nothing else uses it). */

@@ -60,21 +60,70 @@ interface ExecContext {
   blueprint: Blueprint;
   /** A person is waiting (preview / single week / regenerate) → interactive quota. */
   bulk: boolean;
+  /** The week was already done: draft afresh (never "covered" / "unchanged"). */
+  updating?: boolean;
 }
+
+const UPDATE_INSTRUCTION =
+  "This week already has approved content (it is among the sources). Write a refreshed, improved version: keep what works, fix anything weak or missing, and use new examples.";
+
+/** Was this week chosen to be updated (it was already done when the run was planned)? */
+const isUpdateWeek = (run: RunRow, sectionId: number) =>
+  (((run.estimate as any)?.update_section_ids as number[] | undefined) ?? []).includes(sectionId);
 
 export async function executeTask(task: TaskRow, run: RunRow): Promise<TaskOutcome> {
   const course = await loadCourse(run.course_id);
-  const ctx: ExecContext = { task, run, course, blueprint: run.blueprint as Blueprint, bulk: run.mode === "FULL" };
+  const updating = isUpdateWeek(run, task.section_id);
+  const bp = run.blueprint as Blueprint;
+  const ctx: ExecContext = {
+    task,
+    run,
+    course,
+    blueprint: updating ? { ...bp, instructions: [bp.instructions, UPDATE_INSTRUCTION].filter(Boolean).join("\n") } : bp,
+    bulk: run.mode === "FULL",
+    updating,
+  };
   switch (task.kind as ArtifactKind) {
     case "REUSE_PLACEMENT":
       return reusePlacement(ctx);
     case "CORE_LESSON":
-      return coreLesson(ctx);
+      return withReplaces(ctx, "CORE_LESSON", await coreLesson(ctx));
     case "ASSESSMENT_PACK":
-      return assessmentPack(ctx);
+      return withReplaces(ctx, "ASSESSMENT_PACK", await assessmentPack(ctx));
     default:
       throw new Error(`Unknown artifact kind ${task.kind}`);
   }
+}
+
+/**
+ * An update's new drafts say which current items they replace (same week, same artifact,
+ * same item type, already approved). Approving a draft retires those (review.ts) — they
+ * are unpublished, never deleted, so students' progress and submissions on them are kept.
+ */
+async function withReplaces(ctx: ExecContext, kind: ArtifactKind, outcome: TaskOutcome): Promise<TaskOutcome> {
+  const newIds = ((outcome.output_ref as any)?.item_ids as number[] | undefined) ?? [];
+  if (!ctx.updating || outcome.status !== "SUCCEEDED" || newIds.length === 0) return outcome;
+  const current = (await pendingDraftsOfKind(ctx.task.section_id, kind)).filter(
+    (d) => !newIds.includes(d.item_id) && (d.review_state === "ACCEPTED" || d.review_state === "EDITED"),
+  );
+  if (current.length === 0) return outcome;
+  const fresh = await db
+    .select({ item_id: CourseItem.item_id, item_type: CourseItem.item_type, source_refs: CourseItem.source_refs, review_flags: CourseItem.review_flags })
+    .from(CourseItem)
+    .where(inArray(CourseItem.item_id, newIds));
+  for (const item of fresh) {
+    const replaces = current.filter((c) => c.item_type === item.item_type).map((c) => c.item_id);
+    if (replaces.length === 0) continue;
+    const flags = Array.isArray(item.review_flags) ? (item.review_flags as any[]) : [];
+    await db
+      .update(CourseItem)
+      .set({
+        source_refs: { ...((item.source_refs as object) || {}), replaces },
+        review_flags: [...flags, { kind: "UPDATE", note: "An updated version: approving it takes the current one off the course. Students' past work on it is kept." }],
+      })
+      .where(eq(CourseItem.item_id, item.item_id));
+  }
+  return outcome;
 }
 
 async function sectionState(course: CourseRow, sectionId: number) {
@@ -262,7 +311,7 @@ async function coreLesson(ctx: ExecContext): Promise<TaskOutcome> {
   const pack = await packFor(ctx);
   if (!hasCurriculum(pack)) return { status: "SKIPPED", skip_reason: "NO_CURRICULUM" };
 
-  if (bp.reuse_existing_notes && !bp.practical_task.enabled) {
+  if (!ctx.updating && bp.reuse_existing_notes && !bp.practical_task.enabled) {
     const { section, coverage } = await sectionState(ctx.course, ctx.task.section_id);
     const teacherLesson = section.items.some((i) => i.item_type === "LESSON_NOTE" && i.ai_origin === "NONE");
     if (coverage.targets.length > 0 && coverage.gaps.length === 0 && teacherLesson) {
@@ -272,7 +321,8 @@ async function coreLesson(ctx: ExecContext): Promise<TaskOutcome> {
 
   const inputHash = sha256([CORE_LESSON_PROMPT_VERSION, pack.hash, bp.lesson, bp.practical_task, bp.style, bp.instructions]);
   const existing = await pendingDraftsOfKind(ctx.task.section_id, "CORE_LESSON");
-  const same = existing.filter((d) => d.input_hash === inputHash);
+  // An update never counts the approved version as "unchanged" — only a pending redo does.
+  const same = existing.filter((d) => d.input_hash === inputHash && (!ctx.updating || d.review_state === "PENDING_REVIEW"));
   if (same.length > 0) {
     return { status: "SKIPPED", skip_reason: "UNCHANGED", input_hash: inputHash, output_ref: { item_ids: same.map((d) => d.item_id), note_id: same.find((d) => d.item_type === "LESSON_NOTE")?.ref_id ?? undefined } };
   }
@@ -416,7 +466,7 @@ async function assessmentPack(ctx: ExecContext): Promise<TaskOutcome> {
   const lesson = await lessonTextFor(ctx.task.section_id);
   const inputHash = sha256([ASSESSMENT_PROMPT_VERSION, pack.hash, lesson.hash, bp.knowledge_check, bp.flashcards, bp.exit_ticket, bp.video_slot, bp.style, bp.instructions]);
   const existing = await pendingDraftsOfKind(ctx.task.section_id, "ASSESSMENT_PACK");
-  const same = existing.filter((d) => d.input_hash === inputHash);
+  const same = existing.filter((d) => d.input_hash === inputHash && (!ctx.updating || d.review_state === "PENDING_REVIEW"));
   if (same.length > 0) return { status: "SKIPPED", skip_reason: "UNCHANGED", input_hash: inputHash, output_ref: { item_ids: same.map((d) => d.item_id) } };
 
   const { data, providerUsed, model } = await generateStructuredContent<AssessmentOutput>(

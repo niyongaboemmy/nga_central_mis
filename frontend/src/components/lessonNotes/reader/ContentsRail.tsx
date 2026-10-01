@@ -53,7 +53,7 @@ const ContentsRail: React.FC<Props> = ({
           <p className="text-[11px] font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
             Contents
           </p>
-          <p className="text-[11px] font-semibold tabular-nums text-gray-400 dark:text-gray-500">
+          <p className="text-[11px] font-semibold tabular-nums text-slate-600 dark:text-slate-300">
             {currentStop > 0 ? `${currentStop} of ${tops.length}` : `${tops.length} sections`}
           </p>
         </div>
@@ -129,7 +129,7 @@ const ContentsRail: React.FC<Props> = ({
       {/* Footer: the two things worth reaching for without scrolling back up. */}
       <div className="mt-4 flex items-center gap-2 border-t border-gray-100 pt-3 dark:border-white/[0.07]">
         {!!readingMinutes && (
-          <span className="inline-flex items-center gap-1 text-[11px] text-gray-400 dark:text-gray-500">
+          <span className="inline-flex items-center gap-1 text-[11px] text-slate-600 dark:text-slate-300">
             <Clock className="h-3 w-3" /> {readingMinutes} min
           </span>
         )}

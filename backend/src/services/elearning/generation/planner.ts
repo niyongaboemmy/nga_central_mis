@@ -70,12 +70,20 @@ export async function planWeeks(course: CourseRow, bp: Blueprint, sectionIds: nu
     const kinds: ArtifactKind[] = [];
     const notes: string[] = [];
     let calls = 0;
+    // A week that is already done (it has content and covers its criteria, or is live) was
+    // chosen on purpose: the teacher wants it UPDATED — fresh drafts that replace the current
+    // AI-made content once approved — not skipped as "covered" or "unchanged".
+    // Done = published, approved content (drafts still waiting for review don't count).
+    const live = section.items.filter((i) => i.is_published && i.review_state !== "PENDING_REVIEW");
+    const liveCov = coverageOfSection({ ...section, items: live });
+    const done = live.length > 0 && (liveCov.targets.length > 0 ? liveCov.gaps.length === 0 : section.status === "PUBLISHED");
+    if (done) notes.push("UPDATE");
     if (bp.reuse_existing_notes) kinds.push("REUSE_PLACEMENT");
     if (needsCoreLesson(bp)) {
       const teacherLesson = section.items.some((i) => i.item_type === "LESSON_NOTE" && i.ai_origin === "NONE");
       const covered = cov.targets.length > 0 && cov.gaps.length === 0 && teacherLesson;
       kinds.push("CORE_LESSON");
-      if (covered && bp.reuse_existing_notes && !bp.practical_task.enabled) notes.push("COVERED_BY_EXISTING");
+      if (covered && bp.reuse_existing_notes && !bp.practical_task.enabled && !done) notes.push("COVERED_BY_EXISTING");
       else calls += 1;
     }
     if (needsAssessmentPack(bp)) {
@@ -213,7 +221,8 @@ export async function createRun(input: {
     status: tonight ? "PLANNED" : "RUNNING",
     blueprint: input.blueprint,
     section_ids: estimate.planned.map((w) => w.section_id),
-    estimate: { ...estimateSummary, quota: undefined },
+    // The executor reads which weeks are updates (estimateSummary leaves the plan out).
+    estimate: { ...estimateSummary, quota: undefined, update_section_ids: estimate.planned.filter((w) => w.notes.includes("UPDATE")).map((w) => w.section_id) },
     not_before: tonight ? nextEveningKigali() : null,
     started_at: tonight ? null : new Date(),
   })) as any;

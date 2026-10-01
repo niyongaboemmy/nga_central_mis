@@ -22,6 +22,7 @@ import type { CourseItemType, ProgressState } from "../../../api/elearning";
 import { useMotion, useReducedMotionPref } from "../../../design/motion";
 import Mascot, { MascotPose } from "./Mascot";
 import SubjectIcon from "./subjectIcons";
+import { useLearnerScrollRoot } from "../learner/scrollRoot";
 
 // ---------------------------------------------------------------- ProgressRing
 
@@ -208,6 +209,7 @@ export const CompletionDot: React.FC<{ state: ProgressState; locked?: boolean; s
     <span
       className={`inline-flex items-center justify-center rounded-full flex-shrink-0 ${className}`}
       style={{ width: size, height: size }}
+      role="img"
       aria-label={label}
       title={label}
     >
@@ -344,11 +346,11 @@ export const EmptyState: React.FC<{
   <div className={`flex flex-col items-center text-center py-12 px-6 ${className}`}>
     <Mascot pose={pose} size={72} />
     <h3 className="mt-4 text-base font-semibold text-gray-800 dark:text-gray-100">{title}</h3>
-    {body && <p className="mt-1 text-sm text-gray-500 dark:text-gray-400 max-w-sm">{body}</p>}
+    {body && <p className="mt-1 text-sm text-slate-600 dark:text-slate-300 max-w-sm">{body}</p>}
     {action && (
       <button
         onClick={action.onClick}
-        className="mt-5 min-h-[44px] px-5 rounded-pill bg-brand-500 hover:bg-brand-600 text-white text-sm font-semibold shadow-soft focus:outline-none focus-visible:shadow-glow"
+        className="mt-5 min-h-[44px] px-5 rounded-pill bg-brand-600 hover:bg-brand-700 text-white text-sm font-semibold shadow-soft focus:outline-none focus-visible:shadow-glow"
       >
         {action.label}
       </button>
@@ -416,29 +418,60 @@ export const BottomActionBar: React.FC<{ children: React.ReactNode; className?: 
   // Hides on scroll-down, shows on scroll-up (thumb-zone chrome that gets out of the way).
   const [hidden, setHidden] = useState(false);
   const last = useRef(0);
+  // The course page's own scroller on desktop; the window on phones.
+  const root = useLearnerScrollRoot();
   useEffect(() => {
+    const target: HTMLElement | Window = root ?? window;
     const onScroll = () => {
-      const y = window.scrollY;
+      const y = root ? root.scrollTop : window.scrollY;
       setHidden(y > last.current + 8 && y > 80);
       if (Math.abs(y - last.current) > 8) last.current = y;
     };
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
-  }, []);
+    target.addEventListener("scroll", onScroll, { passive: true });
+    return () => target.removeEventListener("scroll", onScroll);
+  }, [root]);
+  // Centre over the scrolling column (desktop), not the whole window — the week list on the
+  // left pushed the window's centre onto the content's edge.
+  const [span, setSpan] = useState<{ left: number; right: number } | null>(null);
+  useEffect(() => {
+    if (!root) {
+      setSpan(null);
+      return;
+    }
+    const measure = () => {
+      const r = root.getBoundingClientRect();
+      setSpan({ left: r.left, right: Math.max(0, window.innerWidth - r.right) });
+    };
+    measure();
+    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(measure) : null;
+    ro?.observe(root);
+    window.addEventListener("resize", measure);
+    return () => {
+      ro?.disconnect();
+      window.removeEventListener("resize", measure);
+    };
+  }, [root]);
   return (
     <AnimatePresence>
       {!hidden && (
-        <motion.div
-          initial={{ y: 24, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          exit={{ y: 24, opacity: 0 }}
-          transition={{ duration: 0.2, ease: [0.2, 0.8, 0.2, 1] }}
-          className={`fixed bottom-4 left-1/2 -translate-x-1/2 z-40 flex items-center gap-2 px-2 py-2 rounded-pill el-float print:hidden ${className}`}
-          role="toolbar"
-          aria-label="Item actions"
+        // Centred by a full-width flex wrapper, not translate-x: the motion transform (y) would
+        // replace a Tailwind translate and push the bar half off the right edge.
+        <div
+          className="fixed inset-x-0 bottom-[max(1rem,env(safe-area-inset-bottom))] z-40 flex justify-center px-3 pointer-events-none print:hidden"
+          style={span ? { left: span.left, right: span.right } : undefined}
         >
-          {children}
-        </motion.div>
+          <motion.div
+            initial={{ y: 24, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 24, opacity: 0 }}
+            transition={{ duration: 0.2, ease: [0.2, 0.8, 0.2, 1] }}
+            className={`pointer-events-auto max-w-full flex items-center gap-1 sm:gap-2 px-2 py-2 rounded-pill el-float ${className}`}
+            role="toolbar"
+            aria-label="Item actions"
+          >
+            {children}
+          </motion.div>
+        </div>
       )}
     </AnimatePresence>
   );
