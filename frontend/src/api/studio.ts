@@ -92,6 +92,17 @@ export interface RunSummary {
   finished_at: string | null;
 }
 
+/** A run as the course page lists it: progress counts and the next automatic re-run, no detail. */
+export interface RunListItem extends RunSummary {
+  totals: Partial<Record<TaskStatus, number>>;
+  next_retry_at: string | null;
+}
+export interface RunList {
+  runs: RunListItem[];
+  /** AI drafts in the whole course still waiting for the teacher. */
+  pending_review: number;
+}
+
 export interface StudioData extends CourseHeader {
   weeks: WeekBundle[];
   active_runs: number[];
@@ -204,7 +215,7 @@ export const studioApi = {
   start: (courseId: number, body: { blueprint: Blueprint; section_ids: number[]; mode: RunMode; start?: "now" | "tonight" }) =>
     apiService.post<Data<{ run_id: number; estimate: Omit<Estimate, "weeks_planned"> }>>(`/elearning/courses/${courseId}/generation/runs`, body),
   run: (runId: number) => apiService.get<Data<RunDetail>>(`/elearning/generation/runs/${runId}`),
-  runs: (courseId: number) => apiService.get<Data<RunSummary[]>>(`/elearning/courses/${courseId}/generation/runs`),
+  runs: (courseId: number) => apiService.get<Data<RunList>>(`/elearning/courses/${courseId}/generation/runs`),
   control: (runId: number, action: "pause" | "resume" | "cancel" | "retry-failed") =>
     apiService.post<Data<RunDetail>>(`/elearning/generation/runs/${runId}/${action}`),
   approve: (sectionId: number, body: { item_ids?: number[]; publish_section?: boolean }) =>

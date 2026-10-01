@@ -14,7 +14,12 @@ import { emitRunEvent } from "./events";
  * 'QUEUED' checked on affectedRows (MySQL 5.7 has no SKIP LOCKED).
  */
 
-const MAX_ATTEMPTS = 3;
+const FAST_ATTEMPTS = 3;
+// Background runs (nobody is watching) don't give up after the quick retries: a failing part is
+// re-run in slow rounds — an outage or a flaky free model usually recovers within hours.
+const SLOW_RETRY_MIN = [60, 180, 360];
+const BACKGROUND_MODES = new Set(["FULL", "SINGLE_WEEK"]);
+export const maxAttempts = (mode: string) => FAST_ATTEMPTS + (BACKGROUND_MODES.has(mode) ? SLOW_RETRY_MIN.length : 0);
 const STALE_MS = 3 * 60 * 1000;
 const HEARTBEAT_MS = 15 * 1000;
 const QUOTA_RETRY_MS = 30 * 60 * 1000;
@@ -37,7 +42,8 @@ export function startGenerationWorker(): void {
 
 /** Nudge the worker now (a run was just created / resumed) instead of waiting for the timer. */
 export function wakeWorker(): void {
-  if (process.env.NODE_ENV === "test") return;
+  // Only when this process runs the worker: ELEARNING_STUDIO_WORKER=false must mean no AI calls here.
+  if (process.env.NODE_ENV === "test" || !timer) return;
   setImmediate(() => void tick().catch(() => undefined));
 }
 
@@ -225,13 +231,17 @@ async function failTask(task: TaskRow, run: RunRow, error: any) {
 
   const message = error instanceof GenerationOutputError ? error.message : friendlyAIErrorMessage(error);
   logger.warn("[studio] task failed", { task_id: task.task_id, kind: task.kind, attempts, error: error?.message });
-  if (attempts < MAX_ATTEMPTS) {
-    const backoff = 30_000 * 2 ** (attempts - 1) + Math.floor(Math.random() * 5000);
+  if (attempts < maxAttempts(run.mode)) {
+    const backoff =
+      attempts < FAST_ATTEMPTS
+        ? 30_000 * 2 ** (attempts - 1) + Math.floor(Math.random() * 5000)
+        : SLOW_RETRY_MIN[attempts - FAST_ATTEMPTS] * 60_000;
+    const retryAt = new Date(Date.now() + backoff);
     await db
       .update(CourseGenerationTask)
-      .set({ status: "QUEUED", not_before: new Date(Date.now() + backoff), claimed_at: null, error: message.slice(0, 1000) })
+      .set({ status: "QUEUED", not_before: retryAt, claimed_at: null, error: message.slice(0, 1000) })
       .where(eq(CourseGenerationTask.task_id, task.task_id));
-    emitRunEvent({ type: "task", run_id: run.run_id, task_id: task.task_id, section_id: task.section_id, kind: task.kind, status: "QUEUED", detail: { retrying: true, error: message } });
+    emitRunEvent({ type: "task", run_id: run.run_id, task_id: task.task_id, section_id: task.section_id, kind: task.kind, status: "QUEUED", detail: { retrying: true, retry_at: retryAt.toISOString(), error: message } });
     return;
   }
   await db.update(CourseGenerationTask).set({ status: "FAILED", error: message.slice(0, 1000), finished_at: new Date() }).where(eq(CourseGenerationTask.task_id, task.task_id));
@@ -256,15 +266,18 @@ export async function refreshRunStatus(runId: number) {
     .where(and(eq(CourseGenerationRun.run_id, runId), inArray(CourseGenerationRun.status, ["RUNNING", "PAUSED_QUOTA"])))) as any;
   if ((res?.affectedRows ?? 0) !== 1) return;
   emitRunEvent({ type: "run", run_id: runId, status: next });
-  if (next === "READY_FOR_REVIEW" && run.mode === "FULL") {
+  // Background runs report back: the teacher started it and left.
+  if (BACKGROUND_MODES.has(run.mode) && next !== "COMPLETED") {
+    const failed = c.FAILED ?? 0;
+    const failedNote = failed ? ` ${failed} part(s) could not be drafted — open the run and choose "Re-run failed".` : "";
     await notifyUsers([run.created_by], {
       kind: "course_studio_ready",
-      title: "Your AI-drafted weeks are ready to review",
-      body: `${c.SUCCEEDED} part(s) were drafted. Nothing is visible to students until you approve it.`,
+      title: next === "READY_FOR_REVIEW" ? "Your AI-drafted weeks are ready to review" : "Your AI drafting run could not finish",
+      body: next === "READY_FOR_REVIEW" ? `${c.SUCCEEDED} part(s) were drafted. Nothing is visible to students until you approve it.${failedNote}` : `None of the parts could be drafted after several tries.${failedNote}`,
       link: `/elearning/courses/${run.course_id}/studio?run=${runId}`,
       subjectType: "course",
       subjectId: run.course_id,
-    }).catch((error) => logger.warn("[studio] ready notification failed", { error }));
+    }).catch((error) => logger.warn("[studio] run notification failed", { error }));
   }
 }
 

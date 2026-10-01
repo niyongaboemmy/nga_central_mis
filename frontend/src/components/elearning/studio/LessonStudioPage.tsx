@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowLeft, ArrowRight, Check, Moon, Sparkles, Wand2, Zap } from "lucide-react";
+import { ArrowLeft, ArrowRight, Bell, Check, Hourglass, Moon, RotateCcw, Server, Sparkles, Wand2, Zap } from "lucide-react";
 import { Blueprint, DraftItem, Estimate, StudioData, studioApi } from "../../../api/studio";
 import { builderRoutes } from "../../../api/elearning";
 import { useToast } from "../../../contexts/ToastContext";
@@ -157,6 +157,7 @@ const LessonStudioPage: React.FC = () => {
       setParams((p) => { p.set("run", String(r.data.data.run_id)); return p; });
       setStep(mode === "PREVIEW" ? "try" : "generate");
       if (when === "tonight") showToast("Scheduled for tonight — you'll get a notification when it's ready", "success");
+      else if (mode === "FULL") showToast("Running on the server — you can leave this page", "success");
       void load();
     } catch (e: any) {
       const existing = e?.response?.data?.errors?.[0]?.run_id;
@@ -480,18 +481,24 @@ const LessonStudioPage: React.FC = () => {
                           <p className="text-sm text-slate-600 dark:text-slate-300">{est.detail}</p>
                         </div>
                       )}
+                      <ul className="text-sm text-slate-700 dark:text-slate-200 space-y-1.5" aria-label="How a background run works">
+                        <li className="flex gap-2"><Server className="w-4 h-4 mt-0.5 flex-shrink-0 text-brand-600 dark:text-brand-200" aria-hidden />Runs on the school server — close this page or log out, it keeps going.</li>
+                        <li className="flex gap-2"><Hourglass className="w-4 h-4 mt-0.5 flex-shrink-0 text-brand-600 dark:text-brand-200" aria-hidden />When the free AI quota runs out it waits, then carries on by itself.</li>
+                        <li className="flex gap-2"><RotateCcw className="w-4 h-4 mt-0.5 flex-shrink-0 text-brand-600 dark:text-brand-200" aria-hidden />A part that fails is re-run automatically over the next hours.</li>
+                        <li className="flex gap-2"><Bell className="w-4 h-4 mt-0.5 flex-shrink-0 text-brand-600 dark:text-brand-200" aria-hidden />You get a notification when it's done; the course page shows the progress.</li>
+                      </ul>
                       <div className="flex flex-wrap gap-2">
                         <button disabled={busy || !data.ai_configured || selectedIds.length === 0} onClick={() => startRun("FULL", "now")} className="inline-flex items-center gap-2 min-h-[48px] px-5 rounded-pill bg-brand-600 text-white text-sm font-semibold shadow-soft disabled:opacity-50">
-                          <Sparkles className="w-4 h-4" /> Start now
+                          <Sparkles className="w-4 h-4" /> Run in background
                         </button>
-                        <button disabled={busy || !data.ai_configured || selectedIds.length === 0} onClick={() => startRun("FULL", "tonight")} className="inline-flex items-center gap-2 min-h-[48px] px-5 rounded-pill el-chip text-sm font-semibold disabled:opacity-50" title="Runs from 19:00, when nobody needs the free AI quota">
+                        <button disabled={busy || !data.ai_configured || selectedIds.length === 0} onClick={() => startRun("FULL", "tonight")} className="inline-flex items-center gap-2 min-h-[48px] px-5 rounded-pill el-chip text-sm font-semibold disabled:opacity-50" title="Starts at 19:00, when nobody needs the free AI quota">
                           <Moon className="w-4 h-4" /> Run tonight
                         </button>
                       </div>
                     </div>
                   )}
                   {run && run.run.mode !== "PREVIEW" && (
-                    <GenerationBoard run={run} connected={connected} busy={busy} onControl={control} onReviewWeek={(sid) => { setFocused(sid); goto("review"); }} />
+                    <GenerationBoard run={run} connected={connected} busy={busy} onControl={control} onReviewWeek={(sid) => { setFocused(sid); goto("review"); }} onLeave={() => navigate(builderRoutes.build(cid))} />
                   )}
                 </section>
               )}
