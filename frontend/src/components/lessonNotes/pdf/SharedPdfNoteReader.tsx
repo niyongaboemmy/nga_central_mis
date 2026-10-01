@@ -204,7 +204,7 @@ const SharedPdfNoteReader: React.FC<Props> = ({ note, onBack, backLabel, embedde
             initial={{ y: -8, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: -8, opacity: 0 }}
-            className={`sticky ${embedded ? "top-16" : "top-0"} z-20 bg-gray-50/85 dark:bg-gray-900/85 backdrop-blur-md border-b border-gray-200/70 dark:border-gray-700/40 print:hidden`}
+            className={`sticky ${embedded ? "top-16 lg:top-0" : "top-0"} z-20 bg-gray-50/85 dark:bg-gray-900/85 backdrop-blur-md border-b border-gray-200/70 dark:border-gray-700/40 print:hidden`}
           >
             <div className="max-w-[1400px] mx-auto px-3 sm:px-5 py-2 flex items-center gap-2">
               <button

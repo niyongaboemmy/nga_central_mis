@@ -76,6 +76,14 @@ export const WEEK_STATE_LABEL: Record<WeekBundle["readiness"]["state"], string> 
   LIVE: "Live for students",
 };
 
+/**
+ * A week that already has its content (live, or ready and covering every criterion).
+ * Choosing it means "update it": the AI drafts a fresh version that replaces the current
+ * AI-made content when approved (planner marks it UPDATE).
+ */
+export const weekIsDone = (w: WeekBundle) =>
+  w.readiness.state === "LIVE" || (w.readiness.state === "DRAFTED" && !!w.coverage && w.coverage.targets > 0 && w.coverage.covered >= w.coverage.targets);
+
 /** How ready the term is: weeks with a topic that are live, and that are ready but still off. */
 export function termReadiness(weeks: WeekBundle[]): { plannable: number; live: number; ready: number; pct: number } {
   const plannable = weeks.filter(weekSelectable);

@@ -152,7 +152,7 @@ const ReviewSheet: React.FC<Props> = ({ section, onClose }) => {
                 <motion.div key={`${index}-${flipped}`} {...m("reveal")}>
                   <p className="text-[11px] uppercase tracking-wider font-semibold text-gray-500">{flipped ? "Answer" : "Term"} · {card?.source}</p>
                   <p className={`mt-2 ${flipped ? "text-sm leading-relaxed text-gray-800 dark:text-gray-100" : "text-lg font-semibold text-gray-900 dark:text-white"}`}>{flipped ? card?.back : card?.front}</p>
-                  {!flipped && <p className="mt-4 text-xs text-gray-400">Tap to flip · space</p>}
+                  {!flipped && <p className="mt-4 text-xs text-slate-600 dark:text-slate-300">Tap to flip · space</p>}
                 </motion.div>
               </AnimatePresence>
             </button>

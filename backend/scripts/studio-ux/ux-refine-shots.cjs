@@ -32,7 +32,7 @@ const waitText = (page, t, timeout = 15000) => page.waitForFunction((x) => docum
   await db.end();
   const token = jwt.sign({ userId: USER, tokenVersion: u.token_version ?? 0 }, process.env.JWT_SECRET, { expiresIn: "2h" });
   const runs = await fetch(`${API}/elearning/courses/${COURSE}/generation/runs`, { headers: { Authorization: `Bearer ${token}` } }).then((r) => r.json());
-  const preview = runs.data.runs.find((r) => r.mode === "PREVIEW" && r.status === "READY_FOR_REVIEW");
+  const preview = runs.data.runs.find((r) => r.mode === "PREVIEW" && ["READY_FOR_REVIEW", "COMPLETED"].includes(r.status));
   if (!preview) throw new Error("Needs a finished preview run with drafts on this course");
   const browser = await puppeteer.launch({ headless: true, args: ["--no-sandbox"] });
   for (const [theme, vp] of [
@@ -77,6 +77,27 @@ const waitText = (page, t, timeout = 15000) => page.waitForFunction((x) => docum
     await axe("Weeks step");
     await noOverflow("Weeks step");
 
+    // Fixed frame: the page itself never scrolls (header + stepper stay), only the panels do.
+    if (vp.label === "desktop") {
+      const fit = await page.evaluate(() => {
+        window.scrollTo(0, 800);
+        return { y: Math.round(window.scrollY), over: document.documentElement.scrollHeight - window.innerHeight };
+      });
+      check(fit.y === 0 && fit.over <= 1, `Studio page doesn't scroll (window ${fit.y}px, overflow ${fit.over}px)`);
+      // Choosing a week that's already live says it will be updated.
+      const live = await page.evaluate(() => {
+        const rows = [...document.querySelectorAll("ul[aria-label='Weeks of the scheme of work'] li")];
+        const row = rows.find((r) => /Live for students/.test(r.innerText) && r.querySelector("[role='checkbox'][aria-checked='false']:not([disabled])"));
+        row?.querySelector("[role='checkbox']")?.click();
+        return !!row;
+      });
+      if (live) {
+        await waitText(page, "will be updated");
+        check(/Update/.test(await text(page)), "a live week, once chosen, is tagged Update and explained");
+        await shot("weeks-update");
+      }
+    }
+
     // Recipe step: the student preview switches between phone and desktop, and enlarges.
     await step("Lesson recipe");
     await waitText(page, "Design each week");
@@ -114,12 +135,25 @@ const waitText = (page, t, timeout = 15000) => page.waitForFunction((x) => docum
     const phoneVisible = await page.evaluate(() => { const el = document.querySelector("[aria-label=\"Preview of a week on a student's phone\"]"); return !!el && el.getBoundingClientRect().width > 0; });
     check(!phoneVisible, "mock phone hidden once real output is on screen");
     const t2 = await text(page);
-    check(/Approve & turn week on|Approve, keep week off/.test(t2), "approve button says what happens");
-    check(/Built from/.test(t2), "drafts say what they were built from");
+    // Only when the preview still has drafts waiting (approving them uses the data up).
+    if (/to review/.test(t2)) {
+      check(/Approve & turn week on|Approve, keep week off/.test(t2), "approve button says what happens");
+      check(/Built from/.test(t2), "drafts say what they were built from");
+    } else console.log("  · preview drafts already reviewed — approve-label checks skipped");
     await shot("try");
     await axe("Try step");
     await noOverflow("Try step");
 
+    // A finished full run offers "Start again", which returns to choosing weeks.
+    const finished = runs.data.runs.find((r) => r.mode === "FULL" && ["COMPLETED", "CANCELLED", "READY_FOR_REVIEW", "FAILED"].includes(r.status));
+    if (vp.label === "desktop" && finished) {
+      await page.goto(`${FE}/elearning/courses/${COURSE}/studio?run=${finished.run_id}`, { waitUntil: "networkidle2" });
+      await waitText(page, "Start again");
+      await shot("round-done");
+      await page.evaluate(() => [...document.querySelectorAll("button")].find((b) => b.innerText.trim() === "Start again")?.click());
+      await waitText(page, "Which weeks should the AI draft");
+      check(!new URL(page.url()).searchParams.get("run"), "Start again clears the finished run and goes back to choosing weeks");
+    }
     check(errors.length === 0, `no page errors (${vp.label}) ${errors.join(" | ")}`);
     await page.close();
   }

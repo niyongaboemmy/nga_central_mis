@@ -102,7 +102,7 @@ const AITutorSheet: React.FC<Props> = ({ courseId, sectionId, open, onClose }) =
               )}
               {turns.map((t, i) =>
                 t.role === "user" ? (
-                  <motion.p key={i} {...m("reveal")} className="ml-8 px-3 py-2 rounded-2xl rounded-br-md bg-brand-500 text-white text-sm">{t.html}</motion.p>
+                  <motion.p key={i} {...m("reveal")} className="ml-8 px-3 py-2 rounded-2xl rounded-br-md bg-brand-600 text-white text-sm">{t.html}</motion.p>
                 ) : (
                   <motion.div key={i} {...m("reveal")} className="mr-4 px-3 py-2 rounded-2xl rounded-bl-md el-chip">
                     {t.grounded === false && <p className="text-[11px] text-warning-700 dark:text-warning-500 mb-1">Not in your notes — take this with care.</p>}
@@ -128,7 +128,7 @@ const AITutorSheet: React.FC<Props> = ({ courseId, sectionId, open, onClose }) =
                   </motion.div>
                 ),
               )}
-              {busy && <p className="text-xs text-gray-400 flex items-center gap-1.5"><Loader2 className="w-3.5 h-3.5 animate-spin" /> Reading your notes…</p>}
+              {busy && <p className="text-xs text-slate-600 dark:text-slate-300 flex items-center gap-1.5"><Loader2 className="w-3.5 h-3.5 animate-spin" /> Reading your notes…</p>}
             </div>
 
             <form
@@ -139,7 +139,7 @@ const AITutorSheet: React.FC<Props> = ({ courseId, sectionId, open, onClose }) =
               className="flex items-center gap-2 p-3 border-t border-gray-100 dark:border-white/[0.06]"
             >
               <input value={input} onChange={(e) => setInput(e.target.value)} placeholder="Ask anything about this course…" aria-label="Your question" className="flex-1 min-h-[44px] px-3 rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.04] text-sm text-gray-900 dark:text-white focus:outline-none focus:border-brand-500" />
-              <button type="submit" disabled={!input.trim() || busy} className="w-11 h-11 flex items-center justify-center rounded-pill bg-brand-500 hover:bg-brand-600 text-white disabled:opacity-40" aria-label="Send"><Send className="w-4 h-4" /></button>
+              <button type="submit" disabled={!input.trim() || busy} className="w-11 h-11 flex items-center justify-center rounded-pill bg-brand-600 hover:bg-brand-700 text-white disabled:opacity-40" aria-label="Send"><Send className="w-4 h-4" /></button>
             </form>
           </motion.aside>
         </>

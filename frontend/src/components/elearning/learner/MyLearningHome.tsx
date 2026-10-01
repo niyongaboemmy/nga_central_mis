@@ -74,12 +74,12 @@ const KIND_STYLE: Record<
   week: {
     dot: "bg-brand-500",
     label: "This week",
-    meta: "text-gray-500 dark:text-gray-400",
+    meta: "text-slate-600 dark:text-slate-300",
   },
   goal: {
     dot: "bg-success-500",
     label: "Almost done",
-    meta: "text-gray-500 dark:text-gray-400",
+    meta: "text-slate-600 dark:text-slate-300",
   },
 };
 
@@ -101,7 +101,7 @@ const RailStat: React.FC<{
       ariaLabel={`${label}: ${value}`}
     />
     <div className="min-w-0">
-      <p className="truncate text-[11px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+      <p className="truncate text-[11px] font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-300">
         {label}
       </p>
       <p className="text-sm font-bold tabular-nums text-gray-900 dark:text-white">{value}</p>
@@ -123,16 +123,16 @@ const QueueRow: React.FC<{ entry: QueueEntry }> = ({ entry }) => {
       {entry.itemType ? (
         <ItemTypeIcon
           type={entry.itemType}
-          className="w-3.5 h-3.5 flex-shrink-0 text-gray-400 dark:text-gray-500"
+          className="w-3.5 h-3.5 flex-shrink-0 text-slate-600 dark:text-slate-300"
         />
       ) : (
-        <Circle className="w-3.5 h-3.5 flex-shrink-0 text-gray-400 dark:text-gray-500" />
+        <Circle className="w-3.5 h-3.5 flex-shrink-0 text-slate-600 dark:text-slate-300" />
       )}
       <span className="min-w-0 flex-1">
         <span className="block truncate text-[13px] font-medium text-gray-800 dark:text-gray-100">
           {entry.title}
         </span>
-        <span className="block truncate text-[11px] text-gray-500 dark:text-gray-400">
+        <span className="block truncate text-[11px] text-slate-600 dark:text-slate-300">
           <span className="sr-only">{style.label}: </span>
           {entry.subtitle}
         </span>
@@ -302,7 +302,7 @@ const MyLearningHome: React.FC = () => {
               </span>
             )}
           </div>
-          <p className="mt-0.5 max-w-2xl text-[13px] text-gray-500 dark:text-gray-400">
+          <p className="mt-0.5 max-w-2xl text-[13px] text-slate-600 dark:text-slate-300">
             {cards === null
               ? " "
               : copy.home.greeting(
@@ -347,11 +347,11 @@ const MyLearningHome: React.FC = () => {
           </Link>
           <Link
             to={learnerRoutes.me}
-            className="inline-flex items-center gap-1.5 rounded-pill px-2.5 py-1.5 text-xs text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-white/[0.06]"
-            aria-label="Me"
+            className="inline-flex items-center gap-1.5 rounded-pill min-h-[44px] px-3 text-sm font-medium text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-white/[0.06]"
           >
-            <User className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">{copy.me.title}</span>
+            {/* A lone person icon read as decoration; the word makes it a link. */}
+            <User className="w-4 h-4" aria-hidden />
+            <span>{copy.me.title}</span>
           </Link>
         </div>
       </div>
@@ -388,13 +388,13 @@ const MyLearningHome: React.FC = () => {
                 ariaLabel={`${copy.home.statOverall}: ${totals.percent}%`}
               />
               <div className="min-w-0">
-                <p className="truncate text-[11px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                <p className="truncate text-[11px] font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-300">
                   {copy.home.statOverall}
                 </p>
                 <p className="truncate text-sm font-bold text-gray-900 dark:text-white">
                   {totals.requiredDone} of {totals.requiredTotal}
                 </p>
-                <p className="truncate text-[11px] text-gray-500 dark:text-gray-400">required</p>
+                <p className="truncate text-[11px] text-slate-600 dark:text-slate-300">required</p>
               </div>
             </div>
             <>
@@ -436,17 +436,19 @@ const MyLearningHome: React.FC = () => {
                     decoration rather than information. The subject's colour now carries
                     something — its progress ring. */}
                 <div className="flex items-start gap-3.5">
-                  <ProgressRing
+                  {/* With one subject this ring repeats the overall one above — show it only when
+                      it says something new. */}
+                  {cards.length > 1 && <ProgressRing
                     value={hero.required_total ? Math.round((hero.required_done / hero.required_total) * 100) : 0}
                     size={52}
                     stroke={5}
                     color={hero.cover_color || undefined}
                     className="mt-0.5"
                     ariaLabel={`${hero.subject_name} ${hero.required_done} of ${hero.required_total} done`}
-                  />
+                  />}
                   <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-1.5">
-                    <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                    <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-300">
                       {hero.next_item
                         ? copy.home.upNext
                         : resume
@@ -454,7 +456,7 @@ const MyLearningHome: React.FC = () => {
                           : copy.home.caughtUpEyebrow}
                     </p>
                     {hero.subject_code && (
-                      <span className="rounded bg-gray-100 px-1.5 py-0.5 font-mono text-[10px] text-gray-500 dark:bg-white/[0.06] dark:text-gray-400">
+                      <span className="rounded bg-gray-100 px-1.5 py-0.5 font-mono text-[10px] text-slate-600 dark:bg-white/[0.06] dark:text-slate-300">
                         {hero.subject_code}
                       </span>
                     )}
@@ -463,14 +465,14 @@ const MyLearningHome: React.FC = () => {
                     {hero.subject_name}
                   </h2>
                   {hero.current_section && (
-                    <p className="truncate text-xs text-gray-500 dark:text-gray-400">
+                    <p className="truncate text-xs text-slate-600 dark:text-slate-300">
                       {hero.current_section.title}
                     </p>
                   )}
 
                   {hero.required_total > 0 && (
                     // The ring already shows the proportion — this says what it counts.
-                    <p className="mt-1 text-[11px] tabular-nums text-gray-500 dark:text-gray-400">
+                    <p className="mt-1 text-[11px] tabular-nums text-slate-600 dark:text-slate-300">
                       {hero.required_done}/{hero.required_total} done ·{" "}
                       {hero.sections_completed}/{hero.sections_total} weeks
                     </p>
@@ -488,7 +490,7 @@ const MyLearningHome: React.FC = () => {
                         <p className="truncate text-[13px] font-semibold text-gray-800 dark:text-gray-100">
                           {hero.next_item.title}
                         </p>
-                        <p className="flex items-center gap-1 text-[11px] text-gray-500 dark:text-gray-400">
+                        <p className="flex items-center gap-1 text-[11px] text-slate-600 dark:text-slate-300">
                           {hero.next_item.estimated_minutes ? (
                             <>
                               <Clock className="w-3 h-3" />
@@ -511,7 +513,7 @@ const MyLearningHome: React.FC = () => {
                             ),
                           )
                         }
-                        className="inline-flex min-h-[40px] flex-shrink-0 items-center justify-center gap-1.5 rounded-pill bg-brand-500 px-4 text-[13px] font-semibold text-white shadow-soft hover:bg-brand-600 focus:outline-none focus-visible:shadow-glow"
+                        className="inline-flex min-h-[40px] flex-shrink-0 items-center justify-center gap-1.5 rounded-pill bg-brand-600 px-4 text-[13px] font-semibold text-white shadow-soft hover:bg-brand-700 focus:outline-none focus-visible:shadow-glow"
                       >
                         {hero.next_item.state === "IN_PROGRESS"
                           ? copy.home.continueBtn
@@ -528,7 +530,7 @@ const MyLearningHome: React.FC = () => {
                             ? copy.home.caughtUpTitle
                             : copy.home.allCaughtUp}
                         </p>
-                        <p className="truncate text-[11px] text-gray-500 dark:text-gray-400">
+                        <p className="truncate text-[11px] text-slate-600 dark:text-slate-300">
                           {copy.home.caughtUpBody(
                             Math.max(
                               totals.sectionsTotal - totals.sectionsDone,
@@ -549,7 +551,7 @@ const MyLearningHome: React.FC = () => {
                               : learnerRoutes.course(hero.course_id),
                           )
                         }
-                        className="inline-flex min-h-[40px] flex-shrink-0 items-center justify-center gap-1.5 rounded-pill bg-brand-500 px-4 text-[13px] font-semibold text-white shadow-soft hover:bg-brand-600 focus:outline-none focus-visible:shadow-glow"
+                        className="inline-flex min-h-[40px] flex-shrink-0 items-center justify-center gap-1.5 rounded-pill bg-brand-600 px-4 text-[13px] font-semibold text-white shadow-soft hover:bg-brand-700 focus:outline-none focus-visible:shadow-glow"
                       >
                         {resume?.resume_item
                           ? copy.home.reviewBtn
@@ -565,7 +567,7 @@ const MyLearningHome: React.FC = () => {
 
             {/* ── One ranked queue, replacing three half-empty cards ─────── */}
             <motion.section {...m("reveal")} className="el-card p-3">
-              <h3 className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+              <h3 className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-300">
                 <ListChecks className="w-3.5 h-3.5" />
                 {copy.home.queue}
                 {queue.length > 0 && (
@@ -593,9 +595,10 @@ const MyLearningHome: React.FC = () => {
             </motion.section>
           </div>
 
-          {/* ── Subjects: one ring each, no spine, no bar ───────────────── */}
-          <motion.section {...m("reveal")} className="el-card p-4">
-            <h3 className="text-[11px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+          {/* ── Subjects: one ring each, no spine, no bar. With a single subject the
+              "Up next" card already is that subject, so the list would only repeat it. ── */}
+          {cards.length > 1 && <motion.section {...m("reveal")} className="el-card p-4">
+            <h3 className="text-[11px] font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-300">
               {copy.home.subjects}
             </h3>
             <ul className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
@@ -607,7 +610,7 @@ const MyLearningHome: React.FC = () => {
                         ? learnerRoutes.item(c.course_id, c.next_item.item_id)
                         : learnerRoutes.course(c.course_id)
                     }
-                    className="group flex min-h-[64px] items-center gap-3 rounded-2xl border border-gray-100 p-3 transition-all hover:-translate-y-0.5 hover:border-brand-300 hover:shadow-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/50 dark:border-white/[0.06] dark:hover:border-brand-500/40"
+                    className="group flex min-h-[64px] items-center gap-3 rounded-2xl border border-gray-100 p-3 transition-all hover:-translate-y-0.5 hover:border-brand-200 hover:shadow-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/50 dark:border-white/[0.06] dark:hover:border-brand-500/40"
                   >
                     {/* The ring carries the subject's colour and its progress at once —
                         the old spine carried the colour and nothing else. */}
@@ -622,7 +625,7 @@ const MyLearningHome: React.FC = () => {
                       <p className="truncate text-[13px] font-semibold text-gray-800 dark:text-gray-100">
                         {c.subject_name}
                       </p>
-                      <p className="mt-0.5 flex items-center gap-1 truncate text-[11px] text-gray-500 dark:text-gray-400">
+                      <p className="mt-0.5 flex items-center gap-1 truncate text-[11px] text-slate-600 dark:text-slate-300">
                         {c.overdue_count > 0 ? (
                           <span className="inline-flex items-center gap-1 font-semibold text-danger-700 dark:text-danger-500">
                             <AlertTriangle className="w-2.5 h-2.5" />
@@ -653,7 +656,7 @@ const MyLearningHome: React.FC = () => {
                 </li>
               ))}
             </ul>
-          </motion.section>
+          </motion.section>}
         </div>
       )}
     </div>

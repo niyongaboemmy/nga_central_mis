@@ -10,6 +10,7 @@ import {
   CourseGenerationRun,
   CourseGenerationTask,
   CourseItem,
+  CourseItemProgress,
   LessonNote,
   LO_LessonSection,
   Notification,
@@ -110,6 +111,7 @@ describe("Lesson Studio A1–A2: chain, context pack, durable generation, review
   let teacherToken: string;
   let otherToken: string;
   let studentToken: string;
+  let studentId: number;
   let schemeId: number;
   let courseId: number;
   let w1: number; // week with a lesson plan and the teacher's own note for 1.1
@@ -131,7 +133,7 @@ describe("Lesson Studio A1–A2: chain, context pack, durable generation, review
   beforeAll(async () => {
     teacherId = await createUser({ userType: "TEACHER" });
     const otherId = await createUser({ userType: "TEACHER" });
-    const studentId = await createUser({ userType: "STUDENT" });
+    studentId = await createUser({ userType: "STUDENT" });
     teacherToken = signToken(teacherId);
     otherToken = signToken(otherId);
     studentToken = signToken(studentId);
@@ -317,6 +319,57 @@ describe("Lesson Studio A1–A2: chain, context pack, durable generation, review
     const cov = await request(app).get(`/elearning/courses/${courseId}/coverage`).set(auth(teacherToken));
     const sec = cov.body.data.sections.find((s: any) => s.section_id === w2);
     expect(sec.gaps).toHaveLength(0);
+  });
+
+  it("choosing a week that is already live UPDATES it: fresh drafts that retire the old items on approval, students' records kept", async () => {
+    // w2 was approved and turned on above. A student has progress on its live knowledge check.
+    const live = await db.select().from(CourseItem).where(and(eq(CourseItem.section_id, w2), eq(CourseItem.is_published, 1)));
+    const oldKc = live.find((i) => i.item_type === "KNOWLEDGE_CHECK")!;
+    const oldLesson = live.find((i) => i.item_type === "LESSON_NOTE" && i.ai_origin !== "NONE")!;
+    expect(oldKc && oldLesson).toBeTruthy();
+    await db.insert(CourseItemProgress).values({ item_id: oldKc.item_id, user_id: studentId, state: "COMPLETED", completed_at: new Date(), completed_via: "EVENT" });
+
+    // Same recipe as before — which used to be skipped as "unchanged".
+    const est = await request(app).post(`/elearning/courses/${courseId}/generation/estimate`).set(auth(teacherToken)).send({ blueprint, section_ids: [w2] });
+    expect(est.body.data.weeks_planned[0].notes).toContain("UPDATE");
+    const before = calls.length;
+    const start = await request(app).post(`/elearning/courses/${courseId}/generation/runs`).set(auth(teacherToken)).send({ blueprint, section_ids: [w2], mode: "FULL" });
+    expect(start.status).toBe(202);
+    await drainWorker();
+    expect(calls.length).toBeGreaterThan(before);
+    expect(calls.some((c) => c.prompt.includes("refreshed, improved version"))).toBe(true);
+    const tasks = await db.select().from(CourseGenerationTask).where(eq(CourseGenerationTask.run_id, start.body.data.run_id));
+    expect(tasks.filter((t) => t.kind !== "REUSE_PLACEMENT").every((t) => t.status === "SUCCEEDED")).toBe(true);
+
+    // The new drafts say what they replace; students still see only the current version.
+    const drafts = await db.select().from(CourseItem).where(and(eq(CourseItem.section_id, w2), eq(CourseItem.review_state, "PENDING_REVIEW")));
+    const newKc = drafts.find((d) => d.item_type === "KNOWLEDGE_CHECK")!;
+    expect((newKc.source_refs as any).replaces).toEqual([oldKc.item_id]);
+    expect((newKc.review_flags as any[]).some((f) => f.kind === "UPDATE")).toBe(true);
+    let learner = await request(app).get(`/elearning/my/courses/${courseId}`).set(auth(studentToken));
+    expect(learner.body.data.sections.find((x: any) => x.section_id === w2).items.map((i: any) => i.item_id)).toContain(oldKc.item_id);
+
+    // Approve: the update takes the old item's place; the old one is retired, not deleted.
+    const r = await request(app).post(`/elearning/sections/${w2}/drafts/approve`).set(auth(teacherToken)).send({ item_ids: [newKc.item_id] });
+    expect(r.status).toBe(200);
+    expect(r.body.data.retired).toEqual([oldKc.item_id]);
+    const [retired] = await db.select().from(CourseItem).where(eq(CourseItem.item_id, oldKc.item_id));
+    expect(retired).toMatchObject({ is_published: 0, review_state: "DISMISSED" });
+    const [promoted] = await db.select().from(CourseItem).where(eq(CourseItem.item_id, newKc.item_id));
+    expect(promoted.position).toBe(oldKc.position);
+    const kept = await db.select().from(CourseItemProgress).where(and(eq(CourseItemProgress.item_id, oldKc.item_id), eq(CourseItemProgress.user_id, studentId)));
+    expect(kept).toHaveLength(1);
+
+    learner = await request(app).get(`/elearning/my/courses/${courseId}`).set(auth(studentToken));
+    const ids = learner.body.data.sections.find((x: any) => x.section_id === w2).items.map((i: any) => i.item_id);
+    expect(ids).toContain(newKc.item_id);
+    expect(ids).not.toContain(oldKc.item_id);
+    const builder = await request(app).get(`/elearning/courses/${courseId}`).set(auth(teacherToken));
+    const bIds = builder.body.data.sections.find((x: any) => x.section_id === w2).items.map((i: any) => i.item_id);
+    expect(bIds).not.toContain(oldKc.item_id);
+
+    // Tidy up so later tests see the week as before: drop the other pending update drafts.
+    for (const d of drafts.filter((x) => x.item_id !== newKc.item_id)) await request(app).post(`/elearning/items/${d.item_id}/dismiss-draft`).set(auth(teacherToken));
   });
 
   it("regenerate replaces an untouched draft but never an edited one", async () => {

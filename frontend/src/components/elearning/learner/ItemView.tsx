@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { motion, useScroll, useSpring } from "framer-motion";
 import {
   CheckCircle2,
@@ -17,6 +17,7 @@ import renderMathInElement from "katex/contrib/auto-render";
 import "katex/dist/katex.min.css";
 import { elearningApi, OpenedItem } from "../../../api/elearning";
 import SharedLessonNoteViewPage from "../../lessonNotes/SharedLessonNoteViewPage";
+import { useLearnerScrollRoot } from "./scrollRoot";
 import { copy } from "../copy";
 import { useMotion } from "../../../design/motion";
 import Mascot from "../ui/Mascot";
@@ -59,7 +60,10 @@ const ReadingProgress: React.FC<{
 }> = ({ container, absolute }) => {
   // In focus mode the page itself doesn't scroll — the overlay does, so the bar has to
   // track that container instead of the window.
-  const { scrollYProgress } = useScroll(container ? { container } : undefined);
+  // Outside focus mode it follows the course page's scroller (desktop) or the window (phones).
+  const root = useLearnerScrollRoot();
+  const rootRef = useMemo(() => ({ current: root }), [root]) as React.RefObject<HTMLElement>;
+  const { scrollYProgress } = useScroll(container ? { container } : root ? { container: rootRef } : undefined);
   const width = useSpring(scrollYProgress, {
     stiffness: 220,
     damping: 40,
@@ -146,7 +150,7 @@ const ItemView: React.FC<Props> = ({
         <h2 className="mt-3 text-base font-semibold text-gray-800 dark:text-gray-100">
           {copy.course.locked}
         </h2>
-        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400 max-w-sm">
+        <p className="mt-1 text-sm text-slate-600 dark:text-slate-300 max-w-sm">
           {copy.course.lockedBody(null)}
         </p>
       </div>
@@ -219,7 +223,7 @@ const ItemView: React.FC<Props> = ({
               href={content?.external_url || item.external_url || "#"}
               target="_blank"
               rel="noopener noreferrer"
-              className="mt-4 inline-flex items-center gap-2 min-h-[44px] px-5 rounded-pill bg-brand-500 hover:bg-brand-600 text-white text-sm font-semibold shadow-soft focus:outline-none focus-visible:shadow-glow"
+              className="mt-4 inline-flex items-center gap-2 min-h-[44px] px-5 rounded-pill bg-brand-600 hover:bg-brand-700 text-white text-sm font-semibold shadow-soft focus:outline-none focus-visible:shadow-glow"
             >
               <ExternalLink className="w-4 h-4" />
               {copy.course.openIn(
@@ -232,13 +236,13 @@ const ItemView: React.FC<Props> = ({
             </a>
             {item.completion_rule === "MARK_DONE" &&
               item.state !== "COMPLETED" && (
-                <p className="mt-3 text-xs text-gray-500 dark:text-gray-400">
+                <p className="mt-3 text-xs text-slate-600 dark:text-slate-300">
                   {copy.course.linkAfterOpening}
                 </p>
               )}
             {["SUBMIT", "MIN_SCORE"].includes(item.completion_rule) &&
               item.state !== "COMPLETED" && (
-                <p className="mt-4 text-xs text-gray-500 dark:text-gray-400 flex items-center gap-2">
+                <p className="mt-4 text-xs text-slate-600 dark:text-slate-300 flex items-center gap-2">
                   <Loader2 className="w-3.5 h-3.5 animate-spin" />{" "}
                   {copy.course.awaitingResult}
                   {item.completion_rule === "MIN_SCORE" && item.min_score_pct
@@ -284,7 +288,7 @@ const ExternalDestination: React.FC<{
         <p className="text-sm font-semibold text-gray-800 dark:text-gray-100 truncate">
           {host}
         </p>
-        <p className="text-[11px] text-gray-500 dark:text-gray-400">
+        <p className="text-[11px] text-slate-600 dark:text-slate-300">
           {itemType === "LINK"
             ? copy.course.linkOpensElsewhere(host)
             : copy.builder.itemTypes[itemType]}
@@ -332,25 +336,30 @@ const ItemFrame: React.FC<{
         } as React.CSSProperties
       }
     >
-      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] uppercase tracking-wider font-semibold text-gray-500 dark:text-gray-400">
+      {/* Eyebrow: where you are (the week, one truncated line that goes back to it), then what
+          this is and how far through the week — instead of one long line that wrapped
+          into a centred block on phones. */}
+      <button
+        onClick={onBack}
+        className="block max-w-full truncate text-left text-xs font-medium text-slate-600 dark:text-slate-300 hover:text-brand-700 dark:hover:text-brand-200 focus-visible:outline-none focus-visible:underline transition-colors"
+        title={opened.section.title}
+      >
+        ← {opened.section.title}
+      </button>
+      <div className="mt-1 flex items-center gap-2 text-[11px] uppercase tracking-wider font-semibold text-slate-600 dark:text-slate-300">
         <span className="flex items-center gap-1.5">
           <ItemTypeIcon type={item.item_type} className="w-3.5 h-3.5" />
           {copy.builder.itemTypes[item.item_type]}
         </span>
-        <span aria-hidden>·</span>
-        <button
-          onClick={onBack}
-          className="hover:text-brand-600 dark:hover:text-brand-300 focus-visible:outline-none focus-visible:underline transition-colors uppercase"
-        >
-          {opened.section.title}
-        </button>
         {step && step.total > 1 && (
-          <>
-            <span aria-hidden>·</span>
-            <span className="normal-case tracking-normal font-medium text-gray-400">
-              {copy.course.stepOf(step.index, step.total)}
+          <span className="normal-case tracking-normal font-medium inline-flex items-center gap-1.5">
+            <span aria-hidden>·</span> {copy.course.stepOf(step.index, step.total)}
+            <span className="inline-flex gap-0.5" aria-hidden>
+              {Array.from({ length: step.total }, (_, i) => (
+                <span key={i} className={`h-1 rounded-full ${i < step.index ? "w-3 bg-brand-600 dark:bg-brand-200" : "w-1.5 bg-gray-300 dark:bg-white/20"}`} />
+              ))}
             </span>
-          </>
+          </span>
         )}
       </div>
 
@@ -393,7 +402,7 @@ const ItemFrame: React.FC<{
         ) : null}
         {item.criteria.length > 0 && (
           <span
-            className="inline-flex items-center gap-1 text-[11px] font-medium text-gray-500 dark:text-gray-400"
+            className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-600 dark:text-slate-300"
             title={copy.course.teachesLabel}
           >
             <Target className="w-3 h-3" />
@@ -407,7 +416,7 @@ const ItemFrame: React.FC<{
           className="mt-3 space-y-1 p-3 rounded-xl el-subtle"
           aria-label={copy.course.teachesLabel}
         >
-          <li className="text-[11px] uppercase tracking-wider font-semibold text-gray-500 dark:text-gray-400">
+          <li className="text-[11px] uppercase tracking-wider font-semibold text-slate-600 dark:text-slate-300">
             {copy.course.teachesLabel}
           </li>
           {item.criteria.map((c) => (
@@ -415,7 +424,7 @@ const ItemFrame: React.FC<{
               key={c.criteria_id}
               className="flex items-start gap-2 text-[13px] text-gray-700 dark:text-gray-200 leading-snug"
             >
-              <span className="mt-0.5 text-[11px] font-bold text-brand-600 dark:text-brand-300 flex-shrink-0">
+              <span className="mt-0.5 text-[11px] font-bold text-brand-600 dark:text-brand-200 flex-shrink-0">
                 {c.criteria_number}
               </span>
               {c.description}
@@ -446,7 +455,7 @@ const ItemFrame: React.FC<{
             <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">
               {item.title}
             </p>
-            <p className="text-[11px] text-gray-500 dark:text-gray-400 truncate">
+            <p className="text-[11px] text-slate-600 dark:text-slate-300 truncate">
               <span>{opened.section.title}</span>
               {step && step.total > 1 && (
                 <>
@@ -456,7 +465,7 @@ const ItemFrame: React.FC<{
               )}
             </p>
           </div>
-          <span className="hidden lg:inline text-[11px] text-gray-400">
+          <span className="hidden lg:inline text-[11px] text-slate-600 dark:text-slate-300">
             {copy.course.focusHint}
           </span>
           {/* Reading settings stay reachable: focus mode is exactly when a student
@@ -550,7 +559,7 @@ const PageView: React.FC<FrameProps> = ({ opened, ...frame }) => {
     <ItemFrame opened={opened} {...frame}>
       <article
         ref={ref}
-        className="el-reader prose prose-slate dark:prose-invert prose-lg max-w-none prose-headings:font-semibold prose-headings:tracking-tight prose-img:rounded-xl prose-a:text-brand-600 dark:prose-a:text-brand-300"
+        className="el-reader prose prose-slate dark:prose-invert prose-lg max-w-[70ch] prose-headings:font-semibold prose-headings:tracking-tight prose-img:rounded-xl prose-a:text-brand-600 dark:prose-a:text-brand-200"
         dangerouslySetInnerHTML={{
           __html: opened.content?.content_html || "<p></p>",
         }}

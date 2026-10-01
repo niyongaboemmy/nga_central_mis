@@ -35,7 +35,7 @@ const Toggle: React.FC<{ checked: boolean; onChange: (v: boolean) => void; label
   <label className="flex items-center justify-between gap-4 min-h-[48px] py-2 cursor-pointer">
     <span>
       <span className="block text-sm text-gray-800 dark:text-gray-100">{label}</span>
-      {hint && <span className="block text-[11px] text-gray-500 dark:text-gray-400">{hint}</span>}
+      {hint && <span className="block text-[11px] text-slate-600 dark:text-slate-300">{hint}</span>}
     </span>
     <button
       role="switch"
@@ -71,14 +71,14 @@ const MePage: React.FC = () => {
 
   return (
     <div className="pt-6 pb-16 max-w-3xl">
-      <Link to={learnerRoutes.home} className="inline-flex items-center gap-1 min-h-[40px] text-sm text-gray-500 hover:text-gray-800 dark:hover:text-gray-200">
+      <Link to={learnerRoutes.home} className="inline-flex items-center gap-1 min-h-[44px] text-sm text-slate-600 dark:text-slate-300 hover:text-gray-900 dark:hover:text-white">
         <ArrowLeft className="w-4 h-4" /> {copy.home.title}
       </Link>
       <div className="mt-2 flex items-center gap-4">
         <Mascot pose="book" size={56} />
         <div>
           <h1 className="text-display text-gray-900 dark:text-white">{firstName || copy.me.title}</h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400">{copy.me.masteryBody}</p>
+          <p className="text-sm text-slate-600 dark:text-slate-300">{copy.me.masteryBody}</p>
         </div>
       </div>
 
@@ -107,7 +107,7 @@ const MePage: React.FC = () => {
                         <p className="text-[13px] text-gray-700 dark:text-gray-200 truncate">
                           <span className="font-semibold">Element {e.element_number}</span> · {e.title}
                         </p>
-                        <span className="text-[11px] text-gray-500 dark:text-gray-400 tabular-nums flex-shrink-0">{e.demonstrated}/{e.total} shown</span>
+                        <span className="text-[11px] text-slate-600 dark:text-slate-300 tabular-nums flex-shrink-0">{e.demonstrated}/{e.total} shown</span>
                       </div>
                       <ProgressBar value={e.total ? ((e.covered + e.demonstrated) / e.total) * 100 : 0} color={s.color || undefined} className="mt-1.5" ariaLabel={copy.me.shown(e.demonstrated, e.total, `Element ${e.element_number}`)} />
                       <ul className="mt-2 flex flex-wrap gap-1.5" aria-label="Criteria">
@@ -120,7 +120,7 @@ const MePage: React.FC = () => {
                                 ? "el-chip-success"
                                 : c.state === "COVERED"
                                   ? "el-chip-brand"
-                                  : "el-chip text-gray-400"
+                                  : "el-chip text-slate-600 dark:text-slate-300"
                             }`}
                           >
                             {c.criteria_number}

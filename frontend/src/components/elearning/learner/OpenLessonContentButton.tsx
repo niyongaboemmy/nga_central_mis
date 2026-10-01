@@ -31,7 +31,7 @@ const OpenLessonContentButton: React.FC<{ subjectId?: number | null; classGroupI
       type="button"
       onClick={() => navigate(learnerRoutes.course(target.course_id, target.section_id))}
       title={target.title}
-      className={`px-5 py-2 text-sm font-medium bg-brand-500 hover:bg-brand-600 text-white rounded-full shadow-sm transition-all flex items-center gap-2 ${className}`}
+      className={`px-5 py-2 text-sm font-medium bg-brand-600 hover:bg-brand-700 text-white rounded-full shadow-sm transition-all flex items-center gap-2 ${className}`}
     >
       <GraduationCap className="w-4 h-4" /> Open lesson content
     </button>

@@ -47,6 +47,8 @@ import {
   WeekPill,
 } from "../ui/primitives";
 import { useLearningPrefs } from "./useLearningPrefs";
+import { LearnerScrollRoot } from "./scrollRoot";
+import { useViewportFit } from "../ui/useViewportFit";
 
 const HEARTBEAT_MS = 30_000;
 
@@ -99,6 +101,22 @@ const CoursePage: React.FC = () => {
   const [reviewing, setReviewing] = useState(false);
   const [tutorOpen, setTutorOpen] = useState(false);
   const { online, queued } = useOffline();
+  // From lg the page is a fixed-height frame: the week list stays put and only the centre
+  // column scrolls. Phones keep window scrolling (the address bar can still collapse).
+  const [frameEl, setFrameEl] = useState<HTMLDivElement | null>(null);
+  const [mainEl, setMainEl] = useState<HTMLElement | null>(null);
+  const [isDesktop, setIsDesktop] = useState(() => typeof window !== "undefined" && !!window.matchMedia?.("(min-width: 1024px)").matches);
+  useEffect(() => {
+    const mq = window.matchMedia?.("(min-width: 1024px)");
+    if (!mq) return;
+    const on = () => setIsDesktop(mq.matches);
+    mq.addEventListener?.("change", on);
+    return () => mq.removeEventListener?.("change", on);
+  }, []);
+  const frameHeight = useViewportFit(isDesktop ? frameEl : null, { gap: 0 });
+  const scrollRoot = isDesktop ? mainEl : null;
+  const scrollRootRef = useRef<HTMLElement | null>(null);
+  scrollRootRef.current = scrollRoot;
 
   useEffect(() => {
     registerLearnerServiceWorker();
@@ -148,7 +166,7 @@ const CoursePage: React.FC = () => {
         if (!cancelled) showToast("That item isn't available", "error");
       })
       .finally(() => !cancelled && setLoadingItem(false));
-    window.scrollTo({ top: 0 });
+    (scrollRootRef.current ?? window).scrollTo({ top: 0 });
     return () => {
       cancelled = true;
     };
@@ -158,7 +176,7 @@ const CoursePage: React.FC = () => {
   // Live scroll position, so a teacher monitoring the class sees where in the
   // page this student actually is. Separate from the heartbeat on purpose: it
   // fires far more often and writes nothing to the database.
-  useReportPosition(cid, opened && !opened.locked ? opened.item.item_id : null);
+  useReportPosition(cid, opened && !opened.locked ? opened.item.item_id : null, scrollRootRef);
 
   // Heartbeat while an item is open (fire-and-forget, one call per 30 s), plus an explicit
   // departure so the teacher's "learning right now" empties the moment a student leaves
@@ -174,7 +192,7 @@ const CoursePage: React.FC = () => {
       seconds.current += HEARTBEAT_MS / 1000;
       sendOrQueue(`/elearning/my/items/${itemId}/heartbeat`, {
         seconds: HEARTBEAT_MS / 1000,
-        position: { scrollY: window.scrollY },
+        position: { scrollY: scrollRootRef.current ? scrollRootRef.current.scrollTop : window.scrollY },
       }).catch(() => undefined);
     }, HEARTBEAT_MS);
 
@@ -317,10 +335,14 @@ const CoursePage: React.FC = () => {
     );
   }
 
+  // Where the student lands: the week asked for, this week, then where their next step is,
+  // then the first week that has anything in it — never an empty Week 1 by default.
   const activeSection = opened
     ? opened.section.section_id
     : sectionParam ||
       course.sections.find((s) => s.is_current_week)?.section_id ||
+      course.summary?.next_item?.section_id ||
+      course.sections.find((s) => s.items.length > 0)?.section_id ||
       course.sections[0]?.section_id ||
       null;
   const overviewSection =
@@ -330,7 +352,12 @@ const CoursePage: React.FC = () => {
   const isDone = opened?.item.state === "COMPLETED";
 
   return (
-    <div className="-mx-4 md:-mx-6 flex min-h-[calc(100vh-4rem)]">
+    <LearnerScrollRoot.Provider value={scrollRoot}>
+    <div
+      ref={setFrameEl}
+      className="-mx-4 md:-mx-6 flex min-h-[calc(100vh-4rem)] lg:min-h-0 lg:overflow-hidden"
+      style={isDesktop && frameHeight ? { height: frameHeight } : undefined}
+    >
       <IndexDrawer
         course={course}
         activeItemId={iid}
@@ -348,7 +375,7 @@ const CoursePage: React.FC = () => {
 
       {/* The reader used to start flush against the app bar, so the title had
           no air above it. */}
-      <main className="min-w-0 flex-1 pt-4 md:pt-6">
+      <main ref={setMainEl} className="min-w-0 flex-1 pt-4 md:pt-6 lg:h-full lg:overflow-y-auto lg:overscroll-contain" tabIndex={-1} aria-label="Course content">
         {(!online || queued > 0) && (
           <div
             className="mx-4 mt-5 flex items-center gap-2 px-3 py-2 rounded-xl el-chip-warning text-xs"
@@ -365,14 +392,15 @@ const CoursePage: React.FC = () => {
           <div className="flex items-center gap-2 px-4 pt-5">
             <button
               onClick={() => navigate(learnerRoutes.home)}
-              className="inline-flex items-center gap-1 min-h-[40px] px-2 rounded-lg text-sm text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-white/[0.06]"
+              aria-label={copy.home.title}
+              className="inline-flex items-center gap-1 min-h-[44px] min-w-[44px] px-2 rounded-lg text-sm text-slate-600 dark:text-slate-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-white/[0.06]"
             >
               <ArrowLeft className="w-4 h-4" />{" "}
               <span className="hidden sm:inline">{copy.home.title}</span>
             </button>
             <button
               onClick={() => setIndexOpen(true)}
-              className="lg:hidden inline-flex items-center gap-1 min-h-[40px] px-2 rounded-lg text-sm text-gray-500 hover:bg-gray-100 dark:hover:bg-white/[0.06]"
+              className="lg:hidden inline-flex items-center gap-1 min-h-[44px] px-2 rounded-lg text-sm text-slate-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-white/[0.06]"
               aria-label={copy.course.index}
             >
               <List className="w-4 h-4" /> {copy.course.index}
@@ -447,6 +475,7 @@ const CoursePage: React.FC = () => {
                 </p>
               )}
               <DownloadWeek sectionId={overviewSection.section_id} />
+              {overviewSection.items.length > 0 && (
               <div className="mt-4 flex items-end gap-3">
                 <div className="flex-1">
                   <ProgressBar
@@ -465,7 +494,7 @@ const CoursePage: React.FC = () => {
                       undefined
                     }
                   />
-                  <p className="mt-1 text-[11px] text-gray-500 dark:text-gray-400">
+                  <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">
                     {overviewSection.required_done ===
                       overviewSection.required_total &&
                     overviewSection.required_total > 0
@@ -487,6 +516,7 @@ const CoursePage: React.FC = () => {
                     </button>
                   )}
               </div>
+              )}
               {/* What this week is for — one line, expandable. Progressive disclosure over a panel. */}
               {overviewSection.criteria_progress.length > 0 &&
                 (() => {
@@ -541,7 +571,20 @@ const CoursePage: React.FC = () => {
                 </div>
               ) : overviewSection.items.length === 0 ? (
                 <div className="mt-6">
-                  <EmptyState pose="sleepy" title={copy.course.emptyStudent} />
+                  {(() => {
+                    // Don't leave the student at a dead end: point at the nearest week with content.
+                    const withContent = course.sections.filter((s) => s.items.length > 0 && s.state !== "locked");
+                    const target =
+                      withContent.find((s) => s.position > overviewSection.position) ?? withContent[withContent.length - 1];
+                    return (
+                      <EmptyState
+                        pose="sleepy"
+                        title={copy.course.emptyStudent}
+                        body={target ? `${target.week_number || target.title.split(" — ")[0]} has ${target.items.length} thing${target.items.length === 1 ? "" : "s"} to learn.` : undefined}
+                        action={target ? { label: `Go to ${target.week_number || target.title.split(" — ")[0]}`, onClick: () => goSection(target.section_id) } : undefined}
+                      />
+                    );
+                  })()}
                 </div>
               ) : (
                 <ol className="mt-6 relative" aria-label="Learning journey">
@@ -554,14 +597,14 @@ const CoursePage: React.FC = () => {
                     i.item_type === "HEADER" ? (
                       <li
                         key={i.item_id}
-                        className="relative pl-12 pt-4 pb-1 text-[11px] uppercase tracking-wider font-semibold text-gray-500 dark:text-gray-400"
+                        className="relative pl-12 pt-4 pb-1 text-[11px] uppercase tracking-wider font-semibold text-slate-600 dark:text-slate-300"
                       >
                         {i.title}
                       </li>
                     ) : (
                       <li key={i.item_id} className="relative py-1">
                         <span
-                          className={`absolute left-2 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold ring-4 ring-gray-50 dark:ring-gray-950 ${i.state === "COMPLETED" ? "bg-success-500 text-white" : i.state === "IN_PROGRESS" ? "bg-brand-500 text-white" : "bg-white dark:bg-gray-900 border-2 border-gray-300 dark:border-white/20 text-gray-500"}`}
+                          className={`absolute left-2 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold ring-4 ring-gray-50 dark:ring-gray-950 ${i.state === "COMPLETED" ? "bg-success-500 text-white" : i.state === "IN_PROGRESS" ? "bg-brand-600 text-white" : "bg-white dark:bg-gray-900 border-2 border-gray-300 dark:border-white/20 text-slate-600 dark:text-slate-300"}`}
                           aria-hidden
                         >
                           {i.state === "COMPLETED"
@@ -575,7 +618,7 @@ const CoursePage: React.FC = () => {
                           {...m("tap")}
                           disabled={i.locked}
                           onClick={() => goItem(i.item_id)}
-                          className={`ml-12 w-[calc(100%-3rem)] flex items-center gap-3 p-3 el-card el-card-hover text-left min-h-[56px] disabled:opacity-60 focus:outline-none focus-visible:shadow-glow ${i.state === "IN_PROGRESS" ? "border-brand-300 dark:border-brand-700" : "border-gray-200 dark:border-white/[0.07] hover:border-brand-200 dark:hover:border-brand-700"}`}
+                          className={`ml-12 w-[calc(100%-3rem)] flex items-center gap-3 p-3 el-card el-card-hover text-left min-h-[56px] disabled:opacity-60 focus:outline-none focus-visible:shadow-glow ${i.state === "IN_PROGRESS" ? "border-brand-200 dark:border-brand-700" : "border-gray-200 dark:border-white/[0.07] hover:border-brand-200 dark:hover:border-brand-700"}`}
                           style={{
                             marginLeft: `calc(3rem + ${i.indent * 16}px)`,
                           }}
@@ -596,7 +639,7 @@ const CoursePage: React.FC = () => {
                             <span className="block text-sm font-medium text-gray-800 dark:text-gray-100 truncate">
                               {i.title}
                             </span>
-                            <span className="block text-[11px] text-gray-500 dark:text-gray-400">
+                            <span className="block text-[11px] text-slate-600 dark:text-slate-300">
                               {copy.builder.itemTypes[i.item_type]}
                               {i.estimated_minutes
                                 ? ` · ${copy.course.minutes(i.estimated_minutes)}`
@@ -661,7 +704,7 @@ const CoursePage: React.FC = () => {
               className={`min-h-[44px] px-5 rounded-pill text-sm font-semibold inline-flex items-center gap-1.5 focus:outline-none focus-visible:shadow-glow ${
                 isDone
                   ? "el-chip-success"
-                  : "bg-brand-500 hover:bg-brand-600 text-white shadow-soft"
+                  : "bg-brand-600 hover:bg-brand-700 text-white shadow-soft"
               }`}
               title="Mark as done (d)"
             >
@@ -670,7 +713,7 @@ const CoursePage: React.FC = () => {
             </motion.button>
           ) : (
             <span
-              className={`min-h-[44px] px-4 inline-flex items-center gap-1.5 text-sm font-medium ${isDone ? "text-success-700 dark:text-success-500" : "text-gray-500 dark:text-gray-400"}`}
+              className={`min-h-[44px] px-4 inline-flex items-center gap-1.5 text-sm font-medium ${isDone ? "text-success-700 dark:text-success-500" : "text-slate-600 dark:text-slate-300"}`}
             >
               {isDone ? (
                 <>
@@ -680,6 +723,15 @@ const CoursePage: React.FC = () => {
                 <CompletionDot state={opened.item.state} size={14} />
               )}
             </span>
+          )}
+          {opened.item.item_type !== "LESSON_NOTE" && (
+            <button
+              onClick={() => setTutorOpen(true)}
+              className="lg:hidden w-11 h-11 flex items-center justify-center rounded-pill text-brand-600 dark:text-brand-200 hover:bg-brand-50 dark:hover:bg-brand-500/10"
+              aria-label="Ask the AI tutor"
+            >
+              <Sparkles className="w-5 h-5" />
+            </button>
           )}
           <button
             onClick={() =>
@@ -696,10 +748,12 @@ const CoursePage: React.FC = () => {
       )}
 
       {/* AI tutor — one floating entry point, never blocks content */}
-      {!tutorOpen && (
+      {/* While an item is open on a phone the tutor lives in the bottom bar instead — a
+          floating button there sat on top of the item's own main action. */}
+      {!tutorOpen && opened?.item.item_type !== "LESSON_NOTE" && (
         <button
           onClick={() => setTutorOpen(true)}
-          className="fixed z-30 right-4 bottom-20 lg:bottom-6 w-12 h-12 rounded-pill bg-gradient-to-r from-brand-500 to-brand-600 text-white shadow-float flex items-center justify-center focus:outline-none focus-visible:shadow-glow"
+          className={`${opened && !opened.locked ? "hidden lg:flex" : "flex"} fixed z-30 right-4 bottom-6 w-12 h-12 rounded-pill bg-gradient-to-r from-brand-500 to-brand-600 text-white shadow-float items-center justify-center focus:outline-none focus-visible:shadow-glow`}
           aria-label="Ask the AI tutor"
           title="Ask the AI tutor"
         >
@@ -767,7 +821,7 @@ const CoursePage: React.FC = () => {
                       setCelebrate(null);
                       goSection(celebrate.nextSectionId!);
                     }}
-                    className="min-h-[44px] px-5 rounded-pill bg-brand-500 hover:bg-brand-600 text-white text-sm font-semibold shadow-soft"
+                    className="min-h-[44px] px-5 rounded-pill bg-brand-600 hover:bg-brand-700 text-white text-sm font-semibold shadow-soft"
                   >
                     {copy.course.nextWeek}
                   </button>
@@ -787,6 +841,7 @@ const CoursePage: React.FC = () => {
         )}
       </AnimatePresence>
     </div>
+    </LearnerScrollRoot.Provider>
   );
 };
 

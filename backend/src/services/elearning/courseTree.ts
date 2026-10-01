@@ -1,4 +1,4 @@
-import { asc, eq, inArray } from "drizzle-orm";
+import { and, asc, eq, inArray, ne } from "drizzle-orm";
 import { db } from "../../db";
 import {
   AcademicTerm,
@@ -156,7 +156,9 @@ export async function loadCourseTree(course: CourseRow, opts: { includeContent?:
   const items = await db
     .select()
     .from(CourseItem)
-    .where(inArray(CourseItem.section_id, sectionIds))
+    // Retired versions (an approved update replaced them) stay in the database for students'
+    // records but are no longer part of the course.
+    .where(and(inArray(CourseItem.section_id, sectionIds), ne(CourseItem.review_state, "DISMISSED")))
     .orderBy(asc(CourseItem.position), asc(CourseItem.item_id));
 
   const noteIds = items.filter((i) => i.item_type === "LESSON_NOTE" && i.ref_id).map((i) => i.ref_id!);

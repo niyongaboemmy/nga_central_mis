@@ -335,6 +335,14 @@ table th,
     transition: background-color 0.2s ease, color 0.2s ease;
 }
 
+/* Phones: 64px of side padding inside an inset card left ~230px of text — a few words
+   a line. Keep the sheet feel with a tighter margin so the lesson gets the width. */
+@media (max-width: 640px) {
+    .note-reader-sheet {
+        padding: 28px 20px 32px;
+    }
+}
+
 .note-reader-sheet--book {
     overflow: hidden;
 }
@@ -546,7 +554,8 @@ table th,
     align-items: center;
     gap: 0.4rem 0.9rem;
     font-size: 0.75rem;
-    opacity: 0.6;
+    /* 0.6 × 0.85 opacity on the body colour fell to ~3.5:1; 0.78 keeps it quiet but AA. */
+    opacity: 0.78;
 }
 
 .note-reader-byline-author {
@@ -554,7 +563,6 @@ table th,
     align-items: center;
     gap: 0.4rem;
     font-weight: 600;
-    opacity: 0.85;
 }
 
 .note-reader-byline-avatar {

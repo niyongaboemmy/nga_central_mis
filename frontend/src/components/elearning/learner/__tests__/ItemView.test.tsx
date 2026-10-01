@@ -67,7 +67,8 @@ describe("ItemView — the lesson reader", () => {
     render(<ItemView opened={opened()} onBack={vi.fn()} step={{ index: 2, total: 5 }} />);
 
     expect(screen.getByText("Step 2 of 5")).toBeInTheDocument();
-    expect(screen.getByText("Week 3 — Data Types and Type Conversion")).toBeInTheDocument();
+    // The week is a back link above the type line ("← Week 3 — …").
+    expect(screen.getByRole("button", { name: /Week 3 — Data Types and Type Conversion/ })).toBeInTheDocument();
   });
 
   it("shows how long the step takes and what it teaches", () => {
@@ -156,18 +157,18 @@ describe("ItemView — the lesson reader", () => {
     localStorage.clear();
     const { unmount } = render(<ItemView opened={opened()} onBack={vi.fn()} />);
 
-    // The reader opens at 80% — a deliberate default, not the floor.
-    expect(screen.getByText("80%")).toBeInTheDocument();
+    // The reader opens at 100% (16px body) — readable by default, and not the floor.
+    expect(screen.getByText("100%")).toBeInTheDocument();
 
     const bigger = screen.getByRole("button", { name: /Larger text/i });
     await userEvent.click(bigger);
     await userEvent.click(bigger);
-    expect(screen.getByText("100%")).toBeInTheDocument();
+    expect(screen.getByText("120%")).toBeInTheDocument();
 
     // Preference is per-device and shared with the lesson-note reader.
     unmount();
     render(<ItemView opened={opened()} onBack={vi.fn()} />);
-    expect(screen.getByText("100%")).toBeInTheDocument();
+    expect(screen.getByText("120%")).toBeInTheDocument();
   });
 
   it("will not shrink the text past the floor", async () => {
