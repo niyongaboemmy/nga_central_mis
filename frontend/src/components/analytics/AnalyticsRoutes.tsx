@@ -3,6 +3,7 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import { useAccess } from "../../hooks/useAccess";
 import { Empty } from "../access/shared";
 import { AnalyticsShell } from "./AnalyticsShell";
+import { PageSkeleton } from "./Skeleton";
 
 /**
  * /analytics/* -- Usage & Monitoring. Pages load lazily so the console's charts and map
@@ -27,10 +28,10 @@ const IpLookupPage = lazy(() => import("./Locations").then((m) => ({ default: m.
 
 const Gate: React.FC<{ caps: string[]; children: React.ReactNode }> = ({ caps, children }) => {
   const { can, loading } = useAccess();
-  if (loading) return <Empty>Loading…</Empty>;
+  if (loading) return <PageSkeleton />;
   if (!can(caps))
     return (
-      <AnalyticsShell title="Not available">
+      <AnalyticsShell title="Not available" back={{ fallback: "/home" }}>
         <Empty>You don't have access to this part of Usage &amp; Monitoring.</Empty>
       </AnalyticsShell>
     );
@@ -40,12 +41,12 @@ const Gate: React.FC<{ caps: string[]; children: React.ReactNode }> = ({ caps, c
 export default function AnalyticsRoutes() {
   const { can, loading } = useAccess();
   return (
-    <Suspense fallback={<Empty>Loading…</Empty>}>
+    <Suspense fallback={<PageSkeleton />}>
       <Routes>
         <Route
           index
           element={
-            loading ? <Empty>Loading…</Empty> : can("ANALYTICS_VIEW") ? <Overview /> : <Navigate to="realtime" replace />
+            loading ? <PageSkeleton /> : can("ANALYTICS_VIEW") ? <Overview /> : <Navigate to="realtime" replace />
           }
         />
         <Route path="realtime" element={<Gate caps={["ANALYTICS_VIEW", "ANALYTICS_LIVE_VIEW"]}><Realtime /></Gate>} />

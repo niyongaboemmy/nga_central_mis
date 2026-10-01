@@ -190,3 +190,61 @@ export async function backfillLegacyGrants(
   }
   return report;
 }
+
+/** Legacy roles whose holders must always carry their v2 grant (migration 099). */
+const SELF_HEALING_PRESETS = ["platform_owner", "school_administrator"] as const;
+
+/**
+ * Boot-time self-heal: an ACTIVE holder of the legacy SUPER_ADMIN / ADMIN role
+ * who has never had a v2 grant of that role gets one, so a platform owner
+ * created after the Phase 1 backfill is not locked out of v2-only screens
+ * (Access Studio, Usage & Monitoring). A grant that exists in any state --
+ * including one an operator ended or suspended -- is left alone.
+ */
+export async function ensureLegacyAdminGrants(): Promise<Array<{ userId: number; role: string }>> {
+  const holdings = await db
+    .select({
+      user_id: UserRole.user_id,
+      role_id: UserRole.role_id,
+      role_name: AccessRole.name,
+      preset_key: AccessRole.preset_key,
+      role_status: AccessRole.status,
+      user_status: User.status,
+    })
+    .from(UserRole)
+    .innerJoin(AccessRole, eq(AccessRole.role_id, UserRole.role_id))
+    .innerJoin(User, eq(User.user_id, UserRole.user_id))
+    .where(inArray(AccessRole.preset_key, [...SELF_HEALING_PRESETS]));
+  const eligible = holdings.filter((h) => h.role_status === "ACTIVE" && h.user_status === "ACTIVE");
+  if (eligible.length === 0) return [];
+
+  const existing = await db
+    .select({ user_id: AccessGrant.user_id, role_id: AccessGrant.role_id })
+    .from(AccessGrant)
+    .where(inArray(AccessGrant.role_id, Array.from(new Set(eligible.map((h) => h.role_id)))));
+  const have = new Set(existing.map((g) => `${g.user_id}|${g.role_id}`));
+  const missing = eligible.filter((h) => !have.has(`${h.user_id}|${h.role_id}`));
+  if (missing.length === 0) return [];
+
+  const schoolId = await defaultSchoolId();
+  for (const h of missing) {
+    await db.insert(AccessGrant).values({
+      user_id: h.user_id,
+      role_id: h.role_id,
+      school_id: schoolId,
+      scope_type: LEGACY_ROLE_BACKFILL[h.preset_key!] === "PLATFORM" ? "PLATFORM" : "SCHOOL",
+      source: "MIGRATION",
+      source_ref: `userrole:${h.user_id}:${h.role_id}`,
+      status: "ACTIVE",
+      title: h.role_name,
+      justification: "Legacy role holder without a v2 grant (self-heal)",
+    });
+  }
+  await bumpAccessVersion(missing.map((h) => h.user_id));
+  await writeAudit({
+    actorId: null,
+    action: "backfill.self_heal",
+    after: { grants: missing.map((h) => ({ userId: h.user_id, role: h.role_name })) },
+  });
+  return missing.map((h) => ({ userId: h.user_id, role: h.role_name }));
+}

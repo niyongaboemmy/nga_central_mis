@@ -10,6 +10,7 @@ import { useReport } from "./useReport";
 import { BarList, DataTable, fmtDate, fmtInt, fmtMsDur } from "./charts";
 import { AppDot, DeviceIcon, Kpi, Segmented, StatusBadge, placeLabel, useFeatureLabels, userTypeLabel } from "./common";
 import { ActivityCalendar, FixList, IpTable, ReasonDialog, Timeline } from "./PersonParts";
+import { SkeletonKpis, SkeletonPanel, SkeletonProfile, SkeletonTable, SkeletonTimeline } from "./Skeleton";
 import { WatchDialog } from "./Watchlist";
 
 /**
@@ -29,8 +30,15 @@ export default function User360() {
   const [ctl, setCtl] = useState<Ctl>(null);
   const label = useFeatureLabels();
 
-  if (error) return <AnalyticsShell title="Person"><Empty>{error}</Empty></AnalyticsShell>;
-  if (loading && !data) return <AnalyticsShell title="Person"><Empty>Loading…</Empty></AnalyticsShell>;
+  if (error) return <AnalyticsShell title="Person" back={{ fallback: "/analytics/audience" }} hideTabs><Empty>{error}</Empty></AnalyticsShell>;
+  if (loading && !data)
+    return (
+      <AnalyticsShell title={"Loading person…"} back={{ fallback: "/analytics/audience" }} hideTabs>
+        <SkeletonProfile />
+        <SkeletonKpis count={5} className="grid grid-cols-2 lg:grid-cols-5 gap-3" />
+        <SkeletonPanel><SkeletonTimeline /></SkeletonPanel>
+      </AnalyticsShell>
+    );
   if (!data) return null;
   const p = data.profile;
   const s = data.summary;
@@ -45,6 +53,9 @@ export default function User360() {
   return (
     <AnalyticsShell
       title={p.name}
+      back={{ fallback: "/analytics/audience" }}
+      hideTabs
+      refreshing={loading}
       subtitle={
         <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-1">
           {userTypeLabel(p.user_type)}
@@ -79,7 +90,7 @@ export default function User360() {
         </div>
       }
     >
-      <Panel title="Right now">
+      <Panel title="Right now" className="an-rise">
         {live ? (
           <ul className="space-y-1.5">
             {live.tabs.map((t: any, i: number) => (
@@ -111,7 +122,7 @@ export default function User360() {
         <Kpi label="First seen" value={<span className="text-base">{fmtDate(p.first_seen_at, false)}</span>} hint={Object.keys(p.first_seen_by_app ?? {}).join(", ")} />
       </div>
 
-      <Panel title="Last 12 months">
+      <Panel title="Last 12 months" className="an-rise">
         <ActivityCalendar days={s.calendar} />
         <div className="flex flex-wrap gap-4 mt-3 text-sm">
           {s.by_app.map((a: any) => (
@@ -238,12 +249,13 @@ const TimelineTab: React.FC<{ id: number }> = ({ id }) => {
 };
 
 const DevicesTab: React.FC<{ id: number }> = ({ id }) => {
-  const { data } = useReport(() => peopleApi.devices(id), `d${id}`);
+  const { data, loading } = useReport(() => peopleApi.devices(id), `d${id}`);
   return (
     <Panel title="Devices">
       <DataTable
         rows={data ?? []}
         rowKey={(r: any) => r.device_id}
+        loading={loading}
         empty="No devices yet."
         columns={[
           { key: "d", label: "Device", render: (r: any) => <Link to={`/analytics/visitors/${r.device_id}`} className="hover:underline inline-flex items-center gap-1.5"><DeviceIcon type={r.device.type} />{[r.device.browser, r.device.os].filter(Boolean).join(" · ") || r.visitor_code}{r.pwa && <span className="text-xs px-1 rounded bg-slate-100 dark:bg-slate-800">App</span>}</Link> },
@@ -262,19 +274,20 @@ const NetworkTab: React.FC<{ id: number; showFixes: boolean }> = ({ id, showFixe
   const { data } = useReport(() => peopleApi.network(id), `n${id}`);
   return (
     <div className="grid lg:grid-cols-3 gap-4">
-      <Panel title="IP addresses" className="lg:col-span-2 min-w-0">{data ? <IpTable ips={data.ips} /> : <Empty>Loading…</Empty>}</Panel>
+      <Panel title="IP addresses" className="lg:col-span-2 min-w-0">{data ? <IpTable ips={data.ips} /> : <SkeletonTable rows={4} cols={4} />}</Panel>
       <Panel title="Precise location" className="min-w-0">{showFixes ? <FixList fixes={data?.fixes ?? []} /> : <Empty>Needs “See precise (browser) location fixes”.</Empty>}</Panel>
     </div>
   );
 };
 
 const SecurityTab: React.FC<{ id: number }> = ({ id }) => {
-  const { data } = useReport(() => peopleApi.security(id), `s${id}`);
+  const { data, loading } = useReport(() => peopleApi.security(id), `s${id}`);
   return (
     <Panel title={`Sign-ins and attempts${data?.online_devices ? ` · online on ${data.online_devices} device(s) now` : ""}`}>
       <DataTable
         rows={data?.events ?? []}
         rowKey={(r: any) => `${r.at}|${r.kind}|${r.outcome}|${r.ip}`}
+        loading={loading}
         empty="No sign-in activity yet."
         columns={[
           { key: "t", label: "When", render: (r: any) => fmtDate(r.at, true) },
@@ -288,12 +301,13 @@ const SecurityTab: React.FC<{ id: number }> = ({ id }) => {
 };
 
 const AccountabilityTab: React.FC<{ id: number }> = ({ id }) => {
-  const { data } = useReport(() => peopleApi.accessLog(id), `al${id}`);
+  const { data, loading } = useReport(() => peopleApi.accessLog(id), `al${id}`);
   return (
     <Panel title="Who looked at or acted on this person">
       <DataTable
         rows={data ?? []}
         rowKey={(r: any) => String(r.id)}
+        loading={loading}
         empty="Nobody yet."
         columns={[
           { key: "t", label: "When", render: (r: any) => fmtDate(r.at, true) },

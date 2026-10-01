@@ -7,8 +7,9 @@ import { AnalyticsShell } from "./AnalyticsShell";
 import { Toolbar } from "./Toolbar";
 import { useReportQuery } from "./useReportQuery";
 import { useReport } from "./useReport";
-import { AppStackedBars, BarList, ChartPanel, DataTable, Delta, TrendLines, bucketLabel, fmtDur, fmtInt, fmtPct, appLabel } from "./charts";
-import { AppDot, Segmented, useFeatureLabels, userTypeLabel } from "./common";
+import { AppStackedBars, BarList, ChartPanel, DataTable, Delta, Donut, Sparkline, TrendLines, bucketLabel, fmtDur, fmtInt, fmtPct, appLabel } from "./charts";
+import { APP_META, AppDot, Segmented, useAppColors, useFeatureLabels, userTypeLabel } from "./common";
+import { SkeletonDonut, SkeletonKpis, SkeletonList, SkeletonPanel } from "./Skeleton";
 
 /**
  * Overview (plan §14 page 1). Definitions follow GA4 (plan §9.2) and are explained
@@ -32,13 +33,16 @@ export default function Overview() {
   const [line, setLine] = useState<"active" | "stickiness">("active");
   const label = useFeatureLabels();
   const live = useReport(() => monitorApi.live({}), "live-mini");
+  const appColor = useAppColors();
 
   const t = data?.totals;
   const d = data?.deltas ?? {};
-  const kpis: { key: string; label: string; value: string; invert?: boolean }[] = t
+  const daily: any[] = data?.series?.daily ?? [];
+  const sparkOf = (k: string) => (daily.length > 1 ? daily.map((r) => Number(r[k] ?? 0)) : undefined);
+  const kpis: { key: string; label: string; value: string; invert?: boolean; spark?: number[] }[] = t
     ? [
-        { key: "accessed_users", label: "Accessed", value: fmtInt(t.accessed_users) },
-        { key: "active_users", label: "Active users", value: fmtInt(t.active_users) },
+        { key: "accessed_users", label: "Accessed", value: fmtInt(t.accessed_users), spark: sparkOf("accessed") },
+        { key: "active_users", label: "Active users", value: fmtInt(t.active_users), spark: sparkOf("dau") },
         { key: "new_users", label: "New users", value: fmtInt(t.new_users) },
         { key: "visitors", label: "Public visitors", value: fmtInt(t.visitors) },
         { key: "sessions", label: "Sessions", value: fmtInt(t.sessions) },
@@ -49,16 +53,28 @@ export default function Overview() {
     : [];
 
   return (
-    <AnalyticsShell title="Overview" subtitle="How the platform is used across the MIS, Task Mentor, Tendo and Tupo.">
+    <AnalyticsShell title="Overview" subtitle="How the platform is used across the MIS, Task Mentor, Tendo and Tupo." refreshing={loading && !!data}>
       <Toolbar state={state} update={update} />
       {error && <Empty>{error}</Empty>}
-      {loading && !data && <Empty>Loading…</Empty>}
+      {loading && !data && !error && (
+        <>
+          <SkeletonKpis count={8} className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-8 gap-3" />
+          <div className="grid lg:grid-cols-3 gap-4">
+            <SkeletonPanel className="lg:col-span-2" />
+            <SkeletonPanel><SkeletonDonut size={130} /></SkeletonPanel>
+          </div>
+          <div className="grid lg:grid-cols-2 gap-4">
+            <SkeletonPanel />
+            <SkeletonPanel><SkeletonList /></SkeletonPanel>
+          </div>
+        </>
+      )}
 
       {data && (
         <>
           <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-8 gap-3" aria-busy={loading}>
             {kpis.map((k) => (
-              <div key={k.key} className="rounded-2xl border border-white/60 dark:border-slate-700/30 bg-white/70 dark:bg-slate-800/50 px-3 py-3 min-w-0">
+              <div key={k.key} className="an-rise rounded-2xl border border-white/60 dark:border-slate-700/30 bg-white/70 dark:bg-slate-800/50 px-3 py-3 min-w-0 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-soft">
                 <div className="text-xs font-medium text-slate-600 dark:text-slate-300 flex items-center gap-1">
                   <span className="truncate">{k.label}</span>
                   <button type="button" className="shrink-0 rounded focus-visible:ring-2 focus-visible:ring-brand-600" title={DEFS[k.key]} aria-label={`How is ${k.label} calculated? ${DEFS[k.key]}`}>
@@ -67,6 +83,7 @@ export default function Overview() {
                 </div>
                 <div className="mt-1 text-xl font-semibold tabular-nums text-text-primary-light dark:text-text-primary-dark">{k.value}</div>
                 {data.previous && <Delta value={d[k.key]} />}
+                {k.spark && <Sparkline values={k.spark} />}
               </div>
             ))}
           </div>
@@ -86,6 +103,7 @@ export default function Overview() {
 
           <div className="grid lg:grid-cols-3 gap-4">
             <ChartPanel
+              loading={loading}
               className="lg:col-span-2"
               title={line === "active" ? "Active users: daily, 7-day and 28-day" : "Stickiness (DAU ÷ MAU)"}
               actions={
@@ -132,23 +150,28 @@ export default function Overview() {
               )}
             </ChartPanel>
 
-            <Panel title="Right now" className="min-w-0" actions={<Link to="/analytics/realtime" className="text-xs hover:underline">Open Realtime</Link>}>
+            <Panel title="Right now" className="min-w-0 an-rise" actions={<Link to="/analytics/realtime" className="text-xs font-medium text-brand-600 dark:text-sky-300 hover:underline">Open Realtime →</Link>}>
               {live.data ? (
                 <div className="space-y-3">
-                  <div className="flex items-baseline gap-2">
-                    <Radio className="w-4 h-4 text-emerald-600" aria-hidden />
-                    <span className="text-3xl font-semibold tabular-nums">{live.data.counts.online}</span>
-                    <span className="text-sm text-slate-600 dark:text-slate-300">online · {live.data.counts.visitors} visitors</span>
+                  <div className="flex items-center gap-2">
+                    <span className="relative flex w-2.5 h-2.5" aria-hidden>
+                      <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75 animate-ping motion-reduce:animate-none" />
+                      <span className="relative inline-flex rounded-full w-2.5 h-2.5 bg-emerald-500" />
+                    </span>
+                    <Radio className="w-4 h-4 text-emerald-700 dark:text-emerald-300" aria-hidden />
+                    <span className="text-sm text-slate-700 dark:text-slate-200">
+                      <span className="text-2xl font-semibold tabular-nums text-text-primary-light dark:text-text-primary-dark">{live.data.counts.online}</span> online · {live.data.counts.visitors} visitors
+                    </span>
                   </div>
-                  <ul className="space-y-1">
-                    {(["mis", "tm", "tendo", "tupo"] as const).map((a) => (
-                      <li key={a} className="flex justify-between text-sm">
-                        <AppDot app={a} />
-                        <span className="tabular-nums">{live.data!.counts.by_app[a] ?? 0}</span>
-                      </li>
-                    ))}
-                  </ul>
+                  <Donut
+                    ariaLabel="People online by app"
+                    centerLabel="Online"
+                    size={140}
+                    data={(["mis", "tm", "tendo", "tupo"] as const).map((a) => ({ key: a, label: APP_META[a].label, value: live.data!.counts.by_app[a] ?? 0, color: appColor(a) }))}
+                  />
                 </div>
+              ) : live.loading ? (
+                <SkeletonDonut size={130} />
               ) : (
                 <Empty>—</Empty>
               )}
@@ -157,6 +180,7 @@ export default function Overview() {
 
           <div className="grid lg:grid-cols-2 gap-4">
             <ChartPanel
+              loading={loading}
               title={`Active users by app, per ${state.gran}`}
               table={
                 <DataTable
@@ -174,7 +198,7 @@ export default function Overview() {
               <AppStackedBars ariaLabel="Active users by app" data={data.series.buckets} gran={state.gran} />
             </ChartPanel>
 
-            <Panel title="Adoption by user type" className="min-w-0">
+            <Panel title="Adoption by user type" className="min-w-0 an-rise">
               <p className="text-xs text-slate-600 dark:text-slate-300 mb-3">Active users ÷ all active accounts of that type.</p>
               <BarList
                 ariaLabel="Adoption by user type"
@@ -190,7 +214,7 @@ export default function Overview() {
             </Panel>
           </div>
 
-          <Panel title="Most used features" actions={<Link to={`/analytics/engagement?${qs}`} className="text-xs hover:underline">All features</Link>}>
+          <Panel title="Most used features" className="an-rise" actions={<Link to={`/analytics/engagement?${qs}`} className="text-xs font-medium text-brand-600 dark:text-sky-300 hover:underline">All features →</Link>}>
             <BarList
               ariaLabel="Most used features"
               rows={data.top_features.map((f: any) => ({

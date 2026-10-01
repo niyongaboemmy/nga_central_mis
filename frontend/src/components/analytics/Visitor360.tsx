@@ -4,6 +4,7 @@ import { Ban, Bot, Eye, LogOut, Trash2, UserCheck } from "lucide-react";
 import { peopleApi } from "../../api/monitor";
 import { useToast } from "../../contexts/ToastContext";
 import { Empty, Panel, btnGhost, inputCls } from "../access/shared";
+import { SkeletonKpis, SkeletonPanel, SkeletonProfile, SkeletonTimeline } from "./Skeleton";
 import { AnalyticsShell } from "./AnalyticsShell";
 import { useReport } from "./useReport";
 import { DataTable, fmtDate, fmtInt } from "./charts";
@@ -37,8 +38,15 @@ export default function Visitor360() {
     setMore(false);
   }, [tl, deviceId]);
 
-  if (error) return <AnalyticsShell title="Visitor"><Empty>{error}</Empty></AnalyticsShell>;
-  if (loading && !data) return <AnalyticsShell title="Visitor"><Empty>Loading…</Empty></AnalyticsShell>;
+  if (error) return <AnalyticsShell title="Visitor" back={{ fallback: "/analytics/visitors" }} hideTabs><Empty>{error}</Empty></AnalyticsShell>;
+  if (loading && !data)
+    return (
+      <AnalyticsShell title={"Loading visitor…"} back={{ fallback: "/analytics/visitors" }} hideTabs>
+        <SkeletonProfile />
+        <SkeletonKpis count={5} className="grid grid-cols-2 lg:grid-cols-5 gap-3" />
+        <SkeletonPanel><SkeletonTimeline /></SkeletonPanel>
+      </AnalyticsShell>
+    );
   if (!data) return null;
   const p = data.profile;
   const can = data.can;
@@ -46,6 +54,9 @@ export default function Visitor360() {
   return (
     <AnalyticsShell
       title={`Visitor ${p.visitor_code}`}
+      back={{ fallback: "/analytics/visitors" }}
+      hideTabs
+      refreshing={loading}
       subtitle={
         <span>
           {[p.device.browser, p.device.os].filter(Boolean).join(" · ") || "Unknown device"} · first seen {fmtDate(p.first_seen, true)}

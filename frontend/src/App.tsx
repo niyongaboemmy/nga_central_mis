@@ -758,7 +758,7 @@ function App() {
               path="/me/activity"
               element={
                 <ProtectedRoute>
-                  <SystemLayoutWrapper>
+                  <SystemLayoutWrapper fullWidth>
                     <MyActivity />
                   </SystemLayoutWrapper>
                 </ProtectedRoute>
@@ -771,7 +771,7 @@ function App() {
               path="/analytics/*"
               element={
                 <ProtectedRoute>
-                  <SystemLayoutWrapper>
+                  <SystemLayoutWrapper fullWidth>
                     <AnalyticsRoutes />
                   </SystemLayoutWrapper>
                 </ProtectedRoute>

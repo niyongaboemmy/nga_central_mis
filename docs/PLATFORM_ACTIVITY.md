@@ -10,7 +10,7 @@ How the platform usage analytics and live monitoring run in production. The desi
 | Console | MIS frontend `/analytics/*`, plus `/me/activity` for every user |
 | Browser tracker | `packages/activity/src/index.ts` (+ `react.ts`), vendored into each SPA as `vendor/nga-activity` |
 | Relay (satellites → MIS) | `packages/activity/src/relay.ts`, vendored as `vendor/nga-activity-relay` into Task Mentor, Tendo, Tupo (api and realtime) |
-| Data | MySQL, migration `095_platform_activity.sql` (raw events are partitioned by month) |
+| Data | MySQL, migration `095_platform_activity.sql` (raw events are partitioned by month); `099_analytics_access.sql` guarantees administrators their access |
 | IP → place / provider | DB-IP Lite files in `/var/lib/nga-geo` (read locally, never an online lookup) |
 
 The MIS must run as **one** pm2 process: live presence and the dedupe set live in memory.
@@ -22,7 +22,15 @@ The MIS must run as **one** pm2 process: live presence and the dedupe set live i
    cd /opt/apps/nga_central_mis/backend && set -a; . ./.env; set +a
    mysql -h "$DB_HOST" -u "$DB_USERNAME" -p"$DB_PASSWORD" "$DB_NAME" < migrations/095_platform_activity.sql
    ```
-   The migration is idempotent and only creates tables.
+   The migration is idempotent and only creates tables. Then apply `099_analytics_access.sql` the same way.
+
+   **099 (access).** The `ANALYTICS_*` capabilities reach a person only through an ACTIVE access-control v2 grant. 099 links them to the roles below and gives every ACTIVE holder of the legacy SUPER_ADMIN / ADMIN role the v2 grant they are missing (PLATFORM / SCHOOL, source MIGRATION). A grant an operator ended or suspended is left alone. It is idempotent: `RolePermission` has no primary key on older databases, so every insert is guarded with `NOT EXISTS`. At boot the MIS also self-heals the same grants for administrators created later (`ensureLegacyAdminGrants`, logged as `grantsHealed`).
+
+   | Role | Gets |
+   |---|---|
+   | SUPER_ADMIN (platform owner) | every `ANALYTICS_*` capability + `USAGE_INSIGHTS_VIEW` |
+   | ADMIN (school administrator) | `ANALYTICS_VIEW`, `_LIVE_VIEW`, `_USER_VIEW` (a person's page and live activity), `_LOCATION_VIEW`, `USAGE_INSIGHTS_VIEW`. Not control or settings. |
+   | IT Support | `ANALYTICS_VIEW`, `ANALYTICS_LIVE_VIEW` |
 
 2. **Environment** (`backend/.env`; all optional except where noted):
 

@@ -6,6 +6,7 @@ import { Toolbar } from "./Toolbar";
 import { useReportQuery } from "./useReportQuery";
 import { useReport } from "./useReport";
 import { BarList, ChartPanel, DataTable, SimpleBars, bucketLabel, fmtDur, fmtInt, fmtMsDur, fmtPct } from "./charts";
+import { SkeletonChart, SkeletonList, SkeletonPanel } from "./Skeleton";
 import { AppDot, Segmented, useFeatureLabels } from "./common";
 import misCatalog from "../../activity/mis.catalog.json";
 
@@ -56,13 +57,14 @@ const Features: React.FC<{ qs: string }> = ({ qs }) => {
   if (error) return <Empty>{error}</Empty>;
   return (
     <Panel
+      className="an-rise"
       title={`Features & pages${data ? ` (${fmtInt(rows.length)})` : ""}`}
       actions={<input aria-label="Filter features" className={`${inputCls} !py-1.5 w-44`} placeholder="Filter…" value={q} onChange={(e) => setQ(e.target.value)} />}
     >
       <DataTable
         rows={rows}
         rowKey={(r: any) => `${r.app}|${r.feature}`}
-        empty={loading ? "Loading…" : "No page views in this range."}
+        loading={loading} empty={"No page views in this range."}
         initialSort={{ key: "views", dir: "desc" }}
         onExport={() => reportsApi.csv("/engagement/features", qs, "features.csv")}
         columns={[
@@ -99,9 +101,9 @@ const Dimension: React.FC<{ qs: string; dim: string; title: string }> = ({ qs, d
   const label = useFeatureLabels();
   if (error) return <Empty>{error}</Empty>;
   return (
-    <Panel title={title} className="min-w-0">
+    <Panel title={title} className="min-w-0 an-rise">
       {loading && !data ? (
-        <Empty>Loading…</Empty>
+        <SkeletonList rows={8} />
       ) : (
         <BarList
           ariaLabel={title}
@@ -121,7 +123,16 @@ const KeyEvents: React.FC<{ qs: string; gran: string }> = ({ qs, gran }) => {
   const { data, loading, error } = useReport(() => reportsApi.keyEvents(qs), `k|${qs}`);
   const label = useFeatureLabels();
   if (error) return <Empty>{error}</Empty>;
-  if (loading && !data) return <Empty>Loading…</Empty>;
+  if (loading && !data)
+    return (
+      <div className="grid md:grid-cols-2 gap-4">
+        {[0, 1, 2, 3].map((i) => (
+          <SkeletonPanel key={i}>
+            <SkeletonChart height={140} legend={false} />
+          </SkeletonPanel>
+        ))}
+      </div>
+    );
   if (!data?.length) return <Empty>No key events in this range. Apps mark key events (quiz submitted, register saved…) in their feature catalog.</Empty>;
   return (
     <div className="grid md:grid-cols-2 gap-4">
