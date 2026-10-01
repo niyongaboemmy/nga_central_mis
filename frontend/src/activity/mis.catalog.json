@@ -36,6 +36,7 @@
     { "key": "mis.course_item", "label": "Course item (learner)", "module": "E-learning", "patterns": ["/my-learning/courses/:courseId/items/:itemId"] },
     { "key": "mis.courses_build", "label": "E-learning courses", "module": "E-learning", "patterns": ["/elearning/courses"] },
     { "key": "mis.course_builder", "label": "Course builder", "module": "E-learning", "patterns": ["/elearning/courses/:courseId/build"] },
+    { "key": "mis.lesson_studio", "label": "Lesson Studio (AI)", "module": "E-learning", "patterns": ["/elearning/courses/:courseId/studio"] },
     { "key": "mis.elearning_admin", "label": "E-learning oversight", "module": "E-learning", "patterns": ["/admin/elearning"] },
     { "key": "mis.dev_ui", "label": "Developer UI kit", "module": "Platform", "patterns": ["/dev/elearning-ui"] },
 

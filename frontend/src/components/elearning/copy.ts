@@ -191,6 +191,10 @@ export const copy = {
       TASKMENTOR_QUIZ: "Task Mentor quiz",
       TASKMENTOR_ASSIGNMENT: "Task Mentor assignment",
       DISCUSSION: "Discussion",
+      FILE: "File",
+      FLASHCARDS: "Flashcards",
+      EXIT_TICKET: "Exit ticket",
+      PRACTICAL_TASK: "Practical task",
     } as Record<string, string>,
   },
   me: {

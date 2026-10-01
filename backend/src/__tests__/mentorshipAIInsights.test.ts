@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import request from "supertest";
 import app from "../app";
 import { db } from "../db";
@@ -13,6 +13,7 @@ import {
   createStudentClassGroup,
 } from "../test/fixtures";
 import { Permissions } from "../utils/permissions";
+import { installFakeAI, uninstallFakeAI } from "../test/fakeAI";
 
 // AI insights endpoint's guard rails — these must reject *before* ever
 // calling Gemini, so they're testable without a real (or mocked) API key.
@@ -24,7 +25,12 @@ describe("Mentee AI insights — guard rails", () => {
   let mentorBToken: string;
   let studentXId: number;
 
+  // Real AI keys are blanked under test; a fake provider keeps the "AI configured" guard
+  // satisfied so these cases exercise the ownership checks they are about.
+  afterAll(() => uninstallFakeAI());
+
   beforeAll(async () => {
+    installFakeAI(() => ({}));
     await db.update(AcademicYear).set({ is_current: 0 });
     const period = await createAcademicPeriod();
     academicYearId = period.academicYearId;

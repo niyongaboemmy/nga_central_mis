@@ -79,7 +79,9 @@ export function deriveMastery(
     const p = progress.get(i.item_id);
     if (!p || p.state !== "COMPLETED") continue;
     covered = true;
-    if (["SUBMIT", "MIN_SCORE"].includes(i.completion_rule)) return "DEMONSTRATED";
+    // Exit tickets and flashcards are formative practice: answering them completes the item
+    // but never proves the criterion (a practical sign-off or a passed check does).
+    if (i.item_type !== "EXIT_TICKET" && i.item_type !== "FLASHCARDS" && ["SUBMIT", "MIN_SCORE"].includes(i.completion_rule)) return "DEMONSTRATED";
     if (i.item_type === "KNOWLEDGE_CHECK" && (bestCheckPct.get(i.item_id) ?? Number(p.best_score_pct ?? 0)) >= DEMONSTRATE_PCT) return "DEMONSTRATED";
   }
   return covered ? "COVERED" : "NOT_COVERED";

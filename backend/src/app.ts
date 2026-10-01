@@ -28,6 +28,10 @@ import notificationRoutes from "./routes/notifications";
 import accessRoutes from "./routes/access";
 import homeRoutes from "./routes/home";
 import elearningRoutes from "./routes/elearning";
+import { wireFilesModule } from "./services/files/assets";
+
+// File previews + file text for the Lesson Studio (job handlers, context-pack source).
+wireFilesModule();
 import reminderRoutes from "./routes/reminders";
 import activityRoutes from "./routes/activity";
 import monitorRoutes from "./routes/monitor";

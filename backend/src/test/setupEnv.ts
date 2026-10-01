@@ -14,3 +14,10 @@ process.env.NODE_ENV = "test";
 // suite fires many rapid sequential Supertest requests against that same
 // pool and needs more headroom to avoid connection-acquisition contention.
 process.env.DB_CONNECTION_LIMIT = "10";
+
+// Tests must never reach a real AI vendor: a stray real call is slow, flaky (free-tier
+// rate limits) and spends the school's quota. Tests that need AI install deterministic
+// providers with installFakeAI() (src/test/fakeAI.ts). TEST_ALLOW_REAL_AI=1 opts out.
+if (process.env.TEST_ALLOW_REAL_AI !== "1") {
+  for (const key of ["GEMINI_API_KEY", "GROQ_API_KEY", "GLM_API_KEY", "OPENAI_API_KEY"]) delete process.env[key];
+}

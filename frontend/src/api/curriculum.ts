@@ -235,6 +235,11 @@ export const subjectDocumentsApi = {
     ),
   delete: (documentId: number) =>
     api.delete(`/curriculum/documents/${documentId}`),
+  /** Preview manifest (server PDF / text of slides and documents — Lesson Studio §10). */
+  previewManifest: (documentId: number) =>
+    api.get(`/curriculum/documents/${documentId}/preview`).then((r: any) => r.data.data),
+  previewVariant: (documentId: number, variant: "pdf" | "text") =>
+    api.get(`/curriculum/documents/${documentId}/download`, { params: { variant }, responseType: "blob", timeout: 120000 }).then((r: any) => r.data as Blob),
   download: (documentId: number) =>
     api.get(`/curriculum/documents/${documentId}/download`, {
       responseType: "blob",

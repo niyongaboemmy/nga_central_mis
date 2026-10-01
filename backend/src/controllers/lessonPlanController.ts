@@ -1,4 +1,5 @@
 import { Request, Response } from "express";
+import { loadLessonPlansForEntries, loadReadableSchemeForEntry } from "../services/curriculumChain/lessonPlans";
 import { db } from "../db";
 import {
   LO_Lesson,
@@ -158,83 +159,22 @@ const extractionSchema: JSONSchema = {
   ],
 };
 
+/**
+ * `GET /lesson-plans/entry/:entryId`. Only people who may read the entry's scheme of work
+ * (owner, co-teacher of the same class, scheme validators) get its plans; anyone else gets
+ * 404 so entry ids can't be probed. Loaded in a fixed number of queries.
+ */
 export const getLessonPlansByEntry = async (req: Request, res: Response) => {
-  console.log(
-    "CRITICAL_DEBUG: getLessonPlansByEntry for entryId:",
-    req.params.entryId,
-  );
   try {
-    const { entryId } = req.params;
-
-    // Fetch lessons for this entry
-    const lessons = await db
-      .select()
-      .from(LO_Lesson)
-      .where(eq(LO_Lesson.entry_id, Number(entryId)));
-
-    // For each lesson, fetch all related details
-    const fullyDetailedLessons = await Promise.all(
-      lessons.map(async (lesson) => {
-        const outcomes = await db
-          .select()
-          .from(LO_LearningOutcome)
-          .where(eq(LO_LearningOutcome.lesson_id, lesson.id));
-
-        const outcomesWithDetails = await Promise.all(
-          outcomes.map(async (outcome) => {
-            const activities = await db
-              .select()
-              .from(LO_LearningOutcomeActivity)
-              .where(
-                eq(LO_LearningOutcomeActivity.learning_outcome_id, outcome.id),
-              );
-
-            const resources = await db
-              .select()
-              .from(LO_LearningOutcomeResource)
-              .where(
-                eq(LO_LearningOutcomeResource.learning_outcome_id, outcome.id),
-              );
-
-            return { ...outcome, activities, resources };
-          }),
-        );
-
-        const sections = await db
-          .select()
-          .from(LO_LessonSection)
-          .where(eq(LO_LessonSection.lesson_id, lesson.id));
-
-        const indicativeContent = await db
-          .select()
-          .from(LO_IndicativeContent)
-          .where(eq(LO_IndicativeContent.lesson_id, lesson.id));
-
-        const assignments = await db
-          .select()
-          .from(LO_LessonAssignment)
-          .where(eq(LO_LessonAssignment.lesson_id, lesson.id));
-
-        const evaluation = await db
-          .select()
-          .from(LO_LessonEvaluation)
-          .where(eq(LO_LessonEvaluation.lesson_id, lesson.id));
-
-        return {
-          ...lesson,
-          outcomes: outcomesWithDetails,
-          sections,
-          indicativeContent,
-          assignments,
-          evaluation: evaluation[0] || null,
-        };
-      }),
-    );
-
-    console.log(
-      `DEBUG: Returning ${fullyDetailedLessons.length} lesson plans for entry ${entryId}`,
-    );
-    res.json(fullyDetailedLessons);
+    const entryId = Number(req.params.entryId);
+    if (!Number.isInteger(entryId) || entryId <= 0) {
+      return res.status(400).json({ message: "Invalid entry id" });
+    }
+    const user = (req as any).user;
+    const scheme = await loadReadableSchemeForEntry(entryId, user.userId, user.permissions ?? []);
+    if (!scheme) return res.status(404).json({ message: "Scheme of work entry not found" });
+    const byEntry = await loadLessonPlansForEntries([entryId]);
+    res.json(byEntry.get(entryId) ?? []);
   } catch (error) {
     logger.error("Error fetching lesson plans:", error);
     res.status(500).json({ message: "Error fetching lesson plans" });
@@ -283,6 +223,13 @@ export const createOrUpdateLessonPlan = async (req: Request, res: Response) => {
 
     if (!userId) {
       return res.status(401).json({ message: "User not authenticated" });
+    }
+
+    // A plan may only be attached to an entry of a scheme the caller can read (owner or
+    // co-teacher); before this, any signed-in user could add plans to any entry id.
+    const readable = await loadReadableSchemeForEntry(Number(entry_id), userId, (req as any).user?.permissions ?? []);
+    if (!readable) {
+      return res.status(404).json({ message: "Scheme of work entry not found" });
     }
 
     // Editing an existing lesson plan is restricted to whoever created it —

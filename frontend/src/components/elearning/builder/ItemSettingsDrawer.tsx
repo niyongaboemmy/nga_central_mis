@@ -20,6 +20,8 @@ import { useToast } from "../../../contexts/ToastContext";
 import { useConfirm } from "../../../contexts/ConfirmContext";
 import { copy } from "../copy";
 import { useMotion } from "../../../design/motion";
+import BuilderFilePreview from "./BuilderFilePreview";
+import { CardRow, ChecklistRow, ClassPulse, FlashcardsEditor, PracticalEditor } from "./InteractiveEditors";
 import LessonNoteRichEditor from "../../lessonNotes/LessonNoteRichEditor";
 import { ItemTypeIcon } from "../ui/primitives";
 import WeekContextPanel, { ItemContext } from "./WeekContextPanel";
@@ -107,6 +109,8 @@ const ItemSettingsDrawer: React.FC<Props> = ({ item, curriculum, onClose, onSave
   const [questions, setQuestions] = useState<KcQuestion[]>([]);
   const [saving, setSaving] = useState(false);
   const [suggesting, setSuggesting] = useState(false);
+  const [cards, setCards] = useState<CardRow[]>([]);
+  const [checklist, setChecklist] = useState<ChecklistRow[]>([]);
   const [generatingKc, setGeneratingKc] = useState(false);
   const [context, setContext] = useState<ItemContext | null>(null);
   const [wide, setWide] = useState(true);
@@ -136,6 +140,8 @@ const ItemSettingsDrawer: React.FC<Props> = ({ item, curriculum, onClose, onSave
     setPageJson(item.content_json ?? null);
     setPageHtml("");
     setQuestions(item.content_json?.questions || []);
+    setCards(item.content_json?.cards || []);
+    setChecklist(item.content_json?.checklist || []);
     setAiInstruction("");
     setContext(null);
     const nonDefault =
@@ -174,7 +180,9 @@ const ItemSettingsDrawer: React.FC<Props> = ({ item, curriculum, onClose, onSave
   const current = metaSignature({ title, description, rule, minScore, required, published, minutes, dueAt, criteriaIds, url });
   // A body editor (page, quick check) has no reliable dirty signal, so those types always
   // allow a save rather than blocking one the teacher expects to work.
-  const hasBody = !!item && ["PAGE", "KNOWLEDGE_CHECK"].includes(item.item_type);
+  const hasBody = !!item && ["PAGE", "KNOWLEDGE_CHECK", "EXIT_TICKET", "FLASHCARDS", "PRACTICAL_TASK"].includes(item.item_type);
+  const isQuestionItem = !!item && (item.item_type === "KNOWLEDGE_CHECK" || item.item_type === "EXIT_TICKET");
+  const qMax = item?.item_type === "EXIT_TICKET" ? 3 : 10;
   const isDirty = !!baseline && (current !== baseline || hasBody);
 
   if (!item) return null;
@@ -203,6 +211,9 @@ const ItemSettingsDrawer: React.FC<Props> = ({ item, curriculum, onClose, onSave
         if (pageHtml) patch.content_html = pageHtml;
       }
       if (item.item_type === "KNOWLEDGE_CHECK") patch.content_json = { questions };
+      if (item.item_type === "EXIT_TICKET") patch.content_json = { questions, ask_confidence: true };
+      if (item.item_type === "FLASHCARDS") patch.content_json = { cards: cards.filter((c) => c.front.trim() && c.back.trim()) };
+      if (item.item_type === "PRACTICAL_TASK") patch.content_json = { ...(item.content_json || {}), checklist: checklist.filter((c) => c.text.trim()) };
       await onSave(item.item_id, patch);
       onClose();
     } catch (e: any) {
@@ -232,7 +243,7 @@ const ItemSettingsDrawer: React.FC<Props> = ({ item, curriculum, onClose, onSave
       const r = await elearningApi.generateCheck(item.item_id, { title, description, count: 5 });
       const qs: KcQuestion[] = r.data.data?.questions || [];
       if (qs.length === 0) showToast("The AI couldn't write questions from this — add a description or a source note", "info");
-      setQuestions((q) => [...q, ...qs].slice(0, 10));
+      setQuestions((q) => [...q, ...qs].slice(0, qMax));
     } catch (e: any) {
       showToast(aiError(e, "write those questions"), "error");
     } finally {
@@ -489,6 +500,8 @@ const ItemSettingsDrawer: React.FC<Props> = ({ item, curriculum, onClose, onSave
               </div>
             )}
 
+            {(item.item_type === "FILE" || item.item_type === "SUBJECT_DOCUMENT") && <BuilderFilePreview itemId={item.item_id} />}
+
             {["LINK", "VIDEO", "TASKMENTOR_QUIZ", "TASKMENTOR_ASSIGNMENT", "DISCUSSION"].includes(item.item_type) && (
               <Field label={item.item_type === "VIDEO" ? "YouTube / Vimeo link" : "Link"}>
                 <input className={input} value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://…" inputMode="url" />
@@ -551,10 +564,15 @@ const ItemSettingsDrawer: React.FC<Props> = ({ item, curriculum, onClose, onSave
               </div>
             )}
 
-            {item.item_type === "KNOWLEDGE_CHECK" && (
+            {item.item_type === "EXIT_TICKET" && <ClassPulse itemId={item.item_id} />}
+            {item.item_type === "FLASHCARDS" && <FlashcardsEditor cards={cards} onChange={setCards} />}
+            {item.item_type === "PRACTICAL_TASK" && (
+              <PracticalEditor checklist={checklist} onChange={setChecklist} criteria={(item.criteria || []).map((c) => c.criteria_number)} />
+            )}
+            {isQuestionItem && (
               <div>
                 <div className="flex items-center justify-between mb-1">
-                  <span className="text-[11px] uppercase tracking-wider font-semibold text-gray-500 dark:text-gray-400">Questions ({questions.length}/10)</span>
+                  <span className="text-[11px] uppercase tracking-wider font-semibold text-gray-500 dark:text-gray-400">Questions ({questions.length}/{qMax})</span>
                   <button onClick={generateQuestions} disabled={generatingKc} className="inline-flex items-center gap-1 text-xs font-semibold text-brand-600 dark:text-brand-200 disabled:opacity-50">
                     <Sparkles className="w-3.5 h-3.5" /> {generatingKc ? "Writing…" : "Write 5 with AI"}
                   </button>
@@ -607,7 +625,7 @@ const ItemSettingsDrawer: React.FC<Props> = ({ item, curriculum, onClose, onSave
                     </li>
                   ))}
                 </ul>
-                {questions.length < 10 && (
+                {questions.length < qMax && (
                   <button onClick={() => setQuestions((qs) => [...qs, { type: "MCQ", prompt: "", options: ["", ""], correct_index: 0 }])} className="mt-2 inline-flex items-center gap-1 min-h-[40px] px-3 rounded-pill el-chip text-sm text-gray-700 dark:text-gray-200">
                     <Plus className="w-4 h-4" /> Add question
                   </button>

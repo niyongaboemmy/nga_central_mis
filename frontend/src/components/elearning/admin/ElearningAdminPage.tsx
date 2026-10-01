@@ -5,6 +5,7 @@ import { useAcademicPeriod } from "../../../contexts/AcademicPeriodContext";
 import { getToken } from "../../../utils/auth";
 import { API_BASE_URL } from "../../../services/api";
 import InsightsTab from "../builder/InsightsTab";
+import AIUsagePanel from "./AIUsagePanel";
 import CoveragePanel from "../builder/CoveragePanel";
 import { elearningApi } from "../../../api/elearning";
 import { ProgressBar, Skeleton } from "../ui/primitives";
@@ -169,6 +170,7 @@ const ElearningAdminPage: React.FC = () => {
               </table>
             </div>
           </div>
+          <AIUsagePanel />
         </>
       )}
     </div>

@@ -34,6 +34,7 @@ import {
   sendOrQueue,
   useOffline,
 } from "./offline";
+import DownloadWeek from "./DownloadWeek";
 import Mascot from "../ui/Mascot";
 import {
   BottomActionBar,
@@ -445,6 +446,7 @@ const CoursePage: React.FC = () => {
                   {overviewSection.summary}
                 </p>
               )}
+              <DownloadWeek sectionId={overviewSection.section_id} />
               <div className="mt-4 flex items-end gap-3">
                 <div className="flex-1">
                   <ProgressBar

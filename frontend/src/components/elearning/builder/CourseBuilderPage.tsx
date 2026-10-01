@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { AnimatePresence, motion, Reorder, useDragControls } from "framer-motion";
-import { ArrowLeft, BarChart3, BookOpenCheck, ChevronLeft, Download, Eye, EyeOff, FolderPlus, GripVertical, HelpCircle, Link as LinkIcon, MoreHorizontal, PlayCircle, Plus, RefreshCw, Settings2, Smartphone, Wand2, X } from "lucide-react";
+import { ArrowLeft, BarChart3, BookOpenCheck, ChevronLeft, Download, Eye, EyeOff, FolderPlus, GripVertical, HelpCircle, Link as LinkIcon, MoreHorizontal, PlayCircle, Plus, RefreshCw, Settings2, Smartphone, Sparkles, X } from "lucide-react";
 import {
   BuilderCourse,
   CourseItem,
@@ -18,6 +18,7 @@ import { copy } from "../copy";
 import AddItemPalette from "./AddItemPalette";
 import ItemSettingsDrawer from "./ItemSettingsDrawer";
 import InsightsTab from "./InsightsTab";
+import PracticalReviewPanel from "./PracticalReviewPanel";
 import CoveragePanel from "./CoveragePanel";
 import NextStepBar, { NextStep } from "./NextStepBar";
 import { useCourseLive } from "./useCourseLive";
@@ -29,6 +30,7 @@ import { API_BASE_URL } from "../../../services/api";
 import { getToken } from "../../../utils/auth";
 import Mascot from "../ui/Mascot";
 import { CompletionDot, ItemTypeIcon, Skeleton, WeekPill } from "../ui/primitives";
+import { studioRoutes } from "../../../api/studio";
 
 type Tab = "content" | "curriculum" | "insights" | "settings";
 
@@ -93,7 +95,13 @@ const ItemRow: React.FC<{
           </p>
         </div>
         {missing && <span className="text-[10px] px-1.5 py-0.5 rounded-pill el-chip-danger">content deleted</span>}
-        {draftNote && <span className="text-[10px] px-1.5 py-0.5 rounded-pill el-chip-warning">note is draft</span>}
+        {(item.review_state === "PENDING_REVIEW" || item.review_state === "EDITED") ? (
+          <span className="text-[10px] px-1.5 py-0.5 rounded-pill el-chip-brand" title="Made in the Lesson Studio — approve it there before students see it">
+            {item.ai_origin === "NONE" ? "waiting for review" : "AI draft · review"}
+          </span>
+        ) : (
+          draftNote && <span className="text-[10px] px-1.5 py-0.5 rounded-pill el-chip-warning">note is draft</span>
+        )}
         <button onClick={onTogglePublished} className="w-10 h-10 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-white/[0.06]" aria-label={item.is_published ? "Hide from students" : "Show to students"} title={item.is_published ? "Visible to students" : "Hidden from students"}>
           {item.is_published ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
         </button>
@@ -118,6 +126,10 @@ const CourseBuilderPage: React.FC = () => {
   const [curriculum, setCurriculum] = useState<CurriculumOutcomePick[]>([]);
   const [selected, setSelected] = useState<number | null>(search.get("section") ? Number(search.get("section")) : null);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  // Files straight onto a week (plan §10): picker or drag-and-drop, with upload progress.
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const [upload, setUpload] = useState<{ pct: number; count: number } | null>(null);
+  const [dragOver, setDragOver] = useState(false);
   const [settingsItem, setSettingsItem] = useState<CourseItem | null>(null);
   const [preview, setPreview] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -258,9 +270,30 @@ const CourseBuilderPage: React.FC = () => {
     );
   };
 
+  const uploadToWeek = async (files: File[]) => {
+    if (!section || files.length === 0) return;
+    setUpload({ pct: 0, count: files.length });
+    try {
+      const r = await elearningApi.uploadFiles(section.section_id, files, (pct) => setUpload({ pct, count: files.length }));
+      const d = r.data.data;
+      if (d?.sections) setData(d);
+      if (d?.created?.length) showToast(`Added ${d.created.length} file${d.created.length > 1 ? "s" : ""} — previews are being prepared`, "success");
+      for (const rej of d?.rejected ?? []) showToast(`${rej.name}: ${rej.reason}`, "error");
+      if (!d?.created?.length && !d?.rejected?.length) showToast((r.data as any).message || copy.errors.save, "error");
+    } catch (e: any) {
+      showToast(e?.response?.status === 413 ? "That file is too big." : e?.response?.data?.message || copy.errors.save, "error");
+    } finally {
+      setUpload(null);
+    }
+  };
+
   const addItem = async (choice: { item_type: CourseItemType; ref_id?: number; title?: string }) => {
     if (!section) return;
     setPaletteOpen(false);
+    if (choice.item_type === "FILE") {
+      fileInputRef.current?.click();
+      return;
+    }
     const body: Record<string, unknown> = { item_type: choice.item_type, ref_id: choice.ref_id, title: choice.title };
     if (choice.item_type === "HEADER") body.title = "New heading";
     if (choice.item_type === "PAGE") body.title = "New page";
@@ -367,9 +400,10 @@ const CourseBuilderPage: React.FC = () => {
           ? "Your notes that match this week's criteria can be added for you."
           : "Add a lesson note, a material or a link — students see them in this order.",
         action: weekCoverage?.gaps.length
-          ? { label: "Build it for me", icon: Wand2, onClick: buildJourney, busy: building }
+          ? { label: "Generate with AI", icon: Sparkles, onClick: () => navigate(studioRoutes.studio(cid, { week: focus?.section_id })) }
           : { label: "Add content", icon: Plus, onClick: () => setPaletteOpen(true) },
-        secondary: weekCoverage?.gaps.length ? { label: "Add it myself", onClick: () => setPaletteOpen(true) } : undefined,
+        secondary: weekCoverage?.gaps.length ? { label: building ? "Placing your notes…" : "Use my notes", onClick: buildJourney } : undefined,
+        more: weekCoverage?.gaps.length ? [{ label: "Add it myself", onClick: () => setPaletteOpen(true) }] : undefined,
       };
     }
     if (focus && weekCoverage && weekCoverage.gaps.length > 0) {
@@ -377,8 +411,10 @@ const CourseBuilderPage: React.FC = () => {
         id: `gaps-${focus.section_id}`,
         title: `${weekName} is missing ${weekCoverage.gaps.length} of its ${weekCoverage.targets.length} criteria`,
         detail: `Nothing covers ${weekCoverage.gaps.map((c) => c.criteria_number).join(", ")} yet.`,
-        action: { label: "Build it for me", icon: Wand2, onClick: buildJourney, busy: building },
-        secondary: { label: "Add it myself", onClick: () => setPaletteOpen(true) },
+        // The Lesson Studio writes what's missing; "Use my notes" places notes you already have.
+        action: { label: "Generate with AI", icon: Sparkles, onClick: () => navigate(studioRoutes.studio(cid, { week: focus.section_id })) },
+        secondary: { label: building ? "Placing your notes…" : "Use my notes", onClick: buildJourney },
+        more: [{ label: "Add it myself", onClick: () => setPaletteOpen(true) }],
       };
     }
     if (focus && weekCoverage && !weekCoverage.hasCheck && focus.items.length > 0) {
@@ -452,6 +488,13 @@ const CourseBuilderPage: React.FC = () => {
               {watchers.length} learning now
             </button>
           )}
+          <button
+            onClick={() => navigate(studioRoutes.studio(cid))}
+            className="inline-flex items-center gap-1.5 min-h-[44px] px-4 rounded-pill bg-brand-500 hover:bg-brand-600 text-white text-sm font-semibold shadow-soft focus:outline-none focus-visible:shadow-glow"
+            title="Draft every week with AI from your scheme of work, plans and notes"
+          >
+            <Sparkles className="w-4 h-4" /> <span className="hidden sm:inline">Build with AI</span>
+          </button>
           <button onClick={() => setPreview(true)} className="inline-flex items-center gap-1.5 min-h-[44px] px-3 rounded-pill el-chip text-sm font-medium" title={copy.builder.previewAsStudent}>
             <Smartphone className="w-4 h-4" /> <span className="hidden lg:inline">Preview</span>
           </button>
@@ -505,6 +548,7 @@ const CourseBuilderPage: React.FC = () => {
                     <Download className="w-3.5 h-3.5" /> Progress report (CSV)
                   </a>
                 </div>
+                <PracticalReviewPanel courseId={cid} />
                 <InsightsTab courseId={cid} course={data} />
               </>
             )}
@@ -547,7 +591,29 @@ const CourseBuilderPage: React.FC = () => {
           </aside>
 
           {/* The week */}
-          <main className={`${showDetail ? "flex" : "hidden"} md:flex flex-col h-full flex-1 min-w-0 mt-4 md:mt-0 overflow-y-auto overscroll-contain pr-0.5`}>
+          <main
+            className={`${showDetail ? "flex" : "hidden"} md:flex flex-col h-full flex-1 min-w-0 mt-4 md:mt-0 overflow-y-auto overscroll-contain pr-0.5 relative`}
+            onDragOver={(e) => {
+              if (!section || !e.dataTransfer.types.includes("Files")) return;
+              e.preventDefault();
+              setDragOver(true);
+            }}
+            onDragLeave={(e) => {
+              if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+              setDragOver(false);
+            }}
+            onDrop={(e) => {
+              if (!section || !e.dataTransfer.files.length) return;
+              e.preventDefault();
+              setDragOver(false);
+              void uploadToWeek([...e.dataTransfer.files]);
+            }}
+          >
+            {dragOver && (
+              <div className="absolute inset-0 z-20 m-1 rounded-2xl border-2 border-dashed border-brand-500 bg-brand-50/90 dark:bg-brand-700/30 flex items-center justify-center pointer-events-none" aria-hidden>
+                <p className="text-base font-semibold text-brand-700 dark:text-brand-200">Drop to add to {section?.week_number || "this week"}</p>
+              </div>
+            )}
             {!section ? (
               <p className="text-sm text-gray-500">Choose a week.</p>
             ) : (
@@ -706,6 +772,26 @@ const CourseBuilderPage: React.FC = () => {
       <WeekPeek section={peek?.section ?? null} anchor={peek?.rect ?? null} />
       {promptUI}
 
+      <input
+        ref={fileInputRef}
+        type="file"
+        multiple
+        hidden
+        accept=".pdf,.doc,.docx,.odt,.rtf,.ppt,.pptx,.odp,.xls,.xlsx,.ods,.csv,.png,.jpg,.jpeg,.gif,.webp,.svg,.mp3,.m4a,.ogg,.wav,.txt,.md,.zip"
+        onChange={(e) => {
+          const files = [...(e.target.files ?? [])];
+          e.target.value = "";
+          void uploadToWeek(files);
+        }}
+      />
+      {upload && (
+        <div className="fixed bottom-4 right-4 z-50 w-[min(92vw,320px)] el-float rounded-2xl p-3" role="status" aria-live="polite">
+          <p className="text-sm font-medium text-gray-900 dark:text-white">Uploading {upload.count} file{upload.count > 1 ? "s" : ""}… {upload.pct}%</p>
+          <div className="mt-2 h-1.5 rounded-full bg-gray-100 dark:bg-white/10 overflow-hidden">
+            <div className="h-full bg-brand-600 transition-[width]" style={{ width: `${upload.pct}%` }} />
+          </div>
+        </div>
+      )}
       {section && <AddItemPalette courseId={cid} sectionTitle={section.week_number || section.title} open={paletteOpen} onClose={() => setPaletteOpen(false)} onPick={addItem} />}
 
       {settingsItem && (

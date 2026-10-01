@@ -10,6 +10,8 @@ export interface NextStep {
   detail?: string;
   action?: { label: string; icon?: LucideIcon; onClick: () => void; busy?: boolean };
   secondary?: { label: string; onClick: () => void };
+  /** Further quiet choices, shown before the secondary one (e.g. "Add it myself"). */
+  more?: { label: string; onClick: () => void }[];
   tone?: "do" | "done";
 }
 
@@ -45,7 +47,12 @@ const NextStepBar: React.FC<{ step: NextStep }> = ({ step }) => {
         {step.detail && <p className="text-[13px] text-gray-600 dark:text-gray-300 mt-0.5">{step.detail}</p>}
       </div>
       {(step.action || step.secondary) && (
-        <div className="flex items-center gap-2 flex-shrink-0">
+        <div className="flex flex-wrap items-center gap-2 flex-shrink-0">
+          {step.more?.map((x) => (
+            <button key={x.label} onClick={x.onClick} className="min-h-[40px] px-3 rounded-pill text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-white/60 dark:hover:bg-white/5">
+              {x.label}
+            </button>
+          ))}
           {step.secondary && (
             <button onClick={step.secondary.onClick} className="min-h-[40px] px-3 rounded-pill text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-white/60 dark:hover:bg-white/5">
               {step.secondary.label}

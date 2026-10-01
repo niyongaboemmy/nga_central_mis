@@ -1,5 +1,5 @@
 import { GoogleGenAI, Type } from "@google/genai";
-import { AIProvider, GenerateJSONParams, JSONSchema } from "./types";
+import { AIProvider, GenerateJSONParams, JSONSchema, ProviderResult } from "./types";
 
 const isConfigured = () =>
   !!process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== "your_gemini_api_key_here";
@@ -31,7 +31,7 @@ export const geminiProvider: AIProvider = {
   isConfigured,
   supportsStrictSchema: true,
 
-  async generateJSON<T = any>(params: GenerateJSONParams): Promise<T> {
+  async generateJSON<T = any>(params: GenerateJSONParams): Promise<ProviderResult<T>> {
     // Without an explicit timeout, a stuck network connection to Gemini hangs this
     // promise forever — the orchestrator never even reaches the Groq/GLM fallback,
     // since it's simply still awaiting this call. Groq and GLM's clients already set
@@ -52,9 +52,17 @@ export const geminiProvider: AIProvider = {
         responseMimeType: "application/json",
         responseSchema: toGeminiSchema(params.schema),
         ...(params.maxOutputTokens ? { maxOutputTokens: params.maxOutputTokens } : {}),
+        // Thinking tokens come out of maxOutputTokens: on long JSON (a lesson, an array of
+        // questions) they truncated the reply mid-string. Structured output doesn't need them.
+        ...(params.disableThinking ? { thinkingConfig: { thinkingBudget: 0 } } : {}),
       },
     });
 
-    return JSON.parse(response.text || "{}") as T;
+    const meta: any = (response as any).usageMetadata || {};
+    return {
+      data: JSON.parse(response.text || "{}") as T,
+      model,
+      usage: { input_tokens: meta.promptTokenCount, output_tokens: meta.candidatesTokenCount },
+    };
   },
 };

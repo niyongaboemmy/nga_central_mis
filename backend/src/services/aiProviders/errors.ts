@@ -29,3 +29,35 @@ export const friendlyAIErrorMessage = (err: any): string => {
   }
   return "AI generation failed. Please try again.";
 };
+
+/**
+ * A provider that will keep failing until a human fixes something: a bad or revoked key,
+ * or an account that now needs billing (OpenAI's 429 "insufficient_quota" is this, not a
+ * rate limit). Parked for an hour instead of the 5-minute quota cooldown, so a dead key
+ * doesn't cost every request a failed round trip.
+ */
+export const isDeadProviderError = (err: any): boolean => {
+  if (err?.status === 401 || err?.status === 403) return true;
+  const raw = [err?.message, err?.error?.message, err?.code, err?.error?.code].filter(Boolean).join(" ");
+  // Careful: Gemini's *free-tier daily* 429 also says "check your plan and billing details",
+  // and that one resets tomorrow — it is a quota error, not a dead key. Only OpenAI's explicit
+  // insufficient_quota code, a bad key, or a payment/suspension message parks a provider.
+  return (
+    /insufficient_quota/i.test(raw) ||
+    /invalid.?api.?key|incorrect api key|api key not valid|API_KEY_INVALID/i.test(raw) ||
+    /payment required|account.*(deactivated|suspended)/i.test(raw)
+  );
+};
+
+export type AIErrorClass = "QUOTA" | "DEAD" | "TIMEOUT" | "SCHEMA" | "SAFETY" | "OTHER";
+
+/** One word per failure for the usage log, so the admin view can say why a provider failed. */
+export const classifyAIError = (err: any): AIErrorClass => {
+  if (isDeadProviderError(err)) return "DEAD";
+  if (isQuotaError(err)) return "QUOTA";
+  const raw = String(err?.message || err?.name || "");
+  if (/timeout|timed out|ETIMEDOUT|aborted/i.test(raw)) return "TIMEOUT";
+  if (/JSON|schema|Unexpected token|Unterminated/i.test(raw)) return "SCHEMA";
+  if (isSafetyBlock(err)) return "SAFETY";
+  return "OTHER";
+};

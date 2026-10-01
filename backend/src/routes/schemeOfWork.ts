@@ -30,6 +30,7 @@ import {
   bulkSuggestCriteria,
 } from "../controllers/schemeEntryCriteriaController";
 import { Permissions } from "../utils/permissions";
+import { getWeekBundles } from "../controllers/curriculumChainController";
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage() });
@@ -78,6 +79,9 @@ router.get("/ai-generate/:jobId/status", getAIGenerationStatus);
 // The signed-in teacher's own progress across every assigned subject/class —
 // backs the Scheme of Work list's coverage bars and comparison view.
 router.get("/my-progress", getMySchemeProgress);
+
+// Every week of a scheme with its plans, notes, materials and e-learning state.
+router.get("/schemes/:id/week-bundles", getWeekBundles);
 
 router.get("/entries", getSchemeEntries);
 

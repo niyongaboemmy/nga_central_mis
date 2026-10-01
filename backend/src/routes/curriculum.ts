@@ -24,6 +24,7 @@ import {
   uploadSubjectDocument,
   deleteSubjectDocument,
   downloadSubjectDocument,
+  previewSubjectDocument,
 } from "../controllers/curriculumController";
 import {
   startCurriculumImport,
@@ -159,6 +160,7 @@ router.post(
   uploadSubjectDocument,
 );
 router.get("/documents/:documentId/download", downloadSubjectDocument);
+router.get("/documents/:documentId/preview", previewSubjectDocument);
 router.delete(
   "/documents/:documentId",
   authorize("UPLOAD_SUBJECT_DOCUMENTS"),

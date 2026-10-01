@@ -2077,27 +2077,19 @@ export const downloadDocument = asyncHandler(async (req: any, res: any) => {
     throw new NotFoundError("File not found on server");
   }
 
-  // Download file to memory
-  const buffer = await storageService.downloadToBuffer(doc.file_path);
-
-  if (!buffer.length) {
-    throw new NotFoundError("File is empty or corrupted");
-  }
-
   // Force correct headers for PDF
   const mime =
     doc.file_extension?.toLowerCase() === "pdf"
       ? "application/pdf"
       : doc.mime_type || "application/octet-stream";
 
-  res.setHeader("Content-Type", mime);
-  res.setHeader(
-    "Content-Disposition",
-    `inline; filename="${doc.original_name}"`,
-  );
-  res.setHeader("Content-Length", buffer.length);
-
-  res.send(buffer);
+  // Streamed (Range-aware) rather than loaded into memory first.
+  await storageService.streamTo(res, doc.file_path, {
+    range: req.headers.range,
+    contentType: mime,
+    filename: doc.original_name,
+    disposition: "inline",
+  });
 });
 
 // ======================
@@ -3110,19 +3102,17 @@ export const downloadViaShareLink = asyncHandler(
     const exists = await storageService.fileExists(doc.file_path);
     if (!exists) throw new NotFoundError("File not found on server");
 
-    const buffer = await storageService.downloadToBuffer(doc.file_path);
     const mime =
       doc.file_extension?.toLowerCase() === "pdf"
         ? "application/pdf"
         : doc.mime_type || "application/octet-stream";
 
-    res.setHeader("Content-Type", mime);
-    res.setHeader(
-      "Content-Disposition",
-      `attachment; filename="${doc.original_name}"`,
-    );
-    res.setHeader("Content-Length", buffer.length);
-    res.send(buffer);
+    await storageService.streamTo(res, doc.file_path, {
+      range: req.headers.range,
+      contentType: mime,
+      filename: doc.original_name,
+      disposition: "attachment",
+    });
   },
 );
 

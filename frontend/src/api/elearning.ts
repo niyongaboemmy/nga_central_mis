@@ -14,7 +14,11 @@ export type CourseItemType =
   | "TASKMENTOR_QUIZ"
   | "TASKMENTOR_ASSIGNMENT"
   | "KNOWLEDGE_CHECK"
-  | "DISCUSSION";
+  | "DISCUSSION"
+  | "FILE"
+  | "FLASHCARDS"
+  | "EXIT_TICKET"
+  | "PRACTICAL_TASK";
 export type CompletionRule = "NONE" | "VIEW" | "MARK_DONE" | "SUBMIT" | "MIN_SCORE";
 export type ProgressState = "NOT_STARTED" | "IN_PROGRESS" | "COMPLETED";
 export type SectionState = "locked" | "unlocked" | "started" | "completed";
@@ -85,6 +89,10 @@ export interface CourseItem {
   ref: ItemRef | null;
   /** Builder payloads only. */
   content_json?: any;
+  /** Lesson Studio provenance (migration 096): AI drafts wait for review, never shown to students. */
+  ai_origin?: "NONE" | "AI_GENERATED" | "AI_ASSISTED";
+  review_state?: "NOT_REQUIRED" | "PENDING_REVIEW" | "ACCEPTED" | "EDITED" | "DISMISSED";
+  review_flags?: { kind: string; note: string; target_id?: string }[] | null;
 }
 
 export interface CourseSection {
@@ -347,6 +355,9 @@ export interface PageDraft {
   provider_used: string;
 }
 
+export type { PreviewManifest as FilePreviewManifest } from "../lib/files/previewPlan";
+import type { PreviewManifest as FilePreviewManifest } from "../lib/files/previewPlan";
+
 // ---------------------------------------------------------------- client
 
 export const elearningApi = {
@@ -359,7 +370,9 @@ export const elearningApi = {
   markDone: (itemId: number) => apiService.post<Data<MarkDoneResult>>(`/elearning/my/items/${itemId}/done`),
   itemFileUrl: (itemId: number, download = false) =>
     `/elearning/my/items/${itemId}/file${download ? "?download=1" : ""}`,
-  itemFileBlob: (itemId: number) => apiService.get<Blob>(`/elearning/my/items/${itemId}/file`, { responseType: "blob" }),
+  itemFileBlob: (itemId: number, variant: "original" | "pdf" | "text" = "original") =>
+    apiService.get<Blob>(`/elearning/my/items/${itemId}/file`, { responseType: "blob", params: variant === "original" ? undefined : { variant }, timeout: 120_000 }),
+  myItemPreview: (itemId: number) => apiService.get<Data<FilePreviewManifest>>(`/elearning/my/items/${itemId}/preview`),
   sectionForDate: (subjectId: number, classGroupId: number, date: string) =>
     apiService.get<Data<{ course_id: number; section_id: number; title: string } | null>>("/elearning/my/section-for-date", {
       params: { subject_id: subjectId, class_group_id: classGroupId, date },
@@ -410,6 +423,19 @@ export const elearningApi = {
         already_placed: boolean;
       }>
     >(`/elearning/notes/${noteId}/place`, sectionId ? { section_id: sectionId } : {}),
+  /** Files straight onto a week (multipart). Progress is reported for the upload bar. */
+  uploadFiles: (sectionId: number, files: File[], onProgress?: (pct: number) => void) => {
+    const form = new FormData();
+    for (const f of files) form.append("files", f);
+    return apiService.post<Data<BuilderCourse & { created: { item_id: number; asset_id: number; name: string }[]; rejected: { name: string; reason: string }[] }>>(
+      `/elearning/sections/${sectionId}/files`,
+      form,
+      { timeout: 0, headers: { "Content-Type": "multipart/form-data" }, onUploadProgress: (e: any) => onProgress?.(e.total ? Math.round((e.loaded / e.total) * 100) : 0), validateStatus: (s: number) => s < 500 },
+    );
+  },
+  builderItemPreview: (itemId: number) => apiService.get<Data<FilePreviewManifest>>(`/elearning/items/${itemId}/preview`),
+  builderItemFileBlob: (itemId: number, variant: "original" | "pdf" | "text" = "original") =>
+    apiService.get<Blob>(`/elearning/items/${itemId}/file`, { responseType: "blob", params: variant === "original" ? undefined : { variant }, timeout: 120_000 }),
   pickDocuments: (courseId: number) =>
     apiService.get<Data<PickerDocument[]>>(`/elearning/courses/${courseId}/pickers/subject-documents`),
   // --- AI (long-running; see AI_TIMEOUT_MS) ---

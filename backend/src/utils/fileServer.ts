@@ -114,6 +114,83 @@ class FileServerService {
     return buffer;
   }
 
+  /**
+   * Streams a stored file to an HTTP response without buffering it (LESSON_STUDIO plan G9):
+   * the Range header is forwarded, so audio can seek and pdf.js can fetch pages lazily,
+   * and a 200 MB deck never sits in this process's memory. Only the wait for the
+   * file-server's *headers* is time-limited; the body streams for as long as it takes.
+   */
+  async streamTo(
+    res: import("express").Response,
+    remotePath: string,
+    opts: {
+      range?: string;
+      contentType?: string;
+      filename?: string;
+      disposition?: "inline" | "attachment";
+      cacheSeconds?: number;
+    } = {},
+  ): Promise<void> {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), FILE_SERVER_TIMEOUT_MS);
+    let upstream: Response;
+    try {
+      upstream = await fetch(`${FILE_SERVER_URL}/files?path=${encodeURIComponent(namespaced(remotePath))}`, {
+        signal: controller.signal,
+        headers: { "X-API-Key": FILE_SERVER_API_KEY, ...(opts.range ? { Range: opts.range } : {}) },
+      });
+    } catch (err: any) {
+      clearTimeout(timer);
+      if (err?.name === "AbortError") throw new AppError("File storage did not respond in time", 504);
+      throw err;
+    }
+    clearTimeout(timer);
+    if (upstream.status === 404) throw new AppError("File not found in storage", 404);
+    if (upstream.status === 416) {
+      res.status(416).setHeader("Content-Range", upstream.headers.get("content-range") || "");
+      res.end();
+      return;
+    }
+    if (!upstream.ok || !upstream.body) throw new Error(`Failed to stream file: ${upstream.status}`);
+
+    res.status(upstream.status === 206 ? 206 : 200);
+    res.setHeader("Content-Type", opts.contentType || upstream.headers.get("content-type") || "application/octet-stream");
+    for (const h of ["content-length", "content-range", "last-modified", "etag"]) {
+      const v = upstream.headers.get(h);
+      if (v) res.setHeader(h, v);
+    }
+    res.setHeader("Accept-Ranges", "bytes");
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.setHeader("Cache-Control", `private, max-age=${opts.cacheSeconds ?? 0}`);
+    if (opts.filename) {
+      res.setHeader(
+        "Content-Disposition",
+        `${opts.disposition || "inline"}; filename*=UTF-8''${encodeURIComponent(opts.filename)}`,
+      );
+    }
+    const { Readable } = await import("stream");
+    const body = Readable.fromWeb(upstream.body as any);
+    await new Promise<void>((resolve, reject) => {
+      body.on("error", reject);
+      res.on("close", () => {
+        body.destroy();
+        resolve();
+      });
+      body.pipe(res).on("finish", resolve);
+    });
+  }
+
+  /** Streams a stored file to a local path (for conversion / text extraction), never buffering it. */
+  async downloadToFile(remotePath: string, localPath: string): Promise<number> {
+    const res = await request(`/files?path=${encodeURIComponent(namespaced(remotePath))}`, {}, { timeout: false });
+    if (!res.ok || !res.body) throw new Error(`Failed to download file: ${res.status}`);
+    const fs = await import("fs");
+    const { Readable } = await import("stream");
+    const { pipeline } = await import("stream/promises");
+    await pipeline(Readable.fromWeb(res.body as any), fs.createWriteStream(localPath));
+    return (await fs.promises.stat(localPath)).size;
+  }
+
   async deleteFile(remotePath: string): Promise<void> {
     const res = await request(
       `/files?path=${encodeURIComponent(namespaced(remotePath))}`,

@@ -328,6 +328,41 @@ export const listMyLessonNoteSubjects = asyncHandler(
       assignedGroups.set(a.subject_id, entry);
     }
 
+    // E-learning weeks per subject (LESSON_STUDIO plan §5.2): the teacher's most recent
+    // course for the subject (this term when one is selected) — how many scheme weeks it has
+    // and how many are live with at least one published item. Drives "Fill all weeks with AI".
+    const subjectIdsForWeeks = [
+      ...new Set([...assignments.map((a) => a.subject_id), ...noteRows.map((r) => r.subject_id)]),
+    ];
+    const weeksBySubject = new Map<number, { course_id: number; weeks_total: number; weeks_live: number }>();
+    if (subjectIdsForWeeks.length) {
+      const courseRows = await db
+        .select({
+          course_id: Course.course_id,
+          subject_id: Course.subject_id,
+          weeks_total: sql<number>`COUNT(${CourseSection.section_id})`,
+          weeks_live: sql<number>`SUM(CASE WHEN ${CourseSection.status} <> 'HIDDEN' AND EXISTS (
+            SELECT 1 FROM CourseItem ci WHERE ci.section_id = ${CourseSection.section_id} AND ci.is_published = 1 AND ci.item_type <> 'HEADER'
+          ) THEN 1 ELSE 0 END)`,
+        })
+        .from(Course)
+        .leftJoin(CourseSection, eq(CourseSection.course_id, Course.course_id))
+        .where(
+          and(
+            eq(Course.owner_user_id, userId),
+            inArray(Course.subject_id, subjectIdsForWeeks),
+            academic_term_id ? eq(Course.academic_term_id, parseInt(academic_term_id, 10)) : undefined,
+          ),
+        )
+        .groupBy(Course.course_id, Course.subject_id)
+        .orderBy(desc(Course.course_id));
+      for (const c of courseRows) {
+        if (!weeksBySubject.has(c.subject_id)) {
+          weeksBySubject.set(c.subject_id, { course_id: c.course_id, weeks_total: Number(c.weeks_total || 0), weeks_live: Number(c.weeks_live || 0) });
+        }
+      }
+    }
+
     const shape = (
       subjectId: number,
       name: string,
@@ -345,6 +380,9 @@ export const listMyLessonNoteSubjects = asyncHandler(
         published_count: Number(n?.published_count || 0),
         draft_count: Number(n?.draft_count || 0),
         on_course_count: onCourse.get(subjectId) || 0,
+        course_id: weeksBySubject.get(subjectId)?.course_id ?? null,
+        weeks_total: weeksBySubject.get(subjectId)?.weeks_total ?? 0,
+        weeks_live: weeksBySubject.get(subjectId)?.weeks_live ?? 0,
         last_updated: n?.last_updated || null,
         class_group_names: classGroups,
       };
@@ -711,14 +749,14 @@ export const streamLessonNotePdf = asyncHandler(async (req: any, res: any) => {
       );
   }
 
-  const buffer = await storageService.downloadToBuffer(note.file_path);
-  res.setHeader("Content-Type", "application/pdf");
-  res.setHeader(
-    "Content-Disposition",
-    `inline; filename="${safePdfFilename(note.title)}"`,
-  );
-  res.setHeader("Cache-Control", "private, max-age=3600");
-  res.send(buffer);
+  // Streamed with Range support so pdf.js can load a long PDF page by page.
+  await storageService.streamTo(res, note.file_path, {
+    range: req.headers.range,
+    contentType: "application/pdf",
+    filename: safePdfFilename(note.title),
+    disposition: "inline",
+    cacheSeconds: 3600,
+  });
 });
 
 export const getLessonNote = asyncHandler(async (req: any, res: any) => {
@@ -792,13 +830,11 @@ export const exportLessonNotePdf = asyncHandler(async (req: any, res: any) => {
   // A PDF note *is* a PDF already — hand back the teacher's original, byte for byte,
   // rather than re-rendering the extracted text into a worse-looking copy.
   if (isPdfNote(note) && note.file_path) {
-    const buffer = await storageService.downloadToBuffer(note.file_path);
-    res.setHeader("Content-Type", "application/pdf");
-    res.setHeader(
-      "Content-Disposition",
-      `attachment; filename="${safePdfFilename(note.title)}"`,
-    );
-    res.send(buffer);
+    await storageService.streamTo(res, note.file_path, {
+      contentType: "application/pdf",
+      filename: safePdfFilename(note.title),
+      disposition: "attachment",
+    });
     return;
   }
 
@@ -934,11 +970,23 @@ export const updateLessonNote = asyncHandler(async (req: any, res: any) => {
   if (snapshot_prompt !== undefined && note.source === "MANUAL") {
     updates.source = "AI_ASSISTED";
   }
+  const contentEdited = content_html !== undefined || content_json !== undefined;
+  // A teacher editing an AI-written note makes it a co-authored one (so the Lesson Studio
+  // never deletes it as an untouched draft).
+  if (contentEdited && note.source === "AI_GENERATED") updates.source = "AI_ASSISTED";
 
   await db
     .update(LessonNote)
     .set(updates)
     .where(eq(LessonNote.note_id, noteId));
+
+  if (contentEdited) {
+    // Same for its place on e-learning: a Studio draft the teacher has edited is theirs.
+    await db
+      .update(CourseItem)
+      .set({ review_state: "EDITED" })
+      .where(and(eq(CourseItem.item_type, "LESSON_NOTE"), eq(CourseItem.ref_id, noteId), eq(CourseItem.review_state, "PENDING_REVIEW")));
+  }
 
   if (status === "PUBLISHED" && note.status !== "PUBLISHED") {
     await recordActivity(

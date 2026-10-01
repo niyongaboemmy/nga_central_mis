@@ -47,7 +47,9 @@ export const sanitizeNoteHtml = (html: string): string =>
       input: [{ name: "type", values: ["checkbox"] }, "checked", "disabled"],
       p: ["style", "class"],
       details: ["data-type", "class"],
-      div: ["data-type", "data-check", "class"],
+      // data-activity: Lesson Studio activities (fill-in-the-blank, order-the-steps,
+      // match-pairs) — <div data-type="activity" data-activity="{json}">…fallback…</div>.
+      div: ["data-type", "data-check", "data-activity", "class"],
       h1: ["style"],
       h2: ["style"],
       h3: ["style"],

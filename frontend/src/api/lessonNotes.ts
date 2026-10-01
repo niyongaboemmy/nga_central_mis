@@ -43,6 +43,10 @@ export interface LessonNoteSubjectSummary {
   published_count: number;
   draft_count: number;
   on_course_count: number;
+  /** The teacher's e-learning course for this subject, and how many of its weeks are live. */
+  course_id: number | null;
+  weeks_total: number;
+  weeks_live: number;
   /** Null when the subject has no notes yet. */
   last_updated: string | null;
   class_group_names: string | null;
