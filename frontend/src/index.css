@@ -26,6 +26,14 @@ body {
   line-height: 1.6;
 }
 
+/* Text that sets no colour of its own (dialog bodies, form labels, legends) follows
+   the theme instead of falling back to the browser's black, which is unreadable on
+   the dark surfaces. Explicit text-* classes still win. */
+.dark body {
+  color: #e2e8f0;
+  color-scheme: dark;
+}
+
 * {
   font-optical-sizing: auto;
 }

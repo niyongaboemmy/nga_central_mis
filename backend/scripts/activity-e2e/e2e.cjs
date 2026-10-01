@@ -220,7 +220,10 @@ const waitFor = async (fn, timeoutMs, everyMs = 500) => {
   }
 
   // ── accessibility & layout: 2 themes × 3 viewports ─────────────────────────
+  // The signed-in user's saved theme overrides localStorage, so set it per pass.
+  const [[pref]] = await db.query("SELECT preferred_theme FROM User WHERE user_id = ?", [ADMIN_ID]);
   for (const theme of ["light", "dark"]) {
+    await db.query("UPDATE User SET preferred_theme = ? WHERE user_id = ?", [theme, ADMIN_ID]);
     const a = await ctx(await tokenFor(ADMIN_ID), theme);
     for (const [path2, title2, w, h] of [
       ["/analytics/realtime", "Realtime", 1440, 900], ["/analytics/realtime", "Realtime", 820, 1180], ["/analytics/realtime", "Realtime", 390, 844],
@@ -236,6 +239,8 @@ const waitFor = async (fn, timeoutMs, everyMs = 500) => {
       await a.p.goto(`${APP}${path2}`, { waitUntil: "networkidle2" });
       await waitFor(() => heading(a.p, title2), 10_000);
       await sleep(1500);
+      const applied = await a.p.evaluate(() => document.documentElement.className);
+      if (w === 1440 || path2 === "/analytics/realtime") check(`page renders in the ${theme} theme ${title2} ${w}px`, applied.includes(theme), applied);
       await a.p.addScriptTag({ content: AXE });
       const axe = await a.p.evaluate(async () => {
         const r = await window.axe.run(document.querySelector("main") || document.body, { runOnly: ["wcag2a", "wcag2aa"] });
@@ -248,6 +253,7 @@ const waitFor = async (fn, timeoutMs, everyMs = 500) => {
     }
     await a.c.close();
   }
+  await db.query("UPDATE User SET preferred_theme = ? WHERE user_id = ?", [pref.preferred_theme, ADMIN_ID]);
   check("no uncaught page errors on the admin page", consoleErrors.length === 0, consoleErrors.slice(0, 3));
 
   await browser.close();
