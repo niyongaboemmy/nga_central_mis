@@ -91,11 +91,14 @@ export const recordAuthEvent = async (req: any, input: AuthEventInput): Promise<
         app: input.app && input.kind !== "app_launch" ? input.app : "mis",
         name,
         at: now,
-        userId: input.userId ?? null,
+        // A FAILED attempt names the account that was targeted, not who is at the keyboard:
+        // it must never attach identity to the device or its session.
+        userId: input.outcome === "failure" ? null : input.userId ?? null,
         deviceId,
         ip,
         ua,
         params: {
+          ...(input.outcome === "failure" && input.userId ? { target_user_id: input.userId } : {}),
           ...(input.method ? { method: input.method } : {}),
           ...(input.reason ? { reason: input.reason } : {}),
           ...(input.kind === "app_launch" && input.app ? { target_app: input.app } : {}),

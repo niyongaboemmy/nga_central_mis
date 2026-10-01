@@ -82,14 +82,43 @@ const toRow = (s: OpenSession): SessionRow => {
   return { ...row, app_path: appPath.join(">").slice(0, 100), last_activity_at: new Date(lastActivityMs) };
 };
 
+/**
+ * Late events (an offline queue flushed hours later, or a backdated relay batch) belong
+ * to a session of their own time, not to whatever session is open now. They get their
+ * own session chain per device, timed out like any other.
+ */
+const late = new Map<string, OpenSession>();
+
 export const touchSession = (t: TouchInput): TouchResult => {
-  let s = open.get(t.deviceId) ?? null;
+  const current = open.get(t.deviceId) ?? null;
+  if (current && t.kind === "event" && t.at < current.startedMs - timeoutMs()) return touchLate(t);
+  let s = current;
   const res: TouchResult = { session: null, started: false, stitched: false, appChanged: false };
 
   if (s && (t.at - s.lastActivityMs > timeoutMs() || (t.userId && s.user_id && t.userId !== s.user_id))) {
     close(s);
     s = null;
   }
+  return applyTouch(t, s, open, res);
+};
+
+const touchLate = (t: TouchInput): TouchResult => {
+  let s = late.get(t.deviceId) ?? null;
+  const res: TouchResult = { session: null, started: false, stitched: false, appChanged: false };
+  if (s && (Math.abs(t.at - s.lastActivityMs) > timeoutMs() || (t.userId && s.user_id && t.userId !== s.user_id))) {
+    closeIn(s, late);
+    s = null;
+  }
+  return applyTouch(t, s, late, res);
+};
+
+const closeIn = (s: OpenSession, map: Map<string, OpenSession>) => {
+  s.ended_at = new Date(s.lastActivityMs);
+  queueSession(toRow(s));
+  map.delete(s.device_id);
+};
+
+const applyTouch = (t: TouchInput, s: OpenSession | null, map: Map<string, OpenSession>, res: TouchResult): TouchResult => {
 
   if (!s) {
     // A beat alone never opens a session (an idle open tab is not a visit).
@@ -131,7 +160,7 @@ export const touchSession = (t: TouchInput): TouchResult => {
       startedMs: t.at,
       engagedNotified: false,
     };
-    open.set(t.deviceId, s);
+    map.set(t.deviceId, s);
     res.started = true;
   }
 
@@ -147,6 +176,10 @@ export const touchSession = (t: TouchInput): TouchResult => {
     if (t.visible && !t.idle) s.lastActivityMs = Math.max(s.lastActivityMs, t.at);
   } else {
     s.lastActivityMs = Math.max(s.lastActivityMs, t.at);
+    if (t.at < s.startedMs) {
+      s.startedMs = t.at;
+      s.started_at = new Date(t.at);
+    }
     s.events++;
     if (t.isPageView) {
       s.page_views++;
@@ -186,6 +219,7 @@ export const endSession = (deviceId: string) => {
 
 export const endUserSessions = (userId: number) => {
   for (const s of [...open.values()]) if (s.user_id === userId) close(s);
+  for (const s of [...late.values()]) if (s.user_id === userId) closeIn(s, late);
 };
 
 /** Close sessions that timed out. Runs every 60 s. */
@@ -198,6 +232,11 @@ export const sweepSessions = () => {
       close(s);
       closed++;
     }
+  }
+  // Late chains close as soon as nothing has been added to them for a minute.
+  for (const s of [...late.values()]) {
+    closeIn(s, late);
+    closed++;
   }
   return closed;
 };
@@ -229,5 +268,8 @@ export const reloadOpenSessions = async () => {
 };
 
 export const openSessionCount = () => open.size;
-export const resetSessions = () => open.clear();
+export const resetSessions = () => {
+  open.clear();
+  late.clear();
+};
 

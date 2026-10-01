@@ -17,6 +17,12 @@ import { consumeStreamTicket, issueStreamTicket } from "../services/activity/tok
 import { bufferDepth, stats as writerStats } from "../services/activity/writer";
 import { logFromReq } from "../services/activity/accessLog";
 import { asyncHandler } from "../middleware/asyncHandler";
+import { parseQuery } from "../services/activity/reports/common";
+import { overview } from "../services/activity/reports/overview";
+import { accessSeries, accessUsers, failedLogins, heatmap, loginSeries } from "../services/activity/reports/access";
+import { adoptionBy, audience, visitors, visitorSeries } from "../services/activity/reports/audience";
+import { apps as appsReport, dimension, features, flows, keyEvents, retention, technology } from "../services/activity/reports/engagement";
+import { ipLookup, locations } from "../services/activity/reports/locations";
 
 /**
  * Admin console API (USAGE_ANALYTICS_IMPLEMENTATION_PLAN.md §15).
@@ -179,6 +185,133 @@ const matchesView = (p: presence.PersonView, f: presence.PresenceFilter) => {
   if (f.feature && !p.tabs.some((t) => t.feature === f.feature)) return false;
   return true;
 };
+
+
+// ---------------------------------------------------------------------------
+// Reports (plan §14). Aggregates need ANALYTICS_VIEW; anything naming people, IPs or
+// usernames tried also needs ANALYTICS_USER_VIEW. Without it, small groups are hidden.
+// ---------------------------------------------------------------------------
+const VIEW = can(["ANALYTICS_VIEW", "ANALYTICS_USER_VIEW"]);
+const NAMED = can("ANALYTICS_USER_VIEW");
+const suppressFor = (req: any) => !hasCap(req, "ANALYTICS_USER_VIEW");
+
+/** CSV for list endpoints (?format=csv). Exports that carry names are access-logged. */
+const csvOf = (rows: Record<string, any>[]) => {
+  if (!rows.length) return "";
+  const cols = Object.keys(rows[0]);
+  const cell = (v: any) => {
+    const t = v === null || v === undefined ? "" : typeof v === "object" ? (v instanceof Date ? v.toISOString() : JSON.stringify(v)) : String(v);
+    // Neutralise spreadsheet formula injection.
+    const safe = /^[=+\-@\t\r]/.test(t) ? `'${t}` : t;
+    return /[",\n]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
+  };
+  return [cols.join(","), ...rows.map((r) => cols.map((c) => cell(r[c])).join(","))].join("\n");
+};
+const sendList = async (req: any, res: any, report: string, data: { rows: any[] } & Record<string, any>, named: boolean) => {
+  if (req.query.format === "csv") {
+    if (named) await logFromReq(req, "export", { detail: { report, filters: req.query, rows: data.rows.length } });
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename="${report}-${new Date().toISOString().slice(0, 10)}.csv"`);
+    return res.send(csvOf(data.rows));
+  }
+  res.json({ success: true, data });
+};
+
+router.get("/overview", authenticate, VIEW, asyncHandler(async (req: any, res: any) => {
+  res.json({ success: true, data: await overview(parseQuery(req.query), suppressFor(req)) });
+}));
+
+router.get("/access/series", authenticate, VIEW, asyncHandler(async (req: any, res: any) => {
+  const rq = parseQuery(req.query);
+  const [access, logins] = await Promise.all([accessSeries(rq), loginSeries(rq)]);
+  res.json({ success: true, data: { access, ...logins } });
+}));
+router.get("/access/heatmap", authenticate, VIEW, asyncHandler(async (req: any, res: any) => {
+  res.json({ success: true, data: await heatmap(parseQuery(req.query)) });
+}));
+router.get("/access/users", authenticate, NAMED, asyncHandler(async (req: any, res: any) => {
+  const rq = parseQuery(req.query);
+  const full = req.query.format === "csv";
+  const data = await accessUsers(rq, {
+    search: req.query.search ? String(req.query.search) : undefined,
+    sort: req.query.sort as any,
+    dir: req.query.dir as any,
+    page: Number(req.query.page) || 1,
+    limit: full ? 500 : Number(req.query.limit) || 50,
+  });
+  await sendList(req, res, "accessed-users", data, true);
+}));
+router.get("/access/failed", authenticate, NAMED, asyncHandler(async (req: any, res: any) => {
+  const rows = await failedLogins(parseQuery(req.query));
+  await sendList(req, res, "failed-sign-ins", { rows }, true);
+}));
+
+router.get("/audience", authenticate, NAMED, asyncHandler(async (req: any, res: any) => {
+  const rq = parseQuery(req.query);
+  const data = await audience(rq, {
+    filter: req.query.filter as any,
+    search: req.query.search ? String(req.query.search) : undefined,
+    page: Number(req.query.page) || 1,
+    limit: req.query.format === "csv" ? 500 : Number(req.query.limit) || 50,
+    sort: req.query.sort ? String(req.query.sort) : undefined,
+    dir: req.query.dir ? String(req.query.dir) : undefined,
+  });
+  await sendList(req, res, "audience", data, true);
+}));
+router.get("/audience/adoption", authenticate, VIEW, asyncHandler(async (req: any, res: any) => {
+  const by = ["program", "grade", "class_group", "role"].includes(String(req.query.by)) ? (String(req.query.by) as any) : "program";
+  res.json({ success: true, data: await adoptionBy(parseQuery(req.query), by, suppressFor(req)) });
+}));
+
+router.get("/visitors", authenticate, NAMED, asyncHandler(async (req: any, res: any) => {
+  const rq = parseQuery(req.query);
+  const data = await visitors(rq, {
+    tab: ["bots", "converted"].includes(String(req.query.tab)) ? (req.query.tab as any) : "humans",
+    search: req.query.search ? String(req.query.search) : undefined,
+    page: Number(req.query.page) || 1,
+    limit: req.query.format === "csv" ? 500 : Number(req.query.limit) || 50,
+  });
+  await sendList(req, res, "visitors", data, true);
+}));
+router.get("/visitors/summary", authenticate, VIEW, asyncHandler(async (req: any, res: any) => {
+  res.json({ success: true, data: await visitorSeries(parseQuery(req.query)) });
+}));
+
+router.get("/engagement/features", authenticate, VIEW, asyncHandler(async (req: any, res: any) => {
+  const rows = await features(parseQuery(req.query));
+  await sendList(req, res, "features", { rows }, false);
+}));
+router.get("/engagement/dimension", authenticate, VIEW, asyncHandler(async (req: any, res: any) => {
+  const dim = String(req.query.dim || "");
+  if (!["event", "landing", "exit", "referrer_host", "entry_kind", "user_type", "network"].includes(dim)) return res.status(400).json({ success: false, message: "Unknown dimension" });
+  res.json({ success: true, data: await dimension(parseQuery(req.query), dim) });
+}));
+router.get("/engagement/key-events", authenticate, VIEW, asyncHandler(async (req: any, res: any) => {
+  res.json({ success: true, data: await keyEvents(parseQuery(req.query)) });
+}));
+router.get("/apps", authenticate, VIEW, asyncHandler(async (req: any, res: any) => {
+  const rq = parseQuery(req.query);
+  const [cards, flow] = await Promise.all([appsReport(rq), flows(rq)]);
+  res.json({ success: true, data: { ...cards, flows: flow } });
+}));
+router.get("/retention", authenticate, VIEW, asyncHandler(async (req: any, res: any) => {
+  res.json({ success: true, data: await retention(parseQuery(req.query, 84)) });
+}));
+router.get("/technology", authenticate, VIEW, asyncHandler(async (req: any, res: any) => {
+  res.json({ success: true, data: await technology(parseQuery(req.query)) });
+}));
+router.get("/locations", authenticate, VIEW, asyncHandler(async (req: any, res: any) => {
+  const data = await locations(parseQuery(req.query));
+  // IP addresses are personal data: only with per-person access.
+  if (!hasCap(req, "ANALYTICS_USER_VIEW")) data.top_ips = [];
+  res.json({ success: true, data });
+}));
+router.get("/ip/:ip", authenticate, NAMED, asyncHandler(async (req: any, res: any) => {
+  const data = await ipLookup(String(req.params.ip));
+  if (!data) return res.status(400).json({ success: false, message: "Not a valid IP address" });
+  await logFromReq(req, "ip_lookup", { targetIp: data.ip });
+  res.json({ success: true, data });
+}));
 
 /** Feature labels for every app (the console shows names, not keys). */
 router.get(

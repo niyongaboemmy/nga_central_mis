@@ -9,6 +9,7 @@ import { activityBus, clock } from "./runtime";
 import { reloadOpenSessions, sweepSessions } from "./sessionizer";
 import { getSettings } from "./settings";
 import { flushActivity } from "./writer";
+import { rollupTick } from "./rollup";
 
 /**
  * Starts the activity engine's timers (plan §9): buffered flush every 2 s, presence
@@ -95,6 +96,9 @@ export const startActivityEngine = async () => {
   every(30_000, () => getSettings());
   every(30_000, () => refreshBlocks());
   every(10_000, () => broadcast({ type: "ping", at: new Date(clock.now()).toISOString() }));
+  // Rollups for today every 5 min (+ the nightly maintenance run inside rollupTick).
+  every(5 * 60_000, rollupTick);
+  setTimeout(() => void rollupTick().catch((error) => logger.error("[activity] rollup failed", { error })), 20_000).unref();
 };
 
 export const stopActivityEngine = async () => {

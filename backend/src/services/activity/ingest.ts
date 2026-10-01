@@ -308,6 +308,11 @@ export const ingestEnvelope = async (env: Envelope, ctx: IngestContext): Promise
 
     const flags = baseFlags | (key ? FLAG.key : 0) | (p.debug ? FLAG.debug : 0);
     delete p.debug;
+    if (ev.n === "page_view") {
+      // Release and display mode come from the envelope (Technology report).
+      if (env.rel) p.rel = env.rel;
+      if (standalone) p.standalone = true;
+    }
     queueEvent(row(ev.id, at, ctx, env.did, lastSessionId, ev.pv ?? null, ev.n, route, feature, engagement, e, Object.keys(p).length ? JSON.stringify(p) : null, flags, now));
     res.accepted++;
 
