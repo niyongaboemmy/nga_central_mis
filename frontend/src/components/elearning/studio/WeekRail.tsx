@@ -1,7 +1,7 @@
 import React from "react";
-import { Check, ClipboardList, FileText, MonitorPlay, Target } from "lucide-react";
+import { Check, Target } from "lucide-react";
 import type { WeekBundle } from "../../../api/studio";
-import { WEEK_STATE_LABEL, WeekFilter, weekSelectable } from "./studioModel";
+import { termReadiness, WEEK_STATE_LABEL, WeekFilter, weekSelectable } from "./studioModel";
 
 const STATE_DOT: Record<WeekBundle["readiness"]["state"], string> = {
   EMPTY: "bg-gray-300 dark:bg-white/20",
@@ -9,25 +9,26 @@ const STATE_DOT: Record<WeekBundle["readiness"]["state"], string> = {
   DRAFTED: "bg-brand-500",
   LIVE: "bg-success-500",
 };
+// The status reads as words; the dot only repeats it. Live is the one state worth colouring.
+const STATE_TEXT: Record<WeekBundle["readiness"]["state"], string> = {
+  EMPTY: "text-slate-600 dark:text-slate-300",
+  TODO: "text-slate-700 dark:text-slate-200",
+  DRAFTED: "text-slate-700 dark:text-slate-200",
+  LIVE: "text-success-700 dark:text-success-500",
+};
 
-/** Plan · Note · E-learning · Coverage — the four facts a teacher checks for a week (§5.4). */
-const Facts: React.FC<{ w: WeekBundle }> = ({ w }) => {
-  const cov = w.coverage && w.coverage.targets ? Math.round((w.coverage.covered / w.coverage.targets) * 100) : null;
-  const fact = (on: boolean, Icon: React.ElementType, label: string) => (
-    <span title={label} aria-label={label} className={`inline-flex items-center ${on ? "text-gray-700 dark:text-gray-200" : "text-gray-300 dark:text-white/20"}`}>
-      <Icon className="w-3.5 h-3.5" />
-    </span>
-  );
+/** Tertiary facts. Only criteria coverage shows on the row; plan / notes / e-learning go in the
+ *  row's tooltip and screen-reader text, so the status line never has to give way to icons. */
+const factsText = (w: WeekBundle) =>
+  [w.readiness.has_plan ? "Has a lesson plan" : "No lesson plan", w.readiness.has_note ? "has lesson notes" : "no lesson notes", w.readiness.has_items ? "has e-learning content" : "nothing on e-learning"].join(", ");
+
+const Coverage: React.FC<{ w: WeekBundle }> = ({ w }) => {
+  if (!w.coverage || !w.coverage.targets) return null;
+  const full = w.coverage.covered === w.coverage.targets;
+  const label = `${w.coverage.covered} of ${w.coverage.targets} criteria covered`;
   return (
-    <span className="flex items-center gap-1.5">
-      {fact(w.readiness.has_plan, ClipboardList, w.readiness.has_plan ? "Has a lesson plan" : "No lesson plan")}
-      {fact(w.readiness.has_note, FileText, w.readiness.has_note ? "Has lesson notes" : "No lesson notes")}
-      {fact(w.readiness.has_items, MonitorPlay, w.readiness.has_items ? "Has e-learning content" : "Nothing on e-learning")}
-      {cov !== null && (
-        <span title={`${w.coverage!.covered} of ${w.coverage!.targets} criteria covered`} className={`inline-flex items-center gap-0.5 text-[11px] tabular-nums ${cov === 100 ? "text-success-700 dark:text-success-500" : "text-slate-600 dark:text-slate-300"}`}>
-          <Target className="w-3 h-3" /> {cov}%
-        </span>
-      )}
+    <span title={label} aria-label={label} className={`inline-flex items-center gap-0.5 text-[11px] tabular-nums ${full ? "text-success-700 dark:text-success-500" : "text-slate-600 dark:text-slate-300"}`}>
+      <Target className="w-3 h-3" aria-hidden /> {w.coverage.covered}/{w.coverage.targets}
     </span>
   );
 };
@@ -46,14 +47,28 @@ export const WeekRail: React.FC<{
   badge?: (sectionId: number) => React.ReactNode;
 }> = ({ weeks, selected, nowSectionId, focused, onToggle, onFocus, onFilter, filter, readOnly, badge }) => {
   const selectable = weeks.filter(weekSelectable).length;
+  const term = termReadiness(weeks);
   return (
     <div className="flex flex-col h-full min-h-0">
+      <div className="px-3 pt-3 pb-2 border-b border-gray-100 dark:border-white/[0.06]">
+        {/* Term readiness: the one number that says how far the term's preparation has got. */}
+        <div className="flex items-baseline justify-between gap-2">
+          <p className="text-sm font-semibold text-gray-900 dark:text-white">Term readiness</p>
+          <p className="text-sm font-semibold tabular-nums text-gray-900 dark:text-white">{term.pct}%</p>
+        </div>
+        <div className="mt-1.5 h-1.5 rounded-full bg-gray-100 dark:bg-white/10 overflow-hidden" role="progressbar" aria-valuenow={term.pct} aria-valuemin={0} aria-valuemax={100} aria-label="Term readiness">
+          <div className="h-full rounded-full bg-success-500 transition-[width] duration-500" style={{ width: `${term.pct}%` }} />
+        </div>
+        <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">
+          {term.live} of {term.plannable} weeks live{term.ready ? ` · ${term.ready} ready, not live` : ""}
+        </p>
+        {!readOnly && (
+          <p className="mt-2 text-xs text-slate-600 dark:text-slate-300 tabular-nums" aria-live="polite" title={`${weeks.length - selectable} week(s) have no topic in the scheme of work yet, so they can't be drafted`}>
+            {weeks.length} weeks · {selectable} can be drafted · <strong className="font-semibold text-gray-900 dark:text-white">{selected.size} selected</strong>
+          </p>
+        )}
       {!readOnly && (
-        <div className="px-3 pt-3 pb-2 border-b border-gray-100 dark:border-white/[0.06]">
-          <div className="flex items-baseline justify-between">
-            <p className="text-[11px] uppercase tracking-wider font-semibold text-slate-600 dark:text-slate-300">{weeks.length} weeks</p>
-            <p className="text-xs text-slate-600 dark:text-slate-300 tabular-nums" aria-live="polite">{selected.size} of {selectable} chosen</p>
-          </div>
+        <div>
           <div className="mt-2 el-segment flex text-xs" role="radiogroup" aria-label="Which weeks">
             {([
               ["gaps", "With gaps"],
@@ -73,6 +88,7 @@ export const WeekRail: React.FC<{
           </div>
         </div>
       )}
+      </div>
       <ul className="flex-1 overflow-y-auto p-1.5 space-y-0.5" aria-label="Weeks of the scheme of work">
         {weeks.map((w) => {
           const sid = w.section?.section_id ?? null;
@@ -96,25 +112,32 @@ export const WeekRail: React.FC<{
                     {isSel && <Check className="w-3.5 h-3.5" strokeWidth={3} />}
                   </button>
                 )}
-                <button onClick={() => sid && onFocus(sid)} disabled={!sid} className="min-w-0 flex-1 text-left focus:outline-none focus-visible:shadow-glow rounded-md">
+                <button onClick={() => sid && onFocus(sid)} disabled={!sid} aria-current={isFocus ? "true" : undefined} title={w.entry.topic ? factsText(w) : undefined} className="min-w-0 flex-1 text-left focus:outline-none focus-visible:shadow-glow rounded-md">
+                  {/* Primary: which week and what it's about */}
                   <span className="flex items-center gap-1.5">
-                    <span className={`w-2 h-2 rounded-full flex-shrink-0 ${STATE_DOT[w.readiness.state]}`} aria-hidden />
                     <span className="text-sm font-semibold text-gray-900 dark:text-white">{w.entry.week_number || "Week"}</span>
-                    {sid === nowSectionId && <span className="px-1.5 rounded-pill bg-brand-600 text-white text-[10px] font-semibold">Now</span>}
-                    {w.entry.start_date && (
-                      <span className="text-[11px] text-slate-600 dark:text-slate-300">
-                        {new Date(w.entry.start_date + "T00:00:00").toLocaleDateString([], { day: "numeric", month: "short" })}
-                      </span>
-                    )}
+                    {sid === nowSectionId && <span className="px-1.5 rounded-pill bg-brand-600 text-white text-[10px] font-semibold">This week</span>}
                     <span className="flex-1" />
                     {sid !== null && badge?.(sid)}
                   </span>
-                  <span className={`block text-sm truncate ${w.entry.topic ? "text-gray-700 dark:text-gray-200" : "italic text-slate-600 dark:text-slate-300"}`}>
+                  <span className={`block text-sm leading-snug line-clamp-2 ${w.entry.topic ? "text-gray-800 dark:text-gray-100" : "italic text-slate-600 dark:text-slate-300"}`} title={w.entry.topic || undefined}>
                     {w.entry.topic || WEEK_STATE_LABEL.EMPTY}
                   </span>
-                  <span className="mt-1 flex items-center justify-between gap-2">
-                    <Facts w={w} />
-                    <span className="text-[11px] text-slate-600 dark:text-slate-300">{WEEK_STATE_LABEL[w.readiness.state]}</span>
+                  {/* Secondary: when, and where it stands (in words). Tertiary: the facts. */}
+                  <span className="mt-1 flex items-center gap-2">
+                    <span className={`min-w-0 inline-flex items-center gap-1.5 text-xs whitespace-nowrap overflow-hidden ${STATE_TEXT[w.readiness.state]}`}>
+                      <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${STATE_DOT[w.readiness.state]}`} aria-hidden />
+                      {w.entry.start_date && (
+                        <>
+                          {new Date(w.entry.start_date + "T00:00:00").toLocaleDateString([], { day: "numeric", month: "short" })}
+                          <span aria-hidden>·</span>
+                        </>
+                      )}
+                      {w.entry.topic ? WEEK_STATE_LABEL[w.readiness.state] : "Add a topic in the scheme"}
+                    </span>
+                    <span className="flex-1" />
+                    {w.entry.topic && <span className="flex-shrink-0"><Coverage w={w} /></span>}
+                    {w.entry.topic && <span className="sr-only">{factsText(w)}</span>}
                   </span>
                 </button>
               </div>

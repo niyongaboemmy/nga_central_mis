@@ -5,6 +5,8 @@ import {
   BookOpen,
   Check,
   CheckCheck,
+  ChevronLeft,
+  ChevronRight,
   CircleHelp,
   ExternalLink,
   Hammer,
@@ -24,6 +26,35 @@ import { useMotion } from "../../../design/motion";
 import { hydrateInlineChecks } from "../interactive/hydrate";
 import { attachImageTokenToHtml } from "../../../utils/lessonNoteImages";
 import { flagTone, REVIEW_KEYS, weekIsClean } from "./studioModel";
+
+/** What the AI read, said the way a teacher would (context-pack source kinds). */
+const SOURCE_KIND: Record<string, string> = {
+  SCHEME_ENTRY: "Scheme of work",
+  LESSON_PLAN: "Your lesson plan",
+  LESSON_NOTE: "Your notes",
+  SUBJECT_DOCUMENT: "Subject material",
+  COURSE_FILE: "Uploaded file",
+  PREVIOUS_WEEKS: "Earlier weeks",
+};
+
+/** "Why this lesson?" at a glance: the kinds of source a draft was built from, each with its titles on hover. */
+const BuiltFrom: React.FC<{ draft: DraftItem }> = ({ draft }) => {
+  const sources = draft.source_refs?.sources ?? [];
+  if (!sources.length) return null;
+  const byKind = new Map<string, string[]>();
+  for (const src of sources) byKind.set(src.kind, [...(byKind.get(src.kind) ?? []), src.title]);
+  return (
+    <p className="mt-2 flex flex-wrap items-center gap-1 text-xs text-slate-600 dark:text-slate-300">
+      <span className="font-medium">Built from</span>
+      {[...byKind.entries()].map(([kind, titles]) => (
+        <span key={kind} title={titles.join("\n")} className="px-1.5 py-0.5 rounded-pill el-subtle text-[11px] text-gray-700 dark:text-gray-200">
+          {SOURCE_KIND[kind] ?? kind}
+          {titles.length > 1 ? ` ×${titles.length}` : ""}
+        </span>
+      ))}
+    </p>
+  );
+};
 
 /** Reader typography at review size: the full reader defaults to 1.15× for long reading. */
 const READER_STYLE = { "--reader-font-scale": 0.92, "--reader-line-height": 1.65 } as React.CSSProperties;
@@ -81,11 +112,11 @@ const LessonPreview: React.FC<{ draft: DraftItem }> = ({ draft }) => {
   if (html === null) return <div className="space-y-2" aria-busy="true">{[0, 1, 2].map((i) => <div key={i} className="h-3 rounded bg-gray-100 dark:bg-white/10 animate-pulse" />)}</div>;
   return (
     <>
-      <div ref={ref} className="lesson-note-preview note-reader-body note-reader-body--sans max-h-[60vh] overflow-y-auto pr-1" style={READER_STYLE} dangerouslySetInnerHTML={{ __html: attachImageTokenToHtml(html) }} />
+      <div ref={ref} className="lesson-note-preview note-reader-body note-reader-body--sans max-h-[60vh] overflow-y-auto pr-1 max-w-[70ch]" style={READER_STYLE} dangerouslySetInnerHTML={{ __html: attachImageTokenToHtml(html) }} />
       {(draft.source_refs?.sections?.length ?? 0) > 0 && (
         <details className="mt-3 group">
           <summary className="cursor-pointer min-h-[36px] inline-flex items-center gap-1.5 text-xs font-semibold text-brand-600 dark:text-brand-200">
-            <Quote className="w-3.5 h-3.5" /> Where each part comes from
+            <Quote className="w-3.5 h-3.5" /> Why this lesson? See where each part comes from
           </summary>
           <ul className="mt-2 space-y-1">
             {draft.source_refs!.sections!.map((s, i) => (
@@ -229,12 +260,13 @@ const DraftCard: React.FC<{
           )}
         </div>
       </header>
+      <BuiltFrom draft={draft} />
       <Flags flags={draft.review_flags} />
       <div className="mt-3">
         {draft.item_type === "LESSON_NOTE" && <LessonPreview draft={draft} />}
         {(draft.item_type === "KNOWLEDGE_CHECK" || draft.item_type === "EXIT_TICKET") && <QuestionsPreview draft={draft} />}
         {draft.item_type === "VIDEO" && <VideoSlot draft={draft} onSaved={onChanged} />}
-        {(draft.item_type === "PAGE" || draft.item_type === "PRACTICAL_TASK") && draft.content_html && <div className="lesson-note-preview note-reader-body note-reader-body--sans" style={READER_STYLE} dangerouslySetInnerHTML={{ __html: draft.content_html }} />}
+        {(draft.item_type === "PAGE" || draft.item_type === "PRACTICAL_TASK") && draft.content_html && <div className="lesson-note-preview note-reader-body note-reader-body--sans max-w-[70ch]" style={READER_STYLE} dangerouslySetInnerHTML={{ __html: draft.content_html }} />}
         {draft.item_type === "PRACTICAL_TASK" && (draft.content_json?.checklist?.length ?? 0) > 0 && (
           <div className="mt-3">
             <p className="text-xs font-semibold text-slate-600 dark:text-slate-300">Success checklist (you tick it when signing off)</p>
@@ -253,7 +285,7 @@ const DraftCard: React.FC<{
       </div>
       <footer className="mt-4 flex flex-wrap gap-2">
         <button disabled={busy || needsLink} onClick={onApprove} className="inline-flex items-center gap-1.5 min-h-[40px] px-3 rounded-pill bg-success-700 hover:brightness-110 text-white text-sm font-semibold disabled:opacity-50" title={needsLink ? "Add a link first" : undefined}>
-          <Check className="w-4 h-4" /> Approve
+          <Check className="w-4 h-4" /> Approve this part
         </button>
         {editHref && (
           <a href={editHref} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 min-h-[40px] px-3 rounded-pill el-chip text-sm font-medium">
@@ -325,13 +357,25 @@ export const ReviewWorkspace: React.FC<{
   return (
     <div className="space-y-4">
       <div className="el-card p-4">
-        <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
           <p className="text-xs font-medium text-slate-600 dark:text-slate-300">
             Week {idx + 1} of {reviewable.length} to review
           </p>
-          <p className="hidden md:block text-xs text-slate-600 dark:text-slate-300">
-            <kbd className="px-1 rounded el-chip font-mono">J</kbd> / <kbd className="px-1 rounded el-chip font-mono">K</kbd> move · <kbd className="px-1 rounded el-chip font-mono">A</kbd> approve
-          </p>
+          <div className="flex items-center gap-1">
+            <span className="hidden lg:inline text-xs text-slate-600 dark:text-slate-300 mr-1">
+              <kbd className="px-1 rounded el-chip font-mono">J</kbd> / <kbd className="px-1 rounded el-chip font-mono">K</kbd> move · <kbd className="px-1 rounded el-chip font-mono">A</kbd> approve
+            </span>
+            {reviewable.length > 1 && (
+              <>
+                <button disabled={idx === 0} onClick={() => onFocus(reviewable[idx - 1].section_id)} aria-label="Previous week to review" className="w-10 h-10 rounded-full el-chip inline-flex items-center justify-center disabled:opacity-40">
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                <button disabled={idx === reviewable.length - 1} onClick={() => onFocus(reviewable[idx + 1].section_id)} aria-label="Next week to review" className="w-10 h-10 rounded-full el-chip inline-flex items-center justify-center disabled:opacity-40">
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </>
+            )}
+          </div>
         </div>
         <h3 className="mt-1 text-lg font-semibold text-gray-900 dark:text-white">{current.title}</h3>
         <div className="mt-1.5 flex flex-wrap gap-1">
@@ -343,15 +387,20 @@ export const ReviewWorkspace: React.FC<{
         <div className="mt-3 flex flex-wrap items-center gap-2 pt-3 border-t border-gray-100 dark:border-white/[0.06]">
           <label className="inline-flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300 mr-auto">
             <input type="checkbox" className="w-4 h-4 accent-brand-500" checked={publish} onChange={(e) => setPublish(e.target.checked)} />
-            Turn the week on (opens on its date)
+            Turn the week on for students (opens on its date)
           </label>
           {cleanWeeks.length > 1 && (
             <button disabled={busy} onClick={() => onApproveClean(cleanWeeks.map((w) => w.section_id), publish)} className="inline-flex items-center gap-1.5 min-h-[44px] px-4 rounded-pill el-chip text-sm font-semibold">
-              Approve {cleanWeeks.length} weeks with no warnings
+              Approve {cleanWeeks.length} weeks with no warnings{publish ? " & turn them on" : ""}
             </button>
           )}
-          <button disabled={busy} onClick={() => onApproveWeek(current.section_id, { publish })} className="inline-flex items-center gap-1.5 min-h-[44px] px-4 rounded-pill bg-success-700 hover:brightness-110 text-white text-sm font-semibold disabled:opacity-50">
-            <CheckCheck className="w-4 h-4" /> Approve week
+          <button
+            disabled={busy}
+            onClick={() => onApproveWeek(current.section_id, { publish })}
+            title={publish ? "Everything in this week goes on the course, and the week opens to students on its date" : "Everything in this week goes on the course, but the week stays off until you turn it on"}
+            className="inline-flex items-center gap-1.5 min-h-[44px] px-4 rounded-pill bg-success-700 hover:brightness-110 text-white text-sm font-semibold disabled:opacity-50"
+          >
+            <CheckCheck className="w-4 h-4" /> {publish ? "Approve & turn week on" : "Approve, keep week off"}
           </button>
         </div>
       </div>

@@ -11,7 +11,8 @@ import { usePrompt } from "../ui/PromptDialog";
 import Mascot from "../ui/Mascot";
 import { Skeleton } from "../ui/primitives";
 import WeekRail from "./WeekRail";
-import RecipeBuilder, { PhonePreview } from "./RecipeBuilder";
+import RecipeBuilder from "./RecipeBuilder";
+import StudentPreview from "./StudentPreview";
 import SourcesStep from "./SourcesStep";
 import GenerationBoard from "./GenerationBoard";
 import ReviewWorkspace from "./ReviewWorkspace";
@@ -288,7 +289,18 @@ const LessonStudioPage: React.FC = () => {
   const reviewCount = run?.weeks.reduce((n, w) => n + w.pending_review, 0) ?? 0;
   const runActive = run ? isRunActive(run.run.status) : false;
   const canNext = step === "weeks" ? selectedIds.length > 0 : true;
-  const planning = step === "weeks" || step === "sources" || step === "recipe" || step === "try";
+  // The week "Try one week" drafts (and the phone shows while trying).
+  const tryWeek = (focused && selected.has(focused) ? focusWeek : data.weeks.find((w) => w.section?.section_id === nowSection)) ?? null;
+  const previewOnScreen = step === "try" && !!run && run.run.mode === "PREVIEW";
+  // The phone mock-up helps while planning; once real output is on screen it only competes with it.
+  const planning = step === "weeks" || step === "sources" || step === "recipe" || (step === "try" && !previewOnScreen);
+  const phoneWeek = step === "try" ? tryWeek : focusWeek;
+  // The desktop preview's sidebar: the previewed week with its neighbours.
+  const previewWeekLabels = (() => {
+    const labelled = data.weeks.filter((w) => w.entry.week_number);
+    const i = Math.max(0, labelled.findIndex((w) => w === phoneWeek));
+    return labelled.slice(Math.max(0, i - 2), i + 3).map((w) => w.entry.week_number as string);
+  })();
 
   return (
     <div className="flex flex-col h-[calc(100dvh-4rem)] overflow-hidden pt-4">
@@ -307,15 +319,17 @@ const LessonStudioPage: React.FC = () => {
               {data.class_group.name} · {data.term.name} · drafts every week from your scheme of work, plans and notes. Nothing reaches students until you approve it.
             </p>
           </div>
-          <div className="flex items-center gap-2 flex-wrap" aria-live="polite">
-            {quotaPct !== null && (
-              <span className={`px-2.5 py-1 rounded-pill text-xs font-semibold ${quotaPct > 30 ? "el-chip-success" : quotaPct > 0 ? "el-chip-warning" : "el-chip-danger"}`} title="Free AI requests left today">
-                Free AI today: {quotaPct}%
+          {/* Metadata stays quiet: drafting time in plain words, AI calls on hover; the free-quota
+              chip only appears when it matters (running low). */}
+          <div className="flex items-center gap-2 flex-wrap text-xs text-slate-600 dark:text-slate-300" aria-live="polite">
+            {quotaPct !== null && quotaPct <= 30 && (
+              <span className={`px-2.5 py-1 rounded-pill font-semibold ${quotaPct > 0 ? "el-chip-warning" : "el-chip-danger"}`} title="Free AI requests left today — runs wait for the quota and carry on by themselves">
+                {quotaPct > 0 ? `Free AI running low (${quotaPct}% left today)` : "Free AI used up for today"}
               </span>
             )}
-            {est && step !== "generate" && step !== "review" && (
-              <span className={`px-2.5 py-1 rounded-pill text-xs font-semibold ${est.tone === "ok" ? "el-chip" : "el-chip-warning"}`} title={est.detail}>
-                {estimating ? "Estimating…" : est.headline}
+            {estimate && step !== "generate" && step !== "review" && (
+              <span className={est?.tone === "wait" ? "text-warning-700 dark:text-warning-500" : ""} title={`${estimate.calls} AI calls · ${est?.detail ?? ""}`}>
+                {estimating ? "Estimating…" : `AI drafting · about ${estimate.minutes} min${estimate.fits_today ? "" : " · continues tomorrow"}`}
               </span>
             )}
           </div>
@@ -337,14 +351,16 @@ const LessonStudioPage: React.FC = () => {
                     onClick={() => !disabled && goto(s.id)}
                     disabled={disabled}
                     aria-current={on ? "step" : undefined}
-                    className={`inline-flex items-center gap-2 min-h-[40px] px-3 rounded-pill text-sm font-medium transition-colors focus:outline-none focus-visible:shadow-glow ${on ? "bg-brand-600 text-white" : done ? "el-chip-brand" : "text-slate-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-white/5"} disabled:opacity-40`}
+                    title={s.label}
+                    className={`inline-flex items-center gap-1.5 min-h-[40px] rounded-pill text-sm transition-colors focus:outline-none focus-visible:shadow-glow ${on ? "px-4 bg-brand-600 text-white font-semibold shadow-soft" : done ? "px-2.5 text-brand-700 dark:text-brand-200 font-medium hover:bg-brand-50 dark:hover:bg-brand-500/10" : "px-2.5 text-slate-600 dark:text-slate-300 font-medium hover:bg-gray-100 dark:hover:bg-white/5"} disabled:opacity-40`}
                   >
-                    <span className={`w-5 h-5 rounded-full text-[11px] flex items-center justify-center font-semibold ${on ? "bg-white/25" : "bg-black/5 dark:bg-white/10"}`}>{done ? <Check className="w-3 h-3" /> : i + 1}</span>
-                    <span className="hidden sm:inline">{s.label}</span>
-                    <span className="sm:hidden">{s.short}</span>
+                    <span className={`w-5 h-5 rounded-full text-[11px] flex items-center justify-center font-semibold ${on ? "bg-white/25" : done ? "bg-brand-100 dark:bg-brand-500/20" : "bg-black/5 dark:bg-white/10"}`}>{done ? <Check className="w-3 h-3" aria-label="done" /> : i + 1}</span>
+                    {/* The current step says its full name; the others stay short. */}
+                    <span className={on ? "hidden sm:inline" : "hidden"}>{s.label}</span>
+                    <span className={on ? "sm:hidden" : ""}>{s.short}</span>
                     {s.id === "review" && reviewCount > 0 && <span className="px-1.5 rounded-pill bg-success-700 hover:brightness-110 text-white text-[10px]">{reviewCount}</span>}
                   </button>
-                  {i < STEPS.length - 1 && <span className="w-3 h-px bg-gray-200 dark:bg-white/10" aria-hidden />}
+                  {i < STEPS.length - 1 && <span className={`w-3 h-px ${done ? "bg-brand-300 dark:bg-brand-500/40" : "bg-gray-200 dark:bg-white/10"}`} aria-hidden />}
                 </li>
               );
             })}
@@ -436,9 +452,9 @@ const LessonStudioPage: React.FC = () => {
               {step === "recipe" && (
                 <section aria-labelledby="recipe-h">
                   <h2 id="recipe-h" className="text-lg font-bold text-gray-900 dark:text-white">Design each week</h2>
-                  <p className="mb-4 text-sm text-slate-600 dark:text-slate-300">Pick a preset or switch blocks on and off. The phone shows what a student will get.</p>
+                  <p className="mb-4 text-sm text-slate-600 dark:text-slate-300">Pick a preset or switch blocks on and off. The preview shows what students get, on a phone or a computer.</p>
                   <RecipeBuilder blueprint={blueprint} onChange={setBlueprint} presets={data.presets} saved={data.blueprints} features={data.features} onSavePreset={savePreset} />
-                  <div className="xl:hidden mt-6"><PhonePreview blueprint={blueprint} features={data.features} title={focusWeek?.entry.topic || "This week's lesson"} week={focusWeek?.entry.week_number} /></div>
+                  <div className="xl:hidden mt-6"><StudentPreview blueprint={blueprint} features={data.features} title={focusWeek?.entry.topic || "This week's lesson"} week={focusWeek?.entry.week_number} course={data.subject.name} weekLabels={previewWeekLabels} /></div>
                 </section>
               )}
 
@@ -446,7 +462,7 @@ const LessonStudioPage: React.FC = () => {
                 <section aria-labelledby="try-h" className="space-y-4">
                   <h2 id="try-h" className="text-lg font-bold text-gray-900 dark:text-white">Try the recipe on one week first</h2>
                   <p className="text-sm text-slate-600 dark:text-slate-300">
-                    See real output for <strong>{(focused && selected.has(focused) ? focusWeek : data.weeks.find((w) => w.section?.section_id === nowSection))?.entry.week_number || "this week"}</strong> before drafting the whole term. Adjust the recipe and try again until you like it.
+                    See real output for <strong>{(previewOnScreen ? data.weeks.find((w) => w.section && run!.run.section_ids.includes(w.section.section_id)) : tryWeek)?.entry.week_number || "this week"}</strong> before drafting the whole term. Adjust the recipe and try again until you like it.
                   </p>
                   {(!run || run.run.mode !== "PREVIEW") && (
                     <button disabled={busy || !data.ai_configured} onClick={() => startRun("PREVIEW")} className="inline-flex items-center gap-2 min-h-[48px] px-5 rounded-pill bg-brand-600 text-white text-sm font-semibold shadow-soft disabled:opacity-50">
@@ -519,8 +535,7 @@ const LessonStudioPage: React.FC = () => {
         </main>
 
         <aside className={planning ? "hidden xl:block min-h-0 overflow-y-auto" : "hidden"}>
-          <p className="text-[11px] uppercase tracking-wider font-semibold text-slate-600 dark:text-slate-300 text-center mb-2">On a student's phone</p>
-          <PhonePreview blueprint={blueprint} features={data.features} title={focusWeek?.entry.topic || "This week's lesson"} week={focusWeek?.entry.week_number} />
+          <StudentPreview blueprint={blueprint} features={data.features} title={phoneWeek?.entry.topic || "This week's lesson"} week={phoneWeek?.entry.week_number} course={data.subject.name} weekLabels={previewWeekLabels} />
           {estimate && estimate.weeks_planned.some((w) => w.notes.includes("COVERED_BY_EXISTING")) && (
             <p className="mt-3 text-xs text-slate-600 dark:text-slate-300 text-center">
               {estimate.weeks_planned.filter((w) => w.notes.includes("COVERED_BY_EXISTING")).length} week(s) are already covered by your notes — no new lesson needed.

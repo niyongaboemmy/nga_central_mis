@@ -777,7 +777,8 @@ mark.note-find-hit-active {
    --------------------------------------------------------------------------- */
 @layer components {
   .el-card {
-    @apply bg-white dark:bg-white/[0.03] border border-gray-200/80 dark:border-white/[0.07] rounded-2xl;
+    /* Dark: a slightly lifted surface so panels separate from the black page on long sessions. */
+    @apply bg-white dark:bg-white/[0.045] border border-gray-200/80 dark:border-white/[0.08] rounded-2xl;
   }
   .el-card-hover {
     @apply transition-[box-shadow,border-color,background-color] hover:border-brand-200 dark:hover:border-brand-500/30 dark:hover:bg-white/[0.05] hover:shadow-soft;

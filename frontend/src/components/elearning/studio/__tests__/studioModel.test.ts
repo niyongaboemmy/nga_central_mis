@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import type { Blueprint, Preset, RunDetail, WeekBundle } from "../../../../api/studio";
 import {
   autoRetry,
+  termReadiness,
   runBanner,
   applyTaskEvent,
   currentWeek,
@@ -161,5 +162,14 @@ describe("background runs: course-page banner and automatic re-runs", () => {
       now,
     );
     expect(r).toEqual({ count: 2, at: "2026-10-01T11:00:00.000Z" });
+  });
+});
+
+describe("term readiness (week rail header)", () => {
+  it("counts live weeks over the weeks that can be planned, and the ready-but-off ones", () => {
+    const drafted = { ...week(3, { topic: "C" }), readiness: { ...week(3, { topic: "C" }).readiness, state: "DRAFTED" as const } };
+    const r = termReadiness([week(1, { topic: "A", live: true }), week(2, { topic: "B" }), drafted, week(4, { topic: null, criteria: 0 })]);
+    expect(r).toEqual({ plannable: 3, live: 1, ready: 1, pct: 33 });
+    expect(termReadiness([])).toEqual({ plannable: 0, live: 0, ready: 0, pct: 0 });
   });
 });
