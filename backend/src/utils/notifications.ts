@@ -14,7 +14,11 @@ export type NotificationKind =
   | "course_section_empty"
   | "course_nudge"
   // Reminder Hub (REMINDERS_SOLUTION_PROPOSAL.md)
-  | "reminder";
+  | "reminder"
+  // Usage & Monitoring (USAGE_ANALYTICS_IMPLEMENTATION_PLAN.md §10.4)
+  | "monitor_watch"
+  | "monitor_alert"
+  | "monitor_message";
 
 export interface NotifyUserInput {
   userId: number;
@@ -22,7 +26,7 @@ export interface NotifyUserInput {
   title: string;
   body?: string;
   link?: string;
-  subjectType: "document" | "folder" | "course_section" | "course_item" | "course" | "reminder";
+  subjectType: "document" | "folder" | "course_section" | "course_item" | "course" | "reminder" | "watch" | "alert" | "message";
   subjectId: number;
   actorId?: number;
 }

@@ -284,7 +284,7 @@ const Roster: React.FC<{ people: LivePerson[]; label: (k: string | null, r?: str
             const main = p.tabs[0];
             const more = p.tabs.length - 1;
             const isOpen = !!open[p.key];
-            const href = p.user ? `/analytics/users/${p.user.id}` : p.visitor ? `/analytics/visitors/${p.visitor.code}` : null;
+            const href = p.user ? `/analytics/users/${p.user.id}` : p.visitor ? `/analytics/visitors/${p.visitor.device_id}` : null;
             const who = p.user ? (
               <>
                 <span className="font-medium">{p.user.name}</span>
@@ -385,7 +385,7 @@ const EVENT_TEXT: Record<string, { icon: React.ElementType; text: (e: LiveEvent)
 const EventFeed: React.FC<{ events: LiveEvent[] }> = ({ events }) => {
   if (!events.length) return <Empty>Sign-ins, app launches and key actions appear here as they happen.</Empty>;
   return (
-    <ol className="space-y-2 max-h-[420px] overflow-auto" aria-live="polite">
+    <ol className="space-y-2 max-h-[420px] overflow-auto focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-600 rounded" aria-live="polite" aria-label="Live events" tabIndex={0}>
       {events.map((e, i) => {
         const def = EVENT_TEXT[e.kind] ?? { icon: Star, text: () => e.kind.replace(/[._]/g, " ") };
         const Icon = def.icon;

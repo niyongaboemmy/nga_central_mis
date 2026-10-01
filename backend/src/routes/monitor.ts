@@ -17,12 +17,23 @@ import { consumeStreamTicket, issueStreamTicket } from "../services/activity/tok
 import { bufferDepth, stats as writerStats } from "../services/activity/writer";
 import { logFromReq } from "../services/activity/accessLog";
 import { asyncHandler } from "../middleware/asyncHandler";
+import { ValidationError } from "../errors/CustomError";
 import { parseQuery } from "../services/activity/reports/common";
 import { overview } from "../services/activity/reports/overview";
 import { accessSeries, accessUsers, failedLogins, heatmap, loginSeries } from "../services/activity/reports/access";
 import { adoptionBy, audience, visitors, visitorSeries } from "../services/activity/reports/audience";
 import { apps as appsReport, dimension, features, flows, keyEvents, retention, technology } from "../services/activity/reports/engagement";
 import { ipLookup, locations } from "../services/activity/reports/locations";
+import {
+  accessLogFor, beforeSignIn, deleteDeviceData, deleteUserData, deviceProfile, exportUserData, setBotOverride, timeline,
+  userDevices, userFeatures, userHoldsCapability, userNetwork, userProfile, userSecurity, userSummary,
+} from "../services/activity/userMonitor";
+import { adminSignOutEverywhere, messageUser, setAccountStatus, setExcluded, signOutDevice } from "../services/activity/control";
+import { ackAlert, createWatch, listAlerts, listWatches, revokeWatch } from "../services/activity/watches";
+import { addBlock, listBlocks, revokeBlock } from "../services/activity/blocklist";
+import { recordAuthEvent } from "../services/activity/authEvents";
+import { DEVICE_ID_RE } from "../services/activity/tokens";
+import { ipToString } from "../services/activity/ip";
 
 /**
  * Admin console API (USAGE_ANALYTICS_IMPLEMENTATION_PLAN.md §15).
@@ -311,6 +322,267 @@ router.get("/ip/:ip", authenticate, NAMED, asyncHandler(async (req: any, res: an
   if (!data) return res.status(400).json({ success: false, message: "Not a valid IP address" });
   await logFromReq(req, "ip_lookup", { targetIp: data.ip });
   res.json({ success: true, data });
+}));
+
+
+// ---------------------------------------------------------------------------
+// User 360 / Visitor 360 (plan §10). Every call is written to MonitorAccessLog.
+// ---------------------------------------------------------------------------
+const CONTROL = can("ANALYTICS_USER_CONTROL");
+const CONFIGURE = can("ANALYTICS_CONFIGURE");
+
+const reasonOf = (req: any, min = 5) => {
+  const r = typeof req.body?.reason === "string" ? req.body.reason.trim() : "";
+  return r.length >= min ? r.slice(0, 2000) : null;
+};
+
+/**
+ * Admin-on-admin rule and self rule: nobody opens their own 360 here (they use My activity),
+ * and only holders of ANALYTICS_CONFIGURE may open the 360 of someone who holds it.
+ */
+const userTarget = asyncHandler(async (req: any, res: any, next: any) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ success: false, message: "Invalid user id" });
+  if (id === req.user.userId) return res.status(403).json({ success: false, code: "SELF", message: "Use My activity to see your own activity." });
+  if ((await userHoldsCapability(id, "ANALYTICS_CONFIGURE")) && !hasCap(req, "ANALYTICS_CONFIGURE"))
+    return res.status(403).json({ success: false, code: "PROTECTED", message: "Only analytics administrators can monitor another analytics administrator." });
+  req.targetUserId = id;
+  next();
+});
+
+router.get("/users/:id", authenticate, NAMED, userTarget, asyncHandler(async (req: any, res: any) => {
+  const rq = parseQuery(req.query);
+  const profile = await userProfile(req.targetUserId);
+  if (!profile) return res.status(404).json({ success: false, message: "User not found" });
+  const [summary, features] = await Promise.all([userSummary(req.targetUserId, rq.from, rq.to), userFeatures(req.targetUserId, rq.fromAt, rq.toAt)]);
+  await logFromReq(req, "view_user", { targetUserId: req.targetUserId });
+  res.json({
+    success: true,
+    data: {
+      profile,
+      summary,
+      features,
+      watches: await listWatches({ userId: req.targetUserId }),
+      can: { control: hasCap(req, "ANALYTICS_USER_CONTROL"), configure: hasCap(req, "ANALYTICS_CONFIGURE"), location: hasCap(req, "ANALYTICS_LOCATION_VIEW") },
+    },
+  });
+}));
+router.get("/users/:id/timeline", authenticate, NAMED, userTarget, asyncHandler(async (req: any, res: any) => {
+  const data = await timeline({ userId: req.targetUserId }, { before: req.query.before ? String(req.query.before) : undefined });
+  if (!req.query.before) await logFromReq(req, "view_timeline", { targetUserId: req.targetUserId });
+  res.json({ success: true, data: { ...data, before_sign_in: req.query.before ? [] : await beforeSignIn(req.targetUserId) } });
+}));
+router.get("/users/:id/devices", authenticate, NAMED, userTarget, asyncHandler(async (req: any, res: any) => {
+  res.json({ success: true, data: await userDevices(req.targetUserId) });
+}));
+router.get("/users/:id/network", authenticate, NAMED, userTarget, asyncHandler(async (req: any, res: any) => {
+  const withFixes = hasCap(req, "ANALYTICS_LOCATION_VIEW");
+  if (withFixes) await logFromReq(req, "view_locations", { targetUserId: req.targetUserId });
+  res.json({ success: true, data: await userNetwork(req.targetUserId, withFixes) });
+}));
+router.get("/users/:id/security", authenticate, NAMED, userTarget, asyncHandler(async (req: any, res: any) => {
+  res.json({ success: true, data: await userSecurity(req.targetUserId) });
+}));
+router.get("/users/:id/access-log", authenticate, CONFIGURE, userTarget, asyncHandler(async (req: any, res: any) => {
+  res.json({ success: true, data: await accessLogFor({ userId: req.targetUserId }) });
+}));
+router.get("/users/:id/export", authenticate, NAMED, userTarget, asyncHandler(async (req: any, res: any) => {
+  await logFromReq(req, "export_user", { targetUserId: req.targetUserId });
+  res.setHeader("Content-Disposition", `attachment; filename="user-${req.targetUserId}-activity.json"`);
+  res.json(await exportUserData(req.targetUserId));
+}));
+
+const control = (action: string, run: (req: any) => Promise<unknown>) =>
+  asyncHandler(async (req: any, res: any) => {
+    const reason = reasonOf(req);
+    if (!reason) return res.status(400).json({ success: false, message: "A reason is required (at least 5 characters)." });
+    const result = await run(req);
+    await logFromReq(req, action, { targetUserId: req.targetUserId ?? null, targetDeviceId: req.targetDeviceId ?? null, reason, detail: { result } as any });
+    res.json({ success: true, data: result ?? null });
+  });
+
+router.post("/users/:id/signout", authenticate, CONTROL, userTarget, control("signout_everywhere", async (req) => {
+  const r = await adminSignOutEverywhere(req.targetUserId);
+  await recordAuthEvent(req, { kind: "logout", outcome: "info", initiator: "admin", userId: req.targetUserId, actorId: req.user.userId });
+  return { apps: (r.apps as any[]).map((a) => ({ app: a.name ?? a.client_id, status: a.status })) };
+}));
+router.post("/users/:id/suspend", authenticate, CONTROL, userTarget, control("suspend", async (req) => {
+  const r = await setAccountStatus(req.targetUserId, "SUSPENDED");
+  await recordAuthEvent(req, { kind: "suspend", outcome: "info", initiator: "admin", userId: req.targetUserId, actorId: req.user.userId });
+  return { previous: r.previous };
+}));
+router.post("/users/:id/reactivate", authenticate, CONTROL, userTarget, control("reactivate", async (req) => {
+  const r = await setAccountStatus(req.targetUserId, "ACTIVE");
+  await recordAuthEvent(req, { kind: "reactivate", outcome: "info", initiator: "admin", userId: req.targetUserId, actorId: req.user.userId });
+  return { previous: r.previous };
+}));
+router.post("/users/:id/message", authenticate, CONTROL, userTarget, control("message", async (req) => {
+  const body = String(req.body?.message ?? "").trim();
+  if (!body) throw new ValidationError("Write a message");
+  return { delivered: await messageUser(req.targetUserId, req.user.userId, String(req.body?.title ?? ""), body) };
+}));
+router.post("/users/:id/exclude", authenticate, CONFIGURE, userTarget, control("exclude", async (req) => {
+  await setExcluded(req.targetUserId, req.body?.excluded !== false);
+  return { excluded: req.body?.excluded !== false };
+}));
+router.delete("/users/:id/data", authenticate, CONFIGURE, userTarget, control("delete_user_data", async (req) => deleteUserData(req.targetUserId)));
+
+// Visitors (devices) — addressed by device id.
+const deviceTarget = (req: any, res: any, next: any) => {
+  if (!DEVICE_ID_RE.test(String(req.params.deviceId))) return res.status(400).json({ success: false, message: "Invalid device id" });
+  req.targetDeviceId = String(req.params.deviceId);
+  next();
+};
+router.get("/visitors/device/:deviceId", authenticate, NAMED, deviceTarget, asyncHandler(async (req: any, res: any) => {
+  const profile = await deviceProfile(req.targetDeviceId);
+  if (!profile) return res.status(404).json({ success: false, message: "Device not found" });
+  await logFromReq(req, "view_device", { targetDeviceId: req.targetDeviceId });
+  res.json({
+    success: true,
+    data: {
+      profile,
+      watches: (await listWatches({})).filter((w: any) => w.target_device_id === req.targetDeviceId),
+      can: { control: hasCap(req, "ANALYTICS_USER_CONTROL"), configure: hasCap(req, "ANALYTICS_CONFIGURE") },
+    },
+  });
+}));
+router.get("/visitors/device/:deviceId/timeline", authenticate, NAMED, deviceTarget, asyncHandler(async (req: any, res: any) => {
+  res.json({ success: true, data: await timeline({ deviceId: req.targetDeviceId }, { before: req.query.before ? String(req.query.before) : undefined }) });
+}));
+router.post("/visitors/device/:deviceId/block", authenticate, CONTROL, deviceTarget, control("block_device", async (req) => {
+  const id = await addBlock({ kind: "device", value: req.targetDeviceId, reason: reasonOf(req)!, days: Number(req.body?.days) || 7, actorId: req.user.userId });
+  signOutDevice(req.targetDeviceId);
+  return { block_id: id };
+}));
+router.post("/visitors/device/:deviceId/bot", authenticate, CONTROL, deviceTarget, control("bot_override", async (req) => {
+  const v = ["none", "human", "bot"].includes(req.body?.override) ? req.body.override : "none";
+  await setBotOverride(req.targetDeviceId, v);
+  const { cachedDevice } = await import("../services/activity/people");
+  const d = cachedDevice(req.targetDeviceId);
+  if (d) d.botOverride = v;
+  return { override: v };
+}));
+router.post("/visitors/device/:deviceId/signout", authenticate, CONTROL, deviceTarget, control("signout_device", async (req) => {
+  signOutDevice(req.targetDeviceId);
+  return { queued: true };
+}));
+router.delete("/visitors/device/:deviceId/data", authenticate, CONFIGURE, deviceTarget, control("delete_device_data", async (req) => deleteDeviceData(req.targetDeviceId)));
+
+// ---------------------------------------------------------------------------
+// Watches, alerts, blocks
+// ---------------------------------------------------------------------------
+router.get("/watches", authenticate, CONTROL, asyncHandler(async (req: any, res: any) => {
+  res.json({ success: true, data: await listWatches({ status: req.query.status ? String(req.query.status) : undefined }) });
+}));
+router.post("/watches", authenticate, CONTROL, asyncHandler(async (req: any, res: any) => {
+  const b = req.body ?? {};
+  const reason = reasonOf(req);
+  if (!reason) return res.status(400).json({ success: false, message: "A reason is required (at least 5 characters)." });
+  let target: any;
+  if (b.target?.kind === "user") {
+    const uid = Number(b.target.userId);
+    if (!Number.isInteger(uid) || uid <= 0) return res.status(400).json({ success: false, message: "Choose a person" });
+    if (uid === req.user.userId) return res.status(400).json({ success: false, message: "You can't watch yourself." });
+    if ((await userHoldsCapability(uid, "ANALYTICS_CONFIGURE")) && !hasCap(req, "ANALYTICS_CONFIGURE"))
+      return res.status(403).json({ success: false, message: "Only analytics administrators can watch another analytics administrator." });
+    target = { kind: "user", userId: uid };
+  } else if (b.target?.kind === "device" && DEVICE_ID_RE.test(String(b.target.deviceId))) target = { kind: "device", deviceId: String(b.target.deviceId) };
+  else if (b.target?.kind === "ip" && b.target.cidr) target = { kind: "ip", cidr: String(b.target.cidr) };
+  else return res.status(400).json({ success: false, message: "Choose who or what to watch" });
+  try {
+    const id = await createWatch({ target, reason, rules: b.rules, channels: b.channels, days: Number(b.days) || 14, actorId: req.user.userId });
+    await logFromReq(req, "watch_create", { targetUserId: target.userId ?? null, targetDeviceId: target.deviceId ?? null, targetIp: target.kind === "ip" ? String(target.cidr).split("/")[0] : null, reason, detail: { watch_id: id, rules: b.rules, days: b.days } });
+    res.status(201).json({ success: true, data: { id } });
+  } catch (e: any) {
+    res.status(400).json({ success: false, message: e?.message ?? "Invalid watch" });
+  }
+}));
+router.delete("/watches/:id", authenticate, CONTROL, asyncHandler(async (req: any, res: any) => {
+  const reason = reasonOf(req, 3) ?? "Ended by an administrator";
+  try {
+    const w: any = await revokeWatch(Number(req.params.id), req.user.userId, reason);
+    await logFromReq(req, "watch_revoke", { targetUserId: w.target_user_id ?? null, targetDeviceId: w.target_device_id ?? null, reason, detail: { watch_id: w.id } });
+    res.json({ success: true, data: { id: w.id, status: "revoked" } });
+  } catch (e: any) {
+    res.status(404).json({ success: false, message: e?.message ?? "Not found" });
+  }
+}));
+router.get("/alerts", authenticate, CONTROL, asyncHandler(async (req: any, res: any) => {
+  res.json({ success: true, data: await listAlerts({ unacked: req.query.unacked === "1" }) });
+}));
+router.post("/alerts/:id/ack", authenticate, CONTROL, asyncHandler(async (req: any, res: any) => {
+  await ackAlert(Number(req.params.id), req.user.userId);
+  res.json({ success: true });
+}));
+router.get("/blocks", authenticate, CONTROL, asyncHandler(async (_req: any, res: any) => {
+  res.json({ success: true, data: await listBlocks() });
+}));
+router.post("/blocks", authenticate, CONTROL, asyncHandler(async (req: any, res: any) => {
+  const reason = reasonOf(req);
+  if (!reason) return res.status(400).json({ success: false, message: "A reason is required (at least 5 characters)." });
+  const kind = ["ip", "cidr", "device"].includes(req.body?.kind) ? req.body.kind : "ip";
+  try {
+    const id = await addBlock({ kind, value: String(req.body?.value ?? ""), reason, days: Number(req.body?.days) || 7, actorId: req.user.userId });
+    await logFromReq(req, "block", { targetIp: kind !== "device" ? String(req.body?.value).split("/")[0] : null, targetDeviceId: kind === "device" ? String(req.body?.value) : null, reason, detail: { block_id: id, kind, days: req.body?.days } });
+    res.status(201).json({ success: true, data: { id } });
+  } catch (e: any) {
+    res.status(400).json({ success: false, message: e?.message ?? "Invalid block" });
+  }
+}));
+router.delete("/blocks/:id", authenticate, CONTROL, asyncHandler(async (req: any, res: any) => {
+  await revokeBlock(Number(req.params.id));
+  await logFromReq(req, "unblock", { detail: { block_id: Number(req.params.id) } });
+  res.json({ success: true });
+}));
+
+// ---------------------------------------------------------------------------
+// Accountability: who looked at whom (append-only log, plan §13.7)
+// ---------------------------------------------------------------------------
+router.get("/access-log", authenticate, CONFIGURE, asyncHandler(async (req: any, res: any) => {
+  const where: string[] = [];
+  const params: any[] = [];
+  if (req.query.viewer) { where.push("l.viewer_id = ?"); params.push(Number(req.query.viewer)); }
+  if (req.query.target) { where.push("l.target_user_id = ?"); params.push(Number(req.query.target)); }
+  if (req.query.action) { where.push("l.action = ?"); params.push(String(req.query.action)); }
+  const rows = await q<any>(
+    `SELECT l.id, l.at, l.viewer_id, l.action, l.target_user_id, l.target_device_id, l.target_ip, l.reason, l.detail, l.viewer_ip,
+            CONCAT_WS(' ', vp.first_name, vp.last_name) AS viewer_name, CONCAT_WS(' ', tp.first_name, tp.last_name) AS target_name
+       FROM MonitorAccessLog l
+       LEFT JOIN UserProfile vp ON vp.user_id = l.viewer_id
+       LEFT JOIN UserProfile tp ON tp.user_id = l.target_user_id
+      ${where.length ? `WHERE ${where.join(" AND ")}` : ""}
+      ORDER BY l.id DESC LIMIT 500`,
+    params,
+  );
+  res.json({ success: true, data: rows.map((r) => ({ ...r, target_ip: ipToString(r.target_ip), viewer_ip: ipToString(r.viewer_ip), detail: typeof r.detail === "string" ? JSON.parse(r.detail) : r.detail })) });
+}));
+
+// ---------------------------------------------------------------------------
+// My activity (every signed-in user, plan §10.5): what is recorded about me, and who
+// is watching me (decision D2).
+// ---------------------------------------------------------------------------
+router.get("/me/activity", authenticate, asyncHandler(async (req: any, res: any) => {
+  const me = req.user.userId;
+  const [profile, devices, network, security, tl] = await Promise.all([
+    userProfile(me),
+    userDevices(me),
+    userNetwork(me, false),
+    userSecurity(me),
+    timeline({ userId: me }, { limit: 20 }),
+  ]);
+  const watches = (await listWatches({ userId: me })).filter((w: any) => w.status === "active").map((w: any) => ({
+    id: w.id, created_by_name: w.created_by_name, reason: w.reason, rules: w.rules, starts_at: w.starts_at, expires_at: w.expires_at,
+  }));
+  res.json({ success: true, data: { profile, devices, network, security: security.events.slice(0, 100), sessions: tl.sessions.map((s: any) => ({ ...s, items: undefined, item_count: s.items.length })), watches } });
+}));
+router.post("/me/notice-ack", authenticate, asyncHandler(async (req: any, res: any) => {
+  await recordAuthEvent(req, { kind: "notice_ack", outcome: "info", userId: req.user.userId, method: String(req.body?.version ?? "").slice(0, 20) || null });
+  res.json({ success: true });
+}));
+router.post("/me/signout-everywhere", authenticate, asyncHandler(async (req: any, res: any) => {
+  await adminSignOutEverywhere(req.user.userId);
+  await recordAuthEvent(req, { kind: "logout", outcome: "info", initiator: "user", userId: req.user.userId, method: "everywhere" });
+  res.json({ success: true });
 }));
 
 /** Programmes / grades / classes for the segment pickers. */

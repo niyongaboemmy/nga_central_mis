@@ -76,6 +76,12 @@ const waitFor = async (fn, timeoutMs, everyMs = 500) => {
         // Keep the install sheet out of the way (it would sit over the page under test).
         localStorage.setItem("nga.pwa.installSnoozedUntil", String(Date.now() + 86400000));
         sessionStorage.setItem("nga.pwa.autoPromptDismissedThisSession", "1");
+        if (t) {
+          try {
+            const uid = JSON.parse(atob(t.split(".")[1])).userId;
+            localStorage.setItem(`nga.activityNotice.2026-10-01.${uid}`, "1");
+          } catch {}
+        }
         // Real people don't browse in an automated browser: hide the automation flags so
         // the activity engine doesn't (correctly) classify the visitor as a bot.
         Object.defineProperty(navigator, "webdriver", { get: () => false });
@@ -104,6 +110,8 @@ const waitFor = async (fn, timeoutMs, everyMs = 500) => {
 
   const visit = await ctx(null);
   await visit.p.goto(`${APP}/login`, { waitUntil: "networkidle2" });
+  const notice = await waitFor(() => visit.p.evaluate(() => /records visits, including your IP address/.test(document.body.innerText)), 8_000);
+  check("public visitors see the activity notice", notice);
   const badName = `e2e-nobody-${Date.now()}`;
   await fetch(`${API}/auth/login`, {
     method: "POST",
@@ -155,6 +163,39 @@ const waitFor = async (fn, timeoutMs, everyMs = 500) => {
   check("teacher page views were stored", Number(ev.n) >= 2, Number(ev.n));
   const [[fl]] = await db.query("SELECT reason, device_id IS NOT NULL AS has_device FROM AuthEvent WHERE username_attempted = ?", [badName]);
   check("failed sign-in stored with reason and device", fl && fl.reason === "unknown_user" && fl.has_device === 1, fl);
+
+  // ── Phase 5: watched person is told (D2), User/Visitor 360, sign out everywhere ──
+  const adminTok = await tokenFor(ADMIN_ID);
+  const api = (method, p2, body) => fetch(`${API}${p2}`, { method, headers: { "Content-Type": "application/json", Authorization: `Bearer ${adminTok}` }, body: body ? JSON.stringify(body) : undefined }).then((r) => r.json().then((j) => ({ status: r.status, body: j })));
+  const teach2 = await ctx(await tokenFor(TEACHER_ID));
+  await teach2.p.goto(`${APP}/home`, { waitUntil: "networkidle2" });
+  const w = await api("POST", "/monitor/watches", { target: { kind: "user", userId: TEACHER_ID }, reason: "E2E transparency check", rules: [{ type: "comes_online" }], days: 1 });
+  check("admin creates a watch", w.status === 201, w.status);
+  await teach2.p.goto(`${APP}/me/activity`, { waitUntil: "networkidle2" });
+  const told = await waitFor(() => teach2.p.evaluate(() => /is monitoring your account activity until/.test(document.body.innerText) && /E2E transparency check/.test(document.body.innerText)), 10_000);
+  check("the watched teacher sees who is monitoring them and why (My activity)", told);
+  await teach2.p.screenshot({ path: path.join(OUT, "my-activity-watched.png"), fullPage: true });
+  const ended = await api("DELETE", `/monitor/watches/${w.body.data.id}`, { reason: "E2E done" });
+  check("admin ends the watch", ended.status === 200);
+
+  for (const [url, title] of [[`/analytics/users/${TEACHER_ID}`, teacher.name], [`/analytics/visitors/${await visit.p.evaluate(() => localStorage.getItem("nga_did"))}`, null], ["/analytics/watchlist", "Watchlist"], ["/analytics/settings", "Settings"], ["/me/activity", "My activity"]]) {
+    await admin.p.goto(`${APP}${url}`, { waitUntil: "networkidle2" });
+    const ok = await waitFor(() => admin.p.evaluate((t) => [...document.querySelectorAll("h1")].some((h) => (t ? h.textContent === t : /^Visitor V-/.test(h.textContent || ""))), title), 15_000);
+    await sleep(800);
+    const bad = await admin.p.evaluate(() => /Couldn't load|don't have access/.test(document.body.innerText));
+    check(`${title ?? "Visitor 360"} page renders`, ok && !bad);
+    await admin.p.addScriptTag({ content: AXE });
+    const axe = await admin.p.evaluate(async () => (await window.axe.run(document.querySelector("main") || document.body, { runOnly: ["wcag2a", "wcag2aa"] })).violations.map((v) => `${v.id} (${v.nodes.length}): ${v.nodes[0]?.target}`));
+    check(`axe WCAG AA ${title ?? "Visitor 360"}`, axe.length === 0, axe.slice(0, 4));
+    await admin.p.screenshot({ path: path.join(OUT, `p5${url.replace(/\//g, "_").slice(0, 60)}.png`), fullPage: true });
+  }
+
+  const so = await api("POST", `/monitor/users/${TEACHER_ID}/signout`, { reason: "E2E sign-out everywhere" });
+  check("admin signs the teacher out everywhere", so.status === 200, so.status);
+  await teach2.p.goto(`${APP}/home`, { waitUntil: "domcontentloaded" }).catch(() => undefined);
+  const kicked = await waitFor(() => teach2.p.evaluate(() => location.pathname === "/login" || location.pathname === "/"), 15_000);
+  check("the teacher's open session ends (back to sign-in)", kicked, await teach2.p.evaluate(() => location.pathname));
+  await teach2.c.close();
 
   // ── every report page renders with data, no errors (admin) ──────────────────
   const PAGES = [

@@ -88,6 +88,13 @@ const Sidebar: React.FC<SidebarProps> = ({
       icon: <LayoutGrid className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
     },
     {
+      // Transparency (USAGE_ANALYTICS_IMPLEMENTATION_PLAN.md §10.5): everyone can see what
+      // is recorded about them, and whether anyone is monitoring their account.
+      label: "My activity",
+      path: "/me/activity",
+      icon: <Activity className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
+    },
+    {
       label: "Profile",
       path: "/profile",
       icon: (

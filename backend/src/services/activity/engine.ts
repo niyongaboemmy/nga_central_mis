@@ -9,7 +9,8 @@ import { activityBus, clock } from "./runtime";
 import { reloadOpenSessions, sweepSessions } from "./sessionizer";
 import { getSettings } from "./settings";
 import { flushActivity } from "./writer";
-import { rollupTick } from "./rollup";
+import { activityNightlyHooks, rollupTick } from "./rollup";
+import { expireWatches, refreshWatches, startWatchMatcher } from "./watches";
 
 /**
  * Starts the activity engine's timers (plan §9): buffered flush every 2 s, presence
@@ -70,6 +71,9 @@ export const startActivityEngine = async () => {
     await saveCatalog("mis", misCatalog.version, misCatalog.features as any);
     await loadCatalog(true);
     await refreshBlocks(true);
+    await refreshWatches(true);
+    startWatchMatcher();
+    activityNightlyHooks.push(expireWatches);
     const reloaded = await reloadOpenSessions();
     await seedPresenceHistory();
     logger.info(`[activity] engine started (${reloaded} open sessions reloaded)`);

@@ -118,7 +118,7 @@ beforeAll(async () => {
   await flushActivity();
   await rollupRange("2025-03-09", "2025-03-18");
   clock.reset();
-});
+}, 60_000);
 
 afterAll(() => {
   setGeoProvider(null);

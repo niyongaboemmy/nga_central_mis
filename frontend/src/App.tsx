@@ -66,6 +66,8 @@ import InsightsHub from "./components/access/InsightsHub";
 import HomePage from "./components/home/HomePage";
 import { ActivityRouterTracker } from "./vendor/nga-activity/react";
 import AnalyticsRoutes from "./components/analytics/AnalyticsRoutes";
+import MyActivity from "./components/analytics/MyActivity";
+import ActivityNotice from "./components/analytics/ActivityNotice";
 import RemindersPage from "./components/reminders/RemindersPage";
 import AppsInstallerPage from "./components/apps/AppsInstallerPage";
 import { AutoInstallPrompt } from "./components/apps/AutoInstallPrompt";
@@ -273,6 +275,7 @@ function App() {
             <AutoInstallPrompt />
             {/* Page views → Usage & Monitoring (patterns only, never ids). */}
             <ActivityRouterTracker />
+            <ActivityNotice />
             <Routes>
 
             {/* Landing page */}
@@ -745,6 +748,18 @@ function App() {
                 <ProtectedRoute>
                   <SystemLayoutWrapper>
                     <InsightsHub />
+                  </SystemLayoutWrapper>
+                </ProtectedRoute>
+              }
+            />
+
+            {/* My activity: what the platform records about me (everyone signed in). */}
+            <Route
+              path="/me/activity"
+              element={
+                <ProtectedRoute>
+                  <SystemLayoutWrapper>
+                    <MyActivity />
                   </SystemLayoutWrapper>
                 </ProtectedRoute>
               }

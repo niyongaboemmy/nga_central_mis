@@ -83,7 +83,7 @@ export default function Visitors() {
                 key: "v",
                 label: "Visitor",
                 render: (r: any) => (
-                  <Link to={`/analytics/visitors/${r.code}`} className="hover:underline">
+                  <Link to={`/analytics/visitors/${r.device_id}`} className="hover:underline">
                     <span className="font-medium">{r.code}</span>
                     {r.guest_names?.length > 0 && <span className="block text-xs">“{r.guest_names.join("”, “")}”</span>}
                     {r.linked_user && <span className="block text-xs text-slate-600 dark:text-slate-300">→ {r.linked_user.name ?? `User ${r.linked_user.id}`}</span>}

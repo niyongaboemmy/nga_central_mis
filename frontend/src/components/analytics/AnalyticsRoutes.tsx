@@ -18,6 +18,10 @@ const AppsPage = lazy(() => import("./AppsRetentionTech").then((m) => ({ default
 const RetentionPage = lazy(() => import("./AppsRetentionTech").then((m) => ({ default: m.RetentionPage })));
 const TechnologyPage = lazy(() => import("./AppsRetentionTech").then((m) => ({ default: m.TechnologyPage })));
 const LocationsPage = lazy(() => import("./Locations").then((m) => ({ default: m.LocationsPage })));
+const User360 = lazy(() => import("./User360"));
+const Visitor360 = lazy(() => import("./Visitor360"));
+const Watchlist = lazy(() => import("./Watchlist"));
+const SettingsPage = lazy(() => import("./SettingsPage"));
 const IpLookupPage = lazy(() => import("./Locations").then((m) => ({ default: m.IpLookupPage })));
 
 const Gate: React.FC<{ caps: string[]; children: React.ReactNode }> = ({ caps, children }) => {
@@ -60,10 +64,10 @@ export default function AnalyticsRoutes() {
         <Route path="locations" element={<Gate caps={["ANALYTICS_VIEW"]}><LocationsPage /></Gate>} />
         <Route path="ip/:ip" element={<Gate caps={["ANALYTICS_USER_VIEW"]}><IpLookupPage /></Gate>} />
         <Route path="explore" element={<Gate caps={["ANALYTICS_VIEW"]}><Soon title="Explore" /></Gate>} />
-        <Route path="watchlist" element={<Gate caps={["ANALYTICS_USER_CONTROL"]}><Soon title="Watchlist" /></Gate>} />
-        <Route path="settings" element={<Gate caps={["ANALYTICS_CONFIGURE"]}><Soon title="Settings" /></Gate>} />
-        <Route path="users/:id" element={<Gate caps={["ANALYTICS_USER_VIEW"]}><Soon title="User 360" /></Gate>} />
-        <Route path="visitors/:code" element={<Gate caps={["ANALYTICS_USER_VIEW"]}><Soon title="Visitor 360" /></Gate>} />
+        <Route path="watchlist" element={<Gate caps={["ANALYTICS_USER_CONTROL"]}><Watchlist /></Gate>} />
+        <Route path="settings" element={<Gate caps={["ANALYTICS_CONFIGURE"]}><SettingsPage /></Gate>} />
+        <Route path="users/:id" element={<Gate caps={["ANALYTICS_USER_VIEW"]}><User360 /></Gate>} />
+        <Route path="visitors/:code" element={<Gate caps={["ANALYTICS_USER_VIEW"]}><Visitor360 /></Gate>} />
         <Route path="*" element={<Navigate to="/analytics" replace />} />
       </Routes>
     </Suspense>

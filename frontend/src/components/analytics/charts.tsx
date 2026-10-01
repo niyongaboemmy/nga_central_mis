@@ -391,7 +391,7 @@ export function DataTable<T>({
           </button>
         </div>
       )}
-      <div className="relative overflow-auto -mx-4 px-4" style={maxHeight ? { maxHeight } : undefined}>
+      <div className="relative overflow-auto -mx-4 px-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-600" style={maxHeight ? { maxHeight } : undefined} tabIndex={0} role="region" aria-label="Table, scrollable">
         <table className={`w-full ${dense ? "text-xs" : "text-sm"}`}>
           <thead className="sticky top-0 bg-white/95 dark:bg-slate-900/95">
             <tr className="text-left text-xs text-slate-600 dark:text-slate-300 border-b border-border-light dark:border-slate-700">

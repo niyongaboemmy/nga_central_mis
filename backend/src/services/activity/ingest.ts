@@ -283,8 +283,9 @@ export const ingestEnvelope = async (env: Envelope, ctx: IngestContext): Promise
         at,
         ip: e.ip,
         geoId: e.geoId,
-        isNewDevice: !!user && !user.knownDevices.has(env.did),
-        isNewIpForUser: !!user && !!ipHex && !user.knownIps.has(ipHex),
+        // "New" only means something against a history: a first-ever session is not an alert.
+        isNewDevice: !!user && user.knownDevices.size > 0 && !user.knownDevices.has(env.did),
+        isNewIpForUser: !!user && !!ipHex && user.knownIps.size > 0 && !user.knownIps.has(ipHex),
         country: e.geo.country_code,
         isp: e.geo.isp,
       });

@@ -229,7 +229,7 @@ const FailedSignIns: React.FC<{ qs: string }> = ({ qs }) => {
               <span className="text-xs">
                 {r.ip ? <Link to={`/analytics/ip/${r.ip}`} className="font-mono hover:underline">{r.ip}</Link> : "—"}
                 <span className="block text-slate-600 dark:text-slate-300">{placeLabel(r.place)}</span>
-                {r.visitor_code && <Link to={`/analytics/visitors/${r.visitor_code}`} className="block hover:underline">Visitor {r.visitor_code}</Link>}
+                {r.visitor_code && <Link to={`/analytics/visitors/${r.device_id}`} className="block hover:underline">Visitor {r.visitor_code}</Link>}
               </span>
             ),
           },

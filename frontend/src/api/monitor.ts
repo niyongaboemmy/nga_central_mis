@@ -149,3 +149,44 @@ export const reportsApi = {
     setTimeout(() => URL.revokeObjectURL(url), 2_000);
   },
 };
+
+// ---------------------------------------------------------------------------
+// Per-person monitoring, controls, watches (plan §10)
+// ---------------------------------------------------------------------------
+const post = async <T = any>(path: string, body: unknown) => (await api.post(`/monitor${path}`, body)).data.data as T;
+const del = async <T = any>(path: string, body?: unknown) => (await api.delete(`/monitor${path}`, { data: body })).data.data as T;
+
+export const peopleApi = {
+  user: (id: number, qs: string) => getData(`/users/${id}`, qs),
+  timeline: (id: number, before?: string) => getData(`/users/${id}/timeline`, before ? `before=${encodeURIComponent(before)}` : ""),
+  devices: (id: number) => getData(`/users/${id}/devices`, ""),
+  network: (id: number) => getData(`/users/${id}/network`, ""),
+  security: (id: number) => getData(`/users/${id}/security`, ""),
+  accessLog: (id: number) => getData(`/users/${id}/access-log`, ""),
+  exportUser: async (id: number) => {
+    const r = await api.get(`/monitor/users/${id}/export`, { responseType: "blob" });
+    const url = URL.createObjectURL(r.data as Blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `user-${id}-activity.json`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 2_000);
+  },
+  control: (id: number, action: "signout" | "suspend" | "reactivate" | "message" | "exclude", body: Record<string, unknown>) => post(`/users/${id}/${action}`, body),
+  deleteUserData: (id: number, reason: string) => del(`/users/${id}/data`, { reason }),
+  device: (deviceId: string) => getData(`/visitors/device/${deviceId}`, ""),
+  deviceTimeline: (deviceId: string, before?: string) => getData(`/visitors/device/${deviceId}/timeline`, before ? `before=${encodeURIComponent(before)}` : ""),
+  deviceControl: (deviceId: string, action: "block" | "bot" | "signout", body: Record<string, unknown>) => post(`/visitors/device/${deviceId}/${action}`, body),
+  deleteDeviceData: (deviceId: string, reason: string) => del(`/visitors/device/${deviceId}/data`, { reason }),
+  watches: (status?: string) => getData("/watches", status ? `status=${status}` : ""),
+  createWatch: (body: Record<string, unknown>) => post("/watches", body),
+  endWatch: (id: number, reason: string) => del(`/watches/${id}`, { reason }),
+  alerts: (unacked = false) => getData("/alerts", unacked ? "unacked=1" : ""),
+  ackAlert: (id: number) => post(`/alerts/${id}/ack`, {}),
+  blocks: () => getData("/blocks", ""),
+  addBlock: (body: Record<string, unknown>) => post("/blocks", body),
+  removeBlock: (id: number) => del(`/blocks/${id}`),
+  accessLog2: (qs: string) => getData("/access-log", qs),
+  me: () => getData("/me/activity", ""),
+  meSignOutEverywhere: () => post("/me/signout-everywhere", {}),
+};

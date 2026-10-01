@@ -144,7 +144,7 @@ export function IpLookupPage() {
                 rowKey={(r: any) => r.device_id}
                 empty="No devices."
                 columns={[
-                  { key: "v", label: "Device", render: (r: any) => <Link className="hover:underline" to={`/analytics/visitors/${r.visitor_code}`}>{r.visitor_code}<span className="block text-xs text-slate-600 dark:text-slate-300 inline-flex items-center gap-1"><DeviceIcon type={r.device.type} className="w-3 h-3" />{[r.device.browser, r.device.os].filter(Boolean).join(" · ")}</span></Link> },
+                  { key: "v", label: "Device", render: (r: any) => <Link className="hover:underline" to={`/analytics/visitors/${r.device_id}`}>{r.visitor_code}<span className="block text-xs text-slate-600 dark:text-slate-300 inline-flex items-center gap-1"><DeviceIcon type={r.device.type} className="w-3 h-3" />{[r.device.browser, r.device.os].filter(Boolean).join(" · ")}</span></Link> },
                   { key: "s", label: "Signed in", render: (r: any) => (r.signed_in_as ? <Link to={`/analytics/users/${r.signed_in_as}`} className="hover:underline">yes</Link> : "no") },
                   { key: "l", label: "Last", render: (r: any) => fmtDate(r.last_seen, true) },
                 ]}
