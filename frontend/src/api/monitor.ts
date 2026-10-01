@@ -114,3 +114,38 @@ export const monitorApi = {
   ingestHealth: async () => (await api.get("/monitor/ingest/health")).data.data,
   catalogHealth: async () => (await api.get("/monitor/catalog/health")).data.data,
 };
+
+// ---------------------------------------------------------------------------
+// Reports (plan §14). Query strings come from useReportQuery (URL state).
+// ---------------------------------------------------------------------------
+const getData = async <T = any>(path: string, qs: string) => (await api.get(`/monitor${path}${qs ? `?${qs}` : ""}`)).data.data as T;
+
+export const reportsApi = {
+  overview: (qs: string) => getData("/overview", qs),
+  accessSeries: (qs: string) => getData("/access/series", qs),
+  heatmap: (qs: string) => getData("/access/heatmap", qs),
+  accessUsers: (qs: string) => getData("/access/users", qs),
+  failed: (qs: string) => getData("/access/failed", qs),
+  audience: (qs: string) => getData("/audience", qs),
+  adoption: (qs: string) => getData("/audience/adoption", qs),
+  visitors: (qs: string) => getData("/visitors", qs),
+  visitorSummary: (qs: string) => getData("/visitors/summary", qs),
+  features: (qs: string) => getData("/engagement/features", qs),
+  dimension: (qs: string) => getData("/engagement/dimension", qs),
+  keyEvents: (qs: string) => getData("/engagement/key-events", qs),
+  apps: (qs: string) => getData("/apps", qs),
+  retention: (qs: string) => getData("/retention", qs),
+  technology: (qs: string) => getData("/technology", qs),
+  locations: (qs: string) => getData("/locations", qs),
+  ip: (ip: string) => getData(`/ip/${encodeURIComponent(ip)}`, ""),
+  /** Download a CSV export (authenticated) and save it. */
+  csv: async (path: string, qs: string, filename: string) => {
+    const r = await api.get(`/monitor${path}?${qs}${qs ? "&" : ""}format=csv`, { responseType: "blob" });
+    const url = URL.createObjectURL(r.data as Blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 2_000);
+  },
+};

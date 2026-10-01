@@ -14,6 +14,10 @@
  *
  * Framework-agnostic: handlers take Express-like (req, res).
  */
+/* eslint-disable @typescript-eslint/no-explicit-any --
+ * The relay is framework-agnostic: it takes whatever request/response objects the host
+ * app's framework hands it (Express in all three apps today) and touches only a few
+ * well-known members. `any` is confined to that boundary. */
 import { gzipSync } from "zlib";
 import { randomBytes } from "crypto";
 

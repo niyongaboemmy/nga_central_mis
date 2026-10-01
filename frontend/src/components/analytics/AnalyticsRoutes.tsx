@@ -9,6 +9,16 @@ import { AnalyticsShell } from "./AnalyticsShell";
  * never weigh on the rest of the MIS bundle.
  */
 const Realtime = lazy(() => import("./Realtime"));
+const Overview = lazy(() => import("./Overview"));
+const AccessLogins = lazy(() => import("./AccessLogins"));
+const Audience = lazy(() => import("./Audience"));
+const Visitors = lazy(() => import("./Visitors"));
+const Engagement = lazy(() => import("./Engagement"));
+const AppsPage = lazy(() => import("./AppsRetentionTech").then((m) => ({ default: m.AppsPage })));
+const RetentionPage = lazy(() => import("./AppsRetentionTech").then((m) => ({ default: m.RetentionPage })));
+const TechnologyPage = lazy(() => import("./AppsRetentionTech").then((m) => ({ default: m.TechnologyPage })));
+const LocationsPage = lazy(() => import("./Locations").then((m) => ({ default: m.LocationsPage })));
+const IpLookupPage = lazy(() => import("./Locations").then((m) => ({ default: m.IpLookupPage })));
 
 const Gate: React.FC<{ caps: string[]; children: React.ReactNode }> = ({ caps, children }) => {
   const { can, loading } = useAccess();
@@ -36,10 +46,24 @@ export default function AnalyticsRoutes() {
         <Route
           index
           element={
-            loading ? <Empty>Loading…</Empty> : can("ANALYTICS_VIEW") ? <Soon title="Overview" /> : <Navigate to="realtime" replace />
+            loading ? <Empty>Loading…</Empty> : can("ANALYTICS_VIEW") ? <Overview /> : <Navigate to="realtime" replace />
           }
         />
         <Route path="realtime" element={<Gate caps={["ANALYTICS_VIEW", "ANALYTICS_LIVE_VIEW"]}><Realtime /></Gate>} />
+        <Route path="access" element={<Gate caps={["ANALYTICS_VIEW"]}><AccessLogins /></Gate>} />
+        <Route path="audience" element={<Gate caps={["ANALYTICS_VIEW"]}><Audience /></Gate>} />
+        <Route path="visitors" element={<Gate caps={["ANALYTICS_USER_VIEW"]}><Visitors /></Gate>} />
+        <Route path="engagement" element={<Gate caps={["ANALYTICS_VIEW"]}><Engagement /></Gate>} />
+        <Route path="apps" element={<Gate caps={["ANALYTICS_VIEW"]}><AppsPage /></Gate>} />
+        <Route path="retention" element={<Gate caps={["ANALYTICS_VIEW"]}><RetentionPage /></Gate>} />
+        <Route path="technology" element={<Gate caps={["ANALYTICS_VIEW"]}><TechnologyPage /></Gate>} />
+        <Route path="locations" element={<Gate caps={["ANALYTICS_VIEW"]}><LocationsPage /></Gate>} />
+        <Route path="ip/:ip" element={<Gate caps={["ANALYTICS_USER_VIEW"]}><IpLookupPage /></Gate>} />
+        <Route path="explore" element={<Gate caps={["ANALYTICS_VIEW"]}><Soon title="Explore" /></Gate>} />
+        <Route path="watchlist" element={<Gate caps={["ANALYTICS_USER_CONTROL"]}><Soon title="Watchlist" /></Gate>} />
+        <Route path="settings" element={<Gate caps={["ANALYTICS_CONFIGURE"]}><Soon title="Settings" /></Gate>} />
+        <Route path="users/:id" element={<Gate caps={["ANALYTICS_USER_VIEW"]}><Soon title="User 360" /></Gate>} />
+        <Route path="visitors/:code" element={<Gate caps={["ANALYTICS_USER_VIEW"]}><Soon title="Visitor 360" /></Gate>} />
         <Route path="*" element={<Navigate to="/analytics" replace />} />
       </Routes>
     </Suspense>

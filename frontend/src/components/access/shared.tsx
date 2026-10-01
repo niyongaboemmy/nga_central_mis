@@ -94,7 +94,7 @@ export const Panel: React.FC<{ title?: React.ReactNode; actions?: React.ReactNod
     className={`bg-white/70 dark:bg-slate-800/50 backdrop-blur-sm rounded-2xl border border-white/60 dark:border-slate-700/30 p-4 text-text-primary-light dark:text-text-primary-dark ${className}`}
   >
     {(title || actions) && (
-      <div className="flex items-center justify-between gap-3 mb-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
         {title && <h2 className="text-sm font-semibold text-text-primary-light dark:text-text-primary-dark">{title}</h2>}
         {actions}
       </div>

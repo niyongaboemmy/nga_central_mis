@@ -58,11 +58,41 @@ interface QueuedEvent {
   id: string;
   n: string;
   t: number;
-  pv?: string;
-  r?: string;
-  f?: string;
-  p?: Params;
+  pv?: string | undefined;
+  r?: string | undefined;
+  f?: string | undefined;
+  p?: Params | undefined;
 }
+
+/** What GET /activity/config answers. */
+interface ConfigResponse {
+  enabled?: boolean;
+  heartbeat_s?: number;
+  flush_s?: number;
+  idle_after_s?: number;
+  precise_location?: string;
+  did?: string;
+  dt?: string;
+}
+
+/** What POST /activity/sync (or a relay) answers. */
+interface SyncResponse {
+  did?: string;
+  dt?: string;
+  ticket?: string;
+  disabled?: boolean;
+  cmd?: { type?: string } | null;
+}
+
+/** Browser extras that are not (yet) in lib.dom for every TypeScript version. */
+type NavigatorExtras = Navigator & {
+  webdriver?: boolean;
+  standalone?: boolean;
+  connection?: { effectiveType?: string };
+};
+const navx = () => navigator as NavigatorExtras;
+
+type VitalEntry = PerformanceEntry & { hadRecentInput?: boolean; value?: number; interactionId?: number };
 interface QueueItem {
   ev: QueuedEvent;
   auth: string | null;
@@ -82,7 +112,7 @@ const STAFF_TYPES = ["TEACHER", "STAFF", "ADMIN"];
 const CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
 const rand = (n: number) => {
   const a = new Uint8Array(n);
-  (globalThis.crypto ?? (window as any).msCrypto).getRandomValues(a);
+  globalThis.crypto.getRandomValues(a);
   return a;
 };
 export const ulid = (time = Date.now()) => {
@@ -125,7 +155,7 @@ const cookieDomain = () => {
 const readCookie = (name: string) =>
   safe(() => {
     const m = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]*)`));
-    return m ? decodeURIComponent(m[1]) : null;
+    return m ? decodeURIComponent(m[1] ?? "") : null;
   }, null);
 const writeCookie = (name: string, value: string) =>
   safe(() => {
@@ -175,7 +205,7 @@ const ID_SEGMENT = /^(\d+|[0-9a-f]{8}-[0-9a-f-]{27}|[A-Za-z0-9_-]{20,}|[^/]*@[^/
 export const genericPattern = (path: string) =>
   "/" +
   path
-    .split(/[?#]/)[0]
+    .split(/[?#]/)[0]!
     .split("/")
     .filter(Boolean)
     .map((s) => (ID_SEGMENT.test(s) ? ":id" : s.slice(0, 40)))
@@ -267,15 +297,16 @@ class Tracker {
 
   async loadConfig() {
     const cacheKey = `nga_activity_cfg_${this.opts.app}`;
-    const cached = safe(() => JSON.parse(ss.get(cacheKey) || "null"), null) as any;
-    let cfg = cached && cached.at > Date.now() - 10 * 60_000 && cached.did === this.did ? cached.cfg : null;
+    const cached = safe(() => JSON.parse(ss.get(cacheKey) || "null"), null) as { at: number; did: string; cfg: ConfigResponse } | null;
+    let cfg: ConfigResponse | null = cached && cached.at > Date.now() - 10 * 60_000 && cached.did === this.did ? cached.cfg : null;
     if (!cfg) {
       try {
         const url = `${this.opts.configUrl}${this.opts.configUrl.includes("?") ? "&" : "?"}did=${encodeURIComponent(this.did)}&dt=${encodeURIComponent(this.dt ?? "")}`;
         const res = await fetch(url, { credentials: this.opts.credentials ?? "same-origin" });
         if (res.ok) {
-          cfg = await res.json();
-          this.adoptIdentity(cfg.did, cfg.dt);
+          const fresh = (await res.json()) as ConfigResponse;
+          cfg = fresh;
+          this.adoptIdentity(fresh.did, fresh.dt);
           ss.set(cacheKey, JSON.stringify({ at: Date.now(), did: this.did, cfg }));
         }
       } catch {
@@ -351,8 +382,8 @@ class Tracker {
     else ls.del(LS_QUEUE + this.opts.app);
   }
   restoreQueue() {
-    const raw = safe(() => JSON.parse(ls.get(LS_QUEUE + this.opts.app) || "[]"), []) as any[];
-    const fresh = raw.filter((q) => q && q.ev && Date.now() - (q.at ?? 0) < PERSIST_TTL_MS);
+    const raw = safe(() => JSON.parse(ls.get(LS_QUEUE + this.opts.app) || "[]"), []) as { ev?: QueuedEvent; auth?: string | null; at?: number }[];
+    const fresh = raw.filter((q): q is { ev: QueuedEvent; auth?: string | null; at?: number } => !!q && !!q.ev && Date.now() - (q.at ?? 0) < PERSIST_TTL_MS);
     this.queue = fresh.map((q) => ({ ev: q.ev, auth: q.auth ?? null })).concat(this.queue);
     ls.del(LS_QUEUE + this.opts.app);
   }
@@ -371,7 +402,7 @@ class Tracker {
       lang: navigator.language?.slice(0, 35),
       scr,
       vp: `${window.innerWidth}x${window.innerHeight}`,
-      env: { auto: (navigator as any).webdriver ? 1 : 0, standalone: isStandalone() },
+      env: { auto: navx().webdriver ? 1 : 0, standalone: isStandalone() },
       events,
       ...(beat ? { beat } : {}),
       ...(this.ticket ? { ticket: this.ticket } : {}),
@@ -406,7 +437,7 @@ class Tracker {
     try {
       const res = await fetch(this.opts.endpoint, { method: "POST", body: json, headers, credentials: this.opts.credentials ?? "same-origin", keepalive: json.length < 60_000 });
       if (res.status >= 500) return false;
-      const data = await res.json().catch(() => null);
+      const data = (await res.json().catch(() => null)) as SyncResponse | null;
       if (data) {
         if (data.did || data.dt) this.adoptIdentity(data.did, data.dt);
         if (data.ticket) this.ticket = data.ticket;
@@ -472,7 +503,7 @@ class Tracker {
     this.flushEngagement();
     void this.flush({
       unloading,
-      beat: { vis, idle, r: this.route ?? undefined, f: this.feature ?? undefined, standalone: isStandalone(), net: (navigator as any).connection?.effectiveType },
+      beat: { vis, idle, r: this.route ?? undefined, f: this.feature ?? undefined, standalone: isStandalone(), net: navx().connection?.effectiveType },
     });
   }
 
@@ -583,22 +614,22 @@ class Tracker {
 
   observeVitals() {
     if (typeof PerformanceObserver === "undefined") return;
-    const obs = (type: string, cb: (entries: any[]) => void) =>
+    const obs = (type: string, cb: (entries: VitalEntry[]) => void) =>
       safe(() => {
-        const o = new PerformanceObserver((l) => cb(l.getEntries()));
-        o.observe({ type, buffered: true } as any);
+        const o = new PerformanceObserver((l) => cb(l.getEntries() as VitalEntry[]));
+        o.observe({ type, buffered: true } as PerformanceObserverInit);
       }, undefined);
     obs("largest-contentful-paint", (es) => {
       const last = es[es.length - 1];
       if (last) this.vitals.LCP = last.startTime;
     });
     obs("layout-shift", (es) => {
-      for (const e of es) if (!e.hadRecentInput) this.vitals.CLS = (this.vitals.CLS ?? 0) + e.value;
+      for (const e of es) if (!e.hadRecentInput) this.vitals.CLS = (this.vitals.CLS ?? 0) + (e.value ?? 0);
     });
     obs("event", (es) => {
       for (const e of es) if (e.interactionId) this.vitals.INP = Math.max(this.vitals.INP ?? 0, e.duration);
     });
-    const nav = safe(() => performance.getEntriesByType("navigation")[0] as any, null);
+    const nav = safe(() => performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming | undefined, undefined);
     if (nav) this.vitals.TTFB = nav.responseStart;
   }
   reportVitals() {
@@ -646,8 +677,8 @@ class Tracker {
   };
 
   start() {
-    const on = (t: EventTarget, ev: string, fn: any, opts: AddEventListenerOptions = { passive: true, capture: true }) =>
-      t.addEventListener(ev, fn, opts);
+    const on = (t: EventTarget, ev: string, fn: (e: never) => void, opts: AddEventListenerOptions = { passive: true, capture: true }) =>
+      t.addEventListener(ev, fn as unknown as EventListener, opts);
     for (const ev of ["pointerdown", "keydown", "wheel", "touchstart", "mousemove"]) on(window, ev, this.onInput);
     on(window, "scroll", () => {
       this.onInput();
@@ -661,7 +692,11 @@ class Tracker {
     on(window, "pagehide", this.onPageHide);
     on(window, "pageshow", this.onPageShow);
     window.addEventListener("error", (e) => this.onError(e.message, e.filename, e.lineno));
-    window.addEventListener("unhandledrejection", (e: any) => this.onError(`Unhandled: ${e?.reason?.message ?? e?.reason ?? ""}`));
+    window.addEventListener("unhandledrejection", (e: PromiseRejectionEvent) => {
+      const reason = e.reason as { message?: unknown } | string | null | undefined;
+      const msg = typeof reason === "string" ? reason : reason && typeof reason.message === "string" ? reason.message : "";
+      this.onError(`Unhandled: ${msg}`);
+    });
     this.observeVitals();
     this.timers.push(
       window.setInterval(() => {
@@ -683,7 +718,7 @@ class Tracker {
 const DOWNLOAD_EXT = new Set(["pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "csv", "txt", "zip", "rar", "7z", "mp4", "mp3", "png", "jpg", "jpeg", "odt", "ods"]);
 
 const isStandalone = () =>
-  safe(() => window.matchMedia("(display-mode: standalone)").matches || (navigator as any).standalone === true, false);
+  safe(() => window.matchMedia("(display-mode: standalone)").matches || navx().standalone === true, false);
 
 // ---------------------------------------------------------------------------
 // Public API

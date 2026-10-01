@@ -294,8 +294,9 @@ export const rollupTick = async () => {
   // Just after midnight, finish yesterday too.
   const kigaliMinutes = Math.floor(((clock.now() + TZ_OFFSET_MS) % 86_400_000) / 60_000);
   if (kigaliMinutes < 15) await rollupDay(addDays(today, -1));
-  // Nightly at 01:30 Kigali: late events, partitions, retention, IP counts.
-  if (kigaliMinutes >= 90 && lastNightly !== today) {
+  // Nightly between 01:30 and 06:00 Kigali (quiet hours): late events, partitions,
+  // retention, IP counts. A restart during the day never triggers it.
+  if (kigaliMinutes >= 90 && kigaliMinutes < 360 && lastNightly !== today) {
     lastNightly = today;
     for (let d = 1; d <= 3; d++) await rollupDay(addDays(today, -d));
     await maintainPartitions().catch((error) => logger.error("[activity] partition maintenance failed", { error }));

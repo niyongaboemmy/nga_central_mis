@@ -156,23 +156,52 @@ const waitFor = async (fn, timeoutMs, everyMs = 500) => {
   const [[fl]] = await db.query("SELECT reason, device_id IS NOT NULL AS has_device FROM AuthEvent WHERE username_attempted = ?", [badName]);
   check("failed sign-in stored with reason and device", fl && fl.reason === "unknown_user" && fl.has_device === 1, fl);
 
+  // ── every report page renders with data, no errors (admin) ──────────────────
+  const PAGES = [
+    ["/analytics", "Overview"],
+    ["/analytics/access", "Access & logins"],
+    ["/analytics/audience", "Audience"],
+    ["/analytics/visitors", "Visitors"],
+    ["/analytics/engagement", "Engagement"],
+    ["/analytics/apps", "Apps"],
+    ["/analytics/retention", "Retention"],
+    ["/analytics/locations", "Locations"],
+    ["/analytics/technology", "Technology"],
+    ["/analytics/ip/127.0.0.1", "IP 127.0.0.1"],
+  ];
+  for (const [url, title] of PAGES) {
+    await admin.p.goto(`${APP}${url}`, { waitUntil: "networkidle2" });
+    const ok = await waitFor(() => heading(admin.p, title), 15_000);
+    await sleep(800);
+    const bad = await admin.p.evaluate(() => /Couldn't load|don't have access/.test(document.body.innerText));
+    check(`${title} page renders without errors`, ok && !bad);
+  }
+
   // ── accessibility & layout: 2 themes × 3 viewports ─────────────────────────
   for (const theme of ["light", "dark"]) {
     const a = await ctx(await tokenFor(ADMIN_ID), theme);
-    for (const [w, h] of [[1440, 900], [820, 1180], [390, 844]]) {
+    for (const [path2, title2, w, h] of [
+      ["/analytics/realtime", "Realtime", 1440, 900], ["/analytics/realtime", "Realtime", 820, 1180], ["/analytics/realtime", "Realtime", 390, 844],
+      ["/analytics", "Overview", 1440, 900], ["/analytics", "Overview", 390, 844],
+      ["/analytics/access", "Access & logins", 1440, 900], ["/analytics/access", "Access & logins", 390, 844],
+      ["/analytics/audience", "Audience", 820, 1180], ["/analytics/visitors", "Visitors", 390, 844],
+      ["/analytics/engagement", "Engagement", 1440, 900], ["/analytics/apps", "Apps", 390, 844],
+      ["/analytics/retention", "Retention", 820, 1180], ["/analytics/locations", "Locations", 1440, 900],
+      ["/analytics/technology", "Technology", 390, 844],
+    ]) {
       await a.p.setViewport({ width: w, height: h });
-      await a.p.goto(`${APP}/analytics/realtime`, { waitUntil: "networkidle2" });
-      await waitFor(() => heading(a.p, "Realtime"), 10_000);
+      await a.p.goto(`${APP}${path2}`, { waitUntil: "networkidle2" });
+      await waitFor(() => heading(a.p, title2), 10_000);
       await sleep(1500);
       await a.p.addScriptTag({ content: AXE });
       const axe = await a.p.evaluate(async () => {
         const r = await window.axe.run(document.querySelector("main") || document.body, { runOnly: ["wcag2a", "wcag2aa"] });
         return r.violations.map((v) => `${v.id} (${v.nodes.length}): ${v.nodes[0]?.target}`);
       });
-      check(`axe WCAG AA ${theme} ${w}px`, axe.length === 0, axe.slice(0, 5));
+      check(`axe WCAG AA ${title2} ${theme} ${w}px`, axe.length === 0, axe.slice(0, 5));
       const overflow = await a.p.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
-      check(`no horizontal page overflow ${theme} ${w}px`, overflow <= 1, overflow);
-      await a.p.screenshot({ path: path.join(OUT, `realtime-${theme}-${w}.png`), fullPage: false });
+      check(`no horizontal page overflow ${title2} ${theme} ${w}px`, overflow <= 1, overflow);
+      await a.p.screenshot({ path: path.join(OUT, `${path2.replace(/\//g, "_")}-${theme}-${w}.png`), fullPage: true });
     }
     await a.c.close();
   }

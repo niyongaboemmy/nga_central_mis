@@ -313,6 +313,12 @@ router.get("/ip/:ip", authenticate, NAMED, asyncHandler(async (req: any, res: an
   res.json({ success: true, data });
 }));
 
+/** Programmes / grades / classes for the segment pickers. */
+router.get("/nodes", authenticate, VIEW, asyncHandler(async (_req: any, res: any) => {
+  const { hierarchyNodes } = await import("../services/access/admin");
+  res.json({ success: true, data: await hierarchyNodes() });
+}));
+
 /** Feature labels for every app (the console shows names, not keys). */
 router.get(
   "/catalog",

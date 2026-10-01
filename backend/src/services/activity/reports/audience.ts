@@ -213,7 +213,18 @@ export const visitorSeries = async (rq: ReportQuery) => {
     [rq.from, rq.to, ...app.params],
   );
   const buckets = new Map(bucketsIn(rq).map((b) => [b, { humans: new Set<string>(), bots: new Set<string>() }]));
-  for (const r of rows) (r.is_bot ? buckets.get(bucketOf(toDay(r.day), rq.gran))?.bots : buckets.get(bucketOf(toDay(r.day), rq.gran))?.humans)?.add(r.device_id);
+  const allHumans = new Set<string>();
+  const allBots = new Set<string>();
+  for (const r of rows) {
+    const b = buckets.get(bucketOf(toDay(r.day), rq.gran));
+    if (r.is_bot) {
+      b?.bots.add(r.device_id);
+      allBots.add(r.device_id);
+    } else {
+      b?.humans.add(r.device_id);
+      allHumans.add(r.device_id);
+    }
+  }
   const entries = await q<any>(
     `SELECT value, SUM(sessions) AS sessions, SUM(users) AS people FROM AnalyticsDimDay
       WHERE day BETWEEN ? AND ? AND audience = 'visitor' AND dim = ?${appSql("app", rq).sql}
@@ -234,6 +245,7 @@ export const visitorSeries = async (rq: ReportQuery) => {
     [rq.fromAt, rq.toAt],
   );
   return {
+    totals: { humans: allHumans.size, bots: allBots.size },
     series: [...buckets].map(([bucket, b]) => ({ bucket, humans: b.humans.size, bots: b.bots.size })),
     entry_pages: entries.map((e) => ({ route: e.value, sessions: Number(e.sessions), people: Number(e.people) })),
     referrers: referrers.map((e) => ({ host: e.value, sessions: Number(e.sessions) })),

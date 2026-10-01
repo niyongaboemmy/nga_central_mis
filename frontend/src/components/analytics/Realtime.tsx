@@ -267,7 +267,7 @@ const Roster: React.FC<{ people: LivePerson[]; label: (k: string | null, r?: str
   const [open, setOpen] = useState<Record<string, boolean>>({});
   const now = Date.now();
   return (
-    <div className="overflow-x-auto -mx-4 px-4">
+    <div className="relative overflow-x-auto -mx-4 px-4">
       <table className="w-full text-sm min-w-[720px]">
         <thead>
           <tr className="text-left text-xs text-slate-600 dark:text-slate-300 border-b border-border-light dark:border-slate-700">
