@@ -190,3 +190,9 @@ export const peopleApi = {
   me: () => getData("/me/activity", ""),
   meSignOutEverywhere: () => post("/me/signout-everywhere", {}),
 };
+
+export const exploreApi = {
+  funnel: async (qs: string, body: Record<string, unknown>) => (await api.post(`/monitor/funnel?${qs}`, body)).data.data,
+  paths: (qs: string) => getData("/paths", qs),
+  catalog: () => getData<{ app: number; feature_key: string; label: string; module: string | null; is_event: number }[]>("/catalog", ""),
+};

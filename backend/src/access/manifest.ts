@@ -143,6 +143,9 @@ export const MIS_MANIFEST = defineManifest({
     ANALYTICS_USER_VIEW: R("Open a person's or visitor's activity, IPs and devices", "SYSTEM", ["detail"], SCHOOL_ONLY),
     ANALYTICS_LOCATION_VIEW: R("See precise (browser) location fixes", "SYSTEM", ["detail"], SCHOOL_ONLY),
     ANALYTICS_USER_CONTROL: W("Sign out, suspend, message, watch or block people and devices", "SYSTEM", SCHOOL_ONLY),
+    // Leadership view of usage (plan §11, decision D5): adoption for the viewer's own
+    // programme / grade / class, aggregates only, small groups suppressed. Scopeable.
+    USAGE_INSIGHTS_VIEW: R("See how much the platform is used in your area (aggregates)", "REPORTING", ["summary"]),
     ANALYTICS_CONFIGURE: W("Configure analytics, retention, exclusions and data deletion", "SYSTEM", SCHOOL_ONLY),
   },
 });

@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll, beforeEach, afterAll } from "vitest";
 import request from "supertest";
 import http from "http";
+import zlib from "zlib";
 import jwt from "jsonwebtoken";
 import { eq, sql } from "drizzle-orm";
 import app from "../app";
@@ -395,6 +396,23 @@ describe("Relay ingest (/activity/ingest)", () => {
     const people = listPeople();
     const me = people.find((p) => p.user?.id === userId)!;
     expect(me.tabs.some((t) => t.app === "tm" && t.feature === "tm.course.grades")).toBe(true);
+  });
+
+  it("accepts the relay's gzip batches (Content-Encoding: gzip), as the real relay sends them", async () => {
+    const userId = await createUser();
+    const did = newDeviceId();
+    const body = zlib.gzipSync(Buffer.from(JSON.stringify({ batches: [{ user_id: userId, ip: "102.22.8.8", envelope: envelope(did, [ev("page_view", { r: "/dashboard", f: "tm.dashboard" })]) }] })));
+    const r = await request(app)
+      .post("/activity/ingest")
+      .set("Authorization", basic(clientId, secret))
+      // supertest JSON-serialises a Buffer when the type is application/json; text/plain
+      // sends the raw gzip bytes exactly as fetch() does (the route takes both types).
+      .set("Content-Type", "text/plain")
+      .set("Content-Encoding", "gzip")
+      .send(body);
+    expect(r.body).toMatchObject({ accepted: 1 });
+    expect(r.status).toBe(202);
+    expect(r.body.accepted).toBe(1);
   });
 
   it("re-keys anonymous relay batches without a valid device token", async () => {

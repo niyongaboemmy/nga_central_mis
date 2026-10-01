@@ -25,6 +25,7 @@ export const V2_ONLY_CAPABILITIES = new Set([
   "ANALYTICS_LOCATION_VIEW",
   "ANALYTICS_USER_CONTROL",
   "ANALYTICS_CONFIGURE",
+  "USAGE_INSIGHTS_VIEW",
 ]);
 
 export const isV2OnlyCapability = (name: string) =>

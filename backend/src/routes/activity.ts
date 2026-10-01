@@ -33,7 +33,9 @@ const parseBody = (req: any): any => {
   if (req.body && typeof req.body === "object" && !Buffer.isBuffer(req.body)) return req.body;
   let raw: Buffer | string | undefined = req.body;
   if (Buffer.isBuffer(raw)) {
-    if (req.get("Content-Encoding") === "gzip") raw = zlib.gunzipSync(raw, { maxOutputLength: 4 * 1024 * 1024 });
+    // body-parser already inflates a `Content-Encoding: gzip` body. Only gunzip what is
+    // still compressed (gzip magic bytes), e.g. when a proxy strips the header.
+    if (raw.length > 2 && raw[0] === 0x1f && raw[1] === 0x8b) raw = zlib.gunzipSync(raw, { maxOutputLength: 4 * 1024 * 1024 });
     raw = raw.toString("utf8");
   }
   if (typeof raw !== "string" || !raw) return null;

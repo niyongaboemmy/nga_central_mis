@@ -209,6 +209,7 @@ const waitFor = async (fn, timeoutMs, everyMs = 500) => {
     ["/analytics/locations", "Locations"],
     ["/analytics/technology", "Technology"],
     ["/analytics/ip/127.0.0.1", "IP 127.0.0.1"],
+    ["/analytics/explore", "Explore"],
   ];
   for (const [url, title] of PAGES) {
     await admin.p.goto(`${APP}${url}`, { waitUntil: "networkidle2" });
@@ -229,6 +230,7 @@ const waitFor = async (fn, timeoutMs, everyMs = 500) => {
       ["/analytics/engagement", "Engagement", 1440, 900], ["/analytics/apps", "Apps", 390, 844],
       ["/analytics/retention", "Retention", 820, 1180], ["/analytics/locations", "Locations", 1440, 900],
       ["/analytics/technology", "Technology", 390, 844],
+      ["/analytics/explore", "Explore", 1440, 900], ["/analytics/explore", "Explore", 390, 844],
     ]) {
       await a.p.setViewport({ width: w, height: h });
       await a.p.goto(`${APP}${path2}`, { waitUntil: "networkidle2" });

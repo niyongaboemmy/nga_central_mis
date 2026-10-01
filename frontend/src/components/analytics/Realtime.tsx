@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { lazy, Suspense, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { ChevronDown, ChevronRight, Radio, Search, Table2, BarChart3, LogIn, LogOut, ShieldAlert, AppWindow, Star, UserX } from "lucide-react";
@@ -17,6 +17,7 @@ import {
  * and where from. Names, IPs and places need ANALYTICS_LIVE_VIEW; with only
  * ANALYTICS_VIEW the page shows counts.
  */
+const MapView = lazy(() => import("./MapView"));
 const USER_TYPES = ["STUDENT", "TEACHER", "STAFF", "ADMIN", "PARENT"];
 
 export default function Realtime() {
@@ -134,6 +135,8 @@ export default function Realtime() {
           )}
         </Panel>
       </div>
+
+      {named && <LiveMap people={live.people} />}
 
       <div className="grid lg:grid-cols-3 gap-4">
         <Panel
@@ -408,5 +411,35 @@ const EventFeed: React.FC<{ events: LiveEvent[] }> = ({ events }) => {
         );
       })}
     </ol>
+  );
+};
+
+/** Where people are connecting from right now: one bubble per place, coloured by app. */
+const LiveMap: React.FC<{ people: LivePerson[] }> = ({ people }) => {
+  const color = useAppColors();
+  const points = useMemo(() => {
+    const m = new Map<string, { lat: number; lon: number; label: string; value: number; apps: Map<AppKey, number> }>();
+    for (const p of people)
+      for (const t of p.tabs) {
+        if (!t.geo || t.geo.lat === null || t.geo.lon === null) continue;
+        const k = `${t.geo.lat},${t.geo.lon}`;
+        const e = m.get(k) ?? { lat: t.geo.lat, lon: t.geo.lon, label: `≈ ${[t.geo.city, t.geo.country_code].filter(Boolean).join(", ")}`, value: 0, apps: new Map() };
+        e.value++;
+        e.apps.set(t.app, (e.apps.get(t.app) ?? 0) + 1);
+        m.set(k, e);
+      }
+    return [...m.entries()].map(([key, e]) => {
+      const top = [...e.apps].sort((a, b) => b[1] - a[1])[0]?.[0] ?? "mis";
+      return { key, lat: e.lat, lon: e.lon, value: e.value, label: e.label, color: color(top) };
+    });
+  }, [people, color]);
+  if (!points.length) return null;
+  return (
+    <Panel title="Where people connect from right now" className="min-w-0">
+      <Suspense fallback={<Empty>Loading map…</Empty>}>
+        <MapView points={points} height={280} ariaLabel="People online by place" />
+      </Suspense>
+      <p className="text-[11px] text-slate-600 dark:text-slate-300 mt-1">Bubble size = open tabs; colour = the app most used there. Places come from IP addresses and are approximate.</p>
+    </Panel>
   );
 };

@@ -18,6 +18,7 @@ const AppsPage = lazy(() => import("./AppsRetentionTech").then((m) => ({ default
 const RetentionPage = lazy(() => import("./AppsRetentionTech").then((m) => ({ default: m.RetentionPage })));
 const TechnologyPage = lazy(() => import("./AppsRetentionTech").then((m) => ({ default: m.TechnologyPage })));
 const LocationsPage = lazy(() => import("./Locations").then((m) => ({ default: m.LocationsPage })));
+const Explore = lazy(() => import("./Explore"));
 const User360 = lazy(() => import("./User360"));
 const Visitor360 = lazy(() => import("./Visitor360"));
 const Watchlist = lazy(() => import("./Watchlist"));
@@ -35,12 +36,6 @@ const Gate: React.FC<{ caps: string[]; children: React.ReactNode }> = ({ caps, c
     );
   return <>{children}</>;
 };
-
-const Soon: React.FC<{ title: string }> = ({ title }) => (
-  <AnalyticsShell title={title}>
-    <Empty>This report is being built.</Empty>
-  </AnalyticsShell>
-);
 
 export default function AnalyticsRoutes() {
   const { can, loading } = useAccess();
@@ -63,7 +58,7 @@ export default function AnalyticsRoutes() {
         <Route path="technology" element={<Gate caps={["ANALYTICS_VIEW"]}><TechnologyPage /></Gate>} />
         <Route path="locations" element={<Gate caps={["ANALYTICS_VIEW"]}><LocationsPage /></Gate>} />
         <Route path="ip/:ip" element={<Gate caps={["ANALYTICS_USER_VIEW"]}><IpLookupPage /></Gate>} />
-        <Route path="explore" element={<Gate caps={["ANALYTICS_VIEW"]}><Soon title="Explore" /></Gate>} />
+        <Route path="explore" element={<Gate caps={["ANALYTICS_VIEW"]}><Explore /></Gate>} />
         <Route path="watchlist" element={<Gate caps={["ANALYTICS_USER_CONTROL"]}><Watchlist /></Gate>} />
         <Route path="settings" element={<Gate caps={["ANALYTICS_CONFIGURE"]}><SettingsPage /></Gate>} />
         <Route path="users/:id" element={<Gate caps={["ANALYTICS_USER_VIEW"]}><User360 /></Gate>} />

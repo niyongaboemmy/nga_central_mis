@@ -24,6 +24,7 @@ import { accessSeries, accessUsers, failedLogins, heatmap, loginSeries } from ".
 import { adoptionBy, audience, visitors, visitorSeries } from "../services/activity/reports/audience";
 import { apps as appsReport, dimension, features, flows, keyEvents, retention, technology } from "../services/activity/reports/engagement";
 import { ipLookup, locations } from "../services/activity/reports/locations";
+import { funnel, paths } from "../services/activity/reports/explore";
 import {
   accessLogFor, beforeSignIn, deleteDeviceData, deleteUserData, deviceProfile, exportUserData, setBotOverride, timeline,
   userDevices, userFeatures, userHoldsCapability, userNetwork, userProfile, userSecurity, userSummary,
@@ -317,6 +318,24 @@ router.get("/locations", authenticate, VIEW, asyncHandler(async (req: any, res: 
   if (!hasCap(req, "ANALYTICS_USER_VIEW")) data.top_ips = [];
   res.json({ success: true, data });
 }));
+router.post("/funnel", authenticate, VIEW, asyncHandler(async (req: any, res: any) => {
+  const b = req.body ?? {};
+  const steps = (Array.isArray(b.steps) ? b.steps : [])
+    .filter((x: any) => x && ["feature", "event"].includes(x.type) && /^[a-z][a-z0-9_.-]{0,79}$/.test(String(x.value)))
+    .map((x: any) => ({ type: x.type, value: String(x.value), label: x.label ? String(x.label).slice(0, 80) : undefined }));
+  try {
+    const data = await funnel(parseQuery({ ...req.query, ...b }), { steps, mode: b.mode === "closed" ? "closed" : "open", within: b.within === "days" ? "days" : "session", days: Number(b.days) || 7 });
+    res.json({ success: true, data });
+  } catch (e: any) {
+    res.status(400).json({ success: false, message: e?.message ?? "Invalid funnel" });
+  }
+}));
+router.get("/paths", authenticate, VIEW, asyncHandler(async (req: any, res: any) => {
+  const feature = String(req.query.feature ?? "");
+  if (!/^[a-z][a-z0-9_.-]{0,79}$/.test(feature)) return res.status(400).json({ success: false, message: "Choose a feature" });
+  res.json({ success: true, data: await paths(parseQuery(req.query), { feature, direction: req.query.direction === "backward" ? "backward" : "forward", depth: Number(req.query.depth) || 4 }) });
+}));
+
 router.get("/ip/:ip", authenticate, NAMED, asyncHandler(async (req: any, res: any) => {
   const data = await ipLookup(String(req.params.ip));
   if (!data) return res.status(400).json({ success: false, message: "Not a valid IP address" });
@@ -659,6 +678,7 @@ router.get(
         buffer: bufferDepth(),
         writer: { ...writerStats, lastFlushAt: writerStats.lastFlushAt ? new Date(writerStats.lastFlushAt).toISOString() : null },
         open_sessions: openSessionCount(),
+        process: { rss_mb: Math.round(process.memoryUsage().rss / 1048576), heap_mb: Math.round(process.memoryUsage().heapUsed / 1048576), uptime_s: Math.round(process.uptime()) },
         live_streams: liveListenerCount(),
         catalog: Object.fromEntries(APPS.map((a) => [a, catalog.get(a)?.size ?? 0])),
         geoip: geoDbStatus(),
