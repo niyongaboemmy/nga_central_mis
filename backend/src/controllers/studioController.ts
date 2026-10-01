@@ -1,6 +1,6 @@
 import { and, desc, eq, gte, inArray, or, sql } from "drizzle-orm";
 import { db } from "../db";
-import { AIUsageLog, COURSE_ITEM_TYPES, CourseBlueprint, CourseGenerationRun, CourseGenerationTask, CourseItem, SchemeOfWork } from "../db/schema";
+import { AIUsageLog, COURSE_ITEM_TYPES, CourseBlueprint, CourseGenerationRun, CourseGenerationTask, CourseItem, CourseSection, SchemeOfWork } from "../db/schema";
 import { asyncHandler } from "../middleware/asyncHandler";
 import { successResponse } from "../utils/response";
 import { NotFoundError, ValidationError } from "../errors/CustomError";
@@ -237,7 +237,44 @@ export const getRun = asyncHandler(async (req: any, res: any) => {
 export const listRuns = asyncHandler(async (req: any, res: any) => {
   const course = await buildableCourse(parseId(req.params.id, "course id"), req.user.userId);
   const runs = await db.select().from(CourseGenerationRun).where(eq(CourseGenerationRun.course_id, course.course_id)).orderBy(desc(CourseGenerationRun.created_at)).limit(20);
-  successResponse(res, "Runs", runs.map(({ blueprint: _b, ...r }) => r));
+  // Progress per run, so the course page can show a background run's status without opening it.
+  const ids = runs.map((r) => r.run_id);
+  const counts = ids.length
+    ? await db
+        .select({
+          run_id: CourseGenerationTask.run_id,
+          status: CourseGenerationTask.status,
+          n: sql<number>`COUNT(*)`,
+        })
+        .from(CourseGenerationTask)
+        .where(inArray(CourseGenerationTask.run_id, ids))
+        .groupBy(CourseGenerationTask.run_id, CourseGenerationTask.status)
+    : [];
+  // Parts that failed and wait for their automatic re-run (typed column → correct time zone).
+  const retrying = ids.length
+    ? await db
+        .select({ run_id: CourseGenerationTask.run_id, not_before: CourseGenerationTask.not_before })
+        .from(CourseGenerationTask)
+        .where(and(inArray(CourseGenerationTask.run_id, ids), eq(CourseGenerationTask.status, "QUEUED"), sql`${CourseGenerationTask.error} IS NOT NULL`))
+    : [];
+  // Drafts still waiting for the teacher, course-wide (whichever run made them).
+  const [pending] = await db
+    .select({ n: sql<number>`COUNT(*)` })
+    .from(CourseItem)
+    .innerJoin(CourseSection, eq(CourseSection.section_id, CourseItem.section_id))
+    .where(and(eq(CourseSection.course_id, course.course_id), eq(CourseItem.review_state, "PENDING_REVIEW")));
+  successResponse(res, "Runs", {
+    runs: runs.map(({ blueprint: _b, ...r }) => {
+      const mine = counts.filter((c) => c.run_id === r.run_id);
+      const retries = retrying.filter((t) => t.run_id === r.run_id && t.not_before).map((t) => new Date(t.not_before as any).getTime());
+      return {
+        ...r,
+        totals: Object.fromEntries(mine.map((c) => [c.status, Number(c.n)])),
+        next_retry_at: retries.length ? new Date(Math.min(...retries)).toISOString() : null,
+      };
+    }),
+    pending_review: Number(pending?.n ?? 0),
+  });
 });
 
 /** SSE: run/task events as they happen. Token rides as ?token= (EventSource can't send headers). */

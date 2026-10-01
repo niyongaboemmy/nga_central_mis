@@ -1,4 +1,4 @@
-import type { Blueprint, Estimate, Preset, QuotaRow, RunDetail, RunStatus, RunTask, TaskStatus, WeekBundle } from "../../../api/studio";
+import type { Blueprint, Estimate, Preset, QuotaRow, RunDetail, RunStatus, RunSummary, RunTask, TaskStatus, WeekBundle } from "../../../api/studio";
 
 /**
  * Pure Lesson Studio logic (no React, no network) — unit-tested in __tests__/studioModel.test.ts.
@@ -237,4 +237,54 @@ export function previewBlocks(
   if (b.knowledge_check.enabled) out.push({ key: "check", label: "Knowledge check", detail: `${b.knowledge_check.questions} questions · ${b.knowledge_check.difficulty.toLowerCase()}` });
   if (b.exit_ticket.enabled && features.exit_ticket) out.push({ key: "exit", label: "Exit ticket", detail: `${b.exit_ticket.questions} question${b.exit_ticket.questions > 1 ? "s" : ""} + confidence` });
   return out;
+}
+
+/** The failing parts a run will re-run by itself, and when the first of them goes again. */
+export function autoRetry(tasks: Pick<RunTask, "status" | "error" | "not_before">[], now = new Date()): { count: number; at: string | null } {
+  const waiting = tasks.filter((t) => t.status === "QUEUED" && t.error && t.not_before && new Date(t.not_before).getTime() > now.getTime());
+  if (!waiting.length) return { count: 0, at: null };
+  const at = Math.min(...waiting.map((t) => new Date(t.not_before as string).getTime()));
+  return { count: waiting.length, at: new Date(at).toISOString() };
+}
+
+export type BannerTone = "working" | "waiting" | "attention" | "review";
+export interface RunBanner {
+  run_id: number | null;
+  tone: BannerTone;
+  title: string;
+  detail: string;
+  progress: number | null;
+  action: "open" | "resume" | "retry-failed" | "review";
+}
+
+/**
+ * What the course page says about AI drafting, from the latest runs: one line, the most
+ * useful thing first — a run still going, then failed parts to re-run, then drafts to review.
+ */
+export function runBanner(list: { runs: (Pick<RunSummary, "run_id" | "mode" | "status" | "not_before" | "section_ids"> & { totals: Partial<Record<TaskStatus, number>>; next_retry_at: string | null })[]; pending_review: number }, now = new Date()): RunBanner | null {
+  const background = list.runs.filter((r) => r.mode === "FULL" || r.mode === "SINGLE_WEEK");
+  const weeks = (r: { section_ids: number[] }) => `${r.section_ids.length} week${r.section_ids.length === 1 ? "" : "s"}`;
+  const active = background.find((r) => isRunActive(r.status));
+  if (active) {
+    const t = active.totals;
+    const total = Object.values(t).reduce((n, v) => n + (v ?? 0), 0);
+    const done = (t.SUCCEEDED ?? 0) + (t.SKIPPED ?? 0) + (t.FAILED ?? 0) + (t.CANCELLED ?? 0) + (t.DISMISSED ?? 0);
+    const counted = total ? `${done} of ${total} parts done` : "";
+    const progress = runProgress(t);
+    if (active.status === "PLANNED")
+      return { run_id: active.run_id, tone: "waiting", title: `AI drafting of ${weeks(active)} is scheduled`, detail: active.not_before ? `Starts ${relativeTime(active.not_before, now)} on the server — nothing for you to do.` : "Starts soon on the server.", progress: null, action: "open" };
+    if (active.status === "PAUSED")
+      return { run_id: active.run_id, tone: "attention", title: `AI drafting of ${weeks(active)} is paused`, detail: [counted, "Resume it whenever you like."].filter(Boolean).join(" · "), progress, action: "resume" };
+    if (active.status === "PAUSED_QUOTA")
+      return { run_id: active.run_id, tone: "waiting", title: "Waiting for free AI quota", detail: [counted, active.not_before ? `continues by itself ${relativeTime(active.not_before, now)}` : "continues by itself when the quota resets"].filter(Boolean).join(" · "), progress, action: "open" };
+    const retry = active.next_retry_at && (t.RUNNING ?? 0) === 0 ? ` · a failing part re-runs by itself ${relativeTime(active.next_retry_at, now)}` : "";
+    return { run_id: active.run_id, tone: "working", title: `AI is drafting ${weeks(active)} on the server`, detail: `${counted || "Starting"}${retry}. You can leave — you'll get a notification.`, progress, action: "open" };
+  }
+  const latest = background[0];
+  const failed = latest && latest.status !== "CANCELLED" ? latest.totals.FAILED ?? 0 : 0;
+  if (latest && failed > 0)
+    return { run_id: latest.run_id, tone: "attention", title: `${failed} part${failed === 1 ? "" : "s"} could not be drafted`, detail: "The AI kept failing on them after several tries. Re-run them now, or later when the AI is quieter.", progress: null, action: "retry-failed" };
+  if (list.pending_review > 0)
+    return { run_id: latest?.run_id ?? null, tone: "review", title: `${list.pending_review} AI draft${list.pending_review === 1 ? "" : "s"} waiting for your review`, detail: "Students see nothing until you approve.", progress: null, action: "review" };
+  return null;
 }

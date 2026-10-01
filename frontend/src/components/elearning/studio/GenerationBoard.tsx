@@ -1,10 +1,10 @@
 import React from "react";
 import { motion } from "framer-motion";
-import { AlertTriangle, CheckCircle2, Clock, Hourglass, Loader2, Pause, Play, RotateCcw, Square, Wifi, WifiOff } from "lucide-react";
+import { AlertTriangle, ArrowLeft, CheckCircle2, Clock, Hourglass, Loader2, Pause, Play, RotateCcw, Server, Square, Wifi, WifiOff } from "lucide-react";
 import type { RunDetail, RunWeek } from "../../../api/studio";
 import { useMotion } from "../../../design/motion";
 import { ProgressBar } from "../ui/primitives";
-import { isRunActive, kindLabel, relativeTime, RUN_STATUS_LABEL, runProgress, skipLabel, STAGE_LABEL, weekStage, WeekStage } from "./studioModel";
+import { autoRetry, isRunActive, kindLabel, relativeTime, RUN_STATUS_LABEL, runProgress, skipLabel, STAGE_LABEL, weekStage, WeekStage } from "./studioModel";
 
 const STAGE_STYLE: Record<WeekStage, { icon: React.ElementType; cls: string; spin?: boolean }> = {
   queued: { icon: Clock, cls: "text-slate-600 dark:text-slate-300" },
@@ -52,12 +52,16 @@ export const GenerationBoard: React.FC<{
   busy: boolean;
   onControl: (action: "pause" | "resume" | "cancel" | "retry-failed") => void;
   onReviewWeek: (sectionId: number) => void;
-}> = ({ run, connected, busy, onControl, onReviewWeek }) => {
+  /** Leave the Studio while the run carries on (the course page shows its status). */
+  onLeave?: () => void;
+}> = ({ run, connected, busy, onControl, onReviewWeek, onLeave }) => {
   const m = useMotion();
   const r = run.run;
   const pct = runProgress(r.totals);
   const failed = r.totals.FAILED ?? 0;
   const active = isRunActive(r.status);
+  const retry = autoRetry(run.weeks.flatMap((w) => w.tasks));
+  const runningNow = (r.totals.RUNNING ?? 0) > 0;
   return (
     <div className="space-y-4">
       <div className="el-card p-4">
@@ -65,6 +69,11 @@ export const GenerationBoard: React.FC<{
           <div className="min-w-0 flex-1">
             <p className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2">
               {RUN_STATUS_LABEL[r.status]}
+              {active && (
+                <span className="inline-flex items-center gap-1 px-1.5 rounded-pill el-chip text-[11px] font-medium" title="The school server does the work — closing this page or logging out doesn't stop it">
+                  <Server className="w-3 h-3" aria-hidden /> on the server
+                </span>
+              )}
               {active && (
                 <span className={`inline-flex items-center gap-1 text-[11px] font-medium ${connected ? "text-success-700 dark:text-success-500" : "text-slate-600 dark:text-slate-300"}`} title={connected ? "Live updates" : "Updating every few seconds"}>
                   {connected ? <Wifi className="w-3 h-3" /> : <WifiOff className="w-3 h-3" />}
@@ -79,8 +88,10 @@ export const GenerationBoard: React.FC<{
                   ? `Starts ${relativeTime(r.not_before)}, when the AI is quiet.`
                   : r.status === "READY_FOR_REVIEW"
                     ? "Everything is drafted. Students see nothing until you approve it."
-                    : active
-                      ? "You can leave this page — the drafts keep coming and you'll get a notification."
+                    : active && retry.count && !runningNow && retry.at
+                      ? `${retry.count} part${retry.count === 1 ? "" : "s"} hit a problem — re-run by itself ${relativeTime(retry.at)}. You can leave this page.`
+                      : active
+                        ? "You can leave this page or log out — the server keeps drafting, waits out quota limits and re-runs failed parts. You'll get a notification."
                       : `${pct}% done`}
             </p>
           </div>
@@ -95,9 +106,14 @@ export const GenerationBoard: React.FC<{
                 <Play className="w-4 h-4" /> {r.status === "PLANNED" ? "Start now" : "Resume"}
               </button>
             )}
-            {failed > 0 && !active && (
+            {failed > 0 && (
               <button disabled={busy} onClick={() => onControl("retry-failed")} className="inline-flex items-center gap-1.5 min-h-[40px] px-3 rounded-pill el-chip text-sm font-medium">
-                <RotateCcw className="w-4 h-4" /> Retry {failed} failed
+                <RotateCcw className="w-4 h-4" /> Re-run {failed} failed
+              </button>
+            )}
+            {active && onLeave && (
+              <button onClick={onLeave} className="inline-flex items-center gap-1.5 min-h-[40px] px-3 rounded-pill el-chip text-sm font-medium">
+                <ArrowLeft className="w-4 h-4" /> Back to the course
               </button>
             )}
             {active && (

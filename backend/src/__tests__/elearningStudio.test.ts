@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import request from "supertest";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import app from "../app";
 import { db } from "../db";
 import {
@@ -12,6 +12,7 @@ import {
   CourseItem,
   LessonNote,
   LO_LessonSection,
+  Notification,
   SchemeEntryCriteria,
   SchemeOfWorkEntry,
   SubjectCompetency,
@@ -47,6 +48,7 @@ const iso = (days: number) => {
 };
 
 let quotaOut = false;
+let lessonBroken = false;
 function lessonFor(prompt: string) {
   const topic = /Topic: (.+)/.exec(prompt)?.[1] ?? "Topic";
   return {
@@ -88,7 +90,10 @@ const questions = (n: number) =>
 
 function fakeHandler(params: { schemaName?: string; prompt: string }) {
   if (quotaOut) throw Object.assign(new Error("429 RESOURCE_EXHAUSTED quota"), { status: 429 });
-  if (params.schemaName === "elearning_core_lesson") return lessonFor(params.prompt);
+  if (params.schemaName === "elearning_core_lesson") {
+    if (lessonBroken) throw new Error("upstream model returned an empty body");
+    return lessonFor(params.prompt);
+  }
   if (params.schemaName === "elearning_assessment_pack") {
     const n = Number(/exactly (\d+) questions/.exec(params.prompt)?.[1] ?? 5);
     return { knowledge_check: questions(n), video_watch_for: ["Watch the tags"], video_search_terms: "html lists" };
@@ -174,6 +179,7 @@ describe("Lesson Studio A1–A2: chain, context pack, durable generation, review
 
   beforeEach(() => {
     quotaOut = false;
+    lessonBroken = false;
     calls = installFakeAI(fakeHandler as any).calls;
   });
   afterAll(() => uninstallFakeAI());
@@ -355,6 +361,50 @@ describe("Lesson Studio A1–A2: chain, context pack, durable generation, review
     calls = installFakeAI(fakeHandler as any).calls;
     const later = () => new Date(Date.now() + 2 * 60 * 60 * 1000);
     await drainWorker(50, later);
+    [run] = await db.select().from(CourseGenerationRun).where(eq(CourseGenerationRun.run_id, runId));
+    expect(run.status).toBe("READY_FOR_REVIEW");
+  });
+
+  it("background runs keep re-running a failing part in slow rounds, report status, then notify", async () => {
+    lessonBroken = true;
+    const bp = { ...blueprint, lesson: { ...blueprint.lesson, length: "LONG" }, knowledge_check: { enabled: false }, video_slot: { enabled: false }, reuse_existing_notes: false };
+    const start = await request(app).post(`/elearning/courses/${courseId}/generation/runs`).set(auth(teacherToken)).send({ blueprint: bp, section_ids: [w3], mode: "FULL" });
+    expect(start.status).toBe(202);
+    const runId = start.body.data.run_id;
+    const at = (ms: number) => () => new Date(Date.now() + ms);
+
+    // The quick retries (30 s, 60 s) are spent; the part now waits an hour instead of failing.
+    await drainWorker(50, at(3 * 60 * 1000));
+    let [core] = await db.select().from(CourseGenerationTask).where(and(eq(CourseGenerationTask.run_id, runId), eq(CourseGenerationTask.kind, "CORE_LESSON")));
+    expect(core).toMatchObject({ status: "QUEUED", attempts: 3 });
+    expect(core.error).toBeTruthy();
+    const waitMin = (new Date(core.not_before as any).getTime() - Date.now()) / 60_000;
+    expect(waitMin).toBeGreaterThan(55);
+    expect(waitMin).toBeLessThan(65);
+
+    // The course page can read the run's status without opening it.
+    const list = await request(app).get(`/elearning/courses/${courseId}/generation/runs`).set(auth(teacherToken));
+    expect(list.status).toBe(200);
+    const mine = list.body.data.runs.find((r: any) => r.run_id === runId);
+    expect(mine.status).toBe("RUNNING");
+    expect(mine.totals.QUEUED).toBeGreaterThanOrEqual(1);
+    expect(new Date(mine.next_retry_at).getTime()).toBeGreaterThan(Date.now() + 55 * 60_000);
+    expect(typeof list.body.data.pending_review).toBe("number");
+
+    // Hours later every slow round failed too: the part gives up and the teacher is told.
+    await drainWorker(50, at(12 * 60 * 60 * 1000));
+    [core] = await db.select().from(CourseGenerationTask).where(eq(CourseGenerationTask.task_id, core.task_id));
+    expect(core).toMatchObject({ status: "FAILED", attempts: 6 });
+    let [run] = await db.select().from(CourseGenerationRun).where(eq(CourseGenerationRun.run_id, runId));
+    expect(run.status).toBe("FAILED");
+    const [note] = await db.select().from(Notification).where(and(eq(Notification.user_id, teacherId), eq(Notification.kind, "course_studio_ready"))).orderBy(desc(Notification.notification_id)).limit(1);
+    expect(note?.title).toMatch(/could not finish/);
+
+    // "Re-run failed" starts the part over (fresh attempts) and it succeeds once the AI works.
+    lessonBroken = false;
+    const rerun = await request(app).post(`/elearning/generation/runs/${runId}/retry-failed`).set(auth(teacherToken));
+    expect(rerun.status).toBe(200);
+    await drainWorker();
     [run] = await db.select().from(CourseGenerationRun).where(eq(CourseGenerationRun.run_id, runId));
     expect(run.status).toBe("READY_FOR_REVIEW");
   });

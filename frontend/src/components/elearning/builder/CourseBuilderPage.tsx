@@ -31,6 +31,7 @@ import { getToken } from "../../../utils/auth";
 import Mascot from "../ui/Mascot";
 import { CompletionDot, ItemTypeIcon, Skeleton, WeekPill } from "../ui/primitives";
 import { studioRoutes } from "../../../api/studio";
+import StudioRunBanner from "../studio/StudioRunBanner";
 
 type Tab = "content" | "curriculum" | "insights" | "settings";
 
@@ -474,7 +475,7 @@ const CourseBuilderPage: React.FC = () => {
               {isLive ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
               {isLive ? "Live for students" : "Draft — students see nothing"}
             </span>
-            <span className="text-gray-400">· {liveWeeks}/{data.sections.length} weeks live · {courseCoveragePct}% of the curriculum</span>
+            <span className="text-slate-600 dark:text-slate-300">· {liveWeeks}/{data.sections.length} weeks live · {courseCoveragePct}% of the curriculum</span>
           </p>
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
@@ -490,7 +491,8 @@ const CourseBuilderPage: React.FC = () => {
           )}
           <button
             onClick={() => navigate(studioRoutes.studio(cid))}
-            className="inline-flex items-center gap-1.5 min-h-[44px] px-4 rounded-pill bg-brand-500 hover:bg-brand-600 text-white text-sm font-semibold shadow-soft focus:outline-none focus-visible:shadow-glow"
+            className="inline-flex items-center gap-1.5 min-h-[44px] px-4 rounded-pill bg-brand-600 hover:bg-brand-700 text-white text-sm font-semibold shadow-soft focus:outline-none focus-visible:shadow-glow"
+            aria-label="Build with AI"
             title="Draft every week with AI from your scheme of work, plans and notes"
           >
             <Sparkles className="w-4 h-4" /> <span className="hidden sm:inline">Build with AI</span>
@@ -499,7 +501,7 @@ const CourseBuilderPage: React.FC = () => {
             <Smartphone className="w-4 h-4" /> <span className="hidden lg:inline">Preview</span>
           </button>
           <div className="relative">
-            <button onClick={() => setMoreOpen((o) => !o)} aria-expanded={moreOpen} className="inline-flex items-center gap-1.5 min-h-[44px] px-3 rounded-pill el-chip text-sm font-medium">
+            <button onClick={() => setMoreOpen((o) => !o)} aria-expanded={moreOpen} aria-label="More course actions" className="inline-flex items-center gap-1.5 min-h-[44px] px-3 rounded-pill el-chip text-sm font-medium">
               <MoreHorizontal className="w-4 h-4" /> <span className="hidden lg:inline">More</span>
             </button>
             <AnimatePresence>
@@ -525,6 +527,9 @@ const CourseBuilderPage: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* AI drafting runs on the server: its status (and what's left to do) shows here */}
+      <StudioRunBanner courseId={cid} refreshKey={coverageKey} className="mt-3" />
 
       {/* One instruction at a time */}
       {tab === "content" && <div className="mt-3"><AnimatePresence mode="wait"><NextStepBar key={nextStep.id} step={nextStep} /></AnimatePresence></div>}

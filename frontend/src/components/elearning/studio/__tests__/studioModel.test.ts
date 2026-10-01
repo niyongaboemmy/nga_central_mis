@@ -1,6 +1,8 @@
 import { describe, it, expect } from "vitest";
 import type { Blueprint, Preset, RunDetail, WeekBundle } from "../../../../api/studio";
 import {
+  autoRetry,
+  runBanner,
   applyTaskEvent,
   currentWeek,
   formatEstimate,
@@ -116,5 +118,48 @@ describe("studioModel", () => {
   it("previews what the student's phone will show for a recipe", () => {
     const blocks = previewBlocks(patchBlueprint(bp, { video_slot: { enabled: true }, exit_ticket: { enabled: true } }));
     expect(blocks.map((b) => b.key)).toEqual(["lesson", "video", "check", "exit"]);
+  });
+});
+
+describe("background runs: course-page banner and automatic re-runs", () => {
+  const now = new Date("2026-10-01T10:00:00Z");
+  const base = { mode: "FULL" as const, not_before: null, section_ids: [1, 2, 3], next_retry_at: null };
+
+  it("a running run shows progress and that it is on the server", () => {
+    const b = runBanner({ runs: [{ ...base, run_id: 7, status: "RUNNING", totals: { SUCCEEDED: 3, QUEUED: 4, RUNNING: 1 } }], pending_review: 2 }, now)!;
+    expect(b).toMatchObject({ run_id: 7, tone: "working", action: "open" });
+    expect(b.title).toMatch(/drafting 3 weeks on the server/);
+    expect(b.detail).toMatch(/3 of 8 parts done/);
+    expect(b.progress).toBeGreaterThan(0);
+  });
+
+  it("says when a failing part re-runs by itself, and when a quota pause carries on", () => {
+    const retry = runBanner({ runs: [{ ...base, run_id: 7, status: "RUNNING", next_retry_at: "2026-10-01T11:00:00Z", totals: { SUCCEEDED: 5, QUEUED: 1 } }], pending_review: 0 }, now)!;
+    expect(retry.detail).toMatch(/re-runs by itself/);
+    const quota = runBanner({ runs: [{ ...base, run_id: 8, status: "PAUSED_QUOTA", not_before: "2026-10-01T10:30:00Z", totals: { QUEUED: 6 } }], pending_review: 0 }, now)!;
+    expect(quota).toMatchObject({ tone: "waiting", title: "Waiting for free AI quota" });
+    expect(quota.detail).toMatch(/continues by itself in 30 min/);
+  });
+
+  it("after the run: failed parts first (re-run), then drafts to review; previews are ignored", () => {
+    const failed = runBanner({ runs: [{ ...base, run_id: 9, status: "READY_FOR_REVIEW", totals: { SUCCEEDED: 5, FAILED: 2 } }], pending_review: 5 }, now)!;
+    expect(failed).toMatchObject({ action: "retry-failed", title: "2 parts could not be drafted" });
+    const review = runBanner({ runs: [{ ...base, run_id: 9, status: "READY_FOR_REVIEW", totals: { SUCCEEDED: 5 } }], pending_review: 5 }, now)!;
+    expect(review).toMatchObject({ action: "review", tone: "review" });
+    expect(runBanner({ runs: [{ ...base, mode: "PREVIEW", run_id: 1, status: "RUNNING", totals: {} }], pending_review: 0 }, now)).toBeNull();
+    expect(runBanner({ runs: [], pending_review: 0 }, now)).toBeNull();
+  });
+
+  it("autoRetry counts parts waiting to re-run and the earliest time", () => {
+    const r = autoRetry(
+      [
+        { status: "QUEUED", error: "boom", not_before: "2026-10-01T13:00:00Z" },
+        { status: "QUEUED", error: "boom", not_before: "2026-10-01T11:00:00Z" },
+        { status: "QUEUED", error: null, not_before: "2026-10-01T12:00:00Z" },
+        { status: "FAILED", error: "boom", not_before: null },
+      ],
+      now,
+    );
+    expect(r).toEqual({ count: 2, at: "2026-10-01T11:00:00.000Z" });
   });
 });
