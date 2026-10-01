@@ -90,11 +90,22 @@ export const authorizeSSO = asyncHandler(async (req: any, res: any) => {
   );
 
   // "Opened Task Mentor / Tendo / Tupo" -- counted even before an app is instrumented.
-  const launchedApp = activitySourceClients().get(String(client_id));
-  trackAuth(req, { kind: "app_launch", outcome: "success", userId, app: launchedApp ?? null, method: String(client_id).slice(0, 20) });
+  // Only a browser opening an app counts: servers that pre-generate codes for a user
+  // (HTTP libraries such as axios) are not launches, and would stamp the server's own
+  // IP and place on the person.
+  if (!isServerToServer(req)) {
+    const launchedApp = activitySourceClients().get(String(client_id));
+    trackAuth(req, { kind: "app_launch", outcome: "success", userId, app: launchedApp ?? null, method: String(client_id).slice(0, 20) });
+  }
 
   successResponse(res, "Authorization code generated", { code, state });
 });
+
+/** A request made by a program rather than a person's browser (no UA, or an HTTP library's). */
+export const isServerToServer = (req: any): boolean => {
+  const ua = String(req.headers?.["user-agent"] ?? "").trim();
+  return !ua || /^(axios|node-fetch|undici|got|node|python-requests|python-urllib|aiohttp|curl|wget|go-http-client|okhttp|java|apache-httpclient|ruby|php|postmanruntime|insomnia)\b/i.test(ua);
+};
 
 /**
  * Exchange Authorization Code for JWT
