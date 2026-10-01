@@ -69,7 +69,7 @@ beforeAll(async () => {
   clock.reset();
 }, 60_000);
 
-const post = (path: string, body: unknown) => request(app).post(`/monitor${path}`).set("Authorization", `Bearer ${signToken(owner.id)}`).send(body);
+const post = (path: string, body: object) => request(app).post(`/monitor${path}`).set("Authorization", `Bearer ${signToken(owner.id)}`).send(body);
 const get = (path: string) => request(app).get(`/monitor${path}`).set("Authorization", `Bearer ${signToken(owner.id)}`);
 const STEPS = [
   { type: "feature", value: "mis.home" },
@@ -124,7 +124,7 @@ describe("Leadership usage insights (aggregates only)", () => {
     // Three of six were active today.
     const today = todayKigali();
     for (const s of students.slice(0, 3)) await exec("INSERT INTO AnalyticsUserDay (day, user_id, app, page_views, is_active) VALUES (?, ?, 1, 3, 1)", [today, s]);
-    const lead = await createUser({ userType: "STAFF" });
+    const lead = await createUser({ userType: "ADMIN" });
     await grantPreset(lead, "programme_coordinator", "PROGRAM", prog.programId);
     const res = await request(app).get(`/access/insights/usage.student_active_rate?node=PROGRAM:${prog.programId}`).set("Authorization", `Bearer ${signToken(lead)}`);
     expect(res.status).toBe(200);

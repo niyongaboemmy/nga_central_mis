@@ -69,6 +69,8 @@ export const getSettings = async (): Promise<ActivitySettings> => {
   } catch {
     // Un-migrated server: defaults.
   }
+  // Hard switch for incidents: ACTIVITY_COLLECT=off wins over the stored setting.
+  if (String(process.env.ACTIVITY_COLLECT ?? "").toLowerCase() === "off") value.collect_enabled = false;
   cache = { at: Date.now(), value };
   return value;
 };

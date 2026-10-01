@@ -10,15 +10,15 @@
  * overwrite live ones. Old rows have no IP or device: engagement, IP and location data
  * start at go-live, and the console says so.
  *
- * Usage: npx ts-node scripts/activity-backfill.ts [--db=name] [--since=YYYY-MM-DD]
- * On the production box (no ts-node): node dist-scripts/activity-backfill.js, or run the
- * compiled copy from `npm run build` output.
+ * Usage (dev):        npx ts-node src/scripts/activityBackfill.ts [--db=name] [--since=YYYY-MM-DD]
+ * Usage (production): node dist/scripts/activityBackfill.js        (built by `npm run build`)
  */
 import path from "path";
 import dotenv from "dotenv";
 import mysql from "mysql2/promise";
 
-dotenv.config({ path: path.resolve(__dirname, "../.env") });
+// Two levels below backend/ in both src/scripts and dist/scripts.
+dotenv.config({ path: path.resolve(__dirname, "../../.env") });
 
 const arg = (name: string) => process.argv.find((a) => a.startsWith(`--${name}=`))?.split("=")[1];
 

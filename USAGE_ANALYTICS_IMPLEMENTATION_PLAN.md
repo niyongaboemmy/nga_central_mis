@@ -1433,3 +1433,74 @@ Response: `202 {"ticket":"…","cfg":{"v":7}, "did"?:"…", "dt"?:"…", "cmd"?:
 - **Decisions:** D1 all users and visitors monitored · D2 watched people are notified · D3 full IPs stored.
 - **Cookie:** `nga_did` on `.amashuri.com` (device id), plus the `nga_dt` device token in localStorage.
 - **Migration:** 095. **SDK:** `packages/activity` → `vendor/nga-activity` + `vendor/nga-activity-relay` via `sync.mjs`. **GeoIP:** `/var/lib/nga-geo/*.mmdb` (DB-IP Lite, CC BY 4.0).
+
+---
+
+## 22. Implementation status (2026-10-01)
+
+All seven phases are built and tested on branch **`feat/platform-activity`**:
+- **MIS:** worktree `nga_central_mis-activity`, branched from `origin/main` f2ff93ff.
+- **Task Mentor, Tendo and Tupo:** one worktree each, named `<repo>-activity`.
+- Nothing is pushed or deployed. Operator guide: [`docs/PLATFORM_ACTIVITY.md`](docs/PLATFORM_ACTIVITY.md).
+
+### 22.1 What was built
+
+| Phase | Status | Notes |
+|---|---|---|
+| 0 Groundwork | Done | Migration 095; G1 trust proxy (MIS, Tendo, Tupo); G4 log redaction; G5 activities authorisation; G6 rate limiter; capabilities in v2Only |
+| 1 MIS core + Realtime | Done | Collector, light auth, anonymous guard, sessionizer, presence and SSE, auth events, backfill, MIS SDK instrumentation, Realtime page |
+| 2 Satellites | Done | Relay, catalog, tracker and key events in TM (`b564631`, `ce7a10f`), Tendo (`4aecb8b`, `74a8c85`) and Tupo (`06b8472`, `0a0d185`; realtime gateway relay included) |
+| 3 IP intelligence, visitors, bots | Done | DB-IP Lite offline lookups, bot scoring and overrides, blocklist, Locations page, IP lookup, Visitors page, live map |
+| 4 Reports | Done | Rollups; Overview, Access, Audience, Engagement, Apps, Retention and Technology pages; toolbar; CSV exports |
+| 5 360s and control | Done | User 360, Visitor 360, controls, watches with target notification (D2), alerts, access log, My activity, notices, privacy section 7 |
+| 6 Explore and hardening | Done | Funnels, paths, leadership usage insights (`USAGE_INSIGHTS_VIEW`), load test, smoke test |
+
+### 22.2 Tests
+
+| Suite | Result |
+|---|---|
+| MIS backend analytics (5 suites) | 80 / 80 |
+| Full MIS backend suite (fresh test schema) | 754 / 754. Unrelated files are flaky on the shared DB, the same as on `main` |
+| MIS frontend | 576 / 576 (SDK 17, catalog 3) |
+| Real-browser e2e | 103 / 103. Covers SSE live roster, cross-tab presence, the visitor → user flow, failed sign-in in the live stream, the D2 watched-person flow, sign-out everywhere ending a live tab, every page, and axe WCAG AA in 2 themes × 3 widths |
+| Load test (1,000 relay tabs + 200 direct tabs, 90 s) | 0 errors; direct p95 15 ms; relay batches of about 330 tabs p95 186 ms; memory flat |
+| Task Mentor | Server 526 pass / 17 fail; client 374 / 6. The failures already fail on `main` |
+| Tendo | Server 298 / 2 (`homeSummary`, fails on `main`); client 13 / 13 |
+| Tupo | API 462 / 463 (`feed` title test, fails on `main`); web 14 / 14; realtime 9 / 9 |
+
+### 22.3 Where it lives
+
+| Area | Path |
+|---|---|
+| Backend services | `backend/src/services/activity/`: `db`, `apps`, `ip`, `geoip`, `ua`, `bot`, `dims`, `people`, `settings`, `tokens`, `schema`, `ingest`, `sessionizer`, `presence`, `writer`, `engine`, `rollup`, `catalog`, `blocklist`, `authEvents`, `control`, `notify`, `userMonitor`, `watches`, `accessLog`, `reports/*` |
+| Backend routes and middleware | `routes/activity.ts`, `routes/monitor.ts`, `middleware/activityAuth.ts`, `middleware/rateLimit.ts` |
+| Frontend | `frontend/src/components/analytics/*`, `frontend/src/activity/`, `frontend/src/api/monitor.ts`, `frontend/src/hooks/useLiveStream.ts` |
+| Shared SDK | `packages/activity/{src,sync.mjs}` |
+| Scripts | `backend/src/scripts/activityBackfill.ts`, `backend/scripts/{geoip-update.sh, activity-smoke.mjs, activity-e2e/, activity-load/}` |
+
+### 22.4 Deviations from the plan
+
+1. **`ANALYTICS_ADMIN` is now `ANALYTICS_CONFIGURE`.** The access test suite forbids role keywords such as "ADMIN" in v2-only names, which the spoke apps keyword-match.
+2. **Visitor 360 is addressed by device id** (`/analytics/visitors/:deviceId`). The short `V-XXXXXXX` code is a one-way hash, so it is shown but cannot be looked up.
+3. **Leadership widgets use a new scopeable capability, `USAGE_INSIGHTS_VIEW`.** The `ANALYTICS_*` capabilities are school-wide only.
+4. **Session ids are generated in-process** (ms × 1024 + counter), so events never wait for an insert round-trip.
+5. **Analytics has its own MySQL pool,** 2 connections, in UTC. The app's pool has a single connection, and analytics writes must never queue in front of user requests.
+6. **Bot classification only hides anonymous traffic.** Signed-in people are always visible.
+7. **Late events get their own session chain.** An offline queue flushed hours later never joins the session that is open now.
+8. **A failed sign-in never attaches identity** to a device or session. The targeted account is kept only on the `AuthEvent` row.
+9. **Presence orders beats by the client's send time** and keeps "gone" tombstones. Chrome fires `pagehide` before `visibilitychange` on navigation, so a late "hidden" beat must not bring a tab back.
+10. **On unload, the cross-origin MIS case uses `sendBeacon` with a signed ticket.** Chrome refuses keepalive requests that need a preflight.
+11. **Nightly maintenance runs only between 01:30 and 06:00 Kigali.**
+
+### 22.5 Still open
+
+- **⚖ Legal items in §13:**
+  - registration with NCSA;
+  - authorisation to store data outside Rwanda (AWS Stockholm);
+  - parental consent wording.
+  These gate go-live.
+- **Production rollout steps 1–9** in `docs/PLATFORM_ACTIVITY.md` (migration, env, GeoIP cron, backfill, satellite deploys, smoke test).
+- **Optional:**
+  - a "Platform view" link from Tupo's admin dashboard;
+  - batch device lookups in the relay ingest path, to cut relay p95;
+  - Redis-backed presence if the MIS ever runs more than one process.
