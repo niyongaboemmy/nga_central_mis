@@ -69,3 +69,24 @@ describe("analytics access for administrators", () => {
     expect((await get(teacher, "/monitor/live")).status).toBe(403);
   });
 });
+
+describe("watch alerts on the live stream", () => {
+  it("carry the person's name and the IP's place, not just the alert", async () => {
+    const { fireAlert } = await import("../services/activity/watches");
+    const { activityBus } = await import("../services/activity/runtime");
+    const { setGeoProvider, UNKNOWN_GEO } = await import("../services/activity/geoip");
+    setGeoProvider(() => ({ ...UNKNOWN_GEO, country_code: "RW", city: "Kigali", isp: "MTN Rwandacell", conn_type: "mobile" }));
+    const seen: any[] = [];
+    const on = (s: any) => s.type === "live_event" && seen.push(s.event);
+    activityBus.on("signal", on);
+    try {
+      await fireAlert({ rule: "admin_new_device", severity: "warning", title: "Signed in from a new device", targetUserId: teacher, ip: "102.22.9.9", recipients: [], dedupeKey: `t-${Date.now()}` });
+    } finally {
+      activityBus.off("signal", on);
+      setGeoProvider(null);
+    }
+    const e = seen.find((x) => x.kind === "alert");
+    expect(e).toMatchObject({ user_id: teacher, user_name: expect.any(String), place: "Kigali, RW", isp: "MTN Rwandacell", detail: { title: "Signed in from a new device", severity: "warning" } });
+    expect(e.user_name).not.toBe("");
+  });
+});
