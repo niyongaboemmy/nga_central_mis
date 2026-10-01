@@ -5,6 +5,7 @@ import Modal from "../ui/Modal";
 import { useTheme } from "../../contexts/ThemeContext";
 import { Empty, btnGhost, btnPrimary, inputCls } from "../access/shared";
 import { AppDot, DeviceIcon, placeLabel, useFeatureLabels } from "./common";
+import { SkeletonTimeline } from "./Skeleton";
 import { DataTable, fmtDate, fmtInt, fmtMsDur } from "./charts";
 import type { AppKey } from "../../api/monitor";
 
@@ -38,7 +39,7 @@ export const Timeline: React.FC<{ data: { sessions: any[]; auth: any[]; next_bef
 }) => {
   const label = useFeatureLabels();
   const [open, setOpen] = useState<Record<number, boolean>>({});
-  if (!data) return <Empty>Loading…</Empty>;
+  if (!data) return <SkeletonTimeline />;
   // Interleave sign-in activity with sessions, newest first.
   const items: { at: string; kind: "session" | "auth"; v: any }[] = [
     ...data.sessions.map((s) => ({ at: s.started_at, kind: "session" as const, v: s })),

@@ -90,7 +90,7 @@ const Modal: React.FC<ModalProps> = ({
             aria-modal="true"
             aria-labelledby={titleId}
             tabIndex={-1}
-            className={`relative w-full ${sizeClasses[size]} max-h-[90vh] bg-white dark:bg-gray-800/30 dark:backdrop-blur-xl rounded-3xl shadow-2xl border border-white/20 dark:border-gray-700/20 overflow-hidden flex flex-col focus:outline-none`}
+            className={`relative w-full ${sizeClasses[size]} max-h-[90vh] bg-white dark:bg-gray-800/30 dark:backdrop-blur-xl text-gray-900 dark:text-gray-100 rounded-3xl shadow-2xl border border-white/20 dark:border-gray-700/20 overflow-hidden flex flex-col focus:outline-none`}
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}

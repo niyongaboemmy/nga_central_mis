@@ -8,6 +8,9 @@ import { useTheme } from "../../contexts/ThemeContext";
 import type { AppKey, LiveEvent, LiveFilter, LivePerson } from "../../api/monitor";
 import { Empty, Panel, inputCls } from "../access/shared";
 import { AnalyticsShell } from "./AnalyticsShell";
+import { SearchSelect } from "../ui/SearchSelect";
+import { BarList, Donut, Legend } from "./charts";
+import { SkeletonChart, SkeletonDonut, SkeletonKpis, SkeletonList, SkeletonMap, SkeletonTable, SkeletonTimeline } from "./Skeleton";
 import {
   APPS, APP_META, AppDot, DeviceIcon, Kpi, Segmented, StatusBadge, placeLabel, timeAgo, useAppColors, useFeatureLabels, userTypeLabel,
 } from "./common";
@@ -48,6 +51,7 @@ export default function Realtime() {
       .sort((a, b) => rank(b) - rank(a) || (a.user?.name ?? a.visitor?.code ?? "").localeCompare(b.user?.name ?? b.visitor?.code ?? ""));
   }, [live.people, search, label]);
 
+  const appColor = useAppColors();
   const toggleApp = (a: AppKey) => setApps((cur) => (cur.includes(a) ? cur.filter((x) => x !== a) : [...cur, a]));
 
   return (
@@ -84,17 +88,20 @@ export default function Realtime() {
             { value: "visitor", label: "Visitors" },
           ]}
         />
-        <select aria-label="User type" className={`${inputCls} !w-auto`} value={type} onChange={(e) => setType(e.target.value)} disabled={aud === "visitor"}>
-          <option value="">All user types</option>
-          {USER_TYPES.map((t) => (
-            <option key={t} value={t}>
-              {userTypeLabel(t)}
-            </option>
-          ))}
-        </select>
+        <SearchSelect
+          label="User type"
+          width={180}
+          isDisabled={aud === "visitor"}
+          value={type || "all"}
+          onChange={(v) => setType(!v || v === "all" ? "" : v)}
+          options={[{ value: "all", label: "All user types" }, ...USER_TYPES.map((t) => ({ value: t, label: `${userTypeLabel(t)}s` }))]}
+        />
       </div>
 
       {/* Headline numbers */}
+      {!s ? (
+        <SkeletonKpis count={6} className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3" />
+      ) : (
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         <Kpi label="Online now" value={s ? s.counts.online : "—"} hint="active + idle" />
         <Kpi label="Active" value={s ? s.counts.active : "—"} hint="using it now" />
@@ -103,6 +110,7 @@ export default function Realtime() {
         <Kpi label="Visitors online" value={s ? s.counts.visitors : "—"} hint="not signed in" />
         <Kpi label="Last 5 minutes" value={s ? s.last5 : "—"} hint={s ? `${s.last30} in 30 min` : undefined} />
       </div>
+      )}
 
       <div className="grid lg:grid-cols-3 gap-4">
         <Panel
@@ -115,26 +123,34 @@ export default function Realtime() {
             </button>
           }
         >
-          {s ? chartAsTable ? <MinuteTable minutes={s.minutes} /> : <MinuteChart minutes={s.minutes} apps={apps.length ? apps : APPS} /> : <Empty>Connecting…</Empty>}
+          {s ? chartAsTable ? <MinuteTable minutes={s.minutes} /> : <MinuteChart minutes={s.minutes} apps={apps.length ? apps : APPS} /> : <SkeletonChart height={176} bars={30} />}
         </Panel>
         <Panel title="Open right now" className="min-w-0">
-          {s && s.top_features.length ? (
-            <ol className="space-y-1.5">
-              {s.top_features.map((f) => (
-                <li key={`${f.app}|${f.feature}`} className="flex items-center justify-between gap-2 text-sm">
-                  <span className="min-w-0 flex items-center gap-2">
+          {!s ? (
+            <SkeletonList rows={6} />
+          ) : s.top_features.length ? (
+            <BarList
+              ariaLabel="Pages open right now"
+              rows={s.top_features.map((f) => ({
+                key: `${f.app}|${f.feature}`,
+                label: (
+                  <span className="inline-flex items-center gap-2 min-w-0">
                     <AppDot app={f.app} withLabel={false} />
                     <span className="truncate">{label(f.feature)}</span>
                   </span>
-                  <span className="tabular-nums text-slate-600 dark:text-slate-300">{f.people}</span>
-                </li>
-              ))}
-            </ol>
+                ),
+                value: f.people,
+                display: `${f.people} ${f.people === 1 ? "person" : "people"}`,
+                color: appColor(f.app),
+              }))}
+            />
           ) : (
             <Empty>Nobody has a page open.</Empty>
           )}
         </Panel>
       </div>
+
+      <Splits snapshot={s} people={named ? live.people : null} />
 
       {named && <LiveMap people={live.people} />}
 
@@ -154,14 +170,16 @@ export default function Realtime() {
         >
           {!named ? (
             <Empty>Names, places and IP addresses are shown to holders of “See who is online right now”.</Empty>
+          ) : people.length === 0 && (live.mode === "connecting" || !s) ? (
+            <SkeletonTable rows={5} cols={6} />
           ) : people.length === 0 ? (
-            <Empty>{live.mode === "connecting" ? "Connecting…" : "Nobody matches these filters right now."}</Empty>
+            <Empty>Nobody matches these filters right now.</Empty>
           ) : (
             <Roster people={people} label={label} canOpen={canOpenPeople} />
           )}
         </Panel>
         <Panel title="Live events" className="min-w-0">
-          {!named ? <Empty>Shown with “See who is online right now”.</Empty> : <EventFeed events={live.events} />}
+          {!named ? <Empty>Shown with “See who is online right now”.</Empty> : !s ? <SkeletonTimeline items={5} /> : <EventFeed events={live.events} />}
         </Panel>
       </div>
     </AnalyticsShell>
@@ -186,15 +204,19 @@ const MinuteChart: React.FC<{ minutes: { minute: string; by_app: Record<string, 
   const { theme } = useTheme();
   const surface = theme === "dark" ? "#1e293b" : "#ffffff";
   const data = minutes.map((m) => ({ t: new Date(m.minute).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }), total: m.total, ...m.by_app }));
+  const [hidden, setHidden] = useState<Set<string>>(new Set());
+  const [hover, setHover] = useState<string | null>(null);
+  const shown = apps.filter((a) => !hidden.has(a));
+  const toggle = (k: string) =>
+    setHidden((h) => {
+      const n = new Set(h);
+      if (n.has(k)) n.delete(k);
+      else if (apps.filter((a) => !n.has(a)).length > 1) n.add(k);
+      return n;
+    });
   return (
     <div>
-      <ul className="flex flex-wrap gap-3 text-xs mb-2" aria-label="Legend">
-        {apps.map((a) => (
-          <li key={a}>
-            <AppDot app={a} />
-          </li>
-        ))}
-      </ul>
+      <Legend items={apps.map((a) => ({ key: a, label: APP_META[a].label, color: color(a) }))} hidden={hidden} onToggle={toggle} onHover={setHover} />
       <div className="h-44" role="img" aria-label="People active per minute in the last 30 minutes, stacked by app">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={data} barCategoryGap={2}>
@@ -205,9 +227,9 @@ const MinuteChart: React.FC<{ minutes: { minute: string; by_app: Record<string, 
               cursor={{ fill: theme === "dark" ? "rgba(148,163,184,0.12)" : "rgba(15,23,42,0.05)" }}
               content={({ active, payload, label }) =>
                 active && payload?.length ? (
-                  <div className="rounded-lg border border-border-light dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-xs shadow-lg">
+                  <div className="rounded-xl border border-border-light dark:border-slate-700 bg-white/95 dark:bg-slate-900/95 backdrop-blur px-3 py-2 text-xs shadow-xl">
                     <div className="font-medium mb-1">{label}</div>
-                    {apps.map((a) => (
+                    {shown.map((a) => (
                       <div key={a} className="flex justify-between gap-4">
                         <AppDot app={a} />
                         <span className="tabular-nums">{(payload[0].payload as any)[a] ?? 0}</span>
@@ -221,8 +243,8 @@ const MinuteChart: React.FC<{ minutes: { minute: string; by_app: Record<string, 
                 ) : null
               }
             />
-            {apps.map((a, i) => (
-              <Bar key={a} dataKey={a} stackId="apps" fill={color(a)} stroke={surface} strokeWidth={1} radius={i === apps.length - 1 ? [4, 4, 0, 0] : 0} isAnimationActive={false} />
+            {shown.map((a, i) => (
+              <Bar key={a} dataKey={a} stackId="apps" fill={color(a)} fillOpacity={hover && hover !== a ? 0.3 : 1} stroke={surface} strokeWidth={1} radius={i === shown.length - 1 ? [4, 4, 0, 0] : 0} isAnimationActive={false} />
             ))}
           </BarChart>
         </ResponsiveContainer>
@@ -301,7 +323,7 @@ const Roster: React.FC<{ people: LivePerson[]; label: (k: string | null, r?: str
             );
             return (
               <React.Fragment key={p.key}>
-                <tr className="border-b border-border-light/60 dark:border-slate-800 align-top">
+                <tr className="border-b border-border-light/60 dark:border-slate-800 align-top transition-colors hover:bg-slate-50/80 dark:hover:bg-slate-800/40">
                   <td className="py-2 pr-3">
                     <div className="flex items-start gap-1.5">
                       {more > 0 ? (
@@ -316,6 +338,7 @@ const Roster: React.FC<{ people: LivePerson[]; label: (k: string | null, r?: str
                       ) : (
                         <span className="w-4" />
                       )}
+                      <Avatar name={p.user?.name ?? null} status={p.status} />
                       <div className="min-w-0">{href && canOpen ? <Link to={href} className="hover:underline">{who}</Link> : who}</div>
                     </div>
                   </td>
@@ -394,7 +417,7 @@ const EventFeed: React.FC<{ events: LiveEvent[] }> = ({ events }) => {
         const Icon = def.icon;
         const who = e.user_name ?? (e.visitor_code ? `Visitor ${e.visitor_code}` : "Someone");
         return (
-          <li key={`${e.at}-${i}`} className="flex gap-2 text-sm">
+          <li key={`${e.at}-${i}`} className="flex gap-2 text-sm an-rise">
             <Icon className={`w-4 h-4 mt-0.5 shrink-0 ${def.tone ?? "text-slate-500"}`} aria-hidden />
             <div className="min-w-0">
               <div className={def.tone}>
@@ -436,10 +459,59 @@ const LiveMap: React.FC<{ people: LivePerson[] }> = ({ people }) => {
   if (!points.length) return null;
   return (
     <Panel title="Where people connect from right now" className="min-w-0">
-      <Suspense fallback={<Empty>Loading map…</Empty>}>
+      <Suspense fallback={<SkeletonMap height={280} />}>
         <MapView points={points} height={280} ariaLabel="People online by place" />
       </Suspense>
       <p className="text-[11px] text-slate-600 dark:text-slate-300 mt-1">Bubble size = open tabs; colour = the app most used there. Places come from IP addresses and are approximate.</p>
     </Panel>
+  );
+};
+
+/** Initials in a circle with the presence status as a dot (shape + word stay in the Status column). */
+const Avatar: React.FC<{ name: string | null; status: LivePerson["status"] }> = ({ name, status }) => {
+  const initials = name ? name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]!.toUpperCase()).join("") : "?";
+  const dot = status === "active" ? "bg-emerald-500" : status === "idle" ? "bg-amber-500" : "bg-slate-400";
+  return (
+    <span aria-hidden className="relative shrink-0 inline-flex items-center justify-center w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-700 text-[11px] font-semibold text-slate-700 dark:text-slate-100">
+      {initials}
+      <span className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full ring-2 ring-white dark:ring-slate-800 ${dot}`} />
+    </span>
+  );
+};
+
+/** Part-to-whole splits of who is online: apps, signed in vs visitors, devices. */
+const Splits: React.FC<{ snapshot: ReturnType<typeof useLiveStream>["snapshot"]; people: LivePerson[] | null }> = ({ snapshot, people }) => {
+  const color = useAppColors();
+  const devices = useMemo(() => {
+    if (!people) return null;
+    const m = new Map<string, number>();
+    for (const p of people) {
+      const t = p.tabs[0]?.device.type ?? "unknown";
+      m.set(t, (m.get(t) ?? 0) + 1);
+    }
+    return [...m].map(([k, v]) => ({ key: k, label: k.charAt(0).toUpperCase() + k.slice(1), value: v }));
+  }, [people]);
+  if (!snapshot)
+    return (
+      <div className="grid md:grid-cols-3 gap-4">
+        {[0, 1, 2].map((i) => (
+          <Panel key={i} className="min-w-0"><SkeletonDonut size={120} /></Panel>
+        ))}
+      </div>
+    );
+  const c = snapshot.counts;
+  const signedIn = c.users;
+  return (
+    <div className="grid md:grid-cols-3 gap-4">
+      <Panel title="Online by app" className="min-w-0 an-rise">
+        <Donut size={128} ariaLabel="People online by app" centerLabel="Online" data={APPS.map((a) => ({ key: a, label: APP_META[a].label, value: c.by_app[a] ?? 0, color: color(a) }))} />
+      </Panel>
+      <Panel title="Signed in vs visitors" className="min-w-0 an-rise">
+        <Donut size={128} ariaLabel="Signed-in people and visitors online" centerLabel="Online" data={[{ key: "u", label: "Signed in", value: signedIn }, { key: "v", label: "Visitors", value: c.visitors }]} />
+      </Panel>
+      <Panel title="Devices" className="min-w-0 an-rise">
+        {devices ? <Donut size={128} ariaLabel="Devices of people online" centerLabel="People" data={devices} /> : <Empty>Shown with “See who is online right now”.</Empty>}
+      </Panel>
+    </div>
   );
 };

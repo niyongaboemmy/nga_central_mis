@@ -10,6 +10,7 @@ import { useReportQuery } from "./useReportQuery";
 import { useReport } from "./useReport";
 import { BarList, DataTable, Pager, fmtDate, fmtInt, fmtMsDur } from "./charts";
 import { AppDot, Segmented, placeLabel, userTypeLabel } from "./common";
+import { SkeletonList } from "./Skeleton";
 
 /**
  * Audience (plan §14 page 4): the whole roster with usage, and the lists GA can't make
@@ -32,7 +33,7 @@ export default function Audience() {
   const adoption = useReport(() => reportsApi.adoption(`${qs}&by=${by}`), `${qs}|${by}`);
 
   return (
-    <AnalyticsShell title="Audience" subtitle="Everyone with an account: who uses the platform, who stopped, and who never started.">
+    <AnalyticsShell title="Audience" subtitle="Everyone with an account: who uses the platform, who stopped, and who never started." refreshing={adoption.loading && !!adoption.data}>
       <Toolbar state={state} update={update} showCompare={false} showGran={false} showAudience={false} />
       <Panel
         title="Adoption"
@@ -53,8 +54,11 @@ export default function Audience() {
         <p className="text-xs text-slate-600 dark:text-slate-300 mb-3">Active people ÷ everyone placed there (students, class and subject teachers, programme leads) in the current academic year.</p>
         {adoption.error ? (
           <Empty>{adoption.error}</Empty>
+        ) : adoption.loading && !adoption.data ? (
+          <SkeletonList rows={6} />
         ) : (
           <BarList
+            key={by}
             ariaLabel="Adoption"
             max={100}
             rows={(adoption.data ?? []).map((r: any) => ({
@@ -96,7 +100,7 @@ const People: React.FC<{ qs: string }> = ({ qs }) => {
       <DataTable
         rows={data?.rows ?? []}
         rowKey={(r: any) => String(r.user_id)}
-        empty={loading ? "Loading…" : "Nobody matches."}
+        loading={loading} empty={"Nobody matches."}
         onExport={() => reportsApi.csv("/audience", `${qs}&filter=${filter}`, `audience-${filter}.csv`)}
         columns={[
           {

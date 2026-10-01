@@ -117,11 +117,29 @@ export const useFeatureLabels = () => {
 // ---------------------------------------------------------------------------
 // Layout bits
 // ---------------------------------------------------------------------------
-export const Kpi: React.FC<{ label: string; value: React.ReactNode; hint?: React.ReactNode; tone?: "default" | "muted" }> = ({ label, value, hint }) => (
-  <div className="rounded-2xl border border-white/60 dark:border-slate-700/30 bg-white/70 dark:bg-slate-800/50 px-4 py-3 min-w-0">
-    <div className="text-xs font-medium text-slate-600 dark:text-slate-300 truncate">{label}</div>
-    <div className="mt-1 text-2xl font-semibold tabular-nums text-text-primary-light dark:text-text-primary-dark">{value}</div>
+export const Kpi: React.FC<{
+  label: string;
+  value: React.ReactNode;
+  hint?: React.ReactNode;
+  tone?: "default" | "muted";
+  icon?: React.ReactNode;
+  /** Change vs the comparison period, in percent. */
+  delta?: React.ReactNode;
+  /** Trend under the number (decorative; the tile states the value). */
+  spark?: React.ReactNode;
+  info?: string;
+}> = ({ label, value, hint, icon, delta, spark, info }) => (
+  <div className="group rounded-2xl border border-white/60 dark:border-slate-700/30 bg-white/70 dark:bg-slate-800/50 px-4 py-3 min-w-0 an-rise transition-all duration-200 hover:-translate-y-0.5 hover:shadow-soft hover:border-slate-200 dark:hover:border-slate-600/50">
+    <div className="flex items-center gap-1.5 text-xs font-medium text-slate-600 dark:text-slate-300 min-w-0">
+      {icon && <span className="shrink-0 inline-flex items-center justify-center w-6 h-6 rounded-lg bg-slate-100 dark:bg-slate-700/60 text-slate-700 dark:text-slate-200" aria-hidden>{icon}</span>}
+      <span className="truncate" title={info}>{label}</span>
+    </div>
+    <div className="mt-1 flex items-baseline gap-2 flex-wrap">
+      <span className="text-2xl font-semibold tabular-nums text-text-primary-light dark:text-text-primary-dark">{value}</span>
+      {delta}
+    </div>
     {hint && <div className="mt-0.5 text-xs text-slate-600 dark:text-slate-300">{hint}</div>}
+    {spark}
   </div>
 );
 
@@ -136,16 +154,16 @@ export const Segmented = <T extends string>({
   onChange: (v: T) => void;
   label: string;
 }) => (
-  <div role="radiogroup" aria-label={label} className="inline-flex rounded-xl border border-border-light dark:border-slate-700 p-0.5 bg-white/60 dark:bg-slate-900/40">
+  <div role="radiogroup" aria-label={label} className="inline-flex max-w-full overflow-x-auto rounded-xl border border-border-light dark:border-slate-700 p-0.5 bg-white/60 dark:bg-slate-900/40">
     {options.map((o) => (
       <button
         key={o.value}
         role="radio"
         aria-checked={value === o.value}
         onClick={() => onChange(o.value)}
-        className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+        className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-all duration-150 whitespace-nowrap ${
           value === o.value
-            ? "bg-brand-600 text-white"
+            ? "bg-brand-600 text-white shadow-sm"
             : "text-text-primary-light dark:text-text-primary-dark hover:bg-surface-light dark:hover:bg-slate-800"
         }`}
       >

@@ -7,7 +7,10 @@ import { Toolbar } from "./Toolbar";
 import { useReportQuery } from "./useReportQuery";
 import { useReport } from "./useReport";
 import { fmtDur, fmtInt, fmtPct } from "./charts";
-import { APPS, AppDot, Segmented, useFeatureLabels } from "./common";
+import { APPS, APP_META, AppDot, Segmented, useFeatureLabels } from "./common";
+import { SearchSelect } from "../ui/SearchSelect";
+import { Skel, SkeletonList } from "./Skeleton";
+import type { AppKey } from "../../api/monitor";
 import { useTheme } from "../../contexts/ThemeContext";
 
 /**
@@ -41,15 +44,29 @@ export default function Explore() {
 
 type Opt = { type: "feature" | "event"; value: string; label: string; app?: string };
 
-const StepSelect: React.FC<{ value: string; options: Opt[]; onChange: (o: Opt) => void; label: string }> = ({ value, options, onChange, label }) => (
-  <select aria-label={label} className={`${inputCls} min-w-0`} value={value} onChange={(e) => { const o = options.find((x) => x.value === e.target.value); if (o) onChange(o); }}>
-    <option value="">Choose a page or action…</option>
-    {APPS.map((a) => (
-      <optgroup key={a} label={a.toUpperCase()}>
-        {options.filter((o) => o.app === a).map((o) => <option key={`${o.type}|${o.value}`} value={o.value}>{o.type === "event" ? "★ " : ""}{o.label}</option>)}
-      </optgroup>
-    ))}
-  </select>
+const StepSelect: React.FC<{ value: string; options: Opt[]; onChange: (o: Opt) => void; label: string; width?: number }> = ({ value, options, onChange, label, width }) => (
+  <SearchSelect
+    label={label}
+    width={width}
+    className="flex-1"
+    isLoading={!options.length}
+    placeholder="Search a page or action…"
+    value={value || null}
+    onChange={(v) => {
+      const o = options.find((x) => x.value === v);
+      if (o) onChange(o);
+    }}
+    options={APPS.flatMap((a) =>
+      options
+        .filter((o) => o.app === a)
+        .map((o) => ({
+          value: o.value,
+          label: `${o.type === "event" ? "★ " : ""}${o.label}`,
+          description: o.type === "event" ? "Key action" : o.value,
+          group: APP_META[a as AppKey].label,
+        })),
+    )}
+  />
 );
 
 const FunnelBuilder: React.FC<{ qs: string; options: Opt[] }> = ({ qs, options }) => {
@@ -99,8 +116,18 @@ const FunnelBuilder: React.FC<{ qs: string; options: Opt[] }> = ({ qs, options }
       </Panel>
       <Panel title={result ? `${result.unit === "session" ? "Visits" : "People"} through each step` : "Result"} className="lg:col-span-2 min-w-0">
         {error && <Empty>{error}</Empty>}
-        {!result && !error && <Empty>Choose the steps and run the funnel.</Empty>}
-        {result && (
+        {busy && (
+          <div role="status" aria-label="Running the funnel" className="space-y-4">
+            {steps.map((_, i) => (
+              <div key={i}>
+                <Skel className="h-3 w-1/3 mb-1.5" />
+                <Skel className="h-7" style={{ width: `${100 - i * 18}%` }} />
+              </div>
+            ))}
+          </div>
+        )}
+        {!result && !error && !busy && <Empty>Choose the steps and run the funnel.</Empty>}
+        {result && !busy && (
           <ol className="space-y-3" aria-label="Funnel result">
             {result.steps.map((s: any, i: number) => {
               const max = Math.max(1, ...result.steps.map((x: any) => x.reached));
@@ -110,8 +137,8 @@ const FunnelBuilder: React.FC<{ qs: string; options: Opt[] }> = ({ qs, options }
                     <span className="font-medium">{i + 1}. {label(s.value)}</span>
                     <span className="tabular-nums">{fmtInt(s.reached)} <span className="text-xs text-slate-600 dark:text-slate-300">({fmtPct(s.rate_from_start)} of step 1{i > 0 ? `, ${fmtPct(s.rate_from_previous)} of previous` : ""})</span></span>
                   </div>
-                  <div className="h-6 rounded-md bg-slate-100 dark:bg-slate-800 mt-1 overflow-hidden" aria-hidden>
-                    <div className="h-full rounded-r-[4px]" style={{ width: `${(s.reached / max) * 100}%`, background: bar }} />
+                  <div className="h-7 rounded-lg bg-slate-100 dark:bg-slate-800 mt-1 overflow-hidden" aria-hidden>
+                    <div className="h-full rounded-r-[6px] an-grow" style={{ width: `${(s.reached / max) * 100}%`, background: bar, opacity: 1 - i * 0.06, animationDelay: `${i * 80}ms` }} />
                   </div>
                   <div className="text-[11px] text-slate-600 dark:text-slate-300 mt-0.5">
                     {i > 0 && <>Dropped here: {fmtInt(s.dropped)}. </>}
@@ -141,12 +168,18 @@ const PathExplorer: React.FC<{ qs: string; options: Opt[] }> = ({ qs, options })
       actions={
         <div className="flex flex-wrap items-center gap-2">
           <Segmented label="Direction" value={direction} onChange={setDirection} options={[{ value: "forward", label: "What comes after" }, { value: "backward", label: "What came before" }]} />
-          <StepSelect label="Starting page" value={feature} options={options} onChange={(o) => setFeature(o.value)} />
+          <StepSelect label="Starting page" width={280} value={feature} options={options} onChange={(o) => setFeature(o.value)} />
         </div>
       }
     >
       {error && <Empty>{error}</Empty>}
-      {loading && !data && <Empty>Loading…</Empty>}
+      {loading && !data && (
+        <div className="flex gap-3 overflow-hidden">
+          {[0, 1, 2, 3].map((i) => (
+            <div key={i} className="w-56 shrink-0"><SkeletonList rows={4} /></div>
+          ))}
+        </div>
+      )}
       {data && data.sessions === 0 && <Empty>No visits opened this page in the range.</Empty>}
       {data && data.sessions > 0 && (
         <>
@@ -160,7 +193,8 @@ const PathExplorer: React.FC<{ qs: string; options: Opt[] }> = ({ qs, options })
                     <div className="text-xs font-semibold mb-2 text-slate-600 dark:text-slate-300">{lvl.depth === 0 ? "Start" : `${direction === "forward" ? "Step +" : "Step −"}${lvl.depth}`}</div>
                     <ul className="space-y-1.5">
                       {lvl.nodes.map((n: any) => (
-                        <li key={n.feature} className="rounded-lg border border-border-light dark:border-slate-700 px-2 py-1.5 text-xs bg-white/70 dark:bg-slate-900/40">
+                        <li key={n.feature} className="an-rise relative overflow-hidden rounded-lg border border-border-light dark:border-slate-700 px-2 py-1.5 text-xs bg-white/70 dark:bg-slate-900/40 transition-all hover:shadow-soft hover:-translate-y-0.5">
+                          <span aria-hidden className="absolute left-0 bottom-0 h-0.5 bg-brand-600/70" style={{ width: `${(n.n / total) * 100}%` }} />
                           <div className="flex items-center gap-1.5 min-w-0">
                             {n.app && <AppDot app={n.app} withLabel={false} />}
                             <span className="truncate" title={n.feature}>{n.feature.startsWith("(") ? n.feature : label(n.feature)}</span>

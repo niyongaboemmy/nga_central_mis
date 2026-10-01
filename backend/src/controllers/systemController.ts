@@ -12,6 +12,7 @@ import {
 } from "../db/schema";
 import { eq, and, desc, gte, lte, like } from "drizzle-orm";
 import crypto from "crypto";
+import { auditCsv, auditFacets, listAuditLogs, parseAuditFilters, summarizeAuditLogs } from "../services/auditLog";
 import { validBackchannelUri } from "../services/sso/backchannelLogout";
 import { isHashedClientSecret } from "../utils/ssoClientSecret";
 
@@ -436,161 +437,45 @@ export const removeSystemFromRoleInSchool = async (
   }
 };
 
-// Get Logs History with date range filtering
-// Default date range is 2 days
-// start_date and end_date should be in ISO format (YYYY-MM-DD)
+// Audit log (ActivityLog) -- see services/auditLog.ts. Dates are YYYY-MM-DD
+// (from/to, or the older start_date/end_date); default is the last 7 days.
 export const getLogsHistory = async (req: Request, res: Response) => {
   try {
-    const {
-      start_date,
-      end_date,
-      limit = 100,
-      offset = 0,
-      user_id,
-    } = req.query;
-
-    // Calculate default date range (last 2 days)
-    const now = new Date();
-    const twoDaysAgo = new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000);
-
-    let startDate: Date;
-    let endDate: Date;
-
-    if (start_date && end_date) {
-      startDate = new Date(String(start_date));
-      endDate = new Date(String(end_date));
-      // Set end date to end of day
-      endDate.setHours(23, 59, 59, 999);
-    } else {
-      // Default to last 2 days
-      startDate = twoDaysAgo;
-      endDate = now;
-    }
-
-    // Build query conditions
-    const conditions = [
-      gte(ActivityLog.created_at, startDate),
-      lte(ActivityLog.created_at, endDate),
-    ];
-
-    // Add user filter if provided
-    if (user_id) {
-      conditions.push(eq(ActivityLog.user_id, Number(user_id)));
-    }
-
-    // Query logs with date range filter
-    const logs = await db
-      .select()
-      .from(ActivityLog)
-      .where(and(...conditions))
-      .orderBy(desc(ActivityLog.created_at))
-      .limit(Number(limit))
-      .offset(Number(offset));
-
-    // Get total count for pagination
-    const countResult = await db
-      .select({ count: ActivityLog.activity_id })
-      .from(ActivityLog)
-      .where(and(...conditions));
-
-    const total = countResult[0]?.count || 0;
-
-    // Enrich logs with user and actor information
-    // Get unique user IDs from logs
-    const userIds = [
-      ...new Set(
-        logs.map((l) => l.user_id).filter((id): id is number => id !== null),
-      ),
-    ];
-    const actorIds = [
-      ...new Set(
-        logs.map((l) => l.actor_id).filter((id): id is number => id !== null),
-      ),
-    ];
-    const allIds = [...new Set([...userIds, ...actorIds])];
-
-    // Fetch user info for all relevant IDs - fetch all users and filter in memory
-    let userMap = new Map<
-      number,
-      {
-        username: string | null;
-        first_name: string | null;
-        last_name: string | null;
-      }
-    >();
-
-    if (allIds.length > 0) {
-      const allUsers = await db
-        .select({
-          user_id: User.user_id,
-          username: User.username,
-          first_name: UserProfile.first_name,
-          last_name: UserProfile.last_name,
-        })
-        .from(User)
-        .leftJoin(UserProfile, eq(User.user_id, UserProfile.user_id));
-
-      // Filter to only relevant users
-      const relevantUsers = allUsers.filter((u) =>
-        allIds.includes(Number(u.user_id)),
-      );
-      userMap = new Map(
-        relevantUsers.map((u) => [
-          Number(u.user_id),
-          {
-            username: u.username,
-            first_name: u.first_name,
-            last_name: u.last_name,
-          },
-        ]),
-      );
-    }
-
-    // Transform logs with user info
-    const enrichedLogs = logs.map((log) => {
-      const user = userMap.get(Number(log.user_id));
-      const actor = log.actor_id ? userMap.get(Number(log.actor_id)) : null;
-
-      // Compute full names
-      const userName = user
-        ? [user.first_name, user.last_name].filter(Boolean).join(" ") ||
-          user.username ||
-          null
-        : null;
-      const actorName = actor
-        ? [actor.first_name, actor.last_name].filter(Boolean).join(" ") ||
-          actor.username ||
-          null
-        : null;
-
-      return {
-        ...log,
-        user_username: user?.username || null,
-        user_first_name: user?.first_name || null,
-        user_last_name: user?.last_name || null,
-        user_name: userName,
-        actor_username: actor?.username || null,
-        actor_first_name: actor?.first_name || null,
-        actor_last_name: actor?.last_name || null,
-        actor_name: actorName,
-      };
-    });
-
+    const f = parseAuditFilters(req.query as Record<string, unknown>);
+    const limit = Math.min(200, Math.max(1, Number(req.query.limit) || 25));
+    const offset = Math.max(0, Number(req.query.offset) || 0);
+    const { rows, total } = await listAuditLogs(f, { limit, offset });
     res.status(200).json({
-      logs: enrichedLogs,
-      pagination: {
-        total,
-        limit: Number(limit),
-        offset: Number(offset),
-        hasMore: Number(offset) + logs.length < total,
-      },
-      dateRange: {
-        start_date: startDate.toISOString().split("T")[0],
-        end_date: endDate.toISOString().split("T")[0],
-      },
+      logs: rows,
+      pagination: { total, limit, offset, hasMore: offset + rows.length < total },
+      dateRange: { start_date: f.fromDay, end_date: f.toDay },
     });
   } catch (error) {
     console.error("Error fetching logs history:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+export const getLogsSummary = async (req: Request, res: Response) => {
+  try {
+    const f = parseAuditFilters(req.query as Record<string, unknown>);
+    const [summary, facets] = await Promise.all([summarizeAuditLogs(f), auditFacets(f)]);
+    res.status(200).json({ ...summary, facets, dateRange: { start_date: f.fromDay, end_date: f.toDay } });
+  } catch (error) {
+    console.error("Error summarising logs history:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+export const exportLogsCsv = async (req: Request, res: Response) => {
+  try {
+    const f = parseAuditFilters(req.query as Record<string, unknown>);
+    const csv = await auditCsv(f);
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename="audit-log-${f.fromDay}-to-${f.toDay}.csv"`);
+    res.status(200).send(csv);
+  } catch (error) {
+    console.error("Error exporting logs history:", error);
     res.status(500).json({ message: "Internal server error" });
   }
 };

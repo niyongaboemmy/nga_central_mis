@@ -72,7 +72,7 @@ const AcademicPeriodSelector: React.FC<AcademicPeriodSelectorProps> = ({
           </option>
         ))}
       </select>
-      <span className="text-text-secondary-light dark:text-text-secondary-dark/40">
+      <span className="text-text-secondary-light dark:text-text-secondary-dark/70" aria-hidden="true">
         /
       </span>
       {noTermsForYear ? (
