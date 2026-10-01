@@ -5,7 +5,7 @@ import { decideAny, requireCapability } from "../services/access/policy";
 import { APPS, AppKey, activitySourceClients, isAppKey } from "../services/activity/apps";
 import { saveCatalog, loadCatalog } from "../services/activity/catalog";
 import { activityTablesPresent, q } from "../services/activity/db";
-import { liveListenerCount, subscribeLive } from "../services/activity/engine";
+import { liveListenerCount, recentLiveEvents, subscribeLive } from "../services/activity/engine";
 import { geoDbStatus } from "../services/activity/geoip";
 import { ingestStats } from "../services/activity/ingest";
 import { loadUsers } from "../services/activity/people";
@@ -93,6 +93,7 @@ const liveSnapshot = async (req: any, named: boolean) => {
     minutes: presence.minuteSeries(f.apps),
     top_features: presence.topFeaturesNow(f),
     people: named ? presence.listPeople(f) : [],
+    events: named ? recentLiveEvents().filter((e: any) => !f.apps?.length || f.apps.includes(e.app)) : [],
     named,
   };
 };
@@ -178,6 +179,17 @@ const matchesView = (p: presence.PersonView, f: presence.PresenceFilter) => {
   if (f.feature && !p.tabs.some((t) => t.feature === f.feature)) return false;
   return true;
 };
+
+/** Feature labels for every app (the console shows names, not keys). */
+router.get(
+  "/catalog",
+  authenticate,
+  can(["ANALYTICS_VIEW", "ANALYTICS_LIVE_VIEW"]),
+  asyncHandler(async (_req: any, res: any) => {
+    const rows = await q<any>("SELECT app, feature_key, label, module, is_event, key_event, is_public FROM AnalyticsFeature ORDER BY app, module, label");
+    res.json({ success: true, data: rows });
+  }),
+);
 
 // ---------------------------------------------------------------------------
 // Settings & health

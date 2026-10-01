@@ -552,6 +552,12 @@ const Sidebar: React.FC<SidebarProps> = ({
       requiredCapability: ["VIEW_ALL_TEACHERS_SCHEME_OF_WORK_LIST", "VIEW_REPORTS", "VIEW_ALL_COURSES"],
     },
     {
+      label: "Usage & Monitoring",
+      path: "/analytics",
+      icon: <Activity className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
+      requiredCapability: ["ANALYTICS_VIEW", "ANALYTICS_LIVE_VIEW"],
+    },
+    {
       label: "Leadership & Access",
       path: "/access-studio",
       icon: <ShieldCheck className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,

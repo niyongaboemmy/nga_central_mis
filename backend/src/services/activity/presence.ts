@@ -45,6 +45,7 @@ export interface Tab {
   since: number;
   lastBeat: number;
   sessionId: number | null;
+  clientAt: number;
 }
 
 export interface Person {
@@ -143,7 +144,14 @@ export interface BeatInput {
   device: DeviceSummary;
   sessionId: number | null;
   at: number;
+  /** The browser's send time. Beats from one tab can arrive out of order (an unload
+   *  sends "hidden" and "gone" a millisecond apart), so order is decided by this. */
+  clientAt?: number;
 }
+
+/** Tabs that said "gone": a late beat sent BEFORE the goodbye must not resurrect them. */
+const gone = new Map<string, number>();
+const GONE_TTL_MS = 5 * 60_000;
 
 export const personKey = (userId: number | null, deviceId: string) => (userId ? `u:${userId}` : `d:${deviceId}`);
 
@@ -197,14 +205,26 @@ export const beat = (b: BeatInput) => {
     }
   }
   const tabKey = `${b.deviceId}:${b.tab}`;
+  const clientAt = b.clientAt ?? b.at;
   let p = people.get(key);
   if (b.vis === "gone") {
+    gone.set(tabKey, clientAt);
+    if (gone.size > 20_000) for (const [k, t] of gone) if (t < clientAt - GONE_TTL_MS) gone.delete(k);
     if (p) {
       p.tabs.delete(tabKey);
       recompute(p, b.at);
     }
     return;
   }
+  const goneAt = gone.get(tabKey);
+  if (goneAt !== undefined) {
+    // Only a newer VISIBLE beat brings a tab back (bfcache restore, reload). A "hidden"
+    // beat after goodbye is the unload's own visibilitychange, in whatever order it came.
+    if (clientAt <= goneAt || b.vis !== "visible") return;
+    gone.delete(tabKey);
+  }
+  const existing = p?.tabs.get(tabKey);
+  if (existing && clientAt < existing.clientAt) return; // stale, out-of-order beat
   if (!p) {
     p = { key, userId: b.userId, deviceId: b.deviceId, since: b.at, tabs: new Map(), status: "offline" };
     people.set(key, p);
@@ -229,6 +249,7 @@ export const beat = (b: BeatInput) => {
     since: prev && prev.app === b.app ? prev.since : b.at,
     lastBeat: Math.max(prev?.lastBeat ?? 0, b.at),
     sessionId: b.sessionId ?? prev?.sessionId ?? null,
+    clientAt: Math.max(clientAt, prev?.clientAt ?? 0),
   };
   if (prev && (prev.route !== t.route || prev.feature !== t.feature || prev.vis !== t.vis || prev.idle !== t.idle || prev.app !== t.app))
     dirty.add(key);
@@ -398,6 +419,7 @@ export const takeDiffs = () => {
 
 export const resetPresence = () => {
   people.clear();
+  gone.clear();
   dirty.clear();
   removed.clear();
   minutes.clear();

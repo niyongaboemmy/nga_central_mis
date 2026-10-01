@@ -64,6 +64,8 @@ import DevKitchenSink from "./components/elearning/DevKitchenSink";
 import AccessStudio from "./components/access/AccessStudio";
 import InsightsHub from "./components/access/InsightsHub";
 import HomePage from "./components/home/HomePage";
+import { ActivityRouterTracker } from "./vendor/nga-activity/react";
+import AnalyticsRoutes from "./components/analytics/AnalyticsRoutes";
 import RemindersPage from "./components/reminders/RemindersPage";
 import AppsInstallerPage from "./components/apps/AppsInstallerPage";
 import { AutoInstallPrompt } from "./components/apps/AutoInstallPrompt";
@@ -269,6 +271,8 @@ function App() {
           <Router basename="/">
             {/* Asks to install the app on load when it isn't installed here. */}
             <AutoInstallPrompt />
+            {/* Page views → Usage & Monitoring (patterns only, never ids). */}
+            <ActivityRouterTracker />
             <Routes>
 
             {/* Landing page */}
@@ -741,6 +745,19 @@ function App() {
                 <ProtectedRoute>
                   <SystemLayoutWrapper>
                     <InsightsHub />
+                  </SystemLayoutWrapper>
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Usage & Monitoring (USAGE_ANALYTICS_IMPLEMENTATION_PLAN.md): every page
+                gates itself on an ANALYTICS_* capability; the server enforces it too. */}
+            <Route
+              path="/analytics/*"
+              element={
+                <ProtectedRoute>
+                  <SystemLayoutWrapper>
+                    <AnalyticsRoutes />
                   </SystemLayoutWrapper>
                 </ProtectedRoute>
               }

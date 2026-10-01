@@ -2,7 +2,8 @@ import logger from "../../utils/logger";
 import { APP_BY_CODE } from "./apps";
 import { activityTablesPresent, q } from "./db";
 import { refreshBlocks } from "./blocklist";
-import { loadCatalog } from "./catalog";
+import { loadCatalog, saveCatalog } from "./catalog";
+import misCatalog from "./catalogs/mis.json";
 import * as presence from "./presence";
 import { activityBus, clock } from "./runtime";
 import { reloadOpenSessions, sweepSessions } from "./sessionizer";
@@ -40,9 +41,15 @@ export const pushLiveDiffs = () => {
   if (upsert.length || remove.length) broadcast({ type: "diff", upsert, remove, at: new Date(clock.now()).toISOString() });
 };
 
-// Logins, failed logins, launches and key events go straight to the live event stream.
+// Logins, failed logins, launches and key events go straight to the live event stream,
+// and the last 50 are kept so a console opened now isn't empty.
+const recent: Record<string, unknown>[] = [];
+export const recentLiveEvents = () => [...recent];
 activityBus.on("signal", (s: any) => {
-  if (s.type === "live_event") broadcast({ type: "event", event: s.event });
+  if (s.type !== "live_event") return;
+  recent.unshift(s.event);
+  if (recent.length > 50) recent.pop();
+  broadcast({ type: "event", event: s.event });
 });
 
 let timers: NodeJS.Timeout[] = [];
@@ -58,6 +65,8 @@ export const startActivityEngine = async () => {
       return;
     }
     await getSettings();
+    // The MIS publishes its own feature catalog; the other apps push theirs via the relay.
+    await saveCatalog("mis", misCatalog.version, misCatalog.features as any);
     await loadCatalog(true);
     await refreshBlocks(true);
     const reloaded = await reloadOpenSessions();

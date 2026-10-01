@@ -73,3 +73,4 @@ coverage/
 # stale committed vite.config.js silently shadows vite.config.ts -- Vite loads .js first.
 frontend/vite.config.js
 frontend/vite.config.d.ts
+backend/scripts/activity-e2e/out/

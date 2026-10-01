@@ -457,6 +457,25 @@ describe("Presence", () => {
     expect(listPeople().find((p) => p.user?.id === userId)!.tabs).toHaveLength(2);
   });
 
+  it("ignores a 'hidden' beat that arrives after the tab's 'gone' but was sent before it", async () => {
+    const userId = await createUser();
+    const did = newDeviceId();
+    const token = tokenFor(userId);
+    const t0 = clock.now();
+    await sync({ ...envelope(did, [], { beat: { vis: "visible", r: "/home" } }), sent_at: t0 }, { token });
+    expect(listPeople().some((p) => p.user?.id === userId)).toBe(true);
+    // Unload sends "hidden" (t0+1000) then "gone" (t0+1001); they arrive in reverse.
+    await sync({ ...envelope(did, [], { beat: { vis: "gone" } }), sent_at: t0 + 1001 }, { token });
+    await sync({ ...envelope(did, [], { beat: { vis: "hidden", r: "/home" } }), sent_at: t0 + 1000 }, { token });
+    expect(listPeople().some((p) => p.user?.id === userId)).toBe(false);
+    // Chrome fires pagehide BEFORE visibilitychange on navigation: a later "hidden" stays ignored.
+    await sync({ ...envelope(did, [], { beat: { vis: "hidden", r: "/home" } }), sent_at: t0 + 1002 }, { token });
+    expect(listPeople().some((p) => p.user?.id === userId)).toBe(false);
+    // The same tab coming back later (bfcache restore) is live again.
+    await sync({ ...envelope(did, [], { beat: { vis: "visible", r: "/home" } }), sent_at: t0 + 5000 }, { token });
+    expect(listPeople().some((p) => p.user?.id === userId)).toBe(true);
+  });
+
   it("logout removes the person from presence at once", async () => {
     const userId = await createUser();
     const did = newDeviceId();

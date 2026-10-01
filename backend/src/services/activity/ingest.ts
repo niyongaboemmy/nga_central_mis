@@ -12,7 +12,7 @@ import { activityBus, clock } from "./runtime";
 import { ANONYMOUS_EVENTS, ANONYMOUS_MAX_EVENTS, Envelope, sanitizeRoute, WireEvent } from "./schema";
 import { touchSession } from "./sessionizer";
 import { ActivitySettings, campusRanges, getSettings } from "./settings";
-import { ulid } from "./tokens";
+import { ulid, visitorCode } from "./tokens";
 import { queueDevice, queueDeviceIp, queueEvent, queueIp, queueUserIp, queueUserState } from "./writer";
 
 /**
@@ -208,7 +208,9 @@ export const ingestEnvelope = async (env: Envelope, ctx: IngestContext): Promise
   device.pageViews += events.filter((ev) => ev.n === "page_view").length;
   const score = scoreBot({ ua: e.ua, automation: env.env?.auto === 1, geo: e.geo, signedIn: !!ctx.userId, device });
   device.botScore = ctx.userId ? score : Math.max(device.botScore, score);
-  const bot = isBot(device, s.bot_threshold);
+  // Bot classification only ever hides ANONYMOUS traffic. A signed-in account is a known
+  // person: they stay visible (the device keeps its score for review).
+  const bot = !ctx.userId && isBot(device, s.bot_threshold);
   const excluded = !!user?.excluded;
   const standalone = !!(env.beat?.standalone ?? env.env?.standalone);
 
@@ -316,7 +318,7 @@ export const ingestEnvelope = async (env: Envelope, ctx: IngestContext): Promise
         presence.beat({
           app: ctx.app, userId: ctx.userId, deviceId: env.did, tab: env.tab ?? "t0", vis: "visible", idle: false,
           route, feature, standalone, ip: e.ip, geo: e.geo, network: e.network, device: devSummary,
-          sessionId: lastSessionId, at,
+          sessionId: lastSessionId, at, clientAt: ev.t,
         });
       }
       if (key) activityBus.emitSignal({ type: "key_event", userId: ctx.userId, deviceId: env.did, app: ctx.app, name: ev.n, at });
@@ -337,7 +339,7 @@ export const ingestEnvelope = async (env: Envelope, ctx: IngestContext): Promise
       app: ctx.app, userId: ctx.userId, deviceId: env.did, tab: env.tab ?? "t0", vis: b.vis, idle: b.idle,
       route, feature: normalizeFeature(ctx.app, b.f), title: b.title ?? null, standalone: b.standalone,
       net: b.net ?? null, ip: e.ip, geo: e.geo, network: e.network, device: devSummary,
-      sessionId: t.session?.session_id ?? lastSessionId, at: now,
+      sessionId: t.session?.session_id ?? lastSessionId, at: now, clientAt: env.sent_at,
     });
   }
 
@@ -452,7 +454,7 @@ export const ingestServerEvent = async (input: ServerEventInput) => {
     const t = touchSession({
       deviceId, userId, app: input.app, at, kind: "event", name: input.name, isKeyEvent: key,
       ip: e.ipBuf, geoId: e.geoId, network: e.network, uaId: e.uaId, userType: user?.userType ?? null,
-      isBot: isBot(device, s.bot_threshold),
+      isBot: !userId && isBot(device, s.bot_threshold),
     });
     sessionId = t.session?.session_id ?? null;
   }
@@ -465,7 +467,23 @@ export const ingestServerEvent = async (input: ServerEventInput) => {
     if (userId) queueUserIp(userId, e.ipBuf, new Date(at));
   }
   if (key) activityBus.emitSignal({ type: "key_event", userId, deviceId: deviceId ?? "", app: input.app, name: input.name, at });
-  activityBus.emitSignal({ type: "live_event", event: { at: new Date(at).toISOString(), kind: input.name, app: input.app, user_id: userId, device_id: deviceId, ip: e.ip } });
+  activityBus.emitSignal({
+    type: "live_event",
+    event: {
+      at: new Date(at).toISOString(),
+      kind: input.name,
+      app: input.app,
+      user_id: userId,
+      user_name: user?.name ?? null,
+      user_type: user?.userType ?? null,
+      device_id: deviceId,
+      visitor_code: !userId && deviceId ? visitorCode(deviceId) : null,
+      ip: e.ip,
+      place: [e.geo.city, e.geo.country_code].filter(Boolean).join(", ") || null,
+      isp: e.geo.isp,
+      detail: pickDetail(p),
+    },
+  });
   noteHealth(input.app, 1, now);
   return true;
 };
@@ -491,3 +509,10 @@ const deviceDelta = (d: DeviceInfo, now: number, e: Enriched) => ({
 });
 
 export { enrich as enrichRequest };
+
+/** The few params worth showing in the live event stream (never free text). */
+const pickDetail = (p: Record<string, any>) => {
+  const out: Record<string, unknown> = {};
+  for (const k of ["target_app", "reason", "method", "initiator", "username_attempted", "display_name", "result"]) if (p[k] != null) out[k] = p[k];
+  return Object.keys(out).length ? out : null;
+};

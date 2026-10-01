@@ -1,3 +1,4 @@
+import { getDeviceId } from "../vendor/nga-activity";
 import axios, {
   AxiosInstance,
   AxiosResponse,
@@ -54,6 +55,10 @@ api.interceptors.request.use(
     if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+    // The shared device id, so sign-in attempts and SSO launches are tied to the device
+    // in Usage & Monitoring (the .amashuri.com cookie covers production; this covers dev).
+    const did = getDeviceId();
+    if (did && config.headers) config.headers["X-NGA-Device"] = did;
     return config;
   },
   (error: AxiosError): Promise<AxiosError> => {
