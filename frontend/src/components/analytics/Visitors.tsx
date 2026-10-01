@@ -7,8 +7,9 @@ import { AnalyticsShell } from "./AnalyticsShell";
 import { Toolbar } from "./Toolbar";
 import { useReportQuery } from "./useReportQuery";
 import { useReport } from "./useReport";
-import { BarList, ChartPanel, DataTable, Pager, TrendLines, bucketLabel, fmtDate, fmtInt, fmtPct } from "./charts";
+import { BarList, ChartPanel, DataTable, Pager, Sparkline, TrendLines, bucketLabel, fmtDate, fmtInt, fmtPct } from "./charts";
 import { DeviceIcon, Kpi, Segmented, placeLabel, useFeatureLabels } from "./common";
+import { SkeletonKpis, SkeletonList } from "./Skeleton";
 
 /**
  * Visitors (plan §6, §14 page 5): public, not-signed-in traffic, identified by device,
@@ -26,19 +27,22 @@ export default function Visitors() {
   const s = summary.data;
 
   return (
-    <AnalyticsShell title="Visitors" subtitle="People on public pages who are not signed in: where they come from and what they look at.">
+    <AnalyticsShell title="Visitors" subtitle="People on public pages who are not signed in: where they come from and what they look at." refreshing={summary.loading && !!s}>
       <Toolbar state={state} update={update} showCompare={false} showAudience={false} showSegments={false} />
       {summary.error && <Empty>{summary.error}</Empty>}
+      {!s && summary.loading && <SkeletonKpis />}
       {s && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <Kpi label="Visitors" value={fmtInt(s.totals.humans)} hint="distinct devices, humans" />
-          <Kpi label="Bots seen" value={fmtInt(s.totals.bots)} hint="excluded from every report" />
+          <Kpi label="Visitors" value={fmtInt(s.totals.humans)} hint="distinct devices, humans" spark={<Sparkline values={(s.series ?? []).map((r: any) => r.humans)} />} />
+          <Kpi label="Bots seen" value={fmtInt(s.totals.bots)} hint="excluded from every report" spark={<Sparkline values={(s.series ?? []).map((r: any) => r.bots)} color="#94a3b8" />} />
           <Kpi label="New devices" value={fmtInt(s.conversion.new_devices)} hint="first seen in range" />
           <Kpi label="Signed in later" value={fmtPct(s.conversion.rate)} hint={`${fmtInt(s.conversion.signed_in_later)} devices`} />
         </div>
       )}
       <div className="grid lg:grid-cols-3 gap-4">
         <ChartPanel
+          pending={summary.loading && !s}
+          loading={summary.loading}
           className="lg:col-span-2"
           title={`Visitors per ${state.gran}`}
           table={
@@ -51,10 +55,10 @@ export default function Visitors() {
         >
           <TrendLines ariaLabel="Visitors over time" data={s?.series ?? []} x="bucket" xLabel={(v) => bucketLabel(v, state.gran)} series={[{ key: "humans", label: "Human visitors" }, { key: "bots", label: "Bots" }]} />
         </ChartPanel>
-        <Panel title="Where they arrive" className="min-w-0">
-          <BarList ariaLabel="Entry pages" rows={(s?.entry_pages ?? []).map((e: any) => ({ key: e.route, label: e.route, value: e.sessions }))} />
+        <Panel title="Where they arrive" className="min-w-0 an-rise">
+          {!s ? <SkeletonList rows={4} /> : <BarList ariaLabel="Entry pages" rows={(s?.entry_pages ?? []).map((e: any) => ({ key: e.route, label: e.route, value: e.sessions }))} />}
           <h3 className="text-xs font-semibold mt-4 mb-2">Referred by</h3>
-          <BarList ariaLabel="Referrers" rows={(s?.referrers ?? []).map((e: any) => ({ key: e.host, label: e.host, value: e.sessions }))} />
+          {!s ? <SkeletonList rows={3} /> : <BarList ariaLabel="Referrers" rows={(s?.referrers ?? []).map((e: any) => ({ key: e.host, label: e.host, value: e.sessions }))} />}
         </Panel>
       </div>
       <Panel
@@ -76,7 +80,7 @@ export default function Visitors() {
           <DataTable
             rows={list.data?.rows ?? []}
             rowKey={(r: any) => r.device_id}
-            empty={list.loading ? "Loading…" : "No visitors in this range."}
+            loading={list.loading} empty={"No visitors in this range."}
             onExport={() => reportsApi.csv("/visitors", `${qs}&tab=${tab}`, `visitors-${tab}.csv`)}
             columns={[
               {

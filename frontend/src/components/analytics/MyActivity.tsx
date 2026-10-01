@@ -9,6 +9,9 @@ import { useReport } from "./useReport";
 import { DataTable, fmtDate, fmtMsDur } from "./charts";
 import { AppDot, DeviceIcon, placeLabel } from "./common";
 import { IpTable } from "./PersonParts";
+import { AnalyticsShell } from "./AnalyticsShell";
+import { SkeletonPanel, SkeletonTable, SkeletonTimeline } from "./Skeleton";
+import { UserRound } from "lucide-react";
 
 /**
  * My activity (plan §10.5, §13 transparency): what the platform records about me, from
@@ -42,15 +45,22 @@ export default function MyActivity() {
   };
 
   return (
-    <div className="space-y-4 max-w-[1200px] mx-auto">
-      <header>
-        <h1 className="text-xl sm:text-2xl font-semibold text-text-primary-light dark:text-text-primary-dark">My activity</h1>
-        <p className="text-sm text-slate-600 dark:text-slate-300">
-          What NGA's platform records about your use of the MIS, Task Mentor, Tendo and Tupo: when, from which devices, networks and approximate places. Nothing you type or read is recorded.
-        </p>
-      </header>
+    <AnalyticsShell
+      title="My activity"
+      eyebrow={<><UserRound className="w-3.5 h-3.5" aria-hidden /> Your account</>}
+      subtitle="What NGA's platform records about your use of the MIS, Task Mentor, Tendo and Tupo: when, from which devices, networks and approximate places. Nothing you type or read is recorded."
+      back={{ fallback: "/home" }}
+      hideTabs
+      refreshing={loading && !!data}
+    >
       {error && <Empty>{error}</Empty>}
-      {loading && !data && <Empty>Loading…</Empty>}
+      {loading && !data && !error && (
+        <>
+          <SkeletonPanel titleWidth="w-64"><SkeletonTimeline items={1} /></SkeletonPanel>
+          <SkeletonPanel><SkeletonTable rows={4} cols={4} /></SkeletonPanel>
+          <SkeletonPanel><SkeletonTable rows={4} cols={4} /></SkeletonPanel>
+        </>
+      )}
       {data && (
         <>
           <Panel title={<span className="inline-flex items-center gap-1.5"><Eye className="w-4 h-4" aria-hidden />Is anyone monitoring my account?</span>}>
@@ -121,6 +131,6 @@ export default function MyActivity() {
           </p>
         </>
       )}
-    </div>
+    </AnalyticsShell>
   );
 }

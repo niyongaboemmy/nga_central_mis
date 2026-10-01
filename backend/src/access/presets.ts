@@ -288,7 +288,19 @@ const MIS_PRESETS: PresetDef[] = [
     description: "Runs school operations. No marks or discipline access by default.",
     category: "Operations",
     scopes: ["SCHOOL"],
-    caps: [...ACCESS_ADMIN, "VIEW_ACADEMICS", "VIEW_ACADEMIC_CALENDAR"],
+    caps: [
+      ["USAGE_INSIGHTS_VIEW", "summary"],
+      ...ACCESS_ADMIN,
+      "VIEW_ACADEMICS",
+      "VIEW_ACADEMIC_CALENDAR",
+      // Usage & Monitoring: reports, who is online, and a person's activity
+      // (migration 099). Control (sign out, block) and settings stay with the
+      // platform owner.
+      "ANALYTICS_VIEW",
+      "ANALYTICS_LIVE_VIEW",
+      "ANALYTICS_USER_VIEW",
+      "ANALYTICS_LOCATION_VIEW",
+    ],
   },
   {
     key: "academic_insights_viewer",

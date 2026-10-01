@@ -6,6 +6,7 @@ import type { UserSearchResult } from "../../api/users";
 import { useToast } from "../../contexts/ToastContext";
 import Modal from "../ui/Modal";
 import { Panel, UserPicker, btnGhost, btnPrimary, inputCls } from "../access/shared";
+import { SearchSelect } from "../ui/SearchSelect";
 import { AnalyticsShell } from "./AnalyticsShell";
 import { useReport } from "./useReport";
 import { DataTable, fmtDate, fmtInt } from "./charts";
@@ -98,10 +99,13 @@ export const WatchDialog: React.FC<{ open: boolean; onClose: () => void; initial
                   {r.label}
                 </label>
                 {rules[r.type] && r.needs === "app" && (
-                  <select aria-label="App" className={`${inputCls} mt-1 !py-1`} value={rules[r.type].app ?? ""} onChange={(e) => setRule(r.type, "app", e.target.value || undefined)}>
-                    <option value="">Any app</option>
-                    {Object.entries(APP_META).map(([k, m]) => <option key={k} value={k}>{m.label}</option>)}
-                  </select>
+                  <SearchSelect
+                    label="App"
+                    className="mt-1"
+                    value={rules[r.type].app ?? "any"}
+                    onChange={(v) => setRule(r.type, "app", !v || v === "any" ? undefined : v)}
+                    options={[{ value: "any", label: "Any app" }, ...Object.entries(APP_META).map(([k, m]) => ({ value: k, label: m.label }))]}
+                  />
                 )}
                 {rules[r.type] && r.needs === "feature" && (
                   <input aria-label="Feature key" className={`${inputCls} mt-1 !py-1`} placeholder="Feature key, e.g. mis.academics" value={rules[r.type].feature ?? ""} onChange={(e) => setRule(r.type, "feature", e.target.value)} />
@@ -163,7 +167,7 @@ export default function Watchlist() {
           <DataTable
             rows={alerts.data ?? []}
             rowKey={(a: any) => String(a.id)}
-            empty={alerts.loading ? "Loading…" : "No alerts."}
+            loading={alerts.loading} empty={"No alerts."}
             columns={[
               { key: "t", label: "When", render: (a: any) => fmtDate(a.fired_at, true) },
               { key: "s", label: "", render: (a: any) => <span className={`text-[11px] px-1.5 py-0.5 rounded ${a.severity === "critical" ? "bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-200" : a.severity === "warning" ? "bg-amber-100 text-amber-900 dark:bg-amber-900/40 dark:text-amber-100" : "bg-slate-100 dark:bg-slate-800"}`}>{a.severity}</span> },

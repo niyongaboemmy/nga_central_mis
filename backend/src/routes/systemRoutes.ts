@@ -12,6 +12,8 @@ import {
   getSchoolRoleAssignments,
   removeSystemFromRoleInSchool,
   getLogsHistory,
+  getLogsSummary,
+  exportLogsCsv,
 } from "../controllers/systemController";
 import {
   listIntegrationTokens,
@@ -30,6 +32,8 @@ router.get(
   authorize([Permissions.VIEW_ALL_LOGS_HISTORY]),
   getLogsHistory,
 );
+router.get("/logs/summary", authenticate, authorize([Permissions.VIEW_ALL_LOGS_HISTORY]), getLogsSummary);
+router.get("/logs/export.csv", authenticate, authorize([Permissions.VIEW_ALL_LOGS_HISTORY]), exportLogsCsv);
 
 // Integration tokens — the machine credentials partner systems (Ganzaa) use to
 // pull read-only data from /integrations. Managed here rather than under

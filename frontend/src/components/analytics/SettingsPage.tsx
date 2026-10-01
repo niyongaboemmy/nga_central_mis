@@ -3,7 +3,9 @@ import { Link } from "react-router-dom";
 import { Save } from "lucide-react";
 import { monitorApi, peopleApi } from "../../api/monitor";
 import { useToast } from "../../contexts/ToastContext";
-import { Empty, Panel, btnGhost, btnPrimary, inputCls } from "../access/shared";
+import { Panel, btnGhost, btnPrimary, inputCls } from "../access/shared";
+import { SearchSelect } from "../ui/SearchSelect";
+import { SkeletonChart, SkeletonList, SkeletonPanel } from "./Skeleton";
 import { AnalyticsShell } from "./AnalyticsShell";
 import { useReport } from "./useReport";
 import { DataTable, fmtDate, fmtInt } from "./charts";
@@ -50,7 +52,12 @@ const SettingsForm = () => {
     setForm(data.settings);
     setCidrs((data.settings.campus_cidrs ?? []).map((c: any) => (typeof c === "string" ? c : `${c.cidr}${c.label && c.label !== "campus" ? ` ${c.label}` : ""}`)).join("\n"));
   }, [data]);
-  if (!form) return <Empty>Loading…</Empty>;
+  if (!form)
+    return (
+      <SkeletonPanel titleWidth="w-48">
+        <SkeletonList rows={5} />
+      </SkeletonPanel>
+    );
   const save = async () => {
     setSaving(true);
     try {
@@ -95,16 +102,21 @@ const SettingsForm = () => {
           <label className="block"><span className="text-xs font-medium">School day starts</span><input type="time" className={`${inputCls} mt-1`} value={form.school_hours.from} onChange={(e) => setForm({ ...form, school_hours: { ...form.school_hours, from: e.target.value } })} /></label>
           <label className="block"><span className="text-xs font-medium">ends</span><input type="time" className={`${inputCls} mt-1`} value={form.school_hours.to} onChange={(e) => setForm({ ...form, school_hours: { ...form.school_hours, to: e.target.value } })} /></label>
         </div>
-        <label className="block mt-3 text-sm">
-          <span className="text-xs font-medium">Precise (browser) location</span>
-          <select className={`${inputCls} mt-1`} value={form.precise_location} onChange={(e) => setForm({ ...form, precise_location: e.target.value })}>
-            <option value="off">Off (recommended)</option>
-            <option value="staff">Staff only</option>
-            <option value="known_users">Everyone signed in</option>
-            <option value="everyone">Everyone, including public visitors</option>
-          </select>
+        <div className="block mt-3 text-sm">
+          <SearchSelect
+            label="Precise (browser) location"
+            showLabel
+            value={form.precise_location}
+            onChange={(v) => v && setForm({ ...form, precise_location: v })}
+            options={[
+              { value: "off", label: "Off (recommended)" },
+              { value: "staff", label: "Staff only" },
+              { value: "known_users", label: "Everyone signed in" },
+              { value: "everyone", label: "Everyone, including public visitors" },
+            ]}
+          />
           <span className="text-[11px] text-slate-600 dark:text-slate-300">Browsers always ask the person first. Turning this on needs a reason and must be in the privacy notice.</span>
-        </label>
+        </div>
         <label className="block mt-3 text-sm">
           <span className="text-xs font-medium">Reason for this change (recorded)</span>
           <input className={`${inputCls} mt-1`} value={reason} onChange={(e) => setReason(e.target.value)} />
@@ -118,7 +130,14 @@ const SettingsForm = () => {
 const Health = () => {
   const { data, reload } = useReport(() => monitorApi.ingestHealth(), "health");
   const cat = useReport(() => monitorApi.catalogHealth(), "cat");
-  if (!data) return <Empty>Loading…</Empty>;
+  if (!data)
+    return (
+      <div className="grid md:grid-cols-2 xl:grid-cols-4 gap-4">
+        {APPS.map((a) => (
+          <SkeletonPanel key={a}><SkeletonChart height={60} bars={20} legend={false} /></SkeletonPanel>
+        ))}
+      </div>
+    );
   return (
     <div className="space-y-4">
       <div className="grid md:grid-cols-2 xl:grid-cols-4 gap-4">
@@ -163,15 +182,25 @@ const AccessLog = () => {
   const { data, loading } = useReport(() => peopleApi.accessLog2(action ? `action=${action}` : ""), `log${action}`);
   return (
     <Panel title="Who looked at whom" actions={
-      <select aria-label="Action" className={`${inputCls} !w-auto !py-1.5`} value={action} onChange={(e) => setAction(e.target.value)}>
-        <option value="">All actions</option>
-        {["view_user", "view_timeline", "view_device", "ip_lookup", "export", "export_user", "signout_everywhere", "suspend", "reactivate", "message", "watch_create", "watch_revoke", "block", "delete_user_data", "settings_update"].map((a) => <option key={a} value={a}>{a.replace(/_/g, " ")}</option>)}
-      </select>
+      <SearchSelect
+        label="Action"
+        width={220}
+        value={action || "all"}
+        onChange={(v) => setAction(!v || v === "all" ? "" : v)}
+        options={[
+          { value: "all", label: "All actions" },
+          ...["view_user", "view_timeline", "view_device", "ip_lookup", "export", "export_user", "signout_everywhere", "suspend", "reactivate", "message", "watch_create", "watch_revoke", "block", "delete_user_data", "settings_update"].map((a) => ({
+            value: a,
+            label: a.charAt(0).toUpperCase() + a.slice(1).replace(/_/g, " "),
+            group: a.startsWith("view") || a === "ip_lookup" ? "Looking" : a.startsWith("export") ? "Exports" : a === "settings_update" ? "Settings" : "Controls",
+          })),
+        ]}
+      />
     }>
       <DataTable
         rows={data ?? []}
         rowKey={(r: any) => String(r.id)}
-        empty={loading ? "Loading…" : "Nothing yet."}
+        loading={loading} empty={"Nothing yet."}
         columns={[
           { key: "t", label: "When", render: (r: any) => fmtDate(r.at, true) },
           { key: "v", label: "Who", render: (r: any) => r.viewer_name || `User ${r.viewer_id}` },

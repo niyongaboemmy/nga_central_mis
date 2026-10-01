@@ -3,6 +3,7 @@ import { CalendarRange, Filter, X } from "lucide-react";
 import api from "../../services/api";
 import { useAcademicPeriod } from "../../contexts/AcademicPeriodContext";
 import { inputCls } from "../access/shared";
+import { SearchSelect } from "../ui/SearchSelect";
 import { APPS, AppDot } from "./common";
 import { PRESETS, ReportState, kigaliToday } from "./useReportQuery";
 
@@ -65,37 +66,50 @@ export const Toolbar: React.FC<{
     <div className="rounded-2xl border border-white/60 dark:border-slate-700/30 bg-white/70 dark:bg-slate-800/50 p-3 space-y-2">
       <div className="flex flex-wrap items-center gap-2">
         <CalendarRange className="w-4 h-4 text-slate-600 dark:text-slate-300" aria-hidden />
-        <label className="sr-only" htmlFor="an-preset">Date range</label>
-        <select id="an-preset" className={`${inputCls} !w-auto`} value={PRESETS.some((p) => p.key === state.preset) ? state.preset : "custom"} onChange={(e) => onPreset(e.target.value)}>
-          {PRESETS.map((p) => (
-            <option key={p.key} value={p.key}>{p.label}</option>
-          ))}
-          {periodPresets.map((p) => (
-            <option key={p.key} value={p.key} disabled={!p.from}>{p.label}</option>
-          ))}
-          <option value="custom">Custom…</option>
-        </select>
+        <SearchSelect
+          label="Date range"
+          width={230}
+          value={PRESETS.some((p) => p.key === state.preset) ? state.preset : "custom"}
+          onChange={(v) => v && onPreset(v)}
+          options={[
+            ...PRESETS.map((p) => ({ value: p.key, label: p.label, group: "Quick ranges" })),
+            ...periodPresets.map((p) => ({ value: p.key, label: p.label, group: "School calendar", disabled: !p.from })),
+            { value: "custom", label: "Custom…", description: "Pick the dates on the right", group: "Custom" },
+          ]}
+        />
         <label className="inline-flex items-center gap-1 text-xs text-slate-600 dark:text-slate-300">
           From
-          <input type="date" className={`${inputCls} !w-auto !py-1.5`} value={state.from} max={state.to} onChange={(e) => e.target.value && update({ from: e.target.value })} />
+          <input type="date" className={`${inputCls} !w-auto !py-1.5 !rounded-[10px]`} value={state.from} max={state.to} onChange={(e) => e.target.value && update({ from: e.target.value })} />
         </label>
         <label className="inline-flex items-center gap-1 text-xs text-slate-600 dark:text-slate-300">
           to
-          <input type="date" className={`${inputCls} !w-auto !py-1.5`} value={state.to} min={state.from} max={kigaliToday()} onChange={(e) => e.target.value && update({ to: e.target.value })} />
+          <input type="date" className={`${inputCls} !w-auto !py-1.5 !rounded-[10px]`} value={state.to} min={state.from} max={kigaliToday()} onChange={(e) => e.target.value && update({ to: e.target.value })} />
         </label>
         {showGran && (
-          <select aria-label="Group by" className={`${inputCls} !w-auto`} value={state.gran} onChange={(e) => update({ gran: e.target.value as ReportState["gran"] })}>
-            <option value="day">By day</option>
-            <option value="week">By week</option>
-            <option value="month">By month</option>
-          </select>
+          <SearchSelect
+            label="Group by"
+            width={130}
+            value={state.gran}
+            onChange={(v) => v && update({ gran: v as ReportState["gran"] })}
+            options={[
+              { value: "day", label: "By day" },
+              { value: "week", label: "By week" },
+              { value: "month", label: "By month" },
+            ]}
+          />
         )}
         {showCompare && (
-          <select aria-label="Compare" className={`${inputCls} !w-auto`} value={state.compare} onChange={(e) => update({ compare: e.target.value as ReportState["compare"] })}>
-            <option value="">No comparison</option>
-            <option value="prev">vs previous period</option>
-            <option value="yoy">vs same period last year</option>
-          </select>
+          <SearchSelect
+            label="Compare"
+            width={220}
+            value={state.compare || "none"}
+            onChange={(v) => update({ compare: (v === "none" || !v ? "" : v) as ReportState["compare"] })}
+            options={[
+              { value: "none", label: "No comparison" },
+              { value: "prev", label: "vs previous period", description: "Same length, just before" },
+              { value: "yoy", label: "vs same period last year" },
+            ]}
+          />
         )}
       </div>
       <div className="flex flex-wrap items-center gap-2">
@@ -116,11 +130,17 @@ export const Toolbar: React.FC<{
           ))}
         </div>
         {showAudience && (
-          <select aria-label="Audience" className={`${inputCls} !w-auto`} value={state.aud} onChange={(e) => update({ aud: e.target.value as ReportState["aud"] })}>
-            <option value="both">Everyone</option>
-            <option value="user">Signed-in users</option>
-            <option value="visitor">Public visitors</option>
-          </select>
+          <SearchSelect
+            label="Audience"
+            width={170}
+            value={state.aud}
+            onChange={(v) => v && update({ aud: v as ReportState["aud"] })}
+            options={[
+              { value: "both", label: "Everyone" },
+              { value: "user", label: "Signed-in users" },
+              { value: "visitor", label: "Public visitors", description: "Devices that never signed in" },
+            ]}
+          />
         )}
         {showSegments && (
           <>
@@ -163,10 +183,14 @@ export const Toolbar: React.FC<{
 };
 
 const NodeSelect: React.FC<{ label: string; options?: Option[]; value: string[]; onChange: (v: string[]) => void }> = ({ label, options, value, onChange }) => (
-  <select aria-label={label} className={`${inputCls} !w-auto max-w-[220px]`} value={value[0] ?? ""} onChange={(e) => onChange(e.target.value ? [e.target.value] : [])}>
-    <option value="">All {label.toLowerCase()}s</option>
-    {(options ?? []).map((o) => (
-      <option key={o.id} value={String(o.id)}>{o.name}</option>
-    ))}
-  </select>
+  <SearchSelect
+    multi
+    label={label}
+    width={240}
+    isLoading={!options}
+    placeholder={`All ${label.toLowerCase()}s`}
+    value={value}
+    onChange={onChange}
+    options={(options ?? []).map((o) => ({ value: String(o.id), label: o.name }))}
+  />
 );

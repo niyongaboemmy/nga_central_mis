@@ -1,4 +1,6 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
+import { ChevronDown } from "lucide-react";
+import { ANALYTICS_TABS } from "../analytics/nav";
 import { School, Server, Activity, Database, GraduationCap, LayoutGrid, MonitorCheck, LayoutDashboard } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useUser } from "../../contexts/UserContext";
@@ -22,6 +24,10 @@ interface NavItem {
   requiredPermission?: string | string[];
   /** Access control v2 capability (any of) -- see hooks/useAccess. */
   requiredCapability?: string | string[];
+  /** Submenu. The group shows when any child is visible. */
+  children?: NavItem[];
+  /** Legacy permissions that open the item even without `requiredCapability`. */
+  orPermission?: string[];
 }
 
 const Sidebar: React.FC<SidebarProps> = ({
@@ -559,10 +565,19 @@ const Sidebar: React.FC<SidebarProps> = ({
       requiredCapability: ["VIEW_ALL_TEACHERS_SCHEME_OF_WORK_LIST", "VIEW_REPORTS", "VIEW_ALL_COURSES"],
     },
     {
+      // One group for every Usage & Monitoring page; each entry carries the
+      // capability its page needs (same list as the in-page tabs).
       label: "Usage & Monitoring",
       path: "/analytics",
       icon: <Activity className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
-      requiredCapability: ["ANALYTICS_VIEW", "ANALYTICS_LIVE_VIEW"],
+      // No gate of its own: the group shows when any page in it is open to the viewer.
+      children: ANALYTICS_TABS.map((t) => ({
+        label: t.label,
+        path: t.to,
+        icon: <t.icon className="w-3.5 h-3.5" />,
+        requiredCapability: t.caps,
+        orPermission: t.perms,
+      })),
     },
     {
       label: "Leadership & Access",
@@ -629,12 +644,6 @@ const Sidebar: React.FC<SidebarProps> = ({
       requiredPermission: Permissions.MANAGE_SYSTEMS,
     },
     {
-      label: "Logs History",
-      path: "/logs-history",
-      icon: <Activity className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
-      requiredPermission: Permissions.VIEW_ALL_LOGS_HISTORY,
-    },
-    {
       label: "Database Management",
       path: "/database-management",
       icon: <Database className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
@@ -656,9 +665,119 @@ const Sidebar: React.FC<SidebarProps> = ({
   const profileItem = navItems.find((item) => item.label === PROFILE_LABEL);
 
   /** Both gates: the v1 permission and, where set, an access-control v2 capability. */
-  const isVisible = (item: NavItem) =>
-    hasPermission(item.requiredPermission) &&
-    (!item.requiredCapability || access.can(item.requiredCapability));
+  const isVisible = (item: NavItem): boolean =>
+    !!hasPermission(item.requiredPermission) &&
+    (!item.requiredCapability || access.can(item.requiredCapability) || (!!item.orPermission?.length && !!hasPermission(item.orPermission))) &&
+    (!item.children || item.children.some(isVisible));
+
+  /** A group is "in" when the current page is one of its children (or below one). */
+  const groupHas = (item: NavItem) =>
+    !!item.path && (location.pathname === item.path || location.pathname.startsWith(`${item.path}/`));
+  const childActive = (child: NavItem, group: NavItem) =>
+    child.path === group.path ? location.pathname === child.path : !!child.path && (location.pathname === child.path || location.pathname.startsWith(`${child.path}/`));
+
+  const OPEN_KEY = "nga.sidebar.openGroups";
+  const [openGroups, setOpenGroups] = useState<Set<string>>(() => {
+    try {
+      return new Set(JSON.parse(localStorage.getItem(OPEN_KEY) || "[]"));
+    } catch {
+      return new Set();
+    }
+  });
+  const setGroupOpen = (label: string, open: boolean) =>
+    setOpenGroups((prev) => {
+      const next = new Set(prev);
+      if (open) next.add(label);
+      else next.delete(label);
+      try {
+        localStorage.setItem(OPEN_KEY, JSON.stringify([...next]));
+      } catch {
+        /* private mode: open state is just not remembered */
+      }
+      return next;
+    });
+  // Landing on a page inside a group opens that group.
+  useEffect(() => {
+    for (const item of navItems) {
+      if (item.children && groupHas(item) && !openGroups.has(item.label)) setGroupOpen(item.label, true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.pathname]);
+
+  const renderGroup = (item: NavItem) => {
+    const kids = item.children!.filter(isVisible);
+    const open = openGroups.has(item.label);
+    const inGroup = groupHas(item);
+    const panelId = `nav-group-${item.label.replace(/\W+/g, "-").toLowerCase()}`;
+    if (isCollapsed) {
+      // Rail mode: the icon opens the group's first page; the in-page tabs do the rest.
+      return (
+        <button
+          onClick={() => {
+            if (kids[0]?.path) navigate(kids[0].path);
+            onMenuClick?.();
+          }}
+          className={`w-full flex items-center justify-center px-3 py-2.5 rounded-xl transition-all duration-200 ${
+            inGroup
+              ? "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"
+              : "font-light text-text-secondary-light dark:text-slate-300 hover:bg-surface-light dark:hover:bg-surface-dark hover:text-text-primary-light dark:hover:text-text-primary-dark"
+          }`}
+          title={item.label}
+          aria-label={item.label}
+        >
+          <span className="flex-shrink-0">{item.icon}</span>
+        </button>
+      );
+    }
+    return (
+      <div>
+        <button
+          onClick={() => setGroupOpen(item.label, !open)}
+          aria-expanded={open}
+          aria-controls={panelId}
+          className={`w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl transition-all duration-200 ${
+            inGroup
+              ? "text-blue-600 dark:text-blue-400 font-medium"
+              : "font-light text-text-secondary-light dark:text-slate-300 hover:bg-surface-light dark:hover:bg-surface-dark hover:text-text-primary-light dark:hover:text-text-primary-dark"
+          }`}
+          title={item.label}
+        >
+          <span className="flex-shrink-0">{item.icon}</span>
+          <span className="flex-1 text-left">{item.label}</span>
+          <ChevronDown className={`w-4 h-4 shrink-0 transition-transform duration-200 ${open ? "rotate-180" : ""}`} aria-hidden />
+        </button>
+        <div
+          id={panelId}
+          className={`grid transition-[grid-template-rows,opacity] duration-200 ease-out ${open ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"}`}
+        >
+          <ul className="overflow-hidden ml-5 pl-2 border-l border-border-light dark:border-gray-700/40 space-y-0.5 mt-0.5" aria-label={item.label} hidden={!open}>
+            {kids.map((child) => {
+              const active = childActive(child, item);
+              return (
+                <li key={child.path || child.label}>
+                  <button
+                    onClick={() => {
+                      if (child.path) navigate(child.path);
+                      onMenuClick?.();
+                    }}
+                    aria-current={active ? "page" : undefined}
+                    className={`w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-[13px] transition-colors ${
+                      active
+                        ? "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 font-medium"
+                        : "font-light text-text-secondary-light dark:text-slate-300 hover:bg-surface-light dark:hover:bg-surface-dark hover:text-text-primary-light dark:hover:text-text-primary-dark"
+                    }`}
+                  >
+                    <span className="flex-shrink-0 opacity-80">{child.icon}</span>
+                    <span className="truncate">{child.label}</span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      </div>
+    );
+  };
 
   const renderNavItem = (item: (typeof navItems)[number]) => (
     <button
@@ -736,7 +855,7 @@ const Sidebar: React.FC<SidebarProps> = ({
           {mainNavItems
             .filter(isVisible)
             .map((item, index) => (
-              <li key={item.path || item.label || `nav-${index}`}>{renderNavItem(item)}</li>
+              <li key={item.path || item.label || `nav-${index}`}>{item.children ? renderGroup(item) : renderNavItem(item)}</li>
             ))}
         </ul>
       </nav>

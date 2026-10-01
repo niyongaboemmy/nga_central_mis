@@ -8,7 +8,8 @@ import { AnalyticsShell } from "./AnalyticsShell";
 import { Toolbar } from "./Toolbar";
 import { useReportQuery } from "./useReportQuery";
 import { useReport } from "./useReport";
-import { BarList, DataTable, fmtDate, fmtInt } from "./charts";
+import { BarList, DataTable, Donut, fmtDate, fmtInt } from "./charts";
+import { SkeletonDonut, SkeletonKpis, SkeletonMap, SkeletonPanel, SkeletonTable } from "./Skeleton";
 import { AppDot, DeviceIcon, Kpi, Segmented, placeLabel, userTypeLabel } from "./common";
 
 const MapView = lazy(() => import("./MapView"));
@@ -29,6 +30,7 @@ export function LocationsPage() {
   return (
     <AnalyticsShell
       title="Locations"
+      refreshing={loading && !!data}
       subtitle="Where people connect from, by IP address: places, internet providers and networks."
       actions={
         can("ANALYTICS_USER_VIEW") && (
@@ -45,12 +47,20 @@ export function LocationsPage() {
     >
       <Toolbar state={state} update={update} showCompare={false} showGran={false} />
       {error && <Empty>{error}</Empty>}
-      {loading && !data && <Empty>Loading…</Empty>}
+      {loading && !data && !error && (
+        <>
+          <div className="grid lg:grid-cols-3 gap-4">
+            <SkeletonPanel className="lg:col-span-2"><SkeletonMap /></SkeletonPanel>
+            <SkeletonPanel><SkeletonDonut size={130} /></SkeletonPanel>
+          </div>
+          <SkeletonPanel><SkeletonTable rows={6} cols={4} /></SkeletonPanel>
+        </>
+      )}
       {data && (
         <>
           <div className="grid lg:grid-cols-3 gap-4">
             <Panel title="Map (visits by place)" className="lg:col-span-2 min-w-0">
-              <Suspense fallback={<Empty>Loading map…</Empty>}>
+              <Suspense fallback={<SkeletonMap />}>
                 <MapView
                   ariaLabel="Visits by place"
                   points={data.points.map((p: any) => ({ key: `${p.country_code}|${p.region}|${p.city}`, lat: p.lat, lon: p.lon, value: p.sessions, label: `≈ ${[p.city, p.country_code].filter(Boolean).join(", ")}` }))}
@@ -58,7 +68,7 @@ export function LocationsPage() {
               </Suspense>
             </Panel>
             <Panel title="Connection type" className="min-w-0">
-              <BarList ariaLabel="Connection type" rows={data.connection.map((c: any) => ({ key: c.conn_type, label: CONN[c.conn_type] ?? c.conn_type, value: c.sessions, display: `${fmtInt(c.sessions)} visits` }))} />
+              <Donut size={130} ariaLabel="Connection type" centerLabel="Visits" data={data.connection.map((c: any) => ({ key: c.conn_type, label: CONN[c.conn_type] ?? c.conn_type, value: c.sessions }))} />
               <h3 className="text-xs font-semibold mt-4 mb-2">Campus / labelled networks</h3>
               {data.networks.length ? (
                 <BarList ariaLabel="Networks" rows={data.networks.map((n: any) => ({ key: n.label, label: n.label === "other" ? "Elsewhere" : n.label, value: n.sessions }))} />
@@ -114,9 +124,17 @@ export function IpLookupPage() {
   const { ip = "" } = useParams();
   const { data, loading, error } = useReport(() => reportsApi.ip(ip), ip);
   return (
-    <AnalyticsShell title={`IP ${ip}`} subtitle="Everyone and every device seen on this address.">
+    <AnalyticsShell title={`IP ${ip}`} subtitle="Everyone and every device seen on this address." back={{ fallback: "/analytics/locations" }} hideTabs refreshing={loading && !!data}>
       {error && <Empty>{error}</Empty>}
-      {loading && !data && <Empty>Loading…</Empty>}
+      {loading && !data && !error && (
+        <>
+          <SkeletonKpis />
+          <div className="grid lg:grid-cols-2 gap-4">
+            <SkeletonPanel><SkeletonTable rows={4} cols={3} /></SkeletonPanel>
+            <SkeletonPanel><SkeletonTable rows={4} cols={3} /></SkeletonPanel>
+          </div>
+        </>
+      )}
       {data && (
         <>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">

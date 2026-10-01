@@ -8,8 +8,10 @@ import { AnalyticsShell } from "./AnalyticsShell";
 import { Toolbar } from "./Toolbar";
 import { useReportQuery } from "./useReportQuery";
 import { useReport } from "./useReport";
-import { BarList, ChartPanel, DataTable, Heatmap, Pager, TrendLines, appLabel, bucketLabel, fmtDate, fmtInt, fmtMsDur } from "./charts";
-import { AppDot, Segmented, placeLabel, userTypeLabel } from "./common";
+import { BarList, ChartPanel, DataTable, Donut, Heatmap, Pager, TrendLines, appLabel, bucketLabel, fmtDate, fmtInt, fmtMsDur } from "./charts";
+import { SearchSelect } from "../ui/SearchSelect";
+import { Skel, SkeletonDonut, SkeletonList } from "./Skeleton";
+import { AppDot, Segmented, placeLabel, useAppColors, userTypeLabel } from "./common";
 
 /**
  * Access & Logins (plan §14 page 3): who accessed the platform by day, week or month,
@@ -22,14 +24,17 @@ export default function AccessLogins() {
   const series = useReport(() => reportsApi.accessSeries(qs), qs);
   const heat = useReport(() => reportsApi.heatmap(qs), qs);
   const [metric, setMetric] = useState<"users" | "logins" | "visitors">("users");
+  const appColor = useAppColors();
 
   return (
-    <AnalyticsShell title="Access & logins" subtitle="Who used the platform, when, and how they signed in.">
+    <AnalyticsShell title="Access & logins" subtitle="Who used the platform, when, and how they signed in." refreshing={(series.loading && !!series.data) || (heat.loading && !!heat.data)}>
       <Toolbar state={state} update={update} showCompare={false} />
       {series.error && <Empty>{series.error}</Empty>}
 
       <div className="grid lg:grid-cols-2 gap-4">
         <ChartPanel
+          pending={series.loading && !series.data}
+          loading={series.loading}
           title={`People who accessed the platform, per ${state.gran}`}
           table={
             <DataTable
@@ -58,6 +63,8 @@ export default function AccessLogins() {
           />
         </ChartPanel>
         <ChartPanel
+          pending={series.loading && !series.data}
+          loading={series.loading}
           title="Sign-ins: successful and failed"
           table={
             <DataTable
@@ -102,18 +109,38 @@ export default function AccessLogins() {
             />
           }
         >
-          {heat.data ? <Heatmap grid={heat.data} metric={metric} /> : <Empty>Loading…</Empty>}
+          {heat.data ? (
+            <Heatmap grid={heat.data} metric={metric} />
+          ) : heat.error ? (
+            <Empty>{heat.error}</Empty>
+          ) : (
+            <div role="status" aria-label="Loading" className="grid gap-[2px]" style={{ gridTemplateColumns: "repeat(24, minmax(0, 1fr))" }}>
+              {Array.from({ length: 7 * 24 }, (_, i) => (
+                <Skel key={i} className="h-5 !rounded" />
+              ))}
+            </div>
+          )}
         </Panel>
-        <Panel title="App launches from the MIS" className="min-w-0">
-          <BarList
-            ariaLabel="App launches"
-            rows={Object.entries(series.data?.launches ?? {}).map(([k, v]) => ({ key: k, label: ["tm", "tendo", "tupo"].includes(k) ? <AppDot app={k as any} /> : k, value: v as number }))}
-          />
+        <Panel title="App launches from the MIS" className="min-w-0 an-rise">
+          {!series.data ? (
+            <SkeletonList rows={3} />
+          ) : (
+            <BarList
+              ariaLabel="App launches"
+              rows={Object.entries(series.data?.launches ?? {}).map(([k, v]) => ({ key: k, label: ["tm", "tendo", "tupo"].includes(k) ? <AppDot app={k as any} /> : k, value: v as number, color: ["tm", "tendo", "tupo"].includes(k) ? appColor(k as any) : undefined }))}
+            />
+          )}
           <h3 className="text-xs font-semibold mt-4 mb-2 text-text-primary-light dark:text-text-primary-dark">Sign-in method</h3>
-          <BarList
-            ariaLabel="Sign-in methods"
-            rows={Object.entries(series.data?.methods ?? {}).map(([k, v]) => ({ key: k, label: k === "google" ? "Google" : k === "password_otp" ? "Password + email code" : k, value: v as number }))}
-          />
+          {!series.data ? (
+            <SkeletonDonut size={110} />
+          ) : (
+            <Donut
+              size={120}
+              ariaLabel="Sign-in methods"
+              centerLabel="Sign-ins"
+              data={Object.entries(series.data?.methods ?? {}).map(([k, v]) => ({ key: k, label: k === "google" ? "Google" : k === "password_otp" ? "Password + email code" : k, value: v as number }))}
+            />
+          )}
         </Panel>
       </div>
 
@@ -142,13 +169,19 @@ const AccessedUsers: React.FC<{ qs: string; gran: string }> = ({ qs }) => {
       title={`Who accessed the platform${data ? ` (${fmtInt(data.total)})` : ""}`}
       actions={
         <div className="flex items-center gap-2">
-          <select aria-label="Sort by" className={`${inputCls} !w-auto !py-1.5`} value={sort} onChange={(e) => { setSort(e.target.value); setPage(1); }}>
-            <option value="last">Most recent</option>
-            <option value="days">Most days active</option>
-            <option value="sessions">Most sessions</option>
-            <option value="engagement">Most time</option>
-            <option value="first">Earliest first visit</option>
-          </select>
+          <SearchSelect
+            label="Sort by"
+            width={190}
+            value={sort}
+            onChange={(v) => { if (v) { setSort(v); setPage(1); } }}
+            options={[
+              { value: "last", label: "Most recent" },
+              { value: "days", label: "Most days active" },
+              { value: "sessions", label: "Most sessions" },
+              { value: "engagement", label: "Most time" },
+              { value: "first", label: "Earliest first visit" },
+            ]}
+          />
           <label className="relative">
             <span className="sr-only">Search people</span>
             <Search className="w-4 h-4 absolute left-2 top-1/2 -translate-y-1/2 text-slate-500" aria-hidden />
@@ -160,7 +193,7 @@ const AccessedUsers: React.FC<{ qs: string; gran: string }> = ({ qs }) => {
       <DataTable
         rows={data?.rows ?? []}
         rowKey={(r: any) => String(r.user_id)}
-        empty={loading ? "Loading…" : "Nobody accessed the platform in this range."}
+        loading={loading} empty={"Nobody accessed the platform in this range."}
         onExport={() => reportsApi.csv("/access/users", qs, "accessed-users.csv")}
         columns={[
           {
@@ -207,7 +240,7 @@ const FailedSignIns: React.FC<{ qs: string }> = ({ qs }) => {
       <DataTable
         rows={rows}
         rowKey={(r: any) => `${r.username_attempted}|${r.ip}|${r.reason}|${r.kind}`}
-        empty={loading ? "Loading…" : "No failed sign-ins in this range."}
+        loading={loading} empty={"No failed sign-ins in this range."}
         onExport={() => reportsApi.csv("/access/failed", qs, "failed-sign-ins.csv")}
         columns={[
           {

@@ -489,6 +489,8 @@ export async function ensureAccessRegistry(): Promise<void> {
     const manifest = await syncManifest(MIS_MANIFEST);
     const presets = await ensurePresets();
     const rules = await ensureDefaultRules();
+    const { ensureLegacyAdminGrants } = await import("./backfill");
+    const healed = await ensureLegacyAdminGrants();
     logger.info("[access] registry ready", {
       manifestUnchanged: manifest.unchanged,
       capabilitiesCreated: manifest.created.length,
@@ -497,6 +499,7 @@ export async function ensureAccessRegistry(): Promise<void> {
       linksAdded: presets.linksAdded.length,
       linksWithheld: presets.linksWithheld.length,
       rulesCreated: rules,
+      grantsHealed: healed.length,
     });
   } catch (err: any) {
     logger.error(`[access] bootstrap failed: ${err?.message ?? err}`);

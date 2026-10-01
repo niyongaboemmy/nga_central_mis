@@ -6,7 +6,8 @@ import { AnalyticsShell } from "./AnalyticsShell";
 import { Toolbar } from "./Toolbar";
 import { useReportQuery } from "./useReportQuery";
 import { useReport } from "./useReport";
-import { BarList, ChartPanel, DataTable, TrendLines, appLabel, bucketLabel, fmtDate, fmtDur, fmtInt, fmtPct } from "./charts";
+import { BarList, ChartPanel, DataTable, Donut, TrendLines, appLabel, bucketLabel, fmtDate, fmtDur, fmtInt, fmtPct } from "./charts";
+import { SkeletonDonut, SkeletonKpis, SkeletonList, SkeletonPanel, SkeletonTable } from "./Skeleton";
 import { AppDot, useAppColors, useFeatureLabels } from "./common";
 import type { AppKey } from "../../api/monitor";
 
@@ -16,18 +17,28 @@ import type { AppKey } from "../../api/monitor";
 export function AppsPage() {
   const { state, update, qs } = useReportQuery();
   const { data, loading, error } = useReport(() => reportsApi.apps(qs), qs);
+  const appColor = useAppColors();
   return (
-    <AnalyticsShell title="Apps" subtitle="The four NGA apps side by side, and how people move between them.">
+    <AnalyticsShell title="Apps" subtitle="The four NGA apps side by side, and how people move between them." refreshing={loading && !!data}>
       <Toolbar state={state} update={update} showCompare={false} showGran={false} showAudience={false} />
       {error && <Empty>{error}</Empty>}
-      {loading && !data && <Empty>Loading…</Empty>}
+      {loading && !data && (
+        <>
+          <SkeletonKpis count={4} className="grid sm:grid-cols-2 xl:grid-cols-4 gap-3" />
+          <div className="grid lg:grid-cols-2 gap-4">
+            <SkeletonPanel><SkeletonList rows={6} /></SkeletonPanel>
+            <SkeletonPanel><SkeletonList rows={6} /></SkeletonPanel>
+          </div>
+        </>
+      )}
       {data && (
         <>
           <div className="grid sm:grid-cols-2 xl:grid-cols-4 gap-3">
             {(["mis", "tm", "tendo", "tupo"] as AppKey[]).map((a) => {
               const c = data.apps.find((x: any) => x.app === a);
               return (
-                <Panel key={a} title={<AppDot app={a} />} className="min-w-0">
+                <Panel key={a} title={<AppDot app={a} />} className="min-w-0 an-rise relative overflow-hidden transition-all duration-200 hover:-translate-y-0.5 hover:shadow-soft">
+                  <span aria-hidden className="absolute inset-x-0 top-0 h-1" style={{ background: appColor(a) }} />
                   {c ? (
                     <dl className="grid grid-cols-2 gap-y-1 text-sm">
                       <dt className="text-slate-600 dark:text-slate-300">Active users</dt><dd className="text-right tabular-nums font-semibold">{fmtInt(c.active)}</dd>
@@ -103,10 +114,15 @@ export function RetentionPage() {
   const { theme } = useTheme();
   const rgb = theme === "dark" ? "57,135,229" : "42,120,214";
   return (
-    <AnalyticsShell title="Retention" subtitle="Do people come back? Cohorts by the week (or month) they were first active.">
+    <AnalyticsShell title="Retention" subtitle="Do people come back? Cohorts by the week (or month) they were first active." refreshing={loading && !!data}>
       <Toolbar state={state} update={update} showCompare={false} showAudience={false} />
       {error && <Empty>{error}</Empty>}
-      {loading && !data && <Empty>Loading…</Empty>}
+      {loading && !data && (
+        <>
+          <SkeletonPanel><SkeletonTable rows={8} cols={8} /></SkeletonPanel>
+          <SkeletonPanel />
+        </>
+      )}
       {data && (
         <>
           <Panel title={`Cohorts (${data.gran === "month" ? "monthly" : "weekly"})`} className="min-w-0">
@@ -132,7 +148,7 @@ export function RetentionPage() {
                         {c.periods.map((p: any, i: number) => (
                           <td
                             key={i}
-                            className="px-2 py-1.5 text-center tabular-nums rounded min-w-[52px]"
+                            className="px-2 py-1.5 text-center tabular-nums rounded min-w-[52px] transition-transform hover:scale-110 hover:ring-2 hover:ring-slate-500/50 cursor-default"
                             style={{ background: p.rate ? `rgba(${rgb},${(0.08 + 0.5 * (p.rate / 100)).toFixed(2)})` : undefined }}
                             title={`${p.active} of ${c.size} active`}
                           >
@@ -168,22 +184,32 @@ export function TechnologyPage() {
   const { state, update, qs } = useReportQuery();
   const { data, loading, error } = useReport(() => reportsApi.technology(qs), qs);
   const label = useFeatureLabels();
+  const donut = (rows: any[], title: string, map?: (v: string) => string) => (
+    <Panel title={title} className="min-w-0 an-rise">
+      <Donut size={140} ariaLabel={title} centerLabel="Visits" data={(rows ?? []).map((r) => ({ key: r.value, label: map ? map(r.value) : r.value, value: r.sessions }))} />
+    </Panel>
+  );
   const bars = (rows: any[], title: string, map?: (v: string) => string) => (
-    <Panel title={title} className="min-w-0">
+    <Panel title={title} className="min-w-0 an-rise">
       <BarList ariaLabel={title} rows={(rows ?? []).map((r) => ({ key: r.value, label: map ? map(r.value) : r.value, value: r.sessions, display: `${fmtInt(r.sessions)} · ${fmtPct(r.share)}` }))} />
     </Panel>
   );
   return (
-    <AnalyticsShell title="Technology" subtitle="Browsers, devices, installed app vs browser tab, app versions, speed and errors.">
+    <AnalyticsShell title="Technology" subtitle="Browsers, devices, installed app vs browser tab, app versions, speed and errors." refreshing={loading && !!data}>
       <Toolbar state={state} update={update} showCompare={false} showGran={false} showSegments={false} />
       {error && <Empty>{error}</Empty>}
-      {loading && !data && <Empty>Loading…</Empty>}
+      {loading && !data && (
+        <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
+          {[0, 1, 2].map((i) => <SkeletonPanel key={`d${i}`}><SkeletonDonut size={130} /></SkeletonPanel>)}
+          {[0, 1, 2].map((i) => <SkeletonPanel key={`l${i}`}><SkeletonList rows={5} /></SkeletonPanel>)}
+        </div>
+      )}
       {data && (
         <>
           <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
-            {bars(data.device_type, "Device type", (v) => v.charAt(0).toUpperCase() + v.slice(1))}
-            {bars(data.standalone, "Installed app or browser tab")}
-            {bars(data.connection, "Connection", (v) => ({ mobile: "Mobile network", fixed: "Fixed line", hosting: "Data centre", education: "Education network", private: "Private network", unknown: "Unknown" })[v] ?? v)}
+            {donut(data.device_type, "Device type", (v) => v.charAt(0).toUpperCase() + v.slice(1))}
+            {donut(data.standalone, "Installed app or browser tab")}
+            {donut(data.connection, "Connection", (v) => ({ mobile: "Mobile network", fixed: "Fixed line", hosting: "Data centre", education: "Education network", private: "Private network", unknown: "Unknown" })[v] ?? v)}
             {bars(data.browser, "Browser")}
             {bars(data.os, "Operating system")}
             {bars(data.release, "App release (page views)")}
