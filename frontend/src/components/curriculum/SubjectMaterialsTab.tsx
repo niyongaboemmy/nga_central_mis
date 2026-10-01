@@ -869,6 +869,7 @@ const SubjectMaterialsTab: React.FC<SubjectMaterialsTabProps> = ({
         document={previewDoc}
         onClose={() => setPreviewDoc(null)}
         downloadFn={subjectDocumentsApi.download}
+        previewFns={{ manifest: subjectDocumentsApi.previewManifest, variant: subjectDocumentsApi.previewVariant }}
       />
 
       <CategoryFormModal

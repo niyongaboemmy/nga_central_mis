@@ -33,6 +33,8 @@ import {
   leaveMyItem,
   markMyItemDone,
   findMySectionForDate,
+  getMyItemPreview,
+  getMySectionOfflineManifest,
 } from "../controllers/learnerCourseController";
 import {
   getCourseAnalytics,
@@ -69,6 +71,44 @@ import {
   courseProgressReportCsv,
 } from "../controllers/courseAdminController";
 import {
+  submitExitTicket,
+  exitTicketPulse,
+  reviewFlashcard,
+  dueFlashcards,
+  practicalUpload,
+  submitPractical,
+  streamMyPracticalPhoto,
+  listPracticals,
+  streamPracticalPhoto,
+  reviewPractical,
+} from "../controllers/interactiveItemsController";
+import {
+  courseFileUpload,
+  uploadSectionFiles,
+  uploadReferenceFiles,
+  getAssetManifest,
+  streamAsset,
+  streamBuilderItemFile,
+  getBuilderItemPreview,
+} from "../controllers/courseFileController";
+import {
+  listStudioPresets,
+  saveBlueprint,
+  deleteBlueprint,
+  getStudio,
+  getContextPack,
+  estimateGeneration,
+  startGeneration,
+  getRun,
+  listRuns,
+  streamRun,
+  controlRun,
+  approveDrafts,
+  dismissDraftHandler,
+  regenerateDraft,
+  getAIUsage,
+} from "../controllers/studioController";
+import {
   askCourseTutor,
   suggestedTutorQuestions,
 } from "../controllers/courseTutorController";
@@ -90,6 +130,8 @@ router.get("/my/courses/:id", learner, getMyLearningCourse);
 router.get("/my/section-for-date", learner, findMySectionForDate);
 router.get("/my/items/:id", learner, openMyItem);
 router.get("/my/items/:id/file", learner, streamMyItemFile);
+router.get("/my/items/:id/preview", learner, getMyItemPreview);
+router.get("/my/sections/:id/offline-manifest", learner, getMySectionOfflineManifest);
 router.post("/my/items/:id/heartbeat", learner, heartbeatMyItem);
 // Scroll position — several times a minute, in memory only (see updateMyPosition).
 router.post("/my/items/:id/position", learner, updateMyPosition);
@@ -173,5 +215,43 @@ router.get("/admin/courses/export.csv", oversight, exportRegisterCsv);
 router.get("/admin/courses/:id/analytics", oversight, adminCourseAnalytics);
 router.get("/admin/courses/:id/mastery", oversight, adminCourseMastery);
 router.get("/admin/courses/:id/coverage", oversight, adminCourseCoverage);
+router.get("/admin/ai-usage", oversight, getAIUsage);
+
+// ---- Lesson Studio (ELEARNING_AI_LESSON_STUDIO_IMPLEMENTATION_PLAN.md §13) ---
+// Same gate as the builder: anyone who may build a course may draft it with AI.
+router.get("/studio/presets", builder, listStudioPresets);
+router.post("/blueprints", builder, saveBlueprint);
+router.patch("/blueprints/:id", builder, saveBlueprint);
+router.delete("/blueprints/:id", builder, deleteBlueprint);
+router.get("/courses/:id/studio", builder, getStudio);
+router.get("/sections/:id/context-pack", builder, getContextPack);
+router.post("/courses/:id/generation/estimate", builder, estimateGeneration);
+router.post("/courses/:id/generation/runs", builder, startGeneration);
+router.get("/courses/:id/generation/runs", builder, listRuns);
+router.get("/generation/runs/:id", builder, getRun);
+router.get("/generation/runs/:id/stream", builder, streamRun);
+router.post("/generation/runs/:id/:action(pause|resume|cancel|retry-failed)", builder, controlRun);
+router.post("/sections/:id/drafts/approve", builder, approveDrafts);
+router.post("/items/:id/dismiss-draft", builder, dismissDraftHandler);
+router.post("/items/:id/regenerate", builder, regenerateDraft);
+
+// ---- Files on weeks + previews (plan §10.7) ---------------------------------------
+router.post("/sections/:id/files", builder, courseFileUpload.array("files", 20), uploadSectionFiles);
+router.post("/courses/:id/reference-files", builder, courseFileUpload.array("files", 20), uploadReferenceFiles);
+router.get("/files/:assetId", builder, getAssetManifest);
+router.get("/files/:assetId/raw", builder, streamAsset);
+router.get("/items/:id/file", builder, streamBuilderItemFile);
+router.get("/items/:id/preview", builder, getBuilderItemPreview);
+
+// ---- Exit tickets · flashcards · practical tasks (plan §11) ------------------------
+router.post("/my/items/:id/exit-ticket", learner, submitExitTicket);
+router.post("/my/items/:id/flashcards/review", learner, reviewFlashcard);
+router.get("/my/flashcards/due", learner, dueFlashcards);
+router.post("/my/items/:id/practical", learner, practicalUpload.array("photos", 5), submitPractical);
+router.get("/my/practical-photos/:assetId", learner, streamMyPracticalPhoto);
+router.get("/items/:id/exit-ticket/pulse", builder, exitTicketPulse);
+router.get("/courses/:id/practicals", builder, listPracticals);
+router.get("/practicals/:id/photos/:assetId", builder, streamPracticalPhoto);
+router.post("/practicals/:id/review", builder, reviewPractical);
 
 export default router;

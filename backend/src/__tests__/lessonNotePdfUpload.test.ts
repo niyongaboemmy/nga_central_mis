@@ -1,24 +1,11 @@
-import { describe, it, expect, beforeAll, vi } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import request from "supertest";
 
-import storageService from "../utils/fileServer";
+import { installFakeFileServer } from "../test/fakeFileServer";
 
-// The file-server isn't running under test — keep uploaded bytes in memory so the
-// stream/download endpoints hand back exactly what was uploaded. Spies on the real
-// singleton (not vi.mock) because the suite runs with isolate:false, where a module
-// mock only takes effect if no earlier test file has already imported the module.
-const memoryStore = new Map<string, Buffer>();
-vi.spyOn(storageService, "uploadFile").mockImplementation(async (data: Buffer | string, remotePath: string) => {
-  memoryStore.set(remotePath, Buffer.isBuffer(data) ? data : Buffer.from(data));
-});
-vi.spyOn(storageService, "downloadToBuffer").mockImplementation(async (remotePath: string) => {
-  const buf = memoryStore.get(remotePath);
-  if (!buf) throw new Error(`not stored: ${remotePath}`);
-  return buf;
-});
-vi.spyOn(storageService, "deleteFile").mockImplementation(async (remotePath: string) => {
-  memoryStore.delete(remotePath);
-});
+// The file-server isn't running under test — an in-memory fake hands back exactly what
+// was uploaded (see test/fakeFileServer.ts).
+const { store: memoryStore } = installFakeFileServer();
 
 import app from "../app";
 import {

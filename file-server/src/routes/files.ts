@@ -101,10 +101,12 @@ router.get("/", async (req, res) => {
         .json({ success: false, message: "File not found" });
     }
 
+    // sendFile handles Range (206 partial content), ETag and Last-Modified, so the
+    // backend can stream audio/large PDFs page by page instead of the whole file.
     const contentType = mime.lookup(fullPath) || "application/octet-stream";
-    res.setHeader("Content-Type", contentType);
-    res.setHeader("Content-Length", stat.size);
-    fs.createReadStream(fullPath).pipe(res);
+    res.sendFile(fullPath, { acceptRanges: true, dotfiles: "allow", headers: { "Content-Type": contentType } }, (err) => {
+      if (err && !res.headersSent) res.status(500).json({ success: false, message: "Could not read file" });
+    });
   } catch (err) {
     if (!handlePathError(res, err)) throw err;
   }

@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { studioRoutes } from "../../api/studio";
 import {
   Plus,
   FileText,
@@ -405,8 +406,8 @@ const LessonNotesListPage: React.FC = () => {
             {visibleSubjects.map((s) => {
               const empty = s.note_count === 0;
               return (
+              <div key={s.subject_id} className="flex flex-col gap-1.5">
               <button
-                key={s.subject_id}
                 onClick={() => selectSubject(s.subject_id)}
                 className={`group text-left rounded-2xl border p-4 hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50 transition-all ${
                   empty
@@ -485,6 +486,24 @@ const LessonNotesListPage: React.FC = () => {
                   </>
                 )}
               </button>
+              {/* Lesson Studio shortcut: how many of this subject's e-learning weeks are live,
+                  and one tap to draft the rest (a sibling of the card — never a nested button). */}
+              {s.course_id && s.weeks_total > 0 && (
+                <div className="flex items-center justify-between gap-2 px-1">
+                  <span className="text-[11px] text-slate-600 dark:text-slate-300 tabular-nums">
+                    E-learning: {s.weeks_live}/{s.weeks_total} weeks live
+                  </span>
+                  {s.weeks_live < s.weeks_total && (
+                    <Link
+                      to={studioRoutes.studio(s.course_id)}
+                      className="inline-flex items-center gap-1 min-h-[32px] px-2.5 rounded-full text-[11px] font-semibold text-blue-700 dark:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-400/10"
+                    >
+                      <Sparkles className="w-3 h-3" /> Fill weeks with AI
+                    </Link>
+                  )}
+                </div>
+              )}
+              </div>
               );
             })}
           </div>

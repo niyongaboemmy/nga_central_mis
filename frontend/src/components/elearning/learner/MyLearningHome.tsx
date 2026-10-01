@@ -13,6 +13,7 @@ import {
   ListChecks,
   Sparkles,
   User,
+  Layers,
 } from "lucide-react";
 import { apiService } from "../../../services/api";
 import { useLearningPrefs } from "./useLearningPrefs";
@@ -32,6 +33,7 @@ import {
   Skeleton,
 } from "../ui/primitives";
 import { buildQueue, type QueueEntry, type QueueKind } from "./queue";
+import { DailyReview, type DueCard } from "./InteractiveItems";
 
 /**
  * Student home — "what do I open now?", answered above the fold.
@@ -153,6 +155,15 @@ const MyLearningHome: React.FC = () => {
   const [cards, setCards] = useState<LearnerCourseCard[] | null>(null);
   const [error, setError] = useState(false);
   const { prefs } = useLearningPrefs();
+  // Spaced-repetition cards due today (Lesson Studio §11).
+  const [dueCards, setDueCards] = useState<DueCard[]>([]);
+  const [reviewOpen, setReviewOpen] = useState(false);
+  useEffect(() => {
+    apiService
+      .get<any>("/elearning/my/flashcards/due")
+      .then((r) => setDueCards(r.data.data?.due || []))
+      .catch(() => setDueCards([]));
+  }, [reviewOpen]);
   const [streak, setStreak] = useState<{
     weeks: number;
     this_week: boolean;
@@ -305,6 +316,15 @@ const MyLearningHome: React.FC = () => {
         </div>
 
         <div className="flex flex-shrink-0 items-center gap-1">
+          {dueCards.length > 0 && (
+            <button
+              onClick={() => setReviewOpen(true)}
+              className="inline-flex items-center gap-1.5 rounded-pill bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white"
+              title="A few minutes of flashcards keeps this week's terms in your head"
+            >
+              <Layers className="w-3.5 h-3.5" /> Review {dueCards.length} card{dueCards.length === 1 ? "" : "s"}
+            </button>
+          )}
           {prefs.streak_enabled && streak && streak.weeks > 0 && (
             <span
               className="inline-flex items-center gap-1.5 rounded-pill bg-accent-100 px-2.5 py-1.5 text-xs font-semibold text-accent-600 dark:bg-accent-500/15 dark:text-accent-400"
@@ -336,6 +356,7 @@ const MyLearningHome: React.FC = () => {
         </div>
       </div>
 
+      {reviewOpen && <DailyReview due={dueCards} onClose={() => setReviewOpen(false)} />}
       {cards === null ? (
         <div className="space-y-3">
           <Skeleton className="h-16" />

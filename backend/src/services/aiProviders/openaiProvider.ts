@@ -1,5 +1,5 @@
 import OpenAI from "openai";
-import { AIProvider, GenerateJSONParams } from "./types";
+import { AIProvider, GenerateJSONParams, ProviderResult } from "./types";
 import { toStrictJsonSchema } from "./strictJsonSchema";
 
 const isConfigured = () =>
@@ -18,7 +18,7 @@ export const openaiProvider: AIProvider = {
   isConfigured,
   supportsStrictSchema: true,
 
-  async generateJSON<T = any>(params: GenerateJSONParams): Promise<T> {
+  async generateJSON<T = any>(params: GenerateJSONParams): Promise<ProviderResult<T>> {
     const model = process.env.OPENAI_MODEL || "gpt-4o";
 
     const completion = await getClient().chat.completions.create({
@@ -36,6 +36,6 @@ export const openaiProvider: AIProvider = {
     } as any);
 
     const text = completion.choices[0]?.message?.content || "{}";
-    return JSON.parse(text) as T;
+    return { data: JSON.parse(text) as T, model, usage: { input_tokens: (completion as any).usage?.prompt_tokens, output_tokens: (completion as any).usage?.completion_tokens } };
   },
 };

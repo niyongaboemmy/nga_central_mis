@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Node, mergeAttributes } from "@tiptap/core";
 import { NodeViewContent, NodeViewWrapper, ReactNodeViewRenderer, type NodeViewProps } from "@tiptap/react";
 import { ChevronDown, HelpCircle, Pencil, Plus, Trash2 } from "lucide-react";
+import { parseActivity, type ActivityData } from "./activities";
 
 /**
  * Interactive blocks a teacher inserts inside a lesson note (UX plan §4.3): tap-to-reveal and an
@@ -219,3 +220,130 @@ export const InlineCheck = Node.create({
 });
 
 export { parseCheck };
+
+// ---------------------------------------------------------------- Activity (Lesson Studio)
+// Fill in the blanks / order the steps / match the pairs, written by the Lesson Studio or by
+// hand. Stored as <div data-type="activity" data-activity="{json}"> with a readable static
+// fallback; the student reader makes it interactive (./activities.ts).
+
+const ACTIVITY_LABEL: Record<ActivityData["kind"], string> = {
+  fill_blank: "Fill in the blanks",
+  order_steps: "Put in order",
+  match_pairs: "Match the pairs",
+};
+
+/** The editable text form of an activity: one line per step / pair, [[word]] for blanks. */
+export const activityToText = (a: ActivityData): string =>
+  a.kind === "fill_blank" ? a.text : a.kind === "order_steps" ? a.steps.join("\n") : a.pairs.map((p) => `${p.left} = ${p.right}`).join("\n");
+
+export const activityFromText = (kind: ActivityData["kind"], text: string, prompt: string): ActivityData | null => {
+  const lines = text.split("\n").map((l) => l.trim()).filter(Boolean);
+  if (kind === "fill_blank") return parseActivity({ kind, text: text.trim() });
+  if (kind === "order_steps") return parseActivity({ kind, prompt, steps: lines });
+  return parseActivity({
+    kind,
+    prompt,
+    pairs: lines.map((l) => {
+      const [left, ...rest] = l.split("=");
+      return { left: (left || "").trim(), right: rest.join("=").trim() };
+    }),
+  });
+};
+
+const ActivityView: React.FC<NodeViewProps> = ({ node, updateAttributes, editor, deleteNode }) => {
+  const data = parseActivity(node.attrs.activity);
+  const [editing, setEditing] = useState(false);
+  const [text, setText] = useState(data ? activityToText(data) : "");
+  const [prompt, setPrompt] = useState(data && data.kind !== "fill_blank" ? data.prompt : "");
+  const [error, setError] = useState<string | null>(null);
+  if (!data) return <NodeViewWrapper contentEditable={false} />;
+  const hint =
+    data.kind === "fill_blank"
+      ? "Write the sentence and put each missing word in [[double brackets]]."
+      : data.kind === "order_steps"
+        ? "One step per line, in the CORRECT order — students see them shuffled."
+        : "One pair per line: term = meaning.";
+  const save = () => {
+    const next = activityFromText(data.kind, text, prompt || (data.kind !== "fill_blank" ? data.prompt : ""));
+    if (!next) {
+      setError(data.kind === "fill_blank" ? "Add at least one [[blank]]." : "Add at least 3 lines.");
+      return;
+    }
+    updateAttributes({ activity: JSON.stringify({ ...(data.kind === "fill_blank" ? { explanation: data.explanation } : {}), ...next }) });
+    setError(null);
+    setEditing(false);
+  };
+  return (
+    <NodeViewWrapper className="my-3 el-card shadow-soft" contentEditable={false} data-activity-kind={data.kind}>
+      <div className="flex items-center gap-2 px-3 py-2 border-b border-gray-100 dark:border-white/[0.06] text-[11px] uppercase tracking-wider font-semibold text-gray-500">
+        <HelpCircle className="w-3.5 h-3.5" /> {ACTIVITY_LABEL[data.kind]}
+        <span className="flex-1" />
+        {editor.isEditable && !editing && (
+          <>
+            <button type="button" onClick={() => setEditing(true)} className="inline-flex items-center gap-1 text-brand-600 dark:text-brand-200 normal-case tracking-normal font-medium"><Pencil className="w-3 h-3" /> Edit</button>
+            <button type="button" onClick={() => deleteNode()} className="inline-flex items-center gap-1 text-danger-700 dark:text-danger-500 normal-case tracking-normal font-medium ml-2"><Trash2 className="w-3 h-3" /> Remove</button>
+          </>
+        )}
+      </div>
+      {editing ? (
+        <div className="p-3 space-y-2">
+          {data.kind !== "fill_blank" && (
+            <input className="w-full min-h-[36px] px-2 rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.05] text-sm" value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder="Instruction for students" aria-label="Instruction for students" />
+          )}
+          <textarea rows={Math.max(3, text.split("\n").length + 1)} className="w-full px-2 py-1.5 rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.05] text-sm font-mono" value={text} onChange={(e) => setText(e.target.value)} aria-label={ACTIVITY_LABEL[data.kind]} />
+          <p className="text-xs text-slate-600 dark:text-slate-300">{hint}</p>
+          {error && <p className="text-xs text-danger-700 dark:text-danger-500">{error}</p>}
+          <div className="flex gap-2">
+            <button type="button" onClick={save} className="min-h-[36px] px-3 rounded-lg bg-brand-500 text-white text-sm font-medium">Save</button>
+            <button type="button" onClick={() => setEditing(false)} className="min-h-[36px] px-3 rounded-lg border border-gray-200 dark:border-white/10 text-sm">Cancel</button>
+          </div>
+        </div>
+      ) : (
+        <div className="p-3 text-sm text-gray-800 dark:text-gray-100">
+          {data.kind === "fill_blank" ? (
+            <p>{data.text.replace(/\[\[([^\]]+)\]\]/g, "[ $1 ]")}</p>
+          ) : (
+            <>
+              <p className="font-medium">{data.prompt}</p>
+              <ol className="mt-1 list-decimal pl-5 space-y-0.5">
+                {(data.kind === "order_steps" ? data.steps : data.pairs.map((p) => `${p.left} — ${p.right}`)).map((s, i) => (
+                  <li key={i}>{s}</li>
+                ))}
+              </ol>
+            </>
+          )}
+        </div>
+      )}
+    </NodeViewWrapper>
+  );
+};
+
+export const Activity = Node.create({
+  name: "activity",
+  group: "block",
+  atom: true,
+  draggable: true,
+  addAttributes() {
+    return { activity: { default: null } };
+  },
+  parseHTML() {
+    return [{ tag: 'div[data-type="activity"]', getAttrs: (el) => ({ activity: (el as HTMLElement).getAttribute("data-activity") }) }];
+  },
+  renderHTML({ node }) {
+    const data = parseActivity(node.attrs.activity);
+    if (!data) return ["div", { "data-type": "activity", class: "note-activity" }];
+    const fallback: any[] =
+      data.kind === "fill_blank"
+        ? [["p", {}, data.text.replace(/\[\[[^\]]+\]\]/g, "_____")]]
+        : [
+            ["p", {}, ["strong", {}, data.prompt]],
+            data.kind === "order_steps"
+              ? ["ol", {}, ...data.steps.map((s) => ["li", {}, s])]
+              : ["ul", {}, ...data.pairs.map((p) => ["li", {}, `${p.left} — ${p.right}`])],
+          ];
+    return ["div", mergeAttributes({ "data-type": "activity", "data-activity": JSON.stringify(data), class: "note-activity" }), ...fallback];
+  },
+  addNodeView() {
+    return ReactNodeViewRenderer(ActivityView);
+  },
+});

@@ -13,6 +13,8 @@ export type NotificationKind =
   | "course_result_received"
   | "course_section_empty"
   | "course_nudge"
+  // Lesson Studio (ELEARNING_AI_LESSON_STUDIO_IMPLEMENTATION_PLAN.md §9.2): AI drafts ready
+  | "course_studio_ready"
   // Reminder Hub (REMINDERS_SOLUTION_PROPOSAL.md)
   | "reminder"
   // Usage & Monitoring (USAGE_ANALYTICS_IMPLEMENTATION_PLAN.md §10.4)

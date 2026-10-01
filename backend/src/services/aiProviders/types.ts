@@ -23,6 +23,8 @@ export interface GenerateJSONParams {
    * this to fit the actual content size.
    */
   maxOutputTokens?: number;
+  /** Turn off "thinking" where the vendor supports it (Gemini 2.5) so long JSON isn't truncated. */
+  disableThinking?: boolean;
 }
 
 export interface AIProvider {
@@ -36,5 +38,25 @@ export interface AIProvider {
    * those need a runtime shape check on the response, see schemaValidator.ts.
    */
   supportsStrictSchema: boolean;
-  generateJSON<T = any>(params: GenerateJSONParams): Promise<T>;
+  generateJSON<T = any>(params: GenerateJSONParams): Promise<ProviderResult<T>>;
 }
+
+/** Token counts as reported by the vendor, when it reports them. */
+export interface TokenUsage {
+  input_tokens?: number;
+  output_tokens?: number;
+}
+
+/** What one provider call returns: the parsed JSON plus what it cost in tokens. */
+export interface ProviderResult<T> {
+  data: T;
+  model: string;
+  usage?: TokenUsage;
+}
+
+/**
+ * What a call is for, which decides the provider order (see roleOrder() in registry.ts):
+ * long lessons, strict-JSON questions, an independent second opinion, a JSON fix-up, or
+ * anything a person is waiting on right now.
+ */
+export type AIRole = "draft" | "assess" | "verify" | "repair" | "interactive";

@@ -15,6 +15,7 @@ import { notifyResultReceived } from "../services/elearning/courseNotifications"
 import { recordProgress } from "../services/elearning/livePresence";
 import { UserProfile } from "../db/schema";
 import { normaliseKnowledgeCheck } from "./courseController";
+import { curriculumBlock, weekContext } from "../services/elearning/generation/contextPack";
 
 const parseId = (raw: unknown, label = "id"): number => {
   const n = parseInt(String(raw), 10);
@@ -198,64 +199,6 @@ async function sourceTextForItem(item: typeof CourseItem.$inferSelect, extra?: {
   return parts.join("\n\n");
 }
 
-
-/**
- * What the scheme of work says this week is for — the topic, the objective, the Learning
- * Outcome and the exact performance criteria. Every AI helper is grounded in this, so
- * generated content follows the subject's curriculum instead of the model's idea of the topic.
- */
-async function weekContext(sectionId: number) {
-  const [row] = await db
-    .select({
-      section_title: CourseSection.title,
-      summary: CourseSection.summary,
-      week_number: SchemeOfWorkEntry.week_number,
-      topic: SchemeOfWorkEntry.topic,
-      sub_topic: SchemeOfWorkEntry.sub_topic,
-      objective: SchemeOfWorkEntry.objective,
-      methodology: SchemeOfWorkEntry.methodology,
-      entry_id: SchemeOfWorkEntry.entry_id,
-      element_number: SubjectCompetency.element_number,
-      competency_title: SubjectCompetency.title,
-      indicative_content: SubjectCompetency.indicative_content,
-    })
-    .from(CourseSection)
-    .leftJoin(SchemeOfWorkEntry, eq(SchemeOfWorkEntry.entry_id, CourseSection.scheme_entry_id))
-    .leftJoin(SubjectCompetency, eq(SubjectCompetency.competency_id, CourseSection.competency_id))
-    .where(eq(CourseSection.section_id, sectionId))
-    .limit(1);
-  if (!row) return null;
-  const criteria = row.entry_id
-    ? await db
-        .select({
-          criteria_id: CompetencyPerformanceCriteria.criteria_id,
-          criteria_number: CompetencyPerformanceCriteria.criteria_number,
-          description: CompetencyPerformanceCriteria.description,
-        })
-        .from(SchemeEntryCriteria)
-        .innerJoin(CompetencyPerformanceCriteria, eq(CompetencyPerformanceCriteria.criteria_id, SchemeEntryCriteria.criteria_id))
-        .where(eq(SchemeEntryCriteria.entry_id, row.entry_id))
-    : [];
-  return { ...row, criteria };
-}
-
-/** The curriculum block every prompt shares. */
-const curriculumBlock = (ctx: Awaited<ReturnType<typeof weekContext>>) =>
-  !ctx
-    ? ""
-    : [
-        ctx.week_number ? `Week: ${ctx.week_number}` : "",
-        ctx.topic ? `Topic: ${ctx.topic}` : "",
-        ctx.sub_topic ? `Sub-topic: ${ctx.sub_topic}` : "",
-        ctx.objective ? `Objective from the scheme of work: ${ctx.objective}` : "",
-        ctx.element_number ? `Learning outcome (Element ${ctx.element_number}): ${ctx.competency_title || ""}` : "",
-        ctx.indicative_content ? `Indicative content: ${ctx.indicative_content}` : "",
-        ctx.criteria.length
-          ? `Performance criteria this week must satisfy:\n${ctx.criteria.map((c) => `- ${c.criteria_number}: ${c.description}`).join("\n")}`
-          : "",
-      ]
-        .filter(Boolean)
-        .join("\n");
 
 /** `GET /items/:id/context` — the week's curriculum, shown beside the editor. */
 export const getItemContext = asyncHandler(async (req: any, res: any) => {

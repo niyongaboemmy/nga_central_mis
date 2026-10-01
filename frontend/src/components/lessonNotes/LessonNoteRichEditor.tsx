@@ -67,7 +67,7 @@ import {
 import { useToast } from "../../contexts/ToastContext";
 import { lessonNotesApi, PromptPreset } from "../../api/lessonNotes";
 import { QUICK_PROMPTS } from "./quickPrompts";
-import { InlineCheck, Reveal } from "../elearning/interactive/nodes";
+import { Activity, InlineCheck, Reveal } from "../elearning/interactive/nodes";
 
 interface Props {
   initialContent: any;
@@ -319,6 +319,7 @@ const LessonNoteRichEditor: React.FC<Props> = ({
       // Interactive blocks for the e-learning reader (tap-to-reveal, inline quick check).
       Reveal,
       InlineCheck,
+      Activity,
     ],
     content: initialContent || "",
     onUpdate: ({ editor: e }) => {

@@ -34,6 +34,7 @@
     "form-data": "^4.0.5",
     "google-auth-library": "^10.9.1",
     "jsonwebtoken": "^9.0.2",
+    "jszip": "^3.10.1",
     "katex": "^0.16.47",
     "mammoth": "^1.11.0",
     "maxmind": "^4.3.29",
@@ -48,7 +49,7 @@
     "validator": "^13.11.0",
     "web-push": "^3.6.7",
     "winston": "^3.11.0",
-    "xlsx": "^0.18.5",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
     "zod": "^3.25.76"
   },
   "devDependencies": {

@@ -1,5 +1,5 @@
 import OpenAI from "openai";
-import { AIProvider, GenerateJSONParams } from "./types";
+import { AIProvider, GenerateJSONParams, ProviderResult } from "./types";
 import { matchesSchema } from "./schemaValidator";
 
 const isConfigured = () => !!process.env.GLM_API_KEY;
@@ -31,7 +31,7 @@ export const glmProvider: AIProvider = {
   // response must be checked against it after the fact (see matchesSchema below).
   supportsStrictSchema: false,
 
-  async generateJSON<T = any>(params: GenerateJSONParams): Promise<T> {
+  async generateJSON<T = any>(params: GenerateJSONParams): Promise<ProviderResult<T>> {
     const model = process.env.GLM_MODEL || "glm-4.5-flash";
 
     const completion = await getClient().chat.completions.create({
@@ -55,6 +55,6 @@ export const glmProvider: AIProvider = {
       throw new Error("GLM response did not match the expected schema");
     }
 
-    return parsed;
+    return { data: parsed, model, usage: { input_tokens: (completion as any).usage?.prompt_tokens, output_tokens: (completion as any).usage?.completion_tokens } };
   },
 };

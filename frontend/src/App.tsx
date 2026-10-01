@@ -58,6 +58,7 @@ import MyLearningHome from "./components/elearning/learner/MyLearningHome";
 import CoursePage from "./components/elearning/learner/CoursePage";
 import MePage from "./components/elearning/learner/MePage";
 import CourseBuilderPage from "./components/elearning/builder/CourseBuilderPage";
+import LessonStudioPage from "./components/elearning/studio/LessonStudioPage";
 import MyCoursesPage from "./components/elearning/builder/MyCoursesPage";
 import ElearningAdminPage from "./components/elearning/admin/ElearningAdminPage";
 import DevKitchenSink from "./components/elearning/DevKitchenSink";
@@ -582,6 +583,16 @@ function App() {
                 <ProtectedRoute>
                   <SystemLayoutWrapper>
                     <MyCoursesPage />
+                  </SystemLayoutWrapper>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/elearning/courses/:courseId/studio"
+              element={
+                <ProtectedRoute>
+                  <SystemLayoutWrapper fullWidth>
+                    <LessonStudioPage />
                   </SystemLayoutWrapper>
                 </ProtectedRoute>
               }

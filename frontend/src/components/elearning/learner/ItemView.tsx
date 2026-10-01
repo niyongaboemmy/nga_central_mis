@@ -1,4 +1,4 @@
-import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { motion, useScroll, useSpring } from "framer-motion";
 import {
   CheckCircle2,
@@ -6,9 +6,7 @@ import {
   Expand,
   Minimize2,
   Sparkles,
-  Download,
   ExternalLink,
-  FileText,
   Globe,
   Loader2,
   Lock,
@@ -28,6 +26,11 @@ import ReaderControls from "./ReaderControls";
 import { useReaderPrefs } from "../../lessonNotes/reader/useReaderPrefs";
 import KnowledgeCheckCard from "./KnowledgeCheckCard";
 import { hydrateInlineChecks } from "../interactive/hydrate";
+import FilePreview from "../../files/FilePreview";
+import { ExitTicketCard, FlashcardDeck, PracticalTaskView } from "./InteractiveItems";
+import type { FilePreviewManifest } from "../../../api/elearning";
+import { API_BASE_URL } from "../../../services/api";
+import { getToken } from "../../../utils/auth";
 
 interface Props {
   opened: OpenedItem;
@@ -122,11 +125,6 @@ const useFocusMode = () => {
   return { on, enter, leave };
 };
 
-const formatBytes = (n?: number | null) => {
-  if (!n) return "";
-  if (n < 1024 * 1024) return `${Math.round(n / 1024)} KB`;
-  return `${(n / 1024 / 1024).toFixed(1)} MB`;
-};
 
 /** Dispatches on item_type — every type renders in the same right pane (UX plan §3.1). */
 const ItemView: React.FC<Props> = ({
@@ -165,7 +163,26 @@ const ItemView: React.FC<Props> = ({
         />
       );
     case "SUBJECT_DOCUMENT":
+    case "FILE":
       return <DocumentView {...frame} />;
+    case "EXIT_TICKET":
+      return (
+        <ItemFrame {...frame}>
+          <ExitTicketCard itemId={item.item_id} content={content} />
+        </ItemFrame>
+      );
+    case "FLASHCARDS":
+      return (
+        <ItemFrame {...frame}>
+          <FlashcardDeck itemId={item.item_id} content={content} />
+        </ItemFrame>
+      );
+    case "PRACTICAL_TASK":
+      return (
+        <ItemFrame {...frame} wide>
+          <PracticalTaskView itemId={item.item_id} content={content} />
+        </ItemFrame>
+      );
     case "PAGE":
       return <PageView {...frame} />;
     case "VIDEO":
@@ -487,82 +504,33 @@ type FrameProps = {
   step?: { index: number; total: number };
 };
 
+/**
+ * Files and subject materials: shown inside the page with the shared <FilePreview> (PDF,
+ * the server's PDF of slides/documents, docx/sheets in the browser, images, audio, text) —
+ * no more "this file opens outside the browser". Downloads stream straight from the API.
+ */
 const DocumentView: React.FC<FrameProps> = ({ opened, ...frame }) => {
   const { content, item } = opened;
-  const isPdf =
-    (content?.mime_type || "").includes("pdf") ||
-    (content?.file_extension || "").toLowerCase() === "pdf";
-  const [blobUrl, setBlobUrl] = useState<string | null>(null);
-  const [failed, setFailed] = useState(false);
-  useEffect(() => {
-    let url: string | null = null;
-    elearningApi
-      .itemFileBlob(item.item_id)
-      .then((r) => {
-        url = URL.createObjectURL(r.data);
-        setBlobUrl(url);
-      })
-      .catch(() => setFailed(true));
-    return () => {
-      if (url) URL.revokeObjectURL(url);
-    };
-  }, [item.item_id]);
-
+  const manifest: FilePreviewManifest | null = content?.preview ?? null;
+  const token = getToken() || "";
+  const fileUrl = (extra: string) => `${API_BASE_URL}/elearning/my/items/${item.item_id}/file?${extra}&token=${encodeURIComponent(token)}`;
+  const loadVariant = useCallback(async (variant: "original" | "pdf" | "text") => (await elearningApi.itemFileBlob(item.item_id, variant)).data, [item.item_id]);
+  const refresh = useCallback(async () => (await elearningApi.myItemPreview(item.item_id)).data.data, [item.item_id]);
   const download = () => {
-    if (!blobUrl) return;
-    const a = document.createElement("a");
-    a.href = blobUrl;
-    a.download = content?.original_name || item.title;
-    a.click();
+    window.location.href = fileUrl("download=1");
   };
-
+  const wide = !!manifest && ["pdf", "word", "slides", "sheet", "csv"].includes(manifest.kind || "");
   return (
-    <ItemFrame opened={opened} {...frame} wide={isPdf}>
-      <div className="el-card overflow-hidden">
-        <div className="flex items-center gap-3 p-4 border-b border-gray-100 dark:border-white/[0.06]">
-          <FileText className="w-5 h-5 text-brand-500" />
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-medium text-gray-800 dark:text-gray-100 truncate">
-              {content?.original_name || item.title}
-            </p>
-            <p className="text-[11px] text-gray-500 dark:text-gray-400">
-              {formatBytes(content?.file_size)}
-              {content?.description ? ` · ${content.description}` : ""}
-            </p>
-          </div>
-          <button
-            onClick={download}
-            disabled={!blobUrl}
-            className="inline-flex items-center gap-1.5 min-h-[40px] px-4 rounded-pill el-chip hover:bg-gray-200 dark:hover:bg-white/[0.10] text-sm font-medium text-gray-700 dark:text-gray-200 disabled:opacity-50"
-          >
-            <Download className="w-4 h-4" /> {copy.course.download}
-          </button>
+    <ItemFrame opened={opened} {...frame} wide={wide}>
+      {manifest ? (
+        <FilePreview manifest={manifest} loadVariant={loadVariant} refreshManifest={refresh} mediaUrl={fileUrl("variant=original")} onDownload={download} />
+      ) : (
+        <div className="el-card p-6 flex items-center gap-3">
+          <Mascot pose="book" size={40} />
+          <p className="text-sm text-gray-600 dark:text-gray-300">This file isn't available any more.</p>
         </div>
-        {isPdf ? (
-          failed ? (
-            <p className="p-6 text-sm text-gray-500">
-              This file couldn't be loaded. Try the download button.
-            </p>
-          ) : blobUrl ? (
-            <iframe
-              title={item.title}
-              src={blobUrl}
-              className="w-full h-[70vh] bg-gray-50 dark:bg-gray-950"
-            />
-          ) : (
-            <div className="flex items-center justify-center h-[40vh] text-gray-400">
-              <Loader2 className="w-5 h-5 animate-spin" />
-            </div>
-          )
-        ) : (
-          <div className="p-6 flex items-center gap-3">
-            <Mascot pose="book" size={40} />
-            <p className="text-sm text-gray-600 dark:text-gray-300">
-              This file opens outside the browser — download it to read.
-            </p>
-          </div>
-        )}
-      </div>
+      )}
+      {content?.description && <p className="mt-3 text-sm text-slate-600 dark:text-slate-300">{content.description}</p>}
     </ItemFrame>
   );
 };

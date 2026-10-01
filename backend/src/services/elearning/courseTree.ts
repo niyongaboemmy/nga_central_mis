@@ -16,6 +16,7 @@ import {
   SubjectCompetency,
   SubjectDocument,
   UserProfile,
+  FileAsset,
 } from "../../db/schema";
 import { CourseRow } from "./courseMembership";
 import { toDateOnly } from "./dates";
@@ -40,6 +41,8 @@ export interface TreeItem extends Omit<ItemRow, "content_json" | "content_html">
     mime_type?: string | null;
     file_size?: number | null;
     owner_user_id?: number | null;
+    /** FILE items: where the preview pipeline is (PENDING → READY / UNSUPPORTED / FAILED). */
+    preview_status?: string | null;
     missing?: boolean;
   } | null;
   /** Builder only — the stored body for PAGE/VIDEO/LINK/KNOWLEDGE_CHECK items. */
@@ -159,6 +162,23 @@ export async function loadCourseTree(course: CourseRow, opts: { includeContent?:
   const noteIds = items.filter((i) => i.item_type === "LESSON_NOTE" && i.ref_id).map((i) => i.ref_id!);
   const docIds = items.filter((i) => i.item_type === "SUBJECT_DOCUMENT" && i.ref_id).map((i) => i.ref_id!);
   const otherIds = items.filter((i) => i.item_type !== "LESSON_NOTE").map((i) => i.item_id);
+  const assetIds = items.filter((i) => i.item_type === "FILE" && i.ref_id).map((i) => i.ref_id!);
+  const assets = assetIds.length
+    ? await db
+        .select({
+          asset_id: FileAsset.asset_id,
+          original_name: FileAsset.original_name,
+          mime_type: FileAsset.mime_type,
+          size_bytes: FileAsset.size_bytes,
+          owner_user_id: FileAsset.owner_user_id,
+          preview_status: FileAsset.preview_status,
+          page_count: FileAsset.page_count,
+          deleted_at: FileAsset.deleted_at,
+        })
+        .from(FileAsset)
+        .where(inArray(FileAsset.asset_id, assetIds))
+    : [];
+  const assetById = new Map(assets.map((a) => [a.asset_id, a]));
 
   const [notes, docs, noteCriteria, itemCriteria] = await Promise.all([
     noteIds.length
@@ -252,6 +272,11 @@ export async function loadCourseTree(course: CourseRow, opts: { includeContent?:
     } else if (i.item_type === "SUBJECT_DOCUMENT") {
       const d = i.ref_id ? docById.get(i.ref_id) : null;
       ref = d ? { mime_type: d.mime_type, file_size: d.file_size, owner_user_id: d.user_id } : { missing: true };
+    } else if (i.item_type === "FILE") {
+      const a = i.ref_id ? assetById.get(i.ref_id) : null;
+      ref = a && !a.deleted_at
+        ? { file_name: a.original_name, mime_type: a.mime_type, file_size: a.size_bytes, owner_user_id: a.owner_user_id, page_count: a.page_count, preview_status: a.preview_status }
+        : { missing: true };
     }
     const item: TreeItem = {
       ...rest,

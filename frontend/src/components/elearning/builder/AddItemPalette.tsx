@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { BookOpen, ExternalLink, FileText, Heading, HelpCircle, Paperclip, PlayCircle, Search, X } from "lucide-react";
+import { BookOpen, ExternalLink, FileText, Heading, HelpCircle, Paperclip, PlayCircle, Search, Upload, X } from "lucide-react";
 import { CourseItemType, elearningApi, PickerDocument, PickerNote } from "../../../api/elearning";
 import { useMotion } from "../../../design/motion";
 import { copy } from "../copy";
@@ -14,8 +14,9 @@ interface Props {
 }
 
 const NEW_TYPES: { type: CourseItemType; icon: React.ElementType; hint: string }[] = [
+  { type: "FILE", icon: Upload, hint: "Slides, documents, spreadsheets, PDFs, images, audio — students preview them here" },
   { type: "PAGE", icon: FileText, hint: "Write a page with text, images, tables" },
-  { type: "VIDEO", icon: PlayCircle, hint: "Embed a YouTube or Vimeo video" },
+  { type: "VIDEO", icon: PlayCircle, hint: "Embed a YouTube or Vimeo video (videos aren't uploaded)" },
   { type: "LINK", icon: ExternalLink, hint: "Link to a website or file" },
   { type: "KNOWLEDGE_CHECK", icon: HelpCircle, hint: "A few quick questions with instant feedback" },
   { type: "HEADER", icon: Heading, hint: "A heading to group items" },

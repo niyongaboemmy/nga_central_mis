@@ -1520,6 +1520,8 @@ export const SubjectDocument = mysqlTable("SubjectDocument", {
   mime_type: varchar("mime_type", { length: 100 }).notNull(),
   file_extension: varchar("file_extension", { length: 20 }).notNull(),
   description: varchar("description", { length: 500 }),
+  // Content hash, filled on first preview — keys the FileDerivative cache (migration 097).
+  sha256: varchar("sha256", { length: 64 }),
   created_at: datetime("created_at").default(sql`CURRENT_TIMESTAMP`),
   updated_at: datetime("updated_at").default(
     sql`CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP`,
@@ -1789,10 +1791,21 @@ export const COURSE_ITEM_TYPES = [
   "TASKMENTOR_ASSIGNMENT",
   "KNOWLEDGE_CHECK",
   "DISCUSSION",
+  // A file uploaded straight onto a week (ref_id → FileAsset), migration 097.
+  "FILE",
+  // Migration 098 (Lesson Studio §11): spaced-repetition cards, an end-of-week ticket with a
+  // confidence rating, and a TVET practical task with photo evidence + teacher sign-off.
+  "FLASHCARDS",
+  "EXIT_TICKET",
+  "PRACTICAL_TASK",
 ] as const;
 export type CourseItemType = (typeof COURSE_ITEM_TYPES)[number];
 
 export const COMPLETION_RULES = ["NONE", "VIEW", "MARK_DONE", "SUBMIT", "MIN_SCORE"] as const;
+
+export const AI_ORIGINS = ["NONE", "AI_GENERATED", "AI_ASSISTED"] as const;
+export const REVIEW_STATES = ["NOT_REQUIRED", "PENDING_REVIEW", "ACCEPTED", "EDITED", "DISMISSED"] as const;
+export type ReviewState = (typeof REVIEW_STATES)[number];
 export type CompletionRule = (typeof COMPLETION_RULES)[number];
 
 // CourseItem — polymorphic by item_type; ref_id points at existing content, content_json
@@ -1820,6 +1833,15 @@ export const CourseItem = mysqlTable("CourseItem", {
   created_by: bigint("created_by", { mode: "number" })
     .notNull()
     .references(() => User.user_id),
+  // Lesson Studio provenance + review (migration 096). An AI draft is is_published = 0
+  // and PENDING_REVIEW until a teacher approves it; ACCEPTED/EDITED items are never
+  // touched by the generation engine again.
+  ai_origin: mysqlEnum("ai_origin", AI_ORIGINS).notNull().default("NONE"),
+  review_state: mysqlEnum("review_state", REVIEW_STATES).notNull().default("NOT_REQUIRED"),
+  generation_task_id: bigint("generation_task_id", { mode: "number" }),
+  input_hash: varchar("input_hash", { length: 64 }),
+  source_refs: json("source_refs"),
+  review_flags: json("review_flags"),
   created_at: datetime("created_at").default(sql`CURRENT_TIMESTAMP`),
   updated_at: datetime("updated_at").default(sql`CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP`),
 });
@@ -1878,6 +1900,8 @@ export const LEARNING_VERBS = [
   "SUBMITTED",
   "COMMENTED",
   "ASKED_AI",
+  "REVIEWED_CARD",
+  "SUBMITTED_EVIDENCE",
 ] as const;
 export type LearningVerb = (typeof LEARNING_VERBS)[number];
 
@@ -1952,4 +1976,226 @@ export const UserLearningPrefs = mysqlTable("UserLearningPrefs", {
   celebrations_enabled: tinyint("celebrations_enabled").notNull().default(1),
   reduced_motion: tinyint("reduced_motion"),
   updated_at: datetime("updated_at").default(sql`CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP`),
+});
+
+// ---------------------------------------------------------------------------------------
+// Lesson Studio: AI generation of whole e-learning weeks (migration 096,
+// ELEARNING_AI_LESSON_STUDIO_IMPLEMENTATION_PLAN.md §8, §12).
+// ---------------------------------------------------------------------------------------
+
+export const CourseBlueprint = mysqlTable("CourseBlueprint", {
+  blueprint_id: bigint("blueprint_id", { mode: "number" }).primaryKey().autoincrement(),
+  owner_user_id: bigint("owner_user_id", { mode: "number" })
+    .notNull()
+    .references(() => User.user_id, { onDelete: "cascade" }),
+  subject_id: bigint("subject_id", { mode: "number" }),
+  program_id: bigint("program_id", { mode: "number" }),
+  visibility: mysqlEnum("visibility", ["PRIVATE", "DEPARTMENT", "SCHOOL"]).notNull().default("PRIVATE"),
+  name: varchar("name", { length: 120 }).notNull(),
+  config: json("config").notNull(),
+  created_at: datetime("created_at").default(sql`CURRENT_TIMESTAMP`),
+  updated_at: datetime("updated_at").default(sql`CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP`),
+});
+
+export const GENERATION_RUN_MODES = ["PREVIEW", "FULL", "SINGLE_WEEK", "REGENERATE_ITEM"] as const;
+export const GENERATION_RUN_STATUSES = [
+  "PLANNED",
+  "RUNNING",
+  "PAUSED",
+  "PAUSED_QUOTA",
+  "READY_FOR_REVIEW",
+  "COMPLETED",
+  "CANCELLED",
+  "FAILED",
+] as const;
+export type GenerationRunStatus = (typeof GENERATION_RUN_STATUSES)[number];
+
+export const CourseGenerationRun = mysqlTable("CourseGenerationRun", {
+  run_id: bigint("run_id", { mode: "number" }).primaryKey().autoincrement(),
+  course_id: bigint("course_id", { mode: "number" })
+    .notNull()
+    .references(() => Course.course_id, { onDelete: "cascade" }),
+  created_by: bigint("created_by", { mode: "number" })
+    .notNull()
+    .references(() => User.user_id, { onDelete: "cascade" }),
+  parent_run_id: bigint("parent_run_id", { mode: "number" }),
+  mode: mysqlEnum("mode", GENERATION_RUN_MODES).notNull(),
+  status: mysqlEnum("status", GENERATION_RUN_STATUSES).notNull().default("PLANNED"),
+  blueprint: json("blueprint").notNull(),
+  section_ids: json("section_ids").notNull(),
+  estimate: json("estimate"),
+  not_before: datetime("not_before"),
+  paused_reason: varchar("paused_reason", { length: 255 }),
+  created_at: datetime("created_at").default(sql`CURRENT_TIMESTAMP`),
+  started_at: datetime("started_at"),
+  finished_at: datetime("finished_at"),
+});
+
+export const GENERATION_TASK_STATUSES = [
+  "QUEUED",
+  "RUNNING",
+  "SUCCEEDED",
+  "FAILED",
+  "SKIPPED",
+  "CANCELLED",
+  "DISMISSED",
+] as const;
+export type GenerationTaskStatus = (typeof GENERATION_TASK_STATUSES)[number];
+
+export const CourseGenerationTask = mysqlTable("CourseGenerationTask", {
+  task_id: bigint("task_id", { mode: "number" }).primaryKey().autoincrement(),
+  run_id: bigint("run_id", { mode: "number" })
+    .notNull()
+    .references(() => CourseGenerationRun.run_id, { onDelete: "cascade" }),
+  section_id: bigint("section_id", { mode: "number" })
+    .notNull()
+    .references(() => CourseSection.section_id, { onDelete: "cascade" }),
+  kind: varchar("kind", { length: 32 }).notNull(),
+  depends_on: json("depends_on"),
+  status: mysqlEnum("status", GENERATION_TASK_STATUSES).notNull().default("QUEUED"),
+  skip_reason: varchar("skip_reason", { length: 40 }),
+  attempts: int("attempts").notNull().default(0),
+  not_before: datetime("not_before").default(sql`CURRENT_TIMESTAMP`),
+  claimed_at: datetime("claimed_at"),
+  heartbeat_at: datetime("heartbeat_at"),
+  input_hash: varchar("input_hash", { length: 64 }),
+  provider_used: varchar("provider_used", { length: 20 }),
+  model: varchar("model", { length: 80 }),
+  output_ref: json("output_ref"),
+  output_digest: json("output_digest"),
+  error: varchar("error", { length: 1000 }),
+  created_at: datetime("created_at").default(sql`CURRENT_TIMESTAMP`),
+  finished_at: datetime("finished_at"),
+});
+
+export const AIUsageLog = mysqlTable("AIUsageLog", {
+  usage_id: bigint("usage_id", { mode: "number" }).primaryKey().autoincrement(),
+  occurred_at: datetime("occurred_at").default(sql`CURRENT_TIMESTAMP`),
+  feature: varchar("feature", { length: 60 }).notNull(),
+  role: varchar("role", { length: 16 }),
+  bulk: tinyint("bulk").notNull().default(0),
+  provider: varchar("provider", { length: 20 }).notNull(),
+  model: varchar("model", { length: 80 }),
+  ok: tinyint("ok").notNull(),
+  error_class: varchar("error_class", { length: 30 }),
+  latency_ms: int("latency_ms"),
+  input_tokens: int("input_tokens"),
+  output_tokens: int("output_tokens"),
+  actor_user_id: bigint("actor_user_id", { mode: "number" }),
+  course_id: bigint("course_id", { mode: "number" }),
+  run_id: bigint("run_id", { mode: "number" }),
+});
+
+// ---------------------------------------------------------------------------------------
+// Files as learning resources + preview derivatives (migration 097, LESSON_STUDIO plan §10).
+// ---------------------------------------------------------------------------------------
+
+export const PREVIEW_STATUSES = ["PENDING", "PROCESSING", "READY", "FAILED", "UNSUPPORTED", "NOT_NEEDED"] as const;
+export type PreviewStatus = (typeof PREVIEW_STATUSES)[number];
+
+export const FileAsset = mysqlTable("FileAsset", {
+  asset_id: bigint("asset_id", { mode: "number" }).primaryKey().autoincrement(),
+  owner_user_id: bigint("owner_user_id", { mode: "number" })
+    .notNull()
+    .references(() => User.user_id, { onDelete: "cascade" }),
+  scope: mysqlEnum("scope", ["COURSE", "RUN_REFERENCE", "SUBJECT", "SUBMISSION"]).notNull(),
+  course_id: bigint("course_id", { mode: "number" }).references(() => Course.course_id, { onDelete: "set null" }),
+  subject_id: bigint("subject_id", { mode: "number" }),
+  original_name: varchar("original_name", { length: 255 }).notNull(),
+  storage_path: varchar("storage_path", { length: 500 }).notNull(),
+  mime_type: varchar("mime_type", { length: 150 }).notNull(),
+  extension: varchar("extension", { length: 16 }).notNull(),
+  kind: varchar("kind", { length: 16 }).notNull(),
+  size_bytes: bigint("size_bytes", { mode: "number" }).notNull(),
+  sha256: varchar("sha256", { length: 64 }).notNull(),
+  preview_status: mysqlEnum("preview_status", PREVIEW_STATUSES).notNull().default("PENDING"),
+  preview_error: varchar("preview_error", { length: 500 }),
+  page_count: int("page_count"),
+  duration_seconds: int("duration_seconds"),
+  text_chars: int("text_chars"),
+  created_at: datetime("created_at").default(sql`CURRENT_TIMESTAMP`),
+  deleted_at: datetime("deleted_at"),
+});
+
+export const FileDerivative = mysqlTable(
+  "FileDerivative",
+  {
+    sha256: varchar("sha256", { length: 64 }).notNull(),
+    variant: mysqlEnum("variant", ["PDF", "THUMB", "TEXT"]).notNull(),
+    storage_path: varchar("storage_path", { length: 500 }).notNull(),
+    size_bytes: bigint("size_bytes", { mode: "number" }).notNull(),
+    meta: json("meta"),
+    created_at: datetime("created_at").default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => ({ pk: primaryKey(table.sha256, table.variant) }),
+);
+
+export const BackgroundJob = mysqlTable("BackgroundJob", {
+  job_id: bigint("job_id", { mode: "number" }).primaryKey().autoincrement(),
+  kind: varchar("kind", { length: 40 }).notNull(),
+  payload: json("payload").notNull(),
+  status: mysqlEnum("status", ["QUEUED", "RUNNING", "SUCCEEDED", "FAILED", "CANCELLED"]).notNull().default("QUEUED"),
+  attempts: int("attempts").notNull().default(0),
+  not_before: datetime("not_before").default(sql`CURRENT_TIMESTAMP`),
+  claimed_at: datetime("claimed_at"),
+  heartbeat_at: datetime("heartbeat_at"),
+  last_error: varchar("last_error", { length: 1000 }),
+  created_at: datetime("created_at").default(sql`CURRENT_TIMESTAMP`),
+  finished_at: datetime("finished_at"),
+});
+
+// ---------------------------------------------------------------------------------------
+// Interactive item types (migration 098, LESSON_STUDIO plan §11).
+// ---------------------------------------------------------------------------------------
+
+export const FlashcardReview = mysqlTable(
+  "FlashcardReview",
+  {
+    item_id: bigint("item_id", { mode: "number" })
+      .notNull()
+      .references(() => CourseItem.item_id, { onDelete: "cascade" }),
+    user_id: bigint("user_id", { mode: "number" })
+      .notNull()
+      .references(() => User.user_id, { onDelete: "cascade" }),
+    card_id: varchar("card_id", { length: 40 }).notNull(),
+    fsrs_state: json("fsrs_state").notNull(),
+    due_at: datetime("due_at").notNull(),
+    last_review_at: datetime("last_review_at"),
+    reps: int("reps").notNull().default(0),
+    lapses: int("lapses").notNull().default(0),
+  },
+  (t) => ({ pk: primaryKey(t.item_id, t.user_id, t.card_id) }),
+);
+
+export const ExitTicketResponse = mysqlTable("ExitTicketResponse", {
+  response_id: bigint("response_id", { mode: "number" }).primaryKey().autoincrement(),
+  item_id: bigint("item_id", { mode: "number" })
+    .notNull()
+    .references(() => CourseItem.item_id, { onDelete: "cascade" }),
+  user_id: bigint("user_id", { mode: "number" })
+    .notNull()
+    .references(() => User.user_id, { onDelete: "cascade" }),
+  answers: json("answers").notNull(),
+  correct: int("correct").notNull(),
+  total: int("total").notNull(),
+  confidence: tinyint("confidence").notNull(),
+  submitted_at: datetime("submitted_at").default(sql`CURRENT_TIMESTAMP`),
+});
+
+export const PracticalSubmission = mysqlTable("PracticalSubmission", {
+  submission_id: bigint("submission_id", { mode: "number" }).primaryKey().autoincrement(),
+  item_id: bigint("item_id", { mode: "number" })
+    .notNull()
+    .references(() => CourseItem.item_id, { onDelete: "cascade" }),
+  user_id: bigint("user_id", { mode: "number" })
+    .notNull()
+    .references(() => User.user_id, { onDelete: "cascade" }),
+  asset_ids: json("asset_ids").notNull(),
+  student_note: varchar("student_note", { length: 1000 }),
+  status: mysqlEnum("status", ["SUBMITTED", "RETURNED", "SIGNED_OFF"]).notNull().default("SUBMITTED"),
+  checklist_result: json("checklist_result"),
+  teacher_comment: varchar("teacher_comment", { length: 1000 }),
+  reviewed_by: bigint("reviewed_by", { mode: "number" }),
+  reviewed_at: datetime("reviewed_at"),
+  submitted_at: datetime("submitted_at").default(sql`CURRENT_TIMESTAMP`),
 });

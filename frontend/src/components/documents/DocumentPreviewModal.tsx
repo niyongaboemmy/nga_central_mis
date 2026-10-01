@@ -1,4 +1,6 @@
-import React, { useState, useEffect } from "react";
+import React, { useCallback, useState, useEffect } from "react";
+import FilePreview from "../files/FilePreview";
+import type { PreviewManifest } from "../../lib/files/previewPlan";
 import { motion } from "framer-motion";
 import {
   FiX,
@@ -32,13 +34,53 @@ interface DocumentPreviewModalProps {
   document: PreviewableDoc | null;
   onClose: () => void;
   downloadFn?: (documentId: number) => Promise<{ data: Blob }>;
+  /**
+   * Server previews (Lesson Studio §10): the manifest and a derivative fetcher. Without them,
+   * office files still preview in the browser (docx / spreadsheets) via <FilePreview>.
+   */
+  previewFns?: {
+    manifest: (documentId: number) => Promise<PreviewManifest>;
+    variant: (documentId: number, variant: "pdf" | "text") => Promise<Blob>;
+  };
 }
+
+const OFFICE_EXTS = ["doc", "docx", "odt", "rtf", "ppt", "pptx", "odp", "xls", "xlsx", "ods"];
+
+/** Office files inside the modal: the shared previewer (server PDF, or browser fallbacks). */
+const OfficePreview: React.FC<{
+  doc: PreviewableDoc;
+  download: () => void;
+  downloadFn: (documentId: number) => Promise<{ data: Blob }>;
+  previewFns?: DocumentPreviewModalProps["previewFns"];
+}> = ({ doc, download, downloadFn, previewFns }) => {
+  const fallback: PreviewManifest = { name: doc.original_name, size: doc.file_size, preview_status: "UNSUPPORTED", variants: { pdf: false, thumb: false, text: false } };
+  const [manifest, setManifest] = useState<PreviewManifest | null>(previewFns ? null : fallback);
+  useEffect(() => {
+    if (!previewFns) return;
+    previewFns.manifest(doc.document_id).then(setManifest, () => setManifest(fallback));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [doc.document_id]);
+  const loadVariant = useCallback(
+    async (v: "original" | "pdf" | "text") => (v === "original" || !previewFns ? (await downloadFn(doc.document_id)).data : await previewFns.variant(doc.document_id, v)),
+    [doc.document_id, downloadFn, previewFns],
+  );
+  const refresh = useCallback(async () => (previewFns ? previewFns.manifest(doc.document_id) : fallback),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [doc.document_id, previewFns]);
+  if (!manifest) return <div className="h-40 m-4 rounded-xl bg-gray-100 dark:bg-white/10 animate-pulse" aria-busy="true" />;
+  return (
+    <div className="h-full overflow-auto p-3">
+      <FilePreview manifest={manifest} loadVariant={loadVariant} refreshManifest={previewFns ? refresh : undefined} onDownload={download} />
+    </div>
+  );
+};
 
 const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
   isOpen,
   document: doc,
   onClose,
   downloadFn,
+  previewFns,
 }) => {
   const [previewContent, setPreviewContent] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -311,6 +353,10 @@ const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
           </pre>
         </div>
       );
+    }
+
+    if (OFFICE_EXTS.includes(ext)) {
+      return <OfficePreview doc={doc} download={handleDownload} downloadFn={downloadFn ?? documentApi.download} previewFns={previewFns} />;
     }
 
     // Default: Show file info

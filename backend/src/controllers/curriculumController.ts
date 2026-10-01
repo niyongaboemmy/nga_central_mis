@@ -27,6 +27,8 @@ import { recordActivity } from "../utils/activityLogger";
 import { sanitizeString } from "../utils/sanitization";
 import logger from "../utils/logger";
 import storageService from "../utils/fileServer";
+import { parseVariant, previewManifest, streamStoredFile } from "../services/files/stream";
+import { ensureDocumentPreviewQueued } from "../services/files/assets";
 import path from "path";
 import fs from "fs/promises";
 import { Permissions } from "../utils/permissions";
@@ -1053,15 +1055,19 @@ export const downloadSubjectDocument = asyncHandler(
       Permissions.DOWNLOAD_SUBJECT_DOCUMENTS,
     );
 
+    // ?variant=pdf|text|thumb serves a preview derivative (LESSON_STUDIO plan §10.7).
+    if (req.query.variant) {
+      return streamStoredFile(
+        res,
+        { name: doc.original_name, storage_path: doc.file_path, sha256: doc.sha256 },
+        parseVariant(req.query.variant),
+        { range: req.headers.range },
+      );
+    }
+
     const exists = await storageService.fileExists(doc.file_path);
     if (!exists) {
       throw new NotFoundError("File not found on server");
-    }
-
-    const buffer = await storageService.downloadToBuffer(doc.file_path);
-
-    if (!buffer.length) {
-      throw new NotFoundError("File is empty or corrupted");
     }
 
     const mime =
@@ -1069,12 +1075,29 @@ export const downloadSubjectDocument = asyncHandler(
         ? "application/pdf"
         : doc.mime_type || "application/octet-stream";
 
-    res.setHeader("Content-Type", mime);
-    res.setHeader(
-      "Content-Disposition",
-      `inline; filename="${doc.original_name}"`,
-    );
-    res.setHeader("Content-Length", buffer.length);
-    res.send(buffer);
+    // Streamed with Range support, never buffered: subject materials can be up to 5 GB.
+    await storageService.streamTo(res, doc.file_path, {
+      range: req.headers.range,
+      contentType: mime,
+      filename: doc.original_name,
+      disposition: "inline",
+    });
   },
 );
+
+/**
+ * `GET /curriculum/documents/:documentId/preview` — the material's preview manifest (server PDF
+ * of slides/documents, text, thumbnail). The first call queues its preview.
+ */
+export const previewSubjectDocument = asyncHandler(async (req: any, res: any) => {
+  const [doc] = await db
+    .select()
+    .from(SubjectDocument)
+    .where(eq(SubjectDocument.document_id, parseInt(req.params.documentId)))
+    .limit(1);
+  if (!doc) throw new NotFoundError("Document not found");
+  await assertSubjectAccess(req, doc.subject_id, Permissions.DOWNLOAD_SUBJECT_DOCUMENTS);
+  const manifest = await previewManifest({ name: doc.original_name, storage_path: doc.file_path, sha256: doc.sha256, size: doc.file_size });
+  if (manifest.preview_status === "PENDING") await ensureDocumentPreviewQueued(doc.document_id).catch(() => undefined);
+  successResponse(res, "Preview", manifest);
+});

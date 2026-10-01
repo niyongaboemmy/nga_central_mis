@@ -13,6 +13,12 @@ import { asyncHandler } from "../middleware/asyncHandler";
 import { successResponse } from "../utils/response";
 import { NotFoundError, ValidationError } from "../errors/CustomError";
 import storageService from "../utils/fileServer";
+import { FileAsset } from "../db/schema";
+import { parseVariant, previewManifest, streamStoredFile } from "../services/files/stream";
+import { ensureDocumentPreviewQueued } from "../services/files/assets";
+import { learnerContent } from "../services/elearning/interactiveItems";
+import { derivativesOf } from "../services/files/assets";
+import { isItemVisibleToStudents, loadSectionWithCourse } from "../services/elearning/courseTree";
 import logger from "../utils/logger";
 import {
   listMemberCourseIds,
@@ -33,6 +39,7 @@ import {
 } from "../services/elearning/livePresence";
 import {
   applyAction,
+  loadProgress,
   deriveLearnerSections,
   LearnerItem,
   loadPrerequisites,
@@ -213,10 +220,16 @@ export const openMyItem = asyncHandler(async (req: any, res: any) => {
     });
   }
 
-  const { progress, justCompleted } = await applyAction(row.item, userId, {
-    kind: "VIEW",
-  });
-  await logLearningEvent({
+  // "Download this week" prefetches items so they open offline (the service worker caches by
+  // URL). A prefetch is not a visit: no view, no completion, no presence (X-Prefetch: 1).
+  const prefetch = req.get("X-Prefetch") === "1";
+  const { progress, justCompleted } = prefetch
+    ? {
+        progress: (await loadProgress(itemId, userId)) ?? ({ state: "NOT_STARTED", completed_at: null, seconds_spent: 0, last_position: null, best_score_pct: null, view_count: 0 } as any),
+        justCompleted: false,
+      }
+    : await applyAction(row.item, userId, { kind: "VIEW" });
+  if (!prefetch) await logLearningEvent({
     actor_user_id: userId,
     verb: "VIEWED",
     object_type: "COURSE_ITEM",
@@ -228,7 +241,7 @@ export const openMyItem = asyncHandler(async (req: any, res: any) => {
       source: "MIS",
     },
   });
-  if (justCompleted) {
+  if (justCompleted && !prefetch) {
     await logLearningEvent({
       actor_user_id: userId,
       verb: "COMPLETED",
@@ -245,7 +258,7 @@ export const openMyItem = asyncHandler(async (req: any, res: any) => {
 
   // Live: the teacher sees who is on which item, and the first open of an item lands as
   // "started". Presence is best-effort — it must never fail opening a lesson.
-  try {
+  if (!prefetch) try {
     const name = await learnerName(userId);
     touch(
       row.course.course_id,
@@ -310,7 +323,22 @@ export const openMyItem = asyncHandler(async (req: any, res: any) => {
         .where(eq(SubjectDocument.document_id, row.item.ref_id!))
         .limit(1);
       content = doc
-        ? { ...doc, file_url: `/elearning/my/items/${itemId}/file` }
+        ? { ...doc, file_url: `/elearning/my/items/${itemId}/file`, preview: await subjectDocumentManifest(row.item.ref_id!) }
+        : null;
+      break;
+    }
+    case "EXIT_TICKET":
+    case "FLASHCARDS":
+    case "PRACTICAL_TASK":
+      content = await learnerContent(row.item, userId);
+      break;
+    case "FILE": {
+      const [asset] = await db.select().from(FileAsset).where(eq(FileAsset.asset_id, row.item.ref_id!)).limit(1);
+      content = asset
+        ? {
+            file_url: `/elearning/my/items/${itemId}/file`,
+            preview: await previewManifest({ name: asset.original_name, storage_path: asset.storage_path, sha256: asset.sha256, size: asset.size_bytes, preview_status: asset.preview_status, preview_error: asset.preview_error, page_count: asset.page_count }),
+          }
         : null;
       break;
     }
@@ -394,33 +422,54 @@ export const openMyItem = asyncHandler(async (req: any, res: any) => {
 });
 
 /** Student-readable file stream for SUBJECT_DOCUMENT items (teacher-only download today). Re-checks membership. */
+/** Preview manifest of a subject material (queues its preview the first time it's opened). */
+async function subjectDocumentManifest(documentId: number) {
+  const [doc] = await db.select().from(SubjectDocument).where(eq(SubjectDocument.document_id, documentId)).limit(1);
+  if (!doc) return null;
+  const manifest = await previewManifest({ name: doc.original_name, storage_path: doc.file_path, sha256: doc.sha256, size: doc.file_size });
+  if (!doc.sha256 && manifest.preview_status === "PENDING") await ensureDocumentPreviewQueued(doc.document_id).catch(() => undefined);
+  return manifest;
+}
+
+/** `GET /my/items/:id/preview` — the file's preview manifest, cheap to poll (no view recorded). */
+export const getMyItemPreview = asyncHandler(async (req: any, res: any) => {
+  const itemId = parseId(req.params.id, "item id");
+  const { row, item } = await findLearnerItem(itemId, req.user.userId);
+  if (item.locked) throw new NotFoundError("Item not found");
+  if (row.item.item_type === "FILE") {
+    const [asset] = await db.select().from(FileAsset).where(eq(FileAsset.asset_id, row.item.ref_id!)).limit(1);
+    if (!asset || asset.deleted_at) throw new NotFoundError("File not found");
+    return successResponse(res, "Preview", await previewManifest({ name: asset.original_name, storage_path: asset.storage_path, sha256: asset.sha256, size: asset.size_bytes, preview_status: asset.preview_status, preview_error: asset.preview_error, page_count: asset.page_count }));
+  }
+  if (row.item.item_type === "SUBJECT_DOCUMENT") {
+    const m = await subjectDocumentManifest(row.item.ref_id!);
+    if (!m) throw new NotFoundError("File not found");
+    return successResponse(res, "Preview", m);
+  }
+  throw new NotFoundError("This item has no file");
+});
+
+/**
+ * `GET /my/items/:id/file?variant=original|pdf|thumb|text[&download=1]` — streams (never
+ * buffers) a FILE item's asset, a subject material or a PDF note, with Range support so
+ * audio seeks and large PDFs load page by page. Membership is re-derived (404 otherwise).
+ */
 export const streamMyItemFile = asyncHandler(async (req: any, res: any) => {
   const itemId = parseId(req.params.id, "item id");
   const { row, item } = await findLearnerItem(itemId, req.user.userId);
   if (item.locked) throw new NotFoundError("Item not found");
+  const variant = parseVariant(req.query.variant);
+  const opts = { range: req.headers.range as string | undefined, download: !!req.query.download };
 
+  if (row.item.item_type === "FILE") {
+    const [asset] = await db.select().from(FileAsset).where(eq(FileAsset.asset_id, row.item.ref_id!)).limit(1);
+    if (!asset || asset.deleted_at) throw new NotFoundError("File not found");
+    return streamStoredFile(res, { name: asset.original_name, storage_path: asset.storage_path, sha256: asset.sha256 }, variant, opts);
+  }
   if (row.item.item_type === "SUBJECT_DOCUMENT") {
-    const [doc] = await db
-      .select()
-      .from(SubjectDocument)
-      .where(eq(SubjectDocument.document_id, row.item.ref_id!))
-      .limit(1);
+    const [doc] = await db.select().from(SubjectDocument).where(eq(SubjectDocument.document_id, row.item.ref_id!)).limit(1);
     if (!doc) throw new NotFoundError("File not found");
-    if (!(await storageService.fileExists(doc.file_path)))
-      throw new NotFoundError("File not found on server");
-    const buffer = await storageService.downloadToBuffer(doc.file_path);
-    const mime =
-      doc.file_extension?.toLowerCase() === "pdf"
-        ? "application/pdf"
-        : doc.mime_type || "application/octet-stream";
-    res.setHeader("Content-Type", mime);
-    res.setHeader(
-      "Content-Disposition",
-      `${req.query.download ? "attachment" : "inline"}; filename="${doc.original_name}"`,
-    );
-    res.setHeader("Content-Length", buffer.length);
-    res.setHeader("Cache-Control", "private, max-age=3600");
-    return res.send(buffer);
+    return streamStoredFile(res, { name: doc.original_name, storage_path: doc.file_path, sha256: doc.sha256 }, variant, opts);
   }
   if (row.item.item_type === "LESSON_NOTE") {
     const [note] = await db
@@ -429,14 +478,7 @@ export const streamMyItemFile = asyncHandler(async (req: any, res: any) => {
       .where(eq(LessonNote.note_id, row.item.ref_id!))
       .limit(1);
     if (!note?.file_path) throw new NotFoundError("PDF not found");
-    const buffer = await storageService.downloadToBuffer(note.file_path);
-    res.setHeader("Content-Type", "application/pdf");
-    res.setHeader(
-      "Content-Disposition",
-      `inline; filename="${note.title.replace(/[^a-z0-9]+/gi, "-").slice(0, 80)}.pdf"`,
-    );
-    res.setHeader("Cache-Control", "private, max-age=3600");
-    return res.send(buffer);
+    return streamStoredFile(res, { name: `${note.title.replace(/[^a-z0-9]+/gi, "-").slice(0, 80)}.pdf`, storage_path: note.file_path, sha256: null }, "original", opts);
   }
   throw new NotFoundError("This item has no file");
 });
@@ -669,4 +711,64 @@ export const findMySectionForDate = asyncHandler(async (req: any, res: any) => {
     }
   }
   successResponse(res, "No section for that date", null);
+});
+
+/**
+ * `GET /my/sections/:id/offline-manifest` — everything a week needs to open with no signal
+ * (Lesson Studio §11): each item's JSON, note bodies, and files as their light preview (the
+ * server PDF of slides rather than the 80 MB deck). The page fetches these with X-Prefetch so
+ * the service worker caches them without counting as visits. Sizes let the student decide.
+ */
+export const getMySectionOfflineManifest = asyncHandler(async (req: any, res: any) => {
+  const sectionId = parseId(req.params.id, "section id");
+  const userId = req.user.userId;
+  const row = await loadSectionWithCourse(sectionId);
+  if (!row || row.course.status !== "PUBLISHED" || row.section.status !== "PUBLISHED" || !(await isCourseMember(row.course, userId))) {
+    throw new NotFoundError("Week not found");
+  }
+  const tree = await loadCourseTree(row.course);
+  const section = tree.find((s) => s.section_id === sectionId);
+  const items = (section?.items ?? []).filter((i) => i.item_type !== "HEADER" && isItemVisibleToStudents(i));
+  const MAX_FILE = 25 * 1024 * 1024;
+  const out: { item_id: number; title: string; urls: { url: string; bytes: number }[]; skipped?: string }[] = [];
+  for (const i of items) {
+    const urls: { url: string; bytes: number }[] = [{ url: `/elearning/my/items/${i.item_id}`, bytes: 6000 }];
+    let skipped: string | undefined;
+    if (i.item_type === "LESSON_NOTE" && i.ref_id) {
+      urls.push({ url: `/lesson-notes/shared-with-me/${i.ref_id}`, bytes: 40_000 });
+      if (i.ref?.file_name) urls.push({ url: `/lesson-notes/${i.ref_id}/pdf/raw`, bytes: 2_000_000 });
+    }
+    if ((i.item_type === "FILE" || i.item_type === "SUBJECT_DOCUMENT") && i.ref_id) {
+      urls.push({ url: `/elearning/my/items/${i.item_id}/preview`, bytes: 800 });
+      let name = "";
+      let sha: string | null = null;
+      let size = 0;
+      if (i.item_type === "FILE") {
+        const [a] = await db.select().from(FileAsset).where(eq(FileAsset.asset_id, i.ref_id)).limit(1);
+        name = a?.original_name ?? "";
+        sha = a?.sha256 ?? null;
+        size = a?.size_bytes ?? 0;
+      } else {
+        const [d] = await db.select().from(SubjectDocument).where(eq(SubjectDocument.document_id, i.ref_id)).limit(1);
+        name = d?.original_name ?? "";
+        sha = d?.sha256 ?? null;
+        size = Number(d?.file_size ?? 0);
+      }
+      const ext = (/\.([a-z0-9]+)$/i.exec(name)?.[1] || "").toLowerCase();
+      const derivs = sha ? await derivativesOf(sha) : {};
+      if (derivs.PDF) urls.push({ url: `/elearning/my/items/${i.item_id}/file?variant=pdf`, bytes: derivs.PDF.size_bytes });
+      else if (size <= MAX_FILE && ["pdf", "png", "jpg", "jpeg", "webp", "gif", "docx", "xlsx", "csv", "txt", "md", "mp3", "m4a", "ogg"].includes(ext)) urls.push({ url: `/elearning/my/items/${i.item_id}/file`, bytes: size });
+      else skipped = "Too large to save — open it when you're online";
+      if (derivs.TEXT && /pptx?|odp/.test(ext) && !derivs.PDF) urls.push({ url: `/elearning/my/items/${i.item_id}/file?variant=text`, bytes: derivs.TEXT.size_bytes });
+    }
+    out.push({ item_id: i.item_id, title: i.title, urls, ...(skipped ? { skipped } : {}) });
+  }
+  const course = { url: `/elearning/my/courses/${row.course.course_id}`, bytes: 20_000 };
+  successResponse(res, "Offline manifest", {
+    section_id: sectionId,
+    title: row.section.title,
+    course,
+    items: out,
+    total_bytes: course.bytes + out.reduce((n, i) => n + i.urls.reduce((m, u) => m + u.bytes, 0), 0),
+  });
 });

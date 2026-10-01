@@ -13,6 +13,9 @@ import {
   MessageSquare,
   Paperclip,
   PlayCircle,
+  Layers,
+  Ticket,
+  Hammer,
   type LucideIcon,
 } from "lucide-react";
 import type { CourseItemType, ProgressState } from "../../../api/elearning";
@@ -244,6 +247,10 @@ export const ITEM_TYPE_ICON: Record<CourseItemType, LucideIcon> = {
   TASKMENTOR_ASSIGNMENT: ClipboardList,
   KNOWLEDGE_CHECK: HelpCircle,
   DISCUSSION: MessageSquare,
+  FILE: Paperclip,
+  FLASHCARDS: Layers,
+  EXIT_TICKET: Ticket,
+  PRACTICAL_TASK: Hammer,
 };
 
 export const ItemTypeIcon: React.FC<{ type: CourseItemType; className?: string }> = ({ type, className = "w-4 h-4" }) => {

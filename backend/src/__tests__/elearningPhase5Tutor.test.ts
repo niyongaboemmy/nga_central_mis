@@ -1,26 +1,9 @@
-import { describe, it, expect, beforeAll, vi } from "vitest";
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import request from "supertest";
 import { and, eq } from "drizzle-orm";
 
-vi.mock("../services/aiProviders", async () => {
-  const actual = await vi.importActual<any>("../services/aiProviders");
-  return {
-    ...actual,
-    isAnyProviderConfigured: () => true,
-    generateStructuredContent: vi.fn(async ({ prompt }: { prompt: string }) => ({
-      providerUsed: "mock",
-      data: {
-        answer_html: `<p>${prompt.includes("Flexbox") ? "Flexbox lays items out along one axis." : "Not covered."}</p>`,
-        key_points: ["one axis"],
-        follow_ups: ["What is justify-content?"],
-        grounded: prompt.includes("Flexbox"),
-        cited_titles: ["Flexbox basics"],
-      },
-    })),
-  };
-});
-
 import app from "../app";
+import { installFakeAI, uninstallFakeAI } from "../test/fakeAI";
 import { db } from "../db";
 import { LearningEvent, SchemeOfWorkEntry } from "../db/schema";
 import { rankChunks } from "../controllers/courseTutorController";
@@ -58,7 +41,16 @@ describe("E-learning Phase 5: course tutor", () => {
   let courseId: number;
   const auth = (token: string) => ({ Authorization: `Bearer ${token}` });
 
+  afterAll(() => uninstallFakeAI());
+
   beforeAll(async () => {
+    installFakeAI(({ prompt }) => ({
+      answer_html: `<p>${prompt.includes("Flexbox") ? "Flexbox lays items out along one axis." : "Not covered."}</p>`,
+      key_points: ["one axis"],
+      follow_ups: ["What is justify-content?"],
+      grounded: prompt.includes("Flexbox"),
+      cited_titles: ["Flexbox basics"],
+    }));
     const teacherId = await createUser({ userType: "TEACHER" });
     studentId = await createUser({ userType: "STUDENT" });
     teacherToken = signToken(teacherId);

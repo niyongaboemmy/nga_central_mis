@@ -59,6 +59,10 @@ const STARTERS = [
   { label: "Key terms", question: "List and define the key terms in this note." },
   { label: "Quiz me", question: "Ask me a few practice questions on this note, then give the answers.", mode: "quiz" as AskMode },
   { label: "Real-world examples", question: "Give me real-world examples of what this note covers.", mode: "example" as AskMode },
+  // "Explain it differently" (Lesson Studio §11): the same lesson, another way in.
+  { label: "Example from a Rwandan workplace", question: "Explain the main idea of this note with an example from a workplace in Rwanda (a garage, a cooperative, a clinic, an office or mobile money).", mode: "example" as AskMode },
+  { label: "Step by step", question: "Explain this note step by step, one small step at a time, as if I am seeing it for the first time.", mode: "simplify" as AskMode },
+  { label: "En français", question: "Explique l'idée principale de cette note en français simple." },
 ];
 
 const historyKey = (noteId: number) => `lessonNoteReader.chat.${noteId}`;

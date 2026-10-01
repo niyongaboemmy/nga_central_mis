@@ -49,6 +49,17 @@ if (config.nodeEnv !== "test") {
       logger.error("[elearning] sweep failed", { error });
     }
   };
+  // Lesson Studio generation worker (ELEARNING_AI_LESSON_STUDIO_IMPLEMENTATION_PLAN.md §8.5):
+  // durable, claim-guarded, resumes after a restart. ELEARNING_STUDIO_WORKER=false switches it off.
+  if (process.env.ELEARNING_STUDIO_WORKER !== "false") {
+    import("./services/elearning/generation/worker")
+      .then((m) => m.startGenerationWorker())
+      .catch((error) => logger.error("[studio] worker failed to start", { error }));
+  }
+  // File previews (office → PDF, thumbnails, text): one job at a time, durable.
+  import("./services/jobs/backgroundJobs")
+    .then((m) => m.startJobWorker())
+    .catch((error) => logger.error("[jobs] worker failed to start", { error }));
   // Live-presence sweep: expires watchers and keeps SSE streams warm.
   import("./services/elearning/livePresence").then((m) => m.startLiveSweep()).catch(() => undefined);
   setTimeout(runSweeps, 30_000);

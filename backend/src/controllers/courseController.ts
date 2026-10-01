@@ -11,6 +11,7 @@ import {
   CourseItemCriteria,
   CourseSection,
   CourseItemType,
+  FileAsset,
   LessonNote,
   LessonNoteShare,
   SchemeOfWork,
@@ -35,6 +36,7 @@ import {
   loadSectionWithCourse,
 } from "../services/elearning/courseTree";
 import { notifySectionPublished } from "../services/elearning/courseNotifications";
+import { normaliseExitTicket, normaliseFlashcards, normalisePractical } from "../services/elearning/interactiveItems";
 
 // ======================
 // HELPERS
@@ -213,6 +215,44 @@ async function buildItemBody(
       out.title = title.slice(0, 255);
       out.content_json = normaliseKnowledgeCheck(body.content_json ?? body);
       out.ref_id = null;
+      break;
+    }
+    case "FLASHCARDS": {
+      if (!title) throw new ValidationError("Give the flashcards a title");
+      out.title = title.slice(0, 255);
+      out.content_json = normaliseFlashcards(body.content_json ?? body);
+      // Done once every card has been reviewed (not on opening, not by a "mark done" tap).
+      out.completion_rule = "SUBMIT";
+      out.ref_id = null;
+      break;
+    }
+    case "EXIT_TICKET": {
+      if (!title) throw new ValidationError("Give the exit ticket a title");
+      out.title = title.slice(0, 255);
+      out.content_json = normaliseExitTicket(body.content_json ?? body);
+      // Answering completes it (no "mark done" shortcut); formative, so mastery ignores it.
+      out.completion_rule = "SUBMIT";
+      out.ref_id = null;
+      break;
+    }
+    case "PRACTICAL_TASK": {
+      if (!title) throw new ValidationError("Give the practical task a title");
+      out.title = title.slice(0, 255);
+      out.content_json = normalisePractical(body.content_json ?? body);
+      if (typeof body.content_html === "string") out.content_html = sanitizeNoteHtml(body.content_html);
+      // Completed only by the teacher's sign-off against the checklist (→ DEMONSTRATED).
+      out.completion_rule = "SUBMIT";
+      out.ref_id = null;
+      break;
+    }
+    case "FILE": {
+      // FILE items are created by the upload endpoint (POST /sections/:id/files); here only
+      // their title/settings change, and the asset must already belong to this course.
+      const assetId = parseId(body.ref_id, "file id");
+      const [asset] = await db.select({ asset_id: FileAsset.asset_id, course_id: FileAsset.course_id, owner_user_id: FileAsset.owner_user_id, original_name: FileAsset.original_name }).from(FileAsset).where(eq(FileAsset.asset_id, assetId)).limit(1);
+      if (!asset || (asset.course_id !== course.course_id && asset.owner_user_id !== userId)) throw new NotFoundError("File not found");
+      out.ref_id = assetId;
+      out.title = (title || asset.original_name).slice(0, 255);
       break;
     }
     case "TASKMENTOR_QUIZ":
@@ -681,6 +721,8 @@ export const updateItem = asyncHandler(async (req: any, res: any) => {
     if (sent.has(k) || derived || (k === "title" && sent.has("title"))) patch[k] = v;
   }
   if (Object.keys(patch).length === 0 && !Array.isArray(req.body.criteria_ids)) throw new ValidationError("Nothing to update");
+  // A teacher touching a Studio draft makes it theirs: the engine never replaces it again.
+  if (Object.keys(patch).length > 0 && item.review_state === "PENDING_REVIEW") patch.review_state = "EDITED";
   if (Object.keys(patch).length > 0) await db.update(CourseItem).set(patch).where(eq(CourseItem.item_id, item.item_id));
   if (item.item_type === "LESSON_NOTE" && patch.ref_id) {
     await ensureClassGroupShare(patch.ref_id, course.class_group_id, req.user.userId);

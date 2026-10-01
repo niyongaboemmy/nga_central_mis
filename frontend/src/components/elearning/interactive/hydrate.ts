@@ -1,5 +1,6 @@
 import { parseCheck } from "./nodes";
 import { copy } from "../copy";
+import { hydrateActivities } from "./activities";
 
 /**
  * Turns the static `<div data-type="inline-check">` blocks in rendered note HTML into live
@@ -75,6 +76,9 @@ export function hydrateInlineChecks(root: HTMLElement | null, onAnswer?: (correc
     });
     block.append(head, prompt, list, feedback);
   });
+
+  // Lesson Studio activities (fill in the blanks / order the steps / match the pairs).
+  hydrateActivities(root, onAnswer);
 
   // Reveal blocks: make sure the summary is keyboard-focusable and styled without needing CSS files.
   root.querySelectorAll<HTMLElement>('details[data-type="reveal"]:not([data-hydrated])').forEach((d) => {
