@@ -36,6 +36,7 @@
     "jsonwebtoken": "^9.0.2",
     "katex": "^0.16.47",
     "mammoth": "^1.11.0",
+    "maxmind": "^4.3.29",
     "multer": "^2.0.2",
     "mysql2": "^3.6.5",
     "nodemailer": "^6.9.7",
@@ -47,7 +48,8 @@
     "validator": "^13.11.0",
     "web-push": "^3.6.7",
     "winston": "^3.11.0",
-    "xlsx": "^0.18.5"
+    "xlsx": "^0.18.5",
+    "zod": "^3.25.76"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",

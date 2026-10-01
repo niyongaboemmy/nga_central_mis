@@ -88,6 +88,13 @@ const Sidebar: React.FC<SidebarProps> = ({
       icon: <LayoutGrid className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
     },
     {
+      // Transparency (USAGE_ANALYTICS_IMPLEMENTATION_PLAN.md §10.5): everyone can see what
+      // is recorded about them, and whether anyone is monitoring their account.
+      label: "My activity",
+      path: "/me/activity",
+      icon: <Activity className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
+    },
+    {
       label: "Profile",
       path: "/profile",
       icon: (
@@ -550,6 +557,12 @@ const Sidebar: React.FC<SidebarProps> = ({
       icon: <BarChart3 className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
       // Anyone holding an insight capability somewhere (the page lists what they can open).
       requiredCapability: ["VIEW_ALL_TEACHERS_SCHEME_OF_WORK_LIST", "VIEW_REPORTS", "VIEW_ALL_COURSES"],
+    },
+    {
+      label: "Usage & Monitoring",
+      path: "/analytics",
+      icon: <Activity className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
+      requiredCapability: ["ANALYTICS_VIEW", "ANALYTICS_LIVE_VIEW"],
     },
     {
       label: "Leadership & Access",

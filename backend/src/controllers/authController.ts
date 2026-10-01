@@ -35,6 +35,9 @@ import config from "../config";
 import logger from "../utils/logger";
 import { recordActivity } from "../utils/activityLogger";
 import { notifyLogout } from "../services/sso/backchannelLogout";
+import { clientIpOf, deviceIdOf, trackAuth } from "../services/activity/authEvents";
+import { checkBlocked } from "../services/activity/blocklist";
+import { signOutEverywhereLocal } from "../services/activity/control";
 import { getCurrentAcademicYearId } from "../utils/academicYear";
 
 export const login = asyncHandler(async (req: any, res: any) => {
@@ -50,6 +53,12 @@ export const login = asyncHandler(async (req: any, res: any) => {
   }
 
   logger.info(`Login attempt for: ${sanitizedInput}`);
+
+  // A device or IP an administrator blocked (Usage & Monitoring → Visitors / IP lookup).
+  if (await checkBlocked(deviceIdOf(req), clientIpOf(req)).catch(() => null)) {
+    trackAuth(req, { kind: "login", outcome: "failure", reason: "blocked", usernameAttempted: sanitizedInput });
+    throw new AuthenticationError("Sign-in from this device or network has been blocked. Contact your administrator.");
+  }
 
   // Determine if input is email or username
   const isEmail = validateEmail(sanitizedInput);
@@ -74,12 +83,14 @@ export const login = asyncHandler(async (req: any, res: any) => {
 
   if (user.length === 0) {
     logger.warn(`Failed login attempt: user ${sanitizedInput} not found`);
+    trackAuth(req, { kind: "login", outcome: "failure", reason: "unknown_user", usernameAttempted: sanitizedInput });
     throw new AuthenticationError("Invalid credentials");
   }
 
   // Check if user is active
   if (user[0].status !== "ACTIVE") {
     logger.warn(`Login attempt for inactive user: ${sanitizedInput}`);
+    trackAuth(req, { kind: "login", outcome: "failure", reason: "inactive", userId: user[0].user_id, usernameAttempted: sanitizedInput });
     throw new AuthenticationError("Account is not active");
   }
 
@@ -92,6 +103,7 @@ export const login = asyncHandler(async (req: any, res: any) => {
 
   if (auth.length === 0) {
     logger.error(`No auth credentials found for user: ${sanitizedInput}`);
+    trackAuth(req, { kind: "login", outcome: "failure", reason: "no_credentials", userId: user[0].user_id, usernameAttempted: sanitizedInput });
     throw new AuthenticationError("Invalid credentials");
   }
 
@@ -104,11 +116,13 @@ export const login = asyncHandler(async (req: any, res: any) => {
     logger.warn(
       `Failed login attempt: invalid password for user ${sanitizedInput}`,
     );
+    trackAuth(req, { kind: "login", outcome: "failure", reason: "bad_password", userId: user[0].user_id, usernameAttempted: sanitizedInput });
     throw new AuthenticationError("Invalid credentials");
   }
 
   // Send OTP for 2FA
   const otp = await sendOTPByEmail(user[0].user_id, user[0].email, "LOGIN_2FA");
+  trackAuth(req, { kind: "otp", outcome: "info", method: "password", userId: user[0].user_id, usernameAttempted: sanitizedInput });
 
   // Generate temporary session token (short-lived).
   //
@@ -157,6 +171,7 @@ const completeLogin = async (
   userId: number,
   res: any,
   loginMethod: "OTP_EMAIL" | "GOOGLE_OAUTH",
+  req?: any,
 ) => {
   // Get user permissions
   const permissions = await getEffectivePermissions(userId);
@@ -326,6 +341,13 @@ const completeLogin = async (
     `Login completed for user: ${user[0].username} via ${loginMethod}`,
   );
 
+  trackAuth(req, {
+    kind: loginMethod === "GOOGLE_OAUTH" ? "google" : "login",
+    outcome: "success",
+    method: loginMethod === "GOOGLE_OAUTH" ? "google" : "password_otp",
+    userId,
+  });
+
   // Record activity
   await recordActivity(
     userId,
@@ -365,10 +387,11 @@ export const verifyOTP = asyncHandler(async (req: any, res: any) => {
   // Verify OTP
   const isValidOTP = await verifyOTPUtil(userId, otp, "LOGIN_2FA");
   if (!isValidOTP) {
+    trackAuth(req, { kind: "otp", outcome: "failure", reason: "otp_failed", userId });
     throw new AuthenticationError("Invalid or expired OTP");
   }
 
-  await completeLogin(userId, res, "OTP_EMAIL");
+  await completeLogin(userId, res, "OTP_EMAIL", req);
 });
 
 // "Sign in with Google" — the frontend obtains a Google ID token (via Google
@@ -398,6 +421,7 @@ export const googleLogin = asyncHandler(async (req: any, res: any) => {
     payload = ticket.getPayload();
   } catch (error) {
     logger.warn(`Google ID token verification failed: ${error}`);
+    trackAuth(req, { kind: "google", outcome: "failure", reason: "google_invalid" });
     throw new AuthenticationError("Invalid or expired Google credential");
   }
 
@@ -417,12 +441,14 @@ export const googleLogin = asyncHandler(async (req: any, res: any) => {
 
   if (user.length === 0) {
     logger.warn(`Google login attempt for unknown email: ${sanitizedEmail}`);
+    trackAuth(req, { kind: "google", outcome: "failure", reason: "unknown_user", usernameAttempted: sanitizedEmail });
     throw new AuthenticationError(
       "No NGA MIS account found for this Google email. Contact your administrator.",
     );
   }
 
   if (user[0].status !== "ACTIVE") {
+    trackAuth(req, { kind: "google", outcome: "failure", reason: "inactive", userId: user[0].user_id, usernameAttempted: sanitizedEmail });
     throw new AuthenticationError("Account is not active");
   }
 
@@ -441,7 +467,7 @@ export const googleLogin = asyncHandler(async (req: any, res: any) => {
       .where(eq(AuthCredential.user_id, user[0].user_id));
   }
 
-  await completeLogin(user[0].user_id, res, "GOOGLE_OAUTH");
+  await completeLogin(user[0].user_id, res, "GOOGLE_OAUTH", req);
 });
 
 export const getSession = asyncHandler(async (req: any, res: any) => {
@@ -559,6 +585,10 @@ export const logout = asyncHandler(async (req: any, res: any) => {
   // background so signing out never waits on another app.
   void notifyLogout(req.user.userId).catch(() => undefined);
 
+  // Presence and sessions end now rather than after the 90 s / 30 min timeouts.
+  signOutEverywhereLocal(req.user.userId);
+  trackAuth(req, { kind: "logout", outcome: "info", initiator: "user", userId: req.user.userId });
+
   successResponse(res, "Logged out successfully");
 });
 
@@ -587,6 +617,7 @@ export const forgotPassword = asyncHandler(async (req: any, res: any) => {
     logger.info(
       `Password reset requested for non-existent email: ${sanitizedEmail}`,
     );
+    trackAuth(req, { kind: "password_reset", outcome: "failure", reason: "unknown_user", usernameAttempted: sanitizedEmail });
     successResponse(
       res,
       "If an account exists with this email, a verification code has been sent.",
@@ -596,6 +627,7 @@ export const forgotPassword = asyncHandler(async (req: any, res: any) => {
 
   // Send OTP for password reset
   await sendOTPByEmail(user[0].user_id, user[0].email, "PASSWORD_RESET");
+  trackAuth(req, { kind: "password_reset", outcome: "info", userId: user[0].user_id, usernameAttempted: sanitizedEmail });
 
   // Generate temporary token for password reset flow. Carries tokenVersion
   // for the same reason as the login temp token above: /auth/verify-reset-otp
@@ -691,6 +723,7 @@ export const resetPassword = asyncHandler(async (req: any, res: any) => {
   }
 
   logger.info(`Password reset completed for userId: ${userId}`);
+  trackAuth(req, { kind: "password_reset", outcome: "success", userId });
 
   // Record activity
   await recordActivity(
@@ -759,6 +792,7 @@ export const changePassword = asyncHandler(async (req: any, res: any) => {
     .where(eq(AuthCredential.user_id, userId));
 
   logger.info(`Password changed for userId: ${userId}`);
+  trackAuth(req, { kind: "password_change", outcome: "success", userId });
 
   // Record activity
   await recordActivity(

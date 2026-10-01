@@ -9,6 +9,7 @@ import React, {
 import { getCurrentUser, UserWithProfile, UserRole } from "../api/users";
 import { logout as apiLogout, checkSession } from "../api/auth";
 import { removeToken, getToken } from "../utils/auth";
+import { endActivity } from "../vendor/nga-activity";
 
 /** Last profile seen on this device -- only ever used while offline (refreshUser). */
 const USER_CACHE_KEY = "nga.user.offlineCache";
@@ -105,6 +106,8 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({
   };
 
   const logout = () => {
+    // Tell Usage & Monitoring this tab's session is over (sent with the old token).
+    void endActivity();
     apiLogout();
     removeToken();
     rememberUser(null);

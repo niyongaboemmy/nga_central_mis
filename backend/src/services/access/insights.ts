@@ -46,6 +46,29 @@ export const MIS_INSIGHTS: Record<string, InsightDef & { unit: string }> = {
     levels: ["SCHOOL", "PROGRAM", "GRADE", "CLASS_GROUP", "DEPARTMENT"],
     unit: "%",
   },
+  // Platform usage (USAGE_ANALYTICS_IMPLEMENTATION_PLAN.md §11): who in the area actually
+  // uses the platform. Aggregates only; small groups are suppressed like every insight.
+  "usage.student_active_rate": {
+    label: "Students active on the platform (last 7 days)",
+    capability: "USAGE_INSIGHTS_VIEW",
+    minDepth: "summary",
+    levels: ["SCHOOL", "PROGRAM", "GRADE", "CLASS_GROUP"],
+    unit: "%",
+  },
+  "usage.teacher_active_rate": {
+    label: "Teachers active on the platform (last 7 days)",
+    capability: "USAGE_INSIGHTS_VIEW",
+    minDepth: "summary",
+    levels: ["SCHOOL", "PROGRAM", "GRADE", "CLASS_GROUP"],
+    unit: "%",
+  },
+  "usage.student_dormant_rate": {
+    label: "Students with no activity for 14 days",
+    capability: "USAGE_INSIGHTS_VIEW",
+    minDepth: "summary",
+    levels: ["SCHOOL", "PROGRAM", "GRADE", "CLASS_GROUP"],
+    unit: "%",
+  },
   "elearning.progress": {
     label: "E-learning courses published",
     capability: "VIEW_ALL_COURSES",
@@ -101,6 +124,42 @@ const BASE_SQL: Record<string, ReturnType<typeof sql>> = {
     LEFT JOIN Subject s ON s.subject_id = lr.subject_id
     WHERE lr.delivery_date >= DATE_SUB(CURDATE(), INTERVAL 90 DAY)
     GROUP BY p.program_id, p.name, g.grade_id, g.name, cg.class_group_id, cg.name, s.subject_id, s.name`,
+  "usage.student_active_rate": sql`
+    SELECT p.program_id, p.name AS program_name, g.grade_id, g.name AS grade_name,
+           cg.class_group_id, cg.name AS class_group_name, NULL AS subject_id, NULL AS subject_name,
+           COUNT(DISTINCT scg.user_id) AS n, COUNT(DISTINCT a.user_id) AS hit
+    FROM StudentClassGroup scg
+    JOIN AcademicYear ay ON ay.academic_year_id = scg.academic_year_id AND ay.is_current = 1
+    JOIN ClassGroup cg ON cg.class_group_id = scg.class_group_id
+    JOIN Grade g ON g.grade_id = cg.grade_id
+    JOIN Program p ON p.program_id = g.program_id
+    LEFT JOIN (SELECT DISTINCT user_id FROM AnalyticsUserDay WHERE is_active = 1 AND day >= DATE_SUB(CURDATE(), INTERVAL 6 DAY)) a ON a.user_id = scg.user_id
+    WHERE scg.status = 'ACTIVE'
+    GROUP BY p.program_id, p.name, g.grade_id, g.name, cg.class_group_id, cg.name`,
+  "usage.teacher_active_rate": sql`
+    SELECT p.program_id, p.name AS program_name, g.grade_id, g.name AS grade_name,
+           cg.class_group_id, cg.name AS class_group_name, s.subject_id, s.name AS subject_name,
+           COUNT(DISTINCT tsa.user_id) AS n, COUNT(DISTINCT a.user_id) AS hit
+    FROM TeacherSubjectAssignment tsa
+    JOIN AcademicYear ay ON ay.academic_year_id = tsa.academic_year_id AND ay.is_current = 1
+    JOIN ClassGroup cg ON cg.class_group_id = tsa.class_group_id
+    JOIN Grade g ON g.grade_id = cg.grade_id
+    JOIN Program p ON p.program_id = g.program_id
+    LEFT JOIN Subject s ON s.subject_id = tsa.subject_id
+    LEFT JOIN (SELECT DISTINCT user_id FROM AnalyticsUserDay WHERE is_active = 1 AND day >= DATE_SUB(CURDATE(), INTERVAL 6 DAY)) a ON a.user_id = tsa.user_id
+    GROUP BY p.program_id, p.name, g.grade_id, g.name, cg.class_group_id, cg.name, s.subject_id, s.name`,
+  "usage.student_dormant_rate": sql`
+    SELECT p.program_id, p.name AS program_name, g.grade_id, g.name AS grade_name,
+           cg.class_group_id, cg.name AS class_group_name, NULL AS subject_id, NULL AS subject_name,
+           COUNT(DISTINCT scg.user_id) AS n, COUNT(DISTINCT IF(a.user_id IS NULL, scg.user_id, NULL)) AS hit
+    FROM StudentClassGroup scg
+    JOIN AcademicYear ay ON ay.academic_year_id = scg.academic_year_id AND ay.is_current = 1
+    JOIN ClassGroup cg ON cg.class_group_id = scg.class_group_id
+    JOIN Grade g ON g.grade_id = cg.grade_id
+    JOIN Program p ON p.program_id = g.program_id
+    LEFT JOIN (SELECT DISTINCT user_id FROM AnalyticsUserDay WHERE day >= DATE_SUB(CURDATE(), INTERVAL 13 DAY)) a ON a.user_id = scg.user_id
+    WHERE scg.status = 'ACTIVE'
+    GROUP BY p.program_id, p.name, g.grade_id, g.name, cg.class_group_id, cg.name`,
   "elearning.progress": sql`
     SELECT p.program_id, p.name AS program_name, g.grade_id, g.name AS grade_name,
            cg.class_group_id, cg.name AS class_group_name, s.subject_id, s.name AS subject_name,

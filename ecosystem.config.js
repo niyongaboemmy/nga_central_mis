@@ -7,6 +7,8 @@ module.exports = {
       instances: 1,
       exec_mode: "fork",
       max_memory_restart: "500M",
+      // Usage & Monitoring flushes buffered activity on SIGTERM (docs/PLATFORM_ACTIVITY.md).
+      kill_timeout: 8000,
       env: {
         NODE_ENV: "production",
       },

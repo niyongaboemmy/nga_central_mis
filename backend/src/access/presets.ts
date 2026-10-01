@@ -66,7 +66,7 @@ const MIS_PRESETS: PresetDef[] = [
     scopes: ["PLATFORM"],
     maxHolders: 2,
     platformOnly: true,
-    caps: [
+    caps: [["USAGE_INSIGHTS_VIEW", "summary"], 
       ...ACCESS_ADMIN,
       "ACCESS_ROLES_MANAGE",
       "ACCESS_RULES_MANAGE",
@@ -74,6 +74,12 @@ const MIS_PRESETS: PresetDef[] = [
       "ACCESS_PREVIEW_AS",
       "ACCESS_AUDIT_VIEW",
       "MANAGE_DEPARTMENTS",
+      "ANALYTICS_VIEW",
+      "ANALYTICS_LIVE_VIEW",
+      "ANALYTICS_USER_VIEW",
+      "ANALYTICS_LOCATION_VIEW",
+      "ANALYTICS_USER_CONTROL",
+      "ANALYTICS_CONFIGURE",
     ],
   },
   {
@@ -84,7 +90,7 @@ const MIS_PRESETS: PresetDef[] = [
     category: "Leadership",
     scopes: ["SCHOOL"],
     maxHolders: 1,
-    caps: [
+    caps: [["USAGE_INSIGHTS_VIEW", "summary"], 
       ...ACCESS_ADMIN,
       "ACCESS_ROLES_MANAGE",
       "ACCESS_RULES_MANAGE",
@@ -121,7 +127,7 @@ const MIS_PRESETS: PresetDef[] = [
     category: "Leadership",
     scopes: ["SCHOOL"],
     maxHolders: 1,
-    caps: [
+    caps: [["USAGE_INSIGHTS_VIEW", "summary"], 
       ...ACCESS_ADMIN,
       "MANAGE_DEPARTMENTS",
       "VIEW_ACADEMICS",
@@ -151,7 +157,7 @@ const MIS_PRESETS: PresetDef[] = [
     description: "Academic lead for one or more programmes.",
     category: "Leadership",
     scopes: ["PROGRAM", "SCHOOL"],
-    caps: [
+    caps: [["USAGE_INSIGHTS_VIEW", "summary"], 
       ...ACCESS_ADMIN,
       "VIEW_ACADEMICS",
       "VIEW_PROGRAM_USERS",
@@ -181,7 +187,7 @@ const MIS_PRESETS: PresetDef[] = [
     description: "Coordinates a programme; granted automatically from programme-lead assignments.",
     category: "Leadership",
     scopes: ["PROGRAM"],
-    caps: [...ACCESS_ADMIN, ["VIEW_ATTENDANCE", "summary"], ["VIEW_RESULTS", "summary"]],
+    caps: [["USAGE_INSIGHTS_VIEW", "summary"], ...ACCESS_ADMIN, ["VIEW_ATTENDANCE", "summary"], ["VIEW_RESULTS", "summary"]],
   },
   {
     key: "deputy_head_discipline",
@@ -229,7 +235,7 @@ const MIS_PRESETS: PresetDef[] = [
     description: "Year-group lead: attendance and first-line discipline across a grade.",
     category: "Leadership",
     scopes: ["GRADE"],
-    caps: [
+    caps: [["USAGE_INSIGHTS_VIEW", "summary"], 
       "VIEW_LEADERSHIP_STRUCTURE",
       "VIEW_PROGRAM_USERS",
       "VIEW_ACADEMIC_CALENDAR",
@@ -244,7 +250,7 @@ const MIS_PRESETS: PresetDef[] = [
     description: "Homeroom teacher of a class group; granted automatically from class-teacher assignments.",
     category: "Teaching",
     scopes: ["CLASS_GROUP", "GRADE"],
-    caps: ["VIEW_LEADERSHIP_STRUCTURE", ["VIEW_ATTENDANCE", "detail"], ["VIEW_RESULTS", "detail"]],
+    caps: [["USAGE_INSIGHTS_VIEW", "summary"], "VIEW_LEADERSHIP_STRUCTURE", ["VIEW_ATTENDANCE", "detail"], ["VIEW_RESULTS", "detail"]],
   },
   {
     key: "subject_teacher",
@@ -291,7 +297,7 @@ const MIS_PRESETS: PresetDef[] = [
       "Add-on: programme dashboards and grade/class summaries (results, attendance, discipline trends) with no individual records.",
     category: "Leadership",
     scopes: ["SCHOOL", "PROGRAM"],
-    caps: [
+    caps: [["USAGE_INSIGHTS_VIEW", "summary"], 
       ["VIEW_RESULTS", "summary"],
       ["VIEW_ATTENDANCE", "summary"],
       ["VIEW_REPORTS", "summary"],
@@ -363,6 +369,8 @@ const MIS_PRESETS: PresetDef[] = [
       "ACCESS_STUDIO_VIEW",
       "ACCESS_PREVIEW_AS",
       "ACCESS_AUDIT_VIEW",
+      "ANALYTICS_VIEW",
+      "ANALYTICS_LIVE_VIEW",
     ],
   },
   // Personas -- baseline self-service, granted by rules at SELF / CHILDREN.

@@ -45,5 +45,13 @@ export default defineConfig({
   build: {
     outDir: "dist",
     sourcemap: true,
+    rollupOptions: {
+      output: {
+        // recharts is used by eagerly and lazily loaded pages alike (dashboards and the
+        // Usage & Monitoring console). One shared chunk avoids Rollup splitting its
+        // circular re-exports across chunks, which can break execution order.
+        manualChunks: (id) => (/node_modules\/(recharts|d3-|victory-vendor)/.test(id) ? "vendor-charts" : undefined),
+      },
+    },
   },
 });
