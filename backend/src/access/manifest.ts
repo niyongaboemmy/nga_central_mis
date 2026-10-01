@@ -31,7 +31,7 @@ const SCHOOL_ONLY = { scopeable: false };
 export const MIS_MANIFEST = defineManifest({
   app: "mis",
   name: "Central MIS",
-  version: "2026.09.27",
+  version: "2026.10.01",
   capabilities: {
     // People & accounts
     MANAGE_USERS: W("Create, update and deactivate users", "PEOPLE"),
@@ -134,6 +134,16 @@ export const MIS_MANIFEST = defineManifest({
     MANAGE_SETTINGS: W("Manage system settings", "SYSTEM", SCHOOL_ONLY),
     DATABASE_MANAGEMENT: W("Database management tool", "SYSTEM", SCHOOL_ONLY),
     VIEW_ALL_LOGS_HISTORY: R("View system activity logs", "SYSTEM", ["detail"], SCHOOL_ONLY),
+
+    // Platform usage analytics & monitoring (USAGE_ANALYTICS_IMPLEMENTATION_PLAN.md §11).
+    // All v2-only (access/v2Only.ts), and named so that none contains a spoke-app role keyword
+    // ("ADMIN", "MANAGE_USER", ...), which accessPhase1Model.test.ts checks.
+    ANALYTICS_VIEW: R("View platform usage reports (aggregates)", "SYSTEM", ["summary", "detail"], SCHOOL_ONLY),
+    ANALYTICS_LIVE_VIEW: R("See who is online right now (named)", "SYSTEM", ["detail"], SCHOOL_ONLY),
+    ANALYTICS_USER_VIEW: R("Open a person's or visitor's activity, IPs and devices", "SYSTEM", ["detail"], SCHOOL_ONLY),
+    ANALYTICS_LOCATION_VIEW: R("See precise (browser) location fixes", "SYSTEM", ["detail"], SCHOOL_ONLY),
+    ANALYTICS_USER_CONTROL: W("Sign out, suspend, message, watch or block people and devices", "SYSTEM", SCHOOL_ONLY),
+    ANALYTICS_CONFIGURE: W("Configure analytics, retention, exclusions and data deletion", "SYSTEM", SCHOOL_ONLY),
   },
 });
 

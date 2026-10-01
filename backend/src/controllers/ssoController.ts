@@ -1,3 +1,5 @@
+import { trackAuth } from "../services/activity/authEvents";
+import { activitySourceClients } from "../services/activity/apps";
 import jwt from "jsonwebtoken";
 import { getPublicSystems } from "../utils/publicSystems";
 import crypto from "crypto";
@@ -86,6 +88,10 @@ export const authorizeSSO = asyncHandler(async (req: any, res: any) => {
   logger.info(
     `Generated SSO auth code for user ${userId} and client ${client_id}`,
   );
+
+  // "Opened Task Mentor / Tendo / Tupo" -- counted even before an app is instrumented.
+  const launchedApp = activitySourceClients().get(String(client_id));
+  trackAuth(req, { kind: "app_launch", outcome: "success", userId, app: launchedApp ?? null, method: String(client_id).slice(0, 20) });
 
   successResponse(res, "Authorization code generated", { code, state });
 });

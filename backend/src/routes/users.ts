@@ -130,7 +130,18 @@ router.post(
 
 router.get("/:id", authenticate, getUser);
 router.get("/:id/programs", authenticate, getUserPrograms);
-router.get("/:userId/activities", authenticate, getUserActivities);
+// Someone's activity feed: their own, or staff who manage users / read the logs (plan G5).
+router.get(
+  "/:userId/activities",
+  authenticate,
+  (req: any, res: any, next: any) => {
+    const own = Number(req.params.userId) === Number(req.user.userId);
+    const perms: string[] = req.user.permissions ?? [];
+    if (own || perms.includes("MANAGE_USERS") || perms.includes("VIEW_ALL_LOGS_HISTORY")) return next();
+    return res.status(403).json({ message: "Forbidden" });
+  },
+  getUserActivities,
+);
 router.put(
   "/:id/profile",
   authenticate,

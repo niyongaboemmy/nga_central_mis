@@ -29,9 +29,15 @@ import accessRoutes from "./routes/access";
 import homeRoutes from "./routes/home";
 import elearningRoutes from "./routes/elearning";
 import reminderRoutes from "./routes/reminders";
+import activityRoutes from "./routes/activity";
+import monitorRoutes from "./routes/monitor";
 import { jwks, ssoIssuer } from "./services/sso/signingKey";
 
 const app = express();
+
+// nginx terminates TLS on the same box and forwards X-Forwarded-For. Without this,
+// req.ip is always 127.0.0.1 (plan G1), and analytics, rate limits and logs all see one client.
+app.set("trust proxy", "loopback");
 
 // CORS configuration
 app.use(
@@ -46,6 +52,11 @@ app.use(
     ],
   }),
 );
+
+// Platform activity collection (USAGE_ANALYTICS_IMPLEMENTATION_PLAN.md §5). Mounted
+// before the 30 MB JSON parser below: it brings its own small parsers (sendBeacon
+// posts text/plain, relays post gzip), and it is far too hot to log request bodies.
+app.use("/activity", activityRoutes);
 
 // Body parsing middleware
 // 30mb (not the default 100kb, nor the old 10mb) because lesson note images are now
@@ -124,6 +135,8 @@ app.use("/reminders", reminderRoutes);
 // among the API routers so it is obvious it shares no middleware with the
 // user-session routes above it.
 app.use("/integrations", integrationRoutes);
+// Usage analytics & live monitoring console (ANALYTICS_* capabilities).
+app.use("/monitor", monitorRoutes);
 
 app.post("/test-post", (req, res) =>
   res.json({ success: true, message: "Root POST test works" }),

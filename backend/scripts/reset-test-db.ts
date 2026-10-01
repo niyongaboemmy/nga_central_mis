@@ -22,7 +22,7 @@ async function main() {
   const user = process.env.DB_USERNAME || "root";
   const password = process.env.DB_PASSWORD || "";
   const sourceDb = process.env.DB_NAME || "nga_central_mis";
-  const testDb = `${sourceDb}_test`;
+  const testDb = process.env.TEST_DB_NAME || `${sourceDb}_test`;
 
   const admin = await mysql.createConnection({ host, port, user, password });
 

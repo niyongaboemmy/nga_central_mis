@@ -74,6 +74,12 @@ const MIS_PRESETS: PresetDef[] = [
       "ACCESS_PREVIEW_AS",
       "ACCESS_AUDIT_VIEW",
       "MANAGE_DEPARTMENTS",
+      "ANALYTICS_VIEW",
+      "ANALYTICS_LIVE_VIEW",
+      "ANALYTICS_USER_VIEW",
+      "ANALYTICS_LOCATION_VIEW",
+      "ANALYTICS_USER_CONTROL",
+      "ANALYTICS_CONFIGURE",
     ],
   },
   {
@@ -363,6 +369,8 @@ const MIS_PRESETS: PresetDef[] = [
       "ACCESS_STUDIO_VIEW",
       "ACCESS_PREVIEW_AS",
       "ACCESS_AUDIT_VIEW",
+      "ANALYTICS_VIEW",
+      "ANALYTICS_LIVE_VIEW",
     ],
   },
   // Personas -- baseline self-service, granted by rules at SELF / CHILDREN.

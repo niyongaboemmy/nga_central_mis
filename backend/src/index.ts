@@ -9,16 +9,16 @@ import config from "./config";
 import logger from "./utils/logger";
 import app from "./app";
 
-// Graceful shutdown
-process.on("SIGTERM", () => {
-  logger.info("SIGTERM received, shutting down gracefully");
-  process.exit(0);
-});
-
-process.on("SIGINT", () => {
-  logger.info("SIGINT received, shutting down gracefully");
-  process.exit(0);
-});
+// Graceful shutdown: flush buffered activity first (pm2 kill_timeout allows ~8 s).
+const shutdown = (signal: string) => {
+  logger.info(`${signal} received, shutting down gracefully`);
+  const done = () => process.exit(0);
+  import("./services/activity/engine")
+    .then((m) => Promise.race([m.flushOnShutdown(), new Promise((r) => setTimeout(r, 5_000))]))
+    .then(done, done);
+};
+process.on("SIGTERM", () => shutdown("SIGTERM"));
+process.on("SIGINT", () => shutdown("SIGINT"));
 
 const server = app.listen(config.port, () => {
   logger.info(
@@ -78,6 +78,14 @@ if (config.nodeEnv !== "test") {
       setInterval(reconcile, 24 * 60 * 60 * 1000).unref();
     })
     .catch(() => undefined);
+}
+// Platform activity engine (USAGE_ANALYTICS_IMPLEMENTATION_PLAN.md §9): buffered writes,
+// presence, sessions and rollups. Fails soft when migration 095 is absent.
+// ACTIVITY_JOBS=false switches the timers off (collection still answers 202).
+if (config.nodeEnv !== "test" && process.env.ACTIVITY_JOBS !== "false") {
+  import("./services/activity/engine")
+    .then(({ startActivityEngine }) => startActivityEngine())
+    .catch((error) => logger.error("[activity] engine failed to start", { error }));
 }
 // Reminder Hub (REMINDERS_SOLUTION_PROPOSAL.md §4): a one-minute dispatcher
 // plus a half-hourly re-plan of everyone who has reminders on. Both are
