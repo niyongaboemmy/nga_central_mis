@@ -84,28 +84,28 @@ export const ATTENDANCE_META: Record<AttendanceStatus, { label: string; short: s
     short: "P",
     key: "1",
     cls: "text-emerald-800 dark:text-emerald-200",
-    active: "bg-emerald-600 text-white border-emerald-600 dark:bg-emerald-500 dark:border-emerald-500",
+    active: "bg-emerald-700 text-white border-emerald-700",
   },
   LATE: {
     label: "Late",
     short: "L",
     key: "2",
     cls: "text-amber-800 dark:text-amber-200",
-    active: "bg-amber-500 text-white border-amber-500",
+    active: "bg-amber-700 text-white border-amber-700",
   },
   ABSENT: {
     label: "Absent",
     short: "A",
     key: "3",
     cls: "text-rose-800 dark:text-rose-200",
-    active: "bg-rose-600 text-white border-rose-600 dark:bg-rose-500 dark:border-rose-500",
+    active: "bg-rose-700 text-white border-rose-700",
   },
   EXCUSED: {
     label: "Excused",
     short: "E",
     key: "4",
     cls: "text-sky-800 dark:text-sky-200",
-    active: "bg-sky-600 text-white border-sky-600 dark:bg-sky-500 dark:border-sky-500",
+    active: "bg-sky-700 text-white border-sky-700",
   },
 };
 

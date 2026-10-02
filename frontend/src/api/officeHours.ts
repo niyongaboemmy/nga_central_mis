@@ -254,6 +254,58 @@ export interface Closure {
   scope: "ALL" | "OFFICE_HOURS";
 }
 
+
+export interface RegisterRow {
+  student_id: number;
+  assignment_id: number | null;
+  is_drop_in: boolean;
+  status: AttendanceStatus | null;
+  excuse_reason: string | null;
+  arrived_at: string | null;
+  note: string | null;
+  outcome: number | null;
+  follow_up: boolean;
+  source: string;
+  marked_at: string | null;
+  first_name: string | null;
+  last_name: string | null;
+  registration_number: string | null;
+  class_group_name: string | null;
+  notice: { reason: string; note: string | null } | null;
+}
+
+export interface RegisterData {
+  session: OfficeHourSession & { register_saved_by_name: string | null; register_last_saved_at: string | null };
+  roster: RegisterRow[];
+  can_edit: boolean;
+  window: { opens_at: string; not_yet: boolean; closed: boolean; last_edit_day: string };
+  late_after_minutes: number;
+  excuse_reasons?: string[];
+}
+
+export interface RegisterRecordInput {
+  student_id: number;
+  status: AttendanceStatus | null;
+  excuse_reason?: string | null;
+  arrived_at?: string | null;
+  note?: string | null;
+  outcome?: number | null;
+  follow_up?: boolean;
+}
+
+export interface UnmarkedSession {
+  session_id: number;
+  schedule_id: number;
+  session_date: string;
+  start_time: string;
+  end_time: string;
+  title: string;
+  host_teacher_id: number;
+  host_name: string | null;
+  expected: number;
+  days_overdue: number;
+}
+
 export interface ScheduleInput {
   academic_term_id?: number | null;
   teacher_id?: number;
@@ -321,6 +373,16 @@ export const officeHoursApi = {
   restoreSession: (id: number) => api.post<Envelope<OfficeHourSession>>(`/office-hours/sessions/${id}/restore`),
   setHost: (id: number, teacherId: number) => api.post<Envelope<OfficeHourSession>>(`/office-hours/sessions/${id}/host`, { teacher_id: teacherId }),
 
+  register: (sessionId: number) => api.get<Envelope<RegisterData>>(`/office-hours/sessions/${sessionId}/register`),
+  saveRegister: (sessionId: number, body: { records: RegisterRecordInput[]; topic?: string | null; version?: number }) =>
+    api.put<Envelope<RegisterData>>(`/office-hours/sessions/${sessionId}/register`, body),
+  registerHistory: (sessionId: number) =>
+    api.get<Envelope<Array<{ history_id: number; student_id: number; student_name: string | null; previous_status: string | null; new_status: string | null; changed_by_name: string | null; changed_at: string; source: string }>>>(
+      `/office-hours/sessions/${sessionId}/history`,
+    ),
+  searchStudents: (q: string) => api.get<Envelope<StudentCard[]>>("/office-hours/students", { params: { q } }),
+  adminUnmarked: (from?: string, to?: string) => api.get<Envelope<UnmarkedSession[]>>("/office-hours/admin/unmarked", { params: { from, to } }),
+
   me: (params: { term_id?: number | null; student_id?: number } = {}) =>
     api.get<Envelope<StudentOverview>>("/office-hours/me", {
       params: { ...(params.term_id ? { term_id: params.term_id } : {}), ...(params.student_id ? { student_id: params.student_id } : {}) },
@@ -342,6 +404,7 @@ export const officeHoursApi = {
     api.get<Envelope<{ term_id: number; schedules: OfficeHourSchedule[] }>>("/office-hours/admin/schedules", { params }),
   override: (body: { student_id: number; to_schedule_id: number; reason: string }) =>
     api.post<Envelope<{ assignment_id: number }>>("/office-hours/admin/assignments/override", body),
+  nudgeUnmarked: (sessionIds: number[]) => api.post<Envelope<{ notified: number }>>("/office-hours/admin/unmarked/nudge", { session_ids: sessionIds }),
   adminTransfers: () => api.get<Envelope<{ incoming: TransferRequest[] }>>("/office-hours/admin/transfer-requests"),
 
   closures: (from?: string, to?: string) => api.get<Envelope<Closure[]>>("/office-hours/closures", { params: { from, to } }),

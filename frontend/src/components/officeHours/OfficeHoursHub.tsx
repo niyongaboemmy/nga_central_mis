@@ -15,6 +15,7 @@ import {
 } from "../../api/officeHours";
 import ScheduleDrawer from "./ScheduleDrawer";
 import RegisterSheet from "./RegisterSheet";
+import { startRegisterQueueFlusher } from "./offlineQueue";
 import OfficeHoursReports from "./reports/OfficeHoursReports";
 import { Card, CardTitle, EmptyState, Muted, primaryBtn, secondaryBtn, SessionStatePill, Spinner } from "./ohUi";
 
@@ -120,6 +121,17 @@ const OfficeHoursHub: React.FC = () => {
   useEffect(() => {
     void load();
   }, [load]);
+
+  // Registers saved while offline are sent as soon as the connection returns.
+  useEffect(
+    () =>
+      startRegisterQueueFlusher((r) => {
+        if (r.sent) showToast(`${r.sent} register${r.sent === 1 ? "" : "s"} saved offline ${r.sent === 1 ? "was" : "were"} sent`, "success");
+        if (r.conflicts) showToast("A register saved offline clashed with a newer one — open it to check", "warning");
+        void load();
+      }),
+    [load, showToast],
+  );
 
   // Deep link from the timetable band: /office-hours?new=1&day=3
   useEffect(() => {

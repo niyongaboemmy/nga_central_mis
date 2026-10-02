@@ -426,7 +426,8 @@ const DashboardCalendarWidget: React.FC = () => {
       )}
 
       {/* Empty state */}
-      {!loading && gridEntries.length === 0 && (
+      {/* Office hours alone are enough to draw the week. */}
+      {!loading && gridEntries.length === 0 && officeHours.length === 0 && (
         <div className="flex flex-col items-center justify-center h-40 text-center">
           <Calendar className="w-10 h-10 text-gray-300 dark:text-gray-600 mb-3" />
           <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
@@ -439,7 +440,7 @@ const DashboardCalendarWidget: React.FC = () => {
       )}
 
       {/* Calendar Grid */}
-      {!loading && gridEntries.length > 0 && (
+      {!loading && (gridEntries.length > 0 || officeHours.length > 0) && (
         <ReadOnlyCalendarGrid
           slots={gridEntries}
           weekDates={weekDates}

@@ -35,7 +35,10 @@ import { cancelSession, CANCEL_REASONS, ensureSessions, restoreSession, setSessi
 import { assertValidTransferBody, cancelTransfer, decideTransfer, requestTransfer, transfersFor } from "../services/officeHours/transfers";
 import { createClosure, deleteClosure, listClosures, previewClosure } from "../services/officeHours/closures";
 import { assertCanSeeStudent, bandFor, childrenOf, studentOverview } from "../services/officeHours/views";
-import { studentCards } from "../services/officeHours/eligibility";
+import { searchStudents, studentCards } from "../services/officeHours/eligibility";
+import { openRegister, registerHistory, saveRegister, EXCUSE_REASONS } from "../services/officeHours/register";
+import { statsByAssignment, statsByStudent } from "../services/officeHours/metrics";
+import { listUnmarked } from "../services/officeHours/admin";
 
 /**
  * Mandatory office hours (OFFICE_HOURS_IMPLEMENTATION_PLAN.md §7.2).
@@ -101,7 +104,8 @@ router.get(
     const studentId = toInt(req.query.student_id) ?? actor.userId;
     const term = await loadTerm(termId);
     await assertCanSeeStudent(actor, studentId, term.yearId);
-    successResponse(res, "Office hours", { student_id: studentId, ...(await studentOverview(studentId, termId)) });
+    const stats = (await statsByStudent({ studentIds: [studentId], fromYmd: term.startYmd, toYmd: term.endYmd })).get(studentId);
+    successResponse(res, "Office hours", { student_id: studentId, ...(await studentOverview(studentId, termId)), stats });
   }),
 );
 
@@ -115,7 +119,8 @@ router.get(
     const ids = await childrenOf(actor.userId);
     const cards = await studentCards(ids, term.yearId);
     const children = [];
-    for (const id of ids) children.push({ student_id: id, student: cards.get(id) ?? null, ...(await studentOverview(id, termId)) });
+    const stats = await statsByStudent({ studentIds: ids, fromYmd: term.startYmd, toYmd: term.endYmd });
+    for (const id of ids) children.push({ student_id: id, student: cards.get(id) ?? null, ...(await studentOverview(id, termId)), stats: stats.get(id) });
     successResponse(res, "Children's office hours", { children });
   }),
 );
@@ -190,7 +195,9 @@ router.get(
     }
     if (schedule.status === "ACTIVE") await ensureSessions(schedule.schedule_id);
     const [shaped] = await serializeSchedules([schedule]);
-    const roster = await rosterOf(schedule);
+    const rows = await rosterOf(schedule);
+    const stats = await statsByAssignment(rows.map((r) => r.assignment_id));
+    const roster = rows.map((r) => ({ ...r, stats: stats.get(r.assignment_id) }));
     const sessions = await sessionsBetween({ scheduleIds: [schedule.schedule_id], fromYmd: schedule.effective_from, toYmd: schedule.effective_to });
     successResponse(res, "Office hours", { schedule: shaped, roster, sessions });
   }),
@@ -363,6 +370,42 @@ router.post(
   }),
 );
 
+router.get(
+  "/sessions/:id/register",
+  anyOfficeHours,
+  asyncHandler(async (req, res) => {
+    successResponse(res, "Register", { ...(await openRegister(actorOf(req), idParam(req.params.id))), excuse_reasons: EXCUSE_REASONS });
+  }),
+);
+router.put(
+  "/sessions/:id/register",
+  teacher,
+  asyncHandler(async (req, res) => {
+    successResponse(res, "Register saved", await saveRegister(actorOf(req), idParam(req.params.id), req.body ?? {}));
+  }),
+);
+router.get(
+  "/sessions/:id/history",
+  teacher,
+  asyncHandler(async (req, res) => {
+    const actor = actorOf(req);
+    await openRegister(actor, idParam(req.params.id));
+    successResponse(res, "Register history", await registerHistory(idParam(req.params.id)));
+  }),
+);
+
+/** Drop-in search: any active student this year, name and class only. */
+router.get(
+  "/students",
+  teacher,
+  asyncHandler(async (req, res) => {
+    const q = typeof req.query.q === "string" ? req.query.q.trim() : "";
+    if (q.length < 2) throw new ValidationError("Type at least two letters");
+    const term = await loadTerm(await resolveTermId(req.query.term_id));
+    successResponse(res, "Students", await searchStudents({ yearId: term.yearId, q, limit: 20 }));
+  }),
+);
+
 // ---------------------------------------------------------------- leadership
 router.get(
   "/admin/schedules",
@@ -385,6 +428,15 @@ router.post(
     const { studentId, toScheduleId } = assertValidTransferBody(req.body);
     const result = await overrideAssignment(actorOf(req), studentId, toScheduleId, req.body?.reason);
     successResponse(res, "Student moved", result, 201);
+  }),
+);
+router.get(
+  "/admin/unmarked",
+  leadership,
+  asyncHandler(async (req, res) => {
+    const to = isYmd(req.query.to) ? (req.query.to as string) : todayYmd();
+    const from = isYmd(req.query.from) ? (req.query.from as string) : addDaysYmd(to, -30);
+    successResponse(res, "Unmarked registers", await listUnmarked(from, to));
   }),
 );
 router.get(

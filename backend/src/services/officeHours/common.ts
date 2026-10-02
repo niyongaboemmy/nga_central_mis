@@ -12,10 +12,20 @@ import { addDaysYmd, dbDateToYmd, dowOfYmd, kigaliParts, parseClock } from "../r
  * 1 = Monday ... 5 = Friday, so dowOfYmd() compares directly.
  */
 
-let clock: () => Date = () => new Date();
+const realClock = (): (() => Date) => {
+  // End-to-end runs pin the server clock (e.g. inside a session) with
+  // OFFICE_HOURS_FAKE_NOW=<ISO instant>. Never honoured in production.
+  const fake = process.env.OFFICE_HOURS_FAKE_NOW;
+  if (fake && process.env.NODE_ENV !== "production" && !Number.isNaN(Date.parse(fake))) {
+    const offset = Date.parse(fake) - Date.now();
+    return () => new Date(Date.now() + offset);
+  }
+  return () => new Date();
+};
+let clock: () => Date = realClock();
 /** Test hook: pin the module's notion of "now". Pass null to restore. */
 export const setOfficeHoursClock = (fn: (() => Date) | null) => {
-  clock = fn ?? (() => new Date());
+  clock = fn ?? realClock();
 };
 export const now = () => clock();
 export const todayYmd = () => kigaliParts(now()).ymd;

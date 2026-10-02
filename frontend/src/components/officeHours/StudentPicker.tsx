@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { AlertTriangle, ArrowRightLeft, Search, UserPlus } from "lucide-react";
 import {
   apiError,
+  formatYmd,
   humanize,
   officeHoursApi,
   studentName,
@@ -26,7 +27,8 @@ export interface StudentPickerProps {
 }
 
 const summarise = (r: AssignResult) => {
-  const parts = [`${r.assigned.length} assigned`];
+  const start = r.assigned[0]?.effective_from;
+  const parts = [`${r.assigned.length} assigned${start ? `, starting ${formatYmd(start)}` : ""}`];
   if (r.conflicts.length) parts.push(`${r.conflicts.length} already ${r.conflicts.length === 1 ? "has" : "have"} office hours`);
   if (r.over_capacity.length) parts.push(`${r.over_capacity.length} over capacity`);
   if (r.ineligible.length) parts.push(`${r.ineligible.length} not eligible`);
