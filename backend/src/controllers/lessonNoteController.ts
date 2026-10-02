@@ -25,6 +25,7 @@ import {
   NotFoundError,
   ValidationError,
   AuthorizationError,
+  ConflictError,
 } from "../errors/CustomError";
 import { recordActivity } from "../utils/activityLogger";
 import { sanitizeNoteHtml } from "../utils/sanitizeNoteHtml";
@@ -810,8 +811,30 @@ export const getLessonNote = asyncHandler(async (req: any, res: any) => {
     note.subject_id,
   );
 
+  // Names + placement for the "Edit details" form: it must show the note's own subject and
+  // class even when the teacher no longer teaches them, and explain why they're locked while
+  // the note is on a course.
+  const [[subject], [classGroup], placements] = await Promise.all([
+    db
+      .select({ name: Subject.name })
+      .from(Subject)
+      .where(eq(Subject.subject_id, note.subject_id))
+      .limit(1),
+    note.class_group_id
+      ? db
+          .select({ name: ClassGroup.name })
+          .from(ClassGroup)
+          .where(eq(ClassGroup.class_group_id, note.class_group_id))
+          .limit(1)
+      : Promise.resolve([] as { name: string }[]),
+    loadNotePlacements([noteId]),
+  ]);
+
   successResponse(res, "Lesson note", {
     ...note,
+    subject_name: subject?.name ?? null,
+    class_group_name: classGroup?.name ?? null,
+    elearning: placements.get(noteId) ?? null,
     scheme_context: schemeContext,
     curriculum_context: curriculumContext
       ? {
@@ -911,16 +934,68 @@ export const updateLessonNote = asyncHandler(async (req: any, res: any) => {
     status,
     snapshot_prompt,
     criteria_ids,
+    subject_id,
+    class_group_id,
   } = req.body;
 
-  // Coverage can be re-pointed at any time, for every kind of note (typed, AI, PDF).
-  if (criteria_ids !== undefined) {
-    const selection = await loadCurriculumSelection(
-      note.subject_id,
-      parseCriteriaIds(criteria_ids),
-    );
-    await setNoteCriteria(noteId, selection.criteriaIds);
+  // ---- Everything is validated before anything is written, so a rejected edit
+  // changes nothing (coverage used to be saved before the PDF read-only check).
+
+  if (title !== undefined && (typeof title !== "string" || !title.trim())) {
+    throw new ValidationError("The note needs a title");
   }
+
+  // Moving a note to another subject / class: the same rules as creating one there.
+  const nextSubjectId =
+    subject_id !== undefined && subject_id !== null && subject_id !== ""
+      ? parseInt(subject_id, 10)
+      : note.subject_id;
+  if (!Number.isInteger(nextSubjectId) || nextSubjectId <= 0) {
+    throw new ValidationError("subject_id must be a valid subject");
+  }
+  const nextClassGroupId =
+    class_group_id === undefined
+      ? note.class_group_id
+      : class_group_id === null || class_group_id === ""
+        ? null
+        : parseInt(class_group_id, 10);
+  if (nextClassGroupId !== null && (!Number.isInteger(nextClassGroupId) || nextClassGroupId <= 0)) {
+    throw new ValidationError("class_group_id must be a valid class");
+  }
+  const subjectChanged = nextSubjectId !== note.subject_id;
+  const classChanged = nextClassGroupId !== note.class_group_id;
+
+  if (subjectChanged) {
+    await assertTeacherOwnsSubject(req.user.userId, nextSubjectId);
+  }
+  if (classChanged && nextClassGroupId !== null) {
+    const [group] = await db
+      .select({ class_group_id: ClassGroup.class_group_id })
+      .from(ClassGroup)
+      .where(eq(ClassGroup.class_group_id, nextClassGroupId))
+      .limit(1);
+    if (!group) throw new ValidationError("Class not found");
+  }
+  if (subjectChanged || classChanged) {
+    // A course is one subject + one class. A note placed on one can't silently move out
+    // from under it — the course item would then point at another class's material.
+    const placement = (await loadNotePlacements([noteId])).get(noteId);
+    if (placement) {
+      throw new ConflictError(
+        `This note is on the "${placement.course_title}" e-learning course (${placement.section_title}). Remove it from that course before moving it to another ${subjectChanged ? "subject" : "class"}.`,
+      );
+    }
+  }
+
+  // Coverage can be re-pointed at any time, for every kind of note (typed, AI, PDF). It is
+  // always checked against the subject the note will belong to after this edit; moving to
+  // another subject without new coverage clears it (the old criteria aren't that subject's).
+  const coverage =
+    criteria_ids !== undefined
+      ? await loadCurriculumSelection(nextSubjectId, parseCriteriaIds(criteria_ids))
+      : subjectChanged
+        ? { criteriaIds: [] as number[] }
+        : null;
 
   // The PDF is the note: its body can only change by replacing the file (POST /:id/pdf).
   // Title and status stay editable so publishing/renaming work exactly like any note.
@@ -935,6 +1010,28 @@ export const updateLessonNote = asyncHandler(async (req: any, res: any) => {
     );
   }
 
+  const sanitizedHtml =
+    content_html !== undefined ? sanitizeNoteHtml(content_html) : undefined;
+  if (status !== undefined) {
+    if (!["DRAFT", "PUBLISHED"].includes(status)) {
+      throw new ValidationError("status must be DRAFT or PUBLISHED");
+    }
+    if (status === "PUBLISHED") {
+      // Use the html this same request is setting, if any, else what's already saved —
+      // covers "type then immediately hit Publish" in one call as well as publishing a
+      // note that already has content from an earlier save.
+      const effectiveHtml =
+        sanitizedHtml !== undefined ? sanitizedHtml : note.content_html;
+      if (!isPublishable({ ...note, content_html: effectiveHtml })) {
+        throw new ValidationError(
+          "Add some content before publishing this note.",
+        );
+      }
+    }
+  }
+
+  // ---- Writes.
+
   if (snapshot_prompt && note.content_json) {
     await db.insert(LessonNoteVersion).values({
       note_id: noteId,
@@ -945,28 +1042,16 @@ export const updateLessonNote = asyncHandler(async (req: any, res: any) => {
   }
 
   const updates: Record<string, any> = { updated_at: new Date() };
-  if (title !== undefined) updates.title = title;
-  if (content_json !== undefined) updates.content_json = content_json;
-  if (content_html !== undefined)
-    updates.content_html = sanitizeNoteHtml(content_html);
-  if (status !== undefined) {
-    if (!["DRAFT", "PUBLISHED"].includes(status)) {
-      throw new ValidationError("status must be DRAFT or PUBLISHED");
-    }
-    if (status === "PUBLISHED") {
-      // Use the html this same request is setting, if any, else what's already saved —
-      // covers "type then immediately hit Publish" in one call as well as publishing a
-      // note that already has content from an earlier save.
-      const effectiveHtml =
-        content_html !== undefined ? updates.content_html : note.content_html;
-      if (!isPublishable({ ...note, content_html: effectiveHtml })) {
-        throw new ValidationError(
-          "Add some content before publishing this note.",
-        );
-      }
-    }
-    updates.status = status;
+  if (title !== undefined) updates.title = title.trim();
+  if (subjectChanged) {
+    updates.subject_id = nextSubjectId;
+    // A legacy Scheme of Work anchor belongs to the old subject's scheme.
+    updates.scheme_entry_id = null;
   }
+  if (classChanged) updates.class_group_id = nextClassGroupId;
+  if (content_json !== undefined) updates.content_json = content_json;
+  if (sanitizedHtml !== undefined) updates.content_html = sanitizedHtml;
+  if (status !== undefined) updates.status = status;
   if (snapshot_prompt !== undefined && note.source === "MANUAL") {
     updates.source = "AI_ASSISTED";
   }
@@ -979,6 +1064,8 @@ export const updateLessonNote = asyncHandler(async (req: any, res: any) => {
     .update(LessonNote)
     .set(updates)
     .where(eq(LessonNote.note_id, noteId));
+
+  if (coverage) await setNoteCriteria(noteId, coverage.criteriaIds);
 
   if (contentEdited) {
     // Same for its place on e-learning: a Studio draft the teacher has edited is theirs.
@@ -998,6 +1085,21 @@ export const updateLessonNote = asyncHandler(async (req: any, res: any) => {
     );
   }
 
+  // Details edits (rename / move) are audited; body autosaves are not — they'd flood the log.
+  const renamed = title !== undefined && title.trim() !== note.title;
+  if (renamed || subjectChanged || classChanged) {
+    const what = [renamed && "title", subjectChanged && "subject", classChanged && "class"]
+      .filter(Boolean)
+      .join(", ");
+    await recordActivity(
+      req.user.userId,
+      "LESSON_NOTE_UPDATE",
+      `Edited the ${what} of lesson note "${updates.title ?? note.title}"`,
+      "LessonNote",
+      noteId,
+    );
+  }
+
   successResponse(res, "Lesson note updated");
 });
 
@@ -1010,7 +1112,20 @@ export const deleteLessonNote = asyncHandler(async (req: any, res: any) => {
     .from(LessonNoteImage)
     .where(eq(LessonNoteImage.note_id, noteId));
 
-  await db.delete(LessonNote).where(eq(LessonNote.note_id, noteId));
+  // CourseItem.ref_id is polymorphic (no FK), so deleting the note alone left a "missing"
+  // item on every course it was placed on. Remove those items with it, atomically; their
+  // criteria/progress rows go by the CourseItem cascades.
+  const placements = await db.transaction(async (tx) => {
+    const items = await tx
+      .select({ item_id: CourseItem.item_id })
+      .from(CourseItem)
+      .where(and(eq(CourseItem.item_type, "LESSON_NOTE"), eq(CourseItem.ref_id, noteId)));
+    if (items.length) {
+      await tx.delete(CourseItem).where(inArray(CourseItem.item_id, items.map((i) => i.item_id)));
+    }
+    await tx.delete(LessonNote).where(eq(LessonNote.note_id, noteId));
+    return items.length;
+  });
 
   if (note.file_path) {
     try {
@@ -1031,12 +1146,12 @@ export const deleteLessonNote = asyncHandler(async (req: any, res: any) => {
   await recordActivity(
     req.user.userId,
     "LESSON_NOTE_DELETE",
-    `Deleted lesson note "${note.title}"`,
+    `Deleted lesson note "${note.title}"${placements ? ` and removed it from ${placements} e-learning course item${placements === 1 ? "" : "s"}` : ""}`,
     "LessonNote",
     noteId,
   );
 
-  successResponse(res, "Lesson note deleted");
+  successResponse(res, "Lesson note deleted", { removed_course_items: placements });
 });
 
 // ======================

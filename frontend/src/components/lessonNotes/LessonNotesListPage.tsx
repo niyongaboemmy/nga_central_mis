@@ -17,6 +17,7 @@ import {
   CheckCircle2,
   Archive,
   PenLine,
+  Pencil,
   Layers,
 } from "lucide-react";
 import {
@@ -29,8 +30,8 @@ import { elearningApi, builderRoutes } from "../../api/elearning";
 import { useToast } from "../../contexts/ToastContext";
 import { usePermissions } from "../../hooks/usePermissions";
 import { useAcademicPeriod } from "../../contexts/AcademicPeriodContext";
-import NewLessonNoteModal from "./NewLessonNoteModal";
-import ConfirmModal from "../ui/ConfirmModal";
+import LessonNoteFormModal from "./LessonNoteFormModal";
+import { useDeleteLessonNote } from "./useDeleteLessonNote";
 import LessonNoteStatusBadge from "./LessonNoteStatusBadge";
 import LessonNoteShareBadge from "./LessonNoteShareBadge";
 
@@ -160,7 +161,8 @@ const LessonNotesListPage: React.FC = () => {
   const [reachFilter, setReachFilter] = useState<ReachFilter>("ALL");
 
   const [showNewModal, setShowNewModal] = useState(false);
-  const [deleteTarget, setDeleteTarget] = useState<LessonNoteSummary | null>(null);
+  const [editNoteId, setEditNoteId] = useState<number | null>(null);
+  const deleteNote = useDeleteLessonNote();
   const [placingNoteId, setPlacingNoteId] = useState<number | null>(null);
 
   const loadSubjects = () => {
@@ -252,18 +254,17 @@ const LessonNotesListPage: React.FC = () => {
     else setSearchParams({ subject: String(subjectId) }, { replace: false });
   };
 
-  const handleDelete = async () => {
-    if (!deleteTarget) return;
-    try {
-      await lessonNotesApi.remove(deleteTarget.note_id);
-      showToast("Lesson note deleted", "success");
-      setNotes((prev) => prev.filter((n) => n.note_id !== deleteTarget.note_id));
-      loadSubjects();
-    } catch (err: any) {
-      showToast(err?.response?.data?.message || "Failed to delete note", "error");
-    } finally {
-      setDeleteTarget(null);
-    }
+  const handleDelete = async (note: LessonNoteSummary) => {
+    if (!(await deleteNote(note))) return;
+    setNotes((prev) => prev.filter((n) => n.note_id !== note.note_id));
+    loadSubjects();
+  };
+
+  /** After an edit the note may have moved subject (then it leaves this list) or changed
+   *  coverage/placement-relevant fields — re-read rather than patch locally. */
+  const handleEdited = () => {
+    if (selectedSubjectId) loadNotes(selectedSubjectId);
+    loadSubjects();
   };
 
   const handlePlaceOnCourse = async (note: LessonNoteSummary) => {
@@ -509,7 +510,7 @@ const LessonNotesListPage: React.FC = () => {
           </div>
         )}
 
-        <NewLessonNoteModal
+        <LessonNoteFormModal
           isOpen={showNewModal}
           onClose={() => {
             setShowNewModal(false);
@@ -639,16 +640,31 @@ const LessonNotesListPage: React.FC = () => {
                       {new Date(note.updated_at).toLocaleDateString()}
                     </p>
                   </div>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setDeleteTarget(note);
-                    }}
-                    title="Delete this note"
-                    className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100 p-1.5 rounded-full text-gray-400 hover:text-red-600 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-400/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/50 transition-all flex-shrink-0"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
+                  {/* Always visible (not hover-only) so they work on touch screens too. */}
+                  <div className="flex items-center gap-0.5 flex-shrink-0">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setEditNoteId(note.note_id);
+                      }}
+                      title="Edit details — subject, class, coverage, title"
+                      aria-label={`Edit ${note.title}`}
+                      className="p-1.5 rounded-full text-gray-400 hover:text-blue-600 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-400/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50 transition-all"
+                    >
+                      <Pencil className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDelete(note);
+                      }}
+                      title="Delete this note"
+                      aria-label={`Delete ${note.title}`}
+                      className="p-1.5 rounded-full text-gray-400 hover:text-red-600 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-400/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/50 transition-all"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 </div>
 
                 <div className="flex items-center gap-2 flex-wrap mt-3">
@@ -666,7 +682,9 @@ const LessonNotesListPage: React.FC = () => {
                     {isPdfBackedNote(note) && note.page_count ? ` · ${note.page_count} p.` : ""}
                   </span>
 
-                  <span className="ml-auto flex items-center gap-2">
+                  {/* Wraps and lets the course chip truncate, so a long section title can't
+                      push the card wider than a phone screen. */}
+                  <span className="ml-auto flex flex-wrap items-center justify-end gap-2 min-w-0 max-w-full">
                     {note.elearning && note.status === "DRAFT" && (
                       <span
                         title="This note is on the course but still a draft — publish it so students can read it."
@@ -696,26 +714,25 @@ const LessonNotesListPage: React.FC = () => {
         </p>
       )}
 
-      <NewLessonNoteModal
+      <LessonNoteFormModal
         isOpen={showNewModal}
         onClose={() => {
           setShowNewModal(false);
           if (selectedSubjectId) loadNotes(selectedSubjectId);
           loadSubjects();
         }}
+        initialSubjectId={selectedSubjectId ?? undefined}
       />
 
-      <ConfirmModal
-        isOpen={!!deleteTarget}
-        onClose={() => setDeleteTarget(null)}
-        onConfirm={handleDelete}
-        title="Delete lesson note?"
-        message={
-          deleteTarget?.elearning
-            ? `"${deleteTarget.title}" is on the "${deleteTarget.elearning.course_title}" course (${deleteTarget.elearning.section_title}). Deleting it removes it from the course as well, along with any shares with students.`
-            : `"${deleteTarget?.title}" will be permanently deleted, including any shares with students.`
-        }
-        confirmText="Delete"
+      <LessonNoteFormModal
+        isOpen={editNoteId !== null}
+        noteId={editNoteId ?? undefined}
+        onClose={() => setEditNoteId(null)}
+        onSaved={handleEdited}
+        onDeleted={() => {
+          setNotes((prev) => prev.filter((n) => n.note_id !== editNoteId));
+          loadSubjects();
+        }}
       />
     </div>
   );

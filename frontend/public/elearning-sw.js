@@ -7,7 +7,12 @@
 const VERSION = "elearning-v1";
 const SHELL = `${VERSION}-shell`;
 const API = `${VERSION}-api`;
-const API_PATHS = ["/elearning/my/", "/lesson-notes/shared-with-me/", "/lesson-notes/images/", "/lesson-notes/"];
+const API_PATHS = ["/elearning/my/", "/lesson-notes/shared-with-me/", "/lesson-notes/images/"];
+// A note's PDF file, which learners read offline. Deliberately NOT every "/lesson-notes/..."
+// path: that also matched the teacher's own note detail, so the editor could open on the
+// copy from its last visit and autosave over newer work, and "Edit details" re-read the
+// pre-save note. Teacher authoring GETs always go to the network.
+const NOTE_PDF = /^\/lesson-notes\/\d+\/pdf\/raw$/;
 
 self.addEventListener("install", (event) => {
   event.waitUntil(self.skipWaiting());
@@ -44,7 +49,7 @@ self.addEventListener("fetch", (event) => {
 
   // Learner API: stale-while-revalidate keyed by URL (the auth header is not part of the key —
   // the cache is per browser profile, which is per student on a personal phone).
-  if (API_PATHS.some((p) => url.pathname.startsWith(p)) && !url.pathname.endsWith("/heartbeat")) {
+  if ((API_PATHS.some((p) => url.pathname.startsWith(p)) || NOTE_PDF.test(url.pathname)) && !url.pathname.endsWith("/heartbeat")) {
     event.respondWith(
       caches.open(API).then(async (cache) => {
         const cached = await cache.match(req);

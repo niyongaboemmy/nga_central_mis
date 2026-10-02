@@ -130,6 +130,11 @@ export interface LessonNoteDetail {
     criteria: { criteria_id: number; criteria_number: string; description: string }[];
   } | null;
   curriculum_context: { outcomes: CurriculumOutcome[]; criteria_ids: number[] } | null;
+  /** Names for the edit form — the note's own subject/class even if no longer assigned. */
+  subject_name: string | null;
+  class_group_name: string | null;
+  /** Where the note sits on e-learning; while set, its subject and class can't change. */
+  elearning: LessonNotePlacement | null;
 }
 
 export interface LessonNoteVersion {
@@ -278,9 +283,15 @@ export const lessonNotesApi = {
     );
   },
 
-  /** The stored PDF itself — works for the owning teacher and for students the note reaches. */
-  getPdfBlob: (id: number) =>
-    apiService.get<Blob>(`/lesson-notes/${id}/pdf/raw`, { responseType: "blob" }),
+  /** The stored PDF itself — works for the owning teacher and for students the note reaches.
+   *  `version` (e.g. the note's updated_at) makes a replaced file a new URL: the offline
+   *  service worker serves this path stale-while-revalidate, and a replacement keeps the
+   *  same storage path, so without it the old file would show once more. */
+  getPdfBlob: (id: number, version?: string) =>
+    apiService.get<Blob>(`/lesson-notes/${id}/pdf/raw`, {
+      responseType: "blob",
+      params: version ? { v: version } : undefined,
+    }),
 
   get: (id: number) => apiService.get<{ data: LessonNoteDetail }>(`/lesson-notes/${id}`),
 
@@ -293,10 +304,15 @@ export const lessonNotesApi = {
       status: "DRAFT" | "PUBLISHED";
       snapshot_prompt: string;
       criteria_ids: number[];
+      /** Moving a note: refused (409) while it is on an e-learning course. */
+      subject_id: number;
+      class_group_id: number | null;
     }>,
   ) => apiService.patch(`/lesson-notes/${id}`, data),
 
-  remove: (id: number) => apiService.delete(`/lesson-notes/${id}`),
+  /** Also removes the note from every e-learning course it was placed on. */
+  remove: (id: number) =>
+    apiService.delete<{ data: { removed_course_items: number } }>(`/lesson-notes/${id}`),
 
   uploadImage: (id: number, file: File) => {
     const form = new FormData();

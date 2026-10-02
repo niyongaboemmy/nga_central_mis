@@ -41,7 +41,8 @@ const PdfNoteWorkspace: React.FC<Props> = ({ note, onReplaced }) => {
     setBlob(null);
     setLoadError(null);
     lessonNotesApi
-      .getPdfBlob(note.note_id)
+      // Versioned so the teacher sees a just-replaced file, not the cached previous one.
+      .getPdfBlob(note.note_id, note.updated_at)
       .then((res) => {
         if (!cancelled) setBlob(res.data);
       })
