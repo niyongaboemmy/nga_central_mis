@@ -31,7 +31,7 @@ const SCHOOL_ONLY = { scopeable: false };
 export const MIS_MANIFEST = defineManifest({
   app: "mis",
   name: "Central MIS",
-  version: "2026.10.01",
+  version: "2026.10.02",
   capabilities: {
     // People & accounts
     MANAGE_USERS: W("Create, update and deactivate users", "PEOPLE"),
@@ -147,6 +147,15 @@ export const MIS_MANIFEST = defineManifest({
     // programme / grade / class, aggregates only, small groups suppressed. Scopeable.
     USAGE_INSIGHTS_VIEW: R("See how much the platform is used in your area (aggregates)", "REPORTING", ["summary"]),
     ANALYTICS_CONFIGURE: W("Configure analytics, retention, exclusions and data deletion", "SYSTEM", SCHOOL_ONLY),
+
+    // Mandatory office hours (OFFICE_HOURS_IMPLEMENTATION_PLAN.md §15). Legacy-visible on
+    // purpose -- teachers, students and parents still reach routes through legacy roles --
+    // and named so none contains a spoke-app role keyword.
+    OFFICE_HOURS_MANAGE_OWN: W("Run your own office hours (schedule, assign students, take the register)", "ACADEMICS", SCHOOL_ONLY),
+    OFFICE_HOURS_MANAGE_ANY: W("Manage anyone's office hours (override, substitute, closures)", "ACADEMICS"),
+    OFFICE_HOURS_VIEW: R("See office-hours attendance and reports in your area", "ATTENDANCE", ["summary", "detail"]),
+    OFFICE_HOURS_VIEW_SELF: R("See your own (or your children's) office hours", "ATTENDANCE", ["detail"]),
+    OFFICE_HOURS_CONFIGURE: W("Configure office-hours policy", "SYSTEM", SCHOOL_ONLY),
   },
 });
 
