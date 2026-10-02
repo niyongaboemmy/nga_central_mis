@@ -3,7 +3,7 @@ import { Check, Loader2, Moon, Plus, Sunrise, X } from "lucide-react";
 import type { ReminderKind, ReminderPreferences } from "../../api/reminders";
 import { formatOffset, KIND_META, OFFSET_PRESETS } from "./agendaUtils";
 
-const KINDS: ReminderKind[] = ["lesson", "activity", "quiz_open", "quiz_close", "assignment_due", "meeting", "event"];
+const KINDS: ReminderKind[] = ["lesson", "activity", "office_hours", "quiz_open", "quiz_close", "assignment_due", "meeting", "event"];
 const MAX_OFFSETS = 3;
 
 type SaveState = "idle" | "saving" | "saved" | "error";

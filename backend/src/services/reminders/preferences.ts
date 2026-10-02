@@ -16,6 +16,7 @@ export const REMINDER_KINDS = [
   "quiz_close",
   "assignment_due",
   "meeting",
+  "office_hours",
   "event",
 ] as const;
 export type ReminderKind = (typeof REMINDER_KINDS)[number];
@@ -68,6 +69,8 @@ export const DEFAULT_SETTINGS: ReminderSettings = {
   quiz_close: { enabled: true, offsets: [60, 15] },
   assignment_due: { enabled: true, offsets: [1440, 120] },
   meeting: { enabled: true, offsets: [15] },
+  // Mandatory office hours (OFFICE_HOURS_IMPLEMENTATION_PLAN.md §13.3).
+  office_hours: { enabled: true, offsets: [15] },
   event: { enabled: true, offsets: [30] },
 };
 

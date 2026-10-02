@@ -306,6 +306,24 @@ export interface UnmarkedSession {
   days_overdue: number;
 }
 
+export interface Escalation {
+  escalation_id: number;
+  student_id: number;
+  assignment_id: number;
+  level: number;
+  trigger_code: "CONSECUTIVE_L1" | "MONTH_L1" | "CONSECUTIVE_L2" | "RATE_BELOW";
+  created_at: string;
+  acknowledged_at: string | null;
+  acknowledged_by_name: string | null;
+  resolution_note: string | null;
+  notified_user_ids: string | null;
+  student: StudentCard | null;
+  title: string;
+  teacher_id: number;
+  teacher_name: string | null;
+  last_missed: string;
+}
+
 export interface ScheduleInput {
   academic_term_id?: number | null;
   teacher_id?: number;
@@ -405,6 +423,9 @@ export const officeHoursApi = {
   override: (body: { student_id: number; to_schedule_id: number; reason: string }) =>
     api.post<Envelope<{ assignment_id: number }>>("/office-hours/admin/assignments/override", body),
   nudgeUnmarked: (sessionIds: number[]) => api.post<Envelope<{ notified: number }>>("/office-hours/admin/unmarked/nudge", { session_ids: sessionIds }),
+  escalations: (params: { term_id?: number | null; status?: "open" | "all" } = {}) =>
+    api.get<Envelope<Escalation[]>>("/office-hours/escalations", { params }),
+  acknowledgeEscalation: (id: number, note?: string) => api.post<Envelope<void>>(`/office-hours/escalations/${id}/ack`, { note }),
   adminTransfers: () => api.get<Envelope<{ incoming: TransferRequest[] }>>("/office-hours/admin/transfer-requests"),
 
   closures: (from?: string, to?: string) => api.get<Envelope<Closure[]>>("/office-hours/closures", { params: { from, to } }),

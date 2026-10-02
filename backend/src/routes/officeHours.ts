@@ -39,6 +39,9 @@ import { searchStudents, studentCards } from "../services/officeHours/eligibilit
 import { openRegister, registerHistory, saveRegister, EXCUSE_REASONS } from "../services/officeHours/register";
 import { statsByAssignment, statsByStudent } from "../services/officeHours/metrics";
 import { listUnmarked } from "../services/officeHours/admin";
+import { acknowledgeEscalation, listEscalations } from "../services/officeHours/escalation";
+import { nudgeUnmarked } from "../services/officeHours/digests";
+import { registerOfficeHoursNotifier } from "../services/officeHours/notify";
 
 /**
  * Mandatory office hours (OFFICE_HOURS_IMPLEMENTATION_PLAN.md §7.2).
@@ -47,6 +50,8 @@ import { listUnmarked } from "../services/officeHours/admin";
  */
 const router = Router();
 router.use(authenticate);
+// Events raised by the services become notifications (bell, push, email, Reminder Hub).
+registerOfficeHoursNotifier();
 
 const P = Permissions;
 const teacher = authorize([P.OFFICE_HOURS_MANAGE_OWN, P.OFFICE_HOURS_MANAGE_ANY]);
@@ -437,6 +442,31 @@ router.get(
     const to = isYmd(req.query.to) ? (req.query.to as string) : todayYmd();
     const from = isYmd(req.query.from) ? (req.query.from as string) : addDaysYmd(to, -30);
     successResponse(res, "Unmarked registers", await listUnmarked(from, to));
+  }),
+);
+router.post(
+  "/admin/unmarked/nudge",
+  leadership,
+  asyncHandler(async (req, res) => {
+    const notified = await nudgeUnmarked(actorOf(req), intList(req.body?.session_ids, "session_ids", 200));
+    successResponse(res, "Reminder sent", { notified });
+  }),
+);
+router.get(
+  "/escalations",
+  authorize([P.OFFICE_HOURS_MANAGE_ANY, P.OFFICE_HOURS_VIEW, P.OFFICE_HOURS_MANAGE_OWN]),
+  asyncHandler(async (req, res) => {
+    const term = await loadTerm(await resolveTermId(req.query.term_id));
+    const status = req.query.status === "all" ? "all" : "open";
+    successResponse(res, "Escalations", await listEscalations(actorOf(req), term.termId, term.yearId, status));
+  }),
+);
+router.post(
+  "/escalations/:id/ack",
+  authorize([P.OFFICE_HOURS_MANAGE_ANY, P.OFFICE_HOURS_VIEW, P.OFFICE_HOURS_MANAGE_OWN]),
+  asyncHandler(async (req, res) => {
+    await acknowledgeEscalation(actorOf(req), idParam(req.params.id), req.body?.note);
+    successResponse(res, "Escalation acknowledged");
   }),
 );
 router.get(

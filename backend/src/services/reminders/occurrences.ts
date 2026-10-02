@@ -8,6 +8,7 @@ import {
   loadTeacherLessons,
 } from "../../controllers/calendarController";
 import type { ReminderKind } from "./preferences";
+import { loadOfficeHourOccurrences } from "../officeHours/reminders";
 import {
   dbDateToYmd,
   dowOfYmd,
@@ -172,6 +173,9 @@ export const collectOccurrences = async (
       }
     }
   }
+
+  // Office hours the user hosts or must attend (OFFICE_HOURS_IMPLEMENTATION_PLAN.md §13.3).
+  out.push(...(await loadOfficeHourOccurrences(userId, from, to)));
 
   // Items the other apps registered through the Source API: addressed to
   // this user directly, or to a subject they're actively enrolled in.

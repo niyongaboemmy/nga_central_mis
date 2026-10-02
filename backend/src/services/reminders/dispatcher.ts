@@ -44,6 +44,7 @@ const LABELS: Record<string, (title: string, lead: string) => string> = {
   lesson: (t, lead) => `${t} ${lead}`,
   activity: (t, lead) => `${t} ${lead}`,
   meeting: (t, lead) => `${t} ${lead}`,
+  office_hours: (t, lead) => `Office hours ${lead}: ${t}`,
   event: (t, lead) => `${t} ${lead}`,
   quiz_open: (t, lead) => `Quiz opens ${lead}: ${t}`,
   quiz_close: (t, lead) => `Quiz closes ${lead}: ${t}`,

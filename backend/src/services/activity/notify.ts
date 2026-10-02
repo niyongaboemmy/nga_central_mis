@@ -1,9 +1,6 @@
-import { eq } from "drizzle-orm";
-import { db } from "../../db";
-import { PushSubscription } from "../../db/reminderSchema";
-import { notifyUser, NotificationKind } from "../../utils/notifications";
-import logger from "../../utils/logger";
-import { appUrl, PushSender, sendWebPush, topicFor } from "../reminders/webPush";
+import { NotificationKind } from "../../utils/notifications";
+import { PushSender, sendWebPush } from "../reminders/webPush";
+import { notifyPerson as deliverNotice } from "../notifications/notifyPerson";
 
 /**
  * Deliver a monitoring notification to one person: always in the app (the bell), and as
@@ -28,48 +25,4 @@ export interface MonitorNotice {
   push?: boolean;
 }
 
-export const notifyPerson = async (n: MonitorNotice) => {
-  const delivered: string[] = [];
-  try {
-    await notifyUser({
-      userId: n.userId,
-      kind: n.kind,
-      title: n.title.slice(0, 255),
-      body: n.body?.slice(0, 500),
-      link: n.link,
-      subjectType: n.subjectType,
-      subjectId: n.subjectId,
-      actorId: n.actorId,
-    });
-    delivered.push("in_app");
-  } catch (error) {
-    logger.error("[activity] in-app notice failed", { error });
-  }
-  if (n.push === false) return delivered;
-  try {
-    const subs = await db.select().from(PushSubscription).where(eq(PushSubscription.user_id, n.userId));
-    const url = appUrl(n.link ?? "/");
-    const payload = JSON.stringify({
-      web_push: 8030,
-      notification: {
-        title: n.title.slice(0, 120),
-        body: (n.body ?? "").slice(0, 240),
-        navigate: url,
-        lang: "en",
-        dir: "ltr",
-        tag: topicFor(`${n.kind}:${n.subjectType}:${n.subjectId}`),
-        silent: false,
-        data: { kind: n.kind, url },
-      },
-    });
-    let ok = 0;
-    for (const sub of subs) {
-      const r = await sender(sub, payload, { ttl: 6 * 3600, urgency: "high", topic: topicFor(`${n.kind}:${n.subjectId}`) });
-      if (r.ok) ok++;
-    }
-    if (ok) delivered.push("push");
-  } catch (error) {
-    logger.error("[activity] push notice failed", { error });
-  }
-  return delivered;
-};
+export const notifyPerson = async (n: MonitorNotice) => deliverNotice(n, sender);

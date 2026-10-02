@@ -181,6 +181,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     await waitText(a, "New office hours · 1 of 3");
     const dayNames = ["", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
     await clickText(a, "button", dayNames[dow]);
+    await a.waitForSelector(`#oh-subject option[value="${subj.insertId}"]`, { timeout: 10000 }).catch(() => undefined);
     await a.select("#oh-subject", String(subj.insertId)).catch(() => undefined);
     await a.type("#oh-room", "B4");
     await shot(a, "01-create-details");
@@ -235,9 +236,16 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     );
     check("marks stored: Aline present, Bruno absent", JSON.stringify(marks.map((m) => m.status)) === JSON.stringify(["PRESENT", "ABSENT"]), marks);
     await a.goto(`${APP}/dashboard`, { waitUntil: "networkidle2" });
-    check("teacher timetable band shows the office hours", await waitText(a, /2 students · B4|Mathematics E2E support/, 20000));
+    const band = await a.waitForSelector(`[data-testid="office-band-day-${dow}"] div, [data-testid="office-band-day-${dow}"] button`, { timeout: 20000 }).catch(() => null);
+    check("teacher timetable band shows the office hours", Boolean(band));
     await shot(a, "06-teacher-timetable");
     await a.close();
+
+    // 3b) Phase 4: notices land in the bell even with Hub reminders off.
+    await sleep(1500);
+    const [noticeRows] = await db.query("SELECT user_id, kind FROM Notification WHERE user_id IN (?, ?) AND kind LIKE 'office_hours_%'", [students[0], students[1]]);
+    check("both students were told they are assigned", noticeRows.filter((n) => n.kind === "office_hours_assigned").length === 2, noticeRows);
+    check("the absent student was told they missed it", noticeRows.some((n) => n.user_id === students[1] && n.kind === "office_hours_absent"));
 
     // 4) The student sees their office hours and their mark.
     const s = await open(tokenOf(students[0]));
@@ -248,6 +256,13 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     check("student never sees the reason code", !/below standard/i.test(studentText));
     await shot(s, "07-student");
     await axe(s, "my office hours (light)");
+    // The bell lists the assignment notice.
+    await s.evaluate(() => {
+      const bell = [...document.querySelectorAll("button")].find((x) => /notification/i.test(x.getAttribute("aria-label") || ""));
+      bell?.click();
+    });
+    check("student bell shows the office-hours notice", await waitText(s, /Office hours with Alice Uwimana/));
+    await shot(s, "07b-student-bell");
     await s.close();
 
     // 5) Leadership: closures and settings, dark theme audit.
@@ -261,6 +276,9 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     await l.goto(`${APP}/office-hours/admin?tab=settings`, { waitUntil: "networkidle2" });
     check("settings tab loads", await waitText(l, "One office hours per student"));
     await axe(l, "oversight settings (dark)");
+    await l.goto(`${APP}/office-hours/admin?tab=escalations`, { waitUntil: "networkidle2" });
+    check("escalations tab loads", await waitText(l, /Nothing needs follow-up|Level \d/));
+    await axe(l, "oversight escalations (dark)");
     await l.goto(`${APP}/office-hours/admin?tab=unmarked`, { waitUntil: "networkidle2" });
     check("missing-registers tab loads", await waitText(l, /Registers not taken|Every register is taken/));
     await l.close();

@@ -18,6 +18,7 @@ const prefs = (): ReminderPreferences => ({
     quiz_close: { enabled: true, offsets: [60, 15] },
     assignment_due: { enabled: true, offsets: [1440, 120] },
     meeting: { enabled: true, offsets: [15] },
+    office_hours: { enabled: true, offsets: [15] },
     event: { enabled: true, offsets: [30] },
   },
 });

@@ -20,7 +20,17 @@ export type NotificationKind =
   // Usage & Monitoring (USAGE_ANALYTICS_IMPLEMENTATION_PLAN.md §10.4)
   | "monitor_watch"
   | "monitor_alert"
-  | "monitor_message";
+  | "monitor_message"
+  // Mandatory office hours (OFFICE_HOURS_IMPLEMENTATION_PLAN.md §13.2)
+  | "office_hours_assigned"
+  | "office_hours_removed"
+  | "office_hours_changed"
+  | "office_hours_cancelled"
+  | "office_hours_register_due"
+  | "office_hours_absent"
+  | "office_hours_escalation"
+  | "office_hours_transfer"
+  | "office_hours_digest";
 
 export interface NotifyUserInput {
   userId: number;
@@ -28,7 +38,22 @@ export interface NotifyUserInput {
   title: string;
   body?: string;
   link?: string;
-  subjectType: "document" | "folder" | "course_section" | "course_item" | "course" | "reminder" | "watch" | "alert" | "message";
+  subjectType:
+    | "document"
+    | "folder"
+    | "course_section"
+    | "course_item"
+    | "course"
+    | "reminder"
+    | "watch"
+    | "alert"
+    | "message"
+    | "office_hour_assignment"
+    | "office_hour_session"
+    | "office_hour_schedule"
+    | "office_hour_escalation"
+    | "office_hour_transfer"
+    | "office_hour_digest";
   subjectId: number;
   actorId?: number;
 }
