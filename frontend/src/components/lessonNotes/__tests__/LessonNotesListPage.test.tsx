@@ -3,11 +3,15 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { ToastProvider } from "../../../contexts/ToastContext";
+import { ConfirmProvider } from "../../../contexts/ConfirmContext";
 import LessonNotesListPage from "../LessonNotesListPage";
 
 const listMock = vi.fn();
 const subjectsMock = vi.fn();
 const placeMock = vi.fn();
+const removeMock = vi.fn();
+// Props of every LessonNoteFormModal render — the modal itself is covered by its own test.
+const modalProps: any[] = [];
 
 vi.mock("../../../api/lessonNotes", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../../api/lessonNotes")>();
@@ -16,7 +20,7 @@ vi.mock("../../../api/lessonNotes", async (importOriginal) => {
     lessonNotesApi: {
       list: (...args: any[]) => listMock(...args),
       subjects: (...args: any[]) => subjectsMock(...args),
-      remove: vi.fn(),
+      remove: (...args: any[]) => removeMock(...args),
     },
   };
 });
@@ -38,7 +42,12 @@ vi.mock("../../../contexts/AcademicPeriodContext", () => ({
   useAcademicPeriod: () => ({ selectedYearId: 9 }),
 }));
 
-vi.mock("../NewLessonNoteModal", () => ({ default: () => null }));
+vi.mock("../LessonNoteFormModal", () => ({
+  default: (props: any) => {
+    modalProps.push(props);
+    return null;
+  },
+}));
 
 const subject = (over: Partial<any> = {}) => ({
   subject_id: 1,
@@ -79,7 +88,9 @@ const renderPage = () =>
   render(
     <MemoryRouter initialEntries={["/lesson-notes"]}>
       <ToastProvider>
-        <LessonNotesListPage />
+        <ConfirmProvider>
+          <LessonNotesListPage />
+        </ConfirmProvider>
       </ToastProvider>
     </MemoryRouter>,
   );
@@ -87,6 +98,7 @@ const renderPage = () =>
 describe("LessonNotesListPage — subject-first browsing and e-learning linkage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    modalProps.length = 0;
     subjectsMock.mockResolvedValue({
       data: {
         data: [subject(), subject({ subject_id: 2, subject_name: "JavaScript", note_count: 1, on_course_count: 0 })],
@@ -230,5 +242,65 @@ describe("LessonNotesListPage — subject-first browsing and e-learning linkage"
     await userEvent.click(screen.getByRole("button", { name: "Not linked" }));
     expect(screen.queryByText("Linked note")).not.toBeInTheDocument();
     expect(screen.getByText("Unlinked note")).toBeInTheDocument();
+  });
+
+  it("opens the edit form for a note from its Edit button, without opening the editor", async () => {
+    listMock.mockResolvedValue({ data: { data: [note()] } });
+    renderPage();
+    await userEvent.click(await screen.findByText("Web3 Applications"));
+
+    await userEvent.click(await screen.findByRole("button", { name: "Edit Blockchain basics" }));
+    await waitFor(() =>
+      expect(modalProps.some((p) => p.isOpen && p.noteId === 10 && typeof p.onDeleted === "function")).toBe(true),
+    );
+    // Still on the list: the card's own click (open editor) didn't fire.
+    expect(screen.getByRole("button", { name: /all subjects/i })).toBeInTheDocument();
+  });
+
+  it("re-reads the list after the edit form saves (the note may have changed subject)", async () => {
+    listMock.mockResolvedValue({ data: { data: [note()] } });
+    renderPage();
+    await userEvent.click(await screen.findByText("Web3 Applications"));
+    await userEvent.click(await screen.findByRole("button", { name: "Edit Blockchain basics" }));
+
+    const editProps = modalProps.filter((p) => p.noteId === 10).pop();
+    listMock.mockResolvedValue({ data: { data: [] } });
+    editProps.onSaved({});
+    await waitFor(() => expect(screen.queryByText("Blockchain basics")).not.toBeInTheDocument());
+  });
+
+  it("deletes a note after confirming, warning that it leaves the course too", async () => {
+    listMock.mockResolvedValue({
+      data: {
+        data: [
+          note({
+            elearning: { item_id: 1, is_published: true, section_id: 2, section_title: "Week 3 — Wallets", course_id: 7, course_title: "Web3 Applications", course_status: "PUBLISHED" },
+          }),
+        ],
+      },
+    });
+    removeMock.mockResolvedValue({ data: { data: { removed_course_items: 1 } } });
+    renderPage();
+    await userEvent.click(await screen.findByText("Web3 Applications"));
+
+    await userEvent.click(await screen.findByRole("button", { name: "Delete Blockchain basics" }));
+    expect(await screen.findByText("Delete lesson note?")).toBeInTheDocument();
+    expect(screen.getByText(/removed from the "Web3 Applications" e-learning course/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Delete note" }));
+
+    await waitFor(() => expect(removeMock).toHaveBeenCalledWith(10));
+    await waitFor(() => expect(screen.queryByText("Blockchain basics")).not.toBeInTheDocument());
+  });
+
+  it("keeps the note when the delete is cancelled", async () => {
+    listMock.mockResolvedValue({ data: { data: [note()] } });
+    renderPage();
+    await userEvent.click(await screen.findByText("Web3 Applications"));
+
+    await userEvent.click(await screen.findByRole("button", { name: "Delete Blockchain basics" }));
+    await userEvent.click(await screen.findByRole("button", { name: /cancel/i }));
+
+    expect(removeMock).not.toHaveBeenCalled();
+    expect(screen.getByText("Blockchain basics")).toBeInTheDocument();
   });
 });
