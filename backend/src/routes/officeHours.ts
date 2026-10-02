@@ -9,7 +9,7 @@ import { OfficeHourSchedule, OfficeHourSession } from "../db/officeHoursSchema";
 import { AuthorizationError, ValidationError } from "../errors/CustomError";
 import { addDaysYmd } from "../services/reminders/time";
 import { actorOf } from "../services/officeHours/access";
-import { intList, isYmd, resolveTermId, todayYmd, toInt, loadTerm } from "../services/officeHours/common";
+import { intList, isYmd, officeHoursEnabled, resolveTermId, todayYmd, toInt, loadTerm } from "../services/officeHours/common";
 import { getSettings, publicConfig, saveSettings } from "../services/officeHours/settings";
 import {
   createSchedule,
@@ -75,6 +75,10 @@ import {
  * are checked in the services (access.ts).
  */
 const router = Router();
+router.use((req, res, next) => {
+  if (!officeHoursEnabled()) return res.status(404).json({ success: false, message: "Office hours are not enabled on this server" });
+  next();
+});
 router.use(authenticate);
 // Events raised by the services become notifications (bell, push, email, Reminder Hub).
 registerOfficeHoursNotifier();

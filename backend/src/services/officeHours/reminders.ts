@@ -27,6 +27,7 @@ export interface OfficeHourOccurrence {
 }
 
 export const loadOfficeHourOccurrences = async (userId: number, from: Date, to: Date): Promise<OfficeHourOccurrence[]> => {
+  if (process.env.OFFICE_HOURS_ENABLED === "false") return [];
   const fromYmd = kigaliParts(from).ymd;
   const toYmd = kigaliParts(to).ymd;
   const rows = await db
@@ -102,7 +103,14 @@ export const peopleOfSessions = async (sessionIds: number[]): Promise<number[]> 
  * reminders already delivered for the old time are set aside first so the new
  * time gets its own reminder.
  */
+let hubSyncInTests = false;
+/** Test hook (like setTimetableSyncInTests): background re-plans outliving a test race the next file. */
+export const setOfficeHoursHubSyncInTests = (on: boolean) => {
+  hubSyncInTests = on;
+};
+
 export const refreshReminderHub = async (userIds: number[], movedSessionIds: number[] = []) => {
+  if (process.env.NODE_ENV === "test" && !hubSyncInTests) return;
   const { releaseDeliveredJobs } = await import("../reminders/timetableChanges");
   for (const id of movedSessionIds) await releaseDeliveredJobs(`office_hours:${id}:`);
   if (!userIds.length) return;

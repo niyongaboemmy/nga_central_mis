@@ -1000,6 +1000,68 @@ nga-task-mentor: server integration endpoint for subject standing (only if missi
 
 ---
 
+## 24. Implementation status (2026-10-03)
+
+All seven phases are built and tested on branch **`feat/office-hours`** (MIS worktree `nga_central_mis-office-hours`, from `origin/main` aa8ea278). Two satellite branches go with it:
+- **Task Mentor** `feat/office-hours-standing` (worktree `nga-task-mentor-office-hours`): `GET /api/integration/student-standing`.
+- **Discipline & Attendance** `feat/office-hours-lane` (worktree `nga-discipline-attendance-office-hours`): calendar lane, discipline-form prefill.
+
+Nothing is pushed, merged or deployed. **Migration 102 is not applied to the dev or production databases**; only the private test clones have it. The operator guide is `docs/OFFICE_HOURS.md`.
+
+### 24.1 What was built, per phase
+
+| Phase | Delivered |
+|---|---|
+| 0 | `102_office_hours.sql` (all tables, settings row, `OFFICE_HOURS_*` permissions + role links), `officeHoursSchema.ts`, manifest/presets/constants |
+| 1 | Schedules (teacher overlap under a row lock, own-lesson clash), assignments (lock table, partial success, cut-off, capacity, clash notes, override), transfers, sessions (materialise, re-materialise, cancel/restore, substitute), closures, settings, nightly reconcile, `/office-hours` routes |
+| 2 | Teacher hub, 3-step create flow, student picker, schedule detail, My Office Hours (student + parent), the 16:20 band on every weekly grid, `/me`, `/children`, `/band` |
+| 3 | Register (snapshot roster, versioned saves, history, drop-ins, edit window, offline queue), metrics, missing registers, auto-close, oversight console (schedules, missing registers, transfers, closures, settings) |
+| 4 | Bell + push notices for every event (independent of Hub opt-in), escalation ladder with re-arm and acknowledgement, parent email, Reminder Hub `office_hours` kind (push/Telegram/Google/webcal), background scheduler (materialise, register reminders, morning roster, Friday digests, reconcile, transfer expiry) |
+| 5 | Period engine, scoped report engine (summary, breakdown, consistency, student/teacher 360, daily sheet, coverage, overview), summary-depth privacy, CSV/Excel/PDF, Home tiles and attention items |
+| 6 | Rotating-QR + 6-digit self check-in, live SSE register, "I can't come" notices, explainable suggestions (Task Mentor standing + office-hours history), term rollover, moving one session, discipline referral link, analytics key events, Tendo lane |
+| 7 | Kill switch `OFFICE_HOURS_ENABLED`, load check (`scripts/office-hours-load.ts`), browser e2e (`scripts/office-hours-e2e/e2e.cjs`, axe in both themes, phone width), operator/teacher/leadership guide |
+
+### 24.2 Tests
+
+- **MIS backend:** `src/__tests__/officeHoursPhase0/Core/Views/Register/Notifications/Reports/Modern.test.ts` (51 tests) plus the touched suites (access presets, Reminder Hub, Home, activity catalog). The full suite on a fresh clone gives 857 of 860 passing. The only 3 failures (`registrationNumberRegenerate`) fail identically on `origin/main`. Run with `TEST_DB_NAME=<private clone>`; never alongside another DB-heavy process (MAMP drops connections, see the local-DB note).
+- **MIS frontend:** `src/components/officeHours/__tests__` (8 files, 32 tests). The full suite is green (663 tests).
+- **Browser:** 75 checks: create → assign → conflict → register → QR self check-in → student page and "I can't come" → bell → oversight → reports → 360. Axe WCAG AA and no horizontal overflow on the hub, My office hours and oversight, in light and dark at 390, 768 and 1366 px. Run with `E2E_TODAY` set to the API's `OFFICE_HOURS_FAKE_NOW` date.
+- **Load:** 3,040 sessions and 45,600 marks; every report query runs in under 0.5 s (summary for a year 234 ms, term consistency lists 409 ms).
+- **Task Mentor:** 4 new tests in `homeSummary.integration.spec.ts`. The same 11 tests in that spec fail on `origin/main`.
+- **Discipline & Attendance:** 3 new lane tests. The same 3 tests fail on `origin/main`.
+
+### 24.3 Deviations from the plan
+
+- **Migration number 102, not 100.** 100 was skipped on main, and 101 is already applied in production, so a new 100 would sort before an applied migration.
+- **Band data comes from `/office-hours/band`** rather than an `office_hours` array on `/calendar/my-calendar`. This keeps the shared `calendarController` untouched.
+- **Area scoping uses the legacy role permissions plus `resolveUserScope`**, as the calendar does, rather than `authorizeIn`. Viewers whose only `OFFICE_HOURS_VIEW` link is at summary depth get totals without names. A VIEW holder who resolves to "unscoped" without MANAGE_ANY sees only their own office hours, never the school.
+- **The school administrator preset** got MANAGE_ANY (§15.1), so it sees names. Summary depth applies to aggregate-only roles.
+- **Moving a session** creates a one-off session (`moved_from_session_id`) and keeps the original as `CANCELLED/MOVED`. The weekly pattern can then never re-create the old date, and reports do not count the move as a cancellation.
+- **QR check-in never marks a session HELD**; only the teacher's save does. Check-ins also never overwrite a teacher's mark.
+- **Drafts reserve their students.** Locks are taken at draft time, so the picker is accurate. The nightly reconcile cancels drafts untouched for 7 days.
+- **Absence-notice notifications** to the host use a combined subject id per (session, student), because the Notification dedupe key has one id column.
+
+### 24.4 Bugs caught while building
+
+- The rollover dropped every active student: `end_reason_code <> 'GOAL_MET'` is not true for NULL.
+- Racing assignments could surface as InnoDB deadlocks (500). Now `withDeadlockRetry` retries them, and they end as a clean conflict.
+- The report dataset resolved a class teacher's scope against an arbitrary academic year.
+- The Home provider used server-local dates; office hours run on Kigali dates, and the production server is on UTC.
+- The dashboard widget hid the grid (and so the band) when a teacher had office hours but no lessons.
+- The toast close button had no accessible name. This is a shared component, fixed here.
+- Office-hours Reminder Hub re-plans kept running after a test file ended and starved the pool in later files. Under test they are now off, like the timetable hooks (`setOfficeHoursHubSyncInTests`).
+
+### 24.5 Still open (owner actions)
+
+1. **Confirm decisions D1–D10 (§3).** The defaults implemented are the recommendations.
+2. **Review and merge the three branches.** Remember the npm-10 lock rule: `qrcode-generator` was added with npm 10.
+3. **Apply `102_office_hours.sql` in production** via `migrate.yml`. Then enter closures and review settings (`docs/OFFICE_HOURS.md`, "Switching it on").
+4. **Tendo:** set `NGA_MIS_FRONTEND_URL` if the MIS web origin is not `https://mis.amashuri.com`.
+5. **Run the production SQL checks** in `docs/OFFICE_HOURS.md` (old "Office Hours" calendar activities, lock invariant).
+6. **Legal items shared with the analytics plan §13** (NCSA registration, Art. 50 storage location, parental consent text): list this module in the processing register.
+
+---
+
 ## A. Research sources (abridged)
 
 - Securly Flex: https://www.securly.com/flex · priority tiers https://docs.securly.com/docs/flex-priority-guide · cut-off https://docs.securly.com/docs/cutoff-time-details

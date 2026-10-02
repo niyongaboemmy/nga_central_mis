@@ -11,7 +11,7 @@ import {
 import { addDaysYmd, dowOfYmd, parseClock } from "../reminders/time";
 import { loadMarks, statsFromMarks } from "../officeHours/metrics";
 import { getSettings } from "../officeHours/settings";
-import { nowMinutes, todayYmd } from "../officeHours/common";
+import { nowMinutes, officeHoursEnabled, todayYmd } from "../officeHours/common";
 import { expectedAssignments } from "../officeHours/sessions";
 import { heldAt, lensesOfType } from "./access";
 import type { AttentionItem, GlanceTile } from "./contract";
@@ -30,6 +30,7 @@ const DAY = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const plural = (n: number, one: string, many: string) => (n === 1 ? one : many);
 
 export async function officeHoursProvider(ctx: ProviderContext): Promise<ProviderResult> {
+  if (!officeHoursEnabled()) return EMPTY;
   const self = lensesOfType(ctx.access, "SELF")[0];
   const userId = ctx.access.userId;
   // Office hours run on Kigali dates (the server itself may be on UTC).

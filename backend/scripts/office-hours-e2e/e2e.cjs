@@ -28,7 +28,7 @@ try {
 
 const API = process.env.E2E_API || "http://localhost:5081";
 const APP = process.env.E2E_APP || "http://localhost:5184";
-const DB = process.env.E2E_DB || "nga_central_mis_test_oh";
+const DB = process.env.E2E_DB || "nga_central_mis_test_oh2";
 const OUT = process.argv[2] || path.join(__dirname, "out");
 const CHROME = process.env.CHROME_PATH || "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 fs.mkdirSync(OUT, { recursive: true });
@@ -53,7 +53,8 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
   // ─── seed ──────────────────────────────────────────────────────────────────
   const stamp = Date.now();
-  const today = new Date(Date.now() + 2 * 3600_000).toISOString().slice(0, 10); // Kigali date
+  // Kigali date; E2E_TODAY must match the API's OFFICE_HOURS_FAKE_NOW date when that is pinned.
+  const today = process.env.E2E_TODAY || new Date(Date.now() + 2 * 3600_000).toISOString().slice(0, 10);
   await db.query("UPDATE AcademicYear SET is_current = 0");
   await db.query("UPDATE AcademicTerm SET is_current = 0");
   const year = Number(today.slice(0, 4));
@@ -247,6 +248,27 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     check("both students were told they are assigned", noticeRows.filter((n) => n.kind === "office_hours_assigned").length === 2, noticeRows);
     check("the absent student was told they missed it", noticeRows.some((n) => n.user_id === students[1] && n.kind === "office_hours_absent"));
 
+    // 3c) Phase 6: QR self check-in (a walk-in student) and the live register panel.
+    check("QR check-in switched on", (await putSettings({ qr_checkin_enabled: true })) === 200);
+    const [[todaySession]] = await db.query("SELECT session_id FROM OfficeHourSession WHERE schedule_id=? AND session_date=?", [sched.schedule_id, today]);
+    const a2 = await open(tokenOf(teacherA));
+    await a2.goto(`${APP}/office-hours`, { waitUntil: "networkidle2" });
+    await waitText(a2, "Edit register");
+    await clickText(a2, "button", "Edit register");
+    await waitText(a2, "Self check-in");
+    await clickText(a2, "button", "Self check-in");
+    check("host sees a rotating check-in code", await waitText(a2, /\b\d{6}\b/));
+    await shot(a2, "05b-checkin-panel");
+    await axe(a2, "check-in panel (light)");
+    const tok = await fetch(`${API}/office-hours/sessions/${todaySession.session_id}/checkin-token`, { method: "POST", headers: { Authorization: `Bearer ${tokenOf(teacherA)}` } }).then((r) => r.json());
+    const walkIn = await open(tokenOf(students[2]));
+    await walkIn.goto(`${APP}/office-hours/checkin?t=${encodeURIComponent(tok.data.token)}`, { waitUntil: "networkidle2" });
+    check("walk-in student checks in from the scanned link", await waitText(walkIn, /Checked in/));
+    await shot(walkIn, "05c-student-checkin");
+    await walkIn.close();
+    await a2.close();
+    await putSettings({ qr_checkin_enabled: false });
+
     // 4) The student sees their office hours and their mark.
     const s = await open(tokenOf(students[0]));
     await s.goto(`${APP}/my-office-hours`, { waitUntil: "networkidle2" });
@@ -256,6 +278,15 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     check("student never sees the reason code", !/below standard/i.test(studentText));
     await shot(s, "07-student");
     await axe(s, "my office hours (light)");
+    // Phase 6: "I can't come" for the next session.
+    if (await waitText(s, "I can't come", 5000)) {
+      await clickText(s, "button", "I can't come");
+      await s.select(`select[id^="oh-abs-"]`, "SCHOOL_ACTIVITY");
+      await clickText(s, "button", "Tell my teacher");
+      check("student told the teacher they can't come", await waitText(s, /told your teacher you can't come/));
+      const [[n]] = await db.query("SELECT COUNT(*) AS n FROM OfficeHourAbsenceNotice WHERE student_id=?", [students[0]]);
+      check("the notice is stored", Number(n.n) === 1, n);
+    } else check("next session offers 'I can't come'", false);
     // The bell lists the assignment notice.
     await s.evaluate(() => {
       const bell = [...document.querySelectorAll("button")].find((x) => /notification/i.test(x.getAttribute("aria-label") || ""));
@@ -297,6 +328,28 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     await l.goto(`${APP}/office-hours/admin?tab=unmarked`, { waitUntil: "networkidle2" });
     check("missing-registers tab loads", await waitText(l, /Registers not taken|Every register is taken/));
     await l.close();
+
+    // Phase 7: accessibility and overflow across themes and viewports.
+    const matrix = [
+      ["/office-hours", teacherA],
+      ["/my-office-hours", students[0]],
+      ["/office-hours/admin?tab=overview", leader],
+    ];
+    for (const theme of ["light", "dark"]) {
+      for (const [who] of [[teacherA], [students[0]], [leader]]) await db.query("UPDATE User SET preferred_theme=? WHERE user_id=?", [theme, who]);
+      for (const [path, who] of matrix) {
+        for (const width of [390, 768, 1366]) {
+          const p = await open(tokenOf(who), theme);
+          await p.setViewport({ width, height: 900 });
+          await p.goto(`${APP}${path}`, { waitUntil: "networkidle2" });
+          await sleep(800);
+          const over = await p.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+          check(`${path} fits ${width}px (${theme})`, over <= 1, over);
+          if (width === 1366 || width === 390) await axe(p, `${path} ${width}px (${theme})`);
+          await p.close();
+        }
+      }
+    }
 
     // Mobile layout: no horizontal scroll on the hub.
     const m = await open(tokenOf(teacherA));

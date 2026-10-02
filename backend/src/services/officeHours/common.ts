@@ -147,3 +147,11 @@ export const withDeadlockRetry = async <T>(fn: () => Promise<T>, attempts = 4): 
     }
   }
 };
+
+/**
+ * Kill switch (plan §21): OFFICE_HOURS_ENABLED=false hides the module -- the
+ * API answers 404, the scheduler does not start, Home and the Reminder Hub
+ * skip office hours. Rollout itself is by permission (grant
+ * OFFICE_HOURS_MANAGE_OWN to the pilot teachers first).
+ */
+export const officeHoursEnabled = () => process.env.OFFICE_HOURS_ENABLED !== "false";
