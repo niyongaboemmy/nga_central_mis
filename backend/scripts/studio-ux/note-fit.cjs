@@ -9,6 +9,8 @@
  *   - with the Study Assistant open, the page keeps that width and the bottom bar stays
  *     clear of the panel.
  *   node scripts/studio-ux/note-fit.cjs [--student=23] [--course=1] [--item=5] [--fe=http://localhost:5173]
+ * EXPECT_REPAIRED_HEADING="Declaring" also checks that a heading stored with escaped
+ * <code> tags (older generated lessons) renders with real code elements.
  */
 const path = require("path");
 const fs = require("fs");
@@ -134,8 +136,9 @@ const LONG_URL = "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Refere
       check(false, `${tag}: found the Ask AI button`);
     }
 
-    // Phones and tablets: the contents open as a drawer from the toolbar.
-    if (vp.width < 1024) {
+    // Wherever the rail doesn't fit, the contents open as a drawer from the toolbar: on
+    // the right, above the app's own menu, fully readable.
+    if (!a.rail) {
       await page.keyboard.press("Escape");
       await page.evaluate(() => document.querySelector("button[aria-label='Close'], button[aria-label*='Close']")?.click());
       await sleep(500);
@@ -147,9 +150,40 @@ const LONG_URL = "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Refere
       });
       if (drawer === "clicked") {
         await sleep(600);
-        const has = await page.evaluate(() => !!document.querySelector("button[aria-label='Close contents']"));
-        check(has, `${tag}: contents open as a drawer`);
+        const d = await page.evaluate(() => {
+          const dlg = document.querySelector("[role='dialog'][aria-labelledby='note-contents-title']");
+          if (!dlg) return null;
+          const r = dlg.getBoundingClientRect();
+          // What a student actually sees at a few points inside the drawer.
+          const pts = [0.25, 0.5, 0.75].map((f) => document.elementFromPoint(r.left + r.width / 2, r.top + r.height * f));
+          const bg = getComputedStyle(dlg).backgroundColor;
+          return {
+            right: Math.round(window.innerWidth - r.right),
+            width: Math.round(r.width),
+            onTop: pts.every((el) => el && dlg.contains(el)),
+            opaque: !/rgba\(.*,\s*0(\.\d+)?\)$/.test(bg),
+            focused: dlg.contains(document.activeElement),
+          };
+        });
+        check(!!d, `${tag}: contents open as a drawer`);
+        if (d) {
+          check(d.right <= 1, `${tag}: drawer opens on the right, by its button (${d.right}px from the edge)`);
+          check(d.onTop, `${tag}: drawer sits above the app menu and page`);
+          check(d.opaque, `${tag}: drawer surface is solid`);
+          check(d.focused, `${tag}: focus moves into the drawer`);
+          check(d.width <= vp.width, `${tag}: drawer fits the screen (${d.width}px)`);
+        }
+        await page.screenshot({ path: path.join(OUT, `${vp.label}-contents.png`) });
+        await page.keyboard.press("Escape");
+        await sleep(1200);
+        const closed = await page.evaluate(() => !document.querySelector("[aria-labelledby='note-contents-title']"));
+        check(closed, `${tag}: Escape closes the drawer`);
       }
+    }
+    if (process.env.EXPECT_REPAIRED_HEADING) {
+      const toc = await page.evaluate(() => [...document.querySelectorAll(".note-reader-body h2")].map((h) => ({ codes: h.querySelectorAll("code").length, text: h.textContent })));
+      const hit = toc.find((h) => h.text.startsWith(process.env.EXPECT_REPAIRED_HEADING));
+      check(!!hit && hit.codes > 0 && !hit.text.includes("<code>"), `${tag}: literal <code> pairs render as code (${hit ? hit.text : "heading missing"})`);
     }
     check(errors.length === 0, `${tag}: no page errors ${errors.slice(0, 2).join(" | ")}`);
     await page.close();

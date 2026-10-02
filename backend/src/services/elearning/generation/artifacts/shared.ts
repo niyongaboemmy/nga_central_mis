@@ -9,6 +9,17 @@ export const escapeHtml = (s: string): string =>
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
 
+/** Escape a short model-written string (a heading, summary, key term, step) but keep the
+ *  bare inline tags the model is told it may use — <code>, <strong>, <em>, <b>, <i> with
+ *  no attributes. Plain escapeHtml showed students a literal "<code>let</code>" in the
+ *  heading, the contents list and the summary. Only balanced, attribute-free pairs are
+ *  restored, so nothing else the model writes can become markup. */
+export const inlineHtml = (s: string): string =>
+  escapeHtml(s).replace(
+    /&lt;(code|strong|em|b|i)&gt;([\s\S]*?)&lt;\/\1&gt;/g,
+    (_m, tag: string, inner: string) => `<${tag}>${inner}</${tag}>`,
+  );
+
 /** The source refs a pack actually contains — anything else the model cites is dropped. */
 export const validRefs = (pack: WeekContextPack): Set<string> => new Set(pack.sources.map((s) => s.ref));
 
