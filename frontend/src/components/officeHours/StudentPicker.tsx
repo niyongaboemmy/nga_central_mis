@@ -9,6 +9,7 @@ import {
   type AssignResult,
   type Candidate,
   type CandidatesResponse,
+  type Suggestion,
 } from "../../api/officeHours";
 import { useToast } from "../../contexts/ToastContext";
 import { AvailabilityChip, EmptyState, inputCls, labelCls, Muted, primaryBtn, secondaryBtn, Spinner } from "./ohUi";
@@ -42,6 +43,8 @@ const StudentPicker: React.FC<StudentPickerProps> = ({ scheduleId, reasonCodes, 
   const [loading, setLoading] = useState(true);
   const [classGroupId, setClassGroupId] = useState<number | "">("");
   const [q, setQ] = useState("");
+  const [mode, setMode] = useState<"all" | "suggested">("all");
+  const [suggested, setSuggested] = useState<{ task_mentor: "ok" | "unavailable"; students: Suggestion[] } | null>(null);
   const [onlyFree, setOnlyFree] = useState(false);
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [reason, setReason] = useState("");
@@ -77,10 +80,22 @@ const StudentPicker: React.FC<StudentPickerProps> = ({ scheduleId, reasonCodes, 
     return () => window.clearTimeout(t);
   }, [load, q]);
 
-  const students = useMemo(
-    () => (data?.students ?? []).filter((s) => !onlyFree || s.availability.status === "FREE"),
-    [data, onlyFree],
-  );
+  useEffect(() => {
+    if (mode !== "suggested" || suggested) return;
+    officeHoursApi
+      .suggestions(scheduleId)
+      .then((r) => setSuggested(r.data.data))
+      .catch(() => setSuggested({ task_mentor: "unavailable", students: [] }));
+  }, [mode, suggested, scheduleId]);
+
+  const signalsOf = useMemo(() => new Map((suggested?.students ?? []).map((s) => [s.student_id, s.signals])), [suggested]);
+  const students = useMemo(() => {
+    const base = (data?.students ?? []).filter((s) => !onlyFree || s.availability.status === "FREE");
+    if (mode !== "suggested") return base;
+    // Suggested students, strongest evidence first, with their availability.
+    const order = new Map((suggested?.students ?? []).map((s, i) => [s.student_id, i]));
+    return base.filter((s) => order.has(s.student_id)).sort((a, b) => order.get(a.student_id)! - order.get(b.student_id)!);
+  }, [data, onlyFree, mode, suggested]);
   const selectable = (s: Candidate) => s.availability.status === "FREE" && s.eligible;
   const freeVisible = students.filter(selectable);
   const capacityLeft = data ? Math.max(0, data.capacity - data.assigned_count) : 0;
@@ -137,7 +152,38 @@ const StudentPicker: React.FC<StudentPickerProps> = ({ scheduleId, reasonCodes, 
 
   return (
     <div className="space-y-4">
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="flex gap-1 rounded-full bg-slate-100 p-1 dark:bg-slate-800" role="tablist" aria-label="Which students">
+        {(
+          [
+            ["all", "All my students"],
+            ["suggested", "Suggested"],
+          ] as const
+        ).map(([k, l]) => (
+          <button
+            key={k}
+            type="button"
+            role="tab"
+            aria-selected={mode === k}
+            onClick={() => {
+              setMode(k);
+              if (k === "suggested") {
+                setClassGroupId("");
+                setQ("");
+              }
+            }}
+            className={`flex-1 rounded-full px-3 py-1 text-sm font-semibold focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${mode === k ? "bg-white text-slate-900 shadow-sm dark:bg-slate-900 dark:text-slate-50" : "text-slate-700 dark:text-slate-300"}`}
+          >
+            {l}
+          </button>
+        ))}
+      </div>
+      {mode === "suggested" && (
+        <Muted className="text-xs">
+          Students with evidence they need support: low Task Mentor results or missing work, or low office-hours attendance before. You decide — nobody is added automatically.
+          {suggested?.task_mentor === "unavailable" ? " Task Mentor results are not available right now." : ""}
+        </Muted>
+      )}
+      <div className={`grid gap-3 sm:grid-cols-3 ${mode === "suggested" ? "hidden" : ""}`}>
         <div>
           <label htmlFor="oh-picker-class" className={labelCls}>Class</label>
           <select
@@ -189,7 +235,12 @@ const StudentPicker: React.FC<StudentPickerProps> = ({ scheduleId, reasonCodes, 
         {loading && !data ? (
           <div className="px-4"><Spinner label="Loading students" /></div>
         ) : students.length === 0 ? (
-          <div className="p-4"><EmptyState title="No students found" body={q ? "Try another name, or clear the class filter." : "Students you teach this year appear here."} /></div>
+          <div className="p-4">
+            <EmptyState
+              title={mode === "suggested" ? (suggested ? "No suggestions right now" : "Looking for suggestions…") : "No students found"}
+              body={mode === "suggested" ? "Nobody you teach shows signs of needing support yet." : q ? "Try another name, or clear the class filter." : "Students you teach this year appear here."}
+            />
+          </div>
         ) : (
           <ul className="divide-y divide-slate-100 dark:divide-slate-800" aria-label="Students">
             {students.map((s) => {
@@ -210,6 +261,15 @@ const StudentPicker: React.FC<StudentPickerProps> = ({ scheduleId, reasonCodes, 
                     <span className="block truncate text-xs text-slate-600 dark:text-slate-300">
                       {[s.class_group_name, s.registration_number].filter(Boolean).join(" · ")}
                     </span>
+                    {mode === "suggested" && signalsOf.get(s.student_id) && (
+                      <span className="mt-1 flex flex-wrap gap-1">
+                        {signalsOf.get(s.student_id)!.map((g) => (
+                          <span key={g.label} className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${g.source === "taskmentor" ? "bg-violet-100 text-violet-800 dark:bg-violet-500/15 dark:text-violet-200" : "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200"}`}>
+                            {g.label}
+                          </span>
+                        ))}
+                      </span>
+                    )}
                   </label>
                   {s.clash_note && (
                     <span className="hidden text-amber-700 dark:text-amber-300 sm:inline" title={`Also scheduled: ${s.clash_note}`}>

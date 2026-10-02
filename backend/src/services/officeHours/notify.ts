@@ -250,6 +250,32 @@ const notifyHostChanged = async (sessionId: number, actorId: number) => {
   await refreshReminderHub(people);
 };
 
+const notifyMoved = async (sessionId: number, fromSessionId: number, actorId: number) => {
+  const [row] = await db
+    .select({ s: OfficeHourSession, title: OfficeHourSchedule.title })
+    .from(OfficeHourSession)
+    .innerJoin(OfficeHourSchedule, eq(OfficeHourSchedule.schedule_id, OfficeHourSession.schedule_id))
+    .where(eq(OfficeHourSession.session_id, sessionId))
+    .limit(1);
+  const [from] = await db.select().from(OfficeHourSession).where(eq(OfficeHourSession.session_id, fromSessionId)).limit(1);
+  if (!row || !from) return;
+  // Everyone expected at the original date.
+  const people = await peopleOfSessions([fromSessionId]);
+  await send(
+    people.filter((p) => p !== actorId),
+    {
+      kind: "office_hours_changed",
+      title: `Office hours moved: ${row.title}`,
+      body: `${ymdLabel(from.session_date)} ${from.start_time} is now ${ymdLabel(row.s.session_date)} ${row.s.start_time}${row.s.location ? `, ${row.s.location}` : ""}.`,
+      link: "/my-office-hours",
+      subjectType: "office_hour_session",
+      subjectId: sessionId,
+      actorId,
+    },
+  );
+  await refreshReminderHub(people, [fromSessionId]);
+};
+
 /** Absent marks tell the student; a correction away from absent withdraws that notice. */
 const notifyMarks = async (sessionId: number, studentIds: number[], actorId: number) => {
   if (!studentIds.length) return;
@@ -485,6 +511,8 @@ export const handleOfficeHoursEvent = async (e: OfficeHoursEvent) => {
       return notifyCancelled(e.sessionIds, e.actorId, "", true);
     case "host_changed":
       return notifyHostChanged(e.sessionId, e.actorId);
+    case "session_moved":
+      return notifyMoved(e.sessionId, e.fromSessionId, e.actorId);
     case "register_saved": {
       await notifyMarks(e.sessionId, e.changedStudentIds, e.actorId);
       const [s] = await db.select({ schedule: OfficeHourSession.schedule_id }).from(OfficeHourSession).where(eq(OfficeHourSession.session_id, e.sessionId));

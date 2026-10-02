@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, CheckCheck, ChevronDown, History, MessageSquareWarning, Search, UserPlus } from "lucide-react";
+import { AlertTriangle, CheckCheck, ChevronDown, History, MessageSquareWarning, QrCode, Search, UserPlus } from "lucide-react";
 import Modal from "../ui/Modal";
 import { useConfirm } from "../../contexts/ConfirmContext";
 import { useToast } from "../../contexts/ToastContext";
@@ -17,6 +17,9 @@ import {
 } from "../../api/officeHours";
 import { ATTENDANCE_META, inputCls, labelCls, Muted, primaryBtn, secondaryBtn, Spinner } from "./ohUi";
 import { queueRegister } from "./offlineQueue";
+import { CheckInPanel } from "./CheckIn";
+import { API_BASE_URL } from "../../services/api";
+import { getToken } from "../../utils/auth";
 
 /**
  * The register (plan §12). One tap per exception: "Mark all present", then
@@ -78,6 +81,8 @@ const RegisterSheet: React.FC<RegisterSheetProps> = ({ sessionId, onClose, onSav
   const [dropInResults, setDropInResults] = useState<StudentCard[]>([]);
   const [extraRows, setExtraRows] = useState<RegisterRow[]>([]);
   const [showHistory, setShowHistory] = useState(false);
+  const [showCheckIn, setShowCheckIn] = useState(false);
+  const [checkedIn, setCheckedIn] = useState(0);
   const [history, setHistory] = useState<Array<{ history_id: number; student_name: string | null; previous_status: string | null; new_status: string | null; changed_by_name: string | null; changed_at: string }>>([]);
   const rowRefs = useRef<Array<HTMLLIElement | null>>([]);
 
@@ -105,6 +110,27 @@ const RegisterSheet: React.FC<RegisterSheetProps> = ({ sessionId, onClose, onSav
   useEffect(() => {
     void load();
   }, [load]);
+
+  // Live register (plan §16.4): QR check-ins appear as they happen. The marks
+  // fill only students the teacher has not marked; the teacher still saves.
+  const editableNow = Boolean(data?.can_edit);
+  useEffect(() => {
+    if (!editableNow || typeof EventSource === "undefined") return;
+    const token = getToken();
+    if (!token) return;
+    const es = new EventSource(`${API_BASE_URL}/office-hours/sessions/${sessionId}/live?token=${encodeURIComponent(token)}`);
+    es.addEventListener("checkin", (ev) => {
+      try {
+        const d = JSON.parse((ev as MessageEvent).data) as { student_id: number; status: AttendanceStatus; arrived_at: string | null; drop_in: boolean };
+        setCheckedIn((n) => n + 1);
+        setDraft((cur) => (cur[d.student_id]?.status ? cur : { ...cur, [d.student_id]: { ...(cur[d.student_id] ?? { student_id: d.student_id }), status: d.status, arrived_at: d.arrived_at } }));
+        if (d.drop_in) void load();
+      } catch {
+        /* ignore a malformed event */
+      }
+    });
+    return () => es.close();
+  }, [editableNow, sessionId, load]);
 
   const rows = useMemo(() => [...(data?.roster ?? []), ...extraRows], [data, extraRows]);
   const original = useMemo(() => {
@@ -330,6 +356,11 @@ const RegisterSheet: React.FC<RegisterSheetProps> = ({ sessionId, onClose, onSav
                 <button type="button" className={secondaryBtn} onClick={markAllPresent}>
                   <CheckCheck className="h-4 w-4" aria-hidden /> Mark all present
                 </button>
+                {data.qr_enabled && (
+                  <button type="button" className={secondaryBtn} onClick={() => setShowCheckIn(true)}>
+                    <QrCode className="h-4 w-4" aria-hidden /> Self check-in{checkedIn ? ` (${checkedIn})` : ""}
+                  </button>
+                )}
                 <Muted className="hidden text-xs sm:block">Keys: ↑ ↓ to move · 1 Present · 2 Late · 3 Absent · 4 Excused · Ctrl/⌘+Enter to save</Muted>
               </div>
             )}
@@ -503,6 +534,7 @@ const RegisterSheet: React.FC<RegisterSheetProps> = ({ sessionId, onClose, onSav
           </div>
         </div>
       )}
+      {showCheckIn && <CheckInPanel sessionId={sessionId} checkedIn={checkedIn} onClose={() => setShowCheckIn(false)} />}
     </Modal>
   );
 };

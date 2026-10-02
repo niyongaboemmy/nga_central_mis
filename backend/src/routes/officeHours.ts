@@ -42,6 +42,20 @@ import { listUnmarked } from "../services/officeHours/admin";
 import { acknowledgeEscalation, listEscalations } from "../services/officeHours/escalation";
 import { nudgeUnmarked } from "../services/officeHours/digests";
 import { registerOfficeHoursNotifier } from "../services/officeHours/notify";
+import {
+  checkIn,
+  checkInToken,
+  moveSession,
+  noticesFor,
+  rolloverSchedule,
+  sendAbsenceNotice,
+  suggestionsFor,
+  trackOfficeHours,
+  withdrawAbsenceNotice,
+  ABSENCE_REASONS,
+} from "../services/officeHours/modern";
+import { subscribeSession } from "../services/officeHours/live";
+import { loadSession } from "../services/officeHours/sessions";
 import { resolvePeriod } from "../services/officeHours/period";
 import {
   breakdownReport,
@@ -97,7 +111,7 @@ router.get(
       purposes: PURPOSES,
       reason_codes: REASON_CODES,
       end_reason_codes: END_REASON_CODES.filter((c) => c !== "SCHEDULE_ENDED" && c !== "ADMIN_OVERRIDE"),
-      cancel_reasons: CANCEL_REASONS.filter((c) => c !== "CLOSURE" && c !== "SCHEDULE_ENDED" && c !== "SCHEDULE_CHANGED"),
+      cancel_reasons: CANCEL_REASONS.filter((c) => c !== "CLOSURE" && c !== "SCHEDULE_ENDED" && c !== "SCHEDULE_CHANGED" && c !== "MOVED"),
       term,
       today: todayYmd(),
       capabilities: {
@@ -122,7 +136,10 @@ router.get(
     const term = await loadTerm(termId);
     await assertCanSeeStudent(actor, studentId, term.yearId);
     const stats = (await statsByStudent({ studentIds: [studentId], fromYmd: term.startYmd, toYmd: term.endYmd })).get(studentId);
-    successResponse(res, "Office hours", { student_id: studentId, ...(await studentOverview(studentId, termId)), stats });
+    const overview = await studentOverview(studentId, termId);
+    const notices = await noticesFor(studentId, overview.upcoming.map((u) => u.session_id));
+    const upcoming = overview.upcoming.map((u) => ({ ...u, notice: notices.get(u.session_id) ?? null }));
+    successResponse(res, "Office hours", { student_id: studentId, ...overview, upcoming, stats, absence_reasons: ABSENCE_REASONS });
   }),
 );
 
@@ -189,6 +206,7 @@ router.post(
   asyncHandler(async (req, res) => {
     const actor = actorOf(req);
     const scheduleId = await createSchedule(actor, req.body ?? {});
+    trackOfficeHours("schedule_create", actor.userId, { schedule_id: scheduleId });
     let assignment = null;
     if (Array.isArray(req.body?.student_ids) && req.body.student_ids.length) {
       assignment = await assignStudents(actor, scheduleId, intList(req.body.student_ids, "student_ids", 200), {
@@ -283,6 +301,7 @@ router.post(
       effectiveFrom: req.body?.effective_from,
     });
     const status = result.assigned.length ? 201 : 200;
+    if (result.assigned.length) trackOfficeHours("assign", actorOf(req).userId, { count: result.assigned.length, conflicts: result.conflicts.length });
     successResponse(res, `${result.assigned.length} assigned`, result, status);
   }),
 );
@@ -398,7 +417,9 @@ router.put(
   "/sessions/:id/register",
   teacher,
   asyncHandler(async (req, res) => {
-    successResponse(res, "Register saved", await saveRegister(actorOf(req), idParam(req.params.id), req.body ?? {}));
+    const saved = await saveRegister(actorOf(req), idParam(req.params.id), req.body ?? {});
+    trackOfficeHours("register_save", actorOf(req).userId, { session_id: saved.session.session_id, students: saved.roster.length });
+    successResponse(res, "Register saved", saved);
   }),
 );
 router.get(
@@ -420,6 +441,80 @@ router.get(
     if (q.length < 2) throw new ValidationError("Type at least two letters");
     const term = await loadTerm(await resolveTermId(req.query.term_id));
     successResponse(res, "Students", await searchStudents({ yearId: term.yearId, q, limit: 20 }));
+  }),
+);
+
+// ---------------------------------------------------------------- phase 6: check-in, notices, suggestions, rollover, move
+const sessionToken = (req: any): string | null => {
+  const header = req.headers?.authorization as string | undefined;
+  if (header?.startsWith("Bearer ")) return header.slice(7);
+  return req.cookies?.nga_auth_token ?? null;
+};
+
+router.post(
+  "/sessions/:id/checkin-token",
+  teacher,
+  asyncHandler(async (req, res) => {
+    successResponse(res, "Check-in code", await checkInToken(actorOf(req), idParam(req.params.id)));
+  }),
+);
+/** Live register stream (EventSource sends the JWT as ?token=, see authenticate). */
+router.get(
+  "/sessions/:id/live",
+  teacher,
+  asyncHandler(async (req, res) => {
+    const actor = actorOf(req);
+    const { session, schedule } = await loadSession(idParam(req.params.id));
+    if (!(actor.manageAny || [schedule.teacher_id, session.host_teacher_id].includes(actor.userId))) {
+      throw new AuthorizationError("Only the host can follow this register live");
+    }
+    subscribeSession(session.session_id, res);
+  }),
+);
+router.post(
+  "/checkin",
+  authorize([P.OFFICE_HOURS_VIEW_SELF]),
+  asyncHandler(async (req, res) => {
+    successResponse(res, "Checked in", await checkIn(actorOf(req).userId, req.body ?? {}));
+  }),
+);
+router.post(
+  "/sessions/:id/absence-notice",
+  authorize([P.OFFICE_HOURS_VIEW_SELF]),
+  asyncHandler(async (req, res) => {
+    await sendAbsenceNotice(actorOf(req).userId, idParam(req.params.id), req.body?.reason, req.body?.note);
+    successResponse(res, "Your teacher has been told", null, 201);
+  }),
+);
+router.delete(
+  "/sessions/:id/absence-notice",
+  authorize([P.OFFICE_HOURS_VIEW_SELF]),
+  asyncHandler(async (req, res) => {
+    await withdrawAbsenceNotice(actorOf(req).userId, idParam(req.params.id));
+    successResponse(res, "Notice withdrawn");
+  }),
+);
+router.get(
+  "/schedules/:id/suggestions",
+  teacher,
+  asyncHandler(async (req, res) => {
+    successResponse(res, "Suggested students", await suggestionsFor(actorOf(req), idParam(req.params.id), sessionToken(req)));
+  }),
+);
+router.post(
+  "/schedules/:id/rollover",
+  teacher,
+  asyncHandler(async (req, res) => {
+    const toTerm = toInt(req.body?.to_term_id);
+    if (!toTerm) throw new ValidationError("to_term_id is required");
+    successResponse(res, "Office hours copied to the new term", await rolloverSchedule(actorOf(req), idParam(req.params.id), toTerm), 201);
+  }),
+);
+router.post(
+  "/sessions/:id/move",
+  teacher,
+  asyncHandler(async (req, res) => {
+    successResponse(res, "Session moved", await moveSession(actorOf(req), idParam(req.params.id), req.body ?? {}));
   }),
 );
 

@@ -22,7 +22,7 @@ import { emitOfficeHoursEvent } from "./events";
  * and lazily on read.
  */
 export const HORIZON_DAYS = 14;
-export const CANCEL_REASONS = ["TEACHER_ABSENT", "CLOSURE", "SCHEDULE_CHANGED", "SCHEDULE_ENDED", "EVENT", "OTHER"] as const;
+export const CANCEL_REASONS = ["TEACHER_ABSENT", "CLOSURE", "SCHEDULE_CHANGED", "SCHEDULE_ENDED", "EVENT", "MOVED", "OTHER"] as const;
 export type CancelReason = (typeof CANCEL_REASONS)[number];
 
 type Schedule = typeof OfficeHourSchedule.$inferSelect;
@@ -160,7 +160,8 @@ export const rematerialiseSchedule = async (scheduleId: number, actorId: number 
   );
   const startedToday = (s: Session) => s.session_date === today && (parseClock(s.start_time) ?? 0) <= nowMinutes();
 
-  const stale = future.filter((s) => s.status === "SCHEDULED" && !valid.has(s.session_date) && !startedToday(s));
+  // One-off moved sessions are not part of the weekly pattern: leave them alone.
+  const stale = future.filter((s) => s.status === "SCHEDULED" && !s.moved_from_session_id && !valid.has(s.session_date) && !startedToday(s));
   const marked = await markedSessionIds(stale.map((s) => s.session_id));
   const toDelete = stale.filter((s) => !marked.has(s.session_id)).map((s) => s.session_id);
   const toCancel = stale.filter((s) => marked.has(s.session_id)).map((s) => s.session_id);
@@ -184,7 +185,7 @@ export const rematerialiseSchedule = async (scheduleId: number, actorId: number 
 
   // Times and room follow the schedule for sessions that have not started.
   const follow = future
-    .filter((s) => s.status === "SCHEDULED" && valid.has(s.session_date) && !startedToday(s))
+    .filter((s) => s.status === "SCHEDULED" && !s.moved_from_session_id && valid.has(s.session_date) && !startedToday(s))
     .filter((s) => s.start_time !== schedule.start_time || s.end_time !== schedule.end_time || s.location !== schedule.location)
     .map((s) => s.session_id);
   if (follow.length) {
@@ -236,7 +237,7 @@ export const expectedAssignments = async (scheduleId: number, sessionDate: strin
     );
 
 export const cancelSession = async (actor: Actor, sessionId: number, reason: unknown, note: unknown) => {
-  if (!CANCEL_REASONS.includes(reason as CancelReason)) {
+  if (!CANCEL_REASONS.includes(reason as CancelReason) || reason === "MOVED") {
     throw new ValidationError("Choose a reason for cancelling", [{ field: "reason", message: `One of ${CANCEL_REASONS.join(", ")}` }]);
   }
   const { session, schedule } = await loadSession(sessionId);

@@ -130,6 +130,8 @@ export const OfficeHourSession = mysqlTable("OfficeHourSession", {
   cancelled_by: bigint("cancelled_by", { mode: "number" }),
   cancelled_at: datetime("cancelled_at"),
   topic: varchar("topic", { length: 255 }),
+  /** A one-off session moved from another date; the original stays CANCELLED (MOVED). */
+  moved_from_session_id: bigint("moved_from_session_id", { mode: "number" }),
   register_first_saved_at: datetime("register_first_saved_at"),
   register_last_saved_at: datetime("register_last_saved_at"),
   register_saved_by: bigint("register_saved_by", { mode: "number" }),

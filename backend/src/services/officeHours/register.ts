@@ -120,6 +120,7 @@ export const openRegister = async (actor: Actor, sessionId: number) => {
       last_edit_day: w.lastEditDay,
     },
     late_after_minutes: (await getSettings()).late_after_minutes,
+    qr_enabled: (await getSettings()).qr_checkin_enabled === 1,
   };
 };
 

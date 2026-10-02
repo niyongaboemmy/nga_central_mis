@@ -18,6 +18,7 @@ export type OfficeHoursEvent =
   | { type: "sessions_cancelled"; sessionIds: number[]; actorId: number; reason: string }
   | { type: "sessions_restored"; sessionIds: number[]; actorId: number }
   | { type: "host_changed"; sessionId: number; previousHostId: number; actorId: number }
+  | { type: "session_moved"; sessionId: number; fromSessionId: number; actorId: number }
   | { type: "register_saved"; sessionId: number; actorId: number; changedStudentIds: number[] }
   | { type: "transfer_requested"; requestId: number; actorId: number }
   | { type: "transfer_decided"; requestId: number; actorId: number; accepted: boolean }

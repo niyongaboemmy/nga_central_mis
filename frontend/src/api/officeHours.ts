@@ -224,6 +224,11 @@ export interface StudentSessionView {
   notice?: { reason: string; note: string | null } | null;
 }
 
+export interface Suggestion extends StudentCard {
+  signals: Array<{ source: "taskmentor" | "office_hours"; label: string; weight: number }>;
+  score: number;
+}
+
 export interface StudentOverview {
   student_id: number;
   term: { academic_term_id: number; name: string | null; start_date: string; end_date: string };
@@ -231,6 +236,7 @@ export interface StudentOverview {
   upcoming: StudentSessionView[];
   history: StudentSessionView[];
   stats?: StudentStats;
+  absence_reasons?: string[];
 }
 
 export interface BandEntry {
@@ -280,6 +286,7 @@ export interface RegisterData {
   can_edit: boolean;
   window: { opens_at: string; not_yet: boolean; closed: boolean; last_edit_day: string };
   late_after_minutes: number;
+  qr_enabled?: boolean;
   excuse_reasons?: string[];
 }
 
@@ -551,6 +558,17 @@ export const officeHoursApi = {
   override: (body: { student_id: number; to_schedule_id: number; reason: string }) =>
     api.post<Envelope<{ assignment_id: number }>>("/office-hours/admin/assignments/override", body),
   nudgeUnmarked: (sessionIds: number[]) => api.post<Envelope<{ notified: number }>>("/office-hours/admin/unmarked/nudge", { session_ids: sessionIds }),
+  checkInToken: (sessionId: number) =>
+    api.post<Envelope<{ token: string; code: string; session_id: number; expires_in: number; rotates_every: number }>>(`/office-hours/sessions/${sessionId}/checkin-token`),
+  checkIn: (body: { token?: string; session_id?: number; code?: string }) =>
+    api.post<Envelope<{ status: AttendanceStatus; already: boolean; drop_in: boolean; title?: string }>>("/office-hours/checkin", body),
+  sendAbsenceNotice: (sessionId: number, reason: string, note?: string) => api.post<Envelope<null>>(`/office-hours/sessions/${sessionId}/absence-notice`, { reason, note }),
+  withdrawAbsenceNotice: (sessionId: number) => api.delete<Envelope<null>>(`/office-hours/sessions/${sessionId}/absence-notice`),
+  suggestions: (scheduleId: number) => api.get<Envelope<{ task_mentor: "ok" | "unavailable"; students: Suggestion[] }>>(`/office-hours/schedules/${scheduleId}/suggestions`),
+  rollover: (scheduleId: number, toTermId: number) =>
+    api.post<Envelope<{ schedule_id: number; assignment: AssignResult | null }>>(`/office-hours/schedules/${scheduleId}/rollover`, { to_term_id: toTermId }),
+  moveSession: (sessionId: number, body: { date: string; start_time?: string; end_time?: string; location?: string }) =>
+    api.post<Envelope<OfficeHourSession>>(`/office-hours/sessions/${sessionId}/move`, body),
   summary: (q: ReportQuery) => api.get<Envelope<SummaryReport>>("/office-hours/reports/summary", { params: q }),
   breakdown: (q: ReportQuery & { group_by: GroupBy }) => api.get<Envelope<{ period: ReportPeriod; group_by: GroupBy; rows: BreakdownRow[] }>>("/office-hours/reports/breakdown", { params: q }),
   consistency: (q: ReportQuery) => api.get<Envelope<ConsistencyReport>>("/office-hours/reports/consistency", { params: q }),

@@ -144,6 +144,7 @@ CREATE TABLE IF NOT EXISTS `OfficeHourSession` (
   `cancelled_by` BIGINT NULL,
   `cancelled_at` DATETIME NULL,
   `topic` VARCHAR(255) NULL,
+  `moved_from_session_id` BIGINT NULL,
   `register_first_saved_at` DATETIME NULL,
   `register_last_saved_at` DATETIME NULL,
   `register_saved_by` BIGINT NULL,

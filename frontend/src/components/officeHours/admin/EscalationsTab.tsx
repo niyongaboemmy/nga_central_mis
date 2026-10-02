@@ -4,6 +4,20 @@ import Modal from "../../ui/Modal";
 import { useToast } from "../../../contexts/ToastContext";
 import { apiError, formatYmd, officeHoursApi, studentName, type Escalation, type OfficeHoursConfig } from "../../../api/officeHours";
 import { Card, CardTitle, EmptyState, inputCls, labelCls, Muted, primaryBtn, secondaryBtn, Spinner } from "../ohUi";
+import { NGA_APPS } from "../../apps/ngaApps";
+
+/** The attendance app's "Log incident" form, prefilled (it saves nothing until the teacher submits). */
+export const disciplineReferralUrl = (e: Escalation) => {
+  const tendo = NGA_APPS.find((a) => a.key === "tendo");
+  if (!tendo || !e.student) return null;
+  const q = new URLSearchParams({
+    student_id: String(e.student_id),
+    ...(e.student.class_group_id ? { class_id: String(e.student.class_group_id) } : {}),
+    title: "Missed mandatory office hours",
+    description: `${e.title} with ${e.teacher_name ?? "their teacher"}: ${TRIGGER[e.trigger_code].toLowerCase()} (last missed ${e.last_missed}).`,
+  });
+  return `${tendo.origin}/discipline/log?${q.toString()}`;
+};
 
 /**
  * Escalations (plan §13.4): students whose repeated absence was escalated,
@@ -90,6 +104,11 @@ const EscalationsTab: React.FC<{ termId: number | null; config?: OfficeHoursConf
                   </p>
                 )}
               </div>
+              {e.level >= 2 && disciplineReferralUrl(e) && (
+                <a className={secondaryBtn} href={disciplineReferralUrl(e)!} target="_blank" rel="noopener noreferrer">
+                  Refer to discipline
+                </a>
+              )}
               {!e.acknowledged_at && (
                 <button type="button" className={secondaryBtn} onClick={() => setAcking(e)}>
                   Mark followed up

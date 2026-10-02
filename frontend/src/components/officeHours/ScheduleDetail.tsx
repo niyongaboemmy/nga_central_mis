@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Ban, CalendarX2, Pencil, RotateCcw, Send, Trash2, UserMinus, UserPlus, Users } from "lucide-react";
+import { ArrowLeft, Ban, CalendarClock, CalendarX2, Copy, Pencil, RotateCcw, Send, Trash2, UserMinus, UserPlus, Users } from "lucide-react";
+import { academicTermsApi, type AcademicTerm } from "../../api/academics";
 import Modal from "../ui/Modal";
 import { useConfirm } from "../../contexts/ConfirmContext";
 import { useToast } from "../../contexts/ToastContext";
@@ -59,6 +60,22 @@ const ScheduleDetail: React.FC = () => {
   const [cancelNote, setCancelNote] = useState("");
   const [registerFor, setRegisterFor] = useState<OfficeHourSession | null>(null);
   const [showEnded, setShowEnded] = useState(false);
+  const [moving, setMoving] = useState<OfficeHourSession | null>(null);
+  const [moveForm, setMoveForm] = useState({ date: "", start_time: "", end_time: "" });
+  const [rollingOver, setRollingOver] = useState(false);
+  const [terms, setTerms] = useState<AcademicTerm[]>([]);
+  const [targetTerm, setTargetTerm] = useState<number | "">("");
+
+  useEffect(() => {
+    if (!rollingOver || terms.length) return;
+    academicTermsApi
+      .getAll()
+      .then((r) => {
+        const list = ((r.data as any).data ?? []) as AcademicTerm[];
+        setTerms(list.filter((t) => t.academic_term_id !== schedule?.academic_term_id).sort((a, b) => String(b.start_date).localeCompare(String(a.start_date))));
+      })
+      .catch(() => setTerms([]));
+  }, [rollingOver, terms.length, schedule?.academic_term_id]);
 
   const load = useCallback(async () => {
     try {
@@ -152,6 +169,11 @@ const ScheduleDetail: React.FC = () => {
               {schedule.status === "ACTIVE" ? "Published" : schedule.status === "DRAFT" ? "Draft — students not told yet" : schedule.status === "ENDED" ? "Ended" : "Cancelled"}
             </span>
           </div>
+          {!live && (
+            <button type="button" className={secondaryBtn} onClick={() => setRollingOver(true)}>
+              <Copy className="h-4 w-4" aria-hidden /> Copy to another term
+            </button>
+          )}
           {live && (
             <div className="flex flex-wrap gap-2">
               {schedule.status === "DRAFT" && (
@@ -164,6 +186,9 @@ const ScheduleDetail: React.FC = () => {
               </button>
               <button type="button" className={secondaryBtn} onClick={() => setEditOpen(true)}>
                 <Pencil className="h-4 w-4" aria-hidden /> Edit
+              </button>
+              <button type="button" className={secondaryBtn} onClick={() => setRollingOver(true)}>
+                <Copy className="h-4 w-4" aria-hidden /> Copy to another term
               </button>
               <button type="button" className={dangerBtn} onClick={endSchedule}>
                 <Ban className="h-4 w-4" aria-hidden /> End
@@ -284,9 +309,14 @@ const ScheduleDetail: React.FC = () => {
                       ) : s.state === "running" ? (
                         <button type="button" className={primaryBtn} onClick={() => setRegisterFor(s)}>Take register</button>
                       ) : (
-                        <button type="button" className={secondaryBtn} onClick={() => setCancelling(s)} aria-label={`Cancel ${formatYmd(s.session_date)}`}>
-                          <CalendarX2 className="h-4 w-4" aria-hidden />
-                        </button>
+                        <span className="flex gap-1">
+                          <button type="button" className={secondaryBtn} onClick={() => { setMoving(s); setMoveForm({ date: s.session_date, start_time: s.start_time, end_time: s.end_time }); }} aria-label={`Move ${formatYmd(s.session_date)}`}>
+                            <CalendarClock className="h-4 w-4" aria-hidden />
+                          </button>
+                          <button type="button" className={secondaryBtn} onClick={() => setCancelling(s)} aria-label={`Cancel ${formatYmd(s.session_date)}`}>
+                            <CalendarX2 className="h-4 w-4" aria-hidden />
+                          </button>
+                        </span>
                       ))}
                   </li>
                 ))}
@@ -375,6 +405,77 @@ const ScheduleDetail: React.FC = () => {
               }}
             >
               Cancel session
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal isOpen={Boolean(moving)} onClose={() => setMoving(null)} title={`Move ${moving ? formatYmd(moving.session_date) : ""}`}>
+        <div className="space-y-3">
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div>
+              <label htmlFor="oh-move-date" className={labelCls}>New date</label>
+              <input id="oh-move-date" type="date" className={inputCls} value={moveForm.date} onChange={(e) => setMoveForm({ ...moveForm, date: e.target.value })} />
+            </div>
+            <div>
+              <label htmlFor="oh-move-start" className={labelCls}>Starts</label>
+              <input id="oh-move-start" type="time" className={inputCls} value={moveForm.start_time} onChange={(e) => setMoveForm({ ...moveForm, start_time: e.target.value })} />
+            </div>
+            <div>
+              <label htmlFor="oh-move-end" className={labelCls}>Ends</label>
+              <input id="oh-move-end" type="time" className={inputCls} value={moveForm.end_time} onChange={(e) => setMoveForm({ ...moveForm, end_time: e.target.value })} />
+            </div>
+          </div>
+          <Muted className="text-xs">Only this session moves. Students are told; if any already has office hours at the new time, nothing moves and you'll see who.</Muted>
+          <div className="flex justify-end gap-2">
+            <button type="button" className={secondaryBtn} onClick={() => setMoving(null)}>Cancel</button>
+            <button
+              type="button"
+              className={primaryBtn}
+              onClick={async () => {
+                if (!moving) return;
+                await run(() => officeHoursApi.moveSession(moving.session_id, moveForm), "Session moved — students told");
+                setMoving(null);
+              }}
+            >
+              Move session
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal isOpen={rollingOver} onClose={() => setRollingOver(false)} title="Copy to another term">
+        <div className="space-y-3">
+          <div>
+            <label htmlFor="oh-rollover-term" className={labelCls}>Term</label>
+            <select id="oh-rollover-term" className={inputCls} value={targetTerm} onChange={(e) => setTargetTerm(e.target.value ? Number(e.target.value) : "")}>
+              <option value="">Choose a term</option>
+              {terms.map((t) => (
+                <option key={t.academic_term_id} value={t.academic_term_id}>{`${t.name}${t.start_date ? ` (from ${String(t.start_date).slice(0, 10)})` : ""}`}</option>
+              ))}
+            </select>
+          </div>
+          <Muted className="text-xs">Days, times, room and capacity are copied as a draft. Students are re-checked for the new term; anyone whose goal was met is left out. Nobody is told until you publish.</Muted>
+          <div className="flex justify-end gap-2">
+            <button type="button" className={secondaryBtn} onClick={() => setRollingOver(false)}>Cancel</button>
+            <button
+              type="button"
+              className={primaryBtn}
+              disabled={!targetTerm || !schedule}
+              onClick={async () => {
+                if (!targetTerm || !schedule) return;
+                try {
+                  const r = await officeHoursApi.rollover(schedule.schedule_id, Number(targetTerm));
+                  const a = r.data.data.assignment;
+                  showToast(`Draft created${a ? ` — ${a.assigned.length} student(s) carried over${a.conflicts.length ? `, ${a.conflicts.length} already taken` : ""}` : ""}`, "success");
+                  setRollingOver(false);
+                  navigate(`/office-hours/schedules/${r.data.data.schedule_id}`);
+                } catch (e) {
+                  showToast(apiError(e, "Couldn't copy"), "error");
+                }
+              }}
+            >
+              Copy as draft
             </button>
           </div>
         </div>

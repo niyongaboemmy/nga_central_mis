@@ -109,7 +109,7 @@ export const studentOverview = async (studentId: number, termId: number) => {
     (byAssignment.get(scheduleId) ?? []).some((a) => a.effective_from <= ymd && ymd <= a.effective_to);
   const assignmentBySchedule = new Map(assignments.map((a) => [a.schedule_id, a]));
   const timeline = sessions
-    .filter((x) => covered(x.s.schedule_id, x.s.session_date) || x.att)
+    .filter((x) => x.s.cancel_reason !== "MOVED" && (covered(x.s.schedule_id, x.s.session_date) || x.att))
     .map((x) => ({
       session_id: x.s.session_id,
       schedule_id: x.s.schedule_id,

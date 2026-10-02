@@ -173,7 +173,8 @@ const sessionKpis = (ds: Dataset, sessions = ds.sessions) => {
   const past = live.filter((x) => sessionEnded(x.s));
   const held = live.filter((x) => x.s.status === "HELD");
   const unmarked = past.filter((x) => x.s.status === "SCHEDULED");
-  const cancelled = sessions.filter((x) => x.s.status === "CANCELLED");
+  // A session moved to another date is not a cancellation: the new one counts instead.
+  const cancelled = sessions.filter((x) => x.s.status === "CANCELLED" && x.s.cancel_reason !== "MOVED");
   const cancelledBy: Record<string, number> = {};
   for (const c of cancelled) cancelledBy[c.s.cancel_reason ?? "OTHER"] = (cancelledBy[c.s.cancel_reason ?? "OTHER"] ?? 0) + 1;
   return {
