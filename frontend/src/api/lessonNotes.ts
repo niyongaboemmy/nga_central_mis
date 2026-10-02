@@ -161,7 +161,7 @@ export interface AINoteGenerationStatus {
   message: string;
   noteId?: number;
   error?: string;
-  /** Which AI provider answered (gemini/groq/glm) — informational, no UI surfaces this yet. */
+  /** Which AI provider answered (gemini/groq/deepseek/glm) — informational, no UI surfaces this yet. */
   providerUsed?: string;
 }
 

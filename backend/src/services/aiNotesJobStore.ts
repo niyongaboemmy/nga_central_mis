@@ -14,7 +14,7 @@ export interface AINotesJobState {
   message: string;
   noteId?: number;
   error?: string;
-  /** Which AI provider actually answered (gemini/groq/glm) — set once known, mainly for
+  /** Which AI provider actually answered (gemini/groq/deepseek/glm) — set once known, mainly for
    * debugging fallback behavior; omitted from the message text on the common path (gemini). */
   providerUsed?: string;
   updatedAt: number;
