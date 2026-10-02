@@ -491,6 +491,61 @@ table th,
     height: auto;
 }
 
+/* Nothing in a lesson may make the page wider than its sheet. A flex child's default
+   min-width is its widest unbreakable line, so one long code line used to stretch the
+   body past the paper and give the whole course column a sideways scroll. Wide things
+   scroll inside themselves instead; long words and URLs break. */
+.note-reader-sheet > *,
+.note-reader-body {
+    min-width: 0;
+    max-width: 100%;
+}
+
+.note-reader-body,
+.note-reader-titleblock {
+    overflow-wrap: break-word;
+}
+
+.note-reader-body pre {
+    max-width: 100%;
+    overflow-x: auto;
+    white-space: pre;
+    margin: 0 0 1em;
+    padding: 0.9em 1.1em;
+    border-radius: 10px;
+    background: rgba(15, 23, 42, 0.05);
+    border: 1px solid rgba(148, 163, 184, 0.3);
+    font-size: 0.85em;
+    line-height: 1.6;
+    -webkit-overflow-scrolling: touch;
+}
+
+.dark .note-reader-body pre {
+    background: rgba(255, 255, 255, 0.04);
+    border-color: rgba(255, 255, 255, 0.1);
+}
+
+.note-reader-body pre code {
+    white-space: inherit;
+    overflow-wrap: normal;
+    background: transparent;
+    padding: 0;
+}
+
+/* Tables keep their fixed layout but sit in a scroller (wrapped by the reader), so a
+   many-column table scrolls on a phone instead of crushing every cell to one word. */
+.note-reader-table-scroll {
+    max-width: 100%;
+    overflow-x: auto;
+    margin-bottom: 1em;
+    -webkit-overflow-scrolling: touch;
+}
+
+.note-reader-table-scroll > table {
+    min-width: 32rem;
+    margin: 0;
+}
+
 .note-reader-body td,
 .note-reader-body th {
     font-size: calc(0.85rem * var(--reader-font-scale));

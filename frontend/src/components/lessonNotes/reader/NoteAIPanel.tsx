@@ -51,6 +51,10 @@ interface Props {
   /** The standalone reader owns the whole viewport, so the panel runs floor to
    *  ceiling. Embedded in the course page it must clear the app navbar. */
   offsetTop?: boolean;
+  /** Sits beside the page (no backdrop) rather than over it. Undocked — small screens,
+   *  or a course page without room beside the paper — it dims the page behind it.
+   *  Left unset, it docks from lg up (the reader pads lg:pr-[420px] for it). */
+  docked?: boolean;
 }
 
 const STARTERS = [
@@ -93,6 +97,7 @@ const NoteAIPanel: React.FC<Props> = ({
   onClose,
   request,
   offsetTop = true,
+  docked,
 }) => {
   const [messages, setMessages] = useState<Message[]>(() => {
     try {
@@ -211,13 +216,13 @@ const NoteAIPanel: React.FC<Props> = ({
     <AnimatePresence>
       {open && (
         <>
-          {/* Backdrop only on small screens — on desktop the panel sits beside the page. */}
+          {/* Backdrop unless the panel is docked beside the page. */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="fixed inset-0 bg-black/30 backdrop-blur-[2px] z-40 lg:hidden"
+            className={`fixed inset-0 bg-black/30 backdrop-blur-[2px] z-40 ${docked === undefined ? "lg:hidden" : docked ? "hidden" : ""}`}
           />
           <motion.aside
             initial={{ x: "100%" }}
