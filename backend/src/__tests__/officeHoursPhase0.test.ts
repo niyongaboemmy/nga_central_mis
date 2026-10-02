@@ -101,7 +101,7 @@ describe("Office hours phase 0: schema and capabilities", () => {
   it("declares every capability in the manifest, legacy-visible and keyword-free", () => {
     const KEYWORDS = ["MANAGE_USER", "MANAGE_ROLE", "MANAGE_STAFF", "MANAGE_SYSTEM", "MANAGE_SCHOOL", "ADMIN", "STUDENT", "VIEW_ATTENDANCE", "TEACHER"];
     for (const cap of CAPS) {
-      expect(MIS_MANIFEST.capabilities[cap], cap).toBeTruthy();
+      expect((MIS_MANIFEST.capabilities as Record<string, unknown>)[cap], cap).toBeTruthy();
       // Teachers, students and parents reach office hours through legacy roles.
       expect(isV2OnlyCapability(cap)).toBe(false);
       // SUPER_ADMIN's code catalog must include it.

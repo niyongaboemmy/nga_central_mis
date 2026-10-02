@@ -35,6 +35,7 @@ wireFilesModule();
 import reminderRoutes from "./routes/reminders";
 import activityRoutes from "./routes/activity";
 import monitorRoutes from "./routes/monitor";
+import officeHoursRoutes from "./routes/officeHours";
 import { jwks, ssoIssuer } from "./services/sso/signingKey";
 
 const app = express();
@@ -141,6 +142,8 @@ app.use("/reminders", reminderRoutes);
 app.use("/integrations", integrationRoutes);
 // Usage analytics & live monitoring console (ANALYTICS_* capabilities).
 app.use("/monitor", monitorRoutes);
+// Mandatory office hours (OFFICE_HOURS_IMPLEMENTATION_PLAN.md).
+app.use("/office-hours", officeHoursRoutes);
 
 app.post("/test-post", (req, res) =>
   res.json({ success: true, message: "Root POST test works" }),
