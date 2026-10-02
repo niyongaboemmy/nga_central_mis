@@ -36,6 +36,7 @@ import FindBar from "./reader/FindBar";
 import ContentsRail from "./reader/ContentsRail";
 import { setReaderAside } from "./reader/readerAside";
 import { repairInlineTags } from "./reader/repairInlineTags";
+import { enhanceCodeBlocks } from "../codeWindow/codeWindow";
 import {
   A4_WIDTH,
   A4_HEIGHT,
@@ -150,6 +151,8 @@ const SharedLessonNoteViewPage: React.FC<Props> = ({ noteId, onBack, backLabel }
   const contentRef = useRef<HTMLDivElement>(null);
   const findInputRef = useRef<HTMLInputElement>(null);
   const askCounter = useRef(0);
+  /** The code windows are built once per note, before ask() exists in render order. */
+  const askRef = useRef<(question: string, selection?: string, mode?: AskMode) => void>(() => undefined);
 
   const bookMode = prefs.mode === "book";
   /** The e-learning course page renders this component inline and brings its own
@@ -192,6 +195,11 @@ const SharedLessonNoteViewPage: React.FC<Props> = ({ noteId, onBack, backLabel }
     if (!note || !root) return;
 
     repairInlineTags(root);
+    // Code shows as an editor window; "Explain" hands it to the Study Assistant.
+    enhanceCodeBlocks(root, {
+      onExplain: (code, language) =>
+        askRef.current(`Explain this ${language === "Code" ? "" : `${language} `}code step by step: what each part does and why.`, code, "explain"),
+    });
     renderMathInElement(root, {
       delimiters: [{ left: "$", right: "$", display: false }],
       throwOnError: false,
@@ -450,6 +458,7 @@ const SharedLessonNoteViewPage: React.FC<Props> = ({ noteId, onBack, backLabel }
     setSelectionRect(null);
     window.getSelection()?.removeAllRanges();
   }, []);
+  askRef.current = ask;
 
   // ---------------------------------------------------------------- keyboard
 

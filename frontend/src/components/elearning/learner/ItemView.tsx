@@ -27,6 +27,7 @@ import ReaderControls from "./ReaderControls";
 import { useReaderPrefs } from "../../lessonNotes/reader/useReaderPrefs";
 import KnowledgeCheckCard from "./KnowledgeCheckCard";
 import { hydrateInlineChecks } from "../interactive/hydrate";
+import { enhanceCodeBlocks } from "../../codeWindow/codeWindow";
 import FilePreview from "../../files/FilePreview";
 import { ExitTicketCard, FlashcardDeck, PracticalTaskView } from "./InteractiveItems";
 import type { FilePreviewManifest } from "../../../api/elearning";
@@ -553,6 +554,7 @@ const PageView: React.FC<FrameProps> = ({ opened, ...frame }) => {
         throwOnError: false,
       });
       hydrateInlineChecks(ref.current);
+      enhanceCodeBlocks(ref.current);
     }
   }, [opened.content?.content_html]);
   return (

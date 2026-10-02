@@ -16,6 +16,7 @@ import {
   X,
 } from "lucide-react";
 import { lessonNotesApi, NoteAskAnswer } from "../../../api/lessonNotes";
+import { enhanceCodeBlocks } from "../../codeWindow/codeWindow";
 
 export type AskMode = "explain" | "simplify" | "example" | "define" | "quiz";
 
@@ -79,6 +80,8 @@ const AssistantBody: React.FC<{ html: string }> = ({ html }) => {
       delimiters: [{ left: "$", right: "$", display: false }],
       throwOnError: false,
     });
+    // Answers in a 420px panel: fold early so one long example doesn't fill it.
+    enhanceCodeBlocks(ref.current, { foldAfter: 12 });
   }, [html]);
   return (
     <div
