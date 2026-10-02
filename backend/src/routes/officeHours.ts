@@ -42,6 +42,18 @@ import { listUnmarked } from "../services/officeHours/admin";
 import { acknowledgeEscalation, listEscalations } from "../services/officeHours/escalation";
 import { nudgeUnmarked } from "../services/officeHours/digests";
 import { registerOfficeHoursNotifier } from "../services/officeHours/notify";
+import { resolvePeriod } from "../services/officeHours/period";
+import {
+  breakdownReport,
+  consistencyReport,
+  coverageReport,
+  dailySheet,
+  GroupBy,
+  overviewReport,
+  studentReport,
+  summaryReport,
+  teacherReport,
+} from "../services/officeHours/reports";
 
 /**
  * Mandatory office hours (OFFICE_HOURS_IMPLEMENTATION_PLAN.md §7.2).
@@ -474,6 +486,68 @@ router.get(
   leadership,
   asyncHandler(async (req, res) => {
     successResponse(res, "Pending transfer requests", await transfersFor(actorOf(req).userId, true));
+  }),
+);
+
+// ---------------------------------------------------------------- reports (plan §14)
+const reporter = authorize([P.OFFICE_HOURS_MANAGE_OWN, P.OFFICE_HOURS_MANAGE_ANY, P.OFFICE_HOURS_VIEW]);
+const reportFilter = (q: any) => ({ termId: toInt(q.term_id), teacherId: toInt(q.teacher_id), subjectId: toInt(q.subject_id), classGroupId: toInt(q.class_group_id), scheduleId: toInt(q.schedule_id) });
+
+router.get(
+  "/reports/summary",
+  reporter,
+  asyncHandler(async (req, res) => {
+    successResponse(res, "Office hours summary", await summaryReport(actorOf(req), await resolvePeriod(req.query), reportFilter(req.query)));
+  }),
+);
+router.get(
+  "/reports/breakdown",
+  reporter,
+  asyncHandler(async (req, res) => {
+    const groupBy = (typeof req.query.group_by === "string" ? req.query.group_by : "teacher") as GroupBy;
+    successResponse(res, "Office hours breakdown", await breakdownReport(actorOf(req), await resolvePeriod(req.query), groupBy, reportFilter(req.query)));
+  }),
+);
+router.get(
+  "/reports/consistency",
+  reporter,
+  asyncHandler(async (req, res) => {
+    successResponse(res, "Consistency", await consistencyReport(actorOf(req), await resolvePeriod(req.query), reportFilter(req.query)));
+  }),
+);
+router.get(
+  "/reports/students/:id",
+  anyOfficeHours,
+  asyncHandler(async (req, res) => {
+    successResponse(res, "Student report", await studentReport(actorOf(req), idParam(req.params.id), await resolvePeriod({ period: "year", ...req.query })));
+  }),
+);
+router.get(
+  "/reports/teachers/:id",
+  reporter,
+  asyncHandler(async (req, res) => {
+    successResponse(res, "Teacher report", await teacherReport(actorOf(req), idParam(req.params.id), await resolvePeriod({ period: "term", ...req.query }), reportFilter(req.query)));
+  }),
+);
+router.get(
+  "/reports/daily",
+  reporter,
+  asyncHandler(async (req, res) => {
+    successResponse(res, "Daily register sheet", await dailySheet(actorOf(req), isYmd(req.query.date) ? (req.query.date as string) : todayYmd(), reportFilter(req.query)));
+  }),
+);
+router.get(
+  "/admin/coverage",
+  authorize([P.OFFICE_HOURS_MANAGE_ANY, P.OFFICE_HOURS_VIEW]),
+  asyncHandler(async (req, res) => {
+    successResponse(res, "Coverage", await coverageReport(actorOf(req), await resolveTermId(req.query.term_id), toInt(req.query.class_group_id)));
+  }),
+);
+router.get(
+  "/admin/overview",
+  authorize([P.OFFICE_HOURS_MANAGE_ANY, P.OFFICE_HOURS_VIEW]),
+  asyncHandler(async (req, res) => {
+    successResponse(res, "Overview", await overviewReport(actorOf(req), await resolveTermId(req.query.term_id)));
   }),
 );
 

@@ -15,6 +15,7 @@ import {
   rankItems,
   teachingProvider,
 } from "./providers";
+import { officeHoursProvider } from "./officeHoursProvider";
 
 // ============================================================================
 // GET /home/overview -- one request, every MIS module, the viewer's lenses.
@@ -40,6 +41,8 @@ const PROVIDERS: Array<[string, (ctx: ProviderContext) => Promise<ProviderResult
   ["class", classProvider],
   ["oversight", oversightProvider],
   ["operations", operationsProvider],
+  // Mandatory office hours (OFFICE_HOURS_IMPLEMENTATION_PLAN.md §17.3).
+  ["office_hours", officeHoursProvider],
 ];
 
 export async function buildHomeOverview(

@@ -48,6 +48,7 @@ import OfficeHoursHub from "./components/officeHours/OfficeHoursHub";
 import ScheduleDetail from "./components/officeHours/ScheduleDetail";
 import MyOfficeHours from "./components/officeHours/MyOfficeHours";
 import OfficeHoursAdmin from "./components/officeHours/admin/OfficeHoursAdmin";
+import { Student360, Teacher360 } from "./components/officeHours/reports/Person360";
 import { MetadataProvider } from "./contexts/MetadataContext";
 import { AcademicPeriodProvider } from "./contexts/AcademicPeriodContext";
 import SubjectDetailPage from "./components/curriculum/SubjectDetailPage";
@@ -925,6 +926,26 @@ function App() {
                 <ProtectedRoute>
                   <SystemLayoutWrapper>
                     <OfficeHoursAdmin />
+                  </SystemLayoutWrapper>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/office-hours/reports/students/:id"
+              element={
+                <ProtectedRoute>
+                  <SystemLayoutWrapper>
+                    <Student360 />
+                  </SystemLayoutWrapper>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/office-hours/reports/teachers/:id"
+              element={
+                <ProtectedRoute>
+                  <SystemLayoutWrapper>
+                    <Teacher360 />
                   </SystemLayoutWrapper>
                 </ProtectedRoute>
               }

@@ -324,6 +324,134 @@ export interface Escalation {
   last_missed: string;
 }
 
+
+export type PeriodKind = "day" | "week" | "month" | "term" | "year" | "custom";
+export interface ReportPeriod {
+  period: PeriodKind;
+  from: string;
+  to: string;
+  label: string;
+  previous: { from: string; to: string; label: string } | null;
+  bucket: "day" | "week" | "month";
+}
+export interface ReportQuery {
+  period: PeriodKind;
+  anchor?: string;
+  from?: string;
+  to?: string;
+  term_id?: number | null;
+  teacher_id?: number;
+  subject_id?: number;
+  class_group_id?: number;
+}
+export type BandCounts = Record<"CONSISTENT" | "WATCH" | "CHRONIC" | "TOO_FEW", number>;
+export interface SummaryKpis {
+  planned: number;
+  due: number;
+  held: number;
+  unmarked: number;
+  cancelled: number;
+  cancelled_by_reason: Record<string, number>;
+  delivery_rate: number | null;
+  expected_attendances: number;
+  present: number;
+  late: number;
+  absent: number;
+  excused: number;
+  attendance_rate: number | null;
+  presence_rate: number | null;
+  punctuality: number | null;
+  drop_ins: number;
+  students: number;
+  bands: BandCounts;
+}
+export interface SummaryReport {
+  period: ReportPeriod;
+  scope: "school" | "classGroups" | "own";
+  kpis: SummaryKpis;
+  previous: SummaryKpis | null;
+  series: Array<{ key: string; label: string; planned: number; held: number; attendance_rate: number | null }>;
+  utilisation: { assigned: number; capacity: number; rate: number | null } | null;
+}
+export type GroupBy = "teacher" | "subject" | "class_group" | "grade" | "program" | "weekday" | "purpose";
+export interface BreakdownRow {
+  key: string;
+  label: string;
+  planned: number;
+  held: number;
+  unmarked: number;
+  cancelled: number;
+  delivery_rate: number | null;
+  expected_attendances: number;
+  attended: number;
+  absent: number;
+  attendance_rate: number | null;
+  presence_rate: number | null;
+  students: number;
+  bands: BandCounts;
+}
+export interface ConsistencyRow extends StudentStats {
+  student_id: number;
+  name: string;
+  class_group_name: string | null;
+  office_hours: string[];
+}
+export interface ConsistencyReport {
+  period: ReportPeriod;
+  thresholds: { consistent: number; watch: number; min_sessions: number };
+  consistent: ConsistencyRow[];
+  watch: ConsistencyRow[];
+  chronic: ConsistencyRow[];
+  too_few: ConsistencyRow[];
+}
+export interface DailySheet {
+  date: string;
+  sessions: Array<{
+    session_id: number;
+    title: string;
+    start_time: string;
+    end_time: string;
+    location: string | null;
+    host_name: string | null;
+    status: string;
+    roster: Array<{ student_id: number; name: string; class_group_name: string | null; status: AttendanceStatus | null; drop_in: boolean }>;
+  }>;
+}
+export interface StudentReport {
+  period: ReportPeriod;
+  student_id: number;
+  name: string;
+  stats: StudentStats;
+  assignments: Array<{ assignment_id: number; schedule_id: number; title: string; teacher_name: string | null; status: string; effective_from: string; effective_to: string; reason_code: string | null; end_reason_code: string | null }>;
+  timeline: Array<{ session_id: number; schedule_id: number; session_date: string; session_status: string; cancel_reason: string | null; status: AttendanceStatus | null; note: string | null; outcome: number | null; title: string | null }>;
+  escalations: Array<{ escalation_id: number; level: number; trigger_code: string; created_at: string; acknowledged_at: string | null }>;
+}
+export interface TeacherReport {
+  period: ReportPeriod;
+  teacher_id: number;
+  name: string;
+  planned: number;
+  held: number;
+  unmarked: number;
+  cancelled: number;
+  delivery_rate: number | null;
+  on_time_registers: number | null;
+  average_roster: number;
+  attendance_rate: number | null;
+  presence_rate: number | null;
+  schedules: Array<{ schedule_id: number; title: string; status: string }>;
+}
+export interface CoverageReport {
+  term_id: number;
+  class_groups: Array<{ class_group_id: number; name: string; students: number; covered: number; coverage_rate: number | null; days: Record<number, number> }>;
+  students_without: Array<{ student_id: number; name: string }>;
+}
+export interface OverviewReport {
+  today: { date: string; sessions: number; expected: number; marked: number; missing: number };
+  open_escalations: number;
+  names_allowed: boolean;
+}
+
 export interface ScheduleInput {
   academic_term_id?: number | null;
   teacher_id?: number;
@@ -423,6 +551,15 @@ export const officeHoursApi = {
   override: (body: { student_id: number; to_schedule_id: number; reason: string }) =>
     api.post<Envelope<{ assignment_id: number }>>("/office-hours/admin/assignments/override", body),
   nudgeUnmarked: (sessionIds: number[]) => api.post<Envelope<{ notified: number }>>("/office-hours/admin/unmarked/nudge", { session_ids: sessionIds }),
+  summary: (q: ReportQuery) => api.get<Envelope<SummaryReport>>("/office-hours/reports/summary", { params: q }),
+  breakdown: (q: ReportQuery & { group_by: GroupBy }) => api.get<Envelope<{ period: ReportPeriod; group_by: GroupBy; rows: BreakdownRow[] }>>("/office-hours/reports/breakdown", { params: q }),
+  consistency: (q: ReportQuery) => api.get<Envelope<ConsistencyReport>>("/office-hours/reports/consistency", { params: q }),
+  daily: (date: string, termId?: number | null) => api.get<Envelope<DailySheet>>("/office-hours/reports/daily", { params: { date, term_id: termId ?? undefined } }),
+  studentReport: (id: number, q: Partial<ReportQuery> = {}) => api.get<Envelope<StudentReport>>(`/office-hours/reports/students/${id}`, { params: q }),
+  teacherReport: (id: number, q: Partial<ReportQuery> = {}) => api.get<Envelope<TeacherReport>>(`/office-hours/reports/teachers/${id}`, { params: q }),
+  coverage: (termId: number | null, classGroupId?: number | null) =>
+    api.get<Envelope<CoverageReport>>("/office-hours/admin/coverage", { params: { term_id: termId ?? undefined, class_group_id: classGroupId ?? undefined } }),
+  overview: (termId: number | null) => api.get<Envelope<OverviewReport>>("/office-hours/admin/overview", { params: { term_id: termId ?? undefined } }),
   escalations: (params: { term_id?: number | null; status?: "open" | "all" } = {}) =>
     api.get<Envelope<Escalation[]>>("/office-hours/escalations", { params }),
   acknowledgeEscalation: (id: number, note?: string) => api.post<Envelope<void>>(`/office-hours/escalations/${id}/ack`, { note }),

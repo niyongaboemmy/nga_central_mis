@@ -20,13 +20,14 @@ import OfficeHoursReports from "../reports/OfficeHoursReports";
 import OverviewTab from "./OverviewTab";
 import EscalationsTab from "./EscalationsTab";
 import SettingsTab from "./SettingsTab";
+import CoverageTab from "./CoverageTab";
 
 /**
  * /office-hours/admin -- leadership console (plan §11): overview, every
  * schedule, registers nobody took, escalations, transfers, closures, reports
  * and settings. Each tab only appears when the viewer may use it.
  */
-type Tab = "overview" | "schedules" | "unmarked" | "escalations" | "transfers" | "closures" | "reports" | "settings";
+type Tab = "overview" | "schedules" | "unmarked" | "escalations" | "coverage" | "transfers" | "closures" | "reports" | "settings";
 
 const SchedulesTab: React.FC<{ termId: number | null }> = ({ termId }) => {
   const { showToast } = useToast();
@@ -326,6 +327,7 @@ const OfficeHoursAdmin: React.FC = () => {
       { key: "schedules", label: "Office hours", icon: null, show: caps.manage_any },
       { key: "unmarked", label: "Missing registers", icon: null, show: caps.manage_any },
       { key: "escalations", label: "Escalations", icon: <ShieldAlert className="h-3.5 w-3.5" aria-hidden />, show: caps.view || caps.manage_any },
+      { key: "coverage", label: "Coverage", icon: null, show: caps.view || caps.manage_any },
       { key: "transfers", label: "Transfers", icon: null, show: caps.manage_any },
       { key: "closures", label: "Closures", icon: null, show: true },
       { key: "reports", label: "Reports", icon: null, show: caps.view || caps.manage_any },
@@ -378,6 +380,7 @@ const OfficeHoursAdmin: React.FC = () => {
       {tab === "schedules" && <SchedulesTab termId={termId} />}
       {tab === "unmarked" && <UnmarkedTab />}
       {tab === "escalations" && <EscalationsTab termId={termId} />}
+      {tab === "coverage" && <CoverageTab termId={termId} />}
       {tab === "transfers" && <TransfersTab />}
       {tab === "closures" && <ClosuresTab canWrite={config.capabilities.manage_any || config.capabilities.configure} />}
       {tab === "reports" && <OfficeHoursReports termId={termId} mode="leadership" />}
