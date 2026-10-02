@@ -17,6 +17,8 @@ import SlotTooltip, { instructorOf, useSlotTooltip } from "./SlotTooltip";
 import { useCurrentTime } from "./useCurrentTime";
 import { getSlotColor, hexToRgba, slotSurface, subjectFocusRing } from "./slotColor";
 import { useIsDark } from "./useIsDark";
+import OfficeHoursBandCells from "../officeHours/OfficeHoursBandCells";
+import type { BandEntry } from "../../api/officeHours";
 import { weeklyActivityEntries, type GridEntry } from "./activityEntry";
 import {
   subjectKey,
@@ -39,6 +41,11 @@ interface CalendarGridProps {
   /** Opens an existing custom activity (non-subject event) for view/edit. */
   onActivityClick?: (activity: CalendarActivity) => void;
   canEdit?: boolean;
+  /** Entries for the 16:20 office-hours band (OFFICE_HOURS_IMPLEMENTATION_PLAN.md §8). */
+  officeHours?: BandEntry[];
+  onOfficeHoursClick?: (entry: BandEntry) => void;
+  /** Offer "+ Office hours" on free weekdays (backend day 1 = Monday). */
+  onOfficeHoursAdd?: (backendDay: number) => void;
 }
 
 /** How far through a lesson we are, 0-1, or null when it isn't running. */
@@ -62,6 +69,9 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
   onEmptyCellClick,
   onActivityClick,
   canEdit = false,
+  officeHours,
+  onOfficeHoursClick,
+  onOfficeHoursAdd,
 }) => {
   // Filter slots for this calendar (skip filtering for personal/teacher & student
   // views, which have no calendar_id — slots are already scoped server-side).
@@ -338,7 +348,17 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
 
                   {/* Breaks, lunch and office hours run right across the week,
                       as one labelled band rather than seven blank cells. */}
-                  {!isTeaching && (
+                  {!isTeaching && scheduleSlot.type === "office" && (
+                    <OfficeHoursBandCells
+                      label={scheduleSlot.label}
+                      entries={officeHours}
+                      dayCount={DAYS.length}
+                      todayIndex={todayIndex}
+                      onEntryClick={onOfficeHoursClick}
+                      onAdd={onOfficeHoursAdd}
+                    />
+                  )}
+                  {!isTeaching && scheduleSlot.type !== "office" && (
                     <td
                       colSpan={DAYS.length}
                       className={`border-l border-gray-100 dark:border-gray-700/20 text-center text-[11px] font-bold uppercase tracking-wider ${

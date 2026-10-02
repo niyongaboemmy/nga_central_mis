@@ -40,6 +40,21 @@ const SEARCH_ITEMS: SearchItem[] = [
     requiredPermission: Permissions.VIEW_ACADEMIC_CALENDAR,
   },
   {
+    label: "Office Hours",
+    path: "/office-hours",
+    requiredPermission: [Permissions.OFFICE_HOURS_MANAGE_OWN, Permissions.OFFICE_HOURS_MANAGE_ANY],
+  },
+  {
+    label: "Office Hours Oversight",
+    path: "/office-hours/admin",
+    requiredPermission: [Permissions.OFFICE_HOURS_MANAGE_ANY, Permissions.OFFICE_HOURS_VIEW, Permissions.OFFICE_HOURS_CONFIGURE],
+  },
+  {
+    label: "My Office Hours",
+    path: "/my-office-hours",
+    requiredPermission: Permissions.OFFICE_HOURS_VIEW_SELF,
+  },
+  {
     label: "Reporting",
     path: "/reporting",
     requiredPermission: Permissions.SUBMIT_REPORTING,

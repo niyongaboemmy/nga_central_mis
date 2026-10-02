@@ -3,6 +3,9 @@ import { useUser } from "../contexts/UserContext";
 import { useScopedGrades } from "../hooks/useScopedGrades";
 import { useToast } from "../contexts/ToastContext";
 import { useAcademicPeriod } from "../contexts/AcademicPeriodContext";
+import { useOfficeHoursBand } from "./officeHours/useOfficeHoursBand";
+import { goTo } from "./officeHours/navigation";
+import type { BandEntry } from "../api/officeHours";
 import { Permissions } from "../constants/permissions";
 import {
   CalendarSlot,
@@ -149,6 +152,7 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({
     selectedTermId: selectedTerm,
   } = useAcademicPeriod();
 
+
   // State
   const [loading, setLoading] = useState(true);
   const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
@@ -187,6 +191,21 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({
   const [calendars, setCalendars] = useState<AcademicCalendar[]>([]);
   const [selectedCalendar, setSelectedCalendar] =
     useState<AcademicCalendar | null>(null);
+
+  // The 16:20 office-hours band (OFFICE_HOURS_IMPLEMENTATION_PLAN.md §8): the viewer's own
+  // office hours on personal grids, a per-day summary on a class group's grid.
+  const canRunOfficeHours = Boolean(
+    user?.roles?.some((role) => role.permissions?.some((perm) => perm.name === Permissions.OFFICE_HOURS_MANAGE_OWN || perm.name === Permissions.OFFICE_HOURS_MANAGE_ANY)),
+  );
+  const personalBand = useOfficeHoursBand({ termId: selectedTerm });
+  const classGroupBand = useOfficeHoursBand({
+    termId: selectedTerm,
+    classGroupId: selectedCalendar?.class_group_id ?? null,
+    enabled: Boolean(selectedCalendar?.class_group_id),
+  });
+  const openOfficeHours = (entry: BandEntry) =>
+    goTo(entry.role === "hosting" && entry.schedule_id ? `/office-hours/schedules/${entry.schedule_id}` : entry.role === "summary" ? "/office-hours/admin" : "/my-office-hours");
+  const addOfficeHours = canRunOfficeHours ? (day: number) => goTo(`/office-hours?new=1&day=${day}`) : undefined;
   const [showCalendarModal, setShowCalendarModal] = useState(false);
   const [availableClassGroups, setAvailableClassGroups] = useState<any[]>([]);
   // Every class group in the selected year, regardless of whether it has an
@@ -1216,6 +1235,8 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({
             onSlotClick={handleSlotClick}
             onEmptyCellClick={handleEmptyCellClick}
             onActivityClick={handleActivityClick}
+            officeHours={personalBand.entries}
+            onOfficeHoursClick={openOfficeHours}
           />
         </div>
       )}
@@ -1236,6 +1257,9 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({
             onSlotClick={handleSlotClick}
             onEmptyCellClick={handleEmptyCellClick}
             onActivityClick={handleActivityClick}
+            officeHours={personalBand.entries}
+            onOfficeHoursClick={openOfficeHours}
+            onOfficeHoursAdd={addOfficeHours}
           />
         </div>
       )}
@@ -1269,6 +1293,8 @@ const AcademicCalendar: React.FC<AcademicCalendarProps> = ({
               onSlotClick={handleSlotClick}
               onEmptyCellClick={handleEmptyCellClick}
               onActivityClick={handleActivityClick}
+              officeHours={classGroupBand.entries}
+              onOfficeHoursClick={openOfficeHours}
             />
           ))}
         </div>

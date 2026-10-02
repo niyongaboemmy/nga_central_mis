@@ -12,13 +12,14 @@ import { getSettings } from "./settings";
 
 /**
  * Nightly reconcile (plan §7.4):
- *   1. windows that are over end naturally (schedules and assignments), freeing locks;
+ *   1. windows that are over end naturally (schedules and assignments), freeing locks,
+ *      and drafts untouched for a week are cancelled so they stop reserving students;
  *   2. a student no longer ACTIVE in a class this year leaves (LEFT_CLASS);
  *   3. the invariant "ACTIVE assignment <=> lock rows" is repaired and drift logged.
  */
 export const reconcileOfficeHours = async () => {
   const today = todayYmd();
-  const out = { schedulesEnded: 0, assignmentsCompleted: 0, leftClass: 0, orphanLocks: 0, locksRestored: 0, lockConflicts: 0 };
+  const out = { schedulesEnded: 0, assignmentsCompleted: 0, draftsCancelled: 0, leftClass: 0, orphanLocks: 0, locksRestored: 0, lockConflicts: 0 };
 
   // 1) Natural ends.
   const finishedSchedules = await db
@@ -44,6 +45,26 @@ export const reconcileOfficeHours = async () => {
       .where(inArray(OfficeHourAssignment.assignment_id, ids));
     await db.delete(OfficeHourStudentLock).where(inArray(OfficeHourStudentLock.assignment_id, ids));
     out.assignmentsCompleted = ids.length;
+  }
+
+  // 1b) Drafts abandoned for a week hold students' locks for nothing: cancel them.
+  const staleDrafts = (await db.execute(sql`
+    SELECT schedule_id FROM OfficeHourSchedule
+    WHERE status = 'DRAFT' AND updated_at < DATE_SUB(UTC_TIMESTAMP(), INTERVAL 7 DAY)
+  `)) as any;
+  const draftIds = (staleDrafts[0] as any[]).map((r) => Number(r.schedule_id));
+  if (draftIds.length) {
+    const held = await db
+      .select({ id: OfficeHourAssignment.assignment_id })
+      .from(OfficeHourAssignment)
+      .where(and(inArray(OfficeHourAssignment.schedule_id, draftIds), eq(OfficeHourAssignment.status, "ACTIVE")));
+    if (held.length) {
+      const ids = held.map((h) => h.id);
+      await db.update(OfficeHourAssignment).set({ status: "ENDED", end_reason_code: "SCHEDULE_ENDED", ended_at: now() }).where(inArray(OfficeHourAssignment.assignment_id, ids));
+      await db.delete(OfficeHourStudentLock).where(inArray(OfficeHourStudentLock.assignment_id, ids));
+    }
+    await db.update(OfficeHourSchedule).set({ status: "CANCELLED", ended_at: now() }).where(inArray(OfficeHourSchedule.schedule_id, draftIds));
+    out.draftsCancelled = draftIds.length;
   }
 
   // 2) Students who left their class (or the school) this year.

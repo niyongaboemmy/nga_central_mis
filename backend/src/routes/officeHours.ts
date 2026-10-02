@@ -34,6 +34,8 @@ import {
 import { cancelSession, CANCEL_REASONS, ensureSessions, restoreSession, setSessionHost } from "../services/officeHours/sessions";
 import { assertValidTransferBody, cancelTransfer, decideTransfer, requestTransfer, transfersFor } from "../services/officeHours/transfers";
 import { createClosure, deleteClosure, listClosures, previewClosure } from "../services/officeHours/closures";
+import { assertCanSeeStudent, bandFor, childrenOf, studentOverview } from "../services/officeHours/views";
+import { studentCards } from "../services/officeHours/eligibility";
 
 /**
  * Mandatory office hours (OFFICE_HOURS_IMPLEMENTATION_PLAN.md §7.2).
@@ -86,6 +88,44 @@ router.get(
         configure: actorOf(req).configure,
       },
     });
+  }),
+);
+
+// ---------------------------------------------------------------- students, parents, the timetable band
+router.get(
+  "/me",
+  anyOfficeHours,
+  asyncHandler(async (req, res) => {
+    const actor = actorOf(req);
+    const termId = await resolveTermId(req.query.term_id);
+    const studentId = toInt(req.query.student_id) ?? actor.userId;
+    const term = await loadTerm(termId);
+    await assertCanSeeStudent(actor, studentId, term.yearId);
+    successResponse(res, "Office hours", { student_id: studentId, ...(await studentOverview(studentId, termId)) });
+  }),
+);
+
+router.get(
+  "/children",
+  anyOfficeHours,
+  asyncHandler(async (req, res) => {
+    const actor = actorOf(req);
+    const termId = await resolveTermId(req.query.term_id);
+    const term = await loadTerm(termId);
+    const ids = await childrenOf(actor.userId);
+    const cards = await studentCards(ids, term.yearId);
+    const children = [];
+    for (const id of ids) children.push({ student_id: id, student: cards.get(id) ?? null, ...(await studentOverview(id, termId)) });
+    successResponse(res, "Children's office hours", { children });
+  }),
+);
+
+router.get(
+  "/band",
+  anyOfficeHours,
+  asyncHandler(async (req, res) => {
+    const termId = await resolveTermId(req.query.term_id);
+    successResponse(res, "Office hours band", await bandFor(actorOf(req), termId, { classGroupId: toInt(req.query.class_group_id) }));
   }),
 );
 

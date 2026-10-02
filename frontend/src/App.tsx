@@ -44,6 +44,10 @@ import SchemeDetails from "./components/SchemeDetails";
 import ReportingModule from "./components/reporting/ReportingModule";
 import AdminReporting from "./components/reporting/AdminReporting";
 import MyMentor from "./components/reporting/MyMentor";
+import OfficeHoursHub from "./components/officeHours/OfficeHoursHub";
+import ScheduleDetail from "./components/officeHours/ScheduleDetail";
+import MyOfficeHours from "./components/officeHours/MyOfficeHours";
+import OfficeHoursAdmin from "./components/officeHours/admin/OfficeHoursAdmin";
 import { MetadataProvider } from "./contexts/MetadataContext";
 import { AcademicPeriodProvider } from "./contexts/AcademicPeriodContext";
 import SubjectDetailPage from "./components/curriculum/SubjectDetailPage";
@@ -889,6 +893,48 @@ function App() {
                 <ProtectedRoute>
                   <SystemLayoutWrapper>
                     <MyMentor />
+                  </SystemLayoutWrapper>
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Mandatory office hours (OFFICE_HOURS_IMPLEMENTATION_PLAN.md). Each page gates itself. */}
+            <Route
+              path="/office-hours"
+              element={
+                <ProtectedRoute>
+                  <SystemLayoutWrapper>
+                    <OfficeHoursHub />
+                  </SystemLayoutWrapper>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/office-hours/schedules/:id"
+              element={
+                <ProtectedRoute>
+                  <SystemLayoutWrapper>
+                    <ScheduleDetail />
+                  </SystemLayoutWrapper>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/office-hours/admin"
+              element={
+                <ProtectedRoute>
+                  <SystemLayoutWrapper>
+                    <OfficeHoursAdmin />
+                  </SystemLayoutWrapper>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/my-office-hours"
+              element={
+                <ProtectedRoute>
+                  <SystemLayoutWrapper>
+                    <MyOfficeHours />
                   </SystemLayoutWrapper>
                 </ProtectedRoute>
               }

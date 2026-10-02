@@ -8,7 +8,7 @@ import { Permissions } from "../../constants/permissions";
 import { getToken } from "../../utils/auth";
 import { useAccess } from "../../hooks/useAccess";
 import { BarChart3, ShieldCheck } from "lucide-react";
-import { BellRing, CalendarDays, House } from "lucide-react";
+import { BellRing, CalendarDays, Clock4, House } from "lucide-react";
 
 interface SidebarProps {
   isCollapsed?: boolean;
@@ -316,6 +316,25 @@ const Sidebar: React.FC<SidebarProps> = ({
         </svg>
       ),
       requiredPermission: Permissions.SUBMIT_REPORTING,
+    },
+    {
+      // Mandatory office hours (OFFICE_HOURS_IMPLEMENTATION_PLAN.md §9-11).
+      label: "Office Hours",
+      path: "/office-hours",
+      icon: <Clock4 className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
+      requiredPermission: [Permissions.OFFICE_HOURS_MANAGE_OWN, Permissions.OFFICE_HOURS_MANAGE_ANY],
+    },
+    {
+      label: "Office Hours Oversight",
+      path: "/office-hours/admin",
+      icon: <Clock4 className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
+      requiredPermission: [Permissions.OFFICE_HOURS_MANAGE_ANY, Permissions.OFFICE_HOURS_VIEW, Permissions.OFFICE_HOURS_CONFIGURE],
+    },
+    {
+      label: "My Office Hours",
+      path: "/my-office-hours",
+      icon: <Clock4 className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
+      requiredPermission: Permissions.OFFICE_HOURS_VIEW_SELF,
     },
     {
       label: "My Mentor",
