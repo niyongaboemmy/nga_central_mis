@@ -8,7 +8,7 @@ import { studioApi } from "../../../api/studio";
  * drafts (kept as-is, edited, or discarded). Read-only; behind VIEW_ALL_COURSES.
  */
 
-const PROVIDER: Record<string, string> = { glm: "GLM", groq: "Groq", gemini: "Gemini", openai: "OpenAI" };
+const PROVIDER: Record<string, string> = { glm: "GLM", groq: "Groq", gemini: "Gemini", openai: "OpenAI", deepseek: "DeepSeek", openrouter: "OpenRouter" };
 const TYPE: Record<string, string> = { LESSON_NOTE: "Lessons", KNOWLEDGE_CHECK: "Checks", PRACTICAL_TASK: "Practical tasks", PAGE: "Pages", VIDEO: "Video slots", EXIT_TICKET: "Exit tickets", FLASHCARDS: "Flashcards" };
 
 const AIUsagePanel: React.FC = () => {

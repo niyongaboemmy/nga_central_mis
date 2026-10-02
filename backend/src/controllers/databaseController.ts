@@ -583,7 +583,7 @@ const sqlGenerationSchema: JSONSchema = {
 export const generateSqlWithAI = asyncHandler(async (req: any, res: Response) => {
   if (!isAnyProviderConfigured()) {
     throw new ServiceUnavailableError(
-      "AI SQL generation is not configured. Add an API key for at least one AI provider (GEMINI_API_KEY, GROQ_API_KEY, DEEPSEEK_API_KEY, or GLM_API_KEY) to the backend environment.",
+      "AI SQL generation is not configured. Add an API key for at least one AI provider (GEMINI_API_KEY, GROQ_API_KEY, DEEPSEEK_API_KEY, OPENROUTER_API_KEY, or GLM_API_KEY) to the backend environment.",
     );
   }
 

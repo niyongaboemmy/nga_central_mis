@@ -4,6 +4,7 @@ import { groqProvider } from "./groqProvider";
 import { glmProvider } from "./glmProvider";
 import { openaiProvider } from "./openaiProvider";
 import { deepseekProvider } from "./deepseekProvider";
+import { openrouterProvider } from "./openrouterProvider";
 
 const ALL_PROVIDERS: Record<string, AIProvider> = {
   gemini: geminiProvider,
@@ -11,9 +12,10 @@ const ALL_PROVIDERS: Record<string, AIProvider> = {
   glm: glmProvider,
   openai: openaiProvider,
   deepseek: deepseekProvider,
+  openrouter: openrouterProvider,
 };
 
-const DEFAULT_ORDER = "gemini,groq,deepseek,glm";
+const DEFAULT_ORDER = "gemini,groq,deepseek,openrouter,glm";
 
 /**
  * Providers to try, in order. Defaults to AI_PROVIDER_ORDER (comma-separated env var,
@@ -37,14 +39,15 @@ export function orderedProviders(overrideOrder?: string[]): AIProvider[] {
  * The free tiers each have a strength (LESSON_STUDIO plan §7.2): GLM-4.5-Flash has no small
  * daily cap and handles long output, so it drafts lessons; Groq's gpt-oss has strict
  * json_schema, so it writes questions; Gemini's ~20 free requests/day are the backup.
+ * OpenRouter's free models (50 requests/day without credits) are the last resort.
  * OpenAI is in no default order (no AI budget, decision D2) but still works if listed in
  * AI_ROLE_ORDER_<ROLE> or AI_PROVIDER_ORDER. "interactive" keeps the school's existing order.
  */
 const DEFAULT_ROLE_ORDERS: Record<Exclude<AIRole, "interactive">, string> = {
-  draft: "glm,gemini,groq",
-  assess: "groq,gemini,glm",
-  verify: "groq,glm,gemini",
-  repair: "groq,glm,gemini",
+  draft: "glm,gemini,groq,openrouter",
+  assess: "groq,gemini,glm,openrouter",
+  verify: "groq,glm,gemini,openrouter",
+  repair: "groq,glm,gemini,openrouter",
 };
 
 export function roleOrder(role?: AIRole): string[] | undefined {

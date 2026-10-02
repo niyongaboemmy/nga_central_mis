@@ -3,7 +3,7 @@
 // Centralize "is this a quota/rate-limit error" and "what should the teacher see" here so
 // every provider adapter and the orchestrator agree on the same classification.
 export const isQuotaError = (err: any): boolean => {
-  // 402 = prepaid balance exhausted (DeepSeek) — same treatment: skip it for a while.
+  // 402 = prepaid balance exhausted (DeepSeek, OpenRouter) — same treatment: skip it for a while.
   if (err?.status === 429 || err?.status === 413 || err?.status === 402) return true;
   const raw = String(err?.message || err?.error?.message || "");
   return (
@@ -11,7 +11,7 @@ export const isQuotaError = (err: any): boolean => {
     raw.includes("429") ||
     raw.includes("413") ||
     /quota/i.test(raw) ||
-    /insufficient balance/i.test(raw) ||
+    /insufficient (balance|credits)/i.test(raw) ||
     /rate.?limit/i.test(raw) ||
     /tokens per minute|tokens per day|TPM|TPD/i.test(raw)
   );

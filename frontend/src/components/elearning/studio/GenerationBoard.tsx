@@ -17,7 +17,7 @@ const STAGE_STYLE: Record<WeekStage, { icon: React.ElementType; cls: string; spi
   waiting: { icon: Hourglass, cls: "text-warning-700 dark:text-warning-500" },
 };
 
-const PROVIDER_NAME: Record<string, string> = { glm: "GLM", groq: "Groq", gemini: "Gemini", openai: "OpenAI" };
+const PROVIDER_NAME: Record<string, string> = { glm: "GLM", groq: "Groq", gemini: "Gemini", openai: "OpenAI", deepseek: "DeepSeek", openrouter: "OpenRouter" };
 const providerName = (p?: string | null) => (p ? PROVIDER_NAME[p] ?? p : null);
 
 function digestLine(week: RunWeek): string[] {
