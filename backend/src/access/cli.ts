@@ -15,7 +15,7 @@ dotenv.config();
 async function main() {
   const [command] = process.argv.slice(2);
   const apply = process.argv.includes("--apply");
-  const { ensureAccessRegistry, accessTablesPresent } = await import(
+  const { runAccessBootstrap, accessTablesPresent } = await import(
     "../services/access/registry"
   );
   if (!(await accessTablesPresent())) {
@@ -24,12 +24,11 @@ async function main() {
 
   switch (command) {
     case "bootstrap": {
-      await ensureAccessRegistry();
-      console.log("Registry, presets and default rules are in place.");
+      console.log(JSON.stringify(await runAccessBootstrap(), null, 2));
       break;
     }
     case "backfill": {
-      await ensureAccessRegistry();
+      await runAccessBootstrap();
       const { backfillLegacyGrants } = await import("../services/access/backfill");
       const report = await backfillLegacyGrants({ apply });
       console.log(JSON.stringify(report, null, 2));
