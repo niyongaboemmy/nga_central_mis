@@ -6,6 +6,7 @@ import { elearningApi, isTimeout, learnerRoutes } from "../../../api/elearning";
 import { useNavigate } from "react-router-dom";
 import { useMotion } from "../../../design/motion";
 import Mascot from "../ui/Mascot";
+import RichHtml from "../../codeWindow/RichHtml";
 
 interface Turn {
   role: "user" | "assistant";
@@ -106,7 +107,7 @@ const AITutorSheet: React.FC<Props> = ({ courseId, sectionId, open, onClose }) =
                 ) : (
                   <motion.div key={i} {...m("reveal")} className="mr-4 px-3 py-2 rounded-2xl rounded-bl-md el-chip">
                     {t.grounded === false && <p className="text-[11px] text-warning-700 dark:text-warning-500 mb-1">Not in your notes — take this with care.</p>}
-                    <div className="prose prose-sm dark:prose-invert max-w-none" dangerouslySetInnerHTML={{ __html: t.html }} />
+                    <RichHtml className="prose prose-sm dark:prose-invert max-w-none" html={t.html} codeOptions={{ foldAfter: 12 }} />
                     {t.citations && t.citations.length > 0 && (
                       <ul className="mt-2 flex flex-wrap gap-1.5" aria-label="Sources">
                         {t.citations.map((c) => (

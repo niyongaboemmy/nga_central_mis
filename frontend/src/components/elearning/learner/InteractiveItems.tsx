@@ -6,6 +6,7 @@ import { getToken } from "../../../utils/auth";
 import { useMotion } from "../../../design/motion";
 import { sendOrQueue } from "./offline";
 import { GRADE_LABEL, Grade, previewIntervals, review, sessionQueue } from "./flashcardModel";
+import RichHtml from "../../codeWindow/RichHtml";
 
 /**
  * Learner views for exit tickets, flashcards and practical tasks (LESSON_STUDIO plan §11).
@@ -254,7 +255,7 @@ export const PracticalTaskView: React.FC<{ itemId: number; content: any; onChang
 
   return (
     <div className="space-y-4">
-      {content?.brief_html && <div className="el-card p-5 lesson-note-preview note-reader-body note-reader-body--sans" style={{ "--reader-font-scale": 0.95 } as React.CSSProperties} dangerouslySetInnerHTML={{ __html: content.brief_html }} />}
+      {content?.brief_html && <RichHtml className="el-card p-5 lesson-note-preview note-reader-body note-reader-body--sans" style={{ "--reader-font-scale": 0.95 } as React.CSSProperties} html={content.brief_html} />}
       <div className="el-card p-5">
         <p className="text-sm font-semibold text-gray-900 dark:text-white">Your teacher will check</p>
         <ul className="mt-2 space-y-1.5">
