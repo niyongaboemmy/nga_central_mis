@@ -1,11 +1,19 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import axios from "axios";
-import { GoogleLogin, type CredentialResponse } from "@react-oauth/google";
 import Login from "./Login";
 import { API_BASE_URL } from "../services/api";
 import { googleLogin, logout } from "../api/auth";
 import { getUserFromToken, isAuthenticated } from "../utils/auth";
-import { validDesktopChallenge, validDesktopRedirect, validDesktopState } from "../desktop/ngaDesktop";
+import {
+  DESKTOP_NONCE_KEY,
+  googleAuthUrl,
+  idTokenNonce,
+  validDesktopChallenge,
+  validDesktopRedirect,
+  validDesktopState,
+} from "../desktop/ngaDesktop";
+
+const GOOGLE_CLIENT_ID = (import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined) || "";
 
 /**
  * Calls made by this page skip the shared client's 401 handling on purpose:
@@ -49,19 +57,70 @@ const DesktopBrowserSignIn: React.FC = () => {
   const viaGoogle = params.get("via") === "google";
   const [fullForm, setFullForm] = useState(!viaGoogle);
   const valid = validDesktopRedirect(redirect) && validDesktopState(state) && validDesktopChallenge(challenge);
-  const [phase, setPhase] = useState<"checking" | "signed-in" | "signed-out" | "sending" | "error">("checking");
+  const [phase, setPhase] = useState<"checking" | "signed-in" | "signed-out" | "redirecting" | "sending" | "error">(
+    "checking",
+  );
   const [error, setError] = useState("");
+  const started = useRef(false);
+
+  /** Straight to Google's own account chooser; it returns to "/" (see main.tsx). */
+  const startGoogle = (chooseAccount = false) => {
+    const bytes = new Uint8Array(16);
+    crypto.getRandomValues(bytes);
+    const nonce = Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+    try {
+      sessionStorage.setItem(DESKTOP_NONCE_KEY, nonce);
+    } catch {
+      /* the nonce check below will then refuse, safely */
+    }
+    setPhase("redirecting");
+    window.location.assign(
+      googleAuthUrl(GOOGLE_CLIENT_ID, window.location.origin, { redirect: redirect!, state: state!, challenge: challenge! }, nonce, chooseAccount),
+    );
+  };
 
   useEffect(() => {
-    if (!valid) return;
+    if (!valid || started.current) return;
+    started.current = true;
+
+    // Back from Google (main.tsx put its answer in the fragment).
+    const back = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+    if (back.has("id_token") || back.has("error")) {
+      window.history.replaceState(null, "", window.location.pathname + window.location.search);
+      const idToken = back.get("id_token");
+      let expected: string | null = null;
+      try {
+        expected = sessionStorage.getItem(DESKTOP_NONCE_KEY);
+        sessionStorage.removeItem(DESKTOP_NONCE_KEY);
+      } catch {
+        /* ignore */
+      }
+      if (!idToken || !expected || idTokenNonce(idToken) !== expected) {
+        setError(back.get("error") === "access_denied" ? "Google sign-in was cancelled." : "Google sign-in didn't finish. Try again.");
+        setPhase("signed-out");
+        return;
+      }
+      setPhase("sending");
+      googleLogin(idToken) // the MIS session in this browser (POST /auth/google)
+        .then(() => handOff())
+        .catch((e: any) => {
+          setError(e?.response?.data?.message || "Google sign-in failed. Try again.");
+          setPhase("signed-out");
+        });
+      return;
+    }
+
     desktopApi
       .get("/auth/session")
       .then(() => setPhase("signed-in"))
       .catch(() => {
-        // Not signed in (or an old token): sign in right here, on this page.
+        // Not signed in (or an old token).
         dropStaleToken();
-        setPhase("signed-out");
+        // The person chose Google in the app: go straight to Google.
+        if (viaGoogle && GOOGLE_CLIENT_ID) startGoogle();
+        else setPhase("signed-out");
       });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [valid]);
 
   const handOff = async () => {
@@ -114,42 +173,18 @@ const DesktopBrowserSignIn: React.FC = () => {
       </>,
     );
   }
-  const onGoogle = async (res: CredentialResponse) => {
-    if (!res.credential) {
-      setError("Google sign-in didn't finish. Try again.");
-      return;
-    }
-    setPhase("sending");
-    try {
-      await googleLogin(res.credential); // MIS session in this browser (POST /auth/google)
-      await handOff();
-    } catch (e: any) {
-      setError(e?.response?.data?.message || "Google sign-in failed. Try again.");
-      setPhase("signed-out");
-    }
-  };
-
   if (phase === "signed-out" && fullForm) return <Login onLoginSuccess={handOff} />;
   if (phase === "signed-out") {
     return card(
       <>
         <h1 className="text-lg font-semibold text-gray-900 dark:text-white">Sign in to the NGA app</h1>
-        <p className="mt-2 mb-6 text-sm text-gray-500 dark:text-gray-400">Continue with your Google account.</p>
-        {error && <p className="mb-4 text-sm text-red-600">{error}</p>}
-        <div className="flex justify-center">
-          {/* One Tap + auto_select: a returning person is often signed in without a click. */}
-          <GoogleLogin
-            onSuccess={onGoogle}
-            onError={() => setError("Google sign-in was cancelled or failed. Try again.")}
-            useOneTap
-            auto_select
-            theme="outline"
-            size="large"
-            shape="pill"
-            text="continue_with"
-            width={300}
-          />
-        </div>
+        {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
+        <button
+          onClick={() => startGoogle(true)}
+          className="mt-6 w-full h-11 rounded-full bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold"
+        >
+          Continue with Google
+        </button>
         <button
           onClick={() => setFullForm(true)}
           className="mt-6 text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline"
@@ -159,7 +194,9 @@ const DesktopBrowserSignIn: React.FC = () => {
       </>,
     );
   }
-  if (phase === "checking") return card(<p className="text-sm text-gray-500">Checking your NGA MIS session…</p>);
+  if (phase === "checking" || phase === "redirecting") {
+    return card(<p className="text-sm text-gray-500">{phase === "redirecting" ? "Opening Google…" : "One moment…"}</p>);
+  }
   if (phase === "sending") {
     return card(
       <>
@@ -185,7 +222,9 @@ const DesktopBrowserSignIn: React.FC = () => {
       <button
         onClick={async () => {
           await logout().catch(() => undefined);
-          setPhase("signed-out");
+          dropStaleToken();
+          if (viaGoogle && GOOGLE_CLIENT_ID) startGoogle(true);
+          else setPhase("signed-out");
         }}
         className="mt-3 w-full h-10 rounded-full text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-800"
       >

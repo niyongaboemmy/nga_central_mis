@@ -43,3 +43,89 @@ export const desktopHandback = (hash: string): { code: string; verifier: string 
   if (!code || !verifier || !/^[\w.-]+$/.test(code) || !/^[A-Za-z0-9._~-]{43,128}$/.test(verifier)) return null;
   return { code, verifier };
 };
+
+// ─── Google, by redirect (no extra page in between) ─────────────────────────
+//
+// With via=google and no MIS session, /desktop/signin goes straight to Google's
+// own account chooser (OpenID Connect implicit flow, response_type=id_token).
+// Google may only return to a registered address, which for MIS is the site
+// root, so the desktop request (redirect_uri / state / challenge) travels in
+// Google's `state`, with a one-time `nonce` kept in sessionStorage. Back on
+// "/", main.tsx forwards to /desktop/signin, which checks the nonce and signs
+// in with the existing POST /auth/google.
+
+export const GOOGLE_STATE_PREFIX = "ngad.";
+export const DESKTOP_NONCE_KEY = "nga.desktop.googleNonce";
+
+export interface DesktopRequest {
+  redirect: string;
+  state: string;
+  challenge: string;
+}
+
+const toB64Url = (s: string) =>
+  btoa(unescape(encodeURIComponent(s))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+const fromB64Url = (s: string) =>
+  decodeURIComponent(escape(atob(s.replace(/-/g, "+").replace(/_/g, "/") + "===".slice((s.length + 3) % 4))));
+
+export const encodeGoogleState = (req: DesktopRequest) =>
+  GOOGLE_STATE_PREFIX + toB64Url(JSON.stringify({ r: req.redirect, s: req.state, c: req.challenge }));
+
+export const decodeGoogleState = (value: string | null): DesktopRequest | null => {
+  if (!value?.startsWith(GOOGLE_STATE_PREFIX)) return null;
+  try {
+    const o = JSON.parse(fromB64Url(value.slice(GOOGLE_STATE_PREFIX.length)));
+    const req = { redirect: String(o.r), state: String(o.s), challenge: String(o.c) };
+    return validDesktopRedirect(req.redirect) && validDesktopState(req.state) && validDesktopChallenge(req.challenge) ? req : null;
+  } catch {
+    return null;
+  }
+};
+
+export const googleAuthUrl = (
+  clientId: string,
+  returnUri: string,
+  req: DesktopRequest,
+  nonce: string,
+  chooseAccount = false,
+) => {
+  const u = new URL("https://accounts.google.com/o/oauth2/v2/auth");
+  u.searchParams.set("client_id", clientId);
+  u.searchParams.set("redirect_uri", returnUri);
+  u.searchParams.set("response_type", "id_token");
+  u.searchParams.set("scope", "openid email profile");
+  u.searchParams.set("nonce", nonce);
+  u.searchParams.set("state", encodeGoogleState(req));
+  if (chooseAccount) u.searchParams.set("prompt", "select_account");
+  return u.toString();
+};
+
+/**
+ * Google came back to "/" for a desktop sign-in: where to continue, carrying
+ * the id_token (or Google's error) in the fragment. Null for anything else.
+ */
+export const desktopGoogleReturn = (pathname: string, hash: string): string | null => {
+  if (pathname !== "/" || !hash) return null;
+  const p = new URLSearchParams(hash.replace(/^#/, ""));
+  const req = decodeGoogleState(p.get("state"));
+  if (!req) return null;
+  const next = new URL("/desktop/signin", "https://x");
+  next.searchParams.set("redirect_uri", req.redirect);
+  next.searchParams.set("state", req.state);
+  next.searchParams.set("challenge", req.challenge);
+  next.searchParams.set("via", "google");
+  const frag = new URLSearchParams();
+  const idToken = p.get("id_token");
+  if (idToken) frag.set("id_token", idToken);
+  else frag.set("error", p.get("error") || "google_failed");
+  return `${next.pathname}${next.search}#${frag.toString()}`;
+};
+
+/** The `nonce` claim of an id_token (to match the one this browser sent). */
+export const idTokenNonce = (idToken: string): string | null => {
+  try {
+    return JSON.parse(fromB64Url(idToken.split(".")[1] ?? "")).nonce ?? null;
+  } catch {
+    return null;
+  }
+};
