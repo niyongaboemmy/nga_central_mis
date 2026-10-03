@@ -11,6 +11,8 @@ import {
   getSession,
   logout,
   verifySession,
+  createDesktopHandoff,
+  redeemDesktopHandoff,
 } from "../controllers/authController";
 import { authenticate } from "../middleware/auth";
 
@@ -18,6 +20,9 @@ const router = express.Router();
 
 router.post("/login", login);
 router.post("/google", googleLogin);
+// NGA desktop app: browser sign-in hand-off (utils/desktopHandoff.ts)
+router.post("/desktop-handoff", authenticate, createDesktopHandoff);
+router.post("/desktop-handoff/redeem", redeemDesktopHandoff);
 router.post("/logout", authenticate, logout);
 router.get("/session", authenticate, getSession);
 // Cheap "is this token still valid" check -- authenticate() already does
