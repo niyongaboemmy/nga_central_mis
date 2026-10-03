@@ -76,6 +76,7 @@ import MyActivity from "./components/analytics/MyActivity";
 import ActivityNotice from "./components/analytics/ActivityNotice";
 import RemindersPage from "./components/reminders/RemindersPage";
 import AppsInstallerPage from "./components/apps/AppsInstallerPage";
+import DesktopGoogleSignIn from "./components/DesktopGoogleSignIn";
 import { AutoInstallPrompt } from "./components/apps/AutoInstallPrompt";
 
 const LoginPage: React.FC = () => {
@@ -352,6 +353,8 @@ function App() {
             {/* Install every NGA app from one place. Public on purpose: a new
                 device can be set up before anyone signs in (docs/APP_LAUNCH.md). */}
             <Route path="/apps" element={<AppsInstallerPage />} />
+            {/* NGA desktop app: Google sign-in in the browser (public, unwrapped). */}
+            <Route path="/desktop/google" element={<DesktopGoogleSignIn />} />
 
             {/* Reminders -- set up this device, Now & Next, what to be
                 reminded of (REMINDERS_SOLUTION_PROPOSAL.md). Everyone. */}
