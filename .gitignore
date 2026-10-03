@@ -26,6 +26,9 @@ backend/.sso-signing-key.pem
 # the copy scripts/sync-local-env.cjs keeps before it repairs one
 .env.bak
 *.env.bak
+# any other env variant or timestamped backup (.env.bak-<ts>, .env.production.bak-<ts>)
+.env.*
+!.env.example
 
 # Logs
 logs/
