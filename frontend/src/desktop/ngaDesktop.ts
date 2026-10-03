@@ -13,11 +13,12 @@ export const ngaDesktopVersion = (ua: string = typeof navigator !== "undefined" 
  * Signing the desktop app in through the person's browser, like Postman's
  * desktop app (Google can't sign in inside an embedded app window):
  *
- * 1. Desktop: the login page links to `/desktop/signin` (no query). The app
+ * 1. Desktop: the login page links to `/desktop/signin?via=google`. The app
  *    intercepts it, keeps a PKCE verifier, listens once on a loopback port and
  *    opens the browser at `/desktop/signin?redirect_uri=http://127.0.0.1:<port>/signin&state=…&challenge=…`.
- * 2. Browser: sign in to MIS as usual (Google, password + OTP, or an existing
- *    session → "Continue as …"). MIS issues a one-time code bound to the
+ * 2. Browser: with via=google, straight to Google's button (One Tap,
+ *    auto-select), not MIS's whole form again; an existing session shows
+ *    "Continue to the NGA app" (one click, as consent). MIS issues a one-time code bound to the
  *    challenge (POST /auth/desktop-handoff) and form-POSTs `{code, state}` to
  *    the loopback address.
  * 3. Desktop: opens `/desktop/complete#code=…&verifier=…` in its MIS window,

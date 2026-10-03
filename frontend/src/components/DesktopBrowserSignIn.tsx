@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
+import { GoogleLogin, type CredentialResponse } from "@react-oauth/google";
 import Login from "./Login";
 import { API_BASE_URL } from "../services/api";
-import { logout } from "../api/auth";
+import { googleLogin, logout } from "../api/auth";
 import { getUserFromToken, isAuthenticated } from "../utils/auth";
 import { validDesktopChallenge, validDesktopRedirect, validDesktopState } from "../desktop/ngaDesktop";
 
@@ -43,6 +44,10 @@ const DesktopBrowserSignIn: React.FC = () => {
   const redirect = params.get("redirect_uri");
   const state = params.get("state");
   const challenge = params.get("challenge");
+  // The person already chose Google in the app: go straight to Google here,
+  // not MIS's whole sign-in form again.
+  const viaGoogle = params.get("via") === "google";
+  const [fullForm, setFullForm] = useState(!viaGoogle);
   const valid = validDesktopRedirect(redirect) && validDesktopState(state) && validDesktopChallenge(challenge);
   const [phase, setPhase] = useState<"checking" | "signed-in" | "signed-out" | "sending" | "error">("checking");
   const [error, setError] = useState("");
@@ -109,7 +114,51 @@ const DesktopBrowserSignIn: React.FC = () => {
       </>,
     );
   }
-  if (phase === "signed-out") return <Login onLoginSuccess={handOff} />;
+  const onGoogle = async (res: CredentialResponse) => {
+    if (!res.credential) {
+      setError("Google sign-in didn't finish. Try again.");
+      return;
+    }
+    setPhase("sending");
+    try {
+      await googleLogin(res.credential); // MIS session in this browser (POST /auth/google)
+      await handOff();
+    } catch (e: any) {
+      setError(e?.response?.data?.message || "Google sign-in failed. Try again.");
+      setPhase("signed-out");
+    }
+  };
+
+  if (phase === "signed-out" && fullForm) return <Login onLoginSuccess={handOff} />;
+  if (phase === "signed-out") {
+    return card(
+      <>
+        <h1 className="text-lg font-semibold text-gray-900 dark:text-white">Sign in to the NGA app</h1>
+        <p className="mt-2 mb-6 text-sm text-gray-500 dark:text-gray-400">Continue with your Google account.</p>
+        {error && <p className="mb-4 text-sm text-red-600">{error}</p>}
+        <div className="flex justify-center">
+          {/* One Tap + auto_select: a returning person is often signed in without a click. */}
+          <GoogleLogin
+            onSuccess={onGoogle}
+            onError={() => setError("Google sign-in was cancelled or failed. Try again.")}
+            useOneTap
+            auto_select
+            theme="outline"
+            size="large"
+            shape="pill"
+            text="continue_with"
+            width={300}
+          />
+        </div>
+        <button
+          onClick={() => setFullForm(true)}
+          className="mt-6 text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline"
+        >
+          Use email and password instead
+        </button>
+      </>,
+    );
+  }
   if (phase === "checking") return card(<p className="text-sm text-gray-500">Checking your NGA MIS session…</p>);
   if (phase === "sending") {
     return card(
