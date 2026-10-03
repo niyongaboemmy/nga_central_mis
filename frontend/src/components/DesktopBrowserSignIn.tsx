@@ -1,9 +1,31 @@
 import React, { useEffect, useState } from "react";
+import axios from "axios";
 import Login from "./Login";
-import api from "../services/api";
-import { checkSession, logout } from "../api/auth";
-import { getUserFromToken } from "../utils/auth";
+import { API_BASE_URL } from "../services/api";
+import { logout } from "../api/auth";
+import { getUserFromToken, isAuthenticated } from "../utils/auth";
 import { validDesktopChallenge, validDesktopRedirect, validDesktopState } from "../desktop/ngaDesktop";
+
+/**
+ * Calls made by this page skip the shared client's 401 handling on purpose:
+ * that handler drops a stale token AND sends the page to "/", which lost the
+ * desktop app's sign-in request. The person then signed in to MIS in the
+ * browser only and had to start Google over from the app. Here a 401 just
+ * means "not signed in": clear the stale token and show the sign-in form.
+ */
+const desktopApi = axios.create({ baseURL: API_BASE_URL, withCredentials: true });
+desktopApi.interceptors.request.use((config) => {
+  const token = localStorage.getItem("token");
+  if (token) config.headers.Authorization = `Bearer ${token}`;
+  return config;
+});
+const dropStaleToken = () => {
+  try {
+    localStorage.removeItem("token");
+  } catch {
+    /* ignore */
+  }
+};
 
 /**
  * `/desktop/signin`: opened by the NGA desktop app in the person's normal
@@ -12,6 +34,11 @@ import { validDesktopChallenge, validDesktopRedirect, validDesktopState } from "
  * one-time code back to the app.
  */
 const DesktopBrowserSignIn: React.FC = () => {
+  // An expired token from an earlier visit: forget it before anything uses it.
+  useState(() => {
+    if (localStorage.getItem("token") && !isAuthenticated()) dropStaleToken();
+    return null;
+  });
   const params = new URLSearchParams(window.location.search);
   const redirect = params.get("redirect_uri");
   const state = params.get("state");
@@ -22,15 +49,20 @@ const DesktopBrowserSignIn: React.FC = () => {
 
   useEffect(() => {
     if (!valid) return;
-    checkSession()
+    desktopApi
+      .get("/auth/session")
       .then(() => setPhase("signed-in"))
-      .catch(() => setPhase("signed-out"));
+      .catch(() => {
+        // Not signed in (or an old token): sign in right here, on this page.
+        dropStaleToken();
+        setPhase("signed-out");
+      });
   }, [valid]);
 
   const handOff = async () => {
     setPhase("sending");
     try {
-      const res = await api.post("/auth/desktop-handoff", { challenge });
+      const res = await desktopApi.post("/auth/desktop-handoff", { challenge });
       const code: string = res.data?.data?.code;
       // A form POST to the app's loopback address (not a URL), so the code
       // never sits in browser history.
@@ -47,6 +79,12 @@ const DesktopBrowserSignIn: React.FC = () => {
       document.body.appendChild(form);
       form.submit();
     } catch (e: any) {
+      if (e?.response?.status === 401) {
+        // The session ended meanwhile: sign in again on this same page.
+        dropStaleToken();
+        setPhase("signed-out");
+        return;
+      }
       setError(e?.response?.data?.message || "Couldn't finish signing in to the NGA app.");
       setPhase("error");
     }

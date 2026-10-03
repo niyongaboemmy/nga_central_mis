@@ -84,7 +84,12 @@ api.interceptors.response.use(
       ) {
         // Token expired or invalid - redirect to login
         localStorage.removeItem("token");
-        window.location.href = "/";
+        // Except on the NGA desktop app's sign-in pages (/desktop/*): they
+        // show their own sign-in form, and leaving them would lose the app's
+        // pending sign-in (the person then had to start Google over).
+        if (!window.location.pathname.startsWith("/desktop/")) {
+          window.location.href = "/";
+        }
       }
     } else if (error.response?.status === 403) {
       // Show toast for forbidden access
