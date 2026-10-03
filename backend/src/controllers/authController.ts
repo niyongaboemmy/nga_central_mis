@@ -29,7 +29,8 @@ import {
   ValidationError,
   NotFoundError,
 } from "../errors/CustomError";
-import { successResponse } from "../utils/response";
+import { errorResponse, successResponse } from "../utils/response";
+import { HANDOFF_TTL_SECONDS, issueHandoffCode, redeemHandoffCode, validChallenge } from "../utils/desktopHandoff";
 import { asyncHandler } from "../middleware/asyncHandler";
 import config from "../config";
 import logger from "../utils/logger";
@@ -170,7 +171,7 @@ const googleClient = new OAuth2Client(config.google.clientId);
 const completeLogin = async (
   userId: number,
   res: any,
-  loginMethod: "OTP_EMAIL" | "GOOGLE_OAUTH",
+  loginMethod: "OTP_EMAIL" | "GOOGLE_OAUTH" | "DESKTOP_BROWSER",
   req?: any,
 ) => {
   // Get user permissions
@@ -343,8 +344,9 @@ const completeLogin = async (
 
   trackAuth(req, {
     kind: loginMethod === "GOOGLE_OAUTH" ? "google" : "login",
+    // DESKTOP_BROWSER: the NGA desktop app, signed in through the person's browser.
     outcome: "success",
-    method: loginMethod === "GOOGLE_OAUTH" ? "google" : "password_otp",
+    method: loginMethod === "GOOGLE_OAUTH" ? "google" : loginMethod === "DESKTOP_BROWSER" ? "desktop_browser" : "password_otp",
     userId,
   });
 
@@ -352,7 +354,7 @@ const completeLogin = async (
   await recordActivity(
     userId,
     "LOGIN_SUCCESS",
-    `User successfully logged in via ${loginMethod === "GOOGLE_OAUTH" ? "Google" : "2FA"}`,
+    `User successfully logged in via ${loginMethod === "GOOGLE_OAUTH" ? "Google" : loginMethod === "DESKTOP_BROWSER" ? "the desktop app (browser sign-in)" : "2FA"}`,
     "User",
     userId,
     { method: loginMethod, timestamp: new Date().toISOString() },
@@ -468,6 +470,44 @@ export const googleLogin = asyncHandler(async (req: any, res: any) => {
   }
 
   await completeLogin(user[0].user_id, res, "GOOGLE_OAUTH", req);
+});
+
+/**
+ * NGA desktop app, step 1 (in the person's browser, signed in to MIS):
+ * issue a one-time code bound to the app's PKCE challenge. See utils/desktopHandoff.ts.
+ */
+export const createDesktopHandoff = asyncHandler(async (req: any, res: any) => {
+  const challenge = req.body?.challenge;
+  if (!validChallenge(challenge)) {
+    return errorResponse(res, "Invalid challenge", 400);
+  }
+  const code = issueHandoffCode(req.user.userId, challenge, config.jwtSecret);
+  successResponse(res, "Desktop sign-in code issued", { code, expiresIn: HANDOFF_TTL_SECONDS });
+});
+
+/**
+ * NGA desktop app, step 2 (inside the app's MIS window): redeem the code with
+ * the PKCE verifier and sign in exactly like any other login.
+ */
+export const redeemDesktopHandoff = asyncHandler(async (req: any, res: any) => {
+  const result = redeemHandoffCode(req.body?.code, req.body?.verifier, config.jwtSecret);
+  if (!result.ok) {
+    trackAuth(req, { kind: "login", outcome: "failure", method: "desktop_browser", reason: `handoff_${result.reason}` });
+    return errorResponse(
+      res,
+      result.reason === "expired" ? "This sign-in took too long. Start again from the NGA app." : "This sign-in link is not valid. Start again from the NGA app.",
+      400,
+    );
+  }
+  // Same gates as the other logins: blocked device/IP, account not active.
+  if (await checkBlocked(deviceIdOf(req), clientIpOf(req)).catch(() => null)) {
+    return errorResponse(res, "Sign-in from this device is blocked.", 403);
+  }
+  const user = await db.select().from(User).where(eq(User.user_id, result.userId));
+  if (!user[0] || user[0].status !== "ACTIVE") {
+    return errorResponse(res, "This account can't sign in.", 403);
+  }
+  await completeLogin(result.userId, res, "DESKTOP_BROWSER", req);
 });
 
 export const getSession = asyncHandler(async (req: any, res: any) => {
