@@ -30,6 +30,8 @@ const DEFAULTS: Record<string, ProviderLimits> = {
   groq: { daily: 1000, rpm: 30, concurrency: 2, resetHourUtc: 0 },
   glm: { daily: 0, rpm: 0, concurrency: 2, resetHourUtc: 0 },
   openai: { daily: 0, rpm: 0, concurrency: 2, resetHourUtc: 0 },
+  // Free models without purchased credits: 50 requests/day, 20/min. Set AI_DAILY_REQUESTS_OPENROUTER=0 once credits are bought.
+  openrouter: { daily: 50, rpm: 20, concurrency: 2, resetHourUtc: 0 },
 };
 
 const envInt = (name: string, fallback: number): number => {
