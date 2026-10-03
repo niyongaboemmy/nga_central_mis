@@ -37,6 +37,10 @@ import {
   countPeriodsBySubject,
 } from "./subjectHighlight";
 import { useIsDark } from "./useIsDark";
+import OfficeHoursBandCells from "../officeHours/OfficeHoursBandCells";
+import { useOfficeHoursBand } from "../officeHours/useOfficeHoursBand";
+import { goTo } from "../officeHours/navigation";
+import type { BandEntry } from "../../api/officeHours";
 import CalendarSlotModal from "./CalendarSlotModal";
 import CalendarGridSkeleton from "./CalendarGridSkeleton";
 import LessonPlanModal from "./LessonPlanModal";
@@ -58,6 +62,12 @@ const DashboardCalendarWidget: React.FC = () => {
       (perm) => perm.name === Permissions.VIEW_STUDENT_CALENDAR,
     ),
   );
+
+  // The 16:20 band: this person's office hours (hosting or attending).
+  const { entries: officeHours } = useOfficeHoursBand({ termId: selectedTermId });
+  const onOfficeHoursClick = useCallback((entry: BandEntry) => {
+    goTo(entry.role === "hosting" && entry.schedule_id ? `/office-hours/schedules/${entry.schedule_id}` : "/my-office-hours");
+  }, []);
 
   // State
   const [slots, setSlots] = useState<CalendarSlot[]>([]);
@@ -416,7 +426,8 @@ const DashboardCalendarWidget: React.FC = () => {
       )}
 
       {/* Empty state */}
-      {!loading && gridEntries.length === 0 && (
+      {/* Office hours alone are enough to draw the week. */}
+      {!loading && gridEntries.length === 0 && officeHours.length === 0 && (
         <div className="flex flex-col items-center justify-center h-40 text-center">
           <Calendar className="w-10 h-10 text-gray-300 dark:text-gray-600 mb-3" />
           <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
@@ -429,12 +440,14 @@ const DashboardCalendarWidget: React.FC = () => {
       )}
 
       {/* Calendar Grid */}
-      {!loading && gridEntries.length > 0 && (
+      {!loading && (gridEntries.length > 0 || officeHours.length > 0) && (
         <ReadOnlyCalendarGrid
           slots={gridEntries}
           weekDates={weekDates}
           onSlotClick={handleSlotClick}
           showClassGroup={!isStudent}
+          officeHours={officeHours}
+          onOfficeHoursClick={onOfficeHoursClick}
         />
       )}
 
@@ -494,6 +507,8 @@ interface ReadOnlyCalendarGridProps {
   weekDates: Date[];
   onSlotClick: (slot: CalendarSlot, date: Date) => void;
   showClassGroup?: boolean;
+  officeHours?: BandEntry[];
+  onOfficeHoursClick?: (entry: BandEntry) => void;
 }
 
 /** How far through a lesson we are, 0-1, or null when it isn't running. */
@@ -512,6 +527,8 @@ const ReadOnlyCalendarGrid: React.FC<ReadOnlyCalendarGridProps> = ({
   weekDates,
   onSlotClick,
   showClassGroup = false,
+  officeHours,
+  onOfficeHoursClick,
 }) => {
   // Rows follow the data, so a period outside the standard timetable still
   // gets a row instead of silently matching none (see buildScheduleRows).
@@ -737,7 +754,17 @@ const ReadOnlyCalendarGrid: React.FC<ReadOnlyCalendarGridProps> = ({
 
                   {/* Breaks, lunch and office hours run right across the week,
                       as one labelled band rather than seven blank cells. */}
-                  {!isTeaching && (
+                  {!isTeaching && scheduleSlot.type === "office" && (
+                    <OfficeHoursBandCells
+                      label={scheduleSlot.label}
+                      entries={officeHours}
+                      dayCount={DAYS.length}
+                      dense
+                      todayIndex={todayIndex}
+                      onEntryClick={onOfficeHoursClick}
+                    />
+                  )}
+                  {!isTeaching && scheduleSlot.type !== "office" && (
                     <td
                       colSpan={DAYS.length}
                       className={`border-l border-gray-100 dark:border-gray-700/20 text-center text-[10px] font-bold uppercase tracking-wider ${

@@ -33,7 +33,7 @@ const endOf = (item: AgendaItem) =>
   item.end ? new Date(item.end).getTime() : new Date(item.start).getTime() + 30 * 60_000;
 
 /** Timed things in the day's flow; deadlines are points, not blocks. */
-const isBlock = (item: AgendaItem) => item.kind === "lesson" || item.kind === "activity" || item.kind === "meeting";
+const isBlock = (item: AgendaItem) => item.kind === "lesson" || item.kind === "activity" || item.kind === "meeting" || item.kind === "office_hours";
 
 export const computeNowNext = (items: AgendaItem[], now: Date): NowNext => {
   const t = now.getTime();
@@ -89,6 +89,7 @@ export const KIND_META: Record<ReminderKind | "briefing" | "test", { label: stri
   quiz_close: { label: "Quiz closes", hint: "Before a quiz closes — so you don’t miss the window" },
   assignment_due: { label: "Assignment due", hint: "Before homework and assignments are due" },
   meeting: { label: "Meetings", hint: "Staff and parent meetings (Tupo)" },
+  office_hours: { label: "Office hours", hint: "Before office hours you run or must attend" },
   event: { label: "Other events", hint: "Anything else the school schedules for you" },
   briefing: { label: "Morning briefing", hint: "" },
   test: { label: "Test", hint: "" },

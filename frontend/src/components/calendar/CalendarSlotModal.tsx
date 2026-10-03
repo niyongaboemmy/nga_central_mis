@@ -52,7 +52,9 @@ export interface ActivityFormErrors {
   end_time?: string;
 }
 
-/** Preset non-subject activity types (free text is still allowed). */
+/** Preset non-subject activity types (free text is still allowed). Office hours
+ *  are not an activity: they are scheduled from the Office Hours page, which
+ *  assigns students and keeps a register. */
 export const ACTIVITY_TYPES = [
   "Devotion",
   "Assembly",
@@ -60,7 +62,6 @@ export const ACTIVITY_TYPES = [
   "Club",
   "Exam",
   "Study Hall",
-  "Office Hours",
   "Meeting",
   "Event",
   "Other",
@@ -529,6 +530,12 @@ const CalendarSlotModal: React.FC<CalendarSlotModalProps> = ({
               {activityErrors.activity_type && (
                 <p className="mt-1 text-xs text-red-500 dark:text-red-400">
                   {activityErrors.activity_type}
+                </p>
+              )}
+              {/office\s*hour/i.test(af.activity_type) && (
+                <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">
+                  Office hours with assigned students and a register are set up from the{" "}
+                  <a href="/office-hours" className="font-semibold text-blue-700 underline dark:text-blue-300">Office Hours</a> page.
                 </p>
               )}
             </div>

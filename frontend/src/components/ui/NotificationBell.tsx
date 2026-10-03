@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { AlarmClock, Bell, Check, FolderOpen, FileText, ShieldOff, X } from "lucide-react";
+import { AlarmClock, Bell, CalendarX2, Check, ClipboardCheck, Clock4, FolderOpen, FileText, ShieldAlert, ShieldOff, X } from "lucide-react";
 import { useNotifications } from "../../contexts/NotificationContext";
 import type { AppNotification } from "../../api/notifications";
 
@@ -12,6 +12,20 @@ const kindIcon = (kind: string) => {
       return <ShieldOff className="w-4 h-4 text-red-500" />;
     case "reminder":
       return <AlarmClock className="w-4 h-4 text-amber-500" />;
+    // Office hours (OFFICE_HOURS_IMPLEMENTATION_PLAN.md §13.2)
+    case "office_hours_cancelled":
+      return <CalendarX2 className="w-4 h-4 text-rose-500" />;
+    case "office_hours_register_due":
+      return <ClipboardCheck className="w-4 h-4 text-amber-500" />;
+    case "office_hours_escalation":
+    case "office_hours_absent":
+      return <ShieldAlert className="w-4 h-4 text-amber-600" />;
+    case "office_hours_assigned":
+    case "office_hours_removed":
+    case "office_hours_changed":
+    case "office_hours_transfer":
+    case "office_hours_digest":
+      return <Clock4 className="w-4 h-4 text-blue-500" />;
     case "document_shared":
     default:
       return <FileText className="w-4 h-4 text-blue-500" />;

@@ -7,6 +7,7 @@ export type ReminderKind =
   | "quiz_close"
   | "assignment_due"
   | "meeting"
+  | "office_hours"
   | "event";
 
 export interface KindSetting {

@@ -93,10 +93,12 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({
             {getIcon(toast.type)}
             <p className="text-sm font-medium">{toast.message}</p>
             <button
+              type="button"
               onClick={() => hideToast(toast.id)}
+              aria-label="Dismiss notification"
               className="ml-2 p-1 hover:bg-black/5 dark:hover:bg-white/10 rounded-full transition-colors"
             >
-              <X className="w-4 h-4" />
+              <X className="w-4 h-4" aria-hidden />
             </button>
           </div>
         ))}

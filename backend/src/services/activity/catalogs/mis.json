@@ -44,6 +44,13 @@
     { "key": "mis.class_calendar", "label": "Class calendar", "module": "Calendar", "patterns": ["/class-calendar"] },
     { "key": "mis.reporting", "label": "Reporting", "module": "Reporting", "patterns": ["/reporting"] },
     { "key": "mis.my_mentor", "label": "My mentor", "module": "Reporting", "patterns": ["/my-mentor"] },
+    { "key": "mis.office_hours_schedule", "label": "Office hours detail", "module": "Office hours", "patterns": ["/office-hours/schedules/:id"] },
+    { "key": "mis.office_hours_student_report", "label": "Office hours student report", "module": "Office hours", "patterns": ["/office-hours/reports/students/:id"] },
+    { "key": "mis.office_hours_teacher_report", "label": "Office hours teacher report", "module": "Office hours", "patterns": ["/office-hours/reports/teachers/:id"] },
+    { "key": "mis.office_hours_checkin", "label": "Office hours check-in", "module": "Office hours", "patterns": ["/office-hours/checkin"] },
+    { "key": "mis.office_hours_admin", "label": "Office hours oversight", "module": "Office hours", "patterns": ["/office-hours/admin"] },
+    { "key": "mis.office_hours", "label": "Office hours", "module": "Office hours", "patterns": ["/office-hours"] },
+    { "key": "mis.my_office_hours", "label": "My office hours", "module": "Office hours", "patterns": ["/my-office-hours"] },
     { "key": "mis.admin_reports", "label": "Admin reports", "module": "Reporting", "patterns": ["/admin/reports"] },
     { "key": "mis.documents", "label": "Documents", "module": "Documents", "patterns": ["/documents"] },
 
@@ -88,6 +95,10 @@
     { "key": "mis.attendance.save", "label": "Attendance saved", "module": "Teaching", "event": true, "key_event": true },
     { "key": "mis.lesson_note.save", "label": "Lesson note saved", "module": "Curriculum", "event": true, "key_event": true },
     { "key": "mis.elearning.publish", "label": "Course section published", "module": "E-learning", "event": true, "key_event": true },
-    { "key": "mis.timetable.save", "label": "Timetable saved", "module": "Calendar", "event": true, "key_event": true }
+    { "key": "mis.timetable.save", "label": "Timetable saved", "module": "Calendar", "event": true, "key_event": true },
+    { "key": "mis.office_hours.schedule_create", "label": "Office hours created", "module": "Office hours", "event": true, "key_event": true },
+    { "key": "mis.office_hours.assign", "label": "Students assigned to office hours", "module": "Office hours", "event": true, "key_event": true },
+    { "key": "mis.office_hours.register_save", "label": "Office-hours register saved", "module": "Office hours", "event": true, "key_event": true },
+    { "key": "mis.office_hours.checkin", "label": "Office-hours self check-in", "module": "Office hours", "event": true }
   ]
 }
