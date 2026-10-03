@@ -38,7 +38,8 @@ export const applyFindMarks = (root: HTMLElement | null, query: string): HTMLEle
       const parent = (node as Text).parentElement;
       // KaTeX renders formulas as a tree of spans holding duplicated/annotation text —
       // splitting those text nodes visibly corrupts the rendered maths.
-      if (!parent || parent.closest(".katex, script, style")) return NodeFilter.FILTER_REJECT;
+      // Code window chrome (title bar, "Show all" button) is UI, not note text.
+      if (!parent || parent.closest(".katex, script, style, [data-code-chrome]")) return NodeFilter.FILTER_REJECT;
       return NodeFilter.FILTER_ACCEPT;
     },
   });

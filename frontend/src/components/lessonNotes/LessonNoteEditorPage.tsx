@@ -14,6 +14,8 @@ import {
   FileText,
   ChevronDown,
   GraduationCap,
+  SlidersHorizontal,
+  Trash2,
 } from "lucide-react";
 import { lessonNotesApi, LessonNoteDetail, isPdfBackedNote } from "../../api/lessonNotes";
 import { useToast } from "../../contexts/ToastContext";
@@ -23,6 +25,8 @@ import VersionHistoryModal from "./VersionHistoryModal";
 import LessonNoteStatusBadge from "./LessonNoteStatusBadge";
 import LessonNoteShareBadge from "./LessonNoteShareBadge";
 import PdfNoteWorkspace from "./pdf/PdfNoteWorkspace";
+import LessonNoteFormModal from "./LessonNoteFormModal";
+import { useDeleteLessonNote } from "./useDeleteLessonNote";
 import {
   attachImageTokenToJson,
   attachImageTokenToHtml,
@@ -42,6 +46,7 @@ const LessonNoteEditorPage: React.FC = () => {
   const navigate = useNavigate();
   const { showToast } = useToast();
   const askConfirm = useConfirm();
+  const deleteNote = useDeleteLessonNote();
 
   const [note, setNote] = useState<LessonNoteDetail | null>(null);
   const [title, setTitle] = useState("");
@@ -55,6 +60,9 @@ const LessonNoteEditorPage: React.FC = () => {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
   const [coverageOpen, setCoverageOpen] = useState(false);
+  const [showEditDetails, setShowEditDetails] = useState(false);
+  // Remounts the PDF viewer after the file is replaced from "Edit details" (same storage path).
+  const [pdfKey, setPdfKey] = useState(0);
 
   const pendingContent = useRef<{ json: any; html: string } | null>(null);
   const pendingAIPrompt = useRef<string | null>(null);
@@ -150,13 +158,65 @@ const LessonNoteEditorPage: React.FC = () => {
     scheduleAutosave(true);
   };
 
-  const handleTitleBlur = () => {
-    if (note && title !== note.title) {
-      lessonNotesApi
-        .update(noteId, { title })
-        .catch(() => showToast("Failed to save title", "error"));
-      setNote((prev) => (prev ? { ...prev, title } : prev));
+  const saveTitle = async () => {
+    if (!note || title === note.title) return;
+    if (!title.trim()) {
+      // An empty title is refused by the server; put the saved one back instead.
+      setTitle(note.title);
+      return;
     }
+    setNote((prev) => (prev ? { ...prev, title } : prev));
+    await lessonNotesApi.update(noteId, { title }).catch(() => showToast("Failed to save title", "error"));
+  };
+
+  const handleTitleBlur = () => {
+    saveTitle();
+  };
+
+  /** Everything typed so far is saved before the details form reads the note. */
+  const openEditDetails = async () => {
+    if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
+    await Promise.all([saveTitle(), flushSave()]);
+    setShowEditDetails(true);
+  };
+
+  const handleDetailsSaved = (fresh: LessonNoteDetail) => {
+    // Body fields stay as the editor has them; only the details the form owns are taken.
+    setNote((prev) =>
+      prev
+        ? {
+            ...prev,
+            title: fresh.title,
+            subject_id: fresh.subject_id,
+            subject_name: fresh.subject_name,
+            class_group_id: fresh.class_group_id,
+            class_group_name: fresh.class_group_name,
+            scheme_entry_id: fresh.scheme_entry_id,
+            scheme_context: fresh.scheme_context,
+            curriculum_context: fresh.curriculum_context,
+            elearning: fresh.elearning,
+            file_path: fresh.file_path,
+            file_name: fresh.file_name,
+            file_size: fresh.file_size,
+            page_count: fresh.page_count,
+            content_html: isPdfBackedNote(fresh) ? fresh.content_html : prev.content_html,
+            updated_at: fresh.updated_at,
+          }
+        : prev,
+    );
+    setTitle(fresh.title);
+    if (isPdfBackedNote(fresh) && fresh.updated_at !== note?.updated_at) setPdfKey((k) => k + 1);
+  };
+
+  const handleDelete = async () => {
+    if (!note) return;
+    // Write any pending edit first: if the delete is cancelled nothing is lost, and if it
+    // goes ahead no autosave fires afterwards against a note that no longer exists.
+    if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
+    await flushSave();
+    if (!(await deleteNote(note))) return;
+    pendingContent.current = null;
+    navigate(`/lesson-notes?subject=${note.subject_id}`, { replace: true });
   };
 
   const handlePublishToggle = async () => {
@@ -360,6 +420,14 @@ const LessonNoteEditorPage: React.FC = () => {
               <Maximize2 className="w-4 h-4" />
             )}
           </button>
+          <button
+            onClick={openEditDetails}
+            title="Edit details — subject, class, curriculum coverage, title"
+            className="px-3 py-2 rounded-full text-sm font-medium flex items-center gap-1.5 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800"
+          >
+            <SlidersHorizontal className="w-4 h-4" />
+            <span className="hidden md:inline">Details</span>
+          </button>
           {!isPdfNote && (
             <button
               onClick={() => setShowVersions(true)}
@@ -399,6 +467,14 @@ const LessonNoteEditorPage: React.FC = () => {
           >
             <Share2 className="w-4 h-4" />
             <span>Share</span>
+          </button>
+          <button
+            onClick={handleDelete}
+            title="Delete this note"
+            aria-label="Delete this note"
+            className="p-2 rounded-full text-gray-500 hover:text-red-600 hover:bg-red-50 dark:hover:text-red-300 dark:hover:bg-red-400/10"
+          >
+            <Trash2 className="w-4 h-4" />
           </button>
           <button
             onClick={handlePublishToggle}
@@ -492,6 +568,7 @@ const LessonNoteEditorPage: React.FC = () => {
       <div className="flex-1 min-h-0 rounded-xl shadow-sm ring-1 ring-black/5 dark:ring-white/10 overflow-hidden">
         {isPdfNote ? (
           <PdfNoteWorkspace
+            key={pdfKey}
             note={note}
             onReplaced={(patch) => {
               setNote((prev) => (prev ? { ...prev, ...patch } : prev));
@@ -523,6 +600,16 @@ const LessonNoteEditorPage: React.FC = () => {
         onShareCountChange={(count) =>
           setNote((prev) => (prev ? { ...prev, share_count: count } : prev))
         }
+      />
+      <LessonNoteFormModal
+        isOpen={showEditDetails}
+        noteId={noteId}
+        onClose={() => setShowEditDetails(false)}
+        onSaved={handleDetailsSaved}
+        onDeleted={() => {
+          pendingContent.current = null;
+          navigate(`/lesson-notes?subject=${note.subject_id}`, { replace: true });
+        }}
       />
       <VersionHistoryModal
         isOpen={showVersions}

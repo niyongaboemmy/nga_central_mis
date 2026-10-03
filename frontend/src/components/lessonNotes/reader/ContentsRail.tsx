@@ -15,6 +15,8 @@ interface Props {
   readingMinutes?: number | null;
   onJump: (id: string) => void;
   onAskAI?: () => void;
+  /** The drawer has its own titled header, so the rail's "Contents" label would repeat it. */
+  hideTitle?: boolean;
   className?: string;
 }
 
@@ -35,6 +37,7 @@ const ContentsRail: React.FC<Props> = ({
   readingMinutes,
   onJump,
   onAskAI,
+  hideTitle = false,
   className = "",
 }) => {
   const pct = Math.round(progress * 100);
@@ -50,9 +53,11 @@ const ContentsRail: React.FC<Props> = ({
       {/* Header: the count first, the percentage as supporting detail. */}
       <div className="px-1">
         <div className="flex items-baseline justify-between gap-2">
-          <p className="text-[11px] font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-            Contents
-          </p>
+          {!hideTitle && (
+            <p className="text-[11px] font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+              Contents
+            </p>
+          )}
           <p className="text-[11px] font-semibold tabular-nums text-slate-600 dark:text-slate-300">
             {currentStop > 0 ? `${currentStop} of ${tops.length}` : `${tops.length} sections`}
           </p>

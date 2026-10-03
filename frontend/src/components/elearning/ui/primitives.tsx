@@ -1,5 +1,6 @@
 import React, { useEffect, useId, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useReaderAside } from "../../lessonNotes/reader/readerAside";
 import {
   BookOpen,
   Check,
@@ -451,14 +452,22 @@ export const BottomActionBar: React.FC<{ children: React.ReactNode; className?: 
       window.removeEventListener("resize", measure);
     };
   }, [root]);
+  // A docked Study Assistant takes the right of the column; a covering one owns the screen.
+  const aside = useReaderAside();
   return (
     <AnimatePresence>
-      {!hidden && (
+      {!hidden && !aside.covering && (
         // Centred by a full-width flex wrapper, not translate-x: the motion transform (y) would
         // replace a Tailwind translate and push the bar half off the right edge.
         <div
           className="fixed inset-x-0 bottom-[max(1rem,env(safe-area-inset-bottom))] z-40 flex justify-center px-3 pointer-events-none print:hidden"
-          style={span ? { left: span.left, right: span.right } : undefined}
+          style={
+            span
+              ? { left: span.left, right: span.right + aside.docked }
+              : aside.docked
+                ? { right: aside.docked }
+                : undefined
+          }
         >
           <motion.div
             initial={{ y: 24, opacity: 0 }}

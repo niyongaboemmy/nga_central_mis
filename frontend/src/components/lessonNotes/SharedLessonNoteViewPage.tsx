@@ -34,6 +34,9 @@ import { useNoteFind } from "./reader/useNoteFind";
 import ReaderSettingsMenu from "./reader/ReaderSettingsMenu";
 import FindBar from "./reader/FindBar";
 import ContentsRail from "./reader/ContentsRail";
+import { setReaderAside } from "./reader/readerAside";
+import { repairInlineTags } from "./reader/repairInlineTags";
+import { enhanceCodeBlocks } from "../codeWindow/codeWindow";
 import {
   A4_WIDTH,
   A4_HEIGHT,
@@ -48,6 +51,13 @@ import { EmptyState } from "../elearning/ui/primitives";
 import { SubjectTile } from "./library/NoteCard";
 import { fullWhen, initialsOf, shortWhen } from "./library/noteVisuals";
 import { hydrateInlineChecks } from "../elearning/interactive/hydrate";
+
+/** Rail (272) + gap (32) + side padding (48) + a page that still reads like one (~600). */
+const RAIL_MIN_ROW_WIDTH = 952;
+/** Matches NoteAIPanel's sm:w-[420px] and the reader's pr-[420px] when docked. */
+const AI_PANEL_WIDTH = 420;
+/** Side padding (48) + the narrowest page worth reading beside the panel (520). */
+const MIN_DOCKED_ROW_WIDTH = 568;
 
 interface TocItem {
   id: string;
@@ -87,7 +97,12 @@ const SharedLessonNoteViewPage: React.FC<Props> = ({ noteId, onBack, backLabel }
 
   const [toc, setToc] = useState<TocItem[]>([]);
   const [activeHeading, setActiveHeading] = useState<string | null>(null);
+  /** The student's choice to show the contents rail beside the page. It only shows when
+   *  there is room for it (railFits); otherwise the contents open as a drawer. */
   const [tocOpen, setTocOpen] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [railFits, setRailFits] = useState(false);
+  const drawerCloseRef = useRef<HTMLButtonElement>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [focusMode, setFocusMode] = useState(false);
   const readerShellRef = useRef<HTMLDivElement>(null);
@@ -129,12 +144,15 @@ const SharedLessonNoteViewPage: React.FC<Props> = ({ noteId, onBack, backLabel }
   const [aiOpen, setAiOpen] = useState(false);
   const [askRequest, setAskRequest] = useState<AskRequest | null>(null);
 
+  const rowRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
   const sheetRef = useRef<HTMLDivElement>(null);
   const flowRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const findInputRef = useRef<HTMLInputElement>(null);
   const askCounter = useRef(0);
+  /** The code windows are built once per note, before ask() exists in render order. */
+  const askRef = useRef<(question: string, selection?: string, mode?: AskMode) => void>(() => undefined);
 
   const bookMode = prefs.mode === "book";
   /** The e-learning course page renders this component inline and brings its own
@@ -176,12 +194,26 @@ const SharedLessonNoteViewPage: React.FC<Props> = ({ noteId, onBack, backLabel }
     const root = contentRef.current;
     if (!note || !root) return;
 
+    repairInlineTags(root);
+    // Code shows as an editor window; "Explain" hands it to the Study Assistant.
+    enhanceCodeBlocks(root, {
+      onExplain: (code, language) =>
+        askRef.current(`Explain this ${language === "Code" ? "" : `${language} `}code step by step: what each part does and why.`, code, "explain"),
+    });
     renderMathInElement(root, {
       delimiters: [{ left: "$", right: "$", display: false }],
       throwOnError: false,
     });
     // Tap-to-reveal / inline quick-check blocks the teacher inserted from the editor.
     hydrateInlineChecks(root);
+    // Each table gets its own sideways scroller (index.css) so it can't widen the page.
+    root.querySelectorAll("table").forEach((table) => {
+      if (table.parentElement?.classList.contains("note-reader-table-scroll")) return;
+      const wrap = document.createElement("div");
+      wrap.className = "note-reader-table-scroll";
+      table.replaceWith(wrap);
+      wrap.appendChild(table);
+    });
 
     const headings = Array.from(root.querySelectorAll("h1, h2, h3")) as HTMLElement[];
     const items: TocItem[] = headings.map((h, i) => {
@@ -194,8 +226,67 @@ const SharedLessonNoteViewPage: React.FC<Props> = ({ noteId, onBack, backLabel }
     // there is room for it. Closed-by-default left the whole left third of a
     // wide screen empty and hid the one control that makes a long note
     // navigable. Narrow screens keep it as a drawer, opened on demand.
-    if (items.length > 1 && window.innerWidth >= 1024) setTocOpen(true);
+    if (items.length > 1) setTocOpen(true);
   }, [note]);
+
+  // Rail or drawer is decided by the room this reader actually has, not the window: in a
+  // course the app menu, the week index and the Study Assistant all take width, and a
+  // 272px rail beside a squeezed page pushed the lesson past the edge of the screen.
+  useEffect(() => {
+    const row = rowRef.current;
+    if (!row) return;
+    const measure = () => setRailFits(row.clientWidth >= RAIL_MIN_ROW_WIDTH);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(row);
+    return () => observer.disconnect();
+  }, [note]);
+
+  useEffect(() => {
+    if (railFits) setDrawerOpen(false);
+  }, [railFits]);
+
+  // The drawer is a dialog: focus moves into it, and back to its button when it closes.
+  useEffect(() => {
+    if (!drawerOpen) return;
+    const opener = document.activeElement as HTMLElement | null;
+    const t = window.setTimeout(() => drawerCloseRef.current?.focus(), 60);
+    return () => {
+      window.clearTimeout(t);
+      opener?.focus?.({ preventScroll: true });
+    };
+  }, [drawerOpen]);
+
+  // The Study Assistant docks beside the page only when the page keeps a readable width
+  // next to it; otherwise it floats over the page like on a phone. The decision uses the
+  // reader's own width (its border box, so making room for the panel doesn't feed back).
+  const [canDock, setCanDock] = useState(false);
+  useEffect(() => {
+    const shell = readerShellRef.current;
+    if (!shell) return;
+    const measure = () =>
+      setCanDock(window.innerWidth >= 1024 && shell.offsetWidth - AI_PANEL_WIDTH >= MIN_DOCKED_ROW_WIDTH);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(shell);
+    window.addEventListener("resize", measure);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", measure);
+    };
+  }, [note]);
+  const aiDocked = aiOpen && canDock;
+
+  // Tell floating page chrome (the course page's bottom bar and week index) where the
+  // panel is, so they step out of its way.
+  useEffect(() => {
+    if (!aiOpen) return;
+    setReaderAside({ open: true, docked: aiDocked ? AI_PANEL_WIDTH : 0, covering: !aiDocked });
+  }, [aiOpen, aiDocked]);
+  useEffect(() => {
+    if (!aiOpen) setReaderAside(null);
+    return () => setReaderAside(null);
+  }, [aiOpen]);
 
   // ---------------------------------------------------------------- A4 scaling
 
@@ -310,7 +401,7 @@ const SharedLessonNoteViewPage: React.FC<Props> = ({ noteId, onBack, backLabel }
       } else {
         el.scrollIntoView({ behavior: "smooth", block: "start" });
       }
-      setTocOpen(false);
+      setDrawerOpen(false);
     },
     [bookMode],
   );
@@ -367,6 +458,7 @@ const SharedLessonNoteViewPage: React.FC<Props> = ({ noteId, onBack, backLabel }
     setSelectionRect(null);
     window.getSelection()?.removeAllRanges();
   }, []);
+  askRef.current = ask;
 
   // ---------------------------------------------------------------- keyboard
 
@@ -383,7 +475,7 @@ const SharedLessonNoteViewPage: React.FC<Props> = ({ noteId, onBack, backLabel }
       }
       if (e.key === "Escape") {
         if (findOpen) setFindOpen(false);
-        else if (tocOpen) setTocOpen(false);
+        else if (drawerOpen) setDrawerOpen(false);
         else if (settingsOpen) setSettingsOpen(false);
         else if (focusMode) exitFocus();
         return;
@@ -399,7 +491,7 @@ const SharedLessonNoteViewPage: React.FC<Props> = ({ noteId, onBack, backLabel }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [bookMode, totalPages, findOpen, tocOpen, settingsOpen, focusMode]);
+  }, [bookMode, totalPages, findOpen, drawerOpen, settingsOpen, focusMode]);
 
   // ---------------------------------------------------------------- render
 
@@ -485,7 +577,7 @@ const SharedLessonNoteViewPage: React.FC<Props> = ({ noteId, onBack, backLabel }
     <div
       ref={readerShellRef}
       className={`note-reader note-reader--${prefs.paper} ${focusMode ? "note-reader--focus" : ""} ${
-        aiOpen ? "lg:pr-[420px]" : ""
+        aiDocked ? "pr-[420px]" : ""
       } ${embedded ? "" : "min-h-screen bg-gray-100 dark:bg-black"} transition-[padding] duration-300`}
     >
       {/* Reading progress — the one always-visible signal of how far in you are. */}
@@ -544,12 +636,12 @@ const SharedLessonNoteViewPage: React.FC<Props> = ({ noteId, onBack, backLabel }
                     row read as a debug bar, not a toolbar. */}
                 {toc.length > 1 && (
                   <button
-                    onClick={() => setTocOpen((o) => !o)}
+                    onClick={() => (railFits ? setTocOpen((o) => !o) : setDrawerOpen((o) => !o))}
                     title="Contents"
                     aria-label="Contents"
-                    aria-pressed={tocOpen}
+                    aria-pressed={railFits ? tocOpen : drawerOpen}
                     className={`grid h-9 w-9 place-items-center rounded-lg transition-colors ${
-                      tocOpen
+                      (railFits ? tocOpen : drawerOpen)
                         ? "el-chip-brand"
                         : "text-gray-500 hover:bg-gray-200/70 hover:text-gray-800 dark:hover:bg-white/[0.08] dark:hover:text-gray-200"
                     }`}
@@ -667,11 +759,11 @@ const SharedLessonNoteViewPage: React.FC<Props> = ({ noteId, onBack, backLabel }
         </button>
       )}
 
-      <div className="mx-auto flex max-w-[1180px] items-start gap-8 px-4 py-8 sm:px-6">
-        {/* Contents rail — persistent on wide screens, drawer elsewhere */}
+      <div ref={rowRef} className="mx-auto flex max-w-[1180px] items-start gap-8 px-4 py-8 sm:px-6">
+        {/* Contents rail — beside the page when there is room, a drawer otherwise */}
         {toc.length > 1 && !focusMode && (
           <AnimatePresence>
-            {tocOpen && (
+            {tocOpen && railFits && (
               <motion.nav
                 initial={{ opacity: 0, x: -12 }}
                 animate={{ opacity: 1, x: 0 }}
@@ -679,7 +771,7 @@ const SharedLessonNoteViewPage: React.FC<Props> = ({ noteId, onBack, backLabel }
                 /* top-32 clears the navbar (top-16, 64px) *and* the reader toolbar
                    that sticks below it: at a smaller offset the rail's own header
                    slides under the toolbar and disappears. */
-                className={`el-card hidden lg:flex flex-col sticky ${railTop} w-[272px] flex-shrink-0 max-h-[calc(100vh-6.5rem)] p-4 print:hidden`}
+                className={`el-card flex flex-col sticky ${railTop} w-[272px] flex-shrink-0 max-h-[calc(100vh-6.5rem)] p-4 print:hidden`}
               >
                 <ContentsRail
                   toc={toc}
@@ -862,31 +954,48 @@ const SharedLessonNoteViewPage: React.FC<Props> = ({ noteId, onBack, backLabel }
         </div>
       </div>
 
-      {/* Mobile contents drawer */}
+      {/* Contents drawer — whenever the rail doesn't fit. It slides in from the right,
+          next to the toolbar button that opens it (and where the Study Assistant lives),
+          on a solid surface above the app's own menu: from the left it opened underneath
+          the translucent app sidebar and the two lists read through each other. */}
       <AnimatePresence>
-        {tocOpen && toc.length > 1 && (
+        {drawerOpen && !railFits && toc.length > 1 && (
           <>
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              onClick={() => setTocOpen(false)}
-              className="fixed inset-0 bg-black/30 z-40 lg:hidden"
+              onClick={() => setDrawerOpen(false)}
+              className="fixed inset-0 z-[60] bg-gray-900/40 backdrop-blur-[2px] print:hidden"
+              aria-hidden
             />
-            <motion.nav
-              initial={{ x: "-100%" }}
+            <motion.div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="note-contents-title"
+              initial={{ x: "100%" }}
               animate={{ x: 0 }}
-              exit={{ x: "-100%" }}
-              transition={{ type: "spring", damping: 30, stiffness: 260 }}
-              className={`fixed ${embedded ? "top-16" : "top-0"} left-0 bottom-0 w-[300px] z-40 bg-white dark:bg-[#0b0d12] border-r border-gray-200 dark:border-white/[0.07] shadow-2xl p-4 lg:hidden flex flex-col`}
+              exit={{ x: "100%" }}
+              transition={{ type: "spring", damping: 32, stiffness: 280 }}
+              className={`fixed ${embedded ? "top-16" : "top-0"} right-0 bottom-0 z-[61] flex w-[min(360px,88vw)] flex-col border-l border-gray-200 bg-white shadow-2xl dark:border-white/[0.08] dark:bg-gray-900 print:hidden`}
             >
-              <div className="mb-3 flex items-center justify-end">
+              <div className="flex items-center gap-3 border-b border-gray-100 px-4 py-3 dark:border-white/[0.07]">
+                <span className="grid h-9 w-9 flex-shrink-0 place-items-center rounded-xl el-chip-brand">
+                  <List className="h-4 w-4" />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p id="note-contents-title" className="text-sm font-semibold leading-tight text-gray-900 dark:text-white">
+                    Contents
+                  </p>
+                  <p className="truncate text-[11px] text-slate-600 dark:text-slate-300">{note.title}</p>
+                </div>
                 <button
-                  onClick={() => setTocOpen(false)}
+                  ref={drawerCloseRef}
+                  onClick={() => setDrawerOpen(false)}
                   aria-label="Close contents"
-                  className="grid h-9 w-9 place-items-center rounded-lg text-gray-400 hover:bg-gray-100 dark:hover:bg-white/[0.06]"
+                  className="grid h-10 w-10 flex-shrink-0 place-items-center rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-800 focus:outline-none focus-visible:shadow-glow dark:text-gray-300 dark:hover:bg-white/[0.06] dark:hover:text-white"
                 >
-                  <X className="w-4 h-4" />
+                  <X className="h-4 w-4" />
                 </button>
               </div>
               <ContentsRail
@@ -896,15 +1005,16 @@ const SharedLessonNoteViewPage: React.FC<Props> = ({ noteId, onBack, backLabel }
                 readingMinutes={note.reading_minutes}
                 onJump={(id) => {
                   jumpToHeading(id);
-                  setTocOpen(false);
+                  setDrawerOpen(false);
                 }}
                 onAskAI={() => {
-                  setTocOpen(false);
+                  setDrawerOpen(false);
                   setAiOpen(true);
                 }}
-                className="min-h-0 flex-1"
+                hideTitle
+                className="min-h-0 flex-1 px-4 pb-4 pt-4"
               />
-            </motion.nav>
+            </motion.div>
           </>
         )}
       </AnimatePresence>
@@ -972,6 +1082,7 @@ const SharedLessonNoteViewPage: React.FC<Props> = ({ noteId, onBack, backLabel }
         onClose={() => setAiOpen(false)}
         request={askRequest}
         offsetTop={embedded}
+        docked={aiDocked}
       />
     </div>
   );

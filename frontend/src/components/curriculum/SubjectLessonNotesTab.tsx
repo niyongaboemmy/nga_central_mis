@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Plus, FileText, Sparkles } from "lucide-react";
 import { lessonNotesApi, LessonNoteSummary, isPdfBackedNote } from "../../api/lessonNotes";
 import { useToast } from "../../contexts/ToastContext";
-import NewLessonNoteModal from "../lessonNotes/NewLessonNoteModal";
+import LessonNoteFormModal from "../lessonNotes/LessonNoteFormModal";
 import LessonNoteStatusBadge from "../lessonNotes/LessonNoteStatusBadge";
 import LessonNoteShareBadge from "../lessonNotes/LessonNoteShareBadge";
 
@@ -107,7 +107,7 @@ const SubjectLessonNotesTab: React.FC<Props> = ({ subjectId }) => {
         </div>
       )}
 
-      <NewLessonNoteModal
+      <LessonNoteFormModal
         isOpen={showNewModal}
         onClose={() => {
           setShowNewModal(false);

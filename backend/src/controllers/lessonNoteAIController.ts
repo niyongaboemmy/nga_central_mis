@@ -326,7 +326,7 @@ async function assertTeacherOwnsSubjectForAI(userId: number, subjectId: number) 
 export const startAINoteGeneration = asyncHandler(async (req: any, res: any) => {
   if (!isAnyProviderConfigured()) {
     throw new ValidationError(
-      "AI note generation is not configured. Add an API key for at least one AI provider (GEMINI_API_KEY, GROQ_API_KEY, or GLM_API_KEY) to the backend environment.",
+      "AI note generation is not configured. Add an API key for at least one AI provider (GEMINI_API_KEY, GROQ_API_KEY, DEEPSEEK_API_KEY, or GLM_API_KEY) to the backend environment.",
     );
   }
 
@@ -401,7 +401,7 @@ export const getAINoteGenerationStatus = asyncHandler(async (req: any, res: any)
 export const proposeAINoteEdit = asyncHandler(async (req: any, res: any) => {
   if (!isAnyProviderConfigured()) {
     throw new ValidationError(
-      "AI editing is not configured. Add an API key for at least one AI provider (GEMINI_API_KEY, GROQ_API_KEY, or GLM_API_KEY) to the backend environment.",
+      "AI editing is not configured. Add an API key for at least one AI provider (GEMINI_API_KEY, GROQ_API_KEY, DEEPSEEK_API_KEY, or GLM_API_KEY) to the backend environment.",
     );
   }
 

@@ -24,6 +24,8 @@ import { lessonNotesApi } from "../../../api/lessonNotes";
 import { elearningApi } from "../../../api/elearning";
 import { useMotion } from "../../../design/motion";
 import { hydrateInlineChecks } from "../interactive/hydrate";
+import { enhanceCodeBlocks } from "../../codeWindow/codeWindow";
+import RichHtml from "../../codeWindow/RichHtml";
 import { attachImageTokenToHtml } from "../../../utils/lessonNoteImages";
 import { flagTone, REVIEW_KEYS, weekIsClean } from "./studioModel";
 
@@ -104,7 +106,10 @@ const LessonPreview: React.FC<{ draft: DraftItem }> = ({ draft }) => {
     };
   }, [draft.ref_id]);
   useEffect(() => {
-    if (html !== null) hydrateInlineChecks(ref.current);
+    if (html !== null) {
+      hydrateInlineChecks(ref.current);
+      enhanceCodeBlocks(ref.current);
+    }
   }, [html]);
   const sources = draft.source_refs?.sources ?? [];
   const titleOf = (refId: string) => sources.find((s) => s.ref === refId)?.title ?? refId;
@@ -266,7 +271,7 @@ const DraftCard: React.FC<{
         {draft.item_type === "LESSON_NOTE" && <LessonPreview draft={draft} />}
         {(draft.item_type === "KNOWLEDGE_CHECK" || draft.item_type === "EXIT_TICKET") && <QuestionsPreview draft={draft} />}
         {draft.item_type === "VIDEO" && <VideoSlot draft={draft} onSaved={onChanged} />}
-        {(draft.item_type === "PAGE" || draft.item_type === "PRACTICAL_TASK") && draft.content_html && <div className="lesson-note-preview note-reader-body note-reader-body--sans max-w-[70ch]" style={READER_STYLE} dangerouslySetInnerHTML={{ __html: draft.content_html }} />}
+        {(draft.item_type === "PAGE" || draft.item_type === "PRACTICAL_TASK") && draft.content_html && <RichHtml className="lesson-note-preview note-reader-body note-reader-body--sans max-w-[70ch]" style={READER_STYLE} html={draft.content_html} />}
         {draft.item_type === "PRACTICAL_TASK" && (draft.content_json?.checklist?.length ?? 0) > 0 && (
           <div className="mt-3">
             <p className="text-xs font-semibold text-slate-600 dark:text-slate-300">Success checklist (you tick it when signing off)</p>

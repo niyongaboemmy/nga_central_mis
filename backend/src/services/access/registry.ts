@@ -475,9 +475,31 @@ export async function accessTablesPresent(): Promise<boolean> {
 }
 
 /**
+ * Register the MIS manifest, presets and default rules, and say what changed.
+ * Throws on failure -- the CLI uses this so a broken bootstrap fails the run
+ * instead of printing success.
+ */
+export async function runAccessBootstrap() {
+  const manifest = await syncManifest(MIS_MANIFEST);
+  const presets = await ensurePresets();
+  const rules = await ensureDefaultRules();
+  return {
+    manifestUnchanged: manifest.unchanged,
+    capabilitiesCreated: manifest.created.length,
+    rolesCreated: presets.rolesCreated,
+    rolesMapped: presets.rolesMapped,
+    linksAdded: presets.linksAdded,
+    linksWithheld: presets.linksWithheld.length,
+    linksDeferred: presets.linksDeferred,
+    rulesCreated: rules,
+  };
+}
+
+/**
  * Boot-time bootstrap: register the MIS manifest, seed presets and default
- * rules. Insert-only and idempotent; logs and carries on if anything fails
- * so the MIS never refuses to start because of the access engine.
+ * rules, then heal legacy admin grants. Insert-only and idempotent; logs and
+ * carries on if anything fails so the MIS never refuses to start because of
+ * the access engine.
  */
 export async function ensureAccessRegistry(): Promise<void> {
   if (process.env.ACCESS_V2_BOOTSTRAP === "false") return;
@@ -486,19 +508,13 @@ export async function ensureAccessRegistry(): Promise<void> {
       logger.warn("[access] migration 090 not applied -- access engine bootstrap skipped");
       return;
     }
-    const manifest = await syncManifest(MIS_MANIFEST);
-    const presets = await ensurePresets();
-    const rules = await ensureDefaultRules();
+    const report = await runAccessBootstrap();
     const { ensureLegacyAdminGrants } = await import("./backfill");
     const healed = await ensureLegacyAdminGrants();
     logger.info("[access] registry ready", {
-      manifestUnchanged: manifest.unchanged,
-      capabilitiesCreated: manifest.created.length,
-      rolesCreated: presets.rolesCreated,
-      rolesMapped: presets.rolesMapped,
-      linksAdded: presets.linksAdded.length,
-      linksWithheld: presets.linksWithheld.length,
-      rulesCreated: rules,
+      ...report,
+      linksAdded: report.linksAdded.length,
+      linksDeferred: report.linksDeferred.length,
       grantsHealed: healed.length,
     });
   } catch (err: any) {

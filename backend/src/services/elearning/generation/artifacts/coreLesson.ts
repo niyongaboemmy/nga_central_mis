@@ -3,7 +3,7 @@ import type { Blueprint } from "../blueprint";
 import type { WeekContextPack } from "../contextPack";
 import { renderSources } from "../contextPack";
 import { sanitizeNoteHtml } from "../../../../utils/sanitizeNoteHtml";
-import { escapeHtml, interactionToHtml, styleRules, validRefs, InteractionSpec } from "./shared";
+import { escapeHtml, inlineHtml, interactionToHtml, styleRules, validRefs, InteractionSpec } from "./shared";
 
 /**
  * CORE_LESSON (LESSON_STUDIO plan §8.3): the week's lesson, written for a phone, grounded in
@@ -201,12 +201,12 @@ export function assembleLesson(out: CoreLessonOutput, pack: WeekContextPack, bp:
 
   const html: string[] = [];
   const citations: { heading: string; refs: string[] }[] = [];
-  if (out.summary) html.push(`<p><strong>${escapeHtml(out.summary.trim())}</strong></p>`);
+  if (out.summary) html.push(`<p><strong>${inlineHtml(out.summary.trim())}</strong></p>`);
   const sections = (out.sections ?? []).filter((s) => s && s.html && s.html.trim());
   let interactions = 0;
   sections.forEach((s, i) => {
     const heading = (s.heading || `Part ${i + 1}`).trim();
-    html.push(`<h2>${escapeHtml(heading)}</h2>`, s.html!.trim());
+    html.push(`<h2>${inlineHtml(heading)}</h2>`, s.html!.trim());
     const sectionRefs = cleanRefs(s.source_refs);
     citations.push({ heading, refs: sectionRefs });
     if (sectionRefs.length === 0) flags.push({ kind: "UNCITED", note: `"${heading}" does not say which source it is based on — check it against your notes.` });
@@ -219,7 +219,7 @@ export function assembleLesson(out: CoreLessonOutput, pack: WeekContextPack, bp:
     }
   });
   if (bp.lesson.worked_example && out.worked_example?.html) {
-    html.push(`<h2>${escapeHtml(out.worked_example.title || "Worked example")}</h2>`, out.worked_example.html);
+    html.push(`<h2>${inlineHtml(out.worked_example.title || "Worked example")}</h2>`, out.worked_example.html);
     citations.push({ heading: out.worked_example.title || "Worked example", refs: cleanRefs(out.worked_example.source_refs) });
   }
   const keyTerms = (out.key_terms ?? [])
@@ -229,11 +229,11 @@ export function assembleLesson(out: CoreLessonOutput, pack: WeekContextPack, bp:
   if (keyTerms.length) {
     html.push(
       "<h2>Key terms</h2>",
-      `<ul>${keyTerms.map((t) => `<li><strong>${escapeHtml(t.term)}</strong>${t.gloss_rw ? ` (<em>${escapeHtml(t.gloss_rw)}</em>)` : ""} — ${escapeHtml(t.definition)}</li>`).join("")}</ul>`,
+      `<ul>${keyTerms.map((t) => `<li><strong>${inlineHtml(t.term)}</strong>${t.gloss_rw ? ` (<em>${escapeHtml(t.gloss_rw)}</em>)` : ""} — ${inlineHtml(t.definition)}</li>`).join("")}</ul>`,
     );
   }
   const checks = (out.check_yourself ?? []).map((q) => String(q).trim()).filter(Boolean).slice(0, 4);
-  if (checks.length) html.push("<h2>Check yourself</h2>", `<ol>${checks.map((q) => `<li>${escapeHtml(q)}</li>`).join("")}</ol>`);
+  if (checks.length) html.push("<h2>Check yourself</h2>", `<ol>${checks.map((q) => `<li>${inlineHtml(q)}</li>`).join("")}</ol>`);
 
   let covered = cleanCriteria(out.covered_criteria);
   for (const s of sections) covered.push(...cleanCriteria(s.criteria));
@@ -252,14 +252,14 @@ export function assembleLesson(out: CoreLessonOutput, pack: WeekContextPack, bp:
     const checklist = (p.checklist ?? []).filter((c) => c?.text);
     const brief = [
       p.brief_html || "",
-      p.tools?.length ? `<h3>You will need</h3><ul>${p.tools.map((t) => `<li>${escapeHtml(String(t))}</li>`).join("")}</ul>` : "",
-      p.steps?.length ? `<h3>Steps</h3><ol>${p.steps.map((t) => `<li>${escapeHtml(String(t))}</li>`).join("")}</ol>` : "",
-      p.safety?.length ? `<h3>Safety</h3><ul>${p.safety.map((t) => `<li>${escapeHtml(String(t))}</li>`).join("")}</ul>` : "",
+      p.tools?.length ? `<h3>You will need</h3><ul>${p.tools.map((t) => `<li>${inlineHtml(String(t))}</li>`).join("")}</ul>` : "",
+      p.steps?.length ? `<h3>Steps</h3><ol>${p.steps.map((t) => `<li>${inlineHtml(String(t))}</li>`).join("")}</ol>` : "",
+      p.safety?.length ? `<h3>Safety</h3><ul>${p.safety.map((t) => `<li>${inlineHtml(String(t))}</li>`).join("")}</ul>` : "",
     ].join("");
     const pHtml = [
       brief,
       checklist.length
-        ? `<h3>Success checklist</h3><ul>${checklist.map((c) => `<li>${escapeHtml(String(c.text))}${c.criteria && weekNumbers.has(String(c.criteria).trim()) ? ` <em>(${escapeHtml(String(c.criteria).trim())})</em>` : ""}</li>`).join("")}</ul>`
+        ? `<h3>Success checklist</h3><ul>${checklist.map((c) => `<li>${inlineHtml(String(c.text))}${c.criteria && weekNumbers.has(String(c.criteria).trim()) ? ` <em>(${escapeHtml(String(c.criteria).trim())})</em>` : ""}</li>`).join("")}</ul>`
         : "",
     ].join("");
     const pCriteria = [...new Set(checklist.map((c) => String(c.criteria ?? "").trim()).filter((c) => weekNumbers.has(c)))];

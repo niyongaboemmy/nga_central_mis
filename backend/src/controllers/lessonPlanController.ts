@@ -29,7 +29,7 @@ import {
 // gpt-4o is the strongest of the configured models at extracting structure from messy,
 // inconsistently-formatted uploaded DOCX lesson plans — prefer it first when available,
 // but still fall through to the rest of AI_PROVIDER_ORDER rather than requiring OpenAI.
-const EXTRACTION_PROVIDER_ORDER = ["openai", "gemini", "groq", "glm"];
+const EXTRACTION_PROVIDER_ORDER = ["openai", "gemini", "groq", "deepseek", "glm"];
 
 const extractionSchema: JSONSchema = {
   type: "object",

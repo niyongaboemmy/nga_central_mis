@@ -49,6 +49,13 @@ import {
 import { useLearningPrefs } from "./useLearningPrefs";
 import { LearnerScrollRoot } from "./scrollRoot";
 import { useViewportFit } from "../ui/useViewportFit";
+import { useReaderAside } from "../../lessonNotes/reader/readerAside";
+
+/** IndexDrawer's widest (xl) width, the Study Assistant panel, and the room a lesson page
+ *  needs between them to read like a page (paper + its padding). */
+const INDEX_WIDTH = 340;
+const ASSISTANT_WIDTH = 420;
+const ROOM_FOR_LESSON = 760;
 
 const HEARTBEAT_MS = 30_000;
 
@@ -114,6 +121,21 @@ const CoursePage: React.FC = () => {
     return () => mq.removeEventListener?.("change", on);
   }, []);
   const frameHeight = useViewportFit(isDesktop ? frameEl : null, { gap: 0 });
+  // The Study Assistant needs 420px on the right. Where the app menu + week index + panel
+  // would leave the lesson too narrow (most laptops), fold the index to its strip while
+  // the panel is open — not remembered, and the student can still unfold it.
+  const aside = useReaderAside();
+  const [assistantFold, setAssistantFold] = useState(false);
+  useEffect(() => {
+    if (!aside.open) {
+      setAssistantFold(false);
+      return;
+    }
+    const width = frameEl?.clientWidth ?? 0;
+    if (isDesktop && width - INDEX_WIDTH - ASSISTANT_WIDTH < ROOM_FOR_LESSON) setAssistantFold(true);
+    // Only when the panel opens: a student who unfolds the index again keeps it unfolded.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [aside.open]);
   const scrollRoot = isDesktop ? mainEl : null;
   const scrollRootRef = useRef<HTMLElement | null>(null);
   scrollRootRef.current = scrollRoot;
@@ -350,6 +372,7 @@ const CoursePage: React.FC = () => {
   const canMarkDone =
     opened && !opened.locked && opened.item.completion_rule === "MARK_DONE";
   const isDone = opened?.item.state === "COMPLETED";
+  const noteOpen = !!opened && !opened.locked && opened.item.item_type === "LESSON_NOTE";
 
   return (
     <LearnerScrollRoot.Provider value={scrollRoot}>
@@ -369,13 +392,20 @@ const CoursePage: React.FC = () => {
         onOpenSection={goSection}
         open={indexOpen}
         onClose={() => setIndexOpen(false)}
-        collapsed={indexCollapsed}
-        onToggleCollapsed={toggleIndexCollapsed}
+        collapsed={indexCollapsed || assistantFold}
+        onToggleCollapsed={() => (assistantFold ? setAssistantFold(false) : toggleIndexCollapsed())}
       />
 
-      {/* The reader used to start flush against the app bar, so the title had
-          no air above it. */}
-      <main ref={setMainEl} className="min-w-0 flex-1 pt-4 md:pt-6 lg:h-full lg:overflow-y-auto lg:overscroll-contain" tabIndex={-1} aria-label="Course content">
+      {/* Air above the title for most items; a lesson note brings its own sticky toolbar,
+          which must sit flush at the top of the column rather than float below a gap.
+          overflow-x-clip is the last guard against a sideways-scrolling column — the
+          content itself is built to fit (see .note-reader-* in index.css). */}
+      <main
+        ref={setMainEl}
+        className={`min-w-0 flex-1 overflow-x-clip ${noteOpen ? "" : "pt-4 md:pt-6"} lg:h-full lg:overflow-y-auto lg:overscroll-contain`}
+        tabIndex={-1}
+        aria-label="Course content"
+      >
         {(!online || queued > 0) && (
           <div
             className="mx-4 mt-5 flex items-center gap-2 px-3 py-2 rounded-xl el-chip-warning text-xs"
