@@ -9,6 +9,8 @@
     { "key": "mis.password_recovery", "label": "Password recovery", "module": "Public", "patterns": ["/password-recovery"], "public": true },
     { "key": "mis.scheme_verify", "label": "Verify a scheme of work", "module": "Public", "patterns": ["/verify/:schemeId"], "public": true },
     { "key": "mis.apps", "label": "Get the apps", "module": "Public", "patterns": ["/apps"], "public": true },
+    { "key": "mis.desktop_signin", "label": "Desktop app: sign in through the browser", "module": "Public", "patterns": ["/desktop/signin"], "public": true },
+    { "key": "mis.desktop_signin_complete", "label": "Desktop app: finishing sign-in", "module": "Public", "patterns": ["/desktop/complete"], "public": true },
     { "key": "mis.legal", "label": "Privacy & terms", "module": "Public", "patterns": ["/privacy", "/terms", "/legal"], "public": true },
 
     { "key": "mis.home", "label": "Home", "module": "Home", "patterns": ["/home"] },
