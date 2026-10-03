@@ -9,7 +9,7 @@ import { OfficeHourSchedule, OfficeHourSession } from "../db/officeHoursSchema";
 import { AuthorizationError, ValidationError } from "../errors/CustomError";
 import { addDaysYmd } from "../services/reminders/time";
 import { actorOf } from "../services/officeHours/access";
-import { intList, isYmd, officeHoursEnabled, resolveTermId, todayYmd, toInt, loadTerm } from "../services/officeHours/common";
+import { intList, isYmd, officeHoursEnabled, officeHoursReady, resolveTermId, todayYmd, toInt, loadTerm } from "../services/officeHours/common";
 import { getSettings, publicConfig, saveSettings } from "../services/officeHours/settings";
 import {
   createSchedule,
@@ -75,8 +75,10 @@ import {
  * are checked in the services (access.ts).
  */
 const router = Router();
-router.use((req, res, next) => {
+router.use(async (req, res, next) => {
   if (!officeHoursEnabled()) return res.status(404).json({ success: false, message: "Office hours are not enabled on this server" });
+  // Deployed before migration 102: say so instead of failing with 500s.
+  if (!(await officeHoursReady())) return res.status(503).json({ success: false, code: "OFFICE_HOURS_NOT_SET_UP", message: "Office hours are being set up on this server" });
   next();
 });
 router.use(authenticate);

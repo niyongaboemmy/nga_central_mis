@@ -1,7 +1,7 @@
 import logger from "../../utils/logger";
 import { dowOfYmd, kigaliParts } from "../reminders/time";
 import { autoCloseUnmarked } from "./admin";
-import { now } from "./common";
+import { now, officeHoursReady } from "./common";
 import { morningDigest, registerReminders, weeklyDigests } from "./digests";
 import { evaluateEscalations } from "./escalation";
 import { notifyEscalations, registerOfficeHoursNotifier } from "./notify";
@@ -32,6 +32,7 @@ const once = async (key: string, period: string, fn: () => Promise<unknown>) => 
 
 export const tick = async () => {
   if (running) return;
+  if (!(await officeHoursReady())) return; // migration 102 not applied yet
   running = true;
   try {
     const at = kigaliParts(now());

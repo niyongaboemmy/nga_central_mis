@@ -3,6 +3,7 @@ import { db } from "../../db";
 import { OfficeHourAssignment, OfficeHourSchedule, OfficeHourSession } from "../../db/officeHoursSchema";
 import { Subject } from "../../db/schema";
 import { kigaliInstant, kigaliParts, parseClock } from "../reminders/time";
+import { officeHoursReady } from "./common";
 
 /**
  * Office hours in the Reminder Hub (plan §13.3). Sessions the user hosts or is
@@ -27,7 +28,7 @@ export interface OfficeHourOccurrence {
 }
 
 export const loadOfficeHourOccurrences = async (userId: number, from: Date, to: Date): Promise<OfficeHourOccurrence[]> => {
-  if (process.env.OFFICE_HOURS_ENABLED === "false") return [];
+  if (!(await officeHoursReady())) return [];
   const fromYmd = kigaliParts(from).ymd;
   const toYmd = kigaliParts(to).ymd;
   const rows = await db

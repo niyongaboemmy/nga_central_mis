@@ -155,3 +155,25 @@ export const withDeadlockRetry = async <T>(fn: () => Promise<T>, attempts = 4): 
  * OFFICE_HOURS_MANAGE_OWN to the pilot teachers first).
  */
 export const officeHoursEnabled = () => process.env.OFFICE_HOURS_ENABLED !== "false";
+
+/**
+ * Deploy-before-migrate guard: until migration 102 has run, background paths
+ * (Reminder Hub planning, Home, the scheduler) skip office hours instead of
+ * failing. Checked once a minute; a "present" answer is cached for good.
+ */
+let tablesPresent: boolean | null = null;
+let checkedAt = 0;
+export const officeHoursReady = async (): Promise<boolean> => {
+  if (!officeHoursEnabled()) return false;
+  if (tablesPresent) return true;
+  if (tablesPresent === false && Date.now() - checkedAt < 60_000) return false;
+  try {
+    const { sql } = await import("drizzle-orm");
+    const rows = (await db.execute(sql`SELECT COUNT(*) AS n FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'OfficeHourSession'`)) as any;
+    tablesPresent = Number(rows?.[0]?.[0]?.n ?? 0) > 0;
+  } catch {
+    tablesPresent = false;
+  }
+  checkedAt = Date.now();
+  return tablesPresent;
+};
