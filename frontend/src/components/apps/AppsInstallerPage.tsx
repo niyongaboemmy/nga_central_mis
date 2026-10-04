@@ -177,6 +177,12 @@ export const AppsInstallerPage: React.FC = () => {
                     </a>
                   ))}
                   {offered[0] && <p className="px-1 text-xs text-white/80">{REQUIREMENTS[offered[0]]}</p>}
+                  {offered[0] === "macos" && (
+                    <p className="rounded-xl bg-white/10 px-3 py-2 text-xs text-white/85" data-testid="damaged-hint">
+                      Saw “NGA is damaged and can't be opened”? That was an earlier download: download again, or use the
+                      one-command install below.
+                    </p>
+                  )}
                   {!primary && (
                     <p className="rounded-2xl bg-white/15 p-4 text-sm backdrop-blur" role="status">
                       NGA Desktop runs on Windows and macOS computers. On this device, use the web apps below.
