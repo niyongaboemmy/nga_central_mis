@@ -4,8 +4,8 @@ import { ArrowLeft, BarChart3, BellRing, CheckCircle2, ChevronDown, Download, Ke
 import { API_BASE_URL } from "../../services/api";
 import { isNgaDesktop, ngaDesktopVersion } from "../../desktop/ngaDesktop";
 import { NGA_APPS, iconUrl, startUrl } from "./ngaApps";
+import { InstallGuide } from "./InstallGuide";
 import {
-  INSTALL_STEPS,
   OS_LABEL,
   REQUIREMENTS,
   detectOs,
@@ -73,7 +73,7 @@ export const AppsInstallerPage: React.FC = () => {
   const desktopVersion = ngaDesktopVersion();
   const [release, setRelease] = useState<DesktopRelease | null>(null);
   const [failed, setFailed] = useState(false);
-  const [showSteps, setShowSteps] = useState(false);
+  const [showSteps, setShowSteps] = useState(true);
   const stats = useDownloadStats();
 
   useEffect(() => {
@@ -201,7 +201,7 @@ export const AppsInstallerPage: React.FC = () => {
           </div>
         </section>
 
-        {/* After downloading */}
+        {/* How to install: download (one-time security step) or one command (no warning) */}
         {!inDesktop && primary && release?.version && (
           <section className={card}>
             <button
@@ -214,16 +214,9 @@ export const AppsInstallerPage: React.FC = () => {
               <ChevronDown className={`h-5 w-5 text-slate-400 transition ${showSteps ? "rotate-180" : ""}`} />
             </button>
             {showSteps && (
-              <ol className="mt-4 space-y-3">
-                {INSTALL_STEPS[stepsFor].map((step, i) => (
-                  <li key={step} className="flex gap-3 text-sm text-slate-600 dark:text-slate-300">
-                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-50 text-xs font-bold text-brand-700 dark:bg-brand-500/15 dark:text-brand-200">
-                      {i + 1}
-                    </span>
-                    {step}
-                  </li>
-                ))}
-              </ol>
+              <div className="mt-4">
+                <InstallGuide os={stepsFor} />
+              </div>
             )}
           </section>
         )}

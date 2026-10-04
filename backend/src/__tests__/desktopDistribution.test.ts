@@ -158,3 +158,17 @@ describe("NGA Desktop distribution", () => {
     expect(compareVersions("v0.2.0", "0.2.0")).toBe(0);
   });
 });
+
+describe("one-line installer routes", () => {
+  it("serve the current release's scripts as text, never cached", async () => {
+    publish("0.2.0");
+    const sh = await request(app).get("/desktop/install.sh");
+    expect(sh.status).toBe(200);
+    expect(sh.headers["content-type"]).toMatch(/text\/x-shellscript/);
+    expect(sh.headers["cache-control"]).toBe("no-store");
+    expect(sh.text).toContain('VERSION="0.2.0"');
+    const ps = await request(app).get("/desktop/install.ps1");
+    expect(ps.status).toBe(200);
+    expect(ps.text).toContain("$version = '0.2.0'");
+  });
+});

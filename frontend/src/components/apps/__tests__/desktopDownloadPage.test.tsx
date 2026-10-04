@@ -1,6 +1,6 @@
 // /apps: NGA Desktop download page (OS-aware, counted downloads, update hint).
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import AppsInstallerPage from "../AppsInstallerPage";
 import { detectOs, downloadUrl, formatSize, isNewer, primaryPlatform, webAppInstallFits } from "../desktopDownload";
@@ -123,6 +123,43 @@ describe("/apps: NGA Desktop download page", () => {
     expect(await screen.findByText(/You're using NGA Desktop 0.2.0/)).toBeInTheDocument();
     expect(await screen.findByText(/Version 0.3.0 is ready: open Settings → Updates/)).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /Download for/ })).toBeNull();
+  });
+
+  it("shows the one-time security step for this OS, with the button to click", async () => {
+    setDevice(UA.mac);
+    mockApi(release);
+    renderPage();
+    const guide = await screen.findByTestId("warning-guide-macos");
+    expect(within(guide).getByText("Open Anyway")).toBeInTheDocument();
+    expect(screen.getByText(/Privacy & Security, scroll down and click Open Anyway/)).toBeInTheDocument();
+  });
+
+  it("offers the no-warning one-command install, ready to copy", async () => {
+    setDevice(UA.win);
+    mockApi(release);
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
+    renderPage();
+    expect(await screen.findByTestId("warning-guide-windows")).toHaveTextContent("Run anyway");
+    fireEvent.click(screen.getByRole("tab", { name: /No warnings: one command/ }));
+    const cmd = screen.getByTestId("install-command");
+    expect(cmd.textContent).toMatch(/^irm .+\/desktop\/install\.ps1 \| iex$/);
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /Copy/ }));
+    });
+    expect(writeText).toHaveBeenCalledWith(cmd.textContent);
+    expect(screen.getByRole("button", { name: /Copied/ })).toBeInTheDocument();
+    expect(screen.getByText(/fingerprint \(SHA-256\) matches the published/)).toBeInTheDocument();
+  });
+
+  it("gives Mac users the Terminal command", async () => {
+    setDevice(UA.mac);
+    mockApi(release);
+    renderPage();
+    await screen.findByTestId("warning-guide-macos");
+    fireEvent.click(screen.getByRole("tab", { name: /No warnings: one command/ }));
+    expect(screen.getByTestId("install-command").textContent).toMatch(/^curl -fsSL .+\/desktop\/install\.sh \| sh$/);
+    expect(screen.getByText(/Open Terminal/)).toBeInTheDocument();
   });
 
   it("shows download stats to admins only", async () => {
