@@ -36,7 +36,7 @@
 | # | Rule | Memo text |
 |---|---|---|
 | **R1** | Office hours run **every weekday, 16:20–17:20, in the Academy Hall**. The time and place are fixed. | "take place daily from 4:20 PM to 5:20 PM in the Academy Hall" |
-| **R2** | **Every instructor holds office hours on two days a week**, each 16:20–17:20. | "Every instructor holds office hours two days each week" · "Set two office-hours days per week" |
+| **R2** | **Every instructor holds office hours on two days a week**, each 16:20–17:20. **Leadership decision (P1, 2026-10-04): teachers may choose 1, 2, 3 or more days**; two stays the suggested number. | "Every instructor holds office hours two days each week" · "Set two office-hours days per week" |
 | **R3** | The instructor **shares the days with all their students** and **sends them to the administration by 05 Oct 2026**. | §1 bullet 2 |
 | **R4** | The instructor **holds them as scheduled**. | §1 bullet 3 |
 | **R5** | To cancel, the instructor **tells students in advance** and **offers another time that week**. | §1 bullet 3 |
@@ -62,7 +62,7 @@ v1 was built from an earlier brief about *mandatory* office hours. Its central o
 
 | Topic | v1 | Policy (v2) |
 |---|---|---|
-| Central object | `OfficeHourSchedule`: title, purpose, room, capacity, date window, 1–5 days, any number per teacher | **Availability**: one per teacher per term, **exactly two days**, fixed time and place |
+| Central object | `OfficeHourSchedule`: title, purpose, room, capacity, date window, 1–5 days, any number per teacher | **Availability**: one per teacher per term, **1–5 days of the teacher's choice** (2 suggested), fixed time and place |
 | A session exists when… | …a schedule exists, which in practice meant a student group | …a declared day arrives, **always** |
 | Voluntary visits | "Add a student who came", inside a schedule | **Primary** register action |
 | Assigning | Build a schedule → draft → pick students → publish (3 screens, ~12 inputs) | **Assign** → who → which session and why (2 steps) |
@@ -115,7 +115,7 @@ Every row is a change of meaning, not of presentation. Keeping v1's tables would
 ### 4.1 Concepts
 
 ```
-OfficeHourPolicy         band 16:20–17:20 · location "Academy Hall" · days_per_teacher 2 · deadline
+OfficeHourPolicy         band 16:20–17:20 · location "Academy Hall" · min_days 1 · suggested_days 2 · deadline
 OfficeHourTeacher        one row per (term, teacher): status ACTIVE | EXEMPT, submitted_at
  └─ OfficeHourTeacherDay    weekday + effective_from / effective_to (history of day changes)
 OfficeHourSession        one per (teacher, date): SCHEDULED | HELD | CANCELLED · replaced_by_session_id
@@ -131,11 +131,11 @@ SchoolClosure            (kept) dates without office hours
 
 **Teacher days (R1–R4)**
 - An **instructor** is a user with `OFFICE_HOURS_MANAGE_OWN` who has at least one `TeacherSubjectAssignment` in the term's year. These are the people the declarations board expects.
-- A teacher declares exactly `days_per_teacher` distinct weekdays (Mon–Fri). The time and place come from the policy and are never entered.
+- A teacher declares **any number of distinct weekdays from `min_days` (default 1) to 5** (P1). `suggested_days` (default 2, from the memo) is shown as a gentle hint, never enforced. The time and place come from the policy and are never entered.
 - **First declaration:** the days take effect today if before the band, otherwise tomorrow. `submitted_at` is set.
 - **Change of days (P3):** takes effect from **next Monday**, so this week stays as students were told. Implementation: close the old rows (`effective_to = Sunday`) and open new ones. Future sessions on dropped days with no visits are deleted. WEEKLY assignments on a dropped day are listed in the same dialog (move to a kept day / release).
 - **Exempt:** leadership (MANAGE_ANY) can mark a teacher `EXEMPT` for the term (part-time, leave) with a note. Exempt teachers disappear from "missing".
-- Leadership can also **set days for a teacher**, for example from the Google Form responses already collected (§12 P9).
+- Leadership can also **set days for a teacher**, for example from the Google Form responses already collected (optional import, §12 P9).
 
 **Sessions (R4, R5)**
 - Created for every effective declared date that is not a closure. A sweep keeps 14 days ahead, and `ensureSessions` runs on every read and save. Unique key **(teacher_id, session_date)**.
@@ -184,7 +184,7 @@ Every task is a **direct manipulation** (tap, drag, swipe or toggle on a visual 
 
 | Who | Task | Interaction | Steps | Where it starts |
 |---|---|---|---|---|
-| Teacher | **Declare my two days** | Drop your two avatar tokens on the **Hall week board** | 2 drops (or 2 taps) → auto-confirm | First visit; Home tile; band "+ Pick your days"; daily reminder |
+| Teacher | **Declare my days** | Tap (or drag your avatar onto) the days you want on the **Hall week board** | 1 tap per day → autosaves | First visit; Home tile; band "+ Pick your days"; daily reminder |
 | Teacher | **Take attendance** | Tap avatar tiles to cycle status; tap visitor bubbles to add; **Finish** | 1 screen | Today hero card; band cell; 16:25 push |
 | Teacher | **Nobody came** | Long-press (or tap ⋯) on the Today card → "No one came" | 1 | Today hero card |
 | Teacher | **Assign students** | Tap student cards → drop them on a **session tile** (or tap it) → tap a **reason tile** | 2 screens | Assign button; register tile ⋯; Person 360; suggestion card |
@@ -217,7 +217,7 @@ Classic form fields (text inputs, selects, date pickers, labelled field grids, S
 | Cancel / reschedule form | **Drag the session tile** to another day | Can't hold it |
 | Settings form | **Policy card**: dual-thumb time band slider on a mini timeline, steppers, toggles, calendar popover chips | Leadership policy |
 | Closure date-range form | **Drag across days** on a month calendar | Closures |
-| File-upload form | **Drop zone** with an animated match preview | Google Form import |
+| File-upload form | **Drop zone** with an animated match preview | Google Form import (optional) |
 
 Text entry is limited to the **search pill** and the optional **one-line note**. Neither is required to finish any task.
 
@@ -276,10 +276,10 @@ Rules:
 
 ```
 ┌──────────────────────────────────────────────────────────────────────┐
-│  [hall line-art]  Pick your two office-hours days                    │
+│  [hall line-art]  Pick your office-hours days (school suggests 2)    │
 │                   16:20–17:20 · Academy Hall    Due Mon 5 Oct  ◔ 2d  │
 │                                                                      │
-│   Your tokens:  (🧑🏽‍🏫 Ms A)  (🧑🏽‍🏫 Ms A)      ← drag onto two days         │
+│   Tap a day to join it — your avatar appears there   ◉ 2 days ✓      │
 │                                                                      │
 │  ┌── Mon ──┐ ┌── Tue ──┐ ┌── Wed ──┐ ┌── Thu ──┐ ┌── Fri ──┐          │
 │  │ ◉◉◉◉◉   │ │ ◉◉◉◉◉◉◉ │ │ ◉◉◉     │ │ ◉◉◉◉◉◉  │ │ ◉◉      │ ← avatars│
@@ -290,9 +290,10 @@ Rules:
 ```
 
 - Each **day column** shows the teachers already on it as an overlapping **avatar stack** (tap to expand), plus a **load meter** in the sequential blue ramp, labelled with the count and "busy"/"quiet".
-- **Drag** a token onto a column. The token snaps in, the column lifts, and the meter grows with a `fill` animation. **Tap a column** does the same on touch and keyboard (Space/Enter), with arrow keys moving between columns.
-- After the **second** token lands, the board confirms itself: a 3-second undo bar ("Tue & Thu saved · Undo") and `Celebration`. There is no Save button.
-- **Changing days later:** the same board, with your tokens already placed. Drag one to another day, and a small inline banner says "From Mon 13 Oct". If weekly assignments sit on the dropped day, their student avatars float above the board with two drop targets: *Move to Thu* / *Release*.
+- **Tap a column** to join it: your avatar flies in and the meter grows with a `fill` animation. Tap again to leave. On desktop you can also **drag your avatar** from one column to another to swap a day. Keyboard: arrow keys move between columns, Space/Enter toggles.
+- **Any number of days, 1 to 5** (P1). A small counter chip reads "◉ 2 days ✓" at the suggested number and "School suggests 2" otherwise, as information, never a block. Removing your last day is refused with a gentle shake and "Keep at least one day".
+- **Autosave.** Each change saves after a short pause (quick multi-taps become one save). A toast confirms "Tue, Wed & Thu saved · Undo". There is no Save button. `Celebration` plays once, on the first declaration.
+- **Changing days later:** the same board, with your avatar already in your columns. Changes made mid-term show a small inline banner, "From Mon 13 Oct". If weekly assignments sit on a day you leave, their student avatars float above the board with two drop targets: *Move to <another of your days>* / *Release*.
 
 ### 6.5 Teacher hub (the only teacher page)
 
@@ -445,15 +446,15 @@ Counters animate when they change, and screen readers get a polite `aria-live` s
  │ [ Nudge all 5 ] │
  └────────────────┘
  MISSING:  ◉ ◉ ◉ ◉ ◉   (tap avatar → set days on a mini week board · exempt · nudge)
- COMPLIANCE   avatar · held ▮▮▮▮▯ 80% · on-day ▮▮▮▮▮ 100% · replaced ▮▮▯ 2/3   (sortable, meters)
- ⋯  Import Google Form (drop zone) · Download CSV
+ COMPLIANCE   avatar · days ◉◉◉ 3 · held ▮▮▮▮▯ 80% · on-day ▮▮▮▮▮ 100% · replaced ▮▮▯ 2/3   (sortable, meters)
+ ⋯  Import Google Form (optional, drop zone) · Download CSV
 ```
 
 - The declaration **progress ring** with **Nudge all** (bell + push), then a burst of "sent" ticks.
 - **Hall load** column chart in one sequential hue. The tooltip lists the teachers on that day; there is a Table view.
 - The **missing avatar wall**. Tapping an avatar opens a mini week board to **set days** for that teacher (the same drag interaction), plus *Exempt* and *Nudge*.
-- **Compliance list:** one card per teacher with three inline **meters** (held, on-day, replaced), sortable by tapping a meter header.
-- **Import:** drop the Google Form CSV. Rows animate into *Matched ✓* / *Needs a look* columns. Tap a "needs a look" row to pick the right teacher from avatar suggestions, then **Apply**.
+- **Compliance list:** one card per teacher with their **number of days** (dots) and three inline **meters** (held, on-day, replaced), sortable by tapping a header. A filter chip "Fewer than suggested" lists teachers below `suggested_days`, as information only.
+- **Import (optional, P9):** drop the Google Form CSV. Rows animate into *Matched ✓* / *Needs a look* columns. Tap a "needs a look" row to pick the right teacher from avatar suggestions, then **Apply**.
 
 **Follow-up: a board, not a list**
 
@@ -515,7 +516,7 @@ A single **filter row** sits above all charts: a period picker shown as segmente
 | `PhraseChips` | assignment note, acknowledgement note | Quick phrases + inline "✎ add your own" |
 | `StepperControl`, `SegmentedPills`, `TimeBandSlider`, `DateChip` | policy, period filter | Self-saving controls |
 | `RangeCalendar` | closures | Drag-to-select range |
-| `DropZone` | CSV import | Animated match preview |
+| `DropZone` | CSV import (optional) | Animated match preview |
 | `KpiTile` (+ sparkline) | hub, school, reports | Hero-number rules from dataviz |
 | `ChartCard` | reports, school | Title, legend, chart, Table view toggle, export |
 | `HallIllustration` | empty states, board header | Inline SVG, `currentColor`, theme-aware |
@@ -545,7 +546,8 @@ OfficeHourPolicy (                      -- one row, id = 1
   id TINYINT PK,
   band_start CHAR(5) DEFAULT '16:20', band_end CHAR(5) DEFAULT '17:20',
   location VARCHAR(100) DEFAULT 'Academy Hall',
-  days_per_teacher TINYINT DEFAULT 2,
+  min_days TINYINT DEFAULT 1,              -- P1: teacher chooses min_days..5
+  suggested_days TINYINT DEFAULT 2,        -- the memo's number, shown as a hint only
   declaration_deadline DATE NULL,        -- seeded 2026-10-05; leadership updates per term
   roster_cutoff_time CHAR(5) DEFAULT '14:00',
   register_edit_days TINYINT DEFAULT 2,
@@ -637,7 +639,7 @@ After v2 has run one week in production with no rollback, `10x_drop_office_hours
 | `common.ts` | Kept |
 | `policy.ts` | Replaces `settings.ts`. Read (60 s cache) and validated save of `OfficeHourPolicy`; `publicPolicy()` |
 | `access.ts` | Rewritten small: `actorOf`, `isInstructor(userId, yearId)`, `canRecord(session)` (teacher, substitute recorder, MANAGE_ANY), `readScopeOf` (kept from v1) |
-| `teacherDays.ts` | `getMyDays`, `saveMyDays` (first declaration vs change-from-next-Monday), `setDaysFor` (leadership), `setExempt`, `hallLoad(term, week)`, `importDays(csvRows, dryRun)` (P9), `effectiveDaysOn(date)` |
+| `teacherDays.ts` | `getMyDays`, `saveMyDays` (first declaration vs change-from-next-Monday), `setDaysFor` (leadership), `setExempt`, `hallLoad(term, week)`, `importDays(csvRows, dryRun)` (optional, P9), `effectiveDaysOn(date)` |
 | `sessions.ts` | `ensureSessions(teacherIds?, from, to)` (closure-aware, idempotent through the unique key), `sessionsFor(viewer, range)`, `cantHold(sessionId, {replacementDate} \| {reason}, message)` |
 | `assignments.ts` | `candidates(actor, query)` (teachable students + availability state: free / with you / assigned by X), `assign(actor, input)` (partial success: `assigned[]`, `blocked[]` with holder, `ineligible[]`), `release`, `askToRelease`, `completeForSession(sessionId)`, `suggestions` (moved from v1) |
 | `register.ts` | `openRegister` (snapshot assigned rows), `saveRegister(sessionId, rows, version)` (auto-absent, late flag, history, HELD, completes ONCE assignments, triggers escalation), `noOneCame`, `recentVisitors(teacherId)` |
@@ -679,7 +681,7 @@ After v2 has run one week in production with no rollback, `10x_drop_office_hours
 | POST | `/school/teachers/remind` | MANAGE_ANY | Remind missing |
 | PUT | `/school/teachers/:id/days` | MANAGE_ANY | Set days |
 | PUT | `/school/teachers/:id/exempt` | MANAGE_ANY | Exempt or restore |
-| POST | `/school/teachers/import?dry_run=1` | MANAGE_ANY | Google Form CSV → days |
+| POST | `/school/teachers/import?dry_run=1` | MANAGE_ANY | Google Form CSV → days (optional, P9) |
 | PUT | `/sessions/:id/recorder` | MANAGE_ANY | Substitute recorder |
 | GET | `/escalations` · POST `/escalations/:id/ack` | VIEW / MANAGE_ANY | Follow-up |
 | GET | `/reports/{summary,breakdown,consistency,compliance,declarations,daily}` · `/reports/students/:id` · `/reports/teachers/:id` | VIEW (scoped, summary depth = totals only); teachers see their own | Reports |
@@ -753,9 +755,9 @@ All mandatory notices go to the **bell + push** directly, whatever the user's Re
 
 | Event | Recipient | Text |
 |---|---|---|
-| Days declared | Teacher (toast); leadership digest | "Tuesdays & Thursdays, 16:20–17:20, Academy Hall — your students can see this now." |
+| Days declared | Teacher (toast); leadership digest | "Tue, Wed & Thu, 16:20–17:20, Academy Hall — your students can see this now." |
 | Days changed | Leadership (digest + Teachers view) | "Ms A: Tue & Thu → Mon & Thu from 13 Oct" |
-| Declaration missing | Missing instructors, daily | "Pick your two office-hours days — due Mon 5 Oct." |
+| Declaration missing | Missing instructors, daily | "Pick your office-hours days — due Mon 5 Oct." |
 | **Assigned** | Student | "Office hours with Ms A — Tue 7 Oct, 16:20–17:20, Academy Hall. Reason: Catch up on missed work." (+ message) |
 | Assigned weekly | Student | "Office hours with Ms A — every Tuesday until 4 Nov, 16:20–17:20, Academy Hall. Reason: …" |
 | Released | Student | "You no longer need to attend office hours with Ms A." |
@@ -811,15 +813,15 @@ The plan is built on the recommendation in each row. All are policy settings or 
 
 | # | Question | Recommendation |
 |---|---|---|
-| **P1** | Exactly two days, or "at least two"? | **Exactly two** (`days_per_teacher = 2`); leadership can exempt or set days for a teacher. |
+| **P1** ✅ | How many days does a teacher hold? | **Confirmed 2026-10-04: the teacher chooses 1, 2, 3 or more days** (`min_days = 1`, max 5). The memo's two is shown as a suggestion (`suggested_days = 2`). Leadership can still exempt or set days for a teacher. |
 | **P2** | Limit how many teachers share one weekday in the hall? | **No cap; show the load live** so teachers balance. Add a soft cap later if a day overflows. |
 | **P3** | May teachers change their days mid-term? | **Yes, effective next Monday**, leadership informed. Weekly assignments on a dropped day are moved or released in the same dialog. |
 | **P4** | Statuses | **Present / Absent** up front; **Late / Excused** under ⋯ (Tendo-compatible). |
-| **P5** | The reason is shown to the student (R9). Shown to parents too? | **Student: yes. Parents: only when an escalation reaches them.** |
-| **P6** | If the teacher records no register, are assigned students absent? | **No.** It is a missing register (teacher compliance). R11 applies when a register is recorded. |
+| **P5** ✅ | The reason is shown to the student (R9). Shown to parents too? | **Confirmed 2026-10-04: students see the reason; parents only when an escalation reaches them.** |
+| **P6** ✅ | If the teacher records no register, are assigned students absent? | **Confirmed 2026-10-04: no.** It is a missing register (teacher compliance). R11 applies when a register is recorded. |
 | **P7** | On replacement, notify all the teacher's students or only assigned ones? | **Only assigned students.** Everyone else sees the change in the directory and timetable. |
 | **P8** | Default assignment mode | **Once (next session)**; "Every week until…" one tap away (default 4 weeks). |
-| **P9** | Teachers already sent days through the **Google Form** by 05 Oct. | **Import the form's CSV** once (leadership: School → Teachers → Import), so nobody enters days twice. Teachers can still adjust. |
+| **P9** ✅ | Teachers already sent days through the **Google Form** by 05 Oct. | **Confirmed 2026-10-04: optional.** Built last (P4b) and skippable. When used, leadership drops the form's CSV once (School → Teachers → Import) so nobody enters days twice; teachers can still adjust. Without it, teachers declare their own days on the board. |
 | **P10** | Register edit window | **On the day** normally; the next day is accepted and flagged *late*; after 2 days only leadership. |
 | **P11** | Self check-in by QR (v1 feature) | **Not in v2.** Teachers record visits with quick-add. Revisit a single hall kiosk if typing proves slow. |
 | **P12** ✅ | Student motivation graphics (visit streak, "Regular visitor" badge) | **Confirmed 2026-10-04: yes.** Positive only: no rankings, no comparisons, never shown to other students. Leadership can switch them off in Policy. |
@@ -854,7 +856,7 @@ Each phase ends green: backend vitest on a private test-DB clone, frontend vites
 **P0 — Confirm (0.5 day)**
 - [ ] Leadership confirms P1–P11 (§12).
 - [ ] Owner runs the production checks in §16.1 (expected: all v1 tables empty).
-- [ ] Get the Google Form response export (columns: teacher email/name, days) for P9.
+- [ ] *(Optional, P9)* Get the Google Form response export (columns: teacher email/name, days) if the import will be built.
 - [ ] Re-check the next free migration number (103 expected) before merging.
 
 **P1 — Data and core services (3 days)**
@@ -871,8 +873,11 @@ Each phase ends green: backend vitest on a private test-DB clone, frontend vites
 - [ ] `/directory`, `/me`, `/children`, `StudentOfficeHours` (hero, can't-come tiles, journey), `HallDirectory`, student band and Home tile.
 
 **P4 — School view and reports (4 days)**
-- [ ] `metrics.ts`, `reports.ts` (+ trend, heatmap), the School view: HallFloor, TeachersBoard (+ ImportDrop, CSV), FollowUpBoard, chart-card Reports, PolicyCard + ClosureCalendar.
+- [ ] `metrics.ts`, `reports.ts` (+ trend, heatmap), the School view: HallFloor, TeachersBoard (+ CSV download), FollowUpBoard, chart-card Reports, PolicyCard + ClosureCalendar.
 - [ ] Escalation, digests, reminders and the scheduler jobs of §8.3.
+
+**P4b — Optional: Google Form import (0.5 day, P9)**
+- [ ] `importDays` + `POST /school/teachers/import`, `ImportDrop` in TeachersBoard. Skip entirely if leadership doesn't need it.
 
 **P5 — Integrations and docs (1 day)**
 - [ ] Reminder Hub occurrences, analytics catalog, NotificationBell kinds.
@@ -885,7 +890,7 @@ Each phase ends green: backend vitest on a private test-DB clone, frontend vites
 - [ ] Load check (40 teachers × a term of sessions, 50 visits a day) with report queries under 0.5 s.
 - [ ] Release per §16.2.
 
-**Total: about 17 working days.** The interactive design adds about 3.5 days over a form-based UI, mostly in the shared building blocks, which later screens reuse.
+**Total: about 17 working days, plus 0.5 day if the optional import (P4b) is built.** The interactive design adds about 3.5 days over a form-based UI, mostly in the shared building blocks, which later screens reuse.
 
 ---
 
@@ -893,16 +898,16 @@ Each phase ends green: backend vitest on a private test-DB clone, frontend vites
 
 ### 15.1 Backend (vitest + supertest, `src/__tests__/officeHoursV2*.test.ts`)
 
-- **Policy:** validation (band order, `days_per_teacher` 1–5, deadline date).
+- **Policy:** validation (band order, `min_days` 1–5, `suggested_days` 1–5, deadline date).
 - **Teacher days:**
-  - exactly N distinct days (1 or 3 → 400);
+  - 1 to 5 distinct days accepted; 0 days, duplicates, weekends or fewer than `min_days` → 400;
   - first save is effective today or tomorrow around the band;
   - a change is effective next Monday and keeps this week's sessions;
   - sessions on dropped days with visits are kept, those without are removed;
   - `affected_weekly` is listed;
   - exempt removes the teacher from "missing";
   - leadership set-days records `submitted_by`;
-  - CSV import dry-run writes nothing, matches by email, reports unknown teachers and bad day counts.
+  - *(optional P9)* CSV import dry-run writes nothing, matches by email, and reports unknown teachers and invalid days.
 - **Sessions:**
   - created for declared days only, none on closures;
   - two concurrent `ensureSessions` calls produce no duplicates;
@@ -948,8 +953,9 @@ Each phase ends green: backend vitest on a private test-DB clone, frontend vites
   - `ChartCard`: the Table view renders the same numbers as the chart;
   - every component renders with reduced motion.
 - **DayBoard:**
-  - the second token auto-confirms, and Undo restores;
-  - a third token is refused with a shake;
+  - tapping a day toggles it and autosaves after a short pause (one save for quick multi-taps); Undo restores the previous set;
+  - any count from 1 to 5 is accepted; removing the last day is refused with a shake and "Keep at least one day";
+  - the suggestion hint reads "✓ 2 days" at the suggested number and "School suggests 2" otherwise, without blocking;
   - a change shows "From Mon …" and floats affected weekly students with *Move* / *Release* targets.
 - **TeacherHub:**
   - first-run vs declared states;
@@ -979,7 +985,7 @@ Each phase ends green: backend vitest on a private test-DB clone, frontend vites
 - **School:**
   - HallFloor counters update from a refetch without a skeleton flash;
   - TeachersBoard: Nudge all, a missing avatar opens the mini board, and the compliance meters sort;
-  - ImportDrop: a dropped CSV animates into Matched / Needs a look;
+  - *(optional P9)* ImportDrop: a dropped CSV animates into Matched / Needs a look;
   - FollowUpBoard: drag or button to Acknowledged asks for a note chip;
   - PolicyCard controls self-save with undo;
   - ClosureCalendar: drag-select shows the affected-sessions count.
@@ -995,7 +1001,7 @@ Each phase ends green: backend vitest on a private test-DB clone, frontend vites
 5. At the session, A adds 2 visitors, marks X present and saves. X's lock is freed, so B can now assign X.
 6. A assigns Y for Thu, then *Can't hold Thu → Fri*. Y is told and the Fri session exists.
 7. On a session where nobody came, A taps "No one came" and the session is HELD.
-8. Leadership checks Teachers (A declared, C missing → remind; import CSV for C), then Today, Follow-up and Reports (the assigned/voluntary split), and exports CSV.
+8. Leadership checks Teachers (A declared, C missing → remind; leadership sets C's days on the mini board), then Today, Follow-up and Reports (the assigned/voluntary split), and exports CSV.
 9. Axe AA with no horizontal overflow in light and dark at 390, 768 and 1366 px on the teacher hub, register, student page and School view.
 
 ---
@@ -1019,7 +1025,7 @@ All counts except closures are expected to be 0. If any are not, stop and export
 1. Merge the MIS PR.
 2. Back up and apply 103 through `migrate.yml`; it takes a mysqldump first.
 3. The MIS deploy runs automatically on merge. The 503 guard covers the gap if the deploy lands before the migration.
-4. Leadership sets `declaration_deadline` and imports the Google Form CSV (P9).
+4. Leadership sets `declaration_deadline` (and, if P9 was built, imports the Google Form CSV).
 5. Merge the Tendo PR.
 6. Announce to staff with the one-page teacher guide.
 7. One week later, run the v1 drop migration.
@@ -1032,10 +1038,10 @@ All counts except closures are expected to be 0. If any are not, stop and export
 | Typing visitors at 16:20 is slow | Focused quick-add with Enter, recent-visitor chips, keyboard flow; kiosk later (P11) |
 | Same-day register too strict (network, power) | Offline queue; late saves accepted and flagged, not blocked; leadership can correct |
 | Showing reasons to students feels stigmatising | Student-friendly reason wording only; no marks or scores in the text; parents excluded unless escalated (P5) |
-| Teachers already used the Google Form | CSV import (P9) so nobody re-enters days |
+| Teachers already used the Google Form | Declaring on the board takes seconds; the optional CSV import (P9) avoids re-entry if leadership wants it |
 | Cached PWA still calls removed v1 endpoints | Service-worker cache bump on release; old URLs redirect to `/office-hours` |
 | Tendo lane breaks on the new shape | `/me` and `/sessions` keep compatible fields; Tendo PR ships in the same release; lane test updated |
-| Drag-and-drop is unfamiliar or hard on old phones | Every drag has a tap-tap and keyboard path; first-use coach marks ("Drag your tokens onto two days"); 6 px drag threshold so scrolling still works |
+| Drag-and-drop is unfamiliar or hard on old phones | Every drag has a tap-tap and keyboard path; first-use coach marks ("Tap the days you'll be in the hall"); 6 px drag threshold so scrolling still works |
 | Rich graphics slow low-end devices | recharts and celebration lazy-loaded; SVG rings, not canvas; virtualised visitor bubbles; reduced-motion path; load check on a mid-range Android in P6 |
 | The v1 code path is needed back | 103 only renames v1 tables; drop only after one clean week |
 
