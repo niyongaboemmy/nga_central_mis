@@ -85,6 +85,7 @@ describe("/apps: NGA Desktop download page", () => {
     expect(within(box).getByRole("link", { name: /^Windows$/ })).toBeInTheDocument();
     expect(within(box).getByText("Downloaded 1,234 times")).toBeInTheDocument();
     expect(screen.getByText("How to install on macOS")).toBeInTheDocument();
+    expect(screen.getByTestId("damaged-hint")).toHaveTextContent("download again");
   });
 
   it("on Windows, offers the Windows installer (and the MSI for IT)", async () => {
