@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Check, Copy, Download, ShieldCheck, Terminal } from "lucide-react";
+import { Check, Copy, Download, Settings, ShieldCheck, Terminal } from "lucide-react";
 import { INSTALL_STEPS, installCommand } from "./desktopDownload";
 
 /**
@@ -105,15 +105,17 @@ const CommandInstall: React.FC<{ os: "macos" | "windows" }> = ({ os }) => {
   );
 };
 
+/** macOS System Settings → Privacy & Security (where "Open Anyway" is). */
+export const PRIVACY_SETTINGS_URL = "x-apple.systempreferences:com.apple.preference.security";
+
 /** A simplified picture of macOS's first-open dialog and where Open Anyway is. */
 const MacWarning: React.FC = () => (
   <div className="space-y-2" data-testid="warning-guide-macos">
     <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800">
       <p className="text-sm font-semibold text-slate-900 dark:text-white">“NGA” Not Opened</p>
       <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Apple could not verify “NGA” is free of malware…</p>
-      <div className="mt-3 flex justify-end gap-2 text-xs font-semibold">
-        <span className="rounded-md bg-slate-100 px-3 py-1 text-slate-500 dark:bg-slate-700 dark:text-slate-300">Move to Trash</span>
-        <span className="rounded-md bg-brand-600 px-3 py-1 text-white ring-4 ring-brand-200 dark:ring-brand-500/30">Done</span>
+      <div className="mt-3 text-xs font-semibold">
+        <span className="block rounded-md bg-brand-600 px-3 py-1 text-center text-white ring-4 ring-brand-200 dark:ring-brand-500/30">Done</span>
       </div>
     </div>
     <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800">
@@ -125,6 +127,13 @@ const MacWarning: React.FC = () => (
         </span>
       </div>
     </div>
+    {/* Opens System Settings at Privacy & Security (macOS asks once to allow the link). */}
+    <a
+      href={PRIVACY_SETTINGS_URL}
+      className="flex w-full items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100"
+    >
+      <Settings className="h-4 w-4" /> Open Privacy &amp; Security
+    </a>
   </div>
 );
 
