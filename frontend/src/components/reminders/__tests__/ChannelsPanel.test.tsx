@@ -77,6 +77,49 @@ describe("ChannelsPanel", () => {
     expect(screen.getByRole("link", { name: "Open again" })).toHaveAttribute("href", "https://t.me/nga_bot?start=abc");
   });
 
+  it("in NGA Desktop, opens Google in the browser and waits for the connection", async () => {
+    api.googleConnectUrl.mockResolvedValue({ url: "https://accounts.google.com/o/oauth2/v2/auth?x=1" });
+    const open = vi.spyOn(window, "open").mockReturnValue(null);
+    const ua = vi.spyOn(navigator, "userAgent", "get").mockReturnValue("Mozilla/5.0 Safari/605.1.15 NGADesktop/0.2.0");
+    vi.useFakeTimers();
+    try {
+      const { onChanged } = renderPanel();
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: /Connect Google Calendar/ }));
+      });
+      expect(open).toHaveBeenCalledWith("https://accounts.google.com/o/oauth2/v2/auth?x=1", "_blank", "noopener");
+      expect(screen.getByText(/Finish in your browser/)).toBeInTheDocument();
+      // Not stuck on "Opening Google…": the page stayed, so the button is usable again.
+      expect(screen.getByRole("button", { name: /Connect Google Calendar/ })).not.toBeDisabled();
+      act(() => {
+        vi.advanceTimersByTime(4000);
+      });
+      expect(onChanged).toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+      ua.mockRestore();
+      open.mockRestore();
+    }
+  });
+
+  it("in a browser, goes to Google in the same tab", async () => {
+    api.googleConnectUrl.mockResolvedValue({ url: "https://accounts.google.com/o/oauth2/v2/auth?x=2" });
+    const open = vi.spyOn(window, "open").mockReturnValue(null);
+    const assign = vi.fn();
+    const loc = vi.spyOn(window, "location", "get").mockReturnValue({ ...window.location, assign } as unknown as Location);
+    try {
+      renderPanel();
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: /Connect Google Calendar/ }));
+      });
+      expect(assign).toHaveBeenCalledWith("https://accounts.google.com/o/oauth2/v2/auth?x=2");
+      expect(open).not.toHaveBeenCalled();
+    } finally {
+      loc.mockRestore();
+      open.mockRestore();
+    }
+  });
+
   it("shows a linked chat, its switch, and disconnects only after confirming", async () => {
     confirm.mockResolvedValue(true);
     api.telegramUnlink.mockResolvedValue({ removed: true });
