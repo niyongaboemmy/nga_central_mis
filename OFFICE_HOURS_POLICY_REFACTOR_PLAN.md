@@ -180,16 +180,16 @@ SchoolClosure            (kept) dates without office hours
 
 ## 5. Workflows, designed for few steps
 
-Every task is a **direct manipulation** (tap, drag, swipe or toggle on a visual object), not a form to fill in. "Steps" counts the deliberate actions a user takes.
+Every task is a **direct manipulation** of a visual object, not a form to fill in. **Every action is a visible tap target first.** Drag, swipe and long-press are only *shortcuts* for the same action (§6.12). "Steps" counts the deliberate actions a user takes.
 
 | Who | Task | Interaction | Steps | Where it starts |
 |---|---|---|---|---|
 | Teacher | **Declare my days** | Tap (or drag your avatar onto) the days you want on the **Hall week board** | 1 tap per day → autosaves | First visit; Home tile; band "+ Pick your days"; daily reminder |
-| Teacher | **Take attendance** | Tap avatar tiles to cycle status; tap visitor bubbles to add; **Finish** | 1 screen | Today hero card; band cell; 16:25 push |
-| Teacher | **Nobody came** | Long-press (or tap ⋯) on the Today card → "No one came" | 1 | Today hero card |
+| Teacher | **Take attendance** | **Tap who's here** (assigned tiles and visitor bubbles); everyone assigned and not tapped is absent at **Finish** | 1 screen | Today hero card; band cell; 16:25 push |
+| Teacher | **Nobody came** | Visible **No one came** button on the Today card (shown when nobody is assigned) or on the Finish bar | 1 | Today hero card; register |
 | Teacher | **Assign students** | Tap student cards → drop them on a **session tile** (or tap it) → tap a **reason tile** | 2 screens | Assign button; register tile ⋯; Person 360; suggestion card |
-| Teacher | **Can't hold a session** | **Drag the session tile** to another day of the same week, or onto the "Can't replace" tray | 1 drag | Week strip; Today ⋯ |
-| Teacher | **Release a student** | Swipe the assigned card left (or tap ✕), with an undo toast | 1 | Assigned avatar strip |
+| Teacher | **Can't hold a session** | Tap **Can't hold** on the session tile → tap a day tile of the same week (or a reason tile). Desktop shortcut: drag the tile | 2 taps | Week strip; Today ⋯ |
+| Teacher | **Release a student** | Tap ✕ on the assigned card (swipe left is a shortcut on phones), with Undo | 1 | Assigned avatar strip |
 | Teacher | **Resolve a block** | Tap the holder's avatar badge on the blocked card → Message / Ask to release | 1 | Inline on the card |
 | Student | **See who's in the hall** | Glance at the week board; tap an avatar for details | 0 | My office hours; band; Home |
 | Student | **See my assignment** | Countdown hero card | 0 | Notice; page; band |
@@ -208,13 +208,13 @@ Classic form fields (text inputs, selects, date pickers, labelled field grids, S
 
 | Instead of… | We use… | Example |
 |---|---|---|
-| Day checkboxes / multi-select | **Draggable avatar tokens on a week board** (tap fallback) | Declaring days |
+| Day checkboxes / multi-select | **Tap-to-join day columns on a week board** (avatar flies in; drag is a desktop shortcut) | Declaring days |
 | Student dropdown / search form | **Student card grid** with photos, availability rings and tap-to-select; one floating search pill that filters as you type | Assigning |
 | Date picker | **Session tiles** on a horizontal week strip | Choosing which session |
 | Reason select | **Icon tiles** (big, illustrated, single tap) | Assignment reason, "I can't come", "can't replace" reason |
 | Free-text message box | **Quick-phrase chips** ("Bring your exercise book", "Bring your laptop") + an optional one-line "✎ add your own" that expands in place | Assignment message |
-| Status radio buttons | **Tap-to-cycle avatar tiles** with an animated ring (and swipe on phones) | Register |
-| Cancel / reschedule form | **Drag the session tile** to another day | Can't hold it |
+| Status radio buttons | **Tap who's here** on avatar tiles (ring fills ✓); the rest are absent at Finish; ⋯ on a tile for Late / Excused | Register |
+| Cancel / reschedule form | **Can't hold** on the session tile → day tiles of the same week (drag as a shortcut) | Can't hold it |
 | Settings form | **Policy card**: dual-thumb time band slider on a mini timeline, steppers, toggles, calendar popover chips | Leadership policy |
 | Closure date-range form | **Drag across days** on a month calendar | Closures |
 | File-upload form | **Drop zone** with an animated match preview | Google Form import (optional) |
@@ -317,9 +317,9 @@ Rules:
 └──────────────────────────────────────────────────────────────────────┘
 ```
 
-- **Today hero card.** A countdown ring before 16:20, a pulsing "In session" ring between 16:20 and 17:20, and a green ✓ "Recorded" afterwards. The assigned students show as an avatar stack with their "I can't come" badges. The primary button changes with time: *Take attendance* → *Finish register* → *Edit*.
-- **Week strip.** Your session tiles show an assigned-count badge. **Dragging a tile** reveals glowing drop zones on the other days of the *same week* only, plus a **"Can't replace"** tray. Dropping on a day shows a one-line confirm toast: "3 students will move to Wed · Confirm". Dropping on the tray opens a row of reason tiles (*Sick* · *Official duty* · *School event* · *Other*). A tap fallback is available under ⋯.
-- **Assigned strip.** Horizontal avatar cards (name, day, reason icon), swipe left to release, tap to open a mini profile with their visit history sparkline.
+- **Today hero card.** When nobody is assigned, a visible secondary **No one came** button sits beside *Take attendance*. A countdown ring before 16:20, a pulsing "In session" ring between 16:20 and 17:20, and a green ✓ "Recorded" afterwards. The assigned students show as an avatar stack with their "I can't come" badges. The primary button changes with time: *Take attendance* → *Finish register* → *Edit*.
+- **Week strip.** Each session tile shows an assigned-count badge and a visible **Can't hold** action. Tapping it opens a bottom sheet (popover on desktop) with the **other days of the same week** as day tiles (with hall load and "your day" marks), plus reason tiles for *Can't replace* (*Sick* · *Official duty* · *School event* · *Other*). **The change applies at once, with Undo.** Students are notified only when the 10-second undo window closes (§8.1 outbox). On desktop the tile can also be **dragged** onto a glowing same-week day or the *Can't replace* tray, as a shortcut for the same action.
+- **Assigned strip.** Horizontal avatar cards (name, day, reason icon) with a visible ✕ **Release** (swipe left is a phone shortcut) and Undo. Tapping a card opens a mini profile with their visit-history sparkline.
 - **Attention chips** (only when relevant): "⚠ Register missing · Thu 2 Oct → Record" and "↔ Mr K asks for Grace". Each opens in place.
 - **Insights row.** Three KPI tiles: visits this term with a sparkline, on-day registers as a ring with a streak flame, and the assigned attendance ring. Below them, an 8-week **stacked column** chart of assigned and voluntary visits, with direct labels on the last week and a Table view toggle.
 
@@ -369,7 +369,7 @@ Rules:
 - **⟳ Every week** is a toggle chip. Turning it on expands a tiny **duration slider** (1–8 weeks, with the end date shown as you slide).
 - **Reason tiles** are large icon cards (lucide icons), single-select with a `check` animation. *Other* shows the one-line note.
 - The **live preview** updates on every tap and looks like the phone notification the student will get.
-- The result animates per student: cards that were assigned turn green ✓, and any card blocked in the meantime shakes and stays with its actions.
+- The result animates per student: cards that were assigned turn green ✓, and any card blocked in the meantime shakes and stays with its actions. The toast reads **"2 assigned · Undo"**. Students' notices leave only after the 10-second undo window (outbox), so a mistaken assignment never reaches a phone.
 
 ### 6.7 Register: tap tiles, not rows (drawer, full screen on phones)
 
@@ -378,24 +378,24 @@ Rules:
  ┌─────────────────────────────────────────────────────────────────────┐
  │ ASSIGNED                                                (All ✓)     │
  │  ┌─────┐  ┌─────┐  ┌─────┐                                          │
- │  │◉✓   │  │◉✕   │  │◉ ?  │   tap: ? → ✓ Present → ✕ Absent → ?     │
- │  │Aline│  │Eric │  │Ivan │   long-press / ⋯: Late ⏱ · Excused ☂      │
+ │  │◉✓   │  │◉    │  │◉    │   tap = here ✓ (tap again = undo)       │
+ │  │Aline│  │Eric │  │Ivan │   ⋯ on tile: Late ⏱ · Excused ☂ · Absent │
  │  └─────┘  └─────┘  └☂────┘   ☂ badge = "I can't come" notice         │
  ├─────────────────────────────────────────────────────────────────────┤
  │ VISITORS   (🔍 type a name…)    Recent: (◉Jean)(◉Grace)(◉Paul) + tap   │
  │  ◉Jean ✓  ◉Grace ✓  ◉Sam ✓  …   (orange ring = voluntary)            │
  └─────────────────────────────────────────────────────────────────────┘
   ┌─────────────────────────────────────────────────────────────────────┐
-  │ ◕ 1 present · 1 absent · 1 → absent · 9 visitors   [ Finish ✓ ]     │
+  │ ◕ 1 here · 2 not here → absent · 9 visitors          [ Finish ✓ ]   │
   └─────────────────────────────────────────────────────────────────────┘
 ```
 
-- **Assigned tiles** are big avatar tiles. **Tap** cycles the status, and the ring fills green ✓ or red ✕ with `check`. On phones, **swipe right = present, swipe left = absent**. **Long-press** (or ⋯) opens a radial mini-menu: Late ⏱ / Excused ☂.
+- **Assigned tiles: tap who's here.** Tapping a tile marks the student **here** (green ring ✓ with `check` and a light haptic tick where supported). Tap again to undo. Anyone not tapped is **absent at Finish** (R11), so the teacher only touches the students in front of them. A visible **⋯** on each tile offers *Late ⏱*, *Excused ☂* (pre-selected when the student sent "I can't come") or an explicit *Absent*. Swipe right is a phone shortcut for "here". There is no tap-cycling, so a status can't be reached by accident.
 - A **progress ring** in the header fills as students are marked.
 - **Visitors.** Recent-visitor **bubbles** add with one tap. Search results appear as avatar bubbles too (no list rows); Enter adds the first. Visitors wear the **orange** voluntary ring, and tapping a visitor removes them, with undo.
 - **Finish** bar: a live summary with the "→ absent" count. Finishing plays a short tick-burst. A perfect on-day week triggers `Celebration` once.
 - **No one came:** with no assigned students and no visitors, the Finish button reads *"No one came · Finish"*.
-- Keyboard: arrows move between tiles, 1/2/3/4 set statuses, `/` focuses search, ⌘↵ finishes. Works offline (queue), with an "Offline · will send" chip.
+- Keyboard: arrows move between tiles, Space toggles here, 1/2/3/4 set Present/Absent/Late/Excused, `/` focuses search, ⌘↵ finishes. Works offline (queue), with an "Offline · will send" chip.
 
 ### 6.8 Student: My office hours
 
@@ -467,7 +467,7 @@ Counters animate when they change, and screen readers get a polite `aria-live` s
  └──────────────┘      └──────────────┘
 ```
 
-Each card shows an absence-history dot strip (✓/✕ per assigned session). **Drag to Acknowledged** (or tap ✓) to add a note chip ("Met with student", "Parent called", "✎ other"). The *Refer* button opens the prefilled Tendo discipline form, and *Assign* opens the Assign drawer for that student.
+Each card shows an absence-history dot strip (✓/✕ per assigned session). Tap the visible **✓ Acknowledge** on a card (dragging it to the column is a desktop shortcut) to add a note chip ("Met with student", "Parent called", "✎ other"). The *Refer* button opens the prefilled Tendo discipline form, and *Assign* opens the Assign drawer for that student.
 
 **Reports: chart cards, each with a Table view**
 
@@ -488,7 +488,7 @@ A single **filter row** sits above all charts: a period picker shown as segmente
 - **Time band:** a dual-thumb slider on a mini day timeline (15:00–18:00). It is locked by default with a 🔒 toggle, because the policy fixes 16:20–17:20.
 - **Days per teacher:** a stepper (− 2 +). **Deadline:** a date chip opening a calendar popover. **Edit window, escalation thresholds:** steppers. **Parent notifications:** segmented pills (Off · Escalations · Weekly).
 - Each control saves itself on change (optimistic, with a "Saved ✓" micro-toast and undo).
-- **Closures:** a month calendar where leadership **drags across days** to create a closure. A popover then asks for a label chip (*Holiday* · *Exams* · *Event* · ✎) and shows "4 sessions affected" before confirming.
+- **Closures:** a month calendar where leadership **taps a start day and an end day** (or drags across days as a shortcut) to create a closure. Because this cancels many sessions at once, it is the one place that keeps an explicit confirm step. A popover then asks for a label chip (*Holiday* · *Exams* · *Event* · ✎) and shows "4 sessions affected" before confirming.
 
 ### 6.10 Accessibility and fallbacks (non-negotiable)
 
@@ -528,6 +528,40 @@ A single **filter row** sits above all charts: a period picker shown as segmente
 - 8-week assigned/voluntary series and the on-day streak (`/hub`);
 - visit streak and badge flags (`/me`);
 - trend and heatmap series (`/reports/trend`, `/reports/heatmap`).
+
+### 6.12 Modern-app UX check (what every screen must pass)
+
+This section checks the design against the conventions users already know from modern apps (Material 3, Apple HIG, the Laws of UX, WCAG 2.2 AA). It also records what this revision changed to comply. Every PR in P2–P4 is reviewed against this table.
+
+| Principle | What it means here | How the design meets it |
+|---|---|---|
+| **Visible first, gestures accelerate** (HIG, Material) | No action may exist only as a drag, swipe or long-press | Every drag/swipe/long-press has a visible button: *Can't hold*, ✕ Release, ✓ Acknowledge, ⋯ on register tiles, No one came. *Changed in this revision:* removed long-press-only and drag-only paths |
+| **Undo over confirm** (Material, Nielsen #3) | Act immediately and let the user take it back; confirm only for bulk, high-impact actions | Days, assignments, releases, replacements, acknowledgements and policy changes apply at once with **Undo**. Notifications wait in an outbox until the 10 s undo window closes (§8.1). Only closures (many sessions cancelled) keep a confirm step |
+| **Recognition over recall** (Nielsen #6) | Show, don't make users remember | Photos/avatars, recent visitors, suggested students, quick-phrase chips, session tiles with dates, live notice preview, the hall board showing who's where |
+| **Hick's law** | Few choices per moment | One primary action per screen (Take attendance / Assign / Finish). At most 6 reason tiles. Rare options behind ⋯ |
+| **Fitts's law and thumb zone** | Big, reachable targets | Tiles ≥ 64 px, controls ≥ 44 px (WCAG 2.5.8 needs 24 px). On phones the primary action sits in the bottom bar within thumb reach, respecting safe-area insets |
+| **Doherty threshold** | Feedback under 100 ms, completion under 400 ms | Optimistic UI on every tap. Server targets p95 < 300 ms for `/hub` and register saves. Interaction to Next Paint (INP) < 200 ms on a mid-range Android |
+| **Visibility of system status** (Nielsen #1) | Users always know what's happening | "Saved ✓ 16:41", "Offline · will send", a countdown ring, a live pulse during the band, a progress ring while marking, sending ticks after Nudge. Screen readers hear `aria-live` status messages (WCAG 4.1.3) |
+| **Error prevention** (Nielsen #5) | Impossible choices aren't offered | Only same-week days for a replacement; blocked students shown, not hidden; the last day can't be removed; the register opens only from 16:05 |
+| **Jakob's law and consistency** | Behave like apps people already use, and like the rest of MIS | Bottom sheets on phones and side drawers on desktop; the standard MIS shell (sidebar, academic period selector, bell); the same tile/ring components on every screen; Assigned blue and Voluntary orange everywhere |
+| **Progressive disclosure** | Simple first, detail on demand | Late/Excused, history, reports and policy all sit one tap deeper. First visit shows only the day board |
+| **Discoverable gestures** | Users learn shortcuts without being blocked | One-time coach marks ("Tap who's here", "Tip: drag a session to move it"), dismissible and remembered per user |
+| **Forgiving input and no redundant entry** (WCAG 3.3.7) | Never ask twice | Autosave, offline register queue, last-used reason and phrase pre-highlighted, students' "I can't come" pre-fills Excused, weekly assignments repeat automatically |
+| **Accessibility, WCAG 2.2 AA** | Usable by everyone | 2.5.7 a single-pointer alternative to every drag; 2.4.11 focus never hidden under sticky bars (`scroll-padding`); 1.4.1 icons + labels with colour; 2.3.3 reduced motion; contrast checked; keyboard maps for board and register; axe in CI e2e |
+| **Mobile-first PWA** | Teachers use phones in the hall | Designed at 390 px first. Installable, push notifications, offline register, light haptics on marking (off with reduced motion), pull-to-refresh on hub and hall floor |
+| **Calm, purposeful motion** | Motion explains change, never decorates | Named motions from `design/motion.ts` (≤ 320 ms). `Celebration` only on milestones (first declaration, perfect week), **never during the register** |
+| **Plain, friendly content** | Short, human copy | Sentence case, verbs on buttons ("Assign 2", "Finish"), Kigali-style dates ("Tue 7 Oct"), one help line per screen. All strings live in one `copy.ts` so French/Kinyarwanda can be added later |
+| **Helpful empty and error states** | Never a dead end | Hall illustration + one action ("Pick your days"). Errors say what to do ("Mr K already assigned Grace — ask to release"), never codes |
+| **Dark mode designed, not inverted** | Comfortable at night | Own dark tokens (§6.3), validated chart colours, photos with a subtle ring so they don't glow |
+| **Performance budget** | Fast on school Wi-Fi | Office-hours route chunk ≤ 150 KB gzip before recharts; recharts + celebration lazy-loaded; avatars lazy with initials fallback; LCP < 2.5 s on a mid-range Android; skeleton only on first load |
+| **Privacy by design in UI** | Show only what each viewer needs | The directory has no student data; the initials-only toggle for projected screens; reasons hidden from parents unless escalated (P5); badges never compared |
+
+**Usability validation (added to P2 and P3).** Before the screens are wired to real data, run the clickable building blocks with 3 teachers and 3 students:
+- a 5-second test of the hub ("what do you do next?");
+- task success for declare / assign / take attendance / can't hold, with a target of ≥ 90% unaided and each task under 30 s;
+- a quick System Usability Scale (SUS) questionnaire, aiming for ≥ 80.
+
+Fix anything that fails before P4.
 
 ---
 
@@ -618,6 +652,11 @@ OfficeHourEscalation (escalation_id PK AI, academic_term_id, student_id, assignm
   level TINYINT, trigger_code VARCHAR(20), trigger_session_id, notified_user_ids TEXT,
   created_at, acknowledged_by NULL, acknowledged_at NULL, resolution_note VARCHAR(500) NULL)
 
+OfficeHourOutbox (                                     -- notices wait out the undo window
+  outbox_id BIGINT PK AI, event VARCHAR(40), subject_key VARCHAR(80),   -- e.g. 'assignment:812'
+  payload JSON, send_after DATETIME, sent_at DATETIME NULL, cancelled_at DATETIME NULL,
+  INDEX (send_after, sent_at, cancelled_at))
+
 OfficeHourAbsenceNotice (notice_id PK AI, session_id, student_id, reason VARCHAR(30),
   note VARCHAR(255) NULL, created_at,  UNIQUE (session_id, student_id))
 ```
@@ -647,7 +686,7 @@ After v2 has run one week in production with no rollback, `10x_drop_office_hours
 | `metrics.ts` | One place for formulas: assigned attendance rate, presence rate, voluntary visits, unique visitors, consistency band, teacher compliance |
 | `reports.ts` | Scoped datasets on the period engine: summary, breakdown (teacher / subject / class / grade / weekday / reason), consistency, student 360, teacher 360, declarations, compliance, daily sheet |
 | `escalation.ts` | Kept logic, re-pointed to `OfficeHourVisit` (assigned only) |
-| `notify.ts` / `events.ts` | Event texts of §10; same delivery helper |
+| `notify.ts` / `events.ts` / **`outbox.ts`** | Event texts of §10; same delivery helper. Student-facing notices for undoable actions (assign, release, replace, not-replaced) are written to `OfficeHourOutbox` with `send_after = now + 10 s`. `undo` cancels the action and its outbox rows in one transaction. A 5-second scheduler tick delivers due rows exactly once |
 | `digests.ts` | Friday teacher digest (week's visits, missing registers), leadership digest (declarations, compliance, follow-ups), parent summary if `WEEKLY` |
 | `reminders.ts` | Reminder Hub occurrences: teachers' own days; students' assigned sessions |
 | `scheduler.ts` | Jobs in §8.3 |
@@ -666,6 +705,7 @@ After v2 has run one week in production with no rollback, `10x_drop_office_hours
 | GET | `/suggestions` | MANAGE_OWN | Evidence-based list |
 | POST | `/assignments` | MANAGE_OWN / MANAGE_ANY (`teacher_id`) | `{ student_ids, mode, session_id \| weekly_days+ends_on, reason_code, message }` |
 | POST | `/assignments/:id/release` | assigner, teacher, MANAGE_ANY | Frees the lock |
+| POST | `/undo/:token` | the actor who made the change, within 10 s | Reverses an assignment batch, release, replacement or acknowledgement; cancels its outbox notices. Tokens come back in each undoable response |
 | POST | `/assignments/:id/ask-release` | MANAGE_OWN | Bell notice to the holder |
 | GET | `/sessions?from=&to=` | auth (scoped) | Sessions for the viewer. **Tendo contract** (§13) |
 | POST | `/sessions/:id/cant-hold` | recorder / MANAGE_ANY | Replace or not-replaced |
@@ -697,6 +737,7 @@ The route-level `officeHoursReady()` guard (503 before migration) and the kill s
 
 | Job | When | What |
 |---|---|---|
+| Outbox delivery | every 5 s | Send due, uncancelled notices (idempotent per `outbox_id`) |
 | Ensure sessions | every 6 h | 14 days ahead for every ACTIVE teacher |
 | Declaration reminder | 07:30 weekdays, until all declared | Bell + push to missing instructors. Leadership summary on deadline day and the day after |
 | Morning note | 06:30 on a teacher's day | "Office hours today 16:20 · Academy Hall · 3 assigned" |
@@ -727,10 +768,11 @@ Scope uses `resolveUserScope`, as in v1 (class teacher → class, programme lead
 | `components/officeHours/ui/*` | new | The interactive building blocks of §6.11 (Avatar, StatusRing, CountdownRing, WeekBoard, DraggableToken, SessionTile, IconTile, PhraseChips, StepperControl, SegmentedPills, TimeBandSlider, DateChip, RangeCalendar, DropZone, KpiTile, ChartCard, HallIllustration) and `ohTokens.css` (§6.3 colour tokens, light and dark) |
 | `components/officeHours/OfficeHoursPage.tsx` | new | `/office-hours` entry: picks Teacher hub / Student page / Me–School switch by capability |
 | `components/officeHours/teacher/DayBoard.tsx` | new | §6.4 Hall week board; reused by "✎" and by leadership *Set days* |
-| `components/officeHours/teacher/TeacherHub.tsx` | new | §6.5 (Today hero, week strip with drag-to-replace, assigned strip, KPI tiles, weekly chart) |
+| `components/officeHours/teacher/TeacherHub.tsx` | new | §6.5 (Today hero, week strip with Can't hold, assigned strip, KPI tiles, weekly chart) |
 | `components/officeHours/teacher/AssignFlow.tsx` | new | §6.6 card grid + session drop + reason tiles + live preview (availability logic ported from `StudentPicker`) |
-| `components/officeHours/teacher/RegisterBoard.tsx` | new | §6.7 tap/swipe tiles, visitor bubbles, Finish bar (offline queue, keyboard and version-conflict merge ported from `RegisterSheet`) |
-| `components/officeHours/teacher/ReplaceSession.ts` | new | Drag-to-replace logic and the "Can't replace" tray used by the week strip (§6.5) |
+| `components/officeHours/teacher/RegisterBoard.tsx` | new | §6.7 tap-who's-here tiles, visitor bubbles, Finish bar (offline queue, keyboard and version-conflict merge ported from `RegisterSheet`) |
+| `components/officeHours/teacher/CantHoldSheet.tsx` | new | Same-week day tiles + reason tiles (§6.5); the drag shortcut on the week strip calls the same action |
+| `components/officeHours/ui/useUndoToast.ts`, `copy.ts`, `CoachMark.tsx` | new | Undo toasts bound to server undo tokens; all strings in one place; one-time gesture tips (§6.12) |
 | `components/officeHours/student/StudentOfficeHours.tsx` | new | §6.8 hero, can't-come tiles, hall board, journey (replaces `MyOfficeHours.tsx`); parent mode |
 | `components/officeHours/student/HallDirectory.tsx` | new | Week board of teacher avatars; also used in the band popover and Home |
 | `components/officeHours/school/SchoolView.tsx` | new | Segmented pills Today · Teachers · Follow-up · Reports · ⚙ |
@@ -809,21 +851,21 @@ All of them export to CSV, Excel and PDF.
 
 ## 12. Decisions for the school
 
-The plan is built on the recommendation in each row. All are policy settings or small changes.
+**All decisions are confirmed (2026-10-04).** P1, P5, P6, P9, P12 and P13 were decided explicitly; the rest follow the recommendation. All are policy settings or small changes.
 
 | # | Question | Recommendation |
 |---|---|---|
 | **P1** ✅ | How many days does a teacher hold? | **Confirmed 2026-10-04: the teacher chooses 1, 2, 3 or more days** (`min_days = 1`, max 5). The memo's two is shown as a suggestion (`suggested_days = 2`). Leadership can still exempt or set days for a teacher. |
-| **P2** | Limit how many teachers share one weekday in the hall? | **No cap; show the load live** so teachers balance. Add a soft cap later if a day overflows. |
-| **P3** | May teachers change their days mid-term? | **Yes, effective next Monday**, leadership informed. Weekly assignments on a dropped day are moved or released in the same dialog. |
-| **P4** | Statuses | **Present / Absent** up front; **Late / Excused** under ⋯ (Tendo-compatible). |
+| **P2** ✅ | Limit how many teachers share one weekday in the hall? | **Confirmed 2026-10-04 (recommendation).** **No cap; show the load live** so teachers balance. Add a soft cap later if a day overflows. |
+| **P3** ✅ | May teachers change their days mid-term? | **Confirmed 2026-10-04 (recommendation).** **Yes, effective next Monday**, leadership informed. Weekly assignments on a dropped day are moved or released in the same dialog. |
+| **P4** ✅ | Statuses | **Confirmed 2026-10-04 (recommendation).** **Present / Absent** up front; **Late / Excused** under ⋯ (Tendo-compatible). |
 | **P5** ✅ | The reason is shown to the student (R9). Shown to parents too? | **Confirmed 2026-10-04: students see the reason; parents only when an escalation reaches them.** |
 | **P6** ✅ | If the teacher records no register, are assigned students absent? | **Confirmed 2026-10-04: no.** It is a missing register (teacher compliance). R11 applies when a register is recorded. |
-| **P7** | On replacement, notify all the teacher's students or only assigned ones? | **Only assigned students.** Everyone else sees the change in the directory and timetable. |
-| **P8** | Default assignment mode | **Once (next session)**; "Every week until…" one tap away (default 4 weeks). |
+| **P7** ✅ | On replacement, notify all the teacher's students or only assigned ones? | **Confirmed 2026-10-04 (recommendation).** **Only assigned students.** Everyone else sees the change in the directory and timetable. |
+| **P8** ✅ | Default assignment mode | **Confirmed 2026-10-04 (recommendation).** **Once (next session)**; "Every week until…" one tap away (default 4 weeks). |
 | **P9** ✅ | Teachers already sent days through the **Google Form** by 05 Oct. | **Confirmed 2026-10-04: optional.** Built last (P4b) and skippable. When used, leadership drops the form's CSV once (School → Teachers → Import) so nobody enters days twice; teachers can still adjust. Without it, teachers declare their own days on the board. |
-| **P10** | Register edit window | **On the day** normally; the next day is accepted and flagged *late*; after 2 days only leadership. |
-| **P11** | Self check-in by QR (v1 feature) | **Not in v2.** Teachers record visits with quick-add. Revisit a single hall kiosk if typing proves slow. |
+| **P10** ✅ | Register edit window | **Confirmed 2026-10-04 (recommendation).** **On the day** normally; the next day is accepted and flagged *late*; after 2 days only leadership. |
+| **P11** ✅ | Self check-in by QR (v1 feature) | **Confirmed 2026-10-04 (recommendation).** **Not in v2.** Teachers record visits with quick-add. Revisit a single hall kiosk if typing proves slow. |
 | **P12** ✅ | Student motivation graphics (visit streak, "Regular visitor" badge) | **Confirmed 2026-10-04: yes.** Positive only: no rankings, no comparisons, never shown to other students. Leadership can switch them off in Policy. |
 | **P13** ✅ | Profile photos on boards and tiles | **Confirmed 2026-10-04: yes.** Use existing MIS photos where present, initials otherwise. Shared screens (projector, hall floor) can switch to initials-only with one toggle. |
 
@@ -861,15 +903,17 @@ Each phase ends green: backend vitest on a private test-DB clone, frontend vites
 
 **P1 — Data and core services (3 days)**
 - [ ] `103_office_hours_v2.sql`, the new `officeHoursSchema.ts`, and `test/officeHoursFixtures.ts` rewritten.
+- [ ] `outbox.ts` + undo tokens.
 - [ ] `policy.ts`, `access.ts`, `teacherDays.ts`, `sessions.ts` (ensure, can't hold), `assignments.ts` (lock, partial success, complete, release, ask), `register.ts` (auto-absent, late, no-one-came, history).
 - [ ] Routes for teacher and student flows; delete v1 services and routes.
 
 **P2 — Interactive building blocks + teacher UI (5 days)**
 - [ ] `ui/*` building blocks (§6.11) + `ohTokens.css` (validated palette), with a kitchen-sink route in `DevKitchenSink` for visual review in both themes.
-- [ ] `OfficeHoursPage`, `DayBoard`, `TeacherHub` (drag-to-replace week strip), `AssignFlow`, `RegisterBoard`.
+- [ ] **Usability test** of the building-block prototype with 3 teachers (§6.12) and fixes.
+- [ ] `OfficeHoursPage`, `DayBoard`, `TeacherHub` (Can't-hold sheet + drag shortcut), `AssignFlow`, `RegisterBoard` (tap who's here).
 - [ ] Band cells (teacher), Home teacher tile, single sidebar item, routes and redirects; delete v1 components.
 
-**P3 — Student and parent (2 days)**
+**P3 — Student and parent (2 days, including a 3-student usability check)**
 - [ ] `/directory`, `/me`, `/children`, `StudentOfficeHours` (hero, can't-come tiles, journey), `HallDirectory`, student band and Home tile.
 
 **P4 — School view and reports (4 days)**
@@ -890,7 +934,7 @@ Each phase ends green: backend vitest on a private test-DB clone, frontend vites
 - [ ] Load check (40 teachers × a term of sessions, 50 visits a day) with report queries under 0.5 s.
 - [ ] Release per §16.2.
 
-**Total: about 17 working days, plus 0.5 day if the optional import (P4b) is built.** The interactive design adds about 3.5 days over a form-based UI, mostly in the shared building blocks, which later screens reuse.
+**Total: about 18 working days (the usability rounds and the undo outbox add about one day), plus 0.5 day if the optional import (P4b) is built.** The interactive design adds about 3.5 days over a form-based UI, mostly in the shared building blocks, which later screens reuse.
 
 ---
 
@@ -940,6 +984,7 @@ Each phase ends green: backend vitest on a private test-DB clone, frontend vites
   - class teacher, programme and school scopes.
 - **Escalation:** levels from assigned absences only; re-arm after two attended.
 - **Views:** the directory carries no student fields; a student sees their own teachers first; a parent sees only linked children.
+- **Outbox and undo:** an undo within 10 s reverses the change and cancels the notices; an undo after 10 s → 410; the outbox delivers each row once, even across two scheduler ticks or a restart.
 - **Jobs:** each job is idempotent when run twice.
 - **Routes:** 404 with the kill switch off; 503 before migration 103.
 
@@ -960,19 +1005,22 @@ Each phase ends green: backend vitest on a private test-DB clone, frontend vites
 - **TeacherHub:**
   - first-run vs declared states;
   - the hero button changes with time;
-  - dragging a session tile shows same-week drop zones only, and dropping shows the move count and confirms;
-  - dropping on the tray opens reason tiles.
+  - **Can't hold** opens same-week day tiles only; choosing one applies at once with Undo, and no notice is sent until the undo window closes;
+  - the reason tiles complete a not-replaced cancel;
+  - the desktop drag shortcut produces the same result as the taps.
 - **AssignFlow:**
   - tapping selects into the tray;
   - a blocked card shakes and shows Message / Ask to release;
   - dropping the tray on a session tile selects it;
   - "Every week" reveals the duration slider;
   - the preview text matches the selection;
-  - the partial-success animation states.
+  - the partial-success animation states;
+  - Undo within 10 s cancels the assignment, and the outbox never sends the notice.
 - **RegisterBoard:**
-  - tap cycles ? → ✓ → ✕;
-  - swipe right/left sets present/absent;
-  - long-press opens Late/Excused;
+  - tapping a tile marks it here, and tapping again clears it;
+  - ⋯ sets Late / Excused / Absent; an "I can't come" student pre-selects Excused in ⋯;
+  - Finish marks every untapped assigned tile absent, matching the footer count;
+  - swipe right is equivalent to a tap;
   - recent-visitor bubbles add, and tap removes with undo;
   - the Finish bar shows the "→ absent" count;
   - "No one came · Finish" appears when empty;
@@ -986,9 +1034,9 @@ Each phase ends green: backend vitest on a private test-DB clone, frontend vites
   - HallFloor counters update from a refetch without a skeleton flash;
   - TeachersBoard: Nudge all, a missing avatar opens the mini board, and the compliance meters sort;
   - *(optional P9)* ImportDrop: a dropped CSV animates into Matched / Needs a look;
-  - FollowUpBoard: drag or button to Acknowledged asks for a note chip;
+  - FollowUpBoard: the ✓ button (and the drag shortcut) asks for a note chip;
   - PolicyCard controls self-save with undo;
-  - ClosureCalendar: drag-select shows the affected-sessions count.
+  - ClosureCalendar: tap-start/tap-end and drag both select a range, and confirm shows the affected-sessions count.
 - **Charts:** the assigned/voluntary colours come from the tokens (no hard-coded hex in components); there is a legend for ≥ 2 series and one y-axis.
 - **Sidebar:** one *Office Hours* item for teachers, students and leadership.
 
