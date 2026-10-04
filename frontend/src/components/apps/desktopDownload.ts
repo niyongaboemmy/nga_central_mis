@@ -78,7 +78,8 @@ export function isNewer(latest: string, current: string): boolean {
 export const INSTALL_STEPS: Record<"macos" | "windows", string[]> = {
   macos: [
     "Open the downloaded NGA file and drag NGA into Applications.",
-    "Open NGA from Applications. The first time, macOS may say it can't check the app: open System Settings → Privacy & Security and click Open Anyway.",
+    "Open NGA. The first time, macOS says it can't verify it: click Done.",
+    "Open System Settings → Privacy & Security, scroll down and click Open Anyway next to NGA (then Open).",
     "Sign in to NGA MIS once. Task Mentor, Tendo and Tupo sign in by themselves.",
   ],
   windows: [
@@ -86,4 +87,10 @@ export const INSTALL_STEPS: Record<"macos" | "windows", string[]> = {
     "If Windows shows “Windows protected your PC”, click More info, then Run anyway.",
     "Sign in to NGA MIS once. Task Mentor, Tendo and Tupo sign in by themselves.",
   ],
+};
+
+/** The one-line installer (backend services/desktop/installScripts.ts): no warning, checksum-checked. */
+export const installCommand = (os: "macos" | "windows") => {
+  const api = API_BASE_URL.replace(/\/+$/, "");
+  return os === "macos" ? `curl -fsSL ${api}/desktop/install.sh | sh` : `irm ${api}/desktop/install.ps1 | iex`;
 };

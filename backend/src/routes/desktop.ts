@@ -14,6 +14,7 @@ import {
   releasesDir,
   type DownloadPlatform,
 } from "../services/desktop/releases";
+import { macInstallScript, windowsInstallScript } from "../services/desktop/installScripts";
 
 /**
  * NGA Desktop distribution (public, no sign-in needed):
@@ -21,6 +22,7 @@ import {
  *   GET /desktop/download/:platform      counts a download, then redirects to the file
  *   GET /desktop/update/:target/:arch/:v Tauri's updater: 204 = up to date, else the package
  *   GET /desktop/files/<version>/<file>  the installers and packages themselves
+ *   GET /desktop/install.sh | install.ps1 one-line installers (checksum-pinned)
  * And for admins (Usage analytics permission):
  *   GET /desktop/stats                   downloads and active installs
  */
@@ -87,6 +89,27 @@ router.get(
     }
     res.set("Cache-Control", "no-store");
     res.redirect(302, fileUrl(release, file.file));
+  }),
+);
+
+// One-line installers (no browser download, so no Gatekeeper/SmartScreen
+// warning), pinned to the published release's SHA-256 (installScripts.ts).
+router.get(
+  "/install.sh",
+  asyncHandler(async (_req, res) => {
+    res.set("Content-Type", "text/x-shellscript; charset=utf-8");
+    res.set("Cache-Control", "no-store");
+    res.set("X-Content-Type-Options", "nosniff");
+    res.send(macInstallScript(await currentRelease()));
+  }),
+);
+router.get(
+  "/install.ps1",
+  asyncHandler(async (_req, res) => {
+    res.set("Content-Type", "text/plain; charset=utf-8");
+    res.set("Cache-Control", "no-store");
+    res.set("X-Content-Type-Options", "nosniff");
+    res.send(windowsInstallScript(await currentRelease()));
   }),
 );
 
