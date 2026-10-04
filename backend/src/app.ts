@@ -36,6 +36,7 @@ import reminderRoutes from "./routes/reminders";
 import activityRoutes from "./routes/activity";
 import monitorRoutes from "./routes/monitor";
 import officeHoursRoutes from "./routes/officeHours";
+import desktopRoutes from "./routes/desktop";
 import { jwks, ssoIssuer } from "./services/sso/signingKey";
 
 const app = express();
@@ -76,6 +77,9 @@ app.use(requestLogger);
 
 // Health check routes (no auth required)
 app.use("/health", healthRoutes);
+
+// NGA Desktop downloads, update checks and release files (public; stats need ANALYTICS_VIEW).
+app.use("/desktop", desktopRoutes);
 
 // SSO discovery + signing keys (public). Apps verify single-sign-out
 // logout tokens against the JWKS (services/sso/backchannelLogout.ts).
