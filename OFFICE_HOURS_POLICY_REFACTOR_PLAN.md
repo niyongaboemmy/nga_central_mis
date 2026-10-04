@@ -1,10 +1,10 @@
-# Office Hours — Policy Alignment & UX Refactor Plan (v2)
+# Office Hours — Policy-First Refactor Plan (v2)
 
-**Written:** 2026-10-04
+**Written:** 2026-10-04 (rev. 2)
 **Branch:** `feat/office-hours-policy-refactor` (from `origin/main` e84056cb)
-**Source of truth:** *Memo: Office Hours Policy* (Administration → all staff, 01 Oct 2026, effective **05 Oct 2026**), file `NGA-Office-Hours-Policy.pdf`.
-**Builds on:** `OFFICE_HOURS_IMPLEMENTATION_PLAN.md` (v1, shipped 2026-10-03 as MIS #53, migration 102) and `docs/OFFICE_HOURS.md`.
-**Audience:** developers and Claude Code sessions doing the work. School leadership: read §1, §3 and §11 (the decisions).
+**Source of truth:** *Memo: Office Hours Policy* (Administration → all staff, dated 01 Oct 2026, effective **05 Oct 2026**), file `NGA-Office-Hours-Policy.pdf`.
+**Replaces:** the v1 design in `OFFICE_HOURS_IMPLEMENTATION_PLAN.md` (MIS #53, migration 102). v1 was deployed but **never used in production**: there is no real data to keep, so v2 is designed from the policy rather than adapted from v1.
+**Audience:** developers and Claude Code sessions doing the work. School leadership: read §1, §5 and §12.
 
 > **Status:** plan only. No code has changed on this branch yet.
 
@@ -12,625 +12,803 @@
 
 ## Contents
 
-1. What the policy requires (rules R1–R12)
-2. How the current module compares (gap analysis)
-3. The root problem: two different models
-4. Target model
-5. Friendly workflows (before → after)
-6. UI/UX design
-7. Data model: migration `103_office_hours_policy.sql`
-8. Backend changes
-9. Frontend changes
-10. Notifications, reports and integrations
-11. Decisions for the school
-12. Getting through 05 October (interim)
-13. Phases and task checklist
-14. Testing
-15. Rollout, data conversion and risks
+1. What the policy requires (R1–R12)
+2. Why v1 is replaced, not patched
+3. What we keep from v1, and what we delete
+4. Target domain model
+5. Workflows, designed for few steps
+6. UI/UX design and wireframes
+7. Data model: migration `103_office_hours_v2.sql`
+8. Backend: services, API, jobs
+9. Frontend: screens and file map
+10. Notifications
+11. Reports and administration follow-up
+12. Decisions for the school
+13. Integrations (Home, timetable, Reminder Hub, Tendo, Task Mentor, desktop)
+14. Phases and task checklist
+15. Testing
+16. Rollout and risks
 
 ---
 
 ## 1. What the policy requires
 
-The memo is short. Every rule below can be traced to one line of it.
-
 | # | Rule | Memo text |
 |---|---|---|
-| **R1** | Office hours run **every weekday, 16:20–17:20, in the Academy Hall**. One fixed time, one fixed place. | "take place daily from 4:20 PM to 5:20 PM in the Academy Hall" |
-| **R2** | **Every instructor holds office hours on exactly two days a week.** | "Every instructor holds office hours two days each week" · "Set two office-hours days per week" |
-| **R3** | The instructor **shares the days with all their students** and **submits them to the administration by 05 Oct 2026**. | "Share them with all your students and send them to the administration by 05 October 2026" |
-| **R4** | The instructor **holds them as scheduled**. | "Hold them as scheduled" |
-| **R5** | If they must cancel, they **tell students in advance** and **offer another time in the same week**. | "If you must cancel, tell students in advance and offer another time that week" |
-| **R6** | **Voluntary attendance:** any student may come on their own to ask for help. | "Voluntary: a student comes to your office hours on their own" |
-| **R7** | **Mandatory attendance:** the instructor directs a student to attend, **assigned through MIS**. | "Mandatory: you direct a student to attend, assigned through MIS" |
-| **R8** | **No double assignment.** A student who already has an assignment **cannot be assigned again**, so nobody is sent to two instructors at once. If blocked, **coordinate with the instructor who assigned them**. | §3 bullets 1–2 |
-| **R9** | When assigning, **tell the student the day, time, place and reason**. | "Tell the student the day, time, place, and reason" |
-| **R10** | **Record attendance for every session, on the day**, noting whether each visit was **voluntary or assigned**. | §4 bullet 1 |
+| **R1** | Office hours run **every weekday, 16:20–17:20, in the Academy Hall**. The time and place are fixed. | "take place daily from 4:20 PM to 5:20 PM in the Academy Hall" |
+| **R2** | **Every instructor holds office hours on two days a week**, each 16:20–17:20. | "Every instructor holds office hours two days each week" · "Set two office-hours days per week" |
+| **R3** | The instructor **shares the days with all their students** and **sends them to the administration by 05 Oct 2026**. | §1 bullet 2 |
+| **R4** | The instructor **holds them as scheduled**. | §1 bullet 3 |
+| **R5** | To cancel, the instructor **tells students in advance** and **offers another time that week**. | §1 bullet 3 |
+| **R6** | **Voluntary:** a student comes on their own to ask for help. | §2 |
+| **R7** | **Mandatory:** the instructor directs a student to attend, **assigned through MIS**. | §2, §3 |
+| **R8** | **No student is sent to two instructors at once.** A student who already has an assignment **cannot be assigned again**. If MIS blocks the instructor, they **coordinate with the instructor who assigned the student**. | §3 bullets 1–2 |
+| **R9** | When assigning, the instructor **tells the student the day, time, place and reason**. | §3 bullet 3 |
+| **R10** | **Attendance is recorded for every session, on the day**, noting whether each visit was **voluntary or assigned**. | §4 bullet 1 |
 | **R11** | **Assigned students who don't attend are marked absent.** | §4 bullet 2 |
-| **R12** | Administration uses the records to see **who attends consistently** and to **follow up with students who miss assigned sessions**. | §4 bullet 3 |
+| **R12** | The administration uses the records to see **who attends consistently** and to **follow up with students who miss assigned sessions**. | §4 bullet 3 |
 
-**Implied by the memo:**
-- **R3** replaces the Google Form in "Next steps". The MIS should make that form unnecessary, and the administration should still be able to download the list.
-- The policy is *teacher-centred*: office hours are a teacher's **open availability**. Assigned students are an *exception* layered on top.
-
----
-
-## 2. How the current module compares
-
-v1 was designed before the memo, from a brief about **mandatory** office hours: a teacher creates a *group* of named students who must come on chosen days.
-
-| Rule | Current implementation (v1) | Fit | Gap → action |
-|---|---|---|---|
-| R1 fixed time | Band 16:20–17:20 is the default, but times are **editable** inside 16:00–18:00 (D7). | 🟡 | Lock the time to the band. Remove the time inputs. |
-| R1 fixed place | Free-text **Room** per schedule (e.g. "B4"). | 🔴 | Setting `default_location = "Academy Hall"`. No room input. |
-| R2 exactly 2 days | 1–5 days per schedule, and **any number of schedules** per teacher. | 🔴 | **One availability per teacher per term, exactly `days_per_teacher` (2) weekdays.** |
-| R3 share + submit by deadline | Students see office hours **only if assigned**. Leadership "Coverage" counts students, not teachers. There is no deadline or submission tracking. | 🔴 | Student-facing **"Teachers in the hall" directory**. Admin **Declarations** board (submitted / missing, Remind, CSV). Deadline setting. |
-| R4 hold as scheduled | Sessions materialise; missing registers are listed; register reminders run. | 🟢 | Keep. Add a **teacher compliance** view (held / on-day register / replaced cancellations). |
-| R5 cancel → replace same week | **Cancel** (notifies) and **Move** exist as separate actions. Move can go to any date. Nothing requires a replacement or keeps it in the same week. | 🟡 | One **"Can't hold it"** flow: pick a replacement day in the **same week** (or record why that's impossible). Admin sees unreplaced cancellations. |
-| R6 voluntary | A register "Add a student who came" (`is_drop_in`) exists, but **only inside a schedule that already has students**. A teacher with no assigned students has no session, so there is nothing to record against. | 🔴 | Sessions exist for **every declared day**, whether or not anyone is assigned. Adding a visitor is the register's **primary** action. |
-| R7 assigned via MIS | Assigning means: create a schedule → pick days, times, dates, subject, title, purpose, room, capacity → draft → picker → publish. | 🟡 | **Assign** is a direct teacher action: *student(s) → which session(s) → reason*. No schedule to build first. |
-| R8 no double assignment | DB-enforced lock `OfficeHourStudentLock` (term, student, weekday), TERM mode by default. Conflict shows the holder. "Ask to transfer" exists. | 🟢 | Keep the lock (it is the strongest part of v1). Lock for the life of the **assignment** (one-off assignments free the student after their session). Rename the transfer flow to "Ask Mr K to release". Drop WEEKDAY mode from the UI. |
-| R9 day, time, place, reason | Notice says day/time/room. **The reason is hidden from students by design** (v1 §4.7, §18). | 🔴 | **Show the reason to the student** (policy overrides v1's privacy default). Reasons become student-facing wording. See decision P5. |
-| R10 record on the day, voluntary vs assigned | Register opens 15 min before start and stays editable **7 days** (`register_edit_days`). Voluntary/assigned is stored (`is_drop_in`) but reports barely use it. | 🟡 | Default edit window: **the same day**. A later save is allowed but flagged **late**. Voluntary vs assigned appears in every register, report and export. |
-| R11 no-show = absent | Rows left unmarked stay `NULL`; the UI asks "mark them absent?". Auto-close is off by default. | 🟡 | **On save, assigned students left unmarked become ABSENT** (with the count shown before saving). |
-| R12 consistency + follow-up | Consistency bands, escalation ladder, digests, reports. All rates assume everyone is assigned. | 🟢/🟡 | Keep the engine. Count **assigned** attendance for absence and follow-up. Count **voluntary** visits as *usage*, never as absences. Admin "Follow-up" list. |
-
-**Things v1 built that the policy does not ask for**, and that add steps and weight: per-schedule titles, purposes, rooms, capacity, date windows, drafts/publish, multiple schedules per teacher, WEEKDAY lock mode, editable times, term rollover of schedules, outcomes/follow-up flags, and a nine-tab oversight console. §9.3 lists what is hidden, kept or removed.
+**Consequences for the design:**
+- Office hours are **teacher availability**: "Ms A is in the Academy Hall on Tue & Thu." A session exists on every declared day, whether or not anyone is assigned.
+- **Voluntary visits are the normal traffic.** An assignment is an exception placed on top of availability.
+- The MIS **replaces the Google Form** in "Next steps": declaring days in MIS *is* sending them to the administration (R3).
+- "Every session" (R10) includes sessions where nobody came. "No one came" must be a one-tap register.
 
 ---
 
-## 3. The root problem: two different models
+## 2. Why v1 is replaced, not patched
 
-```
-v1  (shipped)                              Policy
-─────────────────────────────────────      ──────────────────────────────────────────
-Schedule = "a group of named students      Availability = "Ms A is in the Academy Hall
-  who must come on chosen days"              every Tue & Thu, 16:20–17:20"
-                                             (one per teacher, exactly 2 days, open to all)
-No students → no schedule → no session     Every declared day → a session, even if empty
-Walk-ins are an add-on                     Voluntary visits are the main traffic
-Everything is mandatory                    Mandatory = a referral placed on top of
-                                             a teacher's availability
-```
+v1 was built from an earlier brief about *mandatory* office hours. Its central object is a teacher-built **group of named students**:
 
-Patching UI on top of v1 would keep the wrong mental model ("create office hours" = "build a student group"). The refactor therefore **re-interprets the existing tables** instead of adding new ones:
+| Topic | v1 | Policy (v2) |
+|---|---|---|
+| Central object | `OfficeHourSchedule`: title, purpose, room, capacity, date window, 1–5 days, any number per teacher | **Availability**: one per teacher per term, **exactly two days**, fixed time and place |
+| A session exists when… | …a schedule exists, which in practice meant a student group | …a declared day arrives, **always** |
+| Voluntary visits | "Add a student who came", inside a schedule | **Primary** register action |
+| Assigning | Build a schedule → draft → pick students → publish (3 screens, ~12 inputs) | **Assign** → who → which session and why (2 steps) |
+| No-double-assignment lock | (term, student, weekday) rows, two modes | **One active assignment per student**: PK (term, student) |
+| Reason | Hidden from students on purpose | **Told to the student** (R9) |
+| Cancel | Cancel and Move as separate actions, any date | **Replace within the same week**, or record why not (R5) |
+| Register window | 7 days | **On the day**. Later saves are flagged *late* |
+| Unmarked assigned students | Stay "not marked" | **Absent on save** (R11) |
+| Sharing with students | Students see only what they are assigned to | **Directory** of every teacher's days (R3) |
+| Submission to admin | None | **Declarations board** with deadline, reminders and CSV |
+| Navigation | Two menus: *Office Hours* and *Office Hours Oversight* | **One menu, *Office Hours***, whose views depend on the user's role |
 
-- `OfficeHourSchedule` becomes **the teacher's availability for a term**, at most one live row per (term, teacher).
-- `OfficeHourAssignment` becomes a **referral**: a student sent to that teacher's office hours, either once or weekly.
-- `OfficeHourSession` and `OfficeHourAttendance` stay as they are. `is_drop_in` already means "voluntary".
-
-The engine is kept: the lock table, materialisation, closures, register versioning, metrics, escalation, reports, notifications and the scheduler. What changes is the meaning of the rows, the validation rules and nearly all of the UI.
+Every row is a change of meaning, not of presentation. Keeping v1's tables would mean carrying unused columns (title, purpose, capacity, date windows, lock modes) and rules that contradict the policy. **Production has no office-hours data** (owner-confirmed, §16.1), so a clean model costs nothing in migration.
 
 ---
 
-## 4. Target model
+## 3. What we keep from v1, and what we delete
+
+### 3.1 Kept (generic, already tested)
+
+| Piece | File(s) | Use in v2 |
+|---|---|---|
+| Kigali clock, `todayYmd`, `OFFICE_HOURS_FAKE_NOW`, `withDeadlockRetry`, `officeHoursEnabled/Ready`, term helpers | `services/officeHours/common.ts` | Unchanged |
+| School closures (table, service, admin UI) | `SchoolClosure`, `closures.ts`, `ClosuresTab` | Unchanged. Closure days produce no sessions |
+| Period engine (day/week/month/term/year/custom) | `period.ts`, `reports/PeriodPicker.tsx` | Unchanged |
+| Report export (CSV/Excel/PDF) | `reports/exports.ts` | Unchanged |
+| Notification delivery (bell + push, independent of Reminder Hub opt-in) | the delivery helper inside `notify.ts` | New event texts (§10) |
+| Escalation ladder logic, digest framework, scheduler loop | `escalation.ts`, `digests.ts`, `scheduler.ts` | Re-pointed to assignments and visits |
+| Offline register queue | `offlineQueue.ts` | Unchanged, new payload |
+| "I can't come" notice | `OfficeHourAbsenceNotice`, `AbsenceNoticeButton.tsx` | Applies to assigned sessions |
+| Suggestions (Task Mentor standing + history) | `suggestionsFor` in `modern.ts` | Moves to `assignments.ts`, feeds *Suggested* |
+| UI primitives | `ohUi.tsx` | Unchanged |
+| Permissions `OFFICE_HOURS_MANAGE_OWN / MANAGE_ANY / VIEW / VIEW_SELF / CONFIGURE` + preset links | migration 102, `access/manifest.ts` | Same names, meanings restated in §8.4 |
+| Kill switch and scheduler flag | `OFFICE_HOURS_ENABLED`, `OFFICE_HOURS_SCHEDULER` | Unchanged |
+
+### 3.2 Deleted
+
+- **Tables:** `OfficeHourSchedule`, `OfficeHourScheduleDay`, `OfficeHourAssignment`, `OfficeHourStudentLock`, `OfficeHourSession`, `OfficeHourAttendance(+History)`, `OfficeHourTransferRequest`, `OfficeHourEscalation`, `OfficeHourAbsenceNotice` and the v1 `OfficeHourSetting` are archived by 103 (renamed `v1_*`) and dropped by a later migration (§7.3).
+- **Services:**
+  - `schedules.ts`, `assignments.ts` (rewritten), `transfers.ts`, `sessions.ts` (rewritten);
+  - `live.ts` (SSE register), QR check-in and rollover in `modern.ts`;
+  - `register.ts`, `views.ts`, `metrics.ts`, `reports.ts`, `admin.ts` and `reconcile.ts` (all rewritten on the new tables).
+- **Frontend:** `ScheduleDrawer.tsx`, `ScheduleDetail.tsx`, `StudentPicker.tsx` (its row logic moves into `AssignSheet`), `CheckIn.tsx`, `admin/CoverageTab.tsx`, the transfer list, the `/office-hours/admin` route and the *Office Hours Oversight* sidebar item.
+- **Tests:** `officeHoursPhase0/Core/Views/Register/Notifications/Reports/Modern.test.ts` and the frontend `__tests__` for deleted components. Each is replaced by a v2 suite (§15).
+
+---
+
+## 4. Target domain model
 
 ### 4.1 Concepts
 
 ```
-OfficeHourSetting        days_per_teacher=2 · band 16:20–17:20 (fixed) · default_location="Academy Hall"
-                         declaration_deadline=2026-10-05 · register_same_day=1
-OfficeHourSchedule       ONE per (term, teacher): "Ms A · Tue & Thu · Academy Hall"   ← availability
- ├─ OfficeHourScheduleDay   exactly 2 rows (setting)
- ├─ OfficeHourSession       one per declared date (sweep) — exists with or without students
- │    └─ OfficeHourAttendance  student × session · visit = ASSIGNED | VOLUNTARY (is_drop_in)
- └─ OfficeHourAssignment    referral: student → this teacher · ONCE (a date) | WEEKLY (days, until)
-      └─ OfficeHourStudentLock  term × student × weekday 1–5 → "one active referral at a time"
+OfficeHourPolicy         band 16:20–17:20 · location "Academy Hall" · days_per_teacher 2 · deadline
+OfficeHourTeacher        one row per (term, teacher): status ACTIVE | EXEMPT, submitted_at
+ └─ OfficeHourTeacherDay    weekday + effective_from / effective_to (history of day changes)
+OfficeHourSession        one per (teacher, date): SCHEDULED | HELD | CANCELLED · replaced_by_session_id
+ └─ OfficeHourVisit         student × session · visit_type ASSIGNED | VOLUNTARY · status · assignment_id
+OfficeHourAssignment     student → teacher · ONCE (a session) | WEEKLY (days, until) · reason · message
+ └─ OfficeHourAssignmentLock  PK (term, student): at most one ACTIVE assignment per student
+OfficeHourEscalation     follow-up on missed assigned sessions
+OfficeHourAbsenceNotice  "I can't come" from a student, for an assigned session
+SchoolClosure            (kept) dates without office hours
 ```
 
 ### 4.2 Rules
 
-**Availability (R1–R4)**
-- One live availability per (term, teacher). Saving again *edits* it. It is never a second row.
-- Exactly `days_per_teacher` distinct weekdays (Mon–Fri). Time = band. Location = `default_location`.
-- `submitted_at` is set on first save. The admin board compares it with `declaration_deadline`.
-- **Changing days mid-term** takes effect from the next school week, so this week's sessions stay as students were told. Admin is notified. Weekly referrals on a dropped day are listed for the teacher to move or release (decision P3).
-- A teacher's two days must not clash with their own lessons (impossible inside the band, kept as a guard) or with an `OFFICE_HOURS` closure.
+**Teacher days (R1–R4)**
+- An **instructor** is a user with `OFFICE_HOURS_MANAGE_OWN` who has at least one `TeacherSubjectAssignment` in the term's year. These are the people the declarations board expects.
+- A teacher declares exactly `days_per_teacher` distinct weekdays (Mon–Fri). The time and place come from the policy and are never entered.
+- **First declaration:** the days take effect today if before the band, otherwise tomorrow. `submitted_at` is set.
+- **Change of days (P3):** takes effect from **next Monday**, so this week stays as students were told. Implementation: close the old rows (`effective_to = Sunday`) and open new ones. Future sessions on dropped days with no visits are deleted. WEEKLY assignments on a dropped day are listed in the same dialog (move to a kept day / release).
+- **Exempt:** leadership (MANAGE_ANY) can mark a teacher `EXEMPT` for the term (part-time, leave) with a note. Exempt teachers disappear from "missing".
+- Leadership can also **set days for a teacher**, for example from the Google Form responses already collected (§12 P9).
 
 **Sessions (R4, R5)**
-- Materialised for every declared date (the existing sweep, `ensureSessions`), **independent of assignments**.
-- **Can't hold it** is allowed until the session starts. The teacher must pick a **replacement date in the same Mon–Fri week**, after today and not on a closure. The replacement may be any weekday, including the other declared day (then that day holds both, which is one session). If no day is left, the teacher must give a reason; this is recorded as `cancel_reason = NOT_REPLACED`, notifies admin, and counts against teacher compliance.
-- Implementation: the existing **move** (`moved_from_session_id`, original `CANCELLED/MOVED`) when replaced; the existing **cancel** when not.
-- After the session has started, there is no cancel. An unrecorded session becomes a *missing register* (v1 behaviour).
+- Created for every effective declared date that is not a closure. A sweep keeps 14 days ahead, and `ensureSessions` runs on every read and save. Unique key **(teacher_id, session_date)**.
+- **Can't hold it** is allowed until the band start on that day:
+  - **Replace:** pick a date in the **same Mon–Fri week**, later than today (or today if it is before the band), not a closure. If the teacher already has a session that date (their other day), the original points to it. Otherwise a one-off session is created (`is_extra = 1`). The original becomes `CANCELLED / REPLACED` with `replaced_by_session_id`. ONCE assignments move to the replacement automatically.
+  - **Not possible:** a required reason; `CANCELLED / NOT_REPLACED`. ONCE assignments targeting it are **completed without attendance**: they are not counted absent, and the lock is freed.
+- After the band starts, there is no cancel. An unrecorded session becomes a **missing register** (teacher compliance), never a student absence (P6).
 
-**Referrals (R7–R9)**
-- A teacher refers **students they teach** (D2 unchanged; leadership may refer anyone, to any teacher's office hours).
+**Assignments (R7–R9)**
+- A teacher assigns **students they teach** (subject, class teacher or mentor, the same rule as v1 `teachableStudentIds`). Leadership may assign **any student to any teacher's office hours**.
 - **Mode:**
-  - `ONCE`: one dated session, defaulting to the teacher's next session after the 14:00 cut-off (D10 kept).
-  - `WEEKLY`: every session on chosen declared day(s) until an end date (default 4 weeks, capped at term end) or until released.
-- **Lock:** while a referral is ACTIVE the student holds locks on weekdays 1–5 for the term (TERM mode, unchanged code). A second teacher is blocked: *"Already referred by Mr K — Thu 9 Oct · Mathematics. [Message Mr K] [Ask to release]"*.
-- **Completion frees the lock:**
-  - a ONCE referral **completes** when its session's register is saved (attended or absent), or when the session is cancelled without replacement;
-  - a WEEKLY referral completes at its end date, or when released;
-  - a replaced session carries its ONCE referrals to the replacement date automatically.
-- **Reason (R9):** a required reason chip (`NEEDS_HELP_TOPIC`, `MISSED_WORK`, `LOW_RESULTS`, `CATCH_UP_ABSENCE`, `ASSESSMENT_PREP`, `OTHER`) plus an optional short message. **Both are shown to the student**, worded for students (e.g. *"Catch up on missed work"*). There is no hidden staff-only reason (decision P5).
+  - `ONCE` (default, P8): one session, by default the teacher's next session. After the cut-off (14:00) on a session day, the default is the following one.
+  - `WEEKLY`: every session on chosen declared day(s) until an end date (default 4 weeks, max term end) or until released.
+- **Lock (R8):** creating an assignment inserts `OfficeHourAssignmentLock(term, student)` in the same transaction. A duplicate key is turned into a structured conflict: *"Already assigned by Mr K — Thu 9 Oct · Physics"*, with actions **Message Mr K** and **Ask to release** (a bell notice to Mr K that opens the assignment with *Release*).
+- **Lock release:**
+  - a ONCE assignment **completes** when its session's register is saved, or when the session is cancelled without replacement;
+  - a WEEKLY assignment completes after its last session's register, or at its end date;
+  - any assignment can be **released** by the assigning teacher or by leadership.
 
-**Attendance (R10–R12)**
-- Opens at band start − 15 min. **Same-day editing** by default. A save after the day is accepted but stamped `register_late = 1`; after `register_edit_days` it needs MANAGE_ANY.
-- Visit type: `ASSIGNED` (row has `assignment_id`) or `VOLUNTARY` (`is_drop_in = 1`, never locks, never counts as absent).
-- **On save, assigned rows still unmarked become ABSENT** (R11). The save bar shows it first: *"2 assigned students not marked → will be absent"*.
-- **Primary statuses are Present / Absent.** Late and Excused stay available under "⋯" (decision P4); D3 semantics are unchanged.
-- An assigned student marked absent feeds the existing escalation ladder. Voluntary visits feed **usage** metrics only.
+  Each of these deletes the lock row.
+- **Reason (R9):** a required reason chip, worded for students, plus an optional message (≤ 300 characters). **Both are shown to the student** in the notice, on their page and on the timetable details. Reasons:
+  - `TOPIC_HELP` — Help with a topic;
+  - `MISSED_WORK` — Catch up on missed work;
+  - `ASSESSMENT_REVIEW` — Review your assessment;
+  - `ABSENCE_CATCH_UP` — Catch up after absence;
+  - `PROJECT_SUPPORT` — Project support;
+  - `OTHER`, which requires the message.
 
----
-
-## 5. Friendly workflows (before → after)
-
-### 5.1 Teacher: declare my two days (R2, R3)
-
-| | Before (v1) | After |
-|---|---|---|
-| Steps | New office hours → days, start, end, from, until, subject, title, purpose, room, capacity, notes → save draft → students → review → publish | **Pick 2 days → Save** |
-| Inputs | ~12 fields, 3 screens | **2 taps + 1 button**, 1 card |
-| Result | One student group | Shared with all my students; admin sees "submitted"; sessions exist for both days all term |
-
-Interactive details:
-- Day chips show the **hall load** live ("Tue · 7 teachers"), so teachers balance themselves.
-- Save is enabled only at exactly 2 days, with a counter ("1 of 2 picked").
-- The confirmation reads: *"Tuesdays & Thursdays, 16:20–17:20, Academy Hall. Your students can see this now."*
-
-### 5.2 Teacher: assign a student (R7–R9)
-
-| | Before | After |
-|---|---|---|
-| Path | Open a schedule → Students tab → picker → save → (publish if draft) | **Assign** button (hub, register, student 360, or a Task Mentor suggestion) |
-| Steps | 3–5 | **2: Who → When & why** |
-
-1. **Who.** Search box + "My classes" chips. Each row shows availability inline: `Free` · `Referred by Mr K (Thu)` (disabled, with *Message* / *Ask to release*) · `With you`. *Suggested* lists students with evidence (existing suggestions service).
-2. **When & why.** Session chips (my next 4 sessions: "Tue 7 Oct", "Thu 9 Oct" …), with **Once / Every week until [date]**, a reason chip and an optional message. A live preview shows exactly what the student will receive:
-   > *Office hours with Ms A — Tue 7 Oct, 16:20–17:20, Academy Hall. Reason: Catch up on missed work.*
-
-   **Assign.** The toast reads: "3 referred · 1 already referred by Mr K".
-
-### 5.3 Teacher: take attendance (R10, R11)
-
-- Opened from the hub's **Today** card, the band cell on the timetable, or the 16:25 push reminder.
-- The **"+ Add a visitor"** search sits at the top with focus. Type 3 letters, press Enter, and the student is added as *Present · Voluntary*. A recent-visitors row (students who came voluntarily before) makes the repeat tap one touch.
-- Below it, **Assigned** students show a Present/Absent toggle each, with "All present".
-- Footer: `4 assigned · 3 present · 1 absent · 9 visitors` → **Save**. Unmarked assigned students → absent, with a confirmation line.
-- It works offline (existing queue).
-
-### 5.4 Teacher: can't hold a session (R5)
-
-**Can't hold Tue 7 Oct** → one sheet:
-- **Replacement this week:** chips Wed 8 · Thu 9 (your day) · Fri 10, each with hall load, or "No day possible" + reason;
-- an optional message;
-- **Confirm.**
-
-The MIS then notifies the assigned students, puts the change on every affected timetable band and the directory, and records it for admin. Two decisions, one screen.
-
-### 5.5 Student
-
-- **Timetable band** (the main surface):
-  - on a day with a referral: *"Office hours · Ms A · Academy Hall — assigned"*, highlighted;
-  - otherwise: *"Academy Hall · 3 of your teachers"*, and a tap lists them.
-- **My office hours** page:
-  1. **Assigned to you** (if any): teacher, date, time, place, reason, and an *"I can't come"* button (existing).
-  2. **Your teachers this week:** a Mon–Fri strip of who is in the hall, with *your* teachers (subject teachers, class teacher) first and a search for anyone else.
-  3. **History:** visits, voluntary vs assigned, and attendance on assigned sessions.
-
-### 5.6 Administration (R3, R12)
-
-| Tab | Purpose | Key interaction |
-|---|---|---|
-| **Today** | Live hall view: teachers expected today, registers taken, assigned vs visitors so far | Auto-refresh. A tap on a teacher opens their register (read-only) |
-| **Teachers** | Declarations (submitted / missing vs deadline), weekday load chart, compliance per teacher (held, on-day registers, cancellations replaced) | **Remind missing**, **Download CSV** (replaces the Google Form sheet), set a day for a teacher (MANAGE_ANY) |
-| **Students** | Follow-up: missed assigned sessions (escalations), consistency bands, voluntary usage, students never seen | **Acknowledge / note**, refer to discipline (existing) |
-| **Reports** | Existing period engine and exports, with an assigned/voluntary split everywhere | Period picker, CSV/Excel/PDF |
-| ⚙ | Settings (fewer fields) and Closures | — |
-
-The console goes from nine tabs to four plus settings. Transfers move into the Students tab as a filter. Coverage is replaced by Teachers (load) and Students (never seen).
+**Visits and register (R10, R11)**
+- The register opens at band start − 15 min. Normal edits are allowed **on the day**. A save the next day or later is accepted, stamped `register_late = 1`, and counted in teacher compliance. After `register_edit_days` (default 2) only MANAGE_ANY can edit.
+- **Rows:**
+  - **Assigned** rows are pre-filled from ACTIVE assignments covering the session (snapshotted on first open);
+  - **Voluntary** rows are added by the teacher. They never take a lock and never count as absence.
+- Statuses: **Present / Absent** up front. **Late / Excused** sit under "⋯" (P4). Attended = Present + Late + Excused, as in Tendo.
+- **Save:**
+  - assigned rows still unmarked become **ABSENT** (R11); the footer shows the count before saving;
+  - the session becomes HELD.
+- **"No one came":** one tap saves an empty HELD register when there are no assigned students.
+- Each change writes history (who, when, from → to). Saves are versioned against overwrites (v1 behaviour).
 
 ---
 
-## 6. UI/UX design
+## 5. Workflows, designed for few steps
+
+| Who | Task | Steps | Where it starts |
+|---|---|---|---|
+| Teacher | **Declare my two days** | 1 (tap 2 days → Save) | First visit to Office Hours; Home tile; timetable band "+ Pick your days"; daily reminder until done |
+| Teacher | **Take attendance** | 1 (add visitors, toggle assigned → Save) | Today card; timetable band cell; 16:25 push |
+| Teacher | **Nobody came** | 1 tap | Today card |
+| Teacher | **Assign students** | 2 (Who → When & why) | Assign button; register row "⋯ Assign again"; Person 360; Task Mentor suggestion |
+| Teacher | **Can't hold a session** | 1 sheet (pick replacement day or give reason → Confirm) | Today card ⋯; session ⋯ on This week |
+| Teacher | **Release a student** | 1 tap + undo toast | Assigned list |
+| Teacher | **Resolve a block** | 1 tap (Message / Ask to release) | Inline on the blocked student row |
+| Student | **See who's in the hall** | 0 (visible on page and timetable) | My office hours; timetable band; Home |
+| Student | **See my assignment** | 0 | Notice; My office hours; timetable band |
+| Student | **Say I can't come** | 1 | Assignment card |
+| Leadership | **Check declarations** | 0 (Teachers view), 1 to remind all missing | Office Hours → School → Teachers |
+| Leadership | **Follow up a student** | 1 (open → acknowledge with note / refer) | School → Follow-up |
+| Leadership | **Fill days from the Google Form** | 1 (paste/upload CSV → preview → apply) | School → Teachers ⋯ |
+
+---
+
+## 6. UI/UX design and wireframes
 
 ### 6.1 Principles
 
-1. **One screen per role.** The teacher hub is a single page with no tabs for daily use. Reports stay one link away.
-2. **Defaults over fields.** Time, place, dates, capacity and title are decided by the policy, so they are never asked for.
-3. **Two steps at most** for any frequent action: declare (1), assign (2), register (1), cancel (1).
-4. **Show consequences before commit.** Live student-message preview, hall-load counts, and "will be marked absent" counts.
-5. **Inline conflicts, never error pages.** The lock conflict sits on the student row with the next action (Message / Ask to release).
-6. **Progressive disclosure.** Late, Excused, notes and history sit behind "⋯".
-7. **Interactive feedback.** Optimistic toggles, an undo toast for removal and release, skeleton loading, and keyboard shortcuts kept (1/2 = present/absent, ⌘↵ save).
-8. **House style.** Keep the `ohUi.tsx` primitives (Card, pills, buttons), the `--status-*` colours, dark mode, phone width at 390 px and axe AA (the existing e2e harness).
+1. **Policy values are never asked for.** Time, place and number of days are shown, never entered. The only inputs anywhere are days, students, session, reason, message and statuses.
+2. **One menu, one page per role.** *Office Hours* opens the right view: teacher (My office hours), student/parent (My office hours, student view), leadership (a **Me / School** switch at the top, showing *School* only with `OFFICE_HOURS_VIEW`).
+3. **At most two steps** for any frequent task (§5). There are no drafts, no publish step and no separate detail pages.
+4. **Consequences are shown before commit:**
+   - live hall load on day chips ("Tue · 7 teachers");
+   - a live preview of the student's notice;
+   - "2 not marked → absent" before saving a register;
+   - "3 assigned students will move to Wed" before confirming a replacement.
+5. **Conflicts appear inline with the next action**, never as an error page or a dead end.
+6. **Interactive and forgiving:**
+   - optimistic toggles;
+   - undo toasts (release, remove visitor);
+   - keyboard shortcuts in the register (/ focuses search, Enter adds, 1 = present, 2 = absent, ⌘↵ saves);
+   - skeleton loading;
+   - autosave of the register draft locally.
+7. **Minimal content:** one sentence of help per screen at most, plain words ("Assign", "Can't hold it", "No one came"), and no jargon such as "materialise", "schedule" or "lock".
+8. **House style and accessibility:** `ohUi.tsx` primitives, `--status-*` colours, dark mode, a 390 px phone layout (drawers become full screen), and axe WCAG AA. Charts follow the `dataviz` skill.
 
-### 6.2 Teacher hub `/office-hours` (wireframe)
-
-```
-┌───────────────────────────────────────────────────────────────┐
-│ Office hours                         Academy Hall · 16:20–17:20│
-│ Your days: [Tue] [Thu]   ✎ Change                [+ Assign]   │
-├───────────────────────────────────────────────────────────────┤
-│ TODAY · Tue 7 Oct                                              │
-│  4 assigned · 0 visitors          [ Take attendance ]   ⋯      │
-│                                   (⋯ = Can't hold it)          │
-├───────────────────────────────────────────────────────────────┤
-│ THIS WEEK   Tue 7 ● today   Thu 9 ○ 2 assigned                 │
-├───────────────────────────────────────────────────────────────┤
-│ ASSIGNED STUDENTS (6)                                          │
-│  Aline M. · S4A · Thu 9 · Catch up on missed work   ⋯ Release  │
-│  ...                                                           │
-├───────────────────────────────────────────────────────────────┤
-│ ⚠ 1 register missing (Thu 2 Oct)  [Record]                     │
-│ ↔ Mr K asks you to release Eric N.  [Release] [Keep]           │
-└───────────────────────────────────────────────────────────────┘
-```
-
-**First visit (no days yet)** replaces the whole page body with one card:
+### 6.2 Teacher: first visit
 
 ```
-┌────────────────────────────────────────────┐
-│ Pick your two office-hours days            │
-│ 16:20–17:20 · Academy Hall                 │
-│ [Mon 5] [Tue 7] [Wed 3] [Thu 6] [Fri 2]    │  ← teachers already on that day
-│ 1 of 2 picked             [ Save my days ] │
-│ Due by Mon 5 Oct · shared with your students│
-└────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────┐
+│  Pick your two office-hours days                     │
+│  16:20–17:20 · Academy Hall                          │
+│                                                      │
+│  ( Mon 5 )( Tue 7 )( Wed 3 )( Thu 6 )( Fri 2 )       │ ← teachers already on each day
+│                                                      │
+│  1 of 2 picked                     [ Save my days ]  │
+│  Due Mon 5 Oct · your students will see them         │
+└──────────────────────────────────────────────────────┘
 ```
 
-### 6.3 Assign sheet (2 steps, right drawer; full screen on phones)
+After saving: *"Tuesdays & Thursdays, 16:20–17:20, Academy Hall. Your students can see this now."* The page then becomes the hub.
+
+### 6.3 Teacher hub (the only teacher page)
 
 ```
-Step 1 · Who                         Step 2 · When & why
-[Search name or reg no… ]            Session: (Tue 7)(Thu 9)(Tue 14)(Thu 16)
-(S4A)(S4B)(S5 Maths)  Suggested(3)   ( Once )  ( Every week until [14 Nov] )
-☑ Aline M.   S4A   Free              Reason: (Missed work)(Low results)(Topic help)…
-☐ Eric N.    S4A   Referred by Mr K  Message (optional): [                ]
-              Thu ▸ Message · Ask   ┌ Preview ─────────────────────────────┐
-                                     │ Office hours with Ms A — Tue 7 Oct,  │
-2 selected            [Next →]       │ 16:20–17:20, Academy Hall.           │
-                                     │ Reason: Catch up on missed work.     │
-                                     └──────────────────────────────────────┘
-                                     [← Back]                 [Assign 2]
+┌──────────────────────────────────────────────────────────────────┐
+│ Office hours        Tue & Thu · 16:20–17:20 · Academy Hall  ✎    │
+│                                                     [ + Assign ] │
+├──────────────────────────────────────────────────────────────────┤
+│ TODAY · Tue 7 Oct                                                │
+│ 3 assigned                [ Take attendance ]  [No one came]  ⋯  │
+│                                               (⋯ Can't hold it)  │
+├──────────────────────────────────────────────────────────────────┤
+│ THIS WEEK    Tue 7 ● now      Thu 9 · 2 assigned   ⋯             │
+├──────────────────────────────────────────────────────────────────┤
+│ ASSIGNED (5)                                                     │
+│ Aline M. · S4A · Thu 9 · Catch up on missed work     [Release]   │
+│ Eric N.  · S4B · every Tue until 4 Nov · Topic help  [Release]   │
+├──────────────────────────────────────────────────────────────────┤
+│ ⚠ Register missing · Thu 2 Oct                [ Record now ]     │
+│ ↔ Mr K asks you to release Grace U.        [Release] [Keep]      │
+├──────────────────────────────────────────────────────────────────┤
+│ This term: 8 sessions · 61 visits (12 assigned, 49 voluntary)    │
+│                                              View report →       │
+└──────────────────────────────────────────────────────────────────┘
 ```
 
-### 6.4 Register sheet
+### 6.4 Assign (drawer, 2 steps)
 
 ```
-Tue 7 Oct · 16:20–17:20 · Academy Hall                     ● saved 16:41
-[+ Add a visitor: type a name…                    ]  Recent: (Jean)(Grace)
-ASSIGNED (4)                                         [All present]
- Aline M.   S4A   (Present)( Absent )   ⋯
- Eric N.    S4B   ( Present)(Absent )   ⋯
-VISITORS (9) — voluntary
- Jean P.    S5    Present ✕
-────────────────────────────────────────────────────────────────
-4 assigned · 3 present · 1 not marked → absent · 9 visitors   [ Save ]
+1 · Who                                   2 · When & why
+[ Search name or reg. no.        ]        Session  (Tue 7)(Thu 9)(Tue 14)(Thu 16)
+(S4A)(S4B)(S5 Maths)  ✦ Suggested 3       ( Once )   ( Every Tue ▾ until 4 Nov )
+                                          Reason   (Topic help)(Missed work)
+☑ Aline M.  S4A   Free                             (Assessment review)(…)
+☐ Grace U.  S4A   Assigned by Mr K · Thu  Message  [ optional                 ]
+             ▸ Message Mr K · Ask to release
+☐ Eric N.   S4B   With you                ┌ Aline will receive ─────────────┐
+                                          │ Office hours with Ms A           │
+                                          │ Tue 7 Oct · 16:20–17:20          │
+                                          │ Academy Hall                     │
+                                          │ Reason: Catch up on missed work  │
+1 selected                  [ Next → ]    └──────────────────────────────────┘
+                                          [ ← Back ]             [ Assign 1 ]
 ```
 
-### 6.5 Student "My office hours"
+Result toast: *"2 assigned · 1 already assigned by Mr K"*. Blocked students stay listed with their actions.
+
+### 6.5 Register (drawer; full screen on phones)
+
+```
+Tue 7 Oct · 16:20–17:20 · Academy Hall                    saved 16:41 ✓
+[ / Add a visitor — type a name…                ]   Recent: (Jean)(Grace)(Paul)
+
+ASSIGNED (3)                                              [ All present ]
+ Aline M.  S4A  Catch up on missed work   (●Present)( Absent )  ⋯
+ Eric N.   S4B  Topic help                ( Present)( Absent )  ⋯
+ Ivan K.   S5   Assessment review         ( Present)( Absent )  ⋯   ⓘ "I can't come: sick bay"
+
+VISITORS · voluntary (9)
+ Jean P.   S5   Present   ✕
+ …
+──────────────────────────────────────────────────────────────────────────
+1 present · 2 not marked → absent · 9 visitors                  [ Save ]
+```
+
+### 6.6 Can't hold it (sheet)
+
+```
+Can't hold Tue 7 Oct
+Replace this week:   ( Wed 8 · 5 )( Thu 9 · your day )( Fri 10 · 2 )
+                     ( No day possible → reason [            ] )
+Message to students (optional) [                                     ]
+3 assigned students will move to Thu 9 and be told.        [ Confirm ]
+```
+
+### 6.7 Student: My office hours
 
 ```
 ASSIGNED TO YOU
- Ms A · Mathematics — Tue 7 Oct, 16:20–17:20, Academy Hall
- Reason: Catch up on missed work                  [I can't come]
-YOUR TEACHERS THIS WEEK                          [Search a teacher]
- Mon  Mr K (Physics)
- Tue  Ms A (Maths) · Mr D (English)
- Thu  Ms A (Maths)
- ...
-HISTORY   12 visits · 3 assigned (3/3 attended) · 9 voluntary
+ Ms A · Mathematics
+ Tue 7 Oct · 16:20–17:20 · Academy Hall
+ Reason: Catch up on missed work · "Bring your exercise book"
+                                                  [ I can't come ]
+YOUR TEACHERS IN THE HALL THIS WEEK              [ Search all teachers ]
+ Mon   Mr K · Physics
+ Tue   Ms A · Mathematics   Mr D · English
+ Thu   Ms A · Mathematics
+ Fri   —
+MY VISITS THIS TERM
+ 9 voluntary · 3 assigned (3 attended)            History ▾
 ```
 
----
+Parents see the same page per child, read-only, without "I can't come".
 
-## 7. Data model: migration `103_office_hours_policy.sql`
+### 6.8 Leadership: Office Hours → School
 
-The migration is idempotent and runs on MySQL 5.7 and 8, using the information_schema-guarded `ALTER`s that 102 uses. It is **additive only**: no column is dropped, so a rollback of the code stays safe.
-
-| Table | Change | Why |
+| View | Content | Actions |
 |---|---|---|
-| `OfficeHourSetting` | `+ days_per_teacher TINYINT NOT NULL DEFAULT 2`<br>`+ default_location VARCHAR(100) NOT NULL DEFAULT 'Academy Hall'`<br>`+ declaration_deadline DATE NULL` (seeded `2026-10-05`)<br>`+ band_locked TINYINT NOT NULL DEFAULT 1`<br>`+ weekly_referral_default_weeks TINYINT NOT NULL DEFAULT 4`<br>`UPDATE … SET student_lock_mode='TERM', register_edit_days=1` | R1, R2, R3, R10 |
-| `OfficeHourSchedule` | `+ kind ENUM('AVAILABILITY','LEGACY') NOT NULL DEFAULT 'AVAILABILITY'`<br>`+ submitted_at DATETIME NULL`<br>`+ live_key VARCHAR(40) NULL` + `UNIQUE (live_key)` | One live availability per teacher-term. `live_key = '<term>:<teacher>'` while status is ACTIVE/DRAFT and NULL once ENDED/CANCELLED. MySQL has no partial unique index, and this is the same trick as the lock PK: the DB, not an `if`, enforces it. |
-| `OfficeHourAssignment` | `+ mode ENUM('ONCE','WEEKLY') NOT NULL DEFAULT 'WEEKLY'`<br>`+ target_session_id BIGINT NULL`<br>`+ student_message VARCHAR(300) NULL`<br>status enum `+ 'COMPLETED'` | Referral semantics (R7, R9) |
-| `OfficeHourSession` | `+ register_late TINYINT NOT NULL DEFAULT 0`<br>`cancel_reason` gains `NOT_REPLACED` (varchar, no DDL) | R5, R10 compliance |
-| `OfficeHourAttendance` | none. `is_drop_in` = voluntary. | — |
-
-Index: `OfficeHourSession (session_date, status)` already supports the directory and Today queries. Check this with `EXPLAIN` during P1.
-
-**Data conversion** (`scripts/office-hours-policy-convert.ts`, `--dry-run` by default) for rows written under v1 (prod went live 2026-10-03):
-- per (term, teacher): if exactly one live schedule → `AVAILABILITY`, `location = default_location`, set `live_key` and `submitted_at = created_at`;
-- with several live schedules → keep the earliest as `AVAILABILITY` (union of days), mark the rest `LEGACY` (still readable, read-only), and re-point their ACTIVE assignments to the availability schedule (locks are keyed on the assignment, so nothing is lost);
-- availability with ≠ 2 days → keep, and list it on the admin **Teachers** board as *"needs 2 days"*;
-- `DRAFT` schedules with zero assignments → `CANCELLED`.
-
-The report is printed and written to `backups/`.
+| **Today** | Teachers expected in the hall today, register state per teacher (taken / due / missing), assigned vs visitors so far | Open any register read-only; set a substitute recorder (MANAGE_ANY) |
+| **Teachers** | Declarations: declared / missing / exempt vs deadline; weekday load bar chart; compliance per teacher (sessions held, on-day registers, cancellations replaced) | **Remind missing** · **Set days** · **Exempt** · **Import from form (CSV)** · **Download CSV** |
+| **Follow-up** | Students who missed assigned sessions (escalation levels), with history | Acknowledge with note · Refer to discipline (Tendo prefill) · Assign |
+| **Reports** | Period picker; school / grade / class / teacher / student breakdowns; assigned vs voluntary | CSV · Excel · PDF |
+| ⚙ | Policy (band, location, days per teacher, deadline, cut-off, edit days, escalation thresholds, parent notifications) and closures | Save |
 
 ---
 
-## 8. Backend changes
+## 7. Data model: migration `103_office_hours_v2.sql`
+
+Idempotent, MySQL 5.7 and 8, same style as 102 (information_schema guards, `INSERT IGNORE`). Drizzle definitions live in `backend/src/db/officeHoursSchema.ts`, which is rewritten.
+
+### 7.1 Archive v1
+
+For each v1 table except `SchoolClosure`: `RENAME TABLE OfficeHourX TO v1_OfficeHourX` if the source exists and the target doesn't. This is reversible, and nothing reads `v1_*`.
+
+### 7.2 New tables
+
+```sql
+OfficeHourPolicy (                      -- one row, id = 1
+  id TINYINT PK,
+  band_start CHAR(5) DEFAULT '16:20', band_end CHAR(5) DEFAULT '17:20',
+  location VARCHAR(100) DEFAULT 'Academy Hall',
+  days_per_teacher TINYINT DEFAULT 2,
+  declaration_deadline DATE NULL,        -- seeded 2026-10-05; leadership updates per term
+  roster_cutoff_time CHAR(5) DEFAULT '14:00',
+  register_edit_days TINYINT DEFAULT 2,
+  weekly_default_weeks TINYINT DEFAULT 4,
+  escalation_consecutive_l1 TINYINT DEFAULT 2, escalation_month_l1 TINYINT DEFAULT 2,
+  escalation_consecutive_l2 TINYINT DEFAULT 3,
+  rate_band_consistent TINYINT DEFAULT 90, rate_band_watch TINYINT DEFAULT 80,
+  min_sessions_for_rate TINYINT DEFAULT 3,
+  parent_notifications ENUM('OFF','ESCALATIONS','WEEKLY') DEFAULT 'ESCALATIONS',
+  updated_by BIGINT NULL, updated_at DATETIME NULL)
+
+OfficeHourTeacher (
+  academic_term_id BIGINT, teacher_id BIGINT,          PK (academic_term_id, teacher_id)
+  status ENUM('ACTIVE','EXEMPT') DEFAULT 'ACTIVE', exempt_note VARCHAR(255) NULL,
+  submitted_at DATETIME NULL, submitted_by BIGINT NULL, -- set by teacher or leadership
+  updated_at DATETIME)
+
+OfficeHourTeacherDay (
+  id BIGINT PK AI, academic_term_id BIGINT, teacher_id BIGINT,
+  day_of_week TINYINT,                                  -- 1 = Mon … 5 = Fri
+  effective_from DATE, effective_to DATE NULL,          -- NULL = open
+  created_by BIGINT, created_at DATETIME,
+  INDEX (academic_term_id, day_of_week, effective_from))
+
+OfficeHourSession (
+  session_id BIGINT PK AI, academic_term_id BIGINT, teacher_id BIGINT,
+  session_date DATE,                                    UNIQUE (teacher_id, session_date)
+  status ENUM('SCHEDULED','HELD','CANCELLED') DEFAULT 'SCHEDULED',
+  is_extra TINYINT DEFAULT 0,                           -- one-off replacement day
+  cancel_reason ENUM('REPLACED','NOT_REPLACED','CLOSURE','DAYS_CHANGED','ADMIN') NULL,
+  cancel_note VARCHAR(255) NULL, cancelled_by BIGINT NULL, cancelled_at DATETIME NULL,
+  replaced_by_session_id BIGINT NULL,
+  recorder_id BIGINT NULL,                              -- substitute recorder for this date
+  register_first_saved_at DATETIME NULL, register_last_saved_at DATETIME NULL,
+  register_saved_by BIGINT NULL, register_late TINYINT DEFAULT 0,
+  version INT DEFAULT 1,
+  INDEX (session_date, status), INDEX (academic_term_id, teacher_id, session_date))
+
+OfficeHourAssignment (
+  assignment_id BIGINT PK AI, academic_term_id BIGINT,
+  student_id BIGINT, teacher_id BIGINT, assigned_by BIGINT,
+  mode ENUM('ONCE','WEEKLY'),
+  session_id BIGINT NULL,                               -- ONCE target (follows replacements)
+  weekly_days VARCHAR(9) NULL, starts_on DATE, ends_on DATE,  -- WEEKLY: '2,4'
+  reason_code VARCHAR(30), message VARCHAR(300) NULL,
+  status ENUM('ACTIVE','COMPLETED','RELEASED') DEFAULT 'ACTIVE',
+  ended_at DATETIME NULL, ended_by BIGINT NULL, end_note VARCHAR(255) NULL,
+  created_at DATETIME,
+  INDEX (teacher_id, status), INDEX (student_id, academic_term_id))
+
+OfficeHourAssignmentLock (                              -- R8: the DB enforces it
+  academic_term_id BIGINT, student_id BIGINT,           PK (academic_term_id, student_id)
+  assignment_id BIGINT UNIQUE, created_at DATETIME)
+
+OfficeHourVisit (
+  session_id BIGINT, student_id BIGINT,                 PK (session_id, student_id)
+  visit_type ENUM('ASSIGNED','VOLUNTARY'),
+  assignment_id BIGINT NULL,
+  status ENUM('PRESENT','ABSENT','LATE','EXCUSED') NULL, -- NULL only before save
+  excuse_reason VARCHAR(30) NULL, note VARCHAR(255) NULL,
+  marked_by BIGINT NULL, marked_at DATETIME NULL,
+  INDEX (student_id, session_id))
+
+OfficeHourVisitHistory (history_id PK AI, session_id, student_id, previous_status, new_status,
+  previous_type, new_type, changed_by, changed_at)
+
+OfficeHourEscalation (escalation_id PK AI, academic_term_id, student_id, assignment_id,
+  level TINYINT, trigger_code VARCHAR(20), trigger_session_id, notified_user_ids TEXT,
+  created_at, acknowledged_by NULL, acknowledged_at NULL, resolution_note VARCHAR(500) NULL)
+
+OfficeHourAbsenceNotice (notice_id PK AI, session_id, student_id, reason VARCHAR(30),
+  note VARCHAR(255) NULL, created_at,  UNIQUE (session_id, student_id))
+```
+
+**Permissions:** none added. 103 updates the labels of the existing `OFFICE_HOURS_*` rows to the v2 wording (§8.4).
+
+### 7.3 Clean-up migration
+
+After v2 has run one week in production with no rollback, `10x_drop_office_hours_v1.sql` drops the `v1_*` tables. It gets its own PR so the rollback window is explicit.
+
+---
+
+## 8. Backend: services, API, jobs
 
 ### 8.1 Services (`backend/src/services/officeHours/`)
 
-| File | Change |
+| File | Responsibility |
 |---|---|
-| `settings.ts` | New fields + validation. `publicConfig` exposes `days_per_teacher`, `default_location`, `declaration_deadline` and `band_locked`. Remove `WEEKDAY` from accepted values (the column is kept). |
-| **`availability.ts`** (new) | `getMyAvailability(actor, term)`, `saveAvailability(actor, term, days)`. Upsert by `live_key` under `withDeadlockRetry`. Exactly N distinct days. Time and location forced. `submitted_at`. A mid-term change takes effect next Monday and calls `materialise`, which cancels sessions no longer matching with `SCHEDULE_CHANGED` (v1 logic). Returns `affected_weekly_referrals[]`. `hallLoad(term)` → teachers per weekday. |
-| `schedules.ts` | `createSchedule`/`updateSchedule` become internal helpers used by `availability.ts`. The public create/update/publish/rollover paths are retired (§8.2). `serializeSchedules` drops title/purpose/capacity from the payload. The title is generated: "Office hours — {teacher}". |
-| `assignments.ts` | `referStudents({ actor, teacherId, studentIds, mode, sessionIds \| days, until, reason_code, message })`, which resolves the teacher's availability schedule and reuses the existing lock/partial-success core (`assigned / conflicts / ineligible / already_assigned`). Capacity checks are removed (the hall has no per-teacher cap). `completeOnceReferrals(sessionId)` is new and is called from `saveRegister` and from cancel-without-replacement. Conflicts include the holder's teacher id, so the UI can show *Message*. |
-| `sessions.ts` + `modern.ts` | `cantHold(sessionId, { replacementDate \| notReplacedReason, message })`. It validates same Mon–Fri week, future, not a closure and before start, then calls `moveSession` (existing) or `cancelSession(NOT_REPLACED)`. ONCE referrals targeting the session move with it. |
-| `register.ts` | Same-day window + `register_late`. `saveRegister(..., { unmarkedAssignedAbsent: true })`. The response returns `visit` (`ASSIGNED`/`VOLUNTARY`). `recentVisitors(teacherId)`. |
-| `views.ts` | `directory(term, weekStart, viewer)`: teachers by weekday, ranked with the viewer's own teachers first; staff get counts. `studentOverview` adds the referral reason/message (R9) and voluntary history. `bandFor` adds hall entries for students. |
-| `metrics.ts` / `reports.ts` | Split every rate into **assigned attendance** (present ÷ assigned held) and **voluntary visits** (count, unique students). Absence and escalation use assigned only. New `teacherCompliance(period)`: declared ✓, sessions held/expected, on-day registers %, cancellations replaced %. New `declarations(term)`. |
-| `escalation.ts`, `digests.ts`, `notify.ts` | Assigned-only triggers (already true in practice, made explicit). Referral notice text includes day, time, place and reason. New events: `availability_saved` (admin digest, not per-event), `session_replaced`, `declaration_reminder`. |
-| `scheduler.ts` | New job: **declaration reminders**, daily 07:30 until every teacher has declared (bell + push to missing teachers; summary to admin). The morning roster text gains visitors. |
-| `reconcile.ts` | Repairs `live_key` drift, completes past ONCE referrals whose session ended without a register (status `COMPLETED`, attendance left missing = teacher compliance, not student absence; see P6). |
+| `common.ts` | Kept |
+| `policy.ts` | Replaces `settings.ts`. Read (60 s cache) and validated save of `OfficeHourPolicy`; `publicPolicy()` |
+| `access.ts` | Rewritten small: `actorOf`, `isInstructor(userId, yearId)`, `canRecord(session)` (teacher, substitute recorder, MANAGE_ANY), `readScopeOf` (kept from v1) |
+| `teacherDays.ts` | `getMyDays`, `saveMyDays` (first declaration vs change-from-next-Monday), `setDaysFor` (leadership), `setExempt`, `hallLoad(term, week)`, `importDays(csvRows, dryRun)` (P9), `effectiveDaysOn(date)` |
+| `sessions.ts` | `ensureSessions(teacherIds?, from, to)` (closure-aware, idempotent through the unique key), `sessionsFor(viewer, range)`, `cantHold(sessionId, {replacementDate} \| {reason}, message)` |
+| `assignments.ts` | `candidates(actor, query)` (teachable students + availability state: free / with you / assigned by X), `assign(actor, input)` (partial success: `assigned[]`, `blocked[]` with holder, `ineligible[]`), `release`, `askToRelease`, `completeForSession(sessionId)`, `suggestions` (moved from v1) |
+| `register.ts` | `openRegister` (snapshot assigned rows), `saveRegister(sessionId, rows, version)` (auto-absent, late flag, history, HELD, completes ONCE assignments, triggers escalation), `noOneCame`, `recentVisitors(teacherId)` |
+| `views.ts` | `teacherHub(actor, term)`, `studentPage(studentId, term)` (assignment + reason + directory + history), `directory(term, weekStart, viewer)`, `band(viewer, weekStart)` |
+| `metrics.ts` | One place for formulas: assigned attendance rate, presence rate, voluntary visits, unique visitors, consistency band, teacher compliance |
+| `reports.ts` | Scoped datasets on the period engine: summary, breakdown (teacher / subject / class / grade / weekday / reason), consistency, student 360, teacher 360, declarations, compliance, daily sheet |
+| `escalation.ts` | Kept logic, re-pointed to `OfficeHourVisit` (assigned only) |
+| `notify.ts` / `events.ts` | Event texts of §10; same delivery helper |
+| `digests.ts` | Friday teacher digest (week's visits, missing registers), leadership digest (declarations, compliance, follow-ups), parent summary if `WEEKLY` |
+| `reminders.ts` | Reminder Hub occurrences: teachers' own days; students' assigned sessions |
+| `scheduler.ts` | Jobs in §8.3 |
+| `reconcile.ts` | Nightly: complete expired WEEKLY assignments, remove orphan locks, release assignments of students who left their class, cancel future sessions on new closures |
 
-### 8.2 Routes (`backend/src/routes/officeHours.ts`)
-
-**New**
+### 8.2 API (`backend/src/routes/officeHours.ts`, mounted at `/office-hours`)
 
 | Method | Path | Guard | Purpose |
 |---|---|---|---|
-| GET | `/my-days` | MANAGE_OWN | My availability, hall load, deadline |
-| PUT | `/my-days` | MANAGE_OWN | `{ days: [2,4] }` |
-| GET | `/directory?week=YYYY-MM-DD` | any signed-in user | Teachers in the hall per weekday (student/staff shapes) |
-| POST | `/referrals` | MANAGE_OWN (own) / MANAGE_ANY (`teacher_id`) | Assign (partial success) |
-| POST | `/referrals/:id/release` | owner / MANAGE_ANY | Release (frees the lock) |
-| POST | `/sessions/:id/cant-hold` | host / MANAGE_ANY | Replace in the same week or not-replaced |
-| GET | `/sessions/:id/recent-visitors` | host | Quick-add row |
-| GET | `/admin/declarations` | VIEW | Submitted/missing, load, CSV data |
-| POST | `/admin/declarations/remind` | MANAGE_ANY | Nudge missing teachers |
-| PUT | `/admin/teachers/:id/days` | MANAGE_ANY | Set days for a teacher (absent staff, corrections) |
-| GET | `/reports/compliance` | VIEW | Teacher compliance |
+| GET | `/config` | auth | Policy values + the caller's capabilities |
+| GET | `/hub` | MANAGE_OWN | Teacher hub payload (days, today, week, assigned, missing registers, release asks, term totals) |
+| GET | `/my-days` | MANAGE_OWN | My days + hall load + deadline |
+| PUT | `/my-days` | MANAGE_OWN | `{ days: [2,4] }` → result + `affected_weekly[]` |
+| GET | `/directory?week=` | auth | Teachers per weekday (no student data) |
+| GET | `/candidates?q=&class_group_id=` | MANAGE_OWN | Students with availability state |
+| GET | `/suggestions` | MANAGE_OWN | Evidence-based list |
+| POST | `/assignments` | MANAGE_OWN / MANAGE_ANY (`teacher_id`) | `{ student_ids, mode, session_id \| weekly_days+ends_on, reason_code, message }` |
+| POST | `/assignments/:id/release` | assigner, teacher, MANAGE_ANY | Frees the lock |
+| POST | `/assignments/:id/ask-release` | MANAGE_OWN | Bell notice to the holder |
+| GET | `/sessions?from=&to=` | auth (scoped) | Sessions for the viewer. **Tendo contract** (§13) |
+| POST | `/sessions/:id/cant-hold` | recorder / MANAGE_ANY | Replace or not-replaced |
+| GET | `/sessions/:id/register` | recorder / VIEW | Register rows + absence notices |
+| PUT | `/sessions/:id/register` | recorder / MANAGE_ANY | Save (versioned) |
+| POST | `/sessions/:id/no-one-came` | recorder | Empty HELD register |
+| GET | `/sessions/:id/recent-visitors` | recorder | Quick-add chips |
+| POST / DELETE | `/sessions/:id/absence-notice` | VIEW_SELF (student) | "I can't come" |
+| GET | `/me`, `/children` | VIEW_SELF | Student and parent pages. **Tendo contract** |
+| GET | `/band?week=` | auth | Timetable band entries for the viewer |
+| GET | `/school/today` | VIEW | Live hall view |
+| GET | `/school/teachers` | VIEW | Declarations + load + compliance |
+| POST | `/school/teachers/remind` | MANAGE_ANY | Remind missing |
+| PUT | `/school/teachers/:id/days` | MANAGE_ANY | Set days |
+| PUT | `/school/teachers/:id/exempt` | MANAGE_ANY | Exempt or restore |
+| POST | `/school/teachers/import?dry_run=1` | MANAGE_ANY | Google Form CSV → days |
+| PUT | `/sessions/:id/recorder` | MANAGE_ANY | Substitute recorder |
+| GET | `/escalations` · POST `/escalations/:id/ack` | VIEW / MANAGE_ANY | Follow-up |
+| GET | `/reports/{summary,breakdown,consistency,compliance,declarations,daily}` · `/reports/students/:id` · `/reports/teachers/:id` | VIEW (scoped, summary depth = totals only); teachers see their own | Reports |
+| GET / POST / DELETE | `/closures`, `/closures/preview` | VIEW / CONFIGURE | Kept |
+| GET / PUT | `/policy` | CONFIGURE | Policy |
 
-**Changed:** `GET /my` (adds availability, referrals, next sessions even if empty), `PUT /sessions/:id/register` (auto-absent, late flag), `GET /me` (directory + reason), `GET /band`, `GET /config`.
+The route-level `officeHoursReady()` guard (503 before migration) and the kill switch (404) are kept. `officeHoursReady()` checks for `OfficeHourPolicy` instead of the v1 table.
 
-**Retired** (kept for one release as thin aliases returning `410 OFFICE_HOURS_V2` with a hint, then deleted): `POST /schedules`, `PATCH /schedules/:id`, `POST /schedules/:id/publish`, `POST /schedules/:id/rollover`, `POST /schedules/:id/assignments` (→ `/referrals`), `POST /sessions/:id/move` and `/cancel` for teachers (→ `/cant-hold`; admin keeps `/cancel` for closures and voids). `GET /schedules/:id` stays for the 360 and report links.
+### 8.3 Jobs (one pm2 process, Kigali time, each keyed and idempotent)
 
-### 8.3 Access control
+| Job | When | What |
+|---|---|---|
+| Ensure sessions | every 6 h | 14 days ahead for every ACTIVE teacher |
+| Declaration reminder | 07:30 weekdays, until all declared | Bell + push to missing instructors. Leadership summary on deadline day and the day after |
+| Morning note | 06:30 on a teacher's day | "Office hours today 16:20 · Academy Hall · 3 assigned" |
+| Register reminder | band start + 5 min; band end + 10 min if missing; 20:00 if still missing | Push to recorder |
+| Escalations | 18:30 (also after every register save) | Ladder on assigned absences |
+| Reconcile | 02:00 | §8.1 `reconcile.ts` |
+| Digests | Friday 17:30 | §8.1 `digests.ts` |
 
-There is no new permission. `OFFICE_HOURS_MANAGE_OWN` = declare days, refer own students, record own registers. `MANAGE_ANY` = set anyone's days, refer to anyone's office hours, override, closures. `VIEW` with summary/detail depth is unchanged. The directory needs only authentication, because teacher names and days are not sensitive and R3 requires sharing them. It never returns student data.
+### 8.4 Access control
+
+| Capability | v2 meaning |
+|---|---|
+| `OFFICE_HOURS_MANAGE_OWN` | Declare my days, assign students I teach, record my sessions (all teacher roles, as in 102) |
+| `OFFICE_HOURS_MANAGE_ANY` | Set days or exempt any teacher, assign any student to any teacher, record or correct any register, substitute recorder, closures |
+| `OFFICE_HOURS_VIEW` (summary / detail, scoped) | School view and reports within scope. Summary depth = totals, no names |
+| `OFFICE_HOURS_VIEW_SELF` | Student/parent page and "I can't come" |
+| `OFFICE_HOURS_CONFIGURE` | Policy |
+
+Scope uses `resolveUserScope`, as in v1 (class teacher → class, programme lead → programme, head/deputies → school). The directory needs only authentication: teacher names and days are meant to be shared (R3), and it never returns student data.
 
 ---
 
-## 9. Frontend changes (`frontend/src/components/officeHours/`)
+## 9. Frontend: screens and file map (`frontend/src/`)
 
-### 9.1 New
-
-| File | What |
-|---|---|
-| `DayPicker.tsx` | The 2-day card (first run + "Change"), with hall-load chips and a counter. Shared with the admin "set days" action. |
-| `AssignSheet.tsx` | 2-step drawer (§6.3). It reuses `StudentPicker` internals (row availability chips, search, class chips, suggestions) and adds session chips, mode, reason and a live preview. Openable from the hub, register, Person360 and the timetable band. |
-| `CantHoldSheet.tsx` | Same-week replacement chips + not-replaced reason. |
-| `TeacherDirectory.tsx` | Week strip of teachers per day (student page, band popover, Home card). |
-| `admin/TeachersTab.tsx` | Declarations, load chart (following the `dataviz` skill), compliance table, Remind, CSV. |
-| `admin/StudentsTab.tsx` | Follow-up (escalations + transfers filter), consistency, voluntary usage, never seen. |
-
-### 9.2 Rewritten
-
-| File | Change |
-|---|---|
-| `OfficeHoursHub.tsx` | The single page of §6.2. The tabs go away (Reports becomes a header link). The `?new=1&day=` deep link becomes `?assign=1` / `?days=1`. |
-| `RegisterSheet.tsx` | Visitor quick-add first, assigned section with Present/Absent, auto-absent footer, recent visitors. Late/Excused/notes under ⋯. The offline queue is unchanged. |
-| `MyOfficeHours.tsx` | §6.5: assigned card with reason, directory, history split. Parents see the same per child. |
-| `OfficeHoursBandCells.tsx` / `useOfficeHoursBand.ts` | Teacher: "Academy Hall · 4 assigned" on their days, "+ Pick your days" on the first run. Student: assigned highlight or "3 of your teachers". Admin grid: teachers per day. |
-| `admin/OfficeHoursAdmin.tsx` | 4 tabs + ⚙. `OverviewTab` becomes Today. `SettingsTab` is trimmed (§9.3). |
-| `reports/*` | Assigned/voluntary columns, compliance report, export headers. |
-| `api/officeHours.ts` | New endpoints and types, with retired calls removed. |
-
-### 9.3 Hidden, kept or removed
-
-| v1 feature | Fate |
-|---|---|
-| `ScheduleDrawer.tsx` (3-step create), `ScheduleDetail.tsx` | **Removed.** Replaced by DayPicker + AssignSheet + hub. The schedule detail route redirects to `/office-hours`. |
-| Title, purpose, room, capacity, time and date window inputs | **Removed from the UI.** Columns stay. |
-| Drafts / publish | **Removed.** Days save instantly, and referrals notify instantly. |
-| WEEKDAY lock mode, allowed window, default/max capacity, roster settings shown to admins | **Hidden from Settings.** Cut-off, edit days, escalation thresholds, bands, parent notifications and QR remain. |
-| Term rollover | **Replaced** by a prompt at the start of a term: *"Keep Tue & Thu for Term 2?"* (one tap). |
-| Substitute host | **Admin only** (MANAGE_ANY), from the Today tab. |
-| Outcomes / follow-up flags in the register | **Hidden under ⋯ → More.** |
-| QR self check-in, live SSE register, "I can't come", suggestions, discipline referral | **Kept.** QR gains a P5 option: one **hall QR** where a student picks the teacher, which suits voluntary traffic (decision P7). |
+| File | Status | Content |
+|---|---|---|
+| `api/officeHours.ts` | rewrite | Endpoints and types of §8.2 |
+| `components/officeHours/OfficeHoursPage.tsx` | new | `/office-hours` entry: picks Teacher hub / Student page / Me–School switch by capability |
+| `components/officeHours/teacher/DayPicker.tsx` | new | §6.2; reused by "✎" and by leadership *Set days* |
+| `components/officeHours/teacher/TeacherHub.tsx` | new | §6.3 |
+| `components/officeHours/teacher/AssignDrawer.tsx` | new | §6.4 (row-state logic ported from `StudentPicker`) |
+| `components/officeHours/teacher/RegisterDrawer.tsx` | new | §6.5 (offline queue, keyboard, version conflict merge ported from `RegisterSheet`) |
+| `components/officeHours/teacher/CantHoldSheet.tsx` | new | §6.6 |
+| `components/officeHours/student/StudentOfficeHours.tsx` | new | §6.7 (replaces `MyOfficeHours.tsx`); parent mode |
+| `components/officeHours/student/TeacherDirectory.tsx` | new | Week strip; also used in the band popover and Home |
+| `components/officeHours/school/SchoolView.tsx` | new | Tabs Today · Teachers · Follow-up · Reports · ⚙ |
+| `components/officeHours/school/{TodayTab,TeachersTab,FollowUpTab,PolicyTab}.tsx` | new | §6.8. `ClosuresTab` is kept and moved under ⚙ |
+| `components/officeHours/school/ImportDaysDialog.tsx` | new | CSV paste/upload → preview → apply (P9) |
+| `components/officeHours/reports/*` | adapt | `OfficeHoursReports`, `Person360` on v2 datasets. `PeriodPicker` and `exports` kept |
+| `components/officeHours/OfficeHoursBandCells.tsx`, `useOfficeHoursBand.ts` | adapt | Teacher: "Academy Hall · 3 assigned", or "+ Pick your days" until declared. Student: highlighted assignment or "3 of your teachers". Class grid: teachers per day |
+| `components/officeHours/AbsenceNoticeButton.tsx`, `offlineQueue.ts`, `ohUi.tsx` | keep | — |
+| `ScheduleDrawer`, `ScheduleDetail`, `StudentPicker`, `RegisterSheet`, `MyOfficeHours`, `CheckIn`, `OfficeHoursHub`, `admin/*` (except Closures) | delete | — |
+| `App.tsx` | edit | Routes: `/office-hours` (all), `/office-hours/reports/students/:id`, `/office-hours/reports/teachers/:id`. Remove `/office-hours/admin`, `/office-hours/schedules/:id` (redirect to `/office-hours`), `/office-hours/checkin`, `/my-office-hours` (redirect) |
+| `components/ui/Sidebar.tsx`, `NavSearch.tsx` | edit | **One "Office Hours" item** for anyone holding any `OFFICE_HOURS_*` capability. Remove "Office Hours Oversight" |
+| `activity/mis.catalog.json` + backend `catalogs/mis.json` | edit | New route/action names for analytics |
+| `constants/permissions.ts` | keep | — |
 
 ---
 
-## 10. Notifications, reports and integrations
+## 10. Notifications
 
-### 10.1 Notification matrix (changes only)
+All mandatory notices go to the **bell + push** directly, whatever the user's Reminder Hub opt-in.
 
-| Event | To | Channel | Text |
-|---|---|---|---|
-| Days saved (first time) | Teacher | toast | "Shared with your students" |
-| Days saved / changed | Admin | Friday digest + Teachers tab | "Ms A: Tue & Thu (changed from Mon & Thu, from 13 Oct)" |
-| Declaration missing | Teacher | bell + push, daily 07:30 | "Pick your two office-hours days — due Mon 5 Oct" |
-| Referral created | Student (parents only through escalations, D4) | bell + push (mandatory path) | "Office hours with Ms A — Tue 7 Oct, 16:20–17:20, Academy Hall. Reason: …" |
-| Referral released / completed | Student | bell | "You no longer need to attend office hours with Ms A" |
-| Session replaced | Assigned students, admin digest | bell + push | "Ms A moved Tue 7 Oct office hours to Wed 8 Oct, same time, Academy Hall" |
-| Not replaced | Assigned students; admin | bell + push; admin bell | "…cancelled this week" / "Ms A could not replace Tue 7 Oct: <reason>" |
-| Missed assigned session | Student, class teacher | existing escalation ladder | unchanged |
+| Event | Recipient | Text |
+|---|---|---|
+| Days declared | Teacher (toast); leadership digest | "Tuesdays & Thursdays, 16:20–17:20, Academy Hall — your students can see this now." |
+| Days changed | Leadership (digest + Teachers view) | "Ms A: Tue & Thu → Mon & Thu from 13 Oct" |
+| Declaration missing | Missing instructors, daily | "Pick your two office-hours days — due Mon 5 Oct." |
+| **Assigned** | Student | "Office hours with Ms A — Tue 7 Oct, 16:20–17:20, Academy Hall. Reason: Catch up on missed work." (+ message) |
+| Assigned weekly | Student | "Office hours with Ms A — every Tuesday until 4 Nov, 16:20–17:20, Academy Hall. Reason: …" |
+| Released | Student | "You no longer need to attend office hours with Ms A." |
+| Ask to release | Holder teacher | "Mr K asks you to release Grace U. so he can assign her." → opens the assignment |
+| **Session replaced** | Assigned students | "Ms A moved Tuesday's office hours to Thursday 9 Oct, 16:20–17:20, Academy Hall." |
+| Session not replaced | Assigned students; leadership | "Ms A's office hours on Tue 7 Oct are cancelled. You don't need to attend." / "Ms A could not replace Tue 7 Oct: <reason>" |
+| Before session | Assigned students and teacher (Reminder Hub, opt-in) | "Office hours at 16:20 in the Academy Hall" |
+| I can't come | Teacher | "Ivan K. can't come today: sick bay" (shown on the register too) |
+| Missed assigned session | Student; class teacher; ladder per §11 | "You missed office hours with Ms A on Tue 7 Oct." |
+| Register missing | Recorder (reminders); leadership (Today, digest) | "Record Tuesday's office-hours attendance." |
 
-Students who only come voluntarily are not pinged when a session is replaced. The directory and band update instead. If the school wants every student of the teacher pinged, that is decision P8.
-
-### 10.2 Reports
-
-Every report gains **Assigned** (held, attended, absent, rate) and **Voluntary** (visits, unique students) columns. New: **Teacher compliance** (declared, sessions held/expected, on-day registers %, late registers, cancellations replaced %) and **Declarations** export (teacher, subject(s), days, submitted at), which replaces the Google Form sheet. The consistency bands apply to assigned attendance. A "most-used teachers / quiet days" view helps balance the hall.
-
-### 10.3 Integrations
-
-- **Home tiles** (`services/home/officeHoursProvider.ts`):
-  - teacher: "Today 16:20 · 4 assigned" or "Pick your days";
-  - student: the assigned card or "3 of your teachers today";
-  - leadership: "Declared 41/48 · today 12 teachers · 63 visits this week".
-- **Tendo lane:** unchanged contract. It shows assigned sessions only.
-- **Task Mentor standing:** unchanged. It feeds *Suggested* in the AssignSheet.
-- **Reminder Hub** `office_hours` kind: occurrences come from the availability (the teacher's own days) and from referrals (the student's assigned dates).
-- **Desktop app** watchers: no change (same notification kinds, plus the new ones mapped in `NotificationBell.kindIcon`).
+Voluntary-only students are not notified of replacements (P7). The directory and timetable update for everyone.
 
 ---
 
-## 11. Decisions for the school
+## 11. Reports and administration follow-up
 
-Each has a recommended default that the plan is built on. All are settings or small changes.
+**Metrics (`metrics.ts`, the only definitions, shown under "How is this calculated?"):**
+- **Assigned attendance rate** = (present + late + excused) ÷ assigned visits in HELD sessions.
+- **Presence rate** = (present + late) ÷ the same denominator.
+- **Voluntary visits** = count of VOLUNTARY rows; **unique visitors** = distinct students.
+- **Consistency band** (assigned, from 3 sessions): consistent ≥ 90%, watch 80–89%, chronic < 80%.
+- **Regular visitor** = a student with voluntary visits in ≥ 3 of the last 4 weeks. This is the "attends consistently" view of R12 for voluntary use.
+- **Teacher compliance** for a period:
+  - declared (yes/no);
+  - sessions held ÷ sessions due (due excludes closures and replaced originals);
+  - on-day registers %;
+  - late registers;
+  - cancellations replaced %.
+
+**Reports:**
+- summary;
+- breakdowns by teacher / subject / class / grade / programme / weekday / reason;
+- consistency lists (chronic, watch, regular visitors, never seen);
+- student 360 (every visit, both types);
+- teacher 360 (days, sessions, visits, compliance);
+- **declarations** (teacher, subjects, days, submitted at, by whom): this **replaces the Google Form sheet**;
+- printable daily register sheet.
+
+All of them export to CSV, Excel and PDF.
+
+**Follow-up (R12), escalation ladder on assigned absences only:**
+- **Level 1:** 2 assigned absences in a row, or 2 in 30 days. The student, the assigning teacher and the class teacher are told.
+- **Level 2:** 3 in a row, or a rate below the watch band. The programme lead is told, and parents by email if the policy allows.
+- A level re-arms after two attended assigned sessions in a row.
+- In **Follow-up**, leadership acknowledges with a note, assigns again, or opens a prefilled Tendo discipline record (never automatic).
+
+---
+
+## 12. Decisions for the school
+
+The plan is built on the recommendation in each row. All are policy settings or small changes.
 
 | # | Question | Recommendation |
 |---|---|---|
-| **P1** | Can a teacher choose **more than two** days (e.g. part-time staff fewer, keen staff more)? | **Exactly two** (`days_per_teacher = 2`). Admin can set exceptions per teacher via "set days". |
-| **P2** | Should days be **balanced** across the hall (cap per weekday)? | **Show load only, no cap** at launch. Add a soft cap later if one day overflows. |
-| **P3** | Can teachers **change days** mid-term? | **Yes, from next week**, with admin notified. Weekly referrals on the dropped day must be moved or released in the same dialog. |
-| **P4** | Statuses: just Present/Absent, or keep Late/Excused? | **Present/Absent up front, Late/Excused under ⋯**, so Tendo's semantics (D3) still agree. |
-| **P5** | The memo says to tell the student the **reason**. v1 hides reasons from students. | **Show the reason to the student** (policy wins). Reasons are student-friendly chips + an optional message. Parents do not see them unless escalated. |
-| **P6** | Register never taken: are the assigned students **absent**? | **No.** It is a teacher compliance gap (missing register), not a student absence. R11 applies once a register is recorded. |
-| **P7** | Voluntary visitors: teacher types them in, or **students check in** at a hall QR? | **The teacher adds them at launch** (quick-add + recent visitors). Pilot a hall QR in P5 if teachers report the typing as a burden. |
-| **P8** | When a session is replaced, notify **all the teacher's students** or only the assigned ones? | **Only assigned students** (avoids spamming hundreds). The directory and timetable update for everyone. |
-| **P9** | ONCE vs WEEKLY referral default | **Once** (the next session). Weekly is one tap away with a 4-week default end. |
-| **P10** | Register edit window | **Same day.** Next-day saves are allowed and flagged *late*. After `register_edit_days` (1), only admin. |
+| **P1** | Exactly two days, or "at least two"? | **Exactly two** (`days_per_teacher = 2`); leadership can exempt or set days for a teacher. |
+| **P2** | Limit how many teachers share one weekday in the hall? | **No cap; show the load live** so teachers balance. Add a soft cap later if a day overflows. |
+| **P3** | May teachers change their days mid-term? | **Yes, effective next Monday**, leadership informed. Weekly assignments on a dropped day are moved or released in the same dialog. |
+| **P4** | Statuses | **Present / Absent** up front; **Late / Excused** under ⋯ (Tendo-compatible). |
+| **P5** | The reason is shown to the student (R9). Shown to parents too? | **Student: yes. Parents: only when an escalation reaches them.** |
+| **P6** | If the teacher records no register, are assigned students absent? | **No.** It is a missing register (teacher compliance). R11 applies when a register is recorded. |
+| **P7** | On replacement, notify all the teacher's students or only assigned ones? | **Only assigned students.** Everyone else sees the change in the directory and timetable. |
+| **P8** | Default assignment mode | **Once (next session)**; "Every week until…" one tap away (default 4 weeks). |
+| **P9** | Teachers already sent days through the **Google Form** by 05 Oct. | **Import the form's CSV** once (leadership: School → Teachers → Import), so nobody enters days twice. Teachers can still adjust. |
+| **P10** | Register edit window | **On the day** normally; the next day is accepted and flagged *late*; after 2 days only leadership. |
+| **P11** | Self check-in by QR (v1 feature) | **Not in v2.** Teachers record visits with quick-add. Revisit a single hall kiosk if typing proves slow. |
 
 ---
 
-## 12. Getting through 05 October (interim)
+## 13. Integrations
 
-The memo takes effect tomorrow. The refactor needs about 1.5–2 weeks. Until it ships, v1 can carry the policy with these settings and instructions. No code is needed.
-
-1. Admin sets in *Oversight → Settings*: lock mode **Term**, register edit days **1**.
-2. Teachers: *New office hours* → pick **your two days**, leave the time at 16:20–17:20, room **Academy Hall**, title "Office hours". Publish **without students**. *(v1 creates sessions for a schedule with zero students, so walk-ins can be recorded with "Add a student who came".)* Assign students to that same schedule when needed.
-3. Keep the Google Form for the 05 Oct submission. P1's conversion script reads the MIS rows, not the form.
-
-*Verify step 2 on staging before telling staff. If v1 skips sessions for empty schedules, fall back to the form only and ship P1 + P2 first.*
+- **Timetable band** (`CalendarGrid`, `DashboardCalendarWidget`, `TeacherWelcome`): data from `/office-hours/band` (§9). The `calendarConstants.ts` band literal remains the offline fallback. The `"Office Hours"` activity type stays removed from `CalendarSlotModal`.
+- **Home** (`services/home/officeHoursProvider.ts`, rewritten):
+  - teacher tile: "Pick your days", or "Today 16:20 · 3 assigned · Take attendance";
+  - student tile: the assignment card, or "3 of your teachers in the hall today";
+  - leadership tile: "Declared 41/48 · 12 teachers today · 63 visits this week";
+  - attention items: missing registers older than 1 day, and undeclared instructors after the deadline.
+- **Reminder Hub** (`services/reminders/occurrences.ts`): the `office_hours` kind is kept. Occurrences come from teacher days (teacher) and assigned sessions (student).
+- **Tendo** (`nga-discipline-attendance/server/src/modules/attendance/officeHours.ts`):
+  - reads `/office-hours/me` and `/office-hours/sessions`, and deep-links to `/office-hours/schedules/:id`;
+  - v2 keeps both endpoints with a compatible shape (`session_id`, `session_date`, `start_time`, `end_time`, `title` = "Office hours — Ms A", `location`, `status`, plus a new `assigned` flag);
+  - the deep link becomes `/office-hours?session=<id>`, and MIS redirects the old `/office-hours/schedules/:id` to `/office-hours`;
+  - a small Tendo PR updates the link and the lane test (`officeHoursLane.test.ts`). It shows only sessions where the student is **assigned**.
+- **Task Mentor:** `GET /api/integration/student-standing` is unchanged and feeds *Suggested*.
+- **Desktop app / notification bell:** new notification kinds mapped in `NotificationBell.kindIcon`. The desktop watchers need no change.
+- **Analytics:** key events `oh_days_declared`, `oh_assigned`, `oh_register_saved`, `oh_cant_hold`, `oh_released`.
 
 ---
 
-## 13. Phases and task checklist
+## 14. Phases and task checklist
 
-Each phase ends green: backend vitest (`TEST_DB_NAME=<private clone>`), frontend vitest and `tsc`. Never run vitest alongside the e2e API (MAMP trap).
+Each phase ends green: backend vitest on a private test-DB clone, frontend vitest and `tsc`. Never run vitest while the e2e API or another DB-heavy suite is running (MAMP trap).
 
-**P0 — Decisions and checks (0.5 day)**
-- [ ] Leadership confirms P1–P10 (§11).
-- [ ] Owner runs the prod checks in §15.1 and reports the counts. They decide how much the conversion has to handle.
-- [ ] Re-check the next free migration number right before merging (103 expected).
+**P0 — Confirm (0.5 day)**
+- [ ] Leadership confirms P1–P11 (§12).
+- [ ] Owner runs the production checks in §16.1 (expected: all v1 tables empty).
+- [ ] Get the Google Form response export (columns: teacher email/name, days) for P9.
+- [ ] Re-check the next free migration number (103 expected) before merging.
 
-**P1 — Backend model (3 days)**
-- [ ] `103_office_hours_policy.sql` + `officeHoursSchema.ts` additions; apply locally and to the test DB.
-- [ ] `availability.ts` (+ `live_key`, hall load, mid-term change).
-- [ ] `referStudents`, ONCE/WEEKLY, `completeOnceReferrals`, release; capacity checks removed.
-- [ ] `cantHold` (same-week validation, carries ONCE referrals).
-- [ ] Register: same-day window, `register_late`, auto-absent for assigned, `recentVisitors`.
-- [ ] Routes in §8.2; retired routes → 410 aliases.
-- [ ] `scripts/office-hours-policy-convert.ts` (dry-run + report).
+**P1 — Data and core services (3 days)**
+- [ ] `103_office_hours_v2.sql`, the new `officeHoursSchema.ts`, and `test/officeHoursFixtures.ts` rewritten.
+- [ ] `policy.ts`, `access.ts`, `teacherDays.ts`, `sessions.ts` (ensure, can't hold), `assignments.ts` (lock, partial success, complete, release, ask), `register.ts` (auto-absent, late, no-one-came, history).
+- [ ] Routes for teacher and student flows; delete v1 services and routes.
 
 **P2 — Teacher UI (3 days)**
-- [ ] `DayPicker`, new `OfficeHoursHub`, `AssignSheet`, `CantHoldSheet`, `RegisterSheet` rewrite.
-- [ ] Band cells (teacher states), Home teacher tile.
-- [ ] Remove `ScheduleDrawer`/`ScheduleDetail` and add the redirect.
+- [ ] `OfficeHoursPage`, `DayPicker`, `TeacherHub`, `AssignDrawer`, `RegisterDrawer`, `CantHoldSheet`.
+- [ ] Band cells (teacher), Home teacher tile, single sidebar item, routes and redirects; delete v1 components.
 
 **P3 — Student and parent (1.5 days)**
-- [ ] `/directory`, `TeacherDirectory`, `MyOfficeHours` rewrite (reason visible), student band entries, Home student tile.
+- [ ] `/directory`, `/me`, `/children`, `StudentOfficeHours`, `TeacherDirectory`, absence notice, student band and Home tile.
 
-**P4 — Administration (2.5 days)**
-- [ ] Declarations, compliance, reminders job, Teachers tab with CSV, Students tab, console regrouped to 4 tabs + ⚙, trimmed settings.
-- [ ] Reports: assigned/voluntary split, compliance report, exports.
+**P4 — School view and reports (3 days)**
+- [ ] `metrics.ts`, `reports.ts`, the School view (Today, Teachers + import + CSV, Follow-up, Reports, Policy + Closures).
+- [ ] Escalation, digests, reminders and the scheduler jobs of §8.3.
 
-**P5 — Notifications, docs, polish (1.5 days)**
-- [ ] Notice texts (§10.1), new kinds in `NotificationBell.kindIcon` + Reminder Hub occurrences.
-- [ ] `docs/OFFICE_HOURS.md` rewritten around the policy; teacher one-pager (the 4 actions).
-- [ ] Optional hall-QR pilot (P7).
+**P5 — Integrations and docs (1 day)**
+- [ ] Reminder Hub occurrences, analytics catalog, NotificationBell kinds.
+- [ ] Tendo PR (link + test).
+- [ ] Rewrite `docs/OFFICE_HOURS.md` around the policy, with a one-page teacher guide (declare, attend, assign, can't hold).
+- [ ] Mark `OFFICE_HOURS_IMPLEMENTATION_PLAN.md` as superseded at the top.
 
-**P6 — Verification and release (1.5 days)**
-- [ ] e2e rewrite (§14.3), axe at 390/768/1366 in both themes.
-- [ ] Staging run of the conversion script; prod backup; migration via `migrate.yml`; conversion `--apply`; smoke checks.
+**P6 — Verify and release (1.5 days)**
+- [ ] Browser e2e rewrite (§15.3), axe AA in light and dark at 390/768/1366.
+- [ ] Load check (40 teachers × a term of sessions, 50 visits a day) with report queries under 0.5 s.
+- [ ] Release per §16.2.
+
+**Total: about 13.5 working days.**
 
 ---
 
-## 14. Testing
+## 15. Testing
 
-### 14.1 Backend (`src/__tests__/officeHoursPolicy*.test.ts` + updates to the v1 suites)
+### 15.1 Backend (vitest + supertest, `src/__tests__/officeHoursV2*.test.ts`)
 
-- **Availability:**
-  - exactly 2 distinct days (1 or 3 → 400);
-  - a second save edits the same row;
-  - two concurrent first saves → one row (`live_key` unique);
-  - time and location forced;
-  - a mid-term change cancels only sessions from next Monday;
-  - `submitted_at` vs deadline.
-- **Sessions exist without referrals.** A walk-in can be recorded on a teacher with zero assignments.
-- **Referrals:**
-  - ONCE locks then frees on register save;
-  - WEEKLY frees at its end date and on release;
-  - two teachers racing → one wins, the other gets a conflict carrying `holder_teacher_id`;
-  - leadership refers to another teacher's office hours;
-  - the cut-off moves ONCE to the next session;
-  - the student payload contains the reason and message.
-- **Can't hold:**
-  - a replacement in the same week works and ONCE referrals follow it;
-  - next-week dates → 400;
-  - after start → 409;
-  - not replaced → `NOT_REPLACED` + admin notice + ONCE referrals completed (not absent).
+- **Policy:** validation (band order, `days_per_teacher` 1–5, deadline date).
+- **Teacher days:**
+  - exactly N distinct days (1 or 3 → 400);
+  - first save is effective today or tomorrow around the band;
+  - a change is effective next Monday and keeps this week's sessions;
+  - sessions on dropped days with visits are kept, those without are removed;
+  - `affected_weekly` is listed;
+  - exempt removes the teacher from "missing";
+  - leadership set-days records `submitted_by`;
+  - CSV import dry-run writes nothing, matches by email, reports unknown teachers and bad day counts.
+- **Sessions:**
+  - created for declared days only, none on closures;
+  - two concurrent `ensureSessions` calls produce no duplicates;
+  - can't hold: a same-week replacement creates an extra session or reuses the other day, and ONCE assignments move;
+  - next-week dates → 400; after the band started → 409;
+  - not-replaced completes ONCE assignments with no absence and notifies leadership.
+- **Assignments:**
+  - only teachable students (403 otherwise), while leadership may assign any student to any teacher;
+  - two teachers racing for one student → exactly one assignment, and the other gets `blocked` with `holder_teacher_id`;
+  - partial success;
+  - the cut-off moves the default session;
+  - ONCE completes on register save and frees the lock;
+  - WEEKLY completes at its end and on release;
+  - ask-release notifies the holder;
+  - the student payload contains `reason_code` and `message`.
 - **Register:**
-  - unmarked assigned → ABSENT on save;
-  - voluntary rows never ABSENT;
-  - a next-day save sets `register_late`;
-  - after the edit window → 403 for the owner, OK for MANAGE_ANY.
-- **Metrics:**
-  - voluntary visits never lower attendance rates;
-  - escalations come from assigned absences only;
-  - compliance figures on a fixture week.
-- **Directory:** a student sees their teachers first; there are no student fields.
-- **Conversion script:** fixtures for one schedule, several schedules, a 3-day schedule and an empty draft; dry-run makes no writes.
-- **Regression:** the existing v1 suites are updated where behaviour changed by design (capacity, publish, reason hidden). Every other assertion keeps passing.
+  - assigned rows are snapshotted;
+  - unmarked assigned → ABSENT on save, and voluntary rows are never ABSENT;
+  - adding a voluntary visitor who has an assignment on that session turns them into ASSIGNED, not a duplicate;
+  - a next-day save is flagged late;
+  - past `register_edit_days` → 403 for the teacher, OK for MANAGE_ANY;
+  - the version conflict → 409 with the latest rows;
+  - no-one-came on a session with assigned students → 400;
+  - every change writes history.
+- **Metrics and reports:**
+  - a fixture week checks each formula by hand;
+  - voluntary visits never change attendance rates;
+  - compliance excludes replaced originals and closures;
+  - summary depth hides names;
+  - class teacher, programme and school scopes.
+- **Escalation:** levels from assigned absences only; re-arm after two attended.
+- **Views:** the directory carries no student fields; a student sees their own teachers first; a parent sees only linked children.
+- **Jobs:** each job is idempotent when run twice.
+- **Routes:** 404 with the kill switch off; 503 before migration 103.
 
-### 14.2 Frontend (`components/officeHours/__tests__`)
+### 15.2 Frontend (vitest + Testing Library, `components/officeHours/__tests__`)
 
-- DayPicker enables Save only at 2.
-- AssignSheet: conflict row actions, preview text, partial-success toast.
-- Register: quick-add with Enter, the auto-absent count, keyboard 1/2 + ⌘↵.
-- CantHold: only same-week chips.
-- MyOfficeHours shows the reason and the directory.
-- Admin Teachers: missing list and CSV.
+- DayPicker: Save is enabled only at exactly two days; the load chips render.
+- TeacherHub: first-run vs declared states; "No one came" is visible only with zero assigned students.
+- AssignDrawer:
+  - blocked row actions;
+  - the preview text matches the selection;
+  - the partial-success toast;
+  - "Other" requires a message.
+- RegisterDrawer:
+  - "/" focuses search, Enter adds a visitor;
+  - 1/2 toggles; the auto-absent count; ⌘↵ saves;
+  - an offline save is queued.
+- CantHoldSheet: only same-week dates; the move count line.
+- StudentOfficeHours: reason and message shown; directory ordering; parent mode has no "I can't come".
+- School Teachers tab: missing list, remind, the import preview, CSV columns.
+- Sidebar: one *Office Hours* item for teachers, students and leadership.
 
-### 14.3 Browser e2e (`backend/scripts/office-hours-e2e/e2e.cjs`, rewritten)
+### 15.3 Browser end-to-end (`backend/scripts/office-hours-e2e/e2e.cjs`, rewritten; `OFFICE_HOURS_FAKE_NOW`)
 
-1. A teacher with no days → picks Tue/Thu.
-2. The student sees them in the directory.
-3. The teacher refers student X once.
-4. A second teacher is blocked on X, with Message / Ask to release.
-5. Register: X present + 2 visitors.
-6. X's lock is free.
-7. Can't hold Thu → replaced Fri; X2 is notified.
-8. Admin Today and Teachers show the declaration, compliance and CSV.
-9. Report split.
-10. Axe AA, no horizontal overflow, light/dark, 390/768/1366.
+1. Teacher A (no days) sees the picker and picks Tue/Thu.
+2. Student X sees A in the directory and on the timetable band.
+3. A assigns X once with a reason; X's page and bell show day, time, place and reason.
+4. Teacher B tries to assign X, sees "assigned by A", and asks to release; A sees the request.
+5. At the session, A adds 2 visitors, marks X present and saves. X's lock is freed, so B can now assign X.
+6. A assigns Y for Thu, then *Can't hold Thu → Fri*. Y is told and the Fri session exists.
+7. On a session where nobody came, A taps "No one came" and the session is HELD.
+8. Leadership checks Teachers (A declared, C missing → remind; import CSV for C), then Today, Follow-up and Reports (the assigned/voluntary split), and exports CSV.
+9. Axe AA with no horizontal overflow in light and dark at 390, 768 and 1366 px on the teacher hub, register, student page and School view.
 
 ---
 
-## 15. Rollout, data conversion and risks
+## 16. Rollout and risks
 
-### 15.1 Owner pre-checks (production, read-only; run them yourself)
+### 16.1 Production pre-check (owner; read-only)
 
 ```sql
-SELECT status, COUNT(*) FROM OfficeHourSchedule GROUP BY status;
-SELECT teacher_id, academic_term_id, COUNT(*) n FROM OfficeHourSchedule
- WHERE status IN ('ACTIVE','DRAFT') GROUP BY teacher_id, academic_term_id HAVING n > 1;
-SELECT s.schedule_id, COUNT(d.day_of_week) days FROM OfficeHourSchedule s
- JOIN OfficeHourScheduleDay d USING (schedule_id) WHERE s.status='ACTIVE' GROUP BY s.schedule_id HAVING days <> 2;
-SELECT COUNT(*) FROM OfficeHourAssignment WHERE status='ACTIVE';
-SELECT COUNT(*) held FROM OfficeHourSession WHERE status='HELD';
-SELECT * FROM OfficeHourSetting;
+SELECT 'schedules', COUNT(*) FROM OfficeHourSchedule
+UNION ALL SELECT 'assignments', COUNT(*) FROM OfficeHourAssignment
+UNION ALL SELECT 'sessions', COUNT(*) FROM OfficeHourSession
+UNION ALL SELECT 'attendance', COUNT(*) FROM OfficeHourAttendance
+UNION ALL SELECT 'closures', COUNT(*) FROM SchoolClosure;
 ```
 
-### 15.2 Release order
+All counts except closures are expected to be 0. If any are not, stop and export them before running 103. Closures are kept as they are.
 
-1. Back up: `migrate.yml` dumps first.
-2. Apply 103.
-3. Deploy MIS.
-4. Run the conversion `--dry-run` on prod, review, then `--apply`.
-5. Admin checks the Teachers board (declared count, "needs 2 days").
-6. Announce to staff with the one-pager.
+### 16.2 Release order
 
-103 is additive, so the old code keeps running between steps 2 and 3.
+1. Merge the MIS PR.
+2. Back up and apply 103 through `migrate.yml`; it takes a mysqldump first.
+3. The MIS deploy runs automatically on merge. The 503 guard covers the gap if the deploy lands before the migration.
+4. Leadership sets `declaration_deadline` and imports the Google Form CSV (P9).
+5. Merge the Tendo PR.
+6. Announce to staff with the one-page teacher guide.
+7. One week later, run the v1 drop migration.
 
-### 15.3 Risks
+### 16.3 Risks
 
 | Risk | Mitigation |
 |---|---|
-| Teachers already entered v1 schedules (several, or with students) | Conversion keeps every assignment and lock; extra schedules become read-only `LEGACY`; admin board flags anything non-compliant. |
-| One weekday overloads the Academy Hall | Live load on the day chips + admin load chart; P2 soft cap if needed. |
-| Showing reasons to students feels stigmatising | Student-friendly reason wording; no grades or scores in the text; parents excluded unless escalated (P5). |
-| Typing many visitors is slow at 16:20 | Focused quick-add, recent visitors, optional hall QR (P7). |
-| Same-day register window too strict (power cuts, network) | Offline queue already in place; a late save is allowed but flagged rather than blocked; admin can always correct. |
-| Retired endpoints still called by a cached PWA | 410 with `OFFICE_HOURS_V2` code; the SW cache bump forces the new bundle (see the lesson-note SW stale-cache trap). |
-| Lock semantics change (ONCE frees after the session) surprises v1 users | Release notes; conflict text always names who referred and when. |
+| The Academy Hall is overcrowded on popular days | Live load on day chips and the leadership load chart; soft cap if needed (P2) |
+| Typing visitors at 16:20 is slow | Focused quick-add with Enter, recent-visitor chips, keyboard flow; kiosk later (P11) |
+| Same-day register too strict (network, power) | Offline queue; late saves accepted and flagged, not blocked; leadership can correct |
+| Showing reasons to students feels stigmatising | Student-friendly reason wording only; no marks or scores in the text; parents excluded unless escalated (P5) |
+| Teachers already used the Google Form | CSV import (P9) so nobody re-enters days |
+| Cached PWA still calls removed v1 endpoints | Service-worker cache bump on release; old URLs redirect to `/office-hours` |
+| Tendo lane breaks on the new shape | `/me` and `/sessions` keep compatible fields; Tendo PR ships in the same release; lane test updated |
+| The v1 code path is needed back | 103 only renames v1 tables; drop only after one clean week |
 
 ---
 
-*Next step after approval of §11: start P1 on this branch.*
+*Next step: once §12 is confirmed and §16.1 returns empty counts, start P1 on this branch.*
