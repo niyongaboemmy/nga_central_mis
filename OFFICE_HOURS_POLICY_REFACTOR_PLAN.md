@@ -822,8 +822,8 @@ The plan is built on the recommendation in each row. All are policy settings or 
 | **P9** | Teachers already sent days through the **Google Form** by 05 Oct. | **Import the form's CSV** once (leadership: School → Teachers → Import), so nobody enters days twice. Teachers can still adjust. |
 | **P10** | Register edit window | **On the day** normally; the next day is accepted and flagged *late*; after 2 days only leadership. |
 | **P11** | Self check-in by QR (v1 feature) | **Not in v2.** Teachers record visits with quick-add. Revisit a single hall kiosk if typing proves slow. |
-| **P12** | Student motivation graphics (visit streak, "Regular visitor" badge) | **Yes, positive only:** no rankings, no comparisons, never shown to other students. Leadership can switch them off in Policy. |
-| **P13** | Profile photos on boards and tiles | **Use existing MIS photos where present**, initials otherwise. Shared screens (projector, hall floor) can switch to initials-only with one toggle. |
+| **P12** ✅ | Student motivation graphics (visit streak, "Regular visitor" badge) | **Confirmed 2026-10-04: yes.** Positive only: no rankings, no comparisons, never shown to other students. Leadership can switch them off in Policy. |
+| **P13** ✅ | Profile photos on boards and tiles | **Confirmed 2026-10-04: yes.** Use existing MIS photos where present, initials otherwise. Shared screens (projector, hall floor) can switch to initials-only with one toggle. |
 
 ---
 
