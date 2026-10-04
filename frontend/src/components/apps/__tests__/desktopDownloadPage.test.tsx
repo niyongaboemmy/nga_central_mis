@@ -132,7 +132,11 @@ describe("/apps: NGA Desktop download page", () => {
     renderPage();
     const guide = await screen.findByTestId("warning-guide-macos");
     expect(within(guide).getByText("Open Anyway")).toBeInTheDocument();
-    expect(screen.getByText(/Privacy & Security, scroll down and click Open Anyway/)).toBeInTheDocument();
+    expect(screen.getByText(/scroll down and click Open Anyway next to NGA/)).toBeInTheDocument();
+    expect(within(guide).getByRole("link", { name: /Open Privacy & Security/ })).toHaveAttribute(
+      "href",
+      "x-apple.systempreferences:com.apple.preference.security",
+    );
   });
 
   it("offers the no-warning one-command install, ready to copy", async () => {

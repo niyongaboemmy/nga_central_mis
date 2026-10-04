@@ -77,9 +77,9 @@ export function isNewer(latest: string, current: string): boolean {
 /** What to do after downloading: short, per OS. The installers aren't code-signed yet. */
 export const INSTALL_STEPS: Record<"macos" | "windows", string[]> = {
   macos: [
-    "Open the downloaded NGA file and drag NGA into Applications.",
-    "Open NGA. The first time, macOS says it can't verify it: click Done.",
-    "Open System Settings → Privacy & Security, scroll down and click Open Anyway next to NGA (then Open).",
+    "Open the downloaded NGA file and drag NGA onto Applications (don't open it from the download window).",
+    "Open NGA from Applications. The first time, macOS says “NGA” Not Opened: click Done.",
+    "Click Open Privacy & Security below (or open System Settings → Privacy & Security), scroll down and click Open Anyway next to NGA, then Open. Only once.",
     "Sign in to NGA MIS once. Task Mentor, Tendo and Tupo sign in by themselves.",
   ],
   windows: [
