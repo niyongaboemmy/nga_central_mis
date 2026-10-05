@@ -10,6 +10,7 @@ import Button from "../ui/Button";
 import Modal from "../ui/Modal";
 import ConfirmModal from "../ui/ConfirmModal";
 import UserProfileModal from "../UserProfileModal";
+import SelectField from "../ui/SelectField";
 
 export interface ClassTeacherAssignmentInput {
   user_id: number;
@@ -352,7 +353,7 @@ const ClassTeachersTab: React.FC<ClassTeachersTabProps> = ({
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2.5">
-          <select
+          <SelectField
             value={yearFilter}
             onChange={(e) => setYearFilter(parseInt(e.target.value))}
             className="px-4 py-2 border-2 border-border-light dark:border-border-dark/30 rounded-2xl focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/20 transition-all duration-200 bg-surface-light dark:bg-surface-dark/30 text-sm text-text-primary-light dark:text-text-primary-dark whitespace-nowrap"
@@ -364,7 +365,7 @@ const ClassTeachersTab: React.FC<ClassTeachersTabProps> = ({
                 {year.is_current === 1 ? " (Current)" : ""}
               </option>
             ))}
-          </select>
+          </SelectField>
           <Button
             variant="secondary"
             onClick={onRefresh}
@@ -508,7 +509,7 @@ const ClassTeachersTab: React.FC<ClassTeachersTabProps> = ({
 
           <div>
             <label className={labelClasses}>Copy from</label>
-            <select
+            <SelectField
               value={copySourceYearId}
               onChange={(e) => setCopySourceYearId(parseInt(e.target.value))}
               className={inputClasses}
@@ -521,12 +522,12 @@ const ClassTeachersTab: React.FC<ClassTeachersTabProps> = ({
                   {year.is_current === 1 ? ", Current" : ""})
                 </option>
               ))}
-            </select>
+            </SelectField>
           </div>
 
           <div>
             <label className={labelClasses}>Copy to</label>
-            <select
+            <SelectField
               value={copyTargetYearId}
               onChange={(e) => setCopyTargetYearId(parseInt(e.target.value))}
               className={inputClasses}
@@ -539,7 +540,7 @@ const ClassTeachersTab: React.FC<ClassTeachersTabProps> = ({
                   {year.is_current === 1 ? ", Current" : ""})
                 </option>
               ))}
-            </select>
+            </SelectField>
           </div>
 
           {copyResultMessage && (
@@ -589,7 +590,7 @@ const ClassTeachersTab: React.FC<ClassTeachersTabProps> = ({
         <div className="space-y-4">
           <div>
             <label className={labelClasses}>Academic Year</label>
-            <select
+            <SelectField
               value={formYearId}
               onChange={(e) => setFormYearId(parseInt(e.target.value))}
               className={inputClasses}
@@ -601,7 +602,7 @@ const ClassTeachersTab: React.FC<ClassTeachersTabProps> = ({
                   {year.is_current === 1 ? " (Current)" : ""}
                 </option>
               ))}
-            </select>
+            </SelectField>
           </div>
 
           <div>
@@ -657,7 +658,7 @@ const ClassTeachersTab: React.FC<ClassTeachersTabProps> = ({
 
           <div>
             <label className={labelClasses}>Grade</label>
-            <select
+            <SelectField
               value={formGradeId}
               onChange={(e) => handleGradeChange(parseInt(e.target.value))}
               className={inputClasses}
@@ -668,12 +669,12 @@ const ClassTeachersTab: React.FC<ClassTeachersTabProps> = ({
                   {grade.name}
                 </option>
               ))}
-            </select>
+            </SelectField>
           </div>
 
           <div>
             <label className={labelClasses}>Class Group</label>
-            <select
+            <SelectField
               value={formClassGroupId}
               onChange={(e) => setFormClassGroupId(parseInt(e.target.value))}
               disabled={!formGradeId || classGroupsForGrade.length === 0}
@@ -690,7 +691,7 @@ const ClassTeachersTab: React.FC<ClassTeachersTabProps> = ({
                   {classGroup.name}
                 </option>
               ))}
-            </select>
+            </SelectField>
             {formGradeId > 0 && classGroupsForGrade.length === 0 && (
               <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
                 This grade has no class groups yet. Create one in the Class

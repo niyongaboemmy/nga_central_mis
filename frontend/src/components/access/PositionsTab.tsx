@@ -25,6 +25,7 @@ import {
   SCOPE_LABELS,
   UserPicker,
 } from "./shared";
+import SelectField from "../ui/SelectField";
 
 const SOURCE_LABEL: Record<GrantRow["source"], string> = {
   MANUAL: "Assigned",
@@ -99,7 +100,7 @@ export const AssignPositionModal: React.FC<{
         </label>
         <label className="block">
           <span className="font-medium">Role</span>
-          <select
+          <SelectField
             className={inputCls}
             value={roleId ?? ""}
             onChange={(e) => {
@@ -119,13 +120,13 @@ export const AssignPositionModal: React.FC<{
                 {r.category ? ` · ${r.category}` : ""}
               </option>
             ))}
-          </select>
+          </SelectField>
           {role?.description && <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">{role.description}</p>}
         </label>
         {role && (
           <label className="block">
             <span className="font-medium">Where</span>
-            <select
+            <SelectField
               className={inputCls}
               value={scopeType}
               onChange={(e) => {
@@ -139,7 +140,7 @@ export const AssignPositionModal: React.FC<{
                   {SCOPE_LABELS[s]}
                 </option>
               ))}
-            </select>
+            </SelectField>
           </label>
         )}
         {needsNode && (
@@ -317,20 +318,20 @@ export const PositionsTab: React.FC<{
           value={q}
           onChange={(e) => setQ(e.target.value)}
         />
-        <select aria-label="Filter by role" className={inputCls} value={roleFilter} onChange={(e) => setRoleFilter(e.target.value ? Number(e.target.value) : "")}>
+        <SelectField aria-label="Filter by role" className={inputCls} value={roleFilter} onChange={(e) => setRoleFilter(e.target.value ? Number(e.target.value) : "")}>
           <option value="">All roles</option>
           {roles.map((r) => (
             <option key={r.role_id} value={r.role_id}>
               {r.name}
             </option>
           ))}
-        </select>
-        <select aria-label="Filter by source" className={inputCls} value={source} onChange={(e) => setSource(e.target.value as any)}>
+        </SelectField>
+        <SelectField aria-label="Filter by source" className={inputCls} value={source} onChange={(e) => setSource(e.target.value as any)}>
           <option value="">All sources</option>
           <option value="MANUAL">Assigned here</option>
           <option value="RULE">From assignments (class teacher, subject, ...)</option>
           <option value="MIGRATION">Migrated from old roles</option>
-        </select>
+        </SelectField>
       </div>
       {baselineCount > 0 && (
         <label className={`mb-3 inline-flex items-center gap-2 text-sm ${mutedCls}`}>

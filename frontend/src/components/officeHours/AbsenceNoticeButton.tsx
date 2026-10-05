@@ -3,6 +3,7 @@ import { MessageSquareWarning } from "lucide-react";
 import { useToast } from "../../contexts/ToastContext";
 import { apiError, humanize, officeHoursApi, type StudentSessionView } from "../../api/officeHours";
 import { inputCls, labelCls, primaryBtn, secondaryBtn } from "./ohUi";
+import SelectField from "../ui/SelectField";
 
 /**
  * "I can't come" (plan §10.1): before a session, the student tells the
@@ -67,11 +68,11 @@ const AbsenceNoticeButton: React.FC<{ session: StudentSessionView; onSent?: () =
     >
       <div>
         <label htmlFor={`oh-abs-${session.session_id}`} className={labelCls}>Why?</label>
-        <select id={`oh-abs-${session.session_id}`} className={inputCls} value={reason} onChange={(e) => setReason(e.target.value)}>
+        <SelectField id={`oh-abs-${session.session_id}`} className={inputCls} value={reason} onChange={(e) => setReason(e.target.value)}>
           {REASONS.map((r) => (
             <option key={r} value={r}>{humanize(r)}</option>
           ))}
-        </select>
+        </SelectField>
       </div>
       <div>
         <label htmlFor={`oh-abs-note-${session.session_id}`} className={labelCls}>Message (optional)</label>

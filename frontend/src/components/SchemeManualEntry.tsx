@@ -21,6 +21,7 @@ import {
 import { schemeOfWorkApi } from "../api/schemeOfWork";
 import { competenciesApi, SubjectCompetency } from "../api/curriculum";
 import { useToast } from "../contexts/ToastContext";
+import SelectField from "./ui/SelectField";
 
 /* ─── Types ─────────────────────────────────────────────────────────── */
 interface WeekRow {
@@ -594,7 +595,7 @@ const SchemeManualEntry: React.FC<Props> = ({
                 {/* Optional link to a real Curriculum Learning Outcome — sets competency_id on
                     every week in this group, which the PDF/report groups and totals duration by. */}
                 {subjectCompetencies.length > 0 && (
-                  <select
+                  <SelectField
                     value={group.competency_id ?? ""}
                     onChange={(e) => updateGroupCompetency(group.id, e.target.value)}
                     title="Link this group to a Curriculum Learning Outcome (optional)"
@@ -606,7 +607,7 @@ const SchemeManualEntry: React.FC<Props> = ({
                         LO {c.element_number}: {c.title}
                       </option>
                     ))}
-                  </select>
+                  </SelectField>
                 )}
 
                 <div className="flex items-center gap-1 shrink-0">

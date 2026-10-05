@@ -12,6 +12,7 @@ import {
 import logger from "../../utils/logger";
 import { notifyPerson, PersonNotice } from "../notifications/notifyPerson";
 import { appUrl } from "../reminders/webPush";
+import { addDaysYmd } from "../reminders/time";
 import { humanizeCode } from "./text";
 import { dayLabel, todayYmd } from "./common";
 import { onOfficeHoursEvent, OfficeHoursEvent } from "./events";
@@ -81,6 +82,14 @@ const ymdLabel = (ymd: string) => {
   return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString("en-GB", { timeZone: "UTC", weekday: "short", day: "numeric", month: "short" });
 };
 
+/** "Starts Wed 14 Oct." for the rest of the term; the dates of a weekly invitation otherwise. */
+const invitedFor = (a: { effective_from: string; effective_to: string }, s: { effective_to: string }) => {
+  const from = String(a.effective_from).slice(0, 10);
+  const to = String(a.effective_to).slice(0, 10);
+  if (to >= String(s.effective_to).slice(0, 10)) return `Starts ${ymdLabel(from)}.`;
+  return addDaysYmd(from, 6) >= to ? `For the week of ${ymdLabel(from)} only.` : `From ${ymdLabel(from)} to ${ymdLabel(to)}.`;
+};
+
 const activeStudentsOf = async (scheduleId: number) =>
   db
     .select({ id: OfficeHourAssignment.assignment_id, student: OfficeHourAssignment.student_id, from: OfficeHourAssignment.effective_from })
@@ -101,7 +110,7 @@ const notifyAssigned = async (assignmentIds: number[], actorId: number) => {
       userId: a.student_id,
       kind: "office_hours_assigned",
       title: `Office hours with ${teachers.get(s.teacher_id) ?? "your teacher"}`,
-      body: `${s.title}: ${await when(s)}. Starts ${ymdLabel(a.effective_from)}. Office hours are mandatory.`,
+      body: `${s.title}: ${await when(s)}. ${invitedFor(a, s)} Office hours are mandatory.`,
       link: "/my-office-hours",
       subjectType: "office_hour_assignment",
       subjectId: a.assignment_id,

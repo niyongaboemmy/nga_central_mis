@@ -4,6 +4,7 @@ import Modal from "../ui/Modal";
 import type { Nodes } from "../../api/access";
 import { searchUsers, UserSearchResult } from "../../api/users";
 import type { Depth, ScopeType } from "../../vendor/nga-access";
+import SelectField from "../ui/SelectField";
 
 /** "Programme: Primary", "Class: G7-A", "Maths in G9-B", "Whole school"... */
 export function nodeLabel(
@@ -199,14 +200,14 @@ export const NodePicker: React.FC<{
   onChange: (scopeId: number | null, scopeId2: number | null) => void;
 }> = ({ scopeType, nodes, scopeId, scopeId2, onChange }) => {
   const opt = (list: Array<{ id: number; name: string }> | undefined, value: number | null, set: (v: number | null) => void, label: string) => (
-    <select className={inputCls} value={value ?? ""} onChange={(e) => set(e.target.value ? Number(e.target.value) : null)} aria-label={label}>
+    <SelectField className={inputCls} value={value ?? ""} onChange={(e) => set(e.target.value ? Number(e.target.value) : null)} aria-label={label}>
       <option value="">{label}</option>
       {(list ?? []).map((x) => (
         <option key={x.id} value={x.id}>
           {x.name}
         </option>
       ))}
-    </select>
+    </SelectField>
   );
   switch (scopeType) {
     case "PROGRAM":

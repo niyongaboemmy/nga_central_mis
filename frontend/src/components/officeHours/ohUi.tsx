@@ -1,6 +1,6 @@
 import React from "react";
 import { Loader2 } from "lucide-react";
-import type { Availability, AttendanceStatus, SessionState, StudentStats } from "../../api/officeHours";
+import { shortDate, weekStartOf, type Availability, type AttendanceStatus, type SessionState, type StudentStats } from "../../api/officeHours";
 
 /**
  * Small building blocks shared by the office-hours screens, in the house style
@@ -124,9 +124,11 @@ export const AvailabilityChip: React.FC<{ availability: Availability }> = ({ ava
     return <span className={`${pill} bg-blue-100 text-blue-800 dark:bg-blue-500/15 dark:text-blue-200`}>With you</span>;
   }
   const h = availability.holders[0];
+  // A weekly invitation names its week; a longer one only its days.
+  const week = h?.from && h.to && weekStartOf(h.from) === weekStartOf(h.to) ? ` · wk ${shortDate(weekStartOf(h.from))}` : "";
   return (
-    <span className={`${pill} bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200`} title={h ? `${h.title} · ${h.days_label}` : undefined}>
-      {h ? `With ${h.teacher_name ?? "another teacher"} · ${h.days_label}` : "Taken"}
+    <span className={`${pill} bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200`} title={h ? `${h.title} · ${h.days_label}${week}` : undefined}>
+      {h ? `With ${h.teacher_name ?? "another teacher"} · ${h.days_label}${week}` : "Taken"}
     </span>
   );
 };

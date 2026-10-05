@@ -335,7 +335,7 @@ describe("Teachers lens", () => {
     await openLens(user, /Teachers/);
     await user.click(await screen.findByRole("button", { name: /Copy from year/ }));
 
-    await user.selectOptions(screen.getByLabelText("Source academic year"), "2");
+    await user.selectOptions(screen.getByLabelText("Source academic year", { selector: "select" }), "2");
     await user.click(screen.getByRole("button", { name: "Copy assignments" }));
 
     await waitFor(() =>

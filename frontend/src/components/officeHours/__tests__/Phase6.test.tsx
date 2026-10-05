@@ -86,7 +86,7 @@ describe("office hours phase 6 (frontend)", () => {
     const onSent = vi.fn();
     const { rerender } = render(<AbsenceNoticeButton session={session()} onSent={onSent} />);
     await userEvent.click(screen.getByRole("button", { name: /I can't come/ }));
-    await userEvent.selectOptions(screen.getByLabelText("Why?"), "SCHOOL_ACTIVITY");
+    await userEvent.selectOptions(screen.getByLabelText("Why?", { selector: "select" }), "SCHOOL_ACTIVITY");
     await userEvent.type(screen.getByLabelText(/Message/), "Match");
     await userEvent.click(screen.getByRole("button", { name: "Tell my teacher" }));
     await waitFor(() => expect(api.sendAbsenceNotice).toHaveBeenCalledWith(7, "SCHOOL_ACTIVITY", "Match"));

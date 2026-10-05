@@ -154,7 +154,7 @@ describe("Setup checklist", () => {
     );
     // P1B is the first incomplete class group in the fixture order.
     expect(
-      (screen.getByLabelText("Class group") as HTMLSelectElement).value,
+      (screen.getByLabelText("Class group", { selector: "select" }) as HTMLSelectElement).value,
     ).toBe("1001");
   });
 
@@ -163,7 +163,7 @@ describe("Setup checklist", () => {
     render(<ClassGroupsManagement />);
     await waitFor(() => expect(screen.getAllByText("P1A").length).toBeGreaterThan(0));
 
-    await user.selectOptions(screen.getByLabelText("Program"), "10");
+    await user.selectOptions(screen.getByLabelText("Program", { selector: "select" }), "10");
     await user.click(screen.getByRole("button", { name: /Setup checklist/ }));
 
     const panel = screen.getByRole("dialog", { name: "Setup checklist" });

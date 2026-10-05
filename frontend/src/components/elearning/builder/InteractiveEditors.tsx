@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Frown, Meh, Plus, Smile, Trash2, AlertTriangle } from "lucide-react";
 import { apiService } from "../../../services/api";
+import SelectField from "../../ui/SelectField";
 
 /**
  * Builder editors for flashcards and practical tasks, and the exit-ticket class pulse
@@ -51,12 +52,12 @@ export const PracticalEditor: React.FC<{ checklist: ChecklistRow[]; onChange: (c
       {checklist.map((c, i) => (
         <li key={c.id} className="grid grid-cols-[1fr_auto_auto] gap-2 items-center">
           <input aria-label={`Checklist line ${i + 1}`} className={input} value={c.text} placeholder="Something you can see in the photo" onChange={(e) => onChange(checklist.map((x, j) => (j === i ? { ...x, text: e.target.value } : x)))} />
-          <select aria-label={`Criterion for line ${i + 1}`} className={`${input} w-24`} value={c.criteria_number || ""} onChange={(e) => onChange(checklist.map((x, j) => (j === i ? { ...x, criteria_number: e.target.value || null } : x)))}>
+          <SelectField aria-label={`Criterion for line ${i + 1}`} className={`${input} w-24`} value={c.criteria_number || ""} onChange={(e) => onChange(checklist.map((x, j) => (j === i ? { ...x, criteria_number: e.target.value || null } : x)))}>
             <option value="">—</option>
             {criteria.map((n) => (
               <option key={n} value={n}>{n}</option>
             ))}
-          </select>
+          </SelectField>
           <button aria-label={`Remove line ${i + 1}`} onClick={() => onChange(checklist.filter((_, j) => j !== i))} className="w-10 h-10 rounded-xl hover:bg-gray-100 dark:hover:bg-white/10 flex items-center justify-center text-slate-600 dark:text-slate-300">
             <Trash2 className="w-4 h-4" />
           </button>

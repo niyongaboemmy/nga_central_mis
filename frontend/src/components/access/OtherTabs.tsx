@@ -15,6 +15,7 @@ import {
 import type { UserSearchResult } from "../../api/users";
 import type { AccessSnapshot, ScopeEntry } from "../../vendor/nga-access";
 import { btnGhost, btnPrimary, DepthPill, Empty, inputCls, nodeLabel, Panel, UserPicker } from "./shared";
+import SelectField from "../ui/SelectField";
 
 // ---------------------------------------------------------------------------
 // Auto-assignment rules
@@ -86,7 +87,7 @@ export const RulesTab: React.FC<{ rules: RuleRow[]; roles: AccessRoleRow[]; canE
                   {filter}
                 </td>
                 <td className="py-2 pr-3">
-                  <select
+                  <SelectField
                     className={inputCls}
                     aria-label={`Role granted by ${r.name}`}
                     disabled={!canEdit}
@@ -100,7 +101,7 @@ export const RulesTab: React.FC<{ rules: RuleRow[]; roles: AccessRoleRow[]; canE
                           {x.name}
                         </option>
                       ))}
-                  </select>
+                  </SelectField>
                 </td>
                 <td className="py-2">
                   <input
@@ -287,12 +288,12 @@ export const ExplorerTab: React.FC<{ nodes: Nodes | null; canPreview: boolean }>
       <Panel title="Whose access?">
         <div className="grid sm:grid-cols-[1fr_200px] gap-2">
           <UserPicker value={person} onChange={setPerson} />
-          <select aria-label="App" className={inputCls} value={app} onChange={(e) => setApp(e.target.value)}>
+          <SelectField aria-label="App" className={inputCls} value={app} onChange={(e) => setApp(e.target.value)}>
             <option value="mis">Central MIS</option>
             <option value="tm">Task Mentor</option>
             <option value="da">Discipline & Attendance</option>
             <option value="tupo">Tupo</option>
-          </select>
+          </SelectField>
         </div>
         <p className="mt-2 text-xs text-slate-600 dark:text-slate-300">Read-only preview. Every preview is recorded in the access audit log.</p>
       </Panel>
@@ -336,20 +337,20 @@ export const ExplorerTab: React.FC<{ nodes: Nodes | null; canPreview: boolean }>
           </Panel>
           <Panel title="Can this person …?">
             <div className="grid sm:grid-cols-[1fr_220px_auto] gap-2">
-              <select aria-label="Capability" className={inputCls} value={cap} onChange={(e) => setCap(e.target.value)}>
+              <SelectField aria-label="Capability" className={inputCls} value={cap} onChange={(e) => setCap(e.target.value)}>
                 <option value="">Choose a capability</option>
                 {Object.keys(snap.caps).sort().map((k) => (
                   <option key={k}>{k}</option>
                 ))}
-              </select>
-              <select aria-label="Where" className={inputCls} value={classGroupId} onChange={(e) => setClassGroupId(e.target.value)}>
+              </SelectField>
+              <SelectField aria-label="Where" className={inputCls} value={classGroupId} onChange={(e) => setClassGroupId(e.target.value)}>
                 <option value="">Anywhere</option>
                 {(nodes?.classGroups ?? []).map((c) => (
                   <option key={c.id} value={c.id}>
                     in class {c.name}
                   </option>
                 ))}
-              </select>
+              </SelectField>
               <button
                 className={btnPrimary}
                 disabled={!cap}

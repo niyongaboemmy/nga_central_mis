@@ -21,6 +21,7 @@ import {
 import { Role } from "../../api/users";
 import { useTheme } from "../../contexts/ThemeContext";
 import { StatCard, SkeletonRow } from "./shared";
+import SelectField from "../ui/SelectField";
 
 type SortOption = "count-desc" | "count-asc" | "name-asc";
 
@@ -178,7 +179,7 @@ const RolesPermissionsDashboard: React.FC<RolesPermissionsDashboardProps> = ({
           />
         </div>
         <div className="relative">
-          <select
+          <SelectField
             aria-label="Sort roles"
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value as SortOption)}
@@ -187,7 +188,7 @@ const RolesPermissionsDashboard: React.FC<RolesPermissionsDashboardProps> = ({
             <option value="count-desc">Permissions: high to low</option>
             <option value="count-asc">Permissions: low to high</option>
             <option value="name-asc">Name: A to Z</option>
-          </select>
+          </SelectField>
           <ArrowUpDown className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
         </div>
         <div className="flex gap-1 bg-white/60 dark:bg-slate-800/60 border border-gray-200 dark:border-slate-700 rounded-xl p-1 sm:ml-auto w-fit">

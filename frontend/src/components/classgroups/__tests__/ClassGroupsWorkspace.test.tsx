@@ -49,7 +49,7 @@ describe("Class Groups Management — shell, context and navigator", () => {
       expect(classGroupsWorkspaceMocks.overview).toHaveBeenCalledWith(1),
     );
     expect(
-      (screen.getByLabelText("Academic year") as HTMLSelectElement).value,
+      (screen.getByLabelText("Academic year", { selector: "select" }) as HTMLSelectElement).value,
     ).toBe("1");
   });
 
@@ -96,7 +96,7 @@ describe("Class Groups Management — shell, context and navigator", () => {
 
     await waitFor(() => expect(screen.getAllByText("S1A").length).toBeGreaterThan(0));
 
-    await user.selectOptions(screen.getByLabelText("Program"), "10");
+    await user.selectOptions(screen.getByLabelText("Program", { selector: "select" }), "10");
 
     await waitFor(() => expect(screen.queryByText("S1A")).not.toBeInTheDocument());
     expect(screen.getAllByText("P1A").length).toBeGreaterThan(0);
@@ -111,15 +111,15 @@ describe("Class Groups Management — shell, context and navigator", () => {
     await user.click(screen.getAllByText("S1A")[0]);
 
     await waitFor(() =>
-      expect((screen.getByLabelText("Grade") as HTMLSelectElement).value).toBe(
+      expect((screen.getByLabelText("Grade", { selector: "select" }) as HTMLSelectElement).value).toBe(
         "200",
       ),
     );
-    expect((screen.getByLabelText("Program") as HTMLSelectElement).value).toBe(
+    expect((screen.getByLabelText("Program", { selector: "select" }) as HTMLSelectElement).value).toBe(
       "20",
     );
     expect(
-      (screen.getByLabelText("Class group") as HTMLSelectElement).value,
+      (screen.getByLabelText("Class group", { selector: "select" }) as HTMLSelectElement).value,
     ).toBe("2000");
   });
 
@@ -131,15 +131,15 @@ describe("Class Groups Management — shell, context and navigator", () => {
     await user.click(screen.getAllByText("P1A")[0]);
     await waitFor(() =>
       expect(
-        (screen.getByLabelText("Class group") as HTMLSelectElement).value,
+        (screen.getByLabelText("Class group", { selector: "select" }) as HTMLSelectElement).value,
       ).toBe("1000"),
     );
 
-    await user.selectOptions(screen.getByLabelText("Grade"), "101");
+    await user.selectOptions(screen.getByLabelText("Grade", { selector: "select" }), "101");
 
     await waitFor(() =>
       expect(
-        (screen.getByLabelText("Class group") as HTMLSelectElement).value,
+        (screen.getByLabelText("Class group", { selector: "select" }) as HTMLSelectElement).value,
       ).toBe(""),
     );
   });
@@ -152,7 +152,7 @@ describe("Class Groups Management — shell, context and navigator", () => {
       expect(classGroupsWorkspaceMocks.overview).toHaveBeenCalledWith(1),
     );
 
-    await user.selectOptions(screen.getByLabelText("Academic year"), "2");
+    await user.selectOptions(screen.getByLabelText("Academic year", { selector: "select" }), "2");
 
     await waitFor(() =>
       expect(classGroupsWorkspaceMocks.overview).toHaveBeenCalledWith(2),
@@ -167,7 +167,7 @@ describe("Class Groups Management — shell, context and navigator", () => {
     await user.click(screen.getAllByText("S1A")[0]);
     await waitFor(() =>
       expect(
-        (screen.getByLabelText("Class group") as HTMLSelectElement).value,
+        (screen.getByLabelText("Class group", { selector: "select" }) as HTMLSelectElement).value,
       ).toBe("2000"),
     );
 
@@ -176,7 +176,7 @@ describe("Class Groups Management — shell, context and navigator", () => {
 
     await waitFor(() =>
       expect(
-        (screen.getByLabelText("Class group") as HTMLSelectElement).value,
+        (screen.getByLabelText("Class group", { selector: "select" }) as HTMLSelectElement).value,
       ).toBe("2000"),
     );
   });
@@ -197,7 +197,7 @@ describe("Class Groups Management — shell, context and navigator", () => {
 
     await waitFor(() =>
       expect(
-        (screen.getByLabelText("Class group") as HTMLSelectElement).value,
+        (screen.getByLabelText("Class group", { selector: "select" }) as HTMLSelectElement).value,
       ).toBe(""),
     );
   });
@@ -212,7 +212,7 @@ describe("Class Groups Management — shell, context and navigator", () => {
     await user.click(screen.getByRole("tab", { name: /Subjects/ }));
 
     expect(
-      (screen.getByLabelText("Class group") as HTMLSelectElement).value,
+      (screen.getByLabelText("Class group", { selector: "select" }) as HTMLSelectElement).value,
     ).toBe("1000");
     expect(screen.getByRole("tab", { name: /Subjects/ })).toHaveAttribute(
       "aria-selected",

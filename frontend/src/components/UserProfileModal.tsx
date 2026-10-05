@@ -53,6 +53,7 @@ import GradesTab from "./UserProfileTabs/GradesTab";
 import ActivityTab from "./UserProfileTabs/ActivityTab";
 import FamilyTab from "./UserProfileTabs/FamilyTab";
 import StudentEnrollmentTab from "./UserProfileTabs/StudentEnrollmentTab";
+import SelectField from "./ui/SelectField";
 
 // Main User Profile Modal Component
 interface UserProfileModalProps {
@@ -885,7 +886,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Academic Year
                   </label>
-                  <select
+                  <SelectField
                     value={assignYearId}
                     onChange={(e) => setAssignYearId(parseInt(e.target.value))}
                     className="w-full px-3 py-2 border rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-400"
@@ -900,7 +901,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                         {year.is_current === 1 ? " (Current)" : ""}
                       </option>
                     ))}
-                  </select>
+                  </SelectField>
                 </div>
 
                 <div className="space-y-3 max-h-96 overflow-y-auto">
@@ -987,7 +988,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Academic Year
                   </label>
-                  <select
+                  <SelectField
                     value={assignYearId}
                     onChange={(e) => {
                       const yearId = parseInt(e.target.value);
@@ -1013,7 +1014,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                         {year.is_current === 1 ? " (Current)" : ""}
                       </option>
                     ))}
-                  </select>
+                  </SelectField>
                 </div>
 
                 <div className="space-y-3 max-h-96 overflow-y-auto">

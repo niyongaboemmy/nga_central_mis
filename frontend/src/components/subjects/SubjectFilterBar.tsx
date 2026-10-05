@@ -11,6 +11,7 @@ import {
   ArrowUpDown,
 } from "lucide-react";
 import { Facet, SubjectFacets } from "../../api/users";
+import SelectField from "../ui/SelectField";
 
 /**
  * Filter bar for Class Subjects.
@@ -356,7 +357,7 @@ const SubjectFilterBar: React.FC<SubjectFilterBarProps> = ({
           >
             <div className="flex flex-wrap items-center gap-2 p-3 rounded-2xl border border-gray-200 dark:border-gray-700/40 bg-white dark:bg-gray-800/30">
               {grades.length > 1 && (
-                <select
+                <SelectField
                   value={filters.gradeId}
                   onChange={(e) =>
                     onChange({
@@ -375,7 +376,7 @@ const SubjectFilterBar: React.FC<SubjectFilterBarProps> = ({
                       {g.name}
                     </option>
                   ))}
-                </select>
+                </SelectField>
               )}
 
               <MultiSelect
@@ -426,7 +427,7 @@ const SubjectFilterBar: React.FC<SubjectFilterBarProps> = ({
 
               <div className="flex items-center gap-1.5 ml-auto">
                 <ArrowUpDown className="w-3.5 h-3.5 text-gray-400" />
-                <select
+                <SelectField
                   value={filters.sort}
                   onChange={(e) => onChange({ sort: e.target.value })}
                   aria-label="Sort by"
@@ -437,7 +438,7 @@ const SubjectFilterBar: React.FC<SubjectFilterBarProps> = ({
                       {s.label}
                     </option>
                   ))}
-                </select>
+                </SelectField>
               </div>
             </div>
           </motion.div>

@@ -1,6 +1,7 @@
 import React from "react";
 import { CalendarDays, AlertTriangle } from "lucide-react";
 import { useAcademicPeriod } from "../../contexts/AcademicPeriodContext";
+import SelectField from "./SelectField";
 
 interface AcademicPeriodSelectorProps {
   compact?: boolean;
@@ -58,7 +59,7 @@ const AcademicPeriodSelector: React.FC<AcademicPeriodSelectorProps> = ({
       ) : (
         <CalendarDays className="w-4 h-4 text-text-secondary-light dark:text-text-secondary-dark/70 shrink-0" />
       )}
-      <select
+      <SelectField
         aria-label="Academic Year"
         value={selectedYearId ?? ""}
         onChange={(e) => setSelectedYearId(Number(e.target.value))}
@@ -71,7 +72,7 @@ const AcademicPeriodSelector: React.FC<AcademicPeriodSelectorProps> = ({
             {y.name}
           </option>
         ))}
-      </select>
+      </SelectField>
       <span className="text-text-secondary-light dark:text-text-secondary-dark/70" aria-hidden="true">
         /
       </span>
@@ -80,7 +81,7 @@ const AcademicPeriodSelector: React.FC<AcademicPeriodSelectorProps> = ({
           No term available
         </span>
       ) : (
-        <select
+        <SelectField
           aria-label="Academic Term"
           value={selectedTermId ?? ""}
           onChange={(e) => setSelectedTermId(Number(e.target.value))}
@@ -93,7 +94,7 @@ const AcademicPeriodSelector: React.FC<AcademicPeriodSelectorProps> = ({
               {t.name}
             </option>
           ))}
-        </select>
+        </SelectField>
       )}
     </div>
   );

@@ -31,6 +31,7 @@ import { studentEnrollmentApi, StudentEnrolledSubject } from "../../api/academic
 import { useToast } from "../../contexts/ToastContext";
 import { useUser } from "../../contexts/UserContext";
 import { useAcademicPeriod } from "../../contexts/AcademicPeriodContext";
+import SelectField from "../ui/SelectField";
 
 interface CategoryDef {
   value: CheckInCategory;
@@ -521,7 +522,7 @@ const MyMentor: React.FC = () => {
                 </div>
                 <div className="relative">
                   <BookOpen className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
-                  <select
+                  <SelectField
                     value={subjectId}
                     onChange={(e) => setSubjectId(e.target.value)}
                     disabled={!currentAcademicYearId}
@@ -535,7 +536,7 @@ const MyMentor: React.FC = () => {
                         {s.subject_name}
                       </option>
                     ))}
-                  </select>
+                  </SelectField>
                 </div>
               </div>
 

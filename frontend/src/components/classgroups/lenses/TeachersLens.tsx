@@ -36,6 +36,7 @@ import {
   SkeletonRows,
   fullName,
 } from "../shared";
+import SelectField from "../../ui/SelectField";
 
 const SEARCH_DEBOUNCE_MS = 350;
 
@@ -729,7 +730,7 @@ const CopyAssignmentsModal: React.FC<{
           <span className="text-xs font-medium text-gray-500 dark:text-gray-400">
             Copy from
           </span>
-          <select
+          <SelectField
             value={source ?? ""}
             aria-label="Source academic year"
             onChange={(e) =>
@@ -743,7 +744,7 @@ const CopyAssignmentsModal: React.FC<{
                 {y.name}
               </option>
             ))}
-          </select>
+          </SelectField>
         </label>
         <div className="flex justify-end gap-2">
           <Button variant="secondary" onClick={onClose} disabled={running}>

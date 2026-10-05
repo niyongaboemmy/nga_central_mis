@@ -2,6 +2,7 @@ import React from "react";
 import { Calendar, Bell, Download } from "lucide-react";
 import { AcademicTerm } from "../../api/academics";
 import type { AcademicCalendar } from "../../api/calendar";
+import SelectField from "../ui/SelectField";
 
 interface CalendarHeaderProps {
   isAdmin: boolean | undefined;
@@ -117,7 +118,7 @@ const CalendarHeader: React.FC<CalendarHeaderProps> = ({
           {isAdmin && (
             <>
               <span className="text-gray-400">|</span>
-              <select
+              <SelectField
                 value={selectedCalendar?.class_group_id ?? ""}
                 onChange={(e) => {
                   const classGroupId = parseInt(e.target.value);
@@ -168,13 +169,13 @@ const CalendarHeader: React.FC<CalendarHeaderProps> = ({
                     </option>
                   );
                 })}
-              </select>
+              </SelectField>
             </>
           )}
           {!isAdmin && !isStudent && myClassGroups.length > 1 && (
             <>
               <span className="text-gray-400">|</span>
-              <select
+              <SelectField
                 value={selectedTeacherClassGroupId || ""}
                 onChange={(e) => {
                   const classGroupId = e.target.value
@@ -190,7 +191,7 @@ const CalendarHeader: React.FC<CalendarHeaderProps> = ({
                     {group.name}
                   </option>
                 ))}
-              </select>
+              </SelectField>
             </>
           )}
         </div>

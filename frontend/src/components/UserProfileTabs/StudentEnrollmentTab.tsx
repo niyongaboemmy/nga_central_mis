@@ -26,6 +26,7 @@ import {
 import { useToast } from "../../contexts/ToastContext";
 import { usePermissions } from "../../hooks/usePermissions";
 import { Permissions } from "../../constants/permissions";
+import SelectField from "../ui/SelectField";
 
 interface StudentEnrollmentTabProps {
   studentId: number;
@@ -650,7 +651,7 @@ const StudentEnrollmentTab: React.FC<StudentEnrollmentTabProps> = ({
                   Academic Year:
                 </label>
                 <div className="relative">
-                  <select
+                  <SelectField
                     value={selectedYearId || ""}
                     onChange={(e) => {
                       setSelectedYearId(parseInt(e.target.value));
@@ -667,7 +668,7 @@ const StudentEnrollmentTab: React.FC<StudentEnrollmentTabProps> = ({
                         {year.name} ({year.is_current ? "Current" : "Past"})
                       </option>
                     ))}
-                  </select>
+                  </SelectField>
                   <ChevronDown className="absolute right-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
                 </div>
               </div>

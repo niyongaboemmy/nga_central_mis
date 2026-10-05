@@ -14,7 +14,6 @@ import {
   Shield,
   Check,
   Building,
-  ChevronRight,
   Loader2,
 } from "lucide-react";
 import Modal from "./ui/Modal";
@@ -43,6 +42,7 @@ import {
 } from "../api/systems";
 import { getRoles, Role } from "../api/users";
 import { useConfirm } from "../contexts/ConfirmContext";
+import SelectField from "./ui/SelectField";
 
 // Modern School Card Component
 const SchoolCard = ({
@@ -436,7 +436,7 @@ const SchoolConfigurationModal = ({
                     Select Enabled Module
                   </label>
                   <div className="relative">
-                    <select
+                    <SelectField
                       value={selectedSystemId}
                       onChange={(e) =>
                         setSelectedSystemId(Number(e.target.value))
@@ -449,8 +449,7 @@ const SchoolConfigurationModal = ({
                           {sys.name}
                         </option>
                       ))}
-                    </select>
-                    <ChevronRight className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 rotate-90 pointer-events-none" />
+                    </SelectField>
                   </div>
                   {schoolSystems.length === 0 && (
                     <p className="text-xs text-red-500 mt-1 ml-1">
@@ -465,7 +464,7 @@ const SchoolConfigurationModal = ({
                     Select Role
                   </label>
                   <div className="relative">
-                    <select
+                    <SelectField
                       value={selectedRoleId}
                       onChange={(e) =>
                         setSelectedRoleId(Number(e.target.value))
@@ -478,8 +477,7 @@ const SchoolConfigurationModal = ({
                           {role.name}
                         </option>
                       ))}
-                    </select>
-                    <ChevronRight className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 rotate-90 pointer-events-none" />
+                    </SelectField>
                   </div>
                 </div>
 

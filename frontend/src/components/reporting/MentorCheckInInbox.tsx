@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback } from "react";
 import { MessageCircle, RefreshCw, X, Check, ThumbsDown, Clock3, CheckCircle2, XCircle } from "lucide-react";
 import { mentorshipApi, MenteeCheckInRecord, CheckInStatus, ValidationStatus } from "../../api/mentorship";
 import { useToast } from "../../contexts/ToastContext";
+import SelectField from "../ui/SelectField";
 
 const CATEGORY_LABEL: Record<string, string> = {
   APPRECIATION: "Appreciation",
@@ -116,7 +117,7 @@ const MentorCheckInInbox: React.FC<MentorCheckInInboxProps> = ({ onUnreadCountCh
           <MessageCircle className="w-4 h-4 text-blue-500" />
           Mentee Reports & Check-ins
         </h3>
-        <select
+        <SelectField
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value as CheckInStatus | "")}
           className="text-xs border border-gray-200 dark:border-gray-600 rounded-lg px-2 py-1 bg-white dark:bg-gray-800"
@@ -125,7 +126,7 @@ const MentorCheckInInbox: React.FC<MentorCheckInInboxProps> = ({ onUnreadCountCh
           <option value="NEW">New</option>
           <option value="ACKNOWLEDGED">Acknowledged</option>
           <option value="ADDRESSED">Addressed</option>
-        </select>
+        </SelectField>
       </div>
 
       {loading ? (

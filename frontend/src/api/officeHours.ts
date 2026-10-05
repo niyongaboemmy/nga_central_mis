@@ -58,7 +58,10 @@ export interface OfficeHourSchedule {
   version: number;
   days: number[];
   days_label: string;
+  /** Students at the busiest upcoming session (what capacity is checked against). */
   assigned_count: number;
+  /** Different students invited from today on, across every weekly group. */
+  invited_count?: number;
 }
 
 export interface OfficeHourSession {
@@ -101,6 +104,9 @@ export interface Holder {
   teacher_name: string | null;
   days: number[];
   days_label: string;
+  /** The holder's invitation window (one week, or longer). */
+  from?: string;
+  to?: string;
 }
 
 export type Availability =
@@ -119,8 +125,14 @@ export interface CandidatesResponse {
   students: Candidate[];
   class_groups: number[];
   capacity: number;
+  /** Seats taken at the busiest session of the window. */
   assigned_count: number;
   lock_mode: "TERM" | "WEEKDAY";
+  /** The window really covered (first meeting .. end), null when no session is left in it. */
+  window?: { from: string; to: string } | null;
+  meeting_dates?: string[];
+  /** Who was invited the week before the window. */
+  previous_week?: { from: string; student_ids: number[] };
 }
 
 export interface AssignResult {
@@ -497,19 +509,23 @@ export const officeHoursApi = {
   endSchedule: (id: number) => api.post<Envelope<OfficeHourSchedule>>(`/office-hours/schedules/${id}/end`),
   deleteSchedule: (id: number) => api.delete<Envelope<void>>(`/office-hours/schedules/${id}`),
 
-  candidates: (id: number, params: { class_group_id?: number | null; q?: string; only_free?: boolean } = {}) =>
+  candidates: (id: number, params: { class_group_id?: number | null; q?: string; only_free?: boolean; from?: string; to?: string } = {}) =>
     api.get<Envelope<CandidatesResponse>>(`/office-hours/schedules/${id}/candidates`, {
       params: {
         ...(params.class_group_id ? { class_group_id: params.class_group_id } : {}),
         ...(params.q ? { q: params.q } : {}),
         ...(params.only_free ? { only_free: 1 } : {}),
+        ...(params.from ? { from: params.from } : {}),
+        ...(params.to ? { to: params.to } : {}),
       },
     }),
 
-  assign: (id: number, body: { student_ids: number[]; reason_code?: string; reason_note?: string }) =>
+  /** Invite students over a window: one week, several, or (no dates) the rest of the term. */
+  assign: (id: number, body: { student_ids: number[]; reason_code?: string; reason_note?: string; effective_from?: string; effective_to?: string }) =>
     api.post<Envelope<AssignResult>>(`/office-hours/schedules/${id}/assignments`, body),
 
-  removeAssignment: (assignmentId: number, body: { end_reason_code: string; end_note?: string }) =>
+  /** `from`: leave from that date on, keeping the sessions before it. */
+  removeAssignment: (assignmentId: number, body: { end_reason_code: string; end_note?: string; from?: string }) =>
     api.delete<Envelope<RosterRow>>(`/office-hours/assignments/${assignmentId}`, { data: body }),
 
   transfers: () => api.get<Envelope<{ incoming: TransferRequest[]; outgoing: TransferRequest[] }>>("/office-hours/transfer-requests"),
@@ -625,4 +641,55 @@ export const formatYmd = (ymd: string, opts: { weekday?: boolean; year?: boolean
     month: "short",
     year: opts.year ? "numeric" : undefined,
   });
+};
+
+// ---------------------------------------------------------------- weeks
+// Invitations are weekly (Mon–Fri). Dates are "YYYY-MM-DD", computed in UTC
+// so no local time zone can shift a day.
+
+const ymdToUtc = (ymd: string) => {
+  const [y, m, d] = ymd.split("-").map(Number);
+  return Date.UTC(y, m - 1, d);
+};
+const utcToYmd = (ms: number) => new Date(ms).toISOString().slice(0, 10);
+
+export const addDaysYmd = (ymd: string, days: number) => utcToYmd(ymdToUtc(ymd) + days * 86_400_000);
+/** 1 = Monday ... 7 = Sunday. */
+export const isoDow = (ymd: string) => ((new Date(ymdToUtc(ymd)).getUTCDay() + 6) % 7) + 1;
+/** Monday of the week holding `ymd`. */
+export const weekStartOf = (ymd: string) => addDaysYmd(ymd, 1 - isoDow(ymd));
+/** Friday of the week starting `monday`. */
+export const weekEndOf = (monday: string) => addDaysYmd(monday, 4);
+
+export interface OfficeHoursWeek {
+  /** Monday. */
+  start: string;
+  /** Friday. */
+  end: string;
+  /** Meeting dates of the schedule inside the week and its window. */
+  meetings: string[];
+}
+
+/** Every week of a schedule's window that has at least one meeting day. */
+export const scheduleWeeks = (s: Pick<OfficeHourSchedule, "effective_from" | "effective_to" | "days">): OfficeHoursWeek[] => {
+  const out: OfficeHoursWeek[] = [];
+  for (let start = weekStartOf(s.effective_from), guard = 0; start <= s.effective_to && guard < 60; start = addDaysYmd(start, 7), guard++) {
+    const meetings = s.days
+      .map((d) => addDaysYmd(start, d - 1))
+      .filter((ymd) => ymd >= s.effective_from && ymd <= s.effective_to)
+      .sort();
+    if (meetings.length) out.push({ start, end: weekEndOf(start), meetings });
+  }
+  return out;
+};
+
+/** "12 Oct" (or "12 Oct 2026"). */
+export const shortDate = (ymd: string, year = false) =>
+  new Date(ymdToUtc(ymd)).toLocaleDateString("en-GB", { timeZone: "UTC", day: "numeric", month: "short", ...(year ? { year: "numeric" } : {}) });
+
+/** How long an invitation runs, in words: "This week only", "Until 18 Dec", "12 Oct – 2 Nov". */
+export const invitationSpan = (from: string, to: string, scheduleEnd: string) => {
+  if (to >= scheduleEnd) return `Until ${shortDate(scheduleEnd)}`;
+  if (weekStartOf(from) === weekStartOf(to)) return `Week of ${shortDate(weekStartOf(from))} only`;
+  return `${shortDate(from)} – ${shortDate(to)}`;
 };

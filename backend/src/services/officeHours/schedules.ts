@@ -6,7 +6,7 @@ import {
   OfficeHourSchedule,
   OfficeHourScheduleDay,
   OfficeHourSession,
-  OfficeHourStudentLock,
+  OfficeHourStudentDateLock,
 } from "../../db/officeHoursSchema";
 import { ConflictError, NotFoundError, ValidationError, AuthorizationError } from "../../errors/CustomError";
 import { loadTeacherLessons } from "../../controllers/calendarController";
@@ -35,6 +35,7 @@ import { emitOfficeHoursEvent } from "./events";
 import { userNames } from "./eligibility";
 import { getSettings, OfficeHourSettings } from "./settings";
 import { ensureSessions, rematerialiseSchedule, scheduleDays, sessionState } from "./sessions";
+import { lockDatesFor, seatSummary, seatsUsed } from "./seats";
 
 /**
  * Office-hours schedules (plan §5.2): a teacher's recurring office hours on
@@ -308,11 +309,12 @@ export const updateSchedule = async (actor: Actor, scheduleId: number, input: an
     throw new ValidationError("To stop office hours early, end the schedule instead", [{ field: "effective_to", message: "In the past" }]);
   }
 
-  const activeCount = await countActive(scheduleId);
   if (input.capacity !== undefined) {
     const c = Number(input.capacity);
     if (!Number.isInteger(c) || c < 1 || c > settings.max_capacity) throw new ValidationError(`Capacity must be from 1 to ${settings.max_capacity}`);
-    if (c < activeCount) throw new ConflictError(`${activeCount} students are assigned; remove some before lowering the capacity to ${c}`);
+    // Capacity is per session: weekly groups are checked at their busiest upcoming session.
+    const busiest = await seatsUsed(db, scheduleId, currentDays, maxYmd(todayYmd(), schedule.effective_from), schedule.effective_to);
+    if (c < busiest) throw new ConflictError(`${busiest} students are invited to one session; remove some before lowering the capacity to ${c}`);
     f.capacity = c;
   }
   let publish = false;
@@ -355,18 +357,25 @@ export const updateSchedule = async (actor: Actor, scheduleId: number, input: an
         .update(OfficeHourAssignment)
         .set({ effective_to: f.effectiveTo })
         .where(and(eq(OfficeHourAssignment.schedule_id, scheduleId), gte(OfficeHourAssignment.effective_to, addDaysYmd(f.effectiveTo, 1))));
+      await tx.execute(sql`
+        DELETE l FROM OfficeHourStudentDateLock l
+        JOIN OfficeHourAssignment a ON a.assignment_id = l.assignment_id
+        WHERE a.schedule_id = ${scheduleId} AND l.lock_date > ${f.effectiveTo}`);
     }
-    // WEEKDAY mode locks only the meeting days, so they follow a days change.
+    // WEEKDAY mode locks only the meeting dates, so they follow a days change.
     if (daysChanged && settings.student_lock_mode === "WEEKDAY") {
       const active = await tx
-        .select({ id: OfficeHourAssignment.assignment_id, student: OfficeHourAssignment.student_id })
+        .select({ id: OfficeHourAssignment.assignment_id, student: OfficeHourAssignment.student_id, from: OfficeHourAssignment.effective_from, to: OfficeHourAssignment.effective_to })
         .from(OfficeHourAssignment)
         .where(and(eq(OfficeHourAssignment.schedule_id, scheduleId), eq(OfficeHourAssignment.status, "ACTIVE")));
+      const today = todayYmd();
       for (const a of active) {
-        await tx.delete(OfficeHourStudentLock).where(eq(OfficeHourStudentLock.assignment_id, a.id));
+        await tx.delete(OfficeHourStudentDateLock).where(and(eq(OfficeHourStudentDateLock.assignment_id, a.id), gte(OfficeHourStudentDateLock.lock_date, today)));
+        const dates = lockDatesFor("WEEKDAY", f.days, maxYmd(today, String(a.from).slice(0, 10)), minYmd(String(a.to).slice(0, 10), f.effectiveTo));
+        if (!dates.length) continue;
         try {
-          await tx.insert(OfficeHourStudentLock).values(
-            f.days.map((d) => ({ academic_term_id: schedule.academic_term_id, student_id: a.student, day_of_week: d, assignment_id: a.id })),
+          await tx.insert(OfficeHourStudentDateLock).values(
+            dates.map((d) => ({ student_id: a.student, lock_date: d, academic_term_id: schedule.academic_term_id, assignment_id: a.id })),
           );
         } catch (error) {
           if (isDupEntry(error)) {
@@ -439,7 +448,7 @@ export const endSchedule = async (actor: Actor, scheduleId: number) => {
         .update(OfficeHourAssignment)
         .set({ effective_to: endYmd })
         .where(and(inArray(OfficeHourAssignment.assignment_id, ids), gte(OfficeHourAssignment.effective_to, addDaysYmd(endYmd, 1))));
-      await tx.delete(OfficeHourStudentLock).where(inArray(OfficeHourStudentLock.assignment_id, ids));
+      await tx.delete(OfficeHourStudentDateLock).where(inArray(OfficeHourStudentDateLock.assignment_id, ids));
     }
     await tx
       .update(OfficeHourSchedule)
@@ -479,18 +488,13 @@ export const deleteSchedule = async (actor: Actor, scheduleId: number) => {
 export const serializeSchedules = async (rows: Schedule[]) => {
   if (!rows.length) return [];
   const ids = rows.map((r) => r.schedule_id);
-  const [days, names, subjects, counts] = await Promise.all([
+  const [days, names, subjects] = await Promise.all([
     scheduleDays(ids),
     userNames(rows.map((r) => r.teacher_id)),
     db.select({ id: Subject.subject_id, name: Subject.name, color: Subject.color }).from(Subject).where(inArray(Subject.subject_id, [...new Set(rows.map((r) => r.subject_id ?? 0))])),
-    db
-      .select({ id: OfficeHourAssignment.schedule_id, n: sql<number>`COUNT(*)` })
-      .from(OfficeHourAssignment)
-      .where(and(inArray(OfficeHourAssignment.schedule_id, ids), eq(OfficeHourAssignment.status, "ACTIVE")))
-      .groupBy(OfficeHourAssignment.schedule_id),
   ]);
+  const seats = await seatSummary(rows, days);
   const subjectById = new Map(subjects.map((s) => [s.id, s]));
-  const countById = new Map(counts.map((c) => [c.id, Number(c.n)]));
   return rows.map((r) => ({
     ...r,
     days: days.get(r.schedule_id) ?? [],
@@ -498,7 +502,9 @@ export const serializeSchedules = async (rows: Schedule[]) => {
     teacher_name: names.get(r.teacher_id) ?? null,
     subject_name: r.subject_id ? subjectById.get(r.subject_id)?.name ?? null : null,
     subject_color: r.subject_id ? subjectById.get(r.subject_id)?.color ?? null : null,
-    assigned_count: countById.get(r.schedule_id) ?? 0,
+    // Busiest upcoming session (what capacity is about) and everyone invited across weeks.
+    assigned_count: seats.get(r.schedule_id)?.peak ?? 0,
+    invited_count: seats.get(r.schedule_id)?.invited ?? 0,
   }));
 };
 

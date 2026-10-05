@@ -20,6 +20,7 @@ import { queueRegister } from "./offlineQueue";
 import { CheckInPanel } from "./CheckIn";
 import { API_BASE_URL } from "../../services/api";
 import { getToken } from "../../utils/auth";
+import SelectField from "../ui/SelectField";
 
 /**
  * The register (plan §12). One tap per exception: "Mark all present", then
@@ -439,11 +440,11 @@ const RegisterSheet: React.FC<RegisterSheetProps> = ({ sessionId, onClose, onSav
                       {d.status === "EXCUSED" && (
                         <div>
                           <label htmlFor={`oh-exc-${r.student_id}`} className={labelCls}>Excuse</label>
-                          <select id={`oh-exc-${r.student_id}`} className={inputCls} disabled={!editable} value={d.excuse_reason ?? "OTHER"} onChange={(e) => patch(r.student_id, { excuse_reason: e.target.value })}>
+                          <SelectField id={`oh-exc-${r.student_id}`} className={inputCls} disabled={!editable} value={d.excuse_reason ?? "OTHER"} onChange={(e) => patch(r.student_id, { excuse_reason: e.target.value })}>
                             {(data.excuse_reasons ?? ["SICK", "SCHOOL_ACTIVITY", "FAMILY", "PERMISSION", "OTHER"]).map((x) => (
                               <option key={x} value={x}>{humanize(x)}</option>
                             ))}
-                          </select>
+                          </SelectField>
                         </div>
                       )}
                       {open && (
@@ -454,7 +455,7 @@ const RegisterSheet: React.FC<RegisterSheetProps> = ({ sessionId, onClose, onSav
                           </div>
                           <div>
                             <label htmlFor={`oh-out-${r.student_id}`} className={labelCls}>Outcome</label>
-                            <select
+                            <SelectField
                               id={`oh-out-${r.student_id}`}
                               className={inputCls}
                               disabled={!editable}
@@ -465,7 +466,7 @@ const RegisterSheet: React.FC<RegisterSheetProps> = ({ sessionId, onClose, onSav
                               {OUTCOMES.map(([v, l]) => (
                                 <option key={v} value={v}>{l}</option>
                               ))}
-                            </select>
+                            </SelectField>
                           </div>
                           <label className="flex items-center gap-2 self-end pb-2 text-sm text-slate-700 dark:text-slate-200">
                             <input type="checkbox" className="h-4 w-4 rounded border-slate-400" disabled={!editable} checked={Boolean(d.follow_up)} onChange={(e) => patch(r.student_id, { follow_up: e.target.checked })} />

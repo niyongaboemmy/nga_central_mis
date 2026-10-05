@@ -24,6 +24,7 @@ import Button from "../../ui/Button";
 import { CardShell, EmptyState, ReadOnlyNotice } from "../shared";
 import ReadinessRing from "../ReadinessRing";
 import { checksFor } from "../readiness";
+import SelectField from "../../ui/SelectField";
 
 /** Lens 4 — is the structure right? Grades and the class groups under them. */
 const StructureLens: React.FC = () => {
@@ -426,7 +427,7 @@ const GradeModal: React.FC<{
           <span className="text-xs font-medium text-gray-500 dark:text-gray-400">
             Program
           </span>
-          <select
+          <SelectField
             value={program ?? ""}
             onChange={(e) =>
               setProgram(e.target.value ? Number(e.target.value) : null)
@@ -439,7 +440,7 @@ const GradeModal: React.FC<{
                 {p.name}
               </option>
             ))}
-          </select>
+          </SelectField>
         </label>
 
         <label className="block">

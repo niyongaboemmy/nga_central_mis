@@ -8,7 +8,7 @@ import {
   OfficeHourSession,
 } from "../../db/officeHoursSchema";
 import { AuthorizationError } from "../../errors/CustomError";
-import { addDaysYmd } from "../reminders/time";
+import { addDaysYmd, dowOfYmd } from "../reminders/time";
 import { Actor, readScopeOf } from "./access";
 import { dayLabel, loadTerm, todayYmd } from "./common";
 import { userNames } from "./eligibility";
@@ -161,6 +161,9 @@ const activeSchedulesWithDays = async (conds: any[]) => {
 export const bandFor = async (actor: Actor, termId: number, opts: { classGroupId?: number | null; asOf?: string }) => {
   const today = opts.asOf ?? todayYmd();
   const entries: BandEntry[] = [];
+  // Invitations are weekly: only those covering the week shown count.
+  const weekStart = addDaysYmd(today, -((dowOfYmd(today) + 6) % 7));
+  const inWeek = and(lte(OfficeHourAssignment.effective_from, addDaysYmd(weekStart, 6)), gte(OfficeHourAssignment.effective_to, weekStart));
 
   if (opts.classGroupId) {
     const term = await loadTerm(termId);
@@ -180,7 +183,7 @@ export const bandFor = async (actor: Actor, termId: number, opts: { classGroupId
           eq(StudentClassGroup.status, "ACTIVE"),
         ),
       )
-      .where(and(eq(OfficeHourAssignment.academic_term_id, termId), eq(OfficeHourAssignment.status, "ACTIVE"), eq(OfficeHourSchedule.status, "ACTIVE")));
+      .where(and(eq(OfficeHourAssignment.academic_term_id, termId), eq(OfficeHourAssignment.status, "ACTIVE"), eq(OfficeHourSchedule.status, "ACTIVE"), inWeek));
     const days = await scheduleDays([...new Set(rows.map((r) => r.s.schedule_id))]);
     const teachers = await userNames(rows.map((r) => r.s.teacher_id));
     const byDay = new Map<number, { count: number; teachers: Set<string> }>();
@@ -221,7 +224,7 @@ export const bandFor = async (actor: Actor, termId: number, opts: { classGroupId
       ? await db
           .select({ id: OfficeHourAssignment.schedule_id })
           .from(OfficeHourAssignment)
-          .where(and(inArray(OfficeHourAssignment.schedule_id, rows.map((r) => r.schedule_id)), eq(OfficeHourAssignment.status, "ACTIVE")))
+          .where(and(inArray(OfficeHourAssignment.schedule_id, rows.map((r) => r.schedule_id)), eq(OfficeHourAssignment.status, "ACTIVE"), inWeek))
       : [];
     for (const r of rows) {
       for (const d of days.get(r.schedule_id) ?? []) {
@@ -245,7 +248,7 @@ export const bandFor = async (actor: Actor, termId: number, opts: { classGroupId
     .select({ a: OfficeHourAssignment, s: OfficeHourSchedule })
     .from(OfficeHourAssignment)
     .innerJoin(OfficeHourSchedule, eq(OfficeHourSchedule.schedule_id, OfficeHourAssignment.schedule_id))
-    .where(and(eq(OfficeHourAssignment.student_id, actor.userId), eq(OfficeHourAssignment.academic_term_id, termId), eq(OfficeHourAssignment.status, "ACTIVE"), eq(OfficeHourSchedule.status, "ACTIVE")));
+    .where(and(eq(OfficeHourAssignment.student_id, actor.userId), eq(OfficeHourAssignment.academic_term_id, termId), eq(OfficeHourAssignment.status, "ACTIVE"), eq(OfficeHourSchedule.status, "ACTIVE"), inWeek));
   if (mine.length) {
     const days = await scheduleDays(mine.map((m) => m.s.schedule_id));
     const teachers = await userNames(mine.map((m) => m.s.teacher_id));

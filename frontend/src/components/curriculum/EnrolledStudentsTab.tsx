@@ -26,6 +26,7 @@ import { useToast } from "../../contexts/ToastContext";
 import { useAcademicPeriod } from "../../contexts/AcademicPeriodContext";
 import { Permissions } from "../../constants/permissions";
 import StudentDetailsModal from "./StudentDetailsModal";
+import SelectField from "../ui/SelectField";
 
 interface SearchUser {
   user_id: number;
@@ -254,7 +255,7 @@ const EnrolledStudentsTab: React.FC<Props> = ({ subjectId, subjectName }) => {
       <div className="flex flex-col sm:flex-row sm:items-center gap-3">
         {/* Year selector */}
         <div className="relative">
-          <select
+          <SelectField
             value={selectedYearId ?? ""}
             onChange={(e) => setSelectedYearId(Number(e.target.value))}
             className="appearance-none pl-9 pr-8 py-2.5 text-sm font-medium border border-gray-200 dark:border-gray-700/30 rounded-xl bg-white dark:bg-gray-800/40 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer shadow-sm"
@@ -264,9 +265,8 @@ const EnrolledStudentsTab: React.FC<Props> = ({ subjectId, subjectName }) => {
                 {y.name}{y.is_current ? " (Current)" : ""}
               </option>
             ))}
-          </select>
+          </SelectField>
           <GraduationCap className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-500 pointer-events-none" />
-          <ChevronDownSm className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
         </div>
 
         {/* Stats pill */}
@@ -426,27 +426,25 @@ const EnrolledStudentsTab: React.FC<Props> = ({ subjectId, subjectName }) => {
         <div className="flex gap-2">
           <div className="relative">
             <Filter className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
-            <select
+            <SelectField
               value={selectedGrade}
               onChange={(e) => setSelectedGrade(e.target.value)}
               className="appearance-none pl-8 pr-7 py-2.5 text-sm border border-gray-200 dark:border-gray-700/30 rounded-xl bg-white dark:bg-gray-800/40 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
             >
               <option value="all">All Grades</option>
               {uniqueGrades.map((g) => <option key={g} value={g}>{g}</option>)}
-            </select>
-            <ChevronDownSm className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-gray-400 pointer-events-none" />
+            </SelectField>
           </div>
           <div className="relative">
             <Filter className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
-            <select
+            <SelectField
               value={selectedProgram}
               onChange={(e) => setSelectedProgram(e.target.value)}
               className="appearance-none pl-8 pr-7 py-2.5 text-sm border border-gray-200 dark:border-gray-700/30 rounded-xl bg-white dark:bg-gray-800/40 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
             >
               <option value="all">All Programs</option>
               {uniquePrograms.map((p) => <option key={p} value={p}>{p}</option>)}
-            </select>
-            <ChevronDownSm className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-gray-400 pointer-events-none" />
+            </SelectField>
           </div>
         </div>
       </div>

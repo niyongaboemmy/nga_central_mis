@@ -155,7 +155,7 @@ describe("ClassTeacherSubjectsPage filtering", () => {
     await screen.findByText("Applied Physics I");
 
     fireEvent.click(screen.getByRole("button", { name: /Filters/ }));
-    fireEvent.change(await screen.findByLabelText("Sort by"), {
+    fireEvent.change(await screen.findByLabelText("Sort by", { selector: "select" }), {
       target: { value: "name-desc" },
     });
 

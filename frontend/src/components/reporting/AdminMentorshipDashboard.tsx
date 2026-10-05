@@ -12,6 +12,7 @@ import {
 import { mentorshipApi, AdminMentorshipDashboardData } from "../../api/mentorship";
 import { useAcademicPeriod } from "../../contexts/AcademicPeriodContext";
 import { useToast } from "../../contexts/ToastContext";
+import SelectField from "../ui/SelectField";
 
 type StatColor = "blue" | "indigo" | "orange" | "red" | "amber" | "green";
 const STAT_STYLES: Record<StatColor, { chip: string; text: string; hover: string }> = {
@@ -99,7 +100,7 @@ const AdminMentorshipDashboard: React.FC = () => {
           <h2 className="text-lg font-bold text-gray-900 dark:text-white tracking-tight">Mentorship Dashboard</h2>
           <p className="text-sm text-gray-500 dark:text-gray-400">School-wide mentorship activity and approvals.</p>
         </div>
-        <select
+        <SelectField
           value={yearFilter}
           onChange={(e) => setYearFilter(e.target.value ? Number(e.target.value) : "")}
           className="px-3 py-2 text-sm border border-gray-200 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
@@ -108,7 +109,7 @@ const AdminMentorshipDashboard: React.FC = () => {
           {years.map((y) => (
             <option key={y.academic_year_id} value={y.academic_year_id}>{y.name}</option>
           ))}
-        </select>
+        </SelectField>
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">

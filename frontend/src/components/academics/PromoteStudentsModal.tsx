@@ -18,6 +18,7 @@ import Button from "../ui/Button";
 import Modal from "../ui/Modal";
 import RichSelect from "../ui/RichSelect";
 import { useToast } from "../../contexts/ToastContext";
+import SelectField from "../ui/SelectField";
 
 interface PromoteStudentsModalProps {
   isOpen: boolean;
@@ -365,7 +366,7 @@ const PromoteStudentsModal: React.FC<PromoteStudentsModalProps> = ({
                               group manually below.
                             </p>
                           )}
-                          <select
+                          <SelectField
                             value={overrideValue || 0}
                             onChange={(e) =>
                               setOverrides((prev) => ({
@@ -388,7 +389,7 @@ const PromoteStudentsModal: React.FC<PromoteStudentsModalProps> = ({
                                 {cg.grade_name ? ` (${cg.grade_name})` : ""}
                               </option>
                             ))}
-                          </select>
+                          </SelectField>
                         </div>
                       ) : gradePlan.status === "no_class_group" ? (
                         <p className="mt-1.5 text-xs text-amber-600 dark:text-amber-400">

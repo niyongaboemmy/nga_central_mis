@@ -15,6 +15,7 @@ import {
 import { getRoles, bulkCreateUsers, Role } from "../api/users";
 import { useToast } from "../contexts/ToastContext";
 import * as XLSX from "xlsx";
+import SelectField from "./ui/SelectField";
 
 interface ExcelUploadModalProps {
   isOpen: boolean;
@@ -516,7 +517,7 @@ const ExcelUploadModal: React.FC<ExcelUploadModalProps> = ({
                         Assign Role to All Users
                       </label>
                       <div className="relative">
-                        <select
+                        <SelectField
                           value={selectedRole}
                           onChange={(e) =>
                             setSelectedRole(e.target.value as number | "")
@@ -529,7 +530,7 @@ const ExcelUploadModal: React.FC<ExcelUploadModalProps> = ({
                               {role.name}
                             </option>
                           ))}
-                        </select>
+                        </SelectField>
                       </div>
                     </div>
 

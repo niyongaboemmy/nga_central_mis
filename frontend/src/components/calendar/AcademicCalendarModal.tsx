@@ -1,6 +1,7 @@
 import React from "react";
 import { X } from "lucide-react";
 import { AcademicTerm } from "../../api/academics";
+import SelectField from "../ui/SelectField";
 
 interface CalendarFormData {
   academic_year_id: string;
@@ -54,7 +55,7 @@ const AcademicCalendarModal: React.FC<AcademicCalendarModalProps> = ({
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Academic Year
             </label>
-            <select
+            <SelectField
               value={formData.academic_year_id}
               onChange={(e) =>
                 onFormDataChange({ academic_year_id: e.target.value })
@@ -71,13 +72,13 @@ const AcademicCalendarModal: React.FC<AcademicCalendarModalProps> = ({
                   {year.name}
                 </option>
               ))}
-            </select>
+            </SelectField>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Academic Term
             </label>
-            <select
+            <SelectField
               value={formData.academic_term_id}
               onChange={(e) =>
                 onFormDataChange({ academic_term_id: e.target.value })
@@ -94,13 +95,13 @@ const AcademicCalendarModal: React.FC<AcademicCalendarModalProps> = ({
                   {term.name}
                 </option>
               ))}
-            </select>
+            </SelectField>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Class Group
             </label>
-            <select
+            <SelectField
               value={formData.class_group_id}
               onChange={(e) =>
                 onFormDataChange({ class_group_id: e.target.value })
@@ -115,7 +116,7 @@ const AcademicCalendarModal: React.FC<AcademicCalendarModalProps> = ({
                   {cg.name}
                 </option>
               ))}
-            </select>
+            </SelectField>
             {availableClassGroups.length === 0 && (
               <p className="text-xs text-gray-500 mt-1">
                 All class groups for this year/term already have calendars

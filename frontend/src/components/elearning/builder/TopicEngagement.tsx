@@ -11,6 +11,7 @@ import {
   type AnalyticsSection,
   type TopicSort,
 } from "./topicStats";
+import SelectField from "../../ui/SelectField";
 
 // ─── Topic engagement ───────────────────────────────────────────────────────
 //
@@ -78,7 +79,7 @@ const TopicEngagement: React.FC<{
         </div>
         <label className="flex items-center gap-1.5 text-[11px] text-gray-500 dark:text-gray-400">
           Sort
-          <select
+          <SelectField
             value={sort}
             onChange={(e) => setSort(e.target.value as TopicSort)}
             className="rounded-lg border border-gray-200 bg-white px-2 py-1 text-[11px] text-gray-800 focus:outline-none focus:ring-2 focus:ring-brand-500/30 dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-gray-100"
@@ -96,7 +97,7 @@ const TopicEngagement: React.FC<{
                 {TOPIC_SORT_LABEL[value]}
               </option>
             ))}
-          </select>
+          </SelectField>
         </label>
       </div>
 

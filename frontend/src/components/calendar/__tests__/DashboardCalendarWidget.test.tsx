@@ -158,6 +158,7 @@ describe("DashboardCalendarWidget — class group filter", () => {
 
     const select = (await screen.findByLabelText(
       "Filter by class group",
+      { selector: "select" },
     )) as HTMLSelectElement;
     await waitFor(() => expect(select.value).toBe("3"));
     expect(select).toHaveDisplayValue("L3. Class A (Level 3)");
@@ -184,6 +185,7 @@ describe("DashboardCalendarWidget — class group filter", () => {
     render(<DashboardCalendarWidget />);
     const select = (await screen.findByLabelText(
       "Filter by class group",
+      { selector: "select" },
     )) as HTMLSelectElement;
 
     getMyCalendarMock.mockResolvedValueOnce({
@@ -200,7 +202,7 @@ describe("DashboardCalendarWidget — class group filter", () => {
     );
     // the other group is still on offer even though its slots are gone
     expect(
-      within(select).getByRole("option", { name: "L4. Class A" }),
+      within(select).getByRole("option", { name: "L4. Class A", hidden: true }),
     ).toBeInTheDocument();
   });
 
@@ -536,7 +538,7 @@ describe("DashboardCalendarWidget — loading skeleton", () => {
 
     let resolve: (v: any) => void = () => {};
     getMyCalendarMock.mockReturnValueOnce(new Promise((r) => (resolve = r)));
-    const select = await screen.findByLabelText("Filter by class group");
+    const select = await screen.findByLabelText("Filter by class group", { selector: "select" });
     await userEvent.selectOptions(select, "4");
 
     expect(await screen.findByTestId("calendar-grid-skeleton")).toBeInTheDocument();

@@ -9,6 +9,7 @@ import { getUsers, UserWithProfile } from "../../api/users";
 import Button from "../ui/Button";
 import Modal from "../ui/Modal";
 import ConfirmModal from "../ui/ConfirmModal";
+import SelectField from "../ui/SelectField";
 
 interface AssignmentKey {
   user_id: number;
@@ -536,7 +537,7 @@ const TeacherAssignmentsTab: React.FC<TeacherAssignmentsTabProps> = ({
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2.5">
-          <select
+          <SelectField
             value={yearFilter}
             onChange={(e) => setYearFilter(parseInt(e.target.value))}
             className={`${selectClasses} whitespace-nowrap`}
@@ -548,7 +549,7 @@ const TeacherAssignmentsTab: React.FC<TeacherAssignmentsTabProps> = ({
                 {year.is_current === 1 ? " (Current)" : ""}
               </option>
             ))}
-          </select>
+          </SelectField>
           <Button
             variant="secondary"
             onClick={onRefresh}
@@ -593,7 +594,7 @@ const TeacherAssignmentsTab: React.FC<TeacherAssignmentsTabProps> = ({
           )}
         </div>
         <div className="flex flex-wrap items-center gap-2.5">
-          <select
+          <SelectField
             value={teacherFilter}
             onChange={(e) => setTeacherFilter(parseInt(e.target.value))}
             className={selectClasses}
@@ -604,8 +605,8 @@ const TeacherAssignmentsTab: React.FC<TeacherAssignmentsTabProps> = ({
                 {t.name}
               </option>
             ))}
-          </select>
-          <select
+          </SelectField>
+          <SelectField
             value={subjectFilter}
             onChange={(e) => setSubjectFilter(parseInt(e.target.value))}
             className={selectClasses}
@@ -616,8 +617,8 @@ const TeacherAssignmentsTab: React.FC<TeacherAssignmentsTabProps> = ({
                 {s.name}
               </option>
             ))}
-          </select>
-          <select
+          </SelectField>
+          <SelectField
             value={classGroupFilter}
             onChange={(e) => setClassGroupFilter(parseInt(e.target.value))}
             className={selectClasses}
@@ -628,7 +629,7 @@ const TeacherAssignmentsTab: React.FC<TeacherAssignmentsTabProps> = ({
                 {c.name}
               </option>
             ))}
-          </select>
+          </SelectField>
           {hasActiveFilters && (
             <button
               type="button"
@@ -767,7 +768,7 @@ const TeacherAssignmentsTab: React.FC<TeacherAssignmentsTabProps> = ({
             <label className="block text-sm font-medium text-text-primary-light dark:text-text-primary-dark mb-2">
               Copy from
             </label>
-            <select
+            <SelectField
               value={copySourceYearId}
               onChange={(e) => setCopySourceYearId(parseInt(e.target.value))}
               className={modalFieldClasses}
@@ -780,14 +781,14 @@ const TeacherAssignmentsTab: React.FC<TeacherAssignmentsTabProps> = ({
                   {year.is_current === 1 ? ", Current" : ""})
                 </option>
               ))}
-            </select>
+            </SelectField>
           </div>
 
           <div>
             <label className="block text-sm font-medium text-text-primary-light dark:text-text-primary-dark mb-2">
               Copy to
             </label>
-            <select
+            <SelectField
               value={copyTargetYearId}
               onChange={(e) => setCopyTargetYearId(parseInt(e.target.value))}
               className={modalFieldClasses}
@@ -800,7 +801,7 @@ const TeacherAssignmentsTab: React.FC<TeacherAssignmentsTabProps> = ({
                   {year.is_current === 1 ? ", Current" : ""})
                 </option>
               ))}
-            </select>
+            </SelectField>
           </div>
 
           {copyResultMessage && (
@@ -867,7 +868,7 @@ const TeacherAssignmentsTab: React.FC<TeacherAssignmentsTabProps> = ({
             <label className="block text-sm font-medium text-text-primary-light dark:text-text-primary-dark mb-2">
               Academic Year
             </label>
-            <select
+            <SelectField
               value={formYearId}
               onChange={(e) => setFormYearId(parseInt(e.target.value))}
               className={modalFieldClasses}
@@ -879,7 +880,7 @@ const TeacherAssignmentsTab: React.FC<TeacherAssignmentsTabProps> = ({
                   {year.is_current === 1 ? " (Current)" : ""}
                 </option>
               ))}
-            </select>
+            </SelectField>
           </div>
 
           <div>
@@ -942,7 +943,7 @@ const TeacherAssignmentsTab: React.FC<TeacherAssignmentsTabProps> = ({
             <label className="block text-sm font-medium text-text-primary-light dark:text-text-primary-dark mb-2">
               Subject
             </label>
-            <select
+            <SelectField
               value={formSubjectId}
               onChange={(e) => setFormSubjectId(parseInt(e.target.value))}
               className={modalFieldClasses}
@@ -953,14 +954,14 @@ const TeacherAssignmentsTab: React.FC<TeacherAssignmentsTabProps> = ({
                   {subject.name} {subject.code && `(${subject.code})`}
                 </option>
               ))}
-            </select>
+            </SelectField>
           </div>
 
           <div>
             <label className="block text-sm font-medium text-text-primary-light dark:text-text-primary-dark mb-2">
               Class Group
             </label>
-            <select
+            <SelectField
               value={formClassGroupId}
               onChange={(e) => setFormClassGroupId(parseInt(e.target.value))}
               className={modalFieldClasses}
@@ -971,7 +972,7 @@ const TeacherAssignmentsTab: React.FC<TeacherAssignmentsTabProps> = ({
                   {classGroupLabel(cg)}
                 </option>
               ))}
-            </select>
+            </SelectField>
           </div>
 
           {duplicateWarning && (

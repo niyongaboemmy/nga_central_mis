@@ -115,6 +115,23 @@ export const OfficeHourStudentLock = mysqlTable(
   (t) => ({ pk: primaryKey({ columns: [t.academic_term_id, t.student_id, t.day_of_week] }) }),
 );
 
+/**
+ * The no-overlap guarantee per date (migration 104): PK (student, lock_date).
+ * Replaces OfficeHourStudentLock's (term, student, weekday), which held a
+ * student for the whole term and so could not express weekly invitations.
+ */
+export const OfficeHourStudentDateLock = mysqlTable(
+  "OfficeHourStudentDateLock",
+  {
+    student_id: bigint("student_id", { mode: "number" }).notNull(),
+    lock_date: date("lock_date", { mode: "string" }).notNull(),
+    academic_term_id: bigint("academic_term_id", { mode: "number" }).notNull(),
+    assignment_id: bigint("assignment_id", { mode: "number" }).notNull(),
+    created_at: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`),
+  },
+  (t) => ({ pk: primaryKey({ columns: [t.student_id, t.lock_date] }) }),
+);
+
 export const OfficeHourSession = mysqlTable("OfficeHourSession", {
   session_id: bigint("session_id", { mode: "number" }).primaryKey().autoincrement(),
   schedule_id: bigint("schedule_id", { mode: "number" }).notNull(),

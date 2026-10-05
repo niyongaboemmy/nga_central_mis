@@ -23,6 +23,7 @@ import { useToast } from "../../contexts/ToastContext";
 import { useUser } from "../../contexts/UserContext";
 import { useAcademicPeriod } from "../../contexts/AcademicPeriodContext";
 import { format } from "date-fns";
+import SelectField from "../ui/SelectField";
 
 const parseLocalNoShift = (dateStr: string) => {
   if (!dateStr) return new Date();
@@ -421,7 +422,7 @@ const ReportForm: React.FC<ReportFormProps> = ({
                         )?.name || "N/A"}
                       </p>
                     ) : (
-                      <select
+                      <SelectField
                         value={formData.academic_term_id}
                         onChange={(e) =>
                           setFormData((p) => ({
@@ -440,7 +441,7 @@ const ReportForm: React.FC<ReportFormProps> = ({
                             {t.name}
                           </option>
                         ))}
-                      </select>
+                      </SelectField>
                     )}
                   </div>
 
@@ -457,7 +458,7 @@ const ReportForm: React.FC<ReportFormProps> = ({
                         )?.name || "N/A"}
                       </p>
                     ) : (
-                      <select
+                      <SelectField
                         value={formData.class_group_id}
                         onChange={(e) =>
                           setFormData((p) => ({
@@ -476,7 +477,7 @@ const ReportForm: React.FC<ReportFormProps> = ({
                             {g.name} ({g.grade_name})
                           </option>
                         ))}
-                      </select>
+                      </SelectField>
                     )}
                   </div>
 

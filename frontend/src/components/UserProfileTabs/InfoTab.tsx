@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { UserWithProfile } from "../../api/users";
 import { InfoItem } from "./TabShared";
+import SelectField from "../ui/SelectField";
 
 interface EditedInfo {
   username?: string;
@@ -158,7 +159,7 @@ const InfoTab: React.FC<InfoTabProps> = ({
               />
             </Field>
             <Field label="Account Status" icon={Activity} index={2}>
-              <select
+              <SelectField
                 value={editedInfo.status || "ACTIVE"}
                 disabled={!canManageUsers}
                 onChange={(e) => set({ status: e.target.value as EditedInfo["status"] })}
@@ -167,7 +168,7 @@ const InfoTab: React.FC<InfoTabProps> = ({
                 <option value="ACTIVE">Active</option>
                 <option value="INACTIVE">Inactive</option>
                 <option value="SUSPENDED">Suspended</option>
-              </select>
+              </SelectField>
             </Field>
             <Field label="User Type" icon={Shield} index={3} hint="Set via Roles, not editable here">
               <input
@@ -217,7 +218,7 @@ const InfoTab: React.FC<InfoTabProps> = ({
               />
             </Field>
             <Field label="Gender" icon={Building} index={2}>
-              <select
+              <SelectField
                 value={editedInfo.gender || ""}
                 onChange={(e) => set({ gender: e.target.value as EditedInfo["gender"] })}
                 className={`${inputBase} ${inputOk}`}
@@ -228,7 +229,7 @@ const InfoTab: React.FC<InfoTabProps> = ({
                 <option value="MALE">Male</option>
                 <option value="FEMALE">Female</option>
                 <option value="OTHER">Other</option>
-              </select>
+              </SelectField>
             </Field>
             <Field label="Date of Birth" icon={Calendar} index={3}>
               <input

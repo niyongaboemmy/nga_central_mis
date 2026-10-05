@@ -38,6 +38,7 @@ import {
   type SchemeFilter,
   type SchemeSort,
 } from "./schemeOfWork/schemeProgress";
+import SelectField from "./ui/SelectField";
 
 // ─── Scheme of Work ─────────────────────────────────────────────────────────
 //
@@ -360,7 +361,7 @@ const SchemeOfWorkList: React.FC = () => {
               />
               <label className="ml-auto flex items-center gap-2 text-xs text-text-secondary-light dark:text-text-secondary-dark">
                 Sort
-                <select
+                <SelectField
                   value={sort}
                   onChange={(e) => setSort(e.target.value as SchemeSort)}
                   className="rounded-xl border border-border-light bg-card-light px-2.5 py-1.5 text-xs text-text-primary-light focus:outline-none focus:ring-2 focus:ring-blue-500/30 dark:border-border-dark/50 dark:bg-card-dark/30 dark:text-text-primary-dark"
@@ -372,7 +373,7 @@ const SchemeOfWorkList: React.FC = () => {
                       </option>
                     ),
                   )}
-                </select>
+                </SelectField>
               </label>
             </>
           )}

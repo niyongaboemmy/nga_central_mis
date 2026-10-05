@@ -4,11 +4,12 @@ import { OfficeHourAssignment, OfficeHourSchedule, OfficeHourTransferRequest } f
 import { AuthorizationError, ConflictError, NotFoundError, ValidationError } from "../../errors/CustomError";
 import { addDaysYmd, dowOfYmd, kigaliInstant } from "../reminders/time";
 import { Actor, assertCanManage } from "./access";
-import { availabilityFor, moveStudent } from "./assignments";
+import { availabilityFor, invitationWindow, moveStudent } from "./assignments";
 import { now, todayYmd } from "./common";
 import { emitOfficeHoursEvent } from "./events";
 import { studentCards, userNames } from "./eligibility";
 import { loadSchedule } from "./schedules";
+import { scheduleDays } from "./sessions";
 
 /**
  * Transfer requests (plan §5.4): teacher B asks teacher A to release a student
@@ -32,7 +33,10 @@ export const requestTransfer = async (actor: Actor, studentId: number, toSchedul
   const target = await loadSchedule(toScheduleId);
   assertCanManage(actor, target.teacher_id);
   if (target.status !== "ACTIVE") throw new ConflictError("Publish these office hours before requesting a transfer");
-  const avail = (await availabilityFor(target, [studentId])).get(studentId);
+  // A transfer moves the student for the rest of the target's term.
+  const days = (await scheduleDays([toScheduleId])).get(toScheduleId) ?? [];
+  const window = (await invitationWindow(target, days)) ?? { from: todayYmd(), to: target.effective_to };
+  const avail = (await availabilityFor(target, [studentId], window)).get(studentId);
   if (!avail || avail.status === "FREE") throw new ConflictError("This student is free; assign them directly");
   if (avail.status === "WITH_YOU") throw new ConflictError("This student is already in these office hours");
   const holder = avail.holders[0];

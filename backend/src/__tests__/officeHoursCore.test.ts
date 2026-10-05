@@ -7,13 +7,14 @@ import { CalendarSlot, StudentClassGroup } from "../db/schema";
 import {
   OfficeHourAssignment,
   OfficeHourSession,
-  OfficeHourStudentLock,
+  OfficeHourStudentDateLock,
 } from "../db/officeHoursSchema";
 import { createCalendarSlot } from "../test/fixtures";
 import { createOfficeHoursWorld, OhWorld, OH_MONDAY, pinClock, resetSettings } from "../test/officeHoursFixtures";
 import { setOfficeHoursClock } from "../services/officeHours/common";
 import { clearOfficeHoursEvents, recentOfficeHoursEvents } from "../services/officeHours/events";
 import { reconcileOfficeHours } from "../services/officeHours/reconcile";
+import { dowOfYmd } from "../services/reminders/time";
 
 // Office hours Phase 1: schedules, the no-overlap lock, sessions, closures,
 // transfers, overrides and the nightly reconcile (OFFICE_HOURS_IMPLEMENTATION_PLAN.md §5).
@@ -108,10 +109,10 @@ describe("Office hours phase 1: core scheduling and assignment", () => {
     expect(more.body.data.assigned.map((x: any) => x.student_id)).toEqual([w.students[2]]);
     expect(more.body.data.over_capacity).toEqual([w.students[3]]);
     // TERM mode: every weekday is locked for an assigned student.
-    const locks = await db.select().from(OfficeHourStudentLock).where(and(eq(OfficeHourStudentLock.student_id, w.students[0]), eq(OfficeHourStudentLock.academic_term_id, w.termId)));
-    expect(locks.map((l) => l.day_of_week).sort()).toEqual([1, 2, 3, 4, 5]);
+    const locks = await db.select().from(OfficeHourStudentDateLock).where(and(eq(OfficeHourStudentDateLock.student_id, w.students[0]), eq(OfficeHourStudentDateLock.academic_term_id, w.termId)));
+    expect([...new Set(locks.map((l) => dowOfYmd(String(l.lock_date))))].sort()).toEqual([1, 2, 3, 4, 5]);
     // Clean up for the following tests.
-    await request(app).post(`/office-hours/schedules/${a.schedule_id}/end`).set(auth("teacherA"));
+    await request(app).post(`/office-hours/schedules/${a.schedule_id}/end`).set(auth("teacherA")).expect(200);
   });
 
   it("lets exactly one of two racing teachers take the same student", async () => {
@@ -244,7 +245,7 @@ describe("Office hours phase 1: core scheduling and assignment", () => {
     expect(ended.body.data.status).toBe("ENDED");
     const after = await sessionsOf(a.schedule_id);
     expect(after.every((x) => x.status === "CANCELLED" && x.cancel_reason === "SCHEDULE_ENDED")).toBe(true);
-    const locks = await db.select().from(OfficeHourStudentLock).where(eq(OfficeHourStudentLock.student_id, s));
+    const locks = await db.select().from(OfficeHourStudentDateLock).where(eq(OfficeHourStudentDateLock.student_id, s));
     expect(locks).toHaveLength(0);
   });
 
@@ -258,7 +259,7 @@ describe("Office hours phase 1: core scheduling and assignment", () => {
     const [row] = await db.select().from(OfficeHourAssignment).where(and(eq(OfficeHourAssignment.student_id, s), eq(OfficeHourAssignment.schedule_id, a.schedule_id)));
     expect(row.status).toBe("ENDED");
     expect(row.end_reason_code).toBe("LEFT_CLASS");
-    expect(await db.select().from(OfficeHourStudentLock).where(eq(OfficeHourStudentLock.student_id, s))).toHaveLength(0);
+    expect(await db.select().from(OfficeHourStudentDateLock).where(eq(OfficeHourStudentDateLock.student_id, s))).toHaveLength(0);
     await db.update(StudentClassGroup).set({ status: "ACTIVE" }).where(and(eq(StudentClassGroup.user_id, s), eq(StudentClassGroup.academic_year_id, w.yearId)));
     await request(app).post(`/office-hours/schedules/${a.schedule_id}/end`).set(auth("teacherA"));
   });

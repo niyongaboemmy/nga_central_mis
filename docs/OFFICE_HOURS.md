@@ -94,7 +94,9 @@ Every job is idempotent and keyed: a restart repeats nothing visible.
 
 ## Rules worth knowing
 
-- **No overlap is a database rule.** `OfficeHourStudentLock` has the primary key (term, student, weekday). If two teachers assign the same student at the same moment, one wins and the other sees "With Ms A · Tue". They can *Ask to transfer*, and leadership can *override*.
+- **Invitations are weekly** (migration 104). A teacher invites a group for one week, a few weeks or the rest of the term; next week can be the same students (*Bring back last week's*) or different ones. Capacity is per session, so each week has its own seats.
+- **No overlap is a database rule.** `OfficeHourStudentDateLock` has the primary key (student, date): TERM mode locks every weekday of an invitation, WEEKDAY mode its meeting days. If two teachers invite the same student for the same week at the same moment, one wins and the other sees "With Ms A · Tue · wk 12 Oct". They can *Ask to transfer*, and leadership can *override*. (102's `OfficeHourStudentLock` is no longer used; it is kept for rollback.)
+- **Deploy order:** the code checks for `OfficeHourStudentDateLock`; until migration 104 runs, office hours answer 503 "being set up". Apply 104 right after deploying.
 - **Same-day cut-off (14:00).** A student added on a meeting day after the cut-off starts at the next session. The confirmation says so: "starting Wed 4 Mar".
 - **Only registers count.** Cancelled sessions (including closures) and registers nobody took never count against a student. Excused counts as attended, the same as in the attendance app. Reports also show a stricter presence rate.
 - **Consistency bands** apply once at least 3 sessions are held: consistent ≥ 90%, watch 80–89%, chronic below 80%.
@@ -110,10 +112,11 @@ Every job is idempotent and keyed: a restart repeats nothing visible.
 ## Teacher quick guide
 
 1. **Create office hours.** *Office hours → New office hours*, or the **+** on your timetable's office-hours row. Choose the days, then *Continue to students*.
-2. **Choose students.** Ticks are only possible for students who are free. *Suggested* lists students with evidence: low Task Mentor results, missing work, or past office-hours absences. *Review → Publish* tells every student.
-3. **Take the register.** At 16:20 open *Today → Take register*. Tap *Mark all present*, then change the few who were late, absent or excused (keys 1–4, Ctrl/⌘+Enter to save). Add a walk-in under *Add a student who came*.
-4. **Away?** Cancel the date (students are told), set a substitute, or *Move* that one session.
-5. **Next term.** *Copy to another term* creates a draft with the same days and students, each re-checked for the new term.
+2. **Invite students, week by week.** Pick the week and how long (*This week*, *2 weeks*, *4 weeks*, *Rest of term*). Ticks are only possible for students who are free that week. *Suggested* lists students with evidence: low Task Mentor results, missing work, or past office-hours absences; *Last week* lists last week's group. *Review → Publish* tells every student.
+3. **Plan the next weeks.** On the office hours page, *Students by week* shows each week's count. Pick a week, then *Invite for this week* or *Bring back last week's*. *Remove* in a future week keeps the weeks before it.
+4. **Take the register.** At 16:20 open *Today → Take register*. Tap *Mark all present*, then change the few who were late, absent or excused (keys 1–4, Ctrl/⌘+Enter to save). Add a walk-in under *Add a student who came*.
+5. **Away?** Cancel the date (students are told), set a substitute, or *Move* that one session.
+6. **Next term.** *Copy to another term* creates a draft with the same days and students, each re-checked for the new term.
 
 ## Student guide
 

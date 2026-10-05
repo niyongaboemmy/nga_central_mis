@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Ban, CalendarClock, CalendarX2, Copy, Pencil, RotateCcw, Send, Trash2, UserMinus, UserPlus, Users } from "lucide-react";
+import { ArrowLeft, Ban, CalendarClock, CalendarX2, Copy, History, Pencil, RotateCcw, Send, Trash2, UserMinus, UserPlus, Users } from "lucide-react";
 import { academicTermsApi, type AcademicTerm } from "../../api/academics";
 import Modal from "../ui/Modal";
 import { useConfirm } from "../../contexts/ConfirmContext";
@@ -9,8 +9,13 @@ import {
   apiError,
   formatYmd,
   humanize,
+  invitationSpan,
   officeHoursApi,
+  scheduleWeeks,
+  shortDate,
   studentName,
+  weekStartOf,
+  type OfficeHoursWeek,
   type OfficeHourSchedule,
   type OfficeHourSession,
   type OfficeHoursConfig,
@@ -19,6 +24,7 @@ import {
 import ScheduleDrawer from "./ScheduleDrawer";
 import StudentPicker from "./StudentPicker";
 import RegisterSheet from "./RegisterSheet";
+import WeekNavigator from "./WeekNavigator";
 import { SessionRow } from "./OfficeHoursHub";
 import {
   BandPill,
@@ -34,10 +40,15 @@ import {
   secondaryBtn,
   Spinner,
 } from "./ohUi";
+import SelectField from "../ui/SelectField";
+
+/** Did this invitation cover (part of) the week? Removed-before-it-started ones never ran. */
+const coversWeek = (r: RosterRow, w: OfficeHoursWeek) =>
+  r.effective_from <= r.effective_to && r.effective_from <= w.end && r.effective_to >= w.start && (r.status === "ACTIVE" || r.end_reason_code !== null);
 
 /**
- * /office-hours/schedules/:id (plan §9.4): roster with each student's
- * attendance, the session timeline, and the schedule's actions.
+ * /office-hours/schedules/:id (plan §9.4): the students invited week by week
+ * with each one's attendance, the session timeline, and the schedule's actions.
  */
 const ScheduleDetail: React.FC = () => {
   const { id } = useParams();
@@ -65,6 +76,8 @@ const ScheduleDetail: React.FC = () => {
   const [rollingOver, setRollingOver] = useState(false);
   const [terms, setTerms] = useState<AcademicTerm[]>([]);
   const [targetTerm, setTargetTerm] = useState<number | "">("");
+  const [week, setWeek] = useState<string | null>(null);
+  const [copying, setCopying] = useState(false);
 
   useEffect(() => {
     if (!rollingOver || terms.length) return;
@@ -96,8 +109,29 @@ const ScheduleDetail: React.FC = () => {
   }, [load]);
 
   const active = useMemo(() => roster.filter((r) => r.status === "ACTIVE"), [roster]);
-  const ended = useMemo(() => roster.filter((r) => r.status === "ENDED"), [roster]);
+  // Weekly invitations end on their own ("completed"): only real departures count as former students.
+  const ended = useMemo(() => roster.filter((r) => r.status === "ENDED" && r.end_reason_code !== "COMPLETED" && r.effective_from <= r.effective_to), [roster]);
   const today = config?.today ?? "";
+  const weeks = useMemo(() => (schedule ? scheduleWeeks(schedule) : []), [schedule]);
+  useEffect(() => {
+    if (!weeks.length || (week && weeks.some((w) => w.start === week))) return;
+    const now = weekStartOf(today || weeks[0].start);
+    setWeek((weeks.find((w) => w.start === now) ?? weeks.find((w) => w.start > now) ?? weeks[weeks.length - 1]).start);
+  }, [weeks, week, today]);
+  const currentWeek = weeks.find((w) => w.start === week) ?? null;
+  const weekIndex = currentWeek ? weeks.indexOf(currentWeek) : -1;
+  const previousWeek = weekIndex > 0 ? weeks[weekIndex - 1] : null;
+  const weekCounts = useMemo(() => new Map(weeks.map((w) => [w.start, roster.filter((r) => coversWeek(r, w)).length])), [weeks, roster]);
+  const weekRows = useMemo(
+    () => (currentWeek ? roster.filter((r) => coversWeek(r, currentWeek)).sort((a, b) => studentName(a.student).localeCompare(studentName(b.student))) : []),
+    [roster, currentWeek],
+  );
+  const inWeek = new Set(weekRows.map((r) => r.student_id));
+  const lastWeekRows = previousWeek ? roster.filter((r) => coversWeek(r, previousWeek) && !inWeek.has(r.student_id)) : [];
+  const lastWeekIds = [...new Set(lastWeekRows.map((r) => r.student_id))];
+  const weekOpen = Boolean(currentWeek && currentWeek.end >= today);
+  // Removing from a future week keeps the weeks before it; this week: from the next session on.
+  const removeFrom = currentWeek && currentWeek.start > today ? currentWeek.start : undefined;
   const past = sessions.filter((s) => s.session_date < today || s.state === "held" || s.state === "unmarked").reverse();
   const future = sessions.filter((s) => !past.includes(s));
   const live = schedule?.status === "ACTIVE" || schedule?.status === "DRAFT";
@@ -109,6 +143,25 @@ const ScheduleDetail: React.FC = () => {
       await load();
     } catch (error) {
       showToast(apiError(error), "error");
+    }
+  };
+
+  const copyLastWeek = async () => {
+    if (!schedule || !currentWeek || !lastWeekIds.length) return;
+    setCopying(true);
+    try {
+      const r = await officeHoursApi.assign(schedule.schedule_id, { student_ids: lastWeekIds, effective_from: currentWeek.start, effective_to: currentWeek.end });
+      const res = r.data.data;
+      const missed = res.conflicts.length + res.over_capacity.length + res.ineligible.length;
+      showToast(
+        `${res.assigned.length} invited for the week of ${shortDate(currentWeek.start)}${missed ? ` · ${missed} could not come (busy, full or no longer eligible)` : ""}`,
+        res.assigned.length ? "success" : "warning",
+      );
+      await load();
+    } catch (error) {
+      showToast(apiError(error, "Couldn't copy last week"), "error");
+    } finally {
+      setCopying(false);
     }
   };
 
@@ -181,9 +234,6 @@ const ScheduleDetail: React.FC = () => {
                   <Send className="h-4 w-4" aria-hidden /> Publish
                 </button>
               )}
-              <button type="button" className={primaryBtn} onClick={() => setPickerOpen(true)}>
-                <UserPlus className="h-4 w-4" aria-hidden /> Add students
-              </button>
               <button type="button" className={secondaryBtn} onClick={() => setEditOpen(true)}>
                 <Pencil className="h-4 w-4" aria-hidden /> Edit
               </button>
@@ -208,26 +258,52 @@ const ScheduleDetail: React.FC = () => {
           <CardTitle
             id="oh-roster"
             icon={<Users className="h-4 w-4" aria-hidden />}
-            action={<span className="text-sm font-semibold text-slate-700 dark:text-slate-200">{active.length}/{schedule.capacity}</span>}
+            action={
+              currentWeek && (
+                <span className="text-sm font-semibold tabular-nums text-slate-700 dark:text-slate-200">
+                  {weekRows.length}/{schedule.capacity} this week
+                </span>
+              )
+            }
           >
-            Students
+            Students by week
           </CardTitle>
-          {active.length === 0 ? (
-            <EmptyState title="No students yet" body="Add the students who must come to these office hours." />
+          {currentWeek && week && (
+            <div className="mb-4">
+              <WeekNavigator weeks={weeks} value={week} onChange={setWeek} today={today} counts={weekCounts} capacity={schedule.capacity} />
+            </div>
+          )}
+          {live && weekOpen && (
+            <div className="mb-3 flex flex-wrap gap-2">
+              <button type="button" className={primaryBtn} onClick={() => setPickerOpen(true)}>
+                <UserPlus className="h-4 w-4" aria-hidden /> Invite for this week
+              </button>
+              {lastWeekIds.length > 0 && (
+                <button type="button" className={secondaryBtn} onClick={copyLastWeek} disabled={copying}>
+                  <History className="h-4 w-4" aria-hidden /> {copying ? "Inviting…" : `Bring back last week's ${lastWeekIds.length}`}
+                </button>
+              )}
+            </div>
+          )}
+          {weekRows.length === 0 ? (
+            <EmptyState
+              title={currentWeek ? `Nobody invited for the week of ${shortDate(currentWeek.start)}` : "No students yet"}
+              body={weekOpen ? (lastWeekIds.length ? "Bring back last week's group, or invite new students." : "Invite the students who should come this week.") : "This week is over."}
+            />
           ) : (
             <div className="relative overflow-x-auto">
               <table className="w-full text-left text-sm">
                 <thead>
                   <tr className="text-xs uppercase tracking-wide text-slate-600 dark:text-slate-300">
                     <th scope="col" className="py-2 pr-3 font-semibold">Student</th>
-                    <th scope="col" className="py-2 pr-3 font-semibold">Since</th>
+                    <th scope="col" className="py-2 pr-3 font-semibold">Invited</th>
                     <th scope="col" className="py-2 pr-3 font-semibold">Attendance</th>
                     <th scope="col" className="py-2 pr-3 font-semibold"><span className="sr-only">Actions</span></th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                  {active.map((r) => (
-                    <tr key={r.assignment_id}>
+                  {weekRows.map((r) => (
+                    <tr key={r.assignment_id} className={r.status === "ENDED" ? "opacity-70" : undefined}>
                       <td className="py-2 pr-3">
                         <p className="font-semibold text-slate-900 dark:text-slate-100">{studentName(r.student)}</p>
                         <p className="text-xs text-slate-600 dark:text-slate-300">
@@ -235,7 +311,10 @@ const ScheduleDetail: React.FC = () => {
                         </p>
                         {r.clash_note && <p className="text-xs text-amber-800 dark:text-amber-200">Also scheduled: {r.clash_note}</p>}
                       </td>
-                      <td className="py-2 pr-3 text-xs text-slate-700 dark:text-slate-200">{formatYmd(r.effective_from)}</td>
+                      <td className="py-2 pr-3 text-xs text-slate-700 dark:text-slate-200">
+                        <span className="whitespace-nowrap">{invitationSpan(r.effective_from, r.effective_to, schedule.effective_to)}</span>
+                        {r.status === "ENDED" && r.end_reason_code !== "COMPLETED" && <span className="block text-rose-700 dark:text-rose-300">Left · {humanize(r.end_reason_code)}</span>}
+                      </td>
                       <td className="py-2 pr-3">
                         {r.stats ? (
                           <div className="flex items-center gap-2">
@@ -246,7 +325,7 @@ const ScheduleDetail: React.FC = () => {
                         )}
                       </td>
                       <td className="py-2 text-right">
-                        {live && (
+                        {live && weekOpen && r.status === "ACTIVE" && (
                           <button
                             type="button"
                             onClick={() => setRemoving(r)}
@@ -340,25 +419,37 @@ const ScheduleDetail: React.FC = () => {
 
       <ScheduleDrawer open={editOpen} onClose={() => setEditOpen(false)} config={config} termId={schedule.academic_term_id} schedule={schedule} onSaved={() => void load()} />
 
-      <Modal isOpen={pickerOpen} onClose={() => { setPickerOpen(false); void load(); }} title={`Add students · ${schedule.title}`} size="2xl">
-        <StudentPicker scheduleId={schedule.schedule_id} reasonCodes={config.reason_codes} onAssigned={() => void load()} />
+      <Modal isOpen={pickerOpen} onClose={() => { setPickerOpen(false); void load(); }} title={`Invite students · ${schedule.title}`} size="3xl">
+        <StudentPicker
+          scheduleId={schedule.schedule_id}
+          reasonCodes={config.reason_codes}
+          onAssigned={() => void load()}
+          schedule={schedule}
+          initialWeek={week ?? undefined}
+          today={config.today}
+        />
       </Modal>
 
       <Modal isOpen={Boolean(removing)} onClose={() => setRemoving(null)} title={`Remove ${studentName(removing?.student)}`}>
         <div className="space-y-3">
           <div>
             <label htmlFor="oh-remove-reason" className={labelCls}>Why?</label>
-            <select id="oh-remove-reason" className={inputCls} value={removeReason} onChange={(e) => setRemoveReason(e.target.value)}>
+            <SelectField id="oh-remove-reason" className={inputCls} value={removeReason} onChange={(e) => setRemoveReason(e.target.value)}>
               {config.end_reason_codes.map((c) => (
                 <option key={c} value={c}>{humanize(c)}</option>
               ))}
-            </select>
+            </SelectField>
           </div>
           <div>
             <label htmlFor="oh-remove-note" className={labelCls}>Note (optional)</label>
             <input id="oh-remove-note" className={inputCls} value={removeNote} onChange={(e) => setRemoveNote(e.target.value)} maxLength={500} />
           </div>
-          <Muted className="text-xs">The student is told and becomes free for other teachers' office hours.</Muted>
+          <Muted className="text-xs">
+            {removeFrom && removing && removing.effective_from < removeFrom
+              ? `${studentName(removing.student)} leaves from the week of ${shortDate(removeFrom)} on; the weeks before are kept. `
+              : ""}
+            The student is told and becomes free for other teachers' office hours.
+          </Muted>
           <div className="flex justify-end gap-2">
             <button type="button" className={secondaryBtn} onClick={() => setRemoving(null)}>Cancel</button>
             <button
@@ -366,7 +457,10 @@ const ScheduleDetail: React.FC = () => {
               className={primaryBtn}
               onClick={async () => {
                 if (!removing) return;
-                await run(() => officeHoursApi.removeAssignment(removing.assignment_id, { end_reason_code: removeReason, end_note: removeNote.trim() || undefined }), "Student removed");
+                await run(
+                  () => officeHoursApi.removeAssignment(removing.assignment_id, { end_reason_code: removeReason, end_note: removeNote.trim() || undefined, ...(removeFrom ? { from: removeFrom } : {}) }),
+                  "Student removed",
+                );
                 setRemoving(null);
                 setRemoveNote("");
               }}
@@ -381,11 +475,11 @@ const ScheduleDetail: React.FC = () => {
         <div className="space-y-3">
           <div>
             <label htmlFor="oh-cancel-reason" className={labelCls}>Reason</label>
-            <select id="oh-cancel-reason" className={inputCls} value={cancelReason} onChange={(e) => setCancelReason(e.target.value)}>
+            <SelectField id="oh-cancel-reason" className={inputCls} value={cancelReason} onChange={(e) => setCancelReason(e.target.value)}>
               {config.cancel_reasons.map((c) => (
                 <option key={c} value={c}>{humanize(c)}</option>
               ))}
-            </select>
+            </SelectField>
           </div>
           <div>
             <label htmlFor="oh-cancel-note" className={labelCls}>Message to students (optional)</label>
@@ -448,12 +542,12 @@ const ScheduleDetail: React.FC = () => {
         <div className="space-y-3">
           <div>
             <label htmlFor="oh-rollover-term" className={labelCls}>Term</label>
-            <select id="oh-rollover-term" className={inputCls} value={targetTerm} onChange={(e) => setTargetTerm(e.target.value ? Number(e.target.value) : "")}>
+            <SelectField id="oh-rollover-term" className={inputCls} value={targetTerm} onChange={(e) => setTargetTerm(e.target.value ? Number(e.target.value) : "")}>
               <option value="">Choose a term</option>
               {terms.map((t) => (
                 <option key={t.academic_term_id} value={t.academic_term_id}>{`${t.name}${t.start_date ? ` (from ${String(t.start_date).slice(0, 10)})` : ""}`}</option>
               ))}
-            </select>
+            </SelectField>
           </div>
           <Muted className="text-xs">Days, times, room and capacity are copied as a draft. Students are re-checked for the new term; anyone whose goal was met is left out. Nobody is told until you publish.</Muted>
           <div className="flex justify-end gap-2">

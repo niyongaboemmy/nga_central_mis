@@ -18,6 +18,7 @@ import {
 import { mentorshipApi, AdminLogEntry, SessionStatus, MenteeCheckInRecord } from "../../api/mentorship";
 import { useToast } from "../../contexts/ToastContext";
 import { useAcademicPeriod } from "../../contexts/AcademicPeriodContext";
+import SelectField from "../ui/SelectField";
 
 const CATEGORY_LABEL: Record<string, string> = {
   APPRECIATION: "Appreciation",
@@ -286,7 +287,7 @@ const AdminMentoringLogView: React.FC = () => {
           </div>
 
           {/* Academic year filter */}
-          <select
+          <SelectField
             value={yearFilter}
             onChange={(e) => setYearFilter(e.target.value ? Number(e.target.value) : "")}
             className="px-3 py-2 text-sm border border-gray-200 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
@@ -295,11 +296,11 @@ const AdminMentoringLogView: React.FC = () => {
             {years.map((y) => (
               <option key={y.academic_year_id} value={y.academic_year_id}>{y.name}</option>
             ))}
-          </select>
+          </SelectField>
 
           {/* Mentor filter */}
           {mentorOptions.length > 0 && (
-            <select
+            <SelectField
               value={mentorFilter}
               onChange={(e) => setMentorFilter(e.target.value ? Number(e.target.value) : "")}
               className="px-3 py-2 text-sm border border-gray-200 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-800 text-gray-900 dark:text-white max-w-[160px]"
@@ -308,7 +309,7 @@ const AdminMentoringLogView: React.FC = () => {
               {mentorOptions.map(([id, name]) => (
                 <option key={id} value={id}>{name}</option>
               ))}
-            </select>
+            </SelectField>
           )}
 
           {/* Stat chips */}
@@ -348,7 +349,7 @@ const AdminMentoringLogView: React.FC = () => {
           {/* Flag filter */}
           <div className="relative">
             <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
-            <select
+            <SelectField
               value={filterFlags}
               onChange={(e) => setFilterFlags(e.target.value as any)}
               className="pl-8 pr-8 py-2 text-sm border border-gray-200 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 appearance-none"
@@ -357,7 +358,7 @@ const AdminMentoringLogView: React.FC = () => {
               <option value="dishonesty">Integrity flags</option>
               <option value="stress">Stress flags</option>
               <option value="follow_up">Open follow-ups</option>
-            </select>
+            </SelectField>
           </div>
 
           {/* Print */}

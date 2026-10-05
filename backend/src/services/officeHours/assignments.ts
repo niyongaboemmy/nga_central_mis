@@ -3,25 +3,28 @@ import { db } from "../../db";
 import {
   OfficeHourAssignment,
   OfficeHourSchedule,
-  OfficeHourStudentLock,
+  OfficeHourStudentDateLock,
   OfficeHourTransferRequest,
 } from "../../db/officeHoursSchema";
 import { AuthorizationError, ConflictError, NotFoundError, ValidationError } from "../../errors/CustomError";
 import { loadClassGroupActivities } from "../../controllers/calendarController";
 import { addDaysYmd, dowOfYmd, parseClock } from "../reminders/time";
 import { Actor, assertCanManage, readScopeOf } from "./access";
-import { dayLabel, isDupEntry, isYmd, maxYmd, now, nowMinutes, overlaps, todayYmd, WEEKDAYS, withDeadlockRetry } from "./common";
+import { datesOnDays, dayLabel, isDupEntry, isYmd, maxYmd, minYmd, now, nowMinutes, overlaps, todayYmd, withDeadlockRetry } from "./common";
 import { emitOfficeHoursEvent } from "./events";
 import { searchStudents, studentCards, teachableClassGroupIds, teachableStudentIds, userNames, StudentCard } from "./eligibility";
-import { endDateFor, loadSchedule, countActive, Schedule } from "./schedules";
+import { endDateFor, loadSchedule, Schedule } from "./schedules";
 import { scheduleDays, nextMeetingDate } from "./sessions";
 import { getSettings } from "./settings";
+import { activeWindows, DateWindow, lockDatesFor, peakOver } from "./seats";
 
 /**
- * Student assignments (plan §5.3). The no-overlap rule is the PRIMARY KEY of
- * OfficeHourStudentLock (term, student, weekday): TERM mode inserts days 1-5,
- * WEEKDAY mode the schedule's meeting days. Two teachers racing for the same
- * student can therefore only end one way, whatever the connection pool does.
+ * Student assignments (plan §5.3) -- invitations over a date window: one
+ * week, a few weeks or the rest of the term (migration 104), so a teacher can
+ * invite a different group every week. The no-overlap rule is the PRIMARY KEY
+ * of OfficeHourStudentDateLock (student, date): TERM mode locks every weekday
+ * of the window, WEEKDAY mode its meeting days. Two teachers racing for the
+ * same student can therefore only end one way, whatever the connection pool does.
  */
 export const REASON_CODES = [
   "BELOW_STANDARD",
@@ -43,27 +46,34 @@ export interface Holder {
   teacher_name: string | null;
   days: number[];
   days_label: string;
+  /** The holder's invitation window: a single week, or longer. */
+  from: string;
+  to: string;
 }
 
-/** The days a new assignment to a schedule with `days` must lock. */
-export const lockDaysFor = (mode: "TERM" | "WEEKDAY", days: number[]) => (mode === "TERM" ? [...WEEKDAYS] : [...days]);
-
-/** Current holders for each student in a term (with the days each holder meets). */
-export const holdersOf = async (studentIds: number[], termId: number): Promise<Map<number, Holder[]>> => {
+/**
+ * Holders of each student's locks in `window` (default: from today on), with
+ * the days each holder meets and the window of their invitation.
+ */
+export const holdersOf = async (studentIds: number[], window?: DateWindow): Promise<Map<number, Holder[]>> => {
   const out = new Map<number, Holder[]>();
   if (!studentIds.length) return out;
+  const conds = [inArray(OfficeHourStudentDateLock.student_id, studentIds), gte(OfficeHourStudentDateLock.lock_date, window?.from ?? todayYmd())];
+  if (window) conds.push(lte(OfficeHourStudentDateLock.lock_date, window.to));
   const rows = await db
     .selectDistinct({
-      student_id: OfficeHourStudentLock.student_id,
-      assignment_id: OfficeHourStudentLock.assignment_id,
+      student_id: OfficeHourStudentDateLock.student_id,
+      assignment_id: OfficeHourStudentDateLock.assignment_id,
       schedule_id: OfficeHourSchedule.schedule_id,
       title: OfficeHourSchedule.title,
       teacher_id: OfficeHourSchedule.teacher_id,
+      from: OfficeHourAssignment.effective_from,
+      to: OfficeHourAssignment.effective_to,
     })
-    .from(OfficeHourStudentLock)
-    .innerJoin(OfficeHourAssignment, eq(OfficeHourAssignment.assignment_id, OfficeHourStudentLock.assignment_id))
+    .from(OfficeHourStudentDateLock)
+    .innerJoin(OfficeHourAssignment, eq(OfficeHourAssignment.assignment_id, OfficeHourStudentDateLock.assignment_id))
     .innerJoin(OfficeHourSchedule, eq(OfficeHourSchedule.schedule_id, OfficeHourAssignment.schedule_id))
-    .where(and(eq(OfficeHourStudentLock.academic_term_id, termId), inArray(OfficeHourStudentLock.student_id, studentIds)));
+    .where(and(...conds));
   const days = await scheduleDays([...new Set(rows.map((r) => r.schedule_id))]);
   const names = await userNames(rows.map((r) => r.teacher_id));
   for (const r of rows) {
@@ -76,24 +86,10 @@ export const holdersOf = async (studentIds: number[], termId: number): Promise<M
       teacher_name: names.get(r.teacher_id) ?? null,
       days: d,
       days_label: dayLabel(d),
+      from: String(r.from).slice(0, 10),
+      to: String(r.to).slice(0, 10),
     };
     out.set(r.student_id, [...(out.get(r.student_id) ?? []), holder]);
-  }
-  return out;
-};
-
-/** Locked weekdays per student in a term. */
-const lockedDays = async (studentIds: number[], termId: number): Promise<Map<number, Map<number, number>>> => {
-  const out = new Map<number, Map<number, number>>();
-  if (!studentIds.length) return out;
-  const rows = await db
-    .select()
-    .from(OfficeHourStudentLock)
-    .where(and(eq(OfficeHourStudentLock.academic_term_id, termId), inArray(OfficeHourStudentLock.student_id, studentIds)));
-  for (const r of rows) {
-    const m = out.get(r.student_id) ?? new Map<number, number>();
-    m.set(r.day_of_week, r.assignment_id);
-    out.set(r.student_id, m);
   }
   return out;
 };
@@ -103,28 +99,70 @@ export type Availability =
   | { status: "WITH_YOU"; assignment_id: number }
   | { status: "HELD_BY_OTHER"; holders: Holder[] };
 
-/** Can each student join `schedule` (given the lock mode)? */
-export const availabilityFor = async (schedule: Schedule, studentIds: number[]): Promise<Map<number, Availability>> => {
+/**
+ * The window an invitation would really cover: from the first meeting on or
+ * after `from` (and after today's roster cut-off) to `to`, both clamped to the
+ * schedule. Null when no session is left in it (e.g. a week of closures).
+ */
+export const invitationWindow = async (schedule: Schedule, days: number[], from?: string | null, to?: string | null): Promise<DateWindow | null> => {
+  const start = await startDateFor(schedule, days, from ?? null);
+  const end = minYmd(to ?? schedule.effective_to, schedule.effective_to);
+  if (!start || start > end) return null;
+  return { from: start, to: end };
+};
+
+/** Can each student join `schedule` over `window` (given the lock mode)? */
+export const availabilityFor = async (schedule: Schedule, studentIds: number[], window: DateWindow): Promise<Map<number, Availability>> => {
   const settings = await getSettings();
   const days = (await scheduleDays([schedule.schedule_id])).get(schedule.schedule_id) ?? [];
-  const need = lockDaysFor(settings.student_lock_mode, days);
-  const [locks, holders] = await Promise.all([lockedDays(studentIds, schedule.academic_term_id), holdersOf(studentIds, schedule.academic_term_id)]);
+  const need = new Set(lockDatesFor(settings.student_lock_mode, days, window.from, window.to));
   const out = new Map<number, Availability>();
+  if (!studentIds.length) return out;
+  const [mine, locks, holders] = await Promise.all([
+    db
+      .select({ id: OfficeHourAssignment.assignment_id, student_id: OfficeHourAssignment.student_id })
+      .from(OfficeHourAssignment)
+      .where(
+        and(
+          eq(OfficeHourAssignment.schedule_id, schedule.schedule_id),
+          eq(OfficeHourAssignment.status, "ACTIVE"),
+          inArray(OfficeHourAssignment.student_id, studentIds),
+          lte(OfficeHourAssignment.effective_from, window.to),
+          gte(OfficeHourAssignment.effective_to, window.from),
+        ),
+      ),
+    db
+      .select({ student_id: OfficeHourStudentDateLock.student_id, lock_date: OfficeHourStudentDateLock.lock_date, assignment_id: OfficeHourStudentDateLock.assignment_id })
+      .from(OfficeHourStudentDateLock)
+      .where(
+        and(
+          inArray(OfficeHourStudentDateLock.student_id, studentIds),
+          gte(OfficeHourStudentDateLock.lock_date, window.from),
+          lte(OfficeHourStudentDateLock.lock_date, window.to),
+        ),
+      ),
+    holdersOf(studentIds, window),
+  ]);
+  const mineOf = new Map(mine.map((m) => [m.student_id, m.id]));
+  const blockingOf = new Map<number, Set<number>>();
+  for (const l of locks) {
+    if (!need.has(String(l.lock_date).slice(0, 10))) continue;
+    const set = blockingOf.get(l.student_id) ?? new Set<number>();
+    set.add(l.assignment_id);
+    blockingOf.set(l.student_id, set);
+  }
   for (const id of studentIds) {
-    const mine = holders.get(id)?.find((h) => h.schedule_id === schedule.schedule_id);
-    if (mine) {
-      out.set(id, { status: "WITH_YOU", assignment_id: mine.assignment_id });
+    const own = mineOf.get(id);
+    if (own) {
+      out.set(id, { status: "WITH_YOU", assignment_id: own });
       continue;
     }
-    const held = locks.get(id);
-    // In TERM mode any lock blocks; in WEEKDAY mode only a lock on a day this schedule needs.
-    const blocking = held && need.some((d) => held.has(d));
-    if (!blocking) {
+    const blocking = blockingOf.get(id);
+    if (!blocking?.size) {
       out.set(id, { status: "FREE" });
       continue;
     }
-    const blockingIds = new Set(need.filter((d) => held!.has(d)).map((d) => held!.get(d)!));
-    out.set(id, { status: "HELD_BY_OTHER", holders: (holders.get(id) ?? []).filter((h) => blockingIds.has(h.assignment_id)) });
+    out.set(id, { status: "HELD_BY_OTHER", holders: (holders.get(id) ?? []).filter((h) => blocking.has(h.assignment_id)) });
   }
   return out;
 };
@@ -176,7 +214,7 @@ export const assignStudents = async (
   actor: Actor,
   scheduleId: number,
   studentIds: number[],
-  opts: { reasonCode?: unknown; reasonNote?: unknown; effectiveFrom?: unknown } = {},
+  opts: { reasonCode?: unknown; reasonNote?: unknown; effectiveFrom?: unknown; effectiveTo?: unknown } = {},
 ): Promise<AssignResult> => {
   const schedule = await loadSchedule(scheduleId);
   assertCanManage(actor, schedule.teacher_id);
@@ -186,6 +224,12 @@ export const assignStudents = async (
   }
   if (opts.effectiveFrom !== undefined && opts.effectiveFrom !== null && !isYmd(opts.effectiveFrom)) {
     throw new ValidationError("effective_from must look like 2026-10-06");
+  }
+  if (opts.effectiveTo !== undefined && opts.effectiveTo !== null && !isYmd(opts.effectiveTo)) {
+    throw new ValidationError("effective_to must look like 2026-10-09");
+  }
+  if (isYmd(opts.effectiveFrom) && isYmd(opts.effectiveTo) && opts.effectiveTo < opts.effectiveFrom) {
+    throw new ValidationError("effective_to must be on or after effective_from");
   }
   const settings = await getSettings();
   const days = (await scheduleDays([scheduleId])).get(scheduleId) ?? [];
@@ -212,13 +256,15 @@ export const assignStudents = async (
   }
   if (!candidates.length) return result;
 
-  const startYmd = await startDateFor(schedule, days, (opts.effectiveFrom as string) ?? null);
-  if (!startYmd) {
+  const window = await invitationWindow(schedule, days, (opts.effectiveFrom as string) ?? null, (opts.effectiveTo as string) ?? null);
+  if (!window) {
     result.no_remaining_sessions = true;
     return result;
   }
+  const startYmd = window.from;
   const clashes = await clashNotes(schedule, days, new Map(candidates.map((id) => [id, cards.get(id)!])));
-  const lockDays = lockDaysFor(settings.student_lock_mode, days);
+  const lockDates = lockDatesFor(settings.student_lock_mode, days, window.from, window.to);
+  const meetings = datesOnDays(window.from, window.to, days);
   const created: number[] = [];
 
   for (const studentId of candidates) {
@@ -226,24 +272,17 @@ export const assignStudents = async (
       const outcome = await withDeadlockRetry(() => db.transaction(async (tx) => {
         // Serialise capacity per schedule.
         await tx.execute(sql`SELECT schedule_id FROM OfficeHourSchedule WHERE schedule_id = ${scheduleId} FOR UPDATE`);
-        const [existing] = await tx
-          .select({ id: OfficeHourAssignment.assignment_id })
-          .from(OfficeHourAssignment)
-          .where(and(eq(OfficeHourAssignment.schedule_id, scheduleId), eq(OfficeHourAssignment.student_id, studentId), eq(OfficeHourAssignment.status, "ACTIVE")))
-          .limit(1);
-        if (existing) return { kind: "already" as const };
-        const [cnt] = await tx
-          .select({ n: sql<number>`COUNT(*)` })
-          .from(OfficeHourAssignment)
-          .where(and(eq(OfficeHourAssignment.schedule_id, scheduleId), eq(OfficeHourAssignment.status, "ACTIVE")));
-        if (Number(cnt?.n ?? 0) >= schedule.capacity) return { kind: "full" as const };
+        // Capacity and "already invited" are per session date: weekly groups share the seats.
+        const windows = await activeWindows(tx, scheduleId, window.from, window.to);
+        if (windows.some((w) => w.student_id === studentId)) return { kind: "already" as const };
+        if (peakOver(windows, meetings) >= schedule.capacity) return { kind: "full" as const };
         const [res] = (await tx.insert(OfficeHourAssignment).values({
           schedule_id: scheduleId,
           academic_term_id: schedule.academic_term_id,
           student_id: studentId,
           status: "ACTIVE",
           effective_from: startYmd,
-          effective_to: schedule.effective_to,
+          effective_to: window.to,
           reason_code: (opts.reasonCode as string) ?? null,
           reason_note: typeof opts.reasonNote === "string" ? opts.reasonNote.slice(0, 500) : null,
           clash_note: clashes.get(studentId) ?? null,
@@ -251,9 +290,11 @@ export const assignStudents = async (
           assigned_at: now(),
         })) as any;
         const assignmentId = res.insertId as number;
-        await tx.insert(OfficeHourStudentLock).values(
-          lockDays.map((d) => ({ academic_term_id: schedule.academic_term_id, student_id: studentId, day_of_week: d, assignment_id: assignmentId })),
-        );
+        if (lockDates.length) {
+          await tx.insert(OfficeHourStudentDateLock).values(
+            lockDates.map((d) => ({ student_id: studentId, lock_date: d, academic_term_id: schedule.academic_term_id, assignment_id: assignmentId })),
+          );
+        }
         return { kind: "ok" as const, assignmentId };
       }));
       if (outcome.kind === "already") result.already_assigned.push(studentId);
@@ -268,7 +309,7 @@ export const assignStudents = async (
     }
   }
   if (result.conflicts.length) {
-    const holders = await holdersOf(result.conflicts.map((c) => c.student_id), schedule.academic_term_id);
+    const holders = await holdersOf(result.conflicts.map((c) => c.student_id), window);
     for (const c of result.conflicts) c.holders = holders.get(c.student_id) ?? [];
   }
   if (created.length && schedule.status === "ACTIVE") {
@@ -298,7 +339,7 @@ const endInTx = async (tx: any, assignmentId: number, endYmd: string, reason: st
     .update(OfficeHourAssignment)
     .set({ effective_to: endYmd })
     .where(and(eq(OfficeHourAssignment.assignment_id, assignmentId), gte(OfficeHourAssignment.effective_to, addDaysYmd(endYmd, 1))));
-  await tx.delete(OfficeHourStudentLock).where(eq(OfficeHourStudentLock.assignment_id, assignmentId));
+  await tx.delete(OfficeHourStudentDateLock).where(eq(OfficeHourStudentDateLock.assignment_id, assignmentId));
   // A pending transfer of this student out of here is moot once they leave.
   await tx
     .update(OfficeHourTransferRequest)
@@ -306,15 +347,22 @@ const endInTx = async (tx: any, assignmentId: number, endYmd: string, reason: st
     .where(and(eq(OfficeHourTransferRequest.from_assignment_id, assignmentId), eq(OfficeHourTransferRequest.status, "PENDING")));
 };
 
-export const endAssignment = async (actor: Actor, assignmentId: number, reasonCode: unknown, note: unknown) => {
+/**
+ * End an invitation. `fromYmd` ("remove from the week of ...") keeps the
+ * sessions before it; an invitation that has not started yet then simply
+ * never runs. Without it the student leaves from the next session on.
+ */
+export const endAssignment = async (actor: Actor, assignmentId: number, reasonCode: unknown, note: unknown, fromYmd?: unknown) => {
   const { a, s } = await loadAssignment(assignmentId);
   assertCanManage(actor, s.teacher_id);
   if (!(END_REASON_CODES as readonly string[]).includes(String(reasonCode)) || reasonCode === "SCHEDULE_ENDED") {
     throw new ValidationError("Choose why the student is leaving", [{ field: "end_reason_code", message: END_REASON_CODES.join(", ") }]);
   }
   if (reasonCode === "ADMIN_OVERRIDE" && !actor.manageAny) throw new AuthorizationError("Only leadership can override");
+  if (fromYmd !== undefined && fromYmd !== null && !isYmd(fromYmd)) throw new ValidationError("from must look like 2026-10-12");
   if (a.status === "ENDED") return a;
-  const endYmd = await endDateFor(s.schedule_id);
+  const earliest = await endDateFor(s.schedule_id);
+  const endYmd = isYmd(fromYmd) ? maxYmd(earliest, addDaysYmd(fromYmd, -1)) : earliest;
   await db.transaction((tx) => endInTx(tx, assignmentId, endYmd, String(reasonCode), typeof note === "string" ? note.slice(0, 500) : null, actor.userId));
   emitOfficeHoursEvent({ type: "removed", assignmentId, actorId: actor.userId, reason: String(reasonCode) });
   return (await loadAssignment(assignmentId)).a;
@@ -339,21 +387,18 @@ export const moveStudent = async (
   if (!cards.has(studentId)) throw new ValidationError("This student is not active in a class this year");
   const startYmd = await startDateFor(schedule, days, null);
   if (!startYmd) throw new ConflictError("No sessions remain in the target schedule");
-  const lockDays = lockDaysFor(settings.student_lock_mode, days);
+  const lockDates = lockDatesFor(settings.student_lock_mode, days, startYmd, schedule.effective_to);
+  const meetings = datesOnDays(startYmd, schedule.effective_to, days);
 
   const { assignmentId, ended } = await withDeadlockRetry(() => db.transaction(async (tx) => {
     await tx.execute(sql`SELECT schedule_id FROM OfficeHourSchedule WHERE schedule_id = ${toScheduleId} FOR UPDATE`);
-    const blocking = await tx
-      .select({ id: OfficeHourStudentLock.assignment_id, scheduleId: OfficeHourAssignment.schedule_id })
-      .from(OfficeHourStudentLock)
-      .innerJoin(OfficeHourAssignment, eq(OfficeHourAssignment.assignment_id, OfficeHourStudentLock.assignment_id))
-      .where(
-        and(
-          eq(OfficeHourStudentLock.academic_term_id, schedule.academic_term_id),
-          eq(OfficeHourStudentLock.student_id, studentId),
-          inArray(OfficeHourStudentLock.day_of_week, lockDays),
-        ),
-      );
+    const blocking = lockDates.length
+      ? await tx
+          .select({ id: OfficeHourStudentDateLock.assignment_id, scheduleId: OfficeHourAssignment.schedule_id })
+          .from(OfficeHourStudentDateLock)
+          .innerJoin(OfficeHourAssignment, eq(OfficeHourAssignment.assignment_id, OfficeHourStudentDateLock.assignment_id))
+          .where(and(eq(OfficeHourStudentDateLock.student_id, studentId), inArray(OfficeHourStudentDateLock.lock_date, lockDates)))
+      : [];
     const endedIds = [...new Set(blocking.map((b) => b.id))];
     if (blocking.some((b) => b.scheduleId === toScheduleId)) throw new ConflictError("The student is already in these office hours");
     for (const id of endedIds) {
@@ -361,11 +406,9 @@ export const moveStudent = async (
       const endYmd = await endDateFor(row.scheduleId);
       await endInTx(tx, id, endYmd, reason, note, actor.userId);
     }
-    const [cnt] = await tx
-      .select({ n: sql<number>`COUNT(*)` })
-      .from(OfficeHourAssignment)
-      .where(and(eq(OfficeHourAssignment.schedule_id, toScheduleId), eq(OfficeHourAssignment.status, "ACTIVE")));
-    if (Number(cnt?.n ?? 0) >= schedule.capacity) throw new ConflictError("The target office hours are full");
+    if (peakOver(await activeWindows(tx, toScheduleId, startYmd, schedule.effective_to), meetings) >= schedule.capacity) {
+      throw new ConflictError("The target office hours are full");
+    }
     const [res] = (await tx.insert(OfficeHourAssignment).values({
       schedule_id: toScheduleId,
       academic_term_id: schedule.academic_term_id,
@@ -379,9 +422,11 @@ export const moveStudent = async (
       assigned_at: now(),
     })) as any;
     const id = res.insertId as number;
-    await tx.insert(OfficeHourStudentLock).values(
-      lockDays.map((d) => ({ academic_term_id: schedule.academic_term_id, student_id: studentId, day_of_week: d, assignment_id: id })),
-    );
+    if (lockDates.length) {
+      await tx.insert(OfficeHourStudentDateLock).values(
+        lockDates.map((d) => ({ student_id: studentId, lock_date: d, academic_term_id: schedule.academic_term_id, assignment_id: id })),
+      );
+    }
     return { assignmentId: id, ended: endedIds };
   }));
   emitOfficeHoursEvent({ type: "override", assignmentId, endedAssignmentIds: ended, actorId: actor.userId });
@@ -409,9 +454,10 @@ export const overrideAssignment = async (actor: Actor, studentId: number, toSche
 export const candidatesFor = async (
   actor: Actor,
   schedule: Schedule,
-  params: { classGroupId?: number | null; q?: string | null; onlyFree?: boolean },
+  params: { classGroupId?: number | null; q?: string | null; onlyFree?: boolean; from?: string | null; to?: string | null },
 ) => {
   assertCanManage(actor, schedule.teacher_id);
+  if ((params.from && !isYmd(params.from)) || (params.to && !isYmd(params.to))) throw new ValidationError("from/to must look like 2026-10-12");
   const settings = await getSettings();
   const yearId = schedule.academic_year_id;
   const teachable = await teachableStudentIds(schedule.teacher_id, yearId);
@@ -430,7 +476,28 @@ export const candidatesFor = async (
   }
   const ids = list.map((c) => c.student_id);
   const days = (await scheduleDays([schedule.schedule_id])).get(schedule.schedule_id) ?? [];
-  const [avail, clashes] = await Promise.all([availabilityFor(schedule, ids), clashNotes(schedule, days, new Map(list.map((c) => [c.student_id, c])))]);
+  // The invitation window the picker is filling: one week, several, or the rest of the term.
+  const window = await invitationWindow(schedule, days, params.from, params.to);
+  const probe = window ?? { from: maxYmd(params.from ?? todayYmd(), schedule.effective_from), to: minYmd(params.to ?? schedule.effective_to, schedule.effective_to) };
+  const meetings = window ? datesOnDays(window.from, window.to, days) : [];
+  // Who came the week before: "invite last week's group again" is the common move.
+  const prevFrom = addDaysYmd(probe.from, -7 - ((dowOfYmd(probe.from) + 6) % 7));
+  const [avail, clashes, current, previous] = await Promise.all([
+    availabilityFor(schedule, ids, probe),
+    clashNotes(schedule, days, new Map(list.map((c) => [c.student_id, c]))),
+    window ? activeWindows(db, schedule.schedule_id, window.from, window.to) : Promise.resolve([]),
+    db
+      .selectDistinct({ student_id: OfficeHourAssignment.student_id })
+      .from(OfficeHourAssignment)
+      .where(
+        and(
+          eq(OfficeHourAssignment.schedule_id, schedule.schedule_id),
+          lte(OfficeHourAssignment.effective_from, addDaysYmd(prevFrom, 6)),
+          gte(OfficeHourAssignment.effective_to, prevFrom),
+          sql`(${OfficeHourAssignment.end_reason_code} IS NULL OR ${OfficeHourAssignment.end_reason_code} IN ('COMPLETED', 'SCHEDULE_ENDED'))`,
+        ),
+      ),
+  ]);
   const rows = list.map((c) => ({
     ...c,
     availability: avail.get(c.student_id) ?? { status: "FREE" },
@@ -442,8 +509,12 @@ export const candidatesFor = async (
     students: params.onlyFree ? rows.filter((r) => r.availability.status === "FREE") : rows,
     class_groups: teachableGroups,
     capacity: schedule.capacity,
-    assigned_count: await countActive(schedule.schedule_id),
+    // Seats taken at the busiest session of the window.
+    assigned_count: peakOver(current, meetings),
     lock_mode: settings.student_lock_mode,
+    window,
+    meeting_dates: meetings,
+    previous_week: { from: prevFrom, student_ids: previous.map((p) => p.student_id) },
   };
 };
 

@@ -17,6 +17,7 @@ import {
 import { reportsApi, ReportableLesson, ReportCategory } from "../../api/reports";
 import { myAssignedSubjectsApi, MyAssignedSubject } from "../../api/academics";
 import { useToast } from "../../contexts/ToastContext";
+import SelectField from "../ui/SelectField";
 
 interface Props {
   lesson: ReportableLesson;
@@ -419,7 +420,7 @@ const LessonReportModal: React.FC<Props> = ({
                     <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">
                       Subject
                     </label>
-                    <select
+                    <SelectField
                       value={selectedSubjectId}
                       onChange={(e) => {
                         setSelectedSubjectId(e.target.value ? Number(e.target.value) : "");
@@ -439,13 +440,13 @@ const LessonReportModal: React.FC<Props> = ({
                             : ""}
                         </option>
                       ))}
-                    </select>
+                    </SelectField>
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">
                       Class Group
                     </label>
-                    <select
+                    <SelectField
                       value={selectedClassGroupId}
                       onChange={(e) =>
                         setSelectedClassGroupId(e.target.value ? Number(e.target.value) : "")
@@ -464,7 +465,7 @@ const LessonReportModal: React.FC<Props> = ({
                             : ""}
                         </option>
                       ))}
-                    </select>
+                    </SelectField>
                   </div>
                   {!loadingAssignments && assignedSubjects.length === 0 && (
                     <p className="col-span-full text-xs text-amber-600 dark:text-amber-400">

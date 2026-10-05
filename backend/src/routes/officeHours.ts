@@ -292,6 +292,8 @@ router.get(
       classGroupId: toInt(req.query.class_group_id),
       q: typeof req.query.q === "string" ? req.query.q : null,
       onlyFree: req.query.only_free === "1" || req.query.only_free === "true",
+      from: typeof req.query.from === "string" ? req.query.from : null,
+      to: typeof req.query.to === "string" ? req.query.to : null,
     });
     successResponse(res, "Candidates", data);
   }),
@@ -305,6 +307,7 @@ router.post(
       reasonCode: req.body?.reason_code,
       reasonNote: req.body?.reason_note,
       effectiveFrom: req.body?.effective_from,
+      effectiveTo: req.body?.effective_to,
     });
     const status = result.assigned.length ? 201 : 200;
     if (result.assigned.length) trackOfficeHours("assign", actorOf(req).userId, { count: result.assigned.length, conflicts: result.conflicts.length });
@@ -317,7 +320,7 @@ router.delete(
   teacher,
   asyncHandler(async (req, res) => {
     const body = req.body ?? {};
-    const row = await endAssignment(actorOf(req), idParam(req.params.id), body.end_reason_code ?? req.query.end_reason_code, body.end_note ?? req.query.end_note);
+    const row = await endAssignment(actorOf(req), idParam(req.params.id), body.end_reason_code ?? req.query.end_reason_code, body.end_note ?? req.query.end_note, body.from ?? req.query.from);
     successResponse(res, "Student removed from office hours", row);
   }),
 );

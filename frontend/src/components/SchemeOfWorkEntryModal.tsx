@@ -25,6 +25,7 @@ import {
   ChevronUp,
   ListChecks,
 } from "lucide-react";
+import SelectField from "./ui/SelectField";
 
 interface SchemeOfWorkEntryModalProps {
   isOpen: boolean;
@@ -430,7 +431,7 @@ const SchemeOfWorkEntryModal: React.FC<SchemeOfWorkEntryModalProps> = ({
               <BookOpen className="w-3 h-3" />
               Competence / Learning Outcome
             </label>
-            <select
+            <SelectField
               value={formData.competency_id ?? ""}
               onChange={(e) =>
                 setFormData((prev) => ({
@@ -447,7 +448,7 @@ const SchemeOfWorkEntryModal: React.FC<SchemeOfWorkEntryModalProps> = ({
                   {c.learning_hours ? ` (${c.learning_hours}h)` : ""}
                 </option>
               ))}
-            </select>
+            </SelectField>
           </div>
         )}
 

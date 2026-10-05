@@ -5,6 +5,7 @@ import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays, isSa
 import { reportsApi, ReportableLesson, buildAdHocOccurrence } from "../../api/reports";
 import { myAssignedSubjectsApi, MyAssignedSubject } from "../../api/academics";
 import LessonReportModal from "./LessonReportModal";
+import SelectField from "../ui/SelectField";
 
 interface Props {
   academicTermId: number | null;
@@ -419,7 +420,7 @@ const LessonReportingCalendar: React.FC<Props> = ({
       {/* Filters — subject select plus a status legend that doubles as a
           toggle filter (click a status to hide/show it on the grid). */}
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <select
+        <SelectField
           value={subjectFilter}
           onChange={(e) => setSubjectFilter(e.target.value ? Number(e.target.value) : "")}
           className="px-2.5 py-1.5 text-xs font-medium rounded-lg bg-white dark:bg-white/5 ring-1 ring-inset ring-gray-200 dark:ring-white/10 text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -430,7 +431,7 @@ const LessonReportingCalendar: React.FC<Props> = ({
               {s.subject_name}
             </option>
           ))}
-        </select>
+        </SelectField>
 
         <div className="flex items-center gap-1.5 text-xs">
           {(

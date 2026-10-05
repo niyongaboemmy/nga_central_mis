@@ -21,6 +21,7 @@ import OverviewTab from "./OverviewTab";
 import EscalationsTab from "./EscalationsTab";
 import SettingsTab from "./SettingsTab";
 import CoverageTab from "./CoverageTab";
+import SelectField from "../../ui/SelectField";
 
 /**
  * /office-hours/admin -- leadership console (plan §11): overview, every
@@ -54,12 +55,12 @@ const SchedulesTab: React.FC<{ termId: number | null }> = ({ termId }) => {
         </div>
         <div>
           <label htmlFor="oh-admin-status" className={labelCls}>Status</label>
-          <select id="oh-admin-status" className={inputCls} value={status} onChange={(e) => setStatus(e.target.value)}>
+          <SelectField id="oh-admin-status" className={inputCls} value={status} onChange={(e) => setStatus(e.target.value)}>
             <option value="ACTIVE">Published</option>
             <option value="DRAFT">Drafts</option>
             <option value="ENDED">Ended</option>
             <option value="">All</option>
-          </select>
+          </SelectField>
         </div>
       </div>
       {!rows ? (

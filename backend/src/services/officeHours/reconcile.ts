@@ -1,14 +1,14 @@
 import { and, eq, inArray, lt, sql } from "drizzle-orm";
 import { db } from "../../db";
 import { StudentClassGroup } from "../../db/schema";
-import { OfficeHourAssignment, OfficeHourSchedule, OfficeHourStudentLock } from "../../db/officeHoursSchema";
+import { OfficeHourAssignment, OfficeHourSchedule, OfficeHourStudentDateLock } from "../../db/officeHoursSchema";
 import logger from "../../utils/logger";
 import { addDaysYmd } from "../reminders/time";
-import { isDupEntry, now, todayYmd } from "./common";
+import { isDupEntry, maxYmd, now, todayYmd } from "./common";
 import { emitOfficeHoursEvent } from "./events";
-import { lockDaysFor } from "./assignments";
 import { scheduleDays } from "./sessions";
 import { getSettings } from "./settings";
+import { lockDatesFor } from "./seats";
 
 /**
  * Nightly reconcile (plan §7.4):
@@ -43,7 +43,7 @@ export const reconcileOfficeHours = async () => {
       .update(OfficeHourAssignment)
       .set({ status: "ENDED", end_reason_code: "COMPLETED", ended_at: now() })
       .where(inArray(OfficeHourAssignment.assignment_id, ids));
-    await db.delete(OfficeHourStudentLock).where(inArray(OfficeHourStudentLock.assignment_id, ids));
+    await db.delete(OfficeHourStudentDateLock).where(inArray(OfficeHourStudentDateLock.assignment_id, ids));
     out.assignmentsCompleted = ids.length;
   }
 
@@ -61,7 +61,7 @@ export const reconcileOfficeHours = async () => {
     if (held.length) {
       const ids = held.map((h) => h.id);
       await db.update(OfficeHourAssignment).set({ status: "ENDED", end_reason_code: "SCHEDULE_ENDED", ended_at: now() }).where(inArray(OfficeHourAssignment.assignment_id, ids));
-      await db.delete(OfficeHourStudentLock).where(inArray(OfficeHourStudentLock.assignment_id, ids));
+      await db.delete(OfficeHourStudentDateLock).where(inArray(OfficeHourStudentDateLock.assignment_id, ids));
     }
     await db.update(OfficeHourSchedule).set({ status: "CANCELLED", ended_at: now() }).where(inArray(OfficeHourSchedule.schedule_id, draftIds));
     out.draftsCancelled = draftIds.length;
@@ -85,40 +85,43 @@ export const reconcileOfficeHours = async () => {
       .update(OfficeHourAssignment)
       .set({ status: "ENDED", end_reason_code: "LEFT_CLASS", ended_at: now(), effective_to: yesterday })
       .where(inArray(OfficeHourAssignment.assignment_id, goneIds));
-    await db.delete(OfficeHourStudentLock).where(inArray(OfficeHourStudentLock.assignment_id, goneIds));
+    await db.delete(OfficeHourStudentDateLock).where(inArray(OfficeHourStudentDateLock.assignment_id, goneIds));
     for (const id of goneIds) emitOfficeHoursEvent({ type: "removed", assignmentId: id, actorId: 0, reason: "LEFT_CLASS" });
     out.leftClass = goneIds.length;
   }
 
   // 3) Lock invariant.
   const orphan = (await db.execute(sql`
-    SELECT l.assignment_id FROM OfficeHourStudentLock l
+    SELECT l.assignment_id FROM OfficeHourStudentDateLock l
     LEFT JOIN OfficeHourAssignment a ON a.assignment_id = l.assignment_id AND a.status = 'ACTIVE'
     WHERE a.assignment_id IS NULL
   `)) as any;
   const orphanIds = [...new Set((orphan[0] as any[]).map((r) => Number(r.assignment_id)))];
   if (orphanIds.length) {
-    await db.delete(OfficeHourStudentLock).where(inArray(OfficeHourStudentLock.assignment_id, orphanIds));
+    await db.delete(OfficeHourStudentDateLock).where(inArray(OfficeHourStudentDateLock.assignment_id, orphanIds));
     out.orphanLocks = orphanIds.length;
   }
   const unlocked = (await db.execute(sql`
-    SELECT a.assignment_id, a.schedule_id, a.student_id, a.academic_term_id FROM OfficeHourAssignment a
-    WHERE a.status = 'ACTIVE' AND NOT EXISTS (SELECT 1 FROM OfficeHourStudentLock l WHERE l.assignment_id = a.assignment_id)
+    SELECT a.assignment_id, a.schedule_id, a.student_id, a.academic_term_id,
+           DATE_FORMAT(a.effective_from, '%Y-%m-%d') AS eff_from, DATE_FORMAT(a.effective_to, '%Y-%m-%d') AS eff_to
+    FROM OfficeHourAssignment a
+    WHERE a.status = 'ACTIVE' AND NOT EXISTS (SELECT 1 FROM OfficeHourStudentDateLock l WHERE l.assignment_id = a.assignment_id)
   `)) as any;
   const rows = unlocked[0] as any[];
   if (rows.length) {
     const settings = await getSettings();
     const days = await scheduleDays([...new Set(rows.map((r) => Number(r.schedule_id)))]);
     for (const r of rows) {
-      const lockDays = lockDaysFor(settings.student_lock_mode, days.get(Number(r.schedule_id)) ?? []);
+      const lockDates = lockDatesFor(settings.student_lock_mode, days.get(Number(r.schedule_id)) ?? [], maxYmd(today, String(r.eff_from)), String(r.eff_to));
+      if (!lockDates.length) continue;
       try {
-        await db.insert(OfficeHourStudentLock).values(
-          lockDays.map((d) => ({ academic_term_id: Number(r.academic_term_id), student_id: Number(r.student_id), day_of_week: d, assignment_id: Number(r.assignment_id) })),
+        await db.insert(OfficeHourStudentDateLock).values(
+          lockDates.map((d) => ({ student_id: Number(r.student_id), lock_date: d, academic_term_id: Number(r.academic_term_id), assignment_id: Number(r.assignment_id) })),
         );
         out.locksRestored++;
       } catch (error) {
         if (!isDupEntry(error)) throw error;
-        // Two assignments claim the same day: a human must decide which one stays.
+        // Two assignments claim the same date: a human must decide which one stays.
         out.lockConflicts++;
         logger.warn("[office-hours] reconcile: assignment overlaps another and was left unlocked", { assignmentId: r.assignment_id });
       }

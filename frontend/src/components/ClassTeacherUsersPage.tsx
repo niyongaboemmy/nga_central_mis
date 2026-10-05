@@ -15,6 +15,7 @@ import { useScopedGrades } from "../hooks/useScopedGrades";
 import { useAcademicPeriod } from "../contexts/AcademicPeriodContext";
 import { useToast } from "../contexts/ToastContext";
 import UserProfileViewer from "./UserProfileViewer";
+import SelectField from "./ui/SelectField";
 
 const PAGE_SIZE = 40;
 
@@ -330,7 +331,7 @@ const ClassTeacherUsersPage: React.FC = () => {
                 />
               </div>
               {scope.grades.length > 1 && (
-                <select
+                <SelectField
                   value={gradeFilter}
                   onChange={(e) => {
                     setGradeFilter(
@@ -346,7 +347,7 @@ const ClassTeacherUsersPage: React.FC = () => {
                       {g.name}
                     </option>
                   ))}
-                </select>
+                </SelectField>
               )}
             </div>
 

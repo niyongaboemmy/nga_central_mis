@@ -26,6 +26,7 @@ import {
   CheckCircle,
   Sparkles,
 } from "lucide-react";
+import SelectField from "../ui/SelectField";
 
 interface TeacherSubjectAssignmentProps {
   teacherId: number;
@@ -298,7 +299,7 @@ const TeacherSubjectAssignment: React.FC<TeacherSubjectAssignmentProps> = ({
           </div>
           <div className="flex items-center gap-3">
             {assignmentYearOptions.length > 1 && (
-              <select
+              <SelectField
                 value={viewYearFilter}
                 onChange={(e) => setViewYearFilter(parseInt(e.target.value))}
                 className="px-3 py-2 text-sm border rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-400 transition-colors"
@@ -310,7 +311,7 @@ const TeacherSubjectAssignment: React.FC<TeacherSubjectAssignmentProps> = ({
                     {isCurrent ? " (Current)" : ""}
                   </option>
                 ))}
-              </select>
+              </SelectField>
             )}
             {hasPermission(Permissions.ASSIGN_TEACHER_SUBJECTS) && (
               <Button
