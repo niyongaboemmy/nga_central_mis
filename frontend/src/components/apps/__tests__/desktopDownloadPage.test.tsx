@@ -122,7 +122,8 @@ describe("/apps: NGA Desktop download page", () => {
     mockApi(release);
     renderPage();
     expect(await screen.findByText(/You're using NGA Desktop 0.2.0/)).toBeInTheDocument();
-    expect(await screen.findByText(/Version 0.3.0 is ready: open Settings → Updates/)).toBeInTheDocument();
+    // An older NGA (no page bridge): points at the title-bar Update button.
+    expect(await screen.findByText(/at the top right of this window/)).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /Download for/ })).toBeNull();
   });
 
@@ -165,6 +166,36 @@ describe("/apps: NGA Desktop download page", () => {
     fireEvent.click(screen.getByRole("tab", { name: /No warnings: one command/ }));
     expect(screen.getByTestId("install-command").textContent).toMatch(/^curl -fsSL .+\/desktop\/install\.sh \| sh$/);
     expect(screen.getByText(/Open Terminal/)).toBeInTheDocument();
+  });
+
+  it("inside a newer NGA Desktop, updates with one click", async () => {
+    setDevice(UA.desktopApp);
+    mockApi(release);
+    const installUpdate = vi.fn().mockReturnValue(new Promise(() => {})); // NGA restarts instead of resolving
+    Object.defineProperty(window, "ngaDesktop", { value: { version: "0.2.0", installUpdate }, configurable: true });
+    try {
+      renderPage();
+      const btn = await screen.findByRole("button", { name: /Update to 0.3.0 now/ });
+      fireEvent.click(btn);
+      expect(installUpdate).toHaveBeenCalledTimes(1);
+      expect(await screen.findByText(/Updating… NGA restarts by itself/)).toBeInTheDocument();
+    } finally {
+      delete (window as any).ngaDesktop;
+    }
+  });
+
+  it("says why when the update can't run (a quiz is open)", async () => {
+    setDevice(UA.desktopApp);
+    mockApi(release);
+    const installUpdate = vi.fn().mockRejectedValue("busy: finish the taskmentor quiz or meeting first");
+    Object.defineProperty(window, "ngaDesktop", { value: { version: "0.2.0", installUpdate }, configurable: true });
+    try {
+      renderPage();
+      fireEvent.click(await screen.findByRole("button", { name: /Update to 0.3.0 now/ }));
+      expect(await screen.findByText(/Couldn't update: finish the taskmentor quiz or meeting first\./)).toBeInTheDocument();
+    } finally {
+      delete (window as any).ngaDesktop;
+    }
   });
 
   it("shows download stats to admins only", async () => {
