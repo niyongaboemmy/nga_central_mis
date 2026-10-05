@@ -77,3 +77,33 @@ export const assertTeacherOwnsScheme = async (
     "The selected academic term belongs to an academic year you are not assigned to teach this subject for. Switch the academic year/term selector to the year of this assignment.",
   );
 };
+
+/**
+ * Boolean form of the assignment check for whole-scheme actions (delete, cover details, PDF). A
+ * SchemeOfWork row is shared per (subject, class group, term) — getSchemeEntries looks it up
+ * without filtering on user — so its user_id is only whoever created it. Gating on user_id alone
+ * locks out a co-teacher or the teacher a subject was reassigned to, even though they can already
+ * edit every entry through assertTeacherOwnsScheme.
+ */
+export const isTeacherAssignedToScheme = async (
+  userId: number,
+  scheme: { subject_id: number; class_group_id: number; academic_term_id: number },
+): Promise<boolean> => {
+  const rows = await db
+    .select({ user_id: TeacherSubjectAssignment.user_id })
+    .from(TeacherSubjectAssignment)
+    .innerJoin(
+      AcademicTerm,
+      eq(AcademicTerm.academic_year_id, TeacherSubjectAssignment.academic_year_id),
+    )
+    .where(
+      and(
+        eq(AcademicTerm.academic_term_id, scheme.academic_term_id),
+        eq(TeacherSubjectAssignment.user_id, userId),
+        eq(TeacherSubjectAssignment.subject_id, scheme.subject_id),
+        eq(TeacherSubjectAssignment.class_group_id, scheme.class_group_id),
+      ),
+    )
+    .limit(1);
+  return rows.length > 0;
+};
