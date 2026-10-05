@@ -5,6 +5,7 @@ import { FEATURE, blockedReason, burst, dailyLimit, loadPersona, systemPrompt, u
 import { collectOccurrences } from "../services/reminders/occurrences";
 import { addDaysYmd, kigaliInstant, kigaliParts } from "../services/reminders/time";
 import { buildPolicy, policyRange } from "../services/desktop/policy";
+import { loadTeacherClasses } from "../services/desktop/classes";
 
 /**
  * NGA Tools (NGA Desktop), signed in. Called from the MIS page inside NGA Desktop,
@@ -13,6 +14,7 @@ import { buildPolicy, policyRange } from "../services/desktop/policy";
  *   POST /desktop/tools/ai/chat     stream an answer (NDJSON: {"t":text}… then {"done":…} or {"error":…})
  *   GET  /desktop/tools/agenda      My Day: lessons, activities, office hours, quizzes, meetings (days=1..7)
  *   GET  /desktop/tools/policy      today's lesson and exam windows (games and the student AI pause in them)
+ *   GET  /desktop/tools/classes     the class lists of the classes this person teaches (name picker, groups)
  * Kept apart from routes/desktop.ts (public distribution routes). `authenticate` is
  * passed in by app.ts, so tests can mount this router with their own sign-in without
  * touching the shared auth module (the suite shares one module registry).
@@ -20,6 +22,7 @@ import { buildPolicy, policyRange } from "../services/desktop/policy";
 export interface ToolsDeps {
   /** The person's occurrences (lessons, activities, office hours, Reminder Hub sources). */
   collect: typeof collectOccurrences;
+  classes?: typeof loadTeacherClasses;
 }
 
 export function desktopToolsRouter(authenticate: RequestHandler, deps: ToolsDeps = { collect: collectOccurrences }) {
@@ -56,6 +59,16 @@ router.get(
         })),
       },
     });
+  }),
+);
+
+router.get(
+  "/classes",
+  authenticate,
+  asyncHandler(async (req: any, res) => {
+    const classes = await (deps.classes ?? loadTeacherClasses)(Number(req.user.userId));
+    res.set("Cache-Control", "private, no-store");
+    res.json({ success: true, data: { classes } });
   }),
 );
 
@@ -104,7 +117,8 @@ router.post(
     }
     if (!burst.take(String(userId))) return res.status(429).json({ success: false, code: "SLOW_DOWN", message: "Too many messages in a minute. Please wait a moment." });
     const limit = dailyLimit(persona);
-    if ((await usedToday(userId)) >= limit)
+    const used = await usedToday(userId);
+    if (used >= limit)
       return res.status(429).json({ success: false, code: "DAILY_LIMIT", message: `You've used today's ${limit} messages. They refill tomorrow.` });
 
     // Stream NDJSON. No proxy buffering (nginx), no caching.
@@ -137,7 +151,8 @@ router.post(
         },
       });
       flush();
-      line({ done: true, provider: run.provider, model: run.model, remaining: Math.max(0, limit - (await usedToday(userId))) });
+      // From the count taken before this answer: the usage row is written in the background.
+      line({ done: true, provider: run.provider, model: run.model, remaining: Math.max(0, limit - used - 1) });
     } catch (e: any) {
       flush();
       if (!abort.signal.aborted)
