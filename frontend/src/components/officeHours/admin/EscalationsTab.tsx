@@ -83,7 +83,7 @@ const EscalationsTab: React.FC<{ termId: number | null; config?: OfficeHoursConf
       ) : rows.length === 0 ? (
         <EmptyState icon={<CheckCircle2 className="h-8 w-8" />} title={status === "open" ? "Nothing needs follow-up" : "No escalations this term"} />
       ) : (
-        <ul className="divide-y divide-slate-100 dark:divide-slate-800">
+        <ul className="divide-y divide-slate-100 dark:divide-gray-700/30">
           {rows.map((e) => (
             <li key={e.escalation_id} className="flex flex-wrap items-start gap-3 py-3">
               <span
@@ -92,10 +92,10 @@ const EscalationsTab: React.FC<{ termId: number | null; config?: OfficeHoursConf
                 Level {e.level}
               </span>
               <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                  {studentName(e.student)} <span className="font-normal text-slate-600 dark:text-slate-300">· {e.student?.class_group_name}</span>
+                <p className="text-sm font-semibold text-slate-900 dark:text-gray-100">
+                  {studentName(e.student)} <span className="font-normal text-slate-600 dark:text-gray-300">· {e.student?.class_group_name}</span>
                 </p>
-                <p className="text-sm text-slate-700 dark:text-slate-200">
+                <p className="text-sm text-slate-700 dark:text-gray-200">
                   {TRIGGER[e.trigger_code]} — {e.title} with {e.teacher_name}, last missed {formatYmd(e.last_missed)}
                 </p>
                 {e.acknowledged_at && (

@@ -50,7 +50,7 @@ const AbsenceNoticeButton: React.FC<{ session: StudentSessionView; onSent?: () =
   }
   return (
     <form
-      className="mt-3 space-y-2 rounded-2xl border border-slate-200 p-3 dark:border-slate-700"
+      className="mt-3 space-y-2 rounded-2xl border border-slate-200 p-3 dark:border-gray-700/30"
       onSubmit={async (e) => {
         e.preventDefault();
         setBusy(true);

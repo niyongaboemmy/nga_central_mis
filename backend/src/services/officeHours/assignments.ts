@@ -10,7 +10,7 @@ import { AuthorizationError, ConflictError, NotFoundError, ValidationError } fro
 import { loadClassGroupActivities } from "../../controllers/calendarController";
 import { addDaysYmd, dowOfYmd, parseClock } from "../reminders/time";
 import { Actor, assertCanManage, readScopeOf } from "./access";
-import { datesOnDays, dayLabel, isDupEntry, isYmd, maxYmd, minYmd, now, nowMinutes, overlaps, todayYmd, withDeadlockRetry } from "./common";
+import { datesOnDays, dayLabel, isoDowOfYmd, isDupEntry, isYmd, maxYmd, minYmd, now, nowMinutes, overlaps, todayYmd, withDeadlockRetry } from "./common";
 import { emitOfficeHoursEvent } from "./events";
 import { searchStudents, studentCards, teachableClassGroupIds, teachableStudentIds, userNames, StudentCard } from "./eligibility";
 import { endDateFor, loadSchedule, Schedule } from "./schedules";
@@ -193,7 +193,7 @@ const startDateFor = async (schedule: Schedule, days: number[], requested: strin
   const settings = await getSettings();
   const today = todayYmd();
   let from = maxYmd(today, schedule.effective_from);
-  if (from === today && days.includes(dowOfYmd(today))) {
+  if (from === today && days.includes(isoDowOfYmd(today))) {
     const cutoff = parseClock(settings.roster_cutoff_time) ?? 0;
     if (nowMinutes() >= cutoff) from = addDaysYmd(today, 1);
   }

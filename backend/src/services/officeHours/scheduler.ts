@@ -40,8 +40,8 @@ export const tick = async () => {
     const six = `${at.ymd}:${Math.floor(hour / 6)}`;
     await once("materialise", six, () => ensureAllSessions());
     await once("transfers", `${at.ymd}:${Math.floor(hour)}`, () => expireTransfers());
-    const weekday = dowOfYmd(at.ymd) >= 1 && dowOfYmd(at.ymd) <= 5;
-    if (weekday && at.minutes >= 6 * 60 + 30) await once("morning-digest", at.ymd, () => morningDigest());
+    // Every day: weekend office hours get their digest too (no session, no notice).
+    if (at.minutes >= 6 * 60 + 30) await once("morning-digest", at.ymd, () => morningDigest());
     try {
       await registerReminders();
     } catch (error) {

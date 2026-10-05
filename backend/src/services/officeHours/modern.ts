@@ -17,7 +17,7 @@ import { addDaysYmd, dowOfYmd, parseClock } from "../reminders/time";
 import { configuredApps } from "../home/apps";
 import { Actor, assertCanManage } from "./access";
 import { assignStudents } from "./assignments";
-import { clockOrThrow, isDupEntry, isYmd, loadTerm, maxYmd, now, nowMinutes, overlaps, todayYmd, toInt } from "./common";
+import { clockOrThrow, isDupEntry, isoDowOfYmd, isYmd, loadTerm, maxYmd, now, nowMinutes, overlaps, todayYmd, toInt } from "./common";
 import { emitOfficeHoursEvent } from "./events";
 import { studentCards, teachableStudentIds } from "./eligibility";
 import { loadMarks, statsFromMarks } from "./metrics";
@@ -310,8 +310,7 @@ export const moveSession = async (actor: Actor, sessionId: number, body: any) =>
   if (s < (parseClock(settings.allowed_window_start) ?? 0) || e > (parseClock(settings.allowed_window_end) ?? 24 * 60)) {
     throw new ValidationError(`Office hours must fall between ${settings.allowed_window_start} and ${settings.allowed_window_end}`);
   }
-  const dow = dowOfYmd(date);
-  if (dow < 1 || dow > 5) throw new ValidationError("Office hours run Monday to Friday");
+  const dow = isoDowOfYmd(date);
   const today = todayYmd();
   if (date < today) throw new ValidationError("Choose today or a later date");
   const term = await loadTerm(schedule.academic_term_id);

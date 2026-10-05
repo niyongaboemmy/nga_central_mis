@@ -8,8 +8,9 @@ import { addDaysYmd, dbDateToYmd, dowOfYmd, kigaliParts, parseClock } from "../r
  * Shared helpers for the office-hours module (OFFICE_HOURS_IMPLEMENTATION_PLAN.md §4):
  * an injectable clock (tests pin "now"), Kigali dates, clock validation and terms.
  *
- * day_of_week is the timetable's encoding, which is also JavaScript's getDay():
- * 1 = Monday ... 5 = Friday, so dowOfYmd() compares directly.
+ * day_of_week is the timetable's encoding: 1 = Monday ... 5 = Friday, extended
+ * with 6 = Saturday and 7 = Sunday. Compare dates with isoDowOfYmd(), because
+ * JavaScript's getDay() (dowOfYmd) calls Sunday 0.
  */
 
 const realClock = (): (() => Date) => {
@@ -32,7 +33,12 @@ export const todayYmd = () => kigaliParts(now()).ymd;
 export const nowMinutes = () => kigaliParts(now()).minutes;
 
 export const WEEKDAYS = [1, 2, 3, 4, 5] as const;
-export const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+/** Office hours may run any day, weekends included: 6 = Saturday, 7 = Sunday. */
+export const ALL_DAYS = [1, 2, 3, 4, 5, 6, 7] as const;
+/** Indexed by day_of_week; both 0 and 7 are Sunday. */
+export const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+/** day_of_week of a date in the office-hours encoding (Sunday = 7, not getDay()'s 0). */
+export const isoDowOfYmd = (ymd: string) => dowOfYmd(ymd) || 7;
 export const dayLabel = (days: number[]) =>
   [...days].sort((a, b) => a - b).map((d) => DAY_NAMES[d]).join(", ");
 
@@ -58,7 +64,7 @@ export const datesOnDays = (fromYmd: string, toYmd: string, days: number[]): str
   const want = new Set(days);
   let cursor = fromYmd;
   for (let guard = 0; guard < 800 && cursor <= toYmd; guard++) {
-    if (want.has(dowOfYmd(cursor))) out.push(cursor);
+    if (want.has(isoDowOfYmd(cursor))) out.push(cursor);
     cursor = addDaysYmd(cursor, 1);
   }
   return out;

@@ -58,7 +58,7 @@ const OfficeHoursBandCells: React.FC<OfficeHoursBandCellsProps> = ({ label, entr
                 <button
                   type="button"
                   onClick={() => onAdd(backendDay)}
-                  className={`flex w-full items-center justify-center gap-1 rounded-lg px-1 py-1 ${text} font-semibold text-slate-500 opacity-70 transition hover:bg-white hover:opacity-100 focus:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:text-slate-400 dark:hover:bg-slate-700`}
+                  className={`flex w-full items-center justify-center gap-1 rounded-lg px-1 py-1 ${text} font-semibold text-slate-500 opacity-70 transition hover:bg-white hover:opacity-100 focus:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:text-gray-400 dark:hover:bg-gray-700/50`}
                   aria-label={`Add office hours on ${["", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday"][backendDay]}`}
                 >
                   <Plus className="h-3 w-3" aria-hidden /> {dense ? "" : "Office hours"}
@@ -73,14 +73,14 @@ const OfficeHoursBandCells: React.FC<OfficeHoursBandCellsProps> = ({ label, entr
                   const style = e.color ? { borderLeftColor: e.color } : undefined;
                   const body = (
                     <>
-                      <span className={`block truncate ${text} font-semibold text-slate-800 dark:text-slate-100`}>
+                      <span className={`block truncate ${text} font-semibold text-slate-800 dark:text-gray-100`}>
                         {e.role === "summary" && <Users className="mr-1 inline h-3 w-3" aria-hidden />}
                         {t.main}
                       </span>
-                      {t.sub && !dense && <span className="block truncate text-[10px] text-slate-600 dark:text-slate-300">{t.sub}</span>}
+                      {t.sub && !dense && <span className="block truncate text-[10px] text-slate-600 dark:text-gray-300">{t.sub}</span>}
                     </>
                   );
-                  const cls = `block w-full rounded-lg border-l-4 border-blue-400 bg-white px-2 py-1 text-left shadow-sm dark:bg-slate-800`;
+                  const cls = `block w-full rounded-lg border-l-4 border-blue-400 bg-white px-2 py-1 text-left shadow-sm dark:bg-gray-800/40`;
                   return onEntryClick ? (
                     <button
                       key={`${e.schedule_id ?? "s"}-${i}`}

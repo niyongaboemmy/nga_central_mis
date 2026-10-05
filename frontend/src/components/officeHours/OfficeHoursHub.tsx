@@ -29,16 +29,16 @@ type Tab = "today" | "schedules" | "reports";
 export const SessionRow: React.FC<{ s: OfficeHourSession; onRegister?: (s: OfficeHourSession) => void; showDate?: boolean }> = ({ s, onRegister, showDate = true }) => (
   <li className="flex flex-wrap items-center gap-3 py-3">
     <div className="w-28 flex-shrink-0">
-      {showDate && <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">{formatYmd(s.session_date)}</p>}
-      <p className="text-xs tabular-nums text-slate-600 dark:text-slate-300">
+      {showDate && <p className="text-sm font-semibold text-slate-900 dark:text-gray-100">{formatYmd(s.session_date)}</p>}
+      <p className="text-xs tabular-nums text-slate-600 dark:text-gray-300">
         {s.start_time}–{s.end_time}
       </p>
     </div>
     <div className="min-w-0 flex-1">
-      <Link to={`/office-hours/schedules/${s.schedule_id}`} className="block truncate text-sm font-semibold text-slate-900 hover:underline dark:text-slate-100">
+      <Link to={`/office-hours/schedules/${s.schedule_id}`} className="block truncate text-sm font-semibold text-slate-900 hover:underline dark:text-gray-100">
         {s.title}
       </Link>
-      <p className="truncate text-xs text-slate-600 dark:text-slate-300">
+      <p className="truncate text-xs text-slate-600 dark:text-gray-300">
         {[s.location, `${s.expected} expected`, s.state === "held" ? `${s.attended} attended` : null].filter(Boolean).join(" · ")}
       </p>
     </div>
@@ -66,11 +66,11 @@ const TransferList: React.FC<{ incoming: TransferRequest[]; outgoing: TransferRe
   return (
     <Card labelledBy="oh-transfers">
       <CardTitle id="oh-transfers" icon={<ArrowRightLeft className="h-4 w-4" aria-hidden />}>Transfer requests</CardTitle>
-      <ul className="divide-y divide-slate-100 dark:divide-slate-800">
+      <ul className="divide-y divide-slate-100 dark:divide-gray-700/30">
         {incoming.map((r) => (
           <li key={r.request_id} className="flex flex-wrap items-center gap-3 py-3">
             <div className="min-w-0 flex-1">
-              <p className="text-sm text-slate-900 dark:text-slate-100">
+              <p className="text-sm text-slate-900 dark:text-gray-100">
                 <strong>{r.requested_by_name ?? "A teacher"}</strong> asks you to release <strong>{studentName(r.student)}</strong> to “{r.to_schedule.title}”.
               </p>
               {r.message && <Muted className="text-xs">“{r.message}”</Muted>}
@@ -81,7 +81,7 @@ const TransferList: React.FC<{ incoming: TransferRequest[]; outgoing: TransferRe
         ))}
         {outgoing.map((r) => (
           <li key={r.request_id} className="flex flex-wrap items-center gap-3 py-3">
-            <p className="min-w-0 flex-1 text-sm text-slate-700 dark:text-slate-200">
+            <p className="min-w-0 flex-1 text-sm text-slate-700 dark:text-gray-200">
               Waiting for <strong>{r.from_schedule.teacher_name ?? "the other teacher"}</strong> to release <strong>{studentName(r.student)}</strong>.
             </p>
             <button type="button" className={secondaryBtn} onClick={() => act(() => officeHoursApi.cancelTransfer(r.request_id), "Request withdrawn")}>Withdraw</button>
@@ -161,7 +161,7 @@ const OfficeHoursHub: React.FC = () => {
     <div className="mx-auto max-w-6xl space-y-5 px-4 py-6 sm:px-6">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="flex items-center gap-2 text-2xl font-bold text-slate-900 dark:text-slate-50">
+          <h1 className="flex items-center gap-2 text-2xl font-bold text-slate-900 dark:text-gray-50">
             <Clock4 className="h-6 w-6 text-blue-600" aria-hidden /> Office hours
           </h1>
           <Muted>
@@ -187,7 +187,7 @@ const OfficeHoursHub: React.FC = () => {
         </div>
       </header>
 
-      <nav className="flex gap-1 overflow-x-auto rounded-full bg-slate-100 p-1 dark:bg-slate-800" role="tablist" aria-label="Office hours views">
+      <nav className="flex gap-1 overflow-x-auto rounded-full bg-slate-100 p-1 dark:bg-gray-800/40" role="tablist" aria-label="Office hours views">
         {tabs.map((t) => (
           <button
             key={t.key}
@@ -196,7 +196,7 @@ const OfficeHoursHub: React.FC = () => {
             aria-selected={tab === t.key}
             onClick={() => changeTab(t.key)}
             className={`whitespace-nowrap rounded-full px-4 py-1.5 text-sm font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
-              tab === t.key ? "bg-white text-slate-900 shadow-sm dark:bg-slate-900 dark:text-slate-50" : "text-slate-700 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white"
+              tab === t.key ? "bg-white text-slate-900 shadow-sm dark:bg-gray-800/30 dark:text-gray-50" : "text-slate-700 hover:text-slate-900 dark:text-gray-300 dark:hover:text-white"
             }`}
           >
             {t.label}
@@ -214,7 +214,7 @@ const OfficeHoursHub: React.FC = () => {
               {data.today_sessions.length === 0 ? (
                 <EmptyState title="No office hours today" body="Sessions you host — including ones you cover for a colleague — appear here." />
               ) : (
-                <ul className="divide-y divide-slate-100 dark:divide-slate-800">
+                <ul className="divide-y divide-slate-100 dark:divide-gray-700/30">
                   {data.today_sessions.map((s) => (
                     <SessionRow key={s.session_id} s={s} showDate={false} onRegister={setRegisterFor} />
                   ))}
@@ -224,7 +224,7 @@ const OfficeHoursHub: React.FC = () => {
             {data.unmarked.length > 0 && (
               <Card labelledBy="oh-unmarked" className="border-amber-300 dark:border-amber-500/40">
                 <CardTitle id="oh-unmarked" icon={<ClipboardCheck className="h-4 w-4 text-amber-600" aria-hidden />}>Registers still missing</CardTitle>
-                <ul className="divide-y divide-slate-100 dark:divide-slate-800">
+                <ul className="divide-y divide-slate-100 dark:divide-gray-700/30">
                   {data.unmarked.map((s) => (
                     <SessionRow key={s.session_id} s={s} onRegister={setRegisterFor} />
                   ))}
@@ -239,7 +239,7 @@ const OfficeHoursHub: React.FC = () => {
               {data.upcoming.length === 0 ? (
                 <Muted>Nothing scheduled in the next two weeks.</Muted>
               ) : (
-                <ul className="divide-y divide-slate-100 dark:divide-slate-800">
+                <ul className="divide-y divide-slate-100 dark:divide-gray-700/30">
                   {data.upcoming.map((s) => (
                     <SessionRow key={s.session_id} s={s} />
                   ))}
@@ -267,12 +267,12 @@ const OfficeHoursHub: React.FC = () => {
                 <li key={s.schedule_id}>
                   <Link
                     to={`/office-hours/schedules/${s.schedule_id}`}
-                    className="block rounded-2xl border border-slate-200 p-4 transition hover:border-blue-300 hover:shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:border-slate-700 dark:hover:border-blue-500/50"
+                    className="block rounded-2xl border border-slate-200 p-4 transition hover:border-blue-300 hover:shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:border-gray-700/30 dark:hover:border-blue-500/50"
                     style={s.subject_color ? { borderLeftColor: s.subject_color, borderLeftWidth: 4 } : undefined}
                   >
                     <div className="flex items-start justify-between gap-2">
-                      <p className="font-semibold text-slate-900 dark:text-slate-100">{s.title}</p>
-                      <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-200">
+                      <p className="font-semibold text-slate-900 dark:text-gray-100">{s.title}</p>
+                      <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700 dark:bg-gray-800/40 dark:text-gray-200">
                         {s.status === "ACTIVE" ? "Published" : s.status === "DRAFT" ? "Draft" : "Ended"}
                       </span>
                     </div>

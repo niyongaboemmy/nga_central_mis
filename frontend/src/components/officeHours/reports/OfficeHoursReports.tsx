@@ -42,7 +42,7 @@ const GROUPS: Array<[GroupBy, string]> = [
 const Delta: React.FC<{ now: number | null; before: number | null | undefined; unit?: string; goodWhenUp?: boolean }> = ({ now, before, unit = "", goodWhenUp = true }) => {
   if (now === null || before === null || before === undefined) return null;
   const d = Math.round((now - before) * 10) / 10;
-  if (d === 0) return <span className="text-xs text-slate-600 dark:text-slate-300">no change</span>;
+  if (d === 0) return <span className="text-xs text-slate-600 dark:text-gray-300">no change</span>;
   const up = d > 0;
   const good = up === goodWhenUp;
   const Icon = up ? ArrowUpRight : ArrowDownRight;
@@ -57,9 +57,9 @@ const Delta: React.FC<{ now: number | null; before: number | null | undefined; u
 };
 
 const Kpi: React.FC<{ label: string; value: string; delta?: React.ReactNode; hint?: string }> = ({ label, value, delta, hint }) => (
-  <div className="rounded-2xl border border-slate-200 p-4 dark:border-slate-700" title={hint}>
-    <p className="text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">{label}</p>
-    <p className="mt-1 text-2xl font-bold tabular-nums text-slate-900 dark:text-slate-50">{value}</p>
+  <div className="rounded-2xl border border-slate-200 p-4 dark:border-gray-700/30" title={hint}>
+    <p className="text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-gray-300">{label}</p>
+    <p className="mt-1 text-2xl font-bold tabular-nums text-slate-900 dark:text-gray-50">{value}</p>
     <div className="mt-1 min-h-[1rem]">{delta}</div>
   </div>
 );
@@ -155,17 +155,17 @@ const SummaryView: React.FC<{ data: SummaryReport }> = ({ data }) => {
           <div className="relative overflow-x-auto">
             <table className="w-full text-left text-sm">
               <thead>
-                <tr className="text-xs uppercase tracking-wide text-slate-600 dark:text-slate-300">
+                <tr className="text-xs uppercase tracking-wide text-slate-600 dark:text-gray-300">
                   <th scope="col" className="py-2 pr-3">Period</th>
                   <th scope="col" className="py-2 pr-3 text-right">Planned</th>
                   <th scope="col" className="py-2 pr-3 text-right">Held</th>
                   <th scope="col" className="py-2 pr-3 text-right">Attendance</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+              <tbody className="divide-y divide-slate-100 dark:divide-gray-700/30">
                 {data.series.map((s) => (
                   <tr key={s.key}>
-                    <td className="py-1.5 pr-3 text-slate-800 dark:text-slate-100">{s.label}</td>
+                    <td className="py-1.5 pr-3 text-slate-800 dark:text-gray-100">{s.label}</td>
                     <td className="py-1.5 pr-3 text-right tabular-nums">{s.planned}</td>
                     <td className="py-1.5 pr-3 text-right tabular-nums">{s.held}</td>
                     <td className="py-1.5 pr-3 text-right tabular-nums">{pct(s.attendance_rate)}</td>
@@ -194,7 +194,7 @@ const SummaryView: React.FC<{ data: SummaryReport }> = ({ data }) => {
           <CardTitle id="oh-cancelled">Cancelled sessions</CardTitle>
           <ul className="flex flex-wrap gap-2 text-sm">
             {cancelled.map(([r, n]) => (
-              <li key={r} className="rounded-full bg-slate-100 px-3 py-1 text-slate-800 dark:bg-slate-800 dark:text-slate-100">
+              <li key={r} className="rounded-full bg-slate-100 px-3 py-1 text-slate-800 dark:bg-gray-800/40 dark:text-gray-100">
                 {humanize(r)}: {n}
               </li>
             ))}
@@ -203,7 +203,7 @@ const SummaryView: React.FC<{ data: SummaryReport }> = ({ data }) => {
         </Card>
       )}
 
-      <details className="rounded-2xl border border-slate-200 p-4 text-sm text-slate-700 dark:border-slate-700 dark:text-slate-200">
+      <details className="rounded-2xl border border-slate-200 p-4 text-sm text-slate-700 dark:border-gray-700/30 dark:text-gray-200">
         <summary className="flex cursor-pointer items-center gap-2 font-semibold">
           <Info className="h-4 w-4" aria-hidden /> How is this calculated?
         </summary>
@@ -246,7 +246,7 @@ const BreakdownView: React.FC<{ rows: BreakdownRow[]; groupBy: GroupBy; onGroupB
         <div className="relative overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead>
-              <tr className="text-xs uppercase tracking-wide text-slate-600 dark:text-slate-300">
+              <tr className="text-xs uppercase tracking-wide text-slate-600 dark:text-gray-300">
                 <th scope="col" className="py-2 pr-3">{GROUPS.find((g) => g[0] === groupBy)?.[1]}</th>
                 <th scope="col" className="py-2 pr-3 text-right">Registers</th>
                 <th scope="col" className="py-2 pr-3 text-right">Missing</th>
@@ -255,12 +255,12 @@ const BreakdownView: React.FC<{ rows: BreakdownRow[]; groupBy: GroupBy; onGroupB
                 <th scope="col" className="py-2 pr-3">Consistency</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+            <tbody className="divide-y divide-slate-100 dark:divide-gray-700/30">
               {rows.map((r) => {
                 const total = r.bands.CONSISTENT + r.bands.WATCH + r.bands.CHRONIC + r.bands.TOO_FEW || 1;
                 return (
                   <tr key={r.key}>
-                    <td className="py-2 pr-3 font-semibold text-slate-900 dark:text-slate-100">
+                    <td className="py-2 pr-3 font-semibold text-slate-900 dark:text-gray-100">
                       {groupBy === "teacher" && r.key.startsWith("t") ? (
                         <Link to={`/office-hours/reports/teachers/${r.key.slice(1)}`} className="hover:underline">{r.label}</Link>
                       ) : groupBy === "purpose" ? (
@@ -274,7 +274,7 @@ const BreakdownView: React.FC<{ rows: BreakdownRow[]; groupBy: GroupBy; onGroupB
                     <td className="py-2 pr-3 text-right tabular-nums">{pct(r.attendance_rate)}</td>
                     <td className="py-2 pr-3 text-right tabular-nums">{r.students}</td>
                     <td className="py-2 pr-3">
-                      <div className="flex h-2 w-32 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800" role="img" aria-label={`${r.bands.CONSISTENT} consistent, ${r.bands.WATCH} watch, ${r.bands.CHRONIC} chronic`}>
+                      <div className="flex h-2 w-32 overflow-hidden rounded-full bg-slate-100 dark:bg-gray-800/40" role="img" aria-label={`${r.bands.CONSISTENT} consistent, ${r.bands.WATCH} watch, ${r.bands.CHRONIC} chronic`}>
                         <span className="bg-emerald-600" style={{ width: `${(r.bands.CONSISTENT / total) * 100}%` }} />
                         <span className="bg-amber-500" style={{ width: `${(r.bands.WATCH / total) * 100}%` }} />
                         <span className="bg-rose-600" style={{ width: `${(r.bands.CHRONIC / total) * 100}%` }} />
@@ -295,15 +295,15 @@ const ConsistencyList: React.FC<{ rows: ConsistencyRow[]; empty: string }> = ({ 
   rows.length === 0 ? (
     <Muted className="py-3">{empty}</Muted>
   ) : (
-    <ul className="divide-y divide-slate-100 dark:divide-slate-800">
+    <ul className="divide-y divide-slate-100 dark:divide-gray-700/30">
       {rows.map((r) => (
         <li key={r.student_id} className="flex flex-wrap items-center gap-3 py-2">
           <div className="min-w-0 flex-1">
-            <Link to={`/office-hours/reports/students/${r.student_id}`} className="font-semibold text-slate-900 hover:underline dark:text-slate-100">{r.name}</Link>
-            <p className="truncate text-xs text-slate-600 dark:text-slate-300">{[r.class_group_name, r.office_hours.join("; ")].filter(Boolean).join(" · ")}</p>
+            <Link to={`/office-hours/reports/students/${r.student_id}`} className="font-semibold text-slate-900 hover:underline dark:text-gray-100">{r.name}</Link>
+            <p className="truncate text-xs text-slate-600 dark:text-gray-300">{[r.class_group_name, r.office_hours.join("; ")].filter(Boolean).join(" · ")}</p>
           </div>
-          <span className="text-sm tabular-nums text-slate-800 dark:text-slate-100">{pct(r.rate)}</span>
-          <span className="text-xs text-slate-600 dark:text-slate-300">
+          <span className="text-sm tabular-nums text-slate-800 dark:text-gray-100">{pct(r.rate)}</span>
+          <span className="text-xs text-slate-600 dark:text-gray-300">
             {r.present + r.late}/{r.expected} attended
             {r.current_absent_streak >= 2 ? ` · missed last ${r.current_absent_streak}` : ""}
           </span>
@@ -333,7 +333,7 @@ const ConsistencyView: React.FC<{ data: ConsistencyReport }> = ({ data }) => {
   return (
     <Card labelledBy="oh-consistency">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-        <h2 id="oh-consistency" className="text-sm font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-300">Who comes, who doesn't</h2>
+        <h2 id="oh-consistency" className="text-sm font-semibold uppercase tracking-wider text-slate-600 dark:text-gray-300">Who comes, who doesn't</h2>
         <ExportButtons tables={tables} title={`office-hours-consistency-${data.period.from}`} scope={data.period.label} />
       </div>
       <div className="mb-2 flex flex-wrap gap-1" role="tablist" aria-label="Consistency bands">
@@ -344,7 +344,7 @@ const ConsistencyView: React.FC<{ data: ConsistencyReport }> = ({ data }) => {
             role="tab"
             aria-selected={tab === k}
             onClick={() => setTab(k)}
-            className={`rounded-full px-3 py-1 text-sm font-semibold focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${tab === k ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900" : "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200"}`}
+            className={`rounded-full px-3 py-1 text-sm font-semibold focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${tab === k ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-gray-900" : "bg-slate-100 text-slate-700 dark:bg-gray-800/40 dark:text-gray-200"}`}
           >
             {l} ({n})
           </button>
@@ -398,14 +398,14 @@ const DailyView: React.FC<{ termId: number | null; anchor: string }> = ({ termId
       ) : (
         <div className="grid gap-4 md:grid-cols-2">
           {data.sessions.map((s) => (
-            <section key={s.session_id} className="rounded-2xl border border-slate-200 p-4 dark:border-slate-700" aria-label={s.title}>
-              <p className="font-semibold text-slate-900 dark:text-slate-100">{s.title}</p>
+            <section key={s.session_id} className="rounded-2xl border border-slate-200 p-4 dark:border-gray-700/30" aria-label={s.title}>
+              <p className="font-semibold text-slate-900 dark:text-gray-100">{s.title}</p>
               <Muted className="text-xs">{[`${s.start_time}–${s.end_time}`, s.location, s.host_name, s.status === "CANCELLED" ? "Cancelled" : null].filter(Boolean).join(" · ")}</Muted>
-              <ul className="mt-2 divide-y divide-slate-100 text-sm dark:divide-slate-800">
+              <ul className="mt-2 divide-y divide-slate-100 text-sm dark:divide-gray-700/30">
                 {s.roster.map((r) => (
                   <li key={r.student_id} className="flex items-center justify-between gap-2 py-1">
-                    <span className="text-slate-800 dark:text-slate-100">
-                      {r.name} <span className="text-xs text-slate-600 dark:text-slate-300">{r.class_group_name}</span>
+                    <span className="text-slate-800 dark:text-gray-100">
+                      {r.name} <span className="text-xs text-slate-600 dark:text-gray-300">{r.class_group_name}</span>
                     </span>
                     <AttendancePill status={r.status} />
                   </li>
@@ -460,7 +460,7 @@ const OfficeHoursReports: React.FC<{ termId: number | null; mode: "teacher" | "l
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex gap-1 rounded-full bg-slate-100 p-1 dark:bg-slate-800" role="tablist" aria-label="Report views">
+        <div className="flex gap-1 rounded-full bg-slate-100 p-1 dark:bg-gray-800/40" role="tablist" aria-label="Report views">
           {views.map(([v, l]) => (
             <button
               key={v}
@@ -469,7 +469,7 @@ const OfficeHoursReports: React.FC<{ termId: number | null; mode: "teacher" | "l
               aria-selected={view === v}
               onClick={() => setView(v)}
               className={`rounded-full px-3 py-1 text-sm font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
-                view === v ? "bg-white text-slate-900 shadow-sm dark:bg-slate-900 dark:text-slate-50" : "text-slate-700 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white"
+                view === v ? "bg-white text-slate-900 shadow-sm dark:bg-gray-800/30 dark:text-gray-50" : "text-slate-700 hover:text-slate-900 dark:text-gray-300 dark:hover:text-white"
               }`}
             >
               {l}

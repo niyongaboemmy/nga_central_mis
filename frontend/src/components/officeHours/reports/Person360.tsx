@@ -28,9 +28,9 @@ const cellColor: Record<string, string> = {
 };
 
 const Stat: React.FC<{ label: string; value: string }> = ({ label, value }) => (
-  <div className="rounded-2xl border border-slate-200 p-3 dark:border-slate-700">
-    <p className="text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">{label}</p>
-    <p className="mt-1 text-xl font-bold tabular-nums text-slate-900 dark:text-slate-50">{value}</p>
+  <div className="rounded-2xl border border-slate-200 p-3 dark:border-gray-700/30">
+    <p className="text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-gray-300">{label}</p>
+    <p className="mt-1 text-xl font-bold tabular-nums text-slate-900 dark:text-gray-50">{value}</p>
   </div>
 );
 
@@ -64,7 +64,7 @@ export const Student360: React.FC = () => {
       </Link>
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-50">{data.name}</h1>
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-gray-50">{data.name}</h1>
           <Muted>Office hours · {data.period.label}</Muted>
         </div>
         <PeriodPicker value={query} onChange={setQuery} label={data.period.label} />
@@ -74,7 +74,7 @@ export const Student360: React.FC = () => {
         <Stat label="Attended" value={`${s.present + s.late}/${s.expected}`} />
         <Stat label="Missed" value={String(s.absent)} />
         <Stat label="Missed in a row" value={String(s.current_absent_streak)} />
-        <div className="flex items-center justify-center rounded-2xl border border-slate-200 p-3 dark:border-slate-700">
+        <div className="flex items-center justify-center rounded-2xl border border-slate-200 p-3 dark:border-gray-700/30">
           <BandPill band={s.band} />
         </div>
       </div>
@@ -104,18 +104,18 @@ export const Student360: React.FC = () => {
                     key={t.session_id}
                     title={label}
                     aria-label={label}
-                    className={`h-6 w-6 rounded-md ${cancelled ? "border border-dashed border-slate-400 bg-transparent" : t.status ? cellColor[t.status] : "bg-slate-200 dark:bg-slate-700"}`}
+                    className={`h-6 w-6 rounded-md ${cancelled ? "border border-dashed border-slate-400 bg-transparent" : t.status ? cellColor[t.status] : "bg-slate-200 dark:bg-gray-700/50"}`}
                   />
                 );
               })}
             </ul>
-            <div className="mt-3 flex flex-wrap gap-3 text-xs text-slate-700 dark:text-slate-200">
+            <div className="mt-3 flex flex-wrap gap-3 text-xs text-slate-700 dark:text-gray-200">
               {Object.entries(cellColor).map(([k, c]) => (
                 <span key={k} className="inline-flex items-center gap-1">
                   <span className={`h-3 w-3 rounded-sm ${c}`} aria-hidden /> {humanize(k)}
                 </span>
               ))}
-              <span className="inline-flex items-center gap-1"><span className="h-3 w-3 rounded-sm bg-slate-200 dark:bg-slate-700" aria-hidden /> Not marked</span>
+              <span className="inline-flex items-center gap-1"><span className="h-3 w-3 rounded-sm bg-slate-200 dark:bg-gray-700/50" aria-hidden /> Not marked</span>
               <span className="inline-flex items-center gap-1"><span className="h-3 w-3 rounded-sm border border-dashed border-slate-400" aria-hidden /> Cancelled</span>
             </div>
           </>
@@ -125,13 +125,13 @@ export const Student360: React.FC = () => {
       <div className="grid gap-5 lg:grid-cols-2">
         <Card labelledBy="oh-360-assignments">
           <CardTitle id="oh-360-assignments">Office hours</CardTitle>
-          <ul className="divide-y divide-slate-100 text-sm dark:divide-slate-800">
+          <ul className="divide-y divide-slate-100 text-sm dark:divide-gray-700/30">
             {data.assignments.map((a) => (
               <li key={a.assignment_id} className="py-2">
-                <p className="font-semibold text-slate-900 dark:text-slate-100">
-                  {a.title} <span className="font-normal text-slate-600 dark:text-slate-300">· {a.teacher_name}</span>
+                <p className="font-semibold text-slate-900 dark:text-gray-100">
+                  {a.title} <span className="font-normal text-slate-600 dark:text-gray-300">· {a.teacher_name}</span>
                 </p>
-                <p className="text-xs text-slate-600 dark:text-slate-300">
+                <p className="text-xs text-slate-600 dark:text-gray-300">
                   {formatYmd(a.effective_from)} – {formatYmd(a.effective_to)}
                   {a.reason_code ? ` · ${humanize(a.reason_code)}` : ""}
                   {a.status === "ENDED" && a.end_reason_code ? ` · ended: ${humanize(a.end_reason_code)}` : ""}
@@ -143,11 +143,11 @@ export const Student360: React.FC = () => {
         {data.escalations.length > 0 && (
           <Card labelledBy="oh-360-escalations">
             <CardTitle id="oh-360-escalations">Escalations</CardTitle>
-            <ul className="divide-y divide-slate-100 text-sm dark:divide-slate-800">
+            <ul className="divide-y divide-slate-100 text-sm dark:divide-gray-700/30">
               {data.escalations.map((e) => (
                 <li key={e.escalation_id} className="flex justify-between py-2">
                   <span>Level {e.level} · {humanize(e.trigger_code)}</span>
-                  <span className="text-xs text-slate-600 dark:text-slate-300">{e.acknowledged_at ? "Followed up" : "Open"}</span>
+                  <span className="text-xs text-slate-600 dark:text-gray-300">{e.acknowledged_at ? "Followed up" : "Open"}</span>
                 </li>
               ))}
             </ul>
@@ -183,7 +183,7 @@ export const Teacher360: React.FC = () => {
       </Link>
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-50">{data.name}</h1>
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-gray-50">{data.name}</h1>
           <Muted>Office hours delivery · {data.period.label}</Muted>
         </div>
         <PeriodPicker value={query} onChange={setQuery} label={data.period.label} />
@@ -200,11 +200,11 @@ export const Teacher360: React.FC = () => {
       </div>
       <Card labelledBy="oh-t360-schedules">
         <CardTitle id="oh-t360-schedules">Office hours</CardTitle>
-        <ul className="divide-y divide-slate-100 text-sm dark:divide-slate-800">
+        <ul className="divide-y divide-slate-100 text-sm dark:divide-gray-700/30">
           {data.schedules.map((s) => (
             <li key={s.schedule_id} className="flex justify-between py-2">
-              <Link to={`/office-hours/schedules/${s.schedule_id}`} className="font-semibold text-slate-900 hover:underline dark:text-slate-100">{s.title}</Link>
-              <span className="text-xs text-slate-600 dark:text-slate-300">{humanize(s.status)}</span>
+              <Link to={`/office-hours/schedules/${s.schedule_id}`} className="font-semibold text-slate-900 hover:underline dark:text-gray-100">{s.title}</Link>
+              <span className="text-xs text-slate-600 dark:text-gray-300">{humanize(s.status)}</span>
             </li>
           ))}
         </ul>

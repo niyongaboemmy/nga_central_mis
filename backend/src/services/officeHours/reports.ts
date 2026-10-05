@@ -12,7 +12,7 @@ import {
 import { AuthorizationError, ValidationError } from "../../errors/CustomError";
 import { dowOfYmd, kigaliParts, parseClock } from "../reminders/time";
 import { Actor, readScopeOf } from "./access";
-import { DAY_NAMES, todayYmd, nowMinutes, loadTerm } from "./common";
+import { DAY_NAMES, isoDowOfYmd, todayYmd, nowMinutes, loadTerm } from "./common";
 import { userNames } from "./eligibility";
 import { Band, Mark, statsFromMarks, StudentStats } from "./metrics";
 import { bucketOf, ResolvedPeriod } from "./period";
@@ -283,7 +283,7 @@ export const breakdownReport = async (actor: Actor, period: ResolvedPeriod, grou
     if (groupBy === "teacher") return [`t${x.sch.teacher_id}`, teacherNames.get(x.sch.teacher_id) ?? "Teacher"];
     if (groupBy === "subject") return [`s${x.sch.subject_id ?? 0}`, x.sch.subject_id ? ds.subjects.get(x.sch.subject_id)?.name ?? "Subject" : "No subject"];
     if (groupBy === "weekday") {
-      const d = dowOfYmd(x.s.session_date);
+      const d = isoDowOfYmd(x.s.session_date);
       return [`d${d}`, DAY_NAMES[d]];
     }
     return [`p${x.sch.purpose}`, x.sch.purpose];
@@ -522,7 +522,7 @@ export const coverageReport = async (actor: Actor, termId: number, classGroupId:
   }
   const byGroup = new Map<number, { name: string; students: number; covered: number; days: Record<number, number> }>();
   for (const g of groups) {
-    const cur = byGroup.get(g.class_group_id) ?? { name: g.name, students: 0, covered: 0, days: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 } };
+    const cur = byGroup.get(g.class_group_id) ?? { name: g.name, students: 0, covered: 0, days: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0 } };
     cur.students++;
     const d = daysOf.get(g.user_id);
     if (d && d.size) {

@@ -13,9 +13,9 @@ import { clearOfficeHoursEvents } from "../services/officeHours/events";
 describe("Office hours: weekly invitations", () => {
   let w: OhWorld;
   const auth = (who: string) => ({ Authorization: `Bearer ${w.tokens[who]}` });
-  const WEEK1 = { effective_from: "2026-03-02", effective_to: "2026-03-06" };
-  const WEEK2 = { effective_from: "2026-03-09", effective_to: "2026-03-13" };
-  const WEEK3 = { effective_from: "2026-03-16", effective_to: "2026-03-20" };
+  const WEEK1 = { effective_from: "2026-03-02", effective_to: "2026-03-08" };
+  const WEEK2 = { effective_from: "2026-03-09", effective_to: "2026-03-15" };
+  const WEEK3 = { effective_from: "2026-03-16", effective_to: "2026-03-22" };
   const created: Array<[string, number]> = [];
 
   const createSchedule = async (who: string, body: Record<string, unknown>) => {
@@ -54,7 +54,7 @@ describe("Office hours: weekly invitations", () => {
     // The window starts at the first meeting (Wednesday) and ends with the week.
     expect(wk1.body.data.assigned.map((x: any) => x.effective_from)).toEqual(["2026-03-04", "2026-03-04"]);
     const rows = await db.select().from(OfficeHourAssignment).where(inArray(OfficeHourAssignment.assignment_id, wk1.body.data.assigned.map((x: any) => x.assignment_id)));
-    expect(rows.map((r) => String(r.effective_to))).toEqual(["2026-03-06", "2026-03-06"]);
+    expect(rows.map((r) => String(r.effective_to))).toEqual(["2026-03-08", "2026-03-08"]);
 
     // Week 1 is full; week 2 has its own two seats, and s0 may come again.
     expect((await invite("teacherA", a.schedule_id, [s2], WEEK1)).body.data.over_capacity).toEqual([s2]);
@@ -83,19 +83,20 @@ describe("Office hours: weekly invitations", () => {
 
     // TERM mode: busy with A in week 1, so B cannot have them that week ...
     const clash = await invite("teacherB", b.schedule_id, [s], WEEK1);
-    expect(clash.body.data.conflicts[0].holders[0]).toMatchObject({ teacher_id: w.teacherA, from: "2026-03-03", to: "2026-03-06" });
+    expect(clash.body.data.conflicts[0].holders[0]).toMatchObject({ teacher_id: w.teacherA, from: "2026-03-03", to: "2026-03-08" });
     // ... but can in week 2.
     expect((await invite("teacherB", b.schedule_id, [s], WEEK2)).body.data.assigned).toHaveLength(1);
     const locks = await db.select().from(OfficeHourStudentDateLock).where(eq(OfficeHourStudentDateLock.student_id, s));
     expect(locks.map((l) => String(l.lock_date)).sort()).toEqual([
-      "2026-03-03", "2026-03-04", "2026-03-05", "2026-03-06",
-      "2026-03-12", "2026-03-13",
+      // TERM mode: every day of the week the student is invited, weekend included.
+      "2026-03-03", "2026-03-04", "2026-03-05", "2026-03-06", "2026-03-07", "2026-03-08",
+      "2026-03-12", "2026-03-13", "2026-03-14", "2026-03-15",
     ]);
 
     // The picker for week 2 sees B's hold; for week 3 the student is free.
     const wk2 = await request(app).get(`/office-hours/schedules/${a.schedule_id}/candidates`).query({ from: WEEK2.effective_from, to: WEEK2.effective_to }).set(auth("teacherA"));
     expect(wk2.body.data.students.find((x: any) => x.student_id === s).availability.status).toBe("HELD_BY_OTHER");
-    expect(wk2.body.data.window).toEqual({ from: "2026-03-10", to: "2026-03-13" });
+    expect(wk2.body.data.window).toEqual({ from: "2026-03-10", to: "2026-03-15" });
     const wk3 = await request(app).get(`/office-hours/schedules/${a.schedule_id}/candidates`).query({ from: WEEK3.effective_from, to: WEEK3.effective_to }).set(auth("teacherA"));
     expect(wk3.body.data.students.find((x: any) => x.student_id === s).availability.status).toBe("FREE");
     expect(wk3.body.data.assigned_count).toBe(0);
@@ -126,5 +127,21 @@ describe("Office hours: weekly invitations", () => {
     expect((await invite("teacherA", a.schedule_id, [w.students[5]], { effective_from: "next week" } as any)).status).toBe(400);
     // A week after the schedule's end has no session to invite to.
     expect((await invite("teacherA", a.schedule_id, [w.students[5]], { effective_from: "2026-05-04", effective_to: "2026-05-08" })).body.data.no_remaining_sessions).toBe(true);
+  });
+
+  it("runs at weekends: Saturday and Sunday sessions, invitations and locks", async () => {
+    const a = await createSchedule("teacherB", { days: [6, 7], effective_to: "2026-04-30" });
+    expect(a.days).toEqual([6, 7]);
+    expect(a.days_label).toBe("Sat, Sun");
+    const detail = await request(app).get(`/office-hours/schedules/${a.schedule_id}`).set(auth("teacherB"));
+    // Sat 7 and Sun 8 March are the first weekend after Monday 2 March.
+    expect(detail.body.data.sessions.slice(0, 2).map((x: any) => x.session_date)).toEqual(["2026-03-07", "2026-03-08"]);
+    const s = w.students[5];
+    const res = await invite("teacherB", a.schedule_id, [s], WEEK1);
+    expect(res.body.data.assigned[0].effective_from).toBe("2026-03-07");
+    const [row] = await db.select().from(OfficeHourAssignment).where(eq(OfficeHourAssignment.assignment_id, res.body.data.assigned[0].assignment_id));
+    // The week runs to Sunday when the schedule meets on Sunday.
+    expect(String(row.effective_to)).toBe("2026-03-08");
+    expect(await expectedOn("teacherB", a.schedule_id, "2026-03-08")).toBe(1);
   });
 });
