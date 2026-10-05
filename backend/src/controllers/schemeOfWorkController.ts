@@ -34,7 +34,7 @@ import { recordActivity } from "../utils/activityLogger";
 import logger from "../utils/logger";
 import mammoth = require("mammoth");
 import { computeWeekDates } from "../utils/weekDates";
-import { assertTeacherOwnsScheme } from "../utils/schemeAuthorization";
+import { assertTeacherOwnsScheme, isTeacherAssignedToScheme } from "../utils/schemeAuthorization";
 import { Permissions } from "../utils/permissions";
 import { extractTextFromFile } from "../utils/docExtract";
 import {
@@ -1037,11 +1037,10 @@ export const deleteScheme = asyncHandler(async (req: any, res: any) => {
   }
 
   const userId = req.user.userId;
-  const isOwner = scheme.user_id === userId;
   const canManageAny = (req.user.permissions || []).includes(
     Permissions.VALIDATE_SCHEME_OF_WORK,
   );
-  if (!isOwner && !canManageAny) {
+  if (!canManageAny && !(await isTeacherAssignedToScheme(userId, scheme))) {
     throw new AuthorizationError(
       "You do not have permission to delete this scheme of work",
     );
@@ -1242,11 +1241,10 @@ export const updateSchemeCoverDetails = asyncHandler(async (req: any, res: any) 
   }
 
   const userId = req.user.userId;
-  const isOwner = scheme.user_id === userId;
   const canManageAny = (req.user.permissions || []).includes(
     Permissions.VALIDATE_SCHEME_OF_WORK,
   );
-  if (!isOwner && !canManageAny) {
+  if (!canManageAny && !(await isTeacherAssignedToScheme(userId, scheme))) {
     throw new AuthorizationError(
       "You do not have permission to edit this scheme of work",
     );
@@ -1296,7 +1294,7 @@ export const getSchemePdf = asyncHandler(async (req: any, res: any) => {
       p as any,
     ),
   );
-  if (!isOwner && !canViewAny) {
+  if (!isOwner && !canViewAny && !(await isTeacherAssignedToScheme(userId, scheme))) {
     throw new AuthorizationError(
       "You do not have permission to view this scheme of work",
     );
