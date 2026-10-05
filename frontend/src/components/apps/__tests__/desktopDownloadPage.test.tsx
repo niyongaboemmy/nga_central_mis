@@ -123,7 +123,7 @@ describe("/apps: NGA Desktop download page", () => {
     renderPage();
     expect(await screen.findByText(/You're using NGA Desktop 0.2.0/)).toBeInTheDocument();
     // An older NGA (no page bridge): points at the title-bar Update button.
-    expect(await screen.findByText(/at the top right of this window/)).toBeInTheDocument();
+    expect(await screen.findByText(/Check for updates/)).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /Download for/ })).toBeNull();
   });
 
