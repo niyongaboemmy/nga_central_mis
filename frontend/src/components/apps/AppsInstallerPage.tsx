@@ -65,6 +65,75 @@ function useDownloadStats(): Stats | null {
   return stats;
 }
 
+/** What NGA Desktop (bridge.js) offers MIS pages: 0.2.3 and later. */
+interface NgaDesktopBridge {
+  version: string;
+  installUpdate: () => Promise<void>;
+}
+const desktopBridge = (): NgaDesktopBridge | null => {
+  const b = (window as unknown as { ngaDesktop?: NgaDesktopBridge }).ngaDesktop;
+  return b && typeof b.installUpdate === "function" ? b : null;
+};
+
+/**
+ * Inside NGA Desktop: the version, and when a newer one is out, one click to
+ * update (NGA installs its own signed update and restarts). Versions before
+ * 0.2.3 can't be asked from a page: they point at the Update button instead.
+ */
+export const DesktopStatus: React.FC<{ current: string | null; latest: string | null }> = ({ current, latest }) => {
+  const [state, setState] = useState<"idle" | "updating" | "failed">("idle");
+  const [error, setError] = useState("");
+  const outdated = !!(latest && current && isNewer(latest, current));
+  const bridge = desktopBridge();
+  const update = async () => {
+    if (!bridge) return;
+    setState("updating");
+    try {
+      await bridge.installUpdate(); // NGA restarts when done
+    } catch (e) {
+      setState("failed");
+      const msg = String(e);
+      setError(msg.startsWith("busy") ? msg.replace(/^busy:\s*/, "") + "." : "Try again, or use the Update button at the top of NGA.");
+    }
+  };
+  return (
+    <div className="rounded-2xl bg-white/15 p-5 backdrop-blur" role="status" data-testid="desktop-status">
+      <p className="flex items-center gap-2 text-lg font-semibold">
+        <CheckCircle2 className="h-5 w-5" /> You're using NGA Desktop{current ? ` ${current}` : ""}
+      </p>
+      {!outdated ? (
+        <p className="mt-1 text-sm text-white/85">It updates itself. Nothing to download.</p>
+      ) : bridge ? (
+        <>
+          <p className="mt-1 text-sm text-white/85">Version {latest} is ready.</p>
+          <button
+            type="button"
+            onClick={update}
+            disabled={state === "updating"}
+            className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-bold text-brand-700 shadow-lg transition hover:-translate-y-0.5 disabled:opacity-80"
+          >
+            {state === "updating" ? (
+              <>
+                <RefreshCw className="h-4 w-4 animate-spin" /> Updating… NGA restarts by itself
+              </>
+            ) : (
+              <>
+                <Download className="h-4 w-4" /> Update to {latest} now
+              </>
+            )}
+          </button>
+          {state === "failed" && <p className="mt-2 text-xs text-white/90">Couldn't update: {error}</p>}
+        </>
+      ) : (
+        <p className="mt-1 text-sm text-white/85">
+          Version {latest} is ready: click <strong>Update</strong> at the top right of this window (next to the bell). NGA
+          downloads it and restarts.
+        </p>
+      )}
+    </div>
+  );
+};
+
 export const AppsInstallerPage: React.FC = () => {
   const navigate = useNavigate();
   const os = useMemo(() => detectOs(), []);
@@ -137,16 +206,7 @@ export const AppsInstallerPage: React.FC = () => {
 
             <div className="w-full max-w-sm shrink-0 space-y-3" data-testid="download-box">
               {inDesktop ? (
-                <div className="rounded-2xl bg-white/15 p-5 backdrop-blur" role="status">
-                  <p className="flex items-center gap-2 text-lg font-semibold">
-                    <CheckCircle2 className="h-5 w-5" /> You're using NGA Desktop{desktopVersion ? ` ${desktopVersion}` : ""}
-                  </p>
-                  <p className="mt-1 text-sm text-white/85">
-                    {release?.version && desktopVersion && isNewer(release.version, desktopVersion)
-                      ? `Version ${release.version} is ready: open Settings → Updates in the app.`
-                      : "It updates itself. Nothing to download."}
-                  </p>
-                </div>
+                <DesktopStatus current={desktopVersion} latest={release?.version ?? null} />
               ) : !release && !failed ? (
                 <div className="h-[132px] animate-pulse rounded-2xl bg-white/15" aria-label="Loading" />
               ) : failed || !release?.version ? (
