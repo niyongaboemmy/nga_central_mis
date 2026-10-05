@@ -17,6 +17,7 @@ import {
   type ClassGroup,
 } from "../../api/academics";
 import { getInitials, getAvatarColor } from "./types";
+import SelectField from "../ui/SelectField";
 
 interface PaginationInfo {
   page: number;
@@ -445,7 +446,7 @@ const RoleShareComponent: React.FC<RoleShareComponentProps> = ({
                     Grade
                   </label>
                   <div className="relative">
-                    <select
+                    <SelectField
                       value={selectedGradeId || ""}
                       onChange={(e) => {
                         setSelectedGradeId(
@@ -461,7 +462,7 @@ const RoleShareComponent: React.FC<RoleShareComponentProps> = ({
                           {g.name}
                         </option>
                       ))}
-                    </select>
+                    </SelectField>
                     <FiChevronDown className="w-3 h-3 absolute right-1.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
                   </div>
                 </div>
@@ -472,7 +473,7 @@ const RoleShareComponent: React.FC<RoleShareComponentProps> = ({
                     Class
                   </label>
                   <div className="relative">
-                    <select
+                    <SelectField
                       value={selectedClassGroupId || ""}
                       onChange={(e) =>
                         setSelectedClassGroupId(
@@ -493,7 +494,7 @@ const RoleShareComponent: React.FC<RoleShareComponentProps> = ({
                           {cg.name}
                         </option>
                       ))}
-                    </select>
+                    </SelectField>
                     <FiChevronDown className="w-3 h-3 absolute right-1.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
                   </div>
                 </div>

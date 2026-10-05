@@ -159,8 +159,8 @@ describe("LessonNoteFormModal — edit mode", () => {
   it("opens with the same fields as create, pre-filled from the note", async () => {
     renderModal();
     expect(await screen.findByText("Edit Lesson Note")).toBeInTheDocument();
-    await waitFor(() => expect(screen.getByLabelText("Subject")).toHaveValue("1"));
-    expect(screen.getByLabelText("Class")).toHaveValue("5");
+    await waitFor(() => expect(screen.getByLabelText("Subject", { selector: "select" })).toHaveValue("1"));
+    expect(screen.getByLabelText("Class", { selector: "select" })).toHaveValue("5");
     expect(screen.getByLabelText("Title")).toHaveValue("HTML elements");
     // Saved coverage is restored: the whole of LO 1, none of LO 2.
     expect(await outcomeBox(1)).toHaveAttribute("aria-checked", "true");
@@ -179,7 +179,7 @@ describe("LessonNoteFormModal — edit mode", () => {
 
     await user.clear(screen.getByLabelText("Title"));
     await user.type(screen.getByLabelText("Title"), "HTML & CSS");
-    await user.selectOptions(screen.getByLabelText("Class"), "6");
+    await user.selectOptions(screen.getByLabelText("Class", { selector: "select" }), "6");
     await user.click(await outcomeBox(2));
 
     getMock.mockResolvedValue({ data: { data: detail({ title: "HTML & CSS", class_group_id: 6 }) } });
@@ -197,13 +197,13 @@ describe("LessonNoteFormModal — edit mode", () => {
   it("moving to another subject clears coverage and validates against the new curriculum", async () => {
     const user = userEvent.setup();
     renderModal();
-    await waitFor(() => expect(screen.getByLabelText("Subject")).toHaveValue("1"));
+    await waitFor(() => expect(screen.getByLabelText("Subject", { selector: "select" })).toHaveValue("1"));
     await outcomeBox(1);
 
-    await user.selectOptions(screen.getByLabelText("Subject"), "2");
+    await user.selectOptions(screen.getByLabelText("Subject", { selector: "select" }), "2");
     await waitFor(() => expect(competenciesMock).toHaveBeenLastCalledWith(2));
     expect(await outcomeBox(1)).toHaveAttribute("aria-checked", "false");
-    await user.selectOptions(screen.getByLabelText("Class"), "5");
+    await user.selectOptions(screen.getByLabelText("Class", { selector: "select" }), "5");
     await user.click(screen.getByRole("button", { name: /save changes/i }));
 
     await waitFor(() => expect(updateMock).toHaveBeenCalled());
@@ -215,9 +215,9 @@ describe("LessonNoteFormModal — edit mode", () => {
       data: { data: detail({ subject_id: 77, subject_name: "Old subject", class_group_id: 88, class_group_name: "Old class", curriculum_context: null }) },
     });
     renderModal();
-    await waitFor(() => expect(screen.getByLabelText("Subject")).toHaveValue("77"));
-    expect(within(screen.getByLabelText("Subject")).getByRole("option", { name: "Old subject" })).toBeInTheDocument();
-    expect(screen.getByLabelText("Class")).toHaveValue("88");
+    await waitFor(() => expect(screen.getByLabelText("Subject", { selector: "select" })).toHaveValue("77"));
+    expect(within(screen.getByLabelText("Subject", { selector: "select" })).getByRole("option", { name: "Old subject", hidden: true })).toBeInTheDocument();
+    expect(screen.getByLabelText("Class", { selector: "select" })).toHaveValue("88");
     expect(screen.getByRole("button", { name: /save changes/i })).toBeDisabled();
   });
 
@@ -230,9 +230,9 @@ describe("LessonNoteFormModal — edit mode", () => {
       },
     });
     renderModal();
-    await waitFor(() => expect(screen.getByLabelText("Subject")).toHaveValue("1"));
-    expect(screen.getByLabelText("Subject")).toBeDisabled();
-    expect(screen.getByLabelText("Class")).toBeDisabled();
+    await waitFor(() => expect(screen.getByLabelText("Subject", { selector: "select" })).toHaveValue("1"));
+    expect(screen.getByLabelText("Subject", { selector: "select" })).toBeDisabled();
+    expect(screen.getByLabelText("Class", { selector: "select" })).toBeDisabled();
     expect(screen.getByText(/Remove it from that course to move it/)).toBeInTheDocument();
     // Title and coverage stay editable.
     expect(screen.getByLabelText("Title")).toBeEnabled();
@@ -261,8 +261,8 @@ describe("LessonNoteFormModal — edit mode", () => {
     const user = userEvent.setup();
     updateMock.mockRejectedValue({ response: { data: { message: "Remove it from that course before moving it" } } });
     const { onClose } = renderModal();
-    await waitFor(() => expect(screen.getByLabelText("Class")).toHaveValue("5"));
-    await user.selectOptions(screen.getByLabelText("Class"), "6");
+    await waitFor(() => expect(screen.getByLabelText("Class", { selector: "select" })).toHaveValue("5"));
+    await user.selectOptions(screen.getByLabelText("Class", { selector: "select" }), "6");
     await user.click(screen.getByRole("button", { name: /save changes/i }));
     expect(await screen.findByText("Remove it from that course before moving it")).toBeInTheDocument();
     expect(onClose).not.toHaveBeenCalled();

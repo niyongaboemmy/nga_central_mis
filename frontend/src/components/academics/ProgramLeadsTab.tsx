@@ -4,6 +4,7 @@ import { getUsers, UserWithProfile } from "../../api/users";
 import Button from "../ui/Button";
 import Modal from "../ui/Modal";
 import ConfirmModal from "../ui/ConfirmModal";
+import SelectField from "../ui/SelectField";
 
 interface ProgramLeadsTabProps {
   data: AllProgramLead[];
@@ -244,7 +245,7 @@ const ProgramLeadsTab: React.FC<ProgramLeadsTabProps> = ({
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2.5">
-          <select
+          <SelectField
             value={yearFilter}
             onChange={(e) => setYearFilter(parseInt(e.target.value))}
             className="px-4 py-2 border-2 border-border-light dark:border-border-dark/30 rounded-2xl focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/20 transition-all duration-200 bg-surface-light dark:bg-surface-dark/30 text-sm text-text-primary-light dark:text-text-primary-dark whitespace-nowrap"
@@ -256,7 +257,7 @@ const ProgramLeadsTab: React.FC<ProgramLeadsTabProps> = ({
                 {year.is_current === 1 ? " (Current)" : ""}
               </option>
             ))}
-          </select>
+          </SelectField>
           <Button
             variant="secondary"
             onClick={onRefresh}
@@ -368,7 +369,7 @@ const ProgramLeadsTab: React.FC<ProgramLeadsTabProps> = ({
             <label className="block text-sm font-medium text-text-primary-light dark:text-text-primary-dark mb-2">
               Copy from
             </label>
-            <select
+            <SelectField
               value={copySourceYearId}
               onChange={(e) => setCopySourceYearId(parseInt(e.target.value))}
               className="w-full px-4 py-3 border-2 border-border-light dark:border-border-dark/30 rounded-2xl focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/20 transition-all duration-200 bg-surface-light dark:bg-surface-dark/30 text-text-primary-light dark:text-text-primary-dark"
@@ -381,14 +382,14 @@ const ProgramLeadsTab: React.FC<ProgramLeadsTabProps> = ({
                   {year.is_current === 1 ? ", Current" : ""})
                 </option>
               ))}
-            </select>
+            </SelectField>
           </div>
 
           <div>
             <label className="block text-sm font-medium text-text-primary-light dark:text-text-primary-dark mb-2">
               Copy to
             </label>
-            <select
+            <SelectField
               value={copyTargetYearId}
               onChange={(e) => setCopyTargetYearId(parseInt(e.target.value))}
               className="w-full px-4 py-3 border-2 border-border-light dark:border-border-dark/30 rounded-2xl focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/20 transition-all duration-200 bg-surface-light dark:bg-surface-dark/30 text-text-primary-light dark:text-text-primary-dark"
@@ -401,7 +402,7 @@ const ProgramLeadsTab: React.FC<ProgramLeadsTabProps> = ({
                   {year.is_current === 1 ? ", Current" : ""})
                 </option>
               ))}
-            </select>
+            </SelectField>
           </div>
 
           {copyResultMessage && (
@@ -449,7 +450,7 @@ const ProgramLeadsTab: React.FC<ProgramLeadsTabProps> = ({
             <label className="block text-sm font-medium text-text-primary-light dark:text-text-primary-dark mb-2">
               Academic Year
             </label>
-            <select
+            <SelectField
               value={assignYearId}
               onChange={(e) => setAssignYearId(parseInt(e.target.value))}
               className="w-full px-4 py-3 border-2 border-border-light dark:border-border-dark/30 rounded-2xl focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/20 transition-all duration-200 bg-surface-light dark:bg-surface-dark/30 text-text-primary-light dark:text-text-primary-dark"
@@ -461,7 +462,7 @@ const ProgramLeadsTab: React.FC<ProgramLeadsTabProps> = ({
                   {year.is_current === 1 ? " (Current)" : ""}
                 </option>
               ))}
-            </select>
+            </SelectField>
           </div>
 
           <div>
@@ -518,7 +519,7 @@ const ProgramLeadsTab: React.FC<ProgramLeadsTabProps> = ({
             <label className="block text-sm font-medium text-text-primary-light dark:text-text-primary-dark mb-2">
               Program
             </label>
-            <select
+            <SelectField
               value={assignProgramId}
               onChange={(e) => setAssignProgramId(parseInt(e.target.value))}
               className="w-full px-4 py-3 border-2 border-border-light dark:border-border-dark/30 rounded-2xl focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/20 transition-all duration-200 bg-surface-light dark:bg-surface-dark/30 text-text-primary-light dark:text-text-primary-dark"
@@ -529,7 +530,7 @@ const ProgramLeadsTab: React.FC<ProgramLeadsTabProps> = ({
                   {program.name}
                 </option>
               ))}
-            </select>
+            </SelectField>
           </div>
 
           {assignError && (

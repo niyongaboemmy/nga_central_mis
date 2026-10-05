@@ -13,6 +13,7 @@ import { useUser } from "../contexts/UserContext";
 import { programUsersApi, ProgramUser } from "../api/academics";
 import { programsApi, Program } from "../api/academics";
 import { useToast } from "../contexts/ToastContext";
+import SelectField from "./ui/SelectField";
 
 // Animated floating particles
 const FloatingParticles = () => (
@@ -266,7 +267,7 @@ const ProgramUsers: React.FC = () => {
             transition={{ delay: 0.05 }}
             className="mb-4"
           >
-            <select
+            <SelectField
               value={selectedProgram?.program_id || ""}
               onChange={(e) => {
                 const programId = parseInt(e.target.value);
@@ -290,7 +291,7 @@ const ProgramUsers: React.FC = () => {
                     {program.name}
                   </option>
                 ))}
-            </select>
+            </SelectField>
           </motion.div>
 
           {selectedProgram && (

@@ -4,6 +4,7 @@ import Button from "../ui/Button";
 import Modal from "../ui/Modal";
 import Input from "../ui/Input";
 import Alert from "../ui/Alert";
+import SelectField from "../ui/SelectField";
 
 interface AcademicTermsTabProps {
   data: AcademicTerm[];
@@ -294,7 +295,7 @@ const AcademicTermsTab: React.FC<AcademicTermsTabProps> = ({
             <label className="block text-sm font-medium text-text-primary-light dark:text-text-primary-dark mb-2">
               Academic Year
             </label>
-            <select
+            <SelectField
               value={formData.academic_year_id}
               onChange={(e) =>
                 setFormData((prev) => ({
@@ -318,7 +319,7 @@ const AcademicTermsTab: React.FC<AcademicTermsTabProps> = ({
                   {year.name}
                 </option>
               ))}
-            </select>
+            </SelectField>
             {formErrors.academic_year_id && (
               <p className="mt-1 text-sm text-red-600 dark:text-red-400">
                 {formErrors.academic_year_id}
@@ -412,7 +413,7 @@ const AcademicTermsTab: React.FC<AcademicTermsTabProps> = ({
             <label className="block text-sm font-medium text-text-primary-light dark:text-text-primary-dark mb-2">
               Academic Year
             </label>
-            <select
+            <SelectField
               value={formData.academic_year_id}
               onChange={(e) =>
                 setFormData((prev) => ({
@@ -436,7 +437,7 @@ const AcademicTermsTab: React.FC<AcademicTermsTabProps> = ({
                   {year.name}
                 </option>
               ))}
-            </select>
+            </SelectField>
             {formErrors.academic_year_id && (
               <p className="mt-1 text-sm text-red-600 dark:text-red-400">
                 {formErrors.academic_year_id}

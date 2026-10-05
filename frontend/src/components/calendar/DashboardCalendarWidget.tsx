@@ -44,6 +44,7 @@ import type { BandEntry } from "../../api/officeHours";
 import CalendarSlotModal from "./CalendarSlotModal";
 import CalendarGridSkeleton from "./CalendarGridSkeleton";
 import LessonPlanModal from "./LessonPlanModal";
+import SelectField from "../ui/SelectField";
 
 // ─── DashboardCalendarWidget ───────────────────────────────────────────────
 // A compact, read-only weekly schedule grid shown on every user's dashboard.
@@ -365,7 +366,7 @@ const DashboardCalendarWidget: React.FC = () => {
         <div className="flex items-center gap-2">
           {/* Class group filter (teachers with more than one group) */}
           {!isStudent && classGroupOptions.length > 0 && (
-            <select
+            <SelectField
               aria-label="Filter by class group"
               value={selectedClassGroupId}
               onChange={(e) =>
@@ -383,7 +384,7 @@ const DashboardCalendarWidget: React.FC = () => {
                   {cg.label}
                 </option>
               ))}
-            </select>
+            </SelectField>
           )}
 
           {/* Week navigator */}

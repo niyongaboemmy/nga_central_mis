@@ -10,6 +10,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { useClassGroups } from "./ClassGroupsContext";
+import SelectField from "../ui/SelectField";
 
 interface SelectorProps {
   icon: React.ElementType;
@@ -37,7 +38,7 @@ const Selector: React.FC<SelectorProps> = ({
     <span className="w-7 h-7 rounded-lg bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-300 flex items-center justify-center shrink-0">
       <Icon className="w-3.5 h-3.5" />
     </span>
-    <select
+    <SelectField
       aria-label={label}
       disabled={disabled}
       value={value ?? ""}
@@ -50,7 +51,7 @@ const Selector: React.FC<SelectorProps> = ({
           {o.label}
         </option>
       ))}
-    </select>
+    </SelectField>
   </label>
 );
 

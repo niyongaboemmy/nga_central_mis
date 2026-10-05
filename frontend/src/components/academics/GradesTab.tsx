@@ -6,6 +6,7 @@ import Button from "../ui/Button";
 import Modal from "../ui/Modal";
 import Input from "../ui/Input";
 import Alert from "../ui/Alert";
+import SelectField from "../ui/SelectField";
 
 interface GradesTabProps {
   data: Grade[];
@@ -376,7 +377,7 @@ const GradesTab: React.FC<GradesTabProps> = ({
               <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
                 Academic Program
               </label>
-              <select
+              <SelectField
                 value={formData.program_id}
                 onChange={(e) =>
                   setFormData((prev) => ({
@@ -397,7 +398,7 @@ const GradesTab: React.FC<GradesTabProps> = ({
                     {program.name}
                   </option>
                 ))}
-              </select>
+              </SelectField>
               {formErrors.program_id && (
                 <p className="mt-2 text-sm text-red-600 dark:text-red-400 font-medium">
                   {formErrors.program_id}
@@ -500,7 +501,7 @@ const GradesTab: React.FC<GradesTabProps> = ({
               <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
                 Academic Program
               </label>
-              <select
+              <SelectField
                 value={formData.program_id}
                 onChange={(e) =>
                   setFormData((prev) => ({
@@ -521,7 +522,7 @@ const GradesTab: React.FC<GradesTabProps> = ({
                     {program.name}
                   </option>
                 ))}
-              </select>
+              </SelectField>
               {formErrors.program_id && (
                 <p className="mt-2 text-sm text-red-600 dark:text-red-400 font-medium">
                   {formErrors.program_id}

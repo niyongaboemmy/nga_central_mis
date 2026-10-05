@@ -57,6 +57,7 @@ import ConfirmModal from "./ui/ConfirmModal";
 import { Table2 } from "lucide-react";
 import CourseTabButton from "./elearning/builder/CourseTabButton";
 import { useConfirm } from "../contexts/ConfirmContext";
+import SelectField from "./ui/SelectField";
 
 const SchemeOfWorkCalendar: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -743,7 +744,7 @@ const SchemeOfWorkCalendar: React.FC = () => {
           {/* Filter */}
           <div className="flex items-center gap-2">
             <Filter className="w-4 h-4 text-gray-400" />
-            <select
+            <SelectField
               value={filterStatus}
               onChange={(e) => setFilterStatus(e.target.value as any)}
               className="px-3 py-2 text-sm bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500 dark:text-white"
@@ -752,7 +753,7 @@ const SchemeOfWorkCalendar: React.FC = () => {
               <option value="complete">Complete</option>
               <option value="incomplete">In Progress</option>
               <option value="missing">Missing Plans</option>
-            </select>
+            </SelectField>
           </div>
         </div>
 

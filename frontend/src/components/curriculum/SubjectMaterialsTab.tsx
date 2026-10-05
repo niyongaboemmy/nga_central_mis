@@ -31,6 +31,7 @@ import { Permissions } from "../../constants/permissions";
 import CategoryFormModal from "./CategoryFormModal";
 import DocumentPreviewModal from "../documents/DocumentPreviewModal";
 import { useConfirm } from "../../contexts/ConfirmContext";
+import SelectField from "../ui/SelectField";
 
 interface SubjectMaterialsTabProps {
   subjectId: number;
@@ -695,7 +696,7 @@ const SubjectMaterialsTab: React.FC<SubjectMaterialsTabProps> = ({
                 </div>
                 <div className="relative flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
                   <ArrowUpDown className="w-3 h-3 flex-shrink-0" />
-                  <select
+                  <SelectField
                     value={sortBy}
                     onChange={(e) =>
                       setSortBy(e.target.value as "date" | "name" | "size")
@@ -705,7 +706,7 @@ const SubjectMaterialsTab: React.FC<SubjectMaterialsTabProps> = ({
                     <option value="date">Newest</option>
                     <option value="name">Name</option>
                     <option value="size">Size</option>
-                  </select>
+                  </SelectField>
                 </div>
               </div>
             )}

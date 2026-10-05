@@ -25,6 +25,7 @@ import { CardRow, ChecklistRow, ClassPulse, FlashcardsEditor, PracticalEditor } 
 import LessonNoteRichEditor from "../../lessonNotes/LessonNoteRichEditor";
 import { ItemTypeIcon } from "../ui/primitives";
 import WeekContextPanel, { ItemContext } from "./WeekContextPanel";
+import SelectField from "../../ui/SelectField";
 
 interface Props {
   item: CourseItem | null;
@@ -585,7 +586,7 @@ const ItemSettingsDrawer: React.FC<Props> = ({ item, curriculum, onClose, onSave
                         <button onClick={() => setQuestions((qs) => qs.filter((_, i) => i !== qi))} className="w-10 h-10 flex items-center justify-center rounded-lg text-gray-400 hover:text-danger-500" aria-label="Remove question"><Trash2 className="w-4 h-4" /></button>
                       </div>
                       <div className="flex items-center gap-2 text-xs">
-                        <select
+                        <SelectField
                           value={q.type}
                           onChange={(e) => {
                             const type = e.target.value as KcQuestion["type"];
@@ -595,7 +596,7 @@ const ItemSettingsDrawer: React.FC<Props> = ({ item, curriculum, onClose, onSave
                         >
                           <option value="MCQ">Multiple choice</option>
                           <option value="TRUE_FALSE">True / false</option>
-                        </select>
+                        </SelectField>
                         <span className="text-gray-400">tap the circle to mark the right answer</span>
                       </div>
                       <ul className="space-y-1.5">

@@ -3,6 +3,7 @@ import { Settings2 } from "lucide-react";
 import { useToast } from "../../../contexts/ToastContext";
 import { apiError, officeHoursApi } from "../../../api/officeHours";
 import { Card, CardTitle, inputCls, labelCls, Muted, primaryBtn, Spinner } from "../ohUi";
+import SelectField from "../../ui/SelectField";
 
 /**
  * Office-hours policy (plan §6.8, decisions D1-D10). Every field says what it
@@ -127,11 +128,11 @@ const SettingsTab: React.FC = () => {
                     <>
                       <label htmlFor={id} className={labelCls}>{f.label}</label>
                       {f.type === "select" ? (
-                        <select id={id} className={inputCls} value={values[f.key]} onChange={(e) => setValues({ ...values, [f.key]: e.target.value })}>
+                        <SelectField id={id} className={inputCls} value={values[f.key]} onChange={(e) => setValues({ ...values, [f.key]: e.target.value })}>
                           {f.options.map(([v, l]) => (
                             <option key={v} value={v}>{l}</option>
                           ))}
-                        </select>
+                        </SelectField>
                       ) : (
                         <input
                           id={id}

@@ -34,6 +34,7 @@ import LessonPlanPreviewModal from "./LessonPlanPreviewModal";
 import SchemeOfWorkPreviewModal from "./SchemeOfWorkPreviewModal";
 import SchemeReportPreviewModal from "./SchemeReportPreviewModal";
 import { SchemeReportService } from "../services/SchemeReportService";
+import SelectField from "./ui/SelectField";
 
 type ViewTab = "timeline" | "calendar";
 type StatusFilter = "all" | "complete" | "incomplete" | "missing";
@@ -890,7 +891,7 @@ const SchemeDetails: React.FC = () => {
               </div>
               <div className="flex items-center gap-2">
                 <Filter className="w-3.5 h-3.5 text-gray-400" />
-                <select
+                <SelectField
                   value={filterStatus}
                   onChange={(e) =>
                     setFilterStatus(e.target.value as StatusFilter)
@@ -901,7 +902,7 @@ const SchemeDetails: React.FC = () => {
                   <option value="complete">Complete</option>
                   <option value="incomplete">In Progress</option>
                   <option value="missing">Missing Plans</option>
-                </select>
+                </SelectField>
               </div>
             </div>
 

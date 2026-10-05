@@ -11,6 +11,7 @@ import {
 } from "../../api/access";
 import type { Depth, ScopeType } from "../../vendor/nga-access";
 import { btnGhost, btnPrimary, DEPTH_INFO, DepthPill, Empty, inputCls, Panel, SCOPE_LABELS } from "./shared";
+import SelectField from "../ui/SelectField";
 
 const APP_LABEL: Record<string, string> = { mis: "Central MIS", tm: "Task Mentor", da: "Discipline & Attendance", tupo: "Tupo" };
 const MANUAL_SCOPES: ScopeType[] = ["PLATFORM", "SCHOOL", "PROGRAM", "DEPARTMENT", "GRADE", "CLASS_GROUP", "SUBJECT_CLASS", "MENTEES", "CHILDREN", "SELF"];
@@ -161,7 +162,7 @@ export const RoleEditor: React.FC<{
                       <div className="text-[11px] text-slate-600 dark:text-slate-300">{c.key}{!c.scopeable && " · school-wide only"}</div>
                     </div>
                     {c.kind === "READ" ? (
-                      <select
+                      <SelectField
                         aria-label={`Depth for ${c.key}`}
                         className="rounded-md border border-border-light dark:border-slate-700 bg-transparent px-2 py-1 text-xs"
                         disabled={!canEdit}
@@ -174,7 +175,7 @@ export const RoleEditor: React.FC<{
                             {DEPTH_INFO[d].label}
                           </option>
                         ))}
-                      </select>
+                      </SelectField>
                     ) : (
                       <input
                         type="checkbox"
@@ -241,12 +242,12 @@ export const RolesTab: React.FC<{
       title={`Roles (${shown.length})`}
       actions={
         <div className="flex gap-2">
-          <select aria-label="Filter roles by category" className={inputCls} value={category} onChange={(e) => setCategory(e.target.value)}>
+          <SelectField aria-label="Filter roles by category" className={inputCls} value={category} onChange={(e) => setCategory(e.target.value)}>
             <option value="">All categories</option>
             {categories.map((c) => (
               <option key={c}>{c}</option>
             ))}
-          </select>
+          </SelectField>
           {canEdit && (
             <button className={btnPrimary} onClick={() => setOpen("new")}>
               <Plus className="w-4 h-4" /> New role

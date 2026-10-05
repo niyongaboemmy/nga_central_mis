@@ -5,6 +5,7 @@ import { CheckCircle2, QrCode, XCircle } from "lucide-react";
 import Modal from "../ui/Modal";
 import { apiError, formatYmd, officeHoursApi, type StudentSessionView } from "../../api/officeHours";
 import { Card, EmptyState, inputCls, labelCls, Muted, primaryBtn, Spinner } from "./ohUi";
+import SelectField from "../ui/SelectField";
 
 /**
  * Self check-in (plan §16.1). The host shows a QR code (and a 6-digit code
@@ -149,11 +150,11 @@ export const CheckInPage: React.FC = () => {
                 {today.length > 1 && (
                   <div>
                     <label htmlFor="oh-ci-session" className={labelCls}>Session</label>
-                    <select id="oh-ci-session" className={inputCls} value={sessionId} onChange={(e) => setSessionId(Number(e.target.value))}>
+                    <SelectField id="oh-ci-session" className={inputCls} value={sessionId} onChange={(e) => setSessionId(Number(e.target.value))}>
                       {today.map((s) => (
                         <option key={s.session_id} value={s.session_id}>{`${s.start_time} ${s.title ?? ""}`}</option>
                       ))}
-                    </select>
+                    </SelectField>
                   </div>
                 )}
                 <div>

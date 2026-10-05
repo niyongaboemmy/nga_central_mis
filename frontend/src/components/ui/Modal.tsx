@@ -8,7 +8,7 @@ interface ModalProps {
   onClose: () => void;
   title: React.ReactNode;
   children: React.ReactNode;
-  size?: "sm" | "md" | "lg" | "xl" | "2xl";
+  size?: "sm" | "md" | "lg" | "xl" | "2xl" | "3xl";
   showCloseButton?: boolean;
   contentClassName?: string;
 }
@@ -28,6 +28,7 @@ const Modal: React.FC<ModalProps> = ({
     lg: "max-w-lg",
     xl: "max-w-2xl",
     "2xl": "max-w-5xl",
+    "3xl": "max-w-6xl",
   };
 
   // Accessibility (WAI-ARIA dialog pattern): announced as a labelled modal

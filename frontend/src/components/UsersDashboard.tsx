@@ -21,6 +21,7 @@ import {
 import { Role } from "../api/users";
 import { fetchUserBreakdown, RoleCount } from "../utils/userRoleCounts";
 import { useTheme } from "../contexts/ThemeContext";
+import SelectField from "./ui/SelectField";
 
 interface UsersDashboardProps {
   roles: Role[];
@@ -276,7 +277,7 @@ const UsersDashboard: React.FC<UsersDashboardProps> = ({
           />
         </div>
         <div className="relative">
-          <select
+          <SelectField
             aria-label="Sort roles"
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value as SortOption)}
@@ -285,7 +286,7 @@ const UsersDashboard: React.FC<UsersDashboardProps> = ({
             <option value="total-desc">Total: high to low</option>
             <option value="total-asc">Total: low to high</option>
             <option value="name-asc">Name: A to Z</option>
-          </select>
+          </SelectField>
           <ArrowUpDown className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
         </div>
         <div className="flex gap-1 bg-white/60 dark:bg-slate-800/60 border border-gray-200 dark:border-slate-700 rounded-xl p-1 sm:ml-auto w-fit">

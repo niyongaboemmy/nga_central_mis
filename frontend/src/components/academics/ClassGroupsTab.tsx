@@ -12,6 +12,7 @@ import Input from "../ui/Input";
 import PromoteStudentsModal from "./PromoteStudentsModal";
 import { usePermissions } from "../../hooks/usePermissions";
 import { Permissions } from "../../constants/permissions";
+import SelectField from "../ui/SelectField";
 
 interface ClassGroupsTabProps {
   data: ClassGroup[];
@@ -415,7 +416,7 @@ const ClassGroupsTab: React.FC<ClassGroupsTabProps> = ({
               <label className="block text-sm font-medium text-text-primary-light dark:text-text-primary-dark mb-2">
                 Source Year
               </label>
-              <select
+              <SelectField
                 value={promoteSourceYearId}
                 onChange={(e) =>
                   setPromoteSourceYearId(parseInt(e.target.value))
@@ -432,14 +433,14 @@ const ClassGroupsTab: React.FC<ClassGroupsTabProps> = ({
                     {year.is_current === 1 ? " (Current)" : ""}
                   </option>
                 ))}
-              </select>
+              </SelectField>
             </div>
 
             <div>
               <label className="block text-sm font-medium text-text-primary-light dark:text-text-primary-dark mb-2">
                 Target Year
               </label>
-              <select
+              <SelectField
                 value={promoteTargetYearId}
                 onChange={(e) =>
                   setPromoteTargetYearId(parseInt(e.target.value))
@@ -456,7 +457,7 @@ const ClassGroupsTab: React.FC<ClassGroupsTabProps> = ({
                     {year.is_current === 1 ? " (Current)" : ""}
                   </option>
                 ))}
-              </select>
+              </SelectField>
             </div>
           </div>
 
@@ -464,7 +465,7 @@ const ClassGroupsTab: React.FC<ClassGroupsTabProps> = ({
             <label className="block text-sm font-medium text-text-primary-light dark:text-text-primary-dark mb-2">
               Promote from
             </label>
-            <select
+            <SelectField
               value={promoteSourceId}
               onChange={(e) => setPromoteSourceId(parseInt(e.target.value))}
               className="w-full px-4 py-3 border-2 border-border-light dark:border-border-dark/30 rounded-2xl focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/20 transition-all duration-200 bg-surface-light dark:bg-surface-dark/30 text-text-primary-light dark:text-text-primary-dark"
@@ -475,14 +476,14 @@ const ClassGroupsTab: React.FC<ClassGroupsTabProps> = ({
                   {cg.name} ({getGradeName(cg.grade_id)})
                 </option>
               ))}
-            </select>
+            </SelectField>
           </div>
 
           <div>
             <label className="block text-sm font-medium text-text-primary-light dark:text-text-primary-dark mb-2">
               Promote to
             </label>
-            <select
+            <SelectField
               value={promoteTargetId}
               onChange={(e) => setPromoteTargetId(parseInt(e.target.value))}
               className="w-full px-4 py-3 border-2 border-border-light dark:border-border-dark/30 rounded-2xl focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/20 transition-all duration-200 bg-surface-light dark:bg-surface-dark/30 text-text-primary-light dark:text-text-primary-dark"
@@ -501,7 +502,7 @@ const ClassGroupsTab: React.FC<ClassGroupsTabProps> = ({
                   </option>
                 );
               })}
-            </select>
+            </SelectField>
             {promoteSourceLevelOrder !== undefined &&
               promoteTargetId !== 0 &&
               (() => {
@@ -581,7 +582,7 @@ const ClassGroupsTab: React.FC<ClassGroupsTabProps> = ({
             <label className="block text-sm font-medium text-text-primary-light dark:text-text-primary-dark mb-2">
               Grade
             </label>
-            <select
+            <SelectField
               value={formData.grade_id}
               onChange={(e) =>
                 setFormData((prev) => ({
@@ -601,7 +602,7 @@ const ClassGroupsTab: React.FC<ClassGroupsTabProps> = ({
                   {grade.name}
                 </option>
               ))}
-            </select>
+            </SelectField>
             {formErrors.grade_id && (
               <p className="text-sm text-red-600 dark:text-red-400 font-medium mt-1">
                 {formErrors.grade_id}
@@ -656,7 +657,7 @@ const ClassGroupsTab: React.FC<ClassGroupsTabProps> = ({
             <label className="block text-sm font-medium text-text-primary-light dark:text-text-primary-dark mb-2">
               Grade
             </label>
-            <select
+            <SelectField
               value={formData.grade_id}
               onChange={(e) =>
                 setFormData((prev) => ({
@@ -676,7 +677,7 @@ const ClassGroupsTab: React.FC<ClassGroupsTabProps> = ({
                   {grade.name}
                 </option>
               ))}
-            </select>
+            </SelectField>
             {formErrors.grade_id && (
               <p className="text-sm text-red-600 dark:text-red-400 font-medium mt-1">
                 {formErrors.grade_id}

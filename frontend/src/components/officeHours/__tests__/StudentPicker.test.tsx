@@ -88,8 +88,8 @@ describe("office-hours student picker", () => {
     await userEvent.click(screen.getByRole("button", { name: /Select all free/ }));
     expect(screen.getByRole("checkbox", { name: /Aline Uwase/ })).toBeChecked();
     expect(screen.getByRole("checkbox", { name: /Bruno Mugisha/ })).toBeChecked();
-    await userEvent.selectOptions(screen.getByLabelText(/Why these students/), "BELOW_STANDARD");
-    await userEvent.click(screen.getByRole("button", { name: "Assign 2 students" }));
+    await userEvent.selectOptions(screen.getByLabelText(/Why these students/, { selector: "select" }), "BELOW_STANDARD");
+    await userEvent.click(screen.getByRole("button", { name: "Invite 2 students" }));
     await waitFor(() => expect(assign).toHaveBeenCalledWith(12, { student_ids: [1, 2], reason_code: "BELOW_STANDARD", reason_note: undefined }));
     expect(onAssigned).toHaveBeenCalled();
     const report = await screen.findByText("Not everyone could be added");
@@ -105,5 +105,30 @@ describe("office-hours student picker", () => {
     await userEvent.click(screen.getByRole("button", { name: "Send request" }));
     await waitFor(() => expect(requestTransfer).toHaveBeenCalledWith({ student_id: 3, to_schedule_id: 12, message: "Needs physics help" }));
     expect(showToast).toHaveBeenCalledWith(expect.stringContaining("Mr Habimana"), "success");
+  });
+
+  it("invites week by week and brings last week's group back", async () => {
+    candidates.mockResolvedValue(response({ assigned_count: 0, window: { from: "2026-03-11", to: "2026-03-13" }, previous_week: { from: "2026-03-02", student_ids: [1, 3] } }));
+    assign.mockResolvedValue({ data: { data: { assigned: [{ student_id: 1, assignment_id: 95, effective_from: "2026-03-11", clash_note: null }], conflicts: [], already_assigned: [], ineligible: [], over_capacity: [], no_remaining_sessions: false } } });
+    const schedule = { effective_from: "2026-03-02", effective_to: "2026-06-26", days: [3] };
+    render(<StudentPicker scheduleId={12} reasonCodes={[]} schedule={schedule} initialWeek="2026-03-09" today="2026-03-09" />);
+    await screen.findByText("Aline Uwase");
+    expect(candidates).toHaveBeenLastCalledWith(12, expect.objectContaining({ from: "2026-03-09", to: "2026-03-13" }));
+    expect(screen.getByText("Week of 9 Mar only")).toBeInTheDocument();
+
+    // Only Aline is free among last week's two (Chantal is with another teacher).
+    await userEvent.click(screen.getByRole("button", { name: /Invite last week's group \(1\)/ }));
+    expect(screen.getByRole("checkbox", { name: /Aline Uwase/ })).toBeChecked();
+    await userEvent.click(screen.getByRole("button", { name: "Invite 1 student" }));
+    await waitFor(() =>
+      expect(assign).toHaveBeenCalledWith(12, { student_ids: [1], reason_code: undefined, reason_note: undefined, effective_from: "2026-03-09", effective_to: "2026-03-13" }),
+    );
+
+    // The rest of the term drops the end date; the next week moves the window.
+    await userEvent.click(screen.getByRole("radio", { name: "Rest of term" }));
+    await waitFor(() => expect(candidates).toHaveBeenLastCalledWith(12, expect.not.objectContaining({ to: expect.anything() })));
+    await userEvent.click(screen.getByRole("radio", { name: "This week" }));
+    await userEvent.click(screen.getByRole("button", { name: "Next week" }));
+    await waitFor(() => expect(candidates).toHaveBeenLastCalledWith(12, expect.objectContaining({ from: "2026-03-16", to: "2026-03-20" })));
   });
 });

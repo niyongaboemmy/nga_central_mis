@@ -40,6 +40,7 @@ import {
 import { useToast } from "../../contexts/ToastContext";
 import { useAcademicPeriod } from "../../contexts/AcademicPeriodContext";
 import SessionPrintPreview from "./SessionPrintPreview";
+import SelectField from "../ui/SelectField";
 
 const WELLBEING_OPTIONS = [
   { value: "STRUGGLING", emoji: "😢", label: "Struggling" },
@@ -772,7 +773,7 @@ const MentoringSessionModal: React.FC<Props> = ({
                         <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">
                           Subject Context
                         </label>
-                        <select
+                        <SelectField
                           value={subjectId}
                           onChange={(e) => setSubjectId(e.target.value === "" ? "" : Number(e.target.value))}
                           className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-gray-700/60 rounded-lg bg-white dark:bg-gray-800/40 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -783,7 +784,7 @@ const MentoringSessionModal: React.FC<Props> = ({
                               {s.name}{s.code ? ` (${s.code})` : ""}
                             </option>
                           ))}
-                        </select>
+                        </SelectField>
                       </div>
                     </div>
                   </div>
@@ -846,7 +847,7 @@ const MentoringSessionModal: React.FC<Props> = ({
                       title="Punctuality, Attendance & Discipline"
                       color="border-amber-200 dark:border-amber-800/50 text-amber-600 dark:text-amber-400"
                     />
-                    <select
+                    <SelectField
                       value={punctualityAttendance}
                       onChange={(e) => setPunctualityAttendance(e.target.value)}
                       className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-gray-700/60 rounded-lg bg-white dark:bg-gray-800/40 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-400 mb-3"
@@ -855,7 +856,7 @@ const MentoringSessionModal: React.FC<Props> = ({
                       {RATING_OPTIONS.map((o) => (
                         <option key={o.value} value={o.value}>{o.label}</option>
                       ))}
-                    </select>
+                    </SelectField>
                     <textarea
                       value={disciplineNotes}
                       onChange={(e) => setDisciplineNotes(e.target.value)}
@@ -897,7 +898,7 @@ const MentoringSessionModal: React.FC<Props> = ({
                       title="Assignment Completion & Deadlines"
                       color="border-blue-200 dark:border-blue-800/50 text-blue-600 dark:text-blue-400"
                     />
-                    <select
+                    <SelectField
                       value={assignmentCompletion}
                       onChange={(e) => setAssignmentCompletion(e.target.value)}
                       className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-gray-700/60 rounded-lg bg-white dark:bg-gray-800/40 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 mb-3"
@@ -906,7 +907,7 @@ const MentoringSessionModal: React.FC<Props> = ({
                       {RATING_OPTIONS.map((o) => (
                         <option key={o.value} value={o.value}>{o.label}</option>
                       ))}
-                    </select>
+                    </SelectField>
                     <textarea
                       value={assignmentNotes}
                       onChange={(e) => setAssignmentNotes(e.target.value)}

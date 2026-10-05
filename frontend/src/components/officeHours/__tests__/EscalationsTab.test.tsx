@@ -60,7 +60,7 @@ describe("office-hours escalations tab", () => {
   it("switches between open and all", async () => {
     render(<EscalationsTab termId={4} />);
     await screen.findByText("Level 2");
-    await userEvent.selectOptions(screen.getByLabelText("Show"), "all");
+    await userEvent.selectOptions(screen.getByLabelText("Show", { selector: "select" }), "all");
     await waitFor(() => expect(escalations).toHaveBeenLastCalledWith({ term_id: 4, status: "all" }));
   });
 });

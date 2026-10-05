@@ -12,6 +12,7 @@ import {
   Mail,
   BookOpen,
 } from "lucide-react";
+import SelectField from "./ui/SelectField";
 
 const getInitials = (first?: string, last?: string) =>
   `${first?.[0] || ""}${last?.[0] || ""}`.toUpperCase() || "?";
@@ -192,7 +193,7 @@ const MyStudents: React.FC = () => {
           )}
         </div>
 
-        <select
+        <SelectField
           value={subjectFilter}
           onChange={(e) => setSubjectFilter(e.target.value)}
           className="px-3 py-3 text-sm rounded-2xl border border-gray-200 dark:border-gray-700/30 bg-white dark:bg-gray-800/40 dark:backdrop-blur-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
@@ -203,9 +204,9 @@ const MyStudents: React.FC = () => {
               {s.subject_name}
             </option>
           ))}
-        </select>
+        </SelectField>
 
-        <select
+        <SelectField
           value={classGroupFilter}
           onChange={(e) => setClassGroupFilter(e.target.value)}
           className="px-3 py-3 text-sm rounded-2xl border border-gray-200 dark:border-gray-700/30 bg-white dark:bg-gray-800/40 dark:backdrop-blur-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
@@ -216,7 +217,7 @@ const MyStudents: React.FC = () => {
               {c.class_group_name} · {c.grade_name}
             </option>
           ))}
-        </select>
+        </SelectField>
       </div>
 
       {/* Active filters */}

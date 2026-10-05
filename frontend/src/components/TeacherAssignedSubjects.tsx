@@ -15,6 +15,7 @@ import {
   Layers,
 } from "lucide-react";
 import SubjectItemCard from "./subjects/SubjectItemCard";
+import SelectField from "./ui/SelectField";
 
 type SortMode = "name" | "classes";
 
@@ -208,7 +209,7 @@ const TeacherAssignedSubjects: React.FC = () => {
           )}
         </div>
 
-        <select
+        <SelectField
           value={gradeFilter}
           onChange={(e) => setGradeFilter(e.target.value)}
           className="px-3 py-3 text-sm rounded-2xl border border-gray-200 dark:border-gray-700/30 bg-white dark:bg-gray-800/40 dark:backdrop-blur-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
@@ -219,9 +220,9 @@ const TeacherAssignedSubjects: React.FC = () => {
               {g}
             </option>
           ))}
-        </select>
+        </SelectField>
 
-        <select
+        <SelectField
           value={programFilter}
           onChange={(e) => setProgramFilter(e.target.value)}
           className="px-3 py-3 text-sm rounded-2xl border border-gray-200 dark:border-gray-700/30 bg-white dark:bg-gray-800/40 dark:backdrop-blur-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
@@ -232,18 +233,18 @@ const TeacherAssignedSubjects: React.FC = () => {
               {p}
             </option>
           ))}
-        </select>
+        </SelectField>
 
         <div className="flex items-center gap-1.5 px-3 py-3 text-sm rounded-2xl border border-gray-200 dark:border-gray-700/30 bg-white dark:bg-gray-800/40 dark:backdrop-blur-sm text-gray-600 dark:text-gray-300">
           <ArrowUpDown className="w-3.5 h-3.5 flex-shrink-0" />
-          <select
+          <SelectField
             value={sortMode}
             onChange={(e) => setSortMode(e.target.value as SortMode)}
             className="bg-transparent focus:outline-none cursor-pointer"
           >
             <option value="name">Name (A-Z)</option>
             <option value="classes">Most Classes</option>
-          </select>
+          </SelectField>
         </div>
       </div>
 

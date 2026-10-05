@@ -20,6 +20,7 @@ import {
 import { AttendancePill, BandPill, Card, CardTitle, EmptyState, inputCls, labelCls, Muted, secondaryBtn, Spinner } from "../ohUi";
 import PeriodPicker from "./PeriodPicker";
 import { exportCsv, exportPdf, exportXlsx, ExportTable, pct } from "./exports";
+import SelectField from "../../ui/SelectField";
 
 /**
  * Office-hours reports (plan §14): any day, week, month, term, year or custom
@@ -230,11 +231,11 @@ const BreakdownView: React.FC<{ rows: BreakdownRow[]; groupBy: GroupBy; onGroupB
       <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
         <div>
           <label htmlFor="oh-group-by" className={labelCls}>Group by</label>
-          <select id="oh-group-by" className={`${inputCls} w-auto`} value={groupBy} onChange={(e) => onGroupBy(e.target.value as GroupBy)}>
+          <SelectField id="oh-group-by" className={`${inputCls} w-auto`} value={groupBy} onChange={(e) => onGroupBy(e.target.value as GroupBy)}>
             {GROUPS.map(([g, l]) => (
               <option key={g} value={g}>{l}</option>
             ))}
-          </select>
+          </SelectField>
         </div>
         <ExportButtons tables={tables} title={`office-hours-by-${groupBy}`} scope={label} />
       </div>

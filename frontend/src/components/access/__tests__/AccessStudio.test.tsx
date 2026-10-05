@@ -102,7 +102,7 @@ describe("Access Studio", () => {
     fireEvent.click(await screen.findByRole("tab", { name: "Roles" }));
     fireEvent.click(await screen.findByText("Academic Insights Viewer"));
 
-    const depth = await screen.findByLabelText("Depth for VIEW_RESULTS");
+    const depth = await screen.findByLabelText("Depth for VIEW_RESULTS", { selector: "select" });
     expect((depth as HTMLSelectElement).value).toBe("summary");
     fireEvent.change(depth, { target: { value: "detail" } });
     fireEvent.click(screen.getByLabelText("Allow ENTER_MARKS"));
@@ -141,7 +141,7 @@ describe("Access Studio", () => {
     fireEvent.click(await screen.findByRole("tab", { name: "Roles" }));
     fireEvent.click(await screen.findByText("Academic Insights Viewer"));
     expect(screen.getByText("Save role")).toBeDisabled();
-    fireEvent.change(await screen.findByLabelText("Depth for VIEW_RESULTS"), { target: { value: "detail" } });
+    fireEvent.change(await screen.findByLabelText("Depth for VIEW_RESULTS", { selector: "select" }), { target: { value: "detail" } });
     expect(screen.getByText("Save role")).toBeEnabled();
     fireEvent.click(screen.getByText("Cancel"));
     expect(await screen.findByText("Discard your changes?")).toBeInTheDocument();

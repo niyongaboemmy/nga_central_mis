@@ -6,6 +6,7 @@ import { MentorshipReportService } from "../../services/MentorshipReportService"
 import { useAcademicPeriod } from "../../contexts/AcademicPeriodContext";
 import { useToast } from "../../contexts/ToastContext";
 import { useConfirm } from "../../contexts/ConfirmContext";
+import SelectField from "../ui/SelectField";
 
 interface SearchResultUser {
   user_id: number;
@@ -183,7 +184,7 @@ const AdminMentorAssignments: React.FC = () => {
             </button>
           )}
           <div className="flex items-center gap-2">
-            <select
+            <SelectField
               value={yearFilter}
               onChange={(e) => setYearFilter(e.target.value ? Number(e.target.value) : "")}
               className="px-3 py-2 text-sm border border-gray-200 dark:border-gray-600 rounded-full bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
@@ -194,7 +195,7 @@ const AdminMentorAssignments: React.FC = () => {
                   {y.name}{y.is_current ? " (Current)" : ""}
                 </option>
               ))}
-            </select>
+            </SelectField>
             {/* Mentor assignments are year-scoped — make it unambiguous
                 whether the admin is viewing the school's current academic
                 year or has browsed to a past/future one. */}

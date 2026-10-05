@@ -14,6 +14,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { useState, useEffect } from "react";
+import SelectField from "./ui/SelectField";
 
 // Form field with validation
 interface FormFieldProps {
@@ -62,7 +63,7 @@ const FormField: React.FC<FormFieldProps> = ({
           </div>
         )}
         {options ? (
-          <select
+          <SelectField
             id={id}
             name={name}
             value={value}
@@ -80,7 +81,7 @@ const FormField: React.FC<FormFieldProps> = ({
                 {opt.label}
               </option>
             ))}
-          </select>
+          </SelectField>
         ) : (
           <input
             id={id}

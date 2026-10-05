@@ -30,6 +30,7 @@ import {
 import { useDeleteLessonNote } from "./useDeleteLessonNote";
 import { useAcademicPeriod } from "../../contexts/AcademicPeriodContext";
 import { useToast } from "../../contexts/ToastContext";
+import SelectField from "../ui/SelectField";
 
 interface Props {
   isOpen: boolean;
@@ -588,7 +589,7 @@ const LessonNoteFormModal: React.FC<Props> = ({ isOpen, onClose, initialSubjectI
         <div className="flex flex-col gap-4">
           <div>
             <label className="block text-xs font-medium text-gray-500 dark:text-gray-300 mb-1">Subject</label>
-            <select
+            <SelectField
               aria-label="Subject"
               value={subjectId}
               disabled={placementLocked}
@@ -604,13 +605,13 @@ const LessonNoteFormModal: React.FC<Props> = ({ isOpen, onClose, initialSubjectI
                   {s.subject_name}
                 </option>
               ))}
-            </select>
+            </SelectField>
           </div>
 
           {selectedSubject && (
             <div>
               <label className="block text-xs font-medium text-gray-500 dark:text-gray-300 mb-1">Class</label>
-              <select
+              <SelectField
                 aria-label="Class"
                 value={classGroupId}
                 disabled={placementLocked}
@@ -623,7 +624,7 @@ const LessonNoteFormModal: React.FC<Props> = ({ isOpen, onClose, initialSubjectI
                     {g.label}
                   </option>
                 ))}
-              </select>
+              </SelectField>
             </div>
           )}
 

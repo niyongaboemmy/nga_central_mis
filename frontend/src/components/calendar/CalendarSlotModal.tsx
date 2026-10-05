@@ -11,6 +11,7 @@ import type {
   CalendarSetupData,
   ActivityAssignee,
 } from "../../api/calendar";
+import SelectField from "../ui/SelectField";
 
 interface FormData {
   class_group_id: string;
@@ -566,7 +567,7 @@ const CalendarSlotModal: React.FC<CalendarSlotModalProps> = ({
               <label className={labelCls}>
                 Day of Week <span className="text-red-500">*</span>
               </label>
-              <select
+              <SelectField
                 value={af.day_of_week}
                 onChange={(e) => {
                   setAf({ day_of_week: e.target.value });
@@ -583,7 +584,7 @@ const CalendarSlotModal: React.FC<CalendarSlotModalProps> = ({
                     {day}
                   </option>
                 ))}
-              </select>
+              </SelectField>
               {activityErrors.day_of_week && (
                 <p className="mt-1 text-xs text-red-500 dark:text-red-400">
                   {activityErrors.day_of_week}
@@ -728,7 +729,7 @@ const CalendarSlotModal: React.FC<CalendarSlotModalProps> = ({
               <label className={labelCls}>
                 Day of Week <span className="text-red-500">*</span>
               </label>
-              <select
+              <SelectField
                 value={formData.day_of_week}
                 onChange={(e) => {
                   onFormDataChange({ day_of_week: e.target.value });
@@ -743,7 +744,7 @@ const CalendarSlotModal: React.FC<CalendarSlotModalProps> = ({
                     {day}
                   </option>
                 ))}
-              </select>
+              </SelectField>
               {formErrors.day_of_week && (
                 <p className="mt-1 text-xs text-red-500 dark:text-red-400">
                   {formErrors.day_of_week}

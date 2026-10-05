@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, waitFor } from "@testing-library/react";
 import EnrolledStudentsTab from "../EnrolledStudentsTab";
 
 const academicYearsGetAllMock = vi.fn();
@@ -57,7 +57,7 @@ describe("EnrolledStudentsTab — global academic period wiring", () => {
     );
     expect(academicYearsGetAllMock).not.toHaveBeenCalled();
 
-    const yearSelect = screen.getAllByRole("combobox")[0] as HTMLSelectElement;
+    const yearSelect = document.querySelectorAll("select")[0] as HTMLSelectElement;
     expect(yearSelect.value).toBe("2");
   });
 });

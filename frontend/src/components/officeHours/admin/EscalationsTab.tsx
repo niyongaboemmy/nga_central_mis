@@ -5,6 +5,7 @@ import { useToast } from "../../../contexts/ToastContext";
 import { apiError, formatYmd, officeHoursApi, studentName, type Escalation, type OfficeHoursConfig } from "../../../api/officeHours";
 import { Card, CardTitle, EmptyState, inputCls, labelCls, Muted, primaryBtn, secondaryBtn, Spinner } from "../ohUi";
 import { NGA_APPS } from "../../apps/ngaApps";
+import SelectField from "../../ui/SelectField";
 
 /** The attendance app's "Log incident" form, prefilled (it saves nothing until the teacher submits). */
 export const disciplineReferralUrl = (e: Escalation) => {
@@ -68,10 +69,10 @@ const EscalationsTab: React.FC<{ termId: number | null; config?: OfficeHoursConf
         id="oh-escalations"
         icon={<ShieldAlert className="h-4 w-4" aria-hidden />}
         action={
-          <select aria-label="Show" className={`${inputCls} w-auto`} value={status} onChange={(e) => setStatus(e.target.value as "open" | "all")}>
+          <SelectField aria-label="Show" className={`${inputCls} w-auto`} value={status} onChange={(e) => setStatus(e.target.value as "open" | "all")}>
             <option value="open">Needs follow-up</option>
             <option value="all">All this term</option>
-          </select>
+          </SelectField>
         }
       >
         Escalations

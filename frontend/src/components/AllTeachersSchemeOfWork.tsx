@@ -26,6 +26,7 @@ import { useAcademicPeriod } from "../contexts/AcademicPeriodContext";
 import AllTeachersSOW_Dashboard from "./AllTeachersSOW_Dashboard";
 import AllTeachersSOW_List from "./AllTeachersSOW_List";
 import { exportSowReportPdf, exportSowReportExcel } from "../utils/sowReportExport";
+import SelectField from "./ui/SelectField";
 
 const PERMISSION = "VIEW_ALL_TEACHERS_SCHEME_OF_WORK_LIST";
 
@@ -379,7 +380,7 @@ const AllTeachersSchemeOfWork: React.FC = () => {
           {/* Program */}
           <div className="flex items-center gap-1.5 flex-1 min-w-[150px]">
             <GraduationCap className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
-            <select
+            <SelectField
               value={selectedProgram}
               onChange={(e) => {
                 setSelectedProgram(Number(e.target.value) || "");
@@ -395,13 +396,13 @@ const AllTeachersSchemeOfWork: React.FC = () => {
                   {p.name}
                 </option>
               ))}
-            </select>
+            </SelectField>
           </div>
 
           {/* Grade */}
           <div className="flex items-center gap-1.5 flex-1 min-w-[130px]">
             <Layers className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
-            <select
+            <SelectField
               value={selectedGrade}
               onChange={(e) =>
                 setSelectedGrade(
@@ -418,13 +419,13 @@ const AllTeachersSchemeOfWork: React.FC = () => {
                   {g.name}
                 </option>
               ))}
-            </select>
+            </SelectField>
           </div>
 
           {/* Role */}
           <div className="flex items-center gap-1.5 flex-1 min-w-[130px]">
             <UserCog className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
-            <select
+            <SelectField
               value={selectedRole}
               onChange={(e) => setSelectedRole(e.target.value)}
               title="User Role"
@@ -434,7 +435,7 @@ const AllTeachersSchemeOfWork: React.FC = () => {
               <option value="TEACHER">Teacher</option>
               <option value="STAFF">Staff</option>
               <option value="ADMIN">Admin</option>
-            </select>
+            </SelectField>
           </div>
 
           <p className="text-[11px] font-medium text-gray-400 dark:text-gray-500 flex-shrink-0 ml-auto">

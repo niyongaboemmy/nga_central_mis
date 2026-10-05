@@ -7,7 +7,7 @@ import {
   OfficeHourAttendance,
   OfficeHourAttendanceHistory,
   OfficeHourSession,
-  OfficeHourStudentLock,
+  OfficeHourStudentDateLock,
 } from "../db/officeHoursSchema";
 import { createOfficeHoursWorld, OhWorld, OH_MONDAY, pinClock, resetSettings } from "../test/officeHoursFixtures";
 import { setOfficeHoursClock } from "../services/officeHours/common";
@@ -118,7 +118,7 @@ describe("Office hours phase 3: register and attendance", () => {
     expect(res.status).toBe(200);
     const row = res.body.data.roster.find((r: any) => r.student_id === walkIn);
     expect(row.is_drop_in).toBe(true);
-    expect(await db.select().from(OfficeHourStudentLock).where(eq(OfficeHourStudentLock.student_id, walkIn))).toHaveLength(0);
+    expect(await db.select().from(OfficeHourStudentDateLock).where(eq(OfficeHourStudentDateLock.student_id, walkIn))).toHaveLength(0);
     // Searching for a walk-in.
     const search = await request(app).get("/office-hours/students").query({ q: "Test", term_id: w.termId }).set(auth("teacherA"));
     expect(search.status).toBe(200);

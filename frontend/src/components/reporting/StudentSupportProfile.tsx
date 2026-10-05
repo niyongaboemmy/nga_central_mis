@@ -25,6 +25,7 @@ import {
 import { useToast } from "../../contexts/ToastContext";
 import MentoringSessionModal from "./MentoringSessionModal";
 import AIInsightsCard from "./AIInsightsCard";
+import SelectField from "../ui/SelectField";
 
 const WELLBEING_SCALE: Record<string, number> = {
   STRUGGLING: 1,
@@ -411,7 +412,7 @@ const StudentSupportProfile: React.FC<Props> = ({ student, onBack }) => {
                             </span>
                           )}
                           {session.follow_up_required && (
-                            <select
+                            <SelectField
                               value={session.session_status}
                               disabled={updatingId === session.mentorship_id}
                               onChange={(e) =>
@@ -427,7 +428,7 @@ const StudentSupportProfile: React.FC<Props> = ({ student, onBack }) => {
                               <option value="OPEN">OPEN</option>
                               <option value="IN_PROGRESS">IN PROGRESS</option>
                               <option value="RESOLVED">RESOLVED</option>
-                            </select>
+                            </SelectField>
                           )}
                           {!session.follow_up_required &&
                             session.session_status === "RESOLVED" && (

@@ -33,6 +33,7 @@ import {
 } from "../api/systems";
 import { getSchools, School } from "../api/schools";
 import { getRoles, Role } from "../api/users";
+import SelectField from "./ui/SelectField";
 
 // Modern System Card with Actions Overlay
 const SystemCard = ({
@@ -586,7 +587,7 @@ const AssignModal = ({
                 Select Tenant
               </label>
               <div className="relative">
-                <select
+                <SelectField
                   value={selectedSchoolId}
                   onChange={(e) => setSelectedSchoolId(Number(e.target.value))}
                   className="w-full pl-4 pr-10 py-3 bg-gray-50 dark:bg-slate-900/50 border border-gray-200 dark:border-slate-700/30 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 dark:text-white appearance-none transition-all"
@@ -597,8 +598,7 @@ const AssignModal = ({
                       {school.name}
                     </option>
                   ))}
-                </select>
-                <ChevronRight className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 rotate-90 pointer-events-none" />
+                </SelectField>
               </div>
             </div>
 
@@ -638,7 +638,7 @@ const AssignModal = ({
                 Select Tenant
               </label>
               <div className="relative">
-                <select
+                <SelectField
                   value={roleAssignSchoolId}
                   onChange={(e) =>
                     setRoleAssignSchoolId(Number(e.target.value))
@@ -651,8 +651,7 @@ const AssignModal = ({
                       {school.name}
                     </option>
                   ))}
-                </select>
-                <ChevronRight className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 rotate-90 pointer-events-none" />
+                </SelectField>
               </div>
             </div>
 
@@ -661,7 +660,7 @@ const AssignModal = ({
                 Select Role
               </label>
               <div className="relative">
-                <select
+                <SelectField
                   value={selectedRoleId}
                   onChange={(e) => setSelectedRoleId(Number(e.target.value))}
                   className="w-full pl-4 pr-10 py-3 bg-gray-50 dark:bg-slate-900/50 border border-gray-200 dark:border-slate-700/30 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 dark:text-white appearance-none transition-all"
@@ -672,8 +671,7 @@ const AssignModal = ({
                       {role.name}
                     </option>
                   ))}
-                </select>
-                <ChevronRight className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 rotate-90 pointer-events-none" />
+                </SelectField>
               </div>
             </div>
 

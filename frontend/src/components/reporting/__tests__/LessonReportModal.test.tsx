@@ -179,7 +179,7 @@ describe("LessonReportModal — ad-hoc vs scheduled mode", () => {
     const submitButton = screen.getByRole("button", { name: /log activity/i });
     expect(submitButton).toBeDisabled();
 
-    const [subjectSelect, classGroupSelect] = screen.getAllByRole("combobox");
+    const [subjectSelect, classGroupSelect] = Array.from(document.querySelectorAll("select"));
     await user.selectOptions(subjectSelect, "10");
     await user.selectOptions(classGroupSelect, "100");
 
@@ -375,8 +375,8 @@ describe("LessonReportModal — ad-hoc vs scheduled mode", () => {
 
     await waitFor(() => expect(getAllAssignedSubjectsMock).toHaveBeenCalled());
 
-    const subjectSelect = screen.getAllByRole("combobox")[0];
-    expect(screen.getByRole("option", { name: /Mathematics \(already logged\)/ })).toBeInTheDocument();
+    const subjectSelect = document.querySelectorAll("select")[0];
+    expect(screen.getByRole("option", { name: /Mathematics \(already logged\)/, hidden: true })).toBeInTheDocument();
 
     await user.selectOptions(subjectSelect, "10");
 

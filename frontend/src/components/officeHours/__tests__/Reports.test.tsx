@@ -112,7 +112,7 @@ describe("office-hours reports", () => {
     await userEvent.click(screen.getByRole("tab", { name: "Breakdown" }));
     const link = await screen.findByRole("link", { name: "Ms A" });
     expect(link).toHaveAttribute("href", "/office-hours/reports/teachers/7");
-    await userEvent.selectOptions(screen.getByLabelText("Group by"), "class_group");
+    await userEvent.selectOptions(screen.getByLabelText("Group by", { selector: "select" }), "class_group");
     await waitFor(() => expect(breakdown).toHaveBeenLastCalledWith(expect.objectContaining({ group_by: "class_group" })));
 
     await userEvent.click(screen.getByRole("tab", { name: "Students" }));

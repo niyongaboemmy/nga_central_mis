@@ -44,6 +44,7 @@ import AdminMentoringLogView from "./AdminMentoringLogView";
 import AdminMentorAssignments from "./AdminMentorAssignments";
 import AdminMentorshipDashboard from "./AdminMentorshipDashboard";
 import { Permissions } from "../../constants/permissions";
+import SelectField from "../ui/SelectField";
 
 type MainTab = "lesson" | "mentorship" | "dashboard" | "missing" | "mentoring-log" | "mentorship-dashboard" | "mentor-assignments";
 type PresetType = "today" | "week" | "month" | "all" | "custom";
@@ -648,7 +649,7 @@ const AdminReporting: React.FC = () => {
                 {/* Program */}
                 <div className="space-y-2">
                   <label className="text-[10px] font-black text-gray-400 dark:text-gray-600 uppercase tracking-tighter block ml-1">Program</label>
-                  <select
+                  <SelectField
                     name="program_id"
                     value={filters.program_id}
                     onChange={handleFilterChange}
@@ -658,13 +659,13 @@ const AdminReporting: React.FC = () => {
                     {programs.map((p) => (
                       <option key={p.program_id} value={p.program_id}>{p.name}</option>
                     ))}
-                  </select>
+                  </SelectField>
                 </div>
 
                 {/* Grade */}
                 <div className="space-y-2">
                   <label className="text-[10px] font-black text-gray-400 dark:text-gray-600 uppercase tracking-tighter block ml-1">Grade</label>
-                  <select
+                  <SelectField
                     name="grade_id"
                     value={filters.grade_id}
                     onChange={handleFilterChange}
@@ -675,13 +676,13 @@ const AdminReporting: React.FC = () => {
                     {availableGrades.map((g) => (
                       <option key={g.grade_id} value={g.grade_id}>{g.name}</option>
                     ))}
-                  </select>
+                  </SelectField>
                 </div>
 
                 {/* Subject */}
                 <div className="space-y-2">
                   <label className="text-[10px] font-black text-gray-400 dark:text-gray-600 uppercase tracking-tighter block ml-1">Subject</label>
-                  <select
+                  <SelectField
                     name="subject_id"
                     value={filters.subject_id}
                     onChange={handleFilterChange}
@@ -691,13 +692,13 @@ const AdminReporting: React.FC = () => {
                     {allSubjects.map((s) => (
                       <option key={s.subject_id} value={s.subject_id}>{s.name}</option>
                     ))}
-                  </select>
+                  </SelectField>
                 </div>
 
                 {/* Class Group */}
                 <div className="space-y-2">
                   <label className="text-[10px] font-black text-gray-400 dark:text-gray-600 uppercase tracking-tighter block ml-1">Class Group</label>
-                  <select
+                  <SelectField
                     name="class_group_id"
                     value={filters.class_group_id}
                     onChange={handleFilterChange}
@@ -707,7 +708,7 @@ const AdminReporting: React.FC = () => {
                     {allClassGroups.map((c) => (
                       <option key={c.class_group_id} value={c.class_group_id}>{c.name}</option>
                     ))}
-                  </select>
+                  </SelectField>
                 </div>
               </div>
             </div>
