@@ -1,5 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import { describe, it, expect, vi } from "vitest";
 import {
   buildMobileConfig,
   buildRegFile,
@@ -17,7 +16,6 @@ import {
   startUrl,
 } from "../ngaApps";
 import { shouldAutoOffer, shouldShowInstallButton } from "../AutoInstallPrompt";
-import AppsInstallerPage from "../AppsInstallerPage";
 import { safeReturnUrl } from "../../../reminders/pwa";
 
 const byKey = (k: string) => NGA_APPS.find((a) => a.key === k)!;
@@ -137,140 +135,6 @@ describe("automatic install prompt on load", () => {
     expect(safeReturnUrl("https://evil.example/apps")).toBeNull();
     expect(safeReturnUrl("https://amashuri.com.evil.example/")).toBeNull();
     expect(safeReturnUrl("javascript:alert(1)")).toBeNull();
-  });
-});
-
-describe("/apps installer page", () => {
-  let open: ReturnType<typeof vi.spyOn>;
-  beforeEach(() => {
-    try {
-      localStorage.removeItem("nga.installer.progress");
-    } catch {
-      /* ignore */
-    }
-    window.history.replaceState(null, "", "/apps");
-    open = vi.spyOn(window, "open").mockImplementation(() => ({ focus: vi.fn(), closed: false }) as unknown as Window);
-  });
-  afterEach(() => open.mockRestore());
-
-  const card = (name: string) => screen.getByRole("heading", { name }).closest("[id^='app-']") as HTMLElement;
-
-  it("lists every app and walks 'Install all' as real links -- installed apps open straight in their window", async () => {
-    render(<AppsInstallerPage />);
-    for (const app of NGA_APPS) expect(screen.getByRole("heading", { name: app.name })).toBeInTheDocument();
-
-    // In jsdom this page isn't an NGA origin and has no Web Install API, so
-    // every app is reached by a real link (Chrome sends a clicked link into an
-    // installed app's window -- only without an opener; window.open never
-    // is). The app reports back through a short .amashuri.com cookie.
-    const start = screen.getByRole("link", { name: /Install all apps/ });
-    const url = new URL(start.getAttribute("href")!);
-    expect(url.searchParams.get("nga_install")).toBe("1");
-    expect(url.searchParams.get("return")).toBe(`${window.location.origin}/apps?done=mis`);
-    expect(start).toHaveAttribute("target", "_blank");
-    expect(start).toHaveAttribute("rel", "noopener");
-    expect(open).not.toHaveBeenCalled();
-
-    fireEvent.click(start);
-    // Opening is NOT installing: it waits for the app to report back.
-    expect(within(card("NGA MIS")).getByText("Waiting…")).toBeInTheDocument();
-    expect(screen.getByText("Finish in NGA MIS")).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("button", { name: "Skip" }));
-    expect(await screen.findByText("Step 2 of 4")).toBeInTheDocument();
-    expect(screen.getByText("Install Task Mentor", { selector: "p" })).toBeInTheDocument();
-    expect(within(card("NGA MIS")).getByText("Skipped")).toBeInTheDocument();
-    expect(within(card("Task Mentor")).getByRole("link", { name: /Install & open/ })).toHaveAttribute("rel", "noopener");
-  });
-
-  it("updates live when an app's install card reports back", () => {
-    render(<AppsInstallerPage />);
-    act(() => {
-      window.dispatchEvent(
-        new MessageEvent("message", { origin: "https://taskmentor.amashuri.com", data: { type: "nga-install", app: "taskmentor", status: "installed" } }),
-      );
-    });
-    expect(within(card("Task Mentor")).getByText("Installed")).toBeInTheDocument();
-    expect(screen.getByText("Task Mentor is installed and open")).toBeInTheDocument();
-
-    // A forged message from elsewhere changes nothing.
-    act(() => {
-      window.dispatchEvent(new MessageEvent("message", { origin: "https://evil.example", data: { type: "nga-install", app: "tendo", status: "installed" } }));
-    });
-    expect(within(card("Tendo")).getByText("Not installed")).toBeInTheDocument();
-  });
-
-  it("updates from an app's report cookie when you come back to this tab, and clears it", () => {
-    render(<AppsInstallerPage />);
-    document.cookie = `nga_inst_tupo=already.${Date.now()}; path=/`;
-    act(() => {
-      window.dispatchEvent(new Event("focus"));
-    });
-    expect(within(card("Tupo")).getByText("Already installed")).toBeInTheDocument();
-    expect(screen.getByText("Tupo is installed — opened in its own window")).toBeInTheDocument();
-    expect(document.cookie).not.toContain("nga_inst_tupo=already");
-
-    // A report left over from long before this visit is ignored.
-    document.cookie = `nga_inst_tendo=installed.${Date.now() - 3_600_000}; path=/`;
-    act(() => {
-      window.dispatchEvent(new Event("focus"));
-    });
-    expect(within(card("Tendo")).getByText("Not installed")).toBeInTheDocument();
-  });
-
-  it("marks an app installed -- or skipped -- when its card sends the user back here", () => {
-    window.history.replaceState(null, "", "/apps?done=tendo&skipped=tupo");
-    render(<AppsInstallerPage />);
-    expect(window.location.search).toBe("");
-    expect(within(card("Tendo")).getByText("Installed")).toBeInTheDocument();
-    expect(within(card("Tupo")).getByText("Skipped")).toBeInTheDocument();
-  });
-
-  it("back on this tab with no report: asks whether the app opened as an app, in one click", async () => {
-    render(<AppsInstallerPage />);
-    const now = Date.now();
-    const clock = vi.spyOn(Date, "now").mockReturnValue(now);
-    fireEvent.click(screen.getByRole("link", { name: /Install all apps/ }));
-    clock.mockReturnValue(now + 5000);
-    act(() => {
-      window.dispatchEvent(new Event("focus"));
-    });
-    expect(await screen.findByText(/Did NGA MIS open in its own app window/)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Yes, it opened as an app" }));
-    expect(within(card("NGA MIS")).getByText("Already installed")).toBeInTheDocument();
-    clock.mockRestore();
-  });
-
-  it("has a Back button that leaves for NGA MIS when there's nowhere to go back to", () => {
-    const assign = vi.fn();
-    const original = window.location;
-    Object.defineProperty(window, "location", { value: { ...original, assign, origin: original.origin, href: original.href }, configurable: true });
-    try {
-      render(<AppsInstallerPage />);
-      fireEvent.click(screen.getByRole("button", { name: "Back" }));
-      expect(assign).toHaveBeenCalledWith("/home");
-    } finally {
-      Object.defineProperty(window, "location", { value: original, configurable: true });
-    }
-  });
-
-  it("every card has an install control: installed -> Open app + Reinstall; not installed -> Install & open", () => {
-    window.history.replaceState(null, "", "/apps?done=tendo");
-    render(<AppsInstallerPage />);
-    const tendo = card("Tendo");
-    expect(within(tendo).getByRole("link", { name: /Open app/ })).toBeInTheDocument();
-    expect(within(tendo).getByRole("link", { name: /Reinstall/ })).toBeInTheDocument();
-    const tupo = card("Tupo");
-    expect(within(tupo).getByRole("link", { name: /Install & open/ })).toBeInTheDocument();
-    expect(within(tupo).getByRole("button", { name: "Help with Tupo" })).toBeInTheDocument();
-  });
-
-  it("offers the managed-device files", () => {
-    const create = vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:x");
-    render(<AppsInstallerPage />);
-    fireEvent.click(screen.getByRole("button", { name: /Windows · Chrome/ }));
-    expect(create).toHaveBeenCalledTimes(1);
-    create.mockRestore();
   });
 });
 

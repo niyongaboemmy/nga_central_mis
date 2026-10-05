@@ -79,6 +79,7 @@ import AppsInstallerPage from "./components/apps/AppsInstallerPage";
 import DesktopBrowserSignIn from "./components/DesktopBrowserSignIn";
 import DesktopSignInComplete from "./components/DesktopSignInComplete";
 import { AutoInstallPrompt } from "./components/apps/AutoInstallPrompt";
+import { webAppInstallFits } from "./components/apps/desktopDownload";
 
 const LoginPage: React.FC = () => {
   const navigate = useNavigate();
@@ -279,8 +280,9 @@ function App() {
         <MetadataProvider>
           <AcademicPeriodProvider>
           <Router basename="/">
-            {/* Asks to install the app on load when it isn't installed here. */}
-            <AutoInstallPrompt />
+            {/* Asks to install the web app on load, where NGA Desktop doesn't run
+                (phones, tablets, Chromebooks). Computers get NGA Desktop at /apps. */}
+            {webAppInstallFits() && <AutoInstallPrompt />}
             {/* Page views → Usage & Monitoring (patterns only, never ids). */}
             <ActivityRouterTracker />
             <ActivityNotice />

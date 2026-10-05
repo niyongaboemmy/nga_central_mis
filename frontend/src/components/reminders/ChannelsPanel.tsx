@@ -9,6 +9,7 @@ import {
 } from "../../api/reminders";
 import { useConfirm } from "../../contexts/ConfirmContext";
 import { useToast } from "../../contexts/ToastContext";
+import { isNgaDesktop } from "../../desktop/ngaDesktop";
 
 /**
  * More ways to be reminded (proposal §6): a Telegram chat, the person's own
@@ -85,6 +86,8 @@ export const ChannelsPanel: React.FC<{
   const { showToast } = useToast();
   const [busy, setBusy] = useState<string | null>(null);
   const [telegramUrl, setTelegramUrl] = useState<string | null>(null);
+  // NGA Desktop: Google's consent page opens in the person's browser, not here.
+  const [googleUrl, setGoogleUrl] = useState<string | null>(null);
   const channels: ChannelChoices = preferences.channels ?? { telegram: true, email: false, googleCalendar: true };
   const telegram = connections?.telegram ?? null;
   const google = connections?.googleCalendar ?? null;
@@ -148,10 +151,37 @@ export const ChannelsPanel: React.FC<{
     }
   };
 
+  // Same wait for Google when it was opened in the browser (NGA Desktop).
+  const googleActive = google?.status === "active";
+  useEffect(() => {
+    if (!googleUrl || googleActive) return;
+    const id = window.setInterval(onChanged, 4000);
+    const stop = window.setTimeout(() => setGoogleUrl(null), 15 * 60_000);
+    return () => {
+      window.clearInterval(id);
+      window.clearTimeout(stop);
+    };
+  }, [googleUrl, googleActive, onChanged]);
+
+  useEffect(() => {
+    if (googleActive && googleUrl) {
+      setGoogleUrl(null);
+      showToast("Google Calendar connected", "success");
+    }
+  }, [googleActive, googleUrl, showToast]);
+
   const connectGoogle = async () => {
     setBusy("google-connect");
     try {
       const { url } = await remindersApi.googleConnectUrl();
+      if (isNgaDesktop()) {
+        // The desktop app hands Google's pages to the browser, so this page
+        // stays here: wait for the connection instead of leaving.
+        setGoogleUrl(url);
+        window.open(url, "_blank", "noopener");
+        setBusy(null);
+        return;
+      }
       window.location.assign(url);
     } catch {
       showToast("Couldn't reach Google — try again", "error");
@@ -296,9 +326,19 @@ export const ChannelsPanel: React.FC<{
                   : "Adds your timetable and deadlines, with alarms, to a separate calendar in your own Google account. NGA can only see the calendar it creates."}
               </p>
               {googleReady ? (
-                <button type="button" onClick={connectGoogle} disabled={busy !== null} className={`${primary} mt-2`}>
-                  <CalendarCheck className="h-4 w-4" /> {busy === "google-connect" ? "Opening Google…" : "Connect Google Calendar"}
-                </button>
+                <div className="mt-2 flex flex-wrap items-center gap-3">
+                  <button type="button" onClick={connectGoogle} disabled={busy !== null} className={primary}>
+                    <CalendarCheck className="h-4 w-4" /> {busy === "google-connect" ? "Opening Google…" : "Connect Google Calendar"}
+                  </button>
+                  {googleUrl && (
+                    <span className="text-xs text-slate-500 dark:text-slate-400" aria-live="polite">
+                      Finish in your browser, then come back here.{" "}
+                      <a href={googleUrl} target="_blank" rel="noopener noreferrer" className="font-semibold underline">
+                        Open again
+                      </a>
+                    </span>
+                  )}
+                </div>
               ) : (
                 notSetUp
               )}

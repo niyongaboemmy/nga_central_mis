@@ -1,793 +1,287 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import React, { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { ArrowLeft, BarChart3, BellRing, CheckCircle2, ChevronDown, Download, KeyRound, RefreshCw, ShieldCheck } from "lucide-react";
+import { API_BASE_URL } from "../../services/api";
+import { isNgaDesktop, ngaDesktopVersion } from "../../desktop/ngaDesktop";
+import { NGA_APPS, iconUrl, startUrl } from "./ngaApps";
+import { InstallGuide } from "./InstallGuide";
 import {
-  ArrowLeft,
-  Check,
-  CheckCircle2,
-  ChevronDown,
-  CircleDashed,
-  Download,
-  ExternalLink,
-  FileDown,
-  HelpCircle,
-  Laptop,
-  Loader2,
-  MonitorSmartphone,
-  PartyPopper,
-  RotateCcw,
-  ShieldCheck,
-  SkipForward,
-  Sparkles,
-} from "lucide-react";
-import { getInstallDiagnostics, openAppUrl, promptInstall, refreshInstallCheck, usePwa } from "../../reminders/pwa";
-import { InstallGuide } from "../reminders/InstallGuide";
-import OpenInAppGuide from "./OpenInAppGuide";
-import Modal from "../ui/Modal";
-import {
-  buildMobileConfig,
-  buildRegFile,
-  downloadText,
-  emptyProgress,
-  iconUrl,
-  installedCount,
-  installHandoffUrl,
-  isFinished,
-  isInstalled,
-  clearReportCookie,
-  loadProgress,
-  markStep,
-  NGA_APPS,
-  nextStep,
-  readInstallReport,
-  readReportCookies,
-  reconcileSelfStatus,
-  saveProgress,
-  startUrl,
-  webInstall,
-  webInstallSupported,
-  type NgaApp,
-  type Progress,
-  type StepStatus,
-} from "./ngaApps";
+  OS_LABEL,
+  REQUIREMENTS,
+  detectOs,
+  downloadUrl,
+  formatSize,
+  isNewer,
+  primaryPlatform,
+  type DesktopRelease,
+  type DownloadPlatform,
+} from "./desktopDownload";
 
 /**
- * /apps -- install every NGA app from one place (docs/APP_LAUNCH.md).
- * Public on purpose: a new phone or laptop can set everything up before
- * anyone signs in.
- *
- * Truthful by design: on desktop a site can't see whether another site's app
- * is installed, so each app's install card (ngaInstall.tsx) reports back --
- * live over postMessage to this tab, or via ?done= / ?skipped= when it
- * navigates back. Until it does, an app is "waiting", never "done".
+ * /apps: get NGA Desktop, the one app for NGA MIS, Task Mentor, Tendo and
+ * Tupo on Windows and macOS (nga-desktop). The download fitting this
+ * computer comes first; every download is counted by the API
+ * (/desktop/download/:platform) and installed apps update themselves.
+ * Phones, tablets, Chromebooks and Linux keep the web apps.
  */
 
-const STATUS_CHIP: Record<StepStatus, { label: string; className: string }> = {
-  todo: { label: "Not installed", className: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300" },
-  waiting: { label: "Waiting…", className: "bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-200" },
-  done: { label: "Installed", className: "bg-success-100 text-success-700 dark:bg-success-500/15 dark:text-success-100" },
-  already: { label: "Already installed", className: "bg-success-100 text-success-700 dark:bg-success-500/15 dark:text-success-100" },
-  skipped: { label: "Skipped", className: "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400" },
-};
+const AppleLogo = (p: { className?: string }) => (
+  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden className={p.className}>
+    <path d="M16.37 12.62c-.02-2.3 1.88-3.4 1.96-3.46-1.07-1.56-2.73-1.77-3.32-1.8-1.41-.14-2.76.83-3.47.83-.72 0-1.82-.81-2.99-.79-1.54.02-2.96.9-3.75 2.27-1.6 2.78-.41 6.89 1.15 9.14.76 1.1 1.67 2.34 2.86 2.3 1.15-.05 1.58-.74 2.97-.74 1.38 0 1.77.74 2.98.72 1.24-.02 2.02-1.12 2.77-2.23.87-1.28 1.23-2.52 1.25-2.58-.03-.01-2.4-.92-2.41-3.66ZM14.1 5.86c.63-.77 1.06-1.83.94-2.89-.91.04-2.01.61-2.66 1.37-.58.67-1.09 1.76-.95 2.79 1.01.08 2.04-.51 2.67-1.27Z" />
+  </svg>
+);
+const WindowsLogo = (p: { className?: string }) => (
+  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden className={p.className}>
+    <path d="M3 5.1 10.4 4v7.1H3V5.1Zm8.3-1.2L21 2.5v8.6h-9.7V3.9ZM3 12.9h7.4V20L3 18.9v-6Zm8.3 0H21v8.6l-9.7-1.4v-7.2Z" />
+  </svg>
+);
+const osLogo = (p: DownloadPlatform, cls: string) =>
+  p === "macos" ? <AppleLogo className={cls} /> : <WindowsLogo className={cls} />;
 
-const ProgressRing: React.FC<{ value: number; total: number }> = ({ value, total }) => {
-  const r = 42;
-  const c = 2 * Math.PI * r;
-  const pct = total ? value / total : 0;
-  return (
-    <div className="relative h-28 w-28 flex-shrink-0" role="progressbar" aria-label="Apps installed" aria-valuenow={value} aria-valuemin={0} aria-valuemax={total}>
-      <svg viewBox="0 0 100 100" className="h-full w-full -rotate-90">
-        <circle cx="50" cy="50" r={r} fill="none" strokeWidth="9" className="stroke-white/20" />
-        <motion.circle
-          cx="50"
-          cy="50"
-          r={r}
-          fill="none"
-          strokeWidth="9"
-          strokeLinecap="round"
-          className="stroke-white"
-          strokeDasharray={c}
-          initial={false}
-          animate={{ strokeDashoffset: c * (1 - pct) }}
-          transition={{ type: "spring", stiffness: 80, damping: 18 }}
-        />
-      </svg>
-      <div className="absolute inset-0 flex flex-col items-center justify-center text-white">
-        <span className="text-2xl font-bold leading-none">
-          {value}/{total}
-        </span>
-        <span className="mt-1 text-[11px] font-semibold uppercase tracking-wider text-white/80">ready</span>
-      </div>
-    </div>
-  );
-};
+const FEATURES = [
+  { icon: KeyRound, text: "Sign in once for all four apps" },
+  { icon: BellRing, text: "Notifications from every app" },
+  { icon: RefreshCw, text: "Updates itself" },
+];
 
-const AppsInstallerPage: React.FC = () => {
-  const pwa = usePwa();
-  const [progress, setProgress] = useState<Progress>(() => loadProgress());
-  const [running, setRunning] = useState(false);
-  const [busy, setBusy] = useState<NgaApp["key"] | null>(null);
-  const [guideOpen, setGuideOpen] = useState(false);
-  const [notice, setNotice] = useState<{ text: string; tone: "ok" | "info" | "warn" } | null>(null);
-  const [helpFor, setHelpFor] = useState<NgaApp["key"] | null>(null);
-  // Came back to this tab while an app was "waiting" with no report: it most
-  // likely opened straight in its installed window (which can't message us).
-  const [askOpened, setAskOpened] = useState<NgaApp["key"] | null>(null);
-  const lastOpened = useRef<{ key: NgaApp["key"]; at: number } | null>(null);
-  const here = typeof window !== "undefined" ? window.location.origin : "";
-  // NGA MIS is installed but Chrome opens its links in the browser.
-  const linksInBrowser = pwa.installed && pwa.linksOpenInBrowser;
-  // /apps?diag=1 shows the raw install signals of this browser.
-  const showDiag = typeof window !== "undefined" && new URLSearchParams(window.location.search).has("diag");
-  const [diagTick, setDiagTick] = useState(0);
-  const canWebInstall = webInstallSupported();
+interface Stats {
+  current_version: string | null;
+  downloads: { total: number; people: number; by_platform: { platform: string; count: number }[] };
+  installs: { active_30_days: number; on_current_version: number; windows: number; macos: number };
+}
 
-  const set = useCallback((key: NgaApp["key"], status: StepStatus) => setProgress((p) => markStep(p, key, status)), []);
-  const say = useCallback((text: string, tone: "ok" | "info" | "warn" = "ok") => {
-    setNotice({ text, tone });
-    window.setTimeout(() => setNotice((n) => (n?.text === text ? null : n)), 4500);
+/** Admins (Usage analytics) only; anyone else gets nothing back and sees nothing. */
+function useDownloadStats(): Stats | null {
+  const [stats, setStats] = useState<Stats | null>(null);
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (!token) return;
+    // Plain fetch: the shared API client toasts on 403 and signs out on 401.
+    fetch(`${API_BASE_URL.replace(/\/+$/, "")}/desktop/stats`, { headers: { Authorization: `Bearer ${token}` } })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => j?.data && setStats(j.data))
+      .catch(() => {});
   }, []);
-  const nameOf = (key: NgaApp["key"]) => NGA_APPS.find((a) => a.key === key)?.name ?? key;
+  return stats;
+}
 
-  // Coming back from an app's install card in this same tab (?done= / ?skipped=).
+export const AppsInstallerPage: React.FC = () => {
+  const navigate = useNavigate();
+  const os = useMemo(() => detectOs(), []);
+  const primary = primaryPlatform(os);
+  const inDesktop = isNgaDesktop();
+  const desktopVersion = ngaDesktopVersion();
+  const [release, setRelease] = useState<DesktopRelease | null>(null);
+  const [failed, setFailed] = useState(false);
+  const [showSteps, setShowSteps] = useState(true);
+  const stats = useDownloadStats();
+
   useEffect(() => {
-    const url = new URL(window.location.href);
-    let changed = false;
-    for (const [param, status] of [
-      ["done", "done"],
-      ["skipped", "skipped"],
-    ] as const) {
-      const key = url.searchParams.get(param) as NgaApp["key"] | null;
-      if (key && NGA_APPS.some((a) => a.key === key)) {
-        set(key, status);
-        setRunning(true);
-        changed = true;
-      }
-      url.searchParams.delete(param);
-    }
-    if (changed) window.history.replaceState(window.history.state, "", url.toString());
-  }, [set]);
-
-  const applyReport = useCallback(
-    (report: { key: NgaApp["key"]; status: "done" | "already" | "skipped" }) => {
-      set(report.key, report.status);
-      setRunning(true);
-      setAskOpened((k) => (k === report.key ? null : k));
-      say(
-        report.status === "done"
-          ? `${nameOf(report.key)} is installed and open`
-          : report.status === "already"
-            ? `${nameOf(report.key)} is installed — opened in its own window`
-            : `${nameOf(report.key)} skipped`,
-        report.status === "skipped" ? "info" : "ok",
-      );
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [set, say],
-  );
-
-  // Reports through the shared .amashuri.com cookie: on return to this tab,
-  // and every 1.5 s while an app is being installed or opened.
-  const pageStart = useRef(Date.now());
-  const checkCookies = useCallback(() => {
-    for (const r of readReportCookies(document.cookie)) {
-      clearReportCookie(r.key);
-      // Ignore leftovers from before this visit.
-      if (r.at < pageStart.current - 60_000) continue;
-      applyReport(r);
-    }
-  }, [applyReport]);
-  const anyWaiting = NGA_APPS.some((a) => progress[a.key] === "waiting");
-  useEffect(() => {
-    checkCookies();
-    const onBack = () => document.visibilityState === "visible" && checkCookies();
-    document.addEventListener("visibilitychange", onBack);
-    window.addEventListener("focus", onBack);
-    const id = anyWaiting ? window.setInterval(checkCookies, 1500) : undefined;
-    return () => {
-      document.removeEventListener("visibilitychange", onBack);
-      window.removeEventListener("focus", onBack);
-      if (id) window.clearInterval(id);
-    };
-  }, [checkCookies, anyWaiting]);
-
-  // Live messages from a card that does have an opener (older links).
-  useEffect(() => {
-    const onMessage = (event: MessageEvent) => {
-      const report = readInstallReport(event);
-      if (!report) return;
-      applyReport(report);
-      window.focus();
-    };
-    window.addEventListener("message", onMessage);
-    return () => window.removeEventListener("message", onMessage);
-  }, [applyReport]);
-
-  // This app's own status follows the browser's live answer, both ways: a
-  // saved "installed" must not outlive an uninstall.
-  useEffect(() => {
-    const self = NGA_APPS.find((a) => a.origin === here);
-    if (!self) return;
-    const next = reconcileSelfStatus(progress[self.key], pwa);
-    if (next !== progress[self.key]) set(self.key, next);
-  }, [pwa, here, progress, set]);
-
-  useEffect(() => saveProgress(progress), [progress]);
-
-  const next = nextStep(progress);
-  const ready = installedCount(progress);
-  const finished = NGA_APPS.every((a) => isFinished(progress[a.key]));
-  const returnUrl = (app: NgaApp) => `${here}/apps?done=${app.key}`;
-
-  /**
-   * Other apps are opened with a REAL link (see AppAction), never
-   * window.open: Chrome sends a clicked link straight into an installed
-   * app's window ("navigation capturing"), so an installed app just opens,
-   * and one that isn't shows its one-click "Install & open" card. Chrome
-   * only does that for links WITHOUT an opener, so apps report back through
-   * a short cookie on .amashuri.com (read below), not postMessage.
-   */
-  const usesLink = (app: NgaApp) => app.origin !== here && !canWebInstall;
-  const opened = (app: NgaApp) => {
-    setRunning(true);
-    setAskOpened(null);
-    lastOpened.current = { key: app.key, at: Date.now() };
-    set(app.key, "waiting");
-  };
-
-  // Back on this tab with no report after a while: ask, in one click.
-  useEffect(() => {
-    const onVisible = () => {
-      const last = lastOpened.current;
-      if (document.visibilityState !== "visible" || !last) return;
-      window.setTimeout(() => {
-        setProgress((p) => {
-          if (p[last.key] === "waiting" && Date.now() - last.at > 1500) setAskOpened(last.key);
-          return p;
-        });
-      }, 400);
-    };
-    document.addEventListener("visibilitychange", onVisible);
-    window.addEventListener("focus", onVisible);
-    return () => {
-      document.removeEventListener("visibilitychange", onVisible);
-      window.removeEventListener("focus", onVisible);
-    };
+    fetch(`${API_BASE_URL.replace(/\/+$/, "")}/desktop/release`)
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+      .then((j) => setRelease(j.data))
+      .catch(() => setFailed(true));
   }, []);
 
-  /** An install/open control for `app`: a real link for other apps, else a button. */
-  const appAction = (app: NgaApp, className: string, children: React.ReactNode, disabled = false) =>
-    usesLink(app) ? (
-      <a href={installHandoffUrl(app, returnUrl(app))} target="_blank" rel="noopener" onClick={() => opened(app)} className={className}>
-        {children}
-      </a>
-    ) : (
-      <button type="button" onClick={() => void installApp(app)} disabled={disabled || busy !== null} className={className}>
-        {children}
-      </button>
-    );
+  const files = release?.downloads ?? {};
+  const available = (Object.keys(files) as DownloadPlatform[]).filter((p) => files[p]);
+  const offered: DownloadPlatform[] = primary && files[primary] ? [primary] : [];
+  const others = available.filter((p) => !offered.includes(p));
+  const stepsFor = primary === "macos" ? "macos" : "windows";
 
-  /** One click = one app. Must run inside the click (browser rule). */
-  const installApp = async (app: NgaApp) => {
-    setRunning(true);
-    if (app.origin === here) {
-      if (pwa.installed && !pwa.canPrompt) {
-        // Reinstall asked, but Chrome won't offer an install for an app it
-        // has: explain how (remove in chrome://apps, then install here).
-        set(app.key, "already");
-        setHelpFor(app.key);
-        say(`${app.name} is installed. To reinstall, remove it in chrome://apps first — steps below`, "info");
-        return;
-      }
-      setBusy(app.key);
-      try {
-        // Removed while this page was open: Chrome hands out its install
-        // dialog only on page load -- reload once to get it back.
-        const chromium = ["chrome", "edge", "brave", "opera", "samsung"].includes(pwa.platform.browser);
-        const reloadedOnce = (() => {
-          try {
-            return sessionStorage.getItem("nga.installer.reloadedForPrompt") === "1";
-          } catch {
-            return true;
-          }
-        })();
-        if (!pwa.canPrompt && pwa.installCheck === "no" && chromium && !reloadedOnce) {
-          try {
-            sessionStorage.setItem("nga.installer.reloadedForPrompt", "1");
-          } catch {
-            /* ignore */
-          }
-          say("Getting the install ready…", "info");
-          window.setTimeout(() => window.location.reload(), 500);
-          return;
-        }
-        if (pwa.canPrompt || (navigator as any).install) {
-          const outcome = await promptInstall();
-          if (outcome === "accepted") {
-            set(app.key, "done");
-            say(`${app.name} is installed`);
-          } else if (outcome === "unavailable") setGuideOpen(true);
-        } else {
-          setGuideOpen(true);
-        }
-      } finally {
-        setBusy(null);
-      }
-      return;
-    }
-    if (canWebInstall) {
-      setBusy(app.key);
-      try {
-        if (await webInstall(app)) {
-          set(app.key, "done");
-          say(`${app.name} is installed`);
-          return;
-        }
-      } finally {
-        setBusy(null);
-      }
-    }
-  };
-
-  const restart = () => {
-    setProgress(NGA_APPS.reduce((p, a) => markStep(p, a.key, a.origin === here ? reconcileSelfStatus("todo", pwa) : "todo"), emptyProgress()));
-    setRunning(true);
-  };
-
-  const goBack = () => {
-    const sameOriginReferrer = (() => {
-      try {
-        return document.referrer && new URL(document.referrer).origin === window.location.origin;
-      } catch {
-        return false;
-      }
-    })();
-    if (sameOriginReferrer && window.history.length > 1) window.history.back();
-    else window.location.assign("/home");
-  };
-
-  const policyFiles = useMemo(
-    () => [
-      { label: "Windows · Chrome (.reg)", file: "nga-apps-chrome.reg", type: "text/plain", build: () => buildRegFile("chrome") },
-      { label: "Windows · Edge (.reg)", file: "nga-apps-edge.reg", type: "text/plain", build: () => buildRegFile("edge") },
-      { label: "Mac · Chrome (.mobileconfig)", file: "nga-apps.mobileconfig", type: "application/x-apple-aspen-config", build: () => buildMobileConfig() },
-    ],
-    [],
-  );
-
-  const primaryBtn =
-    "inline-flex items-center justify-center gap-2 rounded-xl bg-brand-600 px-5 py-3 text-sm font-semibold text-white shadow-soft transition hover:bg-brand-700 focus:outline-none focus-visible:ring-4 focus-visible:ring-brand-200 disabled:opacity-60 dark:focus-visible:ring-brand-600/40";
-  const ghostBtn =
-    "inline-flex items-center justify-center gap-1.5 rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 dark:text-slate-300 dark:hover:bg-slate-800";
-  const outlineBtn =
-    "inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800";
-
-  const installLabel = (app: NgaApp) => (busy === app.key ? "Waiting for the browser…" : `Install & open ${app.name}`);
-  const stepHint = (app: NgaApp) =>
-    app.origin === here
-      ? "Your browser shows its install dialog — confirm it."
-      : canWebInstall
-        ? "Your browser installs it straight from here — confirm in its dialog."
-        : `Already installed? It opens straight in its own window. If not, its tab asks once — “Install & open”. This page updates by itself.`;
+  const goBack = () => (window.history.length > 1 ? navigate(-1) : navigate("/home"));
+  const card = "rounded-3xl border border-slate-200/80 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-8";
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
-      {/* Top bar */}
       <header className="sticky top-0 z-20 border-b border-slate-200/70 bg-white/80 backdrop-blur-md dark:border-slate-800 dark:bg-slate-950/80">
-        <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
-          <button type="button" onClick={goBack} className={ghostBtn} aria-label="Back">
+        <div className="mx-auto flex max-w-4xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
+          <button
+            type="button"
+            onClick={goBack}
+            aria-label="Back"
+            className="inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
+          >
             <ArrowLeft className="h-4 w-4" /> <span className="hidden sm:inline">Back</span>
           </button>
-          <p className="truncate text-sm font-semibold text-slate-900 dark:text-white">NGA apps</p>
-          <a href="/home" className={`${ghostBtn} text-brand-700 dark:text-brand-200`}>
+          <p className="text-sm font-semibold text-slate-900 dark:text-white">NGA Desktop</p>
+          <a href="/home" className="rounded-xl px-3 py-2 text-sm font-semibold text-brand-700 hover:bg-slate-100 dark:text-brand-200 dark:hover:bg-slate-800">
             Open NGA MIS
           </a>
         </div>
       </header>
 
-      <main className="mx-auto max-w-5xl space-y-6 px-4 py-6 sm:px-6 sm:py-8">
+      <main className="mx-auto max-w-4xl space-y-5 px-4 py-6 sm:px-6 sm:py-10">
         {/* Hero */}
-        <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-brand-600 to-brand-700 p-5 text-white shadow-float sm:p-8">
-          <div className="pointer-events-none absolute -right-16 -top-16 h-56 w-56 rounded-full bg-white/10 blur-2xl" aria-hidden />
-          <div className="relative grid gap-6 md:grid-cols-[1fr_auto] md:items-center">
-            <div className="min-w-0 max-w-xl">
-              <p className="inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-xs font-semibold uppercase tracking-wider">
-                <Sparkles className="h-3.5 w-3.5" /> New Generation Academy
-              </p>
-              <h1 className="mt-3 text-2xl font-bold sm:text-3xl">{finished ? "You're all set" : "Get all NGA apps on this device"}</h1>
-              <p className="mt-2 text-sm text-white/85">
-                {finished
-                  ? "Every NGA app you chose opens in its own window and can remind you even when the browser is closed."
-                  : "Each app opens in its own window, starts faster and sends reminders even when the browser is closed. Your browser asks you to confirm each app once — we'll guide you, one click per app."}
-              </p>
-              <div className="mt-5 flex flex-wrap gap-2">
-                {!finished && next ? (
-                  progress[next.key] === "waiting" ? (
-                    <span className="inline-flex items-center justify-center gap-2 rounded-xl bg-white/20 px-5 py-3 text-sm font-bold">
-                      <Loader2 className="h-4 w-4 animate-spin" /> Waiting for {next.name}…
-                    </span>
-                  ) : (
-                    appAction(
-                      next,
-                      "inline-flex items-center justify-center gap-2 rounded-xl bg-white px-5 py-3 text-sm font-bold text-brand-700 shadow-soft transition hover:bg-brand-50 focus:outline-none focus-visible:ring-4 focus-visible:ring-white/40 disabled:opacity-70",
-                      <>
-                        <Download className="h-4 w-4" /> {running ? `Continue: ${next.name}` : "Install all apps"}
-                      </>,
-                    )
-                  )
-                ) : (
-                  <button
-                    type="button"
-                    onClick={restart}
-                    className="inline-flex items-center gap-2 rounded-xl bg-white/15 px-4 py-2.5 text-sm font-semibold transition hover:bg-white/25 focus:outline-none focus-visible:ring-4 focus-visible:ring-white/40"
-                  >
-                    <RotateCcw className="h-4 w-4" /> Start again
-                  </button>
-                )}
+        <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-brand-700 via-brand-600 to-indigo-600 p-6 text-white shadow-xl sm:p-10">
+          <div aria-hidden className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-white/10 blur-3xl" />
+          <div className="relative flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between">
+            <div className="max-w-xl">
+              <div className="mb-4 flex -space-x-2">
+                {NGA_APPS.map((a) => (
+                  <img key={a.key} src={iconUrl(a)} alt={a.name} title={a.name} className="h-11 w-11 rounded-2xl bg-white p-1.5 shadow-md ring-2 ring-brand-600" />
+                ))}
               </div>
+              <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">All NGA apps in one desktop app</h1>
+              <p className="mt-3 text-base text-white/85">
+                NGA MIS, Task Mentor, Tendo and Tupo in one window, for Windows and macOS.
+              </p>
+              <ul className="mt-5 flex flex-wrap gap-2">
+                {FEATURES.map(({ icon: Icon, text }) => (
+                  <li key={text} className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1.5 text-sm font-medium backdrop-blur">
+                    <Icon className="h-4 w-4" /> {text}
+                  </li>
+                ))}
+              </ul>
             </div>
-            <ProgressRing value={ready} total={NGA_APPS.length} />
-          </div>
 
-          {/* Stepper */}
-          <ol className="relative -mx-1 mt-6 flex gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none]" aria-label="Install steps">
-            {NGA_APPS.map((app, i) => {
-              const status = progress[app.key];
-              const current = next?.key === app.key && running;
-              return (
-                <li key={app.key} className="flex-shrink-0">
-                  <a
-                    href={`#app-${app.key}`}
-                    className={`flex items-center gap-2 rounded-full py-1.5 pl-1.5 pr-3.5 ring-1 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60 ${
-                      current ? "bg-white/20 ring-white/40" : "ring-white/15 hover:bg-white/10"
-                    }`}
-                    aria-current={current ? "step" : undefined}
-                  >
-                    <span
-                      className={`flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full text-xs font-bold ${
-                        isInstalled(status) ? "bg-white text-brand-700" : status === "skipped" ? "bg-white/20 text-white/70" : "bg-white/15 text-white"
-                      }`}
-                    >
-                      {isInstalled(status) ? (
-                        <Check className="h-4 w-4" />
-                      ) : status === "waiting" ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : status === "skipped" ? (
-                        <SkipForward className="h-3.5 w-3.5" />
-                      ) : (
-                        i + 1
-                      )}
-                    </span>
-                    <span className="whitespace-nowrap text-sm font-semibold">{app.name}</span>
-                  </a>
-                </li>
-              );
-            })}
-          </ol>
-        </section>
-
-        {/* Live status */}
-        <div aria-live="polite" className="min-h-0">
-          <AnimatePresence>
-            {notice && (
-              <motion.div
-                initial={{ opacity: 0, y: -6 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -6 }}
-                className={`flex items-center gap-2 rounded-2xl px-4 py-3 text-sm font-semibold ${
-                  notice.tone === "ok"
-                    ? "bg-success-100 text-success-700 dark:bg-success-500/15 dark:text-success-100"
-                    : notice.tone === "warn"
-                      ? "bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-200"
-                      : "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200"
-                }`}
-              >
-                <CheckCircle2 className="h-4 w-4" /> {notice.text}
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
-
-        {/* Current step */}
-        <AnimatePresence mode="wait">
-          {running && next && (
-            <motion.section
-              key={`${next.key}-${progress[next.key]}`}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              className="rounded-3xl border border-brand-200 bg-white p-5 shadow-soft dark:border-brand-600/40 dark:bg-slate-900 sm:p-6"
-            >
-              <div className="flex items-start gap-4">
-                <div className="relative flex-shrink-0">
-                  <img src={iconUrl(next)} alt="" className="h-14 w-14 rounded-2xl bg-slate-100 object-contain p-2 dark:bg-slate-800 sm:h-16 sm:w-16" />
-                  {progress[next.key] === "waiting" && (
-                    <span className="absolute -right-1 -top-1 flex h-4 w-4">
-                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-75" />
-                      <span className="relative inline-flex h-4 w-4 rounded-full bg-amber-500" />
-                    </span>
-                  )}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-xs font-semibold uppercase tracking-wider text-brand-700 dark:text-brand-200">
-                    Step {NGA_APPS.indexOf(next) + 1} of {NGA_APPS.length}
+            <div className="w-full max-w-sm shrink-0 space-y-3" data-testid="download-box">
+              {inDesktop ? (
+                <div className="rounded-2xl bg-white/15 p-5 backdrop-blur" role="status">
+                  <p className="flex items-center gap-2 text-lg font-semibold">
+                    <CheckCircle2 className="h-5 w-5" /> You're using NGA Desktop{desktopVersion ? ` ${desktopVersion}` : ""}
                   </p>
-                  <p className="mt-0.5 text-lg font-bold text-slate-900 dark:text-white">
-                    {progress[next.key] === "waiting" ? `Finish in ${next.name}` : `Install ${next.name}`}
-                  </p>
-                  <p className="mt-1 text-sm leading-relaxed text-slate-600 dark:text-slate-300">
-                    {progress[next.key] === "waiting" ? (
-                      <>
-                        Press <strong>Install &amp; open {next.name}</strong> there and confirm — it opens in its own window. If it opened as an app straight
-                        away, it's already installed.
-                      </>
-                    ) : (
-                      stepHint(next)
-                    )}
+                  <p className="mt-1 text-sm text-white/85">
+                    {release?.version && desktopVersion && isNewer(release.version, desktopVersion)
+                      ? `Version ${release.version} is ready: open Settings → Updates in the app.`
+                      : "It updates itself. Nothing to download."}
                   </p>
                 </div>
-              </div>
-              {askOpened === next.key && (
-                <motion.p
-                  initial={{ opacity: 0, y: 4 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="mt-4 rounded-2xl bg-brand-50 px-4 py-3 text-sm font-medium text-brand-800 dark:bg-brand-600/15 dark:text-brand-100"
-                  role="status"
-                >
-                  Did {next.name} open in its own app window? Then it's already installed — confirm below.
-                </motion.p>
-              )}
-              <div className="mt-5 flex flex-col gap-2 border-t border-slate-100 pt-4 dark:border-slate-800 sm:flex-row sm:flex-wrap sm:items-center">
-                {progress[next.key] === "waiting" ? (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        set(next.key, "already");
-                        setAskOpened(null);
-                        say(`${next.name} is installed`);
-                      }}
-                      className={askOpened === next.key ? primaryBtn : outlineBtn}
+              ) : !release && !failed ? (
+                <div className="h-[132px] animate-pulse rounded-2xl bg-white/15" aria-label="Loading" />
+              ) : failed || !release?.version ? (
+                <div className="rounded-2xl bg-white/15 p-5 backdrop-blur" role="status">
+                  <p className="text-lg font-semibold">{failed ? "Downloads are unavailable right now" : "Coming soon"}</p>
+                  <p className="mt-1 text-sm text-white/85">
+                    {failed ? "Try again in a moment." : "The first version of NGA Desktop is being prepared."} Until then, use the web apps below.
+                  </p>
+                </div>
+              ) : (
+                <>
+                  {offered.map((p) => (
+                    <a
+                      key={p}
+                      href={downloadUrl(p)}
+                      className="group flex items-center gap-4 rounded-2xl bg-white px-5 py-4 text-slate-900 shadow-lg transition hover:-translate-y-0.5 hover:shadow-xl focus:outline-none focus-visible:ring-4 focus-visible:ring-white/50"
+                      onClick={() => setShowSteps(true)}
                     >
-                      <Check className="h-4 w-4" /> {askOpened === next.key ? "Yes, it opened as an app" : "It's installed"}
-                    </button>
-                    {appAction(
-                      next,
-                      askOpened === next.key ? outlineBtn : primaryBtn,
-                      <>
-                        <ExternalLink className="h-4 w-4" /> Open {next.name} again
-                      </>,
-                    )}
-                  </>
-                ) : (
-                  appAction(
-                    next,
-                    primaryBtn,
-                    <>
-                      {busy === next.key ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />} {installLabel(next)}
-                    </>,
-                  )
-                )}
-                <button
-                  type="button"
-                  onClick={() => {
-                    // Also releases a browser dialog that never answered.
-                    setBusy(null);
-                    set(next.key, "skipped");
-                  }}
-                  className={`${ghostBtn} sm:ml-auto`}
-                >
-                  <SkipForward className="h-4 w-4" /> Skip
-                </button>
-              </div>
-            </motion.section>
-          )}
-          {running && finished && (
-            <motion.section
-              key="finished"
-              initial={{ opacity: 0, scale: 0.97 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="flex items-center gap-4 rounded-3xl border border-success-200 bg-success-50 p-5 dark:border-success-500/30 dark:bg-success-500/10"
-            >
-              <motion.span initial={{ rotate: -20, scale: 0.6 }} animate={{ rotate: 0, scale: 1 }} transition={{ type: "spring", stiffness: 260, damping: 12 }}>
-                <PartyPopper className="h-9 w-9 text-success-600 dark:text-success-100" />
-              </motion.span>
-              <div>
-                <p className="text-lg font-bold text-slate-900 dark:text-white">
-                  {ready === NGA_APPS.length ? "All four NGA apps are installed" : `${ready} of ${NGA_APPS.length} apps installed`}
-                </p>
-                <p className="text-sm text-slate-600 dark:text-slate-300">
-                  Find them in your dock, taskbar or app launcher. You can install a skipped one below any time.
-                </p>
-              </div>
-            </motion.section>
-          )}
-        </AnimatePresence>
-
-        {/* Apps */}
-        <section aria-label="NGA apps" className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          {NGA_APPS.map((app) => {
-            const status = progress[app.key];
-            const chip = STATUS_CHIP[status];
-            const current = running && next?.key === app.key;
-            const installedHere = isInstalled(status);
-            const openHref = app.origin === here ? openAppUrl() : startUrl(app);
-            const iconBtn =
-              "inline-flex h-10 w-10 items-center justify-center rounded-xl text-slate-500 transition hover:bg-slate-100 hover:text-brand-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-brand-200";
-            return (
-              <motion.article
-                layout
-                id={`app-${app.key}`}
-                key={app.key}
-                className={`flex h-full scroll-mt-24 flex-col rounded-3xl border bg-white p-5 shadow-soft transition dark:bg-slate-900 ${
-                  current ? "border-brand-300 ring-2 ring-brand-200 dark:border-brand-600/60 dark:ring-brand-600/30" : "border-slate-200 dark:border-slate-700/60"
-                }`}
-              >
-                <div className="flex items-start gap-4">
-                  <img src={iconUrl(app)} alt="" className="h-14 w-14 flex-shrink-0 rounded-2xl bg-slate-100 object-contain p-1.5 dark:bg-slate-800" />
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                      <h2 className="text-base font-semibold text-slate-900 dark:text-white">{app.name}</h2>
-                      <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ${chip.className}`}>
-                        {installedHere ? <Check className="h-3 w-3" /> : status === "waiting" ? <Loader2 className="h-3 w-3 animate-spin" /> : <CircleDashed className="h-3 w-3" />}
-                        {chip.label}
+                      {osLogo(p, "h-8 w-8 text-slate-900")}
+                      <span className="flex-1">
+                        <span className="block text-base font-bold">Download for {OS_LABEL[p]}</span>
+                        <span className="block text-xs text-slate-500">
+                          Version {release.version}
+                          {formatSize(files[p]?.size) ? ` · ${formatSize(files[p]?.size)}` : ""}
+                        </span>
                       </span>
-                    </div>
-                    <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">{app.description}</p>
-                  </div>
-                </div>
-
-                {app.origin === here && linksInBrowser && (
-                  <div className="mt-4">
-                    <OpenInAppGuide compact />
-                  </div>
-                )}
-
-                <div className="min-h-4 flex-1" aria-hidden />
-                <div className="flex items-center gap-2 border-t border-slate-100 pt-4 dark:border-slate-800">
-                  <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-                    {installedHere ? (
-                      <>
-                        <a href={openHref} target="_blank" rel="noopener" className={`${primaryBtn} px-4 py-2.5`}>
-                          <ExternalLink className="h-4 w-4" /> Open app
-                        </a>
-                        {appAction(
-                          app,
-                          `${ghostBtn} px-3 py-2.5`,
-                          <>
-                            <RotateCcw className="h-4 w-4" /> Reinstall
-                          </>,
-                        )}
-                      </>
-                    ) : (
-                      appAction(
-                        app,
-                        `${primaryBtn} px-4 py-2.5`,
-                        <>
-                          {busy === app.key ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : status === "waiting" ? (
-                            <ExternalLink className="h-4 w-4" />
-                          ) : (
-                            <Download className="h-4 w-4" />
-                          )}
-                          {status === "waiting" ? "Open again" : "Install & open"}
-                        </>,
-                      )
-                    )}
-                  </div>
-                  {!installedHere && (
-                    <a href={openHref} target="_blank" rel="noopener" className={iconBtn} title={`Open ${app.name}`} aria-label={`Open ${app.name}`}>
-                      <ExternalLink className="h-4 w-4" />
+                      <Download className="h-5 w-5 text-brand-600 transition group-hover:translate-y-0.5" />
                     </a>
+                  ))}
+                  {offered[0] && <p className="px-1 text-xs text-white/80">{REQUIREMENTS[offered[0]]}</p>}
+                  {offered[0] === "macos" && (
+                    <p className="rounded-xl bg-white/10 px-3 py-2 text-xs text-white/85" data-testid="damaged-hint">
+                      Saw “NGA is damaged and can't be opened”? That was an earlier download: download again, or use the
+                      one-command install below.
+                    </p>
                   )}
-                  <button
-                    type="button"
-                    onClick={() => setHelpFor((k) => (k === app.key ? null : app.key))}
-                    aria-expanded={helpFor === app.key}
-                    title="Trouble installing or opening?"
-                    aria-label={`Help with ${app.name}`}
-                    className={`${iconBtn} ${helpFor === app.key ? "bg-slate-100 text-brand-700 dark:bg-slate-800 dark:text-brand-200" : ""}`}
-                  >
-                    <HelpCircle className="h-4 w-4" />
-                  </button>
-                </div>
-
-                <AnimatePresence initial={false}>
-                  {helpFor === app.key && (
-                    <motion.ul
-                      initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: "auto", opacity: 1 }}
-                      exit={{ height: 0, opacity: 0 }}
-                      className="mt-3 space-y-1.5 overflow-hidden rounded-2xl bg-slate-50 p-3 text-sm text-slate-600 dark:bg-slate-800/60 dark:text-slate-300"
-                    >
-                      <li>• Install: the install icon at the right of the address bar, or menu ⋮ → “Install {app.name}”.</li>
-                      <li>
-                        • Opens in a browser tab although installed? In <code className="text-xs">chrome://apps</code> right-click it → App settings → turn on “Open
-                        supported links”.
-                      </li>
-                      <li>
-                        • Reinstall: remove it in <code className="text-xs">chrome://apps</code>, then press Install &amp; open here.
-                      </li>
-                      {status === "waiting" && (
-                        <li>
-                          • Installed already?{" "}
-                          <button type="button" className="font-semibold text-brand-700 underline dark:text-brand-200" onClick={() => set(app.key, "done")}>
-                            Mark {app.name} as installed
-                          </button>
-                        </li>
-                      )}
-                    </motion.ul>
+                  {!primary && (
+                    <p className="rounded-2xl bg-white/15 p-4 text-sm backdrop-blur" role="status">
+                      NGA Desktop runs on Windows and macOS computers. On this device, use the web apps below.
+                    </p>
                   )}
-                </AnimatePresence>
-              </motion.article>
-            );
-          })}
+                  {others.length > 0 && (
+                    <div className="flex flex-wrap gap-2 px-1 text-sm">
+                      <span className="text-white/75">{primary ? "Also for" : "Download for"}</span>
+                      {others.map((p) => (
+                        <a key={p} href={downloadUrl(p)} className="inline-flex items-center gap-1 font-semibold underline-offset-4 hover:underline">
+                          {osLogo(p, "h-3.5 w-3.5")} {OS_LABEL[p]}
+                        </a>
+                      ))}
+                    </div>
+                  )}
+                  {!!release.total_downloads && (
+                    <p className="px-1 text-xs text-white/70">Downloaded {release.total_downloads.toLocaleString()} times</p>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
         </section>
 
-        {/* IT */}
-        <details className="group rounded-3xl border border-slate-200 bg-white p-5 shadow-soft dark:border-slate-700/60 dark:bg-slate-900">
-          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-base font-semibold text-slate-900 dark:text-white">
-            <span className="flex items-center gap-2">
-              <ShieldCheck className="h-5 w-5 text-brand-600 dark:text-brand-200" /> For IT: install everything on school computers in one step
-            </span>
-            <ChevronDown className="h-5 w-5 text-slate-400 transition group-open:rotate-180" />
-          </summary>
-          <p className="mt-3 text-sm text-slate-600 dark:text-slate-300">
-            On computers the school manages (joined to the school domain, or enrolled in MDM), IT applies one file and every NGA app
-            installs silently for everyone, with notifications allowed. Browsers ignore these files on personal, unmanaged devices.
-          </p>
-          <div className="mt-4 flex flex-wrap gap-2">
-            {policyFiles.map((f) => (
-              <button key={f.file} type="button" onClick={() => downloadText(f.file, f.build(), f.type)} className={outlineBtn}>
-                <FileDown className="h-4 w-4" /> {f.label}
-              </button>
-            ))}
-          </div>
-          <ul className="mt-3 space-y-1 text-xs text-slate-600 dark:text-slate-300">
-            <li className="flex gap-2">
-              <Laptop className="h-3.5 w-3.5 flex-shrink-0 translate-y-0.5" /> Windows: deploy the .reg by Group Policy / Intune (or run it as admin on a
-              domain-joined PC), then restart the browser.
-            </li>
-            <li className="flex gap-2">
-              <MonitorSmartphone className="h-3.5 w-3.5 flex-shrink-0 translate-y-0.5" /> Mac: push the .mobileconfig with your MDM, then restart Chrome.
-            </li>
-          </ul>
-        </details>
-
-        {showDiag && (
-          <section aria-label="Install diagnostics" className="rounded-3xl border border-dashed border-slate-300 bg-white p-5 text-sm dark:border-slate-700 dark:bg-slate-900">
-            <div className="flex items-center justify-between gap-2">
-              <h2 className="font-semibold text-slate-900 dark:text-white">Install diagnostics (this browser)</h2>
-              <button
-                type="button"
-                className={outlineBtn}
-                onClick={async () => {
-                  await refreshInstallCheck();
-                  setDiagTick((n) => n + 1);
-                }}
-              >
-                <RotateCcw className="h-4 w-4" /> Re-check now
-              </button>
-            </div>
-            <pre className="mt-3 overflow-x-auto whitespace-pre-wrap break-all rounded-2xl bg-slate-50 p-3 text-xs text-slate-700 dark:bg-slate-800/60 dark:text-slate-200">
-              {JSON.stringify({ ...getInstallDiagnostics(), tick: diagTick, misStatusOnThisPage: progress.mis }, null, 2)}
-            </pre>
+        {/* How to install: download (one-time security step) or one command (no warning) */}
+        {!inDesktop && primary && release?.version && (
+          <section className={card}>
+            <button
+              type="button"
+              className="flex w-full items-center justify-between text-left"
+              aria-expanded={showSteps}
+              onClick={() => setShowSteps((s) => !s)}
+            >
+              <span className="text-base font-semibold text-slate-900 dark:text-white">How to install on {OS_LABEL[primary]}</span>
+              <ChevronDown className={`h-5 w-5 text-slate-400 transition ${showSteps ? "rotate-180" : ""}`} />
+            </button>
+            {showSteps && (
+              <div className="mt-4">
+                <InstallGuide os={stepsFor} />
+              </div>
+            )}
           </section>
         )}
 
-        <p className="text-center text-xs text-slate-500 dark:text-slate-400">
-          {canWebInstall ? "Your browser can install the NGA apps directly from this page." : "Tip: Chrome and Edge 156+ install each app straight from this page."}
+        {/* Web apps (phones, tablets, Chromebooks, or the browser by choice) */}
+        <section className={card}>
+          <h2 className="text-base font-semibold text-slate-900 dark:text-white">{primary ? "Prefer the browser?" : "Use the web apps"}</h2>
+          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Every NGA app also works in any browser, on any device.</p>
+          <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+            {NGA_APPS.map((a) => (
+              <a
+                key={a.key}
+                href={startUrl(a).replace("?source=pwa", "")}
+                target="_blank"
+                rel="noopener"
+                className="flex items-center gap-2.5 rounded-2xl border border-slate-200 px-3 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-brand-300 hover:bg-brand-50/50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+              >
+                <img src={iconUrl(a)} alt="" className="h-7 w-7 rounded-lg" />
+                {a.name}
+              </a>
+            ))}
+          </div>
+        </section>
+
+        {/* Admins: how many downloaded, how many use it */}
+        {stats && (
+          <section className={card} data-testid="download-stats">
+            <h2 className="flex items-center gap-2 text-base font-semibold text-slate-900 dark:text-white">
+              <BarChart3 className="h-5 w-5 text-brand-600" /> Downloads and installs
+            </h2>
+            <dl className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+              {[
+                ["Downloads", stats.downloads.total],
+                ["People / devices", stats.downloads.people],
+                ["Active installs (30 days)", stats.installs.active_30_days],
+                [
+                  `On ${stats.current_version ?? "latest"}`,
+                  stats.installs.active_30_days
+                    ? `${Math.round((stats.installs.on_current_version / stats.installs.active_30_days) * 100)}%`
+                    : "–",
+                ],
+              ].map(([label, value]) => (
+                <div key={String(label)} className="rounded-2xl bg-slate-50 p-4 dark:bg-slate-800/60">
+                  <dt className="text-xs font-medium text-slate-500 dark:text-slate-400">{label}</dt>
+                  <dd className="mt-1 text-2xl font-bold text-slate-900 dark:text-white">{typeof value === "number" ? value.toLocaleString() : value}</dd>
+                </div>
+              ))}
+            </dl>
+            <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">
+              {stats.downloads.by_platform.map((p) => `${OS_LABEL[p.platform as DownloadPlatform] ?? p.platform}: ${p.count}`).join(" · ") || "No downloads yet"}
+              {" · "}Installs: Windows {stats.installs.windows}, macOS {stats.installs.macos}
+            </p>
+          </section>
+        )}
+
+        <p className="flex items-center justify-center gap-1.5 pb-4 text-center text-xs text-slate-400">
+          <ShieldCheck className="h-3.5 w-3.5" /> Downloads come from NGA's own server. Updates are signed and checked before they install.
         </p>
       </main>
-
-      <Modal isOpen={guideOpen} onClose={() => setGuideOpen(false)} title="Install NGA MIS" size="md">
-        <InstallGuide
-          onDone={() => {
-            setGuideOpen(false);
-            set("mis", "done");
-          }}
-        />
-      </Modal>
     </div>
   );
 };
