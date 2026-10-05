@@ -25,6 +25,7 @@ import { macInstallScript, windowsInstallScript } from "../services/desktop/inst
  *   GET /desktop/install.sh | install.ps1 one-line installers (checksum-pinned)
  * And for admins (Usage analytics permission):
  *   GET /desktop/stats                   downloads and active installs
+ * NGA Tools endpoints live in routes/desktopTools.ts (/desktop/tools/…).
  */
 const router = express.Router();
 

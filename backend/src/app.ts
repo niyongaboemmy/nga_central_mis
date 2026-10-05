@@ -37,6 +37,8 @@ import activityRoutes from "./routes/activity";
 import monitorRoutes from "./routes/monitor";
 import officeHoursRoutes from "./routes/officeHours";
 import desktopRoutes from "./routes/desktop";
+import { desktopToolsRouter } from "./routes/desktopTools";
+import { authenticate } from "./middleware/auth";
 import { jwks, ssoIssuer } from "./services/sso/signingKey";
 
 const app = express();
@@ -79,6 +81,7 @@ app.use(requestLogger);
 app.use("/health", healthRoutes);
 
 // NGA Desktop downloads, update checks and release files (public; stats need ANALYTICS_VIEW).
+app.use("/desktop/tools", desktopToolsRouter(authenticate));
 app.use("/desktop", desktopRoutes);
 
 // SSO discovery + signing keys (public). Apps verify single-sign-out
