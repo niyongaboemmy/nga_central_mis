@@ -22,7 +22,7 @@ export const StudentOfficeHoursCard: React.FC<{ data: StudentOverview; name?: st
   const stats = data.stats;
   return (
     <div className="space-y-5">
-      {name && <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">{name}</h2>}
+      {name && <h2 className="text-lg font-semibold text-slate-900 dark:text-gray-100">{name}</h2>}
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-5">
         <div className="min-w-0 space-y-5 lg:col-span-3">
           <Card labelledBy={`oh-assign-${data.student_id}`}>
@@ -34,12 +34,12 @@ export const StudentOfficeHoursCard: React.FC<{ data: StudentOverview; name?: st
                 {active.map((a) => (
                   <li
                     key={a.assignment_id}
-                    className="rounded-2xl border border-slate-200 p-4 dark:border-slate-700"
+                    className="rounded-2xl border border-slate-200 p-4 dark:border-gray-700/30"
                     style={a.subject_color ? { borderLeftColor: a.subject_color, borderLeftWidth: 4 } : undefined}
                   >
-                    <p className="font-semibold text-slate-900 dark:text-slate-100">
+                    <p className="font-semibold text-slate-900 dark:text-gray-100">
                       {a.title}
-                      {a.teacher_name ? <span className="font-normal text-slate-700 dark:text-slate-200"> with {a.teacher_name}</span> : null}
+                      {a.teacher_name ? <span className="font-normal text-slate-700 dark:text-gray-200"> with {a.teacher_name}</span> : null}
                     </p>
                     <Muted>
                       {a.days_label} · {a.start_time}–{a.end_time}
@@ -57,7 +57,7 @@ export const StudentOfficeHoursCard: React.FC<{ data: StudentOverview; name?: st
               </ul>
             )}
             {active.length > 0 && (
-              <p className="mt-4 text-sm text-slate-700 dark:text-slate-200">
+              <p className="mt-4 text-sm text-slate-700 dark:text-gray-200">
                 Office hours are mandatory. If you can't come, tell your teacher before the session.
               </p>
             )}
@@ -68,19 +68,19 @@ export const StudentOfficeHoursCard: React.FC<{ data: StudentOverview; name?: st
             {data.history.length === 0 ? (
               <Muted>No sessions yet.</Muted>
             ) : (
-              <ul className="divide-y divide-slate-100 dark:divide-slate-800">
+              <ul className="divide-y divide-slate-100 dark:divide-gray-700/30">
                 {data.history.slice(0, 30).map((h) => (
                   <li key={h.session_id} className="flex items-center justify-between gap-3 py-2">
                     <div className="min-w-0">
-                      <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">{formatYmd(h.session_date)}</p>
-                      <p className="truncate text-xs text-slate-600 dark:text-slate-300">{[h.title, h.teacher_name].filter(Boolean).join(" · ")}</p>
+                      <p className="text-sm font-semibold text-slate-900 dark:text-gray-100">{formatYmd(h.session_date)}</p>
+                      <p className="truncate text-xs text-slate-600 dark:text-gray-300">{[h.title, h.teacher_name].filter(Boolean).join(" · ")}</p>
                     </div>
                     {h.state === "cancelled" ? (
-                      <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">Cancelled{h.cancel_reason === "CLOSURE" ? " (school closed)" : ""}</span>
+                      <span className="text-xs font-semibold text-slate-600 dark:text-gray-300">Cancelled{h.cancel_reason === "CLOSURE" ? " (school closed)" : ""}</span>
                     ) : h.state === "held" ? (
                       <AttendancePill status={h.status} />
                     ) : (
-                      <span className="text-xs text-slate-600 dark:text-slate-300">Not marked yet</span>
+                      <span className="text-xs text-slate-600 dark:text-gray-300">Not marked yet</span>
                     )}
                   </li>
                 ))}
@@ -94,7 +94,7 @@ export const StudentOfficeHoursCard: React.FC<{ data: StudentOverview; name?: st
             <CardTitle id={`oh-next-${data.student_id}`} icon={<CalendarClock className="h-4 w-4" aria-hidden />}>Next session</CardTitle>
             {next ? (
               <div>
-                <p className="text-xl font-bold text-slate-900 dark:text-slate-50">{formatYmd(next.session_date)}</p>
+                <p className="text-xl font-bold text-slate-900 dark:text-gray-50">{formatYmd(next.session_date)}</p>
                 <Muted>
                   {next.start_time}–{next.end_time}
                   {next.location ? ` · ${next.location}` : ""}
@@ -102,7 +102,7 @@ export const StudentOfficeHoursCard: React.FC<{ data: StudentOverview; name?: st
                 <Muted className="text-xs">{[next.title, next.teacher_name].filter(Boolean).join(" · ")}</Muted>
                 {canNotify && <AbsenceNoticeButton session={next} onSent={onChanged} />}
                 {data.upcoming.length > 1 && (
-                  <ul className="mt-3 space-y-1 text-sm text-slate-700 dark:text-slate-200">
+                  <ul className="mt-3 space-y-1 text-sm text-slate-700 dark:text-gray-200">
                     {data.upcoming.slice(1, 5).map((u) => (
                       <li key={u.session_id}>
                         {formatYmd(u.session_date)} · {u.start_time}
@@ -119,7 +119,7 @@ export const StudentOfficeHoursCard: React.FC<{ data: StudentOverview; name?: st
           {stats && stats.expected > 0 && (
             <Card labelledBy={`oh-stats-${data.student_id}`}>
               <CardTitle id={`oh-stats-${data.student_id}`} icon={<Flame className="h-4 w-4 text-orange-500" aria-hidden />}>Attendance</CardTitle>
-              <p className="text-3xl font-bold tabular-nums text-slate-900 dark:text-slate-50">{stats.rate === null ? "—" : `${Math.round(stats.rate)}%`}</p>
+              <p className="text-3xl font-bold tabular-nums text-slate-900 dark:text-gray-50">{stats.rate === null ? "—" : `${Math.round(stats.rate)}%`}</p>
               <Muted className="text-xs">
                 {stats.present + stats.late} attended · {stats.excused} excused · {stats.absent} missed, of {stats.expected}
               </Muted>
@@ -165,7 +165,7 @@ const MyOfficeHours: React.FC = () => {
   return (
     <div className="mx-auto max-w-6xl space-y-6 px-4 py-6 sm:px-6">
       <header>
-        <h1 className="flex items-center gap-2 text-2xl font-bold text-slate-900 dark:text-slate-50">
+        <h1 className="flex items-center gap-2 text-2xl font-bold text-slate-900 dark:text-gray-50">
           <Clock4 className="h-6 w-6 text-blue-600" aria-hidden /> {children.length && !showOwn ? "Office hours" : "My office hours"}
         </h1>
         <Muted>Support sessions with your teachers after the last period.</Muted>

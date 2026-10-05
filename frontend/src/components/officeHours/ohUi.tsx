@@ -18,7 +18,7 @@ export const Card: React.FC<React.PropsWithChildren<{ className?: string; as?: "
   return (
     <Tag
       aria-labelledby={labelledBy}
-      className={`rounded-3xl border border-slate-200 bg-white p-5 shadow-soft dark:border-slate-700/60 dark:bg-slate-900 ${className}`}
+      className={`rounded-3xl border border-slate-200 bg-white p-5 shadow-soft dark:border-gray-700/30 dark:bg-gray-800/30 ${className}`}
     >
       {children}
     </Tag>
@@ -32,7 +32,7 @@ export const CardTitle: React.FC<React.PropsWithChildren<{ id?: string; icon?: R
   action,
 }) => (
   <div className="mb-3 flex items-center justify-between gap-3">
-    <h2 id={id} className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-300">
+    <h2 id={id} className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-slate-600 dark:text-gray-300">
       {icon}
       {children}
     </h2>
@@ -41,11 +41,11 @@ export const CardTitle: React.FC<React.PropsWithChildren<{ id?: string; icon?: R
 );
 
 export const Muted: React.FC<React.PropsWithChildren<{ className?: string }>> = ({ children, className = "" }) => (
-  <p className={`text-sm text-slate-600 dark:text-slate-300 ${className}`}>{children}</p>
+  <p className={`text-sm text-slate-600 dark:text-gray-300 ${className}`}>{children}</p>
 );
 
 export const Spinner: React.FC<{ label?: string }> = ({ label = "Loading" }) => (
-  <div role="status" className="flex items-center gap-2 py-6 text-sm text-slate-600 dark:text-slate-300">
+  <div role="status" className="flex items-center gap-2 py-6 text-sm text-slate-600 dark:text-gray-300">
     <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> {label}…
   </div>
 );
@@ -56,9 +56,9 @@ export const EmptyState: React.FC<{ title: string; body?: string; action?: React
   action,
   icon,
 }) => (
-  <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-slate-300 px-6 py-8 text-center dark:border-slate-700">
-    {icon && <div className="text-slate-400 dark:text-slate-500">{icon}</div>}
-    <p className="font-semibold text-slate-800 dark:text-slate-100">{title}</p>
+  <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-slate-300 px-6 py-8 text-center dark:border-gray-700/30">
+    {icon && <div className="text-slate-400 dark:text-gray-500">{icon}</div>}
+    <p className="font-semibold text-slate-800 dark:text-gray-100">{title}</p>
     {body && <Muted>{body}</Muted>}
     {action}
   </div>
@@ -67,7 +67,7 @@ export const EmptyState: React.FC<{ title: string; body?: string; action?: React
 const pill = "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold";
 
 export const SESSION_STATE_META: Record<SessionState, { label: string; cls: string }> = {
-  upcoming: { label: "Upcoming", cls: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200" },
+  upcoming: { label: "Upcoming", cls: "bg-slate-100 text-slate-700 dark:bg-gray-800/40 dark:text-gray-200" },
   running: { label: "Now", cls: "bg-blue-100 text-blue-800 dark:bg-blue-500/15 dark:text-blue-200" },
   unmarked: { label: "Register missing", cls: "bg-amber-100 text-amber-900 dark:bg-amber-500/15 dark:text-amber-100" },
   held: { label: "Marked", cls: "bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-200" },
@@ -111,9 +111,9 @@ export const ATTENDANCE_META: Record<AttendanceStatus, { label: string; short: s
 
 export const AttendancePill: React.FC<{ status: AttendanceStatus | null }> = ({ status }) =>
   status ? (
-    <span className={`${pill} bg-slate-100 dark:bg-slate-800 ${ATTENDANCE_META[status].cls}`}>{ATTENDANCE_META[status].label}</span>
+    <span className={`${pill} bg-slate-100 dark:bg-gray-800/40 ${ATTENDANCE_META[status].cls}`}>{ATTENDANCE_META[status].label}</span>
   ) : (
-    <span className={`${pill} bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300`}>Not marked</span>
+    <span className={`${pill} bg-slate-100 text-slate-600 dark:bg-gray-800/40 dark:text-gray-300`}>Not marked</span>
   );
 
 export const AvailabilityChip: React.FC<{ availability: Availability }> = ({ availability }) => {
@@ -127,7 +127,7 @@ export const AvailabilityChip: React.FC<{ availability: Availability }> = ({ ava
   // A weekly invitation names its week; a longer one only its days.
   const week = h?.from && h.to && weekStartOf(h.from) === weekStartOf(h.to) ? ` · wk ${shortDate(weekStartOf(h.from))}` : "";
   return (
-    <span className={`${pill} bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200`} title={h ? `${h.title} · ${h.days_label}${week}` : undefined}>
+    <span className={`${pill} bg-slate-200 text-slate-700 dark:bg-gray-700/50 dark:text-gray-200`} title={h ? `${h.title} · ${h.days_label}${week}` : undefined}>
       {h ? `With ${h.teacher_name ?? "another teacher"} · ${h.days_label}${week}` : "Taken"}
     </span>
   );
@@ -137,7 +137,7 @@ export const BAND_META: Record<StudentStats["band"], { label: string; cls: strin
   CONSISTENT: { label: "Consistent", cls: "bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-200" },
   WATCH: { label: "Watch", cls: "bg-amber-100 text-amber-900 dark:bg-amber-500/15 dark:text-amber-100" },
   CHRONIC: { label: "Chronic", cls: "bg-rose-100 text-rose-800 dark:bg-rose-500/15 dark:text-rose-200" },
-  TOO_FEW: { label: "Too few sessions", cls: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200" },
+  TOO_FEW: { label: "Too few sessions", cls: "bg-slate-100 text-slate-700 dark:bg-gray-800/40 dark:text-gray-200" },
 };
 
 export const BandPill: React.FC<{ band: StudentStats["band"] }> = ({ band }) => (
@@ -145,15 +145,15 @@ export const BandPill: React.FC<{ band: StudentStats["band"] }> = ({ band }) => 
 );
 
 export const RatePill: React.FC<{ rate: number | null }> = ({ rate }) => (
-  <span className="tabular-nums text-sm font-semibold text-slate-800 dark:text-slate-100">{rate === null ? "—" : `${Math.round(rate)}%`}</span>
+  <span className="tabular-nums text-sm font-semibold text-slate-800 dark:text-gray-100">{rate === null ? "—" : `${Math.round(rate)}%`}</span>
 );
 
 export const primaryBtn =
-  "inline-flex items-center justify-center gap-2 rounded-full bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:focus-visible:ring-offset-slate-900";
+  "inline-flex items-center justify-center gap-2 rounded-full bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:focus-visible:ring-offset-gray-900";
 export const secondaryBtn =
-  "inline-flex items-center justify-center gap-2 rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-800 transition hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700";
+  "inline-flex items-center justify-center gap-2 rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-800 transition hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700/50 dark:bg-gray-800/40 dark:text-gray-100 dark:hover:bg-gray-700/50";
 export const dangerBtn =
-  "inline-flex items-center justify-center gap-2 rounded-full border border-rose-300 bg-white px-4 py-2 text-sm font-semibold text-rose-700 transition hover:bg-rose-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 disabled:cursor-not-allowed disabled:opacity-50 dark:border-rose-500/40 dark:bg-slate-800 dark:text-rose-200 dark:hover:bg-rose-500/10";
+  "inline-flex items-center justify-center gap-2 rounded-full border border-rose-300 bg-white px-4 py-2 text-sm font-semibold text-rose-700 transition hover:bg-rose-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 disabled:cursor-not-allowed disabled:opacity-50 dark:border-rose-500/40 dark:bg-gray-800/40 dark:text-rose-200 dark:hover:bg-rose-500/10";
 export const inputCls =
-  "w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-500 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400";
-export const labelCls = "mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300";
+  "w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-500 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30 dark:border-gray-700/50 dark:bg-gray-800/40 dark:text-gray-100 dark:placeholder:text-gray-400";
+export const labelCls = "mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-gray-300";

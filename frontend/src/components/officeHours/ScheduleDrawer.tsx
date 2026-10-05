@@ -5,6 +5,7 @@ import { useToast } from "../../contexts/ToastContext";
 import { myAssignedSubjectsApi, type MyAssignedSubject } from "../../api/academics";
 import {
   apiError,
+  ALL_DAYS,
   DAY_LONG,
   DAY_SHORT,
   formatYmd,
@@ -48,7 +49,13 @@ const STEPS: Array<[Step, string]> = [
   ["review", "Review"],
 ];
 
-const sectionTitle = "flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-slate-50";
+const DAY_PRESETS: Array<[string, number[]]> = [
+  ["Mon–Fri", [1, 2, 3, 4, 5]],
+  ["Weekend", [6, 7]],
+  ["Clear", []],
+];
+
+const sectionTitle = "flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-gray-50";
 const errorText = "mt-1 text-xs font-medium text-rose-700 dark:text-rose-300";
 
 const Stepper: React.FC<{ step: Step }> = ({ step }) => {
@@ -59,13 +66,13 @@ const Stepper: React.FC<{ step: Step }> = ({ step }) => {
         <li key={k} className="flex items-center gap-2" aria-current={i === at ? "step" : undefined}>
           <span
             className={`grid h-6 w-6 place-items-center rounded-full text-[11px] ${
-              i < at ? "bg-emerald-600 text-white" : i === at ? "bg-blue-600 text-white" : "bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-300"
+              i < at ? "bg-emerald-600 text-white" : i === at ? "bg-blue-600 text-white" : "bg-slate-200 text-slate-600 dark:bg-gray-700/50 dark:text-gray-300"
             }`}
           >
             {i < at ? <Check className="h-3.5 w-3.5" aria-hidden /> : i + 1}
           </span>
-          <span className={`hidden sm:inline ${i === at ? "text-slate-900 dark:text-slate-50" : "text-slate-500 dark:text-slate-400"}`}>{label}</span>
-          {i < STEPS.length - 1 && <span className="h-px w-6 bg-slate-300 dark:bg-slate-600" aria-hidden />}
+          <span className={`hidden sm:inline ${i === at ? "text-slate-900 dark:text-gray-50" : "text-slate-500 dark:text-gray-400"}`}>{label}</span>
+          {i < STEPS.length - 1 && <span className="h-px w-6 bg-slate-300 dark:bg-gray-600/60" aria-hidden />}
         </li>
       ))}
     </ol>
@@ -145,7 +152,7 @@ const ScheduleDrawer: React.FC<ScheduleDrawerProps> = ({ open, onClose, config, 
 
   const validate = () => {
     const e: Record<string, string> = {};
-    if (!form.days.length) e.days = "Choose at least one weekday";
+    if (!form.days.length) e.days = "Choose at least one day";
     if (form.end_time <= form.start_time) e.end_time = "The end must be after the start";
     if (form.start_time < config.allowed_window_start || form.end_time > config.allowed_window_end) {
       e.start_time = `Office hours must fall between ${config.allowed_window_start} and ${config.allowed_window_end}`;
@@ -231,7 +238,7 @@ const ScheduleDrawer: React.FC<ScheduleDrawerProps> = ({ open, onClose, config, 
   const firstError = errors.days || errors.start_time || errors.end_time || errors.effective_to || errors.capacity;
 
   const footer = (children: React.ReactNode) => (
-    <div className="sticky bottom-0 z-10 flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 bg-white/95 px-5 py-3 backdrop-blur sm:px-6 dark:border-slate-700 dark:bg-slate-900/95">
+    <div className="sticky bottom-0 z-10 flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 bg-white/95 px-5 py-3 backdrop-blur sm:px-6 dark:border-gray-700/30 dark:bg-gray-900/80">
       {children}
     </div>
   );
@@ -258,10 +265,25 @@ const ScheduleDrawer: React.FC<ScheduleDrawerProps> = ({ open, onClose, config, 
                   <CalendarDays className="h-4 w-4 text-blue-600 dark:text-blue-400" aria-hidden /> When
                 </h3>
                 <fieldset>
-                  <legend className={labelCls}>Days</legend>
-                  <div className="grid grid-cols-5 gap-2" role="group" aria-label="Weekdays">
-                    {[1, 2, 3, 4, 5].map((d) => {
+                  <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
+                    <legend className={`${labelCls} mb-0`}>Days</legend>
+                    <div className="flex gap-1" aria-label="Quick choices">
+                      {DAY_PRESETS.map(([label, days]) => (
+                        <button
+                          key={label}
+                          type="button"
+                          onClick={() => setForm((f) => ({ ...f, days: [...days] }))}
+                          className="rounded-full px-2.5 py-0.5 text-xs font-semibold text-blue-700 transition hover:bg-blue-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:text-blue-300 dark:hover:bg-blue-500/10"
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-7 gap-1.5 sm:gap-2" role="group" aria-label="Days of the week">
+                    {ALL_DAYS.map((d) => {
                       const on = form.days.includes(d);
+                      const weekend = d >= 6;
                       return (
                         <button
                           key={d}
@@ -269,14 +291,14 @@ const ScheduleDrawer: React.FC<ScheduleDrawerProps> = ({ open, onClose, config, 
                           aria-pressed={on}
                           aria-label={DAY_LONG[d]}
                           onClick={() => toggleDay(d)}
-                          className={`flex flex-col items-center rounded-2xl border px-2 py-2.5 text-sm font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
+                          className={`flex flex-col items-center rounded-2xl border px-1 py-2.5 text-sm font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
                             on
                               ? "border-blue-600 bg-blue-600 text-white shadow-sm shadow-blue-600/20"
-                              : "border-slate-300 bg-white text-slate-800 hover:border-blue-300 hover:bg-blue-50/60 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:hover:border-blue-500/50"
+                              : `${weekend ? "border-dashed" : ""} border-slate-300 bg-white text-slate-800 hover:border-blue-300 hover:bg-blue-50/60 dark:border-gray-700/50 dark:bg-gray-800/40 dark:text-gray-100 dark:hover:border-blue-500/50 dark:hover:bg-gray-700/40`
                           }`}
                         >
                           <span>{DAY_SHORT[d]}</span>
-                          <span className={`hidden text-[11px] font-medium md:block ${on ? "text-blue-100" : "text-slate-500 dark:text-slate-400"}`}>{DAY_LONG[d]}</span>
+                          <span className={`hidden text-[11px] font-medium xl:block ${on ? "text-blue-100" : "text-slate-500 dark:text-gray-400"}`}>{DAY_LONG[d]}</span>
                         </button>
                       );
                     })}
@@ -308,7 +330,7 @@ const ScheduleDrawer: React.FC<ScheduleDrawerProps> = ({ open, onClose, config, 
                     <button
                       type="button"
                       onClick={() => setForm({ ...form, start_time: config.band_start, end_time: config.band_end })}
-                      className="rounded-full border border-slate-300 px-3 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
+                      className="rounded-full border border-slate-300 px-3 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-gray-700/50 dark:text-gray-200 dark:hover:bg-gray-800/40"
                     >
                       Use the band {config.band_start}–{config.band_end}
                     </button>
@@ -317,7 +339,7 @@ const ScheduleDrawer: React.FC<ScheduleDrawerProps> = ({ open, onClose, config, 
                     <button
                       type="button"
                       onClick={() => setForm({ ...form, effective_from: defaults.effective_from, effective_to: termEnd })}
-                      className="rounded-full border border-slate-300 px-3 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
+                      className="rounded-full border border-slate-300 px-3 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-gray-700/50 dark:text-gray-200 dark:hover:bg-gray-800/40"
                     >
                       Rest of term
                     </button>
@@ -328,7 +350,7 @@ const ScheduleDrawer: React.FC<ScheduleDrawerProps> = ({ open, onClose, config, 
                 </div>
               </section>
 
-              <section aria-labelledby="oh-what" className="space-y-4 border-t border-slate-200 pt-5 dark:border-slate-700">
+              <section aria-labelledby="oh-what" className="space-y-4 border-t border-slate-200 pt-5 dark:border-gray-700/30">
                 <h3 id="oh-what" className={sectionTitle}>
                   <Tag className="h-4 w-4 text-blue-600 dark:text-blue-400" aria-hidden /> What
                 </h3>
@@ -364,8 +386,8 @@ const ScheduleDrawer: React.FC<ScheduleDrawerProps> = ({ open, onClose, config, 
                           onClick={() => setForm({ ...form, purpose: p })}
                           className={`rounded-full border px-3 py-1.5 text-sm font-medium transition focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
                             on
-                              ? "border-slate-900 bg-slate-900 text-white dark:border-white dark:bg-white dark:text-slate-900"
-                              : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+                              ? "border-blue-600 bg-blue-50 text-blue-800 dark:border-blue-400/60 dark:bg-blue-500/15 dark:text-blue-100"
+                              : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50 dark:border-gray-700/50 dark:bg-gray-800/40 dark:text-gray-200 dark:hover:bg-gray-700/50"
                           }`}
                         >
                           {humanize(p)}
@@ -385,8 +407,8 @@ const ScheduleDrawer: React.FC<ScheduleDrawerProps> = ({ open, onClose, config, 
                   </div>
                   <div>
                     <label htmlFor="oh-capacity" className={labelCls}>Capacity</label>
-                    <div className="flex items-stretch overflow-hidden rounded-xl border border-slate-300 bg-white focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/30 dark:border-slate-600 dark:bg-slate-800">
-                      <button type="button" onClick={() => setForm({ ...form, capacity: Math.max(1, Number(form.capacity) - 1) })} className="px-3 text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-700" aria-label="One place fewer">
+                    <div className="flex items-stretch overflow-hidden rounded-xl border border-slate-300 bg-white focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/30 dark:border-gray-700/50 dark:bg-gray-800/40">
+                      <button type="button" onClick={() => setForm({ ...form, capacity: Math.max(1, Number(form.capacity) - 1) })} className="px-3 text-slate-600 hover:bg-slate-100 dark:text-gray-300 dark:hover:bg-gray-700/50" aria-label="One place fewer">
                         <Minus className="h-4 w-4" aria-hidden />
                       </button>
                       <input
@@ -394,16 +416,16 @@ const ScheduleDrawer: React.FC<ScheduleDrawerProps> = ({ open, onClose, config, 
                         type="number"
                         min={1}
                         max={config.max_capacity}
-                        className="w-full min-w-0 border-0 bg-transparent px-1 py-2 text-center text-sm font-semibold tabular-nums text-slate-900 focus:outline-none dark:text-slate-100"
+                        className="w-full min-w-0 border-0 bg-transparent px-1 py-2 text-center text-sm font-semibold tabular-nums [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none text-slate-900 focus:outline-none dark:text-gray-100"
                         value={form.capacity}
                         onChange={(e) => setForm({ ...form, capacity: Number(e.target.value) })}
                         aria-invalid={Boolean(errors.capacity)}
                       />
-                      <button type="button" onClick={() => setForm({ ...form, capacity: Math.min(config.max_capacity, Number(form.capacity) + 1) })} className="px-3 text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-700" aria-label="One place more">
+                      <button type="button" onClick={() => setForm({ ...form, capacity: Math.min(config.max_capacity, Number(form.capacity) + 1) })} className="px-3 text-slate-600 hover:bg-slate-100 dark:text-gray-300 dark:hover:bg-gray-700/50" aria-label="One place more">
                         <Plus className="h-4 w-4" aria-hidden />
                       </button>
                     </div>
-                    {errors.capacity ? <p className={errorText}>{errors.capacity}</p> : <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">Per session · max {config.max_capacity}</p>}
+                    {errors.capacity ? <p className={errorText}>{errors.capacity}</p> : <p className="mt-1 text-[11px] text-slate-500 dark:text-gray-400">Per session · max {config.max_capacity}</p>}
                   </div>
                 </div>
 
@@ -416,26 +438,26 @@ const ScheduleDrawer: React.FC<ScheduleDrawerProps> = ({ open, onClose, config, 
               </section>
             </div>
 
-            <aside className="border-t border-slate-200 bg-slate-50/80 p-5 sm:p-6 lg:border-l lg:border-t-0 dark:border-slate-700 dark:bg-slate-900/40" aria-label="Preview">
+            <aside className="border-t border-slate-200 bg-slate-50/80 p-5 sm:p-6 lg:border-l lg:border-t-0 dark:border-gray-700/30 dark:bg-gray-800/30" aria-label="Preview">
               <div className="space-y-4 lg:sticky lg:top-6">
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">What students will see</p>
-                <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-gray-300">What students will see</p>
+                <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-gray-700/30 dark:bg-gray-800/40">
                   <span className="absolute inset-y-0 left-0 w-1.5" style={{ background: subjectColor ?? "#2563eb" }} aria-hidden />
-                  <p className="truncate pl-2 text-base font-semibold text-slate-900 dark:text-slate-50">{titlePreview}</p>
-                  <ul className="mt-2 space-y-1.5 pl-2 text-sm text-slate-700 dark:text-slate-200">
+                  <p className="truncate pl-2 text-base font-semibold text-slate-900 dark:text-gray-50">{titlePreview}</p>
+                  <ul className="mt-2 space-y-1.5 pl-2 text-sm text-slate-700 dark:text-gray-200">
                     <li className="flex items-center gap-2"><Clock className="h-4 w-4 text-slate-400" aria-hidden />{form.days.length ? form.days.map((d) => DAY_SHORT[d]).join(", ") : "No day yet"} · {form.start_time}–{form.end_time}</li>
                     <li className="flex items-center gap-2"><DoorOpen className="h-4 w-4 text-slate-400" aria-hidden />{form.location.trim() || "Room not set"}</li>
                     <li className="flex items-center gap-2"><CalendarRange className="h-4 w-4 text-slate-400" aria-hidden />{shortDate(form.effective_from)} – {shortDate(form.effective_to, true)}</li>
                   </ul>
                 </div>
 
-                <div className="grid grid-cols-5 gap-1.5" aria-hidden>
-                  {[1, 2, 3, 4, 5].map((d) => {
+                <div className="grid grid-cols-7 gap-1" aria-hidden>
+                  {ALL_DAYS.map((d) => {
                     const on = form.days.includes(d);
                     return (
-                      <div key={d} className={`flex h-16 flex-col items-center justify-between rounded-xl border p-1.5 text-[11px] font-semibold ${on ? "border-blue-200 bg-blue-50 text-blue-800 dark:border-blue-500/40 dark:bg-blue-500/15 dark:text-blue-100" : "border-dashed border-slate-200 text-slate-400 dark:border-slate-700 dark:text-slate-500"}`}>
+                      <div key={d} className={`flex h-14 flex-col items-center justify-between rounded-xl border px-0.5 py-1.5 text-[11px] font-semibold ${on ? "border-blue-200 bg-blue-50 text-blue-800 dark:border-blue-500/40 dark:bg-blue-500/15 dark:text-blue-100" : "border-dashed border-slate-200 text-slate-400 dark:border-gray-700/30 dark:text-gray-500"}`}>
                         <span>{DAY_SHORT[d]}</span>
-                        {on && <span className="rounded-md bg-blue-600 px-1 py-0.5 text-[10px] text-white">{form.start_time}</span>}
+                        {on && <span className="h-1.5 w-1.5 rounded-full bg-blue-600 dark:bg-blue-400" />}
                       </div>
                     );
                   })}
@@ -447,9 +469,9 @@ const ScheduleDrawer: React.FC<ScheduleDrawerProps> = ({ open, onClose, config, 
                     ["Sessions", sessionCount],
                     ["Places", form.capacity || 0],
                   ].map(([k, v]) => (
-                    <div key={k} className="rounded-xl bg-white p-2 dark:bg-slate-800">
-                      <dd className="text-lg font-bold tabular-nums text-slate-900 dark:text-slate-50">{v}</dd>
-                      <dt className="text-[11px] font-medium text-slate-500 dark:text-slate-400">{k}</dt>
+                    <div key={k} className="rounded-xl bg-white p-2 dark:bg-gray-800/40">
+                      <dd className="text-lg font-bold tabular-nums text-slate-900 dark:text-gray-50">{v}</dd>
+                      <dt className="text-[11px] font-medium text-slate-500 dark:text-gray-400">{k}</dt>
                     </div>
                   ))}
                 </dl>
@@ -493,7 +515,7 @@ const ScheduleDrawer: React.FC<ScheduleDrawerProps> = ({ open, onClose, config, 
                 <ChevronLeft className="h-4 w-4" aria-hidden /> Back
               </button>
               <div className="flex items-center gap-3">
-                <span className="hidden text-sm text-slate-600 sm:inline dark:text-slate-300">{assignedCount} invitation{assignedCount === 1 ? "" : "s"} so far</span>
+                <span className="hidden text-sm text-slate-600 sm:inline dark:text-gray-300">{assignedCount} invitation{assignedCount === 1 ? "" : "s"} so far</span>
                 <button type="button" className={primaryBtn} onClick={() => setStep("review")}>Review</button>
               </div>
             </>,
@@ -504,9 +526,9 @@ const ScheduleDrawer: React.FC<ScheduleDrawerProps> = ({ open, onClose, config, 
       {step === "review" && draft && (
         <>
           <div className="grid gap-5 p-5 sm:p-6 lg:grid-cols-2">
-            <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 p-5 dark:border-slate-700 dark:bg-slate-800/60">
+            <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 p-5 dark:border-gray-700/30 dark:bg-gray-800/30">
               {draft.subject_color && <span className="absolute inset-y-0 left-0 w-1.5" style={{ background: draft.subject_color }} aria-hidden />}
-              <p className="text-lg font-semibold text-slate-900 dark:text-slate-100">{draft.title}</p>
+              <p className="text-lg font-semibold text-slate-900 dark:text-gray-100">{draft.title}</p>
               <Muted>
                 {draft.days_label} · {draft.start_time}–{draft.end_time}
                 {draft.location ? ` · ${draft.location}` : ""}
@@ -514,7 +536,7 @@ const ScheduleDrawer: React.FC<ScheduleDrawerProps> = ({ open, onClose, config, 
               <Muted>
                 {formatYmd(draft.effective_from, { year: true })} – {formatYmd(draft.effective_to, { year: true })} · capacity {draft.capacity}
               </Muted>
-              <p className="mt-3 flex items-center gap-2 text-sm font-semibold text-slate-800 dark:text-slate-100">
+              <p className="mt-3 flex items-center gap-2 text-sm font-semibold text-slate-800 dark:text-gray-100">
                 <CheckCircle2 className="h-4 w-4 text-emerald-600" aria-hidden /> {assignedCount} invitation{assignedCount === 1 ? "" : "s"} so far
               </p>
             </div>

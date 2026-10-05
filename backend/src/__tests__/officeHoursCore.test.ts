@@ -62,7 +62,8 @@ describe("Office hours phase 1: core scheduling and assignment", () => {
   });
 
   it("validates days, times, windows, subjects and teacher overlaps", async () => {
-    expect((await createSchedule("teacherA", { days: [6] })).status).toBe(400);
+    expect((await createSchedule("teacherA", { days: [8] })).status).toBe(400);
+    expect((await createSchedule("teacherA", { days: [0] })).status).toBe(400);
     expect((await createSchedule("teacherA", { days: [] })).status).toBe(400);
     expect((await createSchedule("teacherA", { days: [2], start_time: "15:00", end_time: "16:00" })).status).toBe(400);
     expect((await createSchedule("teacherA", { days: [2], start_time: "17:00", end_time: "16:30" })).status).toBe(400);
@@ -108,9 +109,9 @@ describe("Office hours phase 1: core scheduling and assignment", () => {
     const more = await request(app).post(`/office-hours/schedules/${a.schedule_id}/assignments`).set(auth("teacherA")).send({ student_ids: [w.students[2], w.students[3]] });
     expect(more.body.data.assigned.map((x: any) => x.student_id)).toEqual([w.students[2]]);
     expect(more.body.data.over_capacity).toEqual([w.students[3]]);
-    // TERM mode: every weekday is locked for an assigned student.
+    // TERM mode: every day (weekends too, office hours may run then) is locked for an assigned student.
     const locks = await db.select().from(OfficeHourStudentDateLock).where(and(eq(OfficeHourStudentDateLock.student_id, w.students[0]), eq(OfficeHourStudentDateLock.academic_term_id, w.termId)));
-    expect([...new Set(locks.map((l) => dowOfYmd(String(l.lock_date))))].sort()).toEqual([1, 2, 3, 4, 5]);
+    expect([...new Set(locks.map((l) => dowOfYmd(String(l.lock_date))))].sort()).toEqual([0, 1, 2, 3, 4, 5, 6]);
     // Clean up for the following tests.
     await request(app).post(`/office-hours/schedules/${a.schedule_id}/end`).set(auth("teacherA")).expect(200);
   });

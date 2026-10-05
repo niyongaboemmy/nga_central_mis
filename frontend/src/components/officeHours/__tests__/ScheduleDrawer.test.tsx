@@ -93,7 +93,7 @@ describe("office-hours schedule drawer", () => {
     expect(screen.getByRole("button", { name: "Monday" })).toHaveAttribute("aria-pressed", "true");
     await userEvent.click(screen.getByRole("button", { name: "Monday" }));
     await userEvent.click(screen.getByRole("button", { name: "Continue to students" }));
-    expect(screen.getByText("Choose at least one weekday")).toBeInTheDocument();
+    expect(screen.getByText("Choose at least one day")).toBeInTheDocument();
     expect(createSchedule).not.toHaveBeenCalled();
 
     await userEvent.click(screen.getByRole("button", { name: "Monday" }));
@@ -121,5 +121,15 @@ describe("office-hours schedule drawer", () => {
     await userEvent.click(screen.getByRole("button", { name: "Continue to students" }));
     expect(screen.getByText(/must fall between 16:00 and 18:00/)).toBeInTheDocument();
     expect(createSchedule).not.toHaveBeenCalled();
+  });
+
+  it("offers weekends, with quick choices for the usual sets of days", async () => {
+    render(<ScheduleDrawer open onClose={() => {}} config={config} termId={4} onSaved={() => {}} />);
+    await userEvent.click(screen.getByRole("button", { name: "Weekend" }));
+    expect(screen.getByRole("button", { name: "Saturday" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "Sunday" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "Monday" })).toHaveAttribute("aria-pressed", "false");
+    await userEvent.click(screen.getByRole("button", { name: "Continue to students" }));
+    await waitFor(() => expect(createSchedule).toHaveBeenCalledWith(expect.objectContaining({ days: [6, 7] })));
   });
 });

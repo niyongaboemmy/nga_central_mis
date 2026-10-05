@@ -71,27 +71,27 @@ const SchedulesTab: React.FC<{ termId: number | null }> = ({ termId }) => {
         <div className="relative overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead>
-              <tr className="text-xs uppercase tracking-wide text-slate-600 dark:text-slate-300">
+              <tr className="text-xs uppercase tracking-wide text-slate-600 dark:text-gray-300">
                 <th scope="col" className="py-2 pr-3 font-semibold">Office hours</th>
                 <th scope="col" className="py-2 pr-3 font-semibold">Teacher</th>
                 <th scope="col" className="py-2 pr-3 font-semibold">When</th>
                 <th scope="col" className="py-2 pr-3 text-right font-semibold">Students</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+            <tbody className="divide-y divide-slate-100 dark:divide-gray-700/30">
               {shown.map((r) => (
                 <tr key={r.schedule_id}>
                   <td className="py-2 pr-3">
-                    <Link to={`/office-hours/schedules/${r.schedule_id}`} className="font-semibold text-slate-900 hover:underline dark:text-slate-100">{r.title}</Link>
-                    <p className="text-xs text-slate-600 dark:text-slate-300">{r.subject_name ?? "No subject"}</p>
+                    <Link to={`/office-hours/schedules/${r.schedule_id}`} className="font-semibold text-slate-900 hover:underline dark:text-gray-100">{r.title}</Link>
+                    <p className="text-xs text-slate-600 dark:text-gray-300">{r.subject_name ?? "No subject"}</p>
                   </td>
-                  <td className="py-2 pr-3 text-slate-800 dark:text-slate-100">{r.teacher_name}</td>
-                  <td className="py-2 pr-3 text-xs text-slate-700 dark:text-slate-200">
+                  <td className="py-2 pr-3 text-slate-800 dark:text-gray-100">{r.teacher_name}</td>
+                  <td className="py-2 pr-3 text-xs text-slate-700 dark:text-gray-200">
                     {r.days_label} · {r.start_time}–{r.end_time}
                     <br />
                     until {formatYmd(r.effective_to)}
                   </td>
-                  <td className="py-2 pr-3 text-right tabular-nums text-slate-900 dark:text-slate-100">{r.assigned_count}/{r.capacity}</td>
+                  <td className="py-2 pr-3 text-right tabular-nums text-slate-900 dark:text-gray-100">{r.assigned_count}/{r.capacity}</td>
                 </tr>
               ))}
             </tbody>
@@ -138,22 +138,22 @@ const UnmarkedTab: React.FC = () => {
       ) : (
         <ul className="space-y-4">
           {byHost.map(([host, list]) => (
-            <li key={host} className="rounded-2xl border border-slate-200 p-4 dark:border-slate-700">
+            <li key={host} className="rounded-2xl border border-slate-200 p-4 dark:border-gray-700/30">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <p className="font-semibold text-slate-900 dark:text-slate-100">
+                <p className="font-semibold text-slate-900 dark:text-gray-100">
                   {host} · {list.length} missing
                 </p>
                 <button type="button" className={secondaryBtn} onClick={() => void nudge(list.map((l) => l.session_id))}>
                   <BellRing className="h-4 w-4" aria-hidden /> Remind
                 </button>
               </div>
-              <ul className="mt-2 space-y-1 text-sm text-slate-700 dark:text-slate-200">
+              <ul className="mt-2 space-y-1 text-sm text-slate-700 dark:text-gray-200">
                 {list.map((s) => (
                   <li key={s.session_id}>
                     <Link to={`/office-hours/schedules/${s.schedule_id}`} className="hover:underline">
                       {formatYmd(s.session_date)} · {s.title}
                     </Link>{" "}
-                    <span className="text-xs text-slate-600 dark:text-slate-300">
+                    <span className="text-xs text-slate-600 dark:text-gray-300">
                       ({s.expected} expected{s.days_overdue > 0 ? `, ${s.days_overdue} day${s.days_overdue === 1 ? "" : "s"} ago` : ", today"})
                     </span>
                   </li>
@@ -194,12 +194,12 @@ const TransfersTab: React.FC = () => {
       ) : rows.length === 0 ? (
         <EmptyState title="No pending requests" />
       ) : (
-        <ul className="divide-y divide-slate-100 dark:divide-slate-800">
+        <ul className="divide-y divide-slate-100 dark:divide-gray-700/30">
           {rows.map((r) => (
             <li key={r.request_id} className="flex flex-wrap items-center gap-3 py-3">
-              <p className="min-w-0 flex-1 text-sm text-slate-800 dark:text-slate-100">
+              <p className="min-w-0 flex-1 text-sm text-slate-800 dark:text-gray-100">
                 <strong>{r.requested_by_name}</strong> wants <strong>{studentName(r.student)}</strong> (now with {r.from_schedule.teacher_name}) in “{r.to_schedule.title}”.
-                {r.message && <span className="block text-xs text-slate-600 dark:text-slate-300">“{r.message}”</span>}
+                {r.message && <span className="block text-xs text-slate-600 dark:text-gray-300">“{r.message}”</span>}
               </p>
               <button type="button" className={primaryBtn} onClick={() => void decide(r.request_id, true)}>Move student</button>
               <button type="button" className={secondaryBtn} onClick={() => void decide(r.request_id, false)}>Decline</button>
@@ -285,12 +285,12 @@ const ClosuresTab: React.FC<{ canWrite: boolean }> = ({ canWrite }) => {
       ) : rows.length === 0 ? (
         <EmptyState title="No closures yet" />
       ) : (
-        <ul className="divide-y divide-slate-100 dark:divide-slate-800">
+        <ul className="divide-y divide-slate-100 dark:divide-gray-700/30">
           {rows.map((c) => (
             <li key={c.closure_id} className="flex items-center justify-between gap-3 py-2">
               <div>
-                <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">{c.reason}</p>
-                <p className="text-xs text-slate-600 dark:text-slate-300">
+                <p className="text-sm font-semibold text-slate-900 dark:text-gray-100">{c.reason}</p>
+                <p className="text-xs text-slate-600 dark:text-gray-300">
                   {formatYmd(c.start_date, { weekday: true, year: true })}
                   {c.end_date !== c.start_date ? ` – ${formatYmd(c.end_date, { weekday: true, year: true })}` : ""}
                 </p>
@@ -352,12 +352,12 @@ const OfficeHoursAdmin: React.FC = () => {
   return (
     <div className="mx-auto max-w-6xl space-y-5 px-4 py-6 sm:px-6">
       <header>
-        <h1 className="flex items-center gap-2 text-2xl font-bold text-slate-900 dark:text-slate-50">
+        <h1 className="flex items-center gap-2 text-2xl font-bold text-slate-900 dark:text-gray-50">
           <Clock4 className="h-6 w-6 text-blue-600" aria-hidden /> Office hours oversight
         </h1>
         <Muted>{config.term?.name ?? "This term"} · who is attending, which registers are missing, and what needs follow-up.</Muted>
       </header>
-      <nav className="flex gap-1 overflow-x-auto rounded-full bg-slate-100 p-1 dark:bg-slate-800" role="tablist" aria-label="Oversight views">
+      <nav className="flex gap-1 overflow-x-auto rounded-full bg-slate-100 p-1 dark:bg-gray-800/40" role="tablist" aria-label="Oversight views">
         {tabs.map((t) => (
           <button
             key={t.key}
@@ -369,7 +369,7 @@ const OfficeHoursAdmin: React.FC = () => {
               setParams(params, { replace: true });
             }}
             className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full px-4 py-1.5 text-sm font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
-              tab === t.key ? "bg-white text-slate-900 shadow-sm dark:bg-slate-900 dark:text-slate-50" : "text-slate-700 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white"
+              tab === t.key ? "bg-white text-slate-900 shadow-sm dark:bg-gray-800/30 dark:text-gray-50" : "text-slate-700 hover:text-slate-900 dark:text-gray-300 dark:hover:text-white"
             }`}
           >
             {t.icon}

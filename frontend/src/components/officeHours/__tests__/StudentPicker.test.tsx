@@ -113,7 +113,7 @@ describe("office-hours student picker", () => {
     const schedule = { effective_from: "2026-03-02", effective_to: "2026-06-26", days: [3] };
     render(<StudentPicker scheduleId={12} reasonCodes={[]} schedule={schedule} initialWeek="2026-03-09" today="2026-03-09" />);
     await screen.findByText("Aline Uwase");
-    expect(candidates).toHaveBeenLastCalledWith(12, expect.objectContaining({ from: "2026-03-09", to: "2026-03-13" }));
+    expect(candidates).toHaveBeenLastCalledWith(12, expect.objectContaining({ from: "2026-03-09", to: "2026-03-15" }));
     expect(screen.getByText("Week of 9 Mar only")).toBeInTheDocument();
 
     // Only Aline is free among last week's two (Chantal is with another teacher).
@@ -121,7 +121,7 @@ describe("office-hours student picker", () => {
     expect(screen.getByRole("checkbox", { name: /Aline Uwase/ })).toBeChecked();
     await userEvent.click(screen.getByRole("button", { name: "Invite 1 student" }));
     await waitFor(() =>
-      expect(assign).toHaveBeenCalledWith(12, { student_ids: [1], reason_code: undefined, reason_note: undefined, effective_from: "2026-03-09", effective_to: "2026-03-13" }),
+      expect(assign).toHaveBeenCalledWith(12, { student_ids: [1], reason_code: undefined, reason_note: undefined, effective_from: "2026-03-09", effective_to: "2026-03-15" }),
     );
 
     // The rest of the term drops the end date; the next week moves the window.
@@ -129,6 +129,6 @@ describe("office-hours student picker", () => {
     await waitFor(() => expect(candidates).toHaveBeenLastCalledWith(12, expect.not.objectContaining({ to: expect.anything() })));
     await userEvent.click(screen.getByRole("radio", { name: "This week" }));
     await userEvent.click(screen.getByRole("button", { name: "Next week" }));
-    await waitFor(() => expect(candidates).toHaveBeenLastCalledWith(12, expect.objectContaining({ from: "2026-03-16", to: "2026-03-20" })));
+    await waitFor(() => expect(candidates).toHaveBeenLastCalledWith(12, expect.objectContaining({ from: "2026-03-16", to: "2026-03-22" })));
   });
 });

@@ -67,8 +67,8 @@ export const CheckInPanel: React.FC<{ sessionId: number; onClose: () => void; ch
         <div className="flex flex-col items-center gap-4 text-center">
           <div className="w-64 max-w-full rounded-2xl bg-white p-2" aria-label="Check-in QR code" role="img" dangerouslySetInnerHTML={{ __html: qrSvg(checkInUrl(data.token)) }} />
           <div>
-            <p className="text-xs font-semibold uppercase tracking-widest text-slate-600 dark:text-slate-300">Or type this code</p>
-            <p className="font-mono text-4xl font-bold tracking-[0.3em] text-slate-900 dark:text-slate-50" aria-live="polite">{data.code}</p>
+            <p className="text-xs font-semibold uppercase tracking-widest text-slate-600 dark:text-gray-300">Or type this code</p>
+            <p className="font-mono text-4xl font-bold tracking-[0.3em] text-slate-900 dark:text-gray-50" aria-live="polite">{data.code}</p>
           </div>
           <Muted className="text-xs">New code in {left}s · {checkedIn} checked in so far. Codes stop working after a minute, so photos of the screen don't help.</Muted>
         </div>
@@ -125,7 +125,7 @@ export const CheckInPage: React.FC = () => {
   return (
     <div className="mx-auto max-w-md px-4 py-10">
       <Card>
-        <h1 className="mb-4 flex items-center gap-2 text-xl font-bold text-slate-900 dark:text-slate-50">
+        <h1 className="mb-4 flex items-center gap-2 text-xl font-bold text-slate-900 dark:text-gray-50">
           <QrCode className="h-5 w-5 text-blue-600" aria-hidden /> Office hours check-in
         </h1>
         {busy && <Spinner label="Checking you in" />}

@@ -106,12 +106,8 @@ export const registerReminders = async () => {
     else if (at.minutes >= start + 5) await remind(r, "due");
   }
   if (at.minutes >= 7 * 60 + 30) {
-    // Weekend mornings skip; Monday reminds about Friday.
-    const dow = dowOfYmd(today);
-    if (dow >= 1 && dow <= 5) {
-      const previous = addDaysYmd(today, dow === 1 ? -3 : -1);
-      for (const r of await sessionsOn(previous, "SCHEDULED")) await remind(r, "yesterday");
-    }
+    // Yesterday's unmarked registers, every morning (office hours may run at weekends).
+    for (const r of await sessionsOn(addDaysYmd(today, -1), "SCHEDULED")) await remind(r, "yesterday");
   }
   return out;
 };

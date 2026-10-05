@@ -611,8 +611,10 @@ export const officeHoursApi = {
 };
 
 /** "Mon, Wed" from backend days. */
-export const DAY_SHORT: Record<number, string> = { 1: "Mon", 2: "Tue", 3: "Wed", 4: "Thu", 5: "Fri" };
-export const DAY_LONG: Record<number, string> = { 1: "Monday", 2: "Tuesday", 3: "Wednesday", 4: "Thursday", 5: "Friday" };
+export const DAY_SHORT: Record<number, string> = { 1: "Mon", 2: "Tue", 3: "Wed", 4: "Thu", 5: "Fri", 6: "Sat", 7: "Sun" };
+export const DAY_LONG: Record<number, string> = { 1: "Monday", 2: "Tuesday", 3: "Wednesday", 4: "Thursday", 5: "Friday", 6: "Saturday", 7: "Sunday" };
+/** Office hours may run any day: 1 = Monday ... 7 = Sunday. */
+export const ALL_DAYS = [1, 2, 3, 4, 5, 6, 7] as const;
 
 export const humanize = (code: string | null | undefined) =>
   (code ?? "")
@@ -644,7 +646,7 @@ export const formatYmd = (ymd: string, opts: { weekday?: boolean; year?: boolean
 };
 
 // ---------------------------------------------------------------- weeks
-// Invitations are weekly (Mon–Fri). Dates are "YYYY-MM-DD", computed in UTC
+// Invitations are weekly (Monday to Sunday: office hours may run at weekends). Dates are "YYYY-MM-DD", computed in UTC
 // so no local time zone can shift a day.
 
 const ymdToUtc = (ymd: string) => {
@@ -658,13 +660,13 @@ export const addDaysYmd = (ymd: string, days: number) => utcToYmd(ymdToUtc(ymd) 
 export const isoDow = (ymd: string) => ((new Date(ymdToUtc(ymd)).getUTCDay() + 6) % 7) + 1;
 /** Monday of the week holding `ymd`. */
 export const weekStartOf = (ymd: string) => addDaysYmd(ymd, 1 - isoDow(ymd));
-/** Friday of the week starting `monday`. */
-export const weekEndOf = (monday: string) => addDaysYmd(monday, 4);
+/** Sunday of the week starting `monday`. */
+export const weekEndOf = (monday: string) => addDaysYmd(monday, 6);
 
 export interface OfficeHoursWeek {
   /** Monday. */
   start: string;
-  /** Friday. */
+  /** Sunday. */
   end: string;
   /** Meeting dates of the schedule inside the week and its window. */
   meetings: string[];

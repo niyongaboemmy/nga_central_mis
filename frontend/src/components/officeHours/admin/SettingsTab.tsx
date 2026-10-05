@@ -120,7 +120,7 @@ const SettingsTab: React.FC = () => {
               return (
                 <div key={f.key}>
                   {f.type === "bool" ? (
-                    <label htmlFor={id} className="flex items-center gap-2 text-sm font-semibold text-slate-800 dark:text-slate-100">
+                    <label htmlFor={id} className="flex items-center gap-2 text-sm font-semibold text-slate-800 dark:text-gray-100">
                       <input id={id} type="checkbox" className="h-4 w-4 rounded border-slate-400" checked={Boolean(values[f.key])} onChange={(e) => setValues({ ...values, [f.key]: e.target.checked ? 1 : 0 })} />
                       {f.label}
                     </label>

@@ -13,14 +13,14 @@ const Tile: React.FC<{ icon: React.ReactNode; label: string; value: string; hint
   const body = (
     <div
       className={`h-full rounded-2xl border p-4 transition ${
-        tone === "critical" ? "border-rose-300 dark:border-rose-500/40" : tone === "warning" ? "border-amber-300 dark:border-amber-500/40" : "border-slate-200 dark:border-slate-700"
+        tone === "critical" ? "border-rose-300 dark:border-rose-500/40" : tone === "warning" ? "border-amber-300 dark:border-amber-500/40" : "border-slate-200 dark:border-gray-700/30"
       } ${to ? "hover:shadow-sm" : ""}`}
     >
-      <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
+      <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-gray-300">
         {icon}
         {label}
       </p>
-      <p className="mt-1 text-2xl font-bold tabular-nums text-slate-900 dark:text-slate-50">{value}</p>
+      <p className="mt-1 text-2xl font-bold tabular-nums text-slate-900 dark:text-gray-50">{value}</p>
       {hint && <Muted className="text-xs">{hint}</Muted>}
     </div>
   );

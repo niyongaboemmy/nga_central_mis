@@ -1,7 +1,7 @@
 import { and, eq, gte, inArray, lte } from "drizzle-orm";
 import { db } from "../../db";
 import { OfficeHourAssignment } from "../../db/officeHoursSchema";
-import { datesOnDays, maxYmd, todayYmd, WEEKDAYS } from "./common";
+import { ALL_DAYS, datesOnDays, maxYmd, todayYmd } from "./common";
 
 /**
  * Weekly invitations (migration 104). An assignment is an invitation over a
@@ -16,10 +16,11 @@ export interface DateWindow {
 
 /**
  * The dates an invitation over [from, to] locks: TERM mode ("one teacher at a
- * time") every weekday in the window, WEEKDAY mode only the meeting days.
+ * time") every day in the window, weekends included; WEEKDAY mode only the
+ * meeting days.
  */
 export const lockDatesFor = (mode: "TERM" | "WEEKDAY", days: number[], from: string, to: string) =>
-  datesOnDays(from, to, mode === "TERM" ? [...WEEKDAYS] : days);
+  datesOnDays(from, to, mode === "TERM" ? [...ALL_DAYS] : days);
 
 type Window = { from: string; to: string };
 

@@ -44,16 +44,16 @@ const WeekNavigator: React.FC<WeekNavigatorProps> = ({ weeks, value, onChange, t
             onClick={() => prev && onChange(prev.start)}
             disabled={!prev}
             aria-label="Previous week"
-            className="grid h-9 w-9 place-items-center rounded-full border border-slate-300 text-slate-700 transition hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:opacity-40 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
+            className="grid h-9 w-9 place-items-center rounded-full border border-slate-300 text-slate-700 transition hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:opacity-40 dark:border-gray-700/50 dark:text-gray-200 dark:hover:bg-gray-800/40"
           >
             <ChevronLeft className="h-4 w-4" aria-hidden />
           </button>
           <div className="min-w-[11rem] px-2" aria-live="polite">
-            <p className="text-sm font-semibold text-slate-900 dark:text-slate-50">
+            <p className="text-sm font-semibold text-slate-900 dark:text-gray-50">
               {label} of {shortDate(current.start)}
               {current.start === thisWeek && <span className="ml-2 rounded-full bg-blue-100 px-2 py-0.5 text-[11px] font-semibold text-blue-800 dark:bg-blue-500/15 dark:text-blue-200">This week</span>}
             </p>
-            <p className="text-xs text-slate-600 dark:text-slate-300">
+            <p className="text-xs text-slate-600 dark:text-gray-300">
               {current.meetings.map((d) => `${DAY_SHORT[isoDow(d)]} ${shortDate(d)}`).join(" · ")}
             </p>
           </div>
@@ -62,7 +62,7 @@ const WeekNavigator: React.FC<WeekNavigatorProps> = ({ weeks, value, onChange, t
             onClick={() => next && onChange(next.start)}
             disabled={!next}
             aria-label="Next week"
-            className="grid h-9 w-9 place-items-center rounded-full border border-slate-300 text-slate-700 transition hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:opacity-40 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
+            className="grid h-9 w-9 place-items-center rounded-full border border-slate-300 text-slate-700 transition hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:opacity-40 dark:border-gray-700/50 dark:text-gray-200 dark:hover:bg-gray-800/40"
           >
             <ChevronRight className="h-4 w-4" aria-hidden />
           </button>
@@ -95,13 +95,13 @@ const WeekNavigator: React.FC<WeekNavigatorProps> = ({ weeks, value, onChange, t
                 selected
                   ? "border-blue-600 bg-blue-600 text-white shadow-sm"
                   : past
-                    ? "border-slate-200 bg-slate-50 text-slate-500 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800/40 dark:text-slate-400"
-                    : "border-slate-200 bg-white text-slate-800 hover:border-blue-300 hover:bg-blue-50/60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:border-blue-500/50"
+                    ? "border-slate-200 bg-slate-50 text-slate-500 hover:bg-slate-100 dark:border-gray-700/30 dark:bg-gray-800/30 dark:text-gray-400"
+                    : "border-slate-200 bg-white text-slate-800 hover:border-blue-300 hover:bg-blue-50/60 dark:border-gray-700/30 dark:bg-gray-800/40 dark:text-gray-100 dark:hover:border-blue-500/50"
               }`}
             >
               <span className="font-semibold">{shortDate(w.start)}</span>
               {counts && (
-                <span className={`tabular-nums ${selected ? "text-white" : n === 0 && !past ? "text-amber-700 dark:text-amber-300" : full ? "text-emerald-700 dark:text-emerald-300" : "text-slate-600 dark:text-slate-300"}`}>
+                <span className={`tabular-nums ${selected ? "text-white" : n === 0 && !past ? "text-amber-700 dark:text-amber-300" : full ? "text-emerald-700 dark:text-emerald-300" : "text-slate-600 dark:text-gray-300"}`}>
                   {n}
                   {capacity !== undefined ? `/${capacity}` : ""}
                 </span>

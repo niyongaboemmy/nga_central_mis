@@ -314,14 +314,14 @@ const RegisterSheet: React.FC<RegisterSheetProps> = ({ sessionId, onClose, onSav
         <div className="p-6"><Muted>The register could not be opened.</Muted></div>
       ) : (
         <div onKeyDown={onKeyDown} className="flex max-h-[80vh] flex-col">
-          <div className="space-y-3 border-b border-slate-200 px-6 py-4 dark:border-slate-700">
+          <div className="space-y-3 border-b border-slate-200 px-6 py-4 dark:border-gray-700/30">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <Muted className="text-sm">
                 {[s.location, `${rows.filter((r) => !r.is_drop_in).length} expected`, s.host_name && s.host_teacher_id !== s.teacher_id ? `covered by ${s.host_name}` : null].filter(Boolean).join(" · ")}
               </Muted>
               <div className="flex flex-wrap gap-2 text-xs font-semibold" aria-live="polite">
                 {STATUSES.map((st, i) => (
-                  <span key={st} className={`rounded-full bg-slate-100 px-2 py-0.5 dark:bg-slate-800 ${ATTENDANCE_META[st].cls}`}>
+                  <span key={st} className={`rounded-full bg-slate-100 px-2 py-0.5 dark:bg-gray-800/40 ${ATTENDANCE_META[st].cls}`}>
                     {counts[i]} {ATTENDANCE_META[st].label.toLowerCase()}
                   </span>
                 ))}
@@ -329,7 +329,7 @@ const RegisterSheet: React.FC<RegisterSheetProps> = ({ sessionId, onClose, onSav
               </div>
             </div>
             {!editable && (
-              <p className="flex items-center gap-2 rounded-xl bg-slate-100 px-3 py-2 text-sm text-slate-700 dark:bg-slate-800 dark:text-slate-200" role="note">
+              <p className="flex items-center gap-2 rounded-xl bg-slate-100 px-3 py-2 text-sm text-slate-700 dark:bg-gray-800/40 dark:text-gray-200" role="note">
                 <AlertTriangle className="h-4 w-4" aria-hidden />
                 {data.window.not_yet
                   ? `The register opens at ${data.window.opens_at} on ${formatYmd(s.session_date)}.`
@@ -367,7 +367,7 @@ const RegisterSheet: React.FC<RegisterSheetProps> = ({ sessionId, onClose, onSav
             )}
           </div>
 
-          <ul className="flex-1 divide-y divide-slate-100 overflow-y-auto px-2 dark:divide-slate-800" aria-label="Students">
+          <ul className="flex-1 divide-y divide-slate-100 overflow-y-auto px-2 dark:divide-gray-700/30" aria-label="Students">
             {rows.length === 0 && <li className="px-4 py-6"><Muted>No students were expected at this session.</Muted></li>}
             {rows.map((r, idx) => {
               const d = draft[r.student_id] ?? { student_id: r.student_id, status: null };
@@ -385,11 +385,11 @@ const RegisterSheet: React.FC<RegisterSheetProps> = ({ sessionId, onClose, onSav
                 >
                   <div className="flex flex-wrap items-center gap-3">
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">
+                      <p className="truncate text-sm font-semibold text-slate-900 dark:text-gray-100">
                         {name}
                         {r.is_drop_in && <span className="ml-2 rounded-full bg-violet-100 px-2 py-0.5 text-xs font-semibold text-violet-800 dark:bg-violet-500/15 dark:text-violet-200">Drop-in</span>}
                       </p>
-                      <p className="truncate text-xs text-slate-600 dark:text-slate-300">{[r.class_group_name, r.registration_number].filter(Boolean).join(" · ")}</p>
+                      <p className="truncate text-xs text-slate-600 dark:text-gray-300">{[r.class_group_name, r.registration_number].filter(Boolean).join(" · ")}</p>
                       {r.notice && (
                         <p className="mt-1 flex items-center gap-1 text-xs font-semibold text-sky-800 dark:text-sky-200">
                           <MessageSquareWarning className="h-3.5 w-3.5" aria-hidden /> Said they can't come: {humanize(r.notice.reason)}
@@ -410,7 +410,7 @@ const RegisterSheet: React.FC<RegisterSheetProps> = ({ sessionId, onClose, onSav
                             onClick={() => setStatus(r.student_id, st)}
                             title={`${ATTENDANCE_META[st].label} (${ATTENDANCE_META[st].key})`}
                             className={`min-w-[2.5rem] rounded-full border px-2 py-1 text-xs font-bold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-40 sm:min-w-[4.5rem] ${
-                              on ? ATTENDANCE_META[st].active : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
+                              on ? ATTENDANCE_META[st].active : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50 dark:border-gray-700/50 dark:bg-gray-800/40 dark:text-gray-200"
                             }`}
                           >
                             <span className="sm:hidden">{ATTENDANCE_META[st].short}</span>
@@ -424,7 +424,7 @@ const RegisterSheet: React.FC<RegisterSheetProps> = ({ sessionId, onClose, onSav
                       onClick={() => setExpanded(open ? null : r.student_id)}
                       aria-expanded={open}
                       aria-label={`More for ${name}`}
-                      className="rounded-full p-1 text-slate-600 hover:bg-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:text-slate-300 dark:hover:bg-slate-800"
+                      className="rounded-full p-1 text-slate-600 hover:bg-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:text-gray-300 dark:hover:bg-gray-800/40"
                     >
                       <ChevronDown className={`h-4 w-4 transition ${open ? "rotate-180" : ""}`} aria-hidden />
                     </button>
@@ -468,7 +468,7 @@ const RegisterSheet: React.FC<RegisterSheetProps> = ({ sessionId, onClose, onSav
                               ))}
                             </SelectField>
                           </div>
-                          <label className="flex items-center gap-2 self-end pb-2 text-sm text-slate-700 dark:text-slate-200">
+                          <label className="flex items-center gap-2 self-end pb-2 text-sm text-slate-700 dark:text-gray-200">
                             <input type="checkbox" className="h-4 w-4 rounded border-slate-400" disabled={!editable} checked={Boolean(d.follow_up)} onChange={(e) => patch(r.student_id, { follow_up: e.target.checked })} />
                             Follow up next time
                           </label>
@@ -481,7 +481,7 @@ const RegisterSheet: React.FC<RegisterSheetProps> = ({ sessionId, onClose, onSav
             })}
           </ul>
 
-          <div className="space-y-3 border-t border-slate-200 px-6 py-4 dark:border-slate-700">
+          <div className="space-y-3 border-t border-slate-200 px-6 py-4 dark:border-gray-700/30">
             {editable && (
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="relative">
@@ -491,12 +491,12 @@ const RegisterSheet: React.FC<RegisterSheetProps> = ({ sessionId, onClose, onSav
                     <input id="oh-dropin" className={`${inputCls} pl-9`} value={dropInQuery} onChange={(e) => setDropInQuery(e.target.value)} placeholder="Name or registration number" />
                   </div>
                   {dropInResults.length > 0 && (
-                    <ul className="absolute z-10 mt-1 max-h-48 w-full overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-800">
+                    <ul className="absolute z-10 mt-1 max-h-48 w-full overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-lg dark:border-gray-700/30 dark:bg-gray-800/40">
                       {dropInResults.map((st) => (
                         <li key={st.student_id}>
-                          <button type="button" onClick={() => addDropIn(st)} className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-slate-50 focus:bg-slate-50 focus:outline-none dark:hover:bg-slate-700 dark:focus:bg-slate-700">
+                          <button type="button" onClick={() => addDropIn(st)} className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-slate-50 focus:bg-slate-50 focus:outline-none dark:hover:bg-gray-700/50 dark:focus:bg-gray-700/50">
                             <UserPlus className="h-4 w-4 text-slate-500" aria-hidden /> {studentName(st)}
-                            <span className="text-xs text-slate-600 dark:text-slate-300">{st.class_group_name}</span>
+                            <span className="text-xs text-slate-600 dark:text-gray-300">{st.class_group_name}</span>
                           </button>
                         </li>
                       ))}
@@ -523,7 +523,7 @@ const RegisterSheet: React.FC<RegisterSheetProps> = ({ sessionId, onClose, onSav
               </div>
             </div>
             {showHistory && (
-              <ul className="max-h-40 overflow-y-auto text-xs text-slate-700 dark:text-slate-200">
+              <ul className="max-h-40 overflow-y-auto text-xs text-slate-700 dark:text-gray-200">
                 {history.length === 0 && <li>No changes yet.</li>}
                 {history.map((h) => (
                   <li key={h.history_id}>

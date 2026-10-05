@@ -28,7 +28,7 @@ import {
   TermInfo,
   todayYmd,
   toInt,
-  WEEKDAYS,
+  ALL_DAYS,
   isDupEntry,
 } from "./common";
 import { emitOfficeHoursEvent } from "./events";
@@ -67,9 +67,9 @@ interface ScheduleFields {
 }
 
 const parseDays = (raw: unknown): number[] => {
-  const days = intList(raw, "days", 5).sort();
-  if (!days.length || days.some((d) => !(WEEKDAYS as readonly number[]).includes(d))) {
-    throw new ValidationError("Choose one or more weekdays (Monday to Friday)", [{ field: "days", message: "Use 1 (Mon) to 5 (Fri)" }]);
+  const days = intList(raw, "days", 7).sort();
+  if (!days.length || days.some((d) => !(ALL_DAYS as readonly number[]).includes(d))) {
+    throw new ValidationError("Choose one or more days", [{ field: "days", message: "Use 1 (Mon) to 7 (Sun)" }]);
   }
   return days;
 };

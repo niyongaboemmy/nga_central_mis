@@ -63,7 +63,7 @@ const summarise = (r: AssignResult) => {
 
 const tabCls = (on: boolean) =>
   `inline-flex flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-full px-3 py-1.5 text-sm font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
-    on ? "bg-white text-slate-900 shadow-sm dark:bg-slate-900 dark:text-slate-50" : "text-slate-700 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white"
+    on ? "bg-white text-slate-900 shadow-sm dark:bg-gray-800/30 dark:text-gray-50" : "text-slate-700 hover:text-slate-900 dark:text-gray-300 dark:hover:text-white"
   }`;
 
 const StudentPicker: React.FC<StudentPickerProps> = ({ scheduleId, reasonCodes, onAssigned, schedule, initialWeek, today }) => {
@@ -80,7 +80,7 @@ const StudentPicker: React.FC<StudentPickerProps> = ({ scheduleId, reasonCodes, 
   const range = useMemo(() => {
     if (!week) return null;
     const from = week < weekStartOf(todayYmd) ? weekStartOf(todayYmd) : week;
-    return { from, to: span === "term" ? undefined : addDaysYmd(week, 7 * Number(span) - 3) };
+    return { from, to: span === "term" ? undefined : addDaysYmd(week, 7 * Number(span) - 1) };
   }, [week, span, todayYmd]);
 
   const [data, setData] = useState<CandidatesResponse | null>(null);
@@ -221,10 +221,10 @@ const StudentPicker: React.FC<StudentPickerProps> = ({ scheduleId, reasonCodes, 
   return (
     <div className="space-y-4">
       {schedule && week && (
-        <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50/70 p-3 dark:border-slate-700 dark:bg-slate-800/40">
+        <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50/70 p-3 dark:border-gray-700/30 dark:bg-gray-800/30">
           <WeekNavigator weeks={weeks} value={week} onChange={setWeek} today={todayYmd} minWeek={firstOpen} label="Inviting for the week" />
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">For</span>
+            <span className="text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-gray-300">For</span>
             <div className="flex flex-wrap gap-1" role="radiogroup" aria-label="How long">
               {SPANS.map(([k, l]) => (
                 <button
@@ -235,8 +235,8 @@ const StudentPicker: React.FC<StudentPickerProps> = ({ scheduleId, reasonCodes, 
                   onClick={() => setSpan(k)}
                   className={`rounded-full border px-3 py-1 text-xs font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
                     span === k
-                      ? "border-slate-900 bg-slate-900 text-white dark:border-white dark:bg-white dark:text-slate-900"
-                      : "border-slate-300 bg-white text-slate-700 hover:bg-slate-100 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+                      ? "border-blue-600 bg-blue-50 text-blue-800 dark:border-blue-400/60 dark:bg-blue-500/15 dark:text-blue-100"
+                      : "border-slate-300 bg-white text-slate-700 hover:bg-slate-100 dark:border-gray-700/50 dark:bg-gray-800/40 dark:text-gray-200 dark:hover:bg-gray-700/50"
                   }`}
                 >
                   {l}
@@ -250,7 +250,7 @@ const StudentPicker: React.FC<StudentPickerProps> = ({ scheduleId, reasonCodes, 
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_18rem]">
         <div className="min-w-0 space-y-3">
-          <div className="flex gap-1 rounded-full bg-slate-100 p-1 dark:bg-slate-800" role="tablist" aria-label="Which students">
+          <div className="flex gap-1 rounded-full bg-slate-100 p-1 dark:bg-gray-800/40" role="tablist" aria-label="Which students">
             <button type="button" role="tab" aria-selected={mode === "all"} onClick={() => setMode("all")} className={tabCls(mode === "all")}>
               <Users className="h-3.5 w-3.5" aria-hidden /> All my students
             </button>
@@ -308,15 +308,15 @@ const StudentPicker: React.FC<StudentPickerProps> = ({ scheduleId, reasonCodes, 
 
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex flex-wrap items-center gap-3 text-sm">
-              <span className="font-semibold text-slate-800 dark:text-slate-100" aria-live="polite">
+              <span className="font-semibold text-slate-800 dark:text-gray-100" aria-live="polite">
                 {data ? `${data.assigned_count} / ${data.capacity} places used` : "—"}
               </span>
               {data && (
-                <span className="h-2 w-28 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700" aria-hidden>
+                <span className="h-2 w-28 overflow-hidden rounded-full bg-slate-200 dark:bg-gray-700/50" aria-hidden>
                   <span className="block h-full rounded-full bg-blue-600" style={{ width: `${Math.min(100, (data.assigned_count / Math.max(1, data.capacity)) * 100)}%` }} />
                 </span>
               )}
-              <label className="inline-flex items-center gap-2 text-slate-700 dark:text-slate-200">
+              <label className="inline-flex items-center gap-2 text-slate-700 dark:text-gray-200">
                 <input type="checkbox" checked={onlyFree} onChange={(e) => setOnlyFree(e.target.checked)} className="h-4 w-4 rounded border-slate-400" />
                 Only students who are free
               </label>
@@ -335,7 +335,7 @@ const StudentPicker: React.FC<StudentPickerProps> = ({ scheduleId, reasonCodes, 
             </p>
           )}
 
-          <div className="max-h-[46vh] overflow-y-auto rounded-2xl border border-slate-200 lg:max-h-[52vh] dark:border-slate-700">
+          <div className="max-h-[46vh] overflow-y-auto rounded-2xl border border-slate-200 lg:max-h-[52vh] dark:border-gray-700/30">
             {loading && !data ? (
               <div className="px-4"><Spinner label="Loading students" /></div>
             ) : students.length === 0 ? (
@@ -354,13 +354,13 @@ const StudentPicker: React.FC<StudentPickerProps> = ({ scheduleId, reasonCodes, 
                 />
               </div>
             ) : (
-              <ul className="divide-y divide-slate-100 dark:divide-slate-800" aria-label="Students">
+              <ul className="divide-y divide-slate-100 dark:divide-gray-700/30" aria-label="Students">
                 {students.map((s) => {
                   const can = selectable(s) && !noSessions;
                   const id = `oh-pick-${s.student_id}`;
                   const on = selected.has(s.student_id);
                   return (
-                    <li key={s.student_id} className={`flex items-center gap-3 px-4 py-2.5 transition-colors ${on ? "bg-blue-50/70 dark:bg-blue-500/10" : can ? "hover:bg-slate-50 dark:hover:bg-slate-800/50" : "bg-slate-50/60 dark:bg-slate-800/30"}`}>
+                    <li key={s.student_id} className={`flex items-center gap-3 px-4 py-2.5 transition-colors ${on ? "bg-blue-50/70 dark:bg-blue-500/10" : can ? "hover:bg-slate-50 dark:hover:bg-gray-800/30" : "bg-slate-50/60 dark:bg-gray-800/30"}`}>
                       <input
                         id={id}
                         type="checkbox"
@@ -371,18 +371,18 @@ const StudentPicker: React.FC<StudentPickerProps> = ({ scheduleId, reasonCodes, 
                       />
                       <label htmlFor={id} className="min-w-0 flex-1 cursor-pointer">
                         <span className="flex items-center gap-2">
-                          <span className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">{studentName(s)}</span>
+                          <span className="truncate text-sm font-semibold text-slate-900 dark:text-gray-100">{studentName(s)}</span>
                           {schedule && lastWeekIds.has(s.student_id) && mode !== "last" && (
-                            <span className="flex-shrink-0 rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-600 dark:bg-slate-800 dark:text-slate-300">Last week</span>
+                            <span className="flex-shrink-0 rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-600 dark:bg-gray-800/40 dark:text-gray-300">Last week</span>
                           )}
                         </span>
-                        <span className="block truncate text-xs text-slate-600 dark:text-slate-300">
+                        <span className="block truncate text-xs text-slate-600 dark:text-gray-300">
                           {[s.class_group_name, s.registration_number].filter(Boolean).join(" · ")}
                         </span>
                         {mode === "suggested" && signalsOf.get(s.student_id) && (
                           <span className="mt-1 flex flex-wrap gap-1">
                             {signalsOf.get(s.student_id)!.map((g) => (
-                              <span key={g.label} className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${g.source === "taskmentor" ? "bg-violet-100 text-violet-800 dark:bg-violet-500/15 dark:text-violet-200" : "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200"}`}>
+                              <span key={g.label} className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${g.source === "taskmentor" ? "bg-violet-100 text-violet-800 dark:bg-violet-500/15 dark:text-violet-200" : "bg-slate-100 text-slate-700 dark:bg-gray-800/40 dark:text-gray-200"}`}>
                                 {g.label}
                               </span>
                             ))}
@@ -416,7 +416,7 @@ const StudentPicker: React.FC<StudentPickerProps> = ({ scheduleId, reasonCodes, 
 
           {transferFor && transferFor.availability.status === "HELD_BY_OTHER" && (
             <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4 dark:border-blue-500/30 dark:bg-blue-500/10" role="region" aria-label="Transfer request">
-              <p className="text-sm text-slate-800 dark:text-slate-100">
+              <p className="text-sm text-slate-800 dark:text-gray-100">
                 Ask <strong>{transferFor.availability.holders[0]?.teacher_name ?? "the other teacher"}</strong> to release{" "}
                 <strong>{studentName(transferFor)}</strong> from “{transferFor.availability.holders[0]?.title}”?
               </p>
@@ -430,10 +430,10 @@ const StudentPicker: React.FC<StudentPickerProps> = ({ scheduleId, reasonCodes, 
           )}
         </div>
 
-        <aside className="space-y-3 self-start rounded-2xl border border-slate-200 bg-white p-4 lg:sticky lg:top-0 dark:border-slate-700 dark:bg-slate-900/60" aria-label="Invitation">
+        <aside className="space-y-3 self-start rounded-2xl border border-slate-200 bg-white p-4 lg:sticky lg:top-0 dark:border-gray-700/30 dark:bg-gray-800/30" aria-label="Invitation">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">Invitation</p>
-            <p className="text-sm font-semibold text-slate-900 dark:text-slate-50">{spanLabel}</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-gray-300">Invitation</p>
+            <p className="text-sm font-semibold text-slate-900 dark:text-gray-50">{spanLabel}</p>
           </div>
           {schedule && lastWeekFree.length > 0 && capacityLeft > 0 && (
             <button type="button" className={`${secondaryBtn} w-full`} onClick={pickLastWeek}>
@@ -441,9 +441,9 @@ const StudentPicker: React.FC<StudentPickerProps> = ({ scheduleId, reasonCodes, 
             </button>
           )}
           <div>
-            <p className="mb-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200">
+            <p className="mb-1.5 text-xs font-semibold text-slate-700 dark:text-gray-200">
               {selected.size ? `${selected.size} selected` : "Nobody selected yet"}
-              {data ? <span className="font-normal text-slate-500 dark:text-slate-400"> · {capacityLeft} place{capacityLeft === 1 ? "" : "s"} left</span> : null}
+              {data ? <span className="font-normal text-slate-500 dark:text-gray-400"> · {capacityLeft} place{capacityLeft === 1 ? "" : "s"} left</span> : null}
             </p>
             {selected.size > 0 && (
               <ul className="flex max-h-32 flex-wrap gap-1.5 overflow-y-auto" aria-label="Selected students">

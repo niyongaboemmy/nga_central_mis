@@ -34,7 +34,7 @@ export const PeriodPicker: React.FC<{ value: ReportQuery; onChange: (q: ReportQu
   const anchor = value.anchor ?? new Date().toISOString().slice(0, 10);
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <div className="flex gap-1 rounded-full bg-slate-100 p-1 dark:bg-slate-800" role="radiogroup" aria-label="Report period">
+      <div className="flex gap-1 rounded-full bg-slate-100 p-1 dark:bg-gray-800/40" role="radiogroup" aria-label="Report period">
         {KINDS.map(([k, l]) => (
           <button
             key={k}
@@ -43,7 +43,7 @@ export const PeriodPicker: React.FC<{ value: ReportQuery; onChange: (q: ReportQu
             aria-checked={value.period === k}
             onClick={() => onChange({ ...value, period: k, from: k === "custom" ? value.from ?? anchor : undefined, to: k === "custom" ? value.to ?? anchor : undefined })}
             className={`rounded-full px-3 py-1 text-sm font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
-              value.period === k ? "bg-white text-slate-900 shadow-sm dark:bg-slate-900 dark:text-slate-50" : "text-slate-700 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white"
+              value.period === k ? "bg-white text-slate-900 shadow-sm dark:bg-gray-800/30 dark:text-gray-50" : "text-slate-700 hover:text-slate-900 dark:text-gray-300 dark:hover:text-white"
             }`}
           >
             {l}
@@ -53,16 +53,16 @@ export const PeriodPicker: React.FC<{ value: ReportQuery; onChange: (q: ReportQu
       {value.period === "custom" ? (
         <div className="flex items-center gap-2">
           <input aria-label="From" type="date" className={`${inputCls} w-auto`} value={value.from ?? ""} onChange={(e) => onChange({ ...value, from: e.target.value })} />
-          <span className="text-slate-600 dark:text-slate-300">–</span>
+          <span className="text-slate-600 dark:text-gray-300">–</span>
           <input aria-label="To" type="date" className={`${inputCls} w-auto`} value={value.to ?? ""} onChange={(e) => onChange({ ...value, to: e.target.value })} />
         </div>
       ) : (
         <div className="flex items-center gap-1">
-          <button type="button" aria-label="Previous period" onClick={() => onChange({ ...value, anchor: shift(anchor, value.period, -1) })} className="rounded-full p-1.5 text-slate-700 hover:bg-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:text-slate-200 dark:hover:bg-slate-800">
+          <button type="button" aria-label="Previous period" onClick={() => onChange({ ...value, anchor: shift(anchor, value.period, -1) })} className="rounded-full p-1.5 text-slate-700 hover:bg-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:text-gray-200 dark:hover:bg-gray-800/40">
             <ChevronLeft className="h-4 w-4" aria-hidden />
           </button>
-          <span className="min-w-[9rem] text-center text-sm font-semibold text-slate-900 dark:text-slate-100" aria-live="polite">{label ?? anchor}</span>
-          <button type="button" aria-label="Next period" onClick={() => onChange({ ...value, anchor: shift(anchor, value.period, 1) })} className="rounded-full p-1.5 text-slate-700 hover:bg-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:text-slate-200 dark:hover:bg-slate-800">
+          <span className="min-w-[9rem] text-center text-sm font-semibold text-slate-900 dark:text-gray-100" aria-live="polite">{label ?? anchor}</span>
+          <button type="button" aria-label="Next period" onClick={() => onChange({ ...value, anchor: shift(anchor, value.period, 1) })} className="rounded-full p-1.5 text-slate-700 hover:bg-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:text-gray-200 dark:hover:bg-gray-800/40">
             <ChevronRight className="h-4 w-4" aria-hidden />
           </button>
           <input aria-label="Jump to date" type="date" className={`${inputCls} w-auto`} value={anchor} onChange={(e) => e.target.value && onChange({ ...value, anchor: e.target.value })} />

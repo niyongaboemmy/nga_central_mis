@@ -52,7 +52,7 @@ const readOptions = (el: HTMLSelectElement | null): Opt[] =>
 const normalise = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 
 const DEFAULT_TRIGGER =
-  "w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100";
+  "w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 dark:border-gray-700/50 dark:bg-gray-800/40 dark:text-gray-100";
 
 const setNativeValue = (el: HTMLSelectElement, value: string) => {
   const setter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value")?.set;
@@ -303,7 +303,7 @@ const SelectField = React.forwardRef<HTMLSelectElement, SelectFieldProps>(functi
       className="overflow-y-auto overscroll-contain p-1.5 focus:outline-none"
       style={{ maxHeight: sheet ? "60vh" : rect ? rect.maxHeight - (showSearch ? 52 : 0) : 300 }}
     >
-      {filtered.length === 0 && <li className="px-3 py-6 text-center text-sm text-slate-500 dark:text-slate-400">No matches for “{query}”</li>}
+      {filtered.length === 0 && <li className="px-3 py-6 text-center text-sm text-slate-500 dark:text-gray-400">No matches for “{query}”</li>}
       {filtered.map((o, i) => {
         const selected = o.index === selectedIndex;
         const isActive = o.index === active;
@@ -311,7 +311,7 @@ const SelectField = React.forwardRef<HTMLSelectElement, SelectFieldProps>(functi
         return (
           <React.Fragment key={`${o.index}-${o.value}`}>
             {showGroup && (
-              <li role="presentation" className="px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+              <li role="presentation" className="px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-gray-400">
                 {o.group}
               </li>
             )}
@@ -328,14 +328,14 @@ const SelectField = React.forwardRef<HTMLSelectElement, SelectFieldProps>(functi
                 o.disabled
                   ? "cursor-not-allowed opacity-40"
                   : isActive
-                    ? "bg-slate-100 text-slate-900 dark:bg-slate-700/70 dark:text-white"
-                    : "text-slate-800 dark:text-slate-100"
+                    ? "bg-slate-100 text-slate-900 dark:bg-gray-700/60 dark:text-white"
+                    : "text-slate-800 dark:text-gray-100"
               } ${selected ? "font-semibold" : ""}`}
             >
               {o.color && <span className="h-2.5 w-2.5 flex-shrink-0 rounded-full ring-1 ring-black/10" style={{ background: o.color }} aria-hidden />}
               <span className="min-w-0 flex-1">
-                <span className={`block truncate ${o.value === "" ? "text-slate-500 dark:text-slate-400" : ""}`}>{o.label || " "}</span>
-                {o.description && <span className="block truncate text-xs font-normal text-slate-500 dark:text-slate-400">{o.description}</span>}
+                <span className={`block truncate ${o.value === "" ? "text-slate-500 dark:text-gray-400" : ""}`}>{o.label || " "}</span>
+                {o.description && <span className="block truncate text-xs font-normal text-slate-500 dark:text-gray-400">{o.description}</span>}
               </span>
               {selected && <Check className="h-4 w-4 flex-shrink-0 text-blue-600 dark:text-blue-400" aria-hidden />}
             </li>
@@ -346,7 +346,7 @@ const SelectField = React.forwardRef<HTMLSelectElement, SelectFieldProps>(functi
   );
 
   const search = showSearch && (
-    <div className="relative border-b border-slate-200 p-2 dark:border-slate-700">
+    <div className="relative border-b border-slate-200 p-2 dark:border-gray-700/60">
       <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden />
       <input
         ref={searchRef}
@@ -363,7 +363,7 @@ const SelectField = React.forwardRef<HTMLSelectElement, SelectFieldProps>(functi
         placeholder={searchPlaceholder}
         autoComplete="off"
         spellCheck={false}
-        className="w-full rounded-lg border-0 bg-slate-100 py-2 pl-8 pr-8 text-sm text-slate-900 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/40 dark:bg-slate-900/60 dark:text-slate-100 dark:placeholder:text-slate-400"
+        className="w-full rounded-lg border-0 bg-slate-100 py-2 pl-8 pr-8 text-sm text-slate-900 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/40 dark:bg-gray-900/50 dark:text-gray-100 dark:placeholder:text-gray-400"
       />
       {query && (
         <button
@@ -372,7 +372,7 @@ const SelectField = React.forwardRef<HTMLSelectElement, SelectFieldProps>(functi
             setQuery("");
             searchRef.current?.focus();
           }}
-          className="absolute right-4 top-1/2 -translate-y-1/2 rounded p-0.5 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+          className="absolute right-4 top-1/2 -translate-y-1/2 rounded p-0.5 text-slate-400 hover:text-slate-700 dark:hover:text-gray-200"
           aria-label="Clear search"
         >
           <X className="h-3.5 w-3.5" aria-hidden />
@@ -390,13 +390,13 @@ const SelectField = React.forwardRef<HTMLSelectElement, SelectFieldProps>(functi
             ref={popRef}
             role="dialog"
             aria-label={ariaLabel}
-            className="w-full overflow-hidden rounded-t-3xl border-t border-slate-200 bg-white pb-[env(safe-area-inset-bottom)] shadow-2xl dark:border-slate-700 dark:bg-slate-800"
+            className="w-full overflow-hidden rounded-t-3xl border-t border-slate-200 bg-white pb-[env(safe-area-inset-bottom)] shadow-2xl dark:border-gray-700/60 dark:bg-gray-800"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between px-4 pb-1 pt-3">
-              <span className="mx-auto h-1 w-10 rounded-full bg-slate-300 dark:bg-slate-600" aria-hidden />
+              <span className="mx-auto h-1 w-10 rounded-full bg-slate-300 dark:bg-gray-600" aria-hidden />
             </div>
-            {ariaLabel && <p className="px-4 pb-2 text-sm font-semibold text-slate-900 dark:text-slate-100">{ariaLabel}</p>}
+            {ariaLabel && <p className="px-4 pb-2 text-sm font-semibold text-slate-900 dark:text-gray-100">{ariaLabel}</p>}
             {search}
             {list}
           </div>
@@ -404,7 +404,7 @@ const SelectField = React.forwardRef<HTMLSelectElement, SelectFieldProps>(functi
       ) : (
         <div
           ref={popRef}
-          className="fixed z-[1000] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl shadow-slate-900/10 ring-1 ring-black/5 dark:border-slate-700 dark:bg-slate-800 dark:shadow-black/40"
+          className="fixed z-[1000] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl shadow-slate-900/10 ring-1 ring-black/5 dark:border-gray-700/60 dark:bg-gray-800 dark:shadow-black/50 dark:ring-white/5"
           style={
             rect
               ? { left: rect.left, width: rect.width, ...(rect.up ? { bottom: window.innerHeight - rect.top } : { top: rect.top }) }
