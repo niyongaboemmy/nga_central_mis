@@ -126,8 +126,9 @@ export const DesktopStatus: React.FC<{ current: string | null; latest: string | 
         </>
       ) : (
         <p className="mt-1 text-sm text-white/85">
-          Version {latest} is ready: click <strong>Update</strong> at the top right of this window (next to the bell). NGA
-          downloads it and restarts.
+          Version {latest} is ready. In NGA, open <strong>Settings</strong> (the gear, top right) →{" "}
+          <strong>Updates</strong> → <strong>Check for updates</strong>, then <strong>Restart &amp; update</strong>. (If an{" "}
+          <strong>Update</strong> button shows next to the bell, click it instead.)
         </p>
       )}
     </div>
