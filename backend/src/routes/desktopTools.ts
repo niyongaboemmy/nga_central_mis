@@ -2,18 +2,75 @@ import express, { type RequestHandler } from "express";
 import { asyncHandler } from "../middleware/asyncHandler";
 import { ChatUnavailableError, streamChat, trimConversation } from "../services/aiProviders/chat";
 import { FEATURE, blockedReason, burst, dailyLimit, loadPersona, systemPrompt, usedToday } from "../services/desktop/assistant";
+import { collectOccurrences } from "../services/reminders/occurrences";
+import { addDaysYmd, kigaliInstant, kigaliParts } from "../services/reminders/time";
+import { buildPolicy, policyRange } from "../services/desktop/policy";
 
 /**
  * NGA Tools (NGA Desktop), signed in. Called from the MIS page inside NGA Desktop,
  * with that page's own session (the desktop never holds the token):
  *   GET  /desktop/tools/ai/status   may this person use Ask AI, and how many messages are left today
  *   POST /desktop/tools/ai/chat     stream an answer (NDJSON: {"t":text}… then {"done":…} or {"error":…})
+ *   GET  /desktop/tools/agenda      My Day: lessons, activities, office hours, quizzes, meetings (days=1..7)
+ *   GET  /desktop/tools/policy      today's lesson and exam windows (games and the student AI pause in them)
  * Kept apart from routes/desktop.ts (public distribution routes). `authenticate` is
  * passed in by app.ts, so tests can mount this router with their own sign-in without
  * touching the shared auth module (the suite shares one module registry).
  */
-export function desktopToolsRouter(authenticate: RequestHandler) {
+export interface ToolsDeps {
+  /** The person's occurrences (lessons, activities, office hours, Reminder Hub sources). */
+  collect: typeof collectOccurrences;
+}
+
+export function desktopToolsRouter(authenticate: RequestHandler, deps: ToolsDeps = { collect: collectOccurrences }) {
 const router = express.Router();
+
+router.get(
+  "/agenda",
+  authenticate,
+  asyncHandler(async (req: any, res) => {
+    const userId = Number(req.user.userId);
+    const days = Math.min(7, Math.max(1, Math.trunc(Number(req.query?.days)) || 1));
+    const now = new Date();
+    const today = kigaliParts(now).ymd;
+    const occ = await deps.collect(userId, kigaliInstant(today, 0), kigaliInstant(addDaysYmd(today, days), 0));
+    res.set("Cache-Control", "private, no-store");
+    res.json({
+      success: true,
+      data: {
+        now: now.toISOString(),
+        today,
+        days,
+        items: occ.map((o) => ({
+          key: o.key,
+          kind: o.kind,
+          title: o.title,
+          detail: o.detail,
+          location: o.location,
+          link: o.link,
+          color: o.color,
+          role: o.role,
+          critical: o.critical,
+          start: o.start.toISOString(),
+          end: o.end ? o.end.toISOString() : null,
+        })),
+      },
+    });
+  }),
+);
+
+router.get(
+  "/policy",
+  authenticate,
+  asyncHandler(async (req: any, res) => {
+    const userId = Number(req.user.userId);
+    const now = new Date();
+    const { from, to } = policyRange(now);
+    const policy = buildPolicy(await deps.collect(userId, from, to), now);
+    res.set("Cache-Control", "private, no-store");
+    res.json({ success: true, data: policy });
+  }),
+);
 
 router.get(
   "/ai/status",
