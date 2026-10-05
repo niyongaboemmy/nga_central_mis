@@ -18,6 +18,7 @@ import Users from "./components/Users";
 import SystemLayout from "./components/SystemLayout";
 import { useUser } from "./contexts/UserContext";
 import { ToastProvider, useToast } from "./contexts/ToastContext";
+import UpdateBanner from "./components/ui/UpdateBanner";
 import { NotificationProvider } from "./contexts/NotificationContext";
 import { ConfirmProvider } from "./contexts/ConfirmContext";
 import { ToastStore } from "./services/api";
@@ -274,6 +275,7 @@ const ToastInitializer: React.FC<{ children: React.ReactNode }> = ({
 function App() {
   return (
     <ToastProvider>
+      <UpdateBanner />
       <ToastInitializer>
         <NotificationProvider>
         <ConfirmProvider>
