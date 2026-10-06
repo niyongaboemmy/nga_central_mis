@@ -67,14 +67,14 @@ describe("desktop tools settings routes", () => {
   };
 
   it("needs DESKTOP_TOOLS_CONFIGURE", async () => {
-    const u = await createUser({ userType: "STAFF" });
+    const u = await createUser({ userType: "ADMIN" });
     const app = appFor(u, [], false);
     expect((await request(app).get("/desktop/tools/settings/games")).status).toBe(403);
     expect((await request(app).put("/desktop/tools/settings/games").send({ enabled: false })).status).toBe(403);
   });
 
   it("shows and saves settings; an admin can't approve Igisoro; a super admin can", async () => {
-    const admin = await createUser({ userType: "STAFF" });
+    const admin = await createUser({ userType: "ADMIN" });
     const a = appFor(admin, ["DESKTOP_TOOLS_CONFIGURE"], false);
     const got = await request(a).get("/desktop/tools/settings/games");
     expect(got.status).toBe(200);
@@ -91,7 +91,7 @@ describe("desktop tools settings routes", () => {
     expect(denied.body.code).toBe("SUPER_ADMIN_ONLY");
     expect((await loadGameSettings()).igisoro.approved).toBe(false);
 
-    const owner = await createUser({ userType: "STAFF" });
+    const owner = await createUser({ userType: "ADMIN" });
     const s = appFor(owner, ["DESKTOP_TOOLS_CONFIGURE"], true);
     const ok = await request(s).put("/desktop/tools/settings/games").send({ ...(await loadGameSettings()), igisoro: { approved: true, variant: "beginner" } });
     expect(ok.status).toBe(200);
