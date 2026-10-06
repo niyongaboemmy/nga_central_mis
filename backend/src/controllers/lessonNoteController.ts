@@ -1383,45 +1383,129 @@ export const revokeLessonNoteShare = asyncHandler(
 );
 
 /**
- * A PUBLISHED note is readable by its natural audience -- the students in the class group it was
- * written for, and everyone enrolled in its subject -- without any further action by the teacher.
- * Publishing used to only make a note *shareable*, so notes sat published-but-invisible while the
- * class saw an empty "Notes Shared With Me" and nothing in the UI explained the missing step.
+ * A PUBLISHED note is readable by its natural audience without any further action by the
+ * teacher. Publishing used to only make a note *shareable*, so notes sat published-but-invisible
+ * while the class saw an empty "Notes Shared With Me" and nothing in the UI explained the missing
+ * step.
  *
- * LessonNoteShare rows still widen that audience (hand-picked students, a second class group, an
- * expiry window) -- they are additive on top of the default, never a gate in front of it.
+ * The natural audience is the note's own year group, never the whole subject: one Subject row is
+ * often taught to several grades (GradeSubject is many-to-many -- e.g. a general module taken by
+ * Year 1 and Year 2), so "everyone enrolled in the subject" handed Year 2's notes to Year 1 and
+ * the reverse. A note written for a class reaches:
+ *   - the students of that class, and
+ *   - students enrolled in its subject who sit in a class of the same grade (Year 1 A's note
+ *     reaches Year 1 B, not Year 2).
+ * A note with no class has no year to go by, so it falls back to the subject's enrolled students.
+ *
+ * LessonNoteShare rows widen that audience (hand-picked students, a second class group, an expiry
+ * window) -- they are additive on top of the default, never a gate in front of it. "All enrolled"
+ * follows the same year-group rule; reaching another year takes an explicit class or student share.
  */
-async function hasNaturalAudienceAccess(
-  note: { subject_id: number; class_group_id: number | null },
-  studentUserId: number,
-): Promise<boolean> {
-  if (note.class_group_id) {
-    const [membership] = await db
-      .select({ user_id: StudentClassGroup.user_id })
+interface StudentNoteAudience {
+  classGroupIds: number[];
+  gradeIds: number[];
+  subjectIds: number[];
+}
+
+/**
+ * Where the student sits now. Memberships are kept per academic year and old years' rows stay
+ * ACTIVE after promotion, so only the student's latest year counts -- otherwise a Year 2 student
+ * still reads Year 1 through last year's class row. "Latest" is the newest year they have a class
+ * in (else the newest year they are enrolled in), the same newest-year-wins rule the student
+ * placement views use.
+ */
+async function loadStudentNoteAudience(studentId: number): Promise<StudentNoteAudience> {
+  const [classRows, enrollmentRows] = await Promise.all([
+    db
+      .select({
+        class_group_id: StudentClassGroup.class_group_id,
+        grade_id: ClassGroup.grade_id,
+        academic_year_id: StudentClassGroup.academic_year_id,
+      })
       .from(StudentClassGroup)
+      .innerJoin(ClassGroup, eq(ClassGroup.class_group_id, StudentClassGroup.class_group_id))
+      .where(and(eq(StudentClassGroup.user_id, studentId), eq(StudentClassGroup.status, "ACTIVE"))),
+    db
+      .select({
+        subject_id: StudentSubjectEnrollment.subject_id,
+        academic_year_id: StudentSubjectEnrollment.academic_year_id,
+      })
+      .from(StudentSubjectEnrollment)
       .where(
         and(
-          eq(StudentClassGroup.user_id, studentUserId),
-          eq(StudentClassGroup.class_group_id, note.class_group_id),
-          eq(StudentClassGroup.status, "ACTIVE"),
+          eq(StudentSubjectEnrollment.user_id, studentId),
+          eq(StudentSubjectEnrollment.status, "ACTIVE"),
         ),
-      )
-      .limit(1);
-    if (membership) return true;
-  }
-
-  const [enrollment] = await db
-    .select({ user_id: StudentSubjectEnrollment.user_id })
-    .from(StudentSubjectEnrollment)
-    .where(
-      and(
-        eq(StudentSubjectEnrollment.user_id, studentUserId),
-        eq(StudentSubjectEnrollment.subject_id, note.subject_id),
-        eq(StudentSubjectEnrollment.status, "ACTIVE"),
       ),
-    )
-    .limit(1);
-  return !!enrollment;
+  ]);
+
+  const newest = (rows: { academic_year_id: number }[]) =>
+    rows.reduce<number | null>((max, r) => (max == null || r.academic_year_id > max ? r.academic_year_id : max), null);
+  const yearId = newest(classRows) ?? newest(enrollmentRows);
+  const classes = classRows.filter((r) => r.academic_year_id === yearId);
+
+  return {
+    classGroupIds: classes.map((r) => r.class_group_id),
+    gradeIds: classes.map((r) => r.grade_id),
+    subjectIds: enrollmentRows.filter((r) => r.academic_year_id === yearId).map((r) => r.subject_id),
+  };
+}
+
+interface NoteAudienceFacts {
+  subject_id: number;
+  class_group_id: number | null;
+  /** Grade of the note's class group; null when the note has no class. */
+  class_grade_id: number | null;
+}
+
+interface NoteShareRule {
+  filter_type: string | null;
+  filter_ids: unknown;
+  expires_at: Date | string | null;
+}
+
+/**
+ * A share's target ids. MySQL 8 hands the JSON column back as an array, but MariaDB (XAMPP on dev
+ * machines) hands back its text -- and String#includes would then match ids by substring.
+ */
+function shareTargetIds(raw: unknown): number[] {
+  let value = raw;
+  if (typeof value === "string") {
+    try {
+      value = JSON.parse(value);
+    } catch {
+      return [];
+    }
+  }
+  return Array.isArray(value) ? value.map(Number) : [];
+}
+
+/** The note's year group taking its subject: same grade as its class, or the subject alone when classless. */
+function inNoteYearGroup(note: NoteAudienceFacts, audience: StudentNoteAudience): boolean {
+  if (!audience.subjectIds.includes(note.subject_id)) return false;
+  return note.class_grade_id == null || audience.gradeIds.includes(note.class_grade_id);
+}
+
+/** Single source of truth for "can this student read this published note" (list and detail alike). */
+export function noteReachesStudent(
+  note: NoteAudienceFacts,
+  shares: NoteShareRule[],
+  audience: StudentNoteAudience,
+  studentId: number,
+  now: Date = new Date(),
+): boolean {
+  if (note.class_group_id && audience.classGroupIds.includes(note.class_group_id)) return true;
+  if (inNoteYearGroup(note, audience)) return true;
+
+  return shares.some((share) => {
+    if (!share.filter_type) return false;
+    if (share.expires_at && new Date(share.expires_at) < now) return false;
+    const ids = shareTargetIds(share.filter_ids);
+    if (share.filter_type === "specific_students") return ids.includes(studentId);
+    if (share.filter_type === "class_group") return ids.some((id) => audience.classGroupIds.includes(id));
+    if (share.filter_type === "subject_enrolled") return inNoteYearGroup(note, audience);
+    return false;
+  });
 }
 
 export async function hasSharedAccessToNote(
@@ -1432,98 +1516,43 @@ export async function hasSharedAccessToNote(
     .select({
       subject_id: LessonNote.subject_id,
       class_group_id: LessonNote.class_group_id,
+      class_grade_id: ClassGroup.grade_id,
     })
     .from(LessonNote)
+    .leftJoin(ClassGroup, eq(ClassGroup.class_group_id, LessonNote.class_group_id))
     .where(eq(LessonNote.note_id, noteId))
     .limit(1);
   if (!note) return false;
 
-  if (await hasNaturalAudienceAccess(note, studentUserId)) return true;
-
-  const shares = await db
-    .select()
-    .from(LessonNoteShare)
-    .where(eq(LessonNoteShare.note_id, noteId));
-
-  for (const share of shares) {
-    if (share.expires_at && new Date(share.expires_at) < new Date()) continue;
-    const ids = (share.filter_ids as number[]) || [];
-
-    if (
-      share.filter_type === "specific_students" &&
-      ids.includes(studentUserId)
-    ) {
-      return true;
-    }
-    if (share.filter_type === "class_group") {
-      const [membership] = await db
-        .select({ user_id: StudentClassGroup.user_id })
-        .from(StudentClassGroup)
-        .where(
-          and(
-            eq(StudentClassGroup.user_id, studentUserId),
-            eq(StudentClassGroup.status, "ACTIVE"),
-            inArray(StudentClassGroup.class_group_id, ids),
-          ),
-        )
-        .limit(1);
-      if (membership) return true;
-    }
-    if (share.filter_type === "subject_enrolled") {
-      const [enrollment] = await db
-        .select({ user_id: StudentSubjectEnrollment.user_id })
-        .from(StudentSubjectEnrollment)
-        .where(
-          and(
-            eq(StudentSubjectEnrollment.user_id, studentUserId),
-            eq(StudentSubjectEnrollment.subject_id, note.subject_id),
-            eq(StudentSubjectEnrollment.status, "ACTIVE"),
-          ),
-        )
-        .limit(1);
-      if (enrollment) return true;
-    }
-  }
-  return false;
+  const [audience, shares] = await Promise.all([
+    loadStudentNoteAudience(studentUserId),
+    db
+      .select({
+        filter_type: LessonNoteShare.filter_type,
+        filter_ids: LessonNoteShare.filter_ids,
+        expires_at: LessonNoteShare.expires_at,
+      })
+      .from(LessonNoteShare)
+      .where(eq(LessonNoteShare.note_id, noteId)),
+  ]);
+  return noteReachesStudent(note, shares, audience, studentUserId);
 }
 
-// Used by listSharedWithMe — resolves which published
-// notes this student can read: every note written for a class group they're in or a subject
-// they're enrolled in (publication alone grants that — see hasNaturalAudienceAccess), plus
-// anything a teacher additionally shared with them through the three share filters. Deduped
-// by note, since a note can qualify several ways at once, with teacher names attached.
+// Used by listSharedWithMe — resolves which published notes this student can read (see
+// noteReachesStudent). Deduped by note, since a note can qualify several ways at once, with
+// teacher names attached.
 async function resolveVisibleSharedNotes(studentId: number) {
-  const [classGroups, enrollments] = await Promise.all([
-    db
-      .select({ class_group_id: StudentClassGroup.class_group_id })
-      .from(StudentClassGroup)
-      .where(
-        and(
-          eq(StudentClassGroup.user_id, studentId),
-          eq(StudentClassGroup.status, "ACTIVE"),
-        ),
-      ),
-    db
-      .select({ subject_id: StudentSubjectEnrollment.subject_id })
-      .from(StudentSubjectEnrollment)
-      .where(
-        and(
-          eq(StudentSubjectEnrollment.user_id, studentId),
-          eq(StudentSubjectEnrollment.status, "ACTIVE"),
-        ),
-      ),
-  ]);
-  const classGroupIds = classGroups.map((c) => c.class_group_id);
-  const subjectIds = enrollments.map((e) => e.subject_id);
+  const audience = await loadStudentNoteAudience(studentId);
 
   // Every published note, with the shares (if any) that widen its audience. A left join, not
-  // an inner one: a note with no share row at all is still readable by its own class/subject.
+  // an inner one: a note with no share row at all is still readable by its own year group.
   const rows = await db
     .select({
       note_id: LessonNote.note_id,
       note_title: LessonNote.title,
       note_subject_id: LessonNote.subject_id,
       note_class_group_id: LessonNote.class_group_id,
+      note_class_grade_id: ClassGroup.grade_id,
       subject_name: Subject.name,
       content_html: LessonNote.content_html,
       source: LessonNote.source,
@@ -1537,6 +1566,7 @@ async function resolveVisibleSharedNotes(studentId: number) {
     })
     .from(LessonNote)
     .innerJoin(Subject, eq(LessonNote.subject_id, Subject.subject_id))
+    .leftJoin(ClassGroup, eq(ClassGroup.class_group_id, LessonNote.class_group_id))
     .leftJoin(LessonNoteShare, eq(LessonNoteShare.note_id, LessonNote.note_id))
     .leftJoin(
       SchemeOfWorkEntry,
@@ -1545,23 +1575,15 @@ async function resolveVisibleSharedNotes(studentId: number) {
     .where(eq(LessonNote.status, "PUBLISHED"));
 
   const now = new Date();
-  const visible = rows.filter((r) => {
-    // The note's own audience: the class it was written for, or its enrolled students.
-    if (r.note_class_group_id && classGroupIds.includes(r.note_class_group_id))
-      return true;
-    if (subjectIds.includes(r.note_subject_id)) return true;
-
-    // Otherwise this row only counts if it carries a share that reaches this student.
-    if (!r.filter_type) return false;
-    if (r.expires_at && new Date(r.expires_at) < now) return false;
-    const ids = (r.filter_ids as number[]) || [];
-    if (r.filter_type === "specific_students") return ids.includes(studentId);
-    if (r.filter_type === "class_group")
-      return ids.some((id) => classGroupIds.includes(id));
-    if (r.filter_type === "subject_enrolled")
-      return subjectIds.includes(r.note_subject_id);
-    return false;
-  });
+  const visible = rows.filter((r) =>
+    noteReachesStudent(
+      { subject_id: r.note_subject_id, class_group_id: r.note_class_group_id, class_grade_id: r.note_class_grade_id },
+      [r],
+      audience,
+      studentId,
+      now,
+    ),
+  );
 
   const byNote = new Map<number, (typeof visible)[number]>();
   for (const v of visible) byNote.set(v.note_id, v);

@@ -103,7 +103,7 @@ const ShareLessonNoteModal: React.FC<Props> = ({ isOpen, onClose, note, onShareC
 
   const describeShare = (s: LessonNoteShare) => {
     if (s.filter_type === "class_group") return "Whole class";
-    if (s.filter_type === "subject_enrolled") return "Everyone enrolled in the subject";
+    if (s.filter_type === "subject_enrolled") return "Everyone in this year taking the subject";
     return `${s.filter_ids.length} student${s.filter_ids.length === 1 ? "" : "s"}`;
   };
 

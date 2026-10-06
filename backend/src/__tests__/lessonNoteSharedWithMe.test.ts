@@ -6,6 +6,7 @@ import {
   signToken,
   createAcademicPeriod,
   createProgramGradeClassGroup,
+  createProgramGradeClassGroupDetailed,
   createSubject,
   createTeacherSubjectAssignment,
   createStudentClassGroup,
@@ -23,6 +24,7 @@ describe("GET /lesson-notes/shared-with-me", () => {
   let studentId: number;
   let subjectId: number;
   let classGroupId: number;
+  let gradeId: number;
   let academicYearId: number;
 
   const publishNote = async (title: string) => {
@@ -69,7 +71,7 @@ describe("GET /lesson-notes/shared-with-me", () => {
 
     const period = await createAcademicPeriod();
     academicYearId = period.academicYearId;
-    classGroupId = await createProgramGradeClassGroup();
+    ({ classGroupId, gradeId } = await createProgramGradeClassGroupDetailed());
     subjectId = await createSubject();
 
     await createTeacherSubjectAssignment({ userId: teacherId, subjectId, classGroupId, academicYearId });
@@ -82,21 +84,80 @@ describe("GET /lesson-notes/shared-with-me", () => {
     expect(await sharedTitles()).toContain("Just published");
   });
 
-  it("shows a published note to a student enrolled in the subject but not in its class group", async () => {
-    const outsiderId = await createUser({ userType: "STUDENT" });
-    const outsiderToken = signToken(outsiderId);
-    const studentRole = await createRoleWithPermissions("notes_student_enrolled", [
-      "VIEW_SHARED_LESSON_NOTES",
-    ]);
-    await assignRole(outsiderId, studentRole);
-    await createStudentSubjectEnrollment({ userId: outsiderId, subjectId, academicYearId });
+  // A student with the notes permission, signed in, and nothing else yet.
+  const newStudent = async (label: string) => {
+    const id = await createUser({ userType: "STUDENT" });
+    await assignRole(id, await createRoleWithPermissions(label, ["VIEW_SHARED_LESSON_NOTES"]));
+    return { id, token: signToken(id) };
+  };
 
-    await publishNote("Enrolled-only note");
+  const titlesFor = async (token: string) => {
     const res = await request(app)
       .get("/lesson-notes/shared-with-me")
-      .set("Authorization", `Bearer ${outsiderToken}`);
+      .set("Authorization", `Bearer ${token}`);
     expect(res.status).toBe(200);
-    expect(res.body.data.map((n: any) => n.title)).toContain("Enrolled-only note");
+    return res.body.data.map((n: any) => n.title);
+  };
+
+  const openAs = (token: string, noteId: number) =>
+    request(app).get(`/lesson-notes/shared-with-me/${noteId}`).set("Authorization", `Bearer ${token}`);
+
+  it("shows a published note to a sibling class of the same year taking the subject", async () => {
+    const sibling = await newStudent("notes_student_sibling");
+    const { classGroupId: siblingClassId } = await createProgramGradeClassGroupDetailed({ gradeId });
+    await createStudentClassGroup({ userId: sibling.id, classGroupId: siblingClassId, academicYearId });
+    await createStudentSubjectEnrollment({ userId: sibling.id, subjectId, academicYearId });
+
+    const noteId = await publishNote("Same-year note");
+    expect(await titlesFor(sibling.token)).toContain("Same-year note");
+    expect((await openAs(sibling.token, noteId)).status).toBe(200);
+  });
+
+  // The reported bug: one subject taught to Year 1 and Year 2 leaked each year's notes to the other.
+  it("hides a class's note from another year taking the same subject", async () => {
+    const otherYear = await newStudent("notes_student_other_year");
+    const { classGroupId: otherYearClassId } = await createProgramGradeClassGroupDetailed();
+    await createStudentClassGroup({ userId: otherYear.id, classGroupId: otherYearClassId, academicYearId });
+    await createStudentSubjectEnrollment({ userId: otherYear.id, subjectId, academicYearId });
+
+    const noteId = await publishNote("Not for the other year");
+    expect(await titlesFor(otherYear.token)).not.toContain("Not for the other year");
+    expect((await openAs(otherYear.token, noteId)).status).toBe(403);
+  });
+
+  it("keeps 'All enrolled' within the note's year", async () => {
+    const otherYear = await newStudent("notes_student_other_year_shared");
+    const { classGroupId: otherYearClassId } = await createProgramGradeClassGroupDetailed();
+    await createStudentClassGroup({ userId: otherYear.id, classGroupId: otherYearClassId, academicYearId });
+    await createStudentSubjectEnrollment({ userId: otherYear.id, subjectId, academicYearId });
+
+    const noteId = await publishNote("All enrolled, one year");
+    await share(noteId, "subject_enrolled", [subjectId]);
+    expect(await titlesFor(otherYear.token)).not.toContain("All enrolled, one year");
+  });
+
+  it("stops showing last year's class notes once the student is promoted", async () => {
+    // Promotion leaves last year's class row ACTIVE; only the newest year may count.
+    const promoted = await newStudent("notes_student_promoted");
+    await createStudentClassGroup({ userId: promoted.id, classGroupId, academicYearId });
+    await createStudentSubjectEnrollment({ userId: promoted.id, subjectId, academicYearId });
+    const nextYear = await createAcademicPeriod();
+    const { classGroupId: nextClassId } = await createProgramGradeClassGroupDetailed();
+    await createStudentClassGroup({ userId: promoted.id, classGroupId: nextClassId, academicYearId: nextYear.academicYearId });
+
+    const noteId = await publishNote("Previous year's note");
+    expect(await titlesFor(promoted.token)).not.toContain("Previous year's note");
+    expect((await openAs(promoted.token, noteId)).status).toBe(403);
+  });
+
+  it("still reaches a hand-picked student in another year", async () => {
+    const otherYear = await newStudent("notes_student_other_year_picked");
+    const { classGroupId: otherYearClassId } = await createProgramGradeClassGroupDetailed();
+    await createStudentClassGroup({ userId: otherYear.id, classGroupId: otherYearClassId, academicYearId });
+
+    const noteId = await publishNote("Picked across years");
+    await share(noteId, "specific_students", [otherYear.id]);
+    expect(await titlesFor(otherYear.token)).toContain("Picked across years");
   });
 
   it("hides a published note from a student in neither its class group nor its subject", async () => {
