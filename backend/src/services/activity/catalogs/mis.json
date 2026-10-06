@@ -72,6 +72,7 @@
     { "key": "mis.systems", "label": "Systems", "module": "Platform", "patterns": ["/systems"] },
     { "key": "mis.system", "label": "System details", "module": "Platform", "patterns": ["/systems/:id"] },
     { "key": "mis.logs_history", "label": "Logs history", "module": "Platform", "patterns": ["/logs-history"] },
+    { "key": "mis.desktop_tools", "label": "Desktop tools", "module": "Platform", "patterns": ["/desktop-tools"] },
     { "key": "mis.database", "label": "Database management", "module": "Platform", "patterns": ["/database-management"] },
 
     { "key": "mis.analytics", "label": "Usage overview", "module": "Usage & Monitoring", "patterns": ["/analytics"] },

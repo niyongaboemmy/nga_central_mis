@@ -8,7 +8,7 @@ import { Permissions } from "../../constants/permissions";
 import { getToken } from "../../utils/auth";
 import { useAccess } from "../../hooks/useAccess";
 import { BarChart3, ShieldCheck } from "lucide-react";
-import { BellRing, CalendarDays, Clock4, House } from "lucide-react";
+import { BellRing, CalendarDays, Clock4, Gamepad2, House } from "lucide-react";
 
 interface SidebarProps {
   isCollapsed?: boolean;
@@ -649,6 +649,12 @@ const Sidebar: React.FC<SidebarProps> = ({
         </svg>
       ),
       requiredPermission: Permissions.MANAGE_SETTINGS,
+    },
+    {
+      label: "Desktop tools",
+      path: "/desktop-tools",
+      icon: <Gamepad2 className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
+      requiredPermission: Permissions.DESKTOP_TOOLS_CONFIGURE,
     },
     {
       label: "Schools",

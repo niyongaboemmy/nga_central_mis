@@ -45,6 +45,11 @@ const SEARCH_ITEMS: SearchItem[] = [
     requiredPermission: [Permissions.OFFICE_HOURS_MANAGE_OWN, Permissions.OFFICE_HOURS_MANAGE_ANY],
   },
   {
+    label: "Desktop tools",
+    path: "/desktop-tools",
+    requiredPermission: Permissions.DESKTOP_TOOLS_CONFIGURE,
+  },
+  {
     label: "Office Hours Oversight",
     path: "/office-hours/admin",
     requiredPermission: [Permissions.OFFICE_HOURS_MANAGE_ANY, Permissions.OFFICE_HOURS_VIEW, Permissions.OFFICE_HOURS_CONFIGURE],
