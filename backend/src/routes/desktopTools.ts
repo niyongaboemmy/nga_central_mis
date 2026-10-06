@@ -6,6 +6,7 @@ import { collectOccurrences } from "../services/reminders/occurrences";
 import { addDaysYmd, kigaliInstant, kigaliParts } from "../services/reminders/time";
 import { buildPolicy, policyRange } from "../services/desktop/policy";
 import { loadTeacherClasses } from "../services/desktop/classes";
+import { cleanUsage, gamesBlock, loadGameSettings, playedToday, recordUsage } from "../services/desktop/games";
 
 /**
  * NGA Tools (NGA Desktop), signed in. Called from the MIS page inside NGA Desktop,
@@ -15,6 +16,7 @@ import { loadTeacherClasses } from "../services/desktop/classes";
  *   GET  /desktop/tools/agenda      My Day: lessons, activities, office hours, quizzes, meetings (days=1..7)
  *   GET  /desktop/tools/policy      today's lesson and exam windows (games and the student AI pause in them)
  *   GET  /desktop/tools/classes     the class lists of the classes this person teaches (name picker, groups)
+ *   POST /desktop/tools/games/usage play time (cumulative per device and day; the largest total is kept)
  * Kept apart from routes/desktop.ts (public distribution routes). `authenticate` is
  * passed in by app.ts, so tests can mount this router with their own sign-in without
  * touching the shared auth module (the suite shares one module registry).
@@ -72,6 +74,18 @@ router.get(
   }),
 );
 
+router.post(
+  "/games/usage",
+  authenticate,
+  asyncHandler(async (req: any, res) => {
+    const device = String(req.body?.device ?? "");
+    if (!/^[a-z0-9]{8,16}$/.test(device)) return res.status(400).json({ success: false, message: "Bad device" });
+    const entries = cleanUsage(req.body?.entries);
+    const saved = await recordUsage(Number(req.user.userId), device, entries);
+    res.json({ success: true, data: { saved } });
+  }),
+);
+
 router.get(
   "/policy",
   authenticate,
@@ -80,8 +94,9 @@ router.get(
     const now = new Date();
     const { from, to } = policyRange(now);
     const policy = buildPolicy(await deps.collect(userId, from, to), now);
+    const [{ persona }, settings, played] = await Promise.all([loadPersona(userId), loadGameSettings(), playedToday(userId, now)]);
     res.set("Cache-Control", "private, no-store");
-    res.json({ success: true, data: policy });
+    res.json({ success: true, data: { ...policy, games: gamesBlock(settings, persona, played) } });
   }),
 );
 
