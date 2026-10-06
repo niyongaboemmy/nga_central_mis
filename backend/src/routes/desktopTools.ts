@@ -8,6 +8,8 @@ import { buildPolicy, policyRange } from "../services/desktop/policy";
 import { loadTeacherClasses } from "../services/desktop/classes";
 import { applySettingsUpdate, cleanUsage, GAME_IDS, gamesBlock, IGISORO_VARIANTS, loadGameSettings, playedToday, recordUsage, saveGameSettings, usageSummary } from "../services/desktop/games";
 import { ControlError, activeOverrides, createOverride, endClassGameTime, findStudents, revokeOverride, startClassGameTime, studentClassGameTime, studentOverride, teacherClassGameTimes } from "../services/desktop/gameControls";
+import { TrError, isLang, latest, listEntries, publish, releases, revert, rollback, saveEdit, suggest, validKey } from "../services/desktop/translations";
+import { ChatUnavailableError as TrChatUnavailable } from "../services/aiProviders/chat";
 import { getUserRoleNames } from "../utils/auth";
 import { recordActivity } from "../utils/activityLogger";
 
@@ -29,6 +31,9 @@ import { recordActivity } from "../utils/activityLogger";
  *   GET  /desktop/tools/settings/games/students    find students by name (same)
  *   POST /desktop/tools/settings/games/overrides   block or extend one student (same)
  *   POST /desktop/tools/settings/games/overrides/:id/revoke
+ *   GET  /desktop/tools/i18n/:lang?since=  the latest published translations (every desktop)
+ *   GET  /desktop/tools/i18n/workspace/:lang      edits + releases (TOOLS_TRANSLATIONS_MANAGE)
+ *   POST /desktop/tools/i18n/edit | revert | publish | rollback | suggest   (same)
  * Kept apart from routes/desktop.ts (public distribution routes). `authenticate` is
  * passed in by app.ts, so tests can mount this router with their own sign-in without
  * touching the shared auth module (the suite shares one module registry).
@@ -328,6 +333,79 @@ router.post(
     if (!ok) return res.status(404).json({ success: false, message: "Not found or already ended." });
     await recordActivity(userId, "DESKTOP_GAMES_OVERRIDE_REVOKE", "Ended a games exception early", "DesktopGameOverride", Number(req.params.id), undefined, userId);
     res.json({ success: true, data: { revoked: true } });
+  }),
+);
+
+const TRANSLATE = "TOOLS_TRANSLATIONS_MANAGE";
+const canTranslate = (req: any) => Array.isArray(req.user?.permissions) && req.user.permissions.includes(TRANSLATE);
+const trError = (res: any, e: unknown) => {
+  if (e instanceof TrError) return res.status(e.status).json({ success: false, code: e.code, message: e.message });
+  if (e instanceof TrChatUnavailable) return res.status(503).json({ success: false, code: `AI_${e.reason}`, message: "AI suggestions aren't available right now." });
+  throw e;
+};
+
+router.get(
+  "/i18n/workspace/:lang",
+  authenticate,
+  asyncHandler(async (req: any, res) => {
+    if (!canTranslate(req)) return res.status(403).json({ success: false, code: "NO_PERMISSION", message: "Ask an admin for the translations permission." });
+    const lang = req.params.lang;
+    if (!isLang(lang)) return res.status(400).json({ success: false, message: "Unknown language" });
+    const [entries, rel] = await Promise.all([listEntries(lang), releases(lang)]);
+    res.set("Cache-Control", "private, no-store");
+    res.json({ success: true, data: { entries, releases: rel } });
+  }),
+);
+
+router.get(
+  "/i18n/:lang",
+  authenticate,
+  asyncHandler(async (req: any, res) => {
+    const lang = req.params.lang;
+    if (!isLang(lang)) return res.status(400).json({ success: false, message: "Unknown language" });
+    res.set("Cache-Control", "private, no-store");
+    res.json({ success: true, data: await latest(lang, Number(req.query.since) || 0) });
+  }),
+);
+
+router.post(
+  "/i18n/:action(edit|revert|publish|rollback|suggest)",
+  authenticate,
+  asyncHandler(async (req: any, res) => {
+    if (!canTranslate(req)) return res.status(403).json({ success: false, code: "NO_PERMISSION", message: "Ask an admin for the translations permission." });
+    const userId = Number(req.user.userId);
+    const b = req.body ?? {};
+    try {
+      switch (req.params.action) {
+        case "edit": {
+          const e = await saveEdit(userId, b);
+          await recordActivity(userId, e.status === "approved" ? "DESKTOP_TRANSLATION_APPROVE" : "DESKTOP_TRANSLATION_EDIT", `${b.lang}: ${e.key}`, "DesktopToolTranslation", undefined, { lang: b.lang, key: e.key, text: e.text, status: e.status, previous: b.previous ?? null }, userId);
+          return res.json({ success: true, data: e });
+        }
+        case "revert": {
+          if (!isLang(b.lang) || !validKey(b.key)) return res.status(400).json({ success: false, message: "Bad request" });
+          const done = await revert(b.lang, b.key);
+          if (done) await recordActivity(userId, "DESKTOP_TRANSLATION_REVERT", `${b.lang}: ${b.key}`, "DesktopToolTranslation", undefined, { lang: b.lang, key: b.key }, userId);
+          return res.json({ success: true, data: { reverted: done } });
+        }
+        case "publish": {
+          if (!isLang(b.lang)) return res.status(400).json({ success: false, message: "Bad request" });
+          const r = await publish(userId, b.lang, typeof b.note === "string" ? b.note : undefined);
+          await recordActivity(userId, "DESKTOP_TRANSLATION_PUBLISH", `Published ${b.lang} release #${r.id} (${r.count} strings)`, "DesktopToolTranslationRelease", r.id, { lang: b.lang }, userId);
+          return res.json({ success: true, data: r });
+        }
+        case "rollback": {
+          if (!isLang(b.lang)) return res.status(400).json({ success: false, message: "Bad request" });
+          const r = await rollback(userId, b.lang, Number(b.release));
+          await recordActivity(userId, "DESKTOP_TRANSLATION_ROLLBACK", `Rolled ${b.lang} back to release #${b.release} (new #${r.id})`, "DesktopToolTranslationRelease", r.id, { lang: b.lang, from: Number(b.release) }, userId);
+          return res.json({ success: true, data: r });
+        }
+        case "suggest":
+          return res.json({ success: true, data: { text: await suggest(userId, b) } });
+      }
+    } catch (e) {
+      trError(res, e);
+    }
   }),
 );
 

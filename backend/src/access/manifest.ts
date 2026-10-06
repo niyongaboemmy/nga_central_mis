@@ -158,6 +158,8 @@ export const MIS_MANIFEST = defineManifest({
     OFFICE_HOURS_CONFIGURE: W("Configure office-hours policy", "SYSTEM", SCHOOL_ONLY),
     // NGA Desktop tools: game switches, budgets and hours (nga-desktop TOOLS_HUB plan §6.7.5).
     DESKTOP_TOOLS_CONFIGURE: W("Configure NGA Desktop tools and games", "SYSTEM", SCHOOL_ONLY),
+    // Review and publish the desktop tools' French/Kinyarwanda texts (TOOLS_HUB plan §6.3.1).
+    TOOLS_TRANSLATIONS_MANAGE: W("Review and publish NGA Desktop tool translations", "SYSTEM", SCHOOL_ONLY),
   },
 });
 
