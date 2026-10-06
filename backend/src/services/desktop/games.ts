@@ -10,12 +10,12 @@ import { addDaysYmd, kigaliParts } from "../reminders/time";
 export const GAME_IDS = [
   "igisoro", "number-place", "picture-logic", "lights-out", "mines", "sliding-15", "merge-2048",
   "pairs", "echo", "five-letter", "word-search", "math-sprint", "code-breaker", "four-in-a-row", "snake",
-  "breathe", "stretch",
+  "breathe", "stretch", "typing",
 ] as const;
 export type GameId = (typeof GAME_IDS)[number];
 
 /** Learning games count half towards the daily budget; reset activities don't count. */
-export const LEARNING = new Set<string>(["pairs", "five-letter", "word-search", "math-sprint"]);
+export const LEARNING = new Set<string>(["pairs", "five-letter", "word-search", "math-sprint", "typing"]);
 export const RESET = new Set<string>(["breathe", "stretch"]);
 
 export interface GameSettings {
@@ -119,15 +119,28 @@ export async function recordUsage(userId: number, deviceId: string, entries: Usa
   return entries.length;
 }
 
-/** The policy's games block for one person. */
-export function gamesBlock(settings: GameSettings, persona: string, played: Array<{ game: string; seconds: number }>) {
+export interface GameExtras {
+  /** A running class game time for one of the student's classes. */
+  classGameTime?: { until: string; games: string[]; by: string; className: string } | null;
+  /** The student's exception (a block beats an extension). */
+  override?: { kind: "block" | "extend"; until: string; reason: string; extraMin: number | null } | null;
+}
+
+/** The policy's games block for one person. Class game time opens only games the school allows. */
+export function gamesBlock(settings: GameSettings, persona: string, played: Array<{ game: string; seconds: number }>, extras: GameExtras = {}) {
   const off = new Set(settings.disabled);
   if (!settings.igisoro.approved) off.add("igisoro");
   const staff = persona !== "student";
+  const allowed = settings.enabled ? GAME_IDS.filter((g) => !off.has(g)) : [];
+  const cgt = !staff && extras.classGameTime ? { ...extras.classGameTime, games: extras.classGameTime.games.filter((g) => (allowed as string[]).includes(g)) } : null;
+  const override = !staff ? extras.override ?? null : null;
+  const base = staff ? settings.staffBudgetMin : settings.dailyBudgetMin;
   return {
     enabled: settings.enabled && persona !== "parent",
-    allowed: settings.enabled ? GAME_IDS.filter((g) => !off.has(g)) : [],
-    dailyBudgetMin: staff ? settings.staffBudgetMin : settings.dailyBudgetMin,
+    allowed,
+    dailyBudgetMin: base !== null && override?.kind === "extend" ? base + (override.extraMin ?? 0) : base,
+    classGameTime: cgt && cgt.games.length ? cgt : null,
+    override: override ? { kind: override.kind, until: override.until, reason: override.reason, extraMin: override.extraMin } : null,
     usedTodayMin: weightedMinutes(played),
     sessionCapMin: settings.sessionCapMin,
     cooldownMin: settings.cooldownMin,

@@ -7,6 +7,7 @@ import { addDaysYmd, kigaliInstant, kigaliParts } from "../services/reminders/ti
 import { buildPolicy, policyRange } from "../services/desktop/policy";
 import { loadTeacherClasses } from "../services/desktop/classes";
 import { applySettingsUpdate, cleanUsage, GAME_IDS, gamesBlock, IGISORO_VARIANTS, loadGameSettings, playedToday, recordUsage, saveGameSettings, usageSummary } from "../services/desktop/games";
+import { ControlError, activeOverrides, createOverride, endClassGameTime, findStudents, revokeOverride, startClassGameTime, studentClassGameTime, studentOverride, teacherClassGameTimes } from "../services/desktop/gameControls";
 import { getUserRoleNames } from "../utils/auth";
 import { recordActivity } from "../utils/activityLogger";
 
@@ -21,6 +22,13 @@ import { recordActivity } from "../utils/activityLogger";
  *   POST /desktop/tools/games/usage play time (cumulative per device and day; the largest total is kept)
  *   GET  /desktop/tools/settings/games   the school's game settings + 7-day totals (DESKTOP_TOOLS_CONFIGURE)
  *   PUT  /desktop/tools/settings/games   change them (Igisoro approval: super admin only)
+ *   GET  /desktop/tools/class-game-time            running class game time in my classes (teachers)
+ *   POST /desktop/tools/class-game-time            open games for one of my classes, 5–30 min
+ *   POST /desktop/tools/class-game-time/:id/end    end it early
+ *   GET  /desktop/tools/settings/games/overrides   active student exceptions (DESKTOP_TOOLS_CONFIGURE)
+ *   GET  /desktop/tools/settings/games/students    find students by name (same)
+ *   POST /desktop/tools/settings/games/overrides   block or extend one student (same)
+ *   POST /desktop/tools/settings/games/overrides/:id/revoke
  * Kept apart from routes/desktop.ts (public distribution routes). `authenticate` is
  * passed in by app.ts, so tests can mount this router with their own sign-in without
  * touching the shared auth module (the suite shares one module registry).
@@ -105,8 +113,14 @@ router.get(
     const { from, to } = policyRange(now);
     const policy = buildPolicy(await deps.collect(userId, from, to), now);
     const [{ persona }, settings, played] = await Promise.all([loadPersona(userId), loadGameSettings(), playedToday(userId, now)]);
+    const student = persona === "student";
+    const [cgt, override] = student ? await Promise.all([studentClassGameTime(userId), studentOverride(userId)]) : [null, null];
+    const extras = {
+      classGameTime: cgt ? { until: cgt.endsAt, games: cgt.games, by: cgt.by, className: cgt.className } : null,
+      override: override ? { kind: override.kind, until: override.endsAt, reason: override.reason, extraMin: override.extraMin } : null,
+    };
     res.set("Cache-Control", "private, no-store");
-    res.json({ success: true, data: { ...policy, games: gamesBlock(settings, persona, played) } });
+    res.json({ success: true, data: { ...policy, games: gamesBlock(settings, persona, played, extras) } });
   }),
 );
 
@@ -222,6 +236,98 @@ router.put(
       );
     }
     res.json({ success: true, data: { settings: after } });
+  }),
+);
+
+const controlError = (res: any, e: unknown) => {
+  if (e instanceof ControlError) return res.status(e.status).json({ success: false, code: e.code, message: e.message });
+  throw e;
+};
+
+router.get(
+  "/class-game-time",
+  authenticate,
+  asyncHandler(async (req: any, res) => {
+    res.set("Cache-Control", "private, no-store");
+    res.json({ success: true, data: { active: await teacherClassGameTimes(Number(req.user.userId), deps.classes) } });
+  }),
+);
+
+router.post(
+  "/class-game-time",
+  authenticate,
+  asyncHandler(async (req: any, res) => {
+    const userId = Number(req.user.userId);
+    try {
+      const t = await startClassGameTime(userId, req.body ?? {}, deps.classes);
+      await recordActivity(userId, "DESKTOP_CLASS_GAME_TIME", `Opened games for ${t.className} until ${t.endsAt}`, "ClassGroup", t.classGroupId, { games: t.games, endsAt: t.endsAt }, userId);
+      res.json({ success: true, data: t });
+    } catch (e) {
+      controlError(res, e);
+    }
+  }),
+);
+
+router.post(
+  "/class-game-time/:id/end",
+  authenticate,
+  asyncHandler(async (req: any, res) => {
+    const userId = Number(req.user.userId);
+    try {
+      await endClassGameTime(userId, Number(req.params.id), deps.classes);
+      await recordActivity(userId, "DESKTOP_CLASS_GAME_TIME_END", "Ended class game time", "DesktopClassGameTime", Number(req.params.id), undefined, userId);
+      res.json({ success: true, data: { ended: true } });
+    } catch (e) {
+      controlError(res, e);
+    }
+  }),
+);
+
+router.get(
+  "/settings/games/overrides",
+  authenticate,
+  asyncHandler(async (req: any, res) => {
+    if (!canConfigure(req)) return res.status(403).json({ success: false, message: "Forbidden" });
+    res.set("Cache-Control", "private, no-store");
+    res.json({ success: true, data: { overrides: await activeOverrides() } });
+  }),
+);
+
+router.get(
+  "/settings/games/students",
+  authenticate,
+  asyncHandler(async (req: any, res) => {
+    if (!canConfigure(req)) return res.status(403).json({ success: false, message: "Forbidden" });
+    res.json({ success: true, data: { students: await findStudents(String(req.query.q ?? "")) } });
+  }),
+);
+
+router.post(
+  "/settings/games/overrides",
+  authenticate,
+  asyncHandler(async (req: any, res) => {
+    if (!canConfigure(req)) return res.status(403).json({ success: false, message: "Forbidden" });
+    const userId = Number(req.user.userId);
+    try {
+      const o = await createOverride(userId, req.body ?? {});
+      await recordActivity(userId, o.kind === "block" ? "DESKTOP_GAMES_BLOCK" : "DESKTOP_GAMES_EXTEND", `${o.kind === "block" ? "Blocked games for" : "Extended game time for"} ${o.name} until ${o.endsAt}: ${o.reason}`, "User", o.userId, { overrideId: o.id, extraMin: o.extraMin }, userId);
+      res.json({ success: true, data: o });
+    } catch (e) {
+      controlError(res, e);
+    }
+  }),
+);
+
+router.post(
+  "/settings/games/overrides/:id/revoke",
+  authenticate,
+  asyncHandler(async (req: any, res) => {
+    if (!canConfigure(req)) return res.status(403).json({ success: false, message: "Forbidden" });
+    const userId = Number(req.user.userId);
+    const ok = await revokeOverride(userId, Number(req.params.id));
+    if (!ok) return res.status(404).json({ success: false, message: "Not found or already ended." });
+    await recordActivity(userId, "DESKTOP_GAMES_OVERRIDE_REVOKE", "Ended a games exception early", "DesktopGameOverride", Number(req.params.id), undefined, userId);
+    res.json({ success: true, data: { revoked: true } });
   }),
 );
 

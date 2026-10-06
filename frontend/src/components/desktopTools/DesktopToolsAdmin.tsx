@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { BarChart3, Gamepad2, Moon, RotateCcw, Save, ShieldCheck, Timer } from "lucide-react";
-import { apiError, desktopToolsApi, type GameSettings, type GamesAdmin } from "../../api/desktopTools";
+import { BarChart3, Gamepad2, Moon, RotateCcw, Save, ShieldCheck, Timer, UserX } from "lucide-react";
+import { apiError, desktopToolsApi, type GameOverride, type GameSettings, type GamesAdmin } from "../../api/desktopTools";
 import { Card, CardTitle, EmptyState, Muted, Spinner, inputCls as fieldCls, primaryBtn, secondaryBtn } from "../officeHours/ohUi";
 import SelectField from "../ui/SelectField";
 import { useConfirm } from "../../contexts/ConfirmContext";
@@ -26,6 +26,7 @@ const GAME_INFO: Record<string, { name: string; kind: "fun" | "learning" | "rese
   "five-letter": { name: "Five-Letter Guess", kind: "learning", group: "Words & maths" },
   "word-search": { name: "Word Search", kind: "learning", group: "Words & maths" },
   "math-sprint": { name: "Math Sprint", kind: "learning", group: "Words & maths" },
+  typing: { name: "Typing tutor", kind: "learning", group: "Words & maths" },
   "four-in-a-row": { name: "Four in a Row", kind: "fun", group: "Together & reflex" },
   snake: { name: "Snake", kind: "fun", group: "Together & reflex" },
   igisoro: { name: "Igisoro", kind: "fun", group: "Culture" },
@@ -280,6 +281,8 @@ const DesktopToolsAdmin: React.FC = () => {
         </div>
       </Card>
 
+      <Exceptions />
+
       <Card labelledBy="games-usage">
         <CardTitle id="games-usage" icon={<BarChart3 className="h-4 w-4" aria-hidden />}>Last 7 days</CardTitle>
         {data.usage.games.length === 0 ? (
@@ -305,6 +308,149 @@ const DesktopToolsAdmin: React.FC = () => {
         )}
       </Card>
     </div>
+  );
+};
+
+/** Per-student exceptions (plan §6.7.5 layer 8): block, or extra daily minutes, with a reason and an end. */
+const Exceptions: React.FC = () => {
+  const [list, setList] = useState<GameOverride[] | null>(null);
+  const [q, setQ] = useState("");
+  const [found, setFound] = useState<Array<{ id: number; name: string; className: string | null }>>([]);
+  const [pick, setPick] = useState<{ id: number; name: string; className: string | null } | null>(null);
+  const [kind, setKind] = useState<"block" | "extend">("block");
+  const [extra, setExtra] = useState(15);
+  const [days, setDays] = useState(14);
+  const [reason, setReason] = useState("");
+  const [busy, setBusy] = useState(false);
+  const confirm = useConfirm();
+  const { showToast } = useToast();
+
+  const load = async () => {
+    try {
+      setList((await desktopToolsApi.overrides()).data.data.overrides);
+    } catch (e) {
+      showToast(apiError(e, "Couldn't load the exceptions."), "error");
+      setList([]);
+    }
+  };
+  useEffect(() => {
+    void load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  useEffect(() => {
+    if (pick || q.trim().length < 2) return setFound([]);
+    const id = window.setTimeout(() => {
+      desktopToolsApi.findStudents(q).then((r) => setFound(r.data.data.students)).catch(() => setFound([]));
+    }, 250);
+    return () => window.clearTimeout(id);
+  }, [q, pick]);
+
+  const add = async () => {
+    if (!pick) return;
+    setBusy(true);
+    try {
+      await desktopToolsApi.addOverride({ userId: pick.id, kind, extraMin: kind === "extend" ? extra : undefined, reason: reason.trim(), days });
+      showToast(kind === "block" ? `Games blocked for ${pick.name}.` : `${pick.name} gets ${extra} extra minutes a day.`, "success");
+      setPick(null); setQ(""); setReason("");
+      await load();
+    } catch (e) {
+      showToast(apiError(e, "Couldn't add the exception."), "error");
+    } finally {
+      setBusy(false);
+    }
+  };
+  const revoke = async (o: GameOverride) => {
+    if (!(await confirm({ title: "End this exception", message: `${o.name}'s ${o.kind === "block" ? "block" : "extra time"} ends now.`, confirmText: "End now", tone: "warning" }))) return;
+    try {
+      await desktopToolsApi.revokeOverride(o.id);
+      await load();
+    } catch (e) {
+      showToast(apiError(e, "Couldn't end the exception."), "error");
+    }
+  };
+
+  return (
+    <Card labelledBy="games-exceptions">
+      <CardTitle id="games-exceptions" icon={<UserX className="h-4 w-4" aria-hidden />}>Student exceptions</CardTitle>
+      <Muted className="mb-3">Block games for one student (behaviour, a parent's request) or give extra daily minutes (for example a learning plan). Every exception needs a reason and ends on its own; both are kept in the audit log.</Muted>
+      <div className="grid gap-3 rounded-2xl bg-slate-50 p-3 dark:bg-gray-900/40 md:grid-cols-2">
+        <div className="relative">
+          <label htmlFor="ex-student" className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-gray-300">Student</label>
+          {pick ? (
+            <div className="flex items-center justify-between gap-2 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm dark:border-gray-700/50 dark:bg-gray-800/40">
+              <span className="text-slate-900 dark:text-gray-100">{pick.name}{pick.className ? ` · ${pick.className}` : ""}</span>
+              <button className="text-xs font-semibold text-blue-700 dark:text-blue-300" onClick={() => { setPick(null); setQ(""); }}>Change</button>
+            </div>
+          ) : (
+            <input id="ex-student" className={fieldCls} placeholder="Type a name…" value={q} onChange={(e) => setQ(e.target.value)} autoComplete="off" />
+          )}
+          {!pick && found.length > 0 && (
+            <ul role="listbox" className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-xl border border-slate-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-800">
+              {found.map((s) => (
+                <li key={s.id}>
+                  <button role="option" aria-selected={false} className="w-full px-3 py-2 text-left text-sm text-slate-800 hover:bg-slate-50 dark:text-gray-100 dark:hover:bg-gray-700/50" onClick={() => { setPick(s); setFound([]); }}>
+                    {s.name}{s.className && <span className="text-slate-600 dark:text-gray-300"> · {s.className}</span>}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+        <div>
+          <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-gray-300">Exception</span>
+          <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Exception type">
+            {(["block", "extend"] as const).map((k) => (
+              <button key={k} type="button" aria-pressed={kind === k} onClick={() => setKind(k)}
+                className={`rounded-full px-3 py-1.5 text-sm font-semibold transition ${kind === k ? "bg-blue-600 text-white" : "border border-slate-300 text-slate-700 dark:border-gray-700/50 dark:text-gray-200"}`}>
+                {k === "block" ? "Block games" : "Extra time"}
+              </button>
+            ))}
+            {kind === "extend" && (
+              <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-gray-200">
+                <input type="number" min={5} max={120} value={extra} onChange={(e) => setExtra(Math.max(5, Math.min(120, Math.round(Number(e.target.value) || 5))))} className={inputCls} aria-label="Extra minutes a day" />
+                min/day
+              </label>
+            )}
+          </div>
+        </div>
+        <div>
+          <label htmlFor="ex-reason" className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-gray-300">Reason</label>
+          <input id="ex-reason" className={fieldCls} maxLength={300} placeholder="e.g. Parent's request, learning plan" value={reason} onChange={(e) => setReason(e.target.value)} />
+        </div>
+        <div className="flex items-end justify-between gap-3">
+          <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-gray-200">
+            For
+            <input type="number" min={1} max={120} value={days} onChange={(e) => setDays(Math.max(1, Math.min(120, Math.round(Number(e.target.value) || 1))))} className={inputCls} aria-label="Days" />
+            days
+          </label>
+          <button className={primaryBtn} disabled={!pick || reason.trim().length < 3 || busy} onClick={() => void add()}>Add exception</button>
+        </div>
+      </div>
+      <div className="mt-4">
+        {list === null ? (
+          <Spinner label="Loading exceptions" />
+        ) : list.length === 0 ? (
+          <Muted>No exceptions right now.</Muted>
+        ) : (
+          <ul className="divide-y divide-slate-100 dark:divide-gray-700/40">
+            {list.map((o) => (
+              <li key={o.id} className="flex flex-wrap items-center justify-between gap-3 py-2.5">
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-slate-900 dark:text-white">
+                    {o.name}
+                    <span className={`ml-2 rounded-full px-2 py-0.5 text-xs font-semibold ${o.kind === "block" ? "bg-rose-100 text-rose-800 dark:bg-rose-500/15 dark:text-rose-200" : "bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-200"}`}>
+                      {o.kind === "block" ? "Blocked" : `+${o.extraMin} min/day`}
+                    </span>
+                  </p>
+                  <Muted className="!text-xs">{o.reason} · until {new Date(o.endsAt).toLocaleDateString()}{o.by ? ` · by ${o.by}` : ""}</Muted>
+                </div>
+                <button className={secondaryBtn} onClick={() => void revoke(o)}>End now</button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </Card>
   );
 };
 
