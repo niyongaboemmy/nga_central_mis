@@ -2,6 +2,7 @@ import React from "react";
 import { Link, useLocation } from "react-router-dom";
 import { AppWindow, Download } from "lucide-react";
 import { openAppUrl, usePwa } from "../../reminders/pwa";
+import { webAppInstallFits } from "./desktopDownload";
 
 /**
  * Two small top-bar controls (docs/APP_LAUNCH.md):
@@ -9,13 +10,16 @@ import { openAppUrl, usePwa } from "../../reminders/pwa";
  *   confirms NGA MIS is installed right now (getInstalledRelatedApps). A real
  *   link -- Chrome sends a clicked link into the installed app's window.
  * - "Install apps": always reachable, to the one-place installer (/apps). A
- *   dot says this device doesn't have NGA MIS installed yet.
+ *   small still dot says NGA MIS isn't installed here -- only where the web
+ *   app is how you install (phones, tablets, Chromebooks). On Windows/macOS
+ *   NGA Desktop is the app, so a permanent "not installed" dot there was a
+ *   nag nobody could clear.
  */
 export const NavAppActions: React.FC<{ compact?: boolean }> = ({ compact = false }) => {
   const pwa = usePwa();
   const { pathname } = useLocation();
   const showOpen = pwa.inBrowser && pwa.installCheck === "yes";
-  const notInstalledHere = pwa.inBrowser && (pwa.installCheck === "no" || pwa.canPrompt);
+  const notInstalledHere = pwa.inBrowser && (pwa.installCheck === "no" || pwa.canPrompt) && webAppInstallFits();
   const onInstaller = pathname.startsWith("/apps");
 
   return (
@@ -42,10 +46,7 @@ export const NavAppActions: React.FC<{ compact?: boolean }> = ({ compact = false
         >
           <Download className="h-5 w-5" />
           {notInstalledHere && (
-            <span className="absolute right-2 top-2 flex h-2.5 w-2.5" aria-hidden>
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-brand-400 opacity-75" />
-              <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-brand-500 ring-2 ring-white dark:ring-slate-900" />
-            </span>
+            <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-brand-500 ring-2 ring-white dark:ring-slate-900" aria-hidden />
           )}
         </Link>
       )}

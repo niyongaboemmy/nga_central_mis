@@ -467,11 +467,15 @@ export const clearInstallRequest = () => {
 };
 
 // ─── automatic prompt on load (not installed here) ───────────────────────────
-// "Not now" hides the sheet until the browser is reopened; the corner
-// Install button stays available. (A 24 h snooze used to hide the only way
-// to install for a day -- it is cleared on start.)
+// "Not now" (or the small install bar's x) keeps the unprompted offer away
+// for AUTO_DISMISS_DAYS: asking again every browser session was the main
+// complaint. Installing stays one tap away in the top bar and at /apps, so
+// nobody is left without a way to install. The browser's own install dialog
+// being dismissed (installPromptSnoozed, 14 days) counts as "not now" too.
+// (An older 24 h key is cleared on start.)
 const LEGACY_AUTO_SNOOZE_KEY = "nga.pwa.autoPromptSnoozedUntil";
-const AUTO_DISMISS_KEY = "nga.pwa.autoPromptDismissedThisSession";
+const AUTO_DISMISS_KEY = "nga.pwa.installOfferDismissedUntil";
+export const AUTO_DISMISS_DAYS = 30;
 const INSTALL_BUTTON_HIDDEN_KEY = "nga.pwa.installButtonHidden";
 
 const sessionFlag = (key: string) => {
@@ -489,8 +493,16 @@ const setSessionFlag = (key: string) => {
   }
 };
 
-export const snoozeAutoPrompt = () => setSessionFlag(AUTO_DISMISS_KEY);
-export const autoPromptSnoozed = () => sessionFlag(AUTO_DISMISS_KEY);
+export const snoozeAutoPrompt = (now = Date.now()) =>
+  writeItem(AUTO_DISMISS_KEY, String(now + AUTO_DISMISS_DAYS * 86_400_000));
+export const autoPromptSnoozed = (now = Date.now()) => {
+  try {
+    if (Number(localStorage.getItem(AUTO_DISMISS_KEY) || 0) > now) return true;
+  } catch {
+    /* storage blocked: fall through */
+  }
+  return installPromptSnoozed(now);
+};
 export const hideInstallButton = () => setSessionFlag(INSTALL_BUTTON_HIDDEN_KEY);
 export const installButtonHidden = () => sessionFlag(INSTALL_BUTTON_HIDDEN_KEY);
 export const clearLegacySnooze = () => {

@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
-import { ArrowLeft, LayoutGrid } from "lucide-react";
+import { ArrowLeft, Download, LayoutGrid, X } from "lucide-react";
 import Modal from "../ui/Modal";
 import { InstallGuide } from "../reminders/InstallGuide";
 import OpenInAppGuide from "./OpenInAppGuide";
+import { getToken } from "../../utils/auth";
 import {
   autoPromptSnoozed,
   checkInstalledHere,
@@ -50,17 +51,21 @@ export const shouldShowInstallButton = (s: {
 };
 
 /**
- * Opens the install sheet automatically when MIS loads in a browser tab and
- * isn't installed on this device (docs/APP_LAUNCH.md). The browser's own
- * install dialog still needs one click (a gesture) -- the sheet's button.
- * "Not now" hides it until the browser is reopened, and a corner Install
- * button stays available, so nobody is ever left without a way to install.
- * The NGA installer (`nga_install=1`) always asks.
+ * Offers to install MIS when it loads in a browser tab and isn't installed on
+ * this device (docs/APP_LAUNCH.md) -- quietly. An ordinary visit gets a small
+ * bar at the foot of the screen for a signed-in user, never a blocking sheet;
+ * its Install button opens the full guide (the browser's own install dialog
+ * still needs that click as a gesture). "Not now" or the bar's x keeps the
+ * offer away for AUTO_DISMISS_DAYS, and the top-bar Install control stays
+ * available, so nobody is left without a way to install. Only an explicit ask
+ * (the NGA installer's `nga_install=1`, an app launch marker) opens the sheet
+ * straight away, and it ignores "Not now".
  */
 export const AutoInstallPrompt: React.FC = () => {
   const pwa = usePwa();
   const location = useLocation();
   const [open, setOpen] = useState(false);
+  const [barOpen, setBarOpen] = useState(false);
   const [closedThisLoad, setClosedThisLoad] = useState(false);
   const returnUrl = installReturnUrl();
 
@@ -75,10 +80,14 @@ export const AutoInstallPrompt: React.FC = () => {
       onInstallerPage: location.pathname.startsWith("/apps"),
     });
     if (!decide) return;
+    if (!forced && !getToken()) return; // not on the sign-in page
     checkInstalledHere().then((installedHere) => {
-      if (alive && !installedHere) {
+      if (!alive || installedHere) return;
+      if (forced) {
         markLaunchInstallAsked();
         setOpen(true);
+      } else {
+        setBarOpen(true);
       }
     });
     return () => {
@@ -89,6 +98,7 @@ export const AutoInstallPrompt: React.FC = () => {
   }, []);
 
   useEffect(() => {
+    if (pwa.installed) setBarOpen(false);
     if (pwa.installed && !pwa.linksOpenInBrowser && open && !returnUrl) setOpen(false);
   }, [pwa.installed, pwa.linksOpenInBrowser, open, returnUrl]);
 
@@ -102,15 +112,18 @@ export const AutoInstallPrompt: React.FC = () => {
   // The browser's "installable, not installed" signal (beforeinstallprompt)
   // often arrives after the first render: open then too.
   useEffect(() => {
-    if (!pwa.canPrompt || open || closedThisLoad) return;
+    if (!pwa.canPrompt || open || barOpen || closedThisLoad) return;
+    const forced = installRequested() || shouldAskInstallFromLaunch();
     const ok = shouldAutoOffer({
       installed: false,
       installMethod: pwa.platform.installMethod,
-      forced: installRequested() || shouldAskInstallFromLaunch(),
+      forced,
       snoozed: autoPromptSnoozed(),
       onInstallerPage: location.pathname.startsWith("/apps"),
     });
-    if (ok) setOpen(true);
+    if (!ok) return;
+    if (forced) setOpen(true);
+    else if (getToken()) setBarOpen(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pwa.canPrompt]);
 
@@ -119,13 +132,45 @@ export const AutoInstallPrompt: React.FC = () => {
     clearInstallRequest();
     setClosedThisLoad(true);
     setOpen(false);
+    setBarOpen(false);
   };
 
 
   return (
     <>
     {/* The install/open controls live in the top bar (NavAppActions):
-        floating pills covered the sidebar. */}
+        floating pills covered the sidebar. The bar below is the one quiet
+        offer, shown only where this component mounts (phones, tablets,
+        Chromebooks -- see webAppInstallFits), so it covers no sidebar. */}
+    {barOpen && !open && (
+      <div
+        role="region"
+        aria-label="Install NGA MIS"
+        className="fixed inset-x-4 bottom-4 z-40 mx-auto flex max-w-sm items-center gap-3 rounded-2xl border border-slate-200 bg-white/95 py-2 pl-3 pr-2 shadow-lg backdrop-blur dark:border-slate-700 dark:bg-slate-900/95"
+      >
+        <Download className="h-4 w-4 shrink-0 text-brand-600 dark:text-brand-300" aria-hidden />
+        <p className="min-w-0 flex-1 text-sm text-slate-700 dark:text-slate-200">Install NGA MIS for quicker access</p>
+        <button
+          type="button"
+          onClick={() => {
+            setBarOpen(false);
+            setOpen(true);
+          }}
+          className="rounded-xl bg-brand-600 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400"
+        >
+          Install
+        </button>
+        <button
+          type="button"
+          onClick={close}
+          aria-label="Not now"
+          title="Not now"
+          className="rounded-lg p-1.5 text-slate-500 transition hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+        >
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+    )}
     <Modal
       isOpen={open}
       onClose={close}
