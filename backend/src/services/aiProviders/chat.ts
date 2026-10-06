@@ -16,9 +16,13 @@ import { freeModels, isFreeModel } from "./openrouterProvider";
  * provider order, the per-provider limiter and its interactive reserve, cooldown on
  * quota errors, parking dead providers, and one AIUsageLog row per attempt.
  *
- * **Audience.** Several free tiers' terms are 18+ (Gemini API, Groq, OpenRouter
- * since 2026-09), so a `minor` conversation only reaches providers whose terms allow
- * minors (`allowsMinors`). Today that is GLM (Z.ai) alone.
+ * **Audience.** Several providers' terms are 18+ (Gemini API, Groq, OpenRouter,
+ * OpenAI). The school's owner decided on 2026-10-06 that the student AI tutor uses
+ * every configured provider, falling through to the next one when a provider hits
+ * its quota, so `minor` conversations use the same order as adults by default.
+ * `AI_MINORS_STRICT=1` restores the strict rule (only `allowsMinors` providers);
+ * `AI_CHAT_ORDER_MINOR` sets a different student order. The tutor's own safeguards
+ * (tutor prompt, answer/safety check, logging, review) are in services/desktop/tutor.ts.
  */
 
 export interface ChatMessage {
@@ -83,6 +87,14 @@ export const CHAT_TARGETS: Record<string, ChatTarget> = {
       if (chunk?.model && !isFreeModel(String(chunk.model))) throw Object.assign(new Error("OpenRouter served a paid model"), { status: 402 });
     },
   },
+  openai: {
+    name: "openai",
+    allowsMinors: false,
+    isConfigured: () => !!env("OPENAI_API_KEY"),
+    baseURL: () => env("OPENAI_BASE_URL") || "https://api.openai.com/v1",
+    apiKey: () => env("OPENAI_API_KEY"),
+    models: () => [env("OPENAI_CHAT_MODEL") || env("OPENAI_MODEL") || "gpt-4o-mini"],
+  },
   deepseek: {
     name: "deepseek",
     allowsMinors: false,
@@ -94,18 +106,20 @@ export const CHAT_TARGETS: Record<string, ChatTarget> = {
 };
 
 /** Default chat orders (comma lists; env AI_CHAT_ORDER_ADULT / _MINOR override). */
+/** Free tiers first; OpenAI (paid) last, only when every free provider is busy or out of quota. */
 export const DEFAULT_CHAT_ORDER: Record<ChatAudience, string> = {
-  adult: "groq,gemini,glm,openrouter,deepseek",
-  minor: "glm",
+  adult: "groq,gemini,glm,openrouter,deepseek,openai",
+  minor: "groq,gemini,glm,openrouter,deepseek,openai",
 };
 
-/** Providers to try for this audience, in order. Minors never reach an 18+ provider, whatever the env says. */
+/** Providers to try for this audience, in order (see "Audience" above). */
 export function chatOrder(audience: ChatAudience): ChatTarget[] {
   const raw = env(`AI_CHAT_ORDER_${audience.toUpperCase()}`) || DEFAULT_CHAT_ORDER[audience];
+  const strict = audience === "minor" && env("AI_MINORS_STRICT") === "1";
   return raw
     .split(",")
     .map((s) => CHAT_TARGETS[s.trim()])
-    .filter((t): t is ChatTarget => !!t && (audience === "adult" || t.allowsMinors));
+    .filter((t): t is ChatTarget => !!t && (!strict || t.allowsMinors));
 }
 
 /** Character limits keep prompts inside free-tier token budgets. */
@@ -234,4 +248,11 @@ export async function streamChat(opts: {
     throw new ChatUnavailableError("QUOTA", "The free AI services are busy or out of today's quota. Please try again later.");
   logger.warn("[ai-chat] every provider failed", { error: lastErr?.message });
   throw new ChatUnavailableError("FAILED", "The AI couldn't answer right now. Please try again.");
+}
+
+/** A whole reply (no streaming to the user): the tutor drafts and checks before anything is shown. */
+export async function completeChat(opts: Omit<Parameters<typeof streamChat>[0], "onText">): Promise<ChatRun & { text: string }> {
+  let text = "";
+  const run = await streamChat({ ...opts, onText: (t) => (text += t) });
+  return { ...run, text: text.trim() };
 }
