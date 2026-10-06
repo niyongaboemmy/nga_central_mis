@@ -10,6 +10,7 @@ import { applySettingsUpdate, cleanUsage, GAME_IDS, gamesBlock, IGISORO_VARIANTS
 import { ControlError, activeOverrides, createOverride, endClassGameTime, findStudents, revokeOverride, startClassGameTime, studentClassGameTime, studentOverride, teacherClassGameTimes } from "../services/desktop/gameControls";
 import { TrError, isLang, latest, listEntries, publish, releases, revert, rollback, saveEdit, suggest, validKey } from "../services/desktop/translations";
 import { ChatUnavailableError as TrChatUnavailable } from "../services/aiProviders/chat";
+import { DEFAULT_TUTOR, activeLock, conversation as tutorConversation, conversations as tutorConversations, loadTutorSettings, logExchange, mergeTutor, questionsToday, report as reportTutor, runTutor, saveTutorSettings } from "../services/desktop/tutor";
 import { getUserRoleNames } from "../utils/auth";
 import { recordActivity } from "../utils/activityLogger";
 
@@ -135,12 +136,20 @@ router.get(
   asyncHandler(async (req: any, res) => {
     const userId = Number(req.user.userId);
     const { persona } = await loadPersona(userId);
+    if (persona === "student") {
+      const settings = await loadTutorSettings();
+      const used = await questionsToday(userId);
+      return res.json({
+        success: true,
+        data: { available: settings.enabled, reason: settings.enabled ? null : "TUTOR_OFF", persona, mode: "tutor", limit: settings.dailyCap, used, remaining: Math.max(0, settings.dailyCap - used) },
+      });
+    }
     const limit = dailyLimit(persona);
     const used = await usedToday(userId);
     const blocked = blockedReason(persona);
     res.json({
       success: true,
-      data: { available: !blocked, reason: blocked, persona, limit, used, remaining: Math.max(0, limit - used) },
+      data: { available: !blocked, reason: blocked, persona, mode: "assistant", limit, used, remaining: Math.max(0, limit - used) },
     });
   }),
 );
@@ -152,7 +161,7 @@ router.post(
     const userId = Number(req.user.userId);
     const { persona, firstName } = await loadPersona(userId);
     const blocked = blockedReason(persona);
-    if (blocked) return res.status(403).json({ success: false, code: blocked, message: "Ask AI is for teachers and staff for now." });
+    if (blocked) return res.status(403).json({ success: false, code: blocked, message: "Ask AI isn't available for parents yet." });
     let messages;
     try {
       messages = trimConversation(req.body?.messages);
@@ -160,6 +169,7 @@ router.post(
       return res.status(400).json({ success: false, message: e?.message || "Bad request" });
     }
     if (!burst.take(String(userId))) return res.status(429).json({ success: false, code: "SLOW_DOWN", message: "Too many messages in a minute. Please wait a moment." });
+    if (persona === "student") return tutorTurn(req, res, userId, firstName, messages);
     const limit = dailyLimit(persona);
     const used = await usedToday(userId);
     if (used >= limit)
@@ -406,6 +416,91 @@ router.post(
     } catch (e) {
       trError(res, e);
     }
+  }),
+);
+
+/** A student's question: settings, lesson/exam lock, daily cap, then the tutor pipeline (whole reply, NDJSON). */
+async function tutorTurn(req: any, res: any, userId: number, firstName: string, messages: any[]) {
+  const settings = await loadTutorSettings();
+  if (!settings.enabled) return res.status(403).json({ success: false, code: "TUTOR_OFF", message: "Your school has switched the AI Tutor off for now." });
+  const conversationId = String(req.body?.conversationId ?? "");
+  if (!/^[a-z0-9]{6,40}$/.test(conversationId)) return res.status(400).json({ success: false, message: "Bad conversation" });
+  const now = new Date();
+  const { from, to } = policyRange(now);
+  const lock = activeLock(buildPolicy(await deps.collect(userId, from, to), now).windows as any[], now);
+  if (lock) return res.status(423).json({ success: false, code: lock.kind === "exam" ? "LOCKED_EXAM" : "LOCKED_LESSON", label: lock.label, until: lock.until, message: lock.kind === "exam" ? "The AI Tutor pauses during exams." : "The AI Tutor pauses during your lessons." });
+  const used = await questionsToday(userId);
+  if (used >= settings.dailyCap)
+    return res.status(429).json({ success: false, code: "DAILY_LIMIT", message: `You've asked today's ${settings.dailyCap} questions. They refill tomorrow.` });
+
+  res.status(200);
+  res.set({ "Content-Type": "application/x-ndjson; charset=utf-8", "Cache-Control": "no-cache, no-transform", "X-Accel-Buffering": "no" });
+  res.flushHeaders?.();
+  const abort = new AbortController();
+  res.on("close", () => { if (!res.writableEnded) abort.abort(); });
+  const line = (o: unknown) => { if (!res.writableEnded) res.write(`${JSON.stringify(o)}\n`); };
+  line({ status: "thinking" });
+  const question = messages[messages.length - 1].content;
+  try {
+    const reply = await runTutor({ userId, firstName, messages, signal: abort.signal, now });
+    const messageId = await logExchange(userId, conversationId, question, reply);
+    line({ t: reply.text });
+    line({ done: true, mode: "tutor", provider: reply.provider, model: reply.model, messageId, remaining: Math.max(0, settings.dailyCap - used - 1) });
+  } catch (e: any) {
+    if (!abort.signal.aborted)
+      line({ error: e instanceof ChatUnavailableError ? e.message : "The tutor couldn't answer right now. Please try again.", code: e instanceof ChatUnavailableError ? e.reason : "FAILED" });
+  }
+  res.end();
+}
+
+router.post(
+  "/ai/report",
+  authenticate,
+  asyncHandler(async (req: any, res) => {
+    const ok = await reportTutor(Number(req.user.userId), Number(req.body?.messageId), String(req.body?.reason ?? "").trim() || "no reason given");
+    if (!ok) return res.status(404).json({ success: false, message: "Not found" });
+    res.json({ success: true, data: { reported: true } });
+  }),
+);
+
+router.get(
+  "/settings/tutor",
+  authenticate,
+  asyncHandler(async (req: any, res) => {
+    if (!canConfigure(req)) return res.status(403).json({ success: false, message: "Forbidden" });
+    const days = Math.max(1, Math.min(90, Number(req.query.days) || 14));
+    const [settings, list] = await Promise.all([loadTutorSettings(), tutorConversations({ flaggedOnly: req.query.flagged === "1", days })]);
+    res.set("Cache-Control", "private, no-store");
+    res.json({ success: true, data: { settings, defaults: DEFAULT_TUTOR, conversations: list } });
+  }),
+);
+
+router.put(
+  "/settings/tutor",
+  authenticate,
+  asyncHandler(async (req: any, res) => {
+    if (!canConfigure(req)) return res.status(403).json({ success: false, message: "Forbidden" });
+    const userId = Number(req.user.userId);
+    const before = await loadTutorSettings();
+    const after = mergeTutor(req.body);
+    await saveTutorSettings(after, userId);
+    await recordActivity(userId, "DESKTOP_TUTOR_SETTINGS", "Changed the AI Tutor settings", "DesktopToolSetting", undefined, { before, after }, userId);
+    res.json({ success: true, data: { settings: after } });
+  }),
+);
+
+router.get(
+  "/settings/tutor/conversations/:id",
+  authenticate,
+  asyncHandler(async (req: any, res) => {
+    if (!canConfigure(req)) return res.status(403).json({ success: false, message: "Forbidden" });
+    const id = String(req.params.id);
+    if (!/^[a-z0-9]{6,40}$/.test(id)) return res.status(400).json({ success: false, message: "Bad conversation" });
+    const messages = await tutorConversation(id);
+    // Reading a student's conversation is itself recorded.
+    await recordActivity(Number(req.user.userId), "DESKTOP_TUTOR_VIEW", `Viewed AI Tutor conversation ${id}`, "DesktopTutorMessage", undefined, { conversationId: id }, Number(req.user.userId));
+    res.set("Cache-Control", "private, no-store");
+    res.json({ success: true, data: { messages } });
   }),
 );
 

@@ -40,11 +40,19 @@ export interface GameOverride {
   createdAt: string;
 }
 
+export interface TutorSettings { enabled: boolean; dailyCap: number }
+export interface TutorConversation { id: string; userId: number; name: string; messages: number; flagged: number; startedAt: string; lastAt: string; firstQuestion: string; reasons: string | null }
+export interface TutorMessage { id: number; role: "student" | "tutor"; text: string; provider: string | null; model: string | null; verdict: { gives_final_answer?: boolean; does_the_work?: boolean; unsafe?: boolean; reason?: string; unchecked?: boolean } | null; flagged: boolean; flagReason: string | null; at: string }
+
 type Envelope<T> = { success: boolean; message?: string; code?: string; data: T };
 
 export const desktopToolsApi = {
   games: () => api.get<Envelope<GamesAdmin>>("/desktop/tools/settings/games"),
   saveGames: (settings: GameSettings) => api.put<Envelope<{ settings: GameSettings }>>("/desktop/tools/settings/games", settings),
+  tutor: (params: { flagged?: boolean; days?: number }) =>
+    api.get<Envelope<{ settings: TutorSettings; conversations: TutorConversation[] }>>("/desktop/tools/settings/tutor", { params: { flagged: params.flagged ? "1" : undefined, days: params.days } }),
+  saveTutor: (s: TutorSettings) => api.put<Envelope<{ settings: TutorSettings }>>("/desktop/tools/settings/tutor", s),
+  tutorConversation: (id: string) => api.get<Envelope<{ messages: TutorMessage[] }>>(`/desktop/tools/settings/tutor/conversations/${id}`),
   overrides: () => api.get<Envelope<{ overrides: GameOverride[] }>>("/desktop/tools/settings/games/overrides"),
   findStudents: (q: string) => api.get<Envelope<{ students: Array<{ id: number; name: string; className: string | null }> }>>("/desktop/tools/settings/games/students", { params: { q } }),
   addOverride: (body: { userId: number; kind: "block" | "extend"; extraMin?: number; reason: string; days: number }) =>
