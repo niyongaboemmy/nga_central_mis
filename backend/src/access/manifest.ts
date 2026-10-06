@@ -31,7 +31,7 @@ const SCHOOL_ONLY = { scopeable: false };
 export const MIS_MANIFEST = defineManifest({
   app: "mis",
   name: "Central MIS",
-  version: "2026.10.02",
+  version: "2026.10.06",
   capabilities: {
     // People & accounts
     MANAGE_USERS: W("Create, update and deactivate users", "PEOPLE"),
@@ -156,6 +156,8 @@ export const MIS_MANIFEST = defineManifest({
     OFFICE_HOURS_VIEW: R("See office-hours attendance and reports in your area", "ATTENDANCE", ["summary", "detail"]),
     OFFICE_HOURS_VIEW_SELF: R("See your own (or your children's) office hours", "ATTENDANCE", ["detail"]),
     OFFICE_HOURS_CONFIGURE: W("Configure office-hours policy", "SYSTEM", SCHOOL_ONLY),
+    // NGA Desktop tools: game switches, budgets and hours (nga-desktop TOOLS_HUB plan §6.7.5).
+    DESKTOP_TOOLS_CONFIGURE: W("Configure NGA Desktop tools and games", "SYSTEM", SCHOOL_ONLY),
   },
 });
 

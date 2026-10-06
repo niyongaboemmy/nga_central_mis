@@ -6,7 +6,9 @@ import { collectOccurrences } from "../services/reminders/occurrences";
 import { addDaysYmd, kigaliInstant, kigaliParts } from "../services/reminders/time";
 import { buildPolicy, policyRange } from "../services/desktop/policy";
 import { loadTeacherClasses } from "../services/desktop/classes";
-import { cleanUsage, gamesBlock, loadGameSettings, playedToday, recordUsage } from "../services/desktop/games";
+import { applySettingsUpdate, cleanUsage, GAME_IDS, gamesBlock, IGISORO_VARIANTS, loadGameSettings, playedToday, recordUsage, saveGameSettings, usageSummary } from "../services/desktop/games";
+import { getUserRoleNames } from "../utils/auth";
+import { recordActivity } from "../utils/activityLogger";
 
 /**
  * NGA Tools (NGA Desktop), signed in. Called from the MIS page inside NGA Desktop,
@@ -17,6 +19,8 @@ import { cleanUsage, gamesBlock, loadGameSettings, playedToday, recordUsage } fr
  *   GET  /desktop/tools/policy      today's lesson and exam windows (games and the student AI pause in them)
  *   GET  /desktop/tools/classes     the class lists of the classes this person teaches (name picker, groups)
  *   POST /desktop/tools/games/usage play time (cumulative per device and day; the largest total is kept)
+ *   GET  /desktop/tools/settings/games   the school's game settings + 7-day totals (DESKTOP_TOOLS_CONFIGURE)
+ *   PUT  /desktop/tools/settings/games   change them (Igisoro approval: super admin only)
  * Kept apart from routes/desktop.ts (public distribution routes). `authenticate` is
  * passed in by app.ts, so tests can mount this router with their own sign-in without
  * touching the shared auth module (the suite shares one module registry).
@@ -25,7 +29,13 @@ export interface ToolsDeps {
   /** The person's occurrences (lessons, activities, office hours, Reminder Hub sources). */
   collect: typeof collectOccurrences;
   classes?: typeof loadTeacherClasses;
+  /** Is this person a super admin? (Only they approve Igisoro.) */
+  superAdmin?: (userId: number) => Promise<boolean>;
 }
+
+const CONFIGURE = "DESKTOP_TOOLS_CONFIGURE";
+const canConfigure = (req: any) => Array.isArray(req.user?.permissions) && req.user.permissions.includes(CONFIGURE);
+const isSuperAdmin = async (userId: number) => (await getUserRoleNames(userId)).includes("SUPER_ADMIN");
 
 export function desktopToolsRouter(authenticate: RequestHandler, deps: ToolsDeps = { collect: collectOccurrences }) {
 const router = express.Router();
@@ -174,6 +184,44 @@ router.post(
         line({ error: e instanceof ChatUnavailableError ? e.message : "The AI couldn't answer right now. Please try again.", code: e instanceof ChatUnavailableError ? e.reason : "FAILED" });
     }
     res.end();
+  }),
+);
+
+router.get(
+  "/settings/games",
+  authenticate,
+  asyncHandler(async (req: any, res) => {
+    if (!canConfigure(req)) return res.status(403).json({ success: false, message: "Forbidden" });
+    const userId = Number(req.user.userId);
+    const [settings, usage, superAdmin] = await Promise.all([loadGameSettings(), usageSummary(7), (deps.superAdmin ?? isSuperAdmin)(userId)]);
+    res.set("Cache-Control", "private, no-store");
+    res.json({ success: true, data: { settings, usage, games: GAME_IDS, igisoroVariants: IGISORO_VARIANTS, canApproveIgisoro: superAdmin } });
+  }),
+);
+
+router.put(
+  "/settings/games",
+  authenticate,
+  asyncHandler(async (req: any, res) => {
+    if (!canConfigure(req)) return res.status(403).json({ success: false, message: "Forbidden" });
+    const userId = Number(req.user.userId);
+    const superAdmin = await (deps.superAdmin ?? isSuperAdmin)(userId);
+    const before = await loadGameSettings();
+    const want = req.body?.igisoro;
+    const changesIgisoro = !!want && (Boolean(want.approved) !== before.igisoro.approved || (want.approved && (want.variant ?? "standard") !== before.igisoro.variant));
+    if (changesIgisoro && !superAdmin) return res.status(403).json({ success: false, code: "SUPER_ADMIN_ONLY", message: "Only a super admin can approve Igisoro." });
+    const after = applySettingsUpdate(before, req.body, { userId, superAdmin });
+    await saveGameSettings(after, userId);
+    await recordActivity(userId, "DESKTOP_GAMES_SETTINGS", "Changed NGA Desktop game settings", "DesktopToolSetting", undefined, { before, after }, userId);
+    if (before.igisoro.approved !== after.igisoro.approved) {
+      await recordActivity(
+        userId,
+        after.igisoro.approved ? "DESKTOP_IGISORO_APPROVE" : "DESKTOP_IGISORO_REVOKE",
+        after.igisoro.approved ? `Approved Igisoro (${after.igisoro.variant} rules)` : "Switched Igisoro off",
+        "DesktopToolSetting", undefined, { variant: after.igisoro.variant }, userId,
+      );
+    }
+    res.json({ success: true, data: { settings: after } });
   }),
 );
 

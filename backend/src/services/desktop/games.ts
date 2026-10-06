@@ -136,3 +136,55 @@ export function gamesBlock(settings: GameSettings, persona: string, played: Arra
     igisoroVariant: settings.igisoro.approved ? settings.igisoro.variant : null,
   };
 }
+
+/** Igisoro rule sets the desktop knows (nga-desktop src/tools/games/igisoro). */
+export const IGISORO_VARIANTS = ["standard", "beginner"] as const;
+
+/**
+ * An admin's change, applied to the current settings. Pure. Anyone with
+ * DESKTOP_TOOLS_CONFIGURE changes the switches, budgets and hours; only a super
+ * admin approves Igisoro (its rules vary by region), and the approval records who
+ * and when.
+ */
+export function applySettingsUpdate(current: GameSettings, input: unknown, actor: { userId: number; superAdmin: boolean }, now = new Date()): GameSettings {
+  const next = mergeSettings(input);
+  if (!actor.superAdmin) return { ...next, igisoro: current.igisoro };
+  const want = (input as any)?.igisoro ?? {};
+  const approved = want.approved === true;
+  const variant = (IGISORO_VARIANTS as readonly string[]).includes(want.variant) ? want.variant : approved ? "standard" : null;
+  if (!approved) return { ...next, igisoro: { approved: false, variant, approvedBy: null, approvedAt: null } };
+  // Re-saving an approved Igisoro with the same variant keeps the original approval.
+  const same = current.igisoro.approved && current.igisoro.variant === variant;
+  return {
+    ...next,
+    igisoro: same ? current.igisoro : { approved: true, variant, approvedBy: actor.userId, approvedAt: now.toISOString() },
+  };
+}
+
+export async function saveGameSettings(settings: GameSettings, userId: number): Promise<void> {
+  await db.execute(sql`
+    INSERT INTO DesktopToolSetting (setting_key, value, updated_by, updated_at)
+    VALUES ('games', ${JSON.stringify(settings)}, ${userId}, UTC_TIMESTAMP())
+    ON DUPLICATE KEY UPDATE value = VALUES(value), updated_by = VALUES(updated_by), updated_at = VALUES(updated_at)`);
+}
+
+/** Totals only (plan §6.7.5 layer 10): minutes and players per game over the last `days` Kigali days. */
+export async function usageSummary(days = 7, now = new Date()): Promise<{ from: string; to: string; games: Array<{ game: string; minutes: number; players: number }>; players: number; minutes: number }> {
+  const to = kigaliParts(now).ymd;
+  const from = addDaysYmd(to, -(days - 1));
+  try {
+    const r = rows(await db.execute(sql`
+      SELECT game_id AS game, ROUND(SUM(seconds) / 60) AS minutes, COUNT(DISTINCT user_id) AS players
+      FROM DesktopGameUsage WHERE day BETWEEN ${from} AND ${to} GROUP BY game_id ORDER BY minutes DESC`));
+    const t = rows(await db.execute(sql`SELECT COUNT(DISTINCT user_id) AS players, ROUND(SUM(seconds) / 60) AS minutes FROM DesktopGameUsage WHERE day BETWEEN ${from} AND ${to}`));
+    return {
+      from, to,
+      games: r.map((x: any) => ({ game: String(x.game), minutes: Number(x.minutes), players: Number(x.players) })),
+      players: Number(t[0]?.players ?? 0),
+      minutes: Number(t[0]?.minutes ?? 0),
+    };
+  } catch (e: any) {
+    if (e?.code === "ER_NO_SUCH_TABLE" || e?.cause?.code === "ER_NO_SUCH_TABLE") return { from, to, games: [], players: 0, minutes: 0 };
+    throw e;
+  }
+}
