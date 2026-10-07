@@ -7,7 +7,7 @@ import { useUser } from "../../contexts/UserContext";
 import { Permissions } from "../../constants/permissions";
 import { getToken } from "../../utils/auth";
 import { useAccess } from "../../hooks/useAccess";
-import { BarChart3, HeartHandshake, Radar, ShieldAlert, ShieldCheck } from "lucide-react";
+import { BarChart3, CalendarOff, HeartHandshake, Radar, ShieldAlert, ShieldCheck } from "lucide-react";
 import { BellRing, Bot, CalendarDays, Clock4, Gamepad2, House } from "lucide-react";
 
 interface SidebarProps {
@@ -657,6 +657,12 @@ const Sidebar: React.FC<SidebarProps> = ({
       path: "/wellbeing",
       icon: <HeartHandshake className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
       userTypes: ["STUDENT"],
+    },
+    {
+      label: "Staff cover",
+      path: "/cover",
+      icon: <CalendarOff className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
+      userTypes: ["TEACHER", "STAFF", "ADMIN"],
     },
     {
       label: "Early warning",

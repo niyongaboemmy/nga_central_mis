@@ -165,6 +165,8 @@ export const MIS_MANIFEST = defineManifest({
     SAFEGUARDING_MANAGE: W("See and act on safeguarding concerns", "WELFARE", { ...SCHOOL_ONLY, restricted: true }),
     // Early warning: risk signals from Tendo/Task Mentor and interventions, in your scope.
     EARLY_WARNING_VIEW: R("See early-warning signals and log interventions", "WELFARE", ["detail"]),
+    // Staff absence and cover: approve absences, assign cover teachers.
+    STAFF_COVER_MANAGE: W("Approve staff absences and assign cover", "ACADEMICS", SCHOOL_ONLY),
   },
 });
 
