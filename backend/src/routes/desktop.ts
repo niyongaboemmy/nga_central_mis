@@ -34,6 +34,18 @@ const ipHash = (ip: string | undefined) =>
 
 const isPlatform = (p: string): p is DownloadPlatform => (DOWNLOAD_PLATFORMS as string[]).includes(p);
 
+/**
+ * How the app's last update went, sent on its next check (updates.rs `report`):
+ * `X-NGA-Update-Report: <downloaded|installed|failed> <version>[ <why>]`.
+ * A PC that downloads updates but never gets past an old version shows up on /apps.
+ */
+export function parseUpdateReport(header: string | undefined): { outcome: string; to: string; error: string | null } | null {
+  const m = String(header || "").match(/^(downloaded|installed|failed) (\d+\.\d+\.\d+[\w.-]*)(?: (.*))?$/s);
+  if (!m) return null;
+  const error = m[1] === "failed" ? (m[3] || "unknown").replace(/\s+/g, " ").trim().slice(0, 255) || "unknown" : null;
+  return { outcome: m[1], to: m[2].slice(0, 32), error };
+}
+
 router.get(
   "/release",
   asyncHandler(async (_req, res) => {
@@ -123,15 +135,23 @@ router.get(
     const arch = String(req.params.arch).slice(0, 16);
     const current = String(req.params.current).slice(0, 32);
     const installId = String(req.get("X-NGA-Install") || "");
-    if (/^[0-9a-f]{32}$/.test(installId)) {
+    // CI installer smoke tests (X-NGA-CI) get the answer but aren't counted as installs.
+    if (/^[0-9a-f]{32}$/.test(installId) && !req.get("X-NGA-CI")) {
       try {
         await exec(
           "INSERT INTO `DesktopInstall` (install_id, platform, arch, version, first_seen, last_seen, checks) VALUES (?, ?, ?, ?, UTC_TIMESTAMP(), UTC_TIMESTAMP(), 1) " +
             "ON DUPLICATE KEY UPDATE platform = VALUES(platform), arch = VALUES(arch), version = VALUES(version), last_seen = UTC_TIMESTAMP(), checks = checks + 1",
           [installId, target, arch, current],
         );
+        const report = parseUpdateReport(req.get("X-NGA-Update-Report"));
+        if (report) {
+          await exec(
+            "UPDATE `DesktopInstall` SET last_update_to = ?, last_update_outcome = ?, last_update_error = ?, last_update_at = UTC_TIMESTAMP() WHERE install_id = ?",
+            [report.to, report.outcome, report.error, installId],
+          );
+        }
       } catch {
-        /* never block an update check */
+        /* never block an update check (report columns: migration 111) */
       }
     }
     res.set("Cache-Control", "no-store");
@@ -182,6 +202,19 @@ router.get(
         "SUM(platform = 'windows' AND last_seen >= UTC_TIMESTAMP() - INTERVAL 30 DAY) AS windows, " +
         "SUM(platform = 'darwin' AND last_seen >= UTC_TIMESTAMP() - INTERVAL 30 DAY) AS macos FROM `DesktopInstall`",
     );
+    // Active installs not on the published version, and why (their last update report).
+    let behind: Array<{ version: string; outcome: string | null; error: string | null; n: number }> = [];
+    if (release) {
+      try {
+        behind = await q(
+          "SELECT version, last_update_outcome AS outcome, last_update_error AS error, COUNT(*) AS n FROM `DesktopInstall` " +
+            "WHERE last_seen >= UTC_TIMESTAMP() - INTERVAL 7 DAY AND version <> ? GROUP BY version, outcome, error ORDER BY n DESC LIMIT 20",
+          [release.version],
+        );
+      } catch {
+        /* columns not migrated yet */
+      }
+    }
     const active = Number(installs?.active ?? 0);
     const onCurrent = release ? versions.filter((v) => v.version === release.version).reduce((s, v) => s + Number(v.n), 0) : 0;
     res.json({
@@ -203,6 +236,7 @@ router.get(
           by_version: versions
             .map((v) => ({ version: v.version, count: Number(v.n) }))
             .sort((a, b) => compareVersions(b.version, a.version)),
+          behind: behind.map((r) => ({ version: r.version, outcome: r.outcome ?? null, error: r.error ?? null, count: Number(r.n) })),
         },
       },
     });

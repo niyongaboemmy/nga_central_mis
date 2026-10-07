@@ -47,8 +47,21 @@ const FEATURES = [
 interface Stats {
   current_version: string | null;
   downloads: { total: number; people: number; by_platform: { platform: string; count: number }[] };
-  installs: { active_30_days: number; on_current_version: number; windows: number; macos: number };
+  installs: {
+    active_30_days: number;
+    on_current_version: number;
+    windows: number;
+    macos: number;
+    /** Installs seen this week on an older version, with their last update report. */
+    behind?: { version: string; outcome: string | null; error: string | null; count: number }[];
+  };
 }
+
+const OUTCOME_LABEL: Record<string, string> = {
+  downloaded: "downloaded, not installed yet",
+  installed: "installed",
+  failed: "update failed",
+};
 
 /** Admins (Usage analytics) only; anyone else gets nothing back and sees nothing. */
 function useDownloadStats(): Stats | null {
@@ -336,6 +349,21 @@ export const AppsInstallerPage: React.FC = () => {
               {stats.downloads.by_platform.map((p) => `${OS_LABEL[p.platform as DownloadPlatform] ?? p.platform}: ${p.count}`).join(" · ") || "No downloads yet"}
               {" · "}Installs: Windows {stats.installs.windows}, macOS {stats.installs.macos}
             </p>
+            {!!stats.installs.behind?.length && (
+              <div className="mt-4" data-testid="installs-behind">
+                <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200">Not on {stats.current_version ?? "the latest version"} (seen this week)</h3>
+                <ul className="mt-2 space-y-1 text-xs text-slate-600 dark:text-slate-300">
+                  {stats.installs.behind.map((b) => (
+                    <li key={`${b.version}-${b.outcome}-${b.error}`}>
+                      <strong>{b.count}</strong> on {b.version}
+                      {" · "}
+                      {b.outcome ? OUTCOME_LABEL[b.outcome] ?? b.outcome : "no update report yet (older app)"}
+                      {b.error && <span className="text-red-600 dark:text-red-400"> ({b.error})</span>}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </section>
         )}
 
