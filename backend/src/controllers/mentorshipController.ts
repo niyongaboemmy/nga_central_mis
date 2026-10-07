@@ -1,5 +1,5 @@
 import { db } from "../db";
-import { eq, and, or, sql, inArray } from "drizzle-orm";
+import { eq, and, or, sql, inArray, isNull } from "drizzle-orm";
 import { alias } from "drizzle-orm/mysql-core";
 import {
   MentorshipSession,
@@ -39,79 +39,95 @@ async function getCurrentAcademicYearId(): Promise<number | null> {
   return row?.academic_year_id ?? null;
 }
 
-// Explicit roster, per migration 047 — "who mentors whom, this academic year."
-async function getExplicitMenteeIds(
-  mentorId: number,
-  academicYearId?: number | null,
-): Promise<number[]> {
-  const rows = await db
-    .selectDistinct({ student_id: MentorAssignment.student_id })
-    .from(MentorAssignment)
-    .where(
-      and(
-        eq(MentorAssignment.mentor_id, mentorId),
-        eq(MentorAssignment.status, "ACTIVE"),
-        academicYearId
-          ? eq(MentorAssignment.academic_year_id, academicYearId)
-          : sql`1=1`,
-      ),
-    );
-  return rows.map((r) => r.student_id);
-}
-
-// Legacy/implicit roster (pre-migration-047 behavior): "who do I teach."
-// Kept only as a fallback for classes not yet covered by an explicit
-// MentorAssignment row (migration 047's backfill seeds most of these, but a
-// class group added after the backfill would otherwise silently vanish from
-// a mentor's roster).
-async function getInstructorClassGroupIds(
+// Access to a student's mentoring record comes only from an explicit, ACTIVE
+// MentorAssignment in an academic year that has not finished (the current
+// year, or one whose end date is still ahead — an admin may assign next
+// year's mentors early, and the mentor's roster follows the year they pick).
+// Assignments left ACTIVE in a past year — notably the rows migration 047
+// backfilled for every teacher/student pair — no longer grant write or grade
+// access. There used to be a "who do I teach" fallback (any student
+// in a class group the mentor teaches), which put every student of a subject
+// teacher on their mentor roster and let them log sessions for students who
+// had a different, real mentor. `allowOwnHistory` lets a former mentor keep
+// reading the sessions they themselves wrote (the history query is already
+// filtered to their own rows), without regaining write or grade access.
+async function verifyStudentAccess(
   userId: number,
-  academicYearId?: number | null,
-): Promise<number[]> {
-  const rows = await db
-    .selectDistinct({ class_group_id: TeacherSubjectAssignment.class_group_id })
-    .from(TeacherSubjectAssignment)
+  studentId: number,
+  opts: { allowOwnHistory?: boolean } = {},
+): Promise<void> {
+  const [live] = await db
+    .select({ id: MentorAssignment.assignment_id })
+    .from(MentorAssignment)
+    .innerJoin(AcademicYear, eq(AcademicYear.academic_year_id, MentorAssignment.academic_year_id))
     .where(
       and(
-        eq(TeacherSubjectAssignment.user_id, userId),
-        academicYearId
-          ? eq(TeacherSubjectAssignment.academic_year_id, academicYearId)
-          : sql`1=1`,
-      ),
-    );
-  return rows.map((r) => r.class_group_id);
-}
-
-async function verifyStudentAccess(userId: number, studentId: number): Promise<void> {
-  const explicitMentees = await getExplicitMenteeIds(userId);
-  if (explicitMentees.includes(studentId)) return;
-
-  // Fallback: legacy class-group inference, only reached when this mentor
-  // has zero explicit MentorAssignment rows for this student — keeps a
-  // mentor from losing access to a student teaching relationship that
-  // hasn't been formally assigned yet.
-  const classGroupIds = await getInstructorClassGroupIds(userId);
-  if (classGroupIds.length === 0) {
-    throw new NotFoundError("Student not found in your assigned mentees");
-  }
-  const enrollment = await db
-    .select({ user_id: StudentClassGroup.user_id })
-    .from(StudentClassGroup)
-    .where(
-      and(
-        eq(StudentClassGroup.user_id, studentId),
-        inArray(StudentClassGroup.class_group_id, classGroupIds),
-        eq(StudentClassGroup.status, "ACTIVE"),
+        eq(MentorAssignment.mentor_id, userId),
+        eq(MentorAssignment.student_id, studentId),
+        eq(MentorAssignment.status, "ACTIVE"),
+        or(
+          eq(AcademicYear.is_current, 1),
+          sql`${AcademicYear.end_date} >= CURDATE()`,
+          isNull(AcademicYear.end_date),
+        ),
       ),
     )
     .limit(1);
-  if (enrollment.length === 0) {
-    throw new NotFoundError("Student not found in your assigned mentees");
+  if (live) return;
+
+  if (opts.allowOwnHistory) {
+    const [own] = await db
+      .select({ id: MentorshipSession.mentorship_id })
+      .from(MentorshipSession)
+      .where(and(eq(MentorshipSession.user_id, userId), eq(MentorshipSession.student_id, studentId)))
+      .limit(1);
+    if (own) return;
   }
+  throw new NotFoundError("Student not found in your assigned mentees");
 }
 
+// GET /mentorship/me — who am I in mentoring? Open to every signed-in user so
+// the sidebar can offer "My Mentees" to anyone holding an assignment, whatever
+// their user type (staff and admins can mentor too, not only teachers).
+export const getMyMentorshipRole = asyncHandler(async (req: any, res: any) => {
+  const userId = req.user.userId as number;
+  // Follows the year picked in the top-bar period selector, like the hub does.
+  const academicYearId =
+    req.query.academic_year_id && !isNaN(Number(req.query.academic_year_id))
+      ? parseInt(String(req.query.academic_year_id), 10)
+      : await getCurrentAcademicYearId();
+  const [mentoring, mentored] = await Promise.all([
+    db
+      .select({ n: sql<number>`COUNT(DISTINCT ${MentorAssignment.student_id})` })
+      .from(MentorAssignment)
+      .where(
+        and(
+          eq(MentorAssignment.mentor_id, userId),
+          eq(MentorAssignment.status, "ACTIVE"),
+          academicYearId ? eq(MentorAssignment.academic_year_id, academicYearId) : sql`1=1`,
+        ),
+      ),
+    db
+      .select({ n: sql<number>`COUNT(*)` })
+      .from(MentorAssignment)
+      .where(
+        and(
+          eq(MentorAssignment.student_id, userId),
+          eq(MentorAssignment.status, "ACTIVE"),
+          academicYearId ? eq(MentorAssignment.academic_year_id, academicYearId) : sql`1=1`,
+        ),
+      ),
+  ]);
+  const menteeCount = Number(mentoring[0]?.n ?? 0);
+  return successResponse(res, "Mentorship role fetched", {
+    is_mentor: menteeCount > 0,
+    mentee_count: menteeCount,
+    has_mentor: Number(mentored[0]?.n ?? 0) > 0,
+  });
+});
+
 // ─────────────────────────────────────────────────────────────────────────────
-// GET /mentorship/students
+// GET /mentorship/students — the signed-in mentor's own mentees, nobody else.
 // ─────────────────────────────────────────────────────────────────────────────
 export const getAssignedStudents = asyncHandler(async (req: any, res: any) => {
   const userId = req.user.userId as number;
@@ -121,49 +137,61 @@ export const getAssignedStudents = asyncHandler(async (req: any, res: any) => {
       ? parseInt(academic_year_id as string)
       : await getCurrentAcademicYearId();
 
-  // Primary source of truth (migration 047): explicit MentorAssignment roster.
-  const explicitMenteeIds = await getExplicitMenteeIds(userId, academicYearId);
-
-  // Legacy fallback: class groups this mentor teaches but has no explicit
-  // MentorAssignment row for yet (pre-cutover classes, or a class added
-  // after the one-time backfill migration ran).
-  const classGroupIds = await getInstructorClassGroupIds(userId, academicYearId);
-
-  if (explicitMenteeIds.length === 0 && classGroupIds.length === 0) {
-    return successResponse(res, "No mentees assigned", []);
-  }
-
-  const students = await db
-    .selectDistinct({
-      user_id: StudentClassGroup.user_id,
-      class_group_id: StudentClassGroup.class_group_id,
-      class_group_name: ClassGroup.name,
+  // Built from the assignment itself (not from class enrolment) so a mentee
+  // who is not placed in a class group yet still shows up.
+  const assignments = await db
+    .select({
+      user_id: MentorAssignment.student_id,
+      assigned_at: MentorAssignment.assigned_at,
+      academic_year_id: MentorAssignment.academic_year_id,
       first_name: UserProfile.first_name,
       last_name: UserProfile.last_name,
       registration_number: UserProfile.registration_number,
     })
-    .from(StudentClassGroup)
-    .innerJoin(ClassGroup, eq(StudentClassGroup.class_group_id, ClassGroup.class_group_id))
-    .innerJoin(UserProfile, eq(StudentClassGroup.user_id, UserProfile.user_id))
+    .from(MentorAssignment)
+    .leftJoin(UserProfile, eq(MentorAssignment.student_id, UserProfile.user_id))
     .where(
       and(
-        eq(StudentClassGroup.status, "ACTIVE"),
-        or(
-          inArray(StudentClassGroup.class_group_id, classGroupIds.length > 0 ? classGroupIds : [-1]),
-          inArray(StudentClassGroup.user_id, explicitMenteeIds.length > 0 ? explicitMenteeIds : [-1]),
-        ),
+        eq(MentorAssignment.mentor_id, userId),
+        eq(MentorAssignment.status, "ACTIVE"),
+        academicYearId ? eq(MentorAssignment.academic_year_id, academicYearId) : sql`1=1`,
       ),
     );
 
-  if (students.length === 0) {
-    return successResponse(res, "No students found", []);
+  if (assignments.length === 0) {
+    return successResponse(res, "No mentees assigned", []);
   }
 
-  const studentIds = [...new Set(students.map((s) => s.user_id))];
+  const studentIds = [...new Set(assignments.map((s) => s.user_id))];
+
+  const classRows = await db
+    .select({
+      user_id: StudentClassGroup.user_id,
+      academic_year_id: StudentClassGroup.academic_year_id,
+      class_group_id: StudentClassGroup.class_group_id,
+      class_group_name: ClassGroup.name,
+    })
+    .from(StudentClassGroup)
+    .innerJoin(ClassGroup, eq(StudentClassGroup.class_group_id, ClassGroup.class_group_id))
+    .where(
+      and(
+        inArray(StudentClassGroup.user_id, studentIds),
+        eq(StudentClassGroup.status, "ACTIVE"),
+      ),
+    );
+  const classOf = new Map<number, { class_group_id: number; class_group_name: string | null }>();
+  for (const c of classRows) {
+    const a = assignments.find((x) => x.user_id === c.user_id);
+    // Prefer the class of the assignment's own year; any active class otherwise.
+    if (!classOf.has(c.user_id) || c.academic_year_id === a?.academic_year_id) {
+      classOf.set(c.user_id, { class_group_id: c.class_group_id, class_group_name: c.class_group_name });
+    }
+  }
 
   const lastSessions = await db
     .select({
       student_id: MentorshipSession.student_id,
+      session_count: sql<number>`COUNT(*)`,
       last_session_date: sql<string>`MAX(DATE_FORMAT(${MentorshipSession.session_date}, '%Y-%m-%d'))`,
       wellbeing_status: sql<string>`SUBSTRING_INDEX(GROUP_CONCAT(${MentorshipSession.wellbeing_status} ORDER BY ${MentorshipSession.session_date} DESC), ',', 1)`,
       follow_up_required: sql<number>`MAX(${MentorshipSession.follow_up_required})`,
@@ -189,7 +217,7 @@ export const getAssignedStudents = asyncHandler(async (req: any, res: any) => {
   const seen = new Set<number>();
   const result = [];
 
-  for (const s of students) {
+  for (const s of assignments) {
     if (seen.has(s.user_id)) continue;
     seen.add(s.user_id);
 
@@ -201,12 +229,17 @@ export const getAssignedStudents = asyncHandler(async (req: any, res: any) => {
         (today.getTime() - last.getTime()) / (1000 * 60 * 60 * 24),
       );
     }
+    const cls = classOf.get(s.user_id);
 
     result.push({
       user_id: s.user_id,
       first_name: s.first_name,
       last_name: s.last_name,
-      class_group_name: s.class_group_name,
+      registration_number: s.registration_number,
+      class_group_id: cls?.class_group_id ?? null,
+      class_group_name: cls?.class_group_name ?? null,
+      assigned_at: formatDbDate(s.assigned_at),
+      session_count: Number(session?.session_count ?? 0),
       last_session_date: session?.last_session_date ?? null,
       days_since_last_session,
       wellbeing_status: session?.wellbeing_status ?? null,
@@ -236,7 +269,7 @@ export const getStudentMentorshipHistory = asyncHandler(async (req: any, res: an
     throw new ValidationError("Invalid student ID");
   }
 
-  await verifyStudentAccess(userId, studentId);
+  await verifyStudentAccess(userId, studentId, { allowOwnHistory: true });
 
   const sessions = await db
     .select({
@@ -943,8 +976,10 @@ export const getMyMentor = asyncHandler(async (req: any, res: any) => {
     .select({
       mentor_id: MentorAssignment.mentor_id,
       mentor_email: User.email,
+      mentor_phone: User.phone_number,
       mentor_first: UserProfile.first_name,
       mentor_last: UserProfile.last_name,
+      mentor_user_type: UserProfile.user_type,
       assigned_at: MentorAssignment.assigned_at,
     })
     .from(MentorAssignment)
@@ -957,17 +992,60 @@ export const getMyMentor = asyncHandler(async (req: any, res: any) => {
         eq(MentorAssignment.status, "ACTIVE"),
       ),
     )
+    .orderBy(sql`${MentorAssignment.assigned_at} DESC`)
     .limit(1);
 
   if (!row) {
     return successResponse(res, "No mentor assigned", null);
   }
 
+  // What the student may see about their time with this mentor: how often
+  // they have met and when. Session notes stay with the mentor.
+  const [[sessions], subjects] = await Promise.all([
+    db
+      .select({
+        session_count: sql<number>`COUNT(*)`,
+        last_session_date: sql<string | null>`MAX(DATE_FORMAT(${MentorshipSession.session_date}, '%Y-%m-%d'))`,
+      })
+      .from(MentorshipSession)
+      .where(
+        and(
+          eq(MentorshipSession.user_id, row.mentor_id),
+          eq(MentorshipSession.student_id, studentId),
+        ),
+      ),
+    // Subjects this mentor teaches the student this year, if any — helps the
+    // student place who their mentor is.
+    db
+      .selectDistinct({ name: Subject.name })
+      .from(TeacherSubjectAssignment)
+      .innerJoin(Subject, eq(TeacherSubjectAssignment.subject_id, Subject.subject_id))
+      .innerJoin(
+        StudentClassGroup,
+        and(
+          eq(StudentClassGroup.class_group_id, TeacherSubjectAssignment.class_group_id),
+          eq(StudentClassGroup.user_id, studentId),
+          eq(StudentClassGroup.status, "ACTIVE"),
+        ),
+      )
+      .where(
+        and(
+          eq(TeacherSubjectAssignment.user_id, row.mentor_id),
+          eq(TeacherSubjectAssignment.academic_year_id, academicYearId),
+        ),
+      ),
+  ]);
+
   return successResponse(res, "Your mentor fetched", {
     mentor_id: row.mentor_id,
     mentor_name: `${row.mentor_first ?? ""} ${row.mentor_last ?? ""}`.trim() || null,
     mentor_email: row.mentor_email,
+    mentor_phone: row.mentor_phone ?? null,
+    mentor_role: row.mentor_user_type ?? null,
+    teaches_you: subjects.map((s) => s.name).filter(Boolean),
     assigned_at: formatDbDate(row.assigned_at),
+    session_count: Number(sessions?.session_count ?? 0),
+    last_session_date: sessions?.last_session_date ?? null,
   });
 });
 

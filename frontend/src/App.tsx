@@ -46,6 +46,7 @@ import SchemeDetails from "./components/SchemeDetails";
 import ReportingModule from "./components/reporting/ReportingModule";
 import AdminReporting from "./components/reporting/AdminReporting";
 import MyMentor from "./components/reporting/MyMentor";
+import MentoringHub from "./components/reporting/MentoringHub";
 import OfficeHoursHub from "./components/officeHours/OfficeHoursHub";
 import ScheduleDetail from "./components/officeHours/ScheduleDetail";
 import MyOfficeHours from "./components/officeHours/MyOfficeHours";
@@ -899,6 +900,23 @@ function App() {
                 <ProtectedRoute>
                   <SystemLayoutWrapper>
                     <ReportingModule />
+                  </SystemLayoutWrapper>
+                </ProtectedRoute>
+              }
+            />
+
+            {/* My Mentees — the mentor's own roster, for any mentor (teacher,
+                staff or admin). Teachers also reach it via Reporting > Mentoring. */}
+            <Route
+              path="/my-mentees"
+              element={
+                <ProtectedRoute>
+                  <SystemLayoutWrapper>
+                    <div className="p-3 md:p-6">
+                      <div className="bg-white dark:bg-gray-800/30 rounded-3xl p-6 border border-gray-100 dark:border-gray-700/20">
+                        <MentoringHub />
+                      </div>
+                    </div>
                   </SystemLayoutWrapper>
                 </ProtectedRoute>
               }
