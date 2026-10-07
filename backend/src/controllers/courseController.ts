@@ -12,9 +12,13 @@ import {
   CourseSection,
   CourseItemType,
   FileAsset,
+  CourseItemProgress,
   LessonNote,
+  LessonNoteCriteria,
   LessonNoteShare,
+  SchemeEntryCriteria,
   SchemeOfWork,
+  SchemeOfWorkEntry,
   Subject,
   SubjectCompetency,
   SubjectDocument,
@@ -27,7 +31,9 @@ import { NotFoundError, ValidationError, AuthorizationError } from "../errors/Cu
 import { recordActivity } from "../utils/activityLogger";
 import { sanitizeNoteHtml } from "../utils/sanitizeNoteHtml";
 import { assertTeacherOwnsScheme } from "../utils/schemeAuthorization";
-import { assertCanBuildCourse, loadCourse, CourseRow } from "../services/elearning/courseMembership";
+import { assertCanBuildCourse, listCourseMembers, loadCourse, CourseRow } from "../services/elearning/courseMembership";
+import { computeNoteReach } from "../services/elearning/noteReach";
+import { todayDateOnly, toDateOnly } from "../services/elearning/dates";
 import { ensureCourseForScheme, publishDueSections, seedItemsForCourse, syncSectionsFromScheme } from "../services/elearning/courseSeeding";
 import {
   loadCourseHeader,
@@ -1014,4 +1020,240 @@ export const pickCriteria = asyncHandler(async (req: any, res: any) => {
         .map((c) => ({ criteria_id: c.criteria_id, criteria_number: c.criteria_number, description: c.description })),
     })),
   );
+});
+
+
+// ======================
+// A NOTE'S E-LEARNING PANEL (Lesson Notes page and editor)
+// ======================
+
+/**
+ * Everything the teacher needs to put one note in front of students, from the note's
+ * side rather than the course builder's: which course it belongs to, the weeks it could
+ * go in (with the best match suggested), where it is now, whether students can open it
+ * (and what's in the way), and how many have read it.
+ */
+async function noteElearningPayload(noteId: number, userId: number) {
+  const [note] = await db
+    .select({
+      note_id: LessonNote.note_id,
+      title: LessonNote.title,
+      status: LessonNote.status,
+      subject_id: LessonNote.subject_id,
+      class_group_id: LessonNote.class_group_id,
+      scheme_entry_id: LessonNote.scheme_entry_id,
+      user_id: LessonNote.user_id,
+    })
+    .from(LessonNote)
+    .where(eq(LessonNote.note_id, noteId))
+    .limit(1);
+  if (!note) throw new NotFoundError("Lesson note not found");
+
+  const [courseRow] = note.class_group_id
+    ? await db
+        .select({ course_id: Course.course_id })
+        .from(Course)
+        .where(and(eq(Course.subject_id, note.subject_id), eq(Course.class_group_id, note.class_group_id)))
+        .orderBy(desc(Course.course_id))
+        .limit(1)
+    : [];
+
+  const noteOut = { note_id: note.note_id, title: note.title, status: note.status };
+  if (!courseRow) {
+    // No course to build on: only the note's own author learns that much.
+    if (note.user_id !== userId) throw new NotFoundError("Lesson note not found");
+    return {
+      note: noteOut,
+      course: null,
+      no_course_reason: note.class_group_id
+        ? "There is no e-learning course for this subject and class yet."
+        : "This note isn't tied to a class, so it can't go on a course.",
+      placement: null,
+      sections: [],
+      students: null,
+      reach: computeNoteReach({ note_status: note.status, placement: null, has_course: false }),
+    };
+  }
+
+  const course = await loadBuildableCourse(courseRow.course_id, userId);
+  const sections = await db
+    .select({
+      section_id: CourseSection.section_id,
+      title: CourseSection.title,
+      position: CourseSection.position,
+      status: CourseSection.status,
+      unlock_at: CourseSection.unlock_at,
+      scheme_entry_id: CourseSection.scheme_entry_id,
+      start_date: SchemeOfWorkEntry.start_date,
+      end_date: SchemeOfWorkEntry.end_date,
+      item_count: sql<number>`(SELECT COUNT(*) FROM ${CourseItem} WHERE ${CourseItem.section_id} = ${CourseSection.section_id})`,
+    })
+    .from(CourseSection)
+    .leftJoin(SchemeOfWorkEntry, eq(SchemeOfWorkEntry.entry_id, CourseSection.scheme_entry_id))
+    .where(eq(CourseSection.course_id, course.course_id))
+    .orderBy(asc(CourseSection.position));
+
+  // Suggest the week: the note's own scheme week first, then the week whose curriculum
+  // targets it covers most, then the week running today.
+  const noteCriteria = new Set(
+    (
+      await db
+        .select({ criteria_id: LessonNoteCriteria.criteria_id })
+        .from(LessonNoteCriteria)
+        .where(eq(LessonNoteCriteria.note_id, noteId))
+    ).map((r) => r.criteria_id),
+  );
+  const entryIds = sections.map((x) => x.scheme_entry_id).filter((x): x is number => !!x);
+  const sectionCriteria = new Map<number, number[]>();
+  if (noteCriteria.size && entryIds.length) {
+    const rows = await db
+      .select({ entry_id: SchemeEntryCriteria.entry_id, criteria_id: SchemeEntryCriteria.criteria_id })
+      .from(SchemeEntryCriteria)
+      .where(inArray(SchemeEntryCriteria.entry_id, entryIds));
+    for (const r of rows) sectionCriteria.set(r.entry_id, [...(sectionCriteria.get(r.entry_id) || []), r.criteria_id]);
+  }
+  const today = todayDateOnly();
+  const scored = sections.map((x) => {
+    const overlap = x.scheme_entry_id
+      ? (sectionCriteria.get(x.scheme_entry_id) || []).filter((c) => noteCriteria.has(c)).length
+      : 0;
+    const start = toDateOnly(x.start_date);
+    const end = toDateOnly(x.end_date);
+    const current = !!start && !!end && start <= today && today <= end;
+    const sameEntry = !!note.scheme_entry_id && x.scheme_entry_id === note.scheme_entry_id;
+    const score = (sameEntry ? 1000 : 0) + overlap * 10 + (current ? 1 : 0);
+    const reason = sameEntry
+      ? "The note was written for this week"
+      : overlap
+        ? `Covers ${overlap} of the same curriculum target${overlap === 1 ? "" : "s"}`
+        : current
+          ? "This is the current week"
+          : null;
+    return { x, score, reason, current, start, end };
+  });
+  const best = scored.reduce<(typeof scored)[number] | null>((b, c) => (c.score > 0 && (!b || c.score > b.score) ? c : b), null);
+
+  const [placedRow] = await db
+    .select({ item_id: CourseItem.item_id, section_id: CourseItem.section_id, is_published: CourseItem.is_published })
+    .from(CourseItem)
+    .innerJoin(CourseSection, eq(CourseSection.section_id, CourseItem.section_id))
+    .where(and(eq(CourseSection.course_id, course.course_id), eq(CourseItem.item_type, "LESSON_NOTE"), eq(CourseItem.ref_id, noteId)))
+    .orderBy(asc(CourseSection.position), asc(CourseItem.position))
+    .limit(1);
+  const placedSection = placedRow ? sections.find((x) => x.section_id === placedRow.section_id) : undefined;
+  const placement =
+    placedRow && placedSection
+      ? {
+          item_id: placedRow.item_id,
+          is_published: !!placedRow.is_published,
+          section_id: placedSection.section_id,
+          section_title: placedSection.title,
+          section_status: placedSection.status,
+          section_unlock_at: placedSection.unlock_at ?? null,
+          course_status: course.status,
+        }
+      : null;
+
+  let students: { members: number; started: number; completed: number } | null = null;
+  if (placement) {
+    const members = await listCourseMembers(course);
+    const memberIds = members.map((m) => m.user_id);
+    const progress = memberIds.length
+      ? await db
+          .select({ state: CourseItemProgress.state })
+          .from(CourseItemProgress)
+          .where(and(eq(CourseItemProgress.item_id, placement.item_id), inArray(CourseItemProgress.user_id, memberIds)))
+      : [];
+    students = {
+      members: memberIds.length,
+      started: progress.filter((r) => r.state !== "NOT_STARTED").length,
+      completed: progress.filter((r) => r.state === "COMPLETED").length,
+    };
+  }
+
+  return {
+    note: noteOut,
+    course: { course_id: course.course_id, title: course.title, status: course.status },
+    no_course_reason: null,
+    placement,
+    sections: scored.map(({ x, reason, current, start, end }) => ({
+      section_id: x.section_id,
+      title: x.title,
+      status: x.status,
+      unlock_at: x.unlock_at ?? null,
+      start_date: start,
+      end_date: end,
+      item_count: Number(x.item_count || 0),
+      is_current: current,
+      suggested: !!best && best.x.section_id === x.section_id,
+      reason,
+    })),
+    students,
+    reach: computeNoteReach({ note_status: note.status, placement, has_course: true }),
+  };
+}
+
+/** GET /elearning/notes/:noteId/elearning */
+export const getNoteElearning = asyncHandler(async (req: any, res: any) => {
+  const noteId = parseId(req.params.noteId, "note id");
+  successResponse(res, "Note e-learning", await noteElearningPayload(noteId, req.user.userId));
+});
+
+/** PUT /elearning/notes/:noteId/placement { section_id } — put the note in that week, or move it there. */
+export const setNotePlacement = asyncHandler(async (req: any, res: any) => {
+  const noteId = parseId(req.params.noteId, "note id");
+  const sectionId = parseId(req.body?.section_id, "section id");
+  const current = await noteElearningPayload(noteId, req.user.userId);
+  if (!current.course) throw new ValidationError(current.no_course_reason || "No course for this note");
+  const course = await loadBuildableCourse(current.course.course_id, req.user.userId);
+  const target = current.sections.find((x) => x.section_id === sectionId);
+  if (!target) throw new ValidationError("That week belongs to a different course");
+
+  const [{ max }] = await db
+    .select({ max: sql<number>`COALESCE(MAX(${CourseItem.position}), -1)` })
+    .from(CourseItem)
+    .where(eq(CourseItem.section_id, sectionId));
+
+  let message: string;
+  if (current.placement) {
+    if (current.placement.section_id === sectionId) {
+      message = `Already in "${target.title}"`;
+    } else {
+      await db
+        .update(CourseItem)
+        .set({ section_id: sectionId, position: Number(max) + 1 })
+        .where(eq(CourseItem.item_id, current.placement.item_id));
+      message = `Moved to "${target.title}"`;
+    }
+  } else {
+    const body = await buildItemBody(course, req.user.userId, "LESSON_NOTE", { ref_id: noteId });
+    await db.insert(CourseItem).values({
+      section_id: sectionId,
+      item_type: "LESSON_NOTE",
+      title: body.title!,
+      ...body,
+      position: Number(max) + 1,
+      created_by: req.user.userId,
+    });
+    message = `Added to "${target.title}"`;
+  }
+  // Placing a note is what lets the class read it — same as the builder and one-click place.
+  await ensureClassGroupShare(noteId, course.class_group_id, req.user.userId);
+  successResponse(res, message, await noteElearningPayload(noteId, req.user.userId));
+});
+
+/** DELETE /elearning/notes/:noteId/placement — take the note off its course (the note itself stays). */
+export const removeNotePlacement = asyncHandler(async (req: any, res: any) => {
+  const noteId = parseId(req.params.noteId, "note id");
+  const current = await noteElearningPayload(noteId, req.user.userId);
+  if (current.course) {
+    await loadBuildableCourse(current.course.course_id, req.user.userId);
+    const sectionIds = current.sections.map((x) => x.section_id);
+    if (sectionIds.length) {
+      await db
+        .delete(CourseItem)
+        .where(and(eq(CourseItem.item_type, "LESSON_NOTE"), eq(CourseItem.ref_id, noteId), inArray(CourseItem.section_id, sectionIds)));
+    }
+  }
+  successResponse(res, "Removed from the course", await noteElearningPayload(noteId, req.user.userId));
 });

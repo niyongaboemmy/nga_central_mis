@@ -1,3 +1,4 @@
+import type { NoteReach } from "./lessonNotes";
 import { apiService } from "../services/api";
 
 // ---------------------------------------------------------------- shared types
@@ -411,6 +412,13 @@ export const elearningApi = {
   setItemCriteria: (itemId: number, criteriaIds: number[]) =>
     apiService.put<Data<BuilderCourse>>(`/elearning/items/${itemId}/criteria`, { criteria_ids: criteriaIds }),
   pickNotes: (courseId: number) => apiService.get<Data<PickerNote[]>>(`/elearning/courses/${courseId}/pickers/lesson-notes`),
+  /** The note-side e-learning panel: course, weeks (one suggested), placement, reach, readers. */
+  noteElearning: (noteId: number) => apiService.get<Data<NoteElearning>>(`/elearning/notes/${noteId}/elearning`),
+  /** Put the note in this week, or move it there. */
+  setNotePlacement: (noteId: number, sectionId: number) =>
+    apiService.put<Data<NoteElearning> & { message?: string }>(`/elearning/notes/${noteId}/placement`, { section_id: sectionId }),
+  /** Take the note off its course; the note itself is kept. */
+  removeNotePlacement: (noteId: number) => apiService.delete<Data<NoteElearning> & { message?: string }>(`/elearning/notes/${noteId}/placement`),
   /** Places a lesson note onto its subject's course from outside the builder (Lesson Notes page).
    *  The server resolves the course and the section (the note's scheme week, else the last one). */
   placeNoteOnCourse: (noteId: number, sectionId?: number) =>
@@ -460,6 +468,37 @@ export const elearningApi = {
 };
 
 /** Learner routes — kept in one place so deep links from notifications, calendar and TM agree. */
+export interface NoteElearningWeek {
+  section_id: number;
+  title: string;
+  status: SectionStatus;
+  unlock_at: string | null;
+  start_date: string | null;
+  end_date: string | null;
+  item_count: number;
+  is_current: boolean;
+  suggested: boolean;
+  reason: string | null;
+}
+
+export interface NoteElearning {
+  note: { note_id: number; title: string; status: "DRAFT" | "PUBLISHED" };
+  course: { course_id: number; title: string; status: "DRAFT" | "PUBLISHED" | "ARCHIVED" } | null;
+  no_course_reason: string | null;
+  placement: {
+    item_id: number;
+    is_published: boolean;
+    section_id: number;
+    section_title: string;
+    section_status: SectionStatus;
+    section_unlock_at: string | null;
+    course_status: "DRAFT" | "PUBLISHED" | "ARCHIVED";
+  } | null;
+  sections: NoteElearningWeek[];
+  students: { members: number; started: number; completed: number } | null;
+  reach: NoteReach;
+}
+
 export const learnerRoutes = {
   home: "/my-learning",
   me: "/my-learning/me",

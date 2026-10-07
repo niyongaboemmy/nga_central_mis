@@ -21,6 +21,7 @@ import { lessonNotesApi, SharedNoteDetail } from "../../../api/lessonNotes";
 import { useReaderPrefs, ReaderPaper } from "../reader/useReaderPrefs";
 import NoteAIPanel, { AskMode, AskRequest } from "../reader/NoteAIPanel";
 import PdfPagesViewer from "./PdfPagesViewer";
+import CourseLinkBanner from "../elearning/CourseLinkBanner";
 
 interface Props {
   note: SharedNoteDetail;
@@ -197,6 +198,9 @@ const SharedPdfNoteReader: React.FC<Props> = ({ note, onBack, backLabel, embedde
           style={{ width: `${Math.round(progress * 100)}%` }}
         />
       </div>
+
+      {/* Opened outside its course: say where reading it counts. */}
+      {!embedded && <CourseLinkBanner placement={note.placement} />}
 
       <AnimatePresence>
         {!focusMode && (

@@ -51,6 +51,7 @@ import { EmptyState } from "../elearning/ui/primitives";
 import { SubjectTile } from "./library/NoteCard";
 import { fullWhen, initialsOf, shortWhen } from "./library/noteVisuals";
 import { hydrateInlineChecks } from "../elearning/interactive/hydrate";
+import CourseLinkBanner from "./elearning/CourseLinkBanner";
 
 /** Rail (272) + gap (32) + side padding (48) + a page that still reads like one (~600). */
 const RAIL_MIN_ROW_WIDTH = 952;
@@ -587,6 +588,9 @@ const SharedLessonNoteViewPage: React.FC<Props> = ({ noteId, onBack, backLabel }
           style={{ width: `${Math.round(progress * 100)}%` }}
         />
       </div>
+
+      {/* Opened outside its course: say where reading it counts. */}
+      {!embedded && <CourseLinkBanner placement={note.placement} />}
 
       {/* Toolbar. Painted in the page's own background, so no colour band shows
           between the toolbar and the desk the sheet rests on. */}
