@@ -163,6 +163,8 @@ export const MIS_MANIFEST = defineManifest({
     // Safeguarding concerns and wellbeing check-ins (nga-desktop NEXT_FEATURES_ANALYSIS §3 #5).
     // Restricted and audited; holders are alerted to every new concern.
     SAFEGUARDING_MANAGE: W("See and act on safeguarding concerns", "WELFARE", { ...SCHOOL_ONLY, restricted: true }),
+    // Early warning: risk signals from Tendo/Task Mentor and interventions, in your scope.
+    EARLY_WARNING_VIEW: R("See early-warning signals and log interventions", "WELFARE", ["detail"]),
   },
 });
 

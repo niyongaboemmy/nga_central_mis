@@ -9,7 +9,7 @@ import { getToken } from "../../utils/auth";
 import { useAccess } from "../../hooks/useAccess";
 import { useMentorshipRole } from "../../hooks/useMentorshipRole";
 import { useOptionalAcademicPeriod } from "../../contexts/AcademicPeriodContext";
-import { BarChart3, HeartHandshake, ShieldAlert, ShieldCheck } from "lucide-react";
+import { BarChart3, HeartHandshake, Radar, ShieldAlert, ShieldCheck } from "lucide-react";
 import { BellRing, Bot, CalendarDays, Clock4, Gamepad2, House, Users2 } from "lucide-react";
 
 interface SidebarProps {
@@ -670,6 +670,12 @@ const Sidebar: React.FC<SidebarProps> = ({
       path: "/wellbeing",
       icon: <HeartHandshake className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
       userTypes: ["STUDENT"],
+    },
+    {
+      label: "Early warning",
+      path: "/early-warning",
+      icon: <Radar className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
+      requiredCapability: "EARLY_WARNING_VIEW",
     },
     {
       label: "Safeguarding",

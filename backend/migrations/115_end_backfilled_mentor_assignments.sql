@@ -1,4 +1,4 @@
--- 114: End the mentor assignments migration 047 inferred from subject teaching,
+-- 115: End the mentor assignments migration 047 inferred from subject teaching,
 -- in academic years that have finished.
 --
 -- 047 seeded an ACTIVE MentorAssignment for every (subject teacher, student) pair

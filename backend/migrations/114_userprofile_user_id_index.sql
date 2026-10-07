@@ -1,4 +1,4 @@
--- 113: Index UserProfile by user_id.
+-- 114: Index UserProfile by user_id.
 --
 -- UserProfile had no index on user_id (only profile_id and registration_number),
 -- so every User <-> UserProfile join was a full nested-loop scan on MySQL 5.7.

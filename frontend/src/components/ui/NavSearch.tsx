@@ -50,6 +50,11 @@ const SEARCH_ITEMS: SearchItem[] = [
     requiredPermission: Permissions.DESKTOP_TOOLS_CONFIGURE,
   },
   {
+    label: "Early warning",
+    path: "/early-warning",
+    requiredPermission: Permissions.EARLY_WARNING_VIEW,
+  },
+  {
     label: "Safeguarding",
     path: "/safeguarding",
     requiredPermission: Permissions.SAFEGUARDING_MANAGE,
