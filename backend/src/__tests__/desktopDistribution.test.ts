@@ -20,11 +20,12 @@ vi.mock("../services/access/policy", () => ({
   requireCapability: () => (_req: any, res: any, next: any) => (access.allowed ? next() : res.status(403).json({ message: "Forbidden" })),
 }));
 
-import desktopRoutes from "../routes/desktop";
+import desktopRoutes, { parseUpdateReport } from "../routes/desktop";
 import { clearReleaseCache, compareVersions } from "../services/desktop/releases";
 
 const app = express();
 app.set("trust proxy", "loopback");
+app.use(express.json());
 app.use("/desktop", desktopRoutes);
 
 const release = (version: string) => ({
@@ -126,6 +127,30 @@ describe("NGA Desktop distribution", () => {
     expect(db.exec).not.toHaveBeenCalled();
   });
 
+  it("doesn't count CI smoke-test installs", async () => {
+    publish("0.2.0");
+    const r = await request(app).get("/desktop/update/windows/x86_64/0.1.0").set("X-NGA-Install", "0123456789abcdef0123456789abcdef").set("X-NGA-CI", "1");
+    expect(r.status).toBe(200);
+    expect(db.exec).not.toHaveBeenCalled();
+  });
+
+  it("records the update report sent with a check, and ignores junk", async () => {
+    publish("0.2.0");
+    const id = "0123456789abcdef0123456789abcdef";
+    await request(app).get("/desktop/update/windows/x86_64/0.1.0").set("X-NGA-Install", id).set("X-NGA-Update-Report", "failed 0.2.0 still on 0.1.0 after   install");
+    expect(db.exec).toHaveBeenCalledTimes(2);
+    const [sql, params] = db.exec.mock.calls[1];
+    expect(sql).toMatch(/UPDATE `DesktopInstall` SET last_update_to/);
+    expect(params).toEqual(["0.2.0", "failed", "still on 0.1.0 after install", id]);
+    expect(parseUpdateReport("installed 0.2.0")).toEqual({ outcome: "installed", to: "0.2.0", error: null });
+    expect(parseUpdateReport("downloaded 0.2.0 extra")).toEqual({ outcome: "downloaded", to: "0.2.0", error: null });
+    expect(parseUpdateReport("failed 0.2.0")).toEqual({ outcome: "failed", to: "0.2.0", error: "unknown" });
+    for (const junk of [undefined, "", "exploded 0.2.0", "installed latest", "installed"]) expect(parseUpdateReport(junk)).toBeNull();
+    db.exec.mockClear();
+    await request(app).get("/desktop/update/windows/x86_64/0.1.0").set("X-NGA-Install", id).set("X-NGA-Update-Report", "nonsense");
+    expect(db.exec).toHaveBeenCalledTimes(1);
+  });
+
   it("serves the release files", async () => {
     publish("0.2.0");
     const r = await request(app).get("/desktop/files/0.2.0/NGA_0.2.0_universal.dmg");
@@ -141,12 +166,14 @@ describe("NGA Desktop distribution", () => {
       .mockResolvedValueOnce([{ platform: "windows", n: 8 }, { platform: "macos", n: 4 }])
       .mockResolvedValueOnce([{ day: "2026-10-04", n: 12 }])
       .mockResolvedValueOnce([{ version: "0.1.0", n: 2 }, { version: "0.2.0", n: 5 }])
-      .mockResolvedValueOnce([{ active: 7, all_time: 9, windows: 5, macos: 2 }]);
+      .mockResolvedValueOnce([{ active: 7, all_time: 9, windows: 5, macos: 2 }])
+      .mockResolvedValueOnce([{ version: "0.1.0", outcome: "failed", error: "installer exited 2", n: 2 }]);
     const r = await request(app).get("/desktop/stats");
     expect(r.status).toBe(200);
     expect(r.body.data.downloads).toMatchObject({ total: 12, people: 9 });
     expect(r.body.data.installs).toMatchObject({ active_30_days: 7, on_current_version: 5 });
     expect(r.body.data.installs.by_version[0]).toEqual({ version: "0.2.0", count: 5 });
+    expect(r.body.data.installs.behind).toEqual([{ version: "0.1.0", outcome: "failed", error: "installer exited 2", count: 2 }]);
     access.allowed = false;
     expect((await request(app).get("/desktop/stats")).status).toBe(403);
   });

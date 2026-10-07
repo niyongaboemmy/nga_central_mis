@@ -19,6 +19,7 @@ import SystemLayout from "./components/SystemLayout";
 import { useUser } from "./contexts/UserContext";
 import { ToastProvider, useToast } from "./contexts/ToastContext";
 import UpdateBanner from "./components/ui/UpdateBanner";
+import DesktopUpdateBanner from "./components/apps/DesktopUpdateBanner";
 import { NotificationProvider } from "./contexts/NotificationContext";
 import { ConfirmProvider } from "./contexts/ConfirmContext";
 import { ToastStore } from "./services/api";
@@ -278,6 +279,7 @@ function App() {
   return (
     <ToastProvider>
       <UpdateBanner />
+      <DesktopUpdateBanner />
       <ToastInitializer>
         <NotificationProvider>
         <ConfirmProvider>

@@ -211,12 +211,21 @@ describe("/apps: NGA Desktop download page", () => {
     mockApi(release, {
       current_version: "0.3.0",
       downloads: { total: 40, people: 31, by_platform: [{ platform: "windows", count: 30 }, { platform: "macos", count: 10 }] },
-      installs: { active_30_days: 20, on_current_version: 15, windows: 14, macos: 6 },
+      installs: {
+        active_30_days: 20, on_current_version: 15, windows: 14, macos: 6,
+        behind: [
+          { version: "0.2.0", outcome: "failed", error: "installer exited 2", count: 3 },
+          { version: "0.1.0", outcome: null, error: null, count: 2 },
+        ],
+      },
     });
     renderPage();
     const stats = await screen.findByTestId("download-stats");
     expect(stats).toHaveTextContent("Downloads40");
     expect(stats).toHaveTextContent("75%");
     expect(stats).toHaveTextContent("Windows: 30 · macOS: 10");
+    const behind = screen.getByTestId("installs-behind");
+    expect(behind).toHaveTextContent("3 on 0.2.0 · update failed (installer exited 2)");
+    expect(behind).toHaveTextContent("2 on 0.1.0 · no update report yet (older app)");
   });
 });
