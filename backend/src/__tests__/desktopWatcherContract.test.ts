@@ -15,7 +15,7 @@ import { Notification, User, UserProfile } from "../db/schema";
 import { createUser, signToken } from "../test/fixtures";
 
 // Copied verbatim from bridge.js WATCHERS.mis[0].match.
-const MIS_WATCHER_MATCH = /\/notifications\/?(\?|$)/;
+const MIS_WATCHER_MATCH = /^(?:https?:\/\/[^/]+)?\/notifications\/?(\?|$)/;
 // The exact request the web app makes (frontend NotificationContext).
 const WATCHED_PATH = "/notifications?limit=20";
 
@@ -57,6 +57,9 @@ describe("NGA Desktop watcher contract: MIS notifications", () => {
 
   it("the path the web app polls is the one the watcher matches", () => {
     expect(MIS_WATCHER_MATCH.test(WATCHED_PATH)).toBe(true);
+    // Only the top-level path: the calendar's notification settings must not look like the poll.
+    expect(MIS_WATCHER_MATCH.test("/calendar/notifications")).toBe(false);
+    expect(MIS_WATCHER_MATCH.test("https://api.amashuri.com/calendar/notifications")).toBe(false);
     expect(MIS_WATCHER_MATCH.test("/notifications")).toBe(true);
     // Sibling endpoints must NOT be picked up as notification lists.
     expect(MIS_WATCHER_MATCH.test("/notifications/unread-count")).toBe(false);
