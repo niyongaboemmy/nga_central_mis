@@ -53,6 +53,8 @@ import MyOfficeHours from "./components/officeHours/MyOfficeHours";
 import OfficeHoursAdmin from "./components/officeHours/admin/OfficeHoursAdmin";
 import DesktopToolsAdmin from "./components/desktopTools/DesktopToolsAdmin";
 import FamilyTutor from "./components/desktopTools/FamilyTutor";
+import MyChildren from "./components/families/MyChildren";
+import ImportParents from "./components/families/ImportParents";
 import StaffCover from "./components/cover/StaffCover";
 import EarlyWarning from "./components/earlyWarning/EarlyWarning";
 import Safeguarding from "./components/safeguarding/Safeguarding";
@@ -992,6 +994,26 @@ function App() {
                 <ProtectedRoute>
                   <SystemLayoutWrapper>
                     <StaffCover />
+                  </SystemLayoutWrapper>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/family"
+              element={
+                <ProtectedRoute>
+                  <SystemLayoutWrapper>
+                    <MyChildren />
+                  </SystemLayoutWrapper>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/families/import"
+              element={
+                <ProtectedRoute>
+                  <SystemLayoutWrapper>
+                    <ImportParents />
                   </SystemLayoutWrapper>
                 </ProtectedRoute>
               }
