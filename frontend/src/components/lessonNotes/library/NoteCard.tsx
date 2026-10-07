@@ -1,6 +1,6 @@
 import React from "react";
 import { motion } from "framer-motion";
-import { ArrowRight, Clock, FileText, GraduationCap } from "lucide-react";
+import { ArrowRight, CheckCircle2, Clock, FileText, GraduationCap, PlayCircle } from "lucide-react";
 import { SharedNoteSummary, isPdfBackedNote } from "../../../api/lessonNotes";
 import { useMotion } from "../../../design/motion";
 import SubjectIcon from "../../elearning/ui/subjectIcons";
@@ -42,22 +42,57 @@ const SubjectTile: React.FC<{ subject: string; size?: "sm" | "md" | "lg" }> = ({
 
 export { SubjectTile };
 
-/** Says, before the click, that this note opens inside its course and counts
- *  towards the student's progress there. */
+/** Says, before the click, that this note opens inside its course — and where the
+ *  student is with it there: done, part-way, or not started (counts towards progress). */
 export const CourseTag: React.FC<{ note: SharedNoteSummary; className?: string }> = ({
   note,
   className = "",
-}) =>
-  note.placement ? (
+}) => {
+  const p = note.placement;
+  if (!p) return null;
+  const week = p.section_title.split(" — ")[0];
+  if (p.progress === "COMPLETED") {
+    return (
+      <span
+        data-progress="COMPLETED"
+        className={`inline-flex max-w-full items-center gap-1 rounded-pill bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 dark:bg-emerald-400/15 dark:text-emerald-300 ${className}`}
+      >
+        <CheckCircle2 className="h-3 w-3 flex-shrink-0" aria-hidden />
+        <span className="truncate">Done · {week}</span>
+      </span>
+    );
+  }
+  if (p.progress === "IN_PROGRESS") {
+    return (
+      <span
+        data-progress="IN_PROGRESS"
+        className={`inline-flex max-w-full items-center gap-1 rounded-pill bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-800 dark:bg-amber-400/15 dark:text-amber-200 ${className}`}
+      >
+        <PlayCircle className="h-3 w-3 flex-shrink-0" aria-hidden />
+        <span className="truncate">In progress · {week}</span>
+      </span>
+    );
+  }
+  return (
     <span
+      data-progress="NOT_STARTED"
       className={`el-chip-brand inline-flex max-w-full items-center gap-1 rounded-pill px-2 py-0.5 text-[11px] font-medium ${className}`}
     >
       <GraduationCap className="h-3 w-3 flex-shrink-0" aria-hidden />
-      <span className="truncate">
-        {note.placement.section_title.split(" — ")[0]} · counts towards your progress
-      </span>
+      <span className="truncate">{week} · counts towards your progress</span>
     </span>
-  ) : null;
+  );
+};
+
+/** The main button's words for a coursework note, by where the student is with it. */
+export const courseCta = (note: SharedNoteSummary) =>
+  !note.placement
+    ? "Read note"
+    : note.placement.progress === "COMPLETED"
+      ? "Review in e-learning"
+      : note.placement.progress === "IN_PROGRESS"
+        ? "Continue in e-learning"
+        : "Open in e-learning";
 
 /** For a note that opens in its course: reading it outside the course earns
  *  nothing, so this is the quiet secondary way — but a student who only wants
@@ -309,7 +344,7 @@ export const HeroNoteCard: React.FC<{
             onClick={() => onOpen(note.note_id)}
             className="inline-flex min-h-[46px] items-center justify-center gap-1.5 rounded-pill bg-brand-500 px-7 text-sm font-semibold text-white shadow-soft hover:bg-brand-600 focus:outline-none focus-visible:shadow-glow"
           >
-            {note.placement ? "Open in e-learning" : "Read note"} <ArrowRight className="h-4 w-4" />
+            {courseCta(note)} <ArrowRight className="h-4 w-4" />
           </motion.button>
           <ReadHereLink note={note} onReadHere={onReadHere} />
         </div>

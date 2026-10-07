@@ -20,6 +20,9 @@ import {
   setItemCriteriaHandler,
   pickLessonNotes,
   placeLessonNoteOnCourse,
+  getNoteElearning,
+  setNotePlacement,
+  removeNotePlacement,
   pickSubjectDocuments,
   pickCriteria,
 } from "../controllers/courseController";
@@ -166,6 +169,10 @@ router.put("/courses/:id/sections/order", builder, reorderSections);
 router.get("/courses/:id/pickers/lesson-notes", builder, pickLessonNotes);
 // One-click placement from the Lesson Notes page — resolves the course and section itself.
 router.post("/notes/:noteId/place", builder, placeLessonNoteOnCourse);
+// The note's own e-learning panel: reach checklist, week picker, move / remove, readers.
+router.get("/notes/:noteId/elearning", builder, getNoteElearning);
+router.put("/notes/:noteId/placement", builder, setNotePlacement);
+router.delete("/notes/:noteId/placement", builder, removeNotePlacement);
 router.get(
   "/courses/:id/pickers/subject-documents",
   builder,

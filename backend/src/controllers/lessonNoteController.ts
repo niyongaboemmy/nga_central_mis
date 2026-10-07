@@ -46,6 +46,7 @@ import {
 import { LessonNoteCriteria } from "../db/schema";
 import { getCurrentAcademicYearId } from "../utils/academicYear";
 import { resolveNotePlacements } from "../services/elearning/notePlacement";
+import { computeNoteReach } from "../services/elearning/noteReach";
 
 // ======================
 // STATUS MANAGEMENT
@@ -138,6 +139,8 @@ type NotePlacement = {
   item_id: number;
   is_published: boolean;
   section_id: number;
+  section_status: "HIDDEN" | "SCHEDULED" | "PUBLISHED";
+  section_unlock_at: Date | null;
   section_title: string;
   course_id: number;
   course_title: string;
@@ -156,6 +159,8 @@ async function loadNotePlacements(
       is_published: CourseItem.is_published,
       section_id: CourseSection.section_id,
       section_title: CourseSection.title,
+      section_status: CourseSection.status,
+      section_unlock_at: CourseSection.unlock_at,
       course_id: Course.course_id,
       course_title: Course.title,
       course_status: Course.status,
@@ -180,6 +185,8 @@ async function loadNotePlacements(
       is_published: !!r.is_published,
       section_id: r.section_id,
       section_title: r.section_title,
+      section_status: r.section_status as NotePlacement["section_status"],
+      section_unlock_at: r.section_unlock_at ?? null,
       course_id: r.course_id,
       course_title: r.course_title,
       course_status: r.course_status as NotePlacement["course_status"],
@@ -300,14 +307,21 @@ export const listMyLessonNoteSubjects = asyncHandler(
       .select({
         subject_id: LessonNote.subject_id,
         note_id: LessonNote.note_id,
+        status: LessonNote.status,
       })
       .from(LessonNote)
       .where(and(...noteConditions));
     const placements = await loadNotePlacements(ids.map((n) => n.note_id));
     const onCourse = new Map<number, number>();
+    // Placed is not the same as readable: count the notes students can open today.
+    const live = new Map<number, number>();
     for (const n of ids) {
-      if (placements.has(n.note_id)) {
+      const placement = placements.get(n.note_id);
+      if (placement) {
         onCourse.set(n.subject_id, (onCourse.get(n.subject_id) || 0) + 1);
+        if (computeNoteReach({ note_status: n.status, placement }).state === "LIVE") {
+          live.set(n.subject_id, (live.get(n.subject_id) || 0) + 1);
+        }
       }
     }
 
@@ -381,6 +395,7 @@ export const listMyLessonNoteSubjects = asyncHandler(
         published_count: Number(n?.published_count || 0),
         draft_count: Number(n?.draft_count || 0),
         on_course_count: onCourse.get(subjectId) || 0,
+        live_count: live.get(subjectId) || 0,
         course_id: weeksBySubject.get(subjectId)?.course_id ?? null,
         weeks_total: weeksBySubject.get(subjectId)?.weeks_total ?? 0,
         weeks_live: weeksBySubject.get(subjectId)?.weeks_live ?? 0,
@@ -513,6 +528,12 @@ export const listMyLessonNotes = asyncHandler(async (req: any, res: any) => {
       course_target: placements.get(n.note_id)
         ? null
         : courseTargets.get(`${n.subject_id}:${n.class_group_id}`) || null,
+      // Whether students can actually open it on the course, and what's in the way if not.
+      reach: computeNoteReach({
+        note_status: n.status,
+        placement: placements.get(n.note_id) || null,
+        has_course: !!courseTargets.get(`${n.subject_id}:${n.class_group_id}`),
+      }),
     })),
   );
 });
@@ -1702,11 +1723,16 @@ export const getSharedLessonNote = asyncHandler(async (req: any, res: any) => {
   const { teacher_first_name, teacher_last_name, ...rest } = note;
   const wordCount = htmlToPlainText(note.content_html).split(" ").filter(Boolean).length;
 
+  // Opened outside its course (a bookmark, a shared link): the reader points the
+  // student back to the week, where reading it counts towards their progress.
+  const placement = (await resolveNotePlacements([noteId], req.user.userId)).get(noteId) ?? null;
+
   successResponse(res, "Lesson note", {
     ...rest,
     teacher_name: `${teacher_first_name || ""} ${teacher_last_name || ""}`.trim(),
     word_count: wordCount,
     reading_minutes: Math.max(1, Math.round(wordCount / WORDS_PER_MINUTE)),
+    placement,
   });
 });
 

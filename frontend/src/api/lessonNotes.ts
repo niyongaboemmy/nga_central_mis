@@ -19,9 +19,29 @@ export interface LessonNotePlacement {
   is_published: boolean;
   section_id: number;
   section_title: string;
+  section_status: "HIDDEN" | "SCHEDULED" | "PUBLISHED";
+  section_unlock_at: string | null;
   course_id: number;
   course_title: string;
   course_status: "DRAFT" | "PUBLISHED" | "ARCHIVED";
+}
+
+export type NoteReachState = "LIVE" | "SCHEDULED" | "BLOCKED" | "OFF_COURSE";
+export type NoteReachFix = "publish_note" | "place" | "show_item" | "publish_week" | "publish_course";
+
+/** Whether students can actually open the note on its course, and what's in the way if not
+ *  (server: services/elearning/noteReach.ts). */
+export interface NoteReach {
+  state: NoteReachState;
+  opens_at: string | null;
+  blocker: string | null;
+  steps: {
+    key: "note" | "placed" | "item" | "week" | "course";
+    ok: boolean;
+    label: string;
+    detail?: string;
+    fix?: NoteReachFix;
+  }[];
 }
 
 /** The course an unplaced note could be added to, when one exists for its subject + class group. */
@@ -43,6 +63,8 @@ export interface LessonNoteSubjectSummary {
   published_count: number;
   draft_count: number;
   on_course_count: number;
+  /** Notes students can open on the course today (placed AND note, item, week, course all open). */
+  live_count: number;
   /** The teacher's e-learning course for this subject, and how many of its weeks are live. */
   course_id: number | null;
   weeks_total: number;
@@ -75,6 +97,7 @@ export interface LessonNoteSummary {
   elearning?: LessonNotePlacement | null;
   /** Only set when `elearning` is null and a course does exist to place the note into. */
   course_target?: LessonNoteCourseTarget | null;
+  reach?: NoteReach;
 }
 
 export interface CurriculumCriterion {
@@ -189,12 +212,17 @@ export interface SharedNoteSummary {
    * Reading it there counts towards the week; reading it in the standalone
    * reader does not. Null for a note that was only ever shared.
    */
-  placement: {
-    course_id: number;
-    item_id: number;
-    section_id: number;
-    section_title: string;
-  } | null;
+  placement: StudentNotePlacement | null;
+}
+
+/** A note's place on a course the student belongs to, with their own progress on it. */
+export interface StudentNotePlacement {
+  course_id: number;
+  course_title: string;
+  item_id: number;
+  section_id: number;
+  section_title: string;
+  progress: "NOT_STARTED" | "IN_PROGRESS" | "COMPLETED";
 }
 
 export interface NoteAskAnswer {
@@ -221,6 +249,8 @@ export interface SharedNoteDetail {
   teacher_name: string;
   word_count: number;
   reading_minutes: number;
+  /** Set when the note is coursework for this student — the reader points back to the week. */
+  placement?: StudentNotePlacement | null;
 }
 
 export const lessonNotesApi = {
