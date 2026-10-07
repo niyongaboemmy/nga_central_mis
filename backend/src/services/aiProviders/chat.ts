@@ -182,15 +182,21 @@ export async function streamChat(opts: {
   feature: string;
   onText: (text: string) => void;
   signal?: AbortSignal;
+  /** Only these providers (in the usual order): provider tests, and leaving out failed ones. */
+  only?: string[];
+  /** Never these providers. */
+  exclude?: string[];
+  /** Background work (provider tests): yields to the interactive reserve. */
+  bulk?: boolean;
 }): Promise<ChatRun> {
-  const order = chatOrder(opts.audience);
+  const order = chatOrder(opts.audience).filter((t) => (!opts.only || opts.only.includes(t.name)) && !opts.exclude?.includes(t.name));
   let attempted = 0;
   let quotaOnly = true;
   let lastErr: any = null;
 
   for (const t of order) {
     if (!t.isConfigured() || isParkedDead(t.name) || isCoolingDown(t.name)) continue;
-    if (await checkAvailability(t.name, false)) continue;
+    if (await checkAvailability(t.name, !!opts.bulk)) continue;
     attempted++;
     const release = await acquireSlot(t.name);
     const startedAt = new Date();
@@ -256,3 +262,7 @@ export async function completeChat(opts: Omit<Parameters<typeof streamChat>[0], 
   const run = await streamChat({ ...opts, onText: (t) => (text += t) });
   return { ...run, text: text.trim() };
 }
+
+/** Providers with a key, and the model each would use (provider tests, admin page). */
+export const configuredChatProviders = () =>
+  Object.values(CHAT_TARGETS).filter((t) => t.isConfigured()).map((t) => ({ name: t.name, model: t.models()[0] }));

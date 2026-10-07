@@ -7,6 +7,8 @@ import { createUser } from "../test/fixtures";
 import { desktopToolsRouter } from "../routes/desktopTools";
 import { setChatClientFactory } from "../services/aiProviders/chat";
 import { setTestProviders } from "../services/aiProviders/registry";
+import { resetLimiterState } from "../services/aiProviders/limiter";
+import { AIUsageLog } from "../db/schema";
 import { SAFE_HINT, SUPPORT_REPLY, activeLock, mergeTutor, parseVerdict, runTutor, tutorPrompt, worry } from "../services/desktop/tutor";
 import type { Occurrence } from "../services/reminders/occurrences";
 
@@ -34,8 +36,10 @@ function fake(drafts: string[], verdicts: object[]) {
 }
 
 const saved = { GROQ_API_KEY: process.env.GROQ_API_KEY, AI_CHAT_ORDER_MINOR: process.env.AI_CHAT_ORDER_MINOR };
-beforeEach(() => {
+beforeEach(async () => {
   setTestProviders(null);
+  resetLimiterState();
+  await db.delete(AIUsageLog);
   process.env.GROQ_API_KEY = "k";
   process.env.AI_CHAT_ORDER_MINOR = "groq";
 });
@@ -75,8 +79,10 @@ describe("tutor rules", () => {
     expect(activeLock(w, new Date("2026-10-06T08:00:00Z"))).toBeNull();
   });
   it("settings are clamped; the stricter prompt forbids final answers", () => {
-    expect(mergeTutor({ dailyCap: 500, enabled: false })).toEqual({ enabled: false, dailyCap: 100 });
-    expect(mergeTutor(null)).toEqual({ enabled: true, dailyCap: 15 });
+    expect(mergeTutor({ dailyCap: 500, enabled: false })).toMatchObject({ enabled: false, dailyCap: 100, schoolDailyPool: null, requireConsent: false });
+    expect(mergeTutor(null)).toEqual({ enabled: true, dailyCap: 15, schoolDailyPool: null, requireConsent: false });
+    expect(mergeTutor({ schoolDailyPool: -3 }).schoolDailyPool).toBeNull();
+    expect(mergeTutor({ schoolDailyPool: 1500.4, requireConsent: true })).toMatchObject({ schoolDailyPool: 1500, requireConsent: true });
     expect(tutorPrompt("Aline", new Date(), true)).toContain("Do NOT state any final answer");
   });
 });
