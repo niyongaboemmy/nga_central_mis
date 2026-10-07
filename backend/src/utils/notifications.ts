@@ -32,7 +32,9 @@ export type NotificationKind =
   | "office_hours_transfer"
   | "office_hours_digest"
   // Safeguarding (services/safeguarding.ts): never carries what the student wrote.
-  | "safeguarding_concern";
+  | "safeguarding_concern"
+  // Early warning (services/earlyWarning.ts): a student in your class became "at risk".
+  | "early_warning";
 
 export interface NotifyUserInput {
   userId: number;
@@ -56,7 +58,8 @@ export interface NotifyUserInput {
     | "office_hour_escalation"
     | "office_hour_transfer"
     | "office_hour_digest"
-    | "safeguarding_concern";
+    | "safeguarding_concern"
+    | "early_warning";
   subjectId: number;
   actorId?: number;
 }
