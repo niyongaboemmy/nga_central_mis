@@ -30,7 +30,9 @@ export type NotificationKind =
   | "office_hours_absent"
   | "office_hours_escalation"
   | "office_hours_transfer"
-  | "office_hours_digest";
+  | "office_hours_digest"
+  // Safeguarding (services/safeguarding.ts): never carries what the student wrote.
+  | "safeguarding_concern";
 
 export interface NotifyUserInput {
   userId: number;
@@ -53,7 +55,8 @@ export interface NotifyUserInput {
     | "office_hour_schedule"
     | "office_hour_escalation"
     | "office_hour_transfer"
-    | "office_hour_digest";
+    | "office_hour_digest"
+    | "safeguarding_concern";
   subjectId: number;
   actorId?: number;
 }

@@ -50,6 +50,11 @@ const SEARCH_ITEMS: SearchItem[] = [
     requiredPermission: Permissions.DESKTOP_TOOLS_CONFIGURE,
   },
   {
+    label: "Safeguarding",
+    path: "/safeguarding",
+    requiredPermission: Permissions.SAFEGUARDING_MANAGE,
+  },
+  {
     label: "Office Hours Oversight",
     path: "/office-hours/admin",
     requiredPermission: [Permissions.OFFICE_HOURS_MANAGE_ANY, Permissions.OFFICE_HOURS_VIEW, Permissions.OFFICE_HOURS_CONFIGURE],

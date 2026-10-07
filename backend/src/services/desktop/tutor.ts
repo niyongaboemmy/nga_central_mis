@@ -230,6 +230,14 @@ export function activeLock(windows: Array<{ from: string; to: string; kind: stri
 // ─── log and review ─────────────────────────────────────────────────────────
 
 export async function logExchange(userId: number, conversationId: string, question: string, reply: TutorReply, counted = true): Promise<number> {
+  // Worrying words from the student (no provider involved): open a safeguarding
+  // concern for the school's safeguarding team. Lazy import: safeguarding uses `worry`.
+  if (reply.flag && !reply.provider) {
+    const flag = reply.flag;
+    void import("../safeguarding").then(({ raiseConcern }) =>
+      raiseConcern({ studentId: userId, source: "ai_tutor", category: flag, summary: `AI Tutor: the student wrote about ${flag}`, detail: question, ref: conversationId }),
+    );
+  }
   await db.execute(sql`
     INSERT INTO DesktopTutorMessage (user_id, conversation_id, role, text, flagged, flag_reason, counted, created_at)
     VALUES (${userId}, ${conversationId}, 'student', ${question}, ${reply.flag && !reply.provider ? 1 : 0}, ${reply.flag && !reply.provider ? reply.flag : null}, ${counted ? 1 : 0}, UTC_TIMESTAMP())`);

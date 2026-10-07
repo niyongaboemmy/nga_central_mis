@@ -36,6 +36,7 @@ import reminderRoutes from "./routes/reminders";
 import activityRoutes from "./routes/activity";
 import monitorRoutes from "./routes/monitor";
 import officeHoursRoutes from "./routes/officeHours";
+import safeguardingRoutes from "./routes/safeguarding";
 import desktopRoutes from "./routes/desktop";
 import { desktopToolsRouter } from "./routes/desktopTools";
 import { authenticate } from "./middleware/auth";
@@ -151,6 +152,7 @@ app.use("/integrations", integrationRoutes);
 app.use("/monitor", monitorRoutes);
 // Mandatory office hours (OFFICE_HOURS_IMPLEMENTATION_PLAN.md).
 app.use("/office-hours", officeHoursRoutes);
+app.use("/safeguarding", safeguardingRoutes);
 
 app.post("/test-post", (req, res) =>
   res.json({ success: true, message: "Root POST test works" }),
