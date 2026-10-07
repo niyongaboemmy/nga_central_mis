@@ -74,6 +74,7 @@
     { "key": "mis.logs_history", "label": "Logs history", "module": "Platform", "patterns": ["/logs-history"] },
     { "key": "mis.family_ai_tutor", "label": "AI Tutor for my children", "module": "Platform", "patterns": ["/family/ai-tutor"] },
     { "key": "mis.safeguarding", "label": "Safeguarding", "module": "Platform", "patterns": ["/safeguarding"] },
+    { "key": "mis.early_warning", "label": "Early warning", "module": "Platform", "patterns": ["/early-warning"] },
     { "key": "mis.wellbeing", "label": "Wellbeing", "module": "Platform", "patterns": ["/wellbeing"] },
     { "key": "mis.desktop_tools", "label": "Desktop tools", "module": "Platform", "patterns": ["/desktop-tools"] },
     { "key": "mis.database", "label": "Database management", "module": "Platform", "patterns": ["/database-management"] },

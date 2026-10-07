@@ -117,6 +117,7 @@ export const Permissions = {
   // NGA Desktop tools (games settings)
   DESKTOP_TOOLS_CONFIGURE: "DESKTOP_TOOLS_CONFIGURE",
   SAFEGUARDING_MANAGE: "SAFEGUARDING_MANAGE",
+  EARLY_WARNING_VIEW: "EARLY_WARNING_VIEW",
 
   // Curriculum & Subject Materials
   MANAGE_CURRICULUM: "MANAGE_CURRICULUM",
