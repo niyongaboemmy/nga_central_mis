@@ -53,6 +53,9 @@ afterEach(() => {
 });
 afterAll(async () => {
   await db.execute(sql`DELETE FROM DesktopTutorMessage WHERE conversation_id LIKE 'testconv%'`);
+  // Worrying test questions open safeguarding concerns (tutor.ts logExchange).
+  await db.execute(sql`DELETE n FROM SafeguardingNote n JOIN SafeguardingConcern c ON c.concern_id = n.concern_id WHERE c.ref LIKE 'testconv%'`);
+  await db.execute(sql`DELETE FROM SafeguardingConcern WHERE ref LIKE 'testconv%'`);
   await db.execute(sql`DELETE FROM DesktopToolSetting WHERE setting_key = 'tutor'`);
 });
 

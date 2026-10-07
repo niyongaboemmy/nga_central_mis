@@ -7,7 +7,7 @@ import { useUser } from "../../contexts/UserContext";
 import { Permissions } from "../../constants/permissions";
 import { getToken } from "../../utils/auth";
 import { useAccess } from "../../hooks/useAccess";
-import { BarChart3, ShieldCheck } from "lucide-react";
+import { BarChart3, HeartHandshake, ShieldAlert, ShieldCheck } from "lucide-react";
 import { BellRing, Bot, CalendarDays, Clock4, Gamepad2, House } from "lucide-react";
 
 interface SidebarProps {
@@ -651,6 +651,18 @@ const Sidebar: React.FC<SidebarProps> = ({
         </svg>
       ),
       requiredPermission: Permissions.MANAGE_SETTINGS,
+    },
+    {
+      label: "Wellbeing",
+      path: "/wellbeing",
+      icon: <HeartHandshake className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
+      userTypes: ["STUDENT"],
+    },
+    {
+      label: "Safeguarding",
+      path: "/safeguarding",
+      icon: <ShieldAlert className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
+      requiredPermission: Permissions.SAFEGUARDING_MANAGE,
     },
     {
       label: "AI Tutor for my children",
