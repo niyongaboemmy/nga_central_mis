@@ -153,6 +153,10 @@ export const AcademicPeriodProvider: React.FC<{
   );
 };
 
+/** Like useAcademicPeriod, but null outside the provider (for shell chrome such as the sidebar). */
+export const useOptionalAcademicPeriod = (): AcademicPeriodContextType | null =>
+  useContext(AcademicPeriodContext) ?? null;
+
 export const useAcademicPeriod = (): AcademicPeriodContextType => {
   const context = useContext(AcademicPeriodContext);
   if (!context) {

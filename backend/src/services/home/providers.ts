@@ -506,7 +506,7 @@ export async function learnerProvider(ctx: ProviderContext): Promise<ProviderRes
   // get "Continue learning" on their Home.
   if (!lens || persona !== "STUDENT") return EMPTY;
 
-  const [timetable, courseIds, replies] = await Promise.all([
+  const [timetable, courseIds, replies, mentorRows] = await Promise.all([
     termId && yearId
       ? loadStudentLessons({ userId, termId, yearId })
       : Promise.resolve({ slots: [] as any[], activities: [] as any[], reason: null }),
@@ -524,7 +524,24 @@ export async function learnerProvider(ctx: ProviderContext): Promise<ProviderRes
           gte(MenteeCheckIn.responded_at, sql`DATE_SUB(NOW(), INTERVAL 7 DAY)`),
         ),
       ),
+    // Who mentors me this year — shown as a glance tile so a student always
+    // knows who their mentor is without opening the mentor page.
+    yearId
+      ? db
+          .select({ first_name: UserProfile.first_name, last_name: UserProfile.last_name })
+          .from(MentorAssignment)
+          .leftJoin(UserProfile, eq(UserProfile.user_id, MentorAssignment.mentor_id))
+          .where(
+            and(
+              eq(MentorAssignment.student_id, userId),
+              eq(MentorAssignment.academic_year_id, yearId),
+              eq(MentorAssignment.status, "ACTIVE"),
+            ),
+          )
+          .limit(1)
+      : Promise.resolve([] as { first_name: string | null; last_name: string | null }[]),
   ]);
+  const myMentor = mentorRows[0] ? fullName(mentorRows[0].first_name, mentorRows[0].last_name, "Assigned") : null;
 
   const today: TodayLesson[] = timetable.slots
     .filter((s: any) => s.day_of_week === ctx.dow)
@@ -643,6 +660,16 @@ export async function learnerProvider(ctx: ProviderContext): Promise<ProviderRes
       hint: `${summaries.length} ${plural(summaries.length, "course", "courses")}`,
       href: "/my-learning",
     },
+    {
+      id: "mis:tile:my-mentor",
+      source: "mis",
+      lens: lens.key,
+      label: "My mentor",
+      value: myMentor ?? "Not assigned",
+      status: myMentor ? undefined : "warning",
+      hint: myMentor ? "Send a message or request a meeting" : "Ask your school administrator",
+      href: "/my-mentor",
+    },
   ];
 
   // "Continue" is the single most useful action for a learner.
@@ -746,7 +773,7 @@ export async function mentorProvider(ctx: ProviderContext): Promise<ProviderResu
         title: `${inbox.length} mentee ${plural(inbox.length, "check-in is", "check-ins are")} waiting for you`,
         entities: uniq(inbox.map((c) => fullName(c.first_name, c.last_name))),
         why: waited > 48 ? `The oldest has waited ${Math.round(waited / 24)} days — a reply shows them someone is listening.` : "A quick acknowledgement shows them someone is listening.",
-        cta: { label: "Reply", href: "/reporting?tab=mentoring" },
+        cta: { label: "Reply", href: "/my-mentees" },
         waiting_since: oldest,
       }),
     );
@@ -767,7 +794,7 @@ export async function mentorProvider(ctx: ProviderContext): Promise<ProviderResu
         title: `${overdue.length} ${plural(overdue.length, "mentee hasn't", "mentees haven't")} had a session in 3 weeks`,
         entities: overdue.slice(0, 8).map((id) => nameOf.get(id) ?? `Student #${id}`),
         why: "Regular contact is how problems are caught early.",
-        cta: { label: "Log a session", href: "/reporting?tab=mentoring" },
+        cta: { label: "Log a session", href: "/my-mentees" },
       }),
     );
   }
@@ -780,7 +807,7 @@ export async function mentorProvider(ctx: ProviderContext): Promise<ProviderResu
         title: `${followUps.length} mentoring follow-${plural(followUps.length, "up", "ups")} still open`,
         entities: uniq(followUps.map((f) => f.student_name ?? "Mentee")).slice(0, 8),
         why: "You flagged these for follow-up — close them once they're resolved.",
-        cta: { label: "Follow up", href: "/reporting?tab=mentoring" },
+        cta: { label: "Follow up", href: "/my-mentees" },
       }),
     );
   }
@@ -793,10 +820,10 @@ export async function mentorProvider(ctx: ProviderContext): Promise<ProviderResu
       value: String(ids.length),
       hint: overdue.length ? `${overdue.length} due a session` : "All seen recently",
       status: overdue.length ? "warning" : "good",
-      href: "/reporting?tab=mentoring",
+      href: "/my-mentees",
     },
   ];
-  return { items, tiles, actions: [{ id: "mentoring", label: "Mentoring hub", href: "/reporting?tab=mentoring", icon: "users", lens: lens.key }] };
+  return { items, tiles, actions: [{ id: "mentoring", label: "Mentoring hub", href: "/my-mentees", icon: "users", lens: lens.key }] };
 }
 
 // ---------------------------------------------------------------------------

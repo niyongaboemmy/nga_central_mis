@@ -25,6 +25,7 @@ import {
   ChevronDown,
   Check,
   Search,
+  Phone,
 } from "lucide-react";
 import { mentorshipApi, MenteeCheckInRecord, CheckInCategory, ValidationStatus, MyMentorInfo } from "../../api/mentorship";
 import { studentEnrollmentApi, StudentEnrolledSubject } from "../../api/academics";
@@ -116,6 +117,21 @@ const initialsOf = (name: string | null | undefined) => {
   if (!name) return "?";
   const parts = name.trim().split(/\s+/);
   return parts.slice(0, 2).map((p) => p[0]?.toUpperCase() ?? "").join("");
+};
+
+const ROLE_LABELS: Record<string, string> = {
+  TEACHER: "Teacher",
+  STAFF: "Staff",
+  ADMIN: "Administration",
+  PARENT: "Parent",
+};
+const roleLabel = (role: string) => ROLE_LABELS[role] ?? role.charAt(0) + role.slice(1).toLowerCase();
+
+const formatDay = (iso: string) => {
+  const d = new Date(`${iso.slice(0, 10)}T00:00:00`);
+  return isNaN(d.getTime())
+    ? iso
+    : d.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
 };
 
 const QUICK_ACTIONS: { category: CheckInCategory; label: string; icon: React.ReactNode; className: string }[] = [
@@ -350,38 +366,81 @@ const MyMentor: React.FC = () => {
             </div>
           ) : mentor ? (
             <>
-              <div className="flex items-center gap-4 bg-gradient-to-r from-blue-50 to-white dark:from-blue-900/10 dark:to-gray-800/30 rounded-2xl p-5 border border-blue-100 dark:border-blue-900/20 shadow-sm">
-                <div className="w-14 h-14 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-base shrink-0">
-                  {initialsOf(mentor.mentor_name)}
-                </div>
-                <div className="min-w-0">
-                  <p className="text-[11px] uppercase tracking-wide font-semibold text-blue-500 dark:text-blue-400">Your Mentor</p>
-                  <p className="text-base font-semibold text-gray-900 dark:text-white truncate">{mentor.mentor_name ?? "Assigned Mentor"}</p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1 truncate mt-0.5">
-                    <Mail className="w-3 h-3 shrink-0" />
-                    {mentor.mentor_email}
-                  </p>
-                  {mentor.assigned_at && (
-                    <p className="text-[11px] text-gray-400 flex items-center gap-1 mt-0.5">
-                      <CalendarClock className="w-3 h-3 shrink-0" />
-                      Assigned since {mentor.assigned_at}
+              <section
+                aria-label="Your mentor"
+                className="bg-gradient-to-r from-blue-50 to-white dark:from-blue-900/10 dark:to-gray-800/30 rounded-2xl p-5 border border-blue-100 dark:border-blue-900/20 shadow-sm"
+              >
+                <div className="flex items-start gap-4">
+                  <div className="w-16 h-16 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-lg shrink-0">
+                    {initialsOf(mentor.mentor_name)}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[11px] uppercase tracking-wide font-semibold text-blue-600 dark:text-blue-400">
+                      Your mentor{selectedYear?.name ? ` · ${selectedYear.name}` : ""}
                     </p>
-                  )}
+                    <p className="text-lg font-semibold text-gray-900 dark:text-white truncate">
+                      {mentor.mentor_name ?? "Assigned Mentor"}
+                    </p>
+                    <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                      {mentor.mentor_role && (
+                        <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300">
+                          {roleLabel(mentor.mentor_role)}
+                        </span>
+                      )}
+                      {(mentor.teaches_you ?? []).map((subject) => (
+                        <span
+                          key={subject}
+                          className="text-[11px] px-2 py-0.5 rounded-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300"
+                          title="This mentor also teaches you this subject"
+                        >
+                          Teaches you {subject}
+                        </span>
+                      ))}
+                    </div>
+                    <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-xs text-gray-600 dark:text-gray-300">
+                      {mentor.mentor_email && (
+                        <a href={`mailto:${mentor.mentor_email}`} className="flex items-center gap-1 hover:text-blue-600 dark:hover:text-blue-400 min-w-0">
+                          <Mail className="w-3.5 h-3.5 shrink-0" />
+                          <span className="truncate">{mentor.mentor_email}</span>
+                        </a>
+                      )}
+                      {mentor.mentor_phone && (
+                        <a href={`tel:${mentor.mentor_phone}`} className="flex items-center gap-1 hover:text-blue-600 dark:hover:text-blue-400">
+                          <Phone className="w-3.5 h-3.5 shrink-0" />
+                          {mentor.mentor_phone}
+                        </a>
+                      )}
+                      {mentor.assigned_at && (
+                        <span className="flex items-center gap-1">
+                          <CalendarClock className="w-3.5 h-3.5 shrink-0" />
+                          Your mentor since {formatDay(mentor.assigned_at)}
+                        </span>
+                      )}
+                    </div>
+                  </div>
                 </div>
-              </div>
+              </section>
 
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="bg-white dark:bg-gray-800/30 rounded-xl p-3 border border-gray-100 dark:border-gray-700/20 text-center">
+                  <p className="text-lg font-bold text-gray-900 dark:text-white">{mentor.session_count ?? 0}</p>
+                  <p className="text-[11px] text-gray-500 dark:text-gray-400">Sessions held</p>
+                </div>
+                <div className="bg-white dark:bg-gray-800/30 rounded-xl p-3 border border-gray-100 dark:border-gray-700/20 text-center">
+                  <p className="text-lg font-bold text-gray-900 dark:text-white">
+                    {mentor.last_session_date ? formatDay(mentor.last_session_date) : "—"}
+                  </p>
+                  <p className="text-[11px] text-gray-500 dark:text-gray-400">
+                    {mentor.last_session_date ? "Last met" : "Not met yet"}
+                  </p>
+                </div>
                 <div className="bg-white dark:bg-gray-800/30 rounded-xl p-3 border border-gray-100 dark:border-gray-700/20 text-center">
                   <p className="text-lg font-bold text-gray-900 dark:text-white">{history.length}</p>
-                  <p className="text-[11px] text-gray-500 dark:text-gray-400">Total reports</p>
+                  <p className="text-[11px] text-gray-500 dark:text-gray-400">Reports sent</p>
                 </div>
                 <div className="bg-white dark:bg-gray-800/30 rounded-xl p-3 border border-gray-100 dark:border-gray-700/20 text-center">
                   <p className="text-lg font-bold text-amber-500">{pendingCount}</p>
                   <p className="text-[11px] text-gray-500 dark:text-gray-400">Pending review</p>
-                </div>
-                <div className="bg-white dark:bg-gray-800/30 rounded-xl p-3 border border-gray-100 dark:border-gray-700/20 text-center">
-                  <p className="text-lg font-bold text-green-500">{approvedCount}</p>
-                  <p className="text-[11px] text-gray-500 dark:text-gray-400">Approved</p>
                 </div>
               </div>
 

@@ -69,7 +69,7 @@ const SessionPrintPreview: React.FC<Props> = ({ student, session, onClose }) => 
               <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
                 {fullName}
                 {student.registration_number && ` (${student.registration_number})`} ·{" "}
-                {student.class_group_name}
+                {student.class_group_name ?? "No class"}
               </p>
             </div>
             <button
@@ -85,7 +85,7 @@ const SessionPrintPreview: React.FC<Props> = ({ student, session, onClose }) => 
             {/* Document title */}
             <div className="text-center mb-4">
               <h3 className="text-sm font-bold text-gray-800 dark:text-gray-100 uppercase tracking-wide">
-                MENTORSHIP SESSION LOG — {fullName.toUpperCase()} | {student.class_group_name.toUpperCase()}
+                MENTORSHIP SESSION LOG — {fullName.toUpperCase()} | {(student.class_group_name ?? "No class").toUpperCase()}
               </h3>
             </div>
 
