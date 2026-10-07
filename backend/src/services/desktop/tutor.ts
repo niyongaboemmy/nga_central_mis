@@ -16,10 +16,14 @@ export const CHECK_FEATURE = "desktop-tutor-check";
 
 export interface TutorSettings {
   enabled: boolean;
-  /** Questions per student per Kigali day. */
+  /** Questions per student per Kigali day (the most a student can get). */
   dailyCap: number;
+  /** Fair share: questions for all students together per day, split across yesterday's active students; null = off. */
+  schoolDailyPool: number | null;
+  /** Students need a parent's consent (MIS → AI Tutor for my children). */
+  requireConsent: boolean;
 }
-export const DEFAULT_TUTOR: TutorSettings = { enabled: true, dailyCap: 15 };
+export const DEFAULT_TUTOR: TutorSettings = { enabled: true, dailyCap: 15, schoolDailyPool: null, requireConsent: false };
 
 const rows = (r: unknown): any[] => (Array.isArray(r) && Array.isArray(r[0]) ? r[0] : (r as any[]));
 const missing = (e: any) => e?.code === "ER_NO_SUCH_TABLE" || e?.cause?.code === "ER_NO_SUCH_TABLE";
@@ -28,9 +32,12 @@ const iso = (col: string) => sql.raw(`DATE_FORMAT(${col}, '%Y-%m-%dT%H:%i:%sZ')`
 export function mergeTutor(v: unknown): TutorSettings {
   const s = (v && typeof v === "object" ? v : {}) as Partial<TutorSettings>;
   const cap = Number(s.dailyCap);
+  const pool = Number(s.schoolDailyPool);
   return {
     enabled: typeof s.enabled === "boolean" ? s.enabled : DEFAULT_TUTOR.enabled,
     dailyCap: Number.isFinite(cap) ? Math.max(1, Math.min(100, Math.round(cap))) : DEFAULT_TUTOR.dailyCap,
+    schoolDailyPool: s.schoolDailyPool === null || s.schoolDailyPool === undefined || !Number.isFinite(pool) || pool <= 0 ? null : Math.min(100_000, Math.round(pool)),
+    requireConsent: typeof s.requireConsent === "boolean" ? s.requireConsent : DEFAULT_TUTOR.requireConsent,
   };
 }
 
@@ -55,12 +62,41 @@ export async function questionsToday(userId: number, now = new Date()): Promise<
   try {
     // Stored in UTC (UTC_TIMESTAMP on insert): compare with a UTC string, never a Date (driver time zone).
     const start = kigaliInstant(kigaliParts(now).ymd, 0).toISOString().slice(0, 19).replace("T", " ");
-    const [r] = rows(await db.execute(sql`SELECT COUNT(*) AS n FROM DesktopTutorMessage WHERE user_id = ${userId} AND role = 'student' AND created_at >= ${start}`));
+    const [r] = rows(await db.execute(sql`SELECT COUNT(*) AS n FROM DesktopTutorMessage WHERE user_id = ${userId} AND role = 'student' AND counted = 1 AND created_at >= ${start}`));
     return Number(r?.n ?? 0);
   } catch (e) {
     if (missing(e)) return 0;
     throw e;
   }
+}
+
+/**
+ * Today's allowance for one student. With a school pool, the pool is shared evenly
+ * across yesterday's active students (at least 2 questions, at most dailyCap). Pure.
+ */
+export function allowance(s: TutorSettings, activeYesterday: number): number {
+  if (!s.schoolDailyPool) return s.dailyCap;
+  return Math.max(Math.min(2, s.dailyCap), Math.min(s.dailyCap, Math.floor(s.schoolDailyPool / Math.max(1, activeYesterday))));
+}
+
+/** Students who asked the tutor yesterday (Kigali day): the fair-share divisor. */
+export async function activeStudentsYesterday(now = new Date()): Promise<number> {
+  try {
+    const ymd = kigaliParts(now).ymd;
+    const end = kigaliInstant(ymd, 0);
+    const start = new Date(end.getTime() - 86_400_000);
+    const f = (d: Date) => d.toISOString().slice(0, 19).replace("T", " ");
+    const [r] = rows(await db.execute(sql`SELECT COUNT(DISTINCT user_id) AS n FROM DesktopTutorMessage WHERE role = 'student' AND created_at >= ${f(start)} AND created_at < ${f(end)}`));
+    return Number(r?.n ?? 0);
+  } catch (e) {
+    if (missing(e)) return 0;
+    throw e;
+  }
+}
+
+/** Today's allowance for this student, with the settings applied. */
+export async function todaysAllowance(s: TutorSettings, now = new Date()): Promise<number> {
+  return s.schoolDailyPool ? allowance(s, await activeStudentsYesterday(now)) : s.dailyCap;
 }
 
 // ─── safeguarding ───────────────────────────────────────────────────────────
@@ -157,7 +193,7 @@ export interface TutorReply {
 }
 
 /** The pipeline: worry check → draft → check → (stricter redraft → check) → safe reply. */
-export async function runTutor(opts: { userId: number; firstName: string; messages: ChatMessage[]; signal?: AbortSignal; now?: Date }): Promise<TutorReply> {
+export async function runTutor(opts: { userId: number; firstName: string; messages: ChatMessage[]; signal?: AbortSignal; now?: Date; exclude?: string[] }): Promise<TutorReply> {
   const question = opts.messages[opts.messages.length - 1]?.content ?? "";
   const w = worry(question);
   if (w) return { text: SUPPORT_REPLY, provider: null, model: null, verdict: null, flag: w };
@@ -171,6 +207,7 @@ export async function runTutor(opts: { userId: number; firstName: string; messag
       actorUserId: opts.userId,
       feature: TUTOR_FEATURE,
       signal: opts.signal,
+      exclude: opts.exclude,
     });
     const verdict = await check(question, draft.text, opts.userId, opts.signal);
     if (verdict.unsafe) return { text: SAFE_HINT, provider: draft.provider, model: draft.model, verdict, flag: "unsafe reply blocked" };
@@ -192,10 +229,10 @@ export function activeLock(windows: Array<{ from: string; to: string; kind: stri
 
 // ─── log and review ─────────────────────────────────────────────────────────
 
-export async function logExchange(userId: number, conversationId: string, question: string, reply: TutorReply): Promise<number> {
+export async function logExchange(userId: number, conversationId: string, question: string, reply: TutorReply, counted = true): Promise<number> {
   await db.execute(sql`
-    INSERT INTO DesktopTutorMessage (user_id, conversation_id, role, text, flagged, flag_reason, created_at)
-    VALUES (${userId}, ${conversationId}, 'student', ${question}, ${reply.flag && !reply.provider ? 1 : 0}, ${reply.flag && !reply.provider ? reply.flag : null}, UTC_TIMESTAMP())`);
+    INSERT INTO DesktopTutorMessage (user_id, conversation_id, role, text, flagged, flag_reason, counted, created_at)
+    VALUES (${userId}, ${conversationId}, 'student', ${question}, ${reply.flag && !reply.provider ? 1 : 0}, ${reply.flag && !reply.provider ? reply.flag : null}, ${counted ? 1 : 0}, UTC_TIMESTAMP())`);
   const res: any = await db.execute(sql`
     INSERT INTO DesktopTutorMessage (user_id, conversation_id, role, text, provider, model, verdict, flagged, flag_reason, created_at)
     VALUES (${userId}, ${conversationId}, 'tutor', ${reply.text}, ${reply.provider}, ${reply.model}, ${reply.verdict ? JSON.stringify(reply.verdict).slice(0, 400) : null},

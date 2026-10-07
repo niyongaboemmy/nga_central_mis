@@ -3,7 +3,10 @@ import { db } from "../db";
 import { CourseItem, LessonNote, Subject } from "../db/schema";
 import { asyncHandler } from "../middleware/asyncHandler";
 import { successResponse } from "../utils/response";
-import { NotFoundError, ValidationError } from "../errors/CustomError";
+import { CustomError, NotFoundError, ValidationError } from "../errors/CustomError";
+import { loadPersona } from "../services/desktop/assistant";
+import { SUPPORT_REPLY, loadTutorSettings, logExchange, questionsToday, todaysAllowance, worry } from "../services/desktop/tutor";
+import { hasConsent } from "../services/desktop/tutorConsent";
 import logger from "../utils/logger";
 import { sanitizeNoteHtml } from "../utils/sanitizeNoteHtml";
 import { generateStructuredContent, isAnyProviderConfigured, JSONSchema } from "../services/aiProviders";
@@ -96,6 +99,23 @@ export const askCourseTutor = asyncHandler(async (req: any, res: any) => {
   const sectionId = req.body?.section_id ? Number(req.body.section_id) : null;
   const mode = typeof req.body?.mode === "string" ? req.body.mode : "";
 
+  // Students share one AI Tutor allowance with NGA Desktop, the same safeguarding and
+  // (when the school requires it) parent consent; their questions are logged for review.
+  const { persona } = await loadPersona(userId);
+  const student = persona === "student";
+  const conversationId = `course${courseId}u${userId}`;
+  if (student) {
+    const settings = await loadTutorSettings();
+    if (settings.requireConsent && !(await hasConsent(userId))) throw new CustomError("Ask a parent or guardian to allow the AI Tutor in NGA MIS.", 403);
+    const why = worry(question);
+    if (why) {
+      await logExchange(userId, conversationId, question, { text: SUPPORT_REPLY, provider: null, model: null, verdict: null, flag: why });
+      return successResponse(res, "Answer", { answer_html: `<p>${SUPPORT_REPLY}</p>`, key_points: [], follow_ups: [], grounded: true, citations: [], provider_used: "" });
+    }
+    const [used, cap] = await Promise.all([questionsToday(userId), todaysAllowance(settings)]);
+    if (used >= cap) throw new CustomError(`You've asked today's ${cap} AI Tutor questions (NGA Desktop and courses together). They refill tomorrow.`, 429);
+  }
+
   if (!isAnyProviderConfigured()) {
     throw new ValidationError("The AI study assistant is not configured. Ask an administrator to add an AI provider key.");
   }
@@ -179,6 +199,11 @@ Rules:
 
   const citedTitles = new Set((parsed.cited_titles || []).map((t) => String(t).trim().toLowerCase()));
   const citations = [...new Map(contextChunks.filter((c) => citedTitles.size === 0 || citedTitles.has(c.title.toLowerCase())).map((c) => [c.item_id, { item_id: c.item_id, title: c.title, section_id: c.section_id }])).values()].slice(0, 3);
+
+  if (student) {
+    const plain = String(parsed.answer_html).replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+    await logExchange(userId, conversationId, question, { text: plain, provider: providerUsed || null, model: null, verdict: null, flag: null });
+  }
 
   await logLearningEvent({
     actor_user_id: userId,

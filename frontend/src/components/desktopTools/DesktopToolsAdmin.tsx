@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { BarChart3, Bot, Flag, Gamepad2, Moon, RotateCcw, Save, ShieldCheck, Timer, UserX } from "lucide-react";
-import { apiError, desktopToolsApi, type GameOverride, type GameSettings, type GamesAdmin, type TutorConversation, type TutorMessage, type TutorSettings } from "../../api/desktopTools";
+import { apiError, desktopToolsApi, type GameOverride, type GameSettings, type GamesAdmin, type TutorAdmin, type TutorConversation, type TutorMessage, type TutorSettings } from "../../api/desktopTools";
 import { Card, CardTitle, EmptyState, Muted, Spinner, inputCls as fieldCls, primaryBtn, secondaryBtn } from "../officeHours/ohUi";
 import SelectField from "../ui/SelectField";
 import Modal from "../ui/Modal";
@@ -319,6 +319,7 @@ const TutorCard: React.FC = () => {
   const [settings, setSettings] = useState<TutorSettings | null>(null);
   const [draft, setDraft] = useState<TutorSettings | null>(null);
   const [list, setList] = useState<TutorConversation[]>([]);
+  const [info, setInfo] = useState<Omit<TutorAdmin, "settings" | "conversations"> | null>(null);
   const [flaggedOnly, setFlaggedOnly] = useState(true);
   const [days, setDays] = useState(14);
   const [open, setOpen] = useState<{ conv: TutorConversation; messages: TutorMessage[] } | null>(null);
@@ -328,9 +329,11 @@ const TutorCard: React.FC = () => {
   const load = async () => {
     try {
       const r = await desktopToolsApi.tutor({ flagged: flaggedOnly, days });
-      setSettings(r.data.data.settings);
-      setDraft((d) => d ?? r.data.data.settings);
-      setList(r.data.data.conversations);
+      const { settings: st, conversations, ...rest } = r.data.data;
+      setSettings(st);
+      setDraft((d) => d ?? st);
+      setList(conversations);
+      setInfo(rest);
     } catch (e) {
       showToast(apiError(e, "Couldn't load the AI Tutor."), "error");
     }
@@ -339,6 +342,23 @@ const TutorCard: React.FC = () => {
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [flaggedOnly, days]);
+  // While provider tests run (a few minutes), refresh every 10 s.
+  useEffect(() => {
+    if (!info?.evalRunning) return;
+    const id = window.setInterval(() => void load(), 10_000);
+    return () => window.clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [info?.evalRunning]);
+
+  const runTests = async () => {
+    try {
+      await desktopToolsApi.runTutorEvals();
+      setInfo((i) => (i ? { ...i, evalRunning: true } : i));
+      showToast("Testing the AI services. This takes a few minutes.", "success");
+    } catch (e) {
+      showToast(apiError(e, "Couldn't start the tests."), "error");
+    }
+  };
 
   const save = async () => {
     if (!draft) return;
@@ -380,9 +400,55 @@ const TutorCard: React.FC = () => {
           Questions per student per day
           <input type="number" min={1} max={100} value={draft.dailyCap} onChange={(e) => setDraft({ ...draft, dailyCap: Math.max(1, Math.min(100, Math.round(Number(e.target.value) || 1))) })} className={inputCls} aria-label="Questions per student per day" />
         </label>
+        <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-gray-200">
+          School total per day
+          <input type="number" min={0} max={100000} placeholder="Off" value={draft.schoolDailyPool ?? ""} onChange={(e) => setDraft({ ...draft, schoolDailyPool: e.target.value === "" || Number(e.target.value) <= 0 ? null : Math.round(Number(e.target.value)) })} className={inputCls} aria-label="School total questions per day" />
+        </label>
+        <label className="flex items-center gap-3 text-sm text-slate-700 dark:text-gray-200">
+          <Switch on={draft.requireConsent} onChange={(v) => setDraft({ ...draft, requireConsent: v })} label="Require parent consent" />
+          Parent consent required
+        </label>
         <span className="flex-1" />
         <button className={primaryBtn} disabled={!dirty || busy} onClick={() => void save()}><Save className="h-4 w-4" aria-hidden /> Save</button>
       </div>
+      {info && (
+        <Muted className="mt-2 !text-xs">
+          Today each student can ask {info.allowanceToday} question{info.allowanceToday === 1 ? "" : "s"}{draft.schoolDailyPool ? " (the school total shared across yesterday's active students, at least 2, at most the per-student number)" : ""}. Saved answers to common questions: {info.cache.entries}, used {info.cache.hits} times; they don't count against students' questions.
+          {draft.requireConsent ? " Students need a parent's yes in MIS (parents: AI Tutor for my children)." : ""}
+        </Muted>
+      )}
+
+      {info && (
+        <div className="mt-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h3 className="text-sm font-semibold text-slate-800 dark:text-gray-100">AI services for students</h3>
+            <button className={secondaryBtn} disabled={info.evalRunning} onClick={() => void runTests()}>
+              {info.evalRunning ? "Testing…" : "Test the AI services"}
+            </button>
+          </div>
+          <Muted className="!text-xs">Each service answers {"22"} test questions (homework requests, concepts, French). A service passes when at least {info.passMark}% of its homework drafts hold back the answer; one that fails is left out of students' drafts. Services never tested stay in. Every reply is still checked live.</Muted>
+          <table className="mt-2 w-full text-left text-sm">
+            <thead><tr className="text-xs uppercase tracking-wider text-slate-600 dark:text-gray-300"><th className="py-1.5">Service</th><th className="py-1.5">Result</th><th className="py-1.5 text-right">Held back</th><th className="py-1.5 text-right">Tested</th></tr></thead>
+            <tbody className="divide-y divide-slate-100 dark:divide-gray-700/40">
+              {info.providers.map((name) => {
+                const e = info.evals.find((x) => x.provider === name);
+                return (
+                  <tr key={name} className="text-slate-800 dark:text-gray-100">
+                    <td className="py-1.5">{name}{e?.model ? <span className="text-xs text-slate-600 dark:text-gray-300"> · {e.model}</span> : null}</td>
+                    <td className="py-1.5">
+                      {!e ? <span className="text-xs text-slate-600 dark:text-gray-300">Not tested (in use)</span>
+                        : e.passed ? <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-200">In use</span>
+                        : <span className="rounded-full bg-rose-100 px-2 py-0.5 text-xs font-semibold text-rose-800 dark:bg-rose-500/15 dark:text-rose-200">Left out</span>}
+                    </td>
+                    <td className="py-1.5 text-right tabular-nums">{e ? `${e.noLeakPct}%` : "—"}</td>
+                    <td className="py-1.5 text-right text-xs text-slate-600 dark:text-gray-300">{e ? new Date(e.runAt).toLocaleDateString() : "—"}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       <div className="mt-4 flex flex-wrap items-center gap-3">
         <h3 className="text-sm font-semibold text-slate-800 dark:text-gray-100">Conversations</h3>

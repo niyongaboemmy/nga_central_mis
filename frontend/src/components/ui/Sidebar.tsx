@@ -8,7 +8,7 @@ import { Permissions } from "../../constants/permissions";
 import { getToken } from "../../utils/auth";
 import { useAccess } from "../../hooks/useAccess";
 import { BarChart3, ShieldCheck } from "lucide-react";
-import { BellRing, CalendarDays, Clock4, Gamepad2, House } from "lucide-react";
+import { BellRing, Bot, CalendarDays, Clock4, Gamepad2, House } from "lucide-react";
 
 interface SidebarProps {
   isCollapsed?: boolean;
@@ -28,6 +28,8 @@ interface NavItem {
   children?: NavItem[];
   /** Legacy permissions that open the item even without `requiredCapability`. */
   orPermission?: string[];
+  /** Only for these user types (e.g. PARENT). */
+  userTypes?: string[];
 }
 
 const Sidebar: React.FC<SidebarProps> = ({
@@ -651,6 +653,12 @@ const Sidebar: React.FC<SidebarProps> = ({
       requiredPermission: Permissions.MANAGE_SETTINGS,
     },
     {
+      label: "AI Tutor for my children",
+      path: "/family/ai-tutor",
+      icon: <Bot className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
+      userTypes: ["PARENT"],
+    },
+    {
       label: "Desktop tools",
       path: "/desktop-tools",
       icon: <Gamepad2 className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
@@ -691,6 +699,7 @@ const Sidebar: React.FC<SidebarProps> = ({
 
   /** Both gates: the v1 permission and, where set, an access-control v2 capability. */
   const isVisible = (item: NavItem): boolean =>
+    (!item.userTypes || item.userTypes.includes(String(user?.profile?.user_type ?? "").toUpperCase())) &&
     !!hasPermission(item.requiredPermission) &&
     (!item.requiredCapability || access.can(item.requiredCapability) || (!!item.orPermission?.length && !!hasPermission(item.orPermission))) &&
     (!item.children || item.children.some(isVisible));

@@ -50,6 +50,7 @@ import ScheduleDetail from "./components/officeHours/ScheduleDetail";
 import MyOfficeHours from "./components/officeHours/MyOfficeHours";
 import OfficeHoursAdmin from "./components/officeHours/admin/OfficeHoursAdmin";
 import DesktopToolsAdmin from "./components/desktopTools/DesktopToolsAdmin";
+import FamilyTutor from "./components/desktopTools/FamilyTutor";
 import { Student360, Teacher360 } from "./components/officeHours/reports/Person360";
 import { CheckInPage } from "./components/officeHours/CheckIn";
 import { MetadataProvider } from "./contexts/MetadataContext";
@@ -927,6 +928,16 @@ function App() {
                 <ProtectedRoute>
                   <SystemLayoutWrapper>
                     <ScheduleDetail />
+                  </SystemLayoutWrapper>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/family/ai-tutor"
+              element={
+                <ProtectedRoute>
+                  <SystemLayoutWrapper>
+                    <FamilyTutor />
                   </SystemLayoutWrapper>
                 </ProtectedRoute>
               }
