@@ -548,7 +548,7 @@ const MentoringSessionModal: React.FC<Props> = ({
                 )}
               </h2>
               <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
-                {fullName} · {student.class_group_name}
+                {fullName}{student.class_group_name ? ` · ${student.class_group_name}` : ""}
               </p>
             </div>
             <div className="flex items-center gap-3">
