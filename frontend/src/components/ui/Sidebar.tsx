@@ -9,7 +9,7 @@ import { getToken } from "../../utils/auth";
 import { useAccess } from "../../hooks/useAccess";
 import { useMentorshipRole } from "../../hooks/useMentorshipRole";
 import { useOptionalAcademicPeriod } from "../../contexts/AcademicPeriodContext";
-import { BarChart3, CalendarOff, HeartHandshake, Radar, ShieldAlert, ShieldCheck } from "lucide-react";
+import { BarChart3, CalendarOff, HeartHandshake, Radar, ShieldAlert, ShieldCheck, UserPlus, Baby } from "lucide-react";
 import { BellRing, Bot, CalendarDays, Clock4, Gamepad2, House, Users2 } from "lucide-react";
 
 interface SidebarProps {
@@ -688,6 +688,18 @@ const Sidebar: React.FC<SidebarProps> = ({
       path: "/safeguarding",
       icon: <ShieldAlert className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
       requiredPermission: Permissions.SAFEGUARDING_MANAGE,
+    },
+    {
+      label: "My children",
+      path: "/family",
+      icon: <Baby className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
+      userTypes: ["PARENT"],
+    },
+    {
+      label: "Import parents",
+      path: "/families/import",
+      icon: <UserPlus className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
+      requiredPermission: Permissions.MANAGE_USERS,
     },
     {
       label: "AI Tutor for my children",
