@@ -4,7 +4,9 @@ import express from "express";
 import request from "supertest";
 import { sql } from "drizzle-orm";
 import { db } from "../db";
-import { createUser } from "../test/fixtures";
+import { createUser, createSubject, createStudentSubjectEnrollment } from "../test/fixtures";
+import { CompetencyPerformanceCriteria, SubjectCompetency } from "../db/schema";
+import { getCurrentAcademicYearId } from "../utils/academicYear";
 import { familiesRouter } from "../routes/families";
 import { describe as describeChild, digestText, importParents, sendWeeklyDigests, setAccountMailer, setFamilySender, weekOf } from "../services/families";
 
@@ -82,10 +84,12 @@ describe("plain words for parents", () => {
     const t = digestText([
       { studentId: 1, name: "Aline U", firstName: "Aline", className: "S2 A", asOf: null, attendance: "At every lesson on time in the last 2 weeks.", conduct: null, schoolwork: null, attention: false },
       { studentId: 2, name: "Bob", firstName: "Bob", className: null, asOf: null, attendance: null, conduct: null, schoolwork: null, attention: true },
+      { studentId: 3, name: "Cy", firstName: "Cy", className: null, asOf: null, attendance: null, conduct: null, schoolwork: null, attention: false, skills: "Has shown 2 of 9 skills in their subjects so far." },
     ]);
     expect(t.title).toBe("This week at school: worth a look");
     expect(t.body).toContain("Aline (S2 A): At every lesson on time in the last 2 weeks.");
     expect(t.body).toContain("Bob: no information from the school this week.");
+    expect(t.body).toContain("Cy: Has shown 2 of 9 skills in their subjects so far.");
     expect(weekOf("2026-10-09")).toBe("2026-10-05");
   });
 });
@@ -162,5 +166,40 @@ describe("the family page and the weekly summary", () => {
     sent.length = 0;
     await sendWeeklyDigests(friday);
     expect(sent.filter((s) => s.to === parent || s.to === `parent.${kid1}@example.com`)).toEqual([]);
+  });
+});
+
+describe("skills for parents (competency map)", () => {
+  let subject: number;
+  beforeAll(async () => {
+    const yearId = (await getCurrentAcademicYearId())!;
+    subject = await createSubject();
+    await createStudentSubjectEnrollment({ userId: kid1, subjectId: subject, academicYearId: yearId });
+    const lo = ((await db.insert(SubjectCompetency).values({ subject_id: subject, user_id: teacher, element_number: 1, title: "Speak about daily life", sort_order: 1 })) as any)[0].insertId;
+    const pc = async (num: string) => ((await db.insert(CompetencyPerformanceCriteria).values({ competency_id: lo, criteria_number: num, description: `Criterion ${num}`, sort_order: 1 })) as any)[0].insertId as number;
+    const c1 = await pc("1.1");
+    const c2 = await pc("1.2");
+    await db.execute(sql`INSERT INTO CompetencyEvidence (student_id, criteria_id, subject_id, source, source_type, source_ref, title, score_pct, assessed_at, updated_at) VALUES
+      (${kid1}, ${c1}, ${subject}, 'taskmentor', 'quiz', 8801, 'Speaking quiz', 85, UTC_TIMESTAMP(), UTC_TIMESTAMP()),
+      (${kid1}, ${c2}, ${subject}, 'taskmentor', 'quiz', 8801, 'Speaking quiz', 40, UTC_TIMESTAMP(), UTC_TIMESTAMP())`);
+  });
+  afterAll(async () => {
+    await db.execute(sql`DELETE FROM CompetencyEvidence WHERE subject_id = ${subject}`);
+    await db.execute(sql`DELETE FROM SubjectCompetency WHERE subject_id = ${subject}`);
+  });
+
+  it("adds a skills sentence to the child's card, only once something was assessed", async () => {
+    const kids = (await request(app).get("/families/me").set(as(parent))).body.data.children;
+    expect(kids.find((k: any) => k.studentId === kid1).skills).toBe("Has shown 1 of 2 skills in their subjects so far, and is practising 1 more.");
+    expect(kids.find((k: any) => k.studentId === kid2).skills).toBeNull();
+  });
+
+  it("opens a child's skills for their parent only", async () => {
+    const r = await request(app).get(`/families/children/${kid1}/competences`).set(as(parent));
+    expect(r.status).toBe(200);
+    const sub = r.body.data.subjects.find((x: any) => x.subject_id === subject);
+    expect(sub).toMatchObject({ total: 2, demonstrated: 1, assessed: 2 });
+    expect(sub.outcomes[0].criteria[0].evidence[0]).toMatchObject({ title: "Speaking quiz", score_pct: 85 });
+    expect((await request(app).get(`/families/children/${kid1}/competences`).set(as(teacher))).status).toBe(404);
   });
 });

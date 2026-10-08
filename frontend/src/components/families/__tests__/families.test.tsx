@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 
-const api = vi.hoisted(() => ({ me: vi.fn(), savePrefs: vi.fn(), importParents: vi.fn() }));
+const api = vi.hoisted(() => ({ me: vi.fn(), savePrefs: vi.fn(), importParents: vi.fn(), competences: vi.fn() }));
 vi.mock("../../../api/families", async (orig) => ({ ...(await orig<object>()), familiesApi: api }));
 vi.mock("../../../contexts/ToastContext", () => ({ useToast: () => ({ showToast: vi.fn() }) }));
 
@@ -55,5 +55,30 @@ describe("families", () => {
     const res = await screen.findByTestId("imp-results");
     expect(res).toHaveTextContent("Marie Uwase → NGA001Account created");
     expect(res).toHaveTextContent('Not imported: No active student "X9"');
+  });
+
+  it("parents see a skills sentence and open a child's skills", async () => {
+    api.me.mockReturnValue(ok({
+      children: [{ studentId: 5, name: "Aline Uwase", firstName: "Aline", className: "S2 A", asOf: null, attendance: null, conduct: null, schoolwork: null, attention: false, skills: "Has shown 3 of 20 skills in their subjects so far." }],
+      preferences: { weeklyDigest: true, digestEmail: true },
+      telegramLinked: true,
+    }));
+    api.competences.mockReturnValue(ok({ competent_pct: 70, subjects: [{
+      subject_id: 9, name: "English", code: null, color: null, total: 2, demonstrated: 1, assessed: 2,
+      outcomes: [{ competency_id: 1, element_number: 1, title: "Speak about daily life", criteria: [
+        { criteria_id: 11, criteria_number: "1.1", description: "Greet people", state: "DEMONSTRATED", evidence: [{ kind: "quiz", source: "taskmentor", ref: 1, title: "Speaking quiz", score_pct: 85, at: null }] },
+        { criteria_id: 12, criteria_number: "1.2", description: "Describe a routine", state: "COVERED", evidence: [] },
+      ] }],
+    }] }));
+    render(<MemoryRouter><MyChildren /></MemoryRouter>);
+    const kids = await screen.findByTestId("fam-children");
+    expect(kids).toHaveTextContent("SkillsHas shown 3 of 20 skills in their subjects so far.");
+    fireEvent.click(within(kids).getByRole("button", { name: "See Aline's skills" }));
+    const dialog = await screen.findByTestId("fam-skills");
+    expect(api.competences).toHaveBeenCalledWith(5);
+    expect(await within(dialog).findByText("English")).toBeTruthy();
+    expect(dialog).toHaveTextContent("1.1 Greet peopleShown");
+    expect(dialog).toHaveTextContent("Quiz: Speaking quiz · 85%");
+    expect(dialog).toHaveTextContent("1.2 Describe a routinePractising");
   });
 });
