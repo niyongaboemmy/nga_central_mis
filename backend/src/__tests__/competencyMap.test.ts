@@ -173,3 +173,22 @@ describe("the class map", () => {
     expect((await request(app).get(`/competency/map/students/${s3}?subjectId=${subject}&classGroupId=${classA}`).set(as(teacher))).status).toBe(404);
   });
 });
+
+describe("a student's own map", () => {
+  it("lists the subjects they take with outcomes, states and the work behind them", async () => {
+    const r = await request(app).get("/competency/me").set(as(s1));
+    expect(r.status).toBe(200);
+    const mine = r.body.data.subjects.find((s: any) => s.subject_id === subject);
+    expect(mine).toMatchObject({ total: 3, demonstrated: 3, assessed: 3 });
+    expect(mine.outcomes.map((o: any) => o.title)).toEqual(["Apply networking basics", "Configure a router"]);
+    const c = mine.outcomes[0].criteria[0];
+    expect(c).toMatchObject({ criteria_id: c11, state: "DEMONSTRATED" });
+    expect(c.evidence).toEqual([expect.objectContaining({ title: "Quiz 9101", score_pct: 85 })]);
+    expect(r.body.data.subjects.some((s: any) => s.subject_id === otherSubject)).toBe(false); // not enrolled
+  });
+
+  it("is empty for someone who takes no subjects", async () => {
+    const r = await request(app).get("/competency/me").set(as(teacher));
+    expect(r.body.data).toEqual({ competent_pct: 70, subjects: [] });
+  });
+});

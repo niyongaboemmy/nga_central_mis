@@ -318,3 +318,36 @@ export async function studentEvidence(studentId: number, subjectId: number, clas
     }),
   }));
 }
+
+/**
+ * A student's own map: every subject they take this year that has learning
+ * outcomes, with each criterion's state and evidence (also used for parents).
+ */
+export async function studentMap(studentId: number, yearId: number | null) {
+  if (!yearId) return { competent_pct: COMPETENT_PCT, subjects: [] };
+  const subjects = rows(await db.execute(sql`
+    SELECT e.subject_id, s.name, s.code, s.color,
+           (SELECT scg.class_group_id FROM StudentClassGroup scg
+             WHERE scg.user_id = e.user_id AND scg.academic_year_id = ${yearId} AND scg.status = 'ACTIVE' LIMIT 1) AS class_group_id
+    FROM StudentSubjectEnrollment e
+    JOIN Subject s ON s.subject_id = e.subject_id
+    WHERE e.user_id = ${studentId} AND e.academic_year_id = ${yearId} AND e.status = 'ACTIVE'
+      AND EXISTS (SELECT 1 FROM SubjectCompetency sc JOIN CompetencyPerformanceCriteria c ON c.competency_id = sc.competency_id WHERE sc.subject_id = e.subject_id)
+    ORDER BY s.name`));
+  const out = [];
+  for (const s of subjects) {
+    const outcomes = await studentEvidence(studentId, Number(s.subject_id), s.class_group_id ? Number(s.class_group_id) : null);
+    const states = outcomes.flatMap((o) => o.criteria.map((c) => c.state));
+    out.push({
+      subject_id: Number(s.subject_id),
+      name: s.name as string,
+      code: (s.code ?? null) as string | null,
+      color: (s.color ?? null) as string | null,
+      total: states.length,
+      demonstrated: states.filter((x) => x === "DEMONSTRATED").length,
+      assessed: states.filter((x) => x !== "NOT_COVERED").length,
+      outcomes,
+    });
+  }
+  return { competent_pct: COMPETENT_PCT, subjects: out };
+}
