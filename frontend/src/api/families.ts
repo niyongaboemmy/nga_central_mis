@@ -11,6 +11,8 @@ export interface ChildSummary {
   conduct: string | null;
   schoolwork: string | null;
   attention: boolean;
+  /** Learning-outcome progress, when something was assessed. */
+  skills?: string | null;
 }
 export interface FamilyPrefs {
   weeklyDigest: boolean;
@@ -30,6 +32,7 @@ export interface ImportResult {
 }
 
 export const familiesApi = {
+  competences: (studentId: number) => api.get<{ data: import("./competency").MyCompetences }>(`/families/children/${studentId}/competences`),
   me: () => api.get<{ data: { children: ChildSummary[]; preferences: FamilyPrefs; telegramLinked: boolean } }>("/families/me"),
   savePrefs: (p: Partial<FamilyPrefs>) => api.put<{ data: FamilyPrefs }>("/families/me/preferences", p),
   importParents: (rows: ImportRow[]) => api.post<{ data: ImportResult[] }>("/families/import", { rows }),

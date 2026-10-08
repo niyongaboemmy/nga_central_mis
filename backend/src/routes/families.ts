@@ -5,10 +5,13 @@ import { authenticate } from "../middleware/auth";
 import { asyncHandler } from "../middleware/asyncHandler";
 import { recordActivity } from "../utils/activityLogger";
 import { childrenOf, importParents, preferences, savePreferences } from "../services/families";
+import { studentMap } from "../services/competencyMap";
+import { getCurrentAcademicYearId } from "../utils/academicYear";
 
 /**
  * Families (services/families.ts).
  *   GET  /families/me                 a parent's children, in plain words + preferences
+ *   GET  /families/children/:id/competences   one of my children's learning-outcome progress
  *   PUT  /families/me/preferences     { weeklyDigest?, digestEmail? }
  *   POST /families/import             registrars (MANAGE_USERS): { rows: [{ student, parentName, email, phone?, relationship? }] }
  */
@@ -34,6 +37,17 @@ export function familiesRouter(auth: express.RequestHandler = authenticate) {
           telegramLinked: Array.isArray(tg) ? tg.length > 0 : !!tg,
         },
       });
+    }),
+  );
+
+  router.get(
+    "/children/:id/competences",
+    asyncHandler(async (req: any, res) => {
+      const child = Math.trunc(Number(req.params.id)) || 0;
+      const [link] = (await db.execute(sql`SELECT 1 AS x FROM Parenting WHERE parent_id = ${me(req)} AND student_id = ${child} LIMIT 1`)) as any;
+      if (!child || !(Array.isArray(link) ? link.length : link)) return res.status(404).json({ success: false, message: "This isn't one of your children" });
+      res.set("Cache-Control", "private, no-store");
+      res.json({ success: true, data: await studentMap(child, await getCurrentAcademicYearId()) });
     }),
   );
 

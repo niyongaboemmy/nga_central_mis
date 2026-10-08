@@ -18,6 +18,8 @@ import { sql } from "drizzle-orm";
 import { db } from "../db";
 import { notifyUsers } from "../utils/notifications";
 import logger from "../utils/logger";
+import { studentMap } from "./competencyMap";
+import { getCurrentAcademicYearId } from "../utils/academicYear";
 import { addDaysYmd, dowOfYmd, kigaliParts } from "./reminders/time";
 
 const rows = (r: unknown): any[] => (Array.isArray(r) && Array.isArray(r[0]) ? r[0] : (r as any[]));
@@ -34,6 +36,8 @@ export interface ChildSummary {
   schoolwork: string | null;
   /** Something worth a word with the child or the school this week. */
   attention: boolean;
+  /** Learning-outcome progress (competency map), when any skill has been assessed. */
+  skills?: string | null;
 }
 
 type Metrics = Record<string, number | null>;
@@ -99,9 +103,13 @@ export async function childrenOf(parentId: number): Promise<ChildSummary[]> {
   } catch {
     /* early warning not migrated: summaries without data */
   }
+  const yearId = await getCurrentAcademicYearId().catch(() => null);
+  const skills = new Map<number, string | null>();
+  for (const k of kids) skills.set(Number(k.id), await skillsSentence(Number(k.id), yearId).catch(() => null));
   return kids.map((k: any) => {
     const s = sig.get(Number(k.id)) ?? {};
     return {
+      skills: skills.get(Number(k.id)) ?? null,
       studentId: Number(k.id),
       name: k.name || `Student ${k.id}`,
       firstName: k.first || k.name || "Your child",
@@ -110,6 +118,16 @@ export async function childrenOf(parentId: number): Promise<ChildSummary[]> {
       ...describe(s.tendo ?? null, s.taskmentor ?? null),
     };
   });
+}
+
+/** "Has shown 12 of 80 skills in their subjects so far." — null until something was assessed. */
+export async function skillsSentence(studentId: number, yearId: number | null): Promise<string | null> {
+  const m = await studentMap(studentId, yearId);
+  const total = m.subjects.reduce((a, s) => a + s.total, 0);
+  const shown = m.subjects.reduce((a, s) => a + s.demonstrated, 0);
+  const practising = m.subjects.reduce((a, s) => a + s.assessed - s.demonstrated, 0);
+  if (!total || shown + practising === 0) return null;
+  return `Has shown ${shown} of ${plural(total, "skill")} in their subjects so far${practising ? `, and is practising ${practising} more` : ""}.`;
 }
 
 // ─── preferences ────────────────────────────────────────────────────────────
@@ -134,7 +152,7 @@ export async function savePreferences(parentId: number, b: { weeklyDigest?: bool
 export function digestText(children: ChildSummary[]): { title: string; body: string } {
   const lines: string[] = [];
   for (const c of children) {
-    const facts = [c.attendance, c.conduct, c.schoolwork].filter(Boolean);
+    const facts = [c.attendance, c.conduct, c.schoolwork, c.skills].filter(Boolean);
     lines.push(`${c.firstName}${c.className ? ` (${c.className})` : ""}: ${facts.length ? facts.join(" ") : "no information from the school this week."}`);
   }
   const anyAttention = children.some((c) => c.attention);
