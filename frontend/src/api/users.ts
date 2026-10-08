@@ -18,6 +18,27 @@ export interface User {
   updated_at: string;
   roles?: number[];
   preferred_theme?: "light" | "dark";
+  /** 256 px profile picture (null = none); see Avatar for every size. */
+  avatar_url?: string | null;
+}
+
+/** Central profile picture: signed, versioned URLs that every NGA app can load. */
+export interface Avatar {
+  version: number;
+  /** 64 px -- navbars, chips, lists */
+  sm: string;
+  /** 256 px -- cards */
+  md: string;
+  /** 512 px -- profile headers */
+  lg: string;
+}
+
+/** Crop square as fractions (0..1) of the upright picture. */
+export interface AvatarCrop {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
 }
 
 export interface UserProfile {
@@ -63,6 +84,7 @@ export interface Grade {
 export interface UserWithProfile {
   user: User;
   profile: UserProfile | null;
+  avatar?: Avatar | null;
   roles?: UserRole[];
   permissions?: string[];
   assignedPrograms?: Program[];
@@ -706,6 +728,7 @@ export const getScopedSubjectDetail = async (
 export interface ScopedUser {
   user_id: number;
   username: string;
+  avatar?: Avatar | null;
   email: string;
   phone_number?: string | null;
   status: string;
@@ -851,6 +874,7 @@ export interface ScopedUserSubject {
 export interface ScopedUserDetail {
   user: User;
   profile: UserProfile | null;
+  avatar?: Avatar | null;
   roles: UserRole[];
   permissions: string[];
   assignedGrades: {
@@ -1007,6 +1031,33 @@ export const updateProfile = async (
     }
     throw error;
   }
+};
+
+/**
+ * Uploads a new profile picture. The server resizes and compresses it (64/256/512 px
+ * WebP); `crop` is the square the user framed. `userId` = someone else (MANAGE_USERS).
+ */
+export const uploadAvatar = async (
+  file: Blob,
+  crop?: AvatarCrop,
+  opts: { userId?: number; onProgress?: (fraction: number) => void } = {},
+): Promise<Avatar> => {
+  const form = new FormData();
+  if (crop) form.append("crop", JSON.stringify(crop));
+  form.append("avatar", file, (file as File).name || "avatar");
+  const url = opts.userId ? `/users/${opts.userId}/avatar` : "/users/me/avatar";
+  const response = await api.put<BackendResponse<{ avatar: Avatar }>>(url, form, {
+    // The instance defaults to JSON, which would make axios serialise the FormData.
+    headers: { "Content-Type": "multipart/form-data" },
+    onUploadProgress: (e) => {
+      if (opts.onProgress && e.total) opts.onProgress(e.loaded / e.total);
+    },
+  });
+  return response.data.data!.avatar;
+};
+
+export const removeAvatar = async (opts: { userId?: number } = {}): Promise<void> => {
+  await api.delete(opts.userId ? `/users/${opts.userId}/avatar` : "/users/me/avatar");
 };
 
 export const createUser = async (

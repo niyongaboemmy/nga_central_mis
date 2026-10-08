@@ -1,4 +1,5 @@
 import bcrypt from "bcryptjs";
+import { avatarUrls, withAvatar } from "../services/avatar/urls";
 import { getPublicSystems } from "../utils/publicSystems";
 import crypto from "crypto";
 import { db } from "../db";
@@ -518,7 +519,8 @@ export const getCurrentUser = asyncHandler(async (req: any, res: any) => {
   const systems = await getPublicSystems();
 
   successResponse(res, "User profile retrieved successfully", {
-    user: user[0],
+    user: withAvatar(user[0]),
+    avatar: avatarUrls(user[0].user_id, user[0].avatar_version),
     profile: profile[0] || null,
     roles: rolesWithPermissions,
     permissions,
@@ -687,7 +689,8 @@ export const getUsers = asyncHandler(async (req: any, res: any) => {
         .limit(1);
 
       return {
-        user,
+        user: withAvatar(user),
+        avatar: avatarUrls(user.user_id, user.avatar_version),
         profile: profile[0] || null,
         roles: rolesWithPermissions,
         permissions: rolesWithPermissions.flatMap((r) =>
@@ -769,7 +772,8 @@ export const getUser = asyncHandler(async (req: any, res: any) => {
     .limit(1);
 
   successResponse(res, "User retrieved successfully", {
-    user: user[0],
+    user: withAvatar(user[0]),
+    avatar: avatarUrls(user[0].user_id, user[0].avatar_version),
     profile: profile[0] || null,
     roles: rolesWithPermissions,
     permissions: rolesWithPermissions.flatMap((r) =>

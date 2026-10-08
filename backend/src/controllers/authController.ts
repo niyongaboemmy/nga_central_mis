@@ -1,4 +1,5 @@
 import bcrypt from "bcryptjs";
+import { avatarUrls, withAvatar } from "../services/avatar/urls";
 import { getPublicSystems } from "../utils/publicSystems";
 import jwt from "jsonwebtoken";
 import { OAuth2Client } from "google-auth-library";
@@ -363,7 +364,8 @@ const completeLogin = async (
 
   successResponse(res, "Login successful", {
     token,
-    user: user[0],
+    user: withAvatar(user[0]),
+    avatar: avatarUrls(user[0].user_id, user[0].avatar_version),
     profile: profile[0] || null,
     permissions,
     assignedPrograms,
@@ -575,7 +577,8 @@ export const getSession = asyncHandler(async (req: any, res: any) => {
   const systems = await getPublicSystems();
 
   successResponse(res, "Session retrieved", {
-    user: user[0],
+    user: withAvatar(user[0]),
+    avatar: avatarUrls(user[0].user_id, user[0].avatar_version),
     profile: profile[0] || null,
     permissions,
     roles,
@@ -597,9 +600,17 @@ export const verifySession = asyncHandler(async (req: any, res: any) => {
   } catch {
     accessVersion = null;
   }
+  // The current picture rides along, so a spoke's poll picks up a new one within
+  // minutes without a separate call (services/avatar/).
+  const [row] = await db
+    .select({ avatar_version: User.avatar_version })
+    .from(User)
+    .where(eq(User.user_id, req.user.userId))
+    .limit(1);
   successResponse(res, "Token valid", {
     userId: req.user.userId,
     access_version: accessVersion,
+    avatar: avatarUrls(req.user.userId, row?.avatar_version),
   });
 });
 

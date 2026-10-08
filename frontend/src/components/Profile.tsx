@@ -1,606 +1,305 @@
-import React, { useState, useEffect } from "react";
-import { motion } from "framer-motion";
+import React, { useEffect, useMemo, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import {
-  User,
+  AtSign,
+  Calendar,
+  Hash,
+  KeyRound,
+  Lock,
+  LogOut,
   Mail,
   Phone,
-  Calendar,
-  MapPin,
-  Users,
-  Save,
-  Edit2,
-  Check,
-  X,
-  ChevronRight,
-  Hash,
-  Lock,
+  ShieldCheck,
+  Sparkles,
 } from "lucide-react";
 import { useUser } from "../contexts/UserContext";
+import { useToast } from "../contexts/ToastContext";
 import { updateProfile, UserProfile } from "../api/users";
+import AvatarControl from "./profile/AvatarControl";
+import ChangePasswordModal from "./ChangePasswordModal";
+import SelectField from "./ui/SelectField";
 
-// Animated floating particles (from Landing page)
-const FloatingParticles = () => (
-  <div className="absolute inset-0 overflow-hidden pointer-events-none">
-    {[...Array(12)].map((_, i) => (
-      <motion.div
-        key={i}
-        initial={{
-          opacity: 0,
-          x: `${Math.random() * 100}%`,
-          y: "100%",
-        }}
-        animate={{
-          opacity: [0, 0.6, 0],
-          y: "-10%",
-        }}
-        transition={{
-          repeat: Infinity,
-          duration: 8 + Math.random() * 8,
-          delay: Math.random() * 8,
-          ease: "linear",
-        }}
-        className="absolute"
-        style={{
-          left: `${Math.random() * 100}%`,
-        }}
-      >
-        <div className="w-2 h-2 bg-yellow-400/60 rounded-full" />
-      </motion.div>
-    ))}
+type FormState = {
+  first_name: string;
+  last_name: string;
+  gender: string;
+  date_of_birth: string;
+  address: string;
+};
+
+const fromProfile = (p: UserProfile | null | undefined): FormState => ({
+  first_name: p?.first_name ?? "",
+  last_name: p?.last_name ?? "",
+  gender: p?.gender ?? "",
+  // DATE columns arrive as an ISO timestamp; <input type="date"> wants YYYY-MM-DD.
+  date_of_birth: (p?.date_of_birth ?? "").slice(0, 10),
+  address: p?.address ?? "",
+});
+
+const TYPE_STYLES: Record<string, string> = {
+  STUDENT: "bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300",
+  TEACHER: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300",
+  ADMIN: "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300",
+  PARENT: "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300",
+  STAFF: "bg-pink-100 text-pink-700 dark:bg-pink-900/40 dark:text-pink-300",
+};
+
+const STATUS_STYLES: Record<string, string> = {
+  ACTIVE: "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300",
+  INACTIVE: "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300",
+  SUSPENDED: "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300",
+};
+
+const titleCase = (s: string) => s.charAt(0) + s.slice(1).toLowerCase();
+
+const inputCls =
+  "w-full px-3.5 py-2.5 text-sm rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 transition";
+
+const Card: React.FC<{ title: string; subtitle?: string; children: React.ReactNode; className?: string }> = ({
+  title,
+  subtitle,
+  children,
+  className = "",
+}) => (
+  <section
+    className={`rounded-3xl bg-white dark:bg-gray-900 border border-gray-200/70 dark:border-gray-800 shadow-sm p-5 md:p-6 ${className}`}
+  >
+    <header className="mb-4">
+      <h2 className="text-base font-semibold text-gray-900 dark:text-white">{title}</h2>
+      {subtitle && <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{subtitle}</p>}
+    </header>
+    {children}
+  </section>
+);
+
+const Field: React.FC<{ label: string; htmlFor: string; children: React.ReactNode; className?: string }> = ({
+  label,
+  htmlFor,
+  children,
+  className = "",
+}) => (
+  <div className={className}>
+    <label htmlFor={htmlFor} className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5">
+      {label}
+    </label>
+    {children}
   </div>
 );
 
-// Animated background shapes
-// const BackgroundShapes = () => (
-//   <>
-//     <motion.div
-//       animate={{
-//         y: [0, -30, 0],
-//         x: [0, 20, 0],
-//         scale: [1, 1.2, 1],
-//       }}
-//       transition={{ repeat: Infinity, duration: 10, ease: "easeInOut" }}
-//       className="absolute top-20 right-[5%] w-96 h-96 bg-blue-200/20 rounded-full blur-3xl"
-//     />
-//     <motion.div
-//       animate={{
-//         y: [0, 40, 0],
-//         x: [0, -30, 0],
-//         scale: [1, 1.3, 1],
-//       }}
-//       transition={{
-//         repeat: Infinity,
-//         duration: 12,
-//         ease: "easeInOut",
-//         delay: 1,
-//       }}
-//       className="absolute bottom-20 left-[5%] w-[500px] h-[500px] bg-blue-200/20 rounded-full blur-3xl"
-//     />
-//     <motion.div
-//       animate={{
-//         scale: [1, 1.4, 1],
-//         opacity: [0.15, 0.25, 0.15],
-//       }}
-//       transition={{
-//         repeat: Infinity,
-//         duration: 8,
-//         ease: "easeInOut",
-//         delay: 2,
-//       }}
-//       className="absolute top-1/3 right-1/3 w-[400px] h-[400px] bg-indigo-200/20 rounded-full blur-3xl"
-//     />
-//   </>
-// );
-
-// Cute user avatar with animation
-const UserAvatar = ({
-  firstName,
-  lastName,
-}: {
-  firstName?: string;
-  lastName?: string;
-}) => {
-  const initials =
-    `${firstName?.[0] || ""}${lastName?.[0] || ""}`.toUpperCase() || "U";
-
-  return (
-    <motion.div
-      initial={{ scale: 0, rotate: -180 }}
-      animate={{ scale: 1, rotate: 0 }}
-      transition={{ type: "spring", stiffness: 200, damping: 15 }}
-      className="relative"
-    >
-      <div className="w-24 h-24 md:w-28 md:h-28 rounded-full bg-gradient-to-br from-blue-400 via-blue-500 to-blue-500 flex items-center justify-center text-white text-2xl md:text-3xl font-bold shadow-xl shadow-blue-400/20">
-        {initials}
-      </div>
-      <motion.div
-        animate={{ rotate: [0, 360] }}
-        transition={{ repeat: Infinity, duration: 20, ease: "linear" }}
-        className="absolute -top-1 -right-1 w-6 h-6 bg-yellow-400 rounded-full shadow-lg flex items-center justify-center"
-      >
-        <div className="w-2 h-2 bg-white rounded-full" />
-      </motion.div>
-    </motion.div>
-  );
-};
-
-// Small cute info card
-const InfoCard = ({
+const InfoRow: React.FC<{ icon: React.ElementType; label: string; value?: string | null; mono?: boolean }> = ({
   icon: Icon,
   label,
   value,
-  editable,
-  onChange,
-  type = "text",
-  highlight,
-}: {
-  icon: React.ElementType;
-  label: string;
-  value: string | undefined;
-  editable?: boolean;
-  onChange?: (value: string) => void;
-  type?: string;
-  /** Read-only, visually emphasised (e.g. a system-assigned identifier). */
-  highlight?: boolean;
-}) => {
-  const [isEditing, setIsEditing] = useState(false);
-  const [editValue, setEditValue] = useState(value || "");
-
-  useEffect(() => {
-    setEditValue(value || "");
-  }, [value]);
-
-  const handleSave = () => {
-    if (onChange) {
-      onChange(editValue);
-    }
-    setIsEditing(false);
-  };
-
-  const handleCancel = () => {
-    setEditValue(value || "");
-    setIsEditing(false);
-  };
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      whileHover={{ scale: 1.01 }}
-      className={
-        highlight
-          ? "bg-blue-50/80 dark:bg-blue-900/20 backdrop-blur-sm rounded-2xl p-4 shadow-sm border border-blue-300/60 dark:border-blue-500/40"
-          : "bg-white/60 dark:bg-slate-800/60 backdrop-blur-sm rounded-2xl p-4 shadow-sm border border-white/50 dark:border-slate-700/30"
-      }
-    >
-      <div className="flex items-center gap-3">
-        <div
-          className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
-            highlight
-              ? "bg-blue-500 text-white"
-              : "bg-gradient-to-br from-blue-400/10 to-blue-400/10 text-blue-500"
-          }`}
-        >
-          <Icon className="w-5 h-5" />
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-xs text-gray-400 mb-0.5">{label}</p>
-          {isEditing ? (
-            <div className="flex items-center gap-2">
-              <input
-                type={type}
-                value={editValue}
-                onChange={(e) => setEditValue(e.target.value)}
-                className="flex-1 px-3 py-2 text-sm border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-400"
-                autoFocus
-              />
-              <button
-                type="button"
-                onClick={handleSave}
-                className="p-1.5 bg-green-400 text-white rounded-lg hover:bg-green-500 transition-colors"
-              >
-                <Check className="w-4 h-4" />
-              </button>
-              <button
-                type="button"
-                onClick={handleCancel}
-                className="p-1.5 bg-red-400 text-white rounded-lg hover:bg-red-500 transition-colors"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-          ) : (
-            <div className="flex items-center gap-2">
-              <p
-                className={`text-sm font-medium truncate ${
-                  highlight
-                    ? "font-mono tracking-wide text-blue-700 dark:text-blue-300"
-                    : "text-gray-700 dark:text-gray-200"
-                }`}
-              >
-                {value || "—"}
-              </p>
-              {highlight && (
-                <Lock
-                  className="w-3.5 h-3.5 text-blue-400 flex-shrink-0"
-                  aria-label="Not editable"
-                />
-              )}
-              {editable && (
-                <button
-                  type="button"
-                  onClick={() => setIsEditing(true)}
-                  className="p-1 text-gray-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg transition-colors flex-shrink-0"
-                >
-                  <Edit2 className="w-4 h-4" />
-                </button>
-              )}
-            </div>
-          )}
-        </div>
-      </div>
-    </motion.div>
-  );
-};
-
-// Cute status badge
-const StatusBadge = ({ status }: { status: string }) => {
-  const statusColors: Record<string, string> = {
-    ACTIVE:
-      "bg-green-100 text-green-600 dark:bg-green-900/40 dark:text-green-400",
-    INACTIVE: "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400",
-    SUSPENDED: "bg-red-100 text-red-600 dark:bg-red-900/40 dark:text-red-400",
-  };
-
-  return (
-    <motion.span
-      initial={{ scale: 0 }}
-      animate={{ scale: 1 }}
-      className={`px-3 py-1 rounded-full text-xs font-medium ${
-        statusColors[status] || statusColors.ACTIVE
-      }`}
-    >
-      {status}
-    </motion.span>
-  );
-};
-
-// User type badge
-const UserTypeBadge = ({ userType }: { userType?: string }) => {
-  const colors: Record<string, string> = {
-    STUDENT: "from-blue-400 to-blue-500",
-    TEACHER: "from-green-400 to-green-500",
-    ADMIN: "from-blue-400 to-blue-500",
-    PARENT: "from-orange-400 to-orange-500",
-    STAFF: "from-pink-400 to-pink-500",
-  };
-  const color = colors[userType || ""] || colors.STUDENT;
-
-  return (
-    <motion.span
-      initial={{ scale: 0 }}
-      animate={{ scale: 1 }}
-      transition={{ delay: 0.1 }}
-      className={`px-3 py-1 rounded-full text-xs font-semibold text-white bg-gradient-to-r ${color}`}
-    >
-      {userType || "User"}
-    </motion.span>
-  );
-};
-
-// Quick link item
-const QuickLink = ({
-  label,
-  onClick,
-}: {
-  label: string;
-  onClick: () => void;
+  mono,
 }) => (
-  <motion.div
-    whileHover={{ scale: 1.01, x: 4 }}
-    whileTap={{ scale: 0.99 }}
-    onClick={onClick}
-    className="flex items-center justify-between p-4 bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm rounded-2xl cursor-pointer group"
-  >
-    <span className="text-sm font-medium text-gray-700 dark:text-gray-200 group-hover:text-blue-500 transition-colors">
-      {label}
-    </span>
-    <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-blue-500 transition-colors" />
-  </motion.div>
+  <div className="flex items-center gap-3 py-2.5">
+    <div className="w-9 h-9 rounded-xl bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400 flex items-center justify-center shrink-0">
+      <Icon className="w-4 h-4" />
+    </div>
+    <div className="min-w-0">
+      <p className="text-[11px] uppercase tracking-wide text-gray-400">{label}</p>
+      <p className={`text-sm text-gray-800 dark:text-gray-100 truncate ${mono ? "font-mono" : "font-medium"}`}>
+        {value || "—"}
+      </p>
+    </div>
+  </div>
 );
 
 const Profile: React.FC = () => {
   const { user, refreshUser } = useUser();
-  const [isLoading, setIsLoading] = useState(false);
-  const [message, setMessage] = useState<{
-    type: "success" | "error";
-    text: string;
-  } | null>(null);
-  const [formData, setFormData] = useState<Partial<UserProfile>>({});
-
-  useEffect(() => {
-    if (user?.profile) {
-      setFormData({
-        first_name: user.profile.first_name,
-        last_name: user.profile.last_name,
-        gender: user.profile.gender,
-        date_of_birth: user.profile.date_of_birth,
-        address: user.profile.address,
-        external_id: user.profile.external_id,
-      });
-    }
-  }, [user]);
-
-  const handleChange = (field: keyof UserProfile, value: string) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
-    setMessage(null);
-
-    try {
-      await updateProfile(formData, () => {
-        setMessage({ type: "success", text: "Profile updated successfully!" });
-        refreshUser();
-        setTimeout(() => setMessage(null), 3000);
-      });
-    } catch (error: any) {
-      setMessage({
-        type: "error",
-        text: error.response?.data?.message || "Failed to update profile",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const { showToast } = useToast();
+  const initial = useMemo(() => fromProfile(user?.profile), [user?.profile]);
+  // Seeded from the profile (not empty) so the "unsaved changes" bar never flashes on load.
+  const [form, setForm] = useState<FormState>(initial);
+  const [saving, setSaving] = useState(false);
+  const [passwordOpen, setPasswordOpen] = useState(false);
+  useEffect(() => setForm(initial), [initial]);
+  const dirty = (Object.keys(initial) as (keyof FormState)[]).some((k) => form[k] !== initial[k]);
 
   if (!user) {
     return (
-      <div className="min-h-screen bg-blue-50/50 dark:bg-black flex items-center justify-center">
-        <FloatingParticles />
-        <motion.div
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="text-center"
-        >
-          <div className="w-12 h-12 border-3 border-blue-400 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-          <p className="text-sm text-gray-500">Loading...</p>
-        </motion.div>
+      <div className="min-h-[60vh] flex items-center justify-center">
+        <div className="w-10 h-10 border-[3px] border-blue-500 border-t-transparent rounded-full animate-spin" aria-label="Loading" />
       </div>
     );
   }
 
-  const { user: userData, profile } = user;
+  const { user: account, profile } = user;
+  const fullName = [profile?.first_name, profile?.last_name].filter(Boolean).join(" ") || account.username;
+  const userType = profile?.user_type;
+
+  const set = (field: keyof FormState) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
+    setForm((f) => ({ ...f, [field]: e.target.value }));
+
+  const save = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.first_name.trim() || !form.last_name.trim()) {
+      showToast("First and last name are required", "error");
+      return;
+    }
+    setSaving(true);
+    try {
+      const changes: Partial<UserProfile> = {};
+      (Object.keys(form) as (keyof FormState)[]).forEach((k) => {
+        if (form[k] !== initial[k]) (changes as any)[k] = form[k].trim();
+      });
+      await updateProfile(changes);
+      await refreshUser();
+      showToast("Profile updated", "success");
+    } catch (err: any) {
+      showToast(err?.response?.data?.message || "Failed to update profile", "error");
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
-    <div className="min-h-screen bg-blue-50/50 dark:bg-black overflow-hidden relative">
-      {/* Background Effects */}
-      {/* <div className="fixed inset-0 pointer-events-none">
-        <FloatingParticles />
-        <BackgroundShapes />
-      </div> */}
-
-      <div className="relative z-10 pb-10 pt-4 px-4 md:px-6">
-        <div className="max-w-7xl mx-auto">
-          {/* Header */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="text-center md:text-left mb-4"
-          >
-            <motion.h1
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="text-2xl md:text-2xl font-bold text-gray-800 dark:text-white mb-2"
-            >
-              My Profile
-            </motion.h1>
-            <motion.p
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.1 }}
-              className="text-sm md:text-sm text-gray-500"
-            >
-              Manage your personal information
-            </motion.p>
-          </motion.div>
-
-          {/* Main Content Grid */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Profile Card - Left Column */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.1 }}
-              className="lg:col-span-1"
-            >
-              <div className="bg-white/70 dark:bg-slate-800/70 backdrop-blur-xl rounded-3xl p-6 md:p-8 shadow-sm border border-white/50 dark:border-slate-700/30">
-                {/* Avatar and Name */}
-                <div className="flex flex-col items-center mb-6">
-                  <UserAvatar
-                    firstName={profile?.first_name}
-                    lastName={profile?.last_name}
-                  />
-                  <motion.h2
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.2 }}
-                    className="mt-4 text-lg md:text-xl font-bold text-gray-800 dark:text-white text-center"
-                  >
-                    {profile?.first_name || profile?.last_name
-                      ? `${profile.first_name || ""} ${profile.last_name || ""}`
-                      : userData.username}
-                  </motion.h2>
-                  <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ delay: 0.3 }}
-                    className="flex items-center gap-2 mt-3 text-sm"
-                  >
-                    <UserTypeBadge userType={profile?.user_type} />
-                    <StatusBadge status={userData.status} />
-                  </motion.div>
-                </div>
-
-                {/* Toast Message */}
-                {message && (
-                  <motion.div
-                    initial={{ opacity: 0, y: -10, scale: 0.95 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: -10, scale: 0.95 }}
-                    className={`mb-4 px-4 py-3 rounded-xl text-sm font-medium ${
-                      message.type === "success"
-                        ? "bg-green-100 text-green-600 dark:bg-green-900/40 dark:text-green-400"
-                        : "bg-red-100 text-red-600 dark:bg-red-900/40 dark:text-red-400"
-                    }`}
-                  >
-                    {message.text}
-                  </motion.div>
+    <div className="min-h-screen bg-gray-50/60 dark:bg-black pb-28">
+      <div className="max-w-6xl mx-auto px-4 md:px-6 pt-4 space-y-6">
+        {/* Identity */}
+        <motion.section
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="relative overflow-hidden rounded-3xl bg-white dark:bg-gray-900 border border-gray-200/70 dark:border-gray-800 shadow-sm"
+        >
+          <div className="h-28 md:h-36 bg-gradient-to-r from-blue-600 via-indigo-600 to-sky-500 relative">
+            <div
+              className="absolute inset-0 opacity-20"
+              style={{
+                backgroundImage: "radial-gradient(circle at 1px 1px, white 1px, transparent 0)",
+                backgroundSize: "18px 18px",
+              }}
+            />
+          </div>
+          <div className="px-5 md:px-8 pb-6 -mt-14 md:-mt-16 flex flex-col md:flex-row md:items-start gap-4 md:gap-6">
+            <AvatarControl name={fullName} avatar={user.avatar} onChange={() => refreshUser()} size={128} />
+            <div className="flex-1 min-w-0 text-center md:text-left md:pt-16">
+              <h1 className="text-2xl font-bold text-gray-900 dark:text-white truncate">{fullName}</h1>
+              <p className="text-sm text-gray-500 dark:text-gray-400 truncate">
+                @{account.username} · {account.email}
+              </p>
+              <div className="mt-2 flex flex-wrap items-center justify-center md:justify-start gap-2">
+                {userType && (
+                  <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${TYPE_STYLES[userType] ?? TYPE_STYLES.STAFF}`}>
+                    {titleCase(userType)}
+                  </span>
                 )}
-
-                {/* Save Button */}
-                <form onSubmit={handleSubmit}>
-                  <motion.button
-                    type="submit"
-                    disabled={isLoading}
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    className="w-full py-3 bg-gradient-to-r from-blue-400 via-blue-500 to-blue-500 text-white font-semibold rounded-full shadow-lg shadow-blue-400/25 transition-all relative overflow-hidden disabled:opacity-60"
-                  >
-                    {isLoading ? (
-                      <div className="flex items-center justify-center gap-2">
-                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                        Saving...
-                      </div>
-                    ) : (
-                      <div className="flex items-center justify-center gap-2">
-                        <Save className="w-5 h-5" />
-                        Save Changes
-                      </div>
-                    )}
-                  </motion.button>
-                </form>
+                {account.status && (
+                  <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${STATUS_STYLES[account.status] ?? STATUS_STYLES.ACTIVE}`}>
+                    {titleCase(account.status)}
+                  </span>
+                )}
+                {(user.roles ?? []).slice(0, 3).map((r) => (
+                  <span key={r.role_id} className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300">
+                    {r.name}
+                  </span>
+                ))}
               </div>
-            </motion.div>
-
-            {/* Info Cards - Right Columns */}
-            <div className="lg:col-span-2 space-y-6">
-              {/* Personal Info Section */}
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.2 }}
-              >
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="md:col-span-2">
-                    <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">
-                      Personal Information
-                    </h3>
-                  </div>
-                  <InfoCard
-                    icon={User}
-                    label="First Name"
-                    value={formData.first_name}
-                    editable
-                    onChange={(v) => handleChange("first_name", v)}
-                  />
-                  <InfoCard
-                    icon={User}
-                    label="Last Name"
-                    value={formData.last_name}
-                    editable
-                    onChange={(v) => handleChange("last_name", v)}
-                  />
-                  <InfoCard
-                    icon={Users}
-                    label="Gender"
-                    value={formData.gender}
-                    editable
-                    onChange={(v) => handleChange("gender", v)}
-                  />
-                  <InfoCard
-                    icon={Calendar}
-                    label="Date of Birth"
-                    value={formData.date_of_birth}
-                    type="date"
-                    editable
-                    onChange={(v) => handleChange("date_of_birth", v)}
-                  />
-                  <div className="md:col-span-2">
-                    <InfoCard
-                      icon={MapPin}
-                      label="Address"
-                      value={formData.address}
-                      editable
-                      onChange={(v) => handleChange("address", v)}
-                    />
-                  </div>
-                </div>
-              </motion.div>
-
-              {/* Account Info Section */}
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.3 }}
-              >
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="md:col-span-2">
-                    <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">
-                      Account Information
-                    </h3>
-                  </div>
-                  {profile?.user_type === "STUDENT" && (
-                    <div className="md:col-span-2">
-                      <InfoCard
-                        icon={Hash}
-                        label="Registration Number"
-                        value={profile.registration_number || undefined}
-                        highlight
-                      />
-                    </div>
-                  )}
-                  <InfoCard
-                    icon={User}
-                    label="Username"
-                    value={userData.username}
-                  />
-                  <InfoCard icon={Mail} label="Email" value={userData.email} />
-                  <InfoCard
-                    icon={Phone}
-                    label="Phone Number"
-                    value={userData.phone_number}
-                  />
-                  <InfoCard
-                    icon={Calendar}
-                    label="Member Since"
-                    value={new Date(userData.created_at).toLocaleDateString()}
-                  />
-                </div>
-              </motion.div>
-
-              {/* Quick Links Section */}
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.4 }}
-              >
-                <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">
-                  Quick Actions
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <QuickLink label="Change Password" onClick={() => {}} />
-                  <QuickLink label="Notification Settings" onClick={() => {}} />
-                  <QuickLink label="Privacy Settings" onClick={() => {}} />
-                  <QuickLink label="Help & Support" onClick={() => {}} />
-                </div>
-              </motion.div>
             </div>
           </div>
+          <div className="px-5 md:px-8 py-3 border-t border-gray-100 dark:border-gray-800 bg-gray-50/70 dark:bg-gray-900/60 text-xs text-gray-500 dark:text-gray-400 flex items-center gap-2">
+            <Sparkles className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+            Your picture and name follow you into Task Mentor, Tendo and Tupo, so classmates and colleagues recognise you everywhere.
+          </div>
+        </motion.section>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Personal information */}
+          <motion.form
+            id="profile-form"
+            onSubmit={save}
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.05 }}
+            className="lg:col-span-2"
+          >
+            <Card title="Personal information" subtitle="How you appear to teachers, students and staff.">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <Field label="First name" htmlFor="pf-first">
+                  <input id="pf-first" className={inputCls} value={form.first_name} onChange={set("first_name")} autoComplete="given-name" maxLength={100} />
+                </Field>
+                <Field label="Last name" htmlFor="pf-last">
+                  <input id="pf-last" className={inputCls} value={form.last_name} onChange={set("last_name")} autoComplete="family-name" maxLength={100} />
+                </Field>
+                <Field label="Gender" htmlFor="pf-gender">
+                  <SelectField id="pf-gender" className={inputCls} value={form.gender} onChange={set("gender")}>
+                    <option value="">Not specified</option>
+                    <option value="MALE">Male</option>
+                    <option value="FEMALE">Female</option>
+                    <option value="OTHER">Other</option>
+                  </SelectField>
+                </Field>
+                <Field label="Date of birth" htmlFor="pf-dob">
+                  <input id="pf-dob" type="date" className={inputCls} value={form.date_of_birth} onChange={set("date_of_birth")} max={new Date().toISOString().slice(0, 10)} />
+                </Field>
+                <Field label="Address" htmlFor="pf-address" className="sm:col-span-2">
+                  <input id="pf-address" className={inputCls} value={form.address} onChange={set("address")} autoComplete="street-address" maxLength={255} placeholder="District, sector, street" />
+                </Field>
+              </div>
+            </Card>
+          </motion.form>
+
+          <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="space-y-6">
+            <Card title="Account" subtitle="Managed by the school office.">
+              <div className="divide-y divide-gray-100 dark:divide-gray-800">
+                {userType === "STUDENT" && <InfoRow icon={Hash} label="Registration number" value={profile?.registration_number} mono />}
+                <InfoRow icon={AtSign} label="Username" value={account.username} />
+                <InfoRow icon={Mail} label="Email" value={account.email} />
+                <InfoRow icon={Phone} label="Phone" value={account.phone_number} />
+                <InfoRow icon={Calendar} label="Member since" value={account.created_at ? new Date(account.created_at).toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" }) : null} />
+              </div>
+            </Card>
+
+            <Card title="Security">
+              <button
+                type="button"
+                onClick={() => setPasswordOpen(true)}
+                className="w-full flex items-center gap-3 p-3 rounded-2xl border border-gray-200 dark:border-gray-700 hover:border-blue-400 hover:bg-blue-50/50 dark:hover:bg-blue-900/20 transition text-left"
+              >
+                <span className="w-9 h-9 rounded-xl bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300 flex items-center justify-center">
+                  <KeyRound className="w-4 h-4" />
+                </span>
+                <span className="flex-1">
+                  <span className="block text-sm font-semibold text-gray-800 dark:text-gray-100">Change password</span>
+                  <span className="block text-xs text-gray-500 dark:text-gray-400">One password for every NGA app</span>
+                </span>
+                <Lock className="w-4 h-4 text-gray-400" />
+              </button>
+              <p className="mt-3 flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+                <ShieldCheck className="w-3.5 h-3.5 text-green-500" />
+                Sign-in is protected with a one-time code.
+              </p>
+              <p className="mt-1 flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+                <LogOut className="w-3.5 h-3.5" />
+                Signing out here signs you out of every NGA app.
+              </p>
+            </Card>
+          </motion.div>
         </div>
       </div>
+
+      {/* Unsaved changes bar */}
+      <AnimatePresence>
+        {dirty && (
+          <motion.div
+            initial={{ y: 80, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 80, opacity: 0 }}
+            className="fixed bottom-4 inset-x-4 md:inset-x-auto md:left-1/2 md:-translate-x-1/2 z-40 md:w-[32rem] rounded-2xl bg-gray-900 text-white dark:bg-white dark:text-gray-900 shadow-2xl px-4 py-3 flex items-center gap-3"
+            role="status"
+          >
+            <span className="flex-1 text-sm">You have unsaved changes</span>
+            <button type="button" onClick={() => setForm(initial)} disabled={saving} className="px-3 py-1.5 text-sm rounded-xl hover:bg-white/10 dark:hover:bg-gray-900/10">
+              Discard
+            </button>
+            <button type="submit" form="profile-form" disabled={saving} className="px-4 py-1.5 text-sm font-semibold rounded-xl bg-blue-600 text-white hover:bg-blue-500 disabled:opacity-60">
+              {saving ? "Saving…" : "Save changes"}
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <ChangePasswordModal isOpen={passwordOpen} onClose={() => setPasswordOpen(false)} />
     </div>
   );
 };

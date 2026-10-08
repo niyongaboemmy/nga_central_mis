@@ -15,6 +15,7 @@ import { useScopedGrades } from "../hooks/useScopedGrades";
 import { useAcademicPeriod } from "../contexts/AcademicPeriodContext";
 import { useToast } from "../contexts/ToastContext";
 import UserProfileViewer from "./UserProfileViewer";
+import UserAvatar from "./ui/UserAvatar";
 import SelectField from "./ui/SelectField";
 
 const PAGE_SIZE = 40;
@@ -49,12 +50,6 @@ const FloatingParticles = () => (
   </div>
 );
 
-const initialsOf = (u: ScopedUser) =>
-  (
-    `${(u.first_name ?? "").charAt(0)}${(u.last_name ?? "").charAt(0)}`.trim() ||
-    u.username.charAt(0)
-  ).toUpperCase();
-
 // User card component
 const UserCard = ({
   user,
@@ -80,9 +75,11 @@ const UserCard = ({
   >
     <div className="flex items-center justify-between gap-3">
       <div className="flex items-center gap-3 min-w-0">
-        <div className="w-9 h-9 bg-blue-500 rounded-full flex items-center justify-center flex-shrink-0 text-white text-xs font-semibold">
-          {initialsOf(user)}
-        </div>
+        <UserAvatar
+          name={[user.first_name, user.last_name].filter(Boolean).join(" ") || user.username}
+          avatar={user.avatar}
+          size={36}
+        />
         <div className="min-w-0 flex-1">
           <h3 className="font-medium text-gray-900 dark:text-white text-sm truncate">
             {user.first_name || user.last_name

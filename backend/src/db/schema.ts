@@ -34,6 +34,10 @@ export const User = mysqlTable("User", {
   // makes logout actually revoke a session instead of just clearing a
   // cookie -- see authenticate() in middleware/auth.ts.
   token_version: int("token_version").notNull().default(0),
+  // Profile picture: NULL = none, else the upload's unix time -- it is part of
+  // every avatar URL, so a new picture never hits a stale cache (migration 117,
+  // services/avatar/).
+  avatar_version: int("avatar_version", { unsigned: true }),
   created_at: datetime("created_at").default(sql`CURRENT_TIMESTAMP`),
   updated_at: datetime("updated_at").default(
     sql`CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP`,

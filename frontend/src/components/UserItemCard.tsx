@@ -1,7 +1,7 @@
 import React from "react";
+import UserAvatar from "./ui/UserAvatar";
 import { motion } from "framer-motion";
 import {
-  User as UserIcon,
   Shield,
   Mail,
   ChevronDown,
@@ -92,9 +92,15 @@ const UserItemCard: React.FC<UserItemCardProps> = ({
       >
         {/* Avatar */}
         <div className="relative">
-          <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center">
-            <UserIcon className="w-5 h-5 text-white" />
-          </div>
+          <UserAvatar
+            name={
+              [user.profile?.first_name, user.profile?.last_name].filter(Boolean).join(" ") ||
+              user.user.username
+            }
+            avatar={user.avatar}
+            src={user.user.avatar_url}
+            size={40}
+          />
           <div
             className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white dark:border-slate-800 ${
               user.user.status === "ACTIVE" ? "bg-green-500" : "bg-slate-400"
