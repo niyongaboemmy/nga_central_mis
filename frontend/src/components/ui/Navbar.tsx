@@ -9,6 +9,7 @@ import NavSearch from "./NavSearch";
 import NotificationBell from "./NotificationBell";
 import NavAppActions from "../apps/NavAppActions";
 import { LayoutGrid } from "lucide-react";
+import UserAvatar from "./UserAvatar";
 
 interface NavbarProps {
   onNavigateToLogin?: () => void;
@@ -77,15 +78,6 @@ const Navbar: React.FC<NavbarProps> = ({
       return `${profile.first_name} ${profile.last_name}`;
     }
     return userData.username;
-  };
-
-  const getUserInitials = () => {
-    if (!user) return "U";
-    const { profile, user: userData } = user;
-    if (profile?.first_name && profile?.last_name) {
-      return `${profile.first_name[0]}${profile.last_name[0]}`.toUpperCase();
-    }
-    return userData.username[0].toUpperCase();
   };
 
   const handleLogout = () => {
@@ -210,21 +202,32 @@ const Navbar: React.FC<NavbarProps> = ({
                     aria-label="Account menu"
                     title={getUserDisplayName()}
                   >
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white text-sm font-semibold">
-                      {getUserInitials()}
-                    </div>
+                    <UserAvatar
+                      name={getUserDisplayName()}
+                      avatar={user.avatar}
+                      src={user.user?.avatar_url}
+                      size={32}
+                    />
                   </button>
 
                   {/* Dropdown Menu */}
                   {isUserDropdownOpen && (
                     <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-gray-900 rounded-3xl shadow-lg border border-border-light dark:border-gray-700/30 py-2 animate-fade-in">
-                      <div className="px-4 py-3 border-b border-border-light dark:border-gray-700/40">
-                        <p className="text-sm font-medium text-text-primary-light dark:text-text-primary-dark">
-                          {getUserDisplayName()}
-                        </p>
-                        <p className="text-xs text-text-secondary-light dark:text-text-secondary-dark/70 truncate">
-                          {user.user?.email}
-                        </p>
+                      <div className="px-4 py-3 border-b border-border-light dark:border-gray-700/40 flex items-center gap-3">
+                        <UserAvatar
+                          name={getUserDisplayName()}
+                          avatar={user.avatar}
+                          src={user.user?.avatar_url}
+                          size={40}
+                        />
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-text-primary-light dark:text-text-primary-dark truncate">
+                            {getUserDisplayName()}
+                          </p>
+                          <p className="text-xs text-text-secondary-light dark:text-text-secondary-dark/70 truncate">
+                            {user.user?.email}
+                          </p>
+                        </div>
                       </div>
                       <Link to={"/profile"} title="Profile">
                         <button
@@ -409,9 +412,12 @@ const Navbar: React.FC<NavbarProps> = ({
             {showUserCard && user && (
               <div className="px-4 py-3 mb-2 bg-surface-light dark:bg-surface-dark rounded-xl">
                 <div className="flex items-center space-x-3">
-                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white font-semibold">
-                    {getUserInitials()}
-                  </div>
+                  <UserAvatar
+                    name={getUserDisplayName()}
+                    avatar={user.avatar}
+                    src={user.user?.avatar_url}
+                    size={40}
+                  />
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-text-primary-light dark:text-text-primary-dark truncate">
                       {getUserDisplayName()}

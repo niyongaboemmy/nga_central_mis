@@ -23,6 +23,7 @@ import {
 } from "../db/schema";
 import { asyncHandler } from "../middleware/asyncHandler";
 import { successResponse } from "../utils/response";
+import { avatarUrls, withAvatar } from "../services/avatar/urls";
 import { NotFoundError, AuthorizationError } from "../errors/CustomError";
 import logger from "../utils/logger";
 import { getCurrentAcademicYearId } from "../utils/academicYear";
@@ -1003,6 +1004,7 @@ export const getScopedUsers = asyncHandler(async (req: any, res: any) => {
   const baseColumns = {
     user_id: User.user_id,
     username: User.username,
+    avatar_version: User.avatar_version,
     email: User.email,
     phone_number: User.phone_number,
     status: User.status,
@@ -1034,6 +1036,7 @@ export const getScopedUsers = asyncHandler(async (req: any, res: any) => {
           .select({
             user_id: User.user_id,
             username: User.username,
+            avatar_version: User.avatar_version,
             email: User.email,
             phone_number: User.phone_number,
             status: User.status,
@@ -1195,7 +1198,9 @@ export const getScopedUsers = asyncHandler(async (req: any, res: any) => {
   const totalCount = users.length;
   setPaginationHeaders(res, totalCount, pageNum, limitNum);
   successResponse(res, "Users retrieved successfully", {
-    users: users.slice(offset, offset + limitNum),
+    users: users
+      .slice(offset, offset + limitNum)
+      .map((u: any) => ({ ...u, avatar: avatarUrls(u.user_id, u.avatar_version) })),
     roleGroups: Array.from(roleGroups.values()).sort(
       (a, b) => b.count - a.count,
     ),
@@ -1457,7 +1462,8 @@ export const getScopedUserDetail = asyncHandler(async (req: any, res: any) => {
   const { password_hash, ...safeUser } = target as any;
 
   successResponse(res, "User profile retrieved successfully", {
-    user: safeUser,
+    user: withAvatar(safeUser),
+    avatar: avatarUrls(safeUser.user_id, safeUser.avatar_version),
     profile: profileRows[0] ?? null,
     roles,
     permissions: Array.from(

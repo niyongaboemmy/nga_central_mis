@@ -40,6 +40,14 @@ import {
   getScopedUserDetail,
 } from "../controllers/userScopeController";
 import { getUserActivities } from "../controllers/activityController";
+import {
+  avatarUpload,
+  getMyAvatar,
+  uploadMyAvatar,
+  deleteMyAvatar,
+  uploadUserAvatar,
+  deleteUserAvatar,
+} from "../controllers/avatarController";
 import { authenticate, authorize } from "../middleware/auth";
 
 const router = express.Router();
@@ -66,6 +74,10 @@ const upload = multer({
 router.get("/me", authenticate, getCurrentUser);
 router.put("/me/profile", authenticate, updateCurrentUserProfile);
 router.patch("/me/theme", authenticate, updateThemePreference);
+// Central profile picture, shown by every NGA app (services/avatar/).
+router.get("/me/avatar", authenticate, getMyAvatar);
+router.put("/me/avatar", authenticate, avatarUpload, uploadMyAvatar);
+router.delete("/me/avatar", authenticate, deleteMyAvatar);
 router.get("/", authenticate, authorize("MANAGE_USERS"), getUsers);
 
 // Role/status counts for the management chips and dashboard. Two aggregate
@@ -157,6 +169,8 @@ router.post(
   bulkCreateUsers,
 );
 router.put("/:id", authenticate, authorize("MANAGE_USERS"), updateUser);
+router.put("/:id/avatar", authenticate, authorize("MANAGE_USERS"), avatarUpload, uploadUserAvatar);
+router.delete("/:id/avatar", authenticate, authorize("MANAGE_USERS"), deleteUserAvatar);
 router.delete("/:id", authenticate, authorize("MANAGE_USERS"), deleteUser);
 
 // User status management
