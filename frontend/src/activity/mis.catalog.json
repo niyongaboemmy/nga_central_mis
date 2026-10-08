@@ -77,6 +77,7 @@
     { "key": "mis.safeguarding", "label": "Safeguarding", "module": "Platform", "patterns": ["/safeguarding"] },
     { "key": "mis.early_warning", "label": "Early warning", "module": "Platform", "patterns": ["/early-warning"] },
     { "key": "mis.competency_map", "label": "Competency map", "module": "Platform", "patterns": ["/competency-map"] },
+    { "key": "mis.my_competences", "label": "My competences", "module": "Platform", "patterns": ["/my-competences"] },
     { "key": "mis.staff_cover", "label": "Staff cover", "module": "Platform", "patterns": ["/cover"] },
     { "key": "mis.family", "label": "My children", "module": "Platform", "patterns": ["/family"] },
     { "key": "mis.families_import", "label": "Import parents", "module": "Platform", "patterns": ["/families/import"] },

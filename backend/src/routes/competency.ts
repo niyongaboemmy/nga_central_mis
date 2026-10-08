@@ -3,7 +3,7 @@ import { authenticate } from "../middleware/auth";
 import { asyncHandler } from "../middleware/asyncHandler";
 import { requireServiceToken } from "../middleware/serviceAuth";
 import { getCurrentAcademicYearId } from "../utils/academicYear";
-import { CompetencyError, SOURCES, classMap, curriculumFor, ingestEvidence, mapOptions, studentEvidence, teaches, type Source } from "../services/competencyMap";
+import { CompetencyError, SOURCES, classMap, curriculumFor, ingestEvidence, mapOptions, studentEvidence, studentMap, teaches, type Source } from "../services/competencyMap";
 
 /**
  * Competency map (services/competencyMap.ts, migration 116).
@@ -11,6 +11,8 @@ import { CompetencyError, SOURCES, classMap, curriculumFor, ingestEvidence, mapO
  * Apps (client credentials or a token):
  *   GET /competency/curriculum/:subjectId   learning outcomes + criteria, for tagging work  (sync:read)
  *   PUT /competency/evidence                { tasks: [{ source_type, source_ref, subject_id, title, criteria_ids, results }] }  (competency:write)
+ * Students:
+ *   GET /competency/me                      my subjects' learning outcomes, states and evidence
  * Staff:
  *   GET /competency/options                 subject × class pairs the viewer may open
  *   GET /competency/map?subjectId=&classGroupId=                 class × criteria map
@@ -64,6 +66,14 @@ export function competencyRouter(
     if (oversight(req)) return 0;
     return (await teaches(req.user.userId, subjectId, classGroupId, yearId)) ? 0 : 403;
   };
+
+  router.get(
+    "/me",
+    asyncHandler(async (req: any, res) => {
+      res.set("Cache-Control", "private, no-store");
+      res.json({ success: true, data: await studentMap(req.user.userId, await getCurrentAcademicYearId()) });
+    }),
+  );
 
   router.get(
     "/options",

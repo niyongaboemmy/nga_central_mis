@@ -60,3 +60,21 @@ export const competencyApi = {
   student: (id: number, subjectId: number, classGroupId: number) =>
     api.get<{ data: CompStudentDetail }>(`/competency/map/students/${id}`, { params: { subjectId, classGroupId } }),
 };
+
+export interface MySubject {
+  subject_id: number;
+  name: string;
+  code: string | null;
+  color: string | null;
+  total: number;
+  demonstrated: number;
+  assessed: number;
+  outcomes: CompStudentDetail["outcomes"];
+}
+export interface MyCompetences {
+  competent_pct: number;
+  subjects: MySubject[];
+}
+export const myCompetencesApi = {
+  me: () => api.get<{ data: MyCompetences }>("/competency/me"),
+};
