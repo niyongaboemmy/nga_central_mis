@@ -57,6 +57,7 @@ import MyChildren from "./components/families/MyChildren";
 import ImportParents from "./components/families/ImportParents";
 import StaffCover from "./components/cover/StaffCover";
 import EarlyWarning from "./components/earlyWarning/EarlyWarning";
+import CompetencyMap from "./components/competency/CompetencyMap";
 import Safeguarding from "./components/safeguarding/Safeguarding";
 import Wellbeing from "./components/safeguarding/Wellbeing";
 import { Student360, Teacher360 } from "./components/officeHours/reports/Person360";
@@ -984,6 +985,16 @@ function App() {
                 <ProtectedRoute>
                   <SystemLayoutWrapper>
                     <EarlyWarning />
+                  </SystemLayoutWrapper>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/competency-map"
+              element={
+                <ProtectedRoute>
+                  <SystemLayoutWrapper>
+                    <CompetencyMap />
                   </SystemLayoutWrapper>
                 </ProtectedRoute>
               }

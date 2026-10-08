@@ -50,6 +50,11 @@ const SEARCH_ITEMS: SearchItem[] = [
     requiredPermission: Permissions.DESKTOP_TOOLS_CONFIGURE,
   },
   {
+    label: "Competency map",
+    path: "/competency-map",
+    requiredPermission: [Permissions.TEACHER_DASHBOARD, Permissions.VIEW_ALL_COURSES],
+  },
+  {
     label: "Early warning",
     path: "/early-warning",
     requiredPermission: Permissions.EARLY_WARNING_VIEW,

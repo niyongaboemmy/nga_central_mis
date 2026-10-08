@@ -87,7 +87,7 @@ export function deriveMastery(
   return covered ? "COVERED" : "NOT_COVERED";
 }
 
-async function loadBestChecks(itemIds: number[], userIds: number[]) {
+export async function loadBestChecks(itemIds: number[], userIds: number[]) {
   const map = new Map<string, number>();
   if (itemIds.length === 0 || userIds.length === 0) return map;
   const rows = await db

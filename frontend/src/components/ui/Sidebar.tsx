@@ -9,7 +9,7 @@ import { getToken } from "../../utils/auth";
 import { useAccess } from "../../hooks/useAccess";
 import { useMentorshipRole } from "../../hooks/useMentorshipRole";
 import { useOptionalAcademicPeriod } from "../../contexts/AcademicPeriodContext";
-import { BarChart3, CalendarOff, HeartHandshake, Radar, ShieldAlert, ShieldCheck, UserPlus, Baby } from "lucide-react";
+import { BarChart3, CalendarOff, Grid3x3, HeartHandshake, Radar, ShieldAlert, ShieldCheck, UserPlus, Baby } from "lucide-react";
 import { BellRing, Bot, CalendarDays, Clock4, Gamepad2, House, Users2 } from "lucide-react";
 
 interface SidebarProps {
@@ -675,6 +675,12 @@ const Sidebar: React.FC<SidebarProps> = ({
       label: "Staff cover",
       path: "/cover",
       icon: <CalendarOff className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
+      userTypes: ["TEACHER", "STAFF", "ADMIN"],
+    },
+    {
+      label: "Competency map",
+      path: "/competency-map",
+      icon: <Grid3x3 className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
       userTypes: ["TEACHER", "STAFF", "ADMIN"],
     },
     {

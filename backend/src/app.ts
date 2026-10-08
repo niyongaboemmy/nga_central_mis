@@ -39,6 +39,7 @@ import officeHoursRoutes from "./routes/officeHours";
 import familiesRoutes from "./routes/families";
 import staffCoverRoutes from "./routes/staffCover";
 import earlyWarningRoutes from "./routes/earlyWarning";
+import competencyRoutes from "./routes/competency";
 import safeguardingRoutes from "./routes/safeguarding";
 import desktopRoutes from "./routes/desktop";
 import { desktopToolsRouter } from "./routes/desktopTools";
@@ -158,6 +159,7 @@ app.use("/office-hours", officeHoursRoutes);
 app.use("/families", familiesRoutes);
 app.use("/cover", staffCoverRoutes);
 app.use("/early-warning", earlyWarningRoutes);
+app.use("/competency", competencyRoutes);
 app.use("/safeguarding", safeguardingRoutes);
 
 app.post("/test-post", (req, res) =>
