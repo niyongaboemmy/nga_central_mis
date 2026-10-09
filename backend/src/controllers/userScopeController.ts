@@ -23,7 +23,7 @@ import {
 } from "../db/schema";
 import { asyncHandler } from "../middleware/asyncHandler";
 import { successResponse } from "../utils/response";
-import { avatarUrls, withAvatar } from "../services/avatar/urls";
+import { avatarUrls, profileMedia, withAvatar } from "../services/avatar/urls";
 import { NotFoundError, AuthorizationError } from "../errors/CustomError";
 import logger from "../utils/logger";
 import { getCurrentAcademicYearId } from "../utils/academicYear";
@@ -1463,7 +1463,7 @@ export const getScopedUserDetail = asyncHandler(async (req: any, res: any) => {
 
   successResponse(res, "User profile retrieved successfully", {
     user: withAvatar(safeUser),
-    avatar: avatarUrls(safeUser.user_id, safeUser.avatar_version),
+    ...profileMedia(safeUser),
     profile: profileRows[0] ?? null,
     roles,
     permissions: Array.from(

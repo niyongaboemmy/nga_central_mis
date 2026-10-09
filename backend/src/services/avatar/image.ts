@@ -82,7 +82,23 @@ async function decodeUpright(input: Buffer) {
   }
 }
 
-export async function renderAvatar(input: Buffer, crop?: AvatarCrop): Promise<AvatarRenditions> {
+/**
+ * Cover (profile banner) renditions, 3:1:
+ *   md  960x320  -- cards, phones
+ *   lg 1920x640  -- the profile header on wide screens
+ */
+export const COVER_SIZES = { md: [960, 320], lg: [1920, 640] } as const;
+export type CoverSize = keyof typeof COVER_SIZES;
+export const COVER_SIZE_NAMES = Object.keys(COVER_SIZES) as CoverSize[];
+export const COVER_ASPECT = 3;
+export type CoverRenditions = Record<CoverSize, Buffer>;
+
+/**
+ * Cuts a box of the given aspect (width / height) out of the upright image: the largest
+ * one that fits inside the requested crop, centred on it; without a crop, the most
+ * "interesting" one of the whole picture (faces, contrast).
+ */
+async function cutBox(input: Buffer, aspect: number, crop?: AvatarCrop) {
   if (!input?.length) throw new ValidationError("Choose a picture to upload");
   if (input.length > AVATAR_MAX_BYTES) throw new ValidationError("Picture must be 10 MB or smaller");
 
@@ -91,38 +107,63 @@ export async function renderAvatar(input: Buffer, crop?: AvatarCrop): Promise<Av
   if (Math.min(W, H) < MIN_SIDE) {
     throw new ValidationError(`Picture is too small; use one at least ${MIN_SIDE}x${MIN_SIDE} pixels`);
   }
-
   const raw = () => sharp(data, { raw: { width: W, height: H, channels } });
-  let square: Buffer;
-  let side: number;
+
+  const [bw, bh] = crop ? [crop.width * W, crop.height * H] : [W, H];
+  // Largest aspect-shaped box inside the area (the browser's box can drift a pixel
+  // off-shape from rounding), clamped inside the image.
+  const height = Math.max(1, Math.round(Math.min(bh, bw / aspect, H, W / aspect)));
+  const width = Math.max(1, Math.min(W, Math.round(height * aspect)));
+  if (Math.min(width, height) < MIN_SIDE) {
+    throw new ValidationError("The selected area is too small; zoom out a little");
+  }
+
+  let box: Buffer;
   if (crop) {
-    // A square in pixels, centred on the requested box (the browser's box can drift a
-    // pixel off-square from rounding), clamped inside the image.
-    side = Math.max(1, Math.round(Math.min(crop.width * W, crop.height * H, W, H)));
     const cx = (crop.x + crop.width / 2) * W;
     const cy = (crop.y + crop.height / 2) * H;
-    const left = Math.min(Math.max(0, Math.round(cx - side / 2)), W - side);
-    const top = Math.min(Math.max(0, Math.round(cy - side / 2)), H - side);
-    if (side < MIN_SIDE) throw new ValidationError("The selected area is too small; zoom out a little");
-    square = await raw().extract({ left, top, width: side, height: side }).raw().toBuffer();
+    const left = Math.min(Math.max(0, Math.round(cx - width / 2)), W - width);
+    const top = Math.min(Math.max(0, Math.round(cy - height / 2)), H - height);
+    box = await raw().extract({ left, top, width, height }).raw().toBuffer();
   } else {
-    // No crop chosen: keep the most "interesting" square (faces, contrast).
-    side = Math.min(W, H);
-    square = await raw()
-      .resize({ width: side, height: side, fit: "cover", position: sharp.strategy.attention })
+    box = await raw()
+      .resize({ width, height, fit: "cover", position: sharp.strategy.attention })
       .raw()
       .toBuffer();
   }
+  return { box, width, height, channels };
+}
 
+async function encode(
+  cut: Awaited<ReturnType<typeof cutBox>>,
+  outW: number,
+  outH: number,
+  quality: number,
+): Promise<Buffer> {
+  return sharp(cut.box, { raw: { width: cut.width, height: cut.height, channels: cut.channels } })
+    .resize({ width: outW, height: outH, kernel: sharp.kernel.lanczos3 })
+    .webp({ quality, effort: 4, smartSubsample: true })
+    .toBuffer();
+}
+
+export async function renderAvatar(input: Buffer, crop?: AvatarCrop): Promise<AvatarRenditions> {
+  const cut = await cutBox(input, 1, crop);
   const entries = await Promise.all(
     AVATAR_SIZE_NAMES.map(async (name) => {
       const px = AVATAR_SIZES[name];
-      const out = await sharp(square, { raw: { width: side, height: side, channels } })
-        .resize({ width: px, height: px, kernel: sharp.kernel.lanczos3 })
-        .webp({ quality: name === "sm" ? 78 : 82, effort: 4, smartSubsample: true })
-        .toBuffer();
-      return [name, out] as const;
+      return [name, await encode(cut, px, px, name === "sm" ? 78 : 82)] as const;
     }),
   );
   return Object.fromEntries(entries) as AvatarRenditions;
+}
+
+export async function renderCover(input: Buffer, crop?: AvatarCrop): Promise<CoverRenditions> {
+  const cut = await cutBox(input, COVER_ASPECT, crop);
+  const entries = await Promise.all(
+    COVER_SIZE_NAMES.map(async (name) => {
+      const [w, h] = COVER_SIZES[name];
+      return [name, await encode(cut, w, h, 80)] as const;
+    }),
+  );
+  return Object.fromEntries(entries) as CoverRenditions;
 }

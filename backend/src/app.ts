@@ -44,7 +44,7 @@ import safeguardingRoutes from "./routes/safeguarding";
 import desktopRoutes from "./routes/desktop";
 import { desktopToolsRouter } from "./routes/desktopTools";
 import { authenticate } from "./middleware/auth";
-import { serveAvatar } from "./controllers/avatarController";
+import { serveAvatar, serveCover } from "./controllers/avatarController";
 import { jwks, ssoIssuer } from "./services/sso/signingKey";
 
 const app = express();
@@ -125,6 +125,7 @@ app.use("/auth", authRoutes);
 app.use("/users", userRoutes);
 // Profile pictures: public but signed + versioned URLs (services/avatar/urls.ts).
 app.get("/avatars/:userId/:version/:file", serveAvatar);
+app.get("/covers/:userId/:version/:file", serveCover);
 app.use("/permissions", permissionRoutes);
 app.use("/documents", documentRoutes);
 app.use("/academics", academicRoutes);

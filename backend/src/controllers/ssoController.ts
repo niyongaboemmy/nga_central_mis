@@ -1,5 +1,5 @@
 import { trackAuth } from "../services/activity/authEvents";
-import { avatarUrls, withAvatar } from "../services/avatar/urls";
+import { avatarUrls, profileMedia, withAvatar } from "../services/avatar/urls";
 import { activitySourceClients } from "../services/activity/apps";
 import jwt from "jsonwebtoken";
 import { getPublicSystems } from "../utils/publicSystems";
@@ -252,7 +252,7 @@ export const getSSOToken = asyncHandler(async (req: any, res: any) => {
   successResponse(res, "Token generated successfully", {
     token,
     user: withAvatar(user[0]),
-    avatar: avatarUrls(user[0].user_id, user[0].avatar_version),
+    ...profileMedia(user[0]),
     permissions,
     access_version: accessVersion,
   });
