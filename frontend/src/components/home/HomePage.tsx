@@ -296,7 +296,7 @@ const HomePage: React.FC = () => {
       </header>
 
       <p className="sr-only" aria-live="polite">
-        {blockingCount > 0 ? `${blockingCount} items need you now.` : "Nothing urgent."}
+        {blockingCount > 0 ? `${blockingCount} ${blockingCount === 1 ? "item needs" : "items need"} you now.` : "Nothing urgent."}
       </p>
 
       {/* ② Lenses */}

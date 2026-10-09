@@ -41,17 +41,25 @@ const LENS_BONUS: Record<string, number> = {
 
 const hoursBetween = (from: string, to: Date) => (to.getTime() - new Date(from).getTime()) / 3_600_000;
 
+/** A deadline this close counts as pressing: the closer, the higher. */
+const IMMINENT_HOURS = 48;
+
 /**
  * Ranking (plan §13): tier first, then how long someone has waited, how far
  * past due it is, how soon it is due, and a small nudge for the lenses that
- * are the reader's own work.
+ * are the reader's own work. Within a tier: overdue (150-500) > due within
+ * 48 h (0-144, rising as it nears) > no deadline (0) > due later (down to -200),
+ * so a quiz closing in 5 hours leads over a "talk to your teacher" note.
  */
 export const scoreItem = (item: AttentionItem, now: Date): number => {
   let score = TIER_WEIGHT[item.tier];
   if (item.waiting_since) score += Math.min(300, Math.max(0, hoursBetween(item.waiting_since, now)));
   if (item.due_at) {
     const hoursLate = hoursBetween(item.due_at, now);
-    score += hoursLate > 0 ? Math.min(500, hoursLate * 2) : -Math.min(200, -hoursLate);
+    const hoursLeft = -hoursLate;
+    if (hoursLate > 0) score += 150 + Math.min(350, hoursLate * 2);
+    else if (hoursLeft <= IMMINENT_HOURS) score += (IMMINENT_HOURS - hoursLeft) * 3;
+    else score -= Math.min(200, hoursLeft - IMMINENT_HOURS);
   }
   score += LENS_BONUS[item.lens.split(":")[0]] ?? 0;
   return score;

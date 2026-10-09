@@ -1496,8 +1496,12 @@ export function rankItems(items: AttentionItem[], now: Date): AttentionItem[] {
     let s = TIER_WEIGHT[i.tier];
     if (i.waiting_since) s += Math.min(300, hoursSince(i.waiting_since, now));
     if (i.due_at) {
+      // Same rule as the page (frontend merge.ts scoreItem): overdue >
+      // due within 48 h (rising as it nears) > no deadline > due later.
       const h = (new Date(i.due_at).getTime() - now.getTime()) / 3_600_000;
-      s += h < 0 ? Math.min(500, -h * 2) : -Math.min(200, h);
+      if (h < 0) s += 150 + Math.min(350, -h * 2);
+      else if (h <= 48) s += (48 - h) * 3;
+      else s -= Math.min(200, h - 48);
     }
     return s;
   };

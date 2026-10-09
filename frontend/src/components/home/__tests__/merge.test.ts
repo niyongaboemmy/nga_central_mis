@@ -69,6 +69,20 @@ describe("ranking", () => {
     );
     expect(ranked[0].id).toBe("late");
   });
+
+  it("puts a deadline hours away above an item with no deadline, and both below overdue work", () => {
+    const at = (h: number) => new Date(now.getTime() + h * 3_600_000).toISOString();
+    const ranked = rankItems(
+      [
+        item({ id: "no-deadline", title: "A" }),
+        item({ id: "next-week", due_at: at(24 * 6) }),
+        item({ id: "in-5h", due_at: at(5) }),
+        item({ id: "overdue-1h", due_at: at(-1) }),
+      ],
+      now,
+    );
+    expect(ranked.map((i) => i.id)).toEqual(["overdue-1h", "in-5h", "no-deadline", "next-week"]);
+  });
 });
 
 describe("lenses", () => {
