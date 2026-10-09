@@ -99,6 +99,7 @@ const UserItemCard: React.FC<UserItemCardProps> = ({
             }
             avatar={user.avatar}
             src={user.user.avatar_url}
+            userId={user.user.user_id}
             size={40}
           />
           <div

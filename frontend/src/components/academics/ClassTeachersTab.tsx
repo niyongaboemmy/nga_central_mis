@@ -1,3 +1,4 @@
+import UserAvatar from "../ui/UserAvatar";
 import React, { useEffect, useMemo, useState } from "react";
 import { AcademicYear, ClassGroup, Grade } from "../../api/academics";
 import {
@@ -435,6 +436,9 @@ const ClassTeachersTab: React.FC<ClassTeachersTabProps> = ({
                       className="hover:bg-surface-light dark:hover:bg-surface-dark"
                     >
                       <td className="px-4 py-3 whitespace-nowrap">
+                        <div className="flex items-center gap-2.5">
+                        <UserAvatar decorative userId={item.user_id} name={item.user_name || "?"} size={32} />
+                        <div>
                         <button
                           onClick={() => openUserProfile(item.user_id)}
                           className="text-sm font-medium text-text-primary-light dark:text-text-primary-dark hover:text-blue-600 dark:hover:text-blue-400 hover:underline text-left"
@@ -444,6 +448,8 @@ const ClassTeachersTab: React.FC<ClassTeachersTabProps> = ({
                         <p className="text-xs text-text-secondary-light dark:text-text-secondary-dark/70">
                           {item.email}
                         </p>
+                        </div>
+                        </div>
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-sm text-text-secondary-light dark:text-text-secondary-dark/70">
                         {item.grade_name} • {item.program_name}

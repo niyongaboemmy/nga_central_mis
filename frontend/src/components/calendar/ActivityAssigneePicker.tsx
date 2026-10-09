@@ -1,5 +1,6 @@
+import UserAvatar from "../ui/UserAvatar";
 import React, { useEffect, useRef, useState } from "react";
-import { Search, UserPlus, X } from "lucide-react";
+import { Search, X } from "lucide-react";
 import { searchUsers, type UserSearchResult } from "../../api/users";
 import type { ActivityAssignee } from "../../api/calendar";
 
@@ -126,8 +127,9 @@ const ActivityAssigneePicker: React.FC<ActivityAssigneePickerProps> = ({
           <span
             key={u.user_id}
             data-testid="assignee-chip"
-            className="inline-flex items-center gap-1 pl-2 pr-1 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900/40 text-emerald-800 dark:text-emerald-200 text-xs font-medium"
+            className="inline-flex items-center gap-1 pl-0.5 pr-1 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900/40 text-emerald-800 dark:text-emerald-200 text-xs font-medium"
           >
+            <UserAvatar decorative userId={u.user_id} name={assigneeLabel(u)} size={18} />
             {assigneeLabel(u)}
             <button
               type="button"
@@ -194,7 +196,7 @@ const ActivityAssigneePicker: React.FC<ActivityAssigneePickerProps> = ({
                   : "hover:bg-gray-50 dark:hover:bg-gray-700/50"
               }`}
             >
-              <UserPlus className="w-4 h-4 text-emerald-500 flex-shrink-0" />
+              <UserAvatar decorative userId={u.user_id} name={assigneeLabel(u)} size={28} />
               <span className="flex-1 min-w-0">
                 <span className="block truncate text-gray-900 dark:text-white">
                   {assigneeLabel(u)}

@@ -1,3 +1,4 @@
+import UserAvatar from "../ui/UserAvatar";
 import React, { useEffect, useMemo, useState } from "react";
 import {
   X,
@@ -547,7 +548,8 @@ const MentoringSessionModal: React.FC<Props> = ({
                   </span>
                 )}
               </h2>
-              <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5 flex items-center gap-2">
+                <UserAvatar decorative userId={student.user_id} name={fullName || "Student"} size={22} />
                 {fullName}{student.class_group_name ? ` · ${student.class_group_name}` : ""}
               </p>
             </div>
