@@ -200,6 +200,8 @@ export interface SharedNoteSummary {
   title: string;
   subject_name: string;
   teacher_name: string;
+  /** The teacher's MIS user id (their photo is looked up from it). */
+  teacher_id?: number;
   updated_at: string;
   source: LessonNoteSource;
   page_count: number | null;
@@ -247,6 +249,8 @@ export interface SharedNoteDetail {
   updated_at: string;
   /** Credited in the reader header, so opening a note keeps the facts the card showed. */
   teacher_name: string;
+  /** The teacher's MIS user id (their photo is looked up from it). */
+  teacher_id?: number;
   word_count: number;
   reading_minutes: number;
   /** Set when the note is coursework for this student — the reader points back to the week. */

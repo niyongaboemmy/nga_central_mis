@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback, useMemo, useRef } from "react";
+import UserAvatar from "../ui/UserAvatar";
 import { Users, Plus, X, Search, RefreshCw, UserMinus, AlertTriangle, Download, UserPlus, CheckCircle2, ChevronDown, FileDown, Repeat } from "lucide-react";
 import { mentorshipApi, MentorAssignmentRecord, MentorCandidate } from "../../api/mentorship";
 import { MentorshipReportService } from "../../services/MentorshipReportService";
@@ -280,9 +281,7 @@ const AdminMentorAssignments: React.FC = () => {
                             disabled={isDownloading}
                             className="group w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-left hover:bg-blue-600 disabled:opacity-50 transition-colors"
                           >
-                            <div className="w-7 h-7 rounded-full bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 flex items-center justify-center text-[11px] font-bold shrink-0 group-hover:bg-white/20 group-hover:text-white">
-                              {initialsOf(name)}
-                            </div>
+                            <UserAvatar decorative userId={m.mentor_id} name={name} size={28} />
                             <span className="min-w-0 flex-1 truncate">
                               <span className="text-sm text-gray-900 dark:text-white font-medium group-hover:text-white">{name}</span>{" "}
                               <span className="text-xs text-gray-400 group-hover:text-blue-100">({m.menteeCount})</span>
@@ -484,10 +483,6 @@ const AdminMentorAssignments: React.FC = () => {
 // ─────────────────────────────────────────────────────────────────────────────
 // Assign / bulk-assign modal
 // ─────────────────────────────────────────────────────────────────────────────
-const initialsOf = (name: string) => {
-  const parts = name.trim().split(/\s+/);
-  return parts.slice(0, 2).map((p) => p[0]?.toUpperCase() ?? "").join("") || "?";
-};
 
 const ROLE_LABELS: Record<string, string> = {
   TEACHER: "Teacher",
@@ -746,9 +741,7 @@ export const AssignMentorModal: React.FC<{
             {selectedMentor ? (
               <div className="mt-2 flex items-center justify-between px-3.5 py-2.5 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-900/30 rounded-2xl">
                 <div className="flex items-center gap-2.5 min-w-0">
-                  <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center text-[11px] font-bold shrink-0">
-                    {initialsOf(selectedMentor.name)}
-                  </div>
+                  <UserAvatar decorative userId={selectedMentor.user_id} name={selectedMentor.name} size={32} />
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
                       {selectedMentor.name}{" "}
@@ -821,9 +814,7 @@ export const AssignMentorModal: React.FC<{
                           i === mentorActive ? "bg-blue-50 dark:bg-blue-900/30" : ""
                         }`}
                       >
-                        <div className="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 flex items-center justify-center text-[11px] font-bold shrink-0">
-                          {initialsOf(u.name)}
-                        </div>
+                        <UserAvatar decorative userId={u.user_id} name={u.name} size={32} />
                         <span className="min-w-0 flex-1">
                           <span className="block truncate text-gray-900 dark:text-white font-medium">{u.name}</span>
                           <span className="block truncate text-[11px] text-gray-500 dark:text-gray-400">{u.email ?? u.username}</span>
@@ -887,9 +878,7 @@ export const AssignMentorModal: React.FC<{
                             : "bg-blue-50 dark:bg-blue-900/20 border-blue-100 dark:border-blue-900/30 text-gray-800 dark:text-gray-200"
                       }`}
                     >
-                      <span className={`w-5 h-5 rounded-full text-white flex items-center justify-center text-[9px] font-bold ${moves ? "bg-amber-500" : "bg-blue-600"}`}>
-                        {initialsOf(s.name)}
-                      </span>
+                      <UserAvatar decorative userId={s.user_id} name={s.name} size={20} />
                       {s.name}
                       <button
                         onClick={() => toggleStudent(s)}

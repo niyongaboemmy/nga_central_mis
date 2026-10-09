@@ -1617,6 +1617,8 @@ async function resolveVisibleSharedNotes(studentId: number) {
         source: v.source,
         page_count: v.page_count,
         teacher_name: teacherName.get(v.teacher_id) || "",
+        // Lets the card show the teacher's photo (POST /users/avatars/lookup).
+        teacher_id: v.teacher_id,
         updated_at: v.updated_at,
         scheme_start_date: v.scheme_start_date,
       }))
@@ -1706,6 +1708,7 @@ export const getSharedLessonNote = asyncHandler(async (req: any, res: any) => {
       subject_id: LessonNote.subject_id,
       subject_name: Subject.name,
       updated_at: LessonNote.updated_at,
+      teacher_id: LessonNote.user_id,
       teacher_first_name: UserProfile.first_name,
       teacher_last_name: UserProfile.last_name,
     })

@@ -134,6 +134,35 @@ export const lookupProfileMedia = asyncHandler(async (req: any, res: Response) =
   });
 });
 
+const AVATAR_LOOKUP_MAX = 500;
+
+/**
+ * POST /users/avatars/lookup  { user_ids: number[] }  (any signed-in user)
+ * Photos for the people on a page, so every list and detail view can show faces
+ * without each endpoint carrying them. Only people who have a photo are in the
+ * answer; the links are the same signed, versioned ones as everywhere else.
+ */
+export const lookupAvatars = asyncHandler(async (req: any, res: Response) => {
+  const raw = req.body?.user_ids;
+  if (!Array.isArray(raw)) throw new ValidationError("user_ids must be an array of user ids");
+  const ids = Array.from(new Set(raw.map(Number))).filter((n) => Number.isSafeInteger(n) && n > 0);
+  if (ids.length > AVATAR_LOOKUP_MAX) throw new ValidationError(`At most ${AVATAR_LOOKUP_MAX} user ids per request`);
+  const rows = ids.length
+    ? await db
+        .select({ user_id: User.user_id, avatar_version: User.avatar_version })
+        .from(User)
+        .where(inArray(User.user_id, ids))
+    : [];
+  const avatars: Record<number, unknown> = {};
+  for (const r of rows) {
+    const urls = profileMedia(r).avatar;
+    if (urls) avatars[r.user_id] = urls;
+  }
+  // Short private cache: a page re-rendering asks again, a new photo shows within a minute.
+  res.setHeader("Cache-Control", "private, max-age=60");
+  successResponse(res, "Avatars retrieved", { avatars });
+});
+
 const notFound = (res: Response) => res.status(404).json({ success: false, message: "Not found" });
 
 /**

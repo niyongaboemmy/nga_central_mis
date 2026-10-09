@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import UserAvatar from "../ui/UserAvatar";
 import {
   Send,
   MessageCircle,
@@ -112,12 +113,6 @@ type PageTab = "MENTOR" | "REPORT" | "HISTORY";
 // since this codebase has no push/websocket notification infrastructure.
 const POLL_INTERVAL_MS = 45_000;
 const MESSAGE_MAX_LENGTH = 2000;
-
-const initialsOf = (name: string | null | undefined) => {
-  if (!name) return "?";
-  const parts = name.trim().split(/\s+/);
-  return parts.slice(0, 2).map((p) => p[0]?.toUpperCase() ?? "").join("");
-};
 
 const ROLE_LABELS: Record<string, string> = {
   TEACHER: "Teacher",
@@ -371,9 +366,7 @@ const MyMentor: React.FC = () => {
                 className="bg-gradient-to-r from-blue-50 to-white dark:from-blue-900/10 dark:to-gray-800/30 rounded-2xl p-5 border border-blue-100 dark:border-blue-900/20 shadow-sm"
               >
                 <div className="flex items-start gap-4">
-                  <div className="w-16 h-16 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-lg shrink-0">
-                    {initialsOf(mentor.mentor_name)}
-                  </div>
+                  <UserAvatar decorative userId={mentor.mentor_id} name={mentor.mentor_name || "Mentor"} size={64} />
                   <div className="min-w-0 flex-1">
                     <p className="text-[11px] uppercase tracking-wide font-semibold text-blue-600 dark:text-blue-400">
                       Your mentor{selectedYear?.name ? ` · ${selectedYear.name}` : ""}

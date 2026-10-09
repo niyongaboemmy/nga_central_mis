@@ -1,3 +1,4 @@
+import UserAvatar from "../ui/UserAvatar";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, CheckCheck, ChevronDown, History, MessageSquareWarning, QrCode, Search, UserPlus } from "lucide-react";
 import Modal from "../ui/Modal";
@@ -384,6 +385,7 @@ const RegisterSheet: React.FC<RegisterSheetProps> = ({ sessionId, onClose, onSav
                   aria-label={`${name}: ${d.status ? ATTENDANCE_META[d.status].label : "not marked"}`}
                 >
                   <div className="flex flex-wrap items-center gap-3">
+                    <UserAvatar decorative userId={r.student_id} name={name} size={36} />
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-semibold text-slate-900 dark:text-gray-100">
                         {name}
@@ -495,8 +497,9 @@ const RegisterSheet: React.FC<RegisterSheetProps> = ({ sessionId, onClose, onSav
                       {dropInResults.map((st) => (
                         <li key={st.student_id}>
                           <button type="button" onClick={() => addDropIn(st)} className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-slate-50 focus:bg-slate-50 focus:outline-none dark:hover:bg-gray-700/50 dark:focus:bg-gray-700/50">
-                            <UserPlus className="h-4 w-4 text-slate-500" aria-hidden /> {studentName(st)}
+                            <UserAvatar decorative userId={st.student_id} name={studentName(st)} size={24} /> {studentName(st)}
                             <span className="text-xs text-slate-600 dark:text-gray-300">{st.class_group_name}</span>
+                            <UserPlus className="ml-auto h-4 w-4 text-slate-500" aria-hidden />
                           </button>
                         </li>
                       ))}

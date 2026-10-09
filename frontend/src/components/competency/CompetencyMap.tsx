@@ -1,3 +1,4 @@
+import UserAvatar from "../ui/UserAvatar";
 import React, { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Grid3x3, Lightbulb } from "lucide-react";
@@ -183,7 +184,8 @@ const CompetencyMap: React.FC = () => {
                         {map.students.map((s) => (
                           <tr key={s.user_id}>
                             <th scope="row" className="sticky left-0 z-10 bg-white py-0.5 pr-3 text-left font-normal dark:bg-gray-900">
-                              <button type="button" onClick={() => set({ student: s.user_id })} className="text-left text-slate-900 hover:underline dark:text-white">
+                              <button type="button" onClick={() => set({ student: s.user_id })} className="inline-flex items-center gap-2 text-left text-slate-900 hover:underline dark:text-white">
+                                <UserAvatar decorative userId={s.user_id} name={s.name} size={20} />
                                 {s.name}
                               </button>
                               <span className="block text-[11px] text-slate-500 dark:text-gray-400">{s.demonstrated} of {criteria.length} demonstrated</span>

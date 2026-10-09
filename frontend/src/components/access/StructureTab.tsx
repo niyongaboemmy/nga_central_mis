@@ -1,3 +1,4 @@
+import UserAvatar from "../ui/UserAvatar";
 import React, { useId, useMemo, useState } from "react";
 import {
   AlertTriangle,
@@ -38,34 +39,9 @@ type Filter = "all" | "vacant" | "shared";
 export const roleLabel = (role: string) =>
   /^[A-Z0-9_]+$/.test(role) ? role.charAt(0) + role.slice(1).toLowerCase().replace(/_/g, " ") : role;
 
-const initials = (name: string) =>
-  name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((w) => w[0]?.toUpperCase())
-    .join("") || "?";
-
-/** Stable, accessible colour per person (text on tint passes AA in both themes). */
-const AVATAR_TONES = [
-  "bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-200",
-  "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-200",
-  "bg-violet-100 text-violet-800 dark:bg-violet-900/50 dark:text-violet-200",
-  "bg-amber-100 text-amber-900 dark:bg-amber-900/50 dark:text-amber-200",
-  "bg-rose-100 text-rose-800 dark:bg-rose-900/50 dark:text-rose-200",
-  "bg-cyan-100 text-cyan-800 dark:bg-cyan-900/50 dark:text-cyan-200",
-];
-const toneFor = (id: number) => AVATAR_TONES[Math.abs(id) % AVATAR_TONES.length];
-
+/** A person's NGA photo, or their initials. */
 const Avatar: React.FC<{ id: number; name: string; size?: "sm" | "md" }> = ({ id, name, size = "sm" }) => (
-  <span
-    aria-hidden
-    className={`grid flex-shrink-0 place-items-center rounded-full font-semibold ${toneFor(id)} ${
-      size === "md" ? "h-10 w-10 text-sm" : "h-7 w-7 text-[11px]"
-    }`}
-  >
-    {initials(name)}
-  </span>
+  <UserAvatar decorative userId={id} name={name} size={size === "md" ? 40 : 28} />
 );
 
 /** A person in a position. Clicking shows every position they hold. */

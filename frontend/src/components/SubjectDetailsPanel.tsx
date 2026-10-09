@@ -1,4 +1,5 @@
 import React from "react";
+import UserAvatar from "./ui/UserAvatar";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -43,15 +44,6 @@ const DAY_NAMES = [
   "Friday",
   "Saturday",
 ];
-
-const initialsOf = (name: string) =>
-  name
-    .split(" ")
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part.charAt(0))
-    .join("")
-    .toUpperCase() || "?";
 
 const teacherName = (t: {
   first_name?: string | null;
@@ -618,9 +610,7 @@ const SubjectDetailsPanel: React.FC<SubjectDetailsPanelProps> = ({
                             key={t.user_id}
                             className="flex items-start gap-3 p-3 rounded-2xl border border-gray-200 dark:border-gray-700/40 bg-white dark:bg-gray-800/30 hover:border-gray-300 dark:hover:border-gray-600 transition-colors"
                           >
-                            <div className="w-10 h-10 rounded-xl bg-blue-500/10 dark:bg-blue-500/15 text-blue-600 dark:text-blue-400 flex items-center justify-center text-xs font-bold flex-shrink-0">
-                              {initialsOf(teacherName(t))}
-                            </div>
+                            <UserAvatar decorative userId={t.user_id} name={teacherName(t)} size={40} shape="rounded" />
                             <div className="min-w-0 flex-1">
                               <p className="text-sm font-semibold text-gray-900 dark:text-white break-words">
                                 {teacherName(t)}
@@ -690,9 +680,7 @@ const SubjectDetailsPanel: React.FC<SubjectDetailsPanelProps> = ({
                             <span className="w-6 text-[11px] font-semibold text-gray-400 tabular-nums text-right flex-shrink-0">
                               {i + 1}
                             </span>
-                            <div className="w-8 h-8 rounded-lg bg-gray-200 dark:bg-gray-700/50 text-gray-600 dark:text-gray-300 flex items-center justify-center text-[11px] font-bold flex-shrink-0">
-                              {initialsOf(s.full_name)}
-                            </div>
+                            <UserAvatar decorative userId={s.user_id} name={s.full_name} size={32} shape="rounded" />
                             <div className="min-w-0 flex-1">
                               <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
                                 {s.full_name}

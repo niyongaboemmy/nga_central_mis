@@ -1,3 +1,4 @@
+import UserAvatar from "../ui/UserAvatar";
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Bot, Send, Target, Users } from "lucide-react";
@@ -52,6 +53,7 @@ const MyChildren: React.FC = () => {
           {data.children.map((c) => (
             <Card key={c.studentId} labelledBy={`child-${c.studentId}`}>
               <CardTitle id={`child-${c.studentId}`}>
+                <UserAvatar decorative userId={c.studentId} name={c.name} size={40} className="mr-3 align-middle" />
                 {c.name}
                 {c.className && <span className="ml-2 text-sm font-normal text-slate-600 dark:text-gray-300">{c.className}</span>}
               </CardTitle>
