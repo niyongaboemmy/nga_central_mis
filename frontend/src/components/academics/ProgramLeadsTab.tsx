@@ -1,3 +1,4 @@
+import UserAvatar from "../ui/UserAvatar";
 import React, { useEffect, useMemo, useState } from "react";
 import { AllProgramLead, AcademicYear, Program } from "../../api/academics";
 import { getUsers, UserWithProfile } from "../../api/users";
@@ -323,7 +324,10 @@ const ProgramLeadsTab: React.FC<ProgramLeadsTabProps> = ({
                       className="hover:bg-surface-light dark:hover:bg-surface-dark"
                     >
                       <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-text-primary-light dark:text-text-primary-dark">
-                        {item.user_name}
+                        <span className="inline-flex items-center gap-2.5">
+                          <UserAvatar decorative userId={item.user_id} name={item.user_name || "?"} size={28} />
+                          {item.user_name}
+                        </span>
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-sm text-text-secondary-light dark:text-text-secondary-dark/70">
                         {item.program_name}

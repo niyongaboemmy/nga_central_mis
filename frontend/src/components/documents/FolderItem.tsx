@@ -4,12 +4,10 @@ import { motion } from "framer-motion";
 import {
   FiFolder,
   FiMoreVertical,
-  FiUser,
   FiEye,
   FiDownload,
   FiEdit2,
-  FiShare2,
-} from "react-icons/fi";
+  FiShare2 } from "react-icons/fi";
 import { type Folder } from "../../api/documents";
 import ShareBadge from "./ShareBadge";
 
@@ -161,7 +159,7 @@ const FolderItem: React.FC<FolderItemProps> = ({
             showOwner &&
             ownerName && (
               <div className="flex items-center gap-1 mt-2.5">
-                <FiUser className="w-3 h-3 text-gray-400" />
+                <UserAvatar decorative userId={folder.owner?.user_id} name={ownerName} size={16} />
                 <span className="text-xs text-gray-400">{ownerName}</span>
               </div>
             )
@@ -210,7 +208,7 @@ const FolderItem: React.FC<FolderItemProps> = ({
             showOwner &&
             ownerName && (
               <div className="flex items-center gap-1 mt-0.5">
-                <FiUser className="w-3 h-3 text-gray-400" />
+                <UserAvatar decorative userId={folder.owner?.user_id} name={ownerName} size={16} />
                 <span className="text-xs text-gray-500 dark:text-gray-400">
                   {ownerName}
                 </span>

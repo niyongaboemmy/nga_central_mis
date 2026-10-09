@@ -1116,6 +1116,8 @@ export const getScopedUsers = asyncHandler(async (req: any, res: any) => {
         user_type: row.user_type,
         gender: row.gender,
         registration_number: row.registration_number ?? null,
+        // Carried through so the row's photo link can be built below.
+        avatar_version: row.avatar_version ?? null,
         roles: [] as any[],
         grades: [] as any[],
         class_groups: [] as any[],

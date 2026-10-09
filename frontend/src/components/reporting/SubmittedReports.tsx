@@ -1,14 +1,13 @@
+import UserAvatar from "../ui/UserAvatar";
 import React, { useState, useEffect, useCallback } from "react";
 import {
   Search,
   FileText,
   ChevronRight,
   Calendar as CalendarIcon,
-  User,
   CheckCircle2,
   Clock,
-  X,
-} from "lucide-react";
+  X } from "lucide-react";
 import { InstructorReport } from "../../api/reports";
 import {
   format,
@@ -247,7 +246,7 @@ const SubmittedReports: React.FC<SubmittedReportsProps> = ({
                         )}
                       </span>
                       <span className="flex items-center gap-1">
-                        <User className="w-3 h-3" />
+                        <UserAvatar decorative userId={report.user_id} name={`${report.first_name ?? ""} ${report.last_name ?? ""}`.trim() || "?"} size={16} />
                         {report.first_name} {report.last_name}
                       </span>
                       <span className="flex items-center gap-1 text-gray-400 dark:text-gray-500">

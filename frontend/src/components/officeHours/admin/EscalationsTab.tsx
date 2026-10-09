@@ -1,3 +1,4 @@
+import UserAvatar from "../../ui/UserAvatar";
 import React, { useCallback, useEffect, useState } from "react";
 import { CheckCircle2, ShieldAlert } from "lucide-react";
 import Modal from "../../ui/Modal";
@@ -92,7 +93,8 @@ const EscalationsTab: React.FC<{ termId: number | null; config?: OfficeHoursConf
                 Level {e.level}
               </span>
               <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold text-slate-900 dark:text-gray-100">
+                <p className="flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-gray-100">
+                  <UserAvatar decorative userId={e.student_id} name={studentName(e.student)} size={24} />
                   {studentName(e.student)} <span className="font-normal text-slate-600 dark:text-gray-300">· {e.student?.class_group_name}</span>
                 </p>
                 <p className="text-sm text-slate-700 dark:text-gray-200">

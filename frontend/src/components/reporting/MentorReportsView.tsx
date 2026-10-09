@@ -1,3 +1,4 @@
+import UserAvatar from "../ui/UserAvatar";
 import React, { useEffect, useState, useCallback } from "react";
 import {
   Calendar,
@@ -253,7 +254,12 @@ const MentorReportsView: React.FC<Props> = ({ onBack }) => {
                 {(report?.sessions ?? []).map((s) => (
                   <tr key={s.mentorship_id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
                     <td className="px-4 py-3 text-gray-500 text-xs">{s.session_date}</td>
-                    <td className="px-4 py-3 font-medium text-gray-900 dark:text-white">{s.student_name ?? "—"}</td>
+                    <td className="px-4 py-3 font-medium text-gray-900 dark:text-white">
+                      <span className="inline-flex items-center gap-2">
+                        {s.student_id ? <UserAvatar decorative userId={s.student_id} name={s.student_name ?? "Student"} size={24} /> : null}
+                        {s.student_name ?? "—"}
+                      </span>
+                    </td>
                     <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{s.topic ?? "—"}</td>
                     <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{s.wellbeing_status ?? "—"}</td>
                     <td className="px-4 py-3">
@@ -288,7 +294,12 @@ const MentorReportsView: React.FC<Props> = ({ onBack }) => {
                 {(report?.checkins ?? []).map((c) => (
                   <tr key={c.checkin_id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
                     <td className="px-4 py-3 text-gray-500 text-xs">{c.submitted_at}</td>
-                    <td className="px-4 py-3 font-medium text-gray-900 dark:text-white">{c.student_name ?? "—"}</td>
+                    <td className="px-4 py-3 font-medium text-gray-900 dark:text-white">
+                      <span className="inline-flex items-center gap-2">
+                        {c.student_id ? <UserAvatar decorative userId={c.student_id} name={c.student_name ?? "Student"} size={24} /> : null}
+                        {c.student_name ?? "—"}
+                      </span>
+                    </td>
                     <td className="px-4 py-3 text-gray-600 dark:text-gray-400 max-w-[320px] truncate">
                       {c.title && <span className="font-semibold">{c.title}: </span>}
                       {c.message}

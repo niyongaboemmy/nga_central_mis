@@ -1,3 +1,4 @@
+import UserAvatar from "../ui/UserAvatar";
 import React, { useMemo, useState } from "react";
 import { Plus, ShieldCheck, PauseCircle, PlayCircle, XCircle } from "lucide-react";
 import Modal from "../ui/Modal";
@@ -348,9 +349,12 @@ export const PositionsTab: React.FC<{
             {rows.map((g) => (
               <li key={g.grant_id} className="rounded-xl border border-border-light dark:border-slate-700/60 p-3">
                 <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
+                  <div className="min-w-0 flex items-start gap-2.5">
+                    <UserAvatar decorative userId={g.user_id} name={g.full_name} size={32} />
+                    <div className="min-w-0">
                     <div className="font-medium break-words">{g.full_name}</div>
                     <div className="text-sm break-words">{g.title || g.role_name}</div>
+                    </div>
                   </div>
                   <StatusPill status={g.status} />
                 </div>
@@ -398,8 +402,13 @@ export const PositionsTab: React.FC<{
                 {rows.map((g) => (
                   <tr key={g.grant_id} className="border-t border-border-light dark:border-slate-700/50">
                     <td className="py-2 pr-3">
-                      <div className="font-medium">{g.full_name}</div>
-                      {g.title && <div className={`text-xs ${mutedCls}`}>{g.title}</div>}
+                      <div className="flex items-center gap-2.5">
+                        <UserAvatar decorative userId={g.user_id} name={g.full_name} size={28} />
+                        <div>
+                          <div className="font-medium">{g.full_name}</div>
+                          {g.title && <div className={`text-xs ${mutedCls}`}>{g.title}</div>}
+                        </div>
+                      </div>
                     </td>
                     <td className="py-2 pr-3">{g.role_name}</td>
                     <td className="py-2 pr-3">

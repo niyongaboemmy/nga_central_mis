@@ -78,7 +78,9 @@ const UserCard = ({
         <UserAvatar
           name={[user.first_name, user.last_name].filter(Boolean).join(" ") || user.username}
           avatar={user.avatar}
+          userId={user.user_id}
           size={36}
+          decorative
         />
         <div className="min-w-0 flex-1">
           <h3 className="font-medium text-gray-900 dark:text-white text-sm truncate">
