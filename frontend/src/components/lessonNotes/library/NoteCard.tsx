@@ -1,10 +1,11 @@
+import UserAvatar from "../../ui/UserAvatar";
 import React from "react";
 import { motion } from "framer-motion";
 import { ArrowRight, CheckCircle2, Clock, FileText, GraduationCap, PlayCircle } from "lucide-react";
 import { SharedNoteSummary, isPdfBackedNote } from "../../../api/lessonNotes";
 import { useMotion } from "../../../design/motion";
 import SubjectIcon from "../../elearning/ui/subjectIcons";
-import { Highlight, cleanExcerpt, fullWhen, initialsOf, isRecent, shortWhen } from "./noteVisuals";
+import { Highlight, cleanExcerpt, fullWhen, isRecent, shortWhen } from "./noteVisuals";
 
 /** Reading time for prose, page count for a PDF. */
 export const NoteLength: React.FC<{ note: SharedNoteSummary; className?: string }> = ({
@@ -172,12 +173,7 @@ const NoteCard: React.FC<CardProps> = ({ note, tokens, onOpen, onReadHere }) => 
 
       {/* Pinned, so every card in a row ends on the same line whatever the title length. */}
       <div className="mt-auto flex items-center gap-2 border-t border-gray-100 pt-3.5 dark:border-white/[0.06]">
-        <span
-          aria-hidden
-          className="grid h-6 w-6 flex-shrink-0 place-items-center rounded-pill bg-gray-100 text-[9px] font-bold text-gray-500 dark:bg-white/[0.08] dark:text-gray-300"
-        >
-          {initialsOf(note.teacher_name || "?")}
-        </span>
+        <UserAvatar decorative userId={note.teacher_id} name={note.teacher_name || "?"} size={24} />
         <span className="min-w-0 flex-1 truncate text-xs text-gray-500 dark:text-gray-400">
           <Highlight text={note.teacher_name} tokens={tokens} />
         </span>
@@ -246,12 +242,7 @@ export const NoteListRow: React.FC<CardProps> = ({ note, tokens, onOpen, onReadH
       </span>
 
       <span className="hidden flex-shrink-0 items-center gap-2 text-xs text-gray-500 dark:text-gray-400 sm:flex">
-        <span
-          aria-hidden
-          className="grid h-6 w-6 place-items-center rounded-pill bg-gray-100 text-[9px] font-bold text-gray-500 dark:bg-white/[0.08] dark:text-gray-300"
-        >
-          {initialsOf(note.teacher_name || "?")}
-        </span>
+        <UserAvatar decorative userId={note.teacher_id} name={note.teacher_name || "?"} size={24} />
         <span className="hidden w-28 truncate lg:block">
           <Highlight text={note.teacher_name} tokens={tokens} />
         </span>

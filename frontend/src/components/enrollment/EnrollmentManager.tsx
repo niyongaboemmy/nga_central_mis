@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import UserAvatar from "../ui/UserAvatar";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   BookOpen,
@@ -42,9 +43,6 @@ import Modal from "../ui/Modal";
 import { useToast } from "../../contexts/ToastContext";
 import { usePermissions } from "../../hooks/usePermissions";
 import { Permissions } from "../../constants/permissions";
-
-const getInitials = (first?: string, last?: string) =>
-  `${first?.[0] || ""}${last?.[0] || ""}`.toUpperCase() || "?";
 
 // Same stat-tile language as UsersManagement's StatCard, reused here so the
 // Enrollment page reads as part of the same design system rather than a
@@ -894,9 +892,7 @@ const EnrollmentManager: React.FC = () => {
         {detailStudent && roster && (
           <div className="space-y-4">
             <div className="flex items-center gap-3 pb-4 border-b border-gray-100 dark:border-gray-700/40">
-              <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center flex-shrink-0 text-sm font-bold text-white">
-                {getInitials(detailStudent.first_name, detailStudent.last_name)}
-              </div>
+              <UserAvatar decorative userId={detailStudent.user_id} name={`${detailStudent.first_name ?? ""} ${detailStudent.last_name ?? ""}`.trim() || "?"} size={48} />
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
                   {detailStudent.email}
@@ -1071,9 +1067,7 @@ const StudentRow: React.FC<{
         onClick={(e) => e.stopPropagation()}
         className="w-4 h-4 rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-400"
       />
-      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center flex-shrink-0 text-[11px] font-bold text-white">
-        {getInitials(student.first_name, student.last_name)}
-      </div>
+      <UserAvatar decorative userId={student.user_id} name={`${student.first_name ?? ""} ${student.last_name ?? ""}`.trim() || "?"} size={32} />
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
           {student.first_name} {student.last_name}
@@ -1123,9 +1117,7 @@ const AssignRow: React.FC<{
       onClick={(e) => e.stopPropagation()}
       className="w-4 h-4 rounded border-gray-300 dark:border-gray-600 text-emerald-600 focus:ring-emerald-400"
     />
-    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center flex-shrink-0 text-[11px] font-bold text-white">
-      {getInitials(user.first_name, user.last_name)}
-    </div>
+    <UserAvatar decorative userId={user.user_id} name={`${user.first_name ?? ""} ${user.last_name ?? ""}`.trim() || "?"} size={32} />
     <div className="flex-1 min-w-0">
       <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
         {user.first_name} {user.last_name}

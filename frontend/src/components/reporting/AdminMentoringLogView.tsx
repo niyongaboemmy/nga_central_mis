@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import UserAvatar from "../ui/UserAvatar";
 import { motion } from "framer-motion";
 import {
   Search,
@@ -431,9 +432,7 @@ const AdminMentoringLogView: React.FC = () => {
                     {/* Student */}
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
-                        <div className="w-7 h-7 rounded-full bg-indigo-100 dark:bg-indigo-900/40 flex items-center justify-center text-indigo-600 dark:text-indigo-300 font-semibold text-xs flex-shrink-0">
-                          {(entry.student_name?.[0] ?? "?").toUpperCase()}
-                        </div>
+                        <UserAvatar decorative userId={entry.student_id} name={entry.student_name || "?"} size={28} />
                         <span className="font-medium text-gray-900 dark:text-white whitespace-nowrap">
                           {entry.student_name ?? "—"}
                         </span>

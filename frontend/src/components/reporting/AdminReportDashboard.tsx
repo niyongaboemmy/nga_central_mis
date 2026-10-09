@@ -1,4 +1,5 @@
 import React, { useMemo } from "react";
+import UserAvatar from "../ui/UserAvatar";
 import { format } from "date-fns";
 import {
   Users,
@@ -458,9 +459,7 @@ export const AdminReportDashboard: React.FC<AdminReportDashboardProps> = ({
           <div className="space-y-3">
             {complianceData.slice(0, 8).map((inst) => (
               <div key={inst.user_id} className="flex items-center gap-4 p-3 bg-gray-50/50 dark:bg-gray-800/40 rounded-2xl border border-gray-100/50 dark:border-gray-700/30">
-                <div className="w-8 h-8 bg-white dark:bg-gray-800 rounded-full flex items-center justify-center text-xs font-black shadow-sm text-gray-700 dark:text-gray-200 border border-gray-100 dark:border-gray-700">
-                  {inst.instructor_name.charAt(0)}
-                </div>
+                <UserAvatar decorative userId={inst.user_id} name={inst.instructor_name} size={32} />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between mb-1">
                     <span className="text-xs font-bold text-gray-800 dark:text-white truncate">{inst.instructor_name}</span>
@@ -503,9 +502,7 @@ export const AdminReportDashboard: React.FC<AdminReportDashboardProps> = ({
             {reports.slice(0, 4).map((r, idx) => (
               <div key={idx} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800/50 rounded-2xl border border-gray-100 dark:border-gray-700/50">
                 <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 bg-white dark:bg-gray-800 dark:text-white rounded-full flex items-center justify-center text-[16px] font-black shadow-sm">
-                    {r.instructor_name?.charAt(0)}
-                  </div>
+                  <UserAvatar decorative userId={r.reported_by} name={r.instructor_name || "?"} size={32} />
                   <div>
                     <div className="text-xs font-bold text-gray-800 dark:text-white">{r.instructor_name}</div>
                     <div className="text-[10px] text-gray-500 dark:text-gray-400 font-medium">

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import type { Avatar } from "../../api/users";
+import { useUserAvatar } from "../../lib/avatarDirectory";
 
 /** Same gradients for the same person everywhere, so initials still read as "them". */
 const GRADIENTS = [
@@ -32,19 +33,32 @@ export interface UserAvatarProps {
   avatar?: Avatar | null;
   /** A single URL (e.g. `user.avatar_url`) when the full set is not at hand. */
   src?: string | null;
+  /**
+   * The person's MIS user id: their photo is looked up (batched, cached) when neither
+   * `avatar` nor `src` is given -- how lists show faces without carrying photo links.
+   */
+  userId?: number | null;
   /** Rendered size in px. */
   size?: number;
   className?: string;
   /** Adds a white ring, for avatars sitting on coloured or image backgrounds. */
   ring?: boolean;
+  /** People are round; "rounded" keeps the square-ish look some tables use. */
+  shape?: "circle" | "rounded";
+  /** Hidden from screen readers -- for avatars beside a visible name, so it isn't read twice. */
+  decorative?: boolean;
 }
 
-const UserAvatar: React.FC<UserAvatarProps> = ({ name, avatar, src, size = 32, className = "", ring = false }) => {
+const UserAvatar: React.FC<UserAvatarProps> = ({ name, avatar, src, userId, size = 32, className = "", ring = false, shape = "circle", decorative = false }) => {
+  const looked = useUserAvatar(avatar || src ? null : userId);
+  avatar = avatar ?? looked ?? null;
   const url = avatar ? (size <= 64 ? avatar.sm : size <= 256 ? avatar.md : avatar.lg) : src || null;
   const [failed, setFailed] = useState(false);
   useEffect(() => setFailed(false), [url]);
 
-  const box = `relative inline-flex shrink-0 select-none items-center justify-center overflow-hidden rounded-full ${
+  const box = `relative inline-flex shrink-0 select-none items-center justify-center overflow-hidden ${
+    shape === "rounded" ? "rounded-xl" : "rounded-full"
+  } ${
     ring ? "ring-2 ring-white dark:ring-gray-900" : ""
   } ${className}`;
   const style = { width: size, height: size };
@@ -56,7 +70,8 @@ const UserAvatar: React.FC<UserAvatarProps> = ({ name, avatar, src, size = 32, c
           src={url}
           srcSet={avatar ? `${avatar.sm} 64w, ${avatar.md} 256w, ${avatar.lg} 512w` : undefined}
           sizes={avatar ? `${size}px` : undefined}
-          alt={name}
+          alt={decorative ? "" : name}
+          aria-hidden={decorative || undefined}
           width={size}
           height={size}
           loading="lazy"
@@ -71,8 +86,7 @@ const UserAvatar: React.FC<UserAvatarProps> = ({ name, avatar, src, size = 32, c
 
   return (
     <span
-      role="img"
-      aria-label={name}
+      {...(decorative ? { "aria-hidden": true } : { role: "img", "aria-label": name })}
       className={`${box} bg-gradient-to-br ${gradientFor(name || "?")} font-semibold text-white`}
       style={{ ...style, fontSize: Math.max(10, Math.round(size * 0.4)) }}
     >

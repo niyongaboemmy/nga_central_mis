@@ -51,6 +51,7 @@ import {
   uploadMyCover,
   deleteMyCover,
   lookupProfileMedia,
+  lookupAvatars,
 } from "../controllers/avatarController";
 import { requireServiceToken } from "../middleware/serviceAuth";
 import { authenticate, authorize } from "../middleware/auth";
@@ -87,6 +88,8 @@ router.put("/me/cover", authenticate, coverUpload, uploadMyCover);
 router.delete("/me/cover", authenticate, deleteMyCover);
 // Sibling apps (client credentials): everyone's current picture + cover in one call.
 router.post("/profile-media/lookup", requireServiceToken("profiles:read"), lookupProfileMedia);
+// Signed-in users: photos for the people on the page they are looking at.
+router.post("/avatars/lookup", authenticate, lookupAvatars);
 router.get("/", authenticate, authorize("MANAGE_USERS"), getUsers);
 
 // Role/status counts for the management chips and dashboard. Two aggregate

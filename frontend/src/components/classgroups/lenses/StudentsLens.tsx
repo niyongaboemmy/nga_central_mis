@@ -353,6 +353,7 @@ const StudentsLens: React.FC = () => {
                       <td className="px-3 py-2">
                         <div className="flex items-center gap-2 min-w-0">
                           <Avatar
+                            userId={student.user_id}
                             first={student.first_name}
                             last={student.last_name}
                             size="sm"
@@ -682,7 +683,7 @@ const AddStudentsModal: React.FC<{
                     }
                     className="w-4 h-4 rounded accent-blue-600"
                   />
-                  <Avatar first={row.first_name} last={row.last_name} size="sm" />
+                  <Avatar userId={row.user_id} first={row.first_name} last={row.last_name} size="sm" />
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
                       {fullName(row.first_name, row.last_name) || row.username}

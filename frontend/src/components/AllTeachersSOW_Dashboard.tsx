@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from "react";
+import UserAvatar from "./ui/UserAvatar";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import {
@@ -61,12 +62,6 @@ const statusConfig = {
     border: "border-rose-200 dark:border-rose-800",
     icon: AlertTriangle,
   },
-};
-
-const getInitials = (name: string) => {
-  const words = name.trim().split(" ");
-  if (words.length >= 2) return (words[0][0] + words[1][0]).toUpperCase();
-  return name.slice(0, 2).toUpperCase();
 };
 
 /** Small ring gauge used in the completion-rate hero strip. */
@@ -431,15 +426,7 @@ const AllTeachersSOW_Dashboard: React.FC<Props> = ({
                   >
                     {/* Teacher */}
                     <div className="flex items-center gap-2.5 min-w-0">
-                      <div
-                        className="w-8 h-8 rounded-lg flex items-center justify-center text-white font-bold text-[11px] flex-shrink-0"
-                        style={{
-                          backgroundColor:
-                            teacher.schemes[0]?.subject_color || "#3B82F6",
-                        }}
-                      >
-                        {getInitials(teacher.full_name)}
-                      </div>
+                      <UserAvatar decorative userId={teacher.user_id} name={teacher.full_name} size={32} shape="rounded" />
                       <div className="min-w-0">
                         <p className="font-semibold text-gray-900 dark:text-white text-sm truncate group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
                           {teacher.full_name}
@@ -539,16 +526,7 @@ const AllTeachersSOW_Dashboard: React.FC<Props> = ({
               {/* Header */}
               <div className="px-5 py-4 border-b border-gray-100 dark:border-gray-800/50 flex items-center justify-between gap-3 bg-gray-50 dark:bg-gray-800/50 flex-shrink-0">
                 <div className="flex items-center gap-3 min-w-0">
-                  <div
-                    className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold text-sm flex-shrink-0 shadow-sm"
-                    style={{
-                      backgroundColor:
-                        selectedTeacherForModal.schemes[0]?.subject_color ||
-                        "#3B82F6",
-                    }}
-                  >
-                    {getInitials(selectedTeacherForModal.full_name)}
-                  </div>
+                  <UserAvatar decorative userId={selectedTeacherForModal.user_id} name={selectedTeacherForModal.full_name} size={40} shape="rounded" />
                   <div className="min-w-0">
                     <h2 className="text-sm font-bold text-gray-900 dark:text-white truncate">
                       {selectedTeacherForModal.full_name}

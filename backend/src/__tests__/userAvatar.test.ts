@@ -380,3 +380,30 @@ describe("profile cover API and profile-media lookup", () => {
     expect(notArray.status).toBe(400);
   });
 });
+
+describe("POST /users/avatars/lookup (signed-in people)", () => {
+  it("returns photos for the people asked about, only those who have one", async () => {
+    const withPhoto = await createUser({ userType: "STUDENT" });
+    const without = await createUser({ userType: "STUDENT" });
+    const viewer = signToken(await createUser({ userType: "TEACHER" }));
+    await request(app).put("/users/me/avatar").set("Authorization", `Bearer ${signToken(withPhoto)}`)
+      .attach("avatar", await picture(120, 120), { filename: "a.png", contentType: "image/png" });
+
+    const res = await request(app).post("/users/avatars/lookup").set("Authorization", `Bearer ${viewer}`)
+      .send({ user_ids: [withPhoto, without, withPhoto, 999999999, "x"] });
+    expect(res.status).toBe(200);
+    expect(Object.keys(res.body.data.avatars)).toEqual([String(withPhoto)]);
+    expect(res.body.data.avatars[withPhoto].sm).toMatch(new RegExp(`/avatars/${withPhoto}/`));
+    expect(res.headers["cache-control"]).toBe("private, max-age=60");
+  });
+
+  it("needs sign-in and a sane request", async () => {
+    expect((await request(app).post("/users/avatars/lookup").send({ user_ids: [1] })).status).toBe(401);
+    const viewer = signToken(await createUser({ userType: "TEACHER" }));
+    expect((await request(app).post("/users/avatars/lookup").set("Authorization", `Bearer ${viewer}`).send({ user_ids: 3 })).status).toBe(400);
+    const tooMany = Array.from({ length: 501 }, (_, i) => i + 1);
+    expect((await request(app).post("/users/avatars/lookup").set("Authorization", `Bearer ${viewer}`).send({ user_ids: tooMany })).status).toBe(400);
+    const empty = await request(app).post("/users/avatars/lookup").set("Authorization", `Bearer ${viewer}`).send({ user_ids: [] });
+    expect(empty.body.data.avatars).toEqual({});
+  });
+});

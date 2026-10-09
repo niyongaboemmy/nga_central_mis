@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import UserAvatar from "../ui/UserAvatar";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Search,
@@ -277,9 +278,7 @@ const MentoringHub: React.FC = () => {
                   className={`group w-full flex items-center gap-3 p-3 rounded-xl border bg-white dark:bg-gray-800/30 transition-colors hover:bg-gray-50 dark:hover:bg-gray-800/60 ${borderAccent}`}
                 >
                   <div className="relative flex-shrink-0">
-                    <div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-500 to-indigo-500 flex items-center justify-center text-white font-bold text-sm shadow-sm">
-                      {(student.first_name?.[0] ?? "?").toUpperCase()}
-                    </div>
+                    <UserAvatar decorative userId={student.user_id} name={[student.first_name, student.last_name].filter(Boolean).join(" ") || "?"} size={36} />
                     {student.wellbeing_status && (
                       <span className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 flex items-center justify-center text-[10px]">
                         {WELLBEING_EMOJI[student.wellbeing_status] ?? ""}

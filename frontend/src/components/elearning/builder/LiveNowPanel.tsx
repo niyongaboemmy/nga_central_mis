@@ -1,3 +1,4 @@
+import UserAvatar from "../../ui/UserAvatar";
 import React, { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Check, Radio, Trophy } from "lucide-react";
@@ -25,12 +26,6 @@ const awayFor = (lastSeen: number) => {
   const s = Math.max(0, Math.round((Date.now() - lastSeen) / 1000));
   return s < 60 ? `away ${s}s` : `away ${Math.round(s / 60)}m`;
 };
-const initials = (n: string) =>
-  n
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((p) => p[0]?.toUpperCase() || "")
-    .join("");
 
 /**
  * Who is learning right now, and what just landed. Presence comes from the pings students
@@ -101,8 +96,8 @@ const LiveNowPanel: React.FC<{
                       : "hover:bg-gray-50 dark:hover:bg-white/[0.04]"
                   }`}
                 >
-                  <span className="relative w-9 h-9 rounded-full bg-brand-500 text-white text-[11px] font-bold flex items-center justify-center flex-shrink-0">
-                    {initials(w.name)}
+                  <span className="relative flex-shrink-0">
+                    <UserAvatar decorative userId={w.user_id} name={w.name} size={36} />
                     <span
                       className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-success-500 ring-2 ring-white dark:ring-black"
                       aria-hidden

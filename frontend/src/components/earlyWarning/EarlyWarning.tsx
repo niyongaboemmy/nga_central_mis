@@ -1,3 +1,4 @@
+import UserAvatar from "../ui/UserAvatar";
 import React, { useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { AlertTriangle, ClipboardList, Radar } from "lucide-react";
@@ -128,6 +129,7 @@ const EarlyWarning: React.FC = () => {
               <li key={s.studentId}>
                 <button type="button" onClick={() => open(s.studentId)} className="flex w-full flex-wrap items-center gap-x-3 gap-y-1 py-3 text-left hover:bg-slate-50 dark:hover:bg-gray-800/50">
                   <Pill level={s.level} />
+                  <UserAvatar decorative userId={s.studentId} name={s.name} size={32} />
                   <span className="min-w-0 flex-1">
                     <span className="block text-sm font-semibold text-slate-900 dark:text-white">{s.name}{s.className ? ` · ${s.className}` : ""}</span>
                     <span className="block text-xs text-slate-600 dark:text-gray-300">

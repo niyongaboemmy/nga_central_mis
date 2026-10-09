@@ -1,4 +1,5 @@
 import React from "react";
+import UserAvatar from "../ui/UserAvatar";
 import { UserX } from "lucide-react";
 
 interface AdminMissingReportsProps {
@@ -49,9 +50,7 @@ const AdminMissingReports: React.FC<AdminMissingReportsProps> = ({
         >
           <div className="flex items-start justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-full flex items-center justify-center text-xl font-black">
-                {instructor.instructor_name?.charAt(0)}
-              </div>
+              <UserAvatar decorative userId={instructor.user_id} name={instructor.instructor_name || "?"} size={48} />
               <div className="flex-1 min-w-0">
                 <h4 className="font-bold text-gray-900 dark:text-white group-hover:text-blue-600 transition-colors truncate">
                   {instructor.instructor_name}

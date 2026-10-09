@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import UserAvatar from "../ui/UserAvatar";
 import { Link, useSearchParams } from "react-router-dom";
 import {
   Bot,
@@ -85,7 +86,6 @@ const bucketText = (b: string, gran: "hour" | "day") => {
     ? d.toLocaleString([], { weekday: "short", hour: "2-digit", minute: "2-digit" })
     : d.toLocaleDateString([], { weekday: "short", day: "2-digit", month: "short" });
 };
-const initials = (name: string) => name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]!.toUpperCase()).join("") || "?";
 
 // ---------------------------------------------------------------------------
 // URL-backed filters
@@ -405,9 +405,7 @@ const Insights: React.FC<{ summary: ReturnType<typeof useReport<any>>; update: Q
                     title="Show only this person's entries"
                   >
                     <span className="flex items-center gap-2.5">
-                      <span aria-hidden className="shrink-0 inline-flex items-center justify-center w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-700 text-[11px] font-semibold text-slate-700 dark:text-slate-100">
-                        {initials(u.name)}
-                      </span>
+                      <UserAvatar decorative userId={u.user_id} name={u.name} size={32} />
                       <span className="min-w-0 flex-1">
                         <span className="flex justify-between gap-2 text-sm">
                           <span className="truncate font-medium text-text-primary-light dark:text-text-primary-dark">{u.name}</span>
@@ -499,7 +497,7 @@ const LogTable: React.FC<{ qs: string; state: Q["state"]; update: Q["update"] }>
                 const name = r.user_name ?? `User ${r.user_id}`;
                 return (
                   <span className="flex items-center gap-2 min-w-[150px]">
-                    <span aria-hidden className="shrink-0 inline-flex items-center justify-center w-7 h-7 rounded-full bg-slate-100 dark:bg-slate-700 text-[10px] font-semibold text-slate-700 dark:text-slate-100">{initials(name)}</span>
+                    <UserAvatar decorative userId={r.user_id} name={name} size={28} />
                     <span className="min-w-0">
                       <button className="block text-left font-medium hover:underline text-text-primary-light dark:text-text-primary-dark" onClick={() => update({ user: r.user_id, user_name: name })} title="Show only this person's entries">
                         {name}
