@@ -971,3 +971,32 @@ Verified end to end on the dev machine with all four APIs running: every app ver
   | Tupo | 26 → 61 | 420/421 (1 failure predates this work) | counts capped by query limits, 500 on a bad date or time zone, 404/429 from MIS treated as a bad token, approving bulk mail sent in the viewer's own name, no verify timeout |
 
   A contract checker now runs on every response in each app's suite.
+
+### 16.6 Every quick reminder on Home (2026-10-09)
+
+An audit of all four apps against what Home showed found reminder-worthy state that only reached people through each app's own dashboard or bell. Each app now sends it, using the same rules as its own dashboard, so Home and the app never disagree.
+
+- **MIS** (`services/home/careProvider.ts`, `__tests__/homeCare.test.ts`). These pages are guarded by `requireCapability`, which always uses the v2 engine, so this provider decides with the v2 snapshot in every access mode.
+  - **Safeguarding team:** SG-01 new concerns to acknowledge, SG-02 concerns assigned to me (counts only, never names).
+  - **Students:** SG-S1, the weekly wellbeing check-in.
+  - **Early warning:** EW-01 at-risk students with no support plan, EW-02 plan reviews that are due.
+  - **Cover managers:** CV-01 absences waiting for a decision, CV-02 lessons with no cover teacher.
+  - **Any teacher:** CV-03, lessons I'm covering.
+  - **Parents:** FAM-01, a child who needs a word this week, plus one tile per child (the H5 `CHILDREN` lens).
+  - **Frontend:** a third audience, `family` ("For your family" / "Worth a look"). The learner blocking label is now "Do now", because work due today and running quizzes are not overdue.
+- **Task Mentor** (nga-task-mentor PR #56). The student loader is shared with the student dashboard, and dashboard alerts come from `computeOverview`/`buildAlerts`.
+  - **Learners:** S-05 quiz in progress; S-01 missed in the last 7 days (late work is refused, so it says "talk to your teacher"); S-02/S-03 due or closing within 24 h; S-10 due within 3 days; S-06 unsubmitted drafts; S-09 project returned for changes; S-04 new work; S-07 quiz retake available; S-08 quiz opens soon. Quizzes count only when public.
+  - **Teachers:** T-07 now uses the dashboard's grading queue (co-teachers' work and timed-out attempts included, blocking after 7 days).
+  - **Teachers, from dashboard alerts:** T-16 subject at risk, T-17 closing soon with under half submitted, T-18 closed with missing work, T-19 low class average, T-20 students needing support, T-21/T-22 live or stale proctoring, T-23 unpublished drafts, T-25 subjects with nothing published.
+  - **Teachers, question bank:** T-24, an empty or thin question bank.
+  - **Admins** get no dashboard alerts, because a school-wide `computeOverview` loads every roster from MIS.
+- **Discipline & Attendance** (nga-discipline-attendance PR #48):
+  - **Discipline staff:** D-01 demerits waiting for review (needs `DISCIPLINE_REVIEW` too), D-02 conduct follow-up (15 or more demerit points this term), D-03 major incidents in the last 7 days.
+  - **Excuse reviewers:** C-05, approved excuses whose absence is still recorded.
+  - **Students:** S-09, own excuses pending or rejected and resubmittable.
+  - **Staff:** O-07, own clock-in missing.
+  - **Admins:** A-01, accounts waiting for a role.
+  - **Legacy mode:** D items are school-wide, as on the discipline overview page.
+- **Tupo** (nga-communication-module PR #29): M-03 unread mail, M-04 meeting invitations with no reply, M-06 failed scheduled messages, F-01 unseen announcements (last 14 days), P-08 bulk sends sent back or failed.
+- **Query budgets:** the Tupo summary is at its test cap of 15 queries and the D&A teacher path at its cap of 20 reads. A new signal in either app must share a query.
+- **Production prerequisite:** none of the app items reach Home unless `HOME_APP_TASKMENTOR_URL`, `HOME_APP_ATTENDANCE_URL` and `HOME_APP_TUPO_URL` are set in the MIS `.env.production`.
