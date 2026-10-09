@@ -124,8 +124,9 @@ describe("Next up", () => {
 });
 
 describe("audience copy", () => {
-  it("speaks to learners about overdue work, not blocking work", () => {
-    expect(TIER_LABEL.learner.blocking).toBe("Overdue");
+  it("speaks to learners and families in their own words, not about blocking work", () => {
+    expect(TIER_LABEL.learner.blocking).toBe("Do now");
+    expect(TIER_LABEL.family.slipping).toBe("Worth a look");
     expect(TIER_LABEL.staff.blocking).toBe("Needs you now");
   });
 });

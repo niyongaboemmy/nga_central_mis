@@ -237,7 +237,7 @@ describe("Home", () => {
     );
     renderHome();
     expect(await screen.findByRole("heading", { name: "Your to-do" })).toBeInTheDocument();
-    expect(screen.getAllByText(/Overdue/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Do now/).length).toBeGreaterThan(0);
     expect(screen.queryByRole("group", { name: "Focus" })).not.toBeInTheDocument();
   });
 
