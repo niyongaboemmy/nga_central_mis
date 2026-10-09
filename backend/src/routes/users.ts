@@ -47,7 +47,12 @@ import {
   deleteMyAvatar,
   uploadUserAvatar,
   deleteUserAvatar,
+  coverUpload,
+  uploadMyCover,
+  deleteMyCover,
+  lookupProfileMedia,
 } from "../controllers/avatarController";
+import { requireServiceToken } from "../middleware/serviceAuth";
 import { authenticate, authorize } from "../middleware/auth";
 
 const router = express.Router();
@@ -78,6 +83,10 @@ router.patch("/me/theme", authenticate, updateThemePreference);
 router.get("/me/avatar", authenticate, getMyAvatar);
 router.put("/me/avatar", authenticate, avatarUpload, uploadMyAvatar);
 router.delete("/me/avatar", authenticate, deleteMyAvatar);
+router.put("/me/cover", authenticate, coverUpload, uploadMyCover);
+router.delete("/me/cover", authenticate, deleteMyCover);
+// Sibling apps (client credentials): everyone's current picture + cover in one call.
+router.post("/profile-media/lookup", requireServiceToken("profiles:read"), lookupProfileMedia);
 router.get("/", authenticate, authorize("MANAGE_USERS"), getUsers);
 
 // Role/status counts for the management chips and dashboard. Two aggregate

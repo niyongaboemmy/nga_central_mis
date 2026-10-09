@@ -4,54 +4,91 @@ import { User } from "../../db/schema";
 import { NotFoundError } from "../../errors/CustomError";
 import storage from "../../utils/fileServer";
 import logger from "../../utils/logger";
-import { AVATAR_SIZE_NAMES, AvatarCrop, renderAvatar } from "./image";
-import { AvatarUrls, avatarStoragePath, avatarUrls } from "./urls";
+import { AVATAR_SIZE_NAMES, AvatarCrop, COVER_SIZE_NAMES, renderAvatar, renderCover } from "./image";
+import {
+  AvatarUrls,
+  CoverUrls,
+  MediaKind,
+  avatarStoragePath,
+  avatarUrls,
+  coverStoragePath,
+  coverUrls,
+} from "./urls";
 
-async function currentVersion(userId: number): Promise<number | null> {
+/** Profile picture and cover share one lifecycle; only sizes, column and paths differ. */
+const KINDS = {
+  avatar: {
+    column: User.avatar_version,
+    field: "avatar_version" as const,
+    sizes: AVATAR_SIZE_NAMES as readonly string[],
+    render: renderAvatar as (input: Buffer, crop?: AvatarCrop) => Promise<Record<string, Buffer>>,
+    path: avatarStoragePath as (userId: number, version: number, size: any) => string,
+  },
+  cover: {
+    column: User.cover_version,
+    field: "cover_version" as const,
+    sizes: COVER_SIZE_NAMES as readonly string[],
+    render: renderCover as (input: Buffer, crop?: AvatarCrop) => Promise<Record<string, Buffer>>,
+    path: coverStoragePath as (userId: number, version: number, size: any) => string,
+  },
+};
+
+async function currentVersion(kind: MediaKind, userId: number): Promise<number | null> {
   const rows = await db
-    .select({ avatar_version: User.avatar_version })
+    .select({ v: KINDS[kind].column })
     .from(User)
     .where(eq(User.user_id, userId))
     .limit(1);
   if (!rows.length) throw new NotFoundError("User not found");
-  return rows[0].avatar_version ?? null;
+  return rows[0].v ?? null;
 }
 
 /** Best effort: an orphaned old rendition costs a few KB, never a failed request. */
-function deleteVersion(userId: number, version: number) {
-  for (const size of AVATAR_SIZE_NAMES) {
+function deleteVersion(kind: MediaKind, userId: number, version: number) {
+  for (const size of KINDS[kind].sizes) {
     storage
-      .deleteFile(avatarStoragePath(userId, version, size))
-      .catch((err) => logger.warn(`avatar cleanup failed for ${userId}/${version}-${size}: ${err?.message ?? err}`));
+      .deleteFile(KINDS[kind].path(userId, version, size))
+      .catch((err) => logger.warn(`${kind} cleanup failed for ${userId}/${version}-${size}: ${err?.message ?? err}`));
   }
 }
 
-export async function getAvatar(userId: number): Promise<AvatarUrls | null> {
-  return avatarUrls(userId, await currentVersion(userId));
-}
-
 /** Resizes + compresses the upload, stores the renditions, then points the user at them. */
-export async function setAvatar(userId: number, input: Buffer, crop?: AvatarCrop): Promise<AvatarUrls> {
-  const previous = await currentVersion(userId);
-  const renditions = await renderAvatar(input, crop);
+async function setMedia(kind: MediaKind, userId: number, input: Buffer, crop?: AvatarCrop): Promise<number> {
+  const k = KINDS[kind];
+  const previous = await currentVersion(kind, userId);
+  const renditions = await k.render(input, crop);
 
   // Seconds since the epoch, but always moving forward, so two uploads in the same
   // second still get distinct (cache-busting) URLs.
   const version = Math.max(Math.floor(Date.now() / 1000), (previous ?? 0) + 1);
-  await Promise.all(
-    AVATAR_SIZE_NAMES.map((size) => storage.uploadFile(renditions[size], avatarStoragePath(userId, version, size))),
-  );
-  await db.update(User).set({ avatar_version: version }).where(eq(User.user_id, userId));
-  if (previous) deleteVersion(userId, previous);
+  await Promise.all(k.sizes.map((size) => storage.uploadFile(renditions[size], k.path(userId, version, size))));
+  await db.update(User).set({ [k.field]: version }).where(eq(User.user_id, userId));
+  if (previous) deleteVersion(kind, userId, previous);
 
-  logger.info(`avatar updated for user ${userId} (v${version})`);
-  return avatarUrls(userId, version)!;
+  logger.info(`${kind} updated for user ${userId} (v${version})`);
+  return version;
 }
 
-export async function removeAvatar(userId: number): Promise<void> {
-  const previous = await currentVersion(userId);
+async function removeMedia(kind: MediaKind, userId: number): Promise<void> {
+  const previous = await currentVersion(kind, userId);
   if (!previous) return;
-  await db.update(User).set({ avatar_version: null }).where(eq(User.user_id, userId));
-  deleteVersion(userId, previous);
-  logger.info(`avatar removed for user ${userId}`);
+  await db.update(User).set({ [KINDS[kind].field]: null }).where(eq(User.user_id, userId));
+  deleteVersion(kind, userId, previous);
+  logger.info(`${kind} removed for user ${userId}`);
 }
+
+export async function getAvatar(userId: number): Promise<AvatarUrls | null> {
+  return avatarUrls(userId, await currentVersion("avatar", userId));
+}
+export async function setAvatar(userId: number, input: Buffer, crop?: AvatarCrop): Promise<AvatarUrls> {
+  return avatarUrls(userId, await setMedia("avatar", userId, input, crop))!;
+}
+export const removeAvatar = (userId: number) => removeMedia("avatar", userId);
+
+export async function getCover(userId: number): Promise<CoverUrls | null> {
+  return coverUrls(userId, await currentVersion("cover", userId));
+}
+export async function setCover(userId: number, input: Buffer, crop?: AvatarCrop): Promise<CoverUrls> {
+  return coverUrls(userId, await setMedia("cover", userId, input, crop))!;
+}
+export const removeCover = (userId: number) => removeMedia("cover", userId);

@@ -7,6 +7,8 @@ vi.mock("../../api/users", () => ({
   updateProfile: (...args: any[]) => updateProfileMock(...args),
   uploadAvatar: vi.fn(),
   removeAvatar: vi.fn(),
+  uploadCover: vi.fn(),
+  removeCover: vi.fn(),
 }));
 
 const refreshUserMock = vi.fn();
@@ -75,6 +77,18 @@ describe("Profile page", () => {
     expect(screen.getByText("NGA-2025-0042")).toBeInTheDocument();
     expect(screen.getByText(/@jdoe/)).toBeInTheDocument();
     expect(screen.getByText(/Task Mentor, Tendo and Tupo/)).toBeInTheDocument();
+  });
+
+  it("shows the cover, or plain system blue without one", () => {
+    const COVER = { version: 1, md: "https://api.example/covers/7/1/md.webp?s=x", lg: "https://api.example/covers/7/1/lg.webp?s=x" };
+    const { unmount } = render(<Profile />);
+    expect(screen.getByTestId("profile-cover").className).toContain("bg-blue-600");
+    expect(screen.getByRole("button", { name: /add cover/i })).toBeInTheDocument();
+    unmount();
+    mockUser = { ...mockUser, cover: COVER };
+    render(<Profile />);
+    expect(screen.getByTestId("profile-cover").querySelector("img")?.getAttribute("src")).toBe(COVER.lg);
+    expect(screen.getByRole("button", { name: /change cover/i })).toBeInTheDocument();
   });
 
   it("offers to add a picture when there is none", () => {

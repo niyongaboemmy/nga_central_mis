@@ -20,6 +20,8 @@ export interface User {
   preferred_theme?: "light" | "dark";
   /** 256 px profile picture (null = none); see Avatar for every size. */
   avatar_url?: string | null;
+  /** Wide profile cover (null = none; apps show the system blue). */
+  cover_url?: string | null;
 }
 
 /** Central profile picture: signed, versioned URLs that every NGA app can load. */
@@ -30,6 +32,15 @@ export interface Avatar {
   /** 256 px -- cards */
   md: string;
   /** 512 px -- profile headers */
+  lg: string;
+}
+
+/** Profile cover (3:1 banner) in two sizes. */
+export interface Cover {
+  version: number;
+  /** 960x320 */
+  md: string;
+  /** 1920x640 */
   lg: string;
 }
 
@@ -85,6 +96,7 @@ export interface UserWithProfile {
   user: User;
   profile: UserProfile | null;
   avatar?: Avatar | null;
+  cover?: Cover | null;
   roles?: UserRole[];
   permissions?: string[];
   assignedPrograms?: Program[];
@@ -1054,6 +1066,28 @@ export const uploadAvatar = async (
     },
   });
   return response.data.data!.avatar;
+};
+
+/** Uploads a new profile cover; the server cuts a 3:1 banner from `crop`. */
+export const uploadCover = async (
+  file: Blob,
+  crop?: AvatarCrop,
+  opts: { onProgress?: (fraction: number) => void } = {},
+): Promise<Cover> => {
+  const form = new FormData();
+  if (crop) form.append("crop", JSON.stringify(crop));
+  form.append("cover", file, (file as File).name || "cover");
+  const response = await api.put<BackendResponse<{ cover: Cover }>>("/users/me/cover", form, {
+    headers: { "Content-Type": "multipart/form-data" },
+    onUploadProgress: (e) => {
+      if (opts.onProgress && e.total) opts.onProgress(e.loaded / e.total);
+    },
+  });
+  return response.data.data!.cover;
+};
+
+export const removeCover = async (): Promise<void> => {
+  await api.delete("/users/me/cover");
 };
 
 export const removeAvatar = async (opts: { userId?: number } = {}): Promise<void> => {

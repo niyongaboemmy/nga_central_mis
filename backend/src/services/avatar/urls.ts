@@ -1,6 +1,6 @@
 import crypto from "crypto";
 import config from "../../config";
-import { AVATAR_SIZE_NAMES, AvatarSize } from "./image";
+import { AVATAR_SIZE_NAMES, AvatarSize, COVER_SIZE_NAMES, CoverSize } from "./image";
 
 /**
  * Avatar links are what every NGA app stores and renders, so they are:
@@ -30,21 +30,29 @@ export function publicApiBase(): string {
   return config.envType === "production" ? "https://api.amashuri.com" : `http://localhost:${config.port}`;
 }
 
-/** One signature covers all three sizes of one picture version. */
-export function avatarSignature(userId: number, version: number): string {
+export type MediaKind = "avatar" | "cover";
+
+/** One signature covers every size of one picture version (kinds never share one). */
+function mediaSignature(kind: MediaKind, userId: number, version: number): string {
   return crypto
     .createHmac("sha256", secret())
-    .update(`avatar:v1:${userId}:${version}`)
+    .update(`${kind}:v1:${userId}:${version}`)
     .digest("base64url")
     .slice(0, 22);
 }
 
-export function verifyAvatarSignature(userId: number, version: number, sig: unknown): boolean {
+export const avatarSignature = (userId: number, version: number) => mediaSignature("avatar", userId, version);
+export const coverSignature = (userId: number, version: number) => mediaSignature("cover", userId, version);
+
+export function verifyMediaSignature(kind: MediaKind, userId: number, version: number, sig: unknown): boolean {
   if (typeof sig !== "string" || sig.length !== 22) return false;
-  const expected = Buffer.from(avatarSignature(userId, version));
+  const expected = Buffer.from(mediaSignature(kind, userId, version));
   const given = Buffer.from(sig);
   return given.length === expected.length && crypto.timingSafeEqual(given, expected);
 }
+
+export const verifyAvatarSignature = (userId: number, version: number, sig: unknown) =>
+  verifyMediaSignature("avatar", userId, version, sig);
 
 /** File-server path (inside this app's namespace) of one rendition. */
 export function avatarStoragePath(userId: number, version: number, size: AvatarSize): string {
@@ -59,12 +67,44 @@ export function avatarUrls(userId: number, version: number | null | undefined): 
   return { version, ...(urls as Record<AvatarSize, string>) };
 }
 
+/** Profile banner, 3:1: https://api.amashuri.com/covers/<userId>/<version>/<md|lg>.webp?s=<sig> */
+export interface CoverUrls {
+  version: number;
+  md: string;
+  lg: string;
+}
+
+export function coverStoragePath(userId: number, version: number, size: CoverSize): string {
+  return `covers/${userId}/${version}-${size}.webp`;
+}
+
+export function coverUrls(userId: number, version: number | null | undefined): CoverUrls | null {
+  if (!userId || !version) return null;
+  const base = `${publicApiBase()}/covers/${userId}/${version}`;
+  const query = `?s=${coverSignature(userId, version)}`;
+  const urls = Object.fromEntries(COVER_SIZE_NAMES.map((s) => [s, `${base}/${s}.webp${query}`]));
+  return { version, ...(urls as Record<CoverSize, string>) };
+}
+
+/** `avatar` + `cover` for a user payload (both null when not set). */
+export function profileMedia(user: { user_id: number; avatar_version?: number | null; cover_version?: number | null }) {
+  return {
+    avatar: avatarUrls(user.user_id, user.avatar_version),
+    cover: coverUrls(user.user_id, user.cover_version),
+  };
+}
+
 /**
  * The avatar fields every user payload carries: `avatar` (all sizes) and, on the user
- * row itself, `avatar_url` (the 256 px one) -- the single field the spoke apps read.
+ * row itself, `avatar_url` (the 256 px one) and `cover_url` (the wide banner) -- the
+ * fields the spoke apps read.
  */
-export function withAvatar<T extends { user_id: number; avatar_version?: number | null }>(
+export function withAvatar<T extends { user_id: number; avatar_version?: number | null; cover_version?: number | null }>(
   user: T,
-): T & { avatar_url: string | null } {
-  return { ...user, avatar_url: avatarUrls(user.user_id, user.avatar_version)?.md ?? null };
+): T & { avatar_url: string | null; cover_url: string | null } {
+  return {
+    ...user,
+    avatar_url: avatarUrls(user.user_id, user.avatar_version)?.md ?? null,
+    cover_url: coverUrls(user.user_id, user.cover_version)?.lg ?? null,
+  };
 }

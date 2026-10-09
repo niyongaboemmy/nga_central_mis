@@ -16,6 +16,7 @@ import { useUser } from "../contexts/UserContext";
 import { useToast } from "../contexts/ToastContext";
 import { updateProfile, UserProfile } from "../api/users";
 import AvatarControl from "./profile/AvatarControl";
+import ProfileCover from "./profile/ProfileCover";
 import ChangePasswordModal from "./ChangePasswordModal";
 import SelectField from "./ui/SelectField";
 
@@ -162,16 +163,8 @@ const Profile: React.FC = () => {
           animate={{ opacity: 1, y: 0 }}
           className="relative overflow-hidden rounded-3xl bg-white dark:bg-gray-900 border border-gray-200/70 dark:border-gray-800 shadow-sm"
         >
-          <div className="h-28 md:h-36 bg-gradient-to-r from-blue-600 via-indigo-600 to-sky-500 relative">
-            <div
-              className="absolute inset-0 opacity-20"
-              style={{
-                backgroundImage: "radial-gradient(circle at 1px 1px, white 1px, transparent 0)",
-                backgroundSize: "18px 18px",
-              }}
-            />
-          </div>
-          <div className="px-5 md:px-8 pb-6 -mt-14 md:-mt-16 flex flex-col md:flex-row md:items-start gap-4 md:gap-6">
+          <ProfileCover cover={user.cover} editable onChange={() => refreshUser()} className="h-36 md:h-52" />
+          <div className="relative px-5 md:px-8 pb-6 -mt-14 md:-mt-16 flex flex-col md:flex-row md:items-start gap-4 md:gap-6">
             <AvatarControl name={fullName} avatar={user.avatar} onChange={() => refreshUser()} size={128} />
             <div className="flex-1 min-w-0 text-center md:text-left md:pt-16">
               <h1 className="text-2xl font-bold text-gray-900 dark:text-white truncate">{fullName}</h1>

@@ -3,7 +3,7 @@ import Cropper, { Area } from "react-easy-crop";
 import "react-easy-crop/react-easy-crop.css";
 import { RotateCcw, ZoomIn, ZoomOut } from "lucide-react";
 import Modal from "../ui/Modal";
-import { Avatar, AvatarCrop, uploadAvatar } from "../../api/users";
+import { Avatar, AvatarCrop, Cover, uploadAvatar, uploadCover } from "../../api/users";
 
 export const AVATAR_MAX_BYTES = 10 * 1024 * 1024;
 export const AVATAR_ACCEPT = "image/jpeg,image/png,image/webp,image/gif,image/avif";
@@ -24,15 +24,28 @@ export function toAvatarCrop(area: Area): AvatarCrop {
   return { x, y, width: Math.min(f(area.width), 1 - x), height: Math.min(f(area.height), 1 - y) };
 }
 
-interface Props {
+type Props = {
   file: File | null;
   onClose: () => void;
-  onSaved: (avatar: Avatar) => void;
-  /** Someone else's picture (MANAGE_USERS); omit for your own. */
-  userId?: number;
-}
+} & (
+  | {
+      /** Profile picture (round, 1:1) -- the default. */
+      variant?: "avatar";
+      onSaved: (avatar: Avatar) => void;
+      /** Someone else's picture (MANAGE_USERS); omit for your own. */
+      userId?: number;
+    }
+  | {
+      /** Profile cover (3:1 banner), always your own. */
+      variant: "cover";
+      onSaved: (cover: Cover) => void;
+      userId?: undefined;
+    }
+);
 
-const ProfilePictureEditor: React.FC<Props> = ({ file, onClose, onSaved, userId }) => {
+const ProfilePictureEditor: React.FC<Props> = (props) => {
+  const { file, onClose, userId } = props;
+  const isCover = props.variant === "cover";
   const [src, setSrc] = useState<string | null>(null);
   const [crop, setCrop] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
@@ -59,11 +72,12 @@ const ProfilePictureEditor: React.FC<Props> = ({ file, onClose, onSaved, userId 
     setError(null);
     setProgress(0);
     try {
-      const avatar = await uploadAvatar(file, area ? toAvatarCrop(area) : undefined, {
-        userId,
-        onProgress: setProgress,
-      });
-      onSaved(avatar);
+      const crop = area ? toAvatarCrop(area) : undefined;
+      if (props.variant === "cover") {
+        props.onSaved(await uploadCover(file, crop, { onProgress: setProgress }));
+      } else {
+        props.onSaved(await uploadAvatar(file, crop, { userId, onProgress: setProgress }));
+      }
     } catch (err: any) {
       setError(err?.response?.data?.message || "The picture could not be saved. Check your connection and try again.");
     } finally {
@@ -72,7 +86,7 @@ const ProfilePictureEditor: React.FC<Props> = ({ file, onClose, onSaved, userId 
   };
 
   return (
-    <Modal isOpen={!!file} onClose={saving ? () => undefined : onClose} title="Profile picture" size="md" contentClassName="p-0">
+    <Modal isOpen={!!file} onClose={saving ? () => undefined : onClose} title={isCover ? "Cover image" : "Profile picture"} size={isCover ? "xl" : "md"} contentClassName="p-0">
       <div className="relative h-72 sm:h-80 bg-gray-900">
         {src && (
           <Cropper
@@ -81,8 +95,8 @@ const ProfilePictureEditor: React.FC<Props> = ({ file, onClose, onSaved, userId 
             zoom={zoom}
             minZoom={1}
             maxZoom={4}
-            aspect={1}
-            cropShape="round"
+            aspect={isCover ? 3 : 1}
+            cropShape={isCover ? "rect" : "round"}
             showGrid={false}
             onCropChange={setCrop}
             onZoomChange={setZoom}
@@ -134,7 +148,9 @@ const ProfilePictureEditor: React.FC<Props> = ({ file, onClose, onSaved, userId 
         </div>
 
         <p className="text-xs text-gray-500 dark:text-gray-400">
-          Drag to position, zoom to frame your face. Your picture is shown in NGA MIS, Task Mentor, Tendo and Tupo.
+          {isCover
+            ? "Drag to position and zoom to choose the strip shown across the top of your profile."
+            : "Drag to position, zoom to frame your face. Your picture is shown in NGA MIS, Task Mentor, Tendo and Tupo."}
         </p>
 
         {error && (

@@ -38,6 +38,8 @@ export const User = mysqlTable("User", {
   // every avatar URL, so a new picture never hits a stale cache (migration 117,
   // services/avatar/).
   avatar_version: int("avatar_version", { unsigned: true }),
+  // Profile cover (3:1 banner), same scheme as avatar_version (migration 118).
+  cover_version: int("cover_version", { unsigned: true }),
   created_at: datetime("created_at").default(sql`CURRENT_TIMESTAMP`),
   updated_at: datetime("updated_at").default(
     sql`CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP`,

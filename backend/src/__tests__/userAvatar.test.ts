@@ -10,8 +10,10 @@ const { store } = installFakeFileServer();
 import app from "../app";
 import storage from "../utils/fileServer";
 import { createUser, signToken, createRoleWithPermissions, assignRole } from "../test/fixtures";
-import { renderAvatar, parseAvatarCrop, AVATAR_SIZES } from "../services/avatar/image";
-import { avatarSignature, avatarUrls, verifyAvatarSignature } from "../services/avatar/urls";
+import { renderAvatar, renderCover, parseAvatarCrop, AVATAR_SIZES, COVER_SIZES } from "../services/avatar/image";
+import { avatarSignature, avatarUrls, coverUrls, verifyAvatarSignature, verifyMediaSignature } from "../services/avatar/urls";
+import { db } from "../db";
+import { System } from "../db/schema";
 
 /** Solid-colour test picture; `split` paints the right half blue. */
 async function picture(
@@ -274,5 +276,107 @@ describe("profile picture API", () => {
     const removed = await request(app).delete(`/users/${userId}/avatar`).set("Authorization", `Bearer ${adminToken}`);
     expect(removed.status).toBe(200);
     expect((await request(app).get("/users/me/avatar").set("Authorization", `Bearer ${token}`)).body.data.avatar).toBeNull();
+  });
+});
+
+describe("profile cover", () => {
+  it("renders 3:1 WebP banners at 960x320 and 1920x640", async () => {
+    const out = await renderCover(await picture(2400, 1600));
+    for (const [name, [w, h]] of Object.entries(COVER_SIZES)) {
+      const meta = await sharp(out[name as keyof typeof out]).metadata();
+      expect([meta.format, meta.width, meta.height]).toEqual(["webp", w, h]);
+    }
+  });
+
+  it("cuts the cover from the chosen area", async () => {
+    // Left half red, right half blue; a 3:1 strip from the right half is blue.
+    const src = await picture(1200, 600, { split: true });
+    const right = await renderCover(src, { x: 0.5, y: 0.25, width: 0.5, height: 0.333 });
+    expect(await dominant(right.md)).toBe("blue");
+  });
+
+  it("signs cover links separately from avatar links", () => {
+    const urls = coverUrls(42, 1790000000)!;
+    expect(urls.md).toMatch(/\/covers\/42\/1790000000\/md\.webp\?s=/);
+    const sig = new URL(urls.md).searchParams.get("s");
+    expect(verifyMediaSignature("cover", 42, 1790000000, sig)).toBe(true);
+    expect(verifyMediaSignature("avatar", 42, 1790000000, sig)).toBe(false);
+    expect(coverUrls(42, null)).toBeNull();
+  });
+});
+
+describe("profile cover API and profile-media lookup", () => {
+  let userId: number;
+  let token: string;
+  const basic = (id: string, secret: string) => `Basic ${Buffer.from(`${id}:${secret}`).toString("base64")}`;
+  const clientId = `tupo_avatar_${Date.now()}`;
+
+  beforeAll(async () => {
+    userId = await createUser({ userType: "TEACHER" });
+    token = signToken(userId);
+    await db.insert(System).values({
+      name: `Tupo avatars ${clientId}`, client_id: clientId, client_secret: "s3cret", icon_url: "x", home_url: "x", status: "ACTIVE",
+    } as any);
+  });
+
+  const uploadCover = (file: Buffer) =>
+    request(app).put("/users/me/cover").set("Authorization", `Bearer ${token}`)
+      .attach("cover", file, { filename: "cover.png", contentType: "image/png" });
+
+  it("uploads, serves and removes a cover", async () => {
+    const res = await uploadCover(await picture(1800, 900));
+    expect(res.status).toBe(200);
+    const { cover } = res.body.data;
+    expect(store.has(`covers/${userId}/${cover.version}-lg.webp`)).toBe(true);
+
+    const me = await request(app).get("/users/me").set("Authorization", `Bearer ${token}`);
+    expect(me.body.data.cover).toEqual(cover);
+    expect(me.body.data.user.cover_url).toBe(cover.lg);
+    const verify = await request(app).get("/auth/verify").set("Authorization", `Bearer ${token}`);
+    expect(verify.body.data.cover).toEqual(cover);
+
+    expect((await request(app).get(pathOf(cover.md))).status).toBe(200);
+    // An avatar URL shape with the cover's signature is refused.
+    expect((await request(app).get(pathOf(cover.md).replace("/covers/", "/avatars/"))).status).toBe(404);
+    expect((await request(app).get(pathOf(cover.md).replace("/md.webp", "/sm.webp"))).status).toBe(404);
+
+    const removed = await request(app).delete("/users/me/cover").set("Authorization", `Bearer ${token}`);
+    expect(removed.body.data.cover).toBeNull();
+    await tick();
+    expect(store.has(`covers/${userId}/${cover.version}-lg.webp`)).toBe(false);
+    expect((await request(app).get("/users/me").set("Authorization", `Bearer ${token}`)).body.data.cover).toBeNull();
+  });
+
+  it("rejects a cover that is not a picture", async () => {
+    const res = await uploadCover(Buffer.from("nope"));
+    expect(res.status).toBe(400);
+  });
+
+  it("answers a batch lookup for a registered app, and nobody else", async () => {
+    await request(app).put("/users/me/avatar").set("Authorization", `Bearer ${token}`)
+      .attach("avatar", await picture(200, 200), { filename: "a.png", contentType: "image/png" });
+
+    const denied = await request(app).post("/users/profile-media/lookup").send({ user_ids: [userId] });
+    expect(denied.status).toBe(401);
+    const wrong = await request(app).post("/users/profile-media/lookup").set("Authorization", basic(clientId, "nope")).send({ user_ids: [userId] });
+    expect(wrong.status).toBe(401);
+    // A signed-in person is not a registered app.
+    const person = await request(app).post("/users/profile-media/lookup").set("Authorization", `Bearer ${token}`).send({ user_ids: [userId] });
+    expect(person.status).toBe(401);
+
+    const ok = await request(app)
+      .post("/users/profile-media/lookup")
+      .set("Authorization", basic(clientId, "s3cret"))
+      .send({ user_ids: [userId, userId, 999999999, "x"] });
+    expect(ok.status).toBe(200);
+    expect(ok.body.data.users).toHaveLength(1);
+    expect(ok.body.data.users[0]).toMatchObject({ user_id: userId, cover: null });
+    expect(ok.body.data.users[0].avatar.md).toMatch(new RegExp(`/avatars/${userId}/`));
+
+    const tooMany = await request(app).post("/users/profile-media/lookup").set("Authorization", basic(clientId, "s3cret"))
+      .send({ user_ids: Array.from({ length: 1001 }, (_, i) => i + 1) });
+    expect(tooMany.status).toBe(400);
+    const notArray = await request(app).post("/users/profile-media/lookup").set("Authorization", basic(clientId, "s3cret")).send({ user_ids: 5 });
+    expect(notArray.status).toBe(400);
   });
 });
