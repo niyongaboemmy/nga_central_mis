@@ -40,13 +40,13 @@ describe("Wellbeing (students)", () => {
     expect(screen.getByText(/a member of staff will find you soon/)).toBeTruthy();
   });
 
-  it("asks for help, and always shows the helplines", async () => {
+  it("asks for help, without an outside helpline", async () => {
     api.checkIn.mockReturnValue(ok({ applies: false }));
     api.report.mockReturnValue(Promise.resolve({ data: { success: true } }));
     render(<Wellbeing />);
     const send = await screen.findByRole("button", { name: "Send to the safeguarding team" });
     expect(screen.queryByText("This week's check-in")).toBeNull(); // staff: no check-in
-    expect(screen.getByText(/child helpline/)).toHaveTextContent("116");
+    expect(screen.queryByText(/helpline/i)).toBeNull();
     fireEvent.click(screen.getByLabelText("I don't feel safe"));
     fireEvent.change(screen.getByLabelText("What is happening?"), { target: { value: "Older students wait for me after school" } });
     fireEvent.click(send);
