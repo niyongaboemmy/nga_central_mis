@@ -1,3 +1,4 @@
+import UserAvatar from "../ui/UserAvatar";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -32,8 +33,6 @@ import {
 } from "../../api/documents";
 import {
   modalVariants,
-  getInitials,
-  getAvatarColor,
   type ShareTabType,
   type DocumentPermission,
 } from "./types";
@@ -513,17 +512,7 @@ const ShareModal: React.FC<ShareModalProps> = ({
                             className="flex items-center justify-between gap-3 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-2xl hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
                           >
                             <div className="flex items-center gap-3 min-w-0 flex-1">
-                              <div
-                                className={`w-10 h-10 rounded-xl flex items-center justify-center text-white text-sm font-semibold flex-shrink-0 ${getAvatarColor(
-                                  perm.user.username,
-                                )}`}
-                              >
-                                {getInitials(
-                                  perm.user.first_name,
-                                  perm.user.last_name,
-                                  perm.user.username,
-                                )}
-                              </div>
+                              <UserAvatar decorative userId={perm.user.user_id} name={[perm.user.first_name, perm.user.last_name].filter(Boolean).join(" ") || perm.user.username} size={40} shape="rounded" />
                               <div className="min-w-0 flex-1">
                                 <p
                                   className="font-medium text-sm text-gray-700 dark:text-gray-200 truncate"
@@ -618,17 +607,7 @@ const ShareModal: React.FC<ShareModalProps> = ({
                             onClick={() => onAddUser(user)}
                             className="w-full p-3 text-left hover:bg-gray-50 dark:hover:bg-gray-600 flex items-center gap-3 transition-colors border-b border-gray-100 dark:border-gray-600 last:border-b-0"
                           >
-                            <div
-                              className={`w-9 h-9 rounded-xl flex items-center justify-center text-white text-sm font-semibold ${getAvatarColor(
-                                user.username,
-                              )}`}
-                            >
-                              {getInitials(
-                                user.first_name,
-                                user.last_name,
-                                user.username,
-                              )}
-                            </div>
+                            <UserAvatar decorative userId={user.user_id} name={[user.first_name, user.last_name].filter(Boolean).join(" ") || user.username} size={36} shape="rounded" />
                             <div className="flex-1 min-w-0">
                               <p
                                 className="font-medium text-sm text-gray-700 dark:text-gray-200 truncate"
@@ -676,17 +655,7 @@ const ShareModal: React.FC<ShareModalProps> = ({
                             className="flex items-center justify-between gap-2 p-2.5 bg-blue-50 dark:bg-blue-900/20 rounded-2xl border border-blue-100 dark:border-blue-800"
                           >
                             <div className="flex items-center gap-3 min-w-0 flex-1">
-                              <div
-                                className={`w-8 h-8 rounded-xl flex items-center justify-center text-white text-xs font-semibold flex-shrink-0 ${getAvatarColor(
-                                  user.username,
-                                )}`}
-                              >
-                                {getInitials(
-                                  user.first_name,
-                                  user.last_name,
-                                  user.username,
-                                )}
-                              </div>
+                              <UserAvatar decorative userId={user.user_id} name={[user.first_name, user.last_name].filter(Boolean).join(" ") || user.username} size={32} shape="rounded" />
                               <span
                                 className="text-sm font-medium text-gray-700 dark:text-gray-200 truncate"
                                 title={

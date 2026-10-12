@@ -42,6 +42,26 @@ const getConsolidatedReportMock = vi.fn((_params?: any) =>
   }),
 );
 
+const searchCandidatesMock = vi.fn((params: any) =>
+  Promise.resolve({
+    data: {
+      data:
+        params.role === "mentor"
+          ? [
+              { user_id: 30, username: "assadou", email: "assadou@nga.ac.rw", first_name: "Assadou", last_name: "Nzigamasabo", user_type: "STAFF", name: "Assadou Nzigamasabo", mentee_count: 2 },
+              { user_id: 5, username: "jb", email: "jb@nga.ac.rw", first_name: "Jean", last_name: "Bosco", user_type: "TEACHER", name: "Jean Bosco", mentee_count: 1 },
+            ]
+          : [
+              { user_id: 10, username: "ada", email: null, first_name: "Ada", last_name: "Lovelace", user_type: "STUDENT", name: "Ada Lovelace", registration_number: "R-10", class_group_name: "Year 1A", current_mentor_id: 5, current_mentor_name: "Jean Bosco" },
+              { user_id: 11, username: "alan", email: null, first_name: "Alan", last_name: "Turing", user_type: "STUDENT", name: "Alan Turing", registration_number: "R-11", class_group_name: "Year 1A", current_mentor_id: null, current_mentor_name: null },
+            ],
+    },
+  }),
+);
+const bulkAssignMock = vi.fn((_data: any) =>
+  Promise.resolve({ data: { data: { assigned: 1, moved: 1, unchanged: 0, assignment_ids: [7, 8] } } }),
+);
+
 vi.mock("../../../api/mentorship", async () => {
   const actual = await vi.importActual<any>("../../../api/mentorship");
   return {
@@ -52,6 +72,8 @@ vi.mock("../../../api/mentorship", async () => {
       getUnassignedStudents: (yearId?: number) => getUnassignedStudentsMock(yearId),
       endAssignment: (id: number) => endAssignmentMock(id),
       getConsolidatedReport: (params?: any) => getConsolidatedReportMock(params),
+      searchCandidates: (params: any) => searchCandidatesMock(params),
+      bulkAssignMentor: (data: any) => bulkAssignMock(data),
     },
   };
 });
@@ -86,6 +108,8 @@ describe("AdminMentorAssignments", () => {
     getConsolidatedReportMock.mockClear();
     downloadMock.mockClear();
     showToastMock.mockClear();
+    searchCandidatesMock.mockClear();
+    bulkAssignMock.mockClear();
   });
 
   it("lists active mentor assignments", async () => {
@@ -147,7 +171,76 @@ describe("AdminMentorAssignments", () => {
     await waitFor(() => expect(listAssignmentsMock).toHaveBeenCalled());
 
     await user.click(screen.getAllByRole("button", { name: /Assign Mentor/i })[0]);
-    expect(screen.getByPlaceholderText(/Search teacher/i)).toBeInTheDocument();
-    expect(screen.getByPlaceholderText(/Search student/i)).toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "Assign Mentor" })).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/Search staff/i)).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/Search students/i)).toBeInTheDocument();
+    // The OS autocorrect bubble must not cover the results.
+    expect(screen.getByPlaceholderText(/Search staff/i)).toHaveAttribute("spellcheck", "false");
+  });
+
+  it("offers non-teacher staff as mentors and assigns, spelling out a student who moves", async () => {
+    const user = userEvent.setup();
+    render(<ConfirmProvider><AdminMentorAssignments /></ConfirmProvider>);
+    await waitFor(() => expect(listAssignmentsMock).toHaveBeenCalled());
+    await user.click(screen.getAllByRole("button", { name: /Assign Mentor/i })[0]);
+
+    // The mentor list opens on focus, without typing, and asks for role=mentor.
+    const staffOption = await screen.findByRole("option", { name: /Assadou Nzigamasabo/ });
+    expect(searchCandidatesMock).toHaveBeenCalledWith(expect.objectContaining({ role: "mentor", academic_year_id: 1 }));
+    expect(staffOption).toHaveTextContent("Staff");
+    expect(staffOption).toHaveTextContent("2 mentees");
+    await user.click(staffOption);
+
+    // Students: one already mentored by Jean Bosco, one without a mentor.
+    const ada = await screen.findByRole("option", { name: /Ada Lovelace/ });
+    expect(ada).toHaveTextContent("Mentor: Jean Bosco");
+    expect(screen.getByRole("option", { name: /Alan Turing/ })).toHaveTextContent("No mentor");
+    await user.click(screen.getByRole("button", { name: "Select all shown" }));
+
+    expect(screen.getByText(/will mentor 2 more students \(1 new, 1 moving\)/)).toBeInTheDocument();
+    expect(screen.getByText(/Ada Lovelace \(from Jean Bosco\)/)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Assign 2 students" }));
+    await waitFor(() =>
+      expect(bulkAssignMock).toHaveBeenCalledWith({ mentor_id: 30, student_ids: [10, 11], academic_year_id: 1, reassign: true }),
+    );
+    expect(showToastMock).toHaveBeenCalledWith(
+      "Assadou Nzigamasabo: 1 assigned, 1 moved from their previous mentor",
+      "success",
+    );
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+  });
+
+  it("does not let a student already with the chosen mentor be re-assigned", async () => {
+    const user = userEvent.setup();
+    render(<ConfirmProvider><AdminMentorAssignments /></ConfirmProvider>);
+    await waitFor(() => expect(listAssignmentsMock).toHaveBeenCalled());
+    await user.click(screen.getByRole("button", { name: /Change mentor/i }));
+
+    // Preloaded with Ada; choosing her current mentor changes nothing.
+    await user.click(await screen.findByRole("option", { name: /Jean Bosco/ }));
+    expect(screen.getByText(/already mentored by Jean Bosco — skipped/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Choose students" })).toBeDisabled();
+  });
+
+  it("opens the modal pre-filled from an unassigned student", async () => {
+    const user = userEvent.setup();
+    render(<ConfirmProvider><AdminMentorAssignments /></ConfirmProvider>);
+    await waitFor(() => expect(screen.getByText(/1 unassigned/)).toBeInTheDocument());
+    await user.click(screen.getByText(/1 unassigned/));
+    await user.click(screen.getByRole("button", { name: /Grace Hopper/ }));
+
+    const dialog = screen.getByRole("dialog", { name: "Assign Mentor" });
+    expect(dialog).toHaveTextContent("Grace Hopper");
+    expect(screen.getByRole("button", { name: "Remove Grace Hopper" })).toBeInTheDocument();
+  });
+
+  it("filters the assignment table", async () => {
+    const user = userEvent.setup();
+    render(<ConfirmProvider><AdminMentorAssignments /></ConfirmProvider>);
+    await waitFor(() => expect(screen.getByText("Ada Lovelace")).toBeInTheDocument());
+    await user.type(screen.getByLabelText("Filter assignments"), "zzz");
+    expect(screen.queryByText("Ada Lovelace")).not.toBeInTheDocument();
+    expect(screen.getByText(/No assignment matches/)).toBeInTheDocument();
   });
 });

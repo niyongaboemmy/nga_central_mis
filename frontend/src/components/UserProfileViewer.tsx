@@ -1,4 +1,5 @@
 import React from "react";
+import UserAvatar from "./ui/UserAvatar";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -359,9 +360,18 @@ const UserProfileViewer: React.FC<UserProfileViewerProps> = ({
             </button>
 
             <div className="flex items-center gap-4 pr-10">
-              <div className="w-16 h-16 rounded-2xl bg-white/20 backdrop-blur flex items-center justify-center text-xl font-bold flex-shrink-0">
-                {initialsOf(firstName, lastName, summary.username)}
-              </div>
+              {detail?.avatar || summary.avatar ? (
+                <UserAvatar
+                  name={fullName}
+                  avatar={detail?.avatar ?? summary.avatar}
+                  size={64}
+                  ring
+                />
+              ) : (
+                <div className="w-16 h-16 rounded-2xl bg-white/20 backdrop-blur flex items-center justify-center text-xl font-bold flex-shrink-0">
+                  {initialsOf(firstName, lastName, summary.username)}
+                </div>
+              )}
               <div className="min-w-0">
                 <h2 className="text-xl font-bold leading-tight truncate">
                   {fullName}

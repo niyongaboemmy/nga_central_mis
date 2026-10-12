@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import UserAvatar from "./ui/UserAvatar";
 import { motion, AnimatePresence } from "framer-motion";
 import { myStudentsApi, MyStudent, MyStudentsResponse } from "../api/academics";
 import { useAcademicPeriod } from "../contexts/AcademicPeriodContext";
@@ -13,9 +14,6 @@ import {
   BookOpen,
 } from "lucide-react";
 import SelectField from "./ui/SelectField";
-
-const getInitials = (first?: string, last?: string) =>
-  `${first?.[0] || ""}${last?.[0] || ""}`.toUpperCase() || "?";
 
 const EMPTY: MyStudentsResponse = {
   students: [],
@@ -278,9 +276,7 @@ const StudentCard: React.FC<{ student: MyStudent }> = ({ student }) => (
     className="bg-white dark:bg-gray-800/40 dark:backdrop-blur-sm rounded-2xl p-4 border border-gray-200 dark:border-gray-700/30 shadow-sm hover:shadow-md transition-all duration-200"
   >
     <div className="flex items-center gap-3">
-      <div className="w-11 h-11 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center flex-shrink-0 text-sm font-bold text-white">
-        {getInitials(student.first_name, student.last_name)}
-      </div>
+      <UserAvatar decorative userId={student.user_id} name={`${student.first_name} ${student.last_name}`} size={44} />
       <div className="min-w-0 flex-1">
         <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">
           {student.first_name} {student.last_name}

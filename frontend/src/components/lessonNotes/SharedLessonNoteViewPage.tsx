@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import UserAvatar from "../ui/UserAvatar";
 import { useNavigate, useParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 // @ts-expect-error — katex ships no type declarations for this subpath
@@ -49,8 +50,9 @@ import NoteAIPanel, { AskMode, AskRequest } from "./reader/NoteAIPanel";
 import SharedPdfNoteReader from "./pdf/SharedPdfNoteReader";
 import { EmptyState } from "../elearning/ui/primitives";
 import { SubjectTile } from "./library/NoteCard";
-import { fullWhen, initialsOf, shortWhen } from "./library/noteVisuals";
+import { fullWhen, shortWhen } from "./library/noteVisuals";
 import { hydrateInlineChecks } from "../elearning/interactive/hydrate";
+import CourseLinkBanner from "./elearning/CourseLinkBanner";
 
 /** Rail (272) + gap (32) + side padding (48) + a page that still reads like one (~600). */
 const RAIL_MIN_ROW_WIDTH = 952;
@@ -588,6 +590,9 @@ const SharedLessonNoteViewPage: React.FC<Props> = ({ noteId, onBack, backLabel }
         />
       </div>
 
+      {/* Opened outside its course: say where reading it counts. */}
+      {!embedded && <CourseLinkBanner placement={note.placement} />}
+
       {/* Toolbar. Painted in the page's own background, so no colour band shows
           between the toolbar and the desk the sheet rests on. */}
       <AnimatePresence>
@@ -823,9 +828,7 @@ const SharedLessonNoteViewPage: React.FC<Props> = ({ noteId, onBack, backLabel }
                 <div className="note-reader-byline">
                   {note.teacher_name && (
                     <span className="note-reader-byline-author">
-                      <span aria-hidden className="note-reader-byline-avatar">
-                        {initialsOf(note.teacher_name)}
-                      </span>
+                      <UserAvatar decorative userId={note.teacher_id} name={note.teacher_name} size={28} />
                       {note.teacher_name}
                     </span>
                   )}

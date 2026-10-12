@@ -318,6 +318,7 @@ const TeachersLens: React.FC = () => {
                           className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 pl-1 pr-1.5 py-0.5 text-xs font-medium"
                         >
                           <Avatar
+                            userId={teacher.user_id}
                             first={teacher.name?.split(" ")[0]}
                             last={teacher.name?.split(" ")[1]}
                             size="sm"
@@ -511,6 +512,7 @@ const TeacherPicker: React.FC<{
               }`}
             >
               <Avatar
+                userId={teacher.user_id}
                 first={teacher.first_name}
                 last={teacher.last_name}
                 size="sm"

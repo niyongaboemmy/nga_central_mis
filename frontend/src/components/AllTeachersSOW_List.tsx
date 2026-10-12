@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from "react";
+import UserAvatar from "./ui/UserAvatar";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import {
@@ -34,12 +35,6 @@ interface Props {
       | "not_validated",
   ) => void;
 }
-
-const getInitials = (name: string) => {
-  const words = name.trim().split(" ");
-  if (words.length >= 2) return (words[0][0] + words[1][0]).toUpperCase();
-  return name.slice(0, 2).toUpperCase();
-};
 
 const statusBadge = (status: "submitted" | "pending") => {
   if (status === "submitted") {
@@ -246,14 +241,7 @@ const AllTeachersSOW_List: React.FC<Props> = ({
                 >
                   <div className="flex items-center gap-3">
                     {/* Avatar */}
-                    <div
-                      className="w-8 h-8 rounded-lg flex items-center justify-center text-white font-bold text-[11px] flex-shrink-0"
-                      style={{
-                        backgroundColor: scheme.subject_color || "#3B82F6",
-                      }}
-                    >
-                      {getInitials(teacher.full_name)}
-                    </div>
+                    <UserAvatar decorative userId={teacher.user_id} name={teacher.full_name} size={32} shape="rounded" />
 
                     {/* Main info */}
                     <div className="flex-1 min-w-0">

@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import UserAvatar from "../ui/UserAvatar";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Search,
@@ -85,7 +86,7 @@ const StatCard: React.FC<{
 
 const MentoringHub: React.FC = () => {
   const { showToast } = useToast();
-  const { selectedYearId } = useAcademicPeriod();
+  const { selectedYearId, selectedYear } = useAcademicPeriod();
 
   const [students, setStudents] = useState<AssignedStudent[]>([]);
   const [loading, setLoading] = useState(true);
@@ -192,7 +193,8 @@ const MentoringHub: React.FC = () => {
               Mentoring Hub
             </h2>
             <p className="text-sm text-gray-500 dark:text-gray-400">
-              {students.length} student{students.length !== 1 ? "s" : ""} assigned to you
+              {students.length} mentee{students.length !== 1 ? "s" : ""} assigned to you
+              {selectedYear?.name ? ` · ${selectedYear.name}` : ""}
             </p>
           </div>
         </div>
@@ -245,8 +247,11 @@ const MentoringHub: React.FC = () => {
           <div className="p-4 rounded-2xl bg-gray-50 dark:bg-gray-800/40">
             <Users className="w-10 h-10 text-gray-300 dark:text-gray-600" />
           </div>
-          <p className="text-base font-semibold text-gray-500 dark:text-gray-400">No students assigned</p>
-          <p className="text-sm text-gray-400 dark:text-gray-500">Students appear here once you are assigned to a class group.</p>
+          <p className="text-base font-semibold text-gray-500 dark:text-gray-400">No mentees assigned yet</p>
+          <p className="text-sm text-gray-400 dark:text-gray-500 text-center max-w-sm">
+            Only students your school administrator assigns to you as their mentor appear here
+            {selectedYear?.name ? ` for ${selectedYear.name}` : ""}.
+          </p>
         </div>
       ) : filtered.length === 0 ? (
         <div className="flex-1 flex items-center justify-center text-gray-400">
@@ -273,9 +278,7 @@ const MentoringHub: React.FC = () => {
                   className={`group w-full flex items-center gap-3 p-3 rounded-xl border bg-white dark:bg-gray-800/30 transition-colors hover:bg-gray-50 dark:hover:bg-gray-800/60 ${borderAccent}`}
                 >
                   <div className="relative flex-shrink-0">
-                    <div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-500 to-indigo-500 flex items-center justify-center text-white font-bold text-sm shadow-sm">
-                      {(student.first_name?.[0] ?? "?").toUpperCase()}
-                    </div>
+                    <UserAvatar decorative userId={student.user_id} name={[student.first_name, student.last_name].filter(Boolean).join(" ") || "?"} size={36} />
                     {student.wellbeing_status && (
                       <span className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 flex items-center justify-center text-[10px]">
                         {WELLBEING_EMOJI[student.wellbeing_status] ?? ""}
@@ -288,9 +291,15 @@ const MentoringHub: React.FC = () => {
                       {fullName || "Unnamed"}
                     </p>
                     <p className="text-xs text-gray-400 dark:text-gray-500 truncate">
-                      {student.registration_number
-                        ? `${student.registration_number} · ${student.class_group_name}`
-                        : student.class_group_name}
+                      {[
+                        student.registration_number,
+                        student.class_group_name ?? "Not placed in a class",
+                        student.session_count
+                          ? `${student.session_count} session${student.session_count !== 1 ? "s" : ""}`
+                          : null,
+                      ]
+                        .filter(Boolean)
+                        .join(" · ")}
                     </p>
                   </div>
 

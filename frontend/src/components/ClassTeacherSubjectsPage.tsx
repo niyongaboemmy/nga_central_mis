@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
+import UserAvatar from "./ui/UserAvatar";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   BookOpen,
@@ -40,15 +41,6 @@ const teacherLabel = (t: {
     ? `${t.first_name} ${t.last_name}`
     : t.username ?? "Unknown";
 
-const initialsOf = (name: string) =>
-  name
-    .split(" ")
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((p) => p.charAt(0))
-    .join("")
-    .toUpperCase();
-
 // ---------------------------------------------------------------------------
 // Cards
 // ---------------------------------------------------------------------------
@@ -73,9 +65,7 @@ const TeacherChips = ({ subject }: { subject: ScopedSubject }) =>
           key={teacher.user_id}
           className="inline-flex items-center gap-1 pl-1 pr-2 py-0.5 bg-gray-100 dark:bg-gray-800/60 text-gray-700 dark:text-gray-300 rounded-full text-xs border border-gray-200 dark:border-gray-700/40"
         >
-          <span className="w-4 h-4 rounded-full bg-gray-400 dark:bg-gray-600 text-white text-[8px] font-bold flex items-center justify-center">
-            {initialsOf(teacherLabel(teacher))}
-          </span>
+          <UserAvatar decorative userId={teacher.user_id} name={teacherLabel(teacher)} size={16} />
           {teacherLabel(teacher)}
         </span>
       ))}

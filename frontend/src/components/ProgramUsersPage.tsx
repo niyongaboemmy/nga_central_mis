@@ -1,3 +1,4 @@
+import UserAvatar from "./ui/UserAvatar";
 import React, { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import {
@@ -73,7 +74,7 @@ const UserCard = ({
           {isLoading ? (
             <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white" />
           ) : (
-            <UserIcon className="w-4 h-4 text-white" />
+            <UserAvatar decorative userId={user.user_id} name={`${user.first_name ?? ""} ${user.last_name ?? ""}`.trim() || "?"} size={32} />
           )}
         </div>
         <div className="min-w-0 flex-1">

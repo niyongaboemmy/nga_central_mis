@@ -1,3 +1,4 @@
+import UserAvatar from "../ui/UserAvatar";
 import React, { useEffect, useRef, useState } from "react";
 import {
   X,
@@ -6,7 +7,6 @@ import {
   AlertCircle,
   CheckCircle2,
   Tag,
-  User as UserIcon,
 } from "lucide-react";
 import {
   LineChart,
@@ -98,9 +98,7 @@ const AdminStudentSupportModal: React.FC<Props> = ({ studentId, studentName, onC
         {/* Header */}
         <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-gray-100 dark:border-gray-700 flex-shrink-0">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-full bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center text-blue-600 dark:text-blue-300 font-semibold text-sm flex-shrink-0">
-              <UserIcon className="w-4 h-4" />
-            </div>
+            <UserAvatar decorative userId={studentId} name={studentName || "Student"} size={36} />
             <div>
               <h2 className="text-base font-semibold text-gray-900 dark:text-white">
                 {studentName || "Student"} — Support Profile

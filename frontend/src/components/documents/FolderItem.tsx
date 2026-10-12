@@ -1,17 +1,15 @@
+import UserAvatar from "../ui/UserAvatar";
 import React from "react";
 import { motion } from "framer-motion";
 import {
   FiFolder,
   FiMoreVertical,
-  FiUser,
   FiEye,
   FiDownload,
   FiEdit2,
-  FiShare2,
-} from "react-icons/fi";
+  FiShare2 } from "react-icons/fi";
 import { type Folder } from "../../api/documents";
 import ShareBadge from "./ShareBadge";
-import { getInitials, getAvatarColor } from "./types";
 
 // Same icon-per-level mapping as the Share modal's own permission selector
 // (ShareModal.tsx's PERMISSION_LEVELS) — a VIEW badge should look like VIEW
@@ -83,13 +81,7 @@ const SharedByChip: React.FC<{
       title={`Shared by ${name}`}
       className={`inline-flex items-center gap-1.5 rounded-full ${INCOMING_SHARE_CLASSES} pl-0.5 pr-2.5 py-0.5 text-[11px] max-w-full ${className}`}
     >
-      <span
-        className={`w-4 h-4 rounded-full flex items-center justify-center text-white text-[8px] font-bold flex-shrink-0 ${getAvatarColor(
-          owner.username,
-        )}`}
-      >
-        {getInitials(owner.first_name, owner.last_name, owner.username)}
-      </span>
+      <UserAvatar decorative userId={owner.user_id} name={[owner.first_name, owner.last_name].filter(Boolean).join(" ") || owner.username} size={16} />
       <span className="truncate">{name}</span>
     </div>
   );
@@ -167,7 +159,7 @@ const FolderItem: React.FC<FolderItemProps> = ({
             showOwner &&
             ownerName && (
               <div className="flex items-center gap-1 mt-2.5">
-                <FiUser className="w-3 h-3 text-gray-400" />
+                <UserAvatar decorative userId={folder.owner?.user_id} name={ownerName} size={16} />
                 <span className="text-xs text-gray-400">{ownerName}</span>
               </div>
             )
@@ -216,7 +208,7 @@ const FolderItem: React.FC<FolderItemProps> = ({
             showOwner &&
             ownerName && (
               <div className="flex items-center gap-1 mt-0.5">
-                <FiUser className="w-3 h-3 text-gray-400" />
+                <UserAvatar decorative userId={folder.owner?.user_id} name={ownerName} size={16} />
                 <span className="text-xs text-gray-500 dark:text-gray-400">
                   {ownerName}
                 </span>

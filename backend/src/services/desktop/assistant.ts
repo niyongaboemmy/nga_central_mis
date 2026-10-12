@@ -6,8 +6,9 @@ import { kigaliInstant, kigaliParts } from "../reminders/time";
 
 /**
  * NGA Desktop "Ask AI" (docs/TOOLS_HUB_IMPLEMENTATION_PLAN.md §5.6, decision D1):
- * teachers, staff and admins first. Students get the AI Tutor (tutor mode, leak
- * check, safeguarding review) after the staff pilot; parents later.
+ * teachers, staff and admins get the assistant; students get the AI Tutor (tutor
+ * mode, answer/safety check, safeguarding review: services/desktop/tutor.ts);
+ * parents later.
  */
 export const FEATURE = "desktop-assistant";
 
@@ -23,9 +24,8 @@ export const persona = (userType: string | null | undefined): AssistantPersona =
   }
 };
 
-/** Who may use it now; null = allowed. */
-export const blockedReason = (p: AssistantPersona): "STUDENTS_SOON" | "PARENTS_SOON" | null =>
-  p === "student" ? "STUDENTS_SOON" : p === "parent" ? "PARENTS_SOON" : null;
+/** Who may use it now; null = allowed. Students get the AI Tutor (services/desktop/tutor.ts). */
+export const blockedReason = (p: AssistantPersona): "PARENTS_SOON" | null => (p === "parent" ? "PARENTS_SOON" : null);
 
 const envInt = (k: string, d: number) => {
   const n = Number(process.env[k]);

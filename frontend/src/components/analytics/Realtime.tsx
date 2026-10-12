@@ -1,3 +1,4 @@
+import UserAvatar from "../ui/UserAvatar";
 import React, { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
@@ -338,7 +339,7 @@ const Roster: React.FC<{ people: LivePerson[]; label: (k: string | null, r?: str
                       ) : (
                         <span className="w-4" />
                       )}
-                      <Avatar name={p.user?.name ?? null} status={p.status} />
+                      <Avatar name={p.user?.name ?? null} userId={p.user?.id} status={p.status} />
                       <div className="min-w-0">{href && canOpen ? <Link to={href} className="hover:underline">{who}</Link> : who}</div>
                     </div>
                   </td>
@@ -556,13 +557,12 @@ const LiveMap: React.FC<{ people: LivePerson[] }> = ({ people }) => {
   );
 };
 
-/** Initials in a circle with the presence status as a dot (shape + word stay in the Status column). */
-const Avatar: React.FC<{ name: string | null; status: LivePerson["status"] }> = ({ name, status }) => {
-  const initials = name ? name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]!.toUpperCase()).join("") : "?";
+/** Photo (or initials) in a circle with the presence status as a dot (shape + word stay in the Status column). */
+const Avatar: React.FC<{ name: string | null; userId?: number | null; status: LivePerson["status"] }> = ({ name, userId, status }) => {
   const dot = status === "active" ? "bg-emerald-500" : status === "idle" ? "bg-amber-500" : "bg-slate-400";
   return (
-    <span aria-hidden className="relative shrink-0 inline-flex items-center justify-center w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-700 text-[11px] font-semibold text-slate-700 dark:text-slate-100">
-      {initials}
+    <span aria-hidden className="relative shrink-0 inline-flex">
+      <UserAvatar decorative userId={userId} name={name || "?"} size={32} />
       <span className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full ring-2 ring-white dark:ring-slate-800 ${dot}`} />
     </span>
   );

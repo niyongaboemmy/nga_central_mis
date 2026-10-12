@@ -30,7 +30,15 @@ export type NotificationKind =
   | "office_hours_absent"
   | "office_hours_escalation"
   | "office_hours_transfer"
-  | "office_hours_digest";
+  | "office_hours_digest"
+  // Safeguarding (services/safeguarding.ts): never carries what the student wrote.
+  | "safeguarding_concern"
+  // Early warning (services/earlyWarning.ts): a student in your class became "at risk".
+  | "early_warning"
+  // Staff absence and cover (services/staffCover.ts).
+  | "staff_cover"
+  // Families (services/families.ts): the weekly summary for parents.
+  | "family_digest";
 
 export interface NotifyUserInput {
   userId: number;
@@ -53,7 +61,12 @@ export interface NotifyUserInput {
     | "office_hour_schedule"
     | "office_hour_escalation"
     | "office_hour_transfer"
-    | "office_hour_digest";
+    | "office_hour_digest"
+    | "safeguarding_concern"
+    | "early_warning"
+    | "staff_absence"
+    | "cover_lesson"
+    | "family_digest";
   subjectId: number;
   actorId?: number;
 }

@@ -1,3 +1,4 @@
+import UserAvatar from "../ui/UserAvatar";
 import React, { useEffect, useMemo, useState } from "react";
 import {
   AllTeacherSubjectAssignment,
@@ -710,7 +711,10 @@ const TeacherAssignmentsTab: React.FC<TeacherAssignmentsTabProps> = ({
                       className="hover:bg-surface-light dark:hover:bg-surface-dark cursor-pointer"
                     >
                       <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-text-primary-light dark:text-text-primary-dark">
-                        {item.teacher_name}
+                        <span className="inline-flex items-center gap-2.5">
+                          <UserAvatar decorative userId={item.user_id} name={item.teacher_name || "?"} size={28} />
+                          {item.teacher_name}
+                        </span>
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-sm text-text-secondary-light dark:text-text-secondary-dark/70">
                         {item.subject_name}

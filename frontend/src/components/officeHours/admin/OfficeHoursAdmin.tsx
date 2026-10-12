@@ -1,3 +1,4 @@
+import UserAvatar from "../../ui/UserAvatar";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { ArrowRightLeft, BellRing, CalendarOff, ClipboardX, Clock4, Settings2, ShieldAlert, Trash2 } from "lucide-react";
@@ -85,7 +86,12 @@ const SchedulesTab: React.FC<{ termId: number | null }> = ({ termId }) => {
                     <Link to={`/office-hours/schedules/${r.schedule_id}`} className="font-semibold text-slate-900 hover:underline dark:text-gray-100">{r.title}</Link>
                     <p className="text-xs text-slate-600 dark:text-gray-300">{r.subject_name ?? "No subject"}</p>
                   </td>
-                  <td className="py-2 pr-3 text-slate-800 dark:text-gray-100">{r.teacher_name}</td>
+                  <td className="py-2 pr-3 text-slate-800 dark:text-gray-100">
+                    <span className="inline-flex items-center gap-2">
+                      <UserAvatar decorative userId={r.teacher_id} name={r.teacher_name ?? "Teacher"} size={24} />
+                      {r.teacher_name}
+                    </span>
+                  </td>
                   <td className="py-2 pr-3 text-xs text-slate-700 dark:text-gray-200">
                     {r.days_label} · {r.start_time}–{r.end_time}
                     <br />

@@ -1,4 +1,6 @@
 import React from "react";
+import UserAvatar from "./ui/UserAvatar";
+import AvatarControl from "./profile/AvatarControl";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -31,6 +33,7 @@ import {
   UserGrade,
   updateUserProfile,
   updateUser,
+  Avatar,
 } from "../api/users";
 import {
   programsApi,
@@ -73,6 +76,13 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
 }) => {
   const { showToast } = useToast();
   const { hasPermission } = usePermissions();
+  // Local copy so a picture changed here shows at once; the list refreshes on its own.
+  const [avatar, setAvatar] = React.useState<Avatar | null>(user?.avatar ?? null);
+  React.useEffect(() => setAvatar(user?.avatar ?? null), [user]);
+  const displayName =
+    [user?.profile?.first_name, user?.profile?.last_name].filter(Boolean).join(" ") ||
+    user?.user.username ||
+    "User";
   const [activeTab, setActiveTab] = React.useState<
     | "info"
     | "roles"
@@ -544,18 +554,19 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({
                 {/* Profile Card */}
                 <div className="p-4">
                   <div className="flex flex-col items-center text-center">
-                    <motion.div
-                      initial={{ scale: 0 }}
-                      animate={{ scale: 1 }}
-                      transition={{
-                        type: "spring",
-                        stiffness: 200,
-                        delay: 0.1,
-                      }}
-                      className="w-20 h-20 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center shadow-2xl shadow-blue-500/30 mb-3 hover:scale-105 transition-transform"
-                    >
-                      <UserIcon className="w-8 h-8 text-white" />
-                    </motion.div>
+                    <div className="mb-3">
+                      {hasPermission("MANAGE_USERS") ? (
+                        <AvatarControl
+                          name={displayName}
+                          avatar={avatar}
+                          userId={user.user.user_id}
+                          onChange={setAvatar}
+                          size={96}
+                        />
+                      ) : (
+                        <UserAvatar name={displayName} avatar={avatar} size={96} ring />
+                      )}
+                    </div>
                     <h2 className="text-lg font-bold text-gray-900 dark:text-white">
                       {user.profile?.first_name && user.profile?.last_name
                         ? `${user.profile.first_name} ${user.profile.last_name}`

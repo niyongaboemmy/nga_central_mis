@@ -6,7 +6,7 @@ import Navbar from "../Navbar";
 import { ToastProvider } from "../../../contexts/ToastContext";
 import { ThemeProvider } from "../../../contexts/ThemeContext";
 
-const mockUser = {
+const mockUser: any = {
   user: { user_id: 1, username: "jdoe", email: "jane.doe@example.com" },
   profile: { first_name: "Jane", last_name: "Doe" },
   roles: [],
@@ -101,6 +101,29 @@ describe("Navbar", () => {
     expect(
       within(desktopAccountContainer).getByText("jane.doe@example.com"),
     ).toBeInTheDocument();
+  });
+
+  it("shows the central profile picture in the account button and dropdown", async () => {
+    mockUser.avatar = {
+      version: 1790000000,
+      sm: "https://api.example/avatars/1/1790000000/sm.webp?s=x",
+      md: "https://api.example/avatars/1/1790000000/md.webp?s=x",
+      lg: "https://api.example/avatars/1/1790000000/lg.webp?s=x",
+    };
+    try {
+      const user = userEvent.setup();
+      renderNavbar();
+      const accountButton = screen.getByRole("button", { name: /account menu/i });
+      const img = within(accountButton).getByRole("img", { name: "Jane Doe" });
+      expect(img.getAttribute("src")).toBe(mockUser.avatar.sm);
+      expect(accountButton.textContent).not.toContain("JD");
+
+      await user.click(accountButton);
+      const container = accountButton.closest(".relative") as HTMLElement;
+      expect(within(container).getAllByRole("img", { name: "Jane Doe" })).toHaveLength(2);
+    } finally {
+      delete mockUser.avatar;
+    }
   });
 
   it("renders a search icon that opens a search dropdown", async () => {

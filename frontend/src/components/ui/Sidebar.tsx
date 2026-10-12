@@ -7,8 +7,10 @@ import { useUser } from "../../contexts/UserContext";
 import { Permissions } from "../../constants/permissions";
 import { getToken } from "../../utils/auth";
 import { useAccess } from "../../hooks/useAccess";
-import { BarChart3, ShieldCheck } from "lucide-react";
-import { BellRing, CalendarDays, Clock4, Gamepad2, House } from "lucide-react";
+import { useMentorshipRole } from "../../hooks/useMentorshipRole";
+import { useOptionalAcademicPeriod } from "../../contexts/AcademicPeriodContext";
+import { BarChart3, CalendarOff, Grid3x3, Target, HeartHandshake, Radar, ShieldAlert, ShieldCheck, UserPlus, Baby } from "lucide-react";
+import { BellRing, Bot, CalendarDays, Clock4, Gamepad2, House, Users2 } from "lucide-react";
 
 interface SidebarProps {
   isCollapsed?: boolean;
@@ -48,6 +50,10 @@ interface NavItem {
   children?: NavItem[];
   /** Legacy permissions that open the item even without `requiredCapability`. */
   orPermission?: string[];
+  /** Only for these user types (e.g. PARENT). */
+  userTypes?: string[];
+  /** Extra runtime condition (e.g. "has mentees"); hidden when false. */
+  when?: boolean;
 }
 
 type TopNavItem = NavItem & { section: NavSection };
@@ -61,6 +67,8 @@ const Sidebar: React.FC<SidebarProps> = ({
   const navigate = useNavigate();
   const { user } = useUser();
   const access = useAccess();
+  const selectedYearId = useOptionalAcademicPeriod()?.selectedYearId;
+  const mentorship = useMentorshipRole(user?.user?.user_id, selectedYearId);
 
   const hasPermission = (perm?: string | string[]) => {
     if (!perm) return true;
@@ -379,6 +387,13 @@ const Sidebar: React.FC<SidebarProps> = ({
       section: "learning",
       icon: <Clock4 className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
       requiredPermission: Permissions.OFFICE_HOURS_VIEW_SELF,
+    },
+    {
+      // Anyone holding mentees this year — teacher, staff or admin.
+      label: "My Mentees",
+      path: "/my-mentees",
+      icon: <Users2 className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
+      when: !!mentorship?.is_mentor,
     },
     {
       label: "My Mentor",
@@ -711,6 +726,60 @@ const Sidebar: React.FC<SidebarProps> = ({
       requiredPermission: Permissions.MANAGE_SETTINGS,
     },
     {
+      label: "My competences",
+      path: "/my-competences",
+      icon: <Target className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
+      userTypes: ["STUDENT"],
+    },
+    {
+      label: "Wellbeing",
+      path: "/wellbeing",
+      icon: <HeartHandshake className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
+      userTypes: ["STUDENT"],
+    },
+    {
+      label: "Staff cover",
+      path: "/cover",
+      icon: <CalendarOff className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
+      userTypes: ["TEACHER", "STAFF", "ADMIN"],
+    },
+    {
+      label: "Competency map",
+      path: "/competency-map",
+      icon: <Grid3x3 className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
+      userTypes: ["TEACHER", "STAFF", "ADMIN"],
+    },
+    {
+      label: "Early warning",
+      path: "/early-warning",
+      icon: <Radar className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
+      requiredCapability: "EARLY_WARNING_VIEW",
+    },
+    {
+      label: "Safeguarding",
+      path: "/safeguarding",
+      icon: <ShieldAlert className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
+      requiredPermission: Permissions.SAFEGUARDING_MANAGE,
+    },
+    {
+      label: "My children",
+      path: "/family",
+      icon: <Baby className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
+      userTypes: ["PARENT"],
+    },
+    {
+      label: "Import parents",
+      path: "/families/import",
+      icon: <UserPlus className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
+      requiredPermission: Permissions.MANAGE_USERS,
+    },
+    {
+      label: "AI Tutor for my children",
+      path: "/family/ai-tutor",
+      icon: <Bot className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
+      userTypes: ["PARENT"],
+    },
+    {
       label: "Desktop tools",
       path: "/desktop-tools",
       section: "admin",
@@ -755,6 +824,8 @@ const Sidebar: React.FC<SidebarProps> = ({
 
   /** Both gates: the v1 permission and, where set, an access-control v2 capability. */
   const isVisible = (item: NavItem): boolean =>
+    item.when !== false &&
+    (!item.userTypes || item.userTypes.includes(String(user?.profile?.user_type ?? "").toUpperCase())) &&
     !!hasPermission(item.requiredPermission) &&
     (!item.requiredCapability || access.can(item.requiredCapability) || (!!item.orPermission?.length && !!hasPermission(item.orPermission))) &&
     (!item.children || item.children.some(isVisible));

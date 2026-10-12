@@ -1,3 +1,4 @@
+import UserAvatar from "../ui/UserAvatar";
 import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -16,7 +17,6 @@ import {
   gradesApi,
   type ClassGroup,
 } from "../../api/academics";
-import { getInitials, getAvatarColor } from "./types";
 import SelectField from "../ui/SelectField";
 
 interface PaginationInfo {
@@ -670,15 +670,7 @@ const RoleShareComponent: React.FC<RoleShareComponentProps> = ({
                                 : "hover:bg-gray-50 dark:hover:bg-gray-700/40"
                             }`}
                           >
-                            <div
-                              className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0 ${getAvatarColor(user.username)}`}
-                            >
-                              {getInitials(
-                                user.first_name,
-                                user.last_name,
-                                user.username,
-                              )}
-                            </div>
+                            <UserAvatar decorative userId={user.user_id} name={[user.first_name, user.last_name].filter(Boolean).join(" ") || user.username} size={32} />
                             <div className="flex-1 min-w-0">
                               <p
                                 className={`text-sm font-medium truncate leading-tight ${isSel ? "text-green-700 dark:text-green-300" : "text-gray-700 dark:text-gray-200"}`}
@@ -782,15 +774,7 @@ const RoleShareComponent: React.FC<RoleShareComponentProps> = ({
                   exit={{ opacity: 0, scale: 0.85 }}
                   className="flex items-center gap-1.5 pl-1.5 pr-1 py-1 bg-white dark:bg-green-900/30 border border-green-200 dark:border-green-700 text-green-700 dark:text-green-300 rounded-full text-xs font-medium"
                 >
-                  <div
-                    className={`w-5 h-5 rounded-full flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0 ${getAvatarColor(user.username)}`}
-                  >
-                    {getInitials(
-                      user.first_name,
-                      user.last_name,
-                      user.username,
-                    )}
-                  </div>
+                  <UserAvatar decorative userId={user.user_id} name={[user.first_name, user.last_name].filter(Boolean).join(" ") || user.username} size={20} />
                   <span className="truncate max-w-[90px]">
                     {user.first_name || user.last_name || user.username}
                   </span>

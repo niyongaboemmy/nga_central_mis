@@ -21,6 +21,7 @@ import {
   getMySessionsReport,
   adminUpdateCheckIn,
   getAdminMentorshipDashboard,
+  getMyMentorshipRole,
 } from "../controllers/mentorshipController";
 import { generateMenteeAIInsights } from "../controllers/mentorshipAIController";
 import {
@@ -29,30 +30,64 @@ import {
   bulkAssign,
   endAssignment,
   getUnassignedStudents,
+  searchCandidates,
 } from "../controllers/mentorAssignmentController";
 import { Permissions } from "../utils/permissions";
+import { db } from "../db";
+import { MentorAssignment } from "../db/schema";
+import { and, eq } from "drizzle-orm";
 
 const router = Router();
 
 router.use(authenticate);
 
+/**
+ * Mentor-side gate. A mentor may be anyone who is not a student — teachers,
+ * but also staff and admins who hold no teacher permission. Holding the
+ * route's permission still works as before; otherwise an ACTIVE assignment
+ * as mentor is what grants entry. Each handler then scopes the data to the
+ * caller's own mentees.
+ */
+const mentorOr = (perm: string | string[]) => {
+  const allow = authorize(perm);
+  return async (req: any, res: any, next: any) => {
+    const perms: string[] = req.user?.permissions ?? [];
+    const required = Array.isArray(perm) ? perm : [perm];
+    if (required.some((p) => perms.includes(p))) return allow(req, res, next);
+    try {
+      const [row] = await db
+        .select({ id: MentorAssignment.assignment_id })
+        .from(MentorAssignment)
+        .where(and(eq(MentorAssignment.mentor_id, req.user.userId), eq(MentorAssignment.status, "ACTIVE")))
+        .limit(1);
+      if (row) return next();
+    } catch (err) {
+      return next(err);
+    }
+    return res.status(403).json({ message: "Forbidden" });
+  };
+};
+
+// Anyone signed in: am I a mentor / do I have one? Drives the sidebar.
+router.get("/me", getMyMentorshipRole);
+
 // Instructor (mentor) routes
-router.get("/students", authorize(Permissions.TEACHER_DASHBOARD), getAssignedStudents);
-router.get("/students/:studentId/history", authorize(Permissions.TEACHER_DASHBOARD), getStudentMentorshipHistory);
-router.get("/students/:studentId/intelligence", authorize(Permissions.TEACHER_DASHBOARD), getMenteeIntelligence);
+router.get("/students", mentorOr(Permissions.TEACHER_DASHBOARD), getAssignedStudents);
+router.get("/students/:studentId/history", mentorOr(Permissions.TEACHER_DASHBOARD), getStudentMentorshipHistory);
+router.get("/students/:studentId/intelligence", mentorOr(Permissions.TEACHER_DASHBOARD), getMenteeIntelligence);
 router.post(
   "/students/:studentId/ai-insights",
-  authorize(Permissions.TEACHER_DASHBOARD),
+  mentorOr(Permissions.TEACHER_DASHBOARD),
   generateMenteeAIInsights,
 );
-router.get("/follow-ups", authorize(Permissions.TEACHER_DASHBOARD), getPendingFollowUps);
-router.post("/sessions", authorize(Permissions.SUBMIT_REPORTING), submitMentorshipSession);
-router.get("/sessions/:sessionId", authorize(Permissions.SUBMIT_REPORTING), getMentorshipSessionById);
-router.put("/sessions/:sessionId", authorize(Permissions.SUBMIT_REPORTING), updateMentorshipSession);
-router.patch("/sessions/:sessionId/status", authorize(Permissions.SUBMIT_REPORTING), updateSessionStatus);
+router.get("/follow-ups", mentorOr(Permissions.TEACHER_DASHBOARD), getPendingFollowUps);
+router.post("/sessions", mentorOr(Permissions.SUBMIT_REPORTING), submitMentorshipSession);
+router.get("/sessions/:sessionId", mentorOr(Permissions.SUBMIT_REPORTING), getMentorshipSessionById);
+router.put("/sessions/:sessionId", mentorOr(Permissions.SUBMIT_REPORTING), updateMentorshipSession);
+router.patch("/sessions/:sessionId/status", mentorOr(Permissions.SUBMIT_REPORTING), updateSessionStatus);
 router.get(
   "/reports/consolidated",
-  authorize([
+  mentorOr([
     Permissions.TEACHER_DASHBOARD,
     Permissions.MANAGE_REPORTS,
     Permissions.ALL_SUBMITTED_REPORTS,
@@ -62,21 +97,21 @@ router.get(
 );
 router.get(
   "/reports/my-sessions",
-  authorize(Permissions.TEACHER_DASHBOARD),
+  mentorOr(Permissions.TEACHER_DASHBOARD),
   getMySessionsReport,
 );
 
 // Mentor's check-in inbox (mentee-submitted messages) — specific paths
 // ("inbox") must be registered before the "/:id" wildcard route below.
-router.get("/checkins/inbox", authorize(Permissions.TEACHER_DASHBOARD), getCheckInInbox);
+router.get("/checkins/inbox", mentorOr(Permissions.TEACHER_DASHBOARD), getCheckInInbox);
 
 // Student (mentee) routes — "/mine" must also precede "/:id"
 router.post("/checkins", authorize(Permissions.SUBMIT_MENTEE_CHECKIN), submitCheckIn);
 router.get("/checkins/mine", authorize(Permissions.SUBMIT_MENTEE_CHECKIN), getMyCheckIns);
 router.get("/my-mentor", authorize(Permissions.SUBMIT_MENTEE_CHECKIN), getMyMentor);
 
-router.get("/checkins/:id", authorize(Permissions.TEACHER_DASHBOARD), getCheckInDetail);
-router.patch("/checkins/:id", authorize(Permissions.TEACHER_DASHBOARD), updateCheckIn);
+router.get("/checkins/:id", mentorOr(Permissions.TEACHER_DASHBOARD), getCheckInDetail);
+router.patch("/checkins/:id", mentorOr(Permissions.TEACHER_DASHBOARD), updateCheckIn);
 
 // Admin routes
 router.get(
@@ -100,6 +135,7 @@ router.get(
   getAdminMentorshipDashboard,
 );
 router.get("/admin/assignments", authorize(Permissions.MANAGE_MENTOR_ASSIGNMENTS), listAssignments);
+router.get("/admin/candidates", authorize(Permissions.MANAGE_MENTOR_ASSIGNMENTS), searchCandidates);
 router.get(
   "/admin/unassigned-students",
   authorize(Permissions.MANAGE_MENTOR_ASSIGNMENTS),

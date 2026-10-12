@@ -1,3 +1,4 @@
+import UserAvatar from "../ui/UserAvatar";
 import React, { useState } from "react";
 import { motion } from "framer-motion";
 import {
@@ -22,10 +23,8 @@ import {
   Clock3,
   XCircle,
   Sparkles,
-  UserCircle2,
   ClipboardCheck,
-  BadgeCheck,
-} from "lucide-react";
+  BadgeCheck } from "lucide-react";
 import AdminStudentSupportModal from "./AdminStudentSupportModal";
 import {
   AdminLessonReport,
@@ -537,7 +536,7 @@ const PlanVsRealityDrawer: React.FC<{
             <div className="min-w-0">
               <h2 className="text-sm font-black text-gray-900 dark:text-white tracking-tight">Plan vs Reality</h2>
               <p className="text-[11px] text-gray-400 dark:text-gray-500 font-semibold flex items-center gap-1.5 truncate">
-                <UserCircle2 className="w-3.5 h-3.5 flex-shrink-0" />
+                <UserAvatar decorative userId={log.reported_by} name={log.instructor_name} size={16} />
                 <span className="truncate">{log.instructor_name}</span>
                 <span className="text-gray-200 dark:text-gray-700">·</span>
                 {log.delivery_date}
@@ -692,7 +691,7 @@ const MentorshipSessionDrawer: React.FC<{
             <div className="min-w-0">
               <h2 className="text-sm font-black text-gray-900 dark:text-white tracking-tight">Mentorship Session</h2>
               <p className="text-[11px] text-gray-400 dark:text-gray-500 font-semibold flex items-center gap-1.5 truncate">
-                <UserCircle2 className="w-3.5 h-3.5 flex-shrink-0" />
+                <UserAvatar decorative userId={log.user_id} name={log.instructor_name} size={16} />
                 <span className="truncate">{log.instructor_name}</span>
                 <span className="text-gray-200 dark:text-gray-700">·</span>
                 {log.session_date}
@@ -741,7 +740,10 @@ const MentorshipSessionDrawer: React.FC<{
           <p className="text-[10px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest flex items-center gap-1.5">
             <UserIcon className="w-3.5 h-3.5" /> Student
           </p>
-          <p className="text-xs font-bold text-gray-800 dark:text-white">{log.student_name ?? "Student not specified"}</p>
+          <p className="text-xs font-bold text-gray-800 dark:text-white flex items-center gap-2">
+            {log.student_id && <UserAvatar decorative userId={log.student_id} name={log.student_name ?? "Student"} size={28} />}
+            {log.student_name ?? "Student not specified"}
+          </p>
 
           <div className="grid grid-cols-2 gap-3">
             <DrawerStat icon={<Clock3 className="w-3.5 h-3.5" />} label="Duration" value={log.duration_minutes != null ? `${log.duration_minutes} min` : null} />
@@ -984,9 +986,7 @@ const LegacyReportList: React.FC<{ reports: any[]; onViewDetails: (r: any) => vo
         >
           <div className="flex flex-col lg:flex-row lg:items-center gap-6">
             <div className="flex items-center space-x-4 lg:w-1/4">
-              <div className="w-14 h-14 rounded-xl bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-800/50 group-hover:scale-105 transition-transform duration-300 flex-shrink-0">
-                <UserIcon className="w-7 h-7" />
-              </div>
+              <UserAvatar decorative userId={report.user_id} name={report.instructor_name} size={56} shape="rounded" />
               <div className="min-w-0">
                 <h3 className="font-bold text-gray-900 dark:text-white truncate text-base">{report.instructor_name}</h3>
                 <div className="text-[10px] text-gray-400 dark:text-gray-500 uppercase tracking-widest font-black flex items-center gap-1.5 mt-0.5">
@@ -1060,9 +1060,7 @@ const LessonLogList: React.FC<{
       >
         <div className="flex flex-col sm:flex-row sm:items-center gap-4">
           <div onClick={() => onSelect(log)} className="flex items-center gap-3 sm:w-1/4 cursor-pointer">
-            <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-800/50 flex-shrink-0">
-              <BookOpen className="w-5 h-5" />
-            </div>
+            <UserAvatar decorative userId={log.reported_by} name={log.instructor_name} size={40} shape="rounded" />
             <div className="min-w-0">
               <p className="text-xs font-bold text-gray-900 dark:text-white truncate">{log.instructor_name}</p>
               <p className="text-[10px] text-gray-400 font-medium flex items-center gap-1">

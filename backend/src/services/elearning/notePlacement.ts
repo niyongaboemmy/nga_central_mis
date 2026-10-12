@@ -3,6 +3,7 @@ import { db } from "../../db";
 import {
   Course,
   CourseItem,
+  CourseItemProgress,
   CourseSection,
   StudentClassGroup,
   StudentSubjectEnrollment,
@@ -29,9 +30,12 @@ import {
 
 export interface NotePlacement {
   course_id: number;
+  course_title: string;
   item_id: number;
   section_id: number;
   section_title: string;
+  /** This student's own progress on the item, so the library can say "Done" or "Continue". */
+  progress: "NOT_STARTED" | "IN_PROGRESS" | "COMPLETED";
 }
 
 export const resolveNotePlacements = async (
@@ -48,6 +52,7 @@ export const resolveNotePlacements = async (
       section_id: CourseSection.section_id,
       section_title: CourseSection.title,
       course_id: Course.course_id,
+      course_title: Course.title,
       class_group_id: Course.class_group_id,
       subject_id: Course.subject_id,
     })
@@ -107,10 +112,26 @@ export const resolveNotePlacements = async (
     if (found.has(row.note_id)) continue;
     found.set(row.note_id, {
       course_id: row.course_id,
+      course_title: row.course_title,
       item_id: row.item_id,
       section_id: row.section_id,
       section_title: row.section_title,
+      progress: "NOT_STARTED",
     });
+  }
+
+  if (found.size) {
+    const progress = await db
+      .select({ item_id: CourseItemProgress.item_id, state: CourseItemProgress.state })
+      .from(CourseItemProgress)
+      .where(
+        and(
+          eq(CourseItemProgress.user_id, studentId),
+          inArray(CourseItemProgress.item_id, [...found.values()].map((p) => p.item_id)),
+        ),
+      );
+    const byItem = new Map(progress.map((r) => [r.item_id, r.state]));
+    for (const p of found.values()) p.progress = byItem.get(p.item_id) ?? "NOT_STARTED";
   }
 
   return found;

@@ -1,3 +1,4 @@
+import UserAvatar from "../ui/UserAvatar";
 import React from "react";
 import { motion } from "framer-motion";
 
@@ -59,18 +60,20 @@ export const getInitials = (first?: string | null, last?: string | null) =>
 export const fullName = (first?: string | null, last?: string | null) =>
   [first, last].filter(Boolean).join(" ").trim();
 
+/** A person in a class-group view: their NGA photo when they have one, else initials. */
 export const Avatar: React.FC<{
   first?: string | null;
   last?: string | null;
+  userId?: number | null;
   size?: "sm" | "md";
-}> = ({ first, last, size = "md" }) => (
-  <div
-    className={`${
-      size === "sm" ? "w-7 h-7 text-[10px]" : "w-9 h-9 text-xs"
-    } rounded-xl bg-gradient-to-br from-blue-500 to-indigo-500 text-white font-semibold flex items-center justify-center shrink-0`}
-  >
-    {getInitials(first, last)}
-  </div>
+}> = ({ first, last, userId, size = "md" }) => (
+  <UserAvatar
+    decorative
+    userId={userId}
+    name={fullName(first, last) || "?"}
+    size={size === "sm" ? 28 : 36}
+    shape="rounded"
+  />
 );
 
 export const EmptyState: React.FC<{

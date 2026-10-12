@@ -44,6 +44,8 @@ describe("Ask AI: chat service", () => {
     process.env.GLM_API_KEY = "k";
     process.env.OPENROUTER_API_KEY = "k";
     delete process.env.DEEPSEEK_API_KEY;
+    delete process.env.OPENAI_API_KEY;
+    delete process.env.AI_MINORS_STRICT;
     delete process.env.AI_CHAT_ORDER_ADULT;
     delete process.env.AI_CHAT_ORDER_MINOR;
   });
@@ -54,11 +56,15 @@ describe("Ask AI: chat service", () => {
     process.env = { ...saved };
   });
 
-  it("minors only ever reach providers whose terms allow them, whatever the env says", () => {
+  it("students use every provider by default (owner decision 2026-10-06); strict mode keeps minor-safe ones only", () => {
+    const all = ["groq", "gemini", "glm", "openrouter", "deepseek", "openai"];
+    expect(chatOrder("adult").map((t) => t.name)).toEqual(all);
+    expect(chatOrder("minor").map((t) => t.name)).toEqual(all);
+    process.env.AI_MINORS_STRICT = "1";
     expect(chatOrder("minor").map((t) => t.name)).toEqual(["glm"]);
-    process.env.AI_CHAT_ORDER_MINOR = "groq,gemini,openrouter,glm";
-    expect(chatOrder("minor").map((t) => t.name)).toEqual(["glm"]);
-    expect(chatOrder("adult").map((t) => t.name)).toEqual(["groq", "gemini", "glm", "openrouter", "deepseek"]);
+    delete process.env.AI_MINORS_STRICT;
+    process.env.AI_CHAT_ORDER_MINOR = "glm,groq";
+    expect(chatOrder("minor").map((t) => t.name)).toEqual(["glm", "groq"]);
   });
 
   it("streams from the first provider and logs the usage", async () => {
@@ -84,12 +90,21 @@ describe("Ask AI: chat service", () => {
     expect(calls.map((c) => c.provider)).toEqual(["groq", "gemini", "gemini"]);
   });
 
-  it("a minor's conversation is never sent to an 18+ provider, even if GLM fails", async () => {
+  it("a student's conversation falls through every provider on quota errors", async () => {
+    const calls = fakeClients({ groq: quota(), gemini: quota(), glm: ["from glm"] });
+    const run = await streamChat({ system: "S", messages: [{ role: "user", content: "hi" }], audience: "minor", actorUserId: 1, feature: "t", onText: () => {} });
+    expect(run.provider).toBe("glm");
+    expect(calls.map((c) => c.provider)).toEqual(["groq", "gemini", "glm"]);
+  });
+
+  it("strict mode never sends a minor's conversation to an 18+ provider", async () => {
+    process.env.AI_MINORS_STRICT = "1";
     const calls = fakeClients({ glm: quota(), groq: ["nope"] });
     await expect(
       streamChat({ system: "S", messages: [{ role: "user", content: "hi" }], audience: "minor", actorUserId: 1, feature: "t", onText: () => {} }),
     ).rejects.toMatchObject({ reason: "QUOTA" });
     expect(calls.map((c) => c.provider)).toEqual(["glm"]);
+    delete process.env.AI_MINORS_STRICT;
   });
 
   it("does not start a second answer after text was sent", async () => {
@@ -150,7 +165,7 @@ describe("Ask AI: who and how", () => {
     expect(persona("STUDENT")).toBe("student");
     expect(persona("teacher")).toBe("teacher");
     expect(persona(null)).toBe("staff");
-    expect(blockedReason("student")).toBe("STUDENTS_SOON");
+    expect(blockedReason("student")).toBeNull(); // students get the tutor (desktopTutor.test.ts)
     expect(blockedReason("parent")).toBe("PARENTS_SOON");
     expect(blockedReason("teacher")).toBeNull();
   });
@@ -211,13 +226,12 @@ describe("Ask AI: routes", () => {
     expect(res.status).toBe(401);
   });
 
-  it("students are told it's coming (403)", async () => {
+  it("students get the tutor (status says so); a conversation id is required", async () => {
     const id = await createUser({ userType: "STUDENT" });
     const status = await request(app).get("/desktop/tools/ai/status").set("Authorization", `Bearer ${signToken(id)}`);
-    expect(status.body.data).toMatchObject({ available: false, reason: "STUDENTS_SOON" });
+    expect(status.body.data).toMatchObject({ available: true, mode: "tutor" });
     const res = await request(app).post("/desktop/tools/ai/chat").set("Authorization", `Bearer ${signToken(id)}`).send({ messages: [{ role: "user", content: "hi" }] });
-    expect(res.status).toBe(403);
-    expect(res.body.code).toBe("STUDENTS_SOON");
+    expect(res.status).toBe(400);
   });
 
   it("streams NDJSON and counts the message", async () => {

@@ -5,6 +5,7 @@ import WelcomePopup from "./WelcomePopup";
 import ChangePasswordModal from "./ChangePasswordModal";
 import { useUser } from "../contexts/UserContext";
 import { ReminderNudge } from "./reminders/ReminderNudge";
+import ProfilePhotoPrompt from "./profile/ProfilePhotoPrompt";
 
 interface SystemLayoutProps {
   children: React.ReactNode;
@@ -127,6 +128,9 @@ const SystemLayout: React.FC<SystemLayoutProps> = ({
       {/* Install / notification nudges + the permission health check that
           runs on every app open (REMINDERS_SOLUTION_PROPOSAL.md §7.5). */}
       {showSidebar && user && <ReminderNudge />}
+
+      {/* Signed in without a profile photo: a gentle, snoozable invitation to add one. */}
+      {showSidebar && user && <ProfilePhotoPrompt />}
 
       {/* Welcome Popup */}
       {showWelcomePopup && (

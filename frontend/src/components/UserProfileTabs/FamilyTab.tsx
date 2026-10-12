@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import UserAvatar from "../ui/UserAvatar";
 import {
   UserWithProfile,
   parentingApi,
@@ -167,9 +168,7 @@ const FamilyTab: React.FC<FamilyTabProps> = ({ user, onViewUser }) => {
   }) => (
     <div className="flex items-center justify-between p-3 bg-white dark:bg-slate-800/50 rounded-2xl border border-gray-100 dark:border-slate-700/30 shadow-sm">
       <div className="flex items-center gap-3">
-        <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center text-blue-600 dark:text-blue-400 font-bold">
-          {relation.first_name?.[0] || relation.username[0].toUpperCase()}
-        </div>
+        <UserAvatar decorative userId={relation.user_id} name={[relation.first_name, relation.last_name].filter(Boolean).join(" ") || relation.username} size={40} />
         <div>
           <p className="font-medium text-gray-900 dark:text-white">
             {relation.first_name} {relation.last_name || ""}

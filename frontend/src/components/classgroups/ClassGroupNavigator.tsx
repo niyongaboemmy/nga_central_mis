@@ -1,3 +1,4 @@
+import UserAvatar from "../ui/UserAvatar";
 import React, { useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -12,7 +13,7 @@ import {
 import { useClassGroups } from "./ClassGroupsContext";
 import ReadinessRing from "./ReadinessRing";
 import { checksFor, failedChecks } from "./readiness";
-import { EmptyState, getInitials } from "./shared";
+import { EmptyState } from "./shared";
 import { ClassGroupOverviewRow } from "../../api/classGroups";
 
 /**
@@ -242,12 +243,7 @@ const ClassGroupNavigator: React.FC<{ onSelect?: () => void }> = ({
                                   className="inline-flex items-center gap-1 truncate"
                                   title={`Class teacher: ${row.class_teacher.first_name ?? ""} ${row.class_teacher.last_name ?? ""}`}
                                 >
-                                  <span className="w-4 h-4 rounded-full bg-gradient-to-br from-blue-500 to-indigo-500 text-white text-[8px] font-bold flex items-center justify-center shrink-0">
-                                    {getInitials(
-                                      row.class_teacher.first_name,
-                                      row.class_teacher.last_name,
-                                    )}
-                                  </span>
+                                  <UserAvatar decorative userId={row.class_teacher.user_id} name={`${row.class_teacher.first_name ?? ""} ${row.class_teacher.last_name ?? ""}`.trim() || "?"} size={16} />
                                 </span>
                               ) : (
                                 <span

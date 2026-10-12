@@ -16,6 +16,9 @@ import {
   signToken,
 } from "../test/fixtures";
 import { Permissions } from "../utils/permissions";
+import { db } from "../db";
+import { User } from "../db/schema";
+import { eq } from "drizzle-orm";
 
 // Class Subjects / Class Users used to issue one request per assigned grade and
 // merge client-side. The merge hid two server-side fan-outs:
@@ -215,6 +218,20 @@ describe("Grade-scoped subjects and users", () => {
     expect(
       res.body.data.users.filter((u: any) => u.user_id === dualRoleTeacherId),
     ).toHaveLength(1);
+  });
+
+  it("carries each person's profile photo (Class Users showed initials for everyone)", async () => {
+    await db.update(User).set({ avatar_version: 1790000000 }).where(eq(User.user_id, studentInScopeId));
+    try {
+      const res = await getUsers(classTeacherToken, "&limit=500");
+      const row = res.body.data.users.find((u: any) => u.user_id === studentInScopeId);
+      expect(row.avatar).toMatchObject({ version: 1790000000 });
+      expect(row.avatar.sm).toContain(`/avatars/${studentInScopeId}/1790000000/sm.webp?s=`);
+      const others = res.body.data.users.filter((u: any) => u.user_id !== studentInScopeId);
+      expect(others.every((u: any) => u.avatar === null)).toBe(true);
+    } finally {
+      await db.update(User).set({ avatar_version: null }).where(eq(User.user_id, studentInScopeId));
+    }
   });
 
   it("excludes users who are only in a grade outside the scope", async () => {

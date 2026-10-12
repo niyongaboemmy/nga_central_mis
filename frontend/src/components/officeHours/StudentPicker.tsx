@@ -1,3 +1,4 @@
+import UserAvatar from "../ui/UserAvatar";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { AlertTriangle, ArrowRightLeft, History, Search, Sparkles, UserPlus, Users, X } from "lucide-react";
 import {
@@ -371,6 +372,7 @@ const StudentPicker: React.FC<StudentPickerProps> = ({ scheduleId, reasonCodes, 
                       />
                       <label htmlFor={id} className="min-w-0 flex-1 cursor-pointer">
                         <span className="flex items-center gap-2">
+                          <UserAvatar decorative userId={s.student_id} name={studentName(s)} size={28} />
                           <span className="truncate text-sm font-semibold text-slate-900 dark:text-gray-100">{studentName(s)}</span>
                           {schedule && lastWeekIds.has(s.student_id) && mode !== "last" && (
                             <span className="flex-shrink-0 rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-600 dark:bg-gray-800/40 dark:text-gray-300">Last week</span>

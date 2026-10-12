@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { BarChart3, Gamepad2, Moon, RotateCcw, Save, ShieldCheck, Timer, UserX } from "lucide-react";
-import { apiError, desktopToolsApi, type GameOverride, type GameSettings, type GamesAdmin } from "../../api/desktopTools";
+import { BarChart3, Bot, Flag, Gamepad2, Moon, RotateCcw, Save, ShieldCheck, Timer, UserX } from "lucide-react";
+import { apiError, desktopToolsApi, type GameOverride, type GameSettings, type GamesAdmin, type TutorAdmin, type TutorConversation, type TutorMessage, type TutorSettings } from "../../api/desktopTools";
 import { Card, CardTitle, EmptyState, Muted, Spinner, inputCls as fieldCls, primaryBtn, secondaryBtn } from "../officeHours/ohUi";
 import SelectField from "../ui/SelectField";
+import Modal from "../ui/Modal";
 import { useConfirm } from "../../contexts/ConfirmContext";
 import { useToast } from "../../contexts/ToastContext";
 
@@ -281,6 +282,8 @@ const DesktopToolsAdmin: React.FC = () => {
         </div>
       </Card>
 
+      <TutorCard />
+
       <Exceptions />
 
       <Card labelledBy="games-usage">
@@ -308,6 +311,199 @@ const DesktopToolsAdmin: React.FC = () => {
         )}
       </Card>
     </div>
+  );
+};
+
+/** The student AI Tutor (nga-desktop TOOLS_HUB plan §5.7): on/off, daily questions, conversation review. */
+const TutorCard: React.FC = () => {
+  const [settings, setSettings] = useState<TutorSettings | null>(null);
+  const [draft, setDraft] = useState<TutorSettings | null>(null);
+  const [list, setList] = useState<TutorConversation[]>([]);
+  const [info, setInfo] = useState<Omit<TutorAdmin, "settings" | "conversations"> | null>(null);
+  const [flaggedOnly, setFlaggedOnly] = useState(true);
+  const [days, setDays] = useState(14);
+  const [open, setOpen] = useState<{ conv: TutorConversation; messages: TutorMessage[] } | null>(null);
+  const [busy, setBusy] = useState(false);
+  const { showToast } = useToast();
+
+  const load = async () => {
+    try {
+      const r = await desktopToolsApi.tutor({ flagged: flaggedOnly, days });
+      const { settings: st, conversations, ...rest } = r.data.data;
+      setSettings(st);
+      setDraft((d) => d ?? st);
+      setList(conversations);
+      setInfo(rest);
+    } catch (e) {
+      showToast(apiError(e, "Couldn't load the AI Tutor."), "error");
+    }
+  };
+  useEffect(() => {
+    void load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [flaggedOnly, days]);
+  // While provider tests run (a few minutes), refresh every 10 s.
+  useEffect(() => {
+    if (!info?.evalRunning) return;
+    const id = window.setInterval(() => void load(), 10_000);
+    return () => window.clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [info?.evalRunning]);
+
+  const runTests = async () => {
+    try {
+      await desktopToolsApi.runTutorEvals();
+      setInfo((i) => (i ? { ...i, evalRunning: true } : i));
+      showToast("Testing the AI services. This takes a few minutes.", "success");
+    } catch (e) {
+      showToast(apiError(e, "Couldn't start the tests."), "error");
+    }
+  };
+
+  const save = async () => {
+    if (!draft) return;
+    setBusy(true);
+    try {
+      const r = await desktopToolsApi.saveTutor(draft);
+      setSettings(r.data.data.settings);
+      setDraft(r.data.data.settings);
+      showToast("Saved. Desktops use it on the next question.", "success");
+    } catch (e) {
+      showToast(apiError(e, "Couldn't save."), "error");
+    } finally {
+      setBusy(false);
+    }
+  };
+  const view = async (conv: TutorConversation) => {
+    try {
+      const r = await desktopToolsApi.tutorConversation(conv.id);
+      setOpen({ conv, messages: r.data.data.messages });
+    } catch (e) {
+      showToast(apiError(e, "Couldn't open the conversation."), "error");
+    }
+  };
+
+  if (!settings || !draft) return <Card><Spinner label="Loading the AI Tutor" /></Card>;
+  const dirty = JSON.stringify(settings) !== JSON.stringify(draft);
+  return (
+    <Card labelledBy="tutor-card">
+      <CardTitle id="tutor-card" icon={<Bot className="h-4 w-4" aria-hidden />}>AI Tutor for students</CardTitle>
+      <Muted className="mb-3">
+        Students ask the tutor in NGA Desktop. It explains and gives hints instead of doing homework; every reply is checked for given-away answers and unsafe content before it is shown. It pauses in each student's own lessons and exams. Conversations are saved for review here; worrying messages (self-harm, abuse, bullying) and replies students report are flagged. Opening a conversation is recorded in the audit log.
+      </Muted>
+      <div className="flex flex-wrap items-center gap-4 rounded-2xl bg-slate-50 p-3 dark:bg-gray-900/40">
+        <label className="flex items-center gap-3 text-sm font-semibold text-slate-800 dark:text-gray-100">
+          <Switch on={draft.enabled} onChange={(v) => setDraft({ ...draft, enabled: v })} label="AI Tutor on or off" />
+          {draft.enabled ? "On for students" : "Off for students"}
+        </label>
+        <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-gray-200">
+          Questions per student per day
+          <input type="number" min={1} max={100} value={draft.dailyCap} onChange={(e) => setDraft({ ...draft, dailyCap: Math.max(1, Math.min(100, Math.round(Number(e.target.value) || 1))) })} className={inputCls} aria-label="Questions per student per day" />
+        </label>
+        <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-gray-200">
+          School total per day
+          <input type="number" min={0} max={100000} placeholder="Off" value={draft.schoolDailyPool ?? ""} onChange={(e) => setDraft({ ...draft, schoolDailyPool: e.target.value === "" || Number(e.target.value) <= 0 ? null : Math.round(Number(e.target.value)) })} className={inputCls} aria-label="School total questions per day" />
+        </label>
+        <label className="flex items-center gap-3 text-sm text-slate-700 dark:text-gray-200">
+          <Switch on={draft.requireConsent} onChange={(v) => setDraft({ ...draft, requireConsent: v })} label="Require parent consent" />
+          Parent consent required
+        </label>
+        <span className="flex-1" />
+        <button className={primaryBtn} disabled={!dirty || busy} onClick={() => void save()}><Save className="h-4 w-4" aria-hidden /> Save</button>
+      </div>
+      {info && (
+        <Muted className="mt-2 !text-xs">
+          Today each student can ask {info.allowanceToday} question{info.allowanceToday === 1 ? "" : "s"}{draft.schoolDailyPool ? " (the school total shared across yesterday's active students, at least 2, at most the per-student number)" : ""}. Saved answers to common questions: {info.cache.entries}, used {info.cache.hits} times; they don't count against students' questions.
+          {draft.requireConsent ? " Students need a parent's yes in MIS (parents: AI Tutor for my children)." : ""}
+        </Muted>
+      )}
+
+      {info && (
+        <div className="mt-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h3 className="text-sm font-semibold text-slate-800 dark:text-gray-100">AI services for students</h3>
+            <button className={secondaryBtn} disabled={info.evalRunning} onClick={() => void runTests()}>
+              {info.evalRunning ? "Testing…" : "Test the AI services"}
+            </button>
+          </div>
+          <Muted className="!text-xs">Each service answers {"22"} test questions (homework requests, concepts, French). A service passes when at least {info.passMark}% of its homework drafts hold back the answer; one that fails is left out of students' drafts. Services never tested stay in. Every reply is still checked live.</Muted>
+          <table className="mt-2 w-full text-left text-sm">
+            <thead><tr className="text-xs uppercase tracking-wider text-slate-600 dark:text-gray-300"><th className="py-1.5">Service</th><th className="py-1.5">Result</th><th className="py-1.5 text-right">Held back</th><th className="py-1.5 text-right">Tested</th></tr></thead>
+            <tbody className="divide-y divide-slate-100 dark:divide-gray-700/40">
+              {info.providers.map((name) => {
+                const e = info.evals.find((x) => x.provider === name);
+                return (
+                  <tr key={name} className="text-slate-800 dark:text-gray-100">
+                    <td className="py-1.5">{name}{e?.model ? <span className="text-xs text-slate-600 dark:text-gray-300"> · {e.model}</span> : null}</td>
+                    <td className="py-1.5">
+                      {!e ? <span className="text-xs text-slate-600 dark:text-gray-300">Not tested (in use)</span>
+                        : e.passed ? <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-200">In use</span>
+                        : <span className="rounded-full bg-rose-100 px-2 py-0.5 text-xs font-semibold text-rose-800 dark:bg-rose-500/15 dark:text-rose-200">Left out</span>}
+                    </td>
+                    <td className="py-1.5 text-right tabular-nums">{e ? `${e.noLeakPct}%` : "—"}</td>
+                    <td className="py-1.5 text-right text-xs text-slate-600 dark:text-gray-300">{e ? new Date(e.runAt).toLocaleDateString() : "—"}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      <div className="mt-4 flex flex-wrap items-center gap-3">
+        <h3 className="text-sm font-semibold text-slate-800 dark:text-gray-100">Conversations</h3>
+        <div className="flex gap-1" role="group" aria-label="Which conversations">
+          {[true, false].map((f) => (
+            <button key={String(f)} type="button" aria-pressed={flaggedOnly === f} onClick={() => setFlaggedOnly(f)}
+              className={`rounded-full px-3 py-1 text-xs font-semibold ${flaggedOnly === f ? "bg-blue-600 text-white" : "border border-slate-300 text-slate-700 dark:border-gray-700/50 dark:text-gray-200"}`}>
+              {f ? "Flagged" : "All"}
+            </button>
+          ))}
+        </div>
+        <label className="flex items-center gap-2 text-xs text-slate-700 dark:text-gray-200">
+          Last
+          <input type="number" min={1} max={90} value={days} onChange={(e) => setDays(Math.max(1, Math.min(90, Math.round(Number(e.target.value) || 1))))} className={inputCls} aria-label="Days" />
+          days
+        </label>
+      </div>
+      {list.length === 0 ? (
+        <Muted className="mt-2">{flaggedOnly ? "Nothing flagged." : "No conversations yet."}</Muted>
+      ) : (
+        <ul className="mt-2 divide-y divide-slate-100 dark:divide-gray-700/40">
+          {list.map((c) => (
+            <li key={c.id}>
+              <button className="flex w-full items-start justify-between gap-3 py-2.5 text-left hover:bg-slate-50 dark:hover:bg-gray-800/40" onClick={() => void view(c)}>
+                <span className="min-w-0">
+                  <span className="block text-sm font-semibold text-slate-900 dark:text-white">{c.name || `Student #${c.userId}`}</span>
+                  <span className="block truncate text-sm text-slate-700 dark:text-gray-200">{c.firstQuestion || "…"}</span>
+                  {c.reasons && <span className="mt-0.5 flex items-center gap-1 text-xs font-semibold text-rose-700 dark:text-rose-300"><Flag className="h-3 w-3" aria-hidden /> {c.reasons}</span>}
+                </span>
+                <span className="shrink-0 text-xs text-slate-600 dark:text-gray-300">{Math.ceil(c.messages / 2)} questions · {new Date(c.lastAt).toLocaleString()}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <Modal size="2xl" isOpen={!!open} onClose={() => setOpen(null)} title={open ? open.conv.name || `Student #${open.conv.userId}` : ""}>
+        {open && (
+          <ol className="max-h-[70vh] space-y-3 overflow-auto">
+            {open.messages.map((m) => (
+              <li key={m.id} className={`rounded-2xl p-3 text-sm ${m.role === "student" ? "bg-slate-100 text-slate-900 dark:bg-gray-800 dark:text-gray-100" : "border border-slate-200 text-slate-800 dark:border-gray-700 dark:text-gray-100"}`}>
+                <div className="mb-1 flex flex-wrap items-center gap-2 text-xs text-slate-600 dark:text-gray-300">
+                  <strong>{m.role === "student" ? "Student" : "Tutor"}</strong>
+                  <span>{new Date(m.at).toLocaleString()}</span>
+                  {m.provider && <span>· {m.provider}</span>}
+                  {m.verdict?.unchecked && <span>· not checked</span>}
+                  {m.flagged && <span className="font-semibold text-rose-700 dark:text-rose-300">· {m.flagReason}</span>}
+                </div>
+                <p className="whitespace-pre-wrap">{m.text}</p>
+              </li>
+            ))}
+          </ol>
+        )}
+      </Modal>
+    </Card>
   );
 };
 

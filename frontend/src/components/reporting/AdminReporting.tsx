@@ -53,7 +53,7 @@ const AdminReporting: React.FC = () => {
   // `?tab=` lets other pages (Home) open a specific tab directly.
   const [activeTab,      setActiveTab]      = useState<MainTab>(() => {
     const tab = new URLSearchParams(window.location.search).get("tab");
-    const known: MainTab[] = ["lesson", "mentorship", "dashboard", "missing", "mentoring-log", "mentorship-dashboard"];
+    const known: MainTab[] = ["lesson", "mentorship", "dashboard", "missing", "mentoring-log", "mentorship-dashboard", "mentor-assignments"];
     return known.includes(tab as MainTab) ? (tab as MainTab) : "lesson";
   });
 

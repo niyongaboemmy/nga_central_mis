@@ -30,6 +30,18 @@ const setCookie = () => {
 };
 const ackKey = (id: number) => `nga.activityNotice.${VERSION}.${id}`;
 
+/** Fired when a signed-in user dismisses the notice, so other bottom prompts can follow it. */
+export const ACTIVITY_NOTICE_ACK_EVENT = "nga:activity-notice-ack";
+
+/** Has this account already acknowledged the current notice on this device? */
+export const activityNoticeAcknowledged = (userId: number): boolean => {
+  try {
+    return localStorage.getItem(ackKey(userId)) === "1";
+  } catch {
+    return true; // storage blocked: the notice can't track it either, so don't hold anyone up
+  }
+};
+
 export default function ActivityNotice() {
   const { user, isAuthenticated, isLoading } = useUser();
   const userId: number | null = user?.user?.user_id ?? null;
@@ -58,6 +70,7 @@ export default function ActivityNotice() {
       } catch {
         /* ignore */
       }
+      window.dispatchEvent(new Event(ACTIVITY_NOTICE_ACK_EVENT));
       void api.post("/monitor/me/notice-ack", { version: VERSION }).catch(() => undefined);
     }
   };

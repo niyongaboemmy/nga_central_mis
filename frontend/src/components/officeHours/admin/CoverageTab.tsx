@@ -1,3 +1,4 @@
+import UserAvatar from "../../ui/UserAvatar";
 import React, { useEffect, useState } from "react";
 import { Grid3X3 } from "lucide-react";
 import { useToast } from "../../../contexts/ToastContext";
@@ -86,7 +87,10 @@ const CoverageTab: React.FC<{ termId: number | null }> = ({ termId }) => {
         ) : (
           <ul className="max-h-96 divide-y divide-slate-100 overflow-y-auto text-sm dark:divide-gray-700/30">
             {data.students_without.map((s) => (
-              <li key={s.student_id} className="py-1.5 text-slate-800 dark:text-gray-100">{s.name}</li>
+              <li key={s.student_id} className="flex items-center gap-2 py-1.5 text-slate-800 dark:text-gray-100">
+                <UserAvatar decorative userId={s.student_id} name={s.name} size={24} />
+                {s.name}
+              </li>
             ))}
           </ul>
         )}

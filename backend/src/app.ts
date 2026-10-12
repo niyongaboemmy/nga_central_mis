@@ -36,9 +36,15 @@ import reminderRoutes from "./routes/reminders";
 import activityRoutes from "./routes/activity";
 import monitorRoutes from "./routes/monitor";
 import officeHoursRoutes from "./routes/officeHours";
+import familiesRoutes from "./routes/families";
+import staffCoverRoutes from "./routes/staffCover";
+import earlyWarningRoutes from "./routes/earlyWarning";
+import competencyRoutes from "./routes/competency";
+import safeguardingRoutes from "./routes/safeguarding";
 import desktopRoutes from "./routes/desktop";
 import { desktopToolsRouter } from "./routes/desktopTools";
 import { authenticate } from "./middleware/auth";
+import { serveAvatar, serveCover } from "./controllers/avatarController";
 import { jwks, ssoIssuer } from "./services/sso/signingKey";
 
 const app = express();
@@ -117,6 +123,9 @@ app.get("/", (req, res) => {
 
 app.use("/auth", authRoutes);
 app.use("/users", userRoutes);
+// Profile pictures: public but signed + versioned URLs (services/avatar/urls.ts).
+app.get("/avatars/:userId/:version/:file", serveAvatar);
+app.get("/covers/:userId/:version/:file", serveCover);
 app.use("/permissions", permissionRoutes);
 app.use("/documents", documentRoutes);
 app.use("/academics", academicRoutes);
@@ -151,6 +160,11 @@ app.use("/integrations", integrationRoutes);
 app.use("/monitor", monitorRoutes);
 // Mandatory office hours (OFFICE_HOURS_IMPLEMENTATION_PLAN.md).
 app.use("/office-hours", officeHoursRoutes);
+app.use("/families", familiesRoutes);
+app.use("/cover", staffCoverRoutes);
+app.use("/early-warning", earlyWarningRoutes);
+app.use("/competency", competencyRoutes);
+app.use("/safeguarding", safeguardingRoutes);
 
 app.post("/test-post", (req, res) =>
   res.json({ success: true, message: "Root POST test works" }),

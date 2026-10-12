@@ -158,6 +158,15 @@ export const MIS_MANIFEST = defineManifest({
     OFFICE_HOURS_CONFIGURE: W("Configure office-hours policy", "SYSTEM", SCHOOL_ONLY),
     // NGA Desktop tools: game switches, budgets and hours (nga-desktop TOOLS_HUB plan §6.7.5).
     DESKTOP_TOOLS_CONFIGURE: W("Configure NGA Desktop tools and games", "SYSTEM", SCHOOL_ONLY),
+    // Review and publish the desktop tools' French/Kinyarwanda texts (TOOLS_HUB plan §6.3.1).
+    TOOLS_TRANSLATIONS_MANAGE: W("Review and publish NGA Desktop tool translations", "SYSTEM", SCHOOL_ONLY),
+    // Safeguarding concerns and wellbeing check-ins (nga-desktop NEXT_FEATURES_ANALYSIS §3 #5).
+    // Restricted and audited; holders are alerted to every new concern.
+    SAFEGUARDING_MANAGE: W("See and act on safeguarding concerns", "WELFARE", { ...SCHOOL_ONLY, restricted: true }),
+    // Early warning: risk signals from Tendo/Task Mentor and interventions, in your scope.
+    EARLY_WARNING_VIEW: R("See early-warning signals and log interventions", "WELFARE", ["detail"]),
+    // Staff absence and cover: approve absences, assign cover teachers.
+    STAFF_COVER_MANAGE: W("Approve staff absences and assign cover", "ACADEMICS", SCHOOL_ONLY),
   },
 });
 

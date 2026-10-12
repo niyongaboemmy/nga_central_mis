@@ -23,6 +23,7 @@ import {
 } from "../db/schema";
 import { asyncHandler } from "../middleware/asyncHandler";
 import { successResponse } from "../utils/response";
+import { avatarUrls, profileMedia, withAvatar } from "../services/avatar/urls";
 import { NotFoundError, AuthorizationError } from "../errors/CustomError";
 import logger from "../utils/logger";
 import { getCurrentAcademicYearId } from "../utils/academicYear";
@@ -1003,6 +1004,7 @@ export const getScopedUsers = asyncHandler(async (req: any, res: any) => {
   const baseColumns = {
     user_id: User.user_id,
     username: User.username,
+    avatar_version: User.avatar_version,
     email: User.email,
     phone_number: User.phone_number,
     status: User.status,
@@ -1034,6 +1036,7 @@ export const getScopedUsers = asyncHandler(async (req: any, res: any) => {
           .select({
             user_id: User.user_id,
             username: User.username,
+            avatar_version: User.avatar_version,
             email: User.email,
             phone_number: User.phone_number,
             status: User.status,
@@ -1113,6 +1116,8 @@ export const getScopedUsers = asyncHandler(async (req: any, res: any) => {
         user_type: row.user_type,
         gender: row.gender,
         registration_number: row.registration_number ?? null,
+        // Carried through so the row's photo link can be built below.
+        avatar_version: row.avatar_version ?? null,
         roles: [] as any[],
         grades: [] as any[],
         class_groups: [] as any[],
@@ -1195,7 +1200,9 @@ export const getScopedUsers = asyncHandler(async (req: any, res: any) => {
   const totalCount = users.length;
   setPaginationHeaders(res, totalCount, pageNum, limitNum);
   successResponse(res, "Users retrieved successfully", {
-    users: users.slice(offset, offset + limitNum),
+    users: users
+      .slice(offset, offset + limitNum)
+      .map((u: any) => ({ ...u, avatar: avatarUrls(u.user_id, u.avatar_version) })),
     roleGroups: Array.from(roleGroups.values()).sort(
       (a, b) => b.count - a.count,
     ),
@@ -1457,7 +1464,8 @@ export const getScopedUserDetail = asyncHandler(async (req: any, res: any) => {
   const { password_hash, ...safeUser } = target as any;
 
   successResponse(res, "User profile retrieved successfully", {
-    user: safeUser,
+    user: withAvatar(safeUser),
+    ...profileMedia(safeUser),
     profile: profileRows[0] ?? null,
     roles,
     permissions: Array.from(

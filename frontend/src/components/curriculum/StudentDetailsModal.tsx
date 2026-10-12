@@ -1,3 +1,4 @@
+import UserAvatar from "../ui/UserAvatar";
 import React from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -76,18 +77,7 @@ const StudentDetailsModal: React.FC<Props> = ({
                 <X className="w-4 h-4" />
               </button>
               <div className="flex flex-col items-center text-center">
-                <div
-                  className={`w-20 h-20 rounded-2xl flex items-center justify-center text-2xl font-bold text-white shadow-lg ring-4 ring-white/20 ${
-                    student.gender === "MALE"
-                      ? "bg-gradient-to-br from-blue-400 to-blue-600"
-                      : student.gender === "FEMALE"
-                        ? "bg-gradient-to-br from-pink-400 to-rose-500"
-                        : "bg-gradient-to-br from-gray-400 to-gray-600"
-                  }`}
-                >
-                  {student.first_name.charAt(0)}
-                  {student.last_name.charAt(0)}
-                </div>
+                <UserAvatar decorative userId={student.user_id} name={`${student.first_name} ${student.last_name}`} size={80} shape="rounded" ring />
                 <h2 className="mt-3 text-lg font-bold text-white">
                   {student.first_name} {student.last_name}
                 </h2>

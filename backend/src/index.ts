@@ -62,6 +62,8 @@ if (config.nodeEnv !== "test") {
     .catch((error) => logger.error("[jobs] worker failed to start", { error }));
   // Live-presence sweep: expires watchers and keeps SSE streams warm.
   import("./services/elearning/livePresence").then((m) => m.startLiveSweep()).catch(() => undefined);
+  // Weekly family summary (Friday afternoon; services/familiesScheduler.ts).
+  import("./services/familiesScheduler").then((m) => m.startFamiliesScheduler()).catch(() => undefined);
   setTimeout(runSweeps, 30_000);
   setInterval(runSweeps, 6 * 60 * 60 * 1000).unref();
 

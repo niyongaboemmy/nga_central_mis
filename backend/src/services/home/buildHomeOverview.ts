@@ -16,6 +16,7 @@ import {
   teachingProvider,
 } from "./providers";
 import { officeHoursProvider } from "./officeHoursProvider";
+import { careProvider } from "./careProvider";
 
 // ============================================================================
 // GET /home/overview -- one request, every MIS module, the viewer's lenses.
@@ -43,6 +44,8 @@ const PROVIDERS: Array<[string, (ctx: ProviderContext) => Promise<ProviderResult
   ["operations", operationsProvider],
   // Mandatory office hours (OFFICE_HOURS_IMPLEMENTATION_PLAN.md §17.3).
   ["office_hours", officeHoursProvider],
+  // Safeguarding, early warning, staff cover and families (careProvider.ts).
+  ["care", careProvider],
 ];
 
 export async function buildHomeOverview(

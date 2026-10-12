@@ -5,7 +5,9 @@ export interface AssignedStudent {
   first_name: string | null;
   last_name: string | null;
   registration_number: string | null;
-  class_group_name: string;
+  class_group_name: string | null;
+  assigned_at?: string | null;
+  session_count?: number;
   last_session_date: string | null;
   days_since_last_session: number | null;
   wellbeing_status: string | null;
@@ -176,8 +178,10 @@ export interface MentorAssignmentRecord {
   assignment_id: number;
   mentor_id: number;
   mentor_name: string | null;
+  mentor_user_type?: string | null;
   student_id: number;
   student_name: string | null;
+  student_registration_number?: string | null;
   academic_year_id: number;
   academic_year_name: string | null;
   status: AssignmentStatus;
@@ -224,7 +228,45 @@ export interface MyMentorInfo {
   mentor_id: number;
   mentor_name: string | null;
   mentor_email: string;
+  mentor_phone?: string | null;
+  /** UserProfile.user_type of the mentor (TEACHER, STAFF, ADMIN...). */
+  mentor_role?: string | null;
+  /** Subjects this mentor teaches the student this year. */
+  teaches_you?: string[];
   assigned_at: string | null;
+  session_count?: number;
+  last_session_date?: string | null;
+}
+
+/** A person offered by the Assign Mentor pickers. */
+export interface MentorCandidate {
+  user_id: number;
+  username: string;
+  email: string | null;
+  first_name: string | null;
+  last_name: string | null;
+  user_type: string | null;
+  name: string;
+  /** mentor role only: active mentees in the year. */
+  mentee_count?: number;
+  /** student role only. */
+  registration_number?: string | null;
+  class_group_name?: string | null;
+  current_mentor_id?: number | null;
+  current_mentor_name?: string | null;
+}
+
+export interface AssignOutcome {
+  assigned: number;
+  moved: number;
+  unchanged: number;
+  assignment_ids: number[];
+}
+
+export interface MyMentorshipRole {
+  is_mentor: boolean;
+  mentee_count: number;
+  has_mentor: boolean;
 }
 
 // Consolidated periodic report (Phase 3)
@@ -432,7 +474,7 @@ export const mentorshipApi = {
     notes?: string;
     reassign?: boolean;
   }) =>
-    api.post<{ success: boolean; data: { assignment_id: number } }>(
+    api.post<{ success: boolean; data: AssignOutcome & { assignment_id: number | null } }>(
       "/mentorship/assignments",
       data,
     ),
@@ -444,10 +486,23 @@ export const mentorshipApi = {
     reassign?: boolean;
     notes?: string;
   }) =>
-    api.post<{ success: boolean; data: { assigned: number } }>(
+    api.post<{ success: boolean; data: AssignOutcome }>(
       "/mentorship/assignments/bulk",
       data,
     ),
+
+  searchCandidates: (params: {
+    role: "mentor" | "student";
+    q?: string;
+    academic_year_id?: number;
+    unassigned_only?: 1;
+  }) =>
+    api.get<{ success: boolean; data: MentorCandidate[] }>("/mentorship/admin/candidates", { params }),
+
+  getMyRole: (academicYearId?: number) =>
+    api.get<{ success: boolean; data: MyMentorshipRole }>("/mentorship/me", {
+      params: academicYearId ? { academic_year_id: academicYearId } : undefined,
+    }),
 
   endAssignment: (assignmentId: number) =>
     api.delete<{ success: boolean; data: { assignment_id: number } }>(

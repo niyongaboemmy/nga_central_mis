@@ -1,3 +1,4 @@
+import UserAvatar from "../ui/UserAvatar";
 import React, { useState, useEffect, useRef } from "react";
 import {
   Edit3,
@@ -170,7 +171,7 @@ const ReportDetailsModal: React.FC<ReportDetailsModalProps> = ({
                 Instructor
               </p>
               <div className="flex items-center space-x-2 text-gray-800 dark:text-gray-200 text-xs font-bold">
-                <Users className="w-3.5 h-3.5 text-gray-400" />
+                <UserAvatar decorative userId={report.user_id} name={`${report.first_name ?? ""} ${report.last_name ?? ""}`.trim() || "?"} size={20} />
                 <span className="truncate">
                   {report.first_name} {report.last_name}
                 </span>
@@ -343,7 +344,8 @@ const ReportDetailsModal: React.FC<ReportDetailsModalProps> = ({
                     className="bg-rose-50/30 dark:bg-rose-900/10 p-4 rounded-2xl border border-rose-100/50 dark:border-rose-900/20"
                   >
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-bold text-gray-800 dark:text-gray-200">
+                      <span className="inline-flex items-center gap-2 text-sm font-bold text-gray-800 dark:text-gray-200">
+                        <UserAvatar decorative userId={Number(s.student_id) || null} name={s.student_name || "Student"} size={24} />
                         {s.student_name || `Student ID: ${s.student_id}`}
                       </span>
                       <span className="text-[10px] font-bold text-rose-500 bg-rose-50 dark:bg-rose-900/30 px-2 py-0.5 rounded-md">

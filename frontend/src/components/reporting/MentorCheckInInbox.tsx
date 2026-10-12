@@ -1,3 +1,4 @@
+import UserAvatar from "../ui/UserAvatar";
 import React, { useEffect, useState, useCallback } from "react";
 import { MessageCircle, RefreshCw, X, Check, ThumbsDown, Clock3, CheckCircle2, XCircle } from "lucide-react";
 import { mentorshipApi, MenteeCheckInRecord, CheckInStatus, ValidationStatus } from "../../api/mentorship";
@@ -151,7 +152,10 @@ const MentorCheckInInbox: React.FC<MentorCheckInInboxProps> = ({ onUnreadCountCh
                 }`}
               >
                 <div className="flex items-center justify-between mb-1 gap-2 flex-wrap">
-                  <span className="text-sm font-medium text-gray-900 dark:text-white">{c.student_name}</span>
+                  <span className="inline-flex items-center gap-2 text-sm font-medium text-gray-900 dark:text-white">
+                    <UserAvatar decorative userId={c.student_id} name={c.student_name ?? "Student"} size={24} />
+                    {c.student_name}
+                  </span>
                   <div className="flex items-center gap-1.5">
                     <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${CATEGORY_COLOR[c.category]}`}>
                       {CATEGORY_LABEL[c.category]}
@@ -175,7 +179,10 @@ const MentorCheckInInbox: React.FC<MentorCheckInInboxProps> = ({ onUnreadCountCh
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
           <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-xl w-full max-w-md">
             <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 dark:border-gray-700">
-              <h3 className="font-semibold text-gray-900 dark:text-white">{selected.student_name}</h3>
+              <h3 className="flex items-center gap-2.5 font-semibold text-gray-900 dark:text-white">
+                <UserAvatar decorative userId={selected.student_id} name={selected.student_name ?? "Student"} size={32} />
+                {selected.student_name}
+              </h3>
               <button onClick={() => { setSelected(null); setRejectMode(false); }}><X className="w-5 h-5 text-gray-400" /></button>
             </div>
             <div className="p-5 space-y-3">

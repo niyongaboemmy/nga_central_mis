@@ -141,6 +141,7 @@ export const Permissions = {
 
   // NGA Desktop tools (games settings)
   DESKTOP_TOOLS_CONFIGURE: "DESKTOP_TOOLS_CONFIGURE",
+  TOOLS_TRANSLATIONS_MANAGE: "TOOLS_TRANSLATIONS_MANAGE",
 
   // Database Management
   DATABASE_MANAGEMENT: "DATABASE_MANAGEMENT",

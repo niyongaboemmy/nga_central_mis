@@ -11,16 +11,20 @@ import type { AppMeeting, AppState, AppUpdate } from "./appContract";
 export const EVERYTHING = "EVERYTHING";
 export const TIERS: Tier[] = ["blocking", "slipping", "tidy"];
 
-export type Audience = "staff" | "learner";
+export type Audience = "staff" | "learner" | "family";
 
-/** Tier names in the reader's words: a student's work is "overdue", not "blocking". */
+/**
+ * Tier names in the reader's words: a student "does it now" (overdue, due today,
+ * a quiz already running), a parent hears what is worth a word.
+ */
 export const TIER_LABEL: Record<Audience, Record<Tier, string>> = {
   staff: { blocking: "Needs you now", slipping: "Coming up", tidy: "When you can" },
-  learner: { blocking: "Overdue", slipping: "Due soon", tidy: "When you can" },
+  learner: { blocking: "Do now", slipping: "Due soon", tidy: "When you can" },
+  family: { blocking: "Act now", slipping: "Worth a look", tidy: "When you can" },
 };
 
 export const audienceOf = (data: Pick<HomeOverview, "viewer" | "lenses">): Audience =>
-  data.viewer.persona === "STUDENT" || data.viewer.persona === "PARENT" ? "learner" : "staff";
+  data.viewer.persona === "STUDENT" ? "learner" : data.viewer.persona === "PARENT" ? "family" : "staff";
 
 const TIER_WEIGHT: Record<Tier, number> = { blocking: 3000, slipping: 2000, tidy: 1000 };
 const LENS_BONUS: Record<string, number> = {
@@ -37,17 +41,25 @@ const LENS_BONUS: Record<string, number> = {
 
 const hoursBetween = (from: string, to: Date) => (to.getTime() - new Date(from).getTime()) / 3_600_000;
 
+/** A deadline this close counts as pressing: the closer, the higher. */
+const IMMINENT_HOURS = 48;
+
 /**
  * Ranking (plan §13): tier first, then how long someone has waited, how far
  * past due it is, how soon it is due, and a small nudge for the lenses that
- * are the reader's own work.
+ * are the reader's own work. Within a tier: overdue (150-500) > due within
+ * 48 h (0-144, rising as it nears) > no deadline (0) > due later (down to -200),
+ * so a quiz closing in 5 hours leads over a "talk to your teacher" note.
  */
 export const scoreItem = (item: AttentionItem, now: Date): number => {
   let score = TIER_WEIGHT[item.tier];
   if (item.waiting_since) score += Math.min(300, Math.max(0, hoursBetween(item.waiting_since, now)));
   if (item.due_at) {
     const hoursLate = hoursBetween(item.due_at, now);
-    score += hoursLate > 0 ? Math.min(500, hoursLate * 2) : -Math.min(200, -hoursLate);
+    const hoursLeft = -hoursLate;
+    if (hoursLate > 0) score += 150 + Math.min(350, hoursLate * 2);
+    else if (hoursLeft <= IMMINENT_HOURS) score += (IMMINENT_HOURS - hoursLeft) * 3;
+    else score -= Math.min(200, hoursLeft - IMMINENT_HOURS);
   }
   score += LENS_BONUS[item.lens.split(":")[0]] ?? 0;
   return score;

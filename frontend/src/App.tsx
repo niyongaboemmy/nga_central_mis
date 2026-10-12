@@ -19,6 +19,7 @@ import SystemLayout from "./components/SystemLayout";
 import { useUser } from "./contexts/UserContext";
 import { ToastProvider, useToast } from "./contexts/ToastContext";
 import UpdateBanner from "./components/ui/UpdateBanner";
+import DesktopUpdateBanner from "./components/apps/DesktopUpdateBanner";
 import { NotificationProvider } from "./contexts/NotificationContext";
 import { ConfirmProvider } from "./contexts/ConfirmContext";
 import { ToastStore } from "./services/api";
@@ -45,11 +46,21 @@ import SchemeDetails from "./components/SchemeDetails";
 import ReportingModule from "./components/reporting/ReportingModule";
 import AdminReporting from "./components/reporting/AdminReporting";
 import MyMentor from "./components/reporting/MyMentor";
+import MentoringHub from "./components/reporting/MentoringHub";
 import OfficeHoursHub from "./components/officeHours/OfficeHoursHub";
 import ScheduleDetail from "./components/officeHours/ScheduleDetail";
 import MyOfficeHours from "./components/officeHours/MyOfficeHours";
 import OfficeHoursAdmin from "./components/officeHours/admin/OfficeHoursAdmin";
 import DesktopToolsAdmin from "./components/desktopTools/DesktopToolsAdmin";
+import FamilyTutor from "./components/desktopTools/FamilyTutor";
+import MyChildren from "./components/families/MyChildren";
+import ImportParents from "./components/families/ImportParents";
+import StaffCover from "./components/cover/StaffCover";
+import EarlyWarning from "./components/earlyWarning/EarlyWarning";
+import CompetencyMap from "./components/competency/CompetencyMap";
+import MyCompetences from "./components/competency/MyCompetences";
+import Safeguarding from "./components/safeguarding/Safeguarding";
+import Wellbeing from "./components/safeguarding/Wellbeing";
 import { Student360, Teacher360 } from "./components/officeHours/reports/Person360";
 import { CheckInPage } from "./components/officeHours/CheckIn";
 import { MetadataProvider } from "./contexts/MetadataContext";
@@ -277,6 +288,7 @@ function App() {
   return (
     <ToastProvider>
       <UpdateBanner />
+      <DesktopUpdateBanner />
       <ToastInitializer>
         <NotificationProvider>
         <ConfirmProvider>
@@ -898,6 +910,23 @@ function App() {
               }
             />
 
+            {/* My Mentees — the mentor's own roster, for any mentor (teacher,
+                staff or admin). Teachers also reach it via Reporting > Mentoring. */}
+            <Route
+              path="/my-mentees"
+              element={
+                <ProtectedRoute>
+                  <SystemLayoutWrapper>
+                    <div className="p-3 md:p-6">
+                      <div className="bg-white dark:bg-gray-800/30 rounded-3xl p-6 border border-gray-100 dark:border-gray-700/20">
+                        <MentoringHub />
+                      </div>
+                    </div>
+                  </SystemLayoutWrapper>
+                </ProtectedRoute>
+              }
+            />
+
             {/* My Mentor (student-facing) - protected with sidebar */}
             <Route
               path="/my-mentor"
@@ -927,6 +956,96 @@ function App() {
                 <ProtectedRoute>
                   <SystemLayoutWrapper>
                     <ScheduleDetail />
+                  </SystemLayoutWrapper>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/safeguarding"
+              element={
+                <ProtectedRoute>
+                  <SystemLayoutWrapper>
+                    <Safeguarding />
+                  </SystemLayoutWrapper>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/wellbeing"
+              element={
+                <ProtectedRoute>
+                  <SystemLayoutWrapper>
+                    <Wellbeing />
+                  </SystemLayoutWrapper>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/early-warning"
+              element={
+                <ProtectedRoute>
+                  <SystemLayoutWrapper>
+                    <EarlyWarning />
+                  </SystemLayoutWrapper>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/my-competences"
+              element={
+                <ProtectedRoute>
+                  <SystemLayoutWrapper>
+                    <MyCompetences />
+                  </SystemLayoutWrapper>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/competency-map"
+              element={
+                <ProtectedRoute>
+                  <SystemLayoutWrapper>
+                    <CompetencyMap />
+                  </SystemLayoutWrapper>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/cover"
+              element={
+                <ProtectedRoute>
+                  <SystemLayoutWrapper>
+                    <StaffCover />
+                  </SystemLayoutWrapper>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/family"
+              element={
+                <ProtectedRoute>
+                  <SystemLayoutWrapper>
+                    <MyChildren />
+                  </SystemLayoutWrapper>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/families/import"
+              element={
+                <ProtectedRoute>
+                  <SystemLayoutWrapper>
+                    <ImportParents />
+                  </SystemLayoutWrapper>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/family/ai-tutor"
+              element={
+                <ProtectedRoute>
+                  <SystemLayoutWrapper>
+                    <FamilyTutor />
                   </SystemLayoutWrapper>
                 </ProtectedRoute>
               }

@@ -40,6 +40,20 @@ import {
   getScopedUserDetail,
 } from "../controllers/userScopeController";
 import { getUserActivities } from "../controllers/activityController";
+import {
+  avatarUpload,
+  getMyAvatar,
+  uploadMyAvatar,
+  deleteMyAvatar,
+  uploadUserAvatar,
+  deleteUserAvatar,
+  coverUpload,
+  uploadMyCover,
+  deleteMyCover,
+  lookupProfileMedia,
+  lookupAvatars,
+} from "../controllers/avatarController";
+import { requireServiceToken } from "../middleware/serviceAuth";
 import { authenticate, authorize } from "../middleware/auth";
 
 const router = express.Router();
@@ -66,6 +80,16 @@ const upload = multer({
 router.get("/me", authenticate, getCurrentUser);
 router.put("/me/profile", authenticate, updateCurrentUserProfile);
 router.patch("/me/theme", authenticate, updateThemePreference);
+// Central profile picture, shown by every NGA app (services/avatar/).
+router.get("/me/avatar", authenticate, getMyAvatar);
+router.put("/me/avatar", authenticate, avatarUpload, uploadMyAvatar);
+router.delete("/me/avatar", authenticate, deleteMyAvatar);
+router.put("/me/cover", authenticate, coverUpload, uploadMyCover);
+router.delete("/me/cover", authenticate, deleteMyCover);
+// Sibling apps (client credentials): everyone's current picture + cover in one call.
+router.post("/profile-media/lookup", requireServiceToken("profiles:read"), lookupProfileMedia);
+// Signed-in users: photos for the people on the page they are looking at.
+router.post("/avatars/lookup", authenticate, lookupAvatars);
 router.get("/", authenticate, authorize("MANAGE_USERS"), getUsers);
 
 // Role/status counts for the management chips and dashboard. Two aggregate
@@ -157,6 +181,8 @@ router.post(
   bulkCreateUsers,
 );
 router.put("/:id", authenticate, authorize("MANAGE_USERS"), updateUser);
+router.put("/:id/avatar", authenticate, authorize("MANAGE_USERS"), avatarUpload, uploadUserAvatar);
+router.delete("/:id/avatar", authenticate, authorize("MANAGE_USERS"), deleteUserAvatar);
 router.delete("/:id", authenticate, authorize("MANAGE_USERS"), deleteUser);
 
 // User status management

@@ -44,7 +44,7 @@ async function nextId(tableName: string, idColumn: string): Promise<number> {
 }
 
 export async function createUser(
-  overrides: { userType?: "TEACHER" | "ADMIN" | "STUDENT" } = {},
+  overrides: { userType?: "TEACHER" | "ADMIN" | "STUDENT" | "STAFF" | "PARENT" } = {},
 ) {
   const username = unique("user");
   const [result] = (await db.insert(User).values({

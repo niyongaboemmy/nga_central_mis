@@ -10,6 +10,7 @@ import { getCurrentUser, UserWithProfile, UserRole } from "../api/users";
 import { logout as apiLogout, checkSession } from "../api/auth";
 import { removeToken, getToken } from "../utils/auth";
 import { endActivity } from "../vendor/nga-activity";
+import { primeAvatars } from "../lib/avatarDirectory";
 
 /** Last profile seen on this device -- only ever used while offline (refreshUser). */
 const USER_CACHE_KEY = "nga.user.offlineCache";
@@ -76,6 +77,10 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({
 
       setUser(userData || null);
       rememberUser(userData || null);
+      // Lists elsewhere on the page show your own face from the photo directory.
+      if (userData?.user?.user_id && userData.avatar !== undefined) {
+        primeAvatars([{ user_id: userData.user.user_id, avatar: userData.avatar ?? null }]);
+      }
     } catch (error: any) {
       // Offline (no response at all) with a session token: open with the
       // profile last seen on this device, so the installed app and its cached

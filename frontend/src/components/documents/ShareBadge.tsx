@@ -1,6 +1,6 @@
+import UserAvatar from "../ui/UserAvatar";
 import React from "react";
 import { type ShareRecipient } from "../../api/documents";
-import { getInitials, getAvatarColor } from "./types";
 
 const displayName = (u: ShareRecipient) =>
   u.first_name || u.last_name
@@ -44,14 +44,7 @@ const ShareBadge: React.FC<ShareBadgeProps> = ({
       <span className="flex items-center -space-x-1.5">
         {shown.length > 0
           ? shown.map((u) => (
-              <span
-                key={u.user_id}
-                className={`w-5 h-5 rounded-full flex items-center justify-center text-white text-[9px] font-bold ring-2 ring-white dark:ring-gray-800 ${getAvatarColor(
-                  u.username,
-                )}`}
-              >
-                {getInitials(u.first_name, u.last_name, u.username)}
-              </span>
+              <UserAvatar key={u.user_id} userId={u.user_id} name={[u.first_name, u.last_name].filter(Boolean).join(" ") || u.username} size={20} ring />
             ))
           : null}
       </span>

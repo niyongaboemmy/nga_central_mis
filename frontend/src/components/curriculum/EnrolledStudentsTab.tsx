@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
+import UserAvatar from "../ui/UserAvatar";
 import { motion, AnimatePresence } from "framer-motion";
 import * as XLSX from "xlsx";
 import {
@@ -368,9 +369,7 @@ const EnrolledStudentsTab: React.FC<Props> = ({ subjectId, subjectName }) => {
                             }`}
                           >
                             <div className="flex items-center gap-3">
-                              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-indigo-500 flex items-center justify-center flex-shrink-0 text-white text-xs font-bold">
-                                {name.charAt(0).toUpperCase()}
-                              </div>
+                              <UserAvatar decorative userId={u.user_id} name={name} size={32} />
                               <div>
                                 <p className="text-sm font-medium text-gray-900 dark:text-white">{name}</p>
                                 <p className="text-xs text-gray-500 dark:text-gray-400">
@@ -521,17 +520,7 @@ const EnrolledStudentsTab: React.FC<Props> = ({ subjectId, subjectName }) => {
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-3">
-                          <div
-                            className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-bold text-white ${
-                              s.gender === "MALE"
-                                ? "bg-gradient-to-br from-blue-400 to-blue-600"
-                                : s.gender === "FEMALE"
-                                ? "bg-gradient-to-br from-pink-400 to-rose-500"
-                                : "bg-gradient-to-br from-gray-400 to-gray-600"
-                            }`}
-                          >
-                            {s.first_name.charAt(0)}{s.last_name.charAt(0)}
-                          </div>
+                          <UserAvatar decorative userId={s.user_id} name={`${s.first_name} ${s.last_name}`} size={32} />
                           <div>
                             <p className="font-medium text-gray-900 dark:text-white leading-tight">
                               {s.first_name} {s.last_name}

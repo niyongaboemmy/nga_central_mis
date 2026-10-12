@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { ToastProvider } from "../../../contexts/ToastContext";
@@ -9,6 +9,7 @@ import LessonNotesListPage from "../LessonNotesListPage";
 const listMock = vi.fn();
 const subjectsMock = vi.fn();
 const placeMock = vi.fn();
+const panelMock = vi.fn();
 const removeMock = vi.fn();
 // Props of every LessonNoteFormModal render — the modal itself is covered by its own test.
 const modalProps: any[] = [];
@@ -29,7 +30,10 @@ vi.mock("../../../api/elearning", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../../api/elearning")>();
   return {
     ...actual,
-    elearningApi: { placeNoteOnCourse: (...args: any[]) => placeMock(...args) },
+    elearningApi: {
+      noteElearning: (...args: any[]) => panelMock(...args),
+      setNotePlacement: (...args: any[]) => placeMock(...args),
+    },
   };
 });
 
@@ -124,41 +128,65 @@ describe("LessonNotesListPage — subject-first browsing and e-learning linkage"
     expect(await screen.findByText("Blockchain basics")).toBeInTheDocument();
   });
 
-  it("marks an unlinked note and places it on the course in one click", async () => {
+  const reach = (state: string, over: Partial<any> = {}) => ({ state, opens_at: null, blocker: null, steps: [], ...over });
+  const placed = { item_id: 1, is_published: true, section_id: 2, section_title: "Week 3 — Wallets", section_status: "PUBLISHED", section_unlock_at: null, course_id: 7, course_title: "Web3 Applications", course_status: "PUBLISHED" };
+  const panelData = (over: Partial<any> = {}) => ({
+    note: { note_id: 10, title: "Blockchain basics", status: "PUBLISHED" },
+    course: { course_id: 7, title: "Web3 Applications", status: "PUBLISHED" },
+    no_course_reason: null,
+    placement: null,
+    sections: [
+      { section_id: 1, title: "Week 2 — Keys", status: "PUBLISHED", unlock_at: null, start_date: null, end_date: null, item_count: 2, is_current: true, suggested: false, reason: null },
+      { section_id: 2, title: "Week 3 — Wallets", status: "PUBLISHED", unlock_at: null, start_date: null, end_date: null, item_count: 1, is_current: false, suggested: true, reason: "The note was written for this week" },
+    ],
+    students: null,
+    reach: { state: "OFF_COURSE", opens_at: null, blocker: "Not on e-learning", steps: [{ key: "note", ok: true, label: "Note is published" }, { key: "placed", ok: false, label: "Not on a course week", fix: "place" }] },
+    ...over,
+  });
+
+  it("opens the e-learning panel from an unlinked note and places it in the suggested week", async () => {
     listMock.mockResolvedValue({
-      data: { data: [note({ course_target: { course_id: 7, title: "Web3 Applications", status: "DRAFT" } })] },
+      data: { data: [note({ course_target: { course_id: 7, title: "Web3 Applications", status: "PUBLISHED" }, reach: reach("OFF_COURSE") })] },
     });
+    panelMock.mockResolvedValue({ data: { data: panelData() } });
     placeMock.mockResolvedValue({
-      data: { data: { item_id: 1, section_id: 2, section_title: "Week 3 — Wallets", course_id: 7, already_placed: false } },
+      data: {
+        message: 'Added to "Week 3 — Wallets"',
+        data: panelData({
+          placement: placed,
+          students: { members: 20, started: 0, completed: 0 },
+          reach: { state: "LIVE", opens_at: null, blocker: null, steps: [] },
+        }),
+      },
     });
 
     renderPage();
     await userEvent.click(await screen.findByText("Web3 Applications"));
+    // Exact name: the note card is itself a button whose name contains the chip's text.
+    await userEvent.click(await screen.findByRole("button", { name: "Add to e-learning" }));
 
-    // Exact name: the note card is itself a button, and its accessible name contains
-    // the chip's text.
-    const addBtn = await screen.findByRole("button", { name: "Add to e-learning" });
-    await userEvent.click(addBtn);
+    const panel = await screen.findByTestId("note-elearning-panel");
+    expect(panelMock).toHaveBeenCalledWith(10);
+    expect(await within(panel).findByText(/Suggested — the note was written for this week/)).toBeInTheDocument();
+    // Placement is a choice now, not a blind guess: the suggested week is one click away.
+    await userEvent.click(within(panel).getByRole("button", { name: /Add to suggested week/ }));
+    await waitFor(() => expect(placeMock).toHaveBeenCalledWith(10, 2));
 
-    await waitFor(() => expect(placeMock).toHaveBeenCalledWith(10));
-    // The list is re-read from the server, which decides the section.
-    await waitFor(() => expect(listMock).toHaveBeenCalledTimes(2));
+    // The row updates in place from the panel's answer.
+    expect(await screen.findByText("Live · Week 3")).toBeInTheDocument();
+    expect(within(panel).getByText("0 of 20 finished · 0 started")).toBeInTheDocument();
   });
 
-  it("shows where a linked note lives on the course", async () => {
+  it("says whether placed notes actually reach students, and why not", async () => {
     listMock.mockResolvedValue({
       data: {
         data: [
+          note({ note_id: 10, title: "Live note", elearning: placed, reach: reach("LIVE") }),
           note({
-            elearning: {
-              item_id: 1,
-              is_published: true,
-              section_id: 2,
-              section_title: "Week 3 — Wallets",
-              course_id: 7,
-              course_title: "Web3 Applications",
-              course_status: "PUBLISHED",
-            },
+            note_id: 11,
+            title: "Hidden week note",
+            elearning: { ...placed, section_status: "HIDDEN" },
+            reach: reach("BLOCKED", { blocker: "Week is hidden" }),
           }),
         ],
       },
@@ -166,9 +194,42 @@ describe("LessonNotesListPage — subject-first browsing and e-learning linkage"
 
     renderPage();
     await userEvent.click(await screen.findByText("Web3 Applications"));
-
-    expect(await screen.findByText("Week 3 — Wallets")).toBeInTheDocument();
+    await screen.findByText("Live note");
+    expect(screen.getByText("Live · Week 3")).toBeInTheDocument();
+    expect(screen.getByText("Week 3 · Week is hidden")).toBeInTheDocument();
+    // Placed is not the same as reaching students.
+    expect(screen.getByText("1 of 2 reaching students")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /1 needs attention/ })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Add to e-learning" })).not.toBeInTheDocument();
+  });
+
+  it("filters notes by reach: needing attention, not on e-learning", async () => {
+    listMock.mockResolvedValue({
+      data: {
+        data: [
+          note({ note_id: 10, title: "Live note", elearning: placed, reach: reach("LIVE") }),
+          note({ note_id: 11, title: "Blocked note", elearning: placed, reach: reach("BLOCKED", { blocker: "Course is a draft" }) }),
+          note({ note_id: 12, title: "Unlinked note", reach: reach("OFF_COURSE") }),
+        ],
+      },
+    });
+
+    renderPage();
+    await userEvent.click(await screen.findByText("Web3 Applications"));
+    await screen.findByText("Live note");
+
+    await userEvent.click(screen.getByRole("button", { name: "Needs attention" }));
+    expect(screen.queryByText("Live note")).not.toBeInTheDocument();
+    expect(screen.getByText("Blocked note")).toBeInTheDocument();
+    expect(screen.queryByText("Unlinked note")).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Not on e-learning" }));
+    expect(screen.getByText("Unlinked note")).toBeInTheDocument();
+    expect(screen.queryByText("Blocked note")).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Reaching students" }));
+    expect(screen.getByText("Live note")).toBeInTheDocument();
+    expect(screen.queryByText("Unlinked note")).not.toBeInTheDocument();
   });
 
   it("lists an assigned subject that has no notes yet, as a way in", async () => {
@@ -223,25 +284,6 @@ describe("LessonNotesListPage — subject-first browsing and e-learning linkage"
     renderPage();
     expect(await screen.findByText("Legacy Subject")).toBeInTheDocument();
     expect(screen.getByText("Past subject")).toBeInTheDocument();
-  });
-
-  it("filters the subject's notes down to the ones not yet on e-learning", async () => {
-    listMock.mockResolvedValue({
-      data: {
-        data: [
-          note({ note_id: 10, title: "Linked note", elearning: { item_id: 1, is_published: true, section_id: 2, section_title: "Week 1", course_id: 7, course_title: "C", course_status: "DRAFT" } }),
-          note({ note_id: 11, title: "Unlinked note" }),
-        ],
-      },
-    });
-
-    renderPage();
-    await userEvent.click(await screen.findByText("Web3 Applications"));
-    await screen.findByText("Linked note");
-
-    await userEvent.click(screen.getByRole("button", { name: "Not linked" }));
-    expect(screen.queryByText("Linked note")).not.toBeInTheDocument();
-    expect(screen.getByText("Unlinked note")).toBeInTheDocument();
   });
 
   it("opens the edit form for a note from its Edit button, without opening the editor", async () => {

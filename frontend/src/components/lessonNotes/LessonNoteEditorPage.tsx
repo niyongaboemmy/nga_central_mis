@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import {
   ArrowLeft,
   Share2,
@@ -32,6 +32,10 @@ import {
   attachImageTokenToHtml,
 } from "../../utils/lessonNoteImages";
 import { useConfirm } from "../../contexts/ConfirmContext";
+import { usePermissions } from "../../hooks/usePermissions";
+import { elearningApi, type NoteElearning } from "../../api/elearning";
+import NoteReachChip from "./elearning/NoteReachChip";
+import NoteElearningPanel from "./elearning/NoteElearningPanel";
 
 const AUTOSAVE_DELAY_MS = 1500;
 
@@ -44,9 +48,17 @@ const LessonNoteEditorPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const noteId = Number(id);
   const navigate = useNavigate();
+  const location = useLocation();
   const { showToast } = useToast();
   const askConfirm = useConfirm();
   const deleteNote = useDeleteLessonNote();
+  const { hasPermission } = usePermissions();
+  const canBuild = hasPermission("MANAGE_COURSE_CONTENT");
+  // Where "back" goes: the exact list the teacher opened this note from (subject, search,
+  // filters), else that subject's notes — never the bare subject picker.
+  const backTo = (location.state as { backTo?: string } | null)?.backTo;
+  const [elearning, setElearning] = useState<NoteElearning | null>(null);
+  const [showElearning, setShowElearning] = useState(false);
 
   const [note, setNote] = useState<LessonNoteDetail | null>(null);
   const [title, setTitle] = useState("");
@@ -219,6 +231,25 @@ const LessonNoteEditorPage: React.FC = () => {
     navigate(`/lesson-notes?subject=${note.subject_id}`, { replace: true });
   };
 
+  useEffect(() => {
+    if (!canBuild || !noteId) return;
+    elearningApi
+      .noteElearning(noteId)
+      .then((res) => setElearning(res.data.data))
+      .catch(() => setElearning(null));
+  }, [noteId, canBuild]);
+
+  /** Publishing from the e-learning panel goes through the editor's save, so unsaved edits go too. */
+  const publishFromPanel = async () => {
+    if (!note || note.status === "PUBLISHED") return;
+    if (!hasContent) {
+      showToast("Add some content before publishing this note.", "error");
+      throw new Error("empty");
+    }
+    await flushSave({ status: "PUBLISHED" });
+    setNote((prev) => (prev ? { ...prev, status: "PUBLISHED" } : prev));
+  };
+
   const handlePublishToggle = async () => {
     if (!note) return;
     const nextStatus = note.status === "PUBLISHED" ? "DRAFT" : "PUBLISHED";
@@ -228,6 +259,7 @@ const LessonNoteEditorPage: React.FC = () => {
     }
     await flushSave({ status: nextStatus });
     setNote((prev) => (prev ? { ...prev, status: nextStatus } : prev));
+    if (canBuild) elearningApi.noteElearning(noteId).then((res) => setElearning(res.data.data)).catch(() => {});
     showToast(
       nextStatus === "PUBLISHED"
         ? "Note published — your students can now see it"
@@ -286,7 +318,7 @@ const LessonNoteEditorPage: React.FC = () => {
       });
       if (!leave) return;
     }
-    navigate("/lesson-notes");
+    navigate(backTo || (note ? `/lesson-notes?subject=${note.subject_id}` : "/lesson-notes"));
   };
 
   useEffect(() => {
@@ -362,10 +394,12 @@ const LessonNoteEditorPage: React.FC = () => {
         <div className="flex items-center gap-2 min-w-0 flex-1 basis-64">
           <button
             onClick={handleBackToNotes}
-            className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 flex-shrink-0"
+            title={`Back to ${note.subject_name || "your"} notes`}
+            aria-label={`Back to ${note.subject_name || "your"} notes`}
+            className="group flex items-center gap-1.5 pl-1.5 pr-3 py-1.5 rounded-full text-sm font-medium text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-white/[0.06] hover:bg-gray-200 dark:hover:bg-white/[0.12] flex-shrink-0 max-w-[14rem] transition-colors"
           >
-            <ArrowLeft className="w-4 h-4" />{" "}
-            <span className="hidden sm:inline">Notes</span>
+            <ArrowLeft className="w-4 h-4 group-hover:-translate-x-0.5 transition-transform" />
+            <span className="hidden sm:inline truncate">{note.subject_name || "Notes"}</span>
           </button>
           <input
             value={title}
@@ -384,6 +418,21 @@ const LessonNoteEditorPage: React.FC = () => {
           )}
           {note.status === "PUBLISHED" && (
             <LessonNoteShareBadge shareCount={note.share_count} />
+          )}
+          {elearning && (
+            <span className="hidden md:inline-flex min-w-0">
+              <NoteReachChip
+                reach={elearning.reach}
+                placement={
+                  elearning.placement && elearning.course
+                    ? { ...elearning.placement, course_id: elearning.course.course_id, course_title: elearning.course.title }
+                    : null
+                }
+                hasCourse={!!elearning.course}
+                onClick={() => setShowElearning(true)}
+                size="md"
+              />
+            </span>
           )}
         </div>
 
@@ -420,6 +469,16 @@ const LessonNoteEditorPage: React.FC = () => {
               <Maximize2 className="w-4 h-4" />
             )}
           </button>
+          {elearning && (
+            <button
+              onClick={() => setShowElearning(true)}
+              title="On e-learning"
+              aria-label="On e-learning"
+              className="md:hidden p-2 rounded-full text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800"
+            >
+              <GraduationCap className="w-4 h-4" />
+            </button>
+          )}
           <button
             onClick={openEditDetails}
             title="Edit details — subject, class, curriculum coverage, title"
@@ -610,6 +669,15 @@ const LessonNoteEditorPage: React.FC = () => {
           pendingContent.current = null;
           navigate(`/lesson-notes?subject=${note.subject_id}`, { replace: true });
         }}
+      />
+      <NoteElearningPanel
+        noteId={showElearning ? noteId : null}
+        onClose={() => setShowElearning(false)}
+        onChanged={(d) => {
+          setElearning(d);
+          setNote((prev) => (prev ? { ...prev, status: d.note.status } : prev));
+        }}
+        onPublishNote={publishFromPanel}
       />
       <VersionHistoryModal
         isOpen={showVersions}

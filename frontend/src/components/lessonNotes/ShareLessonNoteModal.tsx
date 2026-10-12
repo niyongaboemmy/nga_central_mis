@@ -1,3 +1,4 @@
+import UserAvatar from "../ui/UserAvatar";
 import React, { useEffect, useState } from "react";
 import { Users, GraduationCap, UserCheck, Trash2 } from "lucide-react";
 import Modal from "../ui/Modal";
@@ -162,6 +163,7 @@ const ShareLessonNoteModal: React.FC<Props> = ({ isOpen, onClose, note, onShareC
                       )
                     }
                   />
+                  <UserAvatar decorative userId={s.user_id} name={`${s.first_name ?? ""} ${s.last_name ?? ""}`.trim() || "?"} size={24} />
                   {s.first_name} {s.last_name}
                   <span className="text-gray-400 text-xs ml-auto">{s.class_group_name}</span>
                 </label>
