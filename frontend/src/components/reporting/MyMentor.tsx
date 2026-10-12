@@ -1,5 +1,4 @@
 import React, { useEffect, useMemo, useState } from "react";
-import UserAvatar from "../ui/UserAvatar";
 import {
   Send,
   MessageCircle,
@@ -16,7 +15,6 @@ import {
   XCircle,
   Clock3,
   UserCircle2,
-  Mail,
   ShieldAlert,
   CalendarClock,
   ClipboardList,
@@ -26,7 +24,6 @@ import {
   ChevronDown,
   Check,
   Search,
-  Phone,
 } from "lucide-react";
 import { mentorshipApi, MenteeCheckInRecord, CheckInCategory, ValidationStatus, MyMentorInfo } from "../../api/mentorship";
 import { studentEnrollmentApi, StudentEnrolledSubject } from "../../api/academics";
@@ -34,6 +31,7 @@ import { useToast } from "../../contexts/ToastContext";
 import { useUser } from "../../contexts/UserContext";
 import { useAcademicPeriod } from "../../contexts/AcademicPeriodContext";
 import SelectField from "../ui/SelectField";
+import MentorProfileCard from "./MentorProfileCard";
 
 interface CategoryDef {
   value: CheckInCategory;
@@ -113,14 +111,6 @@ type PageTab = "MENTOR" | "REPORT" | "HISTORY";
 // since this codebase has no push/websocket notification infrastructure.
 const POLL_INTERVAL_MS = 45_000;
 const MESSAGE_MAX_LENGTH = 2000;
-
-const ROLE_LABELS: Record<string, string> = {
-  TEACHER: "Teacher",
-  STAFF: "Staff",
-  ADMIN: "Administration",
-  PARENT: "Parent",
-};
-const roleLabel = (role: string) => ROLE_LABELS[role] ?? role.charAt(0) + role.slice(1).toLowerCase();
 
 const formatDay = (iso: string) => {
   const d = new Date(`${iso.slice(0, 10)}T00:00:00`);
@@ -257,7 +247,9 @@ const MyMentor: React.FC = () => {
         category,
         title: title.trim() || undefined,
         subject_id: subjectId ? parseInt(subjectId, 10) : undefined,
-        academic_year_id: currentAcademicYearId ?? undefined,
+        // The mentor's own assignment year: it can differ from the selected one
+        // when the page fell back to the student's live mentor.
+        academic_year_id: mentor.academic_year_id ?? currentAcademicYearId ?? undefined,
         message: message.trim(),
       });
       showToast("Report sent to your mentor", "success");
@@ -361,58 +353,7 @@ const MyMentor: React.FC = () => {
             </div>
           ) : mentor ? (
             <>
-              <section
-                aria-label="Your mentor"
-                className="bg-gradient-to-r from-blue-50 to-white dark:from-blue-900/10 dark:to-gray-800/30 rounded-2xl p-5 border border-blue-100 dark:border-blue-900/20 shadow-sm"
-              >
-                <div className="flex items-start gap-4">
-                  <UserAvatar decorative userId={mentor.mentor_id} name={mentor.mentor_name || "Mentor"} size={64} />
-                  <div className="min-w-0 flex-1">
-                    <p className="text-[11px] uppercase tracking-wide font-semibold text-blue-600 dark:text-blue-400">
-                      Your mentor{selectedYear?.name ? ` · ${selectedYear.name}` : ""}
-                    </p>
-                    <p className="text-lg font-semibold text-gray-900 dark:text-white truncate">
-                      {mentor.mentor_name ?? "Assigned Mentor"}
-                    </p>
-                    <div className="flex flex-wrap items-center gap-1.5 mt-1">
-                      {mentor.mentor_role && (
-                        <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300">
-                          {roleLabel(mentor.mentor_role)}
-                        </span>
-                      )}
-                      {(mentor.teaches_you ?? []).map((subject) => (
-                        <span
-                          key={subject}
-                          className="text-[11px] px-2 py-0.5 rounded-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300"
-                          title="This mentor also teaches you this subject"
-                        >
-                          Teaches you {subject}
-                        </span>
-                      ))}
-                    </div>
-                    <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-xs text-gray-600 dark:text-gray-300">
-                      {mentor.mentor_email && (
-                        <a href={`mailto:${mentor.mentor_email}`} className="flex items-center gap-1 hover:text-blue-600 dark:hover:text-blue-400 min-w-0">
-                          <Mail className="w-3.5 h-3.5 shrink-0" />
-                          <span className="truncate">{mentor.mentor_email}</span>
-                        </a>
-                      )}
-                      {mentor.mentor_phone && (
-                        <a href={`tel:${mentor.mentor_phone}`} className="flex items-center gap-1 hover:text-blue-600 dark:hover:text-blue-400">
-                          <Phone className="w-3.5 h-3.5 shrink-0" />
-                          {mentor.mentor_phone}
-                        </a>
-                      )}
-                      {mentor.assigned_at && (
-                        <span className="flex items-center gap-1">
-                          <CalendarClock className="w-3.5 h-3.5 shrink-0" />
-                          Your mentor since {formatDay(mentor.assigned_at)}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </section>
+              <MentorProfileCard mentor={mentor} yearName={selectedYear?.name} />
 
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <div className="bg-white dark:bg-gray-800/30 rounded-xl p-3 border border-gray-100 dark:border-gray-700/20 text-center">

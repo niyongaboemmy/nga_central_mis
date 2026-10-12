@@ -19,6 +19,8 @@ import { asyncHandler } from "../middleware/asyncHandler";
 import { successResponse } from "../utils/response";
 import { ValidationError, NotFoundError, AuthorizationError } from "../errors/CustomError";
 import { Permissions } from "../utils/permissions";
+import { profileMedia } from "../services/avatar/urls";
+import { mentorshipRelationshipsFor } from "../services/mentorship/relationships";
 
 const formatDbDate = (d: any): string | null => {
   if (!d) return null;
@@ -968,36 +970,45 @@ export const getMyMentor = asyncHandler(async (req: any, res: any) => {
     academic_year_id && !isNaN(Number(academic_year_id))
       ? parseInt(academic_year_id as string, 10)
       : await getCurrentAcademicYearId();
-  if (!academicYearId) {
-    return successResponse(res, "No mentor assigned", null);
+  const findMentor = (yearCondition: any) =>
+    db
+      .select({
+        mentor_id: MentorAssignment.mentor_id,
+        mentor_email: User.email,
+        mentor_phone: User.phone_number,
+        mentor_first: UserProfile.first_name,
+        mentor_last: UserProfile.last_name,
+        mentor_user_type: UserProfile.user_type,
+        mentor_gender: UserProfile.gender,
+        avatar_version: User.avatar_version,
+        cover_version: User.cover_version,
+        assigned_at: MentorAssignment.assigned_at,
+        assignment_year_id: MentorAssignment.academic_year_id,
+        academic_year_name: AcademicYear.name,
+      })
+      .from(MentorAssignment)
+      .innerJoin(User, eq(MentorAssignment.mentor_id, User.user_id))
+      .leftJoin(UserProfile, eq(MentorAssignment.mentor_id, UserProfile.user_id))
+      .innerJoin(AcademicYear, eq(AcademicYear.academic_year_id, MentorAssignment.academic_year_id))
+      .where(and(eq(MentorAssignment.student_id, studentId), eq(MentorAssignment.status, "ACTIVE"), yearCondition))
+      .orderBy(sql`${AcademicYear.is_current} DESC`, sql`${MentorAssignment.assigned_at} DESC`)
+      .limit(1);
+
+  let [row] = academicYearId ? await findMentor(eq(MentorAssignment.academic_year_id, academicYearId)) : [];
+  // Nothing in the selected year: show the mentor the student has right now
+  // (the unfinished-year rule the mentor side uses), rather than "no mentor".
+  // The period selector can sit on a different year than the assignment, and
+  // the student still needs to reach the person mentoring them today.
+  const fromOtherYear = !row;
+  if (!row) {
+    [row] = await findMentor(
+      or(eq(AcademicYear.is_current, 1), sql`${AcademicYear.end_date} >= CURDATE()`, isNull(AcademicYear.end_date)),
+    );
   }
-
-  const [row] = await db
-    .select({
-      mentor_id: MentorAssignment.mentor_id,
-      mentor_email: User.email,
-      mentor_phone: User.phone_number,
-      mentor_first: UserProfile.first_name,
-      mentor_last: UserProfile.last_name,
-      mentor_user_type: UserProfile.user_type,
-      assigned_at: MentorAssignment.assigned_at,
-    })
-    .from(MentorAssignment)
-    .innerJoin(User, eq(MentorAssignment.mentor_id, User.user_id))
-    .leftJoin(UserProfile, eq(MentorAssignment.mentor_id, UserProfile.user_id))
-    .where(
-      and(
-        eq(MentorAssignment.student_id, studentId),
-        eq(MentorAssignment.academic_year_id, academicYearId),
-        eq(MentorAssignment.status, "ACTIVE"),
-      ),
-    )
-    .orderBy(sql`${MentorAssignment.assigned_at} DESC`)
-    .limit(1);
-
   if (!row) {
     return successResponse(res, "No mentor assigned", null);
   }
+  const mentorYearId = row.assignment_year_id;
 
   // What the student may see about their time with this mentor: how often
   // they have met and when. Session notes stay with the mentor.
@@ -1031,17 +1042,30 @@ export const getMyMentor = asyncHandler(async (req: any, res: any) => {
       .where(
         and(
           eq(TeacherSubjectAssignment.user_id, row.mentor_id),
-          eq(TeacherSubjectAssignment.academic_year_id, academicYearId),
+          eq(TeacherSubjectAssignment.academic_year_id, mentorYearId),
         ),
       ),
   ]);
 
+  // Everything a student needs to recognise and reach their mentor: photo and
+  // cover (the same signed links every NGA app shows), contact details, and
+  // how they are connected. Nothing private (date of birth, address) is sent.
+  const media = profileMedia({ user_id: row.mentor_id, avatar_version: row.avatar_version, cover_version: row.cover_version });
   return successResponse(res, "Your mentor fetched", {
     mentor_id: row.mentor_id,
     mentor_name: `${row.mentor_first ?? ""} ${row.mentor_last ?? ""}`.trim() || null,
+    mentor_first_name: row.mentor_first ?? null,
+    mentor_last_name: row.mentor_last ?? null,
     mentor_email: row.mentor_email,
     mentor_phone: row.mentor_phone ?? null,
     mentor_role: row.mentor_user_type ?? null,
+    mentor_gender: row.mentor_gender ?? null,
+    avatar: media.avatar,
+    cover: media.cover,
+    academic_year_id: mentorYearId,
+    academic_year_name: row.academic_year_name ?? null,
+    // True when the selected year has no assignment and this is the live mentor.
+    from_other_year: fromOtherYear,
     teaches_you: subjects.map((s) => s.name).filter(Boolean),
     assigned_at: formatDbDate(row.assigned_at),
     session_count: Number(sessions?.session_count ?? 0),
@@ -1639,4 +1663,14 @@ export const getAdminMentorshipDashboard = asyncHandler(async (req: any, res: an
       session_count: Number(m.session_count),
     })),
   });
+});
+
+// GET /mentorship/service/relationships/:userId  (client credentials, scope mentorship:read)
+// A sibling app (Tupo) asks who mentors this person and whom they mentor right
+// now, so it can show the mentor's profile and let a student message their own
+// mentor even though students cannot start direct messages in general.
+export const getRelationshipsForService = asyncHandler(async (req: any, res: any) => {
+  const userId = Number(req.params.userId);
+  if (!Number.isSafeInteger(userId) || userId <= 0) throw new ValidationError("A valid user id is required");
+  return successResponse(res, "Mentorship relationships fetched", await mentorshipRelationshipsFor(userId));
 });

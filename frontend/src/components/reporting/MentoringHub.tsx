@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import UserAvatar from "../ui/UserAvatar";
+import { tupoMentorUrl } from "./MentorProfileCard";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Search,
@@ -8,6 +9,7 @@ import {
   Clock,
   RefreshCw,
   MessageCircle,
+  MessageSquareText,
   ChevronRight,
   ChevronLeft,
   UserCheck,
@@ -207,6 +209,19 @@ const MentoringHub: React.FC = () => {
             <ClipboardList className="w-4 h-4" />
             <span className="hidden sm:inline">My Reports</span>
           </button>
+
+          {students.length > 0 && (
+            <a
+              href={tupoMentorUrl()}
+              target="_blank"
+              rel="noopener noreferrer"
+              title="Chat with your mentees on Tupo"
+              className="flex-shrink-0 flex items-center gap-1.5 text-sm font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 px-3.5 py-2.5 rounded-2xl hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors"
+            >
+              <MessageSquareText className="w-4 h-4" />
+              <span className="hidden sm:inline">Message on Tupo</span>
+            </a>
+          )}
 
           {/* Search */}
           <div className="relative w-full lg:w-64">
