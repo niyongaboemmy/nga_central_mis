@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   Send,
   MessageCircle,
@@ -136,7 +137,11 @@ const MyMentor: React.FC = () => {
   // while that selection is still loading.
   const currentAcademicYearId = selectedYearId ?? years.find((y) => y.is_current)?.academic_year_id ?? null;
 
-  const [activeTab, setActiveTab] = useState<PageTab>("MENTOR");
+  // `?checkin=<id>` is the link in a "your mentor replied" notification: open
+  // the history on that check-in.
+  const [params] = useSearchParams();
+  const linkedCheckIn = Number(params.get("checkin")) || null;
+  const [activeTab, setActiveTab] = useState<PageTab>(linkedCheckIn ? "HISTORY" : "MENTOR");
   const [categoryMenuOpen, setCategoryMenuOpen] = useState(false);
   const [categorySearch, setCategorySearch] = useState("");
   const categoryMenuRef = React.useRef<HTMLDivElement>(null);
@@ -199,17 +204,30 @@ const MyMentor: React.FC = () => {
   }, [currentAcademicYearId]);
 
   const studentUserId = user?.user.user_id;
+  // A check-in is filed (and its subject checked) against the mentor's own
+  // year, which can differ from the selected one when the page falls back to
+  // the student's live mentor — offer that year's subjects.
+  const subjectYearId = mentor?.academic_year_id ?? currentAcademicYearId;
 
   useEffect(() => {
-    if (!studentUserId || !currentAcademicYearId) return;
+    if (!linkedCheckIn || loading) return;
+    setActiveTab("HISTORY");
+    setFilterTab("ALL");
+    window.setTimeout(() => {
+      document.getElementById(`checkin-${linkedCheckIn}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 50);
+  }, [linkedCheckIn, loading]);
+
+  useEffect(() => {
+    if (!studentUserId || !subjectYearId) return;
     studentEnrollmentApi
-      .getEnrolledSubjects(studentUserId, currentAcademicYearId)
+      .getEnrolledSubjects(studentUserId, subjectYearId)
       .then((res) => setSubjects((res as any).data?.data ?? []))
       .catch(() => {
         setSubjects([]);
         showToast("Failed to load your enrolled subjects", "error");
       });
-  }, [studentUserId, currentAcademicYearId]);
+  }, [studentUserId, subjectYearId]);
 
   useEffect(() => {
     if (!categoryMenuOpen) {
@@ -627,7 +645,15 @@ const MyMentor: React.FC = () => {
                 const badge = VALIDATION_BADGE[h.validation_status];
                 const catMeta = CATEGORY_META[h.category];
                 return (
-                  <div key={h.checkin_id} className="p-3.5 rounded-xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800/30 transition-shadow hover:shadow-sm">
+                  <div
+                    key={h.checkin_id}
+                    id={`checkin-${h.checkin_id}`}
+                    className={`p-3.5 rounded-xl border bg-white dark:bg-gray-800/30 transition-shadow hover:shadow-sm ${
+                      h.checkin_id === linkedCheckIn
+                        ? "border-blue-300 dark:border-blue-700 ring-2 ring-blue-500/30"
+                        : "border-gray-100 dark:border-gray-700"
+                    }`}
+                  >
                     <div className="flex items-center justify-between mb-1.5 gap-2 flex-wrap">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${catMeta.className}`}>
@@ -644,7 +670,11 @@ const MyMentor: React.FC = () => {
                           {badge.label}
                         </span>
                       </div>
-                      <span className="text-[10px] text-gray-400">{h.submitted_at}</span>
+                      <span className="text-[10px] text-gray-400">
+                        {h.submitted_at}
+                        {/* Whether the mentor has opened it yet — silence reads very differently from "seen". */}
+                        {h.status === "NEW" ? " · Not read yet" : !h.mentor_response && h.validation_status === "PENDING" ? " · Seen by your mentor" : ""}
+                      </span>
                     </div>
                     {h.title && (
                       <p className="text-sm font-semibold text-gray-900 dark:text-white mb-0.5">{h.title}</p>

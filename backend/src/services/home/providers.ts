@@ -522,6 +522,7 @@ export async function learnerProvider(ctx: ProviderContext): Promise<ProviderRes
         and(
           eq(MenteeCheckIn.student_id, userId),
           gte(MenteeCheckIn.responded_at, sql`DATE_SUB(NOW(), INTERVAL 7 DAY)`),
+          sql`(${MenteeCheckIn.mentor_response} IS NOT NULL OR ${MenteeCheckIn.validation_status} <> 'PENDING')`,
         ),
       ),
     // Who mentors me this year — shown as a glance tile so a student always
@@ -740,12 +741,17 @@ export async function mentorProvider(ctx: ProviderContext): Promise<ProviderResu
             last: sql<string>`MAX(DATE_FORMAT(${MentorshipSession.session_date}, '%Y-%m-%d'))`,
           })
           .from(MentorshipSession)
-          .where(inArray(MentorshipSession.student_id, ids))
+          // This mentor's own sessions: another adult meeting the student does
+          // not make up for the mentor never having met them (same rule as the
+          // hub's roster).
+          .where(and(eq(MentorshipSession.user_id, userId), inArray(MentorshipSession.student_id, ids)))
           .groupBy(MentorshipSession.student_id)
       : Promise.resolve([] as Array<{ student_id: number; last: string }>),
     db
-      .select({ id: MentorshipSession.mentorship_id, student_name: MentorshipSession.student_name })
+      // MentorshipSession.student_name is never filled in; the name comes from the profile.
+      .select({ id: MentorshipSession.mentorship_id, first_name: UserProfile.first_name, last_name: UserProfile.last_name })
       .from(MentorshipSession)
+      .leftJoin(UserProfile, eq(UserProfile.user_id, MentorshipSession.student_id))
       .where(
         and(
           eq(MentorshipSession.user_id, userId),
@@ -773,7 +779,7 @@ export async function mentorProvider(ctx: ProviderContext): Promise<ProviderResu
         title: `${inbox.length} mentee ${plural(inbox.length, "check-in is", "check-ins are")} waiting for you`,
         entities: uniq(inbox.map((c) => fullName(c.first_name, c.last_name))),
         why: waited > 48 ? `The oldest has waited ${Math.round(waited / 24)} days — a reply shows them someone is listening.` : "A quick acknowledgement shows them someone is listening.",
-        cta: { label: "Reply", href: "/my-mentees" },
+        cta: { label: "Reply", href: inbox.length === 1 ? `/my-mentees/inbox?checkin=${inbox[0].checkin_id}` : "/my-mentees/inbox" },
         waiting_since: oldest,
       }),
     );
@@ -794,7 +800,7 @@ export async function mentorProvider(ctx: ProviderContext): Promise<ProviderResu
         title: `${overdue.length} ${plural(overdue.length, "mentee hasn't", "mentees haven't")} had a session in 3 weeks`,
         entities: overdue.slice(0, 8).map((id) => nameOf.get(id) ?? `Student #${id}`),
         why: "Regular contact is how problems are caught early.",
-        cta: { label: "Log a session", href: "/my-mentees" },
+        cta: { label: "Log a session", href: overdue.length === 1 ? `/my-mentees/${overdue[0]}` : "/my-mentees" },
       }),
     );
   }
@@ -805,7 +811,7 @@ export async function mentorProvider(ctx: ProviderContext): Promise<ProviderResu
         depth: "detail",
         count: followUps.length,
         title: `${followUps.length} mentoring follow-${plural(followUps.length, "up", "ups")} still open`,
-        entities: uniq(followUps.map((f) => f.student_name ?? "Mentee")).slice(0, 8),
+        entities: uniq(followUps.map((f) => fullName(f.first_name, f.last_name, "Mentee"))).slice(0, 8),
         why: "You flagged these for follow-up — close them once they're resolved.",
         cta: { label: "Follow up", href: "/my-mentees" },
       }),

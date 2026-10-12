@@ -130,7 +130,10 @@ const AdminMentoringLogView: React.FC = () => {
   const { showToast } = useToast();
   const { years, selectedYearId } = useAcademicPeriod();
 
-  const [viewMode, setViewMode] = useState<"sessions" | "checkins">("sessions");
+  // `?view=checkins` (the link in an "unanswered check-in" escalation) opens the check-ins list.
+  const [viewMode, setViewMode] = useState<"sessions" | "checkins">(() =>
+    new URLSearchParams(window.location.search).get("view") === "checkins" ? "checkins" : "sessions",
+  );
   const [entries, setEntries] = useState<AdminLogEntry[]>([]);
   const [checkIns, setCheckIns] = useState<(MenteeCheckInRecord & { mentor_name: string | null })[]>([]);
   const [loading, setLoading] = useState(true);

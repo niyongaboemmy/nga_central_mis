@@ -21,6 +21,11 @@ import { ValidationError, NotFoundError, AuthorizationError } from "../errors/Cu
 import { Permissions } from "../utils/permissions";
 import { profileMedia } from "../services/avatar/urls";
 import { mentorshipRelationshipsFor } from "../services/mentorship/relationships";
+import {
+  notifyCheckInSubmitted,
+  notifyCheckInAnswered,
+  CheckInAnswer,
+} from "../services/mentorship/notify";
 
 const formatDbDate = (d: any): string | null => {
   if (!d) return null;
@@ -89,98 +94,146 @@ async function verifyStudentAccess(
 }
 
 // GET /mentorship/me — who am I in mentoring? Open to every signed-in user so
-// the sidebar can offer "My Mentees" to anyone holding an assignment, whatever
-// their user type (staff and admins can mentor too, not only teachers).
+// the sidebar (and the top-bar mentees button) can offer "My Mentees" to anyone
+// holding an assignment, whatever their user type (staff and admins can mentor
+// too, not only teachers).
+//
+// The counts follow the year picked in the top-bar period selector, but the
+// flags also hold when that year has no assignment and a live one exists: the
+// selector often sits on another year than the assignment (an admin assigns
+// next year's mentors early; several years can be flagged current), and the
+// entry point must not vanish while the person still mentors someone today.
 export const getMyMentorshipRole = asyncHandler(async (req: any, res: any) => {
   const userId = req.user.userId as number;
-  // Follows the year picked in the top-bar period selector, like the hub does.
   const academicYearId =
     req.query.academic_year_id && !isNaN(Number(req.query.academic_year_id))
       ? parseInt(String(req.query.academic_year_id), 10)
       : await getCurrentAcademicYearId();
-  const [mentoring, mentored] = await Promise.all([
+  const count = (who: "mentor" | "student", year: "selected" | "live") =>
     db
-      .select({ n: sql<number>`COUNT(DISTINCT ${MentorAssignment.student_id})` })
+      .select({ n: sql<number>`COUNT(DISTINCT ${who === "mentor" ? MentorAssignment.student_id : MentorAssignment.mentor_id})` })
       .from(MentorAssignment)
+      .innerJoin(AcademicYear, eq(AcademicYear.academic_year_id, MentorAssignment.academic_year_id))
       .where(
         and(
-          eq(MentorAssignment.mentor_id, userId),
+          eq(who === "mentor" ? MentorAssignment.mentor_id : MentorAssignment.student_id, userId),
           eq(MentorAssignment.status, "ACTIVE"),
-          academicYearId ? eq(MentorAssignment.academic_year_id, academicYearId) : sql`1=1`,
+          year === "live" ? liveYear : academicYearId ? eq(MentorAssignment.academic_year_id, academicYearId) : sql`1=1`,
         ),
-      ),
-    db
-      .select({ n: sql<number>`COUNT(*)` })
-      .from(MentorAssignment)
-      .where(
-        and(
-          eq(MentorAssignment.student_id, userId),
-          eq(MentorAssignment.status, "ACTIVE"),
-          academicYearId ? eq(MentorAssignment.academic_year_id, academicYearId) : sql`1=1`,
-        ),
-      ),
+      )
+      .then((r) => Number(r[0]?.n ?? 0));
+  const [mentoring, mentoringLive, mentored, mentoredLive] = await Promise.all([
+    count("mentor", "selected"),
+    count("mentor", "live"),
+    count("student", "selected"),
+    count("student", "live"),
   ]);
-  const menteeCount = Number(mentoring[0]?.n ?? 0);
+  const isMentor = mentoring > 0 || mentoringLive > 0;
+  // Unread check-ins waiting for this mentor — the badge on every entry point.
+  const newCheckins = isMentor
+    ? await db
+        .select({ n: sql<number>`COUNT(*)` })
+        .from(MenteeCheckIn)
+        .where(and(eq(MenteeCheckIn.mentor_id, userId), eq(MenteeCheckIn.status, "NEW")))
+        .then((r) => Number(r[0]?.n ?? 0))
+    : 0;
   return successResponse(res, "Mentorship role fetched", {
-    is_mentor: menteeCount > 0,
-    mentee_count: menteeCount,
-    has_mentor: Number(mentored[0]?.n ?? 0) > 0,
+    is_mentor: isMentor,
+    mentee_count: mentoring > 0 ? mentoring : mentoringLive,
+    has_mentor: mentored > 0 || mentoredLive > 0,
+    new_checkins: newCheckins,
   });
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// GET /mentorship/students — the signed-in mentor's own mentees, nobody else.
-// ─────────────────────────────────────────────────────────────────────────────
-export const getAssignedStudents = asyncHandler(async (req: any, res: any) => {
-  const userId = req.user.userId as number;
-  const { academic_year_id } = req.query;
-  const academicYearId =
-    academic_year_id && !isNaN(Number(academic_year_id))
-      ? parseInt(academic_year_id as string)
-      : await getCurrentAcademicYearId();
+// An academic year that has not finished: the current one, or one whose end
+// date is still ahead (or open). Same rule as verifyStudentAccess.
+const liveYear = or(
+  eq(AcademicYear.is_current, 1),
+  sql`${AcademicYear.end_date} >= CURDATE()`,
+  isNull(AcademicYear.end_date),
+);
 
-  // Built from the assignment itself (not from class enrolment) so a mentee
-  // who is not placed in a class group yet still shows up.
+const OVERDUE_DAYS = 21;
+
+/**
+ * One mentor's roster rows: who, where they sit, how the mentoring is going
+ * (this mentor's own sessions only) and what they are waiting on (unread
+ * check-ins). Built from the assignment itself, not from class enrolment, so a
+ * mentee who is not placed in a class group yet still shows up.
+ *
+ * `can_log` is false for a mentee from a finished year: the mentor may still
+ * read their own notes, but not log new sessions (verifyStudentAccess).
+ */
+async function loadRoster(
+  mentorId: number,
+  scope: { yearId?: number | null; live?: boolean; studentIds?: number[] },
+) {
+  const isLive = sql<number>`(${AcademicYear.is_current} = 1 OR ${AcademicYear.end_date} >= CURDATE() OR ${AcademicYear.end_date} IS NULL)`;
   const assignments = await db
     .select({
       user_id: MentorAssignment.student_id,
       assigned_at: MentorAssignment.assigned_at,
       academic_year_id: MentorAssignment.academic_year_id,
+      academic_year_name: AcademicYear.name,
+      is_live: isLive,
       first_name: UserProfile.first_name,
       last_name: UserProfile.last_name,
       registration_number: UserProfile.registration_number,
     })
     .from(MentorAssignment)
+    .innerJoin(AcademicYear, eq(AcademicYear.academic_year_id, MentorAssignment.academic_year_id))
     .leftJoin(UserProfile, eq(MentorAssignment.student_id, UserProfile.user_id))
     .where(
       and(
-        eq(MentorAssignment.mentor_id, userId),
+        eq(MentorAssignment.mentor_id, mentorId),
         eq(MentorAssignment.status, "ACTIVE"),
-        academicYearId ? eq(MentorAssignment.academic_year_id, academicYearId) : sql`1=1`,
+        scope.yearId ? eq(MentorAssignment.academic_year_id, scope.yearId) : sql`1=1`,
+        scope.live ? liveYear : sql`1=1`,
+        scope.studentIds ? inArray(MentorAssignment.student_id, scope.studentIds.length ? scope.studentIds : [0]) : sql`1=1`,
       ),
-    );
+    )
+    // A live assignment wins over a stale one for the same student.
+    .orderBy(sql`${isLive} DESC`, sql`${MentorAssignment.assigned_at} DESC`);
 
-  if (assignments.length === 0) {
-    return successResponse(res, "No mentees assigned", []);
-  }
+  if (assignments.length === 0) return [];
 
   const studentIds = [...new Set(assignments.map((s) => s.user_id))];
 
-  const classRows = await db
-    .select({
-      user_id: StudentClassGroup.user_id,
-      academic_year_id: StudentClassGroup.academic_year_id,
-      class_group_id: StudentClassGroup.class_group_id,
-      class_group_name: ClassGroup.name,
-    })
-    .from(StudentClassGroup)
-    .innerJoin(ClassGroup, eq(StudentClassGroup.class_group_id, ClassGroup.class_group_id))
-    .where(
-      and(
-        inArray(StudentClassGroup.user_id, studentIds),
-        eq(StudentClassGroup.status, "ACTIVE"),
-      ),
-    );
+  const [classRows, lastSessions, checkins] = await Promise.all([
+    db
+      .select({
+        user_id: StudentClassGroup.user_id,
+        academic_year_id: StudentClassGroup.academic_year_id,
+        class_group_id: StudentClassGroup.class_group_id,
+        class_group_name: ClassGroup.name,
+      })
+      .from(StudentClassGroup)
+      .innerJoin(ClassGroup, eq(StudentClassGroup.class_group_id, ClassGroup.class_group_id))
+      .where(and(inArray(StudentClassGroup.user_id, studentIds), eq(StudentClassGroup.status, "ACTIVE"))),
+    db
+      .select({
+        student_id: MentorshipSession.student_id,
+        session_count: sql<number>`COUNT(*)`,
+        last_session_date: sql<string>`MAX(DATE_FORMAT(${MentorshipSession.session_date}, '%Y-%m-%d'))`,
+        wellbeing_status: sql<string>`SUBSTRING_INDEX(GROUP_CONCAT(${MentorshipSession.wellbeing_status} ORDER BY ${MentorshipSession.session_date} DESC), ',', 1)`,
+        follow_up_required: sql<number>`MAX(CASE WHEN ${MentorshipSession.follow_up_required} = 1 AND ${MentorshipSession.session_status} != 'RESOLVED' THEN 1 ELSE 0 END)`,
+        dishonesty_flagged: sql<number>`MAX(${MentorshipSession.dishonesty_flagged})`,
+        stress_flag: sql<number>`MAX(${MentorshipSession.stress_flag})`,
+      })
+      .from(MentorshipSession)
+      .where(and(eq(MentorshipSession.user_id, mentorId), inArray(MentorshipSession.student_id, studentIds)))
+      .groupBy(MentorshipSession.student_id),
+    db
+      .select({
+        student_id: MenteeCheckIn.student_id,
+        new_checkins: sql<number>`SUM(CASE WHEN ${MenteeCheckIn.status} = 'NEW' THEN 1 ELSE 0 END)`,
+        last_checkin_at: sql<string>`MAX(${MenteeCheckIn.submitted_at})`,
+      })
+      .from(MenteeCheckIn)
+      .where(and(eq(MenteeCheckIn.mentor_id, mentorId), inArray(MenteeCheckIn.student_id, studentIds)))
+      .groupBy(MenteeCheckIn.student_id),
+  ]);
+
   const classOf = new Map<number, { class_group_id: number; class_group_name: string | null }>();
   for (const c of classRows) {
     const a = assignments.find((x) => x.user_id === c.user_id);
@@ -189,49 +242,26 @@ export const getAssignedStudents = asyncHandler(async (req: any, res: any) => {
       classOf.set(c.user_id, { class_group_id: c.class_group_id, class_group_name: c.class_group_name });
     }
   }
-
-  const lastSessions = await db
-    .select({
-      student_id: MentorshipSession.student_id,
-      session_count: sql<number>`COUNT(*)`,
-      last_session_date: sql<string>`MAX(DATE_FORMAT(${MentorshipSession.session_date}, '%Y-%m-%d'))`,
-      wellbeing_status: sql<string>`SUBSTRING_INDEX(GROUP_CONCAT(${MentorshipSession.wellbeing_status} ORDER BY ${MentorshipSession.session_date} DESC), ',', 1)`,
-      follow_up_required: sql<number>`MAX(${MentorshipSession.follow_up_required})`,
-      dishonesty_flagged: sql<number>`MAX(${MentorshipSession.dishonesty_flagged})`,
-      stress_flag: sql<number>`MAX(${MentorshipSession.stress_flag})`,
-    })
-    .from(MentorshipSession)
-    .where(
-      and(
-        eq(MentorshipSession.user_id, userId),
-        inArray(MentorshipSession.student_id, studentIds),
-      ),
-    )
-    .groupBy(MentorshipSession.student_id);
-
-  const sessionMap = new Map<number, (typeof lastSessions)[0]>();
-  for (const s of lastSessions) {
-    if (s.student_id !== null) sessionMap.set(s.student_id, s);
-  }
+  const sessionMap = new Map(lastSessions.filter((s) => s.student_id !== null).map((s) => [s.student_id as number, s]));
+  const checkinMap = new Map(checkins.map((c) => [c.student_id, c]));
 
   const today = new Date();
-
   const seen = new Set<number>();
   const result = [];
-
   for (const s of assignments) {
     if (seen.has(s.user_id)) continue;
     seen.add(s.user_id);
 
     const session = sessionMap.get(s.user_id);
+    const inbox = checkinMap.get(s.user_id);
     let days_since_last_session: number | null = null;
     if (session?.last_session_date) {
-      const last = new Date(session.last_session_date);
       days_since_last_session = Math.floor(
-        (today.getTime() - last.getTime()) / (1000 * 60 * 60 * 24),
+        (today.getTime() - new Date(session.last_session_date).getTime()) / (1000 * 60 * 60 * 24),
       );
     }
     const cls = classOf.get(s.user_id);
+    const canLog = Number(s.is_live) === 1;
 
     result.push({
       user_id: s.user_id,
@@ -240,24 +270,130 @@ export const getAssignedStudents = asyncHandler(async (req: any, res: any) => {
       registration_number: s.registration_number,
       class_group_id: cls?.class_group_id ?? null,
       class_group_name: cls?.class_group_name ?? null,
+      academic_year_id: s.academic_year_id,
+      academic_year_name: s.academic_year_name ?? null,
       assigned_at: formatDbDate(s.assigned_at),
+      can_log: canLog,
       session_count: Number(session?.session_count ?? 0),
       last_session_date: session?.last_session_date ?? null,
       days_since_last_session,
       wellbeing_status: session?.wellbeing_status ?? null,
-      follow_up_required: Boolean(session?.follow_up_required),
-      dishonesty_flagged: Boolean(session?.dishonesty_flagged),
-      stress_flag: Boolean(session?.stress_flag),
-      overdue: days_since_last_session === null || days_since_last_session > 21,
+      follow_up_required: Boolean(Number(session?.follow_up_required ?? 0)),
+      dishonesty_flagged: Boolean(Number(session?.dishonesty_flagged ?? 0)),
+      stress_flag: Boolean(Number(session?.stress_flag ?? 0)),
+      new_checkins: Number(inbox?.new_checkins ?? 0),
+      last_checkin_at: inbox?.last_checkin_at ? new Date(inbox.last_checkin_at).toISOString() : null,
+      // Only someone the mentor can still meet is "overdue"; a finished year is history.
+      overdue: canLog && (days_since_last_session === null || days_since_last_session > OVERDUE_DAYS),
     });
   }
+  return result;
+}
 
-  result.sort((a, b) => {
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /mentorship/students — the signed-in mentor's own mentees, nobody else.
+// Follows the selected year; when that year holds none, falls back to the
+// mentees the mentor has right now (rows then carry from_other_year), the same
+// rule the student's "My Mentor" page uses. ?fallback=0 switches that off.
+// ─────────────────────────────────────────────────────────────────────────────
+export const getAssignedStudents = asyncHandler(async (req: any, res: any) => {
+  const userId = req.user.userId as number;
+  const { academic_year_id, fallback } = req.query;
+  const academicYearId =
+    academic_year_id && !isNaN(Number(academic_year_id))
+      ? parseInt(academic_year_id as string)
+      : await getCurrentAcademicYearId();
+
+  let rows = (await loadRoster(userId, { yearId: academicYearId })).map((r) => ({ ...r, from_other_year: false }));
+  if (rows.length === 0 && String(fallback ?? "1") !== "0") {
+    rows = (await loadRoster(userId, { live: true })).map((r) => ({ ...r, from_other_year: true }));
+  }
+  if (rows.length === 0) {
+    return successResponse(res, "No mentees assigned", []);
+  }
+
+  rows.sort((a, b) => {
     if (a.overdue !== b.overdue) return a.overdue ? -1 : 1;
     return `${a.first_name} ${a.last_name}`.localeCompare(`${b.first_name} ${b.last_name}`);
   });
 
-  return successResponse(res, "Assigned students fetched", result);
+  return successResponse(res, "Assigned students fetched", rows);
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /mentorship/students/:studentId — one mentee's roster row, so a mentee's
+// page can be opened straight from a link (a notification, Home, the top-bar
+// list) instead of only by clicking through the hub. Any year the mentor holds
+// an ACTIVE assignment in; the live one wins.
+// ─────────────────────────────────────────────────────────────────────────────
+export const getMenteeSummary = asyncHandler(async (req: any, res: any) => {
+  const userId = req.user.userId as number;
+  const studentId = parseInt(req.params.studentId, 10);
+  if (!studentId || isNaN(studentId)) throw new ValidationError("Invalid student ID");
+
+  const [row] = await loadRoster(userId, { studentIds: [studentId] });
+  if (!row) throw new NotFoundError("Student not found in your assigned mentees");
+  return successResponse(res, "Mentee fetched", { ...row, from_other_year: false });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /mentorship/students/:studentId/checkins — the conversation between this
+// mentor and one mentee: every check-in the student sent them and the replies.
+// The mentee page used to show sessions only, so a mentor reading a student's
+// record never saw what the student had told them.
+// ─────────────────────────────────────────────────────────────────────────────
+export const getMenteeCheckIns = asyncHandler(async (req: any, res: any) => {
+  const userId = req.user.userId as number;
+  const studentId = parseInt(req.params.studentId, 10);
+  if (!studentId || isNaN(studentId)) throw new ValidationError("Invalid student ID");
+
+  const rows = await db
+    .select({
+      checkin_id: MenteeCheckIn.checkin_id,
+      student_id: MenteeCheckIn.student_id,
+      student_first: UserProfile.first_name,
+      student_last: UserProfile.last_name,
+      mentor_id: MenteeCheckIn.mentor_id,
+      academic_year_id: MenteeCheckIn.academic_year_id,
+      submitted_at: MenteeCheckIn.submitted_at,
+      category: MenteeCheckIn.category,
+      title: MenteeCheckIn.title,
+      subject_id: MenteeCheckIn.subject_id,
+      subject_name: Subject.name,
+      message: MenteeCheckIn.message,
+      linked_session_id: MenteeCheckIn.linked_session_id,
+      status: MenteeCheckIn.status,
+      validation_status: MenteeCheckIn.validation_status,
+      mentor_response: MenteeCheckIn.mentor_response,
+      responded_at: MenteeCheckIn.responded_at,
+    })
+    .from(MenteeCheckIn)
+    .leftJoin(UserProfile, eq(MenteeCheckIn.student_id, UserProfile.user_id))
+    .leftJoin(Subject, eq(MenteeCheckIn.subject_id, Subject.subject_id))
+    // Scoped to the caller as the recipient: another mentor's thread with the
+    // same student never shows here.
+    .where(and(eq(MenteeCheckIn.mentor_id, userId), eq(MenteeCheckIn.student_id, studentId)))
+    .orderBy(sql`${MenteeCheckIn.submitted_at} DESC`);
+
+  if (rows.length === 0) {
+    // Nothing to show is fine for a mentee; a stranger's id is a 404.
+    await verifyStudentAccess(userId, studentId, { allowOwnHistory: true }).catch(async (err) => {
+      const [any] = await loadRoster(userId, { studentIds: [studentId] });
+      if (!any) throw err;
+    });
+  }
+
+  return successResponse(
+    res,
+    "Mentee check-ins fetched",
+    rows.map((r) => ({
+      ...r,
+      student_name: `${r.student_first ?? ""} ${r.student_last ?? ""}`.trim() || null,
+      submitted_at: formatDbDate(r.submitted_at),
+      submitted_at_iso: r.submitted_at ? new Date(r.submitted_at as any).toISOString() : null,
+      responded_at: formatDbDate(r.responded_at),
+    })),
+  );
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -917,8 +1053,17 @@ export const submitCheckIn = asyncHandler(async (req: any, res: any) => {
     status: "NEW",
     validation_status: "PENDING",
   });
+  const checkinId = (result as any).insertId as number;
 
-  return successResponse(res, "Check-in submitted", { checkin_id: (result as any).insertId }, 201);
+  await notifyCheckInSubmitted({
+    checkinId,
+    studentId,
+    mentorId: assignment.mentor_id,
+    category: cat,
+    title: title ? String(title).trim().slice(0, 150) : null,
+  });
+
+  return successResponse(res, "Check-in submitted", { checkin_id: checkinId }, 201);
 });
 
 // GET /mentorship/checkins/mine  (student)
@@ -1182,16 +1327,22 @@ export const getCheckInDetail = asyncHandler(async (req: any, res: any) => {
   const id = parseInt(req.params.id, 10);
   if (!id || isNaN(id)) throw new ValidationError("Invalid check-in ID");
 
-  const [row] = await db
-    .select()
+  const [found] = await db
+    .select({ checkin: MenteeCheckIn, first: UserProfile.first_name, last: UserProfile.last_name, subject_name: Subject.name })
     .from(MenteeCheckIn)
+    .leftJoin(UserProfile, eq(MenteeCheckIn.student_id, UserProfile.user_id))
+    .leftJoin(Subject, eq(MenteeCheckIn.subject_id, Subject.subject_id))
     .where(and(eq(MenteeCheckIn.checkin_id, id), eq(MenteeCheckIn.mentor_id, mentorId)))
     .limit(1);
 
-  if (!row) throw new NotFoundError("Check-in not found");
+  if (!found) throw new NotFoundError("Check-in not found");
+  const row = found.checkin;
 
   return successResponse(res, "Check-in fetched", {
     ...row,
+    // Opened from a link (a notification), the dialog needs to say who wrote it.
+    student_name: `${found.first ?? ""} ${found.last ?? ""}`.trim() || null,
+    subject_name: found.subject_name ?? null,
     submitted_at: formatDbDate(row.submitted_at),
     responded_at: formatDbDate(row.responded_at),
   });
@@ -1202,8 +1353,24 @@ export const updateCheckIn = asyncHandler(async (req: any, res: any) => {
   const mentorId = req.user.userId as number;
   const id = parseInt(req.params.id, 10);
   if (!id || isNaN(id)) throw new ValidationError("Invalid check-in ID");
+  await applyCheckInUpdate(id, req.body, { actorId: mentorId, mentorId });
+  return successResponse(res, "Check-in updated", { checkin_id: id });
+});
 
-  const { status, validation_status, mentor_response, linked_session_id } = req.body;
+/**
+ * One write path for a mentor answering a check-in and for an admin acting on
+ * a mentor's behalf. `mentorId` restricts the row to that mentor's own inbox.
+ *
+ * Opening a check-in marks it ACKNOWLEDGED ("seen"); that alone neither stamps
+ * responded_at nor notifies the student — only a reply, an approval/rejection
+ * or marking it dealt with does, so Home's "your mentor replied" stays true.
+ */
+async function applyCheckInUpdate(
+  id: number,
+  body: any,
+  opts: { actorId: number; mentorId?: number },
+) {
+  const { status, validation_status, mentor_response, linked_session_id } = body ?? {};
   if (status && !["NEW", "ACKNOWLEDGED", "ADDRESSED"].includes(status)) {
     throw new ValidationError("status must be NEW, ACKNOWLEDGED, or ADDRESSED");
   }
@@ -1215,33 +1382,72 @@ export const updateCheckIn = asyncHandler(async (req: any, res: any) => {
   }
 
   const [existing] = await db
-    .select({ checkin_id: MenteeCheckIn.checkin_id })
+    .select({
+      checkin_id: MenteeCheckIn.checkin_id,
+      student_id: MenteeCheckIn.student_id,
+      mentor_id: MenteeCheckIn.mentor_id,
+      title: MenteeCheckIn.title,
+      status: MenteeCheckIn.status,
+      mentor_response: MenteeCheckIn.mentor_response,
+    })
     .from(MenteeCheckIn)
-    .where(and(eq(MenteeCheckIn.checkin_id, id), eq(MenteeCheckIn.mentor_id, mentorId)))
+    .where(
+      and(
+        eq(MenteeCheckIn.checkin_id, id),
+        opts.mentorId ? eq(MenteeCheckIn.mentor_id, opts.mentorId) : sql`1=1`,
+      ),
+    )
     .limit(1);
 
   if (!existing) throw new NotFoundError("Check-in not found");
+
+  const response = typeof mentor_response === "string" ? mentor_response.trim() : mentor_response;
+  const newReply = typeof response === "string" && response !== "" && response !== (existing.mentor_response ?? "");
+  const answer: CheckInAnswer | null =
+    validation_status === "APPROVED"
+      ? "approved"
+      : validation_status === "REJECTED"
+        ? "rejected"
+        : newReply
+          ? "reply"
+          : status === "ADDRESSED" && existing.status !== "ADDRESSED"
+            ? "addressed"
+            : null;
 
   await db
     .update(MenteeCheckIn)
     .set({
       // Approving/rejecting a report concludes the mentor's workflow on it,
       // so the read/action status moves to ADDRESSED unless the caller
-      // explicitly set a different one in the same request.
-      ...(status ? { status } : validation_status ? { status: "ADDRESSED" } : {}),
+      // explicitly set a different one in the same request. A reply on an
+      // unread check-in at least marks it seen.
+      ...(status
+        ? { status }
+        : validation_status
+          ? { status: "ADDRESSED" }
+          : newReply && existing.status === "NEW"
+            ? { status: "ACKNOWLEDGED" }
+            : {}),
       ...(validation_status ? { validation_status } : {}),
-      ...(mentor_response !== undefined ? { mentor_response } : {}),
+      ...(mentor_response !== undefined ? { mentor_response: response || null } : {}),
       ...(linked_session_id !== undefined
         ? { linked_session_id: linked_session_id ? parseInt(String(linked_session_id), 10) : null }
         : {}),
-      ...(mentor_response !== undefined || status || validation_status
-        ? { responded_at: sql`CURRENT_TIMESTAMP` }
-        : {}),
+      ...(answer ? { responded_at: sql`CURRENT_TIMESTAMP` } : {}),
     })
     .where(eq(MenteeCheckIn.checkin_id, id));
 
-  return successResponse(res, "Check-in updated", { checkin_id: id });
-});
+  if (answer) {
+    await notifyCheckInAnswered({
+      checkinId: id,
+      studentId: existing.student_id,
+      mentorId: existing.mentor_id,
+      actorId: opts.actorId,
+      answer,
+      title: existing.title ?? null,
+    });
+  }
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GET /mentorship/reports/consolidated  (mentor's own; admin passes mentor_id)
@@ -1500,41 +1706,7 @@ export const getMySessionsReport = asyncHandler(async (req: any, res: any) => {
 export const adminUpdateCheckIn = asyncHandler(async (req: any, res: any) => {
   const id = parseInt(req.params.id, 10);
   if (!id || isNaN(id)) throw new ValidationError("Invalid check-in ID");
-
-  const { status, validation_status, mentor_response, linked_session_id } = req.body;
-  if (status && !["NEW", "ACKNOWLEDGED", "ADDRESSED"].includes(status)) {
-    throw new ValidationError("status must be NEW, ACKNOWLEDGED, or ADDRESSED");
-  }
-  if (validation_status && !["PENDING", "APPROVED", "REJECTED"].includes(validation_status)) {
-    throw new ValidationError("validation_status must be PENDING, APPROVED, or REJECTED");
-  }
-  if (validation_status === "REJECTED" && !mentor_response?.trim()) {
-    throw new ValidationError("A comment is required when rejecting a report");
-  }
-
-  const [existing] = await db
-    .select({ checkin_id: MenteeCheckIn.checkin_id })
-    .from(MenteeCheckIn)
-    .where(eq(MenteeCheckIn.checkin_id, id))
-    .limit(1);
-
-  if (!existing) throw new NotFoundError("Check-in not found");
-
-  await db
-    .update(MenteeCheckIn)
-    .set({
-      ...(status ? { status } : validation_status ? { status: "ADDRESSED" } : {}),
-      ...(validation_status ? { validation_status } : {}),
-      ...(mentor_response !== undefined ? { mentor_response } : {}),
-      ...(linked_session_id !== undefined
-        ? { linked_session_id: linked_session_id ? parseInt(String(linked_session_id), 10) : null }
-        : {}),
-      ...(mentor_response !== undefined || status || validation_status
-        ? { responded_at: sql`CURRENT_TIMESTAMP` }
-        : {}),
-    })
-    .where(eq(MenteeCheckIn.checkin_id, id));
-
+  await applyCheckInUpdate(id, req.body, { actorId: req.user.userId as number });
   return successResponse(res, "Check-in updated", { checkin_id: id });
 });
 

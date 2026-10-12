@@ -34,6 +34,8 @@ interface NavItem {
   userTypes?: string[];
   /** Extra runtime condition (e.g. "has mentees"); hidden when false. */
   when?: boolean;
+  /** Count shown next to the label (e.g. unread mentee check-ins). */
+  badge?: number;
 }
 
 const Sidebar: React.FC<SidebarProps> = ({
@@ -350,6 +352,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       path: "/my-mentees",
       icon: <Users2 className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
       when: !!mentorship?.is_mentor,
+      badge: mentorship?.new_checkins ?? 0,
     },
     {
       label: "My Mentor",
@@ -751,7 +754,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   const isActive = (path?: string) =>
     path
       ? location.pathname === path ||
-        ((path === "/my-learning" || path === "/elearning/courses") && location.pathname.startsWith(path))
+        ((path === "/my-learning" || path === "/elearning/courses" || path === "/my-mentees") && location.pathname.startsWith(path))
       : false;
 
   /** Profile is an account action, not a destination alongside Academics or
@@ -896,10 +899,21 @@ const Sidebar: React.FC<SidebarProps> = ({
           ? "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"
           : "font-light text-text-secondary-light dark:text-slate-300 hover:bg-surface-light dark:hover:bg-surface-dark hover:text-text-primary-light dark:hover:text-text-primary-dark"
       }`}
-      title={item.label}
+      title={item.badge ? `${item.label} (${item.badge} unread)` : item.label}
     >
-      <span className="flex-shrink-0">{item.icon}</span>
-      {!isCollapsed && <span>{item.label}</span>}
+      <span className="relative flex-shrink-0">
+        {item.icon}
+        {isCollapsed && !!item.badge && (
+          <span className="absolute -top-1 -right-1.5 w-2 h-2 rounded-full bg-blue-600" aria-hidden />
+        )}
+      </span>
+      {!isCollapsed && <span className="flex-1 text-left">{item.label}</span>}
+      {!isCollapsed && !!item.badge && (
+        <span className="ml-auto min-w-[20px] h-5 px-1.5 rounded-full bg-blue-600 text-white text-[10px] font-bold flex items-center justify-center">
+          {item.badge > 99 ? "99+" : item.badge}
+          <span className="sr-only"> unread</span>
+        </span>
+      )}
     </button>
   );
 

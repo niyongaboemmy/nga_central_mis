@@ -14,7 +14,11 @@ import {
   Minus,
   BarChart2,
   Pencil,
+  Lock,
+  MessageCircle,
+  MessageSquareText,
 } from "lucide-react";
+import { Link } from "react-router-dom";
 import { LineChart, Line, Tooltip, ResponsiveContainer } from "recharts";
 import {
   mentorshipApi,
@@ -22,11 +26,15 @@ import {
   MenteeIntelligence,
   MentorshipSessionRecord,
   SessionStatus,
+  MenteeCheckInRecord,
 } from "../../api/mentorship";
 import { useToast } from "../../contexts/ToastContext";
 import MentoringSessionModal from "./MentoringSessionModal";
 import AIInsightsCard from "./AIInsightsCard";
 import SelectField from "../ui/SelectField";
+import CheckInDetailModal from "./CheckInDetailModal";
+import { tupoMentorUrl } from "./MentorProfileCard";
+import { categoryMeta, formatDay } from "./checkInMeta";
 
 const WELLBEING_SCALE: Record<string, number> = {
   STRUGGLING: 1,
@@ -84,22 +92,32 @@ const StudentSupportProfile: React.FC<Props> = ({ student, onBack }) => {
   const [showModal, setShowModal] = useState(false);
   const [editingSession, setEditingSession] = useState<MentorshipSessionRecord | null>(null);
   const [updatingId, setUpdatingId] = useState<number | null>(null);
+  const [checkIns, setCheckIns] = useState<MenteeCheckInRecord[]>([]);
+  const [openCheckIn, setOpenCheckIn] = useState<MenteeCheckInRecord | null>(null);
+  // A mentee from a finished year: the mentor keeps reading their own notes,
+  // but cannot log new sessions (the backend refuses), so don't offer it.
+  const canLog = student.can_log !== false;
 
   const hasFetched = useRef(false);
 
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [histRes, intRes] = await Promise.all([
+      // Each part loads on its own: one failing (the intelligence brief is
+      // refused for a finished year's mentee) must not blank the others.
+      const [histRes, intRes, checkRes] = await Promise.allSettled([
         mentorshipApi.getStudentHistory(student.user_id),
-        mentorshipApi.getMenteeIntelligence(student.user_id),
+        canLog ? mentorshipApi.getMenteeIntelligence(student.user_id) : Promise.resolve(null),
+        mentorshipApi.getMenteeCheckIns(student.user_id),
       ]);
-      const hist = (histRes as any).data?.data ?? (histRes as any).data ?? [];
-      const intel = (intRes as any).data?.data ?? (intRes as any).data ?? null;
+      const body = (r: PromiseSettledResult<any>) =>
+        r.status === "fulfilled" && r.value ? (r.value as any).data?.data ?? (r.value as any).data : null;
+      const hist = body(histRes);
+      const checks = body(checkRes);
       setSessions(Array.isArray(hist) ? hist : []);
-      setIntelligence(intel);
-    } catch {
-      showToast("Failed to load session history", "error");
+      setIntelligence(body(intRes));
+      setCheckIns(Array.isArray(checks) ? checks : []);
+      if (histRes.status === "rejected") showToast("Failed to load session history", "error");
     } finally {
       setLoading(false);
     }
@@ -153,10 +171,12 @@ const StudentSupportProfile: React.FC<Props> = ({ student, onBack }) => {
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
+        <div className="flex items-center gap-3 min-w-0">
           <button
             onClick={onBack}
+            aria-label="Back to my mentees"
+            title="Back to my mentees"
             className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500"
           >
             <ArrowLeft className="w-5 h-5" />
@@ -171,14 +191,43 @@ const StudentSupportProfile: React.FC<Props> = ({ student, onBack }) => {
             </p>
           </div>
         </div>
-        <button
-          onClick={() => setShowModal(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-xl transition-colors"
-        >
-          <Plus className="w-4 h-4" />
-          Log Session
-        </button>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          {canLog && (
+            <a
+              href={tupoMentorUrl()}
+              target="_blank"
+              rel="noopener noreferrer"
+              title={`Chat with ${student.first_name ?? "this mentee"} on Tupo`}
+              aria-label={`Message ${student.first_name ?? "this mentee"} on Tupo`}
+              className="flex items-center gap-2 px-3.5 py-2 text-sm font-medium text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-900/30 hover:bg-blue-100 dark:hover:bg-blue-900/50 rounded-xl transition-colors"
+            >
+              <MessageSquareText className="w-4 h-4" />
+              <span className="hidden sm:inline">Message</span>
+            </a>
+          )}
+          {canLog ? (
+            <button
+              onClick={() => setShowModal(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-xl transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+              Log Session
+            </button>
+          ) : (
+            <span className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 rounded-xl">
+              <Lock className="w-3.5 h-3.5" />
+              Read only
+            </span>
+          )}
+        </div>
       </div>
+
+      {!canLog && (
+        <div className="mb-4 p-3 rounded-xl bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 text-xs text-gray-600 dark:text-gray-300">
+          You mentored {student.first_name ?? "this student"} in {student.academic_year_name ?? "a past year"}. Your notes stay
+          readable here; new sessions can only be logged for this year's mentees.
+        </div>
+      )}
 
       {/* Alert banner — only shown when flags are present in recent sessions */}
       {hasAlerts && (
@@ -248,8 +297,60 @@ const StudentSupportProfile: React.FC<Props> = ({ student, onBack }) => {
             </div>
           </div>
 
+          {/* What the mentee has told this mentor — their check-ins and your replies. */}
+          <div className="bg-white dark:bg-gray-800/30 rounded-2xl p-5 border border-gray-100 dark:border-gray-700/20">
+            <div className="flex items-center justify-between mb-3">
+              <p className="flex items-center gap-1.5 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                <MessageCircle className="w-3.5 h-3.5 text-blue-500" />
+                Messages from {student.first_name ?? "mentee"}
+              </p>
+              {checkIns.some((c) => c.status === "NEW") && (
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-600 text-white">
+                  {checkIns.filter((c) => c.status === "NEW").length} new
+                </span>
+              )}
+            </div>
+            {checkIns.length === 0 ? (
+              <p className="text-xs text-gray-400">
+                Nothing yet. {student.first_name ?? "They"} can message you from their “My Mentor” page; you'll get a notification.
+              </p>
+            ) : (
+              <ul className="space-y-1.5">
+                {checkIns.slice(0, 4).map((c) => {
+                  const cat = categoryMeta(c.category);
+                  const isNew = c.status === "NEW";
+                  return (
+                    <li key={c.checkin_id}>
+                      <button
+                        onClick={() => setOpenCheckIn(c)}
+                        className={`w-full text-left rounded-xl px-3 py-2 transition-colors ${
+                          isNew ? "bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100/70" : "hover:bg-gray-50 dark:hover:bg-gray-800/60"
+                        }`}
+                      >
+                        <span className="flex items-center gap-1.5">
+                          {isNew && <span className="w-1.5 h-1.5 rounded-full bg-blue-600 flex-shrink-0" aria-label="Unread" />}
+                          <span className={`text-[10px] font-bold uppercase px-1.5 py-0.5 rounded-full ${cat.className}`}>{cat.label}</span>
+                          <span className="ml-auto text-[11px] text-gray-400">{formatDay(c.submitted_at)}</span>
+                        </span>
+                        <span className={`block text-xs mt-1 truncate ${isNew ? "font-semibold text-gray-900 dark:text-white" : "text-gray-600 dark:text-gray-300"}`}>
+                          {c.title || c.message}
+                        </span>
+                        {c.mentor_response && <span className="block text-[11px] text-gray-400 mt-0.5">You replied</span>}
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+            {checkIns.length > 4 && (
+              <Link to="/my-mentees/inbox" className="block mt-2 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline">
+                See all {checkIns.length} in your inbox
+              </Link>
+            )}
+          </div>
+
           {/* AI Insights card */}
-          <AIInsightsCard studentId={student.user_id} />
+          {canLog && <AIInsightsCard studentId={student.user_id} />}
 
           {/* Grade snapshot card */}
           {intelligence && intelligence.recent_scores.length > 0 && (
@@ -546,6 +647,16 @@ const StudentSupportProfile: React.FC<Props> = ({ student, onBack }) => {
           )}
         </div>
       </div>
+
+      <CheckInDetailModal
+        checkin={openCheckIn}
+        showProfileLink={false}
+        onClose={() => setOpenCheckIn(null)}
+        onChanged={(id, p) => {
+          setCheckIns((list) => list.map((c) => (c.checkin_id === id ? { ...c, ...p } : c)));
+          setOpenCheckIn((c) => (c && c.checkin_id === id ? { ...c, ...p } : c));
+        }}
+      />
 
       {(showModal || editingSession) && (
         <MentoringSessionModal

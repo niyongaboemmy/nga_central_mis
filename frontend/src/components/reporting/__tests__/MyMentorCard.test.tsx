@@ -1,3 +1,4 @@
+import { MemoryRouter } from "react-router-dom";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import MyMentor from "../MyMentor";
@@ -46,7 +47,7 @@ describe("MyMentor — mentor card (student)", () => {
       session_count: 3,
       last_session_date: "2026-10-01",
     };
-    render(<MyMentor />);
+    render(<MemoryRouter><MyMentor /></MemoryRouter>);
     const card = await screen.findByRole("region", { name: "Your mentor" });
     expect(card).toHaveTextContent("Assadou Nzigamasabo");
     expect(card).toHaveTextContent("Your mentor · 2026 - 2027");
@@ -59,7 +60,7 @@ describe("MyMentor — mentor card (student)", () => {
   });
 
   it("says clearly when no mentor is assigned for the year", async () => {
-    render(<MyMentor />);
+    render(<MemoryRouter><MyMentor /></MemoryRouter>);
     expect(await screen.findByText("No mentor assigned yet")).toBeInTheDocument();
     expect(screen.getByText(/for 2026 - 2027/)).toBeInTheDocument();
   });
@@ -80,7 +81,7 @@ describe("MyMentor — mentor card (student)", () => {
     };
     const writeText = vi.fn().mockResolvedValue(undefined);
     Object.assign(navigator, { clipboard: { writeText } });
-    render(<MyMentor />);
+    render(<MemoryRouter><MyMentor /></MemoryRouter>);
     const message = await screen.findByRole("link", { name: /Message on Tupo/ });
     expect(message.getAttribute("href")).toMatch(/\/app\/mentorship\?message=1$/);
     expect(message).toHaveAttribute("target", "_blank");

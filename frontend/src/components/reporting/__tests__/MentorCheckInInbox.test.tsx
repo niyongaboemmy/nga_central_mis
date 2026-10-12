@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { MemoryRouter } from "react-router-dom";
 import MentorCheckInInbox from "../MentorCheckInInbox";
 import type { MenteeCheckInRecord } from "../../../api/mentorship";
 
@@ -20,13 +21,19 @@ const sampleCheckIn: MenteeCheckInRecord = {
   mentor_response: null,
   responded_at: null,
 };
+// One of the five categories the inbox used to show as a blank badge.
+const academicCheckIn: MenteeCheckInRecord = {
+  ...sampleCheckIn,
+  checkin_id: 2,
+  student_id: 11,
+  student_name: "Ben Kamali",
+  category: "ACADEMIC",
+  title: "Maths homework",
+  status: "ACKNOWLEDGED",
+};
 
-const getCheckInInboxMock = vi.fn((_status?: string) =>
-  Promise.resolve({ data: { data: [sampleCheckIn] } }),
-);
-const updateCheckInMock = vi.fn((_id: number, _payload: any) =>
-  Promise.resolve({ data: { data: { checkin_id: 1 } } }),
-);
+const getCheckInInboxMock = vi.fn((_status?: string) => Promise.resolve({ data: { data: [sampleCheckIn, academicCheckIn] } }));
+const updateCheckInMock = vi.fn((_id: number, _payload: any) => Promise.resolve({ data: { data: { checkin_id: 1 } } }));
 
 vi.mock("../../../api/mentorship", async () => {
   const actual = await vi.importActual<any>("../../../api/mentorship");
@@ -39,11 +46,23 @@ vi.mock("../../../api/mentorship", async () => {
     },
   };
 });
+vi.mock("../../../hooks/useMentorshipRole", () => ({ refreshMentorshipRole: vi.fn() }));
 
 const showToastMock = vi.fn();
-vi.mock("../../../contexts/ToastContext", () => ({
-  useToast: () => ({ showToast: showToastMock }),
-}));
+vi.mock("../../../contexts/ToastContext", () => ({ useToast: () => ({ showToast: showToastMock }) }));
+
+const renderInbox = (props: { onUnreadCountChange?: (n: number) => void } = {}, url = "/my-mentees/inbox") =>
+  render(
+    <MemoryRouter initialEntries={[url]}>
+      <MentorCheckInInbox {...props} />
+    </MemoryRouter>,
+  );
+
+const openAda = async (user: ReturnType<typeof userEvent.setup>) => {
+  await waitFor(() => expect(screen.getByText("Ada Lovelace")).toBeInTheDocument());
+  await user.click(screen.getByText("Falling behind"));
+  return screen.findByRole("dialog");
+};
 
 describe("MentorCheckInInbox", () => {
   beforeEach(() => {
@@ -54,71 +73,83 @@ describe("MentorCheckInInbox", () => {
 
   it("shows the empty state when there are no check-ins", async () => {
     getCheckInInboxMock.mockResolvedValueOnce({ data: { data: [] } } as any);
-    render(<MentorCheckInInbox />);
-    await waitFor(() =>
-      expect(screen.getByText(/No check-ins from your mentees yet/i)).toBeInTheDocument(),
-    );
+    renderInbox();
+    expect(await screen.findByText("No check-ins yet")).toBeInTheDocument();
   });
 
-  it("lists a check-in with its title and PENDING badge, and reports the unread (NEW) count", async () => {
+  it("labels every category and reports the unread count", async () => {
     const onUnreadCountChange = vi.fn();
-    render(<MentorCheckInInbox onUnreadCountChange={onUnreadCountChange} />);
-
+    renderInbox({ onUnreadCountChange });
     await waitFor(() => expect(screen.getByText("Ada Lovelace")).toBeInTheDocument());
-    expect(screen.getByText("Falling behind")).toBeInTheDocument();
-    expect(screen.getByText("Pending")).toBeInTheDocument();
-    expect(onUnreadCountChange).toHaveBeenCalledWith(1);
+    expect(screen.getByText("Concern")).toBeInTheDocument();
+    expect(screen.getByText("Academic")).toBeInTheDocument();
+    expect(screen.getByText("1 unread")).toBeInTheDocument();
+    expect(onUnreadCountChange).toHaveBeenLastCalledWith(1);
+  });
+
+  it("filters to unread check-ins", async () => {
+    const user = userEvent.setup();
+    renderInbox();
+    await waitFor(() => expect(screen.getByText("Ben Kamali")).toBeInTheDocument());
+    await user.click(screen.getByRole("tab", { name: /Unread/ }));
+    expect(screen.getByText("Ada Lovelace")).toBeInTheDocument();
+    expect(screen.queryByText("Ben Kamali")).not.toBeInTheDocument();
+  });
+
+  it("marks an unread check-in seen as soon as it is opened", async () => {
+    const user = userEvent.setup();
+    renderInbox();
+    await openAda(user);
+    await waitFor(() => expect(updateCheckInMock).toHaveBeenCalledWith(1, { status: "ACKNOWLEDGED" }));
+  });
+
+  it("sends a reply and says the student was notified", async () => {
+    const user = userEvent.setup();
+    renderInbox();
+    const dialog = await openAda(user);
+    const send = within(dialog).getByRole("button", { name: /Send reply/i });
+    expect(send).toBeDisabled();
+    await user.type(within(dialog).getByLabelText(/Reply to Ada/i), "Let's meet on Thursday.");
+    await user.click(send);
+    await waitFor(() => expect(updateCheckInMock).toHaveBeenCalledWith(1, { mentor_response: "Let's meet on Thursday." }));
+    expect(showToastMock).toHaveBeenCalledWith("Reply sent — Ada has been notified", "success");
   });
 
   it("approves a report without requiring a comment", async () => {
     const user = userEvent.setup();
-    render(<MentorCheckInInbox />);
-
-    await waitFor(() => expect(screen.getByText("Ada Lovelace")).toBeInTheDocument());
-    await user.click(screen.getByText("Ada Lovelace"));
-
-    await user.click(screen.getByRole("button", { name: /^Approve$/i }));
-
+    renderInbox();
+    const dialog = await openAda(user);
+    await user.click(within(dialog).getByRole("button", { name: /^Approve$/i }));
     await waitFor(() =>
-      expect(updateCheckInMock).toHaveBeenCalledWith(
-        1,
-        expect.objectContaining({ validation_status: "APPROVED" }),
-      ),
+      expect(updateCheckInMock).toHaveBeenCalledWith(1, expect.objectContaining({ validation_status: "APPROVED" })),
     );
-    expect(showToastMock).toHaveBeenCalledWith("Report approved", "success");
+    expect(showToastMock).toHaveBeenCalledWith("Approved — Ada has been notified", "success");
   });
 
-  it("requires a comment before confirming a rejection", async () => {
+  it("requires a reason before sending a report back", async () => {
     const user = userEvent.setup();
-    render(<MentorCheckInInbox />);
+    renderInbox();
+    const dialog = await openAda(user);
+    updateCheckInMock.mockClear(); // ignore the "seen" mark
 
-    await waitFor(() => expect(screen.getByText("Ada Lovelace")).toBeInTheDocument());
-    await user.click(screen.getByText("Ada Lovelace"));
+    await user.click(within(dialog).getByRole("button", { name: /Reject/i }));
+    const sendBack = within(dialog).getByRole("button", { name: /Send back/i });
+    expect(sendBack).toBeDisabled();
 
-    // First click switches into "confirm reject" mode without submitting
-    await user.click(screen.getByRole("button", { name: /^Reject$/i }));
-    expect(updateCheckInMock).not.toHaveBeenCalled();
-
-    // Second click (now "Confirm Reject") with an empty comment is rejected client-side
-    await user.click(screen.getByRole("button", { name: /Confirm Reject/i }));
-    expect(updateCheckInMock).not.toHaveBeenCalled();
-    expect(showToastMock).toHaveBeenCalledWith(
-      "A comment is required when rejecting a report",
-      "error",
-    );
-
-    // Filling the comment lets the rejection go through
-    await user.type(
-      screen.getByPlaceholderText(/Explain why this report is being rejected/i),
-      "Please add more detail.",
-    );
-    await user.click(screen.getByRole("button", { name: /Confirm Reject/i }));
-
+    await user.type(within(dialog).getByLabelText(/Why are you sending this back/i), "Please add more detail.");
+    await user.click(sendBack);
     await waitFor(() =>
       expect(updateCheckInMock).toHaveBeenCalledWith(
         1,
         expect.objectContaining({ validation_status: "REJECTED", mentor_response: "Please add more detail." }),
       ),
     );
+  });
+
+  it("opens the check-in named in the link (?checkin=)", async () => {
+    renderInbox({}, "/my-mentees/inbox?checkin=2");
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText("Maths homework")).toBeInTheDocument();
+    expect(within(dialog).getByRole("link", { name: /Open Ben's page/i })).toHaveAttribute("href", "/my-mentees/11");
   });
 });

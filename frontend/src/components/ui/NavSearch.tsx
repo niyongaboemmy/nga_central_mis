@@ -2,7 +2,11 @@ import React, { useState, useRef, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { Search, X } from "lucide-react";
 import { useUser } from "../../contexts/UserContext";
+import { useAcademicPeriod } from "../../contexts/AcademicPeriodContext";
 import { Permissions } from "../../constants/permissions";
+import { useMentorshipRole } from "../../hooks/useMentorshipRole";
+import { mentorshipApi, AssignedStudent } from "../../api/mentorship";
+import UserAvatar from "./UserAvatar";
 
 interface SearchItem {
   label: string;
@@ -149,6 +153,12 @@ const NavSearch: React.FC = () => {
   const inputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
   const { user } = useUser();
+  const { selectedYearId } = useAcademicPeriod();
+  // Mentoring is assignment-driven, not permission-driven: any mentor gets the
+  // mentee pages and can find a mentee by name from here.
+  const mentorship = useMentorshipRole(user?.user?.user_id, selectedYearId);
+  const isMentor = !!mentorship?.is_mentor;
+  const [mentees, setMentees] = useState<AssignedStudent[]>([]);
 
   const hasPermission = (perm?: string | string[]) => {
     if (!perm) return true;
@@ -158,16 +168,42 @@ const NavSearch: React.FC = () => {
     );
   };
 
+  useEffect(() => {
+    if (!isOpen || !isMentor) return;
+    let alive = true;
+    mentorshipApi
+      .getAssignedStudents(selectedYearId ?? undefined)
+      .then((res) => alive && setMentees(((res as any).data?.data ?? []) as AssignedStudent[]))
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, [isOpen, isMentor, selectedYearId]);
+
+  const menteeResults = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (q.length < 2) return [];
+    return mentees
+      .filter((m) => `${m.first_name ?? ""} ${m.last_name ?? ""} ${m.registration_number ?? ""}`.toLowerCase().includes(q))
+      .slice(0, 6);
+  }, [mentees, query]);
+
   const results = useMemo(() => {
-    const available = SEARCH_ITEMS.filter((item) =>
-      hasPermission(item.requiredPermission),
-    );
+    const available = [
+      ...SEARCH_ITEMS.filter((item) => hasPermission(item.requiredPermission)),
+      ...(isMentor
+        ? [
+            { label: "My Mentees", path: "/my-mentees" },
+            { label: "Mentee check-in inbox", path: "/my-mentees/inbox" },
+          ]
+        : []),
+    ];
     if (!query.trim()) return available;
     return available.filter((item) =>
       item.label.toLowerCase().includes(query.toLowerCase()),
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [query, user]);
+  }, [query, user, isMentor]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -215,7 +251,7 @@ const NavSearch: React.FC = () => {
               type="text"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search pages..."
+              placeholder={isMentor ? "Search pages or mentees..." : "Search pages..."}
               className="w-full pl-8 pr-8 py-2 text-sm bg-gray-50 dark:bg-gray-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 dark:text-white"
             />
             {query && (
@@ -229,9 +265,33 @@ const NavSearch: React.FC = () => {
             )}
           </div>
           <div className="max-h-72 overflow-y-auto py-1">
-            {results.length === 0 ? (
+            {menteeResults.length > 0 && (
+              <>
+                <p className="px-4 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-wider text-gray-400">Your mentees</p>
+                {menteeResults.map((m) => {
+                  const name = `${m.first_name ?? ""} ${m.last_name ?? ""}`.trim() || "Unnamed";
+                  return (
+                    <button
+                      key={`mentee-${m.user_id}`}
+                      onClick={() => handleSelect(`/my-mentees/${m.user_id}`)}
+                      className="w-full flex items-center gap-2.5 text-left px-4 py-2 text-sm text-text-secondary-light dark:text-text-secondary-dark/70 hover:bg-surface-light dark:hover:bg-surface-dark"
+                    >
+                      <UserAvatar decorative userId={m.user_id} name={name} size={24} />
+                      <span className="min-w-0 flex-1 truncate">{name}</span>
+                      {!!m.new_checkins && (
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-blue-600 text-white">{m.new_checkins} new</span>
+                      )}
+                    </button>
+                  );
+                })}
+                {results.length > 0 && (
+                  <p className="px-4 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-wider text-gray-400">Pages</p>
+                )}
+              </>
+            )}
+            {results.length === 0 && menteeResults.length === 0 ? (
               <p className="px-4 py-6 text-center text-xs text-gray-400">
-                No pages found
+                {isMentor ? "No pages or mentees found" : "No pages found"}
               </p>
             ) : (
               results.map((item) => (

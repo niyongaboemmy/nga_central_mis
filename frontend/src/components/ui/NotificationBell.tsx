@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { AlarmClock, Bell, CalendarX2, Check, ClipboardCheck, Clock4, FolderOpen, FileText, ShieldAlert, ShieldOff, X } from "lucide-react";
+import { AlarmClock, Bell, CalendarX2, Check, ClipboardCheck, Clock4, FolderOpen, FileText, MessageCircle, ShieldAlert, ShieldOff, UserMinus, Users2, X } from "lucide-react";
 import { useNotifications } from "../../contexts/NotificationContext";
 import type { AppNotification } from "../../api/notifications";
 
@@ -26,6 +26,18 @@ const kindIcon = (kind: string) => {
     case "office_hours_transfer":
     case "office_hours_digest":
       return <Clock4 className="w-4 h-4 text-blue-500" />;
+    // Mentorship (services/mentorship/notify.ts)
+    case "mentorship_checkin":
+    case "mentorship_checkin_reply":
+      return <MessageCircle className="w-4 h-4 text-blue-500" />;
+    case "mentorship_checkin_waiting":
+      return <MessageCircle className="w-4 h-4 text-amber-500" />;
+    case "mentorship_checkin_escalated":
+      return <ShieldAlert className="w-4 h-4 text-red-500" />;
+    case "mentorship_assigned":
+      return <Users2 className="w-4 h-4 text-blue-500" />;
+    case "mentorship_ended":
+      return <UserMinus className="w-4 h-4 text-gray-500" />;
     case "document_shared":
     default:
       return <FileText className="w-4 h-4 text-blue-500" />;

@@ -23,6 +23,8 @@ import {
   getAdminMentorshipDashboard,
   getMyMentorshipRole,
   getRelationshipsForService,
+  getMenteeSummary,
+  getMenteeCheckIns,
 } from "../controllers/mentorshipController";
 import { generateMenteeAIInsights } from "../controllers/mentorshipAIController";
 import {
@@ -108,6 +110,8 @@ router.get("/me", getMyMentorshipRole);
 
 // Instructor (mentor) routes
 router.get("/students", mentorOr(Permissions.TEACHER_DASHBOARD), getAssignedStudents);
+router.get("/students/:studentId", mentorOr(Permissions.TEACHER_DASHBOARD), getMenteeSummary);
+router.get("/students/:studentId/checkins", mentorOr(Permissions.TEACHER_DASHBOARD), getMenteeCheckIns);
 router.get("/students/:studentId/history", mentorOr(Permissions.TEACHER_DASHBOARD), getStudentMentorshipHistory);
 router.get("/students/:studentId/intelligence", mentorOr(Permissions.TEACHER_DASHBOARD), getMenteeIntelligence);
 router.post(
