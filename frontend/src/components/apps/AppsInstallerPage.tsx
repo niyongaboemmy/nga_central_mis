@@ -148,8 +148,8 @@ export const DesktopStatus: React.FC<{ current: string | null; latest: string | 
   );
 };
 
-export const AppsInstallerPage: React.FC = () => {
-  const navigate = useNavigate();
+/** Everything below the page header: shared by the /apps page and the in-app dialog (AppsDialog). */
+export const AppsInstaller: React.FC = () => {
   const os = useMemo(() => detectOs(), []);
   const primary = primaryPlatform(os);
   const inDesktop = isNgaDesktop();
@@ -172,29 +172,10 @@ export const AppsInstallerPage: React.FC = () => {
   const others = available.filter((p) => !offered.includes(p));
   const stepsFor = primary === "macos" ? "macos" : "windows";
 
-  const goBack = () => (window.history.length > 1 ? navigate(-1) : navigate("/home"));
   const card = "rounded-3xl border border-slate-200/80 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-8";
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
-      <header className="sticky top-0 z-20 border-b border-slate-200/70 bg-white/80 backdrop-blur-md dark:border-slate-800 dark:bg-slate-950/80">
-        <div className="mx-auto flex max-w-4xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
-          <button
-            type="button"
-            onClick={goBack}
-            aria-label="Back"
-            className="inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
-          >
-            <ArrowLeft className="h-4 w-4" /> <span className="hidden sm:inline">Back</span>
-          </button>
-          <p className="text-sm font-semibold text-slate-900 dark:text-white">NGA Desktop</p>
-          <a href="/home" className="rounded-xl px-3 py-2 text-sm font-semibold text-brand-700 hover:bg-slate-100 dark:text-brand-200 dark:hover:bg-slate-800">
-            Open NGA MIS
-          </a>
-        </div>
-      </header>
-
-      <main className="mx-auto max-w-4xl space-y-5 px-4 py-6 sm:px-6 sm:py-10">
+    <div className="space-y-5">
         {/* Hero */}
         <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-brand-700 via-brand-600 to-indigo-600 p-6 text-white shadow-xl sm:p-10">
           <div aria-hidden className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-white/10 blur-3xl" />
@@ -370,6 +351,36 @@ export const AppsInstallerPage: React.FC = () => {
         <p className="flex items-center justify-center gap-1.5 pb-4 text-center text-xs text-slate-400">
           <ShieldCheck className="h-3.5 w-3.5" /> Downloads come from NGA's own server. Updates are signed and checked before they install.
         </p>
+    </div>
+  );
+};
+
+/** Public /apps: a new device can be set up before anyone signs in (docs/APP_LAUNCH.md). */
+export const AppsInstallerPage: React.FC = () => {
+  const navigate = useNavigate();
+  const goBack = () => (window.history.length > 1 ? navigate(-1) : navigate("/home"));
+
+  return (
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
+      <header className="sticky top-0 z-20 border-b border-slate-200/70 bg-white/80 backdrop-blur-md dark:border-slate-800 dark:bg-slate-950/80">
+        <div className="mx-auto flex max-w-4xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
+          <button
+            type="button"
+            onClick={goBack}
+            aria-label="Back"
+            className="inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
+          >
+            <ArrowLeft className="h-4 w-4" /> <span className="hidden sm:inline">Back</span>
+          </button>
+          <p className="text-sm font-semibold text-slate-900 dark:text-white">NGA Desktop</p>
+          <a href="/home" className="rounded-xl px-3 py-2 text-sm font-semibold text-brand-700 hover:bg-slate-100 dark:text-brand-200 dark:hover:bg-slate-800">
+            Open NGA MIS
+          </a>
+        </div>
+      </header>
+
+      <main className="mx-auto max-w-4xl px-4 py-6 sm:px-6 sm:py-10">
+        <AppsInstaller />
       </main>
     </div>
   );

@@ -6,6 +6,7 @@ import ChangePasswordModal from "./ChangePasswordModal";
 import { useUser } from "../contexts/UserContext";
 import { ReminderNudge } from "./reminders/ReminderNudge";
 import ProfilePhotoPrompt from "./profile/ProfilePhotoPrompt";
+import AppsDialog from "./apps/AppsDialog";
 
 interface SystemLayoutProps {
   children: React.ReactNode;
@@ -131,6 +132,9 @@ const SystemLayout: React.FC<SystemLayoutProps> = ({
 
       {/* Signed in without a profile photo: a gentle, snoozable invitation to add one. */}
       {showSidebar && user && <ProfilePhotoPrompt />}
+
+      {/* "Get the apps" (sidebar, top bar) opens here, over the current page. */}
+      {showSidebar && <AppsDialog />}
 
       {/* Welcome Popup */}
       {showWelcomePopup && (

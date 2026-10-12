@@ -6,6 +6,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { useUser } from "../../contexts/UserContext";
 import { Permissions } from "../../constants/permissions";
 import { getToken } from "../../utils/auth";
+import { requestAppsDialog } from "../apps/openAppsDialog";
 import { useAccess } from "../../hooks/useAccess";
 import { useMentorshipRole } from "../../hooks/useMentorshipRole";
 import { useOptionalAcademicPeriod } from "../../contexts/AcademicPeriodContext";
@@ -28,6 +29,7 @@ const NAV_SECTIONS = [
   { key: "main", title: null },
   { key: "teaching", title: "Teaching" },
   { key: "learning", title: "Learning" },
+  { key: "family", title: "Family" },
   { key: "class", title: "Class teacher" },
   { key: "workspace", title: "Workspace" },
   { key: "oversight", title: "Oversight" },
@@ -35,6 +37,12 @@ const NAV_SECTIONS = [
   { key: "you", title: "You" },
 ] as const;
 type NavSection = (typeof NAV_SECTIONS)[number]["key"];
+const KNOWN_SECTIONS: ReadonlySet<string> = new Set(NAV_SECTIONS.map((s) => s.key));
+/**
+ * A link merged in without a section (or with one not listed above) would otherwise
+ * never render; it lands under "More" so it stays reachable until it is placed.
+ */
+const RENDERED_SECTIONS = [...NAV_SECTIONS, { key: "more", title: "More" }] as const;
 
 interface NavItem {
   label: string;
@@ -42,6 +50,8 @@ interface NavItem {
   /** Top-level links must have one (TopNavItem); submenu children sit in their group's. */
   section?: NavSection;
   externalUrl?: string;
+  /** Done on click instead of navigating to `path`. */
+  action?: () => void;
   icon: React.ReactNode;
   requiredPermission?: string | string[];
   /** Access control v2 capability (any of) -- see hooks/useAccess. */
@@ -78,11 +88,6 @@ const Sidebar: React.FC<SidebarProps> = ({
     );
   };
 
-  // For a teacher, /dashboard is the welcome page (greeting + weekly
-  // timetable) and the figures live on /teacher-dashboard, so the menu says
-  // so. Every other role still lands on a dashboard there.
-  const isTeacher = hasPermission(Permissions.TEACHER_DASHBOARD);
-
   const navItems: TopNavItem[] = [
     {
       // Home: what needs me across every module (HOME_OVERVIEW_IMPLEMENTATION_PLAN.md).
@@ -92,20 +97,16 @@ const Sidebar: React.FC<SidebarProps> = ({
       icon: <House className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
     },
     {
-      label: isTeacher ? "My Timetable" : "Dashboard",
+      // /dashboard is the week's timetable for everyone, so it is named for what
+      // it shows. "Dashboard" next to Home read as two names for one page.
+      label: "Schedule",
       path: "/dashboard",
       section: "main",
-      // Not a house: Home above already is one, and the two read as duplicates.
-      icon: isTeacher ? (
-        <CalendarDays className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />
-      ) : (
-        <LayoutDashboard className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />
-      ),
+      icon: <CalendarDays className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
     },
     {
-      // The teacher's working board. "Dashboard" above it is the welcome page
-      // (greeting + weekly timetable); this is where the figures and reminders
-      // moved to.
+      // The teacher's working board: figures and reminders. Schedule above it is
+      // the weekly timetable.
       label: "Teacher Dashboard",
       path: "/teacher-dashboard",
       section: "main",
@@ -122,9 +123,12 @@ const Sidebar: React.FC<SidebarProps> = ({
       icon: <BellRing className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
     },
     {
-      // Install every NGA app on this device from one place.
+      // Install every NGA app on this device from one place, in a dialog over the
+      // current page (the standalone /apps page is for signed-out devices).
       label: "Get the apps",
-      path: "/apps",
+      action: () => {
+        if (!requestAppsDialog()) navigate("/apps");
+      },
       section: "you",
       icon: <LayoutGrid className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
     },
@@ -343,7 +347,13 @@ const Sidebar: React.FC<SidebarProps> = ({
           />
         </svg>
       ),
-      requiredPermission: Permissions.VIEW_ACADEMIC_CALENDAR,
+      // Where the timetable is built. Students and teachers read theirs under
+      // Schedule, so for them this was a second calendar of the same lessons.
+      requiredPermission: [
+        Permissions.MANAGE_ACADEMIC_CALENDAR,
+        Permissions.CREATE_ACADEMIC_CALENDAR,
+        Permissions.UPDATE_CALENDAR_SLOT,
+      ],
     },
     {
       label: "Reporting",
@@ -392,6 +402,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       // Anyone holding mentees this year — teacher, staff or admin.
       label: "My Mentees",
       path: "/my-mentees",
+      section: "teaching",
       icon: <Users2 className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
       when: !!mentorship?.is_mentor,
     },
@@ -730,54 +741,63 @@ const Sidebar: React.FC<SidebarProps> = ({
     {
       label: "My competences",
       path: "/my-competences",
+      section: "learning",
       icon: <Target className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
       userTypes: ["STUDENT"],
     },
     {
       label: "Wellbeing",
       path: "/wellbeing",
+      section: "learning",
       icon: <HeartHandshake className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
       userTypes: ["STUDENT"],
     },
     {
       label: "Staff cover",
       path: "/cover",
+      section: "workspace",
       icon: <CalendarOff className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
       userTypes: ["TEACHER", "STAFF", "ADMIN"],
     },
     {
       label: "Competency map",
       path: "/competency-map",
+      section: "teaching",
       icon: <Grid3x3 className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
       userTypes: ["TEACHER", "STAFF", "ADMIN"],
     },
     {
       label: "Early warning",
       path: "/early-warning",
+      section: "oversight",
       icon: <Radar className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
       requiredCapability: "EARLY_WARNING_VIEW",
     },
     {
       label: "Safeguarding",
       path: "/safeguarding",
+      section: "oversight",
       icon: <ShieldAlert className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
       requiredPermission: Permissions.SAFEGUARDING_MANAGE,
     },
     {
       label: "My children",
       path: "/family",
+      section: "family",
       icon: <Baby className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
       userTypes: ["PARENT"],
     },
     {
       label: "Import parents",
       path: "/families/import",
+      section: "admin",
       icon: <UserPlus className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
       requiredPermission: Permissions.MANAGE_USERS,
     },
     {
       label: "AI Tutor for my children",
       path: "/family/ai-tutor",
+      section: "family",
       icon: <Bot className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
       userTypes: ["PARENT"],
     },
@@ -944,7 +964,9 @@ const Sidebar: React.FC<SidebarProps> = ({
   const renderNavItem = (item: (typeof navItems)[number]) => (
     <button
       onClick={() => {
-        if (item.externalUrl) {
+        if (item.action) {
+          item.action();
+        } else if (item.externalUrl) {
           const token = getToken();
           const url = item.externalUrl.replace("xxxxxxx", token || "");
           window.open(url, "_blank");
@@ -1013,8 +1035,10 @@ const Sidebar: React.FC<SidebarProps> = ({
 
       {/* Navigation */}
       <nav className="flex-1 py-3 overflow-y-auto text-sm">
-        {NAV_SECTIONS.map(({ key, title }, sectionIndex) => {
-          const items = mainNavItems.filter((item) => item.section === key && isVisible(item));
+        {RENDERED_SECTIONS.map(({ key, title }, sectionIndex) => {
+          const items = mainNavItems.filter(
+            (item) => (key === "more" ? !KNOWN_SECTIONS.has(item.section) : item.section === key) && isVisible(item),
+          );
           if (items.length === 0) return null;
           const headingId = `nav-section-${key}`;
           return (

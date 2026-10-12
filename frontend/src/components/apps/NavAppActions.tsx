@@ -3,13 +3,15 @@ import { Link, useLocation } from "react-router-dom";
 import { AppWindow, Download } from "lucide-react";
 import { openAppUrl, usePwa } from "../../reminders/pwa";
 import { webAppInstallFits } from "./desktopDownload";
+import { requestAppsDialog } from "./openAppsDialog";
 
 /**
  * Two small top-bar controls (docs/APP_LAUNCH.md):
  * - "Open app": only in a browser tab, and only when the browser itself
  *   confirms NGA MIS is installed right now (getInstalledRelatedApps). A real
  *   link -- Chrome sends a clicked link into the installed app's window.
- * - "Install apps": always reachable, to the one-place installer (/apps). A
+ * - "Install apps": always reachable, to the one-place installer -- opened as a
+ *   dialog over the current page when one is mounted, else the /apps page. A
  *   small still dot says NGA MIS isn't installed here -- only where the web
  *   app is how you install (phones, tablets, Chromebooks). On Windows/macOS
  *   NGA Desktop is the app, so a permanent "not installed" dot there was a
@@ -40,6 +42,9 @@ export const NavAppActions: React.FC<{ compact?: boolean }> = ({ compact = false
       {!onInstaller && (
         <Link
           to="/apps"
+          onClick={(e) => {
+            if (requestAppsDialog()) e.preventDefault();
+          }}
           title={notInstalledHere ? "Install the NGA apps on this device" : "NGA apps"}
           aria-label={notInstalledHere ? "Install the NGA apps (NGA MIS isn't installed on this device)" : "Install the NGA apps"}
           className="relative inline-flex h-10 w-10 items-center justify-center rounded-full text-text-secondary-light transition hover:bg-gray-100 hover:text-brand-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 dark:text-text-secondary-dark/80 dark:hover:bg-gray-700/40 dark:hover:text-brand-200"
