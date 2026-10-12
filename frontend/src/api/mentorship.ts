@@ -1,4 +1,5 @@
 import api from "../services/api";
+import type { Avatar, Cover } from "./users";
 
 export interface AssignedStudent {
   user_id: number;
@@ -227,10 +228,20 @@ export interface MenteeCheckInRecord {
 export interface MyMentorInfo {
   mentor_id: number;
   mentor_name: string | null;
+  mentor_first_name?: string | null;
+  mentor_last_name?: string | null;
   mentor_email: string;
   mentor_phone?: string | null;
   /** UserProfile.user_type of the mentor (TEACHER, STAFF, ADMIN...). */
   mentor_role?: string | null;
+  mentor_gender?: string | null;
+  /** The mentor's central profile picture and cover (null = none). */
+  avatar?: Avatar | null;
+  cover?: Cover | null;
+  academic_year_id?: number;
+  academic_year_name?: string | null;
+  /** The selected year has no assignment; this is the mentor the student has now. */
+  from_other_year?: boolean;
   /** Subjects this mentor teaches the student this year. */
   teaches_you?: string[];
   assigned_at: string | null;
