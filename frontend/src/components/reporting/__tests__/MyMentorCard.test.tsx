@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import MyMentor from "../MyMentor";
 
 let mentorPayload: any = null;
@@ -62,5 +62,34 @@ describe("MyMentor — mentor card (student)", () => {
     render(<MyMentor />);
     expect(await screen.findByText("No mentor assigned yet")).toBeInTheDocument();
     expect(screen.getByText(/for 2026 - 2027/)).toBeInTheDocument();
+  });
+
+  it("hands the student off to a Tupo chat with their mentor and lets them copy contacts", async () => {
+    mentorPayload = {
+      mentor_id: 5,
+      mentor_name: "Assadou Nzigamasabo",
+      mentor_first_name: "Assadou",
+      mentor_email: "assadou@nga.ac.rw",
+      mentor_phone: "+250780000000",
+      mentor_role: "TEACHER",
+      academic_year_name: "2026 - 2027",
+      teaches_you: [],
+      assigned_at: "2026-10-07",
+      avatar: null,
+      cover: null,
+    };
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.assign(navigator, { clipboard: { writeText } });
+    render(<MyMentor />);
+    const message = await screen.findByRole("link", { name: /Message on Tupo/ });
+    expect(message.getAttribute("href")).toMatch(/\/app\/mentorship\?message=1$/);
+    expect(message).toHaveAttribute("target", "_blank");
+    expect(message.getAttribute("rel")).toContain("noopener");
+    expect(screen.getByRole("link", { name: /Assadou's full profile/ }).getAttribute("href")).toMatch(/\/app\/mentorship$/);
+    expect(screen.getByRole("link", { name: "Email Assadou Nzigamasabo" })).toHaveAttribute("href", "mailto:assadou@nga.ac.rw");
+    expect(screen.getByRole("link", { name: "Call Assadou Nzigamasabo" })).toHaveAttribute("href", "tel:+250780000000");
+
+    fireEvent.click(screen.getByRole("button", { name: "Copy phone" }));
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith("+250780000000"));
   });
 });

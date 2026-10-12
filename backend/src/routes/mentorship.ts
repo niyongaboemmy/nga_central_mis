@@ -22,6 +22,7 @@ import {
   adminUpdateCheckIn,
   getAdminMentorshipDashboard,
   getMyMentorshipRole,
+  getRelationshipsForService,
 } from "../controllers/mentorshipController";
 import { generateMenteeAIInsights } from "../controllers/mentorshipAIController";
 import {
@@ -33,11 +34,20 @@ import {
   searchCandidates,
 } from "../controllers/mentorAssignmentController";
 import { Permissions } from "../utils/permissions";
+import { requireServiceToken } from "../middleware/serviceAuth";
 import { db } from "../db";
 import { MentorAssignment } from "../db/schema";
 import { and, eq } from "drizzle-orm";
 
 const router = Router();
+
+// Sibling apps (client credentials) — mounted before `authenticate`, which
+// would otherwise demand a person's session.
+router.get(
+  "/service/relationships/:userId",
+  requireServiceToken("mentorship:read"),
+  getRelationshipsForService,
+);
 
 router.use(authenticate);
 
@@ -59,6 +69,31 @@ const mentorOr = (perm: string | string[]) => {
         .select({ id: MentorAssignment.assignment_id })
         .from(MentorAssignment)
         .where(and(eq(MentorAssignment.mentor_id, req.user.userId), eq(MentorAssignment.status, "ACTIVE")))
+        .limit(1);
+      if (row) return next();
+    } catch (err) {
+      return next(err);
+    }
+    return res.status(403).json({ message: "Forbidden" });
+  };
+};
+
+/**
+ * Mentee-side gate. SUBMIT_MENTEE_CHECKIN was never granted to any role by
+ * migration 047 (it left that to an admin), so a student with a real mentor
+ * could not even see who it was. Holding the permission still works; otherwise
+ * an ACTIVE assignment as the student is what grants entry. Each handler is
+ * already scoped to the caller's own mentor and check-ins.
+ */
+const menteeOr = (perm: string) => {
+  const allow = authorize(perm);
+  return async (req: any, res: any, next: any) => {
+    if ((req.user?.permissions ?? []).includes(perm)) return allow(req, res, next);
+    try {
+      const [row] = await db
+        .select({ id: MentorAssignment.assignment_id })
+        .from(MentorAssignment)
+        .where(and(eq(MentorAssignment.student_id, req.user.userId), eq(MentorAssignment.status, "ACTIVE")))
         .limit(1);
       if (row) return next();
     } catch (err) {
@@ -106,9 +141,9 @@ router.get(
 router.get("/checkins/inbox", mentorOr(Permissions.TEACHER_DASHBOARD), getCheckInInbox);
 
 // Student (mentee) routes — "/mine" must also precede "/:id"
-router.post("/checkins", authorize(Permissions.SUBMIT_MENTEE_CHECKIN), submitCheckIn);
-router.get("/checkins/mine", authorize(Permissions.SUBMIT_MENTEE_CHECKIN), getMyCheckIns);
-router.get("/my-mentor", authorize(Permissions.SUBMIT_MENTEE_CHECKIN), getMyMentor);
+router.post("/checkins", menteeOr(Permissions.SUBMIT_MENTEE_CHECKIN), submitCheckIn);
+router.get("/checkins/mine", menteeOr(Permissions.SUBMIT_MENTEE_CHECKIN), getMyCheckIns);
+router.get("/my-mentor", menteeOr(Permissions.SUBMIT_MENTEE_CHECKIN), getMyMentor);
 
 router.get("/checkins/:id", mentorOr(Permissions.TEACHER_DASHBOARD), getCheckInDetail);
 router.patch("/checkins/:id", mentorOr(Permissions.TEACHER_DASHBOARD), updateCheckIn);

@@ -411,7 +411,7 @@ const MIS_PRESETS: PresetDef[] = [
     description: "Learner self-service.",
     category: "Learner",
     scopes: ["SELF"],
-    caps: [["OFFICE_HOURS_VIEW_SELF", "detail"]],
+    caps: [["OFFICE_HOURS_VIEW_SELF", "detail"], "SUBMIT_MENTEE_CHECKIN"],
   },
   {
     key: "parent",

@@ -369,7 +369,9 @@ const Sidebar: React.FC<SidebarProps> = ({
           />
         </svg>
       ),
-      requiredPermission: Permissions.SUBMIT_MENTEE_CHECKIN,
+      // Any student with a live mentor, even where no admin ever granted the
+      // check-in permission (migration 047 left it ungranted).
+      when: !!mentorship?.has_mentor || !!hasPermission(Permissions.SUBMIT_MENTEE_CHECKIN),
     },
     {
       label: "Admin Reports",
