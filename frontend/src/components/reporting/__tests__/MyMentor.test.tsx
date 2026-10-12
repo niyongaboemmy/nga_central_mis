@@ -1,3 +1,4 @@
+import { MemoryRouter } from "react-router-dom";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -59,7 +60,7 @@ describe("MyMentor — student check-in submission", () => {
 
   it("shows the empty-history state when the student has no prior reports", async () => {
     const user = userEvent.setup();
-    render(<MyMentor />);
+    render(<MemoryRouter><MyMentor /></MemoryRouter>);
     await waitFor(() => expect(getMyCheckInsMock).toHaveBeenCalled());
     await user.click(screen.getByRole("button", { name: /My Reports/i }));
 
@@ -72,7 +73,7 @@ describe("MyMentor — student check-in submission", () => {
 
   it("blocks submission with an error toast when the message is empty", async () => {
     const user = userEvent.setup();
-    render(<MyMentor />);
+    render(<MemoryRouter><MyMentor /></MemoryRouter>);
     await waitFor(() => expect(getMyCheckInsMock).toHaveBeenCalled());
     await user.click(screen.getByRole("button", { name: /^Reporting$/i }));
 
@@ -87,7 +88,7 @@ describe("MyMentor — student check-in submission", () => {
 
   it("submits the selected category, title, and message, then reloads history", async () => {
     const user = userEvent.setup();
-    render(<MyMentor />);
+    render(<MemoryRouter><MyMentor /></MemoryRouter>);
     await waitFor(() => expect(getMyCheckInsMock).toHaveBeenCalledTimes(1));
     await user.click(screen.getByRole("button", { name: /^Reporting$/i }));
 
@@ -139,7 +140,7 @@ describe("MyMentor — student check-in submission", () => {
     } as any);
 
     const user = userEvent.setup();
-    render(<MyMentor />);
+    render(<MemoryRouter><MyMentor /></MemoryRouter>);
     await waitFor(() => expect(getMyCheckInsMock).toHaveBeenCalled());
     await user.click(screen.getByRole("button", { name: /My Reports/i }));
 
@@ -155,7 +156,7 @@ describe("MyMentor — student check-in submission", () => {
         response: { data: { message: "You don't have an assigned mentor yet for this academic year." } },
       }),
     );
-    render(<MyMentor />);
+    render(<MemoryRouter><MyMentor /></MemoryRouter>);
     await waitFor(() => expect(getMyCheckInsMock).toHaveBeenCalled());
     await user.click(screen.getByRole("button", { name: /^Reporting$/i }));
 

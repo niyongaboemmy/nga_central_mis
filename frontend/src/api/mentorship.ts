@@ -16,6 +16,16 @@ export interface AssignedStudent {
   dishonesty_flagged: boolean;
   stress_flag: boolean;
   overdue: boolean;
+  class_group_id?: number | null;
+  academic_year_id?: number;
+  academic_year_name?: string | null;
+  /** False for a mentee from a finished year: notes stay readable, no new sessions. */
+  can_log?: boolean;
+  /** Check-ins from this mentee the mentor has not opened yet. */
+  new_checkins?: number;
+  last_checkin_at?: string | null;
+  /** The selected year had no mentees; these are the mentor's current ones. */
+  from_other_year?: boolean;
 }
 
 export type SessionStatus = "OPEN" | "IN_PROGRESS" | "RESOLVED";
@@ -278,6 +288,8 @@ export interface MyMentorshipRole {
   is_mentor: boolean;
   mentee_count: number;
   has_mentor: boolean;
+  /** Unread mentee check-ins waiting for this mentor. */
+  new_checkins?: number;
 }
 
 // Consolidated periodic report (Phase 3)
@@ -394,6 +406,14 @@ export const mentorshipApi = {
       "/mentorship/students",
       { params: academicYearId ? { academic_year_id: academicYearId } : undefined },
     ),
+
+  /** One mentee's roster row — lets /my-mentees/:id open straight from a link. */
+  getMentee: (studentId: number) =>
+    api.get<{ success: boolean; data: AssignedStudent }>(`/mentorship/students/${studentId}`),
+
+  /** Everything this mentee has sent the signed-in mentor, newest first. */
+  getMenteeCheckIns: (studentId: number) =>
+    api.get<{ success: boolean; data: MenteeCheckInRecord[] }>(`/mentorship/students/${studentId}/checkins`),
 
   getStudentHistory: (studentId: number) =>
     api.get<{ success: boolean; data: MentorshipSessionRecord[] }>(

@@ -47,6 +47,7 @@ import ReportingModule from "./components/reporting/ReportingModule";
 import AdminReporting from "./components/reporting/AdminReporting";
 import MyMentor from "./components/reporting/MyMentor";
 import MentoringHub from "./components/reporting/MentoringHub";
+import { MenteeInboxPage, MenteeProfilePage } from "./components/reporting/MyMenteesPages";
 import OfficeHoursHub from "./components/officeHours/OfficeHoursHub";
 import ScheduleDetail from "./components/officeHours/ScheduleDetail";
 import MyOfficeHours from "./components/officeHours/MyOfficeHours";
@@ -911,17 +912,40 @@ function App() {
             />
 
             {/* My Mentees — the mentor's own roster, for any mentor (teacher,
-                staff or admin). Teachers also reach it via Reporting > Mentoring. */}
+                staff or admin). Reached from the sidebar, the top-bar mentees
+                button, search, Home and notifications; teachers also see it
+                under Reporting > Mentoring. The inbox and each mentee have
+                their own URL so links can open them directly. */}
             <Route
               path="/my-mentees"
               element={
                 <ProtectedRoute>
                   <SystemLayoutWrapper>
                     <div className="p-3 md:p-6">
-                      <div className="bg-white dark:bg-gray-800/30 rounded-3xl p-6 border border-gray-100 dark:border-gray-700/20">
+                      <div className="bg-white dark:bg-gray-800/30 rounded-3xl p-4 sm:p-6 border border-gray-100 dark:border-gray-700/20">
                         <MentoringHub />
                       </div>
                     </div>
+                  </SystemLayoutWrapper>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/my-mentees/inbox"
+              element={
+                <ProtectedRoute>
+                  <SystemLayoutWrapper>
+                    <MenteeInboxPage />
+                  </SystemLayoutWrapper>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/my-mentees/:studentId"
+              element={
+                <ProtectedRoute>
+                  <SystemLayoutWrapper>
+                    <MenteeProfilePage />
                   </SystemLayoutWrapper>
                 </ProtectedRoute>
               }

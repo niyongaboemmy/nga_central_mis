@@ -67,6 +67,20 @@ if (config.nodeEnv !== "test") {
   setTimeout(runSweeps, 30_000);
   setInterval(runSweeps, 6 * 60 * 60 * 1000).unref();
 
+  // Mentee check-ins nobody opened: nudge the mentor once, escalate an
+  // unanswered concern/wellbeing check-in to the coordinators once.
+  const runMentorshipSweep = async () => {
+    try {
+      const { sweepWaitingCheckIns } = await import("./services/mentorship/notify");
+      const r = await sweepWaitingCheckIns();
+      if (r.nudged || r.escalated) logger.info(`[mentorship] sweep: ${r.nudged} nudged, ${r.escalated} escalated`);
+    } catch (error) {
+      logger.error("[mentorship] sweep failed", { error });
+    }
+  };
+  setTimeout(runMentorshipSweep, 90_000);
+  setInterval(runMentorshipSweep, 3 * 60 * 60 * 1000).unref();
+
   // Access control v2 (ACCESS_LEVELS_RBAC_IMPLEMENTATION_PLAN.md): register
   // the MIS capability manifest, seed presets/rules (insert-only), then keep
   // rule-owned grants converged with placements once a day. Never throws;

@@ -38,7 +38,14 @@ export type NotificationKind =
   // Staff absence and cover (services/staffCover.ts).
   | "staff_cover"
   // Families (services/families.ts): the weekly summary for parents.
-  | "family_digest";
+  | "family_digest"
+  // Mentorship (services/mentorship/notify.ts): check-ins, replies, assignments.
+  | "mentorship_checkin"
+  | "mentorship_checkin_reply"
+  | "mentorship_checkin_waiting"
+  | "mentorship_checkin_escalated"
+  | "mentorship_assigned"
+  | "mentorship_ended";
 
 export interface NotifyUserInput {
   userId: number;
@@ -66,7 +73,9 @@ export interface NotifyUserInput {
     | "early_warning"
     | "staff_absence"
     | "cover_lesson"
-    | "family_digest";
+    | "family_digest"
+    | "mentee_checkin"
+    | "mentor_assignment";
   subjectId: number;
   actorId?: number;
 }

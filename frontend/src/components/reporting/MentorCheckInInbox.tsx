@@ -1,255 +1,197 @@
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
+import { Inbox, MessageCircle, RefreshCw } from "lucide-react";
 import UserAvatar from "../ui/UserAvatar";
-import React, { useEffect, useState, useCallback } from "react";
-import { MessageCircle, RefreshCw, X, Check, ThumbsDown, Clock3, CheckCircle2, XCircle } from "lucide-react";
-import { mentorshipApi, MenteeCheckInRecord, CheckInStatus, ValidationStatus } from "../../api/mentorship";
+import { mentorshipApi, MenteeCheckInRecord, CheckInStatus } from "../../api/mentorship";
 import { useToast } from "../../contexts/ToastContext";
-import SelectField from "../ui/SelectField";
+import CheckInDetailModal from "./CheckInDetailModal";
+import { categoryMeta, CHECKIN_STATUS_LABEL, formatDay, VALIDATION_LABEL } from "./checkInMeta";
 
-const CATEGORY_LABEL: Record<string, string> = {
-  APPRECIATION: "Appreciation",
-  CONCERN: "Concern",
-  REQUEST_MEETING: "Meeting Request",
-  GENERAL: "General",
-};
-
-const CATEGORY_COLOR: Record<string, string> = {
-  APPRECIATION: "bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400",
-  CONCERN: "bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400",
-  REQUEST_MEETING: "bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400",
-  GENERAL: "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400",
-};
-
-const VALIDATION_BADGE: Record<ValidationStatus, { label: string; className: string; icon: React.ReactNode }> = {
-  PENDING: {
-    label: "Pending",
-    className: "bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400",
-    icon: <Clock3 className="w-3 h-3" />,
-  },
-  APPROVED: {
-    label: "Approved",
-    className: "bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400",
-    icon: <CheckCircle2 className="w-3 h-3" />,
-  },
-  REJECTED: {
-    label: "Rejected",
-    className: "bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400",
-    icon: <XCircle className="w-3 h-3" />,
-  },
-};
-
-// Same polling cadence as MyMentor.tsx's badge refresh — no push/websocket
-// infra exists in this codebase, so a periodic re-fetch is how "new since
-// last look" stays fresh without a manual reload.
+// Notifications now tell the mentor when a check-in arrives; the poll only
+// keeps an open inbox current while they are looking at it.
 const POLL_INTERVAL_MS = 45_000;
+
+type Filter = "ALL" | CheckInStatus;
+const FILTERS: { value: Filter; label: string }[] = [
+  { value: "ALL", label: "All" },
+  { value: "NEW", label: "Unread" },
+  { value: "ACKNOWLEDGED", label: "Seen" },
+  { value: "ADDRESSED", label: "Dealt with" },
+];
 
 interface MentorCheckInInboxProps {
   onUnreadCountChange?: (count: number) => void;
 }
 
+/**
+ * Every check-in the signed-in mentor's mentees sent them. `?checkin=<id>`
+ * (the link in a notification or on Home) opens that one straight away.
+ */
 const MentorCheckInInbox: React.FC<MentorCheckInInboxProps> = ({ onUnreadCountChange }) => {
   const { showToast } = useToast();
+  const [params, setParams] = useSearchParams();
   const [checkIns, setCheckIns] = useState<MenteeCheckInRecord[]>([]);
   const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState<Filter>("ALL");
   const [selected, setSelected] = useState<MenteeCheckInRecord | null>(null);
-  const [statusFilter, setStatusFilter] = useState<CheckInStatus | "">("");
-  const [rejectMode, setRejectMode] = useState(false);
-  const [actionLoading, setActionLoading] = useState(false);
 
-  const load = useCallback(async (silent = false) => {
-    if (!silent) setLoading(true);
-    try {
-      const res = await mentorshipApi.getCheckInInbox(statusFilter || undefined);
-      const data = (res as any).data?.data ?? (res as any).data ?? [];
-      const list = Array.isArray(data) ? data : [];
-      setCheckIns(list);
-      onUnreadCountChange?.(list.filter((c: MenteeCheckInRecord) => c.status === "NEW").length);
-    } catch {
-      if (!silent) showToast("Failed to load check-ins", "error");
-    } finally {
-      if (!silent) setLoading(false);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [statusFilter]);
+  const load = useCallback(
+    async (silent = false) => {
+      if (!silent) setLoading(true);
+      try {
+        const res = await mentorshipApi.getCheckInInbox();
+        const data = (res as any).data?.data ?? (res as any).data ?? [];
+        setCheckIns(Array.isArray(data) ? data : []);
+      } catch {
+        if (!silent) showToast("Failed to load check-ins", "error");
+      } finally {
+        if (!silent) setLoading(false);
+      }
+    },
+    [showToast],
+  );
 
   useEffect(() => {
     load();
     const interval = setInterval(() => load(true), POLL_INTERVAL_MS);
     return () => clearInterval(interval);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [load]);
 
-  const handleRespond = async (checkin: MenteeCheckInRecord, status: CheckInStatus, response?: string) => {
-    try {
-      await mentorshipApi.updateCheckIn(checkin.checkin_id, { status, mentor_response: response });
-      showToast("Check-in updated", "success");
-      setSelected(null);
-      load();
-    } catch {
-      showToast("Failed to update check-in", "error");
+  const unread = checkIns.filter((c) => c.status === "NEW").length;
+  useEffect(() => {
+    onUnreadCountChange?.(unread);
+  }, [unread, onUnreadCountChange]);
+
+  // Deep link: open the check-in named in the URL once the list is in.
+  const linked = Number(params.get("checkin")) || null;
+  useEffect(() => {
+    if (!linked || loading) return;
+    const hit = checkIns.find((c) => c.checkin_id === linked);
+    if (hit) {
+      setSelected(hit);
+    } else {
+      mentorshipApi
+        .getCheckInDetail(linked)
+        .then((res) => setSelected(((res as any).data?.data ?? null) as MenteeCheckInRecord | null))
+        .catch(() => showToast("That check-in is not in your inbox", "error"));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [linked, loading]);
+
+  const close = () => {
+    setSelected(null);
+    if (params.has("checkin")) {
+      params.delete("checkin");
+      setParams(params, { replace: true });
     }
   };
 
-  const handleReview = async (checkin: MenteeCheckInRecord, validation_status: ValidationStatus, comment?: string) => {
-    if (validation_status === "REJECTED" && !comment?.trim()) {
-      showToast("A comment is required when rejecting a report", "error");
-      return;
-    }
-    setActionLoading(true);
-    try {
-      await mentorshipApi.updateCheckIn(checkin.checkin_id, {
-        validation_status,
-        mentor_response: comment,
-      });
-      showToast(validation_status === "APPROVED" ? "Report approved" : "Report rejected", "success");
-      setSelected(null);
-      setRejectMode(false);
-      load();
-    } catch {
-      showToast("Failed to submit review", "error");
-    } finally {
-      setActionLoading(false);
-    }
+  const patch = (id: number, p: Partial<MenteeCheckInRecord>) => {
+    setCheckIns((list) => list.map((c) => (c.checkin_id === id ? { ...c, ...p } : c)));
+    setSelected((s) => (s && s.checkin_id === id ? { ...s, ...p } : s));
   };
+
+  const visible = useMemo(
+    () => (filter === "ALL" ? checkIns : checkIns.filter((c) => c.status === filter)),
+    [checkIns, filter],
+  );
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <h3 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
           <MessageCircle className="w-4 h-4 text-blue-500" />
-          Mentee Reports & Check-ins
+          Mentee check-ins
+          {unread > 0 && (
+            <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-blue-600 text-white">{unread} unread</span>
+          )}
         </h3>
-        <SelectField
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value as CheckInStatus | "")}
-          className="text-xs border border-gray-200 dark:border-gray-600 rounded-lg px-2 py-1 bg-white dark:bg-gray-800"
-        >
-          <option value="">All</option>
-          <option value="NEW">New</option>
-          <option value="ACKNOWLEDGED">Acknowledged</option>
-          <option value="ADDRESSED">Addressed</option>
-        </SelectField>
-      </div>
-
-      {loading ? (
-        <div className="flex items-center justify-center text-gray-400 py-8">
-          <RefreshCw className="w-4 h-4 animate-spin mr-2" />
-          Loading...
-        </div>
-      ) : checkIns.length === 0 ? (
-        <p className="text-sm text-gray-400 py-8 text-center">No check-ins from your mentees yet.</p>
-      ) : (
-        <div className="space-y-2">
-          {checkIns.map((c) => {
-            const badge = VALIDATION_BADGE[c.validation_status];
+        <div role="tablist" aria-label="Filter check-ins" className="flex items-center gap-1 p-1 rounded-2xl bg-gray-100 dark:bg-gray-800/60">
+          {FILTERS.map((f) => {
+            const count = f.value === "ALL" ? checkIns.length : checkIns.filter((c) => c.status === f.value).length;
+            const active = filter === f.value;
             return (
               <button
-                key={c.checkin_id}
-                onClick={() => setSelected(c)}
-                className={`w-full text-left p-3 rounded-xl border transition-all ${
-                  c.status === "NEW"
-                    ? "border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-900/10"
-                    : "border-gray-100 dark:border-gray-700"
+                key={f.value}
+                role="tab"
+                aria-selected={active}
+                onClick={() => setFilter(f.value)}
+                className={`px-3 py-1.5 text-xs font-semibold rounded-xl transition-colors ${
+                  active
+                    ? "bg-white dark:bg-gray-900 text-gray-900 dark:text-white shadow-sm"
+                    : "text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
                 }`}
               >
-                <div className="flex items-center justify-between mb-1 gap-2 flex-wrap">
-                  <span className="inline-flex items-center gap-2 text-sm font-medium text-gray-900 dark:text-white">
-                    <UserAvatar decorative userId={c.student_id} name={c.student_name ?? "Student"} size={24} />
-                    {c.student_name}
-                  </span>
-                  <div className="flex items-center gap-1.5">
-                    <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${CATEGORY_COLOR[c.category]}`}>
-                      {CATEGORY_LABEL[c.category]}
-                    </span>
-                    <span className={`flex items-center gap-1 text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${badge.className}`}>
-                      {badge.icon}
-                      {badge.label}
-                    </span>
-                  </div>
-                </div>
-                {c.title && <p className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-0.5">{c.title}</p>}
-                <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2">{c.message}</p>
-                <p className="text-[10px] text-gray-400 mt-1">{c.submitted_at} — {c.status}</p>
+                {f.label}
+                <span className="ml-1 text-gray-400">{count}</span>
               </button>
             );
           })}
         </div>
+      </div>
+
+      {loading ? (
+        <div className="flex items-center justify-center text-gray-400 py-10">
+          <RefreshCw className="w-4 h-4 animate-spin mr-2" />
+          Loading check-ins…
+        </div>
+      ) : visible.length === 0 ? (
+        <div className="flex flex-col items-center justify-center text-center py-12 gap-2">
+          <Inbox className="w-8 h-8 text-gray-300 dark:text-gray-600" />
+          <p className="text-sm font-semibold text-gray-600 dark:text-gray-300">
+            {checkIns.length === 0 ? "No check-ins yet" : `Nothing ${FILTERS.find((f) => f.value === filter)?.label.toLowerCase()}`}
+          </p>
+          <p className="text-xs text-gray-400 max-w-xs">
+            {checkIns.length === 0
+              ? "When a mentee sends you a message, concern or meeting request, it appears here and in your notifications."
+              : "Try another filter."}
+          </p>
+        </div>
+      ) : (
+        <ul className="space-y-2">
+          {visible.map((c) => {
+            const cat = categoryMeta(c.category);
+            const isNew = c.status === "NEW";
+            return (
+              <li key={c.checkin_id}>
+                <button
+                  onClick={() => setSelected(c)}
+                  className={`w-full text-left p-3 rounded-2xl border transition-colors flex gap-3 ${
+                    isNew
+                      ? "border-blue-200 dark:border-blue-800 bg-blue-50/60 dark:bg-blue-900/10 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                      : "border-gray-100 dark:border-gray-700/60 hover:bg-gray-50 dark:hover:bg-gray-800/50"
+                  }`}
+                >
+                  <UserAvatar decorative userId={c.student_id} name={c.student_name ?? "Student"} size={36} />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className={`text-sm ${isNew ? "font-bold" : "font-semibold"} text-gray-900 dark:text-white truncate`}>
+                        {c.student_name ?? "Student"}
+                      </span>
+                      <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${cat.className}`}>{cat.label}</span>
+                      {c.validation_status !== "PENDING" && (
+                        <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${VALIDATION_LABEL[c.validation_status].className}`}>
+                          {VALIDATION_LABEL[c.validation_status].label}
+                        </span>
+                      )}
+                      <span className="ml-auto text-[11px] text-gray-400 whitespace-nowrap">{formatDay(c.submitted_at)}</span>
+                    </div>
+                    {c.title && <p className="text-xs font-semibold text-gray-700 dark:text-gray-300 mt-0.5 truncate">{c.title}</p>}
+                    <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2 mt-0.5">{c.message}</p>
+                    <p className="text-[11px] mt-1 flex items-center gap-1.5 text-gray-400">
+                      {isNew && <span className="w-1.5 h-1.5 rounded-full bg-blue-600" aria-hidden />}
+                      {CHECKIN_STATUS_LABEL[c.status]}
+                      {c.mentor_response ? " · You replied" : ""}
+                    </p>
+                  </div>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
       )}
 
-      {selected && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-xl w-full max-w-md">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 dark:border-gray-700">
-              <h3 className="flex items-center gap-2.5 font-semibold text-gray-900 dark:text-white">
-                <UserAvatar decorative userId={selected.student_id} name={selected.student_name ?? "Student"} size={32} />
-                {selected.student_name}
-              </h3>
-              <button onClick={() => { setSelected(null); setRejectMode(false); }}><X className="w-5 h-5 text-gray-400" /></button>
-            </div>
-            <div className="p-5 space-y-3">
-              <div className="flex items-center gap-1.5 flex-wrap">
-                <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${CATEGORY_COLOR[selected.category]}`}>
-                  {CATEGORY_LABEL[selected.category]}
-                </span>
-                <span className={`flex items-center gap-1 text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${VALIDATION_BADGE[selected.validation_status].className}`}>
-                  {VALIDATION_BADGE[selected.validation_status].icon}
-                  {VALIDATION_BADGE[selected.validation_status].label}
-                </span>
-              </div>
-              {selected.title && <p className="text-sm font-semibold text-gray-900 dark:text-white">{selected.title}</p>}
-              <p className="text-sm text-gray-700 dark:text-gray-300">{selected.message}</p>
-              {selected.mentor_response && (
-                <div className="bg-gray-50 dark:bg-gray-800 rounded-xl p-3 text-xs text-gray-600 dark:text-gray-400">
-                  <span className="font-semibold">Your response: </span>{selected.mentor_response}
-                </div>
-              )}
-              <textarea
-                id="mentor-response-textarea"
-                placeholder={rejectMode ? "Explain why this report is being rejected (required)..." : "Write a response (optional)..."}
-                defaultValue={selected.mentor_response ?? ""}
-                className="w-full text-sm border border-gray-200 dark:border-gray-600 rounded-xl p-2.5 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-                rows={3}
-              />
-            </div>
-            <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-gray-100 dark:border-gray-700 flex-wrap">
-              <button
-                onClick={() => {
-                  const el = document.getElementById("mentor-response-textarea") as HTMLTextAreaElement | null;
-                  handleRespond(selected, "ACKNOWLEDGED", el?.value);
-                }}
-                className="px-3 py-2 text-xs font-semibold text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-xl"
-              >
-                Acknowledge
-              </button>
-              <button
-                disabled={actionLoading}
-                onClick={() => {
-                  const el = document.getElementById("mentor-response-textarea") as HTMLTextAreaElement | null;
-                  if (rejectMode) {
-                    handleReview(selected, "REJECTED", el?.value);
-                  } else {
-                    setRejectMode(true);
-                  }
-                }}
-                className="flex items-center gap-1 px-3 py-2 text-xs font-semibold text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl disabled:opacity-50"
-              >
-                <ThumbsDown className="w-3.5 h-3.5" />
-                {rejectMode ? "Confirm Reject" : "Reject"}
-              </button>
-              <button
-                disabled={actionLoading}
-                onClick={() => {
-                  const el = document.getElementById("mentor-response-textarea") as HTMLTextAreaElement | null;
-                  handleReview(selected, "APPROVED", el?.value);
-                }}
-                className="flex items-center gap-1 px-3 py-2 text-xs font-semibold bg-green-600 hover:bg-green-700 text-white rounded-xl disabled:opacity-50"
-              >
-                <Check className="w-3.5 h-3.5" />
-                Approve
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <CheckInDetailModal checkin={selected} onClose={close} onChanged={patch} />
     </div>
   );
 };

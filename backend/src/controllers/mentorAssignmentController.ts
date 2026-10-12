@@ -11,6 +11,7 @@ import {
 } from "../db/schema";
 import { applyPlacementChange } from "../services/access/ruleEngine";
 import { asyncHandler } from "../middleware/asyncHandler";
+import { notifyAssignmentsChanged, notifyAssignmentEnded } from "../services/mentorship/notify";
 import { successResponse } from "../utils/response";
 import { ValidationError, ConflictError, NotFoundError } from "../errors/CustomError";
 
@@ -361,14 +362,18 @@ async function assignStudentsToMentor(params: {
   }
 
   const [year] = await db
-    .select({ academic_year_id: AcademicYear.academic_year_id })
+    .select({ academic_year_id: AcademicYear.academic_year_id, name: AcademicYear.name })
     .from(AcademicYear)
     .where(eq(AcademicYear.academic_year_id, yearId))
     .limit(1);
   if (!year) throw new NotFoundError("Academic year not found");
 
   const existing = await db
-    .select({ student_id: MentorAssignment.student_id, mentor_id: MentorAssignment.mentor_id })
+    .select({
+      assignment_id: MentorAssignment.assignment_id,
+      student_id: MentorAssignment.student_id,
+      mentor_id: MentorAssignment.mentor_id,
+    })
     .from(MentorAssignment)
     .where(
       and(
@@ -422,6 +427,14 @@ async function assignStudentsToMentor(params: {
   if (toInsert.length > 0) {
     // Mentors whose mentee list changed (their access snapshots list mentees).
     await applyPlacementChange([mentorId, ...elsewhere.map((e) => e.mentor_id)], adminId);
+    // Both sides learn about the pairing, and a mentor who lost a student is told.
+    await notifyAssignmentsChanged({
+      mentorId,
+      actorId: adminId,
+      added: toInsert.map((studentId, i) => ({ studentId, assignmentId: assignmentIds[i] })),
+      movedFrom: elsewhere.map((e) => ({ studentId: e.student_id, mentorId: e.mentor_id, assignmentId: e.assignment_id })),
+      yearName: year.name ?? null,
+    });
   }
 
   return {
@@ -502,18 +515,32 @@ export const endAssignment = asyncHandler(async (req: any, res: any) => {
   if (!id || isNaN(id)) throw new ValidationError("Invalid assignment ID");
 
   const existing = await db
-    .select({ assignment_id: MentorAssignment.assignment_id, mentor_id: MentorAssignment.mentor_id })
+    .select({
+      assignment_id: MentorAssignment.assignment_id,
+      mentor_id: MentorAssignment.mentor_id,
+      student_id: MentorAssignment.student_id,
+      status: MentorAssignment.status,
+    })
     .from(MentorAssignment)
     .where(eq(MentorAssignment.assignment_id, id))
     .limit(1);
 
   if (existing.length === 0) throw new NotFoundError("Assignment not found");
+  if (existing[0].status === "ENDED") {
+    return successResponse(res, "Assignment already ended", { assignment_id: id });
+  }
 
   await db
     .update(MentorAssignment)
     .set({ status: "ENDED", ended_at: sql`CURRENT_TIMESTAMP` })
     .where(eq(MentorAssignment.assignment_id, id));
   await applyPlacementChange([existing[0].mentor_id], req.user?.userId);
+  await notifyAssignmentEnded({
+    assignmentId: id,
+    mentorId: existing[0].mentor_id,
+    studentId: existing[0].student_id,
+    actorId: req.user?.userId,
+  });
 
   return successResponse(res, "Assignment ended", { assignment_id: id });
 });
