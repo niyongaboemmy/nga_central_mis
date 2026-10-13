@@ -24,6 +24,11 @@ const SEARCH_ITEMS: SearchItem[] = [
   },
   { label: "Profile", path: "/profile" },
   {
+    label: "Code Playground",
+    path: "/code-playground",
+    requiredPermission: Permissions.CODE_PLAYGROUND_USE,
+  },
+  {
     label: "My Subjects",
     path: "/my-subjects",
     requiredPermission: Permissions.VIEW_MY_ASSIGNED_SUBJECTS,

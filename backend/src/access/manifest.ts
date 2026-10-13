@@ -31,7 +31,7 @@ const SCHOOL_ONLY = { scopeable: false };
 export const MIS_MANIFEST = defineManifest({
   app: "mis",
   name: "Central MIS",
-  version: "2026.10.06",
+  version: "2026.10.14",
   capabilities: {
     // People & accounts
     MANAGE_USERS: W("Create, update and deactivate users", "PEOPLE"),
@@ -90,6 +90,9 @@ export const MIS_MANIFEST = defineManifest({
     VIEW_CALENDAR_SUBJECT_LESSON_PLAN: R("View full lesson plans from the calendar", "CURRICULUM"),
     STUDENT_VIEW_LESSON_PLAN_SUMMARY: R("View lesson plan summaries (students)", "CURRICULUM", ["summary"]),
     MANAGE_LESSON_NOTES: W("Create and share lesson notes", "CURRICULUM"),
+    // Code Playground (sidebar page + Run on lesson code): granted to every role and
+    // persona baseline by migration 120; removable per role in Access Studio.
+    CODE_PLAYGROUND_USE: W("Write and run code in the Code Playground", "CURRICULUM", SCHOOL_ONLY),
     VIEW_SHARED_LESSON_NOTES: R("View lesson notes shared with me", "CURRICULUM"),
     UPLOAD_SUBJECT_DOCUMENTS: W("Upload subject materials", "CURRICULUM"),
     VIEW_SUBJECT_DOCUMENTS: R("View subject materials", "CURRICULUM"),

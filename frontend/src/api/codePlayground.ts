@@ -55,6 +55,7 @@ export async function runOnServer(body: { language: string; code: string; stdin?
   } catch (e: any) {
     if (e?.code === "ERR_CANCELED" || e?.name === "CanceledError") throw new PlaygroundRunError("CANCELED", "Run stopped.");
     const data = e?.response?.data;
+    if (e?.response?.status === 403) throw new PlaygroundRunError("FORBIDDEN", "Your role doesn't include the Code Playground. Ask the school's administrator for access.");
     if (data?.code || data?.message) throw new PlaygroundRunError(data.code ?? "RUN_FAILED", data.message ?? "The code couldn't be run.");
     if (e?.code === "ECONNABORTED") throw new PlaygroundRunError("TIMEOUT", "The run took too long. Check for an endless loop or waiting for input.");
     throw new PlaygroundRunError("NETWORK", "Couldn't reach the MIS. Check your connection and try again.");

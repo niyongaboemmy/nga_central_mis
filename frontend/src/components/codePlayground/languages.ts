@@ -41,7 +41,7 @@ export const LANGUAGES: PlaygroundLanguage[] = [
     file: "script.js",
     prettier: "babel",
     stdin: true,
-    starter: 'const name = prompt("Your name?") ?? "student";\nconsole.log(`Hello, ${name}!`);\n',
+    starter: 'const name = prompt("Your name?") || "student";\nconsole.log(`Hello, ${name}!`);\n',
   }),
   L({
     id: "node",
@@ -85,7 +85,7 @@ export const LANGUAGES: PlaygroundLanguage[] = [
     file: "Main.java",
     stdin: true,
     starter:
-      'import java.util.Scanner;\n\npublic class Main {\n    public static void main(String[] args) {\n        Scanner in = new Scanner(System.in);\n        String name = in.hasNextLine() ? in.nextLine() : "student";\n        System.out.println("Hello, " + name + "!");\n    }\n}\n',
+      'import java.util.Scanner;\n\npublic class Main {\n    public static void main(String[] args) {\n        Scanner in = new Scanner(System.in);\n        String line = in.hasNextLine() ? in.nextLine().trim() : "";\n        String name = line.isEmpty() ? "student" : line;\n        System.out.println("Hello, " + name + "!");\n    }\n}\n',
   }),
   L({
     id: "c",
@@ -106,7 +106,7 @@ export const LANGUAGES: PlaygroundLanguage[] = [
     file: "main.cpp",
     stdin: true,
     starter:
-      '#include <iostream>\n#include <string>\n\nint main() {\n    std::string name = "student";\n    std::getline(std::cin, name);\n    std::cout << "Hello, " << name << "!" << std::endl;\n    return 0;\n}\n',
+      '#include <iostream>\n#include <string>\n\nint main() {\n    std::string name;\n    if (!std::getline(std::cin, name) || name.empty()) name = "student";\n    std::cout << "Hello, " << name << "!" << std::endl;\n    return 0;\n}\n',
   }),
   L({
     id: "csharp",
@@ -116,7 +116,7 @@ export const LANGUAGES: PlaygroundLanguage[] = [
     hljs: "csharp",
     file: "Program.cs",
     stdin: true,
-    starter: 'using System;\n\nclass Program {\n    static void Main() {\n        var name = Console.ReadLine() ?? "student";\n        Console.WriteLine($"Hello, {name}!");\n    }\n}\n',
+    starter: 'using System;\n\nclass Program {\n    static void Main() {\n        var name = Console.ReadLine();\n        if (string.IsNullOrWhiteSpace(name)) name = "student";\n        Console.WriteLine($"Hello, {name}!");\n    }\n}\n',
   }),
   L({
     id: "php",
@@ -131,7 +131,7 @@ export const LANGUAGES: PlaygroundLanguage[] = [
   L({ id: "go", label: "Go", short: "Go", runner: "go", hljs: "go", file: "main.go", stdin: true, starter: 'package main\n\nimport "fmt"\n\nfunc main() {\n    fmt.Println("Hello, student!")\n}\n' }),
   L({ id: "rust", label: "Rust", short: "Rust", runner: "rust", hljs: "rust", file: "main.rs", stdin: true, starter: 'fn main() {\n    println!("Hello, student!");\n}\n' }),
   L({ id: "kotlin", label: "Kotlin", short: "Kt", runner: "kotlin", hljs: "kotlin", file: "Main.kt", stdin: true, starter: 'fun main() {\n    println("Hello, student!")\n}\n' }),
-  L({ id: "ruby", label: "Ruby", short: "Ruby", runner: "ruby", hljs: "ruby", file: "main.rb", stdin: true, starter: 'name = gets&.strip || "student"\nputs "Hello, #{name}!"\n' }),
+  L({ id: "ruby", label: "Ruby", short: "Ruby", runner: "ruby", hljs: "ruby", file: "main.rb", stdin: true, starter: 'name = gets.to_s.strip\nname = "student" if name.empty?\nputs "Hello, #{name}!"\n' }),
   L({ id: "swift", label: "Swift", short: "Swift", runner: "swift", hljs: "swift", file: "main.swift", stdin: true, starter: 'print("Hello, student!")\n' }),
   L({ id: "bash", label: "Bash", short: "Bash", runner: "bash", hljs: "bash", file: "main.sh", stdin: true, starter: 'read -r name\necho "Hello, ${name:-student}!"\n' }),
   L({

@@ -1,14 +1,16 @@
 import express from "express";
-import { authenticate } from "../middleware/auth";
+import { authenticate, authorize } from "../middleware/auth";
+import { Permissions } from "../utils/permissions";
 import { asyncHandler } from "../middleware/asyncHandler";
 import { perMinute } from "../middleware/rateLimit";
 import { successResponse } from "../utils/response";
 import { RunnerError, runCode, runnerLanguages } from "../services/codePlayground/relay";
 
 /**
- * Code Playground -- run the code in lessons and exercises
- * (services/codePlayground/relay.ts). Any signed-in user who can read a lesson
- * may run its code; runs are practice only (nothing graded or stored).
+ * Code Playground -- run the code in lessons, exercises and the Code Playground
+ * page (services/codePlayground/relay.ts). Needs CODE_PLAYGROUND_USE, which every
+ * role holds by default (migration 120); runs are practice only (nothing graded
+ * or stored).
  */
 const router = express.Router();
 
@@ -28,7 +30,7 @@ const sessionToken = (req: any): string | null => {
 
 const fail = (res: any, status: number, code: string, message: string) => res.status(status).json({ success: false, code, message });
 
-router.use(authenticate);
+router.use(authenticate, authorize(Permissions.CODE_PLAYGROUND_USE));
 
 router.get(
   "/languages",

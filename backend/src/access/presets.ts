@@ -393,7 +393,7 @@ const MIS_PRESETS: PresetDef[] = [
     description: "Baseline for every teacher (own calendar, own records). Teaching power comes from Subject/Class Teacher grants.",
     category: "Teaching",
     scopes: ["SELF"],
-    caps: ["OFFICE_HOURS_MANAGE_OWN", "VIEW_LEADERSHIP_STRUCTURE"],
+    caps: ["OFFICE_HOURS_MANAGE_OWN", "VIEW_LEADERSHIP_STRUCTURE", "CODE_PLAYGROUND_USE"],
   },
   {
     key: "support_staff",
@@ -402,7 +402,7 @@ const MIS_PRESETS: PresetDef[] = [
     description: "Baseline for non-teaching staff.",
     category: "Operations",
     scopes: ["SELF"],
-    caps: ["VIEW_LEADERSHIP_STRUCTURE"],
+    caps: ["VIEW_LEADERSHIP_STRUCTURE", "CODE_PLAYGROUND_USE"],
   },
   {
     key: "student",
@@ -411,7 +411,7 @@ const MIS_PRESETS: PresetDef[] = [
     description: "Learner self-service.",
     category: "Learner",
     scopes: ["SELF"],
-    caps: [["OFFICE_HOURS_VIEW_SELF", "detail"], "SUBMIT_MENTEE_CHECKIN"],
+    caps: [["OFFICE_HOURS_VIEW_SELF", "detail"], "SUBMIT_MENTEE_CHECKIN", "CODE_PLAYGROUND_USE"],
   },
   {
     key: "parent",
@@ -420,7 +420,7 @@ const MIS_PRESETS: PresetDef[] = [
     description: "Parent/guardian: their children's records.",
     category: "Family",
     scopes: ["CHILDREN", "SELF"],
-    caps: [["OFFICE_HOURS_VIEW_SELF", "detail"]],
+    caps: [["OFFICE_HOURS_VIEW_SELF", "detail"], "CODE_PLAYGROUND_USE"],
   },
 ];
 

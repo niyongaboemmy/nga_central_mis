@@ -2,8 +2,13 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import request from "supertest";
 import express from "express";
 import type { Server } from "http";
+import fs from "fs";
+import path from "path";
+import mysql from "mysql2/promise";
 import app from "../app";
-import { createUser, signToken } from "../test/fixtures";
+import { assignRole, createRoleWithPermissions, createUser, signToken } from "../test/fixtures";
+import { MIS_MANIFEST } from "../access/manifest";
+import { PRESETS } from "../access/presets";
 import { clearRunnerLanguageCache, mainFileFor } from "../services/codePlayground/relay";
 import { resetPlaygroundRunLimit } from "../routes/codePlayground";
 
@@ -60,6 +65,7 @@ describe("/code-playground", () => {
     });
     process.env.HOME_APP_TASKMENTOR_URL = `http://127.0.0.1:${(stub.address() as any).port}`;
     userId = await createUser({ userType: "STUDENT" });
+    await assignRole(userId, await createRoleWithPermissions("PLAYGROUND", ["CODE_PLAYGROUND_USE"]));
   });
 
   afterAll(async () => {
@@ -79,6 +85,13 @@ describe("/code-playground", () => {
   it("requires a session", async () => {
     expect((await request(app).post("/code-playground/run").send({})).status).toBe(401);
     expect((await request(app).get("/code-playground/languages")).status).toBe(401);
+  });
+
+  it("requires CODE_PLAYGROUND_USE", async () => {
+    const without = await createUser({ userType: "STUDENT" });
+    const auth = `Bearer ${signToken(without)}`;
+    expect((await request(app).get("/code-playground/languages").set("Authorization", auth)).status).toBe(403);
+    expect((await request(app).post("/code-playground/run").set("Authorization", auth).send({ language: "python", code: "print(1)" })).status).toBe(403);
   });
 
   it("lists the runner's languages with the user's own token", async () => {
@@ -141,5 +154,51 @@ describe("/code-playground", () => {
     let last = 0;
     for (let i = 0; i < 21; i++) last = (await run({ language: "python", code: "print(1)" })).status;
     expect(last).toBe(429);
+  });
+});
+
+describe("CODE_PLAYGROUND_USE", () => {
+  it("is a registered MIS capability every persona baseline carries", () => {
+    expect(MIS_MANIFEST.capabilities.CODE_PLAYGROUND_USE).toMatchObject({ kind: "WRITE", domain: "CURRICULUM" });
+    for (const key of ["teaching_staff", "support_staff", "student", "parent"]) {
+      const preset = PRESETS.find((p) => p.key === key)!;
+      expect(preset.caps.map((c) => (Array.isArray(c) ? c[0] : c))).toContain("CODE_PLAYGROUND_USE");
+    }
+  });
+
+  it("migration 120 grants it to every role, once", async () => {
+    const roleId = await createRoleWithPermissions("ANY_ROLE", []);
+    const conn = await mysql.createConnection({
+      host: process.env.DB_HOST,
+      port: Number(process.env.DB_PORT || 3306),
+      user: process.env.DB_USERNAME,
+      password: process.env.DB_PASSWORD,
+      database: process.env.DB_NAME,
+      multipleStatements: true,
+    });
+    try {
+      const migration = fs.readFileSync(path.join(__dirname, "../../migrations/120_code_playground_use.sql"), "utf8");
+      const count = async () => {
+        const [[row]]: any = await conn.query(
+          `SELECT (SELECT COUNT(*) FROM Role) AS roles,
+                  (SELECT COUNT(*) FROM RolePermission rp JOIN Permission p ON p.perm_id = rp.perm_id WHERE p.name = 'CODE_PLAYGROUND_USE') AS grants,
+                  (SELECT COUNT(*) FROM Permission WHERE name = 'CODE_PLAYGROUND_USE') AS perms`,
+        );
+        return row;
+      };
+      await conn.query(migration);
+      const first = await count();
+      expect(Number(first.perms)).toBe(1);
+      expect(Number(first.grants)).toBe(Number(first.roles));
+      const [[mine]]: any = await conn.query(
+        "SELECT COUNT(*) AS n FROM RolePermission rp JOIN Permission p ON p.perm_id = rp.perm_id WHERE p.name = 'CODE_PLAYGROUND_USE' AND rp.role_id = ?",
+        [roleId],
+      );
+      expect(Number(mine.n)).toBe(1);
+      await conn.query(migration);
+      expect(await count()).toEqual(first);
+    } finally {
+      await conn.end();
+    }
   });
 });
