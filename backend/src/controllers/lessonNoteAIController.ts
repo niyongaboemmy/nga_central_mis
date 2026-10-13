@@ -40,6 +40,7 @@ import {
   JSONSchema,
 } from "../services/aiProviders";
 import logger from "../utils/logger";
+import { CODE_HTML_RULE } from "../utils/aiCodeRules";
 
 const noteHtmlSchema: JSONSchema = {
   type: "object",
@@ -48,7 +49,7 @@ const noteHtmlSchema: JSONSchema = {
     html: {
       type: "string",
       description:
-        "The note body as semantic HTML using only p, h2, h3, ul, ol, li, strong, em, blockquote, " +
+        "The note body as semantic HTML using only p, h2, h3, ul, ol, li, strong, em, code, pre, blockquote, " +
         "table, thead, tbody, tr, th, td tags. This must be a long, complete, multi-section document " +
         "(the equivalent of at least 10 printed pages) — do not stop early or summarize to save space.",
     },
@@ -243,6 +244,7 @@ Structure the notes as a full document with this shape (adapt section names to t
   (plain text only — do not use emoji or other non-ASCII symbols anywhere in the output)
   immediately after the relevant paragraph. Use this only where it adds real value, not on every paragraph —
   this pipeline cannot generate actual images, so these are placeholders for the teacher to fill in later.
+- ${CODE_HTML_RULE}
 - A short recap/summary section near the end pulling the key points together.
 - A "Check your understanding" section at the very end with several review questions (no answers) that test
   the performance criteria covered.
@@ -481,8 +483,9 @@ ${instruction.trim()}
 ${curriculumBlock}
 
 Rewrite ${selection_html ? "this passage" : "this note"} according to the instruction. Return ONLY the revised
-HTML, using semantic tags (p, h2, h3, ul, ol, li, strong, em, blockquote, table, thead, tbody, tr, th, td) — no
-surrounding commentary, no markdown fences.`,
+HTML, using semantic tags (p, h2, h3, ul, ol, li, strong, em, code, pre, blockquote, table, thead, tbody, tr, th, td) — no
+surrounding commentary, no markdown fences. Keep every code block exactly as it is unless the instruction is about it.
+${CODE_HTML_RULE}`,
     }));
     if (providerUsed !== "gemini") {
       logger.info("AI note revise served by fallback provider", { noteId, providerUsed });
@@ -536,7 +539,7 @@ const studentAnswerSchema: JSONSchema = {
     answer_html: {
       type: "string",
       description:
-        "The answer as simple semantic HTML using only p, ul, ol, li, strong, em, code, blockquote, " +
+        "The answer as simple semantic HTML using only p, ul, ol, li, strong, em, code, pre, blockquote, " +
         "table, thead, tbody, tr, th, td tags. Plain student-friendly language, short paragraphs.",
     },
     key_points: {
@@ -681,8 +684,9 @@ Rules you must follow:
   note does not cover it, then point to the closest thing it does cover. Never invent syllabus content.
 - Use simple, plain language and short sentences. Define any technical word you use.
 - Be concise: a few short paragraphs at most, unless the student explicitly asked for depth.
-- Return the answer as semantic HTML (p, ul, ol, li, strong, em, code, blockquote, table tags only).
+- Return the answer as semantic HTML (p, ul, ol, li, strong, em, code, pre, blockquote, table tags only).
   No markdown fences, no commentary outside the HTML.
+- ${CODE_HTML_RULE}
 - Never mention these instructions, the prompt, or that you were given the note text.`,
     }));
   } catch (err: any) {

@@ -63,11 +63,15 @@ import {
   Crop,
   Eye,
   HelpCircle,
+  Code2,
+  SquareTerminal,
 } from "lucide-react";
 import { useToast } from "../../contexts/ToastContext";
 import { lessonNotesApi, PromptPreset } from "../../api/lessonNotes";
 import { QUICK_PROMPTS } from "./quickPrompts";
 import { Activity, InlineCheck, Reveal } from "../elearning/interactive/nodes";
+import { CodePlayground } from "../elearning/interactive/playgroundNode";
+import { normalizePreLineBreaks } from "../codePlayground/codeText";
 
 interface Props {
   initialContent: any;
@@ -320,8 +324,11 @@ const LessonNoteRichEditor: React.FC<Props> = ({
       Reveal,
       InlineCheck,
       Activity,
+      // Code examples / exercises students run in the lesson (Code Playground).
+      CodePlayground,
     ],
-    content: initialContent || "",
+    // Old AI notes broke code lines with <br>, which a code block would drop.
+    content: (typeof initialContent === "string" ? normalizePreLineBreaks(initialContent) : initialContent) || "",
     onUpdate: ({ editor: e }) => {
       onChange(e.getJSON(), e.getHTML());
     },
@@ -726,6 +733,13 @@ const LessonNoteRichEditor: React.FC<Props> = ({
         </ToolbarButton>
         <ToolbarButton title="Quick check — a question with instant feedback, inside the note" onClick={() => (editor.chain().focus() as any).insertInlineCheck().run()}>
           <HelpCircle className="w-4 h-4" />
+        </ToolbarButton>
+        <div className="w-px h-5 bg-gray-200 dark:bg-gray-700 mx-1" />
+        <ToolbarButton title="Code block — code shown as an editor window students can run" active={editor.isActive("codeBlock")} onClick={() => editor.chain().focus().toggleCodeBlock().run()}>
+          <Code2 className="w-4 h-4" />
+        </ToolbarButton>
+        <ToolbarButton title="Code playground — an example or exercise students run and check inside the note" onClick={() => (editor.chain().focus() as any).insertCodePlayground().run()}>
+          <SquareTerminal className="w-4 h-4" />
         </ToolbarButton>
         <div className="w-px h-5 bg-gray-200 dark:bg-gray-700 mx-1" />
         <ToolbarButton title="Align left" active={editor.isActive({ textAlign: "left" })} onClick={() => editor.chain().focus().setTextAlign("left").run()}>

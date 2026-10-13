@@ -1,0 +1,145 @@
+import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
+import request from "supertest";
+import express from "express";
+import type { Server } from "http";
+import app from "../app";
+import { createUser, signToken } from "../test/fixtures";
+import { clearRunnerLanguageCache, mainFileFor } from "../services/codePlayground/relay";
+import { resetPlaygroundRunLimit } from "../routes/codePlayground";
+
+/**
+ * Code Playground: lesson code runs on Task Mentor's code runner, relayed with
+ * the user's own MIS token (a fake Task Mentor here).
+ */
+
+describe("mainFileFor", () => {
+  it("names a Java file after its public class and others by language", () => {
+    expect(mainFileFor("java", "public class Garage {\n public static void main(String[] a) {}\n}")).toBe("Garage.java");
+    expect(mainFileFor("java", "class Hidden {}")).toBe("Main.java");
+    expect(mainFileFor("python", "print(1)")).toBe("main.py");
+    expect(mainFileFor("csharp", "")).toBe("Program.cs");
+  });
+});
+
+describe("/code-playground", () => {
+  let stub: Server;
+  let seenAuth: string | undefined;
+  let seenBody: any;
+  let mode: "ok" | "compile" | "401" | "429" | "down" = "ok";
+  let userId: number;
+  const prev = process.env.HOME_APP_TASKMENTOR_URL;
+
+  beforeAll(async () => {
+    const fake = express();
+    fake.use(express.json());
+    fake.get("/api/integration/code/languages", (req, res) => {
+      seenAuth = req.headers.authorization;
+      res.json({ success: true, data: { languages: [{ key: "python", label: "Python", engine: "tmjudge" }, { key: "cpp", label: "C++", engine: "tmjudge" }] } });
+    });
+    fake.post("/api/integration/code/run", (req, res) => {
+      seenAuth = req.headers.authorization;
+      seenBody = req.body;
+      if (mode === "401") return res.status(401).json({ success: false, code: "MIS_TOKEN_INVALID" });
+      if (mode === "429") return res.status(429).json({ success: false, code: "RATE_LIMITED", message: "Too many code runs — wait a minute and try again." });
+      if (mode === "down") return res.status(503).json({ success: false, code: "JUDGE_UNAVAILABLE", message: "The code runner is busy or offline." });
+      if (mode === "compile") {
+        return res.json({ success: true, data: { engine: "tmjudge", language: "cpp", compile: { ok: false, output: "main.cpp:1: error: expected ';'" }, tests: [] } });
+      }
+      res.json({
+        success: true,
+        data: {
+          engine: "tmjudge",
+          language: "python",
+          compile: null,
+          tests: [{ id: "run", verdict: "ok", passed: true, stdout: "Hello, Aline\n", stderr: null, exit_code: 0, time_ms: 12, memory_kb: 9000 }],
+        },
+      });
+    });
+    await new Promise<void>((resolve) => {
+      stub = fake.listen(0, () => resolve());
+    });
+    process.env.HOME_APP_TASKMENTOR_URL = `http://127.0.0.1:${(stub.address() as any).port}`;
+    userId = await createUser({ userType: "STUDENT" });
+  });
+
+  afterAll(async () => {
+    process.env.HOME_APP_TASKMENTOR_URL = prev;
+    await new Promise((r) => stub.close(r));
+  });
+
+  beforeEach(() => {
+    mode = "ok";
+    resetPlaygroundRunLimit();
+    clearRunnerLanguageCache();
+  });
+
+  const token = () => signToken(userId);
+  const run = (body: any) => request(app).post("/code-playground/run").set("Authorization", `Bearer ${token()}`).send(body);
+
+  it("requires a session", async () => {
+    expect((await request(app).post("/code-playground/run").send({})).status).toBe(401);
+    expect((await request(app).get("/code-playground/languages")).status).toBe(401);
+  });
+
+  it("lists the runner's languages with the user's own token", async () => {
+    const sent = token();
+    const res = await request(app).get("/code-playground/languages").set("Authorization", `Bearer ${sent}`);
+    expect(res.status).toBe(200);
+    expect(res.body.data).toMatchObject({ available: true, languages: [{ key: "python", label: "Python" }, { key: "cpp", label: "C++" }] });
+    expect(seenAuth).toBe(`Bearer ${sent}`);
+  });
+
+  it("relays a run as one file plus the input and reshapes the answer", async () => {
+    const res = await run({ language: "Python", code: "name = input()\nprint(f'Hello, {name}')", stdin: "Aline" });
+    expect(res.status).toBe(200);
+    expect(seenBody).toEqual({
+      language: "python",
+      entry: "main.py",
+      files: [{ path: "main.py", content: "name = input()\nprint(f'Hello, {name}')" }],
+      tests: [{ id: "run", input: "Aline" }],
+    });
+    expect(res.body.data).toMatchObject({ verdict: "ok", stdout: "Hello, Aline\n", stderr: "", exit_code: 0, time_ms: 12, engine: "tmjudge" });
+  });
+
+  it("reports a compile error with the compiler's output", async () => {
+    mode = "compile";
+    const res = await run({ language: "cpp", code: "int main() { return 0 }" });
+    expect(res.body.data).toMatchObject({ verdict: "compile-error", compile_output: expect.stringContaining("expected ';'") });
+  });
+
+  it("checks the request before calling the runner", async () => {
+    expect((await run({ language: "", code: "x" })).status).toBe(400);
+    expect((await run({ language: "python", code: "   " })).status).toBe(400);
+    expect((await run({ language: "python", code: "x".repeat(70 * 1024) })).status).toBe(413);
+    expect((await run({ language: "python", code: "x", files: [{ path: "../etc/passwd", content: "x" }] })).status).toBe(400);
+  });
+
+  it("passes the runner's refusals on with a clear code", async () => {
+    mode = "429";
+    expect((await run({ language: "python", code: "print(1)" })).body).toMatchObject({ success: false, code: "RATE_LIMITED" });
+    mode = "down";
+    const down = await run({ language: "python", code: "print(1)" });
+    expect(down.status).toBe(503);
+    expect(down.body.code).toBe("JUDGE_UNAVAILABLE");
+    mode = "401";
+    expect((await run({ language: "python", code: "print(1)" })).body.code).toBe("SESSION_EXPIRED");
+  });
+
+  it("says when Task Mentor isn't connected instead of failing the page", async () => {
+    const url = process.env.HOME_APP_TASKMENTOR_URL;
+    delete process.env.HOME_APP_TASKMENTOR_URL;
+    try {
+      const langs = await request(app).get("/code-playground/languages").set("Authorization", `Bearer ${token()}`);
+      expect(langs.body.data).toMatchObject({ available: false, languages: [], code: "RUNNER_NOT_CONNECTED" });
+      expect((await run({ language: "python", code: "print(1)" })).status).toBe(503);
+    } finally {
+      process.env.HOME_APP_TASKMENTOR_URL = url;
+    }
+  });
+
+  it("limits runs per user", async () => {
+    let last = 0;
+    for (let i = 0; i < 21; i++) last = (await run({ language: "python", code: "print(1)" })).status;
+    expect(last).toBe(429);
+  });
+});

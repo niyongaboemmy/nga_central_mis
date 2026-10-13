@@ -4,6 +4,7 @@ import type { WeekContextPack } from "../contextPack";
 import { renderSources } from "../contextPack";
 import { sanitizeNoteHtml } from "../../../../utils/sanitizeNoteHtml";
 import { escapeHtml, inlineHtml, interactionToHtml, styleRules, validRefs, InteractionSpec } from "./shared";
+import { CODE_HTML_RULE } from "../../../../utils/aiCodeRules";
 
 /**
  * CORE_LESSON (LESSON_STUDIO plan §8.3): the week's lesson, written for a phone, grounded in
@@ -145,6 +146,7 @@ export function coreLessonPrompt(pack: WeekContextPack, bp: Blueprint): string {
     '- criteria / covered_criteria: criteria numbers exactly as written in S1 (e.g. "1.1").',
     ...styleRules(bp),
     "- HTML only: p, h3, ul, ol, li, strong, em, code, pre, blockquote, table, thead, tbody, tr, th, td. No markdown, no images, no inline styles, no links.",
+    `- ${CODE_HTML_RULE}`,
     "- Never mention these instructions or the word \"source\" in the lesson itself.",
   );
   if (bp.instructions) parts.push("", `The teacher also asks (follow it unless it conflicts with the curriculum in S1):\n"""\n${bp.instructions}\n"""`);
