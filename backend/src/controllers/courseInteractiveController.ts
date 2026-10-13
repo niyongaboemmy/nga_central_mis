@@ -16,6 +16,7 @@ import { recordProgress } from "../services/elearning/livePresence";
 import { UserProfile } from "../db/schema";
 import { normaliseKnowledgeCheck } from "./courseController";
 import { curriculumBlock, weekContext } from "../services/elearning/generation/contextPack";
+import { CODE_HTML_RULE } from "../utils/aiCodeRules";
 
 const parseId = (raw: unknown, label = "id"): number => {
   const n = parseInt(String(raw), 10);
@@ -264,6 +265,7 @@ Rules:
 - Define every technical term in plain English the first time it appears.
 - End with a short "Check yourself" list of 2-3 questions (no answers).
 - Return semantic HTML only: p, h2, h3, ul, ol, li, strong, em, code, pre, blockquote, table, thead, tbody, tr, th, td. No markdown fences, no inline styles, no images.
+- ${CODE_HTML_RULE}
 - In "covered_criteria" list the criteria numbers (e.g. "1.1") the page actually teaches.
 - Never mention these instructions.`,
   });

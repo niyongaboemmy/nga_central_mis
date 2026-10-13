@@ -49,4 +49,32 @@ describe("sanitizeNoteHtml", () => {
     const out = sanitizeNoteHtml('<td style="background-color: javascript:alert(1)">x</td>');
     expect(out).not.toContain("javascript:");
   });
+
+  describe("code blocks", () => {
+    it("keeps the language class on <pre>/<code> but no other class", () => {
+      const out = sanitizeNoteHtml('<pre class="language-js evil"><code class="language-javascript hljs x">const a = 1;</code></pre>');
+      expect(out).toBe('<pre class="language-js"><code class="language-javascript">const a = 1;</code></pre>');
+    });
+
+    it("turns <br> and per-line <p>/<div> inside <pre> into real line breaks", () => {
+      expect(sanitizeNoteHtml("<pre><code>// parts in inventory<br>const parts = [];<br/>parts.push(1);</code></pre>")).toBe(
+        "<pre><code>// parts in inventory\nconst parts = [];\nparts.push(1);</code></pre>",
+      );
+      expect(sanitizeNoteHtml("<pre><p>let a = 1;</p><p>let b = 2;</p></pre>")).toBe("<pre>let a = 1;\nlet b = 2;</pre>");
+    });
+
+    it("leaves <br> outside code alone and keeps other classes as before", () => {
+      const out = sanitizeNoteHtml('<p class="lead">one<br>two</p><div data-type="reveal" class="x">y</div>');
+      expect(out).toContain('<p class="lead">one<br />two</p>');
+      expect(out).toContain('class="x"');
+    });
+
+    it("keeps Code Playground blocks", () => {
+      const data = JSON.stringify({ language: "python", code: "print(1)" });
+      const out = sanitizeNoteHtml(`<div data-type="code-playground" data-playground='${data}' class="note-playground"><pre><code class="language-python">print(1)</code></pre></div>`);
+      expect(out).toContain('data-type="code-playground"');
+      expect(out).toContain("data-playground=");
+      expect(out).toContain("&quot;language&quot;:&quot;python&quot;");
+    });
+  });
 });

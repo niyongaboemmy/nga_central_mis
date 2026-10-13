@@ -27,6 +27,7 @@ import integrationRoutes from "./routes/integrationRoutes";
 import notificationRoutes from "./routes/notifications";
 import accessRoutes from "./routes/access";
 import homeRoutes from "./routes/home";
+import codePlaygroundRoutes from "./routes/codePlayground";
 import elearningRoutes from "./routes/elearning";
 import { wireFilesModule } from "./services/files/assets";
 
@@ -149,6 +150,8 @@ app.use("/notifications", notificationRoutes);
 app.use("/access", accessRoutes);
 // Home -- the post-login overview across every module (HOME_OVERVIEW_IMPLEMENTATION_PLAN.md).
 app.use("/home", homeRoutes);
+// Code Playground -- run lesson code on Task Mentor's code runner (routes/codePlayground.ts).
+app.use("/code-playground", codePlaygroundRoutes);
 // Reminder Hub -- timetable/deadline reminders by Web Push, in-app and
 // calendar feed (REMINDERS_SOLUTION_PROPOSAL.md).
 app.use("/reminders", reminderRoutes);

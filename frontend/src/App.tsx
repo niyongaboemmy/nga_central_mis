@@ -19,6 +19,7 @@ import SystemLayout from "./components/SystemLayout";
 import { useUser } from "./contexts/UserContext";
 import { ToastProvider, useToast } from "./contexts/ToastContext";
 import UpdateBanner from "./components/ui/UpdateBanner";
+import CodePlaygroundHost from "./components/codePlayground/CodePlaygroundHost";
 import DesktopUpdateBanner from "./components/apps/DesktopUpdateBanner";
 import { NotificationProvider } from "./contexts/NotificationContext";
 import { ConfirmProvider } from "./contexts/ConfirmContext";
@@ -290,6 +291,8 @@ function App() {
     <ToastProvider>
       <UpdateBanner />
       <DesktopUpdateBanner />
+      {/* "Run" on lesson code and playground blocks open the Code Playground here. */}
+      <CodePlaygroundHost />
       <ToastInitializer>
         <NotificationProvider>
         <ConfirmProvider>

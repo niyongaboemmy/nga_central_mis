@@ -3,11 +3,28 @@ import sanitizeHtml from "sanitize-html";
 const HEX_COLOR = /^#[0-9a-fA-F]{3,6}$/;
 const TEXT_ALIGN = /^(left|center|right|justify)$/;
 
+/**
+ * Code must keep its lines. AI models (and pasted HTML) often break lines inside
+ * <pre> with <br> or wrap each line in <p>/<div>; the reader takes the code's text,
+ * where those tags vanish and every line ran into the next ("inventoryconst parts").
+ * Turn them into real newlines before anything else sees the code.
+ */
+export const normalizePreLineBreaks = (html: string): string =>
+  html.replace(/(<pre\b[^>]*>)([\s\S]*?)(<\/pre>)/gi, (_m, open: string, body: string, close: string) => {
+    const fixed = body
+      .replace(/<br\s*\/?>/gi, "\n")
+      .replace(/<\/(p|div|li)>\s*/gi, "\n")
+      .replace(/<(p|div|li)\b[^>]*>/gi, "")
+      .replace(/\n+(<\/code>\s*)$/i, "$1")
+      .replace(/\n+$/, "");
+    return open + fixed + close;
+  });
+
 // Allow-list matches what the Tiptap StarterKit + Image/Table extensions can produce.
 // AI output and any client-submitted HTML for a note must go through this before
 // it's persisted or rendered — never trust it as pre-sanitized platform content.
 export const sanitizeNoteHtml = (html: string): string =>
-  sanitizeHtml(html, {
+  sanitizeHtml(normalizePreLineBreaks(html), {
     allowedTags: [
       "p", "br", "strong", "em", "u", "s", "code", "pre", "mark",
       "h1", "h2", "h3", "h4",
@@ -49,7 +66,12 @@ export const sanitizeNoteHtml = (html: string): string =>
       details: ["data-type", "class"],
       // data-activity: Lesson Studio activities (fill-in-the-blank, order-the-steps,
       // match-pairs) — <div data-type="activity" data-activity="{json}">…fallback…</div>.
-      div: ["data-type", "data-check", "data-activity", "class"],
+      // data-playground: Code Playground blocks (examples / exercises students run) —
+      // <div data-type="code-playground" data-playground="{json}"><pre>…starter…</pre></div>.
+      div: ["data-type", "data-check", "data-activity", "data-playground", "class"],
+      // language-xxx: the code's language, so the reader colours and runs it correctly.
+      pre: ["class"],
+      code: ["class"],
       h1: ["style"],
       h2: ["style"],
       h3: ["style"],
@@ -92,6 +114,10 @@ export const sanitizeNoteHtml = (html: string): string =>
       h2: { "text-align": [TEXT_ALIGN] },
       h3: { "text-align": [TEXT_ALIGN] },
       h4: { "text-align": [TEXT_ALIGN] },
+    },
+    allowedClasses: {
+      pre: ["language-*", "lang-*"],
+      code: ["language-*", "lang-*"],
     },
     allowedSchemes: ["http", "https", "data"],
     allowProtocolRelative: false,

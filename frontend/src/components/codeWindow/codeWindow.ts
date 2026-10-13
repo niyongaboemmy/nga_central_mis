@@ -13,13 +13,26 @@
  * Line numbers are drawn from data attributes (CSS ::before), so they are never copied,
  * found by find-in-note, or read out as text. Highlighting loads on demand; until it
  * arrives (or if it fails) the code shows plain, already laid out in lines.
+ *
+ * Code that lost its line breaks on the way (AI output, pasted HTML) is laid out again
+ * (codePlayground/format.ts), and "Run" opens it in the Code Playground. Playground
+ * blocks a teacher inserted (`div[data-type="code-playground"]`) are hydrated here too,
+ * so every reader that shows code gets them without extra wiring.
  */
+import { codeTextOf } from "../codePlayground/codeText";
+import { looksSquashed, tidyCode } from "../codePlayground/format";
+import { resolveLanguage } from "../codePlayground/languages";
+import { DEFAULT_BLOCK } from "../codePlayground/playgroundData";
+import { openPlayground, playgroundAvailable } from "../codePlayground/store";
+import { hydratePlaygrounds } from "../codePlayground/hydratePlaygrounds";
 
 export interface CodeWindowOptions {
   /** Adds an "Explain" button (the reader's Study Assistant). */
   onExplain?: (code: string, language: string) => void;
   /** Blocks longer than this start folded. 0 disables folding. */
   foldAfter?: number;
+  /** Adds "Run" (opens the Code Playground) for languages it runs. Default on. */
+  run?: boolean;
 }
 
 const ENHANCED = "data-code-window";
@@ -60,6 +73,7 @@ const ICON = {
   copy: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>',
   check: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>',
   wrap: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M3 12h15a3 3 0 1 1 0 6h-4"/><path d="m16 16-2 2 2 2"/><path d="M3 18h7"/></svg>',
+  play: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5v15a1 1 0 0 0 1.5.86l12.5-7.5a1 1 0 0 0 0-1.72L8.5 3.64A1 1 0 0 0 7 4.5Z"/></svg>',
   spark: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/></svg>',
   chevron: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>',
 };
@@ -145,16 +159,25 @@ let highlighter: Promise<typeof import("./highlight")> | null = null;
 const loadHighlighter = () => (highlighter ??= import("./highlight"));
 
 /** Turn every <pre> under root into a code window. Safe to call again on the same root. */
+const PRETTIER_PARSER: Record<string, "babel" | "typescript" | "css" | "html"> = { javascript: "babel", typescript: "typescript", css: "css", scss: "css", xml: "html" };
+
+/** A brace language to lay squashed code out with when nobody named the language. */
+const guessShape = (code: string) => (/;\s*\S/.test(code) || /[{}]/.test(code) ? "c" : null);
+
 export function enhanceCodeBlocks(root: HTMLElement | null, options: CodeWindowOptions = {}): void {
   if (!root) return;
-  const pres = Array.from(root.querySelectorAll("pre")).filter((p) => !p.closest(`[${ENHANCED}]`));
+  hydratePlaygrounds(root);
+  const pres = Array.from(root.querySelectorAll("pre")).filter((p) => !p.closest(`[${ENHANCED}], [data-type="code-playground"]`));
   if (!pres.length) return;
   const foldAfter = options.foldAfter ?? DEFAULT_FOLD;
+  const canRun = options.run !== false;
 
   for (const pre of pres) {
-    const code = (pre.querySelector("code") ?? pre).textContent?.replace(/\n$/, "") ?? "";
-    if (!code.trim()) continue;
     const declared = declaredLanguage(pre);
+    const raw = codeTextOf(pre);
+    let code = tidyCode(raw, declared ?? guessShape(raw));
+    const wasSquashed = code !== raw && looksSquashed(raw);
+    if (!code.trim()) continue;
     const lines = code.split("\n");
     const count = lines.length;
     const folds = foldAfter > 0 && count > foldAfter + 4;
@@ -170,6 +193,7 @@ export function enhanceCodeBlocks(root: HTMLElement | null, options: CodeWindowO
       `<span class="code-window__dots" aria-hidden="true"><i></i><i></i><i></i></span>` +
       `<span class="code-window__title"><span class="code-window__lang">${escapeHtml(label)}</span><span class="code-window__meta">${count} line${count === 1 ? "" : "s"}</span></span>` +
       `<span class="code-window__actions">` +
+      (canRun ? button("cw-run", "Run this code in the playground", ICON.play, "Run", "hidden") : "") +
       (options.onExplain ? button("cw-explain", "Explain this code", ICON.spark, "Explain") : "") +
       button("cw-wrap", "Wrap long lines", ICON.wrap, "Wrap", 'aria-pressed="false"') +
       button("cw-copy", "Copy code", ICON.copy, "Copy") +
@@ -205,6 +229,20 @@ export function enhanceCodeBlocks(root: HTMLElement | null, options: CodeWindowO
       const on = win.classList.toggle("is-wrapped");
       (e.currentTarget as HTMLButtonElement).setAttribute("aria-pressed", String(on));
     });
+    // Run: shown once we know the language and the playground can run it.
+    const runBtn = win.querySelector<HTMLButtonElement>(".cw-run");
+    const showRun = (lang: string | null) => {
+      const target = resolveLanguage(lang, code);
+      if (!runBtn || !target || !playgroundAvailable()) return;
+      runBtn.hidden = false;
+      runBtn.dataset.lang = target.id;
+    };
+    runBtn?.addEventListener("click", () => {
+      const language = runBtn.dataset.lang;
+      if (!language) return;
+      openPlayground({ block: { ...DEFAULT_BLOCK, language, code }, autoRun: true, source: "Code from the lesson" });
+    });
+    showRun(declared);
     win.querySelector<HTMLButtonElement>(".cw-explain")?.addEventListener("click", () =>
       options.onExplain?.(code, languageLabel(win.dataset.lang === "plaintext" ? "" : win.dataset.lang || "")),
     );
@@ -221,15 +259,31 @@ export function enhanceCodeBlocks(root: HTMLElement | null, options: CodeWindowO
       ln?.parentElement?.classList.toggle("is-marked");
     });
 
+    const paint = (highlightCode: (code: string, lang?: string | null) => { html: string; language: string }) => {
+      const out = highlightCode(code, declared);
+      codeEl.innerHTML = renderLines(splitHighlightedLines(out.html));
+      return out;
+    };
     loadHighlighter()
-      .then(({ highlightCode }) => {
+      .then(async ({ highlightCode }) => {
         if (!win.isConnected) return;
-        const out = highlightCode(code, declared);
-        codeEl.innerHTML = renderLines(splitHighlightedLines(out.html));
+        const out = paint(highlightCode);
         if (!declared) {
           win.querySelector(".code-window__lang")!.textContent = out.language ? languageLabel(out.language) : "Code";
         }
         setLabel(declared || out.language);
+        if (!declared) showRun(out.language);
+        // Squashed web code: Prettier lays it out properly (loaded only for such blocks).
+        const parser = wasSquashed ? PRETTIER_PARSER[declared || out.language] : undefined;
+        if (!parser) return;
+        const { prettifyCode } = await import("../codePlayground/format");
+        const pretty = (await prettifyCode(code, declared || out.language, parser)).replace(/\n$/, "");
+        if (!win.isConnected || pretty === code) return;
+        code = pretty;
+        const n = code.split("\n").length;
+        win.querySelector(".code-window__meta")!.textContent = `${n} line${n === 1 ? "" : "s"}`;
+        win.style.setProperty("--cw-digits", String(String(n).length));
+        paint(highlightCode);
       })
       .catch(() => {
         /* plain lines are already on screen — highlighting is a nicety */
