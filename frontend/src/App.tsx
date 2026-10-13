@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { Suspense, lazy, useEffect } from "react";
 import {
   BrowserRouter as Router,
   Routes,
@@ -20,6 +20,8 @@ import { useUser } from "./contexts/UserContext";
 import { ToastProvider, useToast } from "./contexts/ToastContext";
 import UpdateBanner from "./components/ui/UpdateBanner";
 import CodePlaygroundHost from "./components/codePlayground/CodePlaygroundHost";
+// The editor and runner load with the page, not with the app.
+const CodePlaygroundPage = lazy(() => import("./components/codePlayground/CodePlaygroundPage"));
 import DesktopUpdateBanner from "./components/apps/DesktopUpdateBanner";
 import { NotificationProvider } from "./contexts/NotificationContext";
 import { ConfirmProvider } from "./contexts/ConfirmContext";
@@ -378,6 +380,19 @@ function App() {
             {/* NGA desktop app: sign in through the browser, Postman-style (public, unwrapped). */}
             <Route path="/desktop/signin" element={<DesktopBrowserSignIn />} />
             <Route path="/desktop/complete" element={<DesktopSignInComplete />} />
+
+            {/* Code Playground -- write and run code in any language, full screen
+                (no sidebar). CODE_PLAYGROUND_USE, every role by default. */}
+            <Route
+              path="/code-playground"
+              element={
+                <ProtectedRoute>
+                  <Suspense fallback={<div className="min-h-[100dvh] bg-white dark:bg-[#0d1117]" />}>
+                    <CodePlaygroundPage />
+                  </Suspense>
+                </ProtectedRoute>
+              }
+            />
 
             {/* Reminders -- set up this device, Now & Next, what to be
                 reminded of (REMINDERS_SOLUTION_PROPOSAL.md). Everyone. */}

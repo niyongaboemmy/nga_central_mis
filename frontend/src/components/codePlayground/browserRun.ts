@@ -28,7 +28,7 @@ const scriptSafe = (code: string) => code.replace(/<\/(script)/gi, "<\\/$1");
 /** Console capture + prompt() fed from the Input panel, injected before the user's code. */
 function bridge(runId: string, stdin: string): string {
   return `<script>(function(){
-var RUN=${JSON.stringify(runId)};var lines=${JSON.stringify(stdin.split("\n"))};var at=0;
+var RUN=${JSON.stringify(runId)};var lines=${JSON.stringify(stdin ? stdin.replace(/\n$/, "").split("\n") : [])};var at=0;
 function fmt(v,d){d=d||0;try{if(typeof v==="string")return d?JSON.stringify(v):v;if(typeof v==="function")return "[Function "+(v.name||"anonymous")+"]";if(v instanceof Error)return v.name+": "+v.message;if(typeof v==="undefined")return "undefined";if(typeof v==="symbol"||typeof v==="bigint")return String(v);if(v&&typeof v==="object"){if(d>3)return Array.isArray(v)?"[Array]":"[Object]";if(Array.isArray(v))return "["+v.map(function(x){return fmt(x,d+1)}).join(", ")+"]";if(typeof Node!=="undefined"&&v instanceof Node)return "<"+(v.nodeName||"node").toLowerCase()+">";var ks=Object.keys(v);return (v.constructor&&v.constructor.name&&v.constructor.name!=="Object"?v.constructor.name+" ":"")+"{ "+ks.map(function(k){return k+": "+fmt(v[k],d+1)}).join(", ")+(ks.length?" ":"")+"}";}return String(v);}catch(e){return String(v);}}
 function send(level,args){try{parent.postMessage({__ngaPlayground:RUN,level:level,text:Array.prototype.map.call(args,function(a){return fmt(a,0)}).join(" ")},"*");}catch(e){}}
 ["log","info","warn","error","debug"].forEach(function(k){var o=console[k];console[k]=function(){send(k==="debug"?"log":k,arguments);try{o&&o.apply(console,arguments);}catch(e){}};});

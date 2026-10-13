@@ -143,6 +143,9 @@ export const Permissions = {
   DESKTOP_TOOLS_CONFIGURE: "DESKTOP_TOOLS_CONFIGURE",
   TOOLS_TRANSLATIONS_MANAGE: "TOOLS_TRANSLATIONS_MANAGE",
 
+  // Code Playground (write and run code; every role by default, migration 120)
+  CODE_PLAYGROUND_USE: "CODE_PLAYGROUND_USE",
+
   // Database Management
   DATABASE_MANAGEMENT: "DATABASE_MANAGEMENT",
 } as const;

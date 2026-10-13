@@ -24,6 +24,8 @@ import {
   Wand2,
   X,
   XCircle,
+  ArrowLeft,
+  Share2,
 } from "lucide-react";
 import CodeEditor from "./CodeEditor";
 import { LANGUAGES, isRunnable, languageById, type PlaygroundLanguage } from "./languages";
@@ -41,7 +43,14 @@ import { useDarkMode } from "./useDarkMode";
 
 export interface WorkbenchProps {
   block: PlaygroundBlock;
-  variant: "modal" | "inline";
+  /** inline: a block in a lesson; modal: over the page; page: the whole /code-playground page. */
+  variant: "modal" | "inline" | "page";
+  /** Page: picking another language is handled by the page (URL + per-language drafts). */
+  onLanguageChange?: (language: string) => void;
+  /** Page: copies a link that opens this code. */
+  onShare?: (current: { language: string; code: string }) => Promise<boolean> | boolean;
+  /** Page: the back button. */
+  onBack?: () => void;
   autoRun?: boolean;
   source?: string;
   onClose?: () => void;
@@ -102,8 +111,24 @@ const writeDraft = (key: string, value: { language: string; code: string; stdin:
 const formatMs = (ms?: number | null) => (ms == null ? null : ms < 1000 ? `${Math.round(ms)} ms` : `${(ms / 1000).toFixed(2)} s`);
 const formatKb = (kb?: number | null) => (kb == null || kb <= 0 ? null : kb < 1024 ? `${kb} KB` : `${(kb / 1024).toFixed(1)} MB`);
 
-const PlaygroundWorkbench: React.FC<WorkbenchProps> = ({ block, variant, autoRun, source, onClose, onExpand, onSave, fullscreen, onToggleFullscreen }) => {
-  const modal = variant === "modal";
+const PlaygroundWorkbench: React.FC<WorkbenchProps> = ({
+  block,
+  variant,
+  autoRun,
+  source,
+  onClose,
+  onExpand,
+  onSave,
+  fullscreen,
+  onToggleFullscreen,
+  onLanguageChange,
+  onShare,
+  onBack,
+}) => {
+  /** The modal and the page share the large layout. */
+  const modal = variant !== "inline";
+  const page = variant === "page";
+  const [shared, setShared] = useState(false);
   const dark = useDarkMode();
   const runner = useRunnerLanguages();
   const { state, run, stop, clear } = useRunner();
@@ -183,6 +208,7 @@ const PlaygroundWorkbench: React.FC<WorkbenchProps> = ({ block, variant, autoRun
   const switchLanguage = (next: PlaygroundLanguage) => {
     setMenuOpen(false);
     if (next.id === lang.id) return;
+    if (onLanguageChange) return onLanguageChange(next.id);
     // Untouched starter code follows the language; the student's own code stays.
     if (!code.trim() || code === lang.starter || code === block.code) setCode(next.id === block.language ? block.code : next.starter);
     setLangId(next.id);
@@ -610,15 +636,26 @@ const PlaygroundWorkbench: React.FC<WorkbenchProps> = ({ block, variant, autoRun
   // ------------------------------------------------------------------ modal
 
   return (
-    <div className="flex flex-col h-full min-h-0 bg-white dark:bg-[#0d1117] text-slate-900 dark:text-slate-100" data-testid="code-playground-modal">
+    <div className="flex flex-col h-full min-h-0 bg-white dark:bg-[#0d1117] text-slate-900 dark:text-slate-100" data-testid={page ? "code-playground-page" : "code-playground-modal"}>
       <header className="flex items-center gap-2 px-3 sm:px-4 h-14 border-b border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-[#161b22] flex-shrink-0">
+        {onBack && (
+          <button type="button" className={iconBtn} onClick={onBack} title="Back" aria-label="Back" data-testid="playground-back">
+            <ArrowLeft className="w-5 h-5" />
+          </button>
+        )}
         <span className="hidden sm:inline-flex items-center justify-center w-8 h-8 rounded-lg bg-gradient-to-br from-brand-500 to-indigo-500 text-white shadow-sm">
           <Code2 className="w-4 h-4" />
         </span>
         <div className="min-w-0 mr-1">
-          <h2 id="code-playground-title" className="text-sm font-semibold truncate">
-            {block.title || (exercise ? "Coding exercise" : "Code Playground")}
-          </h2>
+          {page ? (
+            <h1 id="code-playground-title" className="text-sm font-semibold truncate">
+              Code Playground
+            </h1>
+          ) : (
+            <h2 id="code-playground-title" className="text-sm font-semibold truncate">
+              {block.title || (exercise ? "Coding exercise" : "Code Playground")}
+            </h2>
+          )}
           <p className="hidden sm:block text-[11px] text-slate-500 dark:text-slate-400 truncate">{source || "Write, run and test code"}</p>
         </div>
         {languageMenu}
@@ -627,6 +664,23 @@ const PlaygroundWorkbench: React.FC<WorkbenchProps> = ({ block, variant, autoRun
         {onSave && (
           <button type="button" onClick={() => onSave({ ...block, language: langId, code, stdin })} className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg border border-slate-200 dark:border-white/10 text-sm font-medium hover:bg-slate-100 dark:hover:bg-white/10">
             <Save className="w-4 h-4" /> Save to block
+          </button>
+        )}
+        {onShare && (
+          <button
+            type="button"
+            className={`${iconBtn} hidden sm:inline-flex`}
+            onClick={async () => {
+              if (await onShare({ language: langId, code })) {
+                setShared(true);
+                window.setTimeout(() => setShared(false), 1800);
+              }
+            }}
+            title="Copy a link that opens this code"
+            aria-label="Share a link to this code"
+          >
+            {shared ? <Check className="w-4 h-4 text-success-500" /> : <Share2 className="w-4 h-4" />}
+            <span className="hidden lg:inline">{shared ? "Link copied" : "Share"}</span>
           </button>
         )}
         {runButton}

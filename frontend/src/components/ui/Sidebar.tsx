@@ -10,7 +10,7 @@ import { useAccess } from "../../hooks/useAccess";
 import { useMentorshipRole } from "../../hooks/useMentorshipRole";
 import { useOptionalAcademicPeriod } from "../../contexts/AcademicPeriodContext";
 import { BarChart3, CalendarOff, Grid3x3, Target, HeartHandshake, Radar, ShieldAlert, ShieldCheck, UserPlus, Baby } from "lucide-react";
-import { BellRing, Bot, CalendarDays, Clock4, Gamepad2, House, Users2 } from "lucide-react";
+import { BellRing, Bot, CalendarDays, Clock4, Gamepad2, House, SquareTerminal, Users2 } from "lucide-react";
 
 interface SidebarProps {
   isCollapsed?: boolean;
@@ -234,6 +234,13 @@ const Sidebar: React.FC<SidebarProps> = ({
       path: "/my-learning",
       icon: <GraduationCap className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
       requiredPermission: Permissions.VIEW_MY_COURSES,
+    },
+    {
+      // Write and run code in any language, full screen (CODE_PLAYGROUND_USE: every role).
+      label: "Code Playground",
+      path: "/code-playground",
+      icon: <SquareTerminal className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
+      requiredPermission: Permissions.CODE_PLAYGROUND_USE,
     },
     {
       label: "E-Learning",

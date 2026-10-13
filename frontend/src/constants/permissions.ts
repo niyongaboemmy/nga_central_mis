@@ -117,6 +117,8 @@ export const Permissions = {
   // NGA Desktop tools (games settings)
   DESKTOP_TOOLS_CONFIGURE: "DESKTOP_TOOLS_CONFIGURE",
   SAFEGUARDING_MANAGE: "SAFEGUARDING_MANAGE",
+  // Code Playground: every role by default (backend migration 120)
+  CODE_PLAYGROUND_USE: "CODE_PLAYGROUND_USE",
   EARLY_WARNING_VIEW: "EARLY_WARNING_VIEW",
 
   // Curriculum & Subject Materials
