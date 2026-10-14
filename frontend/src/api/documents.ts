@@ -308,6 +308,16 @@ export const documentApi = {
 
   revokeShareLink: (documentId: number) =>
     apiService.delete(`/documents/${documentId}/share-link`),
+
+  /** The caller's own document with exactly this name in a folder (or the root of a year), else null. */
+  findByName: (params: { name: string; folderId?: number; academicYearId?: number }) =>
+    apiService.get<{ data: Document | null }>("/documents/find", { params }),
+
+  /** Replace a document's file; what it held before is kept as a version. */
+  replaceContent: (documentId: number, data: FormData) =>
+    apiService.put<{ data: Document & { previous_version: number } }>(`/documents/${documentId}/content`, data, {
+      headers: { "Content-Type": "multipart/form-data" },
+    }),
 };
 
 export interface ShareLink {

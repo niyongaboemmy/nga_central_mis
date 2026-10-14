@@ -16,7 +16,7 @@
 const INDENT = "    ";
 
 /** Languages laid out by braces and semicolons. */
-const BRACE_LANGS = new Set(["javascript", "typescript", "node", "react", "java", "c", "cpp", "csharp", "php", "go", "rust", "kotlin", "swift", "css", "scss", "sql", "dart", "scala"]);
+const BRACE_LANGS = new Set(["javascript", "typescript", "node", "react", "java", "c", "cpp", "arduino", "csharp", "php", "go", "rust", "kotlin", "swift", "css", "scss", "sql", "dart", "scala"]);
 
 /** Code that starts right after a comment it was glued to ("inventoryconst parts = …"). */
 const GLUED_CODE =

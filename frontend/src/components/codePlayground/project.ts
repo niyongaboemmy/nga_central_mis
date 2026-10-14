@@ -54,6 +54,7 @@ export function editorLanguageFor(path: string, fallback: string): string {
     c: "c",
     h: "c",
     cpp: "cpp",
+    ino: "cpp",
     cc: "cpp",
     cxx: "cpp",
     hpp: "cpp",
@@ -386,6 +387,87 @@ export function exampleProject(langId: string): PlayProject | null {
         files: [
           f("script.js", 'import { total } from "./utils.js";\n\nconst prices = [5000, 12000, 3000];\nconsole.log("Total:", total(prices));\n'),
           f("utils.js", "export function total(values) {\n    return values.reduce((sum, v) => sum + v, 0);\n}\n"),
+        ],
+      };
+    case "arduino":
+      // A pedestrian crossing: three LEDs, a button, a potentiometer for the speed; logic in lights.cpp,
+      // the circuit in diagram.json (the simulator wires it), events on the Serial Monitor.
+      return {
+        entry: "sketch.ino",
+        files: [
+          f(
+            "sketch.ino",
+            `#include "lights.h"
+
+const int BUTTON = 2;  // to GND, read with INPUT_PULLUP
+const int SPEED = A0;  // potentiometer: how long each light stays on
+
+void setup() {
+  Serial.begin(9600);
+  pinMode(BUTTON, INPUT_PULLUP);
+  lightsBegin();
+  Serial.println("Crossing ready. Press the button to cross.");
+}
+
+void loop() {
+  if (digitalRead(BUTTON) == LOW) {
+    int wait = map(analogRead(SPEED), 0, 1023, 500, 3000);
+    Serial.print("Button pressed, crossing in ");
+    Serial.print(wait);
+    Serial.println(" ms");
+    show(YELLOW);
+    delay(wait);
+    show(RED);
+    Serial.println("Walk!");
+    delay(wait * 2);
+    show(GREEN);
+    Serial.println("Cars go.");
+  }
+}
+`,
+          ),
+          f("lights.h", "#pragma once\n\nenum Light { RED, YELLOW, GREEN };\n\nvoid lightsBegin();\nvoid show(Light light);\n"),
+          f(
+            "lights.cpp",
+            `#include <Arduino.h>
+#include "lights.h"
+
+const int RED_PIN = 12;
+const int YELLOW_PIN = 11;
+const int GREEN_PIN = 10;
+
+void lightsBegin() {
+  pinMode(RED_PIN, OUTPUT);
+  pinMode(YELLOW_PIN, OUTPUT);
+  pinMode(GREEN_PIN, OUTPUT);
+  show(GREEN);
+}
+
+void show(Light light) {
+  digitalWrite(RED_PIN, light == RED);
+  digitalWrite(YELLOW_PIN, light == YELLOW);
+  digitalWrite(GREEN_PIN, light == GREEN);
+}
+`,
+          ),
+          f(
+            "diagram.json",
+            `${JSON.stringify(
+              {
+                version: 1,
+                board: "uno",
+                parts: [
+                  { id: "red", type: "led", label: "Red", color: "red", pins: { pin: "D12" } },
+                  { id: "yellow", type: "led", label: "Yellow", color: "yellow", pins: { pin: "D11" } },
+                  { id: "green", type: "led", label: "Green", color: "green", pins: { pin: "D10" } },
+                  { id: "button", type: "button", label: "Cross", pins: { pin: "D2" }, wiring: "to-gnd" },
+                  { id: "speed", type: "potentiometer", label: "Speed", pins: { pin: "A0" } },
+                ],
+              },
+              null,
+              2,
+            )}\n`,
+          ),
         ],
       };
     case "react":

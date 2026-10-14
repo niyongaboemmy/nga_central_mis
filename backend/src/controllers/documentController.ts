@@ -204,6 +204,23 @@ async function resolveDocumentAccess(
   return null;
 }
 
+/**
+ * Removes documents' earlier versions: their files in storage and their rows. Runs before
+ * the documents themselves go (a version row may reference its document).
+ */
+async function deleteVersionsOf(documentIds: number[]) {
+  if (!documentIds.length) return;
+  const versions = await db.select().from(DocumentVersion).where(inArray(DocumentVersion.document_id, documentIds));
+  for (const v of versions) {
+    try {
+      await storageService.deleteFile(v.file_path);
+    } catch {
+      logger.warn(`Failed to delete version file from storage: ${v.file_path}`);
+    }
+  }
+  await db.delete(DocumentVersion).where(inArray(DocumentVersion.document_id, documentIds));
+}
+
 async function resolveFolderAccess(
   userId: number,
   folderId: number,
@@ -1074,6 +1091,7 @@ export const deleteFolder = asyncHandler(async (req: any, res: any) => {
   }
 
   // Delete documents and their versions
+  await deleteVersionsOf(documents.map((d) => d.document_id));
   await db.delete(Document).where(eq(Document.folder_id, folderIdNum));
   await db
     .delete(DocumentFolder)
@@ -2034,10 +2052,8 @@ export const deleteDocument = asyncHandler(async (req: any, res: any) => {
     logger.warn(`Failed to delete file from storage: ${document[0].file_path}`);
   }
 
-  // Delete document versions
-  await db
-    .delete(DocumentVersion)
-    .where(eq(DocumentVersion.document_id, documentIdNum));
+  // Delete document versions (their files too)
+  await deleteVersionsOf([documentIdNum]);
 
   // Delete document permissions
   await db
@@ -2179,6 +2195,124 @@ export const uploadNewVersion = asyncHandler(async (req: any, res: any) => {
     logger.error("Version upload failed:", error);
     throw error;
   }
+});
+
+/**
+ * GET /documents/find?name=…&folderId=… (or &academicYearId=… for "My Documents")
+ * The caller's own document with exactly that name in that place, or null — so
+ * "Save to Documents" can offer to update the copy saved last time.
+ */
+export const findDocumentByName = asyncHandler(async (req: any, res: any) => {
+  const userId = req.user.userId;
+  const name = typeof req.query.name === "string" ? req.query.name.trim() : "";
+  if (!name || name.length > 255) {
+    throw new ValidationError("name is required (at most 255 characters)");
+  }
+  const folderId = req.query.folderId ? parseInt(req.query.folderId as string) : null;
+  if (folderId !== null && (isNaN(folderId) || folderId <= 0)) {
+    throw new ValidationError("Invalid folderId");
+  }
+  const yearId = req.query.academicYearId ? parseInt(req.query.academicYearId as string) : null;
+  if (yearId !== null && (isNaN(yearId) || yearId <= 0)) {
+    throw new ValidationError("Invalid academicYearId");
+  }
+
+  const conditions: SQL[] = [eq(Document.user_id, userId), eq(Document.original_name, name)];
+  if (folderId !== null) conditions.push(eq(Document.folder_id, folderId));
+  else {
+    conditions.push(isNull(Document.folder_id));
+    // Root documents are listed per academic year, like getDocuments.
+    if (yearId !== null) conditions.push(eq(Document.academic_year_id, yearId));
+  }
+
+  const [doc] = await db
+    .select()
+    .from(Document)
+    .where(and(...conditions))
+    .orderBy(desc(Document.updated_at))
+    .limit(1);
+
+  successResponse(res, doc ? "Document found" : "No document with that name", doc ?? null);
+});
+
+/**
+ * PUT /documents/:documentId/content (multipart "file")
+ * Replaces what a document holds, keeping what it held before as a version: the
+ * document opens and downloads as the new file, and its history keeps the old one.
+ * Owner, or someone it (or its folder) is shared with for editing.
+ */
+export const replaceDocumentContent = asyncHandler(async (req: any, res: any) => {
+  const userId = req.user.userId;
+  const documentId = parseInt(req.params.documentId);
+  const file = req.file;
+  const changeDescription = typeof req.body?.changeDescription === "string" ? req.body.changeDescription : "";
+
+  if (isNaN(documentId) || documentId <= 0) {
+    throw new ValidationError("Invalid document ID");
+  }
+  if (!file) {
+    throw new ValidationError("No file uploaded");
+  }
+
+  const access = await resolveDocumentAccess(userId, documentId);
+  if (!access) {
+    throw new NotFoundError("Document not found");
+  }
+  if (access.permissionType !== "OWNER" && access.permissionType !== "EDIT") {
+    throw new AuthorizationError("You can't change this document");
+  }
+  const doc = access.document;
+
+  const [latest] = await db
+    .select()
+    .from(DocumentVersion)
+    .where(eq(DocumentVersion.document_id, documentId))
+    .orderBy(desc(DocumentVersion.version_number))
+    .limit(1);
+  const versionNumber = latest ? latest.version_number + 1 : 1;
+
+  // The new file lives where the document's files live (its owner's folder).
+  const fileExtension = path.extname(file.originalname || doc.original_name).toLowerCase();
+  const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}${fileExtension}`;
+  const remoteFilePath = `${doc.user_id}/${fileName}`;
+  await storageService.uploadFile(file.buffer, remoteFilePath);
+
+  // What it held until now becomes a version (its file stays in storage).
+  await db.insert(DocumentVersion).values({
+    document_id: documentId,
+    user_id: userId,
+    version_number: versionNumber,
+    file_name: doc.file_name,
+    file_path: doc.file_path,
+    file_size: doc.file_size,
+    change_description: sanitizeString(changeDescription || "Replaced with a newer copy").slice(0, 500),
+  });
+
+  await db
+    .update(Document)
+    .set({
+      file_name: fileName,
+      file_path: remoteFilePath,
+      file_size: file.size,
+      mime_type: file.mimetype,
+      file_extension: fileExtension.replace(".", ""),
+    })
+    .where(eq(Document.document_id, documentId));
+
+  const [updated] = await db.select().from(Document).where(eq(Document.document_id, documentId)).limit(1);
+
+  logger.info(`Document content replaced: ${documentId} (previous kept as v${versionNumber}) by user ${userId}`);
+  await recordActivity(
+    userId,
+    "DOCUMENT_UPDATE",
+    `Document updated: ${doc.original_name}`,
+    "Document",
+    documentId,
+    { previous_version: versionNumber, file_size: file.size, mime_type: file.mimetype },
+    userId,
+  );
+
+  successResponse(res, "Document updated", { ...updated, previous_version: versionNumber });
 });
 
 export const getDocumentVersions = asyncHandler(async (req: any, res: any) => {

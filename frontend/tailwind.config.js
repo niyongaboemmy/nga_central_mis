@@ -53,6 +53,8 @@ export default {
       transitionTimingFunction: { spring: "cubic-bezier(.2,.8,.2,1)" },
       animation: {
         "fade-in": "fadeIn 0.3s ease-in-out",
+        // Code Playground: expanding to the whole window (a quick zoom, not a slide).
+        "expand-in": "expandIn 0.18s ease-out",
         "slide-up": "slideUp 0.3s ease-out",
         "grow-width": "growWidth 5s linear forwards",
         shimmer: "shimmer 1.6s infinite",
@@ -87,6 +89,10 @@ export default {
         ],
       },
       keyframes: {
+        expandIn: {
+          "0%": { opacity: "0.6", transform: "scale(0.985)" },
+          "100%": { opacity: "1", transform: "none" },
+        },
         fadeIn: {
           "0%": { opacity: "0" },
           "100%": { opacity: "1" },

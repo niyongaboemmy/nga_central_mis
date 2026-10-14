@@ -21,7 +21,7 @@ const PlaygroundWorkbench = lazy(() => import("./PlaygroundWorkbench"));
  */
 export interface CodePlaygroundProps
   extends Partial<Omit<PlaygroundBlock, "language" | "code">>,
-    Pick<WorkbenchProps, "autoRun" | "source" | "onClose" | "onExpand" | "onSave" | "fullscreen" | "onToggleFullscreen" | "onLanguageChange" | "onShare" | "onBack"> {
+    Pick<WorkbenchProps, "autoRun" | "source" | "onClose" | "onExpand" | "onSave" | "fullscreen" | "onToggleFullscreen" | "expanded" | "onToggleExpanded" | "onLanguageChange" | "onShare" | "onBack"> {
   /** Playground language id (languages.ts); defaults to HTML, CSS & JavaScript. */
   language?: string;
   /** Starting code; defaults to the language's starter program. */

@@ -4,6 +4,7 @@
  * school are registered — the full highlight.js bundle is ~10x the size.
  */
 import hljs from "highlight.js/lib/core";
+import arduino from "highlight.js/lib/languages/arduino";
 import bash from "highlight.js/lib/languages/bash";
 import c from "highlight.js/lib/languages/c";
 import cpp from "highlight.js/lib/languages/cpp";
@@ -22,7 +23,7 @@ import sql from "highlight.js/lib/languages/sql";
 import typescript from "highlight.js/lib/languages/typescript";
 import xml from "highlight.js/lib/languages/xml";
 
-const LANGUAGES = { bash, c, cpp, csharp, css, go, java, javascript, json, kotlin, php, plaintext, python, scss, sql, typescript, xml };
+const LANGUAGES = { arduino, bash, c, cpp, csharp, css, go, java, javascript, json, kotlin, php, plaintext, python, scss, sql, typescript, xml };
 for (const [name, def] of Object.entries(LANGUAGES)) hljs.registerLanguage(name, def);
 
 /** Guessing among every language makes short snippets come out as something exotic;

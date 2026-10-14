@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { Lock } from "lucide-react";
+import { Link, useSearchParams } from "react-router-dom";
+import { Lock, Minimize2 } from "lucide-react";
 import CodePlayground from "./CodePlayground";
 import { languageById } from "./languages";
 import { WEB_STARTER, type PlayFile } from "./project";
@@ -8,12 +8,15 @@ import { usePermissions } from "../../hooks/usePermissions";
 import { Permissions } from "../../constants/permissions";
 
 /**
- * /code-playground — the Code Playground on its own, filling the screen (no sidebar or
- * top bar), for any language it runs. ?lang=python picks the language (HTML, CSS & JavaScript by default); each language
- * keeps its own draft on this device. "Share" copies a link carrying the files
+ * /code-playground — the Code Playground as a page of the MIS (sidebar and top bar around it),
+ * for any language it runs. ?lang=python picks the language (HTML, CSS & JavaScript by default);
+ * each language keeps its own draft on this device. "Share" copies a link carrying the files
  * (#p=…, base64 JSON; older links #code=… carry one file), so a teacher can hand an example
- * to a class. Full screen hides
- * the browser's own bars too. Needs CODE_PLAYGROUND_USE (every role by default).
+ * to a class.
+ *
+ * "Expand" (Ctrl/⌘+Shift+E) lets it fill the window over the MIS bars; Esc comes back. Expanded,
+ * "Full screen" hides the browser's own bars too. The same element only changes size, so the
+ * code, a running program and its console carry on. Needs CODE_PLAYGROUND_USE (every role).
  */
 
 /** A page made of HTML, CSS and JavaScript: what most students start with. */
@@ -51,7 +54,8 @@ const sharedProgram = (): { code: string; entry?: string; files?: PlayFile[] } |
 
 const CodePlaygroundPage: React.FC = () => {
   const { hasPermission } = usePermissions();
-  const navigate = useNavigate();
+  const [expanded, setExpanded] = useState(false);
+  const [hint, setHint] = useState(false);
   const [params, setParams] = useSearchParams();
   const language = languageById(params.get("lang"))?.id ?? DEFAULT_LANGUAGE;
   // Shared code is read once, for the language in the link.
@@ -64,6 +68,42 @@ const CodePlaygroundPage: React.FC = () => {
     document.addEventListener("fullscreenchange", onChange);
     return () => document.removeEventListener("fullscreenchange", onChange);
   }, []);
+
+  const toggleExpanded = useCallback(() => {
+    setExpanded((on) => {
+      if (on && document.fullscreenElement) void document.exitFullscreen?.();
+      return !on;
+    });
+  }, []);
+
+  // Expanded: say how to come back for a moment, and keep the page behind from scrolling.
+  useEffect(() => {
+    if (!expanded) return;
+    setHint(true);
+    const t = window.setTimeout(() => setHint(false), 2600);
+    const overflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.clearTimeout(t);
+      setHint(false);
+      document.body.style.overflow = overflow;
+    };
+  }, [expanded]);
+
+  // Ctrl/⌘+Shift+E expands or comes back; Esc comes back (unless a menu, a dialog or the
+  // editor used it — they mark the key handled).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && !e.altKey && e.key.toLowerCase() === "e") {
+        e.preventDefault();
+        toggleExpanded();
+      } else if (e.key === "Escape" && expanded && !e.defaultPrevented) {
+        setExpanded(false);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [expanded, toggleExpanded]);
 
   const toggleFullscreen = useCallback(() => {
     if (document.fullscreenElement) void document.exitFullscreen?.();
@@ -90,12 +130,6 @@ const CodePlaygroundPage: React.FC = () => {
     }
   }, []);
 
-  const onBack = useCallback(() => {
-    if (document.fullscreenElement) void document.exitFullscreen?.();
-    if (window.history.length > 1) navigate(-1);
-    else navigate("/home");
-  }, [navigate]);
-
   const program = useMemo(() => {
     if (shared && shared.code.trim()) return shared;
     // HTML, CSS & JavaScript opens as three linked files: index.html, style.css, script.js.
@@ -108,7 +142,7 @@ const CodePlaygroundPage: React.FC = () => {
 
   if (!hasPermission(Permissions.CODE_PLAYGROUND_USE)) {
     return (
-      <main className="min-h-[100dvh] flex items-center justify-center p-6 bg-slate-50 dark:bg-[#0d1117]">
+      <main className="min-h-[60vh] flex items-center justify-center p-6">
         <div className="max-w-sm text-center">
           <Lock className="w-8 h-8 mx-auto text-slate-400" />
           <h1 className="mt-3 text-lg font-semibold text-slate-900 dark:text-white">No access to the Code Playground</h1>
@@ -122,22 +156,41 @@ const CodePlaygroundPage: React.FC = () => {
   }
 
   return (
-    <main className="fixed inset-0 z-40 bg-white dark:bg-[#0d1117]" data-testid="code-playground-route">
-      <CodePlayground
-        variant="page"
-        language={language}
-        code={program?.code}
-        entry={program?.entry}
-        files={program?.files}
-        source="Write, run and test code in any language"
-        onLanguageChange={onLanguageChange}
-        onShare={onShare}
-        onBack={onBack}
-        fullscreen={isFullscreen}
-        onToggleFullscreen={toggleFullscreen}
-        className="h-full"
-      />
-    </main>
+    // Normal: a card filling the page under the MIS top bar. Expanded: the same element over
+    // everything (above the bars, under dialogs such as Save to Documents).
+    <div className={expanded ? "" : "py-3 sm:py-4"}>
+      <section
+        aria-label="Code Playground"
+        className={
+          expanded
+            ? "fixed inset-0 z-[900] bg-white dark:bg-[#0d1117] animate-expand-in motion-reduce:animate-none"
+            : "relative h-[calc(100dvh-4rem-1.5rem)] sm:h-[calc(100dvh-4rem-2rem)] min-h-[520px] rounded-2xl overflow-hidden border border-slate-200 dark:border-white/10 shadow-sm bg-white dark:bg-[#0d1117]"
+        }
+        data-testid="code-playground-route"
+        data-view={expanded ? "expanded" : "normal"}
+      >
+        <CodePlayground
+          variant="page"
+          language={language}
+          code={program?.code}
+          entry={program?.entry}
+          files={program?.files}
+          source="Write, run and test code in any language"
+          onLanguageChange={onLanguageChange}
+          onShare={onShare}
+          expanded={expanded}
+          onToggleExpanded={toggleExpanded}
+          fullscreen={isFullscreen}
+          onToggleFullscreen={expanded ? toggleFullscreen : undefined}
+          className="h-full"
+        />
+        {hint && (
+          <div role="status" className="pointer-events-none fixed bottom-12 left-1/2 -translate-x-1/2 z-[950] whitespace-nowrap inline-flex items-center gap-2 rounded-full bg-slate-900/90 dark:bg-white/90 text-white dark:text-slate-900 px-4 py-2 text-sm shadow-lg animate-fade-in" data-testid="playground-expanded-hint">
+            <Minimize2 className="w-4 h-4" /> Expanded view · press <kbd className="font-sans font-semibold">Esc</kbd> to go back
+          </div>
+        )}
+      </section>
+    </div>
   );
 };
 

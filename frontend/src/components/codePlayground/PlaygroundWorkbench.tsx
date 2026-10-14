@@ -1,10 +1,10 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Check,
   CheckCircle2,
   Code2,
+  Cpu,
   Copy,
-  Download,
   Eye,
   EyeOff,
   Globe,
@@ -13,6 +13,8 @@ import {
   Loader2,
   Maximize2,
   Minimize2,
+  Expand,
+  Shrink,
   Play,
   RotateCcw,
   Save,
@@ -33,6 +35,13 @@ import FileTabs from "./FileTabs";
 import LiveConsole from "./LiveConsole";
 import LanguagePicker from "./LanguagePicker";
 import SqlOutput from "./SqlOutput";
+import { DIAGRAM_FILE, parseCircuit, serializeCircuit, type Circuit } from "./arduino/parts";
+
+/** The Arduino simulator (avr8js + Wokwi parts): loaded only when an Arduino sketch is open. */
+const ArduinoSimulator = React.lazy(() => import("./arduino/ArduinoSimulator"));
+import DownloadMenu from "./DownloadMenu";
+import SaveToDocumentsDialog from "./SaveToDocumentsDialog";
+import { exportForDownload, projectZipName, saveBlob } from "./saveCode";
 import SelectField from "../ui/SelectField";
 import {
   editorLanguageFor,
@@ -76,11 +85,17 @@ export interface WorkbenchProps {
   onClose?: () => void;
   onExpand?: (current: PlaygroundBlock) => void;
   onSave?: (block: PlaygroundBlock) => void;
+  /** Page, expanded: the browser's full screen (hides its own bars too). */
   fullscreen?: boolean;
   onToggleFullscreen?: () => void;
+  /** Page: filling the window over the MIS bars, or a page among the others. */
+  expanded?: boolean;
+  onToggleExpanded?: () => void;
 }
 
 type Pane = "output" | "preview" | "input";
+
+const isMac = typeof navigator !== "undefined" && /Mac|iP(hone|ad)/.test(navigator.platform || navigator.userAgent);
 
 const VERDICT: Record<string, { label: string; tone: "ok" | "warn" | "bad" }> = {
   ok: { label: "Finished", tone: "ok" },
@@ -159,6 +174,8 @@ const PlaygroundWorkbench: React.FC<WorkbenchProps> = ({
   onSave,
   fullscreen,
   onToggleFullscreen,
+  expanded,
+  onToggleExpanded,
   onLanguageChange,
   onShare,
   onBack,
@@ -188,6 +205,7 @@ const PlaygroundWorkbench: React.FC<WorkbenchProps> = ({
   const [stdin, setStdin] = useState(saved?.stdin ?? block.stdin);
   const [pane, setPane] = useState<Pane>("output");
   const [copied, setCopied] = useState(false);
+  const [saveOpen, setSaveOpen] = useState(false);
   const [formatting, setFormatting] = useState(false);
   const [showHint, setShowHint] = useState(false);
   const [showSolution, setShowSolution] = useState(false);
@@ -205,7 +223,7 @@ const PlaygroundWorkbench: React.FC<WorkbenchProps> = ({
   const setActiveCode = useCallback((v: string) => setFiles((fs) => fs.map((x) => (x.path === activeFile.path ? { ...x, content: v } : x))), [activeFile.path]);
   const setMainCode = (v: string) => setFiles((fs) => fs.map((x) => (x.path === entry ? { ...x, content: v } : x)));
   // A page printed by PHP shows in the Preview too.
-  const hasPreview = lang.browser === "web" || lang.browser === "react" || (!lang.browser && !!state.doc);
+  const hasPreview = lang.browser === "web" || lang.browser === "react" || lang.firmware === "avr-uno" || (!lang.browser && !!state.doc);
   const sameFiles = (a: PlayFile[], b: PlayFile[]) => a.length === b.length && a.every((x, i) => x.path === b[i].path && x.content === b[i].content);
   const dirty = !sameFiles(files, blockProject.files) || entry !== blockProject.entry || langId !== block.language || stdin !== block.stdin;
   const changed = useMemo(
@@ -221,6 +239,14 @@ const PlaygroundWorkbench: React.FC<WorkbenchProps> = ({
   // An exercise with an expected output runs in one batch, so its check is deterministic.
   const live = runsLive(lang, runner.interactive) && !(exercise && block.expected.trim());
   const example = exampleProject(lang.id);
+  /** Arduino: compiled on the runner, run in the simulator; the circuit lives in diagram.json. */
+  const arduino = lang.firmware === "avr-uno";
+  const diagramText = files.find((x) => x.path === DIAGRAM_FILE)?.content;
+  const circuit = useMemo(() => parseCircuit(diagramText), [diagramText]);
+  const setCircuit = useCallback((c: Circuit) => {
+    const text = serializeCircuit(c);
+    setFiles((fs) => (fs.some((x) => x.path === DIAGRAM_FILE) ? fs.map((x) => (x.path === DIAGRAM_FILE ? { ...x, content: text } : x)) : [...fs, { path: DIAGRAM_FILE, content: text }]));
+  }, []);
 
   // Keep the student's work on this device (not for the teacher editing the block).
   useEffect(() => {
@@ -232,9 +258,16 @@ const PlaygroundWorkbench: React.FC<WorkbenchProps> = ({
   const doRun = useCallback(() => {
     if (!runnable || problem || !files.some((x) => x.content.trim())) return;
     setChecked(null);
-    setPane(lang.browser === "web" || lang.browser === "react" ? "preview" : "output");
-    void (live ? runLive : run)(lang, { files, entry }, stdin);
-  }, [runnable, problem, files, entry, run, runLive, live, lang, stdin]);
+    setPane(lang.browser === "web" || lang.browser === "react" || lang.firmware ? "preview" : "output");
+    if (live) void runLive(lang, { files, entry }, stdin);
+    // An exercise checks the output (Arduino: the sketch's Serial output, simulated).
+    else void run(lang, { files, entry }, stdin, exercise && block.expected.trim() ? { check: block.expected } : {});
+  }, [runnable, problem, files, entry, run, runLive, live, lang, stdin, exercise, block.expected]);
+
+  // Arduino: a sketch that didn't compile shows the compiler's messages.
+  useEffect(() => {
+    if (arduino && state.phase === "done" && state.meta && !state.firmware) setPane("output");
+  }, [arduino, state.phase, state.meta, state.firmware]);
 
   // A server program that printed a page (PHP): show the page.
   const shownDocFor = useRef<string | null>(null);
@@ -338,27 +371,24 @@ const PlaygroundWorkbench: React.FC<WorkbenchProps> = ({
     }
   };
 
+  const zipName = projectZipName(block.title, "playground");
   const download = async () => {
-    let blob: Blob;
-    let name: string;
-    if (files.length === 1) {
-      blob = new Blob([files[0].content], { type: "text/plain;charset=utf-8" });
-      name = files[0].path.split("/").pop() || lang.file;
-    } else {
-      // Several files: one .zip, folders kept.
-      const { default: JSZip } = await import("jszip");
-      const zip = new JSZip();
-      for (const x of files) zip.file(x.path, x.content);
-      blob = await zip.generateAsync({ type: "blob" });
-      name = `${(block.title || "playground").replace(/[^\w-]+/g, "-").replace(/^-|-$/g, "").toLowerCase() || "playground"}.zip`;
-    }
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = name;
-    a.click();
-    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    const { blob, name } = await exportForDownload(files, zipName);
+    saveBlob(blob, name);
   };
+
+  // Ctrl/⌘+S saves to Documents (instead of the browser saving the web page).
+  useEffect(() => {
+    if (!modal) return;
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === "s") {
+        e.preventDefault();
+        setSaveOpen(true);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [modal]);
 
   // Drag the divider between the editor and the output (modal, wide screens).
   const startDrag = (e: React.PointerEvent) => {
@@ -453,9 +483,11 @@ const PlaygroundWorkbench: React.FC<WorkbenchProps> = ({
         {copied ? <Check className="w-4 h-4 text-success-500" /> : <Copy className="w-4 h-4" />}
       </button>
       {modal && (
-        <button type="button" className={iconBtn} onClick={() => void download()} title={files.length > 1 ? "Download the files (.zip)" : `Download ${files[0].path}`} aria-label="Download code">
-          <Download className="w-4 h-4" />
-        </button>
+        <DownloadMenu
+          downloadLabel={files.length > 1 ? `${zipName} (${files.length} files)` : files[0].path.split("/").pop() || lang.file}
+          onDownload={() => void download()}
+          onSaveToDocuments={() => setSaveOpen(true)}
+        />
       )}
     </div>
   );
@@ -612,7 +644,21 @@ const PlaygroundWorkbench: React.FC<WorkbenchProps> = ({
     />
   );
 
-  const previewPane = hasPreview && (
+  const simulatorPane = arduino && (
+    <div className={`flex-1 min-h-0 flex flex-col overflow-hidden ${pane === "preview" ? "" : "hidden"}`}>
+      <Suspense
+        fallback={
+          <p className="m-auto flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
+            <Loader2 className="w-4 h-4 animate-spin" /> Opening the Arduino simulator…
+          </p>
+        }
+      >
+        <ArduinoSimulator firmware={state.firmware} compiling={state.phase === "running"} circuit={circuit} onCircuitChange={setCircuit} code={code} sketchName={entry} onRun={doRun} />
+      </Suspense>
+    </div>
+  );
+
+  const previewPane = !arduino && hasPreview && (
     <div className={`flex-1 min-h-0 flex flex-col bg-white ${pane === "preview" ? "" : "hidden"}`}>
       {state.page && (
         <div className="flex items-center gap-1.5 h-8 px-2 border-b border-slate-200 bg-slate-50 text-[12px] text-slate-600 [color-scheme:light]" data-testid="playground-address">
@@ -745,7 +791,7 @@ const PlaygroundWorkbench: React.FC<WorkbenchProps> = ({
         <Terminal className="w-3.5 h-3.5" />,
         errorCount ? <span className="ml-0.5 px-1.5 rounded-full bg-danger-500 text-white text-[10px] leading-4">{errorCount}</span> : state.live && state.phase === "running" ? <span className="w-1.5 h-1.5 rounded-full bg-success-500 animate-pulse" aria-label="running" /> : null,
       )}
-      {hasPreview && paneTab("preview", "Preview", <Globe className="w-3.5 h-3.5" />)}
+      {hasPreview && (arduino ? paneTab("preview", "Simulator", <Cpu className="w-3.5 h-3.5" />, state.firmware ? <span className="w-1.5 h-1.5 rounded-full bg-success-500" aria-label="running" /> : null) : paneTab("preview", "Preview", <Globe className="w-3.5 h-3.5" />))}
       {lang.stdin && paneTab("input", "Input", <Keyboard className="w-3.5 h-3.5" />, stdin.trim() ? <span className="w-1.5 h-1.5 rounded-full bg-brand-500" /> : null)}
       </div>
       <span className="flex-1" />
@@ -762,6 +808,7 @@ const PlaygroundWorkbench: React.FC<WorkbenchProps> = ({
       {outputTabs}
       <div className={`flex-1 min-h-0 flex flex-col ${pane === "output" ? "" : "hidden"}`}>{consolePane || outputPane}</div>
       {previewPane}
+      {simulatorPane}
       {pane === "input" && inputPane}
     </div>
   );
@@ -795,7 +842,7 @@ const PlaygroundWorkbench: React.FC<WorkbenchProps> = ({
           {toolbar}
         </div>
         {(state.phase !== "idle" || state.entries.length > 0 || pane === "input") && (
-          <div className={`${hasPreview ? "h-[320px]" : "min-h-[140px] max-h-[320px]"} flex flex-col border-t border-slate-200 dark:border-white/10`}>{results}</div>
+          <div className={`${arduino ? "h-[600px]" : hasPreview ? "h-[320px]" : "min-h-[140px] max-h-[320px]"} flex flex-col border-t border-slate-200 dark:border-white/10`}>{results}</div>
         )}
         {state.phase === "idle" && lang.stdin && pane !== "input" && (
           <button type="button" onClick={() => setPane("input")} className="w-full text-left px-3 py-1.5 text-[11.5px] text-slate-500 hover:text-brand-600 border-t border-slate-200 dark:border-white/10">
@@ -859,8 +906,22 @@ const PlaygroundWorkbench: React.FC<WorkbenchProps> = ({
         )}
         {runButton}
         {onToggleFullscreen && (
-          <button type="button" className={`${iconBtn} hidden sm:inline-flex`} onClick={onToggleFullscreen} title={fullscreen ? "Exit full screen" : "Full screen"} aria-label={fullscreen ? "Exit full screen" : "Full screen"}>
-            {fullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+          <button type="button" className={`${iconBtn} hidden sm:inline-flex`} onClick={onToggleFullscreen} title={fullscreen ? "Exit full screen" : "Full screen (hides the browser's bars too)"} aria-label={fullscreen ? "Exit full screen" : "Full screen"} data-testid="playground-fullscreen">
+            {fullscreen ? <Shrink className="w-4 h-4" /> : <Expand className="w-4 h-4" />}
+          </button>
+        )}
+        {onToggleExpanded && (
+          <button
+            type="button"
+            className={`${iconBtn} border border-slate-200 dark:border-white/10`}
+            onClick={onToggleExpanded}
+            title={`${expanded ? "Back to the page" : "Expand: use the whole window"} (${isMac ? "⌘" : "Ctrl"}+Shift+E${expanded ? " or Esc" : ""})`}
+            aria-label={expanded ? "Back to the page" : "Expand the playground"}
+            aria-pressed={!!expanded}
+            data-testid="playground-expand"
+          >
+            {expanded ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+            <span className="hidden xl:inline">{expanded ? "Exit" : "Expand"}</span>
           </button>
         )}
         {onClose && (
@@ -893,6 +954,7 @@ const PlaygroundWorkbench: React.FC<WorkbenchProps> = ({
       </div>
       {statusBar}
       {hiddenFrame}
+      {saveOpen && <SaveToDocumentsDialog files={files} activePath={active} zipName={zipName} languageLabel={lang.label} languageId={lang.id} onClose={() => setSaveOpen(false)} />}
     </div>
   );
 };

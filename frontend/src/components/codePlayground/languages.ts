@@ -26,6 +26,11 @@ export interface PlaygroundLanguage {
   prettier?: "babel" | "typescript" | "css" | "html" | "json";
   /** Reads input (stdin) — shows the Input panel. */
   stdin: boolean;
+  /**
+   * Compiled on the runner to firmware that runs here in a simulator (avr8js): the run's output
+   * is the firmware, not the program's text. "avr-uno": an Arduino Uno (ATmega328P).
+   */
+  firmware?: "avr-uno";
   starter: string;
 }
 
@@ -135,6 +140,18 @@ export const LANGUAGES: PlaygroundLanguage[] = [
   L({ id: "swift", label: "Swift", short: "Swift", runner: "swift", hljs: "swift", file: "main.swift", stdin: true, starter: 'print("Your name? ", terminator: "")\nlet line = readLine() ?? ""\nlet name = line.isEmpty ? "student" : line\nprint("Hello, \\(name)!")\n' }),
   L({ id: "bash", label: "Bash", short: "Bash", runner: "bash", hljs: "bash", file: "main.sh", stdin: true, starter: '# read -p only shows its prompt in a real terminal: echo -n works everywhere.\necho -n "Your name? "\nread -r name\necho "Hello, ${name:-student}!"\n' }),
   L({
+    id: "arduino",
+    label: "Arduino (Uno)",
+    short: "Ino",
+    runner: "arduino",
+    firmware: "avr-uno",
+    hljs: "arduino",
+    file: "sketch.ino",
+    stdin: false,
+    starter:
+      '// Blink the Uno\'s LED on pin 13 and count on the Serial Monitor.\n\nint count = 0;\n\nvoid setup() {\n  Serial.begin(9600);\n  pinMode(LED_BUILTIN, OUTPUT);\n  Serial.println("Hello, Arduino!");\n}\n\nvoid loop() {\n  digitalWrite(LED_BUILTIN, HIGH);\n  delay(500);\n  digitalWrite(LED_BUILTIN, LOW);\n  delay(500);\n  count++;\n  Serial.print("Blinks: ");\n  Serial.println(count);\n}\n',
+  }),
+  L({
     id: "sql",
     label: "SQL (SQLite)",
     short: "SQL",
@@ -222,6 +239,8 @@ const ALIAS: Record<string, string> = {
   bash: "bash",
   sh: "bash",
   shell: "bash",
+  arduino: "arduino",
+  ino: "arduino",
   sql: "sql",
   mysql: "sql",
   sqlite: "sql",
@@ -239,6 +258,7 @@ const KEYWORDS: Record<string, string> = {
   python: "py3",
   csharp: "dotnet .net",
   php: "web form backend",
+  arduino: "uno avr embedded electronics microcontroller circuit led sensor servo robot iot",
   sql: "database query table sqlite mysql",
   html: "web page website css javascript js frontend",
   css: "style web design",
