@@ -53,7 +53,7 @@ export const LANGUAGES: PlaygroundLanguage[] = [
     prettier: "babel",
     stdin: true,
     starter:
-      'const lines = require("fs").readFileSync(0, "utf8").trim().split("\\n");\nconsole.log(`Hello, ${lines[0] || "student"}!`);\n',
+      'const readline = require("readline");\n\nconst rl = readline.createInterface({ input: process.stdin, output: process.stdout });\nrl.question("Your name? ", (answer) => {\n    const name = answer.trim() || "student";\n    console.log(`Hello, ${name}!`);\n    rl.close();\n});\n',
   }),
   L({
     id: "typescript",
@@ -64,7 +64,7 @@ export const LANGUAGES: PlaygroundLanguage[] = [
     file: "main.ts",
     prettier: "typescript",
     stdin: true,
-    starter: 'const greet = (name: string): string => `Hello, ${name}!`;\nconsole.log(greet("student"));\n',
+    starter: 'import * as readline from "readline";\n\nconst rl = readline.createInterface({ input: process.stdin, output: process.stdout });\nrl.question("Your name? ", (answer: string) => {\n    const name: string = answer.trim() || "student";\n    console.log(`Hello, ${name}!`);\n    rl.close();\n});\n',
   }),
   L({
     id: "python",
@@ -74,7 +74,7 @@ export const LANGUAGES: PlaygroundLanguage[] = [
     hljs: "python",
     file: "main.py",
     stdin: true,
-    starter: 'import sys\n\nname = sys.stdin.readline().strip() or "student"\nprint(f"Hello, {name}!")\n',
+    starter: 'name = input("Your name? ").strip() or "student"\nprint(f"Hello, {name}!")\n',
   }),
   L({
     id: "java",
@@ -85,7 +85,7 @@ export const LANGUAGES: PlaygroundLanguage[] = [
     file: "Main.java",
     stdin: true,
     starter:
-      'import java.util.Scanner;\n\npublic class Main {\n    public static void main(String[] args) {\n        Scanner in = new Scanner(System.in);\n        String line = in.hasNextLine() ? in.nextLine().trim() : "";\n        String name = line.isEmpty() ? "student" : line;\n        System.out.println("Hello, " + name + "!");\n    }\n}\n',
+      'import java.util.Scanner;\n\npublic class Main {\n    public static void main(String[] args) {\n        Scanner in = new Scanner(System.in);\n        System.out.print("Your name? ");\n        String line = in.hasNextLine() ? in.nextLine().trim() : "";\n        String name = line.isEmpty() ? "student" : line;\n        System.out.println("Hello, " + name + "!");\n    }\n}\n',
   }),
   L({
     id: "c",
@@ -95,7 +95,7 @@ export const LANGUAGES: PlaygroundLanguage[] = [
     hljs: "c",
     file: "main.c",
     stdin: true,
-    starter: '#include <stdio.h>\n\nint main(void) {\n    char name[64] = "student";\n    scanf("%63s", name);\n    printf("Hello, %s!\\n", name);\n    return 0;\n}\n',
+    starter: '#include <stdio.h>\n#include <string.h>\n\nint main(void) {\n    char name[64] = "";\n    printf("Your name? ");\n    if (!fgets(name, sizeof name, stdin) || name[0] == \'\\n\') strcpy(name, "student\\n");\n    name[strcspn(name, "\\n")] = \'\\0\';\n    printf("Hello, %s!\\n", name);\n    return 0;\n}\n',
   }),
   L({
     id: "cpp",
@@ -106,7 +106,7 @@ export const LANGUAGES: PlaygroundLanguage[] = [
     file: "main.cpp",
     stdin: true,
     starter:
-      '#include <iostream>\n#include <string>\n\nint main() {\n    std::string name;\n    if (!std::getline(std::cin, name) || name.empty()) name = "student";\n    std::cout << "Hello, " << name << "!" << std::endl;\n    return 0;\n}\n',
+      '#include <iostream>\n#include <string>\n\nint main() {\n    std::string name;\n    std::cout << "Your name? ";\n    if (!std::getline(std::cin, name) || name.empty()) name = "student";\n    std::cout << "Hello, " << name << "!" << std::endl;\n    return 0;\n}\n',
   }),
   L({
     id: "csharp",
@@ -116,7 +116,7 @@ export const LANGUAGES: PlaygroundLanguage[] = [
     hljs: "csharp",
     file: "Program.cs",
     stdin: true,
-    starter: 'using System;\n\nclass Program {\n    static void Main() {\n        var name = Console.ReadLine();\n        if (string.IsNullOrWhiteSpace(name)) name = "student";\n        Console.WriteLine($"Hello, {name}!");\n    }\n}\n',
+    starter: 'using System;\n\nclass Program {\n    static void Main() {\n        Console.Write("Your name? ");\n        var name = Console.ReadLine();\n        if (string.IsNullOrWhiteSpace(name)) name = "student";\n        Console.WriteLine($"Hello, {name}!");\n    }\n}\n',
   }),
   L({
     id: "php",
@@ -126,14 +126,14 @@ export const LANGUAGES: PlaygroundLanguage[] = [
     hljs: "php",
     file: "main.php",
     stdin: true,
-    starter: '<?php\n$name = trim(fgets(STDIN)) ?: "student";\necho "Hello, $name!\\n";\n',
+    starter: '<?php\necho "Your name? ";\n$name = trim((string) fgets(STDIN)) ?: "student";\necho "Hello, $name!\\n";\n',
   }),
-  L({ id: "go", label: "Go", short: "Go", runner: "go", hljs: "go", file: "main.go", stdin: true, starter: 'package main\n\nimport "fmt"\n\nfunc main() {\n    fmt.Println("Hello, student!")\n}\n' }),
-  L({ id: "rust", label: "Rust", short: "Rust", runner: "rust", hljs: "rust", file: "main.rs", stdin: true, starter: 'fn main() {\n    println!("Hello, student!");\n}\n' }),
-  L({ id: "kotlin", label: "Kotlin", short: "Kt", runner: "kotlin", hljs: "kotlin", file: "Main.kt", stdin: true, starter: 'fun main() {\n    println("Hello, student!")\n}\n' }),
-  L({ id: "ruby", label: "Ruby", short: "Ruby", runner: "ruby", hljs: "ruby", file: "main.rb", stdin: true, starter: 'name = gets.to_s.strip\nname = "student" if name.empty?\nputs "Hello, #{name}!"\n' }),
-  L({ id: "swift", label: "Swift", short: "Swift", runner: "swift", hljs: "swift", file: "main.swift", stdin: true, starter: 'print("Hello, student!")\n' }),
-  L({ id: "bash", label: "Bash", short: "Bash", runner: "bash", hljs: "bash", file: "main.sh", stdin: true, starter: 'read -r name\necho "Hello, ${name:-student}!"\n' }),
+  L({ id: "go", label: "Go", short: "Go", runner: "go", hljs: "go", file: "main.go", stdin: true, starter: 'package main\n\nimport (\n\t"bufio"\n\t"fmt"\n\t"os"\n\t"strings"\n)\n\nfunc main() {\n\tfmt.Print("Your name? ")\n\tline, _ := bufio.NewReader(os.Stdin).ReadString(\'\\n\')\n\tname := strings.TrimSpace(line)\n\tif name == "" {\n\t\tname = "student"\n\t}\n\tfmt.Printf("Hello, %s!\\n", name)\n}\n' }),
+  L({ id: "rust", label: "Rust", short: "Rust", runner: "rust", hljs: "rust", file: "main.rs", stdin: true, starter: 'use std::io::{self, Write};\n\nfn main() {\n    print!("Your name? ");\n    // print! has no newline: flush so the question shows before the program waits.\n    io::stdout().flush().unwrap();\n    let mut line = String::new();\n    io::stdin().read_line(&mut line).unwrap();\n    let name = if line.trim().is_empty() { "student" } else { line.trim() };\n    println!("Hello, {}!", name);\n}\n' }),
+  L({ id: "kotlin", label: "Kotlin", short: "Kt", runner: "kotlin", hljs: "kotlin", file: "Main.kt", stdin: true, starter: 'fun main() {\n    print("Your name? ")\n    val name = readlnOrNull()?.trim().takeUnless { it.isNullOrEmpty() } ?: "student"\n    println("Hello, $name!")\n}\n' }),
+  L({ id: "ruby", label: "Ruby", short: "Ruby", runner: "ruby", hljs: "ruby", file: "main.rb", stdin: true, starter: 'print "Your name? "\nname = gets.to_s.strip\nname = "student" if name.empty?\nputs "Hello, #{name}!"\n' }),
+  L({ id: "swift", label: "Swift", short: "Swift", runner: "swift", hljs: "swift", file: "main.swift", stdin: true, starter: 'print("Your name? ", terminator: "")\nlet line = readLine() ?? ""\nlet name = line.isEmpty ? "student" : line\nprint("Hello, \\(name)!")\n' }),
+  L({ id: "bash", label: "Bash", short: "Bash", runner: "bash", hljs: "bash", file: "main.sh", stdin: true, starter: '# read -p only shows its prompt in a real terminal: echo -n works everywhere.\necho -n "Your name? "\nread -r name\necho "Hello, ${name:-student}!"\n' }),
   L({
     id: "sql",
     label: "SQL (SQLite)",

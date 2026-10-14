@@ -86,7 +86,7 @@ export function mainFileFor(language: string, code: string): string {
 const taskMentor = () => configuredApps().find((a) => a.source === "taskmentor") ?? null;
 const timeoutMs = () => Number(process.env.CODE_PLAYGROUND_TIMEOUT_MS) || 45_000;
 
-async function call(path: string, token: string, init: { method: "GET" | "POST"; body?: unknown }): Promise<any> {
+async function call(path: string, token: string, init: { method: "GET" | "POST" | "DELETE"; body?: unknown }): Promise<any> {
   const tm = taskMentor();
   if (!tm) throw new RunnerError(503, "RUNNER_NOT_CONNECTED", "The code runner is not connected to the MIS yet.");
   const controller = new AbortController();
@@ -109,6 +109,7 @@ async function call(path: string, token: string, init: { method: "GET" | "POST";
     clearTimeout(timer);
   }
   const json: any = await res.json().catch(() => null);
+  if (res.status === 204) return null;
   if (res.ok && json?.success !== false) return json?.data ?? null;
 
   const code = typeof json?.code === "string" ? json.code : "RUN_FAILED";
@@ -116,21 +117,22 @@ async function call(path: string, token: string, init: { method: "GET" | "POST";
   if (res.status === 401) throw new RunnerError(401, "SESSION_EXPIRED", "Your session expired. Sign in again to run code.");
   if (res.status === 429) throw new RunnerError(429, "RATE_LIMITED", message);
   if (res.status === 413) throw new RunnerError(413, "TOO_LARGE", message);
+  if (res.status === 404 || res.status === 409) throw new RunnerError(res.status, code, message);
   if (res.status >= 400 && res.status < 500) throw new RunnerError(422, code, message);
   throw new RunnerError(503, code, message);
 }
 
-let languageCache: { at: number; languages: RunnerLanguage[] } | null = null;
+let languageCache: { at: number; languages: RunnerLanguage[]; interactive: boolean } | null = null;
 
-/** The languages the runner runs now (cached a minute: they change on deploys only). */
-export async function runnerLanguages(token: string): Promise<RunnerLanguage[]> {
-  if (languageCache && Date.now() - languageCache.at < 60_000) return languageCache.languages;
+/** The languages the runner runs now, and whether it runs programs live (cached a minute). */
+export async function runnerLanguages(token: string): Promise<{ languages: RunnerLanguage[]; interactive: boolean }> {
+  if (languageCache && Date.now() - languageCache.at < 60_000) return languageCache;
   const data = await call("/languages", token, { method: "GET" });
   const languages: RunnerLanguage[] = (Array.isArray(data?.languages) ? data.languages : [])
     .filter((l: any) => l && typeof l.key === "string")
     .map((l: any) => ({ key: String(l.key).slice(0, 40), label: String(l.label ?? l.key).slice(0, 60), engine: typeof l.engine === "string" ? l.engine : null }));
-  languageCache = { at: Date.now(), languages };
-  return languages;
+  languageCache = { at: Date.now(), languages, interactive: data?.interactive === true };
+  return languageCache;
 }
 
 /** Tests only. */
@@ -169,4 +171,50 @@ export async function runCode(token: string, input: PlaygroundRunInput): Promise
     memory_kb: numOrNull(test?.memory_kb),
     status: typeof test?.status === "string" ? test.status.slice(0, 120) : null,
   };
+}
+
+// ---------------------------------------------------------------- live runs (sessions)
+//
+// A program that asks for input runs live: Task Mentor starts it on the runner, its output
+// streams back as Server-Sent Events, and what the student types goes to its stdin while
+// it waits (Task Mentor /api/integration/code/sessions).
+
+const SESSION_ID = /^[a-f0-9]{8,64}$/;
+export const validSessionId = (id: string) => SESSION_ID.test(id);
+
+/** Start a live run of a project (the main file under `entry`). Returns Task Mentor's session id. */
+export async function startSession(token: string, input: Omit<PlaygroundRunInput, "stdin">): Promise<string> {
+  const main = input.entry || mainFileFor(input.language, input.code);
+  const extra = input.files.filter((f) => f.path !== main);
+  const data = await call("/sessions", token, {
+    method: "POST",
+    body: { language: input.language, entry: main, files: [{ path: main, content: input.code }, ...extra] },
+  });
+  const id = typeof data?.id === "string" ? data.id : "";
+  if (!validSessionId(id)) throw new RunnerError(503, "RUN_FAILED", "The live run couldn't start. Try again.");
+  return id;
+}
+
+/** A line of input, end of input, or Ctrl+C for a live run. */
+export async function sessionInput(token: string, id: string, body: { data?: string; eof?: boolean; signal?: "SIGINT" | "SIGTERM" }) {
+  await call(`/sessions/${id}/input`, token, { method: "POST", body });
+}
+
+export async function stopSession(token: string, id: string) {
+  await call(`/sessions/${id}`, token, { method: "DELETE" }).catch(() => undefined);
+}
+
+/** The live run's event stream from Task Mentor (null when it isn't there any more). */
+export async function openSessionEvents(token: string, id: string, signal: AbortSignal): Promise<ReadableStream<Uint8Array> | null> {
+  const tm = taskMentor();
+  if (!tm) throw new RunnerError(503, "RUNNER_NOT_CONNECTED", "The code runner is not connected to the MIS yet.");
+  let res: Response;
+  try {
+    res = await fetch(`${tm.apiBaseUrl}/api/integration/code/sessions/${id}/events`, { headers: { Authorization: `Bearer ${token}`, Accept: "text/event-stream" }, signal });
+  } catch {
+    throw new RunnerError(503, "RUNNER_UNAVAILABLE", "The code runner can't be reached right now. Try again in a moment.");
+  }
+  if (res.status === 404) return null;
+  if (!res.ok || !res.body) throw new RunnerError(503, "RUN_FAILED", "The live run's output couldn't be read.");
+  return res.body;
 }

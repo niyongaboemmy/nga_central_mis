@@ -31,6 +31,7 @@ import {
 } from "lucide-react";
 import CodeEditor from "./CodeEditor";
 import FileTabs from "./FileTabs";
+import LiveConsole from "./LiveConsole";
 import SelectField from "../ui/SelectField";
 import {
   editorLanguageFor,
@@ -166,7 +167,7 @@ const PlaygroundWorkbench: React.FC<WorkbenchProps> = ({
   const [shared, setShared] = useState(false);
   const dark = useDarkMode();
   const runner = useRunnerLanguages();
-  const { state, run, stop, clear, back, openPage, pages } = useRunner();
+  const { state, run, runLive, sendLine, sendEof, interrupt, stop, clear, back, openPage, pages } = useRunner();
   const key = useMemo(() => draftKey(block), [block]);
   const saved = useMemo(() => (onSave ? null : readDraft(key)), [key, onSave]);
   /** The block as a project: its main file (code) and its other files. */
@@ -212,6 +213,12 @@ const PlaygroundWorkbench: React.FC<WorkbenchProps> = ({
     [files, baseline],
   );
   const problem = projectProblem({ files, entry });
+  /**
+   * Programs on the code runner run live when it can: output as it is printed, and the student
+   * answers prompts in the console while the program waits. An exercise that checks the output
+   * runs in one go with its input, so the check is the same every time.
+   */
+  const live = !lang.browser && runner.interactive && !(exercise && block.expected.trim());
   const example = exampleProject(lang.id);
 
   // Keep the student's work on this device (not for the teacher editing the block).
@@ -225,8 +232,8 @@ const PlaygroundWorkbench: React.FC<WorkbenchProps> = ({
     if (!runnable || problem || !files.some((x) => x.content.trim())) return;
     setChecked(null);
     setPane(lang.browser === "web" || lang.browser === "react" ? "preview" : "output");
-    void run(lang, { files, entry }, stdin);
-  }, [runnable, problem, files, entry, run, lang, stdin]);
+    void (live ? runLive : run)(lang, { files, entry }, stdin);
+  }, [runnable, problem, files, entry, run, runLive, live, lang, stdin]);
 
   // A server program that printed a page (PHP): show the page.
   const shownDocFor = useRef<string | null>(null);
@@ -607,6 +614,7 @@ const PlaygroundWorkbench: React.FC<WorkbenchProps> = ({
           <Terminal className="w-6 h-6" />
           <p className="text-sm">
             Press <span className="font-semibold text-slate-600 dark:text-slate-300">Run</span> to see what this code does.
+            {live && lang.stdin && <> When it asks for input, type your answer right in the console.</>}
           </p>
           {modal && (
             <p className="text-xs inline-flex items-center gap-1">
@@ -642,6 +650,18 @@ const PlaygroundWorkbench: React.FC<WorkbenchProps> = ({
         </>
       )}
     </div>
+  );
+
+  const consolePane = state.console !== null && (
+    <LiveConsole
+      chunks={state.console}
+      running={state.phase === "running"}
+      stage={state.live?.stage ?? null}
+      lastOutputAt={state.lastOutputAt}
+      onLine={sendLine}
+      onEof={sendEof}
+      onInterrupt={interrupt}
+    />
   );
 
   const previewPane = hasPreview && (
@@ -696,7 +716,11 @@ const PlaygroundWorkbench: React.FC<WorkbenchProps> = ({
   const inputPane = (
     <div className="flex-1 min-h-0 flex flex-col p-3 gap-2">
       <label htmlFor={`stdin-${key}`} className="text-xs text-slate-500 dark:text-slate-400">
-        {lang.browser === "js" ? "Each line answers one prompt() call, in order." : "What the program reads (input / Scanner / cin / readline), one value per line."}
+        {lang.browser === "js"
+          ? "Answers for prompt(), one per line, used in order. Without them, each prompt() opens an input box."
+          : live
+            ? "Optional: answers typed in advance (one per line), sent as soon as the program starts. You can also type into the console while it runs."
+            : "What the program reads (input / Scanner / cin / readline), one value per line."}
       </label>
       <textarea
         id={`stdin-${key}`}
@@ -713,7 +737,7 @@ const PlaygroundWorkbench: React.FC<WorkbenchProps> = ({
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 min-h-[34px] px-3 py-1.5 border-t border-slate-200 dark:border-white/10 text-[11.5px] text-slate-500 dark:text-slate-400">
       <span className="inline-flex items-center gap-1.5">
         {browserRun ? <Globe className="w-3.5 h-3.5" /> : <Server className="w-3.5 h-3.5" />}
-        {browserRun ? "Runs in your browser" : runner.available === false ? "Code runner offline" : "Runs on the school code runner"}
+        {browserRun ? "Runs in your browser" : runner.available === false ? "Code runner offline" : live ? "Runs live on the school code runner" : "Runs on the school code runner"}
       </span>
       {verdict && (
         <span
@@ -767,7 +791,12 @@ const PlaygroundWorkbench: React.FC<WorkbenchProps> = ({
   const outputTabs = (
     <div className="flex items-center border-b border-slate-200 dark:border-white/10 pr-1.5 bg-slate-50/80 dark:bg-white/[0.02]">
       <div role="tablist" aria-label="Results" className="flex items-center">
-      {paneTab("output", "Output", <Terminal className="w-3.5 h-3.5" />, errorCount ? <span className="ml-0.5 px-1.5 rounded-full bg-danger-500 text-white text-[10px] leading-4">{errorCount}</span> : null)}
+      {paneTab(
+        "output",
+        live ? "Console" : "Output",
+        <Terminal className="w-3.5 h-3.5" />,
+        errorCount ? <span className="ml-0.5 px-1.5 rounded-full bg-danger-500 text-white text-[10px] leading-4">{errorCount}</span> : state.live && state.phase === "running" ? <span className="w-1.5 h-1.5 rounded-full bg-success-500 animate-pulse" aria-label="running" /> : null,
+      )}
       {hasPreview && paneTab("preview", "Preview", <Globe className="w-3.5 h-3.5" />)}
       {lang.stdin && paneTab("input", "Input", <Keyboard className="w-3.5 h-3.5" />, stdin.trim() ? <span className="w-1.5 h-1.5 rounded-full bg-brand-500" /> : null)}
       </div>
@@ -783,7 +812,7 @@ const PlaygroundWorkbench: React.FC<WorkbenchProps> = ({
   const results = (
     <div className="flex flex-col min-h-0 flex-1">
       {outputTabs}
-      <div className={`flex-1 min-h-0 flex flex-col ${pane === "output" ? "" : "hidden"}`}>{outputPane}</div>
+      <div className={`flex-1 min-h-0 flex flex-col ${pane === "output" ? "" : "hidden"}`}>{consolePane || outputPane}</div>
       {previewPane}
       {pane === "input" && inputPane}
     </div>

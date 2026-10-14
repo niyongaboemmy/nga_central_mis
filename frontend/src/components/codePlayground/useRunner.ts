@@ -1,5 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { getRunnerLanguages, PlaygroundRunError, runOnServer, type PlaygroundRunResult } from "../../api/codePlayground";
+import {
+  getRunnerLanguages,
+  PlaygroundRunError,
+  runOnServer,
+  sendLiveInput,
+  startLiveRun,
+  stopLiveRun,
+  streamLiveRun,
+  type PlaygroundRunResult,
+  type SessionEvent,
+} from "../../api/codePlayground";
 import {
   buildCssDocument,
   buildPageDocument,
@@ -32,6 +42,12 @@ export interface RunMeta {
   exit_code?: number | null;
 }
 
+/** One piece of a live run's console: what the program printed, its errors, what was typed, our notes. */
+export interface ConsoleChunk {
+  kind: "out" | "err" | "in" | "note";
+  text: string;
+}
+
 export interface RunState {
   phase: RunPhase;
   entries: ConsoleEntry[];
@@ -45,18 +61,35 @@ export interface RunState {
   page: string | null;
   /** Pages visited before it (Back in the preview). */
   history: string[];
+  /** A live run (the program runs while the student watches and types): its transcript. */
+  console: ConsoleChunk[] | null;
+  /** The live run in progress: its session and stage. */
+  live: { id: string | null; stage: "build" | "run" | null } | null;
+  /** When the program last printed something (live runs: "is it waiting for me?"). */
+  lastOutputAt: number;
 }
 
-const IDLE: RunState = { phase: "idle", entries: [], meta: null, output: "", doc: null, runId: null, page: null, history: [] };
+const IDLE: RunState = { phase: "idle", entries: [], meta: null, output: "", doc: null, runId: null, page: null, history: [], console: null, live: null, lastOutputAt: 0 };
+const CONSOLE_MAX = 400_000;
+
+/** Adds to a transcript, joining runs of the same kind (and keeping it bounded). */
+function appendChunk(chunks: ConsoleChunk[], c: ConsoleChunk): ConsoleChunk[] {
+  if (!c.text) return chunks;
+  const last = chunks[chunks.length - 1];
+  const next = last && last.kind === c.kind && c.kind !== "note" ? [...chunks.slice(0, -1), { ...last, text: last.text + c.text }] : [...chunks, c];
+  let total = next.reduce((n, x) => n + x.text.length, 0);
+  while (total > CONSOLE_MAX && next.length > 1) total -= next.shift()!.text.length;
+  return next;
+}
 const BROWSER_TIMEOUT_MS = 6000;
 
 /** The runner's languages (null until known), asked again whenever a playground opens. */
-export function useRunnerLanguages(): { keys: Set<string> | null; available: boolean | null; message?: string } {
-  const [state, setState] = useState<{ keys: Set<string> | null; available: boolean | null; message?: string }>({ keys: null, available: null });
+export function useRunnerLanguages(): { keys: Set<string> | null; available: boolean | null; interactive: boolean; message?: string } {
+  const [state, setState] = useState<{ keys: Set<string> | null; available: boolean | null; interactive: boolean; message?: string }>({ keys: null, available: null, interactive: false });
   useEffect(() => {
     let alive = true;
     getRunnerLanguages().then((r) => {
-      if (alive) setState({ keys: new Set(r.languages.map((l) => l.key)), available: r.available, message: r.message });
+      if (alive) setState({ keys: new Set(r.languages.map((l) => l.key)), available: r.available, interactive: r.interactive === true, message: r.message });
     });
     return () => {
       alive = false;
@@ -83,6 +116,17 @@ export function useRunner() {
   const startedAt = useRef(0);
   /** What the last run ran: navigation in its pages uses the same files. */
   const last = useRef<{ lang: PlaygroundLanguage; project: PlayProject } | null>(null);
+  /** The live run's session and its event stream. */
+  const liveRun = useRef<{ id: string | null; runId: string; stream: AbortController } | null>(null);
+
+  const endLive = useCallback(() => {
+    const l = liveRun.current;
+    liveRun.current = null;
+    if (!l) return;
+    l.stream.abort();
+    if (l.id) void stopLiveRun(l.id);
+  }, []);
+  useEffect(() => () => endLive(), [endLive]);
 
   const finishBrowser = useCallback((runId: string) => {
     setState((s) => {
@@ -201,19 +245,36 @@ export function useRunner() {
   const stop = useCallback(() => {
     abort.current?.abort();
     abort.current = null;
+    if (liveRun.current) {
+      endLive();
+      setState((s) =>
+        s.phase === "running" ? { ...s, phase: "done", live: null, console: appendChunk(s.console ?? [], { kind: "note", text: "Stopped." }), meta: s.meta ?? { verdict: "refused", where: "server" } } : s,
+      );
+      return;
+    }
     setState((s) =>
       s.phase === "running"
         ? { ...s, phase: "done", doc: s.doc && !s.meta ? null : s.doc, meta: s.meta ?? { verdict: "refused", where: s.doc ? "browser" : "server" }, entries: [...s.entries, { level: "warn", text: "Stopped." }] }
         : s,
     );
-  }, []);
+  }, [endLive]);
 
-  const clear = useCallback(() => setState((s) => ({ ...IDLE, doc: s.doc, runId: s.runId, page: s.page, history: s.history, meta: s.meta && { ...s.meta } })), []);
+  const clear = useCallback(
+    () =>
+      setState((s) =>
+        // A live run keeps going: only its transcript is cleared.
+        s.live
+          ? { ...s, console: [], entries: [] }
+          : { ...IDLE, doc: s.doc, runId: s.runId, page: s.page, history: s.history, meta: s.meta && { ...s.meta } },
+      ),
+    [],
+  );
 
   const run = useCallback(
     async (lang: PlaygroundLanguage, project: PlayProject, stdin: string) => {
       abort.current?.abort();
       abort.current = null;
+      endLive();
       last.current = { lang, project };
       const entry = project.files.find((f) => f.path === project.entry);
       const others = project.files.filter((f) => f.path !== project.entry);
@@ -268,8 +329,135 @@ export function useRunner() {
     [openPage],
   );
 
+  /**
+   * A live run: the program starts on the code runner and its output streams in as it is
+   * printed; what the student types (sendLine) reaches its stdin while it waits. Answers typed
+   * in advance (the Input panel) are sent as soon as it starts. Falls back to a batch run
+   * when the runner can't run programs live.
+   */
+  const runLive = useCallback(
+    async (lang: PlaygroundLanguage, project: PlayProject, prefill: string) => {
+      abort.current?.abort();
+      abort.current = null;
+      endLive();
+      last.current = { lang, project };
+      const runId = newRunId();
+      const stream = new AbortController();
+      liveRun.current = { id: null, runId, stream };
+      const mine = (s: RunState) => s.runId === runId;
+      setState({ ...IDLE, phase: "running", runId, console: [], live: { id: null, stage: null }, lastOutputAt: Date.now() });
+
+      const entry = project.files.find((f) => f.path === project.entry);
+      const others = project.files.filter((f) => f.path !== project.entry);
+      const named = others.length > 0 || project.entry !== lang.file;
+      let id: string;
+      try {
+        id = await startLiveRun({ language: lang.runner!, code: entry?.content ?? "", entry: named ? project.entry : undefined, files: others });
+      } catch (e) {
+        const err = e instanceof PlaygroundRunError ? e : new PlaygroundRunError("RUN_FAILED", "The program couldn't start.");
+        if (liveRun.current?.runId !== runId) return;
+        liveRun.current = null;
+        if (err.code === "INTERACTIVE_UNAVAILABLE") return void run(lang, project, prefill);
+        setState((s) => (mine(s) ? { ...s, phase: "done", live: null, console: [{ kind: "err", text: err.message }], meta: { verdict: "refused", where: "server" } } : s));
+        return;
+      }
+      if (liveRun.current?.runId !== runId) {
+        void stopLiveRun(id);
+        return;
+      }
+      liveRun.current.id = id;
+      setState((s) => (mine(s) ? { ...s, live: { id, stage: s.live?.stage ?? null } } : s));
+      if (prefill.trim()) {
+        const text = prefill.endsWith("\n") ? prefill : `${prefill}\n`;
+        setState((s) => (mine(s) ? { ...s, console: appendChunk(s.console ?? [], { kind: "in", text }) } : s));
+        void sendLiveInput(id, { data: text }).catch(() => undefined);
+      }
+
+      let exited = false;
+      const onEvent = (ev: SessionEvent) => {
+        if (ev.event === "stage") {
+          setState((s) => {
+            if (!mine(s)) return s;
+            const note = ev.data.name === "build" ? "Building your program…" : s.live?.stage === "build" ? "Running…" : "";
+            return { ...s, live: { id, stage: ev.data.name }, lastOutputAt: Date.now(), console: note ? appendChunk(s.console ?? [], { kind: "note", text: note }) : s.console };
+          });
+        } else if (ev.event === "stdout" || ev.event === "stderr") {
+          const text = ev.data.data;
+          setState((s) =>
+            mine(s)
+              ? {
+                  ...s,
+                  console: appendChunk(s.console ?? [], { kind: ev.event === "stdout" ? "out" : "err", text }),
+                  output: ev.event === "stdout" ? s.output + text : s.output,
+                  lastOutputAt: Date.now(),
+                }
+              : s,
+          );
+        } else if (ev.event === "exit") {
+          exited = true;
+          const d = ev.data;
+          setState((s) => {
+            if (!mine(s)) return s;
+            const how = d.signal ? `Stopped (${d.signal}).` : d.verdict === "time-limit" ? "Stopped: it ran too long (or waited for input too long)." : d.verdict === "compile-error" ? "" : d.code ? `Exited with code ${d.code}.` : "";
+            // PHP that printed a page: show it.
+            const ctx = last.current;
+            const doc = ctx?.lang.id === "php" && d.verdict === "ok" && looksLikeHtml(s.output) ? buildPageDocument(s.output, ctx.project.entry, ctx.project.files, runId, "").doc : null;
+            return {
+              ...s,
+              phase: "done",
+              live: null,
+              doc,
+              page: doc ? ctx!.project.entry : null,
+              console: how ? appendChunk(s.console ?? [], { kind: "note", text: how }) : s.console,
+              meta: { verdict: d.verdict, where: "server", time_ms: d.time_ms, memory_kb: d.memory_kb, exit_code: d.code },
+            };
+          });
+        } else if (ev.event === "error") {
+          setState((s) => (mine(s) ? { ...s, console: appendChunk(s.console ?? [], { kind: "err", text: `${ev.data.message}\n` }) } : s));
+        }
+      };
+      try {
+        await streamLiveRun(id, onEvent, stream.signal);
+      } catch (e) {
+        if (stream.signal.aborted) return;
+        const msg = e instanceof PlaygroundRunError ? e.message : "The connection to the program was lost.";
+        setState((s) => (mine(s) ? { ...s, console: appendChunk(s.console ?? [], { kind: "err", text: `${msg}\n` }) } : s));
+      } finally {
+        if (liveRun.current?.runId === runId) liveRun.current = null;
+        if (!exited) setState((s) => (mine(s) && s.phase === "running" ? { ...s, phase: "done", live: null, meta: s.meta ?? { verdict: "refused", where: "server" } } : s));
+      }
+    },
+    [endLive, run],
+  );
+
+  /** A line the student typed into the live console (sent with its newline). */
+  const sendLine = useCallback((text: string) => {
+    const l = liveRun.current;
+    if (!l?.id) return;
+    const data = `${text}\n`;
+    setState((s) => (s.runId === l.runId ? { ...s, console: appendChunk(s.console ?? [], { kind: "in", text: data }), lastOutputAt: Date.now() } : s));
+    void sendLiveInput(l.id, { data }).catch((e) =>
+      setState((s) => (s.runId === l.runId ? { ...s, console: appendChunk(s.console ?? [], { kind: "err", text: `${e?.message ?? "The input couldn't be sent."}\n` }) } : s)),
+    );
+  }, []);
+
+  /** End of input (Ctrl+D): a program reading until the end stops waiting. */
+  const sendEof = useCallback(() => {
+    const l = liveRun.current;
+    if (!l?.id) return;
+    setState((s) => (s.runId === l.runId ? { ...s, console: appendChunk(s.console ?? [], { kind: "note", text: "End of input sent." }) } : s));
+    void sendLiveInput(l.id, { eof: true }).catch(() => undefined);
+  }, []);
+
+  /** Ctrl+C: interrupt the program (Python raises KeyboardInterrupt, most programs stop). */
+  const interrupt = useCallback(() => {
+    const l = liveRun.current;
+    if (!l?.id) return;
+    void sendLiveInput(l.id, { signal: "SIGINT" }).catch(() => undefined);
+  }, []);
+
   /** Pages the preview can go to (web projects): for the address bar's list. */
   const pages = last.current ? [...htmlFiles(last.current.project.files).map((f) => f.path), ...last.current.project.files.filter((f) => /\.php$/i.test(f.path)).map((f) => f.path)] : [];
 
-  return { state, run, stop, clear, navigate, back, openPage: (path: string) => openPage(path, "GET", "", [], state.page), pages };
+  return { state, run, runLive, sendLine, sendEof, interrupt, stop, clear, navigate, back, openPage: (path: string) => openPage(path, "GET", "", [], state.page), pages };
 }
