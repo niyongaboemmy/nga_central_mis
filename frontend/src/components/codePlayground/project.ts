@@ -272,6 +272,108 @@ $name = htmlspecialchars($_POST["name"] ?? "visitor");
   ],
 };
 
+/** The start for "HTML, CSS & JavaScript": a page with its own stylesheet and script, linked. */
+export const WEB_STARTER: PlayProject = {
+  entry: "index.html",
+  files: [
+    f(
+      "index.html",
+      `<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>My page</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <main class="card">
+        <h1>Hello, <span id="name">student</span>!</h1>
+        <p>Type your name, then press the button.</p>
+        <form id="greet">
+            <input id="who" placeholder="Your name" autocomplete="off">
+            <button type="submit">Greet me</button>
+        </form>
+        <p class="count">Button pressed <strong id="count">0</strong> times</p>
+    </main>
+    <script src="script.js"></script>
+</body>
+</html>
+`,
+    ),
+    f(
+      "style.css",
+      `body {
+    margin: 0;
+    min-height: 100vh;
+    display: grid;
+    place-items: center;
+    font-family: system-ui, sans-serif;
+    background: linear-gradient(135deg, #eef2ff, #f0fdf4);
+    color: #1e293b;
+}
+
+.card {
+    width: min(360px, 90vw);
+    padding: 24px;
+    border-radius: 16px;
+    background: white;
+    box-shadow: 0 10px 30px rgb(0 0 0 / 0.08);
+}
+
+h1 {
+    margin-top: 0;
+    color: #4338ca;
+}
+
+form {
+    display: flex;
+    gap: 8px;
+}
+
+input {
+    flex: 1;
+    padding: 8px 10px;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+}
+
+button {
+    padding: 8px 14px;
+    border: 0;
+    border-radius: 8px;
+    background: #4338ca;
+    color: white;
+    cursor: pointer;
+}
+
+.count {
+    color: #64748b;
+}
+`,
+    ),
+    f(
+      "script.js",
+      `const form = document.getElementById("greet");
+const who = document.getElementById("who");
+let presses = 0;
+
+form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    presses += 1;
+    const name = who.value.trim() || "student";
+    document.getElementById("name").textContent = name;
+    document.getElementById("count").textContent = presses;
+    console.log("Greeted", name);
+});
+`,
+    ),
+  ],
+};
+
+/** A language's fresh project: HTML, CSS & JavaScript starts as three linked files; the rest as one. */
+export const starterProject = (lang: PlaygroundLanguage): PlayProject => (lang.id === "html" ? WEB_STARTER : singleFile(lang, lang.starter));
+
 /** A small program split over files, wired the language's way — for "Multi-file example". */
 export function exampleProject(langId: string): PlayProject | null {
   switch (langId) {

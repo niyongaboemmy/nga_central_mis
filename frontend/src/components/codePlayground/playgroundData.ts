@@ -31,8 +31,8 @@ export interface PlaygroundBlock {
 export const DEFAULT_BLOCK: PlaygroundBlock = {
   mode: "example",
   title: "",
-  language: "python",
-  code: languageById("python")!.starter,
+  language: "html",
+  code: languageById("html")!.starter,
   entry: "",
   files: [],
   instructions: "",

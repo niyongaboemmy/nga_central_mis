@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
   Check,
   CheckCircle2,
-  ChevronDown,
   Code2,
   Copy,
   Download,
@@ -32,6 +31,8 @@ import {
 import CodeEditor from "./CodeEditor";
 import FileTabs from "./FileTabs";
 import LiveConsole from "./LiveConsole";
+import LanguagePicker from "./LanguagePicker";
+import SqlOutput from "./SqlOutput";
 import SelectField from "../ui/SelectField";
 import {
   editorLanguageFor,
@@ -40,11 +41,12 @@ import {
   newFileContent,
   projectProblem,
   singleFile,
+  starterProject,
   suggestName,
   type PlayFile,
   type PlayProject,
 } from "./project";
-import { LANGUAGES, isRunnable, languageById, type PlaygroundLanguage } from "./languages";
+import { LANGUAGES, isRunnable, languageById, runsLive, type PlaygroundLanguage } from "./languages";
 import { outputMatches, normalizeOutput, type PlaygroundBlock } from "./playgroundData";
 import { prettifyCode } from "./format";
 import { useRunner, useRunnerLanguages } from "./useRunner";
@@ -185,7 +187,6 @@ const PlaygroundWorkbench: React.FC<WorkbenchProps> = ({
   const [baseline, setBaseline] = useState<PlayFile[]>(blockProject.files);
   const [stdin, setStdin] = useState(saved?.stdin ?? block.stdin);
   const [pane, setPane] = useState<Pane>("output");
-  const [menuOpen, setMenuOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const [formatting, setFormatting] = useState(false);
   const [showHint, setShowHint] = useState(false);
@@ -193,7 +194,6 @@ const PlaygroundWorkbench: React.FC<WorkbenchProps> = ({
   const [checked, setChecked] = useState<null | boolean>(null);
   const [split, setSplit] = useState(0.56);
   const bodyRef = useRef<HTMLDivElement>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
 
   const lang = languageById(langId) ?? LANGUAGES[0];
   const exercise = block.mode === "exercise";
@@ -218,7 +218,8 @@ const PlaygroundWorkbench: React.FC<WorkbenchProps> = ({
    * answers prompts in the console while the program waits. An exercise that checks the output
    * runs in one go with its input, so the check is the same every time.
    */
-  const live = !lang.browser && runner.interactive && !(exercise && block.expected.trim());
+  // An exercise with an expected output runs in one batch, so its check is deterministic.
+  const live = runsLive(lang, runner.interactive) && !(exercise && block.expected.trim());
   const example = exampleProject(lang.id);
 
   // Keep the student's work on this device (not for the teacher editing the block).
@@ -311,12 +312,12 @@ const PlaygroundWorkbench: React.FC<WorkbenchProps> = ({
   };
 
   const switchLanguage = (next: PlaygroundLanguage) => {
-    setMenuOpen(false);
     if (next.id === lang.id) return;
     if (onLanguageChange) return onLanguageChange(next.id);
-    // An untouched one-file program follows the language; the student's own files stay.
-    if (files.length === 1 && (!code.trim() || code === lang.starter || code === block.code)) {
-      const p = next.id === block.language ? blockProject : singleFile(next, next.starter);
+    // An untouched program (as loaded, or a language's starter) follows the language; the student's own files stay.
+    const untouched = sameFiles(files, baseline) || (files.length === 1 && (!code.trim() || code === lang.starter || code === block.code));
+    if (untouched) {
+      const p = next.id === block.language ? blockProject : starterProject(next);
       setFiles(p.files);
       setBaseline(p.files);
       setEntry(p.entry);
@@ -359,19 +360,6 @@ const PlaygroundWorkbench: React.FC<WorkbenchProps> = ({
     window.setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
 
-  // Close the language menu on an outside click / Escape.
-  useEffect(() => {
-    if (!menuOpen) return;
-    const onDown = (e: MouseEvent) => !menuRef.current?.contains(e.target as Node) && setMenuOpen(false);
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && (e.stopPropagation(), setMenuOpen(false));
-    document.addEventListener("mousedown", onDown);
-    document.addEventListener("keydown", onKey, true);
-    return () => {
-      document.removeEventListener("mousedown", onDown);
-      document.removeEventListener("keydown", onKey, true);
-    };
-  }, [menuOpen]);
-
   // Drag the divider between the editor and the output (modal, wide screens).
   const startDrag = (e: React.PointerEvent) => {
     const box = bodyRef.current?.getBoundingClientRect();
@@ -405,52 +393,7 @@ const PlaygroundWorkbench: React.FC<WorkbenchProps> = ({
 
   const iconBtn = "inline-flex items-center justify-center gap-1.5 h-8 min-w-[32px] px-2 rounded-lg text-[13px] font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/10 hover:text-slate-900 dark:hover:text-white disabled:opacity-40 disabled:pointer-events-none transition-colors";
 
-  const languageMenu = (
-    <div ref={menuRef} className="relative">
-      <button
-        type="button"
-        onClick={() => setMenuOpen((o) => !o)}
-        aria-haspopup="listbox"
-        aria-expanded={menuOpen}
-        title="Change language"
-        className="inline-flex items-center gap-2 h-8 pl-2 pr-2 rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/[0.04] text-[13px] font-semibold text-slate-800 dark:text-slate-100 hover:border-brand-500 transition-colors"
-      >
-        <span className="inline-flex items-center justify-center h-5 min-w-[22px] px-1 rounded bg-brand-50 dark:bg-brand-500/20 text-[10px] font-bold text-brand-700 dark:text-brand-200">{lang.short}</span>
-        <span className="hidden sm:inline max-w-[160px] truncate">{lang.label}</span>
-        <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform ${menuOpen ? "rotate-180" : ""}`} />
-      </button>
-      {menuOpen && (
-        <div role="listbox" aria-label="Language" className="absolute z-30 mt-1.5 left-0 w-[260px] max-h-[60vh] overflow-auto rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-[#161b22] shadow-xl p-1.5">
-          {[
-            { title: "Runs in your browser", items: LANGUAGES.filter((l) => l.browser) },
-            { title: "Runs on the code runner", items: LANGUAGES.filter((l) => !l.browser) },
-          ].map((g) => (
-            <div key={g.title} className="py-1">
-              <p className="px-2 pb-1 text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">{g.title}</p>
-              {g.items.map((l) => {
-                const ok = isRunnable(l, runner.keys);
-                return (
-                  <button
-                    key={l.id}
-                    type="button"
-                    role="option"
-                    aria-selected={l.id === lang.id}
-                    onClick={() => switchLanguage(l)}
-                    className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-left text-[13px] ${l.id === lang.id ? "bg-brand-50 dark:bg-brand-500/15 text-brand-700 dark:text-brand-200" : "text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5"}`}
-                  >
-                    <span className="inline-flex items-center justify-center h-5 min-w-[30px] px-1 rounded bg-slate-100 dark:bg-white/10 text-[10px] font-bold">{l.short}</span>
-                    <span className="flex-1 truncate">{l.label}</span>
-                    {!ok && <span className="text-[10px] text-slate-500 dark:text-slate-400">not on runner yet</span>}
-                    {l.id === lang.id && <Check className="w-3.5 h-3.5" />}
-                  </button>
-                );
-              })}
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
+  const languageMenu = <LanguagePicker value={lang} runnerKeys={runner.keys} interactive={runner.interactive} onPick={switchLanguage} />;
 
   const runButton = (
     <button
@@ -629,22 +572,27 @@ const PlaygroundWorkbench: React.FC<WorkbenchProps> = ({
               <Loader2 className="w-4 h-4 animate-spin" /> {browserRun ? "Running…" : "Running on the code runner…"}
             </p>
           )}
-          {state.entries.map((e, i) => (
-            <div
-              key={i}
-              className={`whitespace-pre-wrap break-words py-0.5 ${
-                e.level === "error"
-                  ? "text-danger-700 dark:text-red-400 bg-danger-100/60 dark:bg-red-500/10 -mx-3 px-3 border-l-2 border-danger-500"
-                  : e.level === "warn"
-                    ? "text-warning-700 dark:text-amber-300"
-                    : e.level === "info"
-                      ? "text-slate-500 dark:text-slate-400 italic"
-                      : "text-slate-800 dark:text-slate-100"
-              }`}
-            >
-              {e.text || "\u00a0"}
-            </div>
-          ))}
+          {state.entries.map((e, i) =>
+            // SQL result sets as tables (the runner prints them with box-drawing characters).
+            lang.id === "sql" && e.level === "log" && e.text.includes("┌") ? (
+              <SqlOutput key={i} text={e.text} />
+            ) : (
+              <div
+                key={i}
+                className={`whitespace-pre-wrap break-words py-0.5 ${
+                  e.level === "error"
+                    ? "text-danger-700 dark:text-red-400 bg-danger-100/60 dark:bg-red-500/10 -mx-3 px-3 border-l-2 border-danger-500"
+                    : e.level === "warn"
+                      ? "text-warning-700 dark:text-amber-300"
+                      : e.level === "info"
+                        ? "text-slate-500 dark:text-slate-400 italic"
+                        : "text-slate-800 dark:text-slate-100"
+                }`}
+              >
+                {e.text || "\u00a0"}
+              </div>
+            ),
+          )}
           {state.phase === "done" && !state.entries.length && <p className="text-slate-500 dark:text-slate-400 font-sans text-sm">The program finished without printing anything.</p>}
           {meta && VERDICT_HELP[meta.verdict] && <p className="mt-2 font-sans text-xs text-slate-500 dark:text-slate-400">{VERDICT_HELP[meta.verdict]}</p>}
         </>

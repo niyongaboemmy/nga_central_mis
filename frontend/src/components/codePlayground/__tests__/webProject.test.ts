@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+// @ts-expect-error jsdom ships no type declarations here (the test only needs JSDOM and its window).
+import { JSDOM } from "jsdom";
 import { buildPageDocument, buildScriptDocument, composePage, looksLikeHtml, phpFields, phpRequestInput, resolvePath } from "../browserRun";
 import { exampleProject, editorLanguageFor, newFileContent, pathProblem, projectProblem, startPage, suggestName } from "../project";
 import { LANGUAGES, languageById } from "../languages";
@@ -45,6 +47,41 @@ describe("composePage", () => {
     expect(doc).toContain('"submit"');
     expect(doc).toContain("window.__ngaModules()");
     expect(doc).toContain('"js/util.js"');
+  });
+});
+
+describe("forms and links in the preview", () => {
+  /** Runs the preview document and returns what the bridge asked the playground to open. */
+  const preview = (html: string) => {
+    const { doc } = buildPageDocument(html, "index.html", [{ path: "index.html", content: html }, { path: "about.html", content: "<p>About</p>" }], "r1", "");
+    const w: Window = new JSDOM(doc, { runScripts: "dangerously" }).window;
+    const navs: unknown[] = [];
+    w.postMessage = ((m: { nav?: unknown }) => m?.nav && navs.push(m.nav)) as Window["postMessage"];
+    return { w, d: w.document, navs };
+  };
+
+  it("leaves a form the page handles itself alone (no reload, its state stays)", () => {
+    const { d, navs } = preview('<form id="f"><input name="who" value="Aline"><button>Go</button></form><p id="out"></p><script>document.getElementById("f").addEventListener("submit", (e) => { e.preventDefault(); document.getElementById("out").textContent = "Hi"; });</script>');
+    d.querySelector("button")!.click();
+    expect(d.getElementById("out")!.textContent).toBe("Hi");
+    expect(navs).toEqual([]);
+  });
+
+  it("leaves onsubmit=\"return false\" and links with their own handler alone", () => {
+    const { d, navs } = preview('<form onsubmit="return false"><button>Go</button></form><a href="about.html" id="a">About</a><script>document.getElementById("a").onclick = (e) => e.preventDefault();</script>');
+    d.querySelector("button")!.click();
+    d.getElementById("a")!.click();
+    expect(navs).toEqual([]);
+  });
+
+  it("still opens the project's pages for plain forms and links", () => {
+    const { d, navs } = preview('<form action="about.html" method="post"><input name="who" value="Aline"><button>Go</button></form><a href="about.html" id="a">About</a>');
+    d.querySelector("button")!.click();
+    d.getElementById("a")!.click();
+    expect(navs).toEqual([
+      { href: "about.html", method: "POST", fields: [["who", "Aline"]] },
+      { href: "about.html", method: "GET", fields: [] },
+    ]);
   });
 });
 

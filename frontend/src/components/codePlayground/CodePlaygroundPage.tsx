@@ -3,20 +3,21 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Lock } from "lucide-react";
 import CodePlayground from "./CodePlayground";
 import { languageById } from "./languages";
-import type { PlayFile } from "./project";
+import { WEB_STARTER, type PlayFile } from "./project";
 import { usePermissions } from "../../hooks/usePermissions";
 import { Permissions } from "../../constants/permissions";
 
 /**
  * /code-playground — the Code Playground on its own, filling the screen (no sidebar or
- * top bar), for any language it runs. ?lang=python picks the language; each language
+ * top bar), for any language it runs. ?lang=python picks the language (HTML, CSS & JavaScript by default); each language
  * keeps its own draft on this device. "Share" copies a link carrying the files
  * (#p=…, base64 JSON; older links #code=… carry one file), so a teacher can hand an example
  * to a class. Full screen hides
  * the browser's own bars too. Needs CODE_PLAYGROUND_USE (every role by default).
  */
 
-const DEFAULT_LANGUAGE = "python";
+/** A page made of HTML, CSS and JavaScript: what most students start with. */
+const DEFAULT_LANGUAGE = "html";
 const MAX_SHARED_CHARS = 12000;
 
 /** UTF-8 safe base64 for the #code= part of a shared link. */
@@ -95,7 +96,15 @@ const CodePlaygroundPage: React.FC = () => {
     else navigate("/home");
   }, [navigate]);
 
-  const program = useMemo(() => (shared && shared.code.trim() ? shared : null), [shared]);
+  const program = useMemo(() => {
+    if (shared && shared.code.trim()) return shared;
+    // HTML, CSS & JavaScript opens as three linked files: index.html, style.css, script.js.
+    if (language === "html") {
+      const [main, ...rest] = WEB_STARTER.files;
+      return { code: main.content, entry: WEB_STARTER.entry, files: rest };
+    }
+    return null;
+  }, [shared, language]);
 
   if (!hasPermission(Permissions.CODE_PLAYGROUND_USE)) {
     return (

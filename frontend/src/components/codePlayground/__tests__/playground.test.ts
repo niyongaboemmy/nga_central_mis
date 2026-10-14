@@ -54,12 +54,12 @@ describe("playground blocks", () => {
   it("round-trips and drops empty fields", () => {
     const b = { ...DEFAULT_BLOCK, mode: "exercise" as const, title: "Sum", code: "print(1)", expected: "1" };
     const json = serializeBlock(b);
-    expect(JSON.parse(json)).toEqual({ mode: "exercise", language: "python", code: "print(1)", title: "Sum", expected: "1" });
+    expect(JSON.parse(json)).toEqual({ mode: "exercise", language: "html", code: "print(1)", title: "Sum", expected: "1" });
     expect(parseBlock(json)).toEqual(b);
   });
   it("survives bad data", () => {
     expect(parseBlock("{not json")).toEqual(DEFAULT_BLOCK);
-    expect(parseBlock({ language: "cobol", code: 5 }).language).toBe("python");
+    expect(parseBlock({ language: "cobol", code: 5 }).language).toBe("html");
   });
   it("compares output ignoring trailing spaces and blank lines", () => {
     expect(outputMatches("Total: 5  \n\n", "Total: 5")).toBe(true);
