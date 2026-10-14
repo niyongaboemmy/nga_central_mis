@@ -38,6 +38,8 @@ import {
   revokeFolderShareLink,
   resolveShareLink,
   downloadViaShareLink,
+  findDocumentByName,
+  replaceDocumentContent,
 } from "../controllers/documentController";
 
 const router = Router();
@@ -132,6 +134,13 @@ router.post(
 
 // Upload a new document
 router.post("/upload", upload.single("file"), uploadDocument);
+
+// The caller's own document with this exact name in a folder (or the root):
+// lets "Save to Documents" update the copy saved last time. Before /:documentId.
+router.get("/find", findDocumentByName);
+
+// Replace a document's file, keeping the previous one as a version.
+router.put("/:documentId/content", upload.single("file"), replaceDocumentContent);
 
 // Get all documents (with optional folderId, search, pagination)
 router.get("/", getDocuments);

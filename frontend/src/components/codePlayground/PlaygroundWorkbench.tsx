@@ -4,7 +4,6 @@ import {
   CheckCircle2,
   Code2,
   Copy,
-  Download,
   Eye,
   EyeOff,
   Globe,
@@ -33,6 +32,9 @@ import FileTabs from "./FileTabs";
 import LiveConsole from "./LiveConsole";
 import LanguagePicker from "./LanguagePicker";
 import SqlOutput from "./SqlOutput";
+import DownloadMenu from "./DownloadMenu";
+import SaveToDocumentsDialog from "./SaveToDocumentsDialog";
+import { exportForDownload, projectZipName, saveBlob } from "./saveCode";
 import SelectField from "../ui/SelectField";
 import {
   editorLanguageFor,
@@ -188,6 +190,7 @@ const PlaygroundWorkbench: React.FC<WorkbenchProps> = ({
   const [stdin, setStdin] = useState(saved?.stdin ?? block.stdin);
   const [pane, setPane] = useState<Pane>("output");
   const [copied, setCopied] = useState(false);
+  const [saveOpen, setSaveOpen] = useState(false);
   const [formatting, setFormatting] = useState(false);
   const [showHint, setShowHint] = useState(false);
   const [showSolution, setShowSolution] = useState(false);
@@ -338,27 +341,24 @@ const PlaygroundWorkbench: React.FC<WorkbenchProps> = ({
     }
   };
 
+  const zipName = projectZipName(block.title, "playground");
   const download = async () => {
-    let blob: Blob;
-    let name: string;
-    if (files.length === 1) {
-      blob = new Blob([files[0].content], { type: "text/plain;charset=utf-8" });
-      name = files[0].path.split("/").pop() || lang.file;
-    } else {
-      // Several files: one .zip, folders kept.
-      const { default: JSZip } = await import("jszip");
-      const zip = new JSZip();
-      for (const x of files) zip.file(x.path, x.content);
-      blob = await zip.generateAsync({ type: "blob" });
-      name = `${(block.title || "playground").replace(/[^\w-]+/g, "-").replace(/^-|-$/g, "").toLowerCase() || "playground"}.zip`;
-    }
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = name;
-    a.click();
-    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    const { blob, name } = await exportForDownload(files, zipName);
+    saveBlob(blob, name);
   };
+
+  // Ctrl/⌘+S saves to Documents (instead of the browser saving the web page).
+  useEffect(() => {
+    if (!modal) return;
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === "s") {
+        e.preventDefault();
+        setSaveOpen(true);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [modal]);
 
   // Drag the divider between the editor and the output (modal, wide screens).
   const startDrag = (e: React.PointerEvent) => {
@@ -453,9 +453,11 @@ const PlaygroundWorkbench: React.FC<WorkbenchProps> = ({
         {copied ? <Check className="w-4 h-4 text-success-500" /> : <Copy className="w-4 h-4" />}
       </button>
       {modal && (
-        <button type="button" className={iconBtn} onClick={() => void download()} title={files.length > 1 ? "Download the files (.zip)" : `Download ${files[0].path}`} aria-label="Download code">
-          <Download className="w-4 h-4" />
-        </button>
+        <DownloadMenu
+          downloadLabel={files.length > 1 ? `${zipName} (${files.length} files)` : files[0].path.split("/").pop() || lang.file}
+          onDownload={() => void download()}
+          onSaveToDocuments={() => setSaveOpen(true)}
+        />
       )}
     </div>
   );
@@ -893,6 +895,7 @@ const PlaygroundWorkbench: React.FC<WorkbenchProps> = ({
       </div>
       {statusBar}
       {hiddenFrame}
+      {saveOpen && <SaveToDocumentsDialog files={files} activePath={active} zipName={zipName} languageLabel={lang.label} languageId={lang.id} onClose={() => setSaveOpen(false)} />}
     </div>
   );
 };
