@@ -153,7 +153,8 @@ export const LANGUAGES: PlaygroundLanguage[] = [
     file: "index.html",
     prettier: "html",
     stdin: false,
-    starter: '<h1>Hello, student!</h1>\n<button id="btn">Click me</button>\n\n<script>\n    document.getElementById("btn").addEventListener("click", () => {\n        console.log("Clicked!");\n    });\n</script>\n',
+    starter:
+      '<style>\n    body { font-family: system-ui, sans-serif; padding: 16px; }\n    h1 { color: #4338ca; }\n    button { padding: 6px 12px; border: 0; border-radius: 8px; background: #4338ca; color: white; }\n</style>\n\n<h1>Hello, <span id="name">student</span>!</h1>\n<input id="who" placeholder="Your name">\n<button id="btn">Greet me</button>\n\n<script>\n    document.getElementById("btn").addEventListener("click", () => {\n        const name = document.getElementById("who").value.trim() || "student";\n        document.getElementById("name").textContent = name;\n        console.log("Greeted", name);\n    });\n</script>\n',
   }),
   L({
     id: "css",
@@ -230,6 +231,31 @@ const ALIAS: Record<string, string> = {
   scss: "css",
 };
 
+/** Extra words people search a language by. */
+const KEYWORDS: Record<string, string> = {
+  javascript: "browser web dom console",
+  node: "nodejs server backend npm",
+  typescript: "tsx",
+  python: "py3",
+  csharp: "dotnet .net",
+  php: "web form backend",
+  sql: "database query table sqlite mysql",
+  html: "web page website css javascript js frontend",
+  css: "style web design",
+  react: "jsx frontend component web",
+  bash: "shell terminal linux",
+};
+
+/** Whether a search ("py", "c#", ".rs", "sqlite", "web page") finds this language. */
+export function languageMatches(l: PlaygroundLanguage, query: string): boolean {
+  const words = query.trim().toLowerCase().replace(/^\./, "").split(/\s+/).filter(Boolean);
+  if (!words.length) return true;
+  const ext = l.file.split(".").pop() ?? "";
+  const aliases = Object.keys(ALIAS).filter((k) => ALIAS[k] === l.id);
+  const hay = [l.id, l.label, l.short, l.file, ext, ...aliases, KEYWORDS[l.id] ?? ""].join(" ").toLowerCase();
+  return words.every((w) => hay.includes(w));
+}
+
 /** Code that needs Node (files, modules, stdin, process) rather than a browser tab. */
 const NODE_ONLY = /\brequire\s*\(|\bprocess\.(argv|stdin|stdout|env|exit)|\bimport\s+[\w{}*\s,]+\s+from\s+["'](fs|path|os|readline|http|node:)|\bmodule\.exports\b|\b__dirname\b/;
 /** JSX: a tag inside JavaScript (return <div>…, = <App />). */
@@ -258,4 +284,13 @@ export function isRunnable(lang: PlaygroundLanguage, runnerKeys: Set<string> | n
   if (lang.browser) return true;
   // Before the list loads (null) assume yes: the run itself explains a refusal.
   return !!lang.runner && (runnerKeys === null || runnerKeys.has(lang.runner));
+}
+
+/**
+ * Whether a run is live (output as it comes, the student answers input while it waits) or
+ * one batch. Live only for runner programs that read input: SQL's runner feeds the script
+ * on stdin, so a live SQL run would sit waiting for the student instead of running it.
+ */
+export function runsLive(lang: PlaygroundLanguage, runnerInteractive: boolean): boolean {
+  return !lang.browser && lang.stdin && runnerInteractive;
 }

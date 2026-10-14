@@ -53,9 +53,11 @@ window.addEventListener("error",function(e){send("error",[(e.error&&e.error.name
 window.addEventListener("unhandledrejection",function(e){send("error",["Unhandled promise rejection: "+fmt(e.reason)]);});
 window.__ngaDone=function(){setTimeout(function(){post({done:true});},0);};
 if(PAGE!==null){
+// Links and forms open the project's pages here. Listened to last (window, bubbling), so a page
+// that handles them itself (preventDefault in its own listener, onsubmit="return false") keeps them.
 var external=function(h){return !h||/^[a-z][a-z0-9+.-]*:/i.test(h)||h.indexOf("//")===0;};
-document.addEventListener("click",function(e){var a=e.target&&e.target.closest?e.target.closest("a[href]"):null;if(!a)return;var h=a.getAttribute("href");if(!h||h.charAt(0)==="#"||a.target==="_blank"&&external(h))return;if(external(h)){e.preventDefault();send("info",["Links to other sites don't open from the preview: "+h]);return;}e.preventDefault();post({nav:{href:h,method:"GET",fields:[]}});},true);
-document.addEventListener("submit",function(e){var f=e.target;if(!f||f.tagName!=="FORM")return;var act=f.getAttribute("action")||"";if(external(act)&&act)return;e.preventDefault();var fd;try{fd=new FormData(f,e.submitter||undefined);}catch(x){fd=new FormData(f);}var fields=[];fd.forEach(function(v,k){if(typeof v==="string")fields.push([k,v]);});var m=(f.getAttribute("method")||"GET").toUpperCase()==="POST"?"POST":"GET";post({nav:{href:act||PAGE,method:m,fields:fields}});},true);
+window.addEventListener("click",function(e){if(e.defaultPrevented)return;var a=e.target&&e.target.closest?e.target.closest("a[href]"):null;if(!a)return;var h=a.getAttribute("href");if(!h||h.charAt(0)==="#"||a.target==="_blank"&&external(h))return;if(external(h)){e.preventDefault();send("info",["Links to other sites don't open from the preview: "+h]);return;}e.preventDefault();post({nav:{href:h,method:"GET",fields:[]}});});
+window.addEventListener("submit",function(e){if(e.defaultPrevented)return;var f=e.target;if(!f||f.tagName!=="FORM")return;var act=f.getAttribute("action")||"";if(external(act)&&act)return;e.preventDefault();var fd;try{fd=new FormData(f,e.submitter||undefined);}catch(x){fd=new FormData(f);}var fields=[];fd.forEach(function(v,k){if(typeof v==="string")fields.push([k,v]);});var m=(f.getAttribute("method")||"GET").toUpperCase()==="POST"?"POST":"GET";post({nav:{href:act||PAGE,method:m,fields:fields}});});
 }
 })();</script>`;
 }
