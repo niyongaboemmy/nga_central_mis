@@ -31,6 +31,10 @@ describe("/code-playground", () => {
   let seenAuth: string | undefined;
   let seenBody: any;
   let mode: "ok" | "compile" | "401" | "429" | "down" = "ok";
+  const sessionStarts: any[] = [];
+  const sessionInputs: any[] = [];
+  const sessionStops: string[] = [];
+  let waitingForInput: ((name: string) => void) | null = null;
   let userId: number;
   const prev = process.env.HOME_APP_TASKMENTOR_URL;
 
@@ -39,7 +43,32 @@ describe("/code-playground", () => {
     fake.use(express.json());
     fake.get("/api/integration/code/languages", (req, res) => {
       seenAuth = req.headers.authorization;
-      res.json({ success: true, data: { languages: [{ key: "python", label: "Python", engine: "tmjudge" }, { key: "cpp", label: "C++", engine: "tmjudge" }] } });
+      res.json({ success: true, data: { interactive: true, languages: [{ key: "python", label: "Python", engine: "tmjudge" }, { key: "cpp", label: "C++", engine: "tmjudge" }] } });
+    });
+    // Live runs: a program that asks for a name, greets, exits.
+    fake.post("/api/integration/code/sessions", (req, res) => {
+      sessionStarts.push(req.body);
+      res.status(201).json({ success: true, data: { id: "abc123def4567890" } });
+    });
+    fake.get("/api/integration/code/sessions/:id/events", (req, res) => {
+      if (req.params.id !== "abc123def4567890") return res.status(404).json({ success: false, code: "SESSION_NOT_FOUND" });
+      res.writeHead(200, { "Content-Type": "text/event-stream" });
+      res.write('event: stage\ndata: {"name":"run"}\n\n');
+      res.write('event: stdout\ndata: {"data":"Name? "}\n\n');
+      waitingForInput = (name: string) => {
+        res.write(`event: stdout\ndata: ${JSON.stringify({ data: `Hi ${name}` })}\n\n`);
+        res.write('event: exit\ndata: {"code":0,"signal":null,"verdict":"ok","time_ms":5,"memory_kb":800}\n\n');
+        res.end();
+      };
+    });
+    fake.post("/api/integration/code/sessions/:id/input", (req, res) => {
+      sessionInputs.push(req.body);
+      if (typeof req.body.data === "string") waitingForInput?.(req.body.data.trim());
+      res.status(204).end();
+    });
+    fake.delete("/api/integration/code/sessions/:id", (req, res) => {
+      sessionStops.push(req.params.id);
+      res.status(204).end();
     });
     fake.post("/api/integration/code/run", (req, res) => {
       seenAuth = req.headers.authorization;
@@ -98,7 +127,7 @@ describe("/code-playground", () => {
     const sent = token();
     const res = await request(app).get("/code-playground/languages").set("Authorization", `Bearer ${sent}`);
     expect(res.status).toBe(200);
-    expect(res.body.data).toMatchObject({ available: true, languages: [{ key: "python", label: "Python" }, { key: "cpp", label: "C++" }] });
+    expect(res.body.data).toMatchObject({ available: true, interactive: true, languages: [{ key: "python", label: "Python" }, { key: "cpp", label: "C++" }] });
     expect(seenAuth).toBe(`Bearer ${sent}`);
   });
 
@@ -170,6 +199,44 @@ describe("/code-playground", () => {
     } finally {
       process.env.HOME_APP_TASKMENTOR_URL = url;
     }
+  });
+
+  it("runs a program live: output streams, typed input reaches it", async () => {
+    const auth = `Bearer ${token()}`;
+    const start = await request(app).post("/code-playground/sessions").set("Authorization", auth).send({ language: "python", code: "n = input('Name? ')\nprint('Hi', n)", entry: "main.py", files: [{ path: "util.py", content: "" }] });
+    expect(start.status).toBe(201);
+    expect(start.body.data.id).toBe("abc123def4567890");
+    expect(sessionStarts.at(-1)).toEqual({ language: "python", entry: "main.py", files: [{ path: "main.py", content: "n = input('Name? ')\nprint('Hi', n)" }, { path: "util.py", content: "" }] });
+    const streamed = request(app)
+      .get("/code-playground/sessions/abc123def4567890/events")
+      .set("Authorization", auth)
+      .buffer(true)
+      .parse((res, cb) => {
+        let text = "";
+        res.on("data", (c: Buffer) => (text += c.toString()));
+        res.on("end", () => cb(null, text));
+      })
+      .then((r) => r);
+    await new Promise((r) => setTimeout(r, 200));
+    expect((await request(app).post("/code-playground/sessions/abc123def4567890/input").set("Authorization", auth).send({ data: "Ada\n" })).status).toBe(204);
+    const res = await streamed;
+    expect(res.headers["content-type"]).toMatch(/text\/event-stream/);
+    expect(res.headers["x-accel-buffering"]).toBe("no");
+    expect(res.body).toContain('{"data":"Name? "}');
+    expect(res.body).toContain("Hi Ada");
+    expect(res.body).toContain("event: exit");
+    expect(sessionInputs.at(-1)).toEqual({ data: "Ada\n" });
+  });
+
+  it("sends end of input and Ctrl+C, stops runs, and refuses bad session ids", async () => {
+    const auth = `Bearer ${token()}`;
+    expect((await request(app).post("/code-playground/sessions/abc123def4567890/input").set("Authorization", auth).send({ eof: true, signal: "SIGINT" })).status).toBe(204);
+    expect(sessionInputs.at(-1)).toEqual({ eof: true, signal: "SIGINT" });
+    expect((await request(app).post("/code-playground/sessions/abc123def4567890/input").set("Authorization", auth).send({})).status).toBe(400);
+    expect((await request(app).post("/code-playground/sessions/..%2F..%2Fx/input").set("Authorization", auth).send({ data: "x" })).status).toBe(404);
+    expect((await request(app).get("/code-playground/sessions/0000000000000000/events").set("Authorization", auth)).status).toBe(404);
+    expect((await request(app).delete("/code-playground/sessions/abc123def4567890").set("Authorization", auth)).status).toBe(204);
+    expect(sessionStops).toContain("abc123def4567890");
   });
 
   it("limits runs per user", async () => {

@@ -43,9 +43,12 @@ function post(m){m.__ngaPlayground=RUN;try{parent.postMessage(m,"*");}catch(e){}
 function send(level,args){post({level:level,text:Array.prototype.map.call(args,function(a){return fmt(a,0)}).join(" ")});}
 ["log","info","warn","error","debug"].forEach(function(k){var o=console[k];console[k]=function(){send(k==="debug"?"log":k,arguments);try{o&&o.apply(console,arguments);}catch(e){}};});
 console.table=function(d){send("log",[d]);};
-window.prompt=function(q){var v=at<lines.length?lines[at++]:null;send("info",[(q?q+" ":"")+"\\u21b3 "+(v===null?"(no more input)":v)]);return v;};
-window.alert=function(m){send("info",["alert: "+fmt(m)]);};
-window.confirm=function(m){send("info",["confirm: "+fmt(m)+" \\u21b3 OK"]);return true;};
+var nativePrompt=window.prompt,nativeConfirm=window.confirm,nativeAlert=window.alert;
+function ask(fn,args,fallback){try{return fn.apply(window,args);}catch(e){return fallback;}}
+// prompt(): the Input panel's answers first, then the browser's own input box — the program waits for it.
+window.prompt=function(q,d){var asked=q==null?"":String(q);var v=at<lines.length?lines[at++]:ask(nativePrompt,[asked,d==null?"":String(d)],null);send("info",[(asked?asked+" ":"")+"\\u21b3 "+(v===null?"(cancelled)":v)]);return v;};
+window.alert=function(m){send("info",["alert: "+fmt(m)]);ask(nativeAlert,[m==null?"":String(m)],undefined);};
+window.confirm=function(m){var ok=ask(nativeConfirm,[m==null?"":String(m)],true)!==false;send("info",["confirm: "+fmt(m)+" \\u21b3 "+(ok?"OK":"Cancel")]);return ok;};
 window.addEventListener("error",function(e){send("error",[(e.error&&e.error.name?e.error.name+": ":"")+(e.message||"Error").replace(/^Uncaught /,"")+(e.lineno?" (line "+e.lineno+")":"")]);});
 window.addEventListener("unhandledrejection",function(e){send("error",["Unhandled promise rejection: "+fmt(e.reason)]);});
 window.__ngaDone=function(){setTimeout(function(){post({done:true});},0);};
