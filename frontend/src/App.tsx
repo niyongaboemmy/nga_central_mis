@@ -387,9 +387,12 @@ function App() {
               path="/code-playground"
               element={
                 <ProtectedRoute>
-                  <Suspense fallback={<div className="min-h-[100dvh] bg-white dark:bg-[#0d1117]" />}>
-                    <CodePlaygroundPage />
-                  </Suspense>
+                  {/* A page among the others (sidebar + top bar); it can expand to the whole window. */}
+                  <SystemLayoutWrapper fullWidth>
+                    <Suspense fallback={<div className="my-4 h-[calc(100dvh-6rem)] rounded-2xl bg-white dark:bg-[#0d1117] animate-pulse" />}>
+                      <CodePlaygroundPage />
+                    </Suspense>
+                  </SystemLayoutWrapper>
                 </ProtectedRoute>
               }
             />

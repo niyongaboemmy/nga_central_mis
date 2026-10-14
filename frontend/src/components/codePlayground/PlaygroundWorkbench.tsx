@@ -12,6 +12,8 @@ import {
   Loader2,
   Maximize2,
   Minimize2,
+  Expand,
+  Shrink,
   Play,
   RotateCcw,
   Save,
@@ -78,11 +80,17 @@ export interface WorkbenchProps {
   onClose?: () => void;
   onExpand?: (current: PlaygroundBlock) => void;
   onSave?: (block: PlaygroundBlock) => void;
+  /** Page, expanded: the browser's full screen (hides its own bars too). */
   fullscreen?: boolean;
   onToggleFullscreen?: () => void;
+  /** Page: filling the window over the MIS bars, or a page among the others. */
+  expanded?: boolean;
+  onToggleExpanded?: () => void;
 }
 
 type Pane = "output" | "preview" | "input";
+
+const isMac = typeof navigator !== "undefined" && /Mac|iP(hone|ad)/.test(navigator.platform || navigator.userAgent);
 
 const VERDICT: Record<string, { label: string; tone: "ok" | "warn" | "bad" }> = {
   ok: { label: "Finished", tone: "ok" },
@@ -161,6 +169,8 @@ const PlaygroundWorkbench: React.FC<WorkbenchProps> = ({
   onSave,
   fullscreen,
   onToggleFullscreen,
+  expanded,
+  onToggleExpanded,
   onLanguageChange,
   onShare,
   onBack,
@@ -861,8 +871,22 @@ const PlaygroundWorkbench: React.FC<WorkbenchProps> = ({
         )}
         {runButton}
         {onToggleFullscreen && (
-          <button type="button" className={`${iconBtn} hidden sm:inline-flex`} onClick={onToggleFullscreen} title={fullscreen ? "Exit full screen" : "Full screen"} aria-label={fullscreen ? "Exit full screen" : "Full screen"}>
-            {fullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+          <button type="button" className={`${iconBtn} hidden sm:inline-flex`} onClick={onToggleFullscreen} title={fullscreen ? "Exit full screen" : "Full screen (hides the browser's bars too)"} aria-label={fullscreen ? "Exit full screen" : "Full screen"} data-testid="playground-fullscreen">
+            {fullscreen ? <Shrink className="w-4 h-4" /> : <Expand className="w-4 h-4" />}
+          </button>
+        )}
+        {onToggleExpanded && (
+          <button
+            type="button"
+            className={`${iconBtn} border border-slate-200 dark:border-white/10`}
+            onClick={onToggleExpanded}
+            title={`${expanded ? "Back to the page" : "Expand: use the whole window"} (${isMac ? "⌘" : "Ctrl"}+Shift+E${expanded ? " or Esc" : ""})`}
+            aria-label={expanded ? "Back to the page" : "Expand the playground"}
+            aria-pressed={!!expanded}
+            data-testid="playground-expand"
+          >
+            {expanded ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+            <span className="hidden xl:inline">{expanded ? "Exit" : "Expand"}</span>
           </button>
         )}
         {onClose && (
