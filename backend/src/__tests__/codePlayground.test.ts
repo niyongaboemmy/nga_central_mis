@@ -23,6 +23,8 @@ describe("mainFileFor", () => {
     expect(mainFileFor("java", "class Hidden {}")).toBe("Main.java");
     expect(mainFileFor("python", "print(1)")).toBe("main.py");
     expect(mainFileFor("csharp", "")).toBe("Program.cs");
+    // An Arduino sketch must be a .ino (the runner builds a sketch folder named after it).
+    expect(mainFileFor("arduino", "void setup(){}")).toBe("sketch.ino");
   });
 });
 

@@ -67,9 +67,35 @@ export interface RunState {
   live: { id: string | null; stage: "build" | "run" | null } | null;
   /** When the program last printed something (live runs: "is it waiting for me?"). */
   lastOutputAt: number;
+  /** Arduino: the compiled firmware (Intel HEX) the simulator runs, and how much of the chip it uses. */
+  firmware: Firmware | null;
 }
 
-const IDLE: RunState = { phase: "idle", entries: [], meta: null, output: "", doc: null, runId: null, page: null, history: [], console: null, live: null, lastOutputAt: 0 };
+export interface Firmware {
+  hex: string;
+  /** Bytes of flash / RAM the sketch uses, and the chip's (Uno: 32 256 usable flash, 2 048 RAM). */
+  flash: number | null;
+  flashMax: number | null;
+  ram: number | null;
+  ramMax: number | null;
+}
+
+/** arduino-cli's size lines → numbers (null when it didn't say). */
+export function firmwareSize(log: string): Pick<Firmware, "flash" | "flashMax" | "ram" | "ramMax"> {
+  const f = /Sketch uses (\d+) bytes .*?Maximum is (\d+) bytes/.exec(log);
+  const r = /Global variables use (\d+) bytes .*?Maximum is (\d+) bytes/.exec(log);
+  return { flash: f ? +f[1] : null, flashMax: f ? +f[2] : null, ram: r ? +r[1] : null, ramMax: r ? +r[2] : null };
+}
+
+/** The compiler's other messages (warnings), without the size lines. */
+const compileNotes = (log: string) =>
+  log
+    .split("\n")
+    .filter((l) => !/^(Sketch uses|Global variables use)/.test(l))
+    .join("\n")
+    .trim();
+
+const IDLE: RunState = { phase: "idle", entries: [], meta: null, output: "", doc: null, runId: null, page: null, history: [], console: null, live: null, lastOutputAt: 0, firmware: null };
 const CONSOLE_MAX = 400_000;
 
 /** Adds to a transcript, joining runs of the same kind (and keeping it bounded). */
@@ -265,13 +291,18 @@ export function useRunner() {
         // A live run keeps going: only its transcript is cleared.
         s.live
           ? { ...s, console: [], entries: [] }
-          : { ...IDLE, doc: s.doc, runId: s.runId, page: s.page, history: s.history, meta: s.meta && { ...s.meta } },
+          : // The simulated Arduino keeps running: only the log is cleared.
+            { ...IDLE, doc: s.doc, runId: s.runId, page: s.page, history: s.history, meta: s.meta && { ...s.meta }, firmware: s.firmware },
       ),
     [],
   );
 
   const run = useCallback(
-    async (lang: PlaygroundLanguage, project: PlayProject, stdin: string) => {
+    /**
+     * `check`: an exercise checks the output. For Arduino that output is what the sketch prints
+     * on Serial in its first simulated seconds (with `stdin` typed into the Serial Monitor).
+     */
+    async (lang: PlaygroundLanguage, project: PlayProject, stdin: string, opts: { check?: string } = {}) => {
       abort.current?.abort();
       abort.current = null;
       endLive();
@@ -310,6 +341,30 @@ export function useRunner() {
         // One file under the language's usual name: let the server name it (Java: after its public class).
         const named = others.length > 0 || project.entry !== lang.file;
         const r = await runOnServer({ language: lang.runner!, code: entry?.content ?? "", entry: named ? project.entry : undefined, files: others, stdin }, controller.signal);
+        if (lang.firmware) {
+          const log = r.compile_output ?? "";
+          const hex = r.verdict === "ok" && r.stdout.trimStart().startsWith(":") ? r.stdout : null;
+          const size = firmwareSize(log);
+          const entries: ConsoleEntry[] = [];
+          if (hex) {
+            const pct = (a: number | null, b: number | null) => (a !== null && b ? ` (${Math.round((a / b) * 100)}%)` : "");
+            entries.push({
+              level: "info",
+              text: `Compiled for the Arduino Uno${size.flash !== null ? `: ${size.flash.toLocaleString()} bytes of flash${pct(size.flash, size.flashMax)}, ${size.ram?.toLocaleString() ?? "?"} bytes of RAM${pct(size.ram, size.ramMax)}` : ""}. It runs in the simulator.`,
+            });
+            const notes = compileNotes(log);
+            if (notes) entries.push({ level: "warn", text: notes });
+          } else entries.push(...serverEntries({ ...r, stdout: "" }));
+          let output = "";
+          if (hex && opts.check !== undefined) {
+            const { runHeadless } = await import("./arduino/sim");
+            const { parseCircuit, DIAGRAM_FILE } = await import("./arduino/parts");
+            const circuit = parseCircuit(project.files.find((f) => f.path === DIAGRAM_FILE)?.content);
+            output = (await runHeadless(hex, circuit, { ms: 3000, input: stdin || undefined, stopAfterChars: opts.check.length + 400, signal: controller.signal })).serial;
+          }
+          setState((s) => (s.runId !== runId ? s : { ...s, phase: "done", entries, output, meta: serverMeta(r), firmware: hex ? { hex, ...size } : null }));
+          return;
+        }
         // PHP that prints a page (and a project with pages): show it, links and forms working.
         const page = lang.id === "php" && r.verdict === "ok" && looksLikeHtml(r.stdout) ? buildPageDocument(r.stdout, project.entry, project.files, runId, "").doc : null;
         startedAt.current = performance.now();

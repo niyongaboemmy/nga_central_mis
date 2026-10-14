@@ -68,6 +68,8 @@ const MAIN_FILE: Record<string, string> = {
   swift: "main.swift",
   sql: "main.sql",
   bash: "main.sh",
+  // arduino/uno: the sketch folder is named after it (the kind's default entry).
+  arduino: "sketch.ino",
   lua: "main.lua",
   r: "main.R",
   scala: "Main.scala",

@@ -26,6 +26,7 @@ const loaders: Record<string, () => Promise<Extension>> = {
   java: () => import("@codemirror/lang-java").then((m) => m.java()),
   c: () => import("@codemirror/lang-cpp").then((m) => m.cpp()),
   cpp: () => import("@codemirror/lang-cpp").then((m) => m.cpp()),
+  arduino: () => import("@codemirror/lang-cpp").then((m) => m.cpp()),
   php: () => import("@codemirror/lang-php").then((m) => m.php()),
   rust: () => import("@codemirror/lang-rust").then((m) => m.rust()),
   go: () => import("@codemirror/lang-go").then((m) => m.go()),
