@@ -21,6 +21,8 @@ export interface RunnerLanguage {
 export interface PlaygroundRunInput {
   language: string;
   code: string;
+  /** The main file's path (a project of several files); named for the language when absent. */
+  entry?: string | null;
   stdin: string;
   /** Extra files next to the main one (helpers, data). */
   files: { path: string; content: string }[];
@@ -141,7 +143,7 @@ const numOrNull = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ?
 
 /** One run of the code with the given input; the answer reshaped for the page. */
 export async function runCode(token: string, input: PlaygroundRunInput): Promise<PlaygroundRunResult> {
-  const main = mainFileFor(input.language, input.code);
+  const main = input.entry || mainFileFor(input.language, input.code);
   const extra = input.files.filter((f) => f.path !== main);
   const data = await call("/run", token, {
     method: "POST",

@@ -47,7 +47,8 @@ const PlaygroundEditForm: React.FC<{ initial: PlaygroundBlock; onSave: (b: Playg
   // "Use its output": run the solution (or the code) and keep what it prints as the expected output.
   const fillExpected = () => {
     setFilling(true);
-    void run(lang, b.solution.trim() || b.code, b.stdin);
+    const main = b.entry || lang.file;
+    void run(lang, { entry: main, files: [{ path: main, content: b.solution.trim() || b.code }, ...b.files.filter((x) => x.path !== main)] }, b.stdin);
   };
   useEffect(() => {
     if (!filling || state.phase !== "done") return;

@@ -3,14 +3,16 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Lock } from "lucide-react";
 import CodePlayground from "./CodePlayground";
 import { languageById } from "./languages";
+import type { PlayFile } from "./project";
 import { usePermissions } from "../../hooks/usePermissions";
 import { Permissions } from "../../constants/permissions";
 
 /**
  * /code-playground — the Code Playground on its own, filling the screen (no sidebar or
  * top bar), for any language it runs. ?lang=python picks the language; each language
- * keeps its own draft on this device. "Share" copies a link carrying the code
- * (#code=…, base64), so a teacher can hand an example to a class. Full screen hides
+ * keeps its own draft on this device. "Share" copies a link carrying the files
+ * (#p=…, base64 JSON; older links #code=… carry one file), so a teacher can hand an example
+ * to a class. Full screen hides
  * the browser's own bars too. Needs CODE_PLAYGROUND_USE (every role by default).
  */
 
@@ -28,9 +30,22 @@ const decode = (s: string): string | null => {
   }
 };
 
-const sharedCode = () => {
+/** The program a shared link carries: several files (#p=) or one (#code=). */
+const sharedProgram = (): { code: string; entry?: string; files?: PlayFile[] } | null => {
+  const p = window.location.hash.match(/(?:^#|&)p=([^&]+)/);
+  if (p) {
+    try {
+      const d = JSON.parse(decode(p[1]) ?? "");
+      const files: PlayFile[] = (Array.isArray(d?.files) ? d.files : []).filter((x: any) => typeof x?.path === "string" && typeof x?.content === "string");
+      const main = files.find((x) => x.path === d.entry);
+      if (main) return { code: main.content, entry: main.path, files: files.filter((x) => x !== main) };
+    } catch {
+      /* a broken link opens the starter */
+    }
+  }
   const m = window.location.hash.match(/(?:^#|&)code=([^&]+)/);
-  return m ? decode(m[1]) : null;
+  const code = m ? decode(m[1]) : null;
+  return code ? { code } : null;
 };
 
 const CodePlaygroundPage: React.FC = () => {
@@ -39,7 +54,7 @@ const CodePlaygroundPage: React.FC = () => {
   const [params, setParams] = useSearchParams();
   const language = languageById(params.get("lang"))?.id ?? DEFAULT_LANGUAGE;
   // Shared code is read once, for the language in the link.
-  const [shared] = useState(sharedCode);
+  const [shared] = useState(sharedProgram);
   const [isFullscreen, setIsFullscreen] = useState(() => typeof document !== "undefined" && !!document.fullscreenElement);
 
   useEffect(() => {
@@ -62,8 +77,10 @@ const CodePlaygroundPage: React.FC = () => {
     [setParams],
   );
 
-  const onShare = useCallback(async ({ language: lang, code }: { language: string; code: string }) => {
-    const url = `${window.location.origin}/code-playground?lang=${encodeURIComponent(lang)}${code.length <= MAX_SHARED_CHARS ? `#code=${encode(code)}` : ""}`;
+  const onShare = useCallback(async ({ language: lang, files, entry }: { language: string; files: PlayFile[]; entry: string }) => {
+    const size = files.reduce((n, x) => n + x.content.length, 0);
+    const payload = files.length === 1 ? `#code=${encode(files[0].content)}` : `#p=${encode(JSON.stringify({ entry, files }))}`;
+    const url = `${window.location.origin}/code-playground?lang=${encodeURIComponent(lang)}${size <= MAX_SHARED_CHARS ? payload : ""}`;
     try {
       await navigator.clipboard.writeText(url);
       return true;
@@ -78,7 +95,7 @@ const CodePlaygroundPage: React.FC = () => {
     else navigate("/home");
   }, [navigate]);
 
-  const code = useMemo(() => (shared != null && shared.trim() ? shared : undefined), [shared]);
+  const program = useMemo(() => (shared && shared.code.trim() ? shared : null), [shared]);
 
   if (!hasPermission(Permissions.CODE_PLAYGROUND_USE)) {
     return (
@@ -100,7 +117,9 @@ const CodePlaygroundPage: React.FC = () => {
       <CodePlayground
         variant="page"
         language={language}
-        code={code}
+        code={program?.code}
+        entry={program?.entry}
+        files={program?.files}
         source="Write, run and test code in any language"
         onLanguageChange={onLanguageChange}
         onShare={onShare}
