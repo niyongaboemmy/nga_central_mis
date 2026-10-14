@@ -36,19 +36,39 @@ export class PlaygroundRunError extends Error {
   }
 }
 
-let languagesRequest: Promise<RunnerLanguages> | null = null;
+let languagesRequest: { at: number; request: Promise<RunnerLanguages> } | null = null;
+const LANGUAGES_TTL_MS = 60_000;
 
-/** The runner's languages, fetched once per page load (a failure is retried next time). */
-export const getRunnerLanguages = (): Promise<RunnerLanguages> =>
-  (languagesRequest ??= api
+/**
+ * The runner's languages, shared by every playground on the page for a minute. Not for the
+ * whole visit: a language the runner gains (a toolchain installed) shows up without a reload.
+ */
+export const getRunnerLanguages = (): Promise<RunnerLanguages> => {
+  if (languagesRequest && Date.now() - languagesRequest.at < LANGUAGES_TTL_MS) return languagesRequest.request;
+  const request = api
     .get<{ data: RunnerLanguages }>("/code-playground/languages", { timeout: 15000 })
     .then((r) => r.data.data)
     .catch(() => {
       languagesRequest = null;
       return { available: false, languages: [], message: "Couldn't reach the code runner." };
-    }));
+    });
+  languagesRequest = { at: Date.now(), request };
+  return request;
+};
 
-export async function runOnServer(body: { language: string; code: string; stdin?: string }, signal?: AbortSignal): Promise<PlaygroundRunResult> {
+/** Tests only. */
+export const resetRunnerLanguages = () => {
+  languagesRequest = null;
+};
+
+/**
+ * One run: `code` is the main file (`entry`, a project path; named for the language when
+ * left out), `files` the other files it uses (imports, includes, pages, data).
+ */
+export async function runOnServer(
+  body: { language: string; code: string; entry?: string; files?: { path: string; content: string }[]; stdin?: string },
+  signal?: AbortSignal,
+): Promise<PlaygroundRunResult> {
   try {
     const res = await api.post<{ data: PlaygroundRunResult }>("/code-playground/run", body, { timeout: 60000, signal });
     return res.data.data;

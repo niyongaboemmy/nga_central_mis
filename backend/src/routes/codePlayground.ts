@@ -16,7 +16,11 @@ const router = express.Router();
 
 const MAX_CODE = 64 * 1024;
 const MAX_STDIN = 16 * 1024;
-const MAX_FILES = 10;
+/** A playground project: its main file plus up to this many others. */
+const MAX_FILES = 24;
+const MAX_PROJECT = 512 * 1024;
+const PATH = /^[\w.-]+(\/[\w.-]+){0,4}$/;
+const validPath = (p: string) => PATH.test(p) && !p.split("/").some((s) => s === "." || s === "..");
 const LANGUAGE = /^[a-z][a-z0-9+#_-]{0,39}$/;
 
 /** Per user, on top of Task Mentor's own per-user limit: a stuck "Run" key can't flood the runner. */
@@ -57,6 +61,8 @@ router.post(
     const code = typeof body.code === "string" ? body.code : "";
     const stdin = typeof body.stdin === "string" ? body.stdin : "";
     const files = Array.isArray(body.files) ? body.files : [];
+    const entry = typeof body.entry === "string" && body.entry.trim() ? body.entry.trim() : null;
+    if (entry && !validPath(entry)) return fail(res, 400, "VALIDATION_ERROR", "The main file's name is invalid.");
     if (!LANGUAGE.test(language)) return fail(res, 400, "VALIDATION_ERROR", "Pick a language to run.");
     if (!code.trim()) return fail(res, 400, "VALIDATION_ERROR", "There's no code to run.");
     if (code.length > MAX_CODE) return fail(res, 413, "TOO_LARGE", "The code is too long to run here (64 KB at most).");
@@ -65,15 +71,17 @@ router.post(
     const extra: { path: string; content: string }[] = [];
     for (const f of files) {
       const path = typeof f?.path === "string" ? f.path.trim() : "";
-      if (!/^[\w.-]+(\/[\w.-]+)*$/.test(path) || path.split("/").includes("..") || typeof f?.content !== "string" || f.content.length > MAX_CODE) {
-        return fail(res, 400, "VALIDATION_ERROR", "One of the extra files is invalid.");
+      if (!validPath(path) || typeof f?.content !== "string" || f.content.length > MAX_CODE) {
+        return fail(res, 400, "VALIDATION_ERROR", `The file "${path.slice(0, 80) || "?"}" is invalid.`);
       }
+      if (path === entry || extra.some((x) => x.path === path)) return fail(res, 400, "VALIDATION_ERROR", `Two files are named "${path}".`);
       extra.push({ path, content: f.content });
     }
+    if (code.length + extra.reduce((n, f) => n + f.content.length, 0) > MAX_PROJECT) return fail(res, 413, "TOO_LARGE", "The files are too large to run here (512 KB at most).");
     if (!runs.take(String(req.user.userId))) return fail(res, 429, "RATE_LIMITED", "Too many runs — wait a minute and try again.");
 
     try {
-      successResponse(res, "Ran", await runCode(token, { language, code, stdin, files: extra }));
+      successResponse(res, "Ran", await runCode(token, { language, code, entry, stdin, files: extra }));
     } catch (e) {
       if (!(e instanceof RunnerError)) throw e;
       fail(res, e.status, e.code, e.message);

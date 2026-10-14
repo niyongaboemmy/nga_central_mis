@@ -114,6 +114,28 @@ describe("/code-playground", () => {
     expect(res.body.data).toMatchObject({ verdict: "ok", stdout: "Hello, Aline\n", stderr: "", exit_code: 0, time_ms: 12, engine: "tmjudge" });
   });
 
+  it("relays a project: the main file under its own name and the other files", async () => {
+    const res = await run({
+      language: "php",
+      code: "<?php require 'lib/maths.php'; echo twice(21);",
+      entry: "index.php",
+      files: [
+        { path: "lib/maths.php", content: "<?php function twice($x) { return $x * 2; }" },
+        { path: "style.css", content: "h1{}" },
+      ],
+    });
+    expect(res.status).toBe(200);
+    expect(seenBody.entry).toBe("index.php");
+    expect(seenBody.files.map((f: any) => f.path)).toEqual(["index.php", "lib/maths.php", "style.css"]);
+  });
+
+  it("refuses bad project file names and duplicates", async () => {
+    expect((await run({ language: "python", code: "x", entry: "../main.py" })).status).toBe(400);
+    expect((await run({ language: "python", code: "x", entry: "main.py", files: [{ path: "main.py", content: "y" }] })).body.message).toMatch(/Two files/);
+    expect((await run({ language: "python", code: "x", files: [{ path: "a/./b.py", content: "y" }] })).status).toBe(400);
+    expect((await run({ language: "python", code: "x", files: Array.from({ length: 25 }, (_, i) => ({ path: `m${i}.py`, content: "" })) })).status).toBe(400);
+  });
+
   it("reports a compile error with the compiler's output", async () => {
     mode = "compile";
     const res = await run({ language: "cpp", code: "int main() { return 0 }" });

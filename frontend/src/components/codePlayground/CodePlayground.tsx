@@ -30,13 +30,15 @@ export interface CodePlaygroundProps
   className?: string;
 }
 
-const CodePlayground: React.FC<CodePlaygroundProps> = ({ language, code, variant = "inline", className, mode, title, instructions, stdin, expected, hint, solution, ...rest }) => {
+const CodePlayground: React.FC<CodePlaygroundProps> = ({ language, code, entry, files, variant = "inline", className, mode, title, instructions, stdin, expected, hint, solution, ...rest }) => {
   const block = useMemo<PlaygroundBlock>(() => {
     const lang = languageById(language) ?? languageById(DEFAULT_BLOCK.language)!;
     return {
       ...DEFAULT_BLOCK,
       language: lang.id,
       code: code ?? lang.starter,
+      entry: entry ?? "",
+      files: files ?? [],
       mode: mode ?? "example",
       title: title ?? "",
       instructions: instructions ?? "",
@@ -45,7 +47,7 @@ const CodePlayground: React.FC<CodePlaygroundProps> = ({ language, code, variant
       hint: hint ?? "",
       solution: solution ?? "",
     };
-  }, [language, code, mode, title, instructions, stdin, expected, hint, solution]);
+  }, [language, code, entry, files, mode, title, instructions, stdin, expected, hint, solution]);
 
   return (
     <div className={className ?? (variant === "inline" ? undefined : "h-full")}>
@@ -56,7 +58,7 @@ const CodePlayground: React.FC<CodePlaygroundProps> = ({ language, code, variant
           </div>
         }
       >
-        <PlaygroundWorkbench key={`${block.language}\u0000${block.code}`} block={block} variant={variant} {...rest} />
+        <PlaygroundWorkbench key={`${block.language}\u0000${block.entry}\u0000${block.code}\u0000${block.files.length}`} block={block} variant={variant} {...rest} />
       </Suspense>
     </div>
   );

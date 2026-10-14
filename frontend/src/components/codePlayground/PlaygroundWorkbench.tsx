@@ -26,8 +26,23 @@ import {
   XCircle,
   ArrowLeft,
   Share2,
+  ChevronLeft,
+  FolderTree,
 } from "lucide-react";
 import CodeEditor from "./CodeEditor";
+import FileTabs from "./FileTabs";
+import SelectField from "../ui/SelectField";
+import {
+  editorLanguageFor,
+  exampleProject,
+  extOf,
+  newFileContent,
+  projectProblem,
+  singleFile,
+  suggestName,
+  type PlayFile,
+  type PlayProject,
+} from "./project";
 import { LANGUAGES, isRunnable, languageById, type PlaygroundLanguage } from "./languages";
 import { outputMatches, normalizeOutput, type PlaygroundBlock } from "./playgroundData";
 import { prettifyCode } from "./format";
@@ -35,9 +50,11 @@ import { useRunner, useRunnerLanguages } from "./useRunner";
 import { useDarkMode } from "./useDarkMode";
 
 /**
- * The Code Playground: write, run and check code from a lesson. One component, two
- * sizes — the full-screen modal (CodePlaygroundModal) and the compact block inside a
- * lesson (inline). Server languages run on Task Mentor's code runner; web pages,
+ * The Code Playground: write, run and check code from a lesson. One component, three
+ * sizes — the compact block inside a lesson (inline), the modal over a page and the
+ * /code-playground page. A program can be several files, linked the language's way (imports,
+ * includes, headers, classes, `source`; for web pages <link>/<script src>, links between pages
+ * and forms posting to PHP). Server languages run on Task Mentor's code runner; web pages,
  * browser JavaScript and React run in a sandboxed frame here.
  */
 
@@ -48,7 +65,7 @@ export interface WorkbenchProps {
   /** Page: picking another language is handled by the page (URL + per-language drafts). */
   onLanguageChange?: (language: string) => void;
   /** Page: copies a link that opens this code. */
-  onShare?: (current: { language: string; code: string }) => Promise<boolean> | boolean;
+  onShare?: (current: { language: string; files: PlayFile[]; entry: string }) => Promise<boolean> | boolean;
   /** Page: the back button. */
   onBack?: () => void;
   autoRun?: boolean;
@@ -88,18 +105,36 @@ const draftKey = (b: PlaygroundBlock) => {
   return `nga.playground.draft.${(h >>> 0).toString(36)}`;
 };
 
-const readDraft = (key: string): { language: string; code: string; stdin: string } | null => {
+interface Draft {
+  language: string;
+  files: PlayFile[];
+  entry: string;
+  stdin: string;
+}
+
+const readDraft = (key: string): Draft | null => {
   try {
     const raw = localStorage.getItem(key);
     if (!raw) return null;
     const d = JSON.parse(raw);
-    return typeof d?.code === "string" && typeof d?.language === "string" ? { language: d.language, code: d.code, stdin: typeof d.stdin === "string" ? d.stdin : "" } : null;
+    if (typeof d?.language !== "string" || !languageById(d.language)) return null;
+    const stdin = typeof d.stdin === "string" ? d.stdin : "";
+    if (Array.isArray(d.files) && d.files.length && typeof d.entry === "string") {
+      const files = d.files.filter((f: any) => typeof f?.path === "string" && typeof f?.content === "string").map((f: any) => ({ path: f.path, content: f.content }));
+      if (files.some((f: PlayFile) => f.path === d.entry)) return { language: d.language, files, entry: d.entry, stdin };
+    }
+    // Drafts from before projects: one file.
+    if (typeof d.code === "string") {
+      const p = singleFile(languageById(d.language)!, d.code);
+      return { language: d.language, ...p, stdin };
+    }
+    return null;
   } catch {
     return null;
   }
 };
 
-const writeDraft = (key: string, value: { language: string; code: string; stdin: string } | null) => {
+const writeDraft = (key: string, value: Draft | null) => {
   try {
     if (value) localStorage.setItem(key, JSON.stringify(value));
     else localStorage.removeItem(key);
@@ -131,12 +166,22 @@ const PlaygroundWorkbench: React.FC<WorkbenchProps> = ({
   const [shared, setShared] = useState(false);
   const dark = useDarkMode();
   const runner = useRunnerLanguages();
-  const { state, run, stop, clear } = useRunner();
+  const { state, run, stop, clear, back, openPage, pages } = useRunner();
   const key = useMemo(() => draftKey(block), [block]);
   const saved = useMemo(() => (onSave ? null : readDraft(key)), [key, onSave]);
+  /** The block as a project: its main file (code) and its other files. */
+  const blockProject = useMemo<PlayProject>(() => {
+    const main = block.entry || (languageById(block.language) ?? LANGUAGES[0]).file;
+    return { entry: main, files: [{ path: main, content: block.code }, ...block.files.filter((x) => x.path !== main)] };
+  }, [block]);
 
-  const [langId, setLangId] = useState(saved?.language && languageById(saved.language) ? saved.language : block.language);
-  const [code, setCode] = useState(saved?.code ?? block.code);
+  const [langId, setLangId] = useState(saved?.language ?? block.language);
+  const [files, setFiles] = useState<PlayFile[]>(saved?.files ?? blockProject.files);
+  const [entry, setEntry] = useState(saved?.entry ?? blockProject.entry);
+  const [active, setActive] = useState(saved?.entry ?? blockProject.entry);
+  const [confirmExample, setConfirmExample] = useState(false);
+  /** What the tabs' "changed" dots compare with: the project as last loaded (lesson, example…). */
+  const [baseline, setBaseline] = useState<PlayFile[]>(blockProject.files);
   const [stdin, setStdin] = useState(saved?.stdin ?? block.stdin);
   const [pane, setPane] = useState<Pane>("output");
   const [menuOpen, setMenuOpen] = useState(false);
@@ -153,22 +198,72 @@ const PlaygroundWorkbench: React.FC<WorkbenchProps> = ({
   const exercise = block.mode === "exercise";
   const runnable = isRunnable(lang, runner.keys);
   const browserRun = !!lang.browser;
-  const hasPreview = lang.browser === "web" || lang.browser === "react";
-  const dirty = code !== block.code || langId !== block.language || stdin !== block.stdin;
+  const activeFile = files.find((x) => x.path === active) ?? files[0];
+  /** The main file's text (what an exercise checks, "Use it" replaces). */
+  const code = files.find((x) => x.path === entry)?.content ?? "";
+  const setActiveCode = useCallback((v: string) => setFiles((fs) => fs.map((x) => (x.path === activeFile.path ? { ...x, content: v } : x))), [activeFile.path]);
+  const setMainCode = (v: string) => setFiles((fs) => fs.map((x) => (x.path === entry ? { ...x, content: v } : x)));
+  // A page printed by PHP shows in the Preview too.
+  const hasPreview = lang.browser === "web" || lang.browser === "react" || (!lang.browser && !!state.doc);
+  const sameFiles = (a: PlayFile[], b: PlayFile[]) => a.length === b.length && a.every((x, i) => x.path === b[i].path && x.content === b[i].content);
+  const dirty = !sameFiles(files, blockProject.files) || entry !== blockProject.entry || langId !== block.language || stdin !== block.stdin;
+  const changed = useMemo(
+    () => new Set(files.filter((x) => baseline.find((b) => b.path === x.path)?.content !== x.content).map((x) => x.path)),
+    [files, baseline],
+  );
+  const problem = projectProblem({ files, entry });
+  const example = exampleProject(lang.id);
 
   // Keep the student's work on this device (not for the teacher editing the block).
   useEffect(() => {
     if (onSave) return;
-    const t = window.setTimeout(() => writeDraft(key, dirty ? { language: langId, code, stdin } : null), 400);
+    const t = window.setTimeout(() => writeDraft(key, dirty ? { language: langId, files, entry, stdin } : null), 400);
     return () => window.clearTimeout(t);
-  }, [key, langId, code, stdin, dirty, onSave]);
+  }, [key, langId, files, entry, stdin, dirty, onSave]);
 
   const doRun = useCallback(() => {
-    if (!runnable || !code.trim()) return;
+    if (!runnable || problem || !files.some((x) => x.content.trim())) return;
     setChecked(null);
-    setPane(hasPreview ? "preview" : "output");
-    void run(lang, code, stdin);
-  }, [runnable, code, hasPreview, run, lang, stdin]);
+    setPane(lang.browser === "web" || lang.browser === "react" ? "preview" : "output");
+    void run(lang, { files, entry }, stdin);
+  }, [runnable, problem, files, entry, run, lang, stdin]);
+
+  // A server program that printed a page (PHP): show the page.
+  const shownDocFor = useRef<string | null>(null);
+  useEffect(() => {
+    if (!lang.browser && state.doc && state.runId && shownDocFor.current !== state.runId) {
+      shownDocFor.current = state.runId;
+      setPane("preview");
+    }
+  }, [lang.browser, state.doc, state.runId]);
+
+  // ---- files
+  const addFile = (path: string) => {
+    setFiles((fs) => [...fs, { path, content: newFileContent(path) }]);
+    setActive(path);
+  };
+  const renameFile = (from: string, to: string) => {
+    setFiles((fs) => fs.map((x) => (x.path === from ? { ...x, path: to } : x)));
+    if (entry === from) setEntry(to);
+    if (active === from) setActive(to);
+  };
+  const deleteFile = (path: string) => {
+    const rest = files.filter((x) => x.path !== path);
+    if (!rest.length) return;
+    setFiles(rest);
+    const nextEntry = entry === path ? rest[0].path : entry;
+    setEntry(nextEntry);
+    if (active === path) setActive(nextEntry);
+  };
+  const loadProject = (p: PlayProject) => {
+    setFiles(p.files.map((x) => ({ ...x })));
+    setBaseline(p.files);
+    setEntry(p.entry);
+    setActive(p.entry);
+    setConfirmExample(false);
+    setChecked(null);
+    clear();
+  };
 
   // "Run" on a lesson's code: run once as soon as the playground opens.
   const autoRan = useRef(false);
@@ -188,16 +283,19 @@ const PlaygroundWorkbench: React.FC<WorkbenchProps> = ({
   const doFormat = useCallback(async () => {
     setFormatting(true);
     try {
-      const out = await prettifyCode(code, lang.id === "node" ? "javascript" : lang.id, lang.prettier ?? null);
-      setCode(out);
+      // Format the open file by its own kind: Prettier for web files, the brace layout for the rest.
+      const parsers: Record<string, "babel" | "typescript" | "css" | "html" | "json"> = { js: "babel", mjs: "babel", cjs: "babel", jsx: "babel", ts: "typescript", tsx: "typescript", css: "css", html: "html", htm: "html", json: "json" };
+      const fileLang = editorLanguageFor(activeFile.path, lang.id);
+      const out = await prettifyCode(activeFile.content, fileLang === "node" || fileLang === "react" ? "javascript" : fileLang || lang.id, parsers[extOf(activeFile.path)] ?? null);
+      setActiveCode(out);
     } finally {
       setFormatting(false);
     }
-  }, [code, lang]);
+  }, [activeFile, lang, setActiveCode]);
 
   const reset = () => {
     setLangId(block.language);
-    setCode(block.code);
+    loadProject(blockProject);
     setStdin(block.stdin);
     setChecked(null);
     setShowSolution(false);
@@ -209,8 +307,14 @@ const PlaygroundWorkbench: React.FC<WorkbenchProps> = ({
     setMenuOpen(false);
     if (next.id === lang.id) return;
     if (onLanguageChange) return onLanguageChange(next.id);
-    // Untouched starter code follows the language; the student's own code stays.
-    if (!code.trim() || code === lang.starter || code === block.code) setCode(next.id === block.language ? block.code : next.starter);
+    // An untouched one-file program follows the language; the student's own files stay.
+    if (files.length === 1 && (!code.trim() || code === lang.starter || code === block.code)) {
+      const p = next.id === block.language ? blockProject : singleFile(next, next.starter);
+      setFiles(p.files);
+      setBaseline(p.files);
+      setEntry(p.entry);
+      setActive(p.entry);
+    }
     setLangId(next.id);
     setPane("output");
     clear();
@@ -218,7 +322,7 @@ const PlaygroundWorkbench: React.FC<WorkbenchProps> = ({
 
   const copy = async () => {
     try {
-      await navigator.clipboard.writeText(code);
+      await navigator.clipboard.writeText(activeFile.content);
       setCopied(true);
       window.setTimeout(() => setCopied(false), 1500);
     } catch {
@@ -226,11 +330,24 @@ const PlaygroundWorkbench: React.FC<WorkbenchProps> = ({
     }
   };
 
-  const download = () => {
-    const url = URL.createObjectURL(new Blob([code], { type: "text/plain;charset=utf-8" }));
+  const download = async () => {
+    let blob: Blob;
+    let name: string;
+    if (files.length === 1) {
+      blob = new Blob([files[0].content], { type: "text/plain;charset=utf-8" });
+      name = files[0].path.split("/").pop() || lang.file;
+    } else {
+      // Several files: one .zip, folders kept.
+      const { default: JSZip } = await import("jszip");
+      const zip = new JSZip();
+      for (const x of files) zip.file(x.path, x.content);
+      blob = await zip.generateAsync({ type: "blob" });
+      name = `${(block.title || "playground").replace(/[^\w-]+/g, "-").replace(/^-|-$/g, "").toLowerCase() || "playground"}.zip`;
+    }
+    const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = lang.file;
+    a.download = name;
     a.click();
     window.setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
@@ -267,7 +384,15 @@ const PlaygroundWorkbench: React.FC<WorkbenchProps> = ({
   const running = state.phase === "running";
   const meta = state.meta;
   const verdict = meta ? VERDICT[meta.verdict] ?? { label: meta.verdict, tone: "warn" as const } : null;
-  const lineCount = code.split("\n").length;
+  const lineCount = activeFile.content.split("\n").length;
+  const asBlock = (): PlaygroundBlock => ({
+    ...block,
+    language: langId,
+    code,
+    entry: entry === lang.file ? "" : entry,
+    files: files.filter((x) => x.path !== entry),
+    stdin,
+  });
 
   // ------------------------------------------------------------------ pieces
 
@@ -324,8 +449,8 @@ const PlaygroundWorkbench: React.FC<WorkbenchProps> = ({
     <button
       type="button"
       onClick={running ? stop : doRun}
-      disabled={!running && (!runnable || !code.trim())}
-      title={running ? "Stop" : runnable ? "Run (Ctrl/⌘ + Enter)" : `${lang.label} isn't on the code runner yet`}
+      disabled={!running && (!runnable || !!problem || !files.some((x) => x.content.trim()))}
+      title={running ? "Stop" : problem ? problem : runnable ? "Run (Ctrl/⌘ + Enter)" : `${lang.label} isn't on the code runner yet`}
       className={`inline-flex items-center gap-2 h-9 pl-3 pr-4 rounded-lg text-sm font-semibold shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
         running ? "bg-slate-800 text-white dark:bg-white dark:text-slate-900 hover:opacity-90" : "bg-success-700 hover:bg-green-800 text-white active:scale-[0.98]"
       }`}
@@ -338,7 +463,35 @@ const PlaygroundWorkbench: React.FC<WorkbenchProps> = ({
 
   const toolbar = (
     <div className="flex items-center gap-0.5">
-      <button type="button" className={iconBtn} onClick={doFormat} disabled={formatting || !code.trim()} title="Format code (Shift+Alt+F)" aria-label="Format code">
+      {example && (
+        <span className="relative">
+          <button
+            type="button"
+            className={iconBtn}
+            onClick={() => (dirty ? setConfirmExample((c) => !c) : loadProject(example))}
+            title={`A ${lang.label} program split over files`}
+            aria-label="Load a multi-file example"
+            data-testid="playground-example"
+          >
+            <FolderTree className="w-4 h-4" />
+            {modal && <span className="hidden xl:inline">Example</span>}
+          </button>
+          {confirmExample && (
+            <span role="dialog" aria-label="Replace your files?" className="absolute right-0 top-full mt-1 z-40 w-64 rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-[#161b22] shadow-xl p-3 text-[13px] text-slate-700 dark:text-slate-200">
+              Replace your files with the {lang.label} example? Your changes are lost.
+              <span className="mt-2 flex gap-2">
+                <button type="button" className="h-8 px-3 rounded-lg bg-brand-500 text-white text-xs font-semibold" onClick={() => loadProject(example)} data-testid="playground-example-confirm">
+                  Replace
+                </button>
+                <button type="button" className="h-8 px-3 rounded-lg text-xs" onClick={() => setConfirmExample(false)}>
+                  Cancel
+                </button>
+              </span>
+            </span>
+          )}
+        </span>
+      )}
+      <button type="button" className={iconBtn} onClick={doFormat} disabled={formatting || !activeFile.content.trim()} title="Format this file (Shift+Alt+F)" aria-label="Format code">
         {formatting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wand2 className="w-4 h-4" />}
         {modal && <span className="hidden lg:inline">Format</span>}
       </button>
@@ -350,7 +503,7 @@ const PlaygroundWorkbench: React.FC<WorkbenchProps> = ({
         {copied ? <Check className="w-4 h-4 text-success-500" /> : <Copy className="w-4 h-4" />}
       </button>
       {modal && (
-        <button type="button" className={iconBtn} onClick={download} title={`Download ${lang.file}`} aria-label="Download code">
+        <button type="button" className={iconBtn} onClick={() => void download()} title={files.length > 1 ? "Download the files (.zip)" : `Download ${files[0].path}`} aria-label="Download code">
           <Download className="w-4 h-4" />
         </button>
       )}
@@ -391,7 +544,7 @@ const PlaygroundWorkbench: React.FC<WorkbenchProps> = ({
         <div className="mt-2 rounded-lg border border-slate-200 dark:border-white/10 overflow-hidden">
           <div className="flex items-center justify-between px-3 py-1.5 bg-slate-50 dark:bg-white/5 text-xs text-slate-500">
             <span>A possible solution — try your own first</span>
-            <button type="button" className="font-medium text-brand-600 dark:text-brand-200 hover:underline" onClick={() => setCode(block.solution)}>
+            <button type="button" className="font-medium text-brand-600 dark:text-brand-200 hover:underline" onClick={() => setMainCode(block.solution)}>
               Use it
             </button>
           </div>
@@ -492,14 +645,39 @@ const PlaygroundWorkbench: React.FC<WorkbenchProps> = ({
   );
 
   const previewPane = hasPreview && (
-    <div className={`flex-1 min-h-0 bg-white ${pane === "preview" ? "" : "hidden"}`}>
+    <div className={`flex-1 min-h-0 flex flex-col bg-white ${pane === "preview" ? "" : "hidden"}`}>
+      {state.page && (
+        <div className="flex items-center gap-1.5 h-8 px-2 border-b border-slate-200 bg-slate-50 text-[12px] text-slate-600 [color-scheme:light]" data-testid="playground-address">
+          <button type="button" onClick={back} disabled={!state.history.length} aria-label="Previous page" title="Previous page" className="h-6 w-6 inline-flex items-center justify-center rounded hover:bg-slate-200 disabled:opacity-40">
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+          <Globe className="w-3.5 h-3.5 text-slate-500" />
+          {pages.length > 1 ? (
+            <SelectField
+              aria-label="Page"
+              value={state.page}
+              onChange={(e) => void openPage(e.target.value)}
+              searchable={false}
+              className="h-6 min-w-0 flex-1 bg-white border border-slate-200 rounded px-1.5 font-mono text-[12px] text-slate-700 text-left"
+            >
+              {pages.map((p) => (
+                <option key={p} value={p}>
+                  /{p}
+                </option>
+              ))}
+            </SelectField>
+          ) : (
+            <span className="font-mono truncate">/{state.page}</span>
+          )}
+        </div>
+      )}
       {state.doc ? (
         <iframe
           key={state.runId ?? "none"}
           title="Preview of your page"
           sandbox="allow-scripts allow-modals allow-forms allow-popups"
           srcDoc={state.doc}
-          className="w-full h-full min-h-[220px] border-0 bg-white"
+          className="w-full flex-1 min-h-[220px] border-0 bg-white"
           data-testid="playground-preview"
         />
       ) : (
@@ -549,20 +727,38 @@ const PlaygroundWorkbench: React.FC<WorkbenchProps> = ({
       {formatMs(meta?.time_ms) && <span>{formatMs(meta?.time_ms)}</span>}
       {formatKb(meta?.memory_kb) && <span>{formatKb(meta?.memory_kb)}</span>}
       <span className="ml-auto">
-        {lineCount} line{lineCount === 1 ? "" : "s"} · {lang.file}
+        {lineCount} line{lineCount === 1 ? "" : "s"} · {activeFile.path}
+        {files.length > 1 ? ` · ${files.length} files` : ""}
       </span>
     </div>
   );
 
+  const fileTabs = (compact: boolean) => (
+    <FileTabs
+      files={files}
+      entry={entry}
+      active={activeFile.path}
+      onSelect={setActive}
+      onAdd={addFile}
+      onRename={renameFile}
+      onDelete={deleteFile}
+      onSetEntry={setEntry}
+      suggest={() => suggestName(lang, files)}
+      changed={changed}
+      compact={compact}
+    />
+  );
+
   const editor = (
     <CodeEditor
-      value={code}
-      onChange={setCode}
-      language={lang.id}
+      key={activeFile.path}
+      value={activeFile.content}
+      onChange={setActiveCode}
+      language={editorLanguageFor(activeFile.path, lang.id)}
       dark={dark}
       onRun={doRun}
       onFormat={doFormat}
-      ariaLabel={`${lang.label} code`}
+      ariaLabel={`${activeFile.path} (${lang.label})`}
       autoFocus={modal && !autoRun}
       className={modal ? "h-full" : "max-h-[420px] min-h-[120px] overflow-auto"}
     />
@@ -605,13 +801,14 @@ const PlaygroundWorkbench: React.FC<WorkbenchProps> = ({
           </div>
           {languageMenu}
           {onExpand && (
-            <button type="button" className={iconBtn} onClick={() => onExpand({ ...block, language: langId, code, stdin })} title="Open in the full playground" aria-label="Open in the full playground">
+            <button type="button" className={iconBtn} onClick={() => onExpand(asBlock())} title="Open in the full playground" aria-label="Open in the full playground">
               <Maximize2 className="w-4 h-4" />
             </button>
           )}
         </div>
         {instructions}
         {checkBanner}
+        {fileTabs(true)}
         <div className="mt-0">{editor}</div>
         <div className="flex items-center gap-2 px-3 py-2 border-t border-slate-200 dark:border-white/10 bg-slate-50/70 dark:bg-white/[0.02]">
           {runButton}
@@ -662,7 +859,7 @@ const PlaygroundWorkbench: React.FC<WorkbenchProps> = ({
         <span className="flex-1" />
         <div className="hidden md:block">{toolbar}</div>
         {onSave && (
-          <button type="button" onClick={() => onSave({ ...block, language: langId, code, stdin })} className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg border border-slate-200 dark:border-white/10 text-sm font-medium hover:bg-slate-100 dark:hover:bg-white/10">
+          <button type="button" onClick={() => onSave(asBlock())} className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg border border-slate-200 dark:border-white/10 text-sm font-medium hover:bg-slate-100 dark:hover:bg-white/10">
             <Save className="w-4 h-4" /> Save to block
           </button>
         )}
@@ -671,7 +868,7 @@ const PlaygroundWorkbench: React.FC<WorkbenchProps> = ({
             type="button"
             className={`${iconBtn} hidden sm:inline-flex`}
             onClick={async () => {
-              if (await onShare({ language: langId, code })) {
+              if (await onShare({ language: langId, files, entry })) {
                 setShared(true);
                 window.setTimeout(() => setShared(false), 1800);
               }
@@ -705,12 +902,7 @@ const PlaygroundWorkbench: React.FC<WorkbenchProps> = ({
       )}
       <div ref={bodyRef} className={`flex-1 min-h-0 flex flex-col lg:flex-row border-t border-slate-200 dark:border-white/10 ${instructions || checkBanner || (runner.available === false && !browserRun) ? "mt-3" : "border-t-0"}`}>
         <div className="min-h-[220px] lg:min-h-0 flex-1 lg:flex-none lg:w-[var(--pg-split)] flex flex-col" style={{ "--pg-split": `${Math.round(split * 1000) / 10}%` } as React.CSSProperties}>
-          <div className="flex items-center h-9 px-3 border-b border-slate-200 dark:border-white/10 bg-slate-50/80 dark:bg-white/[0.02] text-[12px]">
-            <span className="inline-flex items-center gap-1.5 h-9 px-1 font-medium text-slate-700 dark:text-slate-200 border-b-2 border-brand-500">
-              <Code2 className="w-3.5 h-3.5 text-brand-500" /> {lang.file}
-            </span>
-            {dirty && <span className="ml-2 w-1.5 h-1.5 rounded-full bg-amber-400" title="Changed" />}
-          </div>
+          {fileTabs(false)}
           <div className="flex-1 min-h-0 overflow-hidden">{editor}</div>
         </div>
         <div

@@ -1,4 +1,5 @@
 import { languageById } from "./languages";
+import { MAX_FILES, pathProblem, type PlayFile } from "./project";
 
 /**
  * A Code Playground block inside a lesson note: an example students run and change, or
@@ -11,8 +12,12 @@ export interface PlaygroundBlock {
   title: string;
   /** Playground language id (languages.ts). */
   language: string;
-  /** The code students start from. */
+  /** The code students start from: the main file's text. */
   code: string;
+  /** The main file's name ("" = the language's usual one, e.g. main.py). */
+  entry: string;
+  /** Other files of the program (modules, headers, pages, stylesheets, PHP actions…). */
+  files: PlayFile[];
   /** What to do (plain text; blank lines start paragraphs). */
   instructions: string;
   /** Input given to the program (stdin / prompt()). */
@@ -28,6 +33,8 @@ export const DEFAULT_BLOCK: PlaygroundBlock = {
   title: "",
   language: "python",
   code: languageById("python")!.starter,
+  entry: "",
+  files: [],
   instructions: "",
   stdin: "",
   expected: "",
@@ -50,11 +57,18 @@ export function parseBlock(raw: unknown): PlaygroundBlock {
   }
   if (!d || typeof d !== "object") return { ...DEFAULT_BLOCK };
   const language = languageById(d.language) ? String(d.language) : DEFAULT_BLOCK.language;
+  const entry = typeof d.entry === "string" && !pathProblem(d.entry, []) ? d.entry : "";
+  const files: PlayFile[] = [];
+  for (const x of Array.isArray(d.files) ? d.files.slice(0, MAX_FILES) : []) {
+    if (x && typeof x.path === "string" && typeof x.content === "string" && x.path !== entry && !pathProblem(x.path, files)) files.push({ path: x.path, content: x.content.slice(0, MAX.code) });
+  }
   return {
     mode: d.mode === "exercise" ? "exercise" : "example",
     title: str(d.title, MAX.title),
     language,
     code: typeof d.code === "string" ? d.code.slice(0, MAX.code) : languageById(language)!.starter,
+    entry,
+    files,
     instructions: str(d.instructions, MAX.instructions),
     stdin: str(d.stdin, MAX.stdin),
     expected: str(d.expected, MAX.expected),
@@ -66,8 +80,9 @@ export function parseBlock(raw: unknown): PlaygroundBlock {
 /** Compact JSON: empty fields are left out. */
 export function serializeBlock(b: PlaygroundBlock): string {
   const out: Record<string, string> = { mode: b.mode, language: b.language, code: b.code };
-  for (const k of ["title", "instructions", "stdin", "expected", "hint", "solution"] as const) if (b[k].trim()) out[k] = b[k];
-  return JSON.stringify(out);
+  if (b.entry && b.entry === languageById(b.language)?.file) b = { ...b, entry: "" };
+  for (const k of ["title", "instructions", "stdin", "expected", "hint", "solution", "entry"] as const) if (b[k].trim()) out[k] = b[k];
+  return JSON.stringify(b.files.length ? { ...out, files: b.files } : out);
 }
 
 /** Output comparison for "Check": trailing spaces and blank lines at the end don't count. */

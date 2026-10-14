@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { codeTextOf, normalizePreLineBreaks } from "../codeText";
 import { resolveLanguage, isRunnable, languageById } from "../languages";
 import { outputMatches, parseBlock, serializeBlock, DEFAULT_BLOCK } from "../playgroundData";
-import { buildDocument } from "../browserRun";
+import { buildPageDocument, buildReactDocument, buildScriptDocument } from "../browserRun";
 import { closePlayground, openPlayground, subscribePlayground, type PlaygroundRequest } from "../store";
 import { enhanceCodeBlocks } from "../../codeWindow/codeWindow";
 
@@ -67,22 +67,23 @@ describe("playground blocks", () => {
   });
 });
 
-describe("buildDocument", () => {
+describe("documents", () => {
   it("wraps browser JavaScript with the console bridge and escapes </script>", () => {
-    const doc = buildDocument("js", { html: "", css: "", js: 'console.log("</script>")' }, "run-1", "Aline");
+    const doc = buildScriptDocument({ entry: "script.js", files: [{ path: "script.js", content: 'console.log("</script>")' }] }, "run-1", "Aline");
     expect(doc).toContain('var RUN="run-1"');
     expect(doc).toContain('["Aline"]');
     expect(doc).toContain('console.log("<\\/script>")');
   });
   it("puts the bridge into a full HTML document's head", () => {
-    const doc = buildDocument("web", { html: "<!doctype html><html><head><title>x</title></head><body><p>Hi</p></body></html>", css: "", js: "" }, "r", "");
+    const { doc } = buildPageDocument("<!doctype html><html><head><title>x</title></head><body><p>Hi</p></body></html>", "index.html", [], "r", "");
     expect(doc.indexOf("__ngaPlayground")).toBeLessThan(doc.indexOf("<title>"));
     expect(doc).toContain("__ngaDone()})</script></body>");
   });
   it("loads React and Babel for JSX", () => {
-    const doc = buildDocument("react", { html: "", css: "", js: "function App(){return <p>Hi</p>}" }, "r", "");
+    const doc = buildReactDocument({ entry: "App.jsx", files: [{ path: "App.jsx", content: "function App(){return <p>Hi</p>}" }] }, "r");
     expect(doc).toContain("react-dom@18.3.1");
     expect(doc).toContain("@babel/standalone");
+    expect(doc).toContain("export default App;");
   });
 });
 
