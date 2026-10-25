@@ -8,7 +8,7 @@ import { db } from "../db";
 import { LearningEvent, SchemeOfWorkEntry } from "../db/schema";
 import { rankChunks } from "../controllers/courseTutorController";
 import {
-  createUser,
+  createUser as baseCreateUser, grantAiUse,
   signToken,
   createAcademicPeriod,
   createProgramGradeClassGroup,
@@ -20,6 +20,17 @@ import {
   assignRole,
   createSchemeOfWork,
 } from "../test/fixtures";
+import { AI_POLICY_ALL_ON, setAiPolicyForTests } from "../services/ai/policy";
+
+// AI usage control (AI_USAGE_CONTROL_PLAN.md): the school policy is on for this file and its users
+// hold AI_USE, so the AI features themselves are what is tested.
+const createUser: typeof baseCreateUser = async (o) => {
+  const id = await baseCreateUser(o);
+  await grantAiUse(id);
+  return id;
+};
+beforeAll(() => setAiPolicyForTests(AI_POLICY_ALL_ON));
+afterAll(() => setAiPolicyForTests(null));
 
 describe("E-learning Phase 5: retrieval ranking", () => {
   it("ranks the chunk that shares the most terms with the question first, boosting the current week", () => {

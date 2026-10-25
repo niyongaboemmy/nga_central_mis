@@ -19,9 +19,13 @@ export const errorHandler = (
   console.error(err.stack);
 
   // Handle custom errors with status codes
+  // A typed `code` (AI_DISABLED, TUTOR_OFF, AI_QUOTA_EXHAUSTED...) and, for an AI
+  // refusal, its `reason` travel at the top level next to `message`.
   if (err.statusCode) {
     return res.status(err.statusCode).json({
       success: false,
+      ...(typeof err.code === "string" && { code: err.code }),
+      ...(typeof err.reason === "string" && err.code === "AI_DISABLED" && { reason: err.reason }),
       message: err.message,
       ...(err.errors && { errors: err.errors }),
     });

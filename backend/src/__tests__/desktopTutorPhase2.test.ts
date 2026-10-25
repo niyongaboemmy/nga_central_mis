@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, afterAll } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, afterAll, beforeAll } from "vitest";
 import express from "express";
 import request from "supertest";
 import { sql } from "drizzle-orm";
@@ -12,6 +12,12 @@ import { AIUsageLog } from "../db/schema";
 import { allowance, DEFAULT_TUTOR } from "../services/desktop/tutor";
 import { cacheKey, isConceptQuestion, languageOf, normalise } from "../services/desktop/tutorCache";
 import { EVAL_PROMPTS, runEvals, score } from "../services/desktop/tutorEval";
+import { AI_POLICY_ALL_ON, setAiPolicyForTests } from "../services/ai/policy";
+
+// AI usage control (AI_USAGE_CONTROL_PLAN.md): the school policy is on for this file and its users
+// hold AI_USE (the stub sign-in below), so the AI features themselves are what is tested.
+beforeAll(() => setAiPolicyForTests(AI_POLICY_ALL_ON));
+afterAll(() => setAiPolicyForTests(null));
 
 const KEYS = ["GROQ_API_KEY", "GEMINI_API_KEY", "GLM_API_KEY", "OPENROUTER_API_KEY", "DEEPSEEK_API_KEY", "OPENAI_API_KEY", "AI_CHAT_ORDER_MINOR"] as const;
 const saved = Object.fromEntries(KEYS.map((k) => [k, process.env[k]]));
@@ -122,7 +128,7 @@ describe("provider tests", () => {
 const appFor = (userId: number, permissions: string[] = []) => {
   const app = express();
   app.use(express.json());
-  app.use("/desktop/tools", desktopToolsRouter((req: any, _res, next) => ((req.user = { userId, permissions }), next()), { collect: async () => [] }));
+  app.use("/desktop/tools", desktopToolsRouter((req: any, _res, next) => ((req.user = { userId, permissions: ["AI_USE", ...permissions] }), next()), { collect: async () => [] }));
   return app;
 };
 const lines = (text: string) => text.trim().split("\n").filter(Boolean).map((l) => JSON.parse(l));

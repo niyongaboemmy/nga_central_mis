@@ -305,6 +305,7 @@ export const deleteLessonPlan = async (req: Request, res: Response) => {
 };
 
 import * as cheerio from "cheerio";
+import { aiDecisionFor } from "../services/ai/gate";
 
 export const extractLessonPlan = asyncHandler(async (req: any, res: any) => {
   if (!req.file) {
@@ -314,7 +315,9 @@ export const extractLessonPlan = asyncHandler(async (req: any, res: any) => {
   const result = await mammoth.convertToHtml({ buffer: req.file.buffer });
   const html = result.value;
 
-  if (isAnyProviderConfigured()) {
+  // AI reads the document only when the school AI policy allows it for this user
+  // (AI_USAGE_CONTROL_PLAN.md §4.5); otherwise the deterministic parser below does.
+  if (isAnyProviderConfigured() && (await aiDecisionFor(req, "author")).decision.allowed) {
     try {
       const { data: extracted } = await generateStructuredContent<any>(
         {

@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { requireAi } from "../services/ai/gate";
 import multer from "multer";
 import os from "os";
 import path from "path";
@@ -119,6 +120,7 @@ router.get("/criteria/:criteriaId/scheme-entries", getCriteriaSchemeUsage);
 router.post(
   "/subjects/:subjectId/import/ai-generate",
   authorize("MANAGE_CURRICULUM"),
+  requireAi("author"),
   uploadCurriculumDoc.single("file"),
   startCurriculumImport,
 );

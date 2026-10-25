@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterAll } from "vitest";
+import { describe, it, expect, beforeEach, afterAll, beforeAll } from "vitest";
 import express from "express";
 import request from "supertest";
 import { sql } from "drizzle-orm";
@@ -11,11 +11,17 @@ import { MIS_MANIFEST } from "../access/manifest";
 import { PRESETS } from "../access/presets";
 import { isV2OnlyCapability } from "../access/v2Only";
 import { ALL_PERMISSIONS } from "../utils/permissions";
+import { AI_POLICY_ALL_ON, setAiPolicyForTests } from "../services/ai/policy";
+
+// AI usage control (AI_USAGE_CONTROL_PLAN.md): the school policy is on for this file and its users
+// hold AI_USE (the stub sign-in below), so the AI features themselves are what is tested.
+beforeAll(() => setAiPolicyForTests(AI_POLICY_ALL_ON));
+afterAll(() => setAiPolicyForTests(null));
 
 const appFor = (userId: number, permissions: string[]) => {
   const app = express();
   app.use(express.json());
-  app.use("/desktop/tools", desktopToolsRouter((req: any, _res, next) => ((req.user = { userId, permissions }), next()), { collect: async () => [] }));
+  app.use("/desktop/tools", desktopToolsRouter((req: any, _res, next) => ((req.user = { userId, permissions: ["AI_USE", ...permissions] }), next()), { collect: async () => [] }));
   return app;
 };
 const P = ["TOOLS_TRANSLATIONS_MANAGE"];

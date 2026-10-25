@@ -19,7 +19,7 @@ import {
   SubjectCompetency,
 } from "../db/schema";
 import {
-  createUser,
+  createUser as baseCreateUser, grantAiUse,
   signToken,
   createAcademicPeriod,
   createProgramGradeClassGroupDetailed,
@@ -34,6 +34,17 @@ import {
 } from "../test/fixtures";
 import { installFakeAI, uninstallFakeAI, FakeAICall } from "../test/fakeAI";
 import { claim, drainWorker } from "../services/elearning/generation/worker";
+import { AI_POLICY_ALL_ON, setAiPolicyForTests } from "../services/ai/policy";
+
+// AI usage control (AI_USAGE_CONTROL_PLAN.md): the school policy is on for this file and its users
+// hold AI_USE, so the AI features themselves are what is tested.
+const createUser: typeof baseCreateUser = async (o) => {
+  const id = await baseCreateUser(o);
+  await grantAiUse(id);
+  return id;
+};
+beforeAll(() => setAiPolicyForTests(AI_POLICY_ALL_ON));
+afterAll(() => setAiPolicyForTests(null));
 
 /**
  * Lesson Studio, Phases A1–A2 (ELEARNING_AI_LESSON_STUDIO_IMPLEMENTATION_PLAN.md): the

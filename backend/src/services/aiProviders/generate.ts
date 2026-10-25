@@ -5,6 +5,8 @@ import { orderedProviders, isCoolingDown, markCoolingDown, isParkedDead, markDea
 import { isQuotaError, isDeadProviderError, friendlyAIErrorMessage, classifyAIError } from "./errors";
 import { acquireSlot, checkAvailability, noteAttempt, Unavailable } from "./limiter";
 import { logAIUsage } from "./usageLog";
+import { assertAiAppEnabled } from "../ai/policy";
+import type { AiApp } from "../../vendor/nga-access";
 
 export interface GenerateStructuredContentResult<T> {
   data: T;
@@ -30,6 +32,8 @@ export interface GenerateStructuredContentOptions {
   actorUserId?: number | null;
   courseId?: number | null;
   runId?: number | null;
+  /** Whose AI switch applies (school AI policy); default "mis". */
+  app?: AiApp;
 }
 
 /**
@@ -53,6 +57,9 @@ export async function generateStructuredContent<T = any>(
   params: GenerateJSONParams,
   options?: GenerateStructuredContentOptions,
 ): Promise<GenerateStructuredContentResult<T>> {
+  // School AI policy (AI_USAGE_CONTROL_PLAN.md §4.4): nothing reaches a provider while
+  // AI is off -- AiDisabledError, a 403 AI_DISABLED, whatever route or job called us.
+  await assertAiAppEnabled(options?.app ?? "mis");
   const providers = orderedProviders(options?.providerOrder ?? roleOrder(options?.role));
   const exclude = new Set(options?.excludeProviders ?? []);
   const quotaBlocked: Record<string, Unavailable | "QUOTA"> = {};

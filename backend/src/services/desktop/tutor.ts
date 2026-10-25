@@ -173,7 +173,7 @@ async function check(question: string, reply: string, userId: number, signal?: A
     const r = await completeChat({
       system: CHECK_PROMPT,
       messages: [{ role: "user", content: `Student's message:\n${question.slice(0, 3000)}\n\nTutor's reply:\n${reply.slice(0, 4000)}` }],
-      audience: "minor",
+      audience: "minor", app: "desktop",
       actorUserId: userId,
       feature: CHECK_FEATURE,
       signal,
@@ -203,7 +203,7 @@ export async function runTutor(opts: { userId: number; firstName: string; messag
     const draft = await completeChat({
       system: tutorPrompt(opts.firstName, opts.now, stricter),
       messages: opts.messages,
-      audience: "minor",
+      audience: "minor", app: "desktop",
       actorUserId: opts.userId,
       feature: TUTOR_FEATURE,
       signal: opts.signal,

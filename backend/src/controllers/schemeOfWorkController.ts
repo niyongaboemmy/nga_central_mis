@@ -47,6 +47,7 @@ import {
  * Parses DOCX and extracts entries based on date ranges
  */
 import * as cheerio from "cheerio";
+import { assertAi } from "../services/ai/gate";
 
 interface AIExtractedEntry {
   week_number: number;
@@ -410,6 +411,9 @@ export const uploadAndExtractScheme = asyncHandler(
           "No valid scheme rows found in the document. Please ensure it follows the standard format, or ask an administrator to configure an AI provider so non-standard documents can be read automatically.",
         );
       }
+
+      // The AI fallback is an AI use like any other: school policy + AI_USE (403 AI_DISABLED).
+      await assertAi(req, "author");
 
       logger.info(
         "Standard DOCX table parsing found no rows — falling back to AI-assisted extraction",

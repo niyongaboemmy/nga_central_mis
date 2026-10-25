@@ -1,8 +1,8 @@
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import request from "supertest";
 import app from "../app";
 import {
-  createUser,
+  createUser as baseCreateUser, grantAiUse,
   signToken,
   createAcademicPeriod,
   createProgramGradeClassGroup,
@@ -13,6 +13,17 @@ import {
   createRoleWithPermissions,
   assignRole,
 } from "../test/fixtures";
+import { AI_POLICY_ALL_ON, setAiPolicyForTests } from "../services/ai/policy";
+
+// AI usage control (AI_USAGE_CONTROL_PLAN.md): the school policy is on for this file and its users
+// hold AI_USE, so the AI features themselves are what is tested.
+const createUser: typeof baseCreateUser = async (o) => {
+  const id = await baseCreateUser(o);
+  await grantAiUse(id);
+  return id;
+};
+beforeAll(() => setAiPolicyForTests(AI_POLICY_ALL_ON));
+afterAll(() => setAiPolicyForTests(null));
 
 // End-to-end cover for the student-facing "Notes Shared With Me" list: a note the teacher
 // published and shared must reach the enrolled student through each of the three share filters.
@@ -225,6 +236,23 @@ describe("GET /lesson-notes/shared-with-me", () => {
       .set("Authorization", `Bearer ${strangerToken}`)
       .send({ question: "What is this note about?" });
     expect(res.status).toBe(403);
+    // The share gate comes first: nothing about the school's AI settings leaks.
+    expect(res.body.code).toBeUndefined();
+  });
+
+  it("answers GLOBAL_OFF on a readable note while the school's AI is off", async () => {
+    const noteId = await publishNote("Readable, AI off");
+    setAiPolicyForTests({ enabled: false });
+    try {
+      const res = await request(app)
+        .post(`/lesson-notes/shared-with-me/${noteId}/ask`)
+        .set("Authorization", `Bearer ${studentToken}`)
+        .send({ question: "What is this note about?" });
+      expect(res.status).toBe(403);
+      expect(res.body).toMatchObject({ code: "AI_DISABLED", reason: "GLOBAL_OFF", message: "AI is turned off for the school." });
+    } finally {
+      setAiPolicyForTests(AI_POLICY_ALL_ON);
+    }
   });
 
   it("hides a note that is still a draft even though it was shared", async () => {

@@ -43,7 +43,11 @@ export default function AccessStudio() {
       ).filter(([, , ok]) => ok),
     [can, studio],
   );
-  const [tab, setTab] = useState<TabKey>("structure");
+  // Deep link: /access-studio?tab=roles&cap=AI_USE (Settings -> AI links here).
+  const [tab, setTab] = useState<TabKey>(() => {
+    const t = new URLSearchParams(window.location.search).get("tab");
+    return (["structure", "positions", "roles", "rules", "departments", "explorer", "audit"] as string[]).includes(t ?? "") ? (t as TabKey) : "structure";
+  });
   const current = tabs.find(([k]) => k === tab)?.[0] ?? tabs[0]?.[0];
 
   const [nodes, setNodes] = useState<Nodes | null>(null);

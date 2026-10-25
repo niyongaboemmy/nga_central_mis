@@ -1,4 +1,5 @@
 import { Router, RequestHandler } from "express";
+import { requireAi } from "../services/ai/gate";
 import multer from "multer";
 import { ValidationError } from "../errors/CustomError";
 import { authenticate, authorize } from "../middleware/auth";
@@ -80,7 +81,9 @@ router.use(authenticate);
 // Student-facing (read-only, checked by permission + share resolution in the controller)
 router.get("/shared-with-me", authorize(Permissions.VIEW_SHARED_LESSON_NOTES), listSharedWithMe);
 router.get("/shared-with-me/:id", authorize(Permissions.VIEW_SHARED_LESSON_NOTES), getSharedLessonNote);
-// Reader-side AI study assistant. Same permission + share gate as reading the note itself.
+// Reader-side AI study assistant. Same permission + share gate as reading the note itself;
+// the school AI policy (and, for students, the AI Tutor switch) is checked in the controller
+// after the share gate.
 router.post("/shared-with-me/:id/ask", authorize(Permissions.VIEW_SHARED_LESSON_NOTES), askAboutSharedNote);
 
 // Image streaming needs to come before the generic teacher gate below since students
@@ -102,7 +105,7 @@ router.get("/prompt-presets", listPromptPresets);
 router.post("/prompt-presets", createPromptPreset);
 router.delete("/prompt-presets/:presetId", deletePromptPreset);
 
-router.post("/ai-generate", startAINoteGeneration);
+router.post("/ai-generate", requireAi("author"), startAINoteGeneration);
 router.get("/ai-generate/:jobId/status", getAINoteGenerationStatus);
 
 router.get("/:id", getLessonNote);
@@ -113,7 +116,7 @@ router.delete("/:id", deleteLessonNote);
 router.post("/:id/images", upload.single("image"), uploadLessonNoteImage);
 router.post("/:id/pdf", uploadPdf, replaceLessonNotePdf);
 
-router.post("/:id/ai-edit", proposeAINoteEdit);
+router.post("/:id/ai-edit", requireAi("author"), proposeAINoteEdit);
 
 router.get("/:id/versions", listLessonNoteVersions);
 router.post("/:id/versions/:versionId/restore", restoreLessonNoteVersion);

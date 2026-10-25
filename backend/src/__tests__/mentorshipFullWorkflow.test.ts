@@ -1,10 +1,10 @@
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import request from "supertest";
 import app from "../app";
 import { db } from "../db";
 import { AcademicYear } from "../db/schema";
 import {
-  createUser,
+  createUser as baseCreateUser, grantAiUse,
   createRoleWithPermissions,
   assignRole,
   signToken,
@@ -13,6 +13,17 @@ import {
   createStudentClassGroup,
 } from "../test/fixtures";
 import { Permissions } from "../utils/permissions";
+import { AI_POLICY_ALL_ON, setAiPolicyForTests } from "../services/ai/policy";
+
+// AI usage control (AI_USAGE_CONTROL_PLAN.md): the school policy is on for this file and its users
+// hold AI_USE, so what is tested here is the feature's own rules.
+const createUser: typeof baseCreateUser = async (o) => {
+  const id = await baseCreateUser(o);
+  await grantAiUse(id);
+  return id;
+};
+beforeAll(() => setAiPolicyForTests(AI_POLICY_ALL_ON));
+afterAll(() => setAiPolicyForTests(null));
 
 // A single, realistic end-to-end walk-through of every mentorship role's
 // workflow in sequence, checking that each step's output is consistent with

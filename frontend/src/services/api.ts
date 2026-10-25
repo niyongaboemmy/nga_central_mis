@@ -92,9 +92,16 @@ api.interceptors.response.use(
         }
       }
     } else if (error.response?.status === 403) {
-      // Show toast for forbidden access
+      // An AI feature refused by the school AI policy (code AI_DISABLED, backend
+      // services/ai/policy.ts) or the AI Tutor switch says why, e.g. "AI is turned off
+      // for the school." -- not that the person lacks permission.
+      const body = error.response?.data as { code?: string; message?: string } | undefined;
+      const aiRefusal = body?.code === "AI_DISABLED" || body?.code === "TUTOR_OFF";
       if (showToast) {
-        showToast("You don't have permission to access this resource", "error");
+        showToast(
+          aiRefusal && body?.message ? body.message : "You don't have permission to access this resource",
+          aiRefusal ? "warning" : "error",
+        );
       }
     }
     return Promise.reject(error);

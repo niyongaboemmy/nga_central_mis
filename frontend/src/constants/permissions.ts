@@ -119,6 +119,11 @@ export const Permissions = {
   SAFEGUARDING_MANAGE: "SAFEGUARDING_MANAGE",
   // Code Playground: every role by default (backend migration 120)
   CODE_PLAYGROUND_USE: "CODE_PLAYGROUND_USE",
+
+  // AI usage control (migration 121): use AI tools outside an assessment, and the
+  // school-wide AI policy (restricted to the platform owner).
+  AI_USE: "AI_USE",
+  AI_POLICY_MANAGE: "AI_POLICY_MANAGE",
   EARLY_WARNING_VIEW: "EARLY_WARNING_VIEW",
 
   // Curriculum & Subject Materials

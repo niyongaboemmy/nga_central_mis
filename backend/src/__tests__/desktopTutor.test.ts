@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, afterAll } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, afterAll, beforeAll } from "vitest";
 import express from "express";
 import request from "supertest";
 import { sql } from "drizzle-orm";
@@ -11,6 +11,12 @@ import { resetLimiterState } from "../services/aiProviders/limiter";
 import { AIUsageLog } from "../db/schema";
 import { SAFE_HINT, SUPPORT_REPLY, activeLock, mergeTutor, parseVerdict, runTutor, tutorPrompt, worry } from "../services/desktop/tutor";
 import type { Occurrence } from "../services/reminders/occurrences";
+import { AI_POLICY_ALL_ON, setAiPolicyForTests } from "../services/ai/policy";
+
+// AI usage control (AI_USAGE_CONTROL_PLAN.md): the school policy is on for this file and its users
+// hold AI_USE (the stub sign-in below), so the AI features themselves are what is tested.
+beforeAll(() => setAiPolicyForTests(AI_POLICY_ALL_ON));
+afterAll(() => setAiPolicyForTests(null));
 
 const occ = (p: Partial<Occurrence> & Pick<Occurrence, "kind" | "start">): Occurrence => ({
   key: `${p.kind}:${p.start.toISOString()}`, sourceRef: "", title: "Physics", detail: null, link: null, location: null, end: null, critical: false, color: null, role: "attending", ...p,
@@ -119,7 +125,7 @@ describe("tutor routes", () => {
   const appFor = (userId: number, permissions: string[] = [], occs: Occurrence[] = []) => {
     const app = express();
     app.use(express.json());
-    app.use("/desktop/tools", desktopToolsRouter((req: any, _res, next) => ((req.user = { userId, permissions }), next()), { collect: async () => occs }));
+    app.use("/desktop/tools", desktopToolsRouter((req: any, _res, next) => ((req.user = { userId, permissions: ["AI_USE", ...permissions] }), next()), { collect: async () => occs }));
     return app;
   };
   const lines = (text: string) => text.trim().split("\n").map((l) => JSON.parse(l));

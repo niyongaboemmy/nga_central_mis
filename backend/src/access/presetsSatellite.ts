@@ -20,6 +20,12 @@ const da = (...caps: PresetCap[]): PresetCap[] =>
 const tupo = (...caps: PresetCap[]): PresetCap[] =>
   caps.map((c) => (Array.isArray(c) ? [`tupo:${c[0]}`, c[1]] : `tupo:${c}`));
 
+/**
+ * AI tools in Task Mentor and TMCode outside an assessment (AI_USAGE_CONTROL_PLAN.md §3.2):
+ * TM's admin and instructor roles. Inside a quiz or assignment the teacher's ai_mode decides.
+ */
+const TM_AI = tm("AI_USE");
+
 /** Everyone who talks in Tupo (Tupo's old BASELINE). */
 const TUPO_BASELINE = tupo(
   "MESSAGE_SEND", "MESSAGE_READ", "MESSAGE_EDIT_OWN", "MESSAGE_DELETE_OWN",
@@ -92,6 +98,7 @@ const INSIGHTS = [
 
 export const SATELLITE_PRESET_CAPS: Record<string, PresetCap[]> = {
   platform_owner: [
+    ...TM_AI,
     ...tm("ROLES_PERMISSIONS_VIEW", "ROLES_PERMISSIONS_MANAGE", "DATABASE_ADMIN_ACCESS", "ACADEMICS_MANAGE_PERIODS", "USERS_CREATE", "USERS_EDIT", "USERS_DELETE"),
     ...da("ROLES_PERMISSIONS_VIEW", "ROLES_PERMISSIONS_MANAGE", "USERS_VIEW", "USERS_MANAGE", "AUDIT_VIEW", "ROSTER_SYNC", "ACADEMIC_PERIOD_SWITCH", "NOTIFICATIONS_MANAGE"),
     ...tupo(
@@ -102,6 +109,7 @@ export const SATELLITE_PRESET_CAPS: Record<string, PresetCap[]> = {
     ),
   ],
   head_teacher: [
+    ...TM_AI,
     ...ACADEMIC_LEAD,
     ...DISCIPLINE_LEAD,
     ...INSIGHTS,
@@ -112,9 +120,10 @@ export const SATELLITE_PRESET_CAPS: Record<string, PresetCap[]> = {
     ),
     ...tupo("FEED_PAGE_MANAGE", "FEED_POST", ["FEED_ANALYTICS_VIEW", "summary"], "MAIL_BULK_SEND", "MAIL_APPROVE", "MAIL_LIST_MANAGE", "MAIL_TEMPLATE_MANAGE", ["ANALYTICS_VIEW", "summary"], "USERS_VIEW", "AUDIT_VIEW"),
   ],
-  deputy_head_academics: [...ACADEMIC_LEAD],
-  director_of_studies: [...ACADEMIC_LEAD],
+  deputy_head_academics: [...TM_AI, ...ACADEMIC_LEAD],
+  director_of_studies: [...TM_AI, ...ACADEMIC_LEAD],
   programme_coordinator: [
+    ...TM_AI,
     ...tm(["COURSES_VIEW_GRADES", "summary"], ["REPORT_CARDS_VIEW_ALL", "summary"], ["SUBMISSIONS_VIEW_ALL", "summary"]),
     ...da(["ATTENDANCE_VIEW_ALL", "summary"], ["DISCIPLINE_VIEW_ALL", "summary"], ["REPORTS_VIEW", "summary"]),
     ...tupo("CHANNEL_ANNOUNCE", ["DASHBOARD_VIEW", "summary"]),
@@ -126,6 +135,7 @@ export const SATELLITE_PRESET_CAPS: Record<string, PresetCap[]> = {
   ],
   discipline_lead: [...DISCIPLINE_LEAD],
   head_of_department: [
+    ...TM_AI,
     ...tm(
       "COURSES_VIEW", ["COURSES_VIEW_GRADES", "detail"], ["SUBMISSIONS_VIEW_ALL", "detail"],
       ["QUIZZES_VIEW_RESULTS_ALL", "detail"], "QUESTION_BANK_VIEW", "QUESTION_BANK_MANAGE_ANY",
@@ -134,6 +144,7 @@ export const SATELLITE_PRESET_CAPS: Record<string, PresetCap[]> = {
     ),
   ],
   grade_coordinator: [
+    ...TM_AI,
     ...da(
       ["ATTENDANCE_VIEW_ALL", "detail"], "ATTENDANCE_MARK", "EXCUSES_REVIEW", "DISCIPLINE_LOG",
       ["DISCIPLINE_VIEW_ALL", "detail"], "DISCIPLINE_REVIEW", "DISCIPLINE_SANCTION_MINOR",
@@ -142,6 +153,7 @@ export const SATELLITE_PRESET_CAPS: Record<string, PresetCap[]> = {
     ...tm(["COURSES_VIEW_GRADES", "summary"], ["REPORT_CARDS_VIEW_ALL", "summary"]),
   ],
   class_teacher: [
+    ...TM_AI,
     ...da(
       "ATTENDANCE_MARK", ["ATTENDANCE_VIEW_ALL", "detail"], "EXCUSES_REVIEW", "DISCIPLINE_LOG",
       ["DISCIPLINE_VIEW_ALL", "detail"], "DISCIPLINE_REVIEW", "DISCIPLINE_SANCTION_MINOR",
@@ -156,12 +168,13 @@ export const SATELLITE_PRESET_CAPS: Record<string, PresetCap[]> = {
     ),
     ...tupo("CHANNEL_ANNOUNCE", "MAIL_BULK_SEND", ["DASHBOARD_VIEW", "detail"]),
   ],
-  subject_teacher: [...TEACHING],
+  subject_teacher: [...TM_AI, ...TEACHING],
   mentor: [
     ...da(["ATTENDANCE_VIEW_ALL", "detail"], ["DISCIPLINE_VIEW_ALL", "detail"]),
     ...tm(["COURSES_VIEW_GRADES", "detail"], ["REPORT_CARDS_VIEW_ALL", "detail"]),
   ],
   school_administrator: [
+    ...TM_AI,
     ...da("ACADEMIC_PERIOD_VIEW", ["STAFF_ATTENDANCE_VIEW_ALL", "detail"]),
     ...tupo("CHANNEL_ANNOUNCE", "USERS_VIEW"),
   ],
@@ -194,6 +207,7 @@ export const SATELLITE_PRESET_CAPS: Record<string, PresetCap[]> = {
     ),
   ],
   teaching_staff: [
+    ...TM_AI,
     ...tm("USERS_VIEW_SELF", "DASHBOARD_VIEW_INSTRUCTOR", "ACADEMICS_VIEW", "QUIZZES_VIEW", "COURSES_VIEW"),
     ...da("STAFF_ATTENDANCE_CLOCK", "STAFF_ATTENDANCE_VIEW_OWN", "ACADEMIC_PERIOD_VIEW", "ACADEMIC_PERIOD_SWITCH", "ROSTER_VIEW", "SETTINGS_MANAGE", "NOTIFICATIONS_MANAGE"),
     ...TUPO_STAFF,

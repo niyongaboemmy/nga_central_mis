@@ -14,6 +14,7 @@ import {
 } from "../controllers/databaseController";
 import { authenticate, authorize, requireDbStepUp } from "../middleware/auth";
 import { Permissions } from "../utils/permissions";
+import { requireAi } from "../services/ai/gate";
 
 const router = Router();
 
@@ -26,7 +27,7 @@ router.use(
 router.get("/status", getServerStatus);
 router.get("/query/history", getQueryHistory);
 router.post("/query", runQuery);
-router.post("/query/ai-generate", generateSqlWithAI);
+router.post("/query/ai-generate", requireAi("author"), generateSqlWithAI);
 
 router.get("/tables", listTables);
 router.get("/tables/:table/structure", getTableStructure);

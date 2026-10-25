@@ -41,6 +41,7 @@ import {
 } from "../services/aiProviders";
 import logger from "../utils/logger";
 import { CODE_HTML_RULE } from "../utils/aiCodeRules";
+import { assertAi } from "../services/ai/gate";
 
 const noteHtmlSchema: JSONSchema = {
   type: "object",
@@ -571,6 +572,9 @@ export const askAboutSharedNote = asyncHandler(async (req: any, res: any) => {
   if (!allowed) {
     throw new AuthorizationError("This lesson note has not been shared with you");
   }
+
+  // School AI policy + AI_USE, and for students the AI Tutor switch (403 AI_DISABLED / TUTOR_OFF).
+  await assertAi(req, "assist", { tutor: true });
 
   if (!isAnyProviderConfigured()) {
     throw new ValidationError(

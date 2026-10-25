@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import request from "supertest";
 
 import { installFakeFileServer } from "../test/fakeFileServer";
@@ -9,7 +9,7 @@ const { store: memoryStore } = installFakeFileServer();
 
 import app from "../app";
 import {
-  createUser,
+  createUser as baseCreateUser, grantAiUse,
   signToken,
   createAcademicPeriod,
   createProgramGradeClassGroup,
@@ -20,6 +20,17 @@ import {
   createRoleWithPermissions,
   assignRole,
 } from "../test/fixtures";
+import { AI_POLICY_ALL_ON, setAiPolicyForTests } from "../services/ai/policy";
+
+// AI usage control (AI_USAGE_CONTROL_PLAN.md): the school policy is on for this file and its users
+// hold AI_USE, so what is tested here is the feature's own rules.
+const createUser: typeof baseCreateUser = async (o) => {
+  const id = await baseCreateUser(o);
+  await grantAiUse(id);
+  return id;
+};
+beforeAll(() => setAiPolicyForTests(AI_POLICY_ALL_ON));
+afterAll(() => setAiPolicyForTests(null));
 
 /** A minimal but valid single-page PDF with one line of real text, built by hand so the
  *  test doesn't depend on any PDF-writing library. */

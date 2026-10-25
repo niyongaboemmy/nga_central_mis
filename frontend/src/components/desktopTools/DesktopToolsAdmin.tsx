@@ -6,6 +6,7 @@ import SelectField from "../ui/SelectField";
 import Modal from "../ui/Modal";
 import { useConfirm } from "../../contexts/ConfirmContext";
 import { useToast } from "../../contexts/ToastContext";
+import { aiUnavailableReason, useAiPolicy } from "../../api/aiPolicy";
 
 /**
  * NGA Desktop tools: the school's control over the desktop's games (nga-desktop
@@ -316,6 +317,10 @@ const DesktopToolsAdmin: React.FC = () => {
 
 /** The student AI Tutor (nga-desktop TOOLS_HUB plan §5.7): on/off, daily questions, conversation review. */
 const TutorCard: React.FC = () => {
+  // The school AI policy comes first: with AI off (or off for NGA Desktop) the tutor is off
+  // whatever its own switch says.
+  const aiPolicy = useAiPolicy();
+  const aiOff = aiPolicy && (!aiPolicy.policy.enabled || aiPolicy.policy.apps.desktop === false) ? aiUnavailableReason({ ...aiPolicy, me: { ...aiPolicy.me, hasAiUse: true } }, "desktop") : null;
   const [settings, setSettings] = useState<TutorSettings | null>(null);
   const [draft, setDraft] = useState<TutorSettings | null>(null);
   const [list, setList] = useState<TutorConversation[]>([]);
@@ -391,6 +396,11 @@ const TutorCard: React.FC = () => {
       <Muted className="mb-3">
         Students ask the tutor in NGA Desktop. It explains and gives hints instead of doing homework; every reply is checked for given-away answers and unsafe content before it is shown. It pauses in each student's own lessons and exams. Conversations are saved for review here; worrying messages (self-harm, abuse, bullying) and replies students report are flagged. Opening a conversation is recorded in the audit log.
       </Muted>
+      {aiOff && (
+        <p role="status" className="mb-3 rounded-2xl bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:bg-amber-500/10 dark:text-amber-100">
+          {aiOff} The tutor stays off for every student until a super admin turns AI back on in Settings. Students also need the AI_USE permission.
+        </p>
+      )}
       <div className="flex flex-wrap items-center gap-4 rounded-2xl bg-slate-50 p-3 dark:bg-gray-900/40">
         <label className="flex items-center gap-3 text-sm font-semibold text-slate-800 dark:text-gray-100">
           <Switch on={draft.enabled} onChange={(v) => setDraft({ ...draft, enabled: v })} label="AI Tutor on or off" />

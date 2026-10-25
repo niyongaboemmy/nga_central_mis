@@ -5,3 +5,4 @@ export { friendlyAIErrorMessage, isQuotaError, isDeadProviderError, classifyAIEr
 export { quotaSnapshot, checkAvailability, limitsFor, nextQuotaReset, resetLimiterState } from "./limiter";
 export type { QuotaSnapshot } from "./limiter";
 export type { JSONSchema, AIProvider, GenerateJSONParams, AIRole, ProviderResult, TokenUsage } from "./types";
+export { AiDisabledError } from "../ai/policy";

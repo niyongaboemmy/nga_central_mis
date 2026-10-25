@@ -1,9 +1,14 @@
-import { describe, it, expect, afterEach, beforeEach } from "vitest";
+import { describe, it, expect, afterEach, beforeEach, beforeAll, afterAll } from "vitest";
 import { eq } from "drizzle-orm";
 import { db } from "../db";
 import { AIUsageLog } from "../db/schema";
 import { generateStructuredContent, AIQuotaExhaustedError, quotaSnapshot } from "../services/aiProviders";
 import { installFakeAI, uninstallFakeAI } from "../test/fakeAI";
+import { AI_POLICY_ALL_ON, setAiPolicyForTests } from "../services/ai/policy";
+
+// AI usage control (AI_USAGE_CONTROL_PLAN.md): the school policy is on for this file.
+beforeAll(() => setAiPolicyForTests(AI_POLICY_ALL_ON));
+afterAll(() => setAiPolicyForTests(null));
 
 const schema = { type: "object" as const, properties: { ok: { type: "boolean" as const } } };
 const quota = () => Object.assign(new Error("429 RESOURCE_EXHAUSTED"), { status: 429 });

@@ -36,6 +36,7 @@ import { asyncHandler } from "../middleware/asyncHandler";
 import config from "../config";
 import logger from "../utils/logger";
 import { recordActivity } from "../utils/activityLogger";
+import { getAiPolicy } from "../services/ai/policy";
 import { notifyLogout } from "../services/sso/backchannelLogout";
 import { clientIpOf, deviceIdOf, trackAuth } from "../services/activity/authEvents";
 import { checkBlocked } from "../services/activity/blocklist";
@@ -607,9 +608,13 @@ export const verifySession = asyncHandler(async (req: any, res: any) => {
     .from(User)
     .where(eq(User.user_id, req.user.userId))
     .limit(1);
+  // School AI policy version (AI_USAGE_CONTROL_PLAN.md §4.3): a spoke seeing a new
+  // value refetches GET /integrations/ai-policy, so a flip reaches every app in minutes.
+  const aiPolicyVersion = (await getAiPolicy()).v;
   successResponse(res, "Token valid", {
     userId: req.user.userId,
     access_version: accessVersion,
+    ai_policy_v: aiPolicyVersion,
     ...profileMedia({ user_id: req.user.userId, ...row }),
   });
 });

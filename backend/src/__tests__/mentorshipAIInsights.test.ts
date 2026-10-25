@@ -4,7 +4,7 @@ import app from "../app";
 import { db } from "../db";
 import { AcademicYear } from "../db/schema";
 import {
-  createUser,
+  createUser as baseCreateUser, grantAiUse,
   createRoleWithPermissions,
   assignRole,
   signToken,
@@ -14,6 +14,17 @@ import {
 } from "../test/fixtures";
 import { Permissions } from "../utils/permissions";
 import { installFakeAI, uninstallFakeAI } from "../test/fakeAI";
+import { AI_POLICY_ALL_ON, setAiPolicyForTests } from "../services/ai/policy";
+
+// AI usage control (AI_USAGE_CONTROL_PLAN.md): the school policy is on for this file and its users
+// hold AI_USE, so the AI features themselves are what is tested.
+const createUser: typeof baseCreateUser = async (o) => {
+  const id = await baseCreateUser(o);
+  await grantAiUse(id);
+  return id;
+};
+beforeAll(() => setAiPolicyForTests(AI_POLICY_ALL_ON));
+afterAll(() => setAiPolicyForTests(null));
 
 // AI insights endpoint's guard rails — these must reject *before* ever
 // calling Gemini, so they're testable without a real (or mocked) API key.

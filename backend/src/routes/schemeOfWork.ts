@@ -1,6 +1,7 @@
 import { Router } from "express";
 import multer from "multer";
 import { authenticate, authorize } from "../middleware/auth";
+import { requireAi } from "../services/ai/gate";
 import {
   uploadAndExtractScheme,
   getMySchemeProgress,
@@ -56,7 +57,8 @@ router.get("/verify/:schemeId", getSchemeVerification);
 // All other routes are protected
 router.use(authenticate);
 
-// Upload and extract scheme from DOCX
+// Upload and extract scheme from DOCX (the AI fallback for non-standard documents checks the
+// school AI policy inside the controller)
 router.post("/upload", upload.single("file"), uploadAndExtractScheme);
 
 // Detect Learning Outcome sections in an uploaded curriculum document (fast, no AI call) so the
@@ -70,6 +72,7 @@ router.post(
 // AI-generate scheme of work from an uploaded curriculum document
 router.post(
   "/ai-generate",
+  requireAi("author"),
   uploadCurriculum.single("file"),
   startAIGeneration,
 );
@@ -92,11 +95,11 @@ router.post("/entries", addSchemeEntry);
 router.post("/entries/insert", insertSchemeEntry);
 
 // Generate a single entry's content from a custom AI prompt (for review, not auto-saved)
-router.post("/entries/ai-suggest", suggestEntryContent);
+router.post("/entries/ai-suggest", requireAi("author"), suggestEntryContent);
 
 // AI-powered Performance Criteria matching for a scheme entry's free-text content (stateless —
 // not auto-saved; register before the parameterized /entries/:id below)
-router.post("/entries/suggest-criteria", suggestEntryCriteria);
+router.post("/entries/suggest-criteria", requireAi("author"), suggestEntryCriteria);
 
 // Replace the full set of Performance Criteria linked to a scheme entry
 router.put("/entries/:id/criteria", replaceEntryCriteria);
@@ -107,7 +110,7 @@ router.post("/schemes/:schemeId/link-criteria", linkSchemeCriteria);
 
 // On-demand bulk AI matching for an already-existing scheme (content and/or curriculum that
 // predates this feature, or entries not covered by generation-time auto-tagging)
-router.post("/schemes/:schemeId/bulk-suggest-criteria", bulkSuggestCriteria);
+router.post("/schemes/:schemeId/bulk-suggest-criteria", requireAi("author"), bulkSuggestCriteria);
 
 // Delete an entire scheme of work (all weekly entries, their lesson plans, and criteria links) so
 // the teacher can start over from the 3-option chooser
