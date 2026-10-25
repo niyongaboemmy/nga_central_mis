@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { ArrowLeft, ArrowRight, Bell, Check, Hourglass, Moon, RotateCcw, Server, Sparkles, Wand2, Zap } from "lucide-react";
 import { Blueprint, DraftItem, Estimate, StudioData, studioApi } from "../../../api/studio";
 import { builderRoutes } from "../../../api/elearning";
+import { aiUnavailableReason, useAiPolicy } from "../../../api/aiPolicy";
 import { useToast } from "../../../contexts/ToastContext";
 import { useConfirm } from "../../../contexts/ConfirmContext";
 import { useMotion } from "../../../design/motion";
@@ -48,6 +49,8 @@ const LessonStudioPage: React.FC = () => {
   const cid = Number(courseId);
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
+  // School AI policy (AI_USAGE_CONTROL_PLAN.md): say up front when drafting can't start.
+  const aiBlocked = aiUnavailableReason(useAiPolicy());
   const { showToast } = useToast();
   const confirm = useConfirm();
   const [ask, promptUI] = usePrompt();
@@ -340,6 +343,11 @@ const LessonStudioPage: React.FC = () => {
             )}
           </div>
         </div>
+        {aiBlocked && (
+          <p role="status" className="mt-2 px-3 py-2 rounded-xl el-chip-warning text-sm">
+            {aiBlocked} You can still plan a recipe; drafting starts once AI is available to you.
+          </p>
+        )}
         {!data.ai_configured && (
           <p className="mt-2 px-3 py-2 rounded-xl el-chip-warning text-sm">AI isn't configured on this server yet — you can plan a recipe, but generation won't start.</p>
         )}

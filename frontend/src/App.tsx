@@ -57,6 +57,7 @@ import MyOfficeHours from "./components/officeHours/MyOfficeHours";
 import OfficeHoursAdmin from "./components/officeHours/admin/OfficeHoursAdmin";
 import DesktopToolsAdmin from "./components/desktopTools/DesktopToolsAdmin";
 import FamilyTutor from "./components/desktopTools/FamilyTutor";
+import SettingsPage from "./components/settings/SettingsPage";
 import MyChildren from "./components/families/MyChildren";
 import ImportParents from "./components/families/ImportParents";
 import StaffCover from "./components/cover/StaffCover";
@@ -769,20 +770,13 @@ function App() {
               }
             />
 
-            {/* Settings page - protected with sidebar */}
+            {/* Settings: the school AI policy for super admins (AI_USAGE_CONTROL_PLAN.md §4.6) */}
             <Route
               path="/settings"
               element={
                 <ProtectedRoute>
                   <SystemLayoutWrapper>
-                    <div className="text-center py-12">
-                      <h2 className="text-2xl font-bold text-text-primary-light dark:text-text-primary-dark">
-                        Settings
-                      </h2>
-                      <p className="mt-2 text-text-secondary-light dark:text-text-secondary-dark/70">
-                        This page is under construction
-                      </p>
-                    </div>
+                    <SettingsPage />
                   </SystemLayoutWrapper>
                 </ProtectedRoute>
               }

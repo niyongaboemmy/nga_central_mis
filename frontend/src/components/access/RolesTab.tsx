@@ -35,7 +35,8 @@ export const RoleEditor: React.FC<{
   const [scopes, setScopes] = useState<ScopeType[]>(role?.allowed_scope_types ?? ["SCHOOL"]);
   const [maxHolders, setMaxHolders] = useState<string>(role?.max_holders ? String(role.max_holders) : "");
   const [sel, setSel] = useState<Selection>(selectionOf(role));
-  const [filter, setFilter] = useState("");
+  // Prefilled from ?cap= (e.g. Settings -> AI opens roles filtered to AI_USE).
+  const [filter, setFilter] = useState(() => new URLSearchParams(window.location.search).get("cap") ?? "");
   const [app, setApp] = useState<string>("mis");
   const [saving, setSaving] = useState(false);
   const initial = useMemo(
