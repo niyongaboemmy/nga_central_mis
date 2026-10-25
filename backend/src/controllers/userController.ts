@@ -60,6 +60,27 @@ import * as path from "path";
 import { recordActivity } from "../utils/activityLogger";
 import { getCurrentAcademicYearId } from "../utils/academicYear";
 import {
+  activeUser,
+  activeStudentPlacement,
+  isUserStatus,
+  parseStatusFilter,
+} from "../services/activeUsers";
+import { notifyLogout } from "../services/sso/backchannelLogout";
+import { signOutEverywhereLocal } from "../services/activity/control";
+
+/** A disabled / suspended account loses every session at once: bump
+ *  token_version (every MIS token dies, including the copies the spoke apps
+ *  hold), back-channel logout to Task Mentor / Tendo / Tupo (they re-check the
+ *  user's status), and drop live presence -- the same steps as logout. */
+const endSessionsForDeactivation = async (userId: number) => {
+  await db
+    .update(User)
+    .set({ token_version: sql`token_version + 1` })
+    .where(eq(User.user_id, userId));
+  signOutEverywhereLocal(userId);
+  void notifyLogout(userId).catch(() => undefined);
+};
+import {
   generateStudentRegistrationNumber,
   getSchoolCode,
   resetRegistrationSequence,
@@ -571,8 +592,11 @@ export const getUsers = asyncHandler(async (req: any, res: any) => {
     );
   }
 
-  if (status && status !== "all") {
-    whereConditions.push(eq(User.status, status.toUpperCase()));
+  // Active users only (contract): the default is ACTIVE. `status=all` lists
+  // everyone (the admin Users page), `status=INACTIVE|SUSPENDED` one status.
+  const statusFilter = parseStatusFilter(status, "ACTIVE");
+  if (statusFilter) {
+    whereConditions.push(eq(User.status, statusFilter));
   }
 
   if (userRole && userRole !== "all") {
@@ -1035,7 +1059,21 @@ export const updateUser = asyncHandler(async (req: any, res: any) => {
   if (sanitizedUsername) updateData.username = sanitizedUsername;
   if (sanitizedEmail) updateData.email = sanitizedEmail;
   if (sanitizedPhone !== undefined) updateData.phone_number = sanitizedPhone;
-  if (status) updateData.status = status;
+  let deactivated = false;
+  if (status !== undefined && status !== null && status !== "") {
+    const normalized = String(status).trim().toUpperCase();
+    if (!isUserStatus(normalized)) {
+      throw new ValidationError(
+        "status must be one of ACTIVE, INACTIVE, SUSPENDED",
+      );
+    }
+    if (normalized !== "ACTIVE" && req.user?.userId === userId) {
+      throw new ValidationError("Cannot disable your own account");
+    }
+    updateData.status = normalized;
+    deactivated =
+      normalized !== "ACTIVE" && existingUser[0].status === "ACTIVE";
+  }
 
   logger.info("Updating user", {
     userId,
@@ -1043,7 +1081,14 @@ export const updateUser = asyncHandler(async (req: any, res: any) => {
     updatedBy: req.user?.userId,
   });
 
-  await db.update(User).set(updateData).where(eq(User.user_id, userId));
+  if (Object.keys(updateData).length > 0) {
+    await db.update(User).set(updateData).where(eq(User.user_id, userId));
+  }
+  if (updateData.status && updateData.status !== existingUser[0].status) {
+    // Persona grants follow the account status (rules only cover ACTIVE users).
+    await applyPlacementChange([userId], req.user?.userId);
+  }
+  if (deactivated) await endSessionsForDeactivation(userId);
 
   // Record activity
   if (req.user?.userId) {
@@ -1768,6 +1813,8 @@ export const disableUser = asyncHandler(async (req: any, res: any) => {
     .where(eq(User.user_id, userId));
   // Persona grants follow the account status (rules only cover ACTIVE users).
   await applyPlacementChange([userId], req.user?.userId);
+  // Their open sessions end now, here and in every app (single sign-out).
+  await endSessionsForDeactivation(userId);
 
   // Record activity
   if (req.user?.userId) {
@@ -2117,7 +2164,8 @@ export const getProgramUsersByRole = asyncHandler(
         and(
           eq(Grade.program_id, programIdNum),
           eq(UserRole.role_id, roleIdNum),
-          eq(StudentClassGroup.status, "ACTIVE"),
+          activeUser,
+          activeStudentPlacement(currentYearIdForProgram),
         ),
       );
 
@@ -2149,6 +2197,11 @@ export const getProgramUsersByRole = asyncHandler(
         and(
           eq(Grade.program_id, programIdNum),
           eq(UserRole.role_id, roleIdNum),
+          activeUser,
+          eq(
+            TeacherSubjectAssignment.academic_year_id,
+            currentYearIdForProgram,
+          ),
         ),
       );
 
@@ -2173,6 +2226,7 @@ export const getProgramUsersByRole = asyncHandler(
           eq(UserProgramLead.program_id, programIdNum),
           eq(UserRole.role_id, roleIdNum),
           eq(UserProgramLead.academic_year_id, currentYearIdForProgram),
+          activeUser,
         ),
       );
 
@@ -2298,7 +2352,8 @@ export const getProgramUsers = asyncHandler(async (req: any, res: any) => {
     .where(
       and(
         eq(Grade.program_id, programIdNum),
-        eq(StudentClassGroup.status, "ACTIVE"),
+        activeUser,
+        activeStudentPlacement(currentYearIdForProgram),
       ),
     );
 
@@ -2328,7 +2383,13 @@ export const getProgramUsers = asyncHandler(async (req: any, res: any) => {
     .innerJoin(Grade, eq(ClassGroup.grade_id, Grade.grade_id))
     .innerJoin(UserRole, eq(User.user_id, UserRole.user_id))
     .innerJoin(Role, eq(UserRole.role_id, Role.role_id))
-    .where(eq(Grade.program_id, programIdNum));
+    .where(
+      and(
+        eq(Grade.program_id, programIdNum),
+        activeUser,
+        eq(TeacherSubjectAssignment.academic_year_id, currentYearIdForProgram),
+      ),
+    );
 
   // Program leads: via UserProgramLead
   const leadUsers = await db
@@ -2352,6 +2413,7 @@ export const getProgramUsers = asyncHandler(async (req: any, res: any) => {
       and(
         eq(UserProgramLead.program_id, programIdNum),
         eq(UserProgramLead.academic_year_id, currentYearIdForProgram),
+        activeUser,
       ),
     );
 
@@ -3225,6 +3287,16 @@ export const getUsersByGrade = asyncHandler(async (req: any, res: any) => {
     throw new NotFoundError("Grade not found");
   }
 
+  // Active users only, placed / assigned in the selected year (default: current).
+  const rawYear = req.query.academic_year_id;
+  const yearId =
+    rawYear !== undefined && rawYear !== ""
+      ? parseInt(rawYear as string, 10)
+      : await getCurrentAcademicYearId();
+  if (yearId !== null && isNaN(yearId)) {
+    throw new ValidationError("Invalid academic year ID");
+  }
+
   // Get students in this grade (via class groups)
   const students = await db
     .select({
@@ -3251,7 +3323,8 @@ export const getUsersByGrade = asyncHandler(async (req: any, res: any) => {
     .where(
       and(
         sql`${ClassGroup.grade_id} = ${gradeIdNum}`,
-        eq(StudentClassGroup.status, "ACTIVE"),
+        activeUser,
+        activeStudentPlacement(yearId),
       ),
     );
 
@@ -3280,7 +3353,15 @@ export const getUsersByGrade = asyncHandler(async (req: any, res: any) => {
     )
     .innerJoin(UserRole, eq(User.user_id, UserRole.user_id))
     .innerJoin(Role, eq(UserRole.role_id, Role.role_id))
-    .where(sql`${ClassGroup.grade_id} = ${gradeIdNum}`);
+    .where(
+      and(
+        sql`${ClassGroup.grade_id} = ${gradeIdNum}`,
+        activeUser,
+        yearId
+          ? eq(TeacherSubjectAssignment.academic_year_id, yearId)
+          : undefined,
+      ),
+    );
 
   // Combine students and teachers, remove duplicates
   const allUsers = [...students, ...teachers];
