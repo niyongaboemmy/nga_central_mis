@@ -6,6 +6,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { useUser } from "../../contexts/UserContext";
 import { Permissions } from "../../constants/permissions";
 import { getToken } from "../../utils/auth";
+import { requestAppsDialog } from "../apps/openAppsDialog";
 import { useAccess } from "../../hooks/useAccess";
 import { useMentorshipRole } from "../../hooks/useMentorshipRole";
 import { useOptionalAcademicPeriod } from "../../contexts/AcademicPeriodContext";
@@ -18,10 +19,39 @@ interface SidebarProps {
   onMenuClick?: () => void;
 }
 
+/**
+ * Where a link sits in the menu. Sections render in this order, each under a small
+ * heading, and a section with nothing visible to the user is left out -- so a student
+ * sees Learning, a teacher Teaching, an admin Administration, without wading through
+ * every other role's links in one flat list.
+ */
+const NAV_SECTIONS = [
+  { key: "main", title: null },
+  { key: "teaching", title: "Teaching" },
+  { key: "learning", title: "Learning" },
+  { key: "family", title: "Family" },
+  { key: "class", title: "Class teacher" },
+  { key: "workspace", title: "Workspace" },
+  { key: "oversight", title: "Oversight" },
+  { key: "admin", title: "Administration" },
+  { key: "you", title: "You" },
+] as const;
+type NavSection = (typeof NAV_SECTIONS)[number]["key"];
+const KNOWN_SECTIONS: ReadonlySet<string> = new Set(NAV_SECTIONS.map((s) => s.key));
+/**
+ * A link merged in without a section (or with one not listed above) would otherwise
+ * never render; it lands under "More" so it stays reachable until it is placed.
+ */
+const RENDERED_SECTIONS = [...NAV_SECTIONS, { key: "more", title: "More" }] as const;
+
 interface NavItem {
   label: string;
   path?: string;
+  /** Top-level links must have one (TopNavItem); submenu children sit in their group's. */
+  section?: NavSection;
   externalUrl?: string;
+  /** Done on click instead of navigating to `path`. */
+  action?: () => void;
   icon: React.ReactNode;
   requiredPermission?: string | string[];
   /** Access control v2 capability (any of) -- see hooks/useAccess. */
@@ -37,6 +67,8 @@ interface NavItem {
   /** Count shown next to the label (e.g. unread mentee check-ins). */
   badge?: number;
 }
+
+type TopNavItem = NavItem & { section: NavSection };
 
 const Sidebar: React.FC<SidebarProps> = ({
   isCollapsed = false,
@@ -58,34 +90,28 @@ const Sidebar: React.FC<SidebarProps> = ({
     );
   };
 
-  // For a teacher, /dashboard is the welcome page (greeting + weekly
-  // timetable) and the figures live on /teacher-dashboard, so the menu says
-  // so. Every other role still lands on a dashboard there.
-  const isTeacher = hasPermission(Permissions.TEACHER_DASHBOARD);
-
-  const navItems: NavItem[] = [
+  const navItems: TopNavItem[] = [
     {
       // Home: what needs me across every module (HOME_OVERVIEW_IMPLEMENTATION_PLAN.md).
       label: "Home",
       path: "/home",
+      section: "main",
       icon: <House className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
     },
     {
-      label: isTeacher ? "My Timetable" : "Dashboard",
+      // /dashboard is the week's timetable for everyone, so it is named for what
+      // it shows. "Dashboard" next to Home read as two names for one page.
+      label: "Schedule",
       path: "/dashboard",
-      // Not a house: Home above already is one, and the two read as duplicates.
-      icon: isTeacher ? (
-        <CalendarDays className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />
-      ) : (
-        <LayoutDashboard className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />
-      ),
+      section: "main",
+      icon: <CalendarDays className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
     },
     {
-      // The teacher's working board. "Dashboard" above it is the welcome page
-      // (greeting + weekly timetable); this is where the figures and reminders
-      // moved to.
+      // The teacher's working board: figures and reminders. Schedule above it is
+      // the weekly timetable.
       label: "Teacher Dashboard",
       path: "/teacher-dashboard",
+      section: "main",
       icon: (
         <LayoutDashboard className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />
       ),
@@ -95,12 +121,17 @@ const Sidebar: React.FC<SidebarProps> = ({
       // Reminder Hub: set up this device, Now & Next, reminder preferences.
       label: "Reminders",
       path: "/reminders",
+      section: "you",
       icon: <BellRing className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
     },
     {
-      // Install every NGA app on this device from one place.
+      // Install every NGA app on this device from one place, in a dialog over the
+      // current page (the standalone /apps page is for signed-out devices).
       label: "Get the apps",
-      path: "/apps",
+      action: () => {
+        if (!requestAppsDialog()) navigate("/apps");
+      },
+      section: "you",
       icon: <LayoutGrid className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
     },
     {
@@ -108,11 +139,13 @@ const Sidebar: React.FC<SidebarProps> = ({
       // is recorded about them, and whether anyone is monitoring their account.
       label: "My activity",
       path: "/me/activity",
+      section: "you",
       icon: <Activity className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
     },
     {
       label: "Profile",
       path: "/profile",
+      section: "you",
       icon: (
         <svg
           className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`}
@@ -132,6 +165,7 @@ const Sidebar: React.FC<SidebarProps> = ({
     {
       label: "My Subjects",
       path: "/my-subjects",
+      section: "teaching",
       icon: (
         <svg
           className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`}
@@ -152,6 +186,7 @@ const Sidebar: React.FC<SidebarProps> = ({
     {
       label: "My Students",
       path: "/my-students",
+      section: "teaching",
       icon: (
         <svg
           className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`}
@@ -172,6 +207,7 @@ const Sidebar: React.FC<SidebarProps> = ({
     {
       label: "My Subjects",
       path: "/my-enrolled-subjects",
+      section: "learning",
       icon: (
         <svg
           className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`}
@@ -192,6 +228,7 @@ const Sidebar: React.FC<SidebarProps> = ({
     {
       label: "Scheme Of Work",
       path: "/scheme-of-work",
+      section: "teaching",
       icon: (
         <svg
           className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`}
@@ -212,6 +249,7 @@ const Sidebar: React.FC<SidebarProps> = ({
     {
       label: "Lesson Notes",
       path: "/lesson-notes",
+      section: "teaching",
       icon: (
         <svg
           className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`}
@@ -232,6 +270,7 @@ const Sidebar: React.FC<SidebarProps> = ({
     {
       label: "My Learning",
       path: "/my-learning",
+      section: "learning",
       icon: <GraduationCap className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
       requiredPermission: Permissions.VIEW_MY_COURSES,
     },
@@ -245,18 +284,21 @@ const Sidebar: React.FC<SidebarProps> = ({
     {
       label: "E-Learning",
       path: "/elearning/courses",
+      section: "teaching",
       icon: <LayoutGrid className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
       requiredPermission: Permissions.MANAGE_COURSE_CONTENT,
     },
     {
       label: "E-Learning Oversight",
       path: "/admin/elearning",
+      section: "oversight",
       icon: <MonitorCheck className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
       requiredPermission: Permissions.VIEW_ALL_COURSES,
     },
     {
       label: "Shared Notes",
       path: "/shared-lesson-notes",
+      section: "learning",
       icon: (
         <svg
           className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`}
@@ -277,6 +319,7 @@ const Sidebar: React.FC<SidebarProps> = ({
     {
       label: "All Teachers SOW",
       path: "/all-teachers-sow",
+      section: "oversight",
       icon: (
         <svg
           className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`}
@@ -297,6 +340,7 @@ const Sidebar: React.FC<SidebarProps> = ({
     {
       label: "Academic Calendar",
       path: "/calendar",
+      section: "workspace",
       icon: (
         <svg
           className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`}
@@ -312,11 +356,18 @@ const Sidebar: React.FC<SidebarProps> = ({
           />
         </svg>
       ),
-      requiredPermission: Permissions.VIEW_ACADEMIC_CALENDAR,
+      // Where the timetable is built. Students and teachers read theirs under
+      // Schedule, so for them this was a second calendar of the same lessons.
+      requiredPermission: [
+        Permissions.MANAGE_ACADEMIC_CALENDAR,
+        Permissions.CREATE_ACADEMIC_CALENDAR,
+        Permissions.UPDATE_CALENDAR_SLOT,
+      ],
     },
     {
       label: "Reporting",
       path: "/reporting",
+      section: "teaching",
       icon: (
         <svg
           className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`}
@@ -338,18 +389,21 @@ const Sidebar: React.FC<SidebarProps> = ({
       // Mandatory office hours (OFFICE_HOURS_IMPLEMENTATION_PLAN.md §9-11).
       label: "Office Hours",
       path: "/office-hours",
+      section: "teaching",
       icon: <Clock4 className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
       requiredPermission: [Permissions.OFFICE_HOURS_MANAGE_OWN, Permissions.OFFICE_HOURS_MANAGE_ANY],
     },
     {
       label: "Office Hours Oversight",
       path: "/office-hours/admin",
+      section: "oversight",
       icon: <Clock4 className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
       requiredPermission: [Permissions.OFFICE_HOURS_MANAGE_ANY, Permissions.OFFICE_HOURS_VIEW, Permissions.OFFICE_HOURS_CONFIGURE],
     },
     {
       label: "My Office Hours",
       path: "/my-office-hours",
+      section: "learning",
       icon: <Clock4 className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
       requiredPermission: Permissions.OFFICE_HOURS_VIEW_SELF,
     },
@@ -357,6 +411,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       // Anyone holding mentees this year — teacher, staff or admin.
       label: "My Mentees",
       path: "/my-mentees",
+      section: "teaching",
       icon: <Users2 className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
       when: !!mentorship?.is_mentor,
       badge: mentorship?.new_checkins ?? 0,
@@ -364,6 +419,7 @@ const Sidebar: React.FC<SidebarProps> = ({
     {
       label: "My Mentor",
       path: "/my-mentor",
+      section: "learning",
       icon: (
         <svg
           className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`}
@@ -386,6 +442,7 @@ const Sidebar: React.FC<SidebarProps> = ({
     {
       label: "Admin Reports",
       path: "/admin/reports",
+      section: "oversight",
       icon: (
         <svg
           className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`}
@@ -406,6 +463,7 @@ const Sidebar: React.FC<SidebarProps> = ({
     {
       label: "Documents",
       path: "/documents",
+      section: "workspace",
       icon: (
         <svg
           className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`}
@@ -446,6 +504,7 @@ const Sidebar: React.FC<SidebarProps> = ({
     {
       label: "Academics",
       path: "/academics",
+      section: "admin",
       icon: (
         <svg
           className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`}
@@ -466,6 +525,7 @@ const Sidebar: React.FC<SidebarProps> = ({
     {
       label: "Enrollment",
       path: "/enrollment",
+      section: "admin",
       icon: (
         <svg
           className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`}
@@ -486,6 +546,7 @@ const Sidebar: React.FC<SidebarProps> = ({
     {
       label: "Users",
       path: "/users",
+      section: "admin",
       icon: (
         <svg
           className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`}
@@ -506,6 +567,7 @@ const Sidebar: React.FC<SidebarProps> = ({
     {
       label: "Program Users",
       path: "/program-users",
+      section: "oversight",
       icon: (
         <svg
           className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`}
@@ -526,6 +588,7 @@ const Sidebar: React.FC<SidebarProps> = ({
     {
       label: "Program Academics",
       path: "/program-academics",
+      section: "oversight",
       icon: (
         <svg
           className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`}
@@ -546,6 +609,7 @@ const Sidebar: React.FC<SidebarProps> = ({
     {
       label: "Class Users",
       path: "/class-users",
+      section: "class",
       icon: (
         <svg
           className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`}
@@ -566,6 +630,7 @@ const Sidebar: React.FC<SidebarProps> = ({
     {
       label: "Class Subjects",
       path: "/class-subjects",
+      section: "class",
       icon: (
         <svg
           className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`}
@@ -586,6 +651,7 @@ const Sidebar: React.FC<SidebarProps> = ({
     {
       label: "Class Calendar",
       path: "/class-calendar",
+      section: "class",
       icon: (
         <svg
           className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`}
@@ -606,6 +672,7 @@ const Sidebar: React.FC<SidebarProps> = ({
     {
       label: "Insights",
       path: "/insights",
+      section: "oversight",
       icon: <BarChart3 className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
       // Anyone holding an insight capability somewhere (the page lists what they can open).
       requiredCapability: ["VIEW_ALL_TEACHERS_SCHEME_OF_WORK_LIST", "VIEW_REPORTS", "VIEW_ALL_COURSES"],
@@ -615,6 +682,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       // capability its page needs (same list as the in-page tabs).
       label: "Usage & Monitoring",
       path: "/analytics",
+      section: "oversight",
       icon: <Activity className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
       // No gate of its own: the group shows when any page in it is open to the viewer.
       children: ANALYTICS_TABS.map((t) => ({
@@ -628,12 +696,14 @@ const Sidebar: React.FC<SidebarProps> = ({
     {
       label: "Leadership & Access",
       path: "/access-studio",
+      section: "admin",
       icon: <ShieldCheck className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
       requiredCapability: ["ACCESS_STUDIO_VIEW", "VIEW_LEADERSHIP_STRUCTURE"],
     },
     {
       label: "Permissions",
       path: "/permissions",
+      section: "admin",
       icon: (
         <svg
           className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`}
@@ -654,6 +724,7 @@ const Sidebar: React.FC<SidebarProps> = ({
     {
       label: "Settings",
       path: "/settings",
+      section: "admin",
       icon: (
         <svg
           className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`}
@@ -680,78 +751,91 @@ const Sidebar: React.FC<SidebarProps> = ({
     {
       label: "My competences",
       path: "/my-competences",
+      section: "learning",
       icon: <Target className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
       userTypes: ["STUDENT"],
     },
     {
       label: "Wellbeing",
       path: "/wellbeing",
+      section: "learning",
       icon: <HeartHandshake className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
       userTypes: ["STUDENT"],
     },
     {
       label: "Staff cover",
       path: "/cover",
+      section: "workspace",
       icon: <CalendarOff className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
       userTypes: ["TEACHER", "STAFF", "ADMIN"],
     },
     {
       label: "Competency map",
       path: "/competency-map",
+      section: "teaching",
       icon: <Grid3x3 className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
       userTypes: ["TEACHER", "STAFF", "ADMIN"],
     },
     {
       label: "Early warning",
       path: "/early-warning",
+      section: "oversight",
       icon: <Radar className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
       requiredCapability: "EARLY_WARNING_VIEW",
     },
     {
       label: "Safeguarding",
       path: "/safeguarding",
+      section: "oversight",
       icon: <ShieldAlert className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
       requiredPermission: Permissions.SAFEGUARDING_MANAGE,
     },
     {
       label: "My children",
       path: "/family",
+      section: "family",
       icon: <Baby className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
       userTypes: ["PARENT"],
     },
     {
       label: "Import parents",
       path: "/families/import",
+      section: "admin",
       icon: <UserPlus className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
       requiredPermission: Permissions.MANAGE_USERS,
     },
     {
       label: "AI Tutor for my children",
       path: "/family/ai-tutor",
+      section: "family",
       icon: <Bot className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
       userTypes: ["PARENT"],
     },
     {
       label: "Desktop tools",
       path: "/desktop-tools",
+      section: "admin",
       icon: <Gamepad2 className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
       requiredPermission: Permissions.DESKTOP_TOOLS_CONFIGURE,
     },
     {
       label: "Schools",
       path: "/schools",
+      section: "admin",
       icon: <School className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
       requiredPermission: Permissions.MANAGE_SCHOOLS,
     },
     {
       label: "Systems",
       path: "/systems",
+      section: "admin",
       icon: <Server className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
       requiredPermission: Permissions.MANAGE_SYSTEMS,
     },
     {
       label: "Database Management",
       path: "/database-management",
+      section: "admin",
       icon: <Database className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
       requiredPermission: Permissions.DATABASE_MANAGEMENT,
     },
@@ -890,7 +974,9 @@ const Sidebar: React.FC<SidebarProps> = ({
   const renderNavItem = (item: (typeof navItems)[number]) => (
     <button
       onClick={() => {
-        if (item.externalUrl) {
+        if (item.action) {
+          item.action();
+        } else if (item.externalUrl) {
           const token = getToken();
           const url = item.externalUrl.replace("xxxxxxx", token || "");
           window.open(url, "_blank");
@@ -970,13 +1056,33 @@ const Sidebar: React.FC<SidebarProps> = ({
 
       {/* Navigation */}
       <nav className="flex-1 py-3 overflow-y-auto text-sm">
-        <ul className="space-y-0.5 px-2.5">
-          {mainNavItems
-            .filter(isVisible)
-            .map((item, index) => (
-              <li key={item.path || item.label || `nav-${index}`}>{item.children ? renderGroup(item) : renderNavItem(item)}</li>
-            ))}
-        </ul>
+        {RENDERED_SECTIONS.map(({ key, title }, sectionIndex) => {
+          const items = mainNavItems.filter(
+            (item) => (key === "more" ? !KNOWN_SECTIONS.has(item.section) : item.section === key) && isVisible(item),
+          );
+          if (items.length === 0) return null;
+          const headingId = `nav-section-${key}`;
+          return (
+            <div key={key} className={sectionIndex > 0 ? "mt-3" : undefined}>
+              {title &&
+                (isCollapsed ? (
+                  <div className="mx-4 mb-2 border-t border-border-light dark:border-gray-700/30" role="separator" aria-label={title} />
+                ) : (
+                  <h2
+                    id={headingId}
+                    className="px-5 mb-1 text-[11px] font-semibold uppercase tracking-wider text-text-secondary-light/80 dark:text-slate-400"
+                  >
+                    {title}
+                  </h2>
+                ))}
+              <ul className="space-y-0.5 px-2.5" aria-labelledby={title && !isCollapsed ? headingId : undefined}>
+                {items.map((item, index) => (
+                  <li key={item.path || item.label || `nav-${index}`}>{item.children ? renderGroup(item) : renderNavItem(item)}</li>
+                ))}
+              </ul>
+            </div>
+          );
+        })}
       </nav>
 
       {/* Bottom section */}

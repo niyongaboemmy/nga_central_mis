@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { MemoryRouter } from "react-router-dom";
 
 const updateProfileMock = vi.fn();
 vi.mock("../../api/users", () => ({
@@ -69,10 +70,12 @@ beforeEach(() => {
 
 describe("Profile page", () => {
   it("shows the profile picture, identity and account details", () => {
-    render(<Profile />);
+    render(<Profile />, { wrapper: MemoryRouter });
     expect(screen.getByRole("heading", { name: "Jane Doe" })).toBeInTheDocument();
     const picture = screen.getByRole("img", { name: "Jane Doe" }) as HTMLImageElement;
-    expect(picture.getAttribute("src")).toBe(AVATAR.md);
+    // The labelled picture is the one in the Profile photo row (64 px: the small rendition);
+    // the header copy beside the name is decorative.
+    expect(picture.getAttribute("src")).toBe(AVATAR.sm);
     expect(screen.getByRole("button", { name: /change profile picture/i })).toBeInTheDocument();
     expect(screen.getByText("NGA-2025-0042")).toBeInTheDocument();
     expect(screen.getByText(/@jdoe/)).toBeInTheDocument();
@@ -81,26 +84,26 @@ describe("Profile page", () => {
 
   it("shows the cover, or plain system blue without one", () => {
     const COVER = { version: 1, md: "https://api.example/covers/7/1/md.webp?s=x", lg: "https://api.example/covers/7/1/lg.webp?s=x" };
-    const { unmount } = render(<Profile />);
+    const { unmount } = render(<Profile />, { wrapper: MemoryRouter });
     expect(screen.getByTestId("profile-cover").className).toContain("bg-blue-600");
     expect(screen.getByRole("button", { name: /add cover/i })).toBeInTheDocument();
     unmount();
     mockUser = { ...mockUser, cover: COVER };
-    render(<Profile />);
+    render(<Profile />, { wrapper: MemoryRouter });
     expect(screen.getByTestId("profile-cover").querySelector("img")?.getAttribute("src")).toBe(COVER.lg);
     expect(screen.getByRole("button", { name: /change cover/i })).toBeInTheDocument();
   });
 
   it("offers to add a picture when there is none", () => {
     mockUser = { ...mockUser, avatar: null, user: { ...mockUser.user, avatar_url: null } };
-    render(<Profile />);
+    render(<Profile />, { wrapper: MemoryRouter });
     expect(screen.getByRole("button", { name: /add a profile picture/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /upload photo/i })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /^remove$/i })).not.toBeInTheDocument();
   });
 
   it("fills the form from the profile, with the date in input format", () => {
-    render(<Profile />);
+    render(<Profile />, { wrapper: MemoryRouter });
     expect(screen.getByLabelText("First name")).toHaveValue("Jane");
     expect(screen.getByLabelText("Date of birth")).toHaveValue("2009-04-12");
     expect(screen.getByLabelText("Address")).toHaveValue("Kicukiro");
@@ -108,7 +111,7 @@ describe("Profile page", () => {
   });
 
   it("saves only the fields that changed, then refreshes the session", async () => {
-    render(<Profile />);
+    render(<Profile />, { wrapper: MemoryRouter });
     const address = screen.getByLabelText("Address");
     await userEvent.clear(address);
     await userEvent.type(address, "Remera, Gasabo");
@@ -121,7 +124,7 @@ describe("Profile page", () => {
   });
 
   it("discards edits", async () => {
-    render(<Profile />);
+    render(<Profile />, { wrapper: MemoryRouter });
     const first = screen.getByLabelText("First name");
     await userEvent.type(first, "x");
     await userEvent.click(screen.getByRole("button", { name: /discard/i }));
@@ -130,7 +133,7 @@ describe("Profile page", () => {
   });
 
   it("will not save an empty name", async () => {
-    render(<Profile />);
+    render(<Profile />, { wrapper: MemoryRouter });
     await userEvent.clear(screen.getByLabelText("Last name"));
     await userEvent.click(screen.getByRole("button", { name: /save changes/i }));
     expect(updateProfileMock).not.toHaveBeenCalled();
@@ -138,7 +141,7 @@ describe("Profile page", () => {
   });
 
   it("opens the change-password dialog", async () => {
-    render(<Profile />);
+    render(<Profile />, { wrapper: MemoryRouter });
     await userEvent.click(screen.getByRole("button", { name: /change password/i }));
     expect(screen.getByRole("dialog")).toHaveTextContent("Change password form");
   });

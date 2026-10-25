@@ -16,7 +16,7 @@ interface SearchItem {
 
 const SEARCH_ITEMS: SearchItem[] = [
   { label: "Home", path: "/home" },
-  { label: "Dashboard", path: "/dashboard" },
+  { label: "Schedule", path: "/dashboard" },
   {
     label: "Teacher Dashboard",
     path: "/teacher-dashboard",
@@ -46,7 +46,11 @@ const SEARCH_ITEMS: SearchItem[] = [
   {
     label: "Academic Calendar",
     path: "/calendar",
-    requiredPermission: Permissions.VIEW_ACADEMIC_CALENDAR,
+    requiredPermission: [
+      Permissions.MANAGE_ACADEMIC_CALENDAR,
+      Permissions.CREATE_ACADEMIC_CALENDAR,
+      Permissions.UPDATE_CALENDAR_SLOT,
+    ],
   },
   {
     label: "Office Hours",

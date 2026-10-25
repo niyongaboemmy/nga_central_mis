@@ -16,13 +16,15 @@ interface Props {
   size?: number;
   /** Show the "Change / Remove" text buttons beside the avatar. */
   showActions?: boolean;
+  /** "stacked": buttons under the avatar. "inline": beside it, for a settings row. */
+  layout?: "stacked" | "inline";
 }
 
 /**
  * A large avatar you can click (or drop a photo on) to change, with an optional
  * Change / Remove pair. Uploading goes through ProfilePictureEditor's crop step.
  */
-const AvatarControl: React.FC<Props> = ({ name, avatar, onChange, userId, size = 112, showActions = true }) => {
+const AvatarControl: React.FC<Props> = ({ name, avatar, onChange, userId, size = 112, showActions = true, layout = "stacked" }) => {
   const input = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
   const [dragging, setDragging] = useState(false);
@@ -52,7 +54,7 @@ const AvatarControl: React.FC<Props> = ({ name, avatar, onChange, userId, size =
   };
 
   return (
-    <div className="flex flex-col items-center gap-3">
+    <div className={layout === "inline" ? "flex items-center gap-4" : "flex flex-col items-center gap-3"}>
       <button
         type="button"
         onClick={() => input.current?.click()}
@@ -77,9 +79,12 @@ const AvatarControl: React.FC<Props> = ({ name, avatar, onChange, userId, size =
           <Camera className="w-5 h-5" />
           {avatar ? "Change" : "Add photo"}
         </span>
-        <span className="absolute bottom-1 right-1 w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center shadow-lg ring-2 ring-white dark:ring-gray-900">
-          <Camera className="w-4 h-4" />
-        </span>
+        {/* Too small a picture for a badge to sit on without hiding the face. */}
+        {size >= 96 && (
+          <span className="absolute bottom-1 right-1 w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center shadow-lg ring-2 ring-white dark:ring-gray-900">
+            <Camera className="w-4 h-4" />
+          </span>
+        )}
       </button>
 
       <input
