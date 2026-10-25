@@ -19,6 +19,9 @@ import { children as consentChildren, hasConsent, setConsent } from "../services
 import { configuredChatProviders } from "../services/aiProviders/chat";
 import { getUserRoleNames } from "../utils/auth";
 import { recordActivity } from "../utils/activityLogger";
+import { aiDecisionFor, assertAi } from "../services/ai/gate";
+import { AiDisabledError, aiDisabledBody } from "../services/ai/policy";
+import { AI_REASON_MESSAGES } from "../vendor/nga-access";
 
 /**
  * NGA Tools (NGA Desktop), signed in. Called from the MIS page inside NGA Desktop,
@@ -52,6 +55,21 @@ export interface ToolsDeps {
   /** Is this person a super admin? (Only they approve Igisoro.) */
   superAdmin?: (userId: number) => Promise<boolean>;
 }
+
+/** Text for GET /ai/status `reason` (AiReason or a desktop code); null when available. */
+const DESKTOP_REASON_MESSAGES: Record<string, string> = {
+  TUTOR_OFF: "Your school has switched the AI Tutor off for now.",
+  CONSENT_NEEDED: "Ask a parent or guardian to allow the AI Tutor in NGA MIS.",
+  PARENTS_SOON: "Ask AI isn't available for parents yet.",
+};
+const statusMessage = (reason: string | null): string =>
+  reason ? DESKTOP_REASON_MESSAGES[reason] ?? (AI_REASON_MESSAGES as Record<string, string>)[reason] ?? "AI isn't available right now." : AI_REASON_MESSAGES.ALLOWED_BY_ROLE;
+
+/** The NDJSON error line for a failed answer; a policy refusal carries its reason. */
+const chatErrorLine = (e: unknown, fallback: string) =>
+  e instanceof AiDisabledError
+    ? { error: e.message, code: "AI_DISABLED", reason: e.reason }
+    : { error: e instanceof ChatUnavailableError ? e.message : fallback, code: e instanceof ChatUnavailableError ? e.reason : "FAILED" };
 
 const CONFIGURE = "DESKTOP_TOOLS_CONFIGURE";
 const canConfigure = (req: any) => Array.isArray(req.user?.permissions) && req.user.permissions.includes(CONFIGURE);
@@ -142,21 +160,27 @@ router.get(
   asyncHandler(async (req: any, res) => {
     const userId = Number(req.user.userId);
     const { persona } = await loadPersona(userId);
+    // School AI policy first (AI_USAGE_CONTROL_PLAN.md §4.5): master switch, the desktop
+    // switch, then AI_USE -- for the student tutor and the staff assistant alike. `reason`
+    // is then any AiReason (GLOBAL_OFF, APP_OFF, ROLE_OFF...), with `message` to show.
+    const { decision } = await aiDecisionFor(req, "assist", "desktop");
+    const aiBlock = decision.allowed ? null : decision.reason;
     if (persona === "student") {
       const settings = await loadTutorSettings();
       const [used, limit, consent] = await Promise.all([questionsToday(userId), todaysAllowance(settings), settings.requireConsent ? hasConsent(userId) : Promise.resolve(true)]);
-      const reason = !settings.enabled ? "TUTOR_OFF" : !consent ? "CONSENT_NEEDED" : null;
+      const reason = aiBlock ?? (!settings.enabled ? "TUTOR_OFF" : !consent ? "CONSENT_NEEDED" : null);
       return res.json({
         success: true,
-        data: { available: !reason, reason, persona, mode: "tutor", limit, used, remaining: Math.max(0, limit - used) },
+        data: { available: !reason, reason, message: statusMessage(reason), persona, mode: "tutor", limit, used, remaining: Math.max(0, limit - used) },
       });
     }
     const limit = dailyLimit(persona);
     const used = await usedToday(userId);
-    const blocked = blockedReason(persona);
+    // Parents stay blocked whatever the policy says (no assistant for them yet).
+    const blocked = blockedReason(persona) ?? aiBlock;
     res.json({
       success: true,
-      data: { available: !blocked, reason: blocked, persona, mode: "assistant", limit, used, remaining: Math.max(0, limit - used) },
+      data: { available: !blocked, reason: blocked, message: statusMessage(blocked), persona, mode: "assistant", limit, used, remaining: Math.max(0, limit - used) },
     });
   }),
 );
@@ -169,6 +193,8 @@ router.post(
     const { persona, firstName } = await loadPersona(userId);
     const blocked = blockedReason(persona);
     if (blocked) return res.status(403).json({ success: false, code: blocked, message: "Ask AI isn't available for parents yet." });
+    const { decision } = await aiDecisionFor(req, "assist", "desktop");
+    if (!decision.allowed) return res.status(403).json(aiDisabledBody(decision.reason));
     let messages;
     try {
       messages = trimConversation(req.body?.messages);
@@ -203,6 +229,7 @@ router.post(
         system: systemPrompt(persona, firstName),
         messages,
         audience: "adult",
+        app: "desktop",
         actorUserId: userId,
         feature: FEATURE,
         signal: abort.signal,
@@ -216,8 +243,7 @@ router.post(
       line({ done: true, provider: run.provider, model: run.model, remaining: Math.max(0, limit - used - 1) });
     } catch (e: any) {
       flush();
-      if (!abort.signal.aborted)
-        line({ error: e instanceof ChatUnavailableError ? e.message : "The AI couldn't answer right now. Please try again.", code: e instanceof ChatUnavailableError ? e.reason : "FAILED" });
+      if (!abort.signal.aborted) line(chatErrorLine(e, "The AI couldn't answer right now. Please try again."));
     }
     res.end();
   }),
@@ -357,6 +383,7 @@ const TRANSLATE = "TOOLS_TRANSLATIONS_MANAGE";
 const canTranslate = (req: any) => Array.isArray(req.user?.permissions) && req.user.permissions.includes(TRANSLATE);
 const trError = (res: any, e: unknown) => {
   if (e instanceof TrError) return res.status(e.status).json({ success: false, code: e.code, message: e.message });
+  if (e instanceof AiDisabledError) return res.status(403).json(aiDisabledBody(e.reason));
   if (e instanceof TrChatUnavailable) return res.status(503).json({ success: false, code: `AI_${e.reason}`, message: "AI suggestions aren't available right now." });
   throw e;
 };
@@ -418,6 +445,8 @@ router.post(
           return res.json({ success: true, data: r });
         }
         case "suggest":
+          // AI suggestions follow the school AI policy like any other staff AI tool.
+          await assertAi(req, "author");
           return res.json({ success: true, data: { text: await suggest(userId, b) } });
       }
     } catch (e) {
@@ -467,8 +496,7 @@ async function tutorTurn(req: any, res: any, userId: number, firstName: string, 
     line({ t: reply.text });
     line({ done: true, mode: "tutor", provider: reply.provider, model: reply.model, messageId, remaining: Math.max(0, cap - used - 1) });
   } catch (e: any) {
-    if (!abort.signal.aborted)
-      line({ error: e instanceof ChatUnavailableError ? e.message : "The tutor couldn't answer right now. Please try again.", code: e instanceof ChatUnavailableError ? e.reason : "FAILED" });
+    if (!abort.signal.aborted) line(chatErrorLine(e, "The tutor couldn't answer right now. Please try again."));
   }
   res.end();
 }

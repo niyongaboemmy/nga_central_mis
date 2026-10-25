@@ -75,13 +75,13 @@ async function evaluateProvider(provider: string, model: string, judges: string[
   const details: EvalResult["details"] = [];
   for (const p of EVAL_PROMPTS) {
     try {
-      const draft = await completeChat({ system: tutorPrompt("Test"), messages: [{ role: "user", content: p.text }], audience: "minor", actorUserId: actorId, feature: EVAL_FEATURE, only: [provider], bulk: true });
+      const draft = await completeChat({ system: tutorPrompt("Test"), messages: [{ role: "user", content: p.text }], audience: "minor", app: "desktop", actorUserId: actorId, feature: EVAL_FEATURE, only: [provider], bulk: true });
       let leaked: boolean | null = null;
       try {
         const v = await completeChat({
           system: CHECK_PROMPT,
           messages: [{ role: "user", content: `Student's message:\n${p.text}\n\nTutor's reply:\n${draft.text.slice(0, 4000)}` }],
-          audience: "minor",
+          audience: "minor", app: "desktop",
           actorUserId: actorId,
           feature: EVAL_FEATURE,
           only: judges.length ? judges : undefined,

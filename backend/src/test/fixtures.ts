@@ -116,6 +116,14 @@ export async function assignRole(userId: number, roleId: number) {
   await db.insert(UserRole).values({ user_id: userId, role_id: roleId });
 }
 
+/**
+ * Give a user the AI_USE capability (AI_USAGE_CONTROL_PLAN.md §3) through a role of its
+ * own. Pair with setAiPolicyForTests(AI_POLICY_ALL_ON) for tests that reach AI routes.
+ */
+export async function grantAiUse(userId: number) {
+  await assignRole(userId, await createRoleWithPermissions("AI_USE_TEST", ["AI_USE"]));
+}
+
 export function signToken(userId: number): string {
   return jwt.sign({ userId }, process.env.JWT_SECRET!, { expiresIn: "1h" });
 }

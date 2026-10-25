@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, afterAll } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, afterAll, beforeAll } from "vitest";
 import request from "supertest";
 import { db } from "../db";
 import { AIUsageLog } from "../db/schema";
@@ -9,6 +9,12 @@ import { createUser, signToken } from "../test/fixtures";
 import { setTestProviders } from "../services/aiProviders/registry";
 import { chatOrder, scrub, setChatClientFactory, streamChat, trimConversation, LIMITS } from "../services/aiProviders/chat";
 import { blockedReason, burst, persona, systemPrompt } from "../services/desktop/assistant";
+import { AI_POLICY_ALL_ON, setAiPolicyForTests } from "../services/ai/policy";
+
+// AI usage control (AI_USAGE_CONTROL_PLAN.md): the school policy is on for this file and its users
+// hold AI_USE (the stub sign-in below), so the AI features themselves are what is tested.
+beforeAll(() => setAiPolicyForTests(AI_POLICY_ALL_ON));
+afterAll(() => setAiPolicyForTests(null));
 
 const waitForLogs = () => new Promise((r) => setTimeout(r, 150));
 const quota = () => Object.assign(new Error("429 rate limit"), { status: 429 });
@@ -188,7 +194,7 @@ app.use(
     const h = String(req.headers.authorization || "");
     try {
       const d: any = jwt.verify(h.replace(/^Bearer /, ""), process.env.JWT_SECRET!);
-      req.user = { userId: Number(d.userId) };
+      req.user = { userId: Number(d.userId), permissions: ["AI_USE"] };
       next();
     } catch {
       res.status(401).json({ message: "Invalid token" });

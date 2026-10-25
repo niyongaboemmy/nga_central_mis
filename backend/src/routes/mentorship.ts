@@ -27,6 +27,7 @@ import {
   getMenteeCheckIns,
 } from "../controllers/mentorshipController";
 import { generateMenteeAIInsights } from "../controllers/mentorshipAIController";
+import { requireAi } from "../services/ai/gate";
 import {
   listAssignments,
   createAssignment,
@@ -117,6 +118,7 @@ router.get("/students/:studentId/intelligence", mentorOr(Permissions.TEACHER_DAS
 router.post(
   "/students/:studentId/ai-insights",
   mentorOr(Permissions.TEACHER_DASHBOARD),
+  requireAi("author"),
   generateMenteeAIInsights,
 );
 router.get("/follow-ups", mentorOr(Permissions.TEACHER_DASHBOARD), getPendingFollowUps);

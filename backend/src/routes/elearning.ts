@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { requireAi } from "../services/ai/gate";
 import { authenticate, authorize } from "../middleware/auth";
 import { Permissions } from "../utils/permissions";
 import {
@@ -148,8 +149,10 @@ router.post(
   checkKnowledgeAnswer,
 );
 router.post("/my/items/:id/knowledge-check", learner, submitKnowledgeCheck);
-router.post("/my/courses/:id/ask", learner, askCourseTutor);
-router.get("/my/courses/:id/ask/suggestions", learner, suggestedTutorQuestions);
+// Course tutor: school AI policy + AI_USE, and for students the AI Tutor switch too.
+const tutorAi = requireAi("assist", { tutor: true });
+router.post("/my/courses/:id/ask", learner, tutorAi, askCourseTutor);
+router.get("/my/courses/:id/ask/suggestions", learner, tutorAi, suggestedTutorQuestions);
 router.get("/my/mastery", learner, myMastery);
 router.get("/my/streak", learner, myStreak);
 router.get("/my/prefs", learner, getMyLearningPrefs);
@@ -209,9 +212,10 @@ router.post(
 router.patch("/items/:id", builder, updateItem);
 router.delete("/items/:id", builder, deleteItem);
 router.put("/items/:id/criteria", builder, setItemCriteriaHandler);
-router.post("/items/:id/suggest-criteria", builder, suggestItemCriteria);
-router.post("/items/:id/generate-check", builder, generateKnowledgeCheck);
-router.post("/items/:id/generate-page", builder, generatePageDraft);
+const authorAi = requireAi("author");
+router.post("/items/:id/suggest-criteria", builder, authorAi, suggestItemCriteria);
+router.post("/items/:id/generate-check", builder, authorAi, generateKnowledgeCheck);
+router.post("/items/:id/generate-page", builder, authorAi, generatePageDraft);
 router.get("/items/:id/context", builder, getItemContext);
 router.get("/items/:id/knowledge-check/stats", builder, knowledgeCheckStats);
 
@@ -233,14 +237,16 @@ router.delete("/blueprints/:id", builder, deleteBlueprint);
 router.get("/courses/:id/studio", builder, getStudio);
 router.get("/sections/:id/context-pack", builder, getContextPack);
 router.post("/courses/:id/generation/estimate", builder, estimateGeneration);
-router.post("/courses/:id/generation/runs", builder, startGeneration);
+router.post("/courses/:id/generation/runs", builder, authorAi, startGeneration);
 router.get("/courses/:id/generation/runs", builder, listRuns);
 router.get("/generation/runs/:id", builder, getRun);
 router.get("/generation/runs/:id/stream", builder, streamRun);
-router.post("/generation/runs/:id/:action(pause|resume|cancel|retry-failed)", builder, controlRun);
+// Pausing or cancelling never needs AI; resuming and retrying do.
+router.post("/generation/runs/:id/:action(pause|cancel)", builder, controlRun);
+router.post("/generation/runs/:id/:action(resume|retry-failed)", builder, authorAi, controlRun);
 router.post("/sections/:id/drafts/approve", builder, approveDrafts);
 router.post("/items/:id/dismiss-draft", builder, dismissDraftHandler);
-router.post("/items/:id/regenerate", builder, regenerateDraft);
+router.post("/items/:id/regenerate", builder, authorAi, regenerateDraft);
 
 // ---- Files on weeks + previews (plan §10.7) ---------------------------------------
 router.post("/sections/:id/files", builder, courseFileUpload.array("files", 20), uploadSectionFiles);
