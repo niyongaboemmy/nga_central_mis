@@ -12,6 +12,8 @@ import {
   suppressSmallCohorts,
   validateManifest,
   Manifest,
+  decideAi,
+  normalizeAiPolicy,
 } from "../vendor/nga-access";
 
 /**
@@ -138,4 +140,24 @@ describe("@nga/access helpers", () => {
     const errors = validateManifest(bad);
     expect(errors.length).toBeGreaterThanOrEqual(8);
   });
+});
+
+describe("@nga/access AI usage decisions", () => {
+  for (const c of table.ai.cases) {
+    it(c.name, () => {
+      const policy = c.policy ? normalizeAiPolicy(c.policy) : null;
+      expect(decideAi(policy, c.ctx)).toEqual({ allowed: c.allowed, reason: c.reason });
+    });
+  }
+  for (const c of table.ai.normalize) {
+    it(`normalizeAiPolicy: ${c.name}`, () => {
+      const p = normalizeAiPolicy(c.input);
+      expect({
+        enabled: p.enabled,
+        assessments: p.assessments,
+        grading: p.features.grading,
+        thirdPartyExtensions: p.thirdPartyExtensions,
+      }).toEqual(c.expect);
+    });
+  }
 });
