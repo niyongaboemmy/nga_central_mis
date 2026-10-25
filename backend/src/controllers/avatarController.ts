@@ -125,12 +125,23 @@ export const lookupProfileMedia = asyncHandler(async (req: any, res: Response) =
   if (ids.length > LOOKUP_MAX) throw new ValidationError(`At most ${LOOKUP_MAX} user ids per request`);
   const rows = ids.length
     ? await db
-        .select({ user_id: User.user_id, avatar_version: User.avatar_version, cover_version: User.cover_version })
+        .select({
+          user_id: User.user_id,
+          status: User.status,
+          avatar_version: User.avatar_version,
+          cover_version: User.cover_version,
+        })
         .from(User)
         .where(inArray(User.user_id, ids))
     : [];
+  // `status` lets spokes sweep deactivations with the same call (contract);
+  // a requested id missing from `users` no longer exists in MIS (REMOVED).
   successResponse(res, "Profile media retrieved", {
-    users: rows.map((r) => ({ user_id: r.user_id, ...profileMedia(r) })),
+    users: rows.map(({ status, ...r }) => ({
+      user_id: r.user_id,
+      status: status ?? "ACTIVE",
+      ...profileMedia(r),
+    })),
   });
 });
 

@@ -1,6 +1,7 @@
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { db } from "../../db";
-import { StudentSubjectEnrollment } from "../../db/schema";
+import { StudentSubjectEnrollment, User } from "../../db/schema";
+import { activeUserJoin, activeEnrollment } from "../activeUsers";
 import { ReminderJob, ReminderSource } from "../../db/reminderSchema";
 import { ValidationError } from "../../errors/CustomError";
 import logger from "../../utils/logger";
@@ -95,11 +96,12 @@ export const enrolledStudentIds = async (subjectId: number): Promise<number[]> =
   const rows = await db
     .select({ user_id: StudentSubjectEnrollment.user_id })
     .from(StudentSubjectEnrollment)
+    // Active students only (contract): no reminders to disabled accounts.
+    .innerJoin(User, activeUserJoin(StudentSubjectEnrollment.user_id))
     .where(
       and(
         eq(StudentSubjectEnrollment.subject_id, subjectId),
-        eq(StudentSubjectEnrollment.academic_year_id, term.yearId),
-        eq(StudentSubjectEnrollment.status, "ACTIVE"),
+        activeEnrollment(term.yearId),
       ),
     );
   return rows.map((r: any) => Number(r.user_id));

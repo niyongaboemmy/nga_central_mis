@@ -5,6 +5,7 @@ import { eq, and, sql } from "drizzle-orm";
 import { AppError } from "../middleware/errorHandler";
 import { recordActivity } from "../utils/activityLogger";
 import { applyPlacementChange } from "../services/access/ruleEngine";
+import { activeUser, wantsInactive } from "../services/activeUsers";
 
 export const getParents = async (req: Request, res: Response) => {
   const { studentId } = req.params;
@@ -21,11 +22,13 @@ export const getParents = async (req: Request, res: Response) => {
         relationship: Parenting.relationship,
         created_at: Parenting.created_at,
         user_type: UserProfile.user_type,
+        status: User.status,
       })
       .from(Parenting)
       .innerJoin(User, eq(Parenting.parent_id, User.user_id))
       .leftJoin(UserProfile, eq(User.user_id, UserProfile.user_id))
-      .where(eq(Parenting.student_id, parseInt(studentId)));
+      // Active users only (contract); include_inactive=1 for MANAGE_USERS.
+      .where(and(eq(Parenting.student_id, parseInt(studentId)), wantsInactive(req) ? undefined : activeUser));
 
     res.json({ success: true, data: parents });
   } catch (error) {
@@ -50,11 +53,13 @@ export const getStudents = async (req: Request, res: Response) => {
         created_at: Parenting.created_at,
         user_type: UserProfile.user_type,
         registration_number: UserProfile.registration_number,
+        status: User.status,
       })
       .from(Parenting)
       .innerJoin(User, eq(Parenting.student_id, User.user_id))
       .leftJoin(UserProfile, eq(User.user_id, UserProfile.user_id))
-      .where(eq(Parenting.parent_id, parseInt(parentId)));
+      // Active users only (contract); include_inactive=1 for MANAGE_USERS.
+      .where(and(eq(Parenting.parent_id, parseInt(parentId)), wantsInactive(req) ? undefined : activeUser));
 
     res.json({ success: true, data: students });
   } catch (error) {
@@ -185,6 +190,7 @@ export const searchPotentialRelations = async (req: Request, res: Response) => {
         email: User.email,
         user_type: UserProfile.user_type,
         registration_number: UserProfile.registration_number,
+        status: User.status,
       })
       .from(User)
       .leftJoin(UserProfile, eq(User.user_id, UserProfile.user_id))

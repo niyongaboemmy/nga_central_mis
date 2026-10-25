@@ -46,6 +46,12 @@ import { recordActivity } from "../utils/activityLogger";
 import { notifyUsers } from "../utils/notifications";
 import { sanitizeString } from "../utils/sanitization";
 import logger from "../utils/logger";
+import { getCurrentAcademicYearId } from "../utils/academicYear";
+import {
+  activeUserJoin,
+  activeStudentPlacement,
+  activeEnrollment,
+} from "../services/activeUsers";
 import storageService from "../utils/fileServer";
 import fs from "fs";
 import path from "path";
@@ -506,6 +512,15 @@ export const getUsersByRole = asyncHandler(async (req: any, res: any) => {
   const parsedLimit = Math.min(parseInt(limit as string), 100); // Cap at 100
   const parsedOffset = offset;
 
+  // Active users only (contract), and memberships of the current year only:
+  // a sharing picker must not offer disabled accounts or last year's cohort.
+  // `academic_year_id` picks another year (default: the current one).
+  const rawYear = req.query.academic_year_id;
+  const yearId =
+    rawYear !== undefined && rawYear !== "" && !isNaN(Number(rawYear))
+      ? Number(rawYear)
+      : await getCurrentAcademicYearId();
+
   // Build query based on filters
   let users: any[];
   let totalCount: number;
@@ -527,7 +542,7 @@ export const getUsersByRole = asyncHandler(async (req: any, res: any) => {
         last_name: UserProfile.last_name,
       })
       .from(UserRole)
-      .innerJoin(User, eq(UserRole.user_id, User.user_id))
+      .innerJoin(User, activeUserJoin(UserRole.user_id))
       .leftJoin(UserProfile, eq(User.user_id, UserProfile.user_id))
       .innerJoin(
         TeacherSubjectAssignment,
@@ -541,6 +556,9 @@ export const getUsersByRole = asyncHandler(async (req: any, res: any) => {
         and(
           eq(UserRole.role_id, parsedRoleId),
           eq(ClassGroup.grade_id, targetGradeId),
+          yearId
+            ? eq(TeacherSubjectAssignment.academic_year_id, yearId)
+            : undefined,
         ),
       );
 
@@ -556,13 +574,22 @@ export const getUsersByRole = asyncHandler(async (req: any, res: any) => {
         last_name: UserProfile.last_name,
       })
       .from(UserRole)
-      .innerJoin(User, eq(UserRole.user_id, User.user_id))
+      .innerJoin(User, activeUserJoin(UserRole.user_id))
       .leftJoin(UserProfile, eq(User.user_id, UserProfile.user_id))
       .innerJoin(
         StudentSubjectEnrollment,
-        eq(User.user_id, StudentSubjectEnrollment.user_id),
+        and(
+          eq(User.user_id, StudentSubjectEnrollment.user_id),
+          activeEnrollment(yearId),
+        ),
       )
-      .innerJoin(StudentClassGroup, eq(User.user_id, StudentClassGroup.user_id))
+      .innerJoin(
+        StudentClassGroup,
+        and(
+          eq(User.user_id, StudentClassGroup.user_id),
+          activeStudentPlacement(yearId),
+        ),
+      )
       .innerJoin(
         ClassGroup,
         eq(StudentClassGroup.class_group_id, ClassGroup.class_group_id),
@@ -599,7 +626,7 @@ export const getUsersByRole = asyncHandler(async (req: any, res: any) => {
         last_name: UserProfile.last_name,
       })
       .from(UserRole)
-      .innerJoin(User, eq(UserRole.user_id, User.user_id))
+      .innerJoin(User, activeUserJoin(UserRole.user_id))
       .leftJoin(UserProfile, eq(User.user_id, UserProfile.user_id))
       .innerJoin(
         TeacherSubjectAssignment,
@@ -609,6 +636,9 @@ export const getUsersByRole = asyncHandler(async (req: any, res: any) => {
         and(
           eq(UserRole.role_id, parsedRoleId),
           eq(TeacherSubjectAssignment.class_group_id, targetClassGroupId),
+          yearId
+            ? eq(TeacherSubjectAssignment.academic_year_id, yearId)
+            : undefined,
         ),
       );
 
@@ -623,13 +653,14 @@ export const getUsersByRole = asyncHandler(async (req: any, res: any) => {
         last_name: UserProfile.last_name,
       })
       .from(UserRole)
-      .innerJoin(User, eq(UserRole.user_id, User.user_id))
+      .innerJoin(User, activeUserJoin(UserRole.user_id))
       .leftJoin(UserProfile, eq(User.user_id, UserProfile.user_id))
       .innerJoin(StudentClassGroup, eq(User.user_id, StudentClassGroup.user_id))
       .where(
         and(
           eq(UserRole.role_id, parsedRoleId),
           eq(StudentClassGroup.class_group_id, targetClassGroupId),
+          activeStudentPlacement(yearId),
         ),
       );
 
@@ -655,7 +686,7 @@ export const getUsersByRole = asyncHandler(async (req: any, res: any) => {
         last_name: UserProfile.last_name,
       })
       .from(UserRole)
-      .innerJoin(User, eq(UserRole.user_id, User.user_id))
+      .innerJoin(User, activeUserJoin(UserRole.user_id))
       .leftJoin(UserProfile, eq(User.user_id, UserProfile.user_id))
       .where(eq(UserRole.role_id, parsedRoleId));
 

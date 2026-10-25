@@ -19,9 +19,9 @@ import { Permissions } from "../utils/permissions";
 // `academic_year_id = currentYear` filter therefore emptied every class list
 // while teacher assignments (already rolled forward) still matched.
 //
-// Rosters now carry forward -- the most recent placement at or before the
-// selected year wins -- so a student who has genuinely moved class group still
-// appears in exactly one place.
+// Rosters used to carry forward -- the most recent placement at or before the
+// selected year won. ACTIVE_USERS_CONTRACTS.md replaced that for the roster:
+// only a placement IN the selected year counts. Profiles still carry forward.
 describe("Scoped rosters carry forward across academic years", () => {
   let priorYearId: number;
   let currentYearId: number;
@@ -89,11 +89,14 @@ describe("Scoped rosters carry forward across academic years", () => {
       )
       .set("Authorization", `Bearer ${classTeacherToken}`);
 
-  it("still lists a student whose placement was never re-stamped this year", async () => {
+  it("no longer lists a student whose placement was never re-stamped this year", async () => {
+    // ACTIVE_USERS_CONTRACTS.md: the scoped roster lists students with an
+    // ACTIVE placement IN the selected year (eq, not <=). Re-stamp the roster
+    // when a year opens; the profile below still resolves the old placement.
     const res = await users();
     expect(res.status).toBe(200);
     const ids = res.body.data.users.map((u: any) => u.user_id);
-    expect(ids).toContain(stayingStudentId);
+    expect(ids).not.toContain(stayingStudentId);
   });
 
   it("shows a student who moved only in their new class group", async () => {
@@ -111,7 +114,7 @@ describe("Scoped rosters carry forward across academic years", () => {
   it("lists each carried-forward student exactly once", async () => {
     const res = await users();
     const ids = res.body.data.users.map((u: any) => u.user_id);
-    expect(ids.filter((id: number) => id === stayingStudentId)).toHaveLength(1);
+    expect(ids.filter((id: number) => id === stayingStudentId)).toHaveLength(0);
     expect(ids.filter((id: number) => id === movedStudentId)).toHaveLength(1);
   });
 

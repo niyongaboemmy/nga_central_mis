@@ -21,6 +21,7 @@ import { ValidationError, NotFoundError, AuthorizationError } from "../errors/Cu
 import { Permissions } from "../utils/permissions";
 import { profileMedia } from "../services/avatar/urls";
 import { mentorshipRelationshipsFor } from "../services/mentorship/relationships";
+import { activeUser } from "../services/activeUsers";
 import {
   notifyCheckInSubmitted,
   notifyCheckInAnswered,
@@ -179,14 +180,20 @@ async function loadRoster(
       first_name: UserProfile.first_name,
       last_name: UserProfile.last_name,
       registration_number: UserProfile.registration_number,
+      user_status: User.status,
     })
     .from(MentorAssignment)
     .innerJoin(AcademicYear, eq(AcademicYear.academic_year_id, MentorAssignment.academic_year_id))
+    .innerJoin(User, eq(User.user_id, MentorAssignment.student_id))
     .leftJoin(UserProfile, eq(MentorAssignment.student_id, UserProfile.user_id))
     .where(
       and(
         eq(MentorAssignment.mentor_id, mentorId),
         eq(MentorAssignment.status, "ACTIVE"),
+        // The roster lists active students only (contract). Opening one
+        // mentee's record by id (studentIds) still works for a disabled
+        // student -- that is history -- and the row says `inactive: true`.
+        scope.studentIds ? sql`1=1` : activeUser,
         scope.yearId ? eq(MentorAssignment.academic_year_id, scope.yearId) : sql`1=1`,
         scope.live ? liveYear : sql`1=1`,
         scope.studentIds ? inArray(MentorAssignment.student_id, scope.studentIds.length ? scope.studentIds : [0]) : sql`1=1`,
@@ -268,6 +275,7 @@ async function loadRoster(
       first_name: s.first_name,
       last_name: s.last_name,
       registration_number: s.registration_number,
+      inactive: s.user_status !== "ACTIVE",
       class_group_id: cls?.class_group_id ?? null,
       class_group_name: cls?.class_group_name ?? null,
       academic_year_id: s.academic_year_id,
@@ -1132,7 +1140,8 @@ export const getMyMentor = asyncHandler(async (req: any, res: any) => {
         academic_year_name: AcademicYear.name,
       })
       .from(MentorAssignment)
-      .innerJoin(User, eq(MentorAssignment.mentor_id, User.user_id))
+      // A disabled mentor is no longer anyone's mentor (contract).
+      .innerJoin(User, and(eq(MentorAssignment.mentor_id, User.user_id), activeUser))
       .leftJoin(UserProfile, eq(MentorAssignment.mentor_id, UserProfile.user_id))
       .innerJoin(AcademicYear, eq(AcademicYear.academic_year_id, MentorAssignment.academic_year_id))
       .where(and(eq(MentorAssignment.student_id, studentId), eq(MentorAssignment.status, "ACTIVE"), yearCondition))

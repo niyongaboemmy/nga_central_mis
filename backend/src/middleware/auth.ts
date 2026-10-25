@@ -19,6 +19,25 @@ export const getUserTokenVersion = async (userId: number): Promise<number | null
   return row.length > 0 ? row[0].token_version : null;
 };
 
+/** Token version + account status in one indexed lookup (authenticate). */
+export const getUserSessionState = async (
+  userId: number,
+): Promise<{ token_version: number; status: string | null } | null> => {
+  const row = await db
+    .select({ token_version: User.token_version, status: User.status })
+    .from(User)
+    .where(eq(User.user_id, userId))
+    .limit(1);
+  return row.length > 0 ? row[0] : null;
+};
+
+/** Body every endpoint answers when the account behind a valid token is no
+ *  longer ACTIVE (INACTIVE / SUSPENDED). Spokes key their sign-out on `code`. */
+export const ACCOUNT_INACTIVE_BODY = {
+  code: "ACCOUNT_INACTIVE",
+  message: "This account is no longer active.",
+};
+
 export const authenticate = async (req: any, res: any, next: any) => {
   let token = req.header("Authorization")?.replace("Bearer ", "");
 
@@ -53,14 +72,16 @@ export const authenticate = async (req: any, res: any, next: any) => {
     // before this check existed carry no tokenVersion claim at all --
     // treated as 0, matching the column's default, so already-issued
     // sessions keep working until their next logout.
-    const currentTokenVersion = await getUserTokenVersion(req.user.userId);
-    if (
-      currentTokenVersion === null ||
-      (decoded.tokenVersion ?? 0) !== currentTokenVersion
-    ) {
+    const state = await getUserSessionState(req.user.userId);
+    if (state === null || (decoded.tokenVersion ?? 0) !== state.token_version) {
       return res
         .status(401)
         .json({ message: "Session expired, please log in again." });
+    }
+    // A disabled / suspended account loses every session at once, even one
+    // whose token predates the change (contract: active users only).
+    if (state.status !== "ACTIVE") {
+      return res.status(401).json(ACCOUNT_INACTIVE_BODY);
     }
 
     // Same resolver as GET /users/me and the SSO token (utils/auth.ts).

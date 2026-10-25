@@ -1,6 +1,7 @@
 import { and, eq, gte, inArray, isNull, lte } from "drizzle-orm";
 import { db } from "../../db";
-import { StudentClassGroup } from "../../db/schema";
+import { StudentClassGroup, User } from "../../db/schema";
+import { activeUserJoin } from "../activeUsers";
 import {
   OfficeHourAssignment,
   OfficeHourEscalation,
@@ -166,6 +167,7 @@ export async function officeHoursProvider(ctx: ProviderContext): Promise<Provide
       const students = await db
         .select({ id: StudentClassGroup.user_id })
         .from(StudentClassGroup)
+        .innerJoin(User, activeUserJoin(StudentClassGroup.user_id))
         .where(and(eq(StudentClassGroup.class_group_id, lens.scopeId!), eq(StudentClassGroup.academic_year_id, yearId), eq(StudentClassGroup.status, "ACTIVE")));
       const marks = await loadMarks({ studentIds: students.map((s) => s.id), fromYmd: termStart, toYmd: termEnd });
       const byStudent = new Map<number, typeof marks>();

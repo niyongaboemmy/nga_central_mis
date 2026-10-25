@@ -42,6 +42,14 @@ import { useToast } from "../contexts/ToastContext";
 const SEARCH_DEBOUNCE_MS = 350;
 const PAGE_SIZE = 20;
 
+/** Status filter tabs; values are sent as-is as GET /users?status=. */
+const STATUS_TABS: Array<{ value: string; label: string }> = [
+  { value: "all", label: "All" },
+  { value: "ACTIVE", label: "Active" },
+  { value: "INACTIVE", label: "Disabled" },
+  { value: "SUSPENDED", label: "Suspended" },
+];
+
 interface Stats {
   total: number;
   admins: number;
@@ -303,7 +311,10 @@ const UsersManagement: React.FC<UsersManagementProps> = ({
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [excelModalOpen, setExcelModalOpen] = useState(false);
   const [selectedRole, setSelectedRole] = useState<string>("all");
-  const [selectedStatus, setSelectedStatus] = useState<string>("ACTIVE");
+  // Admin user management keeps disabled accounts reachable (so they can be
+  // re-enabled): the list asks for every status by default. GET /users itself
+  // now defaults to ACTIVE, so "all" is sent explicitly.
+  const [selectedStatus, setSelectedStatus] = useState<string>("all");
   const [expandedUsers, setExpandedUsers] = useState<number[]>([]);
   const [stats, setStats] = useState<Stats>(EMPTY_STATS);
   const [roleTotals, setRoleTotals] = useState<Record<string, number>>({});
@@ -405,7 +416,7 @@ const UsersManagement: React.FC<UsersManagementProps> = ({
             PAGE_SIZE,
             selectedRole === "all" ? undefined : selectedRole,
             debouncedSearch || undefined,
-            selectedStatus === "all" ? undefined : selectedStatus,
+            selectedStatus,
           );
           if (seq !== requestSeqRef.current) return;
           if (result) {
@@ -554,7 +565,7 @@ const UsersManagement: React.FC<UsersManagementProps> = ({
         total,
         selectedRole === "all" ? undefined : selectedRole,
         debouncedSearch || undefined,
-        selectedStatus === "all" ? undefined : selectedStatus,
+        selectedStatus,
       );
       const rows = (result?.users ?? []).map((u, i) => ({
         "#": i + 1,
@@ -842,32 +853,21 @@ const UsersManagement: React.FC<UsersManagementProps> = ({
           aria-label="Filter by status"
           className="flex gap-0 overflow-x-auto pb-0 pt-2 border-b border-gray-200 dark:border-slate-700"
         >
-          <button
-            key="active"
-            role="tab"
-            aria-selected={selectedStatus === "ACTIVE"}
-            onClick={() => selectStatus("ACTIVE")}
-            className={`px-4 py-2 ${loading ? "cursor-not-allowed" : ""} text-sm font-medium transition-all whitespace-nowrap ${
-              selectedStatus === "ACTIVE"
-                ? "text-blue-500 border-b-2 border-blue-500 bg-blue-50 dark:bg-blue-900/20"
-                : "text-gray-600 dark:text-gray-300 border-b-2 border-transparent hover:text-blue-500"
-            }`}
-          >
-            Active
-          </button>
-          <button
-            key="disabled"
-            role="tab"
-            aria-selected={selectedStatus === "INACTIVE"}
-            onClick={() => selectStatus("INACTIVE")}
-            className={`px-4 py-2 ${loading ? "cursor-not-allowed" : ""} text-sm font-medium transition-all whitespace-nowrap ${
-              selectedStatus === "INACTIVE"
-                ? "text-blue-500 border-b-2 border-blue-500 bg-blue-50 dark:bg-blue-900/20"
-                : "text-gray-600 dark:text-gray-300 border-b-2 border-transparent hover:text-blue-500"
-            }`}
-          >
-            Disabled
-          </button>
+          {STATUS_TABS.map((tab) => (
+            <button
+              key={tab.value}
+              role="tab"
+              aria-selected={selectedStatus === tab.value}
+              onClick={() => selectStatus(tab.value)}
+              className={`px-4 py-2 ${loading ? "cursor-not-allowed" : ""} text-sm font-medium transition-all whitespace-nowrap ${
+                selectedStatus === tab.value
+                  ? "text-blue-500 border-b-2 border-blue-500 bg-blue-50 dark:bg-blue-900/20"
+                  : "text-gray-600 dark:text-gray-300 border-b-2 border-transparent hover:text-blue-500"
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
         </div>
       </motion.div>
 

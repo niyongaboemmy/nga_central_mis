@@ -1,6 +1,7 @@
 import { and, eq, gte, inArray, lte } from "drizzle-orm";
 import { db } from "../../db";
-import { Parenting, StudentClassGroup, Subject } from "../../db/schema";
+import { Parenting, StudentClassGroup, Subject, User } from "../../db/schema";
+import { activeUserJoin } from "../activeUsers";
 import {
   OfficeHourAssignment,
   OfficeHourAttendance,
@@ -52,7 +53,12 @@ export const assertCanSeeStudent = async (actor: Actor, studentId: number, yearI
 
 /** Children linked to a parent (for the parent card). */
 export const childrenOf = async (parentId: number) => {
-  const rows = await db.select({ id: Parenting.student_id }).from(Parenting).where(eq(Parenting.parent_id, parentId));
+  // Active children only (contract): a disabled student's card disappears.
+  const rows = await db
+    .select({ id: Parenting.student_id })
+    .from(Parenting)
+    .innerJoin(User, activeUserJoin(Parenting.student_id))
+    .where(eq(Parenting.parent_id, parentId));
   return rows.map((r) => r.id);
 };
 
@@ -183,6 +189,8 @@ export const bandFor = async (actor: Actor, termId: number, opts: { classGroupId
           eq(StudentClassGroup.status, "ACTIVE"),
         ),
       )
+      // Counts are of active students only (contract).
+      .innerJoin(User, activeUserJoin(OfficeHourAssignment.student_id))
       .where(and(eq(OfficeHourAssignment.academic_term_id, termId), eq(OfficeHourAssignment.status, "ACTIVE"), eq(OfficeHourSchedule.status, "ACTIVE"), inWeek));
     const days = await scheduleDays([...new Set(rows.map((r) => r.s.schedule_id))]);
     const teachers = await userNames(rows.map((r) => r.s.teacher_id));

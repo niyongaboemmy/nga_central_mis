@@ -32,6 +32,11 @@ import {
   resolveRequestedGradeIds,
   resolveUserScope,
 } from "../services/userScope";
+import {
+  activeUser,
+  activeUserJoin,
+  activeStudentPlacement,
+} from "../services/activeUsers";
 
 // ---------------------------------------------------------------------------
 // Shared helpers
@@ -164,6 +169,9 @@ const effectiveStudentPlacements = async (params: {
       academic_year_id: StudentClassGroup.academic_year_id,
     })
     .from(StudentClassGroup)
+    // Active users only (ACTIVE_USERS_CONTRACTS.md): a disabled student is
+    // off every scoped roster, subject list and profile scope.
+    .innerJoin(User, activeUserJoin(StudentClassGroup.user_id))
     .innerJoin(
       ClassGroup,
       eq(StudentClassGroup.class_group_id, ClassGroup.class_group_id),
@@ -172,10 +180,9 @@ const effectiveStudentPlacements = async (params: {
     .where(
       and(
         ...([
-          eq(StudentClassGroup.status, "ACTIVE"),
-          params.yearId
-            ? lte(StudentClassGroup.academic_year_id, params.yearId)
-            : undefined,
+          // An active student has an ACTIVE placement IN the selected year
+          // (contract) -- no carry-forward of a prior year's placement.
+          activeStudentPlacement(params.yearId),
           params.userIds?.length
             ? inArray(StudentClassGroup.user_id, params.userIds)
             : undefined,
@@ -716,6 +723,7 @@ export const getScopedSubjectDetail = asyncHandler(
             yearId
               ? lte(TeacherSubjectAssignment.academic_year_id, yearId)
               : undefined,
+            activeUser,
           ].filter(Boolean) as any[]),
         ),
       );
@@ -763,6 +771,7 @@ export const getScopedSubjectDetail = asyncHandler(
                 ...([
                   eq(StudentSubjectEnrollment.subject_id, subjectId),
                   eq(StudentSubjectEnrollment.status, "ACTIVE"),
+                  activeUser,
                   inArray(
                     StudentSubjectEnrollment.user_id,
                     Array.from(detailPlacementsByUser.keys()),
@@ -1091,6 +1100,7 @@ export const getScopedUsers = asyncHandler(async (req: any, res: any) => {
           yearId
             ? lte(TeacherSubjectAssignment.academic_year_id, yearId)
             : undefined,
+          activeUser,
         ].filter(Boolean) as any[]),
       ),
     );
