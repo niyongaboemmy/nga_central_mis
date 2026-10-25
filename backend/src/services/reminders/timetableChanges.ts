@@ -7,7 +7,9 @@ import {
   StudentClassGroup,
   StudentSubjectEnrollment,
   Subject,
+  User,
 } from "../../db/schema";
+import { activeUserJoin, activeStudentPlacement } from "../activeUsers";
 import { ReminderJob } from "../../db/reminderSchema";
 import logger from "../../utils/logger";
 import { loadCurrentTerm } from "./occurrences";
@@ -110,7 +112,9 @@ const classStudents = async (classGroupId: number | null | undefined, subjectId?
   const members = await db
     .select({ user_id: StudentClassGroup.user_id })
     .from(StudentClassGroup)
-    .where(and(eq(StudentClassGroup.class_group_id, classGroupId), eq(StudentClassGroup.academic_year_id, term.yearId)));
+    // Active students with an ACTIVE placement only (contract).
+    .innerJoin(User, activeUserJoin(StudentClassGroup.user_id))
+    .where(and(eq(StudentClassGroup.class_group_id, classGroupId), activeStudentPlacement(term.yearId)));
   const ids = members.map((m: any) => Number(m.user_id));
   if (!subjectId || ids.length === 0) return ids;
   const enrolled = await db

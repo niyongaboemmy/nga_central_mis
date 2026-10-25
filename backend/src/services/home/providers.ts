@@ -23,6 +23,7 @@ import {
   UserGrade,
   UserProfile,
 } from "../../db/schema";
+import { activeUserJoin } from "../activeUsers";
 import { AccessGrant, AccessShadowDiff } from "../../db/accessSchema";
 import {
   loadAssignedActivities,
@@ -859,6 +860,8 @@ export async function classProvider(ctx: ProviderContext): Promise<ProviderResul
     db
       .select({ user_id: StudentClassGroup.user_id, class_group_id: StudentClassGroup.class_group_id })
       .from(StudentClassGroup)
+      // Active students only (contract).
+      .innerJoin(User, activeUserJoin(StudentClassGroup.user_id))
       .where(
         and(
           inArray(StudentClassGroup.class_group_id, classIds),
@@ -880,6 +883,7 @@ export async function classProvider(ctx: ProviderContext): Promise<ProviderResul
     db
       .select({ user_id: StudentSubjectEnrollment.user_id, subject_id: StudentSubjectEnrollment.subject_id })
       .from(StudentSubjectEnrollment)
+      .innerJoin(User, activeUserJoin(StudentSubjectEnrollment.user_id))
       .innerJoin(
         StudentClassGroup,
         and(
@@ -1080,7 +1084,8 @@ export async function oversightProvider(ctx: ProviderContext): Promise<ProviderR
             })
             .from(TeacherSubjectAssignment)
             .leftJoin(UserProfile, eq(UserProfile.user_id, TeacherSubjectAssignment.user_id))
-            .leftJoin(User, eq(User.user_id, TeacherSubjectAssignment.user_id))
+            // A disabled teacher's assignments are not outstanding work (contract).
+            .innerJoin(User, activeUserJoin(TeacherSubjectAssignment.user_id))
             .where(eq(TeacherSubjectAssignment.academic_year_id, yearId))
         : Promise.resolve([] as any[]),
       want(SCHEME_LIST_CAPS)
@@ -1093,6 +1098,8 @@ export async function oversightProvider(ctx: ProviderContext): Promise<ProviderR
         ? db
             .select({ class_group_id: UserGrade.class_group_id })
             .from(UserGrade)
+            // A class led by a disabled account has no class teacher.
+            .innerJoin(User, activeUserJoin(UserGrade.user_id))
             .where(eq(UserGrade.academic_year_id, yearId))
         : Promise.resolve([] as any[]),
       want(STRUCTURE_CAPS)

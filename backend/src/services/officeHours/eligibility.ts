@@ -9,6 +9,7 @@ import {
   UserGrade,
   UserProfile,
 } from "../../db/schema";
+import { activeUserJoin, activeStudentPlacement } from "../activeUsers";
 
 /**
  * Which students a teacher may assign (plan §5.3, decision D2): students in a
@@ -43,6 +44,7 @@ export const menteeIds = async (teacherId: number, yearId: number): Promise<numb
   const rows = await db
     .select({ id: MentorAssignment.student_id })
     .from(MentorAssignment)
+    .innerJoin(User, activeUserJoin(MentorAssignment.student_id))
     .where(
       and(
         eq(MentorAssignment.mentor_id, teacherId),
@@ -61,11 +63,11 @@ export const teachableStudentIds = async (teacherId: number, yearId: number): Pr
     const rows = await db
       .select({ id: StudentClassGroup.user_id })
       .from(StudentClassGroup)
+      .innerJoin(User, activeUserJoin(StudentClassGroup.user_id))
       .where(
         and(
           inArray(StudentClassGroup.class_group_id, groups),
-          eq(StudentClassGroup.academic_year_id, yearId),
-          eq(StudentClassGroup.status, "ACTIVE"),
+          activeStudentPlacement(yearId),
         ),
       );
     for (const r of rows) out.add(Number(r.id));

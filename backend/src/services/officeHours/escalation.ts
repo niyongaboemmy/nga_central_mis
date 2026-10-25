@@ -1,6 +1,7 @@
 import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "../../db";
 import { Grade, ClassGroup, Parenting, StudentClassGroup, UserGrade, UserProgramLead, User } from "../../db/schema";
+import { activeUserJoin } from "../activeUsers";
 import { OfficeHourAssignment, OfficeHourEscalation, OfficeHourSchedule, OfficeHourSession } from "../../db/officeHoursSchema";
 import { NotFoundError } from "../../errors/CustomError";
 import { addDaysYmd } from "../reminders/time";
@@ -44,10 +45,10 @@ export const guardiansOf = async (studentId: number, yearId: number) => {
     .where(and(eq(StudentClassGroup.user_id, studentId), eq(StudentClassGroup.academic_year_id, yearId), eq(StudentClassGroup.status, "ACTIVE")))
     .limit(1);
   const classTeachers = placement
-    ? (await db.select({ id: UserGrade.user_id }).from(UserGrade).where(and(eq(UserGrade.class_group_id, placement.class_group_id), eq(UserGrade.academic_year_id, yearId)))).map((r) => r.id)
+    ? (await db.select({ id: UserGrade.user_id }).from(UserGrade).innerJoin(User, activeUserJoin(UserGrade.user_id)).where(and(eq(UserGrade.class_group_id, placement.class_group_id), eq(UserGrade.academic_year_id, yearId)))).map((r) => r.id)
     : [];
   const programLeads = placement?.program_id
-    ? (await db.select({ id: UserProgramLead.user_id }).from(UserProgramLead).where(and(eq(UserProgramLead.program_id, placement.program_id), eq(UserProgramLead.academic_year_id, yearId)))).map((r) => r.id)
+    ? (await db.select({ id: UserProgramLead.user_id }).from(UserProgramLead).innerJoin(User, activeUserJoin(UserProgramLead.user_id)).where(and(eq(UserProgramLead.program_id, placement.program_id), eq(UserProgramLead.academic_year_id, yearId)))).map((r) => r.id)
     : [];
   const parents = (
     await db

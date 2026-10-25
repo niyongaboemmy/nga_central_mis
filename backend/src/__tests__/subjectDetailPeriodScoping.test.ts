@@ -230,9 +230,10 @@ describe("Subject detail — schedule and scheme follow the selected year/term",
     expect(ids).toContain(currentStudentId);
   });
 
-  it("still names the section from a placement that carried forward", async () => {
-    // The student IS enrolled this year but was placed last year and never
-    // re-stamped -- they must keep their class group, not lose it.
+  it("leaves out a student whose placement was never re-stamped this year", async () => {
+    // ACTIVE_USERS_CONTRACTS.md: an active student has an ACTIVE placement IN
+    // the selected year. A prior year's placement no longer carries forward,
+    // so an enrolment without this year's class group is off the roster.
     const carriedId = await createUser({ userType: "STUDENT" });
     await createStudentClassGroup({
       userId: carriedId,
@@ -248,11 +249,8 @@ describe("Subject detail — schedule and scheme follow the selected year/term",
     const res = await detail(
       `academic_year_id=${yearId}&academic_term_id=${termOneId}`,
     );
-    const row = res.body.data.students.find(
-      (s: any) => s.user_id === carriedId,
-    );
-    expect(row).toBeDefined();
-    expect(row.class_group_id).toBe(classGroupId);
+    const ids = res.body.data.students.map((s: any) => s.user_id);
+    expect(ids).not.toContain(carriedId);
   });
 
   it("excludes a student only placed in a later year", async () => {

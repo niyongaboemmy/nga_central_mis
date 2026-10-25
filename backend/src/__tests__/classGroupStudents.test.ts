@@ -113,8 +113,11 @@ describe("GET /academics/class-groups/:class_group_id/students", () => {
   });
 
   it("returns only students in the requested class group", async () => {
+    // No year given now means the current year (ACTIVE_USERS_CONTRACTS.md);
+    // the test DB holds many "current" years, so name this one.
     const res = await request(app)
       .get(`/academics/class-groups/${classGroupId}/students`)
+      .query({ academic_year_id: thisYearId })
       .set("Authorization", `Bearer ${token}`);
 
     expect(res.status).toBe(200);

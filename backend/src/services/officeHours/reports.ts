@@ -1,6 +1,7 @@
 import { and, eq, gte, inArray, lte, or, sql } from "drizzle-orm";
 import { db } from "../../db";
-import { ClassGroup, Grade, Permission, Program, Role, StudentClassGroup, Subject, UserRole } from "../../db/schema";
+import { ClassGroup, Grade, Permission, Program, Role, StudentClassGroup, Subject, User, UserRole } from "../../db/schema";
+import { activeUserJoin } from "../activeUsers";
 import { AccessRolePermission } from "../../db/accessSchema";
 import {
   OfficeHourAssignment,
@@ -505,6 +506,8 @@ export const coverageReport = async (actor: Actor, termId: number, classGroupId:
   const groups = await db
     .select({ class_group_id: StudentClassGroup.class_group_id, name: ClassGroup.name, user_id: StudentClassGroup.user_id })
     .from(StudentClassGroup)
+    // Coverage counts active students only (contract).
+    .innerJoin(User, activeUserJoin(StudentClassGroup.user_id))
     .innerJoin(ClassGroup, eq(ClassGroup.class_group_id, StudentClassGroup.class_group_id))
     .where(and(eq(StudentClassGroup.academic_year_id, term.yearId), eq(StudentClassGroup.status, "ACTIVE"), scope.kind === "classGroups" ? inArray(StudentClassGroup.class_group_id, scope.classGroupIds.length ? scope.classGroupIds : [0]) : sql`1=1`));
   const active = await db

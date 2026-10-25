@@ -48,6 +48,14 @@ import {
 } from "../services/access/ruleEngine";
 import { getCurrentAcademicYearId } from "../utils/academicYear";
 import {
+  activeUser,
+  activeUserJoin,
+  activeEnrollment,
+  activeStudentPlacement,
+  parseStatusFilter,
+  wantsInactive,
+} from "../services/activeUsers";
+import {
   assignUniqueSubjectColors,
   nextSubjectColor,
 } from "../utils/subjectColors";
@@ -2056,6 +2064,8 @@ export const getSubjectTeacherAssignments = asyncHandler(
         user_id: TeacherSubjectAssignment.user_id,
         teacher_name: sql`CONCAT(${UserProfile.first_name}, ' ', ${UserProfile.last_name})`,
         teacher_username: User.username,
+        // Admin history list: kept; a disabled teacher shows teacher_status.
+        teacher_status: User.status,
         subject_id: TeacherSubjectAssignment.subject_id,
         class_group_id: TeacherSubjectAssignment.class_group_id,
         class_group_name: ClassGroup.name,
@@ -2113,6 +2123,8 @@ export const getAllTeacherSubjectAssignments = asyncHandler(
         user_id: TeacherSubjectAssignment.user_id,
         teacher_name: sql`CONCAT(${UserProfile.first_name}, ' ', ${UserProfile.last_name})`,
         teacher_username: User.username,
+        // Admin history list: kept; a disabled teacher shows teacher_status.
+        teacher_status: User.status,
         subject_id: TeacherSubjectAssignment.subject_id,
         subject_name: Subject.name,
         subject_code: Subject.code,
@@ -3452,6 +3464,8 @@ export const getSubjectEnrolledStudents = asyncHandler(
     //   throw new ValidationError("Teacher is not assigned to this subject");
     // }
 
+    const includeInactive = wantsInactive(req);
+
     // Get enrolled students
     const students = await db
       .select({
@@ -3465,9 +3479,16 @@ export const getSubjectEnrolledStudents = asyncHandler(
         grade_name: Grade.name,
         program_name: Program.name,
         enrolled_at: StudentSubjectEnrollment.enrolled_at,
+        status: User.status,
       })
       .from(StudentSubjectEnrollment)
-      .innerJoin(User, eq(StudentSubjectEnrollment.user_id, User.user_id))
+      // Active users only (contract); include_inactive=1 for MANAGE_USERS.
+      .innerJoin(
+        User,
+        includeInactive
+          ? eq(StudentSubjectEnrollment.user_id, User.user_id)
+          : activeUserJoin(StudentSubjectEnrollment.user_id),
+      )
       .innerJoin(UserProfile, eq(User.user_id, UserProfile.user_id))
       // Scoped to this same year and ACTIVE only -- a student can have
       // StudentClassGroup rows from other years (their promotion history)
@@ -3492,7 +3513,7 @@ export const getSubjectEnrolledStudents = asyncHandler(
       .where(
         and(
           eq(StudentSubjectEnrollment.subject_id, subjId),
-          eq(StudentSubjectEnrollment.academic_year_id, yearId),
+          activeEnrollment(yearId),
         ),
       )
       .orderBy(UserProfile.first_name, UserProfile.last_name);
@@ -3525,6 +3546,7 @@ export const getSubjectEnrolledStudentsByTerm = asyncHandler(
       return successResponse(res, "Enrolled students retrieved successfully", []);
     }
 
+    const includeInactive = wantsInactive(req);
     const students = await db
       .select({
         user_id: User.user_id,
@@ -3537,9 +3559,16 @@ export const getSubjectEnrolledStudentsByTerm = asyncHandler(
         grade_name: Grade.name,
         program_name: Program.name,
         enrolled_at: StudentSubjectEnrollment.enrolled_at,
+        status: User.status,
       })
       .from(StudentSubjectEnrollment)
-      .innerJoin(User, eq(StudentSubjectEnrollment.user_id, User.user_id))
+      // Active users only (contract); include_inactive=1 for MANAGE_USERS.
+      .innerJoin(
+        User,
+        includeInactive
+          ? eq(StudentSubjectEnrollment.user_id, User.user_id)
+          : activeUserJoin(StudentSubjectEnrollment.user_id),
+      )
       .innerJoin(UserProfile, eq(User.user_id, UserProfile.user_id))
       // See getSubjectEnrolledStudents above -- scoping to this year and
       // ACTIVE only is what keeps this left join from fanning out into one
@@ -3561,7 +3590,7 @@ export const getSubjectEnrolledStudentsByTerm = asyncHandler(
       .where(
         and(
           eq(StudentSubjectEnrollment.subject_id, subjId),
-          eq(StudentSubjectEnrollment.academic_year_id, term.academic_year_id),
+          activeEnrollment(term.academic_year_id),
         ),
       )
       .orderBy(UserProfile.first_name, UserProfile.last_name);
@@ -3755,13 +3784,21 @@ export const getClassGroupStudents = asyncHandler(
       // the current term got the wrong students entirely.
     ];
 
-    if (academic_year_id !== undefined) {
-      const yearId = parseInt(academic_year_id as string);
+    // No year given -> the current academic year (contract): an active
+    // student is placed IN the selected year, never "any year".
+    let yearId: number | null;
+    if (academic_year_id !== undefined && academic_year_id !== "") {
+      yearId = parseInt(academic_year_id as string);
       if (isNaN(yearId)) {
         throw new ValidationError("Invalid academic year ID");
       }
+    } else {
+      yearId = await getCurrentAcademicYearId();
+    }
+    if (yearId) {
       filters.push(eq(StudentClassGroup.academic_year_id, yearId));
     }
+    const includeInactive = wantsInactive(req);
 
     const students = await db
       .select({
@@ -3774,9 +3811,16 @@ export const getClassGroupStudents = asyncHandler(
         registration_number: UserProfile.registration_number,
         academic_year_id: StudentClassGroup.academic_year_id,
         enrolled_at: StudentClassGroup.assigned_at,
+        status: User.status,
       })
       .from(StudentClassGroup)
-      .innerJoin(User, eq(StudentClassGroup.user_id, User.user_id))
+      // Active users only (contract); include_inactive=1 for MANAGE_USERS.
+      .innerJoin(
+        User,
+        includeInactive
+          ? eq(StudentClassGroup.user_id, User.user_id)
+          : activeUserJoin(StudentClassGroup.user_id),
+      )
       .innerJoin(UserProfile, eq(User.user_id, UserProfile.user_id))
       .where(
         and(
@@ -4035,6 +4079,13 @@ export const enrollStudentInSubject = asyncHandler(
 
     if (student.length === 0) {
       throw new NotFoundError("Student not found");
+    }
+    // Active users only (contract): a disabled student cannot be placed or
+    // enrolled -- re-enable the account first.
+    if (student[0].User.status !== "ACTIVE") {
+      throw new ValidationError("Student account is not active", [
+        { code: "STUDENT_INACTIVE", ids: [studentId] },
+      ]);
     }
 
     // Verify subject exists and is active
@@ -4421,6 +4472,13 @@ export const assignStudentToClassGroup = asyncHandler(
 
     if (student.length === 0) {
       throw new NotFoundError("Student not found");
+    }
+    // Active users only (contract): a disabled student cannot be placed or
+    // enrolled -- re-enable the account first.
+    if (student[0].User.status !== "ACTIVE") {
+      throw new ValidationError("Student account is not active", [
+        { code: "STUDENT_INACTIVE", ids: [studentId] },
+      ]);
     }
 
     // Verify class group exists
@@ -5282,12 +5340,14 @@ export const bulkAssignStudentsToClassGroup = asyncHandler(
         and(
           inArray(User.user_id, studentIds),
           eq(UserProfile.user_type, "STUDENT"),
+          // Inactive accounts are skipped like any other non-student id.
+          activeUser,
         ),
       );
     const validStudentIds = validStudents.map((s) => Number(s.user_id));
 
     if (validStudentIds.length === 0) {
-      throw new ValidationError("None of the provided user_ids are students");
+      throw new ValidationError("None of the provided user_ids are active students");
     }
 
     // Disable other active class-group assignments for these students in
@@ -5459,11 +5519,13 @@ export const bulkEnrollStudentsInSubjects = asyncHandler(
         and(
           inArray(User.user_id, studentIds),
           eq(UserProfile.user_type, "STUDENT"),
+          // Inactive accounts are skipped like any other non-student id.
+          activeUser,
         ),
       );
     const validStudentIds = validStudents.map((s) => Number(s.user_id));
     if (validStudentIds.length === 0) {
-      throw new ValidationError("None of the provided user_ids are students");
+      throw new ValidationError("None of the provided user_ids are active students");
     }
 
     const validSubjects = await db
@@ -5591,13 +5653,13 @@ export const getClassGroupEnrollmentRoster = asyncHandler(
         registration_number: UserProfile.registration_number,
       })
       .from(StudentClassGroup)
-      .innerJoin(User, eq(StudentClassGroup.user_id, User.user_id))
+      // Active users only (contract): no enrolling a disabled student.
+      .innerJoin(User, activeUserJoin(StudentClassGroup.user_id))
       .innerJoin(UserProfile, eq(User.user_id, UserProfile.user_id))
       .where(
         and(
           eq(StudentClassGroup.class_group_id, classGroupId),
-          eq(StudentClassGroup.academic_year_id, yearId),
-          eq(StudentClassGroup.status, "ACTIVE"),
+          activeStudentPlacement(yearId),
           eq(UserProfile.user_type, "STUDENT"),
         ),
       )
@@ -5689,8 +5751,20 @@ export const getUsersByProgram = asyncHandler(async (req: any, res: any) => {
     );
   }
 
-  if (status && status !== "all") {
-    whereConditions.push(eq(User.status, status.toUpperCase()));
+  // Active users only by default (contract); status=all|INACTIVE|SUSPENDED
+  // for management views.
+  const statusFilter = parseStatusFilter(status, "ACTIVE");
+  if (statusFilter) {
+    whereConditions.push(eq(User.status, statusFilter));
+  }
+  // Placed in the selected year (default: current), not in any year.
+  const rawYear = req.query.academic_year_id;
+  const yearId =
+    rawYear !== undefined && rawYear !== ""
+      ? parseInt(rawYear as string, 10)
+      : await getCurrentAcademicYearId();
+  if (yearId !== null && isNaN(yearId)) {
+    throw new ValidationError("Invalid academic year ID");
   }
 
   // Get users who are in grades of this program
@@ -5707,7 +5781,7 @@ export const getUsersByProgram = asyncHandler(async (req: any, res: any) => {
     .where(
       and(
         eq(Grade.program_id, programIdNum),
-        eq(StudentClassGroup.status, "ACTIVE"),
+        activeStudentPlacement(yearId),
         ...whereConditions,
       ),
     );
@@ -5739,7 +5813,7 @@ export const getUsersByProgram = asyncHandler(async (req: any, res: any) => {
     .where(
       and(
         eq(Grade.program_id, programIdNum),
-        eq(StudentClassGroup.status, "ACTIVE"),
+        activeStudentPlacement(yearId),
         ...whereConditions,
       ),
     )
@@ -6170,12 +6244,13 @@ export const getClassGroupsOverview = asyncHandler(
         user_id: StudentClassGroup.user_id,
       })
       .from(StudentClassGroup)
+      // Counts are of active students only (contract).
+      .innerJoin(User, activeUserJoin(StudentClassGroup.user_id))
       .innerJoin(UserProfile, eq(StudentClassGroup.user_id, UserProfile.user_id))
       .where(
         and(
           inArray(StudentClassGroup.class_group_id, classGroupIds),
-          eq(StudentClassGroup.academic_year_id, yearId),
-          eq(StudentClassGroup.status, "ACTIVE"),
+          activeStudentPlacement(yearId),
           eq(UserProfile.user_type, "STUDENT"),
         ),
       );
@@ -6237,7 +6312,7 @@ export const getClassGroupsOverview = asyncHandler(
         last_name: UserProfile.last_name,
       })
       .from(UserGrade)
-      .innerJoin(User, eq(UserGrade.user_id, User.user_id))
+      .innerJoin(User, activeUserJoin(UserGrade.user_id))
       .innerJoin(UserProfile, eq(User.user_id, UserProfile.user_id))
       .where(
         and(

@@ -80,7 +80,7 @@ export async function childrenOf(parentId: number): Promise<ChildSummary[]> {
   const kids = rows(await db.execute(sql`
     SELECT p.student_id AS id, TRIM(CONCAT(COALESCE(up.first_name, ''), ' ', COALESCE(up.last_name, ''))) AS name, up.first_name AS first,
            (SELECT cg.name FROM StudentClassGroup s JOIN ClassGroup cg ON cg.class_group_id = s.class_group_id
-             WHERE s.user_id = p.student_id ORDER BY s.academic_year_id DESC LIMIT 1) AS className
+             WHERE s.user_id = p.student_id AND s.status = 'ACTIVE' ORDER BY s.academic_year_id DESC LIMIT 1) AS className
     FROM Parenting p JOIN UserProfile up ON up.user_id = p.student_id
     JOIN User u ON u.user_id = p.student_id AND u.status = 'ACTIVE'
     WHERE p.parent_id = ${parentId} ORDER BY up.first_name`));

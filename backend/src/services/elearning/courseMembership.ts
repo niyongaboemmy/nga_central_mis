@@ -7,7 +7,9 @@ import {
   StudentSubjectEnrollment,
   TeacherSubjectAssignment,
   UserProfile,
+  User,
 } from "../../db/schema";
+import { activeUserJoin } from "../activeUsers";
 import { AuthorizationError, NotFoundError } from "../../errors/CustomError";
 
 /**
@@ -91,6 +93,8 @@ export async function listCourseMembers(course: CourseRow) {
         eq(StudentSubjectEnrollment.status, "ACTIVE"),
       ),
     )
+    // Active students only (contract).
+    .innerJoin(User, activeUserJoin(StudentClassGroup.user_id))
     .leftJoin(UserProfile, eq(UserProfile.user_id, StudentClassGroup.user_id))
     .where(
       and(

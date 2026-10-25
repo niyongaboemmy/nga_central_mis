@@ -9,6 +9,7 @@ import {
   UserProfile,
 } from "../../db/schema";
 import { profileMedia } from "../avatar/urls";
+import { activeUserJoin } from "../activeUsers";
 
 /**
  * Who mentors whom right now, for one person, in the shape a sibling app needs
@@ -73,7 +74,7 @@ export async function mentorshipRelationshipsFor(userId: number): Promise<Mentor
       .select({ user_id: MentorAssignment.mentor_id, ...base })
       .from(MentorAssignment)
       .innerJoin(AcademicYear, eq(AcademicYear.academic_year_id, MentorAssignment.academic_year_id))
-      .innerJoin(User, eq(User.user_id, MentorAssignment.mentor_id))
+      .innerJoin(User, activeUserJoin(MentorAssignment.mentor_id))
       .leftJoin(UserProfile, eq(UserProfile.user_id, MentorAssignment.mentor_id))
       .where(and(eq(MentorAssignment.student_id, userId), eq(MentorAssignment.status, "ACTIVE"), liveYear))
       // The current year's mentor first, then the most recent assignment.
@@ -83,7 +84,7 @@ export async function mentorshipRelationshipsFor(userId: number): Promise<Mentor
       .select({ user_id: MentorAssignment.student_id, registration_number: UserProfile.registration_number, ...base })
       .from(MentorAssignment)
       .innerJoin(AcademicYear, eq(AcademicYear.academic_year_id, MentorAssignment.academic_year_id))
-      .innerJoin(User, eq(User.user_id, MentorAssignment.student_id))
+      .innerJoin(User, activeUserJoin(MentorAssignment.student_id))
       .leftJoin(UserProfile, eq(UserProfile.user_id, MentorAssignment.student_id))
       .where(and(eq(MentorAssignment.mentor_id, userId), eq(MentorAssignment.status, "ACTIVE"), liveYear))
       .orderBy(desc(AcademicYear.is_current), desc(MentorAssignment.assigned_at)),

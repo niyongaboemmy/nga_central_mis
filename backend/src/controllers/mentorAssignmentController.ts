@@ -14,6 +14,7 @@ import { asyncHandler } from "../middleware/asyncHandler";
 import { notifyAssignmentsChanged, notifyAssignmentEnded } from "../services/mentorship/notify";
 import { successResponse } from "../utils/response";
 import { ValidationError, ConflictError, NotFoundError } from "../errors/CustomError";
+import { activeUserJoin } from "../services/activeUsers";
 
 async function getCurrentAcademicYearId(): Promise<number | null> {
   const [row] = await db
@@ -47,9 +48,15 @@ export const listAssignments = asyncHandler(async (req: any, res: any) => {
   // Two joins on UserProfile need distinct aliases
   const MentorProfile = alias(UserProfile, "mentor_profile");
   const StudentProfile = alias(UserProfile, "student_profile");
+  const MentorUser = alias(User, "mentor_user");
+  const StudentUser = alias(User, "student_user");
 
   const rows = await db
     .select({
+      // Admin history list: every assignment stays, a disabled account is
+      // flagged rather than dropped (contract).
+      mentor_status: MentorUser.status,
+      student_status: StudentUser.status,
       assignment_id: MentorAssignment.assignment_id,
       mentor_id: MentorAssignment.mentor_id,
       mentor_first_name: MentorProfile.first_name,
@@ -69,6 +76,8 @@ export const listAssignments = asyncHandler(async (req: any, res: any) => {
     .from(MentorAssignment)
     .leftJoin(MentorProfile, eq(MentorAssignment.mentor_id, MentorProfile.user_id))
     .leftJoin(StudentProfile, eq(MentorAssignment.student_id, StudentProfile.user_id))
+    .leftJoin(MentorUser, eq(MentorAssignment.mentor_id, MentorUser.user_id))
+    .leftJoin(StudentUser, eq(MentorAssignment.student_id, StudentUser.user_id))
     .leftJoin(AcademicYear, eq(MentorAssignment.academic_year_id, AcademicYear.academic_year_id))
     .where(conditions.length > 0 ? and(...conditions) : undefined)
     .orderBy(sql`${MentorAssignment.assigned_at} DESC`);
@@ -77,6 +86,8 @@ export const listAssignments = asyncHandler(async (req: any, res: any) => {
     ...r,
     mentor_name: `${r.mentor_first_name ?? ""} ${r.mentor_last_name ?? ""}`.trim() || null,
     student_name: `${r.student_first_name ?? ""} ${r.student_last_name ?? ""}`.trim() || null,
+    mentor_inactive: r.mentor_status !== "ACTIVE",
+    student_inactive: r.student_status !== "ACTIVE",
   }));
 
   return successResponse(res, "Mentor assignments fetched", formatted);
@@ -119,6 +130,8 @@ export const getUnassignedStudents = asyncHandler(async (req: any, res: any) => 
       registration_number: UserProfile.registration_number,
     })
     .from(StudentClassGroup)
+    // Active students only (contract): a disabled account is not a gap.
+    .innerJoin(User, activeUserJoin(StudentClassGroup.user_id))
     .innerJoin(ClassGroup, eq(StudentClassGroup.class_group_id, ClassGroup.class_group_id))
     .innerJoin(UserProfile, eq(StudentClassGroup.user_id, UserProfile.user_id))
     .where(
@@ -358,6 +371,15 @@ async function assignStudentsToMentor(params: {
   if (notStudents.length > 0) {
     throw new ValidationError(
       `Only students can be mentees (${notStudents.length} selected ${notStudents.length === 1 ? "person is" : "people are"} not a student)`,
+    );
+  }
+
+  // Active users only (contract): a disabled student cannot be given a mentor.
+  const inactiveStudents = studentIds.filter((id) => byId.get(id)?.status !== "ACTIVE");
+  if (inactiveStudents.length > 0) {
+    throw new ValidationError(
+      `Only active students can be mentees (${inactiveStudents.length} selected ${inactiveStudents.length === 1 ? "account is" : "accounts are"} not active)`,
+      [{ code: "STUDENT_INACTIVE", ids: inactiveStudents }],
     );
   }
 

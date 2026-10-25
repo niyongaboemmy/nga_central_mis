@@ -173,7 +173,7 @@ async function studentsIn(scope: { all?: boolean; class_groups?: number[]; grade
            scg.class_group_id AS classGroupId, cg.name AS className, cg.grade_id AS gradeId
     FROM User u
     JOIN UserProfile p ON p.user_id = u.user_id AND p.user_type = 'STUDENT'
-    LEFT JOIN StudentClassGroup scg ON scg.user_id = u.user_id ${yearId ? sql`AND scg.academic_year_id = ${yearId}` : sql``}
+    LEFT JOIN StudentClassGroup scg ON scg.user_id = u.user_id AND scg.status = 'ACTIVE' ${yearId ? sql`AND scg.academic_year_id = ${yearId}` : sql``}
     LEFT JOIN ClassGroup cg ON cg.class_group_id = scg.class_group_id
     LEFT JOIN Grade g ON g.grade_id = cg.grade_id
     WHERE u.status = 'ACTIVE' ${where}`));

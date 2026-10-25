@@ -13,6 +13,7 @@ import {
   UserProfile,
   UserRole,
 } from "../db/schema";
+import { activeUserJoin } from "./activeUsers";
 
 /**
  * "The students I teach" — resolved in one place.
@@ -126,7 +127,9 @@ export const getTeacherRosterRows = async (
       subject_id: StudentSubjectEnrollment.subject_id,
     })
     .from(StudentClassGroup)
-    .innerJoin(User, eq(StudentClassGroup.user_id, User.user_id))
+    // Active users only (contract): a disabled student leaves My Students,
+    // the dashboard count and the competency map at once.
+    .innerJoin(User, activeUserJoin(StudentClassGroup.user_id))
     .innerJoin(UserProfile, eq(User.user_id, UserProfile.user_id))
     .innerJoin(
       ClassGroup,

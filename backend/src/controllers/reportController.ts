@@ -1013,6 +1013,8 @@ export const getMissingReports = asyncHandler(async (req: any, res: any) => {
     .where(
       and(
         inArray(Role.name, ["TEACHER", "CLASS_TEACHER"]),
+        // A disabled teacher owes no report (contract: active users only).
+        eq(User.status, "ACTIVE"),
         submittedInstructorIds.length > 0
           ? notInArray(User.user_id, submittedInstructorIds)
           : sql`1=1`,
