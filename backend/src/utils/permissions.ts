@@ -146,6 +146,11 @@ export const Permissions = {
   // Code Playground (write and run code; every role by default, migration 120)
   CODE_PLAYGROUND_USE: "CODE_PLAYGROUND_USE",
 
+  // AI usage control (migration 121): use AI tools outside an assessment, and the
+  // school-wide AI policy (restricted to the platform owner).
+  AI_USE: "AI_USE",
+  AI_POLICY_MANAGE: "AI_POLICY_MANAGE",
+
   // Database Management
   DATABASE_MANAGEMENT: "DATABASE_MANAGEMENT",
 } as const;

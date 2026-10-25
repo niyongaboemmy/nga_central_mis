@@ -31,7 +31,7 @@ const SCHOOL_ONLY = { scopeable: false };
 export const MIS_MANIFEST = defineManifest({
   app: "mis",
   name: "Central MIS",
-  version: "2026.10.14",
+  version: "2026.10.25",
   capabilities: {
     // People & accounts
     MANAGE_USERS: W("Create, update and deactivate users", "PEOPLE"),
@@ -170,6 +170,11 @@ export const MIS_MANIFEST = defineManifest({
     EARLY_WARNING_VIEW: R("See early-warning signals and log interventions", "WELFARE", ["detail"]),
     // Staff absence and cover: approve absences, assign cover teachers.
     STAFF_COVER_MANAGE: W("Approve staff absences and assign cover", "ACADEMICS", SCHOOL_ONLY),
+    // AI usage control (AI_USAGE_CONTROL_PLAN.md §3). Legacy-visible on purpose: MIS routes
+    // still decide through req.user.permissions and spokes read the SSO list. Seeded by
+    // migration 121; the policy switch itself belongs to the platform owner alone.
+    AI_USE: W("Use AI tools (outside quizzes and assignments)", "SYSTEM", SCHOOL_ONLY),
+    AI_POLICY_MANAGE: W("Turn AI on or off for the school and its apps", "SYSTEM", { ...SCHOOL_ONLY, restricted: true }),
   },
 });
 

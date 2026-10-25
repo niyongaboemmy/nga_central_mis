@@ -50,6 +50,11 @@ export interface PresetDef {
   caps: PresetCap[];
 }
 
+// AI_USE (AI tools outside an assessment, plan AI_USAGE_CONTROL_PLAN.md §3.2) goes to
+// teaching, academic leadership, administration, mentors and counsellors; students,
+// parents and support roles have none. AI_POLICY_MANAGE is the platform owner's alone.
+// Migration 121 seeds the same links for roles that already have holders.
+
 const ACCESS_ADMIN: PresetCap[] = [
   "ACCESS_STUDIO_VIEW",
   "ACCESS_GRANTS_MANAGE",
@@ -66,7 +71,7 @@ const MIS_PRESETS: PresetDef[] = [
     scopes: ["PLATFORM"],
     maxHolders: 2,
     platformOnly: true,
-    caps: ["STAFF_COVER_MANAGE", ["EARLY_WARNING_VIEW", "detail"], "SAFEGUARDING_MANAGE", "OFFICE_HOURS_MANAGE_ANY", ["OFFICE_HOURS_VIEW", "detail"], "OFFICE_HOURS_CONFIGURE", "DESKTOP_TOOLS_CONFIGURE", "TOOLS_TRANSLATIONS_MANAGE", ["USAGE_INSIGHTS_VIEW", "summary"], 
+    caps: ["AI_USE", "AI_POLICY_MANAGE", "STAFF_COVER_MANAGE", ["EARLY_WARNING_VIEW", "detail"], "SAFEGUARDING_MANAGE", "OFFICE_HOURS_MANAGE_ANY", ["OFFICE_HOURS_VIEW", "detail"], "OFFICE_HOURS_CONFIGURE", "DESKTOP_TOOLS_CONFIGURE", "TOOLS_TRANSLATIONS_MANAGE", ["USAGE_INSIGHTS_VIEW", "summary"], 
       ...ACCESS_ADMIN,
       "ACCESS_ROLES_MANAGE",
       "ACCESS_RULES_MANAGE",
@@ -90,7 +95,7 @@ const MIS_PRESETS: PresetDef[] = [
     category: "Leadership",
     scopes: ["SCHOOL"],
     maxHolders: 1,
-    caps: ["STAFF_COVER_MANAGE", ["EARLY_WARNING_VIEW", "detail"], "SAFEGUARDING_MANAGE", "OFFICE_HOURS_MANAGE_ANY", ["OFFICE_HOURS_VIEW", "detail"], "OFFICE_HOURS_CONFIGURE", "DESKTOP_TOOLS_CONFIGURE", ["USAGE_INSIGHTS_VIEW", "summary"], 
+    caps: ["AI_USE", "STAFF_COVER_MANAGE", ["EARLY_WARNING_VIEW", "detail"], "SAFEGUARDING_MANAGE", "OFFICE_HOURS_MANAGE_ANY", ["OFFICE_HOURS_VIEW", "detail"], "OFFICE_HOURS_CONFIGURE", "DESKTOP_TOOLS_CONFIGURE", ["USAGE_INSIGHTS_VIEW", "summary"], 
       ...ACCESS_ADMIN,
       "ACCESS_ROLES_MANAGE",
       "ACCESS_RULES_MANAGE",
@@ -127,7 +132,7 @@ const MIS_PRESETS: PresetDef[] = [
     category: "Leadership",
     scopes: ["SCHOOL"],
     maxHolders: 1,
-    caps: ["STAFF_COVER_MANAGE", ["EARLY_WARNING_VIEW", "detail"], "OFFICE_HOURS_MANAGE_ANY", ["OFFICE_HOURS_VIEW", "detail"], ["USAGE_INSIGHTS_VIEW", "summary"], 
+    caps: ["AI_USE", "STAFF_COVER_MANAGE", ["EARLY_WARNING_VIEW", "detail"], "OFFICE_HOURS_MANAGE_ANY", ["OFFICE_HOURS_VIEW", "detail"], ["USAGE_INSIGHTS_VIEW", "summary"], 
       ...ACCESS_ADMIN,
       "MANAGE_DEPARTMENTS",
       "VIEW_ACADEMICS",
@@ -157,7 +162,7 @@ const MIS_PRESETS: PresetDef[] = [
     description: "Academic lead for one or more programmes.",
     category: "Leadership",
     scopes: ["PROGRAM", "SCHOOL"],
-    caps: ["STAFF_COVER_MANAGE", ["EARLY_WARNING_VIEW", "detail"], "OFFICE_HOURS_MANAGE_ANY", ["OFFICE_HOURS_VIEW", "detail"], ["USAGE_INSIGHTS_VIEW", "summary"], 
+    caps: ["AI_USE", "STAFF_COVER_MANAGE", ["EARLY_WARNING_VIEW", "detail"], "OFFICE_HOURS_MANAGE_ANY", ["OFFICE_HOURS_VIEW", "detail"], ["USAGE_INSIGHTS_VIEW", "summary"], 
       ...ACCESS_ADMIN,
       "VIEW_ACADEMICS",
       "VIEW_PROGRAM_USERS",
@@ -187,7 +192,7 @@ const MIS_PRESETS: PresetDef[] = [
     description: "Coordinates a programme; granted automatically from programme-lead assignments.",
     category: "Leadership",
     scopes: ["PROGRAM"],
-    caps: [["EARLY_WARNING_VIEW", "detail"], "OFFICE_HOURS_MANAGE_ANY", ["OFFICE_HOURS_VIEW", "detail"], ["USAGE_INSIGHTS_VIEW", "summary"], ...ACCESS_ADMIN, ["VIEW_ATTENDANCE", "summary"], ["VIEW_RESULTS", "summary"]],
+    caps: ["AI_USE", ["EARLY_WARNING_VIEW", "detail"], "OFFICE_HOURS_MANAGE_ANY", ["OFFICE_HOURS_VIEW", "detail"], ["USAGE_INSIGHTS_VIEW", "summary"], ...ACCESS_ADMIN, ["VIEW_ATTENDANCE", "summary"], ["VIEW_RESULTS", "summary"]],
   },
   {
     key: "deputy_head_discipline",
@@ -218,7 +223,7 @@ const MIS_PRESETS: PresetDef[] = [
     description: "Curriculum quality and assessment moderation for a department's subjects.",
     category: "Leadership",
     scopes: ["DEPARTMENT"],
-    caps: [
+    caps: ["AI_USE", 
       "VIEW_LEADERSHIP_STRUCTURE",
       "VIEW_ALL_TEACHERS_SCHEME_OF_WORK_LIST",
       "VIEW_LESSON_PLANS",
@@ -235,7 +240,7 @@ const MIS_PRESETS: PresetDef[] = [
     description: "Year-group lead: attendance and first-line discipline across a grade.",
     category: "Leadership",
     scopes: ["GRADE"],
-    caps: [["EARLY_WARNING_VIEW", "detail"], ["OFFICE_HOURS_VIEW", "detail"], ["USAGE_INSIGHTS_VIEW", "summary"], 
+    caps: ["AI_USE", ["EARLY_WARNING_VIEW", "detail"], ["OFFICE_HOURS_VIEW", "detail"], ["USAGE_INSIGHTS_VIEW", "summary"], 
       "VIEW_LEADERSHIP_STRUCTURE",
       "VIEW_PROGRAM_USERS",
       "VIEW_ACADEMIC_CALENDAR",
@@ -250,7 +255,7 @@ const MIS_PRESETS: PresetDef[] = [
     description: "Homeroom teacher of a class group; granted automatically from class-teacher assignments.",
     category: "Teaching",
     scopes: ["CLASS_GROUP", "GRADE"],
-    caps: [["EARLY_WARNING_VIEW", "detail"], "OFFICE_HOURS_MANAGE_OWN", ["OFFICE_HOURS_VIEW", "detail"], ["USAGE_INSIGHTS_VIEW", "summary"], "VIEW_LEADERSHIP_STRUCTURE", ["VIEW_ATTENDANCE", "detail"], ["VIEW_RESULTS", "detail"]],
+    caps: ["AI_USE", ["EARLY_WARNING_VIEW", "detail"], "OFFICE_HOURS_MANAGE_OWN", ["OFFICE_HOURS_VIEW", "detail"], ["USAGE_INSIGHTS_VIEW", "summary"], "VIEW_LEADERSHIP_STRUCTURE", ["VIEW_ATTENDANCE", "detail"], ["VIEW_RESULTS", "detail"]],
   },
   {
     key: "subject_teacher",
@@ -258,7 +263,7 @@ const MIS_PRESETS: PresetDef[] = [
     description: "Teaches one subject in one class; granted automatically from subject assignments.",
     category: "Teaching",
     scopes: ["SUBJECT_CLASS"],
-    caps: ["OFFICE_HOURS_MANAGE_OWN",
+    caps: ["AI_USE", "OFFICE_HOURS_MANAGE_OWN",
       "ENTER_MARKS",
       "MARK_ATTENDANCE",
       ["VIEW_ATTENDANCE", "detail"],
@@ -279,7 +284,7 @@ const MIS_PRESETS: PresetDef[] = [
     description: "Mentors a list of students; granted automatically from mentor assignments.",
     category: "Welfare",
     scopes: ["MENTEES"],
-    caps: ["OFFICE_HOURS_MANAGE_OWN", ["VIEW_RESULTS", "detail"], ["VIEW_ATTENDANCE", "detail"]],
+    caps: ["AI_USE", "OFFICE_HOURS_MANAGE_OWN", ["VIEW_RESULTS", "detail"], ["VIEW_ATTENDANCE", "detail"]],
   },
   {
     key: "school_administrator",
@@ -288,7 +293,7 @@ const MIS_PRESETS: PresetDef[] = [
     description: "Runs school operations. No marks or discipline access by default.",
     category: "Operations",
     scopes: ["SCHOOL"],
-    caps: ["OFFICE_HOURS_MANAGE_ANY", ["OFFICE_HOURS_VIEW", "summary"], "OFFICE_HOURS_CONFIGURE", "DESKTOP_TOOLS_CONFIGURE", "TOOLS_TRANSLATIONS_MANAGE",
+    caps: ["AI_USE", "OFFICE_HOURS_MANAGE_ANY", ["OFFICE_HOURS_VIEW", "summary"], "OFFICE_HOURS_CONFIGURE", "DESKTOP_TOOLS_CONFIGURE", "TOOLS_TRANSLATIONS_MANAGE",
       ["USAGE_INSIGHTS_VIEW", "summary"],
       ...ACCESS_ADMIN,
       "VIEW_ACADEMICS",
@@ -347,7 +352,7 @@ const MIS_PRESETS: PresetDef[] = [
     description: "Student welfare; case files are restricted and granted with justification.",
     category: "Welfare",
     scopes: ["SCHOOL", "PROGRAM"],
-    caps: [["EARLY_WARNING_VIEW", "detail"], "SAFEGUARDING_MANAGE", "VIEW_LEADERSHIP_STRUCTURE", ["VIEW_ATTENDANCE", "summary"], ["VIEW_RESULTS", "summary"]],
+    caps: ["AI_USE", ["EARLY_WARNING_VIEW", "detail"], "SAFEGUARDING_MANAGE", "VIEW_LEADERSHIP_STRUCTURE", ["VIEW_ATTENDANCE", "summary"], ["VIEW_RESULTS", "summary"]],
   },
   {
     key: "safeguarding_lead",
@@ -393,7 +398,7 @@ const MIS_PRESETS: PresetDef[] = [
     description: "Baseline for every teacher (own calendar, own records). Teaching power comes from Subject/Class Teacher grants.",
     category: "Teaching",
     scopes: ["SELF"],
-    caps: ["OFFICE_HOURS_MANAGE_OWN", "VIEW_LEADERSHIP_STRUCTURE", "CODE_PLAYGROUND_USE"],
+    caps: ["AI_USE", "OFFICE_HOURS_MANAGE_OWN", "VIEW_LEADERSHIP_STRUCTURE", "CODE_PLAYGROUND_USE"],
   },
   {
     key: "support_staff",
