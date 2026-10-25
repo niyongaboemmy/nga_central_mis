@@ -278,6 +278,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       // Write and run code in any language, full screen (CODE_PLAYGROUND_USE: every role).
       label: "Code Playground",
       path: "/code-playground",
+      section: "learning",
       icon: <SquareTerminal className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
       requiredPermission: Permissions.CODE_PLAYGROUND_USE,
     },
