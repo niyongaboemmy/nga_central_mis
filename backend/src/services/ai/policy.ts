@@ -142,6 +142,10 @@ export async function setAiPolicy(patch: unknown, actorId: number): Promise<AiPo
     bool("thirdPartyExtensions", p.thirdPartyExtensions);
     after.thirdPartyExtensions = p.thirdPartyExtensions === true;
   }
+  if ("thirdPartyExtensionsStaff" in p) {
+    bool("thirdPartyExtensionsStaff", p.thirdPartyExtensionsStaff);
+    after.thirdPartyExtensionsStaff = p.thirdPartyExtensionsStaff === true;
+  }
   if (errors.length) throw new ValidationError(errors.join("; "), errors);
 
   after.v = Math.max(1, before.v) + 1;
@@ -152,6 +156,7 @@ export async function setAiPolicy(patch: unknown, actorId: number): Promise<AiPo
     features: after.features,
     assessments: after.assessments,
     thirdPartyExtensions: after.thirdPartyExtensions,
+    thirdPartyExtensionsStaff: after.thirdPartyExtensionsStaff,
   };
   await db.execute(sql`
     INSERT INTO PlatformSetting (setting_key, value, updated_by, updated_at)
@@ -186,6 +191,7 @@ export function policyDiff(a: AiPolicy, b: AiPolicy): { field: string; from: unk
   cmp("features.grading", a.features.grading, b.features.grading);
   cmp("assessments", a.assessments, b.assessments);
   cmp("thirdPartyExtensions", a.thirdPartyExtensions, b.thirdPartyExtensions);
+  cmp("thirdPartyExtensionsStaff", a.thirdPartyExtensionsStaff, b.thirdPartyExtensionsStaff);
   return out;
 }
 

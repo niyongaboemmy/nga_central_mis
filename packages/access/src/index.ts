@@ -9,7 +9,7 @@
  * vendor an exact copy (see packages/access/README.md) -- never edit a copy.
  */
 
-export const ACCESS_CORE_VERSION = "1.3.0";
+export const ACCESS_CORE_VERSION = "1.4.0";
 
 // ---------------------------------------------------------------------------
 // Vocabulary
@@ -520,8 +520,13 @@ export interface AiPolicy {
   features: { grading: boolean };
   /** "always_off" locks every quiz/assignment to off whatever the teacher chose. */
   assessments: "teacher" | "always_off";
-  /** TMCode third-party AI extensions (Claude Code, Copilot...). Client-enforced. */
+  /** TMCode third-party AI tools (extensions, terminal CLIs) for learners. Client-enforced. */
   thirdPartyExtensions: boolean;
+  /**
+   * The same for staff (users who grade: teachers, admins), who use Claude Code, Gemini and
+   * the like to draft grades. Separate so the school can keep students' off. Default on.
+   */
+  thirdPartyExtensionsStaff: boolean;
   updated_at?: string | null;
   updated_by?: number | null;
 }
@@ -533,6 +538,7 @@ export const AI_POLICY_DEFAULT: AiPolicy = {
   features: { grading: false },
   assessments: "teacher",
   thirdPartyExtensions: false,
+  thirdPartyExtensionsStaff: true,
 };
 
 /** Coerce stored/remote JSON into a policy. Anything unreadable stays off. */
@@ -549,6 +555,8 @@ export function normalizeAiPolicy(raw: unknown): AiPolicy {
     features: { grading: r.features?.grading === true },
     assessments: r.assessments === "always_off" ? "always_off" : "teacher",
     thirdPartyExtensions: r.thirdPartyExtensions === true,
+    // Absent (a policy saved before this field existed) means the default: on for staff.
+    thirdPartyExtensionsStaff: r.thirdPartyExtensionsStaff !== false,
     updated_at: typeof r.updated_at === "string" ? r.updated_at : null,
     updated_by: Number.isFinite(Number(r.updated_by)) && r.updated_by != null ? Number(r.updated_by) : null,
   };

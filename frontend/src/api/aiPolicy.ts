@@ -21,7 +21,7 @@ type Envelope<T> = { success: boolean; message?: string; code?: string; data: T 
 
 export const aiPolicyApi = {
   get: () => api.get<Envelope<AiPolicyView>>("/ai-policy"),
-  save: (patch: Partial<Pick<AiPolicy, "enabled" | "apps" | "features" | "assessments" | "thirdPartyExtensions">>) =>
+  save: (patch: Partial<Pick<AiPolicy, "enabled" | "apps" | "features" | "assessments" | "thirdPartyExtensions" | "thirdPartyExtensionsStaff">>) =>
     api.put<Envelope<{ policy: AiPolicy; updatedByName: string | null }>>("/ai-policy", patch),
 };
 

@@ -96,6 +96,10 @@ describe("policy service", () => {
     const p = await getAiPolicy();
     expect(p).toMatchObject({ v: 3, enabled: false, assessments: "teacher", thirdPartyExtensions: false, features: { grading: false } });
     expect(p.apps.mis).toBe(true);
+    // A policy stored before thirdPartyExtensionsStaff existed reads it as on.
+    expect(p.thirdPartyExtensionsStaff).toBe(true);
+    expect(normalizeAiPolicy({ v: 2, enabled: true, thirdPartyExtensions: true }).thirdPartyExtensionsStaff).toBe(true);
+    expect(normalizeAiPolicy({ thirdPartyExtensionsStaff: false }).thirdPartyExtensionsStaff).toBe(false);
 
     // Changed behind the cache's back: still the cached copy.
     await db.execute(sql`UPDATE PlatformSetting SET value = CAST('{"v": 4, "enabled": true}' AS JSON) WHERE setting_key = 'ai_policy'`);
@@ -125,6 +129,7 @@ describe("policy service", () => {
     await expect(setAiPolicy({ enabled: "on" }, actor)).rejects.toThrow(/enabled must be true or false/);
     await expect(setAiPolicy({ apps: { word: true } }, actor)).rejects.toThrow(/Unknown app/);
     await expect(setAiPolicy({ assessments: "sometimes" }, actor)).rejects.toThrow(/assessments/);
+    await expect(setAiPolicy({ thirdPartyExtensionsStaff: "no" }, actor)).rejects.toThrow(/thirdPartyExtensionsStaff must be true or false/);
     expect((await getAiPolicy()).v).toBe(after.v); // refused changes write nothing
   });
 
@@ -132,6 +137,8 @@ describe("policy service", () => {
     const a = normalizeAiPolicy({ enabled: false });
     const b = normalizeAiPolicy({ enabled: true, apps: { da: false } });
     expect(policyDiff(a, b).map((d) => d.field)).toEqual(["enabled", "apps.da"]);
+    const c = normalizeAiPolicy({ enabled: true, apps: { da: false }, thirdPartyExtensionsStaff: false });
+    expect(policyDiff(b, c)).toEqual([{ field: "thirdPartyExtensionsStaff", from: true, to: false }]);
   });
 });
 
@@ -177,6 +184,22 @@ describe("routes", () => {
     expect(ok.body.data.updatedByName).toMatch(/^Test /);
     const bad = await request(app).put("/ai-policy").set(auth(superAdmin)).send({ enabled: 1 });
     expect(bad.status).toBe(400);
+  });
+
+  it("PUT /ai-policy: thirdPartyExtensionsStaff is validated, stored, audited and returned by GET", async () => {
+    const off = await request(app).put("/ai-policy").set(auth(superAdmin)).send({ thirdPartyExtensionsStaff: false });
+    expect(off.status).toBe(200);
+    expect(off.body.data.policy.thirdPartyExtensionsStaff).toBe(false);
+    const got = await request(app).get("/ai-policy").set(auth(teacher));
+    expect(got.body.data.policy.thirdPartyExtensionsStaff).toBe(false);
+    const [log] = rows(await db.execute(sql`SELECT metadata FROM ActivityLog WHERE actor_id = ${superAdmin} AND action_type = 'AI_POLICY_UPDATE' ORDER BY activity_id DESC LIMIT 1`));
+    const meta = typeof log.metadata === "string" ? JSON.parse(log.metadata) : log.metadata;
+    expect(meta.diff).toContainEqual({ field: "thirdPartyExtensionsStaff", from: true, to: false });
+    expect(meta.after.thirdPartyExtensionsStaff).toBe(false);
+    const bad = await request(app).put("/ai-policy").set(auth(superAdmin)).send({ thirdPartyExtensionsStaff: "off" });
+    expect(bad.status).toBe(400);
+    const on = await request(app).put("/ai-policy").set(auth(superAdmin)).send({ thirdPartyExtensionsStaff: true });
+    expect(on.body.data.policy.thirdPartyExtensionsStaff).toBe(true);
   });
 
   it("GET /auth/verify carries ai_policy_v", async () => {

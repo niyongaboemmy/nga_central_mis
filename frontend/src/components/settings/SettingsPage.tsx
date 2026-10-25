@@ -10,7 +10,8 @@ import { useToast } from "../../contexts/ToastContext";
 /**
  * Settings (/settings). Today it holds the school AI policy (AI_USAGE_CONTROL_PLAN.md §4.6):
  * the super admin's master switch, the per-app switches, AI grading on submit, the
- * assessment lock and third-party AI coding tools in TMCode. Only holders of
+ * assessment lock and third-party AI tools in TMCode (for students, and for staff when
+ * grading). Only holders of
  * AI_POLICY_MANAGE (the platform owner) see and change it; everyone else sees whether AI
  * is available to them. Every app picks a change up within about 3 minutes.
  */
@@ -27,17 +28,19 @@ const APPS: Array<{ key: AiApp; name: string; covers: string }> = [
 /** What the master switch turns off, for the confirm dialog. */
 const TURNS_OFF = [
   ...APPS.map((a) => `${a.name}: ${a.covers}`),
-  "Third-party AI coding tools in TMCode (Claude Code, Codex, Gemini CLI, Copilot)",
+  "Third-party AI tools in TMCode for students and for staff, including grading (Claude Code, Codex, Gemini CLI, Copilot)",
   "AI grading on submit (short answers fall back to keyword marking)",
 ];
 
-type Draft = Pick<AiPolicy, "enabled" | "apps" | "features" | "assessments" | "thirdPartyExtensions">;
+type Draft = Pick<AiPolicy, "enabled" | "apps" | "features" | "assessments" | "thirdPartyExtensions" | "thirdPartyExtensionsStaff">;
 const draftOf = (p: AiPolicy): Draft => ({
   enabled: p.enabled,
   apps: { ...p.apps },
   features: { ...p.features },
   assessments: p.assessments,
   thirdPartyExtensions: p.thirdPartyExtensions,
+  // Default on: a policy saved before the staff switch existed allows staff tools.
+  thirdPartyExtensionsStaff: p.thirdPartyExtensionsStaff !== false,
 });
 
 const Switch: React.FC<{ on: boolean; onChange: (v: boolean) => void; label: string; disabled?: boolean; id?: string }> = ({ on, onChange, label, disabled, id }) => (
@@ -193,13 +196,27 @@ const AiPolicyCard: React.FC<{ view: AiPolicyView; onSaved: (v: AiPolicyView) =>
 
       <Card labelledBy="ai-thirdparty">
         <CardTitle id="ai-thirdparty" icon={<Code2 className="h-4 w-4" aria-hidden />}>TMCode</CardTitle>
-        <Row
-          title="Third-party AI coding tools in TMCode"
-          htmlFor="ai-third-party"
-          hint="Editor extensions and terminal tools such as Claude Code, Codex, Gemini CLI and Copilot. Off blocks them in TMCode (best-effort on the student's device)."
-        >
-          <Switch id="ai-third-party" on={draft.thirdPartyExtensions} onChange={(v) => setDraft({ ...draft, thirdPartyExtensions: v })} label="Third-party AI coding tools in TMCode" />
-        </Row>
+        <div className="divide-y divide-slate-200 dark:divide-gray-700/40">
+          <Row
+            title="Third-party AI tools for students"
+            htmlFor="ai-third-party"
+            hint="Editor extensions and terminal tools such as Claude Code, Codex, Gemini CLI and Copilot. Off blocks them in TMCode for students (best-effort on the student's device)."
+          >
+            <Switch id="ai-third-party" on={draft.thirdPartyExtensions} onChange={(v) => setDraft({ ...draft, thirdPartyExtensions: v })} label="Third-party AI tools for students" />
+          </Row>
+          <Row
+            title="Third-party AI tools for staff (grading)"
+            htmlFor="ai-third-party-staff"
+            hint="Lets teachers use Claude Code, Gemini and similar tools in TMCode, for example to draft grades for their review. On by default."
+          >
+            <Switch
+              id="ai-third-party-staff"
+              on={draft.thirdPartyExtensionsStaff}
+              onChange={(v) => setDraft({ ...draft, thirdPartyExtensionsStaff: v })}
+              label="Third-party AI tools for staff (grading)"
+            />
+          </Row>
+        </div>
       </Card>
 
       <Card labelledBy="ai-roles">
