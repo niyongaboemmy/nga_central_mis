@@ -45,6 +45,9 @@ WHERE `name` IN ('AI_USE', 'AI_POLICY_MANAGE') AND (`app` IS NULL OR `app` = 'mi
 
 -- 3) Role links ----------------------------------------------------------------
 -- RolePermission has no primary key on older databases: guard with NOT EXISTS.
+-- Joins against this temporary table compare with BINARY: on MySQL 8 it gets the
+-- server default collation (utf8mb4_0900_ai_ci), which can't be compared with the
+-- utf8mb4_unicode_ci / utf8 columns of Role and Permission (error 1267).
 CREATE TEMPORARY TABLE `tmp_121_links` (
   `preset` VARCHAR(64) NOT NULL,
   `legacy` VARCHAR(64) NULL,
@@ -71,8 +74,8 @@ INSERT IGNORE INTO `tmp_121_links` (`preset`, `legacy`, `cap`) VALUES
 INSERT INTO `RolePermission` (`role_id`, `perm_id`, `depth`)
 SELECT r.`role_id`, p.`perm_id`, NULL
 FROM `tmp_121_links` l
-JOIN `Role` r ON (r.`preset_key` = l.`preset` OR (r.`preset_key` IS NULL AND l.`legacy` IS NOT NULL AND r.`name` = l.`legacy`))
-JOIN `Permission` p ON p.`app` = 'mis' AND p.`name` = l.`cap`
+JOIN `Role` r ON (BINARY r.`preset_key` = BINARY l.`preset` OR (r.`preset_key` IS NULL AND l.`legacy` IS NOT NULL AND BINARY r.`name` = BINARY l.`legacy`))
+JOIN `Permission` p ON p.`app` = 'mis' AND BINARY p.`name` = BINARY l.`cap`
 WHERE NOT EXISTS (SELECT 1 FROM `RolePermission` x WHERE x.`role_id` = r.`role_id` AND x.`perm_id` = p.`perm_id`);
 
 -- 4) Applied preset links --------------------------------------------------------
@@ -87,7 +90,7 @@ CREATE TEMPORARY TABLE `tmp_121_roles` (`role_id` BIGINT NOT NULL, PRIMARY KEY (
 INSERT IGNORE INTO `tmp_121_roles` (`role_id`)
 SELECT r.`role_id`
 FROM `tmp_121_links` l
-JOIN `Role` r ON (r.`preset_key` = l.`preset` OR (r.`preset_key` IS NULL AND l.`legacy` IS NOT NULL AND r.`name` = l.`legacy`));
+JOIN `Role` r ON (BINARY r.`preset_key` = BINARY l.`preset` OR (r.`preset_key` IS NULL AND l.`legacy` IS NOT NULL AND BINARY r.`name` = BINARY l.`legacy`));
 
 UPDATE `User` u
 JOIN (
