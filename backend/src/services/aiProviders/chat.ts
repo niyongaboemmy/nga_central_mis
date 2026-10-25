@@ -5,6 +5,8 @@ import { acquireSlot, checkAvailability, noteAttempt } from "./limiter";
 import { isCoolingDown, isParkedDead, markCoolingDown, markDead } from "./registry";
 import { logAIUsage } from "./usageLog";
 import { freeModels, isFreeModel } from "./openrouterProvider";
+import { assertAiAppEnabled } from "../ai/policy";
+import type { AiApp } from "../../vendor/nga-access";
 
 /**
  * Streaming chat on the providers MIS already has keys for (NGA Desktop "Ask AI";
@@ -188,7 +190,11 @@ export async function streamChat(opts: {
   exclude?: string[];
   /** Background work (provider tests): yields to the interactive reserve. */
   bulk?: boolean;
+  /** Whose AI switch applies (school AI policy): "desktop" for NGA Desktop, default "mis". */
+  app?: AiApp;
 }): Promise<ChatRun> {
+  // School AI policy (plan §4.4): refused before any provider is tried (AiDisabledError).
+  await assertAiAppEnabled(opts.app ?? "mis");
   const order = chatOrder(opts.audience).filter((t) => (!opts.only || opts.only.includes(t.name)) && !opts.exclude?.includes(t.name));
   let attempted = 0;
   let quotaOnly = true;

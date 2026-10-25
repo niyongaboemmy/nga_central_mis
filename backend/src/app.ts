@@ -29,6 +29,7 @@ import accessRoutes from "./routes/access";
 import homeRoutes from "./routes/home";
 import codePlaygroundRoutes from "./routes/codePlayground";
 import elearningRoutes from "./routes/elearning";
+import aiPolicyRoutes from "./routes/aiPolicy";
 import { wireFilesModule } from "./services/files/assets";
 
 // File previews + file text for the Lesson Studio (job handlers, context-pack source).
@@ -143,6 +144,8 @@ app.use("/curriculum", curriculumRoutes);
 app.use("/mentorship", mentorshipRoutes);
 app.use("/lesson-notes", lessonNoteRoutes);
 app.use("/elearning", elearningRoutes);
+// School AI policy (AI_USAGE_CONTROL_PLAN.md §4): Settings -> AI and every AI button's pre-check.
+app.use("/ai-policy", aiPolicyRoutes);
 app.use("/database", databaseRoutes);
 app.use("/notifications", notificationRoutes);
 // Access control v2 (ACCESS_LEVELS_RBAC_IMPLEMENTATION_PLAN.md) -- snapshot,

@@ -23,6 +23,8 @@ const isSafetyBlock = (err: any): boolean => {
 };
 
 export const friendlyAIErrorMessage = (err: any): string => {
+  // Refused by the school AI policy (services/ai/policy.ts): its message is already for people.
+  if (err?.code === "AI_DISABLED" && typeof err?.message === "string") return err.message;
   if (isQuotaError(err)) {
     return "The AI is temporarily rate-limited. Please try again in a few minutes.";
   }

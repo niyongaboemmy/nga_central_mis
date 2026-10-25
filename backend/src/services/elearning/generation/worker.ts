@@ -3,7 +3,7 @@ import { db } from "../../../db";
 import { CourseGenerationRun, CourseGenerationTask, CourseSection } from "../../../db/schema";
 import logger from "../../../utils/logger";
 import { notifyUsers } from "../../../utils/notifications";
-import { AIQuotaExhaustedError, friendlyAIErrorMessage, nextQuotaReset, limitsFor, orderedProviders } from "../../aiProviders";
+import { AIQuotaExhaustedError, AiDisabledError, friendlyAIErrorMessage, nextQuotaReset, limitsFor, orderedProviders } from "../../aiProviders";
 import { ARTIFACT_ORDER, executeTask, GenerationOutputError, RunRow, TaskRow } from "./execute";
 import { emitRunEvent } from "./events";
 
@@ -225,6 +225,22 @@ async function failTask(task: TaskRow, run: RunRow, error: any) {
       .set({ status: "PAUSED_QUOTA", not_before: resumeAt, paused_reason: "Today's free AI quota is used up. The run continues automatically." })
       .where(and(eq(CourseGenerationRun.run_id, run.run_id), eq(CourseGenerationRun.status, "RUNNING")));
     emitRunEvent({ type: "run", run_id: run.run_id, status: "PAUSED_QUOTA", detail: { resume_at: resumeAt.toISOString() } });
+    emitRunEvent({ type: "task", run_id: run.run_id, task_id: task.task_id, section_id: task.section_id, kind: task.kind, status: "QUEUED" });
+    return;
+  }
+
+  if (error instanceof AiDisabledError) {
+    // The school turned AI off: not the task's fault either. Give the attempt back and
+    // pause the run like a teacher would; Resume works once AI is back on.
+    await db
+      .update(CourseGenerationTask)
+      .set({ status: "QUEUED", attempts: Math.max(0, attempts - 1), claimed_at: null })
+      .where(eq(CourseGenerationTask.task_id, task.task_id));
+    await db
+      .update(CourseGenerationRun)
+      .set({ status: "PAUSED", paused_reason: error.message })
+      .where(and(eq(CourseGenerationRun.run_id, run.run_id), eq(CourseGenerationRun.status, "RUNNING")));
+    emitRunEvent({ type: "run", run_id: run.run_id, status: "PAUSED", detail: { reason: error.reason, message: error.message } });
     emitRunEvent({ type: "task", run_id: run.run_id, task_id: task.task_id, section_id: task.section_id, kind: task.kind, status: "QUEUED" });
     return;
   }
