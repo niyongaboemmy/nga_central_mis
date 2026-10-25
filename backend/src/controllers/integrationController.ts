@@ -1,6 +1,7 @@
 import { and, asc, eq, gt, gte, inArray, sql } from "drizzle-orm";
 import { db } from "../db";
 import { asyncHandler } from "../middleware/asyncHandler";
+import { parseStatusFilter } from "../services/activeUsers";
 import { successResponse } from "../utils/response";
 import { ValidationError } from "../errors/CustomError";
 import {
@@ -303,6 +304,10 @@ export const syncPeople = asyncHandler(async (req: any, res: any) => {
 
   const filters = [gt(User.user_id, cursor)];
   if (since) filters.push(gte(User.updated_at, since));
+  // Everyone by default -- spokes need deactivations to end local access.
+  // `?status=ACTIVE|INACTIVE|SUSPENDED` narrows the page to one status.
+  const statusFilter = parseStatusFilter(req.query.status, null);
+  if (statusFilter) filters.push(eq(User.status, statusFilter));
 
   // One page of users. Everything below is keyed off exactly these ids.
   const users = await db
