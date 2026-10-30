@@ -1,4 +1,5 @@
 import api, { API_BASE_URL } from "../services/api";
+import { readSessionEvents, type SessionEvent } from "../vendor/nga-liveconsole";
 
 /** Code Playground: lesson code runs on Task Mentor's code runner, relayed by the MIS. */
 
@@ -87,11 +88,8 @@ export async function runOnServer(
 // ---------------------------------------------------------------- live runs
 
 /** What the runner says about a live run, as it happens. */
-export type SessionEvent =
-  | { event: "stage"; data: { name: "build" | "run" } }
-  | { event: "stdout" | "stderr"; data: { data: string } }
-  | { event: "exit"; data: { code: number | null; signal: string | null; verdict: string; time_ms: number | null; memory_kb: number | null } }
-  | { event: "error"; data: { message: string } };
+// The live run's events and their reader are nga-liveconsole's (shared with Task Mentor's grading).
+export type { SessionEvent } from "../vendor/nga-liveconsole";
 
 const errorOf = (e: any, fallback: string) => {
   if (e?.code === "ERR_CANCELED" || e?.name === "CanceledError") return new PlaygroundRunError("CANCELED", "Run stopped.");
@@ -144,29 +142,5 @@ export async function streamLiveRun(id: string, onEvent: (e: SessionEvent) => vo
     const data = await res.json().catch(() => null);
     throw new PlaygroundRunError(data?.code ?? "RUN_FAILED", data?.message ?? "The program's output couldn't be read.");
   }
-  const reader = res.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = "";
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
-    let cut: number;
-    while ((cut = buffer.indexOf("\n\n")) >= 0) {
-      const block = buffer.slice(0, cut);
-      buffer = buffer.slice(cut + 2);
-      let event = "message";
-      const data: string[] = [];
-      for (const line of block.split("\n")) {
-        if (line.startsWith("event:")) event = line.slice(6).trim();
-        else if (line.startsWith("data:")) data.push(line.slice(5).replace(/^ /, ""));
-      }
-      if (!data.length || !["stage", "stdout", "stderr", "exit", "error"].includes(event)) continue;
-      try {
-        onEvent({ event, data: JSON.parse(data.join("\n")) } as SessionEvent);
-      } catch {
-        /* a malformed event is skipped */
-      }
-    }
-  }
+  await readSessionEvents(res.body, onEvent);
 }
