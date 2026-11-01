@@ -2,7 +2,7 @@ import { Request, Response, NextFunction } from "express";
 import logger from "../utils/logger";
 
 /** Fields never written to the log (plan G4): credentials, one-time codes, secrets. */
-const SECRET_KEYS = /^(password|newPassword|currentPassword|oldPassword|confirmPassword|password_hash|otp|code|token|tempToken|refresh_token|access_token|id_token|credential|client_secret|secret|api_key|apiKey)$/i;
+const SECRET_KEYS = /^(password|newPassword|currentPassword|oldPassword|confirmPassword|password_hash|otp|code|token|tempToken|refresh_token|access_token|id_token|credential|client_secret|secret|api_key|apiKey|state|code_verifier)$/i;
 
 export const redactBody = (body: unknown, depth = 0): unknown => {
   if (!body || typeof body !== "object" || depth > 4) return body;

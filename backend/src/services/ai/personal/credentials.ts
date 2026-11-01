@@ -382,3 +382,41 @@ export async function disableCredentialsOf(userId: number): Promise<void> {
       if (e?.code !== "ER_NO_SUCH_TABLE") logger.warn("[my-ai] could not disable keys", { error: e?.message });
     });
 }
+
+/**
+ * Daily re-check (PERSONAL_AI_PROVIDERS_PLAN.md §7.2): keys used in the last 30 days and not
+ * checked for a day. At most `limit` per run, one at a time, to spare people's quotas.
+ */
+export async function sweepCredentials(limit = 50): Promise<{ checked: number; changed: number }> {
+  if (!isVaultConfigured()) return { checked: 0, changed: 0 };
+  let due: any[];
+  try {
+    due = rows(
+      await db.execute(sql`
+        SELECT credential_id, owner_user_id, status FROM AiCredential
+        WHERE owner_user_id IS NOT NULL AND status <> 'disabled'
+          AND last_used_at >= UTC_TIMESTAMP() - INTERVAL 30 DAY
+          AND (last_validated_at IS NULL OR last_validated_at < UTC_TIMESTAMP() - INTERVAL 1 DAY)
+        ORDER BY last_validated_at LIMIT ${limit}`),
+    );
+  } catch (e: any) {
+    if (e?.code === "ER_NO_SUCH_TABLE") return { checked: 0, changed: 0 };
+    throw e;
+  }
+  let changed = 0;
+  for (const r of due) {
+    try {
+      const secret = await loadSecret(Number(r.credential_id), Number(r.owner_user_id));
+      const check = await validateKey(secret.provider, secret.apiKey, secret.baseUrl);
+      await saveCheck(secret.id, check);
+      if (check.status !== r.status) {
+        changed++;
+        if (check.status === "invalid") await noteCredentialFailure(secret.id, "AI_KEY_INVALID");
+        if (check.status === "no_credit") await noteCredentialFailure(secret.id, "AI_KEY_NO_CREDIT");
+      }
+    } catch (e: any) {
+      logger.warn("[my-ai] sweep could not check a key", { credentialId: r.credential_id, error: e?.message });
+    }
+  }
+  return { checked: due.length, changed };
+}
