@@ -27,6 +27,20 @@ export interface GenerateJSONParams {
   disableThinking?: boolean;
 }
 
+/**
+ * A key (and optionally a model or endpoint) for one call, used instead of the school's
+ * env key — a user's own provider account (PERSONAL_AI_PROVIDERS_PLAN.md §7.1). Without
+ * one, every adapter behaves exactly as before. Clients built from it are never cached,
+ * so one user's key can't serve another user's call.
+ */
+export interface ProviderCredential {
+  apiKey: string;
+  model?: string;
+  baseUrl?: string;
+  /** OpenRouter only: refuse paid models. Default true; the school's own key is always free-only. */
+  freeOnly?: boolean;
+}
+
 export interface AIProvider {
   name: string;
   /** Whether this provider has the env vars it needs (an API key, etc). */
@@ -38,7 +52,7 @@ export interface AIProvider {
    * those need a runtime shape check on the response, see schemaValidator.ts.
    */
   supportsStrictSchema: boolean;
-  generateJSON<T = any>(params: GenerateJSONParams): Promise<ProviderResult<T>>;
+  generateJSON<T = any>(params: GenerateJSONParams, credential?: ProviderCredential): Promise<ProviderResult<T>>;
 }
 
 /** Token counts as reported by the vendor, when it reports them. */

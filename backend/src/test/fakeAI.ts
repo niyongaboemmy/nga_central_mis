@@ -1,12 +1,14 @@
 import { setTestProviders, resetLimiterState } from "../services/aiProviders";
-import type { AIProvider, GenerateJSONParams } from "../services/aiProviders";
+import type { AIProvider, GenerateJSONParams, ProviderCredential } from "../services/aiProviders";
 
-export type FakeHandler = (params: GenerateJSONParams, provider: string) => any | Promise<any>;
+export type FakeHandler = (params: GenerateJSONParams, provider: string, credential?: ProviderCredential) => any | Promise<any>;
 
 export interface FakeAICall {
   provider: string;
   schemaName?: string;
   prompt: string;
+  /** The user's own key, when the call carried one (PERSONAL_AI_PROVIDERS_PLAN.md §7.1). */
+  apiKey?: string;
 }
 
 /**
@@ -25,10 +27,10 @@ export function installFakeAI(handlers: FakeHandler | Record<string, FakeHandler
       name,
       isConfigured: () => true,
       supportsStrictSchema: true,
-      async generateJSON<T>(params: GenerateJSONParams) {
-        calls.push({ provider: name, schemaName: params.schemaName, prompt: params.prompt });
-        const data = (await handler(params, name)) as T;
-        return { data, model: `fake-${name}`, usage: { input_tokens: 10, output_tokens: 20 } };
+      async generateJSON<T>(params: GenerateJSONParams, credential?: ProviderCredential) {
+        calls.push({ provider: name, schemaName: params.schemaName, prompt: params.prompt, apiKey: credential?.apiKey });
+        const data = (await handler(params, name, credential)) as T;
+        return { data, model: credential?.model ?? `fake-${name}`, usage: { input_tokens: 10, output_tokens: 20 } };
       },
     };
   }

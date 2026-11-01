@@ -1,19 +1,19 @@
 import OpenAI from "openai";
-import { AIProvider, GenerateJSONParams, ProviderResult } from "./types";
+import { AIProvider, GenerateJSONParams, ProviderCredential, ProviderResult } from "./types";
 import { toStrictJsonSchema } from "./strictJsonSchema";
 
 const isConfigured = () => !!process.env.GROQ_API_KEY;
 
+const BASE_URL = "https://api.groq.com/openai/v1";
+// Runs as a background job, not inline with the HTTP request — safe to give a
+// long, detailed lesson-note prompt more room than the old short-note timeout.
+const TIMEOUT_MS = 60_000;
+
 let client: OpenAI | null = null;
-function getClient(): OpenAI {
+function getClient(credential?: ProviderCredential): OpenAI {
+  if (credential) return new OpenAI({ apiKey: credential.apiKey, baseURL: credential.baseUrl || BASE_URL, timeout: TIMEOUT_MS });
   if (!client) {
-    client = new OpenAI({
-      apiKey: process.env.GROQ_API_KEY,
-      baseURL: "https://api.groq.com/openai/v1",
-      // Runs as a background job, not inline with the HTTP request — safe to give a
-      // long, detailed lesson-note prompt more room than the old short-note timeout.
-      timeout: 60_000,
-    });
+    client = new OpenAI({ apiKey: process.env.GROQ_API_KEY, baseURL: BASE_URL, timeout: TIMEOUT_MS });
   }
   return client;
 }
@@ -23,10 +23,10 @@ export const groqProvider: AIProvider = {
   isConfigured,
   supportsStrictSchema: true,
 
-  async generateJSON<T = any>(params: GenerateJSONParams): Promise<ProviderResult<T>> {
-    const model = process.env.GROQ_MODEL || "openai/gpt-oss-20b";
+  async generateJSON<T = any>(params: GenerateJSONParams, credential?: ProviderCredential): Promise<ProviderResult<T>> {
+    const model = credential?.model || process.env.GROQ_MODEL || "openai/gpt-oss-20b";
 
-    const completion = await getClient().chat.completions.create({
+    const completion = await getClient(credential).chat.completions.create({
       model,
       messages: [{ role: "user", content: params.prompt }],
       // gpt-oss models spend part of the completion budget on internal reasoning tokens

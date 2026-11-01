@@ -1,5 +1,5 @@
 import { GoogleGenAI, Type } from "@google/genai";
-import { AIProvider, GenerateJSONParams, JSONSchema, ProviderResult } from "./types";
+import { AIProvider, GenerateJSONParams, JSONSchema, ProviderCredential, ProviderResult } from "./types";
 
 const isConfigured = () =>
   !!process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== "your_gemini_api_key_here";
@@ -31,7 +31,7 @@ export const geminiProvider: AIProvider = {
   isConfigured,
   supportsStrictSchema: true,
 
-  async generateJSON<T = any>(params: GenerateJSONParams): Promise<ProviderResult<T>> {
+  async generateJSON<T = any>(params: GenerateJSONParams, credential?: ProviderCredential): Promise<ProviderResult<T>> {
     // Without an explicit timeout, a stuck network connection to Gemini hangs this
     // promise forever — the orchestrator never even reaches the Groq/GLM fallback,
     // since it's simply still awaiting this call. Groq and GLM's clients already set
@@ -40,10 +40,10 @@ export const geminiProvider: AIProvider = {
     // give a long, detailed (~10-page) lesson note generation plenty of room to finish
     // rather than time out and force a fallback provider.
     const genAI = new GoogleGenAI({
-      apiKey: process.env.GEMINI_API_KEY,
-      httpOptions: { timeout: 120_000 },
+      apiKey: credential?.apiKey ?? process.env.GEMINI_API_KEY,
+      httpOptions: { timeout: 120_000, ...(credential?.baseUrl ? { baseUrl: credential.baseUrl } : {}) },
     });
-    const model = process.env.GEMINI_MODEL || "gemini-2.5-flash";
+    const model = credential?.model || process.env.GEMINI_MODEL || "gemini-2.5-flash";
 
     const response = await genAI.models.generateContent({
       model,

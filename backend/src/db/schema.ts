@@ -2078,9 +2078,12 @@ export const AIUsageLog = mysqlTable("AIUsageLog", {
   usage_id: bigint("usage_id", { mode: "number" }).primaryKey().autoincrement(),
   occurred_at: datetime("occurred_at").default(sql`CURRENT_TIMESTAMP`),
   feature: varchar("feature", { length: 60 }).notNull(),
+  app: varchar("app", { length: 10 }), // migration 122
   role: varchar("role", { length: 16 }),
   bulk: tinyint("bulk").notNull().default(0),
   provider: varchar("provider", { length: 20 }).notNull(),
+  route: varchar("route", { length: 10 }).notNull().default("school"), // migration 122: school | personal
+  credential_id: bigint("credential_id", { mode: "number" }), // migration 122
   model: varchar("model", { length: 80 }),
   ok: tinyint("ok").notNull(),
   error_class: varchar("error_class", { length: 30 }),

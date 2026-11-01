@@ -232,12 +232,12 @@ export async function streamChat(opts: {
         }
       }
       if (!sent) throw Object.assign(new Error(`${t.name} returned an empty answer`), { status: 502 });
-      logAIUsage({ feature: opts.feature, role: "interactive", provider: t.name, model, ok: true, latency_ms: Date.now() - startedAt.getTime(), output_tokens: Math.round(outputChars / 4), actor_user_id: opts.actorUserId, occurred_at: startedAt });
+      logAIUsage({ feature: opts.feature, app: opts.app ?? "mis", role: "interactive", provider: t.name, model, ok: true, latency_ms: Date.now() - startedAt.getTime(), output_tokens: Math.round(outputChars / 4), actor_user_id: opts.actorUserId, occurred_at: startedAt });
       return { provider: t.name, model };
     } catch (err: any) {
       lastErr = err;
       const cls = opts.signal?.aborted ? "ABORTED" : classifyAIError(err);
-      logAIUsage({ feature: opts.feature, role: "interactive", provider: t.name, model, ok: false, error_class: cls, latency_ms: Date.now() - startedAt.getTime(), actor_user_id: opts.actorUserId, occurred_at: startedAt });
+      logAIUsage({ feature: opts.feature, app: opts.app ?? "mis", role: "interactive", provider: t.name, model, ok: false, error_class: cls, latency_ms: Date.now() - startedAt.getTime(), actor_user_id: opts.actorUserId, occurred_at: startedAt });
       if (opts.signal?.aborted) throw err;
       logger.warn(`[ai-chat] ${t.name} failed`, { error: err?.message, class: cls });
       if (isDeadProviderError(err)) {

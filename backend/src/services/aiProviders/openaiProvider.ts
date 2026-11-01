@@ -1,12 +1,13 @@
 import OpenAI from "openai";
-import { AIProvider, GenerateJSONParams, ProviderResult } from "./types";
+import { AIProvider, GenerateJSONParams, ProviderCredential, ProviderResult } from "./types";
 import { toStrictJsonSchema } from "./strictJsonSchema";
 
 const isConfigured = () =>
   !!process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY !== "your_openai_api_key_here";
 
 let client: OpenAI | null = null;
-function getClient(): OpenAI {
+function getClient(credential?: ProviderCredential): OpenAI {
+  if (credential) return new OpenAI({ apiKey: credential.apiKey, baseURL: credential.baseUrl, timeout: 60_000 });
   if (!client) {
     client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY, timeout: 60_000 });
   }
@@ -18,10 +19,10 @@ export const openaiProvider: AIProvider = {
   isConfigured,
   supportsStrictSchema: true,
 
-  async generateJSON<T = any>(params: GenerateJSONParams): Promise<ProviderResult<T>> {
-    const model = process.env.OPENAI_MODEL || "gpt-4o";
+  async generateJSON<T = any>(params: GenerateJSONParams, credential?: ProviderCredential): Promise<ProviderResult<T>> {
+    const model = credential?.model || process.env.OPENAI_MODEL || "gpt-4o";
 
-    const completion = await getClient().chat.completions.create({
+    const completion = await getClient(credential).chat.completions.create({
       model,
       messages: [{ role: "user", content: params.prompt }],
       ...(params.maxOutputTokens ? { max_completion_tokens: params.maxOutputTokens } : {}),

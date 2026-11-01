@@ -69,6 +69,11 @@ export function setTestProviders(providers: Record<string, AIProvider> | null): 
   deadUntil.clear();
 }
 
+/** One provider by name (honours the test seam), for calls on a user's own key. */
+export function providerByName(name: string): AIProvider | undefined {
+  return testProviders ? testProviders[name] : ALL_PROVIDERS[name];
+}
+
 export function isAnyProviderConfigured(): boolean {
   return orderedProviders().some((p) => p.isConfigured());
 }
