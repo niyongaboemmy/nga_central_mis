@@ -12,6 +12,7 @@ import {
   isAnyProviderConfigured,
   JSONSchema,
 } from "../services/aiProviders";
+import { personalFor } from "../services/ai/personal/routes";
 
 const DENYLIST_PATTERNS = [
   /DROP\s+DATABASE/i,
@@ -603,7 +604,7 @@ export const generateSqlWithAI = asyncHandler(async (req: any, res: Response) =>
     structureBlock = `\nThe admin is currently viewing table "${table}" with columns: ${columns.join(", ")}.`;
   }
 
-  const { data, providerUsed } = await generateStructuredContent<{
+  const { data, providerUsed, ai } = await generateStructuredContent<{
     sql?: string;
     explanation?: string;
   }>({
@@ -628,6 +629,10 @@ exist given the table/column names provided — if unsure of exact columns for a
 structure of, prefer SELECT * over guessing specific column names. Never produce DROP DATABASE, DROP SCHEMA,
 GRANT, REVOKE, CREATE USER, DROP USER, ALTER USER, SET GLOBAL, or SHUTDOWN. Do not wrap the SQL in markdown
 code fences and do not include a trailing semicolon.`,
+  }, {
+    feature: "database_sql_query",
+    actorUserId: Number(req.user.userId),
+    personal: await personalFor(req, "author"),
   });
 
   if (!data.sql) {
@@ -655,5 +660,6 @@ code fences and do not include a trailing semicolon.`,
     sql: cleanSql,
     explanation: data.explanation || null,
     providerUsed,
+    ai: ai ?? null,
   });
 });

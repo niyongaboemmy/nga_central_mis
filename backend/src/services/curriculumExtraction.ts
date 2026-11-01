@@ -1,6 +1,8 @@
 import { ValidationError } from "../errors/CustomError";
 import { ImportedElement } from "./curriculumImportJobStore";
 import { generateStructuredContent, JSONSchema } from "./aiProviders";
+import type { PersonalOption } from "./aiProviders/generate";
+import type { AiRouteMeta } from "./ai/personal/run";
 
 const MAX_ELEMENTS = 30;
 const MAX_CRITERIA_PER_ELEMENT = 30;
@@ -37,8 +39,11 @@ const elementSchema: JSONSchema = {
 export const generateCurriculumWithAI = async (
   curriculumText: string,
   subjectName: string,
+  // Who asked (callers resolve My AI from their request; there is no req here), and a hook
+  // that receives which AI answered so a job can report it.
+  opts: { personal?: PersonalOption; actorUserId?: number; onAi?: (ai: AiRouteMeta | null) => void } = {},
 ): Promise<ImportedElement[]> => {
-  const { data: parsed } = await generateStructuredContent<{ elements?: any[] }>({
+  const { data: parsed, ai } = await generateStructuredContent<{ elements?: any[] }>({
     schemaName: "curriculum_elements",
     schema: {
       type: "object",
@@ -102,7 +107,8 @@ judgement to see past it):
 """
 ${curriculumText}
 """`,
-  });
+  }, { feature: "curriculum_elements", actorUserId: opts.actorUserId, personal: opts.personal });
+  opts.onAi?.(ai ?? null);
 
   const rawElements: any[] = Array.isArray(parsed.elements) ? parsed.elements : [];
 

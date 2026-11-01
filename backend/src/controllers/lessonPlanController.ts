@@ -306,6 +306,7 @@ export const deleteLessonPlan = async (req: Request, res: Response) => {
 
 import * as cheerio from "cheerio";
 import { aiDecisionFor } from "../services/ai/gate";
+import { personalFor } from "../services/ai/personal/routes";
 
 export const extractLessonPlan = asyncHandler(async (req: any, res: any) => {
   if (!req.file) {
@@ -319,7 +320,7 @@ export const extractLessonPlan = asyncHandler(async (req: any, res: any) => {
   // (AI_USAGE_CONTROL_PLAN.md §4.5); otherwise the deterministic parser below does.
   if (isAnyProviderConfigured() && (await aiDecisionFor(req, "author")).decision.allowed) {
     try {
-      const { data: extracted } = await generateStructuredContent<any>(
+      const { data: extracted, ai } = await generateStructuredContent<any>(
         {
           schemaName: "lesson_plan_extraction",
           schema: extractionSchema,
@@ -328,12 +329,17 @@ relational format. For activities, split trainer and learner roles. Extract less
 
 ${html}`,
         },
-        { providerOrder: EXTRACTION_PROVIDER_ORDER },
+        {
+          providerOrder: EXTRACTION_PROVIDER_ORDER,
+          feature: "lesson_plan_extraction",
+          actorUserId: Number(req.user.userId),
+          personal: await personalFor(req, "author"),
+        },
       );
       return successResponse(
         res,
         "Lesson plan extracted successfully (AI powered)",
-        extracted,
+        { ...extracted, ai: ai ?? null },
       );
     } catch (err) {
       logger.warn("AI lesson plan extraction failed, falling back to deterministic extraction", {

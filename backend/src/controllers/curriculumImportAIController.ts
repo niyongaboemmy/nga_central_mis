@@ -11,6 +11,9 @@ import { recordActivity } from "../utils/activityLogger";
 import { sanitizeString } from "../utils/sanitization";
 import logger from "../utils/logger";
 import { isAnyProviderConfigured } from "../services/aiProviders";
+import type { PersonalOption } from "../services/aiProviders/generate";
+import type { AiRouteMeta } from "../services/ai/personal/run";
+import { personalFor } from "../services/ai/personal/routes";
 import {
   createImportJob,
   getImportJob,
@@ -24,6 +27,8 @@ const processImportJob = async (
   jobId: string,
   file: Express.Multer.File,
   subjectName: string,
+  // Resolved from the request before the job started (the job has no req).
+  who: { userId: number; personal?: PersonalOption },
 ) => {
   try {
     updateImportJob(jobId, { status: "parsing", message: "Reading document..." });
@@ -40,7 +45,12 @@ const processImportJob = async (
       message: "Analyzing curriculum with AI...",
     });
 
-    const elements = await generateCurriculumWithAI(rawText, subjectName);
+    let ai: AiRouteMeta | null = null;
+    const elements = await generateCurriculumWithAI(rawText, subjectName, {
+      personal: who.personal,
+      actorUserId: who.userId,
+      onAi: (meta) => (ai = meta),
+    });
 
     updateImportJob(jobId, {
       status: "structuring",
@@ -52,6 +62,7 @@ const processImportJob = async (
       message: `Extracted ${elements.length} element${elements.length !== 1 ? "s" : ""} of competency.`,
       elements,
       sourceFilename: file.originalname,
+      ai,
     });
   } catch (err: any) {
     logger.error("AI curriculum import failed", { jobId, error: err?.message });
@@ -88,6 +99,7 @@ export const startCurriculumImport = asyncHandler(async (req: any, res: any) => 
   }
 
   const userId = req.user.userId;
+  const personal = await personalFor(req, "author");
   const jobId = randomUUID();
 
   createImportJob(jobId, userId, id);
@@ -95,7 +107,7 @@ export const startCurriculumImport = asyncHandler(async (req: any, res: any) => 
   successResponse(res, "Curriculum import started", { jobId }, 202);
 
   // Fire-and-forget: progress is tracked via the job store and polled by the client.
-  processImportJob(jobId, req.file, req.body.subject_name || subject.name);
+  processImportJob(jobId, req.file, req.body.subject_name || subject.name, { userId: Number(userId), personal });
 });
 
 export const getCurriculumImportStatus = asyncHandler(
@@ -119,6 +131,7 @@ export const getCurriculumImportStatus = asyncHandler(
       elements: job.elements,
       sourceFilename: job.sourceFilename,
       error: job.error,
+      ai: job.ai ?? null,
     });
   },
 );
