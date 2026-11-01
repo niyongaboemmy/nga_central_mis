@@ -143,5 +143,30 @@ describe("Settings -> AI", () => {
     fireEvent.click(screen.getByRole("button", { name: /Save changes/ }));
     await waitFor(() => expect(api.save).toHaveBeenCalled());
     expect(api.save.mock.calls[0][1]).not.toHaveProperty("personal");
+    expect(api.save.mock.calls[0][1]).not.toHaveProperty("external");
+  });
+
+  it("Your own Claude / ChatGPT: off by default, explained, and saved as policy.external", async () => {
+    api.get.mockResolvedValue({ data: { data: { policy: policy(), me: { hasAiUse: true, canManage: true } } } });
+    api.save.mockResolvedValue({ data: { data: { policy: policy({ v: 5 }), updatedByName: null } } });
+    renderPage();
+
+    const card = await screen.findByRole("region", { name: /Your own Claude \/ ChatGPT/ });
+    const handoff = within(card).getByRole("switch", { name: "Open in my AI + paste back" });
+    const connector = within(card).getByRole("switch", { name: "NGA connector for Claude / ChatGPT" });
+    // A policy saved before these existed reads as all off; pupil names default to consent-only.
+    expect(handoff).toHaveAttribute("aria-checked", "false");
+    expect(connector).toHaveAttribute("aria-checked", "false");
+    expect(within(card).getByText(/nothing is sent automatically/)).toBeInTheDocument();
+    const pupils = within(card).getByLabelText("Pupil names and records", { selector: "select" }) as HTMLSelectElement;
+    expect(pupils.value).toBe("with_consent");
+
+    fireEvent.click(handoff);
+    fireEvent.change(pupils, { target: { value: "never" } });
+    fireEvent.click(screen.getByRole("button", { name: /Save changes/ }));
+    await waitFor(() =>
+      expect(api.save).toHaveBeenCalledWith("/ai-policy", expect.objectContaining({ external: { connector: false, handoff: true, pupilNames: "never" } })),
+    );
+    expect(api.save.mock.calls[0][1]).not.toHaveProperty("personal");
   });
 });

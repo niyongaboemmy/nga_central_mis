@@ -73,6 +73,7 @@ import { Activity, InlineCheck, Reveal } from "../elearning/interactive/nodes";
 import { CodePlayground } from "../elearning/interactive/playgroundNode";
 import { normalizePreLineBreaks } from "../codePlayground/codeText";
 import AiSourceControl, { AiAnsweredBy } from "../ai/AiSourceControl";
+import HandoffControl from "../ai/HandoffControl";
 import type { AiRouteMeta } from "../../api/myAi";
 
 interface Props {
@@ -81,7 +82,14 @@ interface Props {
   onChange: (json: any, html: string) => void;
   onUploadImage: (file: File) => Promise<string>;
   /** Returns the revised HTML, or it with which AI wrote it (`aiRoute`: My AI choice for this request). */
-  onRequestAIEdit: (instruction: string, selectionHtml?: string, wholeNoteHtml?: string, aiRoute?: string) => Promise<string | { html: string; ai?: AiRouteMeta | null }>;
+  onRequestAIEdit: (
+    instruction: string,
+    selectionHtml?: string,
+    wholeNoteHtml?: string,
+    aiRoute?: string,
+    /** `aiHandoff` from HandoffControl; prompt mode resolves with `handoff` instead of a revision. */
+    extra?: Record<string, unknown>,
+  ) => Promise<string | { html: string; ai?: AiRouteMeta | null; handoff?: { prompt: string } }>;
   onAIEditAccepted: (instruction: string) => void;
   /** Renders the note body as a centered, fixed-width A4-like page with side margins
    * instead of stretching edge to edge — only worth the visual overhead in fullscreen,
@@ -1116,6 +1124,25 @@ const LessonNoteRichEditor: React.FC<Props> = ({
                 </button>
               </div>
               <AiSourceControl task="author" value={aiRoute} onChange={setAiRoute} disabled={aiLoading} />
+              <HandoffControl
+                disabled={aiLoading}
+                beforeRun={() => {
+                  if (instruction.trim()) return true;
+                  showToast("Type what the AI should do first", "error");
+                  return false;
+                }}
+                run={(extra) =>
+                  onRequestAIEdit(instruction.trim(), capturedSelection?.html, capturedSelection ? undefined : editor.getHTML(), undefined, extra)
+                }
+                onImported={(revised) =>
+                  setProposal({
+                    originalHtml: capturedSelection?.html ?? editor.getHTML(),
+                    revisedHtml: typeof revised === "string" ? revised : revised.html,
+                    range: capturedSelection?.range ?? null,
+                    ai: typeof revised === "string" ? null : revised.ai,
+                  })
+                }
+              />
             </div>
           ) : (
             <div className="flex flex-col gap-3">

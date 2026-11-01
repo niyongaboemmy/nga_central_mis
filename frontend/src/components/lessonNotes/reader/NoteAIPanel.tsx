@@ -18,6 +18,7 @@ import {
 import { lessonNotesApi, NoteAskAnswer } from "../../../api/lessonNotes";
 import { enhanceCodeBlocks } from "../../codeWindow/codeWindow";
 import AiSourceControl, { AiAnsweredBy, aiRouteBody } from "../../ai/AiSourceControl";
+import HandoffControl from "../../ai/HandoffControl";
 import type { AiRouteMeta } from "../../../api/myAi";
 
 export type AskMode = "explain" | "simplify" | "example" | "define" | "quiz";
@@ -137,6 +138,16 @@ const NoteAIPanel: React.FC<Props> = ({
     scrollRef.current.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages, busy]);
 
+  const answerMessage = (answer: NoteAskAnswer): Message => ({
+    id: `a${Date.now()}`,
+    role: "assistant",
+    html: answer.answer_html,
+    keyPoints: answer.key_points,
+    followUps: answer.follow_ups,
+    grounded: answer.grounded,
+    ai: answer.ai ?? null,
+  });
+
   const send = useCallback(
     async (question: string, selection?: string, mode?: AskMode) => {
       const trimmed = question.trim();
@@ -168,18 +179,7 @@ const NoteAIPanel: React.FC<Props> = ({
           ...aiRouteBody(aiRoute),
         });
         const answer: NoteAskAnswer = res.data.data;
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: `a${Date.now()}`,
-            role: "assistant",
-            html: answer.answer_html,
-            keyPoints: answer.key_points,
-            followUps: answer.follow_ups,
-            grounded: answer.grounded,
-            ai: answer.ai ?? null,
-          },
-        ]);
+        setMessages((prev) => [...prev, answerMessage(answer)]);
       } catch (err: any) {
         setMessages((prev) => [
           ...prev,
@@ -454,6 +454,30 @@ const NoteAIPanel: React.FC<Props> = ({
                 </button>
               </div>
               <AiSourceControl task="assist" value={aiRoute} onChange={setAiRoute} className="mt-1.5 px-1" />
+              <HandoffControl
+                className="mt-1.5 px-1"
+                disabled={busy}
+                beforeRun={() => !!input.trim()}
+                run={(extra) =>
+                  lessonNotesApi
+                    .askAboutShared(noteId, {
+                      question: input.trim(),
+                      selection_text: pendingSelection || undefined,
+                      history: messages
+                        .slice(-6)
+                        .map((m) => ({ role: m.role, content: m.text || m.html || "" }))
+                        .filter((m) => m.content),
+                      ...extra,
+                    })
+                    .then((r) => r.data)
+                }
+                onImported={(body: { data: NoteAskAnswer }) => {
+                  const question: Message = { id: `u${Date.now()}`, role: "user", text: input.trim(), selection: pendingSelection || undefined };
+                  setMessages((prev) => [...prev, question, answerMessage(body.data)]);
+                  setInput("");
+                  setPendingSelection(null);
+                }}
+              />
               <p className="flex items-center gap-1 text-[10px] text-gray-400 mt-1.5 px-1">
                 <CornerDownLeft className="w-2.5 h-2.5" /> Enter to send · AI answers can be imperfect — always
                 double-check against the note.

@@ -619,9 +619,9 @@ export const mentorshipApi = {
     ),
 
   // AI-generated insights for a single mentee
-  generateMenteeAIInsights: (studentId: number, aiRoute?: string) =>
+  generateMenteeAIInsights: (studentId: number, aiRoute?: string, extra?: Record<string, unknown>) =>
     api.post<{ success: boolean; data: MenteeAIInsights }>(
       `/mentorship/students/${studentId}/ai-insights`,
-      aiRoute ? { aiRoute } : {},
+      { ...(aiRoute ? { aiRoute } : {}), ...extra },
     ),
 };

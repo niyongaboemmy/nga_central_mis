@@ -12,7 +12,15 @@ export type { AiApp, AiPolicy };
 
 export interface AiPolicyView {
   policy: AiPolicy;
-  me: { hasAiUse: boolean; canManage: boolean };
+  me: {
+    hasAiUse: boolean;
+    canManage: boolean;
+    /**
+     * "Open in my AI" + "Paste the answer" for this person (policy.external.handoff and
+     * AI_EXTERNAL_CONNECT); pupilConsent: a prompt with pupil details may go out when ticked.
+     */
+    external?: { handoff: boolean; pupilConsent: boolean };
+  };
   /** Who made the last change (super admins only). */
   updatedByName?: string | null;
 }
@@ -21,7 +29,7 @@ type Envelope<T> = { success: boolean; message?: string; code?: string; data: T 
 
 export const aiPolicyApi = {
   get: () => api.get<Envelope<AiPolicyView>>("/ai-policy"),
-  save: (patch: Partial<Pick<AiPolicy, "enabled" | "apps" | "features" | "assessments" | "thirdPartyExtensions" | "thirdPartyExtensionsStaff" | "personal">>) =>
+  save: (patch: Partial<Pick<AiPolicy, "enabled" | "apps" | "features" | "assessments" | "thirdPartyExtensions" | "thirdPartyExtensionsStaff" | "personal" | "external">>) =>
     api.put<Envelope<{ policy: AiPolicy; updatedByName: string | null }>>("/ai-policy", patch),
 };
 

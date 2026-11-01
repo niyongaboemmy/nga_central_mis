@@ -59,6 +59,7 @@ import usePermissions from "../hooks/usePermissions";
 import { Permissions } from "../constants/permissions";
 import CurriculumExtractionPreview from "./curriculum/CurriculumExtractionPreview";
 import AiSourceControl, { AiAnsweredBy } from "./ai/AiSourceControl";
+import HandoffControl from "./ai/HandoffControl";
 import { answeredByText } from "../api/myAi";
 
 interface Props {
@@ -717,6 +718,32 @@ const SchemeAIGenerate: React.FC<Props> = ({
       message: hasCurriculum ? "Reading selected curriculum..." : "Reading document...",
     });
 
+    const formData = buildForm(curriculumEnabled);
+    // My AI: which AI answers this one request ("" = the person's own default).
+    if (aiRoute) formData.append("aiRoute", aiRoute);
+
+    try {
+      const resp = await schemeOfWorkApi.startAIGenerate(formData);
+      const { jobId } = resp.data.data;
+      showToast("AI generation started", "success");
+      pollStatus(jobId);
+    } catch (error: any) {
+      const message = error.response?.data?.message || "Could not start AI generation";
+      setJobStatus({
+        status: "error",
+        stepIndex: 0,
+        totalSteps: 4,
+        message: "Could not start AI generation",
+        error: message,
+      });
+      showToast(message, "error");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  /** The generation request, shared by "Generate" and "Open in my AI" / "Paste the answer". */
+  const buildForm = (curriculumEnabled: boolean) => {
     const formData = new FormData();
     if (file && !hasCurriculum) formData.append("file", file);
     formData.append("subject_id", subjectId.toString());
@@ -741,28 +768,7 @@ const SchemeAIGenerate: React.FC<Props> = ({
         formData.append("generate_curriculum", "true");
       }
     }
-
-    // My AI: which AI answers this one request ("" = the person's own default).
-    if (aiRoute) formData.append("aiRoute", aiRoute);
-
-    try {
-      const resp = await schemeOfWorkApi.startAIGenerate(formData);
-      const { jobId } = resp.data.data;
-      showToast("AI generation started", "success");
-      pollStatus(jobId);
-    } catch (error: any) {
-      const message = error.response?.data?.message || "Could not start AI generation";
-      setJobStatus({
-        status: "error",
-        stepIndex: 0,
-        totalSteps: 4,
-        message: "Could not start AI generation",
-        error: message,
-      });
-      showToast(message, "error");
-    } finally {
-      setIsSubmitting(false);
-    }
+    return formData;
   };
 
   const handleCurriculumSaved = async (subjectIdForLink: number, schemeId?: number) => {
@@ -1514,6 +1520,23 @@ const SchemeAIGenerate: React.FC<Props> = ({
                 </div>
 
                 <AiSourceControl task="author" value={aiRoute} onChange={setAiRoute} disabled={isSubmitting} className="w-full mb-3" />
+                <HandoffControl
+                  className="w-full mb-3"
+                  disabled={isSubmitting}
+                  beforeRun={() => hasCurriculum || !!file}
+                  run={(extra) => {
+                    // One paste answers one request, so the curriculum is never generated alongside.
+                    const form = buildForm(false);
+                    form.append("aiHandoff", JSON.stringify(extra.aiHandoff));
+                    return schemeOfWorkApi.startAIGenerate(form).then((r) => r.data);
+                  }}
+                  onImported={(body: any) => {
+                    // The pasted weeks are already saved: the first poll reads "done".
+                    setCurriculumStepEnabled(false);
+                    setJobStatus({ status: "saving", stepIndex: 4, totalSteps: 4, message: "Saving to database..." });
+                    pollStatus(body.data.jobId);
+                  }}
+                />
                 <div className="w-full flex items-center gap-2">
                   <button
                     onClick={() => setWizardStep("curriculum")}

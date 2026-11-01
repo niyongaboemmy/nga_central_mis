@@ -142,13 +142,15 @@ export const generateSqlWithAI = async (
   prompt: string,
   table?: string,
   aiRoute?: string,
-): Promise<AiSqlResult> => {
+  /** `aiHandoff` from HandoffControl: prompt mode resolves with `handoff` instead of SQL. */
+  extra?: Record<string, unknown>,
+): Promise<AiSqlResult & { handoff?: { prompt: string } }> => {
   const response = await api.post(
     "/database/query/ai-generate",
-    { prompt, table, ...(aiRoute ? { aiRoute } : {}) },
+    { prompt, table, ...(aiRoute ? { aiRoute } : {}), ...extra },
     { headers: dbHeaders() },
   );
-  return response.data.data;
+  return response.data.handoff ? response.data : response.data.data;
 };
 
 export interface QueryLogEntry {

@@ -286,13 +286,18 @@ const LessonNoteEditorPage: React.FC = () => {
     selectionHtml?: string,
     wholeNoteHtml?: string,
     aiRoute?: string,
+    extra?: Record<string, unknown>,
   ) => {
     const res = await lessonNotesApi.proposeAIEdit(noteId, {
       instruction,
       selection_html: selectionHtml,
       whole_note_html: wholeNoteHtml,
       ...(aiRoute ? { aiRoute } : {}),
+      ...extra,
     });
+    // Prompt mode ("Open in my AI") answers with the prompt instead of a revision.
+    const handoff = (res.data as { handoff?: { prompt: string } }).handoff;
+    if (handoff) return { html: "", handoff };
     return { html: res.data.data.html, ai: aiMetaOf(res.data) };
   };
 

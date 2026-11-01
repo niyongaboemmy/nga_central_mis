@@ -14,6 +14,7 @@ import {
 import { lessonPlanApi, AILessonGenerationStatus } from "../api/lessonPlan";
 import { useToast } from "../contexts/ToastContext";
 import AiSourceControl, { AiAnsweredBy } from "./ai/AiSourceControl";
+import HandoffControl from "./ai/HandoffControl";
 import { answeredByText } from "../api/myAi";
 
 interface Props {
@@ -81,12 +82,18 @@ const LessonPlanAIGenerate: React.FC<Props> = ({ entryId, lessonId, weekLabel, t
     }, POLL_INTERVAL_MS);
   };
 
-  const handleGenerate = async () => {
+  const validHours = () => {
     const hours = parseFloat(sessionHours);
     if (isNaN(hours) || hours <= 0 || hours > 12) {
       showToast("Enter a valid session length between 0 and 12 hours", "error");
-      return;
+      return false;
     }
+    return true;
+  };
+
+  const handleGenerate = async () => {
+    if (!validHours()) return;
+    const hours = parseFloat(sessionHours);
 
     setIsSubmitting(true);
     setJobStatus({ status: "loading", stepIndex: 1, totalSteps: 4, message: "Loading week context..." });
@@ -199,6 +206,21 @@ const LessonPlanAIGenerate: React.FC<Props> = ({ entryId, lessonId, weekLabel, t
                   </p>
                 </div>
                 <AiSourceControl task="author" value={aiRoute} onChange={setAiRoute} className="mb-4" />
+                <HandoffControl
+                  className="mb-4"
+                  disabled={isSubmitting}
+                  beforeRun={validHours}
+                  run={(extra) =>
+                    lessonPlanApi
+                      .startAIGenerate(entryId, parseFloat(sessionHours), lessonId, lessonDate, customPrompt.trim() || undefined, undefined, extra)
+                      .then((r) => r.data)
+                  }
+                  onImported={(body) => {
+                    // The pasted plan is already saved: the first poll reads "done".
+                    setJobStatus({ status: "saving", stepIndex: 4, totalSteps: 4, message: "Saving lesson plan..." });
+                    pollStatus(body.data.jobId);
+                  }}
+                />
                 <button
                   onClick={handleGenerate}
                   disabled={isSubmitting}

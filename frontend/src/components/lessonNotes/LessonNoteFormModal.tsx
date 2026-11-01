@@ -29,6 +29,7 @@ import {
 } from "../../api/lessonNotes";
 import { useDeleteLessonNote } from "./useDeleteLessonNote";
 import AiSourceControl, { AiAnsweredBy, aiRouteBody } from "../ai/AiSourceControl";
+import HandoffControl from "../ai/HandoffControl";
 import { answeredByText } from "../../api/myAi";
 import { useAcademicPeriod } from "../../contexts/AcademicPeriodContext";
 import { useToast } from "../../contexts/ToastContext";
@@ -324,21 +325,27 @@ const LessonNoteFormModal: React.FC<Props> = ({ isOpen, onClose, initialSubjectI
     setCreating(false);
   };
 
-  const generateWithAI = async () => {
+  const hasCriteria = () => {
     if (selectedCriteriaIds.length === 0) {
       showToast("Pick at least one Learning Outcome or performance criterion to generate from", "error");
-      return;
+      return false;
     }
+    return true;
+  };
+
+  const generateBody = () => ({
+    subject_id: Number(subjectId),
+    criteria_ids: selectedCriteriaIds,
+    class_group_id: classGroupId ? Number(classGroupId) : undefined,
+    academic_term_id: selectedTermId ?? undefined,
+    extra_instructions: extraInstructions.trim() || undefined,
+  });
+
+  const generateWithAI = async () => {
+    if (!hasCriteria()) return;
     setCreating(true);
     try {
-      const res = await lessonNotesApi.startAIGenerate({
-        subject_id: Number(subjectId),
-        criteria_ids: selectedCriteriaIds,
-        class_group_id: classGroupId ? Number(classGroupId) : undefined,
-        academic_term_id: selectedTermId ?? undefined,
-        extra_instructions: extraInstructions.trim() || undefined,
-        ...aiRouteBody(aiRoute),
-      });
+      const res = await lessonNotesApi.startAIGenerate({ ...generateBody(), ...aiRouteBody(aiRoute) });
       setJobStatus({ status: "loading", stepIndex: 1, totalSteps: 4, message: "Loading curriculum context..." });
       pollJob(res.data.data.jobId);
     } catch (err: any) {
@@ -856,6 +863,18 @@ const LessonNoteFormModal: React.FC<Props> = ({ isOpen, onClose, initialSubjectI
                     These are extra constraints for the AI — they can't override the selected topic or its curriculum criteria.
                   </p>
                   <AiSourceControl task="author" value={aiRoute} onChange={setAiRoute} className="mt-2" />
+                  <HandoffControl
+                    className="mt-2"
+                    disabled={creating}
+                    beforeRun={hasCriteria}
+                    run={(extra) => lessonNotesApi.startAIGenerate({ ...generateBody(), ...extra }).then((r) => r.data)}
+                    onImported={(body: any) => {
+                      // The pasted note is already saved as a draft: the first poll reads "done".
+                      setCreating(true);
+                      setJobStatus({ status: "saving", stepIndex: 4, totalSteps: 4, message: "Saving lesson note..." });
+                      pollJob(body.data.jobId);
+                    }}
+                  />
                 </div>
               )}
 

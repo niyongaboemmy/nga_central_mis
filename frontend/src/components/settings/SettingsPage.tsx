@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Bot, Code2, GraduationCap, History, KeyRound, LayoutGrid, Save, Settings as SettingsIcon } from "lucide-react";
-import { normalizeAiPersonalPolicy } from "../../vendor/nga-access";
+import { normalizeAiExternalPolicy, normalizeAiPersonalPolicy } from "../../vendor/nga-access";
 import PersonalAiPolicyCard from "./PersonalAiPolicyCard";
+import ExternalAiPolicyCard from "./ExternalAiPolicyCard";
 import ProvidersUsagePanel from "./ProvidersUsagePanel";
 import { AI_OFF_MESSAGE, aiPolicyApi, aiUnavailableReason, loadAiPolicy, rememberAiPolicy, type AiApp, type AiPolicy, type AiPolicyView } from "../../api/aiPolicy";
 import { Card, CardTitle, EmptyState, Muted, Spinner, inputCls, primaryBtn, secondaryBtn } from "../officeHours/ohUi";
@@ -35,7 +36,7 @@ const TURNS_OFF = [
   "AI grading on submit (short answers fall back to keyword marking)",
 ];
 
-type Draft = Pick<AiPolicy, "enabled" | "apps" | "features" | "assessments" | "thirdPartyExtensions" | "thirdPartyExtensionsStaff" | "personal">;
+type Draft = Pick<AiPolicy, "enabled" | "apps" | "features" | "assessments" | "thirdPartyExtensions" | "thirdPartyExtensionsStaff" | "personal" | "external">;
 const draftOf = (p: AiPolicy): Draft => ({
   enabled: p.enabled,
   apps: { ...p.apps },
@@ -46,6 +47,8 @@ const draftOf = (p: AiPolicy): Draft => ({
   thirdPartyExtensionsStaff: p.thirdPartyExtensionsStaff !== false,
   // My AI (people's own keys); a policy saved before it existed reads as the defaults (off).
   personal: normalizeAiPersonalPolicy(p.personal),
+  // Your own Claude / ChatGPT (hand-off, connector); all off until a super admin turns them on.
+  external: normalizeAiExternalPolicy(p.external),
 });
 
 const Switch: React.FC<{ on: boolean; onChange: (v: boolean) => void; label: string; disabled?: boolean; id?: string }> = ({ on, onChange, label, disabled, id }) => (
@@ -113,9 +116,14 @@ const AiPolicyCard: React.FC<{ view: AiPolicyView; onSaved: (v: AiPolicyView) =>
     setBusy(true);
     try {
       // The My AI rules go only when they changed, so older servers keep accepting the rest.
-      const { personal, ...rest } = draft;
-      const personalChanged = JSON.stringify(personal) !== JSON.stringify(draftOf(p).personal);
-      const r = await aiPolicyApi.save(personalChanged ? draft : rest);
+      // The same for "Your own Claude / ChatGPT".
+      const { personal, external, ...rest } = draft;
+      const before = draftOf(p);
+      const r = await aiPolicyApi.save({
+        ...rest,
+        ...(JSON.stringify(personal) !== JSON.stringify(before.personal) && { personal }),
+        ...(JSON.stringify(external) !== JSON.stringify(before.external) && { external }),
+      });
       const next: AiPolicyView = { ...view, policy: r.data.data.policy, updatedByName: r.data.data.updatedByName };
       rememberAiPolicy(next);
       onSaved(next);
@@ -228,6 +236,8 @@ const AiPolicyCard: React.FC<{ view: AiPolicyView; onSaved: (v: AiPolicyView) =>
       </Card>
 
       <PersonalAiPolicyCard value={draft.personal} onChange={(personal) => setDraft({ ...draft, personal })} />
+
+      <ExternalAiPolicyCard value={draft.external} onChange={(external) => setDraft({ ...draft, external })} />
 
       <Card labelledBy="ai-roles">
         <CardTitle id="ai-roles" icon={<KeyRound className="h-4 w-4" aria-hidden />}>Who may use AI</CardTitle>

@@ -50,14 +50,19 @@ const SUBSCRIPTIONS: Array<{ name: string; provider: string; text: string }> = [
     text: "A ChatGPT subscription does not include API use, and OpenAI does not let other websites use it. Create an API key at platform.openai.com (paid per use), or connect OpenRouter, which reaches the same GPT models.",
   },
   {
-    name: "Claude Pro / Max",
+    name: "Claude Pro / Max / Team",
     provider: "anthropic",
-    text: "A Claude subscription does not include API use, and Anthropic does not allow other apps to sign in with it. Create an API key at console.anthropic.com (paid per use), or connect OpenRouter for Claude models. Your subscription still works in Claude Code inside TMCode.",
+    text: "A Claude subscription does not include API use, and Anthropic does not allow other apps to sign in with it. Claude Max, Ultra and Team include monthly API credits: create a Console key at console.anthropic.com and add it here. Otherwise a key is paid per use, or connect OpenRouter for Claude models. Your subscription still works in Claude Code inside TMCode.",
   },
   {
     name: "Gemini Advanced / Google AI Pro",
     provider: "gemini",
-    text: "A Google AI subscription does not cover the Gemini API. Create a free API key at aistudio.google.com (18+ only), or connect OpenRouter.",
+    text: "A Google AI subscription does not cover the Gemini API. Create a free API key at aistudio.google.com (18+ only), or connect OpenRouter. Google Workspace for Education gives school accounts Gemini and NotebookLM free.",
+  },
+  {
+    name: "GitHub Copilot",
+    provider: "",
+    text: "Copilot answers inside your code editor, not in NGA web pages. Use it in VS Code next to TMCode.",
   },
 ];
 
@@ -220,7 +225,8 @@ const AddAiWizard: React.FC<Props> = ({ isOpen, onClose, providers, routes, isSt
               <div id={`${uid}-subs`} className="space-y-3 px-4 pb-4 text-sm text-slate-700 dark:text-gray-200">
                 <p>
                   Chat subscriptions are for the provider's own apps. They <strong>don't include API use</strong>, and the providers don't allow other websites
-                  to sign in with them, so they can't be connected here. What works:
+                  to sign in with them, so they can't be connected here. You can still take any NGA prompt to them with <strong>Open in my AI</strong> and paste
+                  the answer back, when your school turns it on. What works here:
                 </p>
                 <ul className="space-y-2">
                   {SUBSCRIPTIONS.map((s) => {

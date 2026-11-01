@@ -107,10 +107,13 @@ export const lessonPlanApi = {
     lessonDate?: string,
     customPrompt?: string,
     aiRoute?: string,
+    /** e.g. `aiHandoff` from HandoffControl ("Open in my AI" / "Paste the answer"). */
+    extra?: Record<string, unknown>,
   ) =>
     apiService.post<{ success: boolean; data: { jobId: string } }>(
       "/lesson-plans/ai-generate",
       {
+        ...extra,
         entry_id: entryId,
         lesson_id: lessonId,
         session_hours: sessionHours,

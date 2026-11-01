@@ -97,7 +97,9 @@ api.interceptors.response.use(
       // for the school." -- not that the person lacks permission.
       const body = error.response?.data as { code?: string; message?: string } | undefined;
       const aiRefusal = body?.code === "AI_DISABLED" || body?.code === "TUTOR_OFF";
-      if (showToast) {
+      // "Open in my AI" refusals (AI_HANDOFF_*) are shown inline by HandoffControl.
+      const handoffRefusal = typeof body?.code === "string" && body.code.startsWith("AI_HANDOFF_");
+      if (showToast && !handoffRefusal) {
         showToast(
           aiRefusal && body?.message ? body.message : "You don't have permission to access this resource",
           aiRefusal ? "warning" : "error",
