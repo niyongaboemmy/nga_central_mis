@@ -1,3 +1,5 @@
+import type { AiRouteMeta } from "./ai/personal/run";
+
 export type AILessonJobStatus =
   | "loading"
   | "analyzing"
@@ -14,6 +16,8 @@ export interface AILessonJobState {
   message: string;
   lessonId?: number;
   error?: string;
+  /** Which AI wrote the plan (school or the teacher's own key), for the "via …" chip. */
+  ai?: AiRouteMeta | null;
   updatedAt: number;
 }
 

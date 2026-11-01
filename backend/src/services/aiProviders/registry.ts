@@ -5,6 +5,8 @@ import { glmProvider } from "./glmProvider";
 import { openaiProvider } from "./openaiProvider";
 import { deepseekProvider } from "./deepseekProvider";
 import { openrouterProvider } from "./openrouterProvider";
+import { anthropicProvider } from "./anthropicProvider";
+import { cerebrasProvider, customProvider, mistralProvider } from "./compatProvider";
 
 const ALL_PROVIDERS: Record<string, AIProvider> = {
   gemini: geminiProvider,
@@ -13,6 +15,11 @@ const ALL_PROVIDERS: Record<string, AIProvider> = {
   openai: openaiProvider,
   deepseek: deepseekProvider,
   openrouter: openrouterProvider,
+  // Not in DEFAULT_ORDER: the school only uses these if its env lists them. My AI uses
+  // them with users' own keys (providerByName).
+  anthropic: anthropicProvider,
+  mistral: mistralProvider,
+  cerebras: cerebrasProvider,
 };
 
 const DEFAULT_ORDER = "gemini,groq,deepseek,openrouter,glm";
@@ -67,6 +74,12 @@ export function setTestProviders(providers: Record<string, AIProvider> | null): 
   testProviders = providers;
   cooldownUntil.clear();
   deadUntil.clear();
+}
+
+/** One provider by name (honours the test seam), for calls on a user's own key. */
+export function providerByName(name: string): AIProvider | undefined {
+  if (testProviders) return testProviders[name];
+  return name === "custom" ? customProvider : ALL_PROVIDERS[name];
 }
 
 export function isAnyProviderConfigured(): boolean {

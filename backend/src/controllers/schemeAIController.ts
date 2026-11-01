@@ -22,6 +22,9 @@ import { NotFoundError, ValidationError } from "../errors/CustomError";
 import { recordActivity } from "../utils/activityLogger";
 import logger from "../utils/logger";
 import { createJob, getJob, updateJob } from "../services/aiSchemeJobStore";
+import type { PersonalOption } from "../services/aiProviders/generate";
+import type { AiRouteMeta } from "../services/ai/personal/run";
+import { personalFor } from "../services/ai/personal/routes";
 import { ImportedElement } from "../services/curriculumImportJobStore";
 import { assertTeacherOwnsScheme } from "../utils/schemeAuthorization";
 import {
@@ -223,8 +226,9 @@ const generateWeeks = async (
   additionalInstructions?: string,
   criteriaList?: string[],
   loList?: { loNumber: number; title: string }[],
-): Promise<GeneratedWeek[]> => {
-  const { data: parsed } = await generateStructuredContent<{ weeks?: GeneratedWeek[] }>({
+  who: { actorUserId?: number; personal?: PersonalOption } = {},
+): Promise<{ weeks: GeneratedWeek[]; ai: AiRouteMeta | null }> => {
+  const { data: parsed, ai } = await generateStructuredContent<{ weeks?: GeneratedWeek[] }>({
     schemaName: "scheme_weeks",
     schema: {
       type: "object",
@@ -307,7 +311,7 @@ CURRICULUM CONTENT:
 """
 ${curriculumText}
 """`,
-  });
+  }, { feature: "scheme_weeks", actorUserId: who.actorUserId, personal: who.personal });
 
   const weeks: GeneratedWeek[] = Array.isArray(parsed.weeks)
     ? parsed.weeks
@@ -319,9 +323,10 @@ ${curriculumText}
     );
   }
 
-  return weeks
-    .sort((a, b) => (a.week_number || 0) - (b.week_number || 0))
-    .slice(0, maxWeeks);
+  return {
+    weeks: weeks.sort((a, b) => (a.week_number || 0) - (b.week_number || 0)).slice(0, maxWeeks),
+    ai: ai ?? null,
+  };
 };
 
 export interface BuiltWeekEntry {
@@ -463,6 +468,8 @@ const processJob = async (
      * subject had zero existing SubjectCompetency rows at request time (checked in
      * startAIGeneration) — see CURRICULUM_SCHEME_OF_WORK_INTEGRATION_IMPLEMENTATION_PLAN.md §5.3. */
     shouldGenerateCurriculum: boolean;
+    /** My AI routing, resolved from the request before the job started (no req in here). */
+    personal?: PersonalOption;
   },
 ) => {
   // Step numbering is conditional: 5 steps when curriculum extraction runs, 4 otherwise.
@@ -585,6 +592,7 @@ const processJob = async (
         proposedCurriculum = await generateCurriculumWithAI(
           rawText,
           params.subjectName,
+          { personal: params.personal, actorUserId: params.userId },
         );
         criteriaForPrompt = proposedCurriculum.flatMap((el) =>
           el.criteria.map((c) => ({
@@ -653,7 +661,7 @@ const processJob = async (
       totalSteps,
     });
 
-    const generatedWeeks = await generateWeeks(
+    const { weeks: generatedWeeks, ai } = await generateWeeks(
       rawText,
       contentCount,
       params.subjectName,
@@ -662,6 +670,7 @@ const processJob = async (
         ? criteriaForPrompt.map((c) => `${c.criteria_number}: ${c.description}`)
         : undefined,
       loListForPrompt.length > 0 ? loListForPrompt : undefined,
+      { actorUserId: params.userId, personal: params.personal },
     );
 
     updateJob(jobId, {
@@ -769,6 +778,7 @@ const processJob = async (
       message: "Scheme of work generated successfully!",
       schemeId,
       entriesCount: entries.length,
+      ai,
       stepIndex: stepFor.saving,
       totalSteps,
       ...(proposedCurriculum
@@ -940,6 +950,8 @@ export const startAIGeneration = asyncHandler(async (req: any, res: any) => {
     shouldGenerateCurriculum = !existingCompetency;
   }
 
+  // Resolved now: the job runs after the response, without the request.
+  const personal = await personalFor(req, "author");
   const jobId = randomUUID();
 
   createJob(jobId, userId);
@@ -966,6 +978,7 @@ export const startAIGeneration = asyncHandler(async (req: any, res: any) => {
         ? additional_instructions.trim().slice(0, MAX_ADDITIONAL_INSTRUCTIONS_CHARS)
         : undefined,
     shouldGenerateCurriculum,
+    personal,
   });
 });
 
@@ -991,6 +1004,7 @@ export const getAIGenerationStatus = asyncHandler(
       entryCriteriaNumbers: job.entryCriteriaNumbers,
       autoTaggedCriteriaCount: job.autoTaggedCriteriaCount,
       entryLoNumbers: job.entryLoNumbers,
+      ai: job.ai ?? null,
     });
   },
 );
@@ -1035,7 +1049,7 @@ export const suggestEntryContent = asyncHandler(async (req: any, res: any) => {
     throw new ValidationError("A prompt is required");
   }
 
-  const { data: parsed } = await generateStructuredContent<any>({
+  const { data: parsed, ai } = await generateStructuredContent<any>({
     schemaName: "scheme_entry",
     schema: singleEntrySchema,
     prompt: `You are an experienced, subject-matter-expert teacher of "${subject_name || "this subject"}",
@@ -1050,6 +1064,10 @@ Follow those instructions to produce this week's entry. Provide: the topic (indi
 sub-topic, a clear learning objective, the teaching methodology/activities, resources needed, the evaluation /
 evidence of formative assessment, the learning place, and any observation notes. Keep each field concise (1-3
 sentences) and write it the way a teacher who actually teaches this subject would — specific, not generic filler.`,
+  }, {
+    feature: "scheme_entry",
+    actorUserId: Number(req.user.userId),
+    personal: await personalFor(req, "author"),
   });
 
   if (!parsed.topic) {
@@ -1058,5 +1076,5 @@ sentences) and write it the way a teacher who actually teaches this subject woul
     );
   }
 
-  successResponse(res, "Entry content generated", parsed);
+  successResponse(res, "Entry content generated", { ...parsed, ai: ai ?? null });
 });

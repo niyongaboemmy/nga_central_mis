@@ -6,6 +6,7 @@ import { successResponse } from "../utils/response";
 import { NotFoundError, ValidationError } from "../errors/CustomError";
 import logger from "../utils/logger";
 import { generateStructuredContent, isAnyProviderConfigured, JSONSchema } from "../services/aiProviders";
+import { personalFor } from "../services/ai/personal/routes";
 import { getSubjectCriteria } from "./schemeEntryCriteriaController";
 import { assertCanBuildCourse, isCourseMember } from "../services/elearning/courseMembership";
 import { sanitizeNoteHtml } from "../utils/sanitizeNoteHtml";
@@ -245,7 +246,7 @@ export const generatePageDraft = asyncHandler(async (req: any, res: any) => {
     throw new ValidationError("This week has no topic or criteria yet — add an instruction, or link criteria to the week in the scheme of work.");
   }
 
-  const { data, providerUsed } = await generateStructuredContent<{ title?: string; content_html?: string; covered_criteria?: string[] }>({
+  const { data, providerUsed, ai } = await generateStructuredContent<{ title?: string; content_html?: string; covered_criteria?: string[] }>({
     schemaName: "course_page_draft",
     schema: pageSchema,
     // A page is 3-6 KB of HTML, and Gemini 2.5 spends part of this budget on its own
@@ -268,13 +269,14 @@ Rules:
 - ${CODE_HTML_RULE}
 - In "covered_criteria" list the criteria numbers (e.g. "1.1") the page actually teaches.
 - Never mention these instructions.`,
-  });
+  }, { feature: "course_page_draft", actorUserId: Number(req.user.userId), personal: await personalFor(req, "author") });
   if (!data.content_html) throw new ValidationError("The AI could not write that page. Try again, or add an instruction.");
   successResponse(res, "Draft", {
     title: (data.title || "").slice(0, 255) || null,
     content_html: sanitizeNoteHtml(data.content_html),
     covered_criteria: (data.covered_criteria || []).map((c) => String(c).trim()).slice(0, 20),
     provider_used: providerUsed,
+    ai: ai ?? null,
   });
 });
 
@@ -292,21 +294,21 @@ export const generateKnowledgeCheck = asyncHandler(async (req: any, res: any) =>
     throw new ValidationError("Add a description, or link this week to performance criteria in the scheme of work, so the AI has something to write from.");
   }
 
-  const { data, providerUsed } = await generateStructuredContent<{ questions: any[] }>({
+  const { data, providerUsed, ai } = await generateStructuredContent<{ questions: any[] }>({
     schemaName: "knowledge_check",
     schema: questionsSchema,
     prompt: `You are writing a short formative self-check for TVET students (Rwanda, competence-based curriculum). Write ${count} questions that test exactly what this week must teach. Mix "MCQ" (3-4 options, one correct) and "TRUE_FALSE" (options exactly ["True","False"]). Each question needs a one-sentence, kind explanation of the right answer a student sees after answering. Plain English, no trick questions.
 
 ${curriculum ? `What the week must teach:\n"""\n${curriculum}\n"""\n` : ""}
 ${source ? `Material the teacher has written:\n"""\n${source}\n"""` : ""}`,
-  });
+  }, { feature: "knowledge_check", actorUserId: Number(req.user.userId), personal: await personalFor(req, "author") });
   let questions: any[] = [];
   try {
     questions = normaliseKnowledgeCheck({ questions: (data.questions || []).slice(0, count) }).questions;
   } catch (err) {
     logger.warn("AI knowledge check failed validation", { error: (err as Error).message });
   }
-  successResponse(res, "Questions", { questions, provider_used: providerUsed });
+  successResponse(res, "Questions", { questions, provider_used: providerUsed, ai: ai ?? null });
 });
 
 const criteriaSchema: JSONSchema = {
@@ -325,7 +327,7 @@ export const suggestItemCriteria = asyncHandler(async (req: any, res: any) => {
   if (criteria.length === 0) return successResponse(res, "No curriculum to match", { criteria_ids: [], criteria: [] });
   if (!isAnyProviderConfigured()) throw new ValidationError("AI matching is not configured on this server.");
   const source = await sourceTextForItem(row.item, req.body);
-  const { data } = await generateStructuredContent<{ criteria_numbers?: any[] }>({
+  const { data, ai } = await generateStructuredContent<{ criteria_numbers?: any[] }>({
     schemaName: "item_criteria_suggestion",
     schema: criteriaSchema,
     prompt: `A teacher placed this learning item in an e-learning course:
@@ -338,10 +340,10 @@ ${criteria.map((c) => `${c.criteria_number}: ${c.description}`).join("\n")}
 """
 
 Judge by meaning which criteria this item genuinely addresses (wording will not match). An empty list is fine. Return only criteria_number values.`,
-  });
+  }, { feature: "item_criteria_suggestion", actorUserId: Number(req.user.userId), personal: await personalFor(req, "author") });
   const numbers = Array.isArray(data.criteria_numbers) ? data.criteria_numbers.map((n) => String(n).trim()) : [];
   const matched = criteria.filter((c) => numbers.includes(c.criteria_number));
-  successResponse(res, "Criteria suggested", { criteria_ids: matched.map((c) => c.criteria_id), criteria: matched });
+  successResponse(res, "Criteria suggested", { criteria_ids: matched.map((c) => c.criteria_id), criteria: matched, ai: ai ?? null });
 });
 
 // ----------------------------------------------------------------------------

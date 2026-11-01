@@ -1,3 +1,5 @@
+import type { AiRouteMeta } from "./ai/personal/run";
+
 export type AINotesJobStatus =
   | "loading"
   | "analyzing"
@@ -17,6 +19,8 @@ export interface AINotesJobState {
   /** Which AI provider actually answered (gemini/groq/deepseek/openrouter/glm) — set once known, mainly for
    * debugging fallback behavior; omitted from the message text on the common path (gemini). */
   providerUsed?: string;
+  /** Which AI wrote the note (school or the teacher's own key), for the "via …" chip. */
+  ai?: AiRouteMeta | null;
   updatedAt: number;
 }
 

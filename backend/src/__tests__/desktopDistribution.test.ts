@@ -1,6 +1,6 @@
 // NGA Desktop distribution: the /apps page's release info, counted downloads,
 // the in-app updater endpoint, and the admin stats.
-import { describe, it, expect, vi, beforeAll, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeAll, beforeEach, afterAll } from "vitest";
 import fs from "fs";
 import os from "os";
 import path from "path";
@@ -20,13 +20,29 @@ vi.mock("../services/access/policy", () => ({
   requireCapability: () => (_req: any, res: any, next: any) => (access.allowed ? next() : res.status(403).json({ message: "Forbidden" })),
 }));
 
-import desktopRoutes, { parseUpdateReport } from "../routes/desktop";
-import { clearReleaseCache, compareVersions } from "../services/desktop/releases";
+// Every test file shares one module cache (vitest isolate: false). If an earlier file already
+// loaded the real modules, the mocks above would not apply, so this file loads its own fresh
+// copies, and afterAll drops them again so no later file sees the mocks.
+let parseUpdateReport: typeof import("../routes/desktop").parseUpdateReport;
+let clearReleaseCache: typeof import("../services/desktop/releases").clearReleaseCache;
+let compareVersions: typeof import("../services/desktop/releases").compareVersions;
 
 const app = express();
 app.set("trust proxy", "loopback");
 app.use(express.json());
-app.use("/desktop", desktopRoutes);
+
+beforeAll(async () => {
+  vi.resetModules();
+  const routes = await import("../routes/desktop");
+  ({ parseUpdateReport } = routes);
+  ({ clearReleaseCache, compareVersions } = await import("../services/desktop/releases"));
+  app.use("/desktop", routes.default);
+});
+
+afterAll(() => {
+  for (const m of ["../services/activity/db", "../middleware/activityAuth", "../middleware/auth", "../services/access/policy"]) vi.doUnmock(m);
+  vi.resetModules();
+});
 
 const release = (version: string) => ({
   version,

@@ -1,19 +1,26 @@
 import { ServiceUnavailableError } from "../../errors/CustomError";
 import logger from "../../utils/logger";
-import { AIRole, GenerateJSONParams, TokenUsage } from "./types";
-import { orderedProviders, isCoolingDown, markCoolingDown, isParkedDead, markDead, roleOrder } from "./registry";
-import { isQuotaError, isDeadProviderError, friendlyAIErrorMessage, classifyAIError } from "./errors";
+import { AIRole, GenerateJSONParams, ProviderCredential, TokenUsage } from "./types";
+import { providerByName, orderedProviders, isCoolingDown, markCoolingDown, isParkedDead, markDead, roleOrder } from "./registry";
+import { isQuotaError, isDeadProviderError, friendlyAIErrorMessage, classifyAIError, PersonalAIError, personalAIErrorCode } from "./errors";
 import { acquireSlot, checkAvailability, noteAttempt, Unavailable } from "./limiter";
 import { logAIUsage } from "./usageLog";
 import { assertAiAppEnabled } from "../ai/policy";
 import type { AiApp } from "../../vendor/nga-access";
+import type { AiRouteMeta } from "../ai/personal/run";
+import type { PersonalCallContext, PersonalWho } from "../ai/personal/routes";
 
 export interface GenerateStructuredContentResult<T> {
   data: T;
   providerUsed: string;
   model?: string;
   usage?: TokenUsage;
+  /** Which AI answered (school or the user's own key), when the call went through My AI. */
+  ai?: AiRouteMeta;
 }
+
+/** Let the user's own key answer when their My AI routes say so (see personalFor()). */
+export type PersonalOption = PersonalCallContext & { who: PersonalWho };
 
 export interface GenerateStructuredContentOptions {
   /** Try these providers, in this order, instead of AI_PROVIDER_ORDER — see orderedProviders(). */
@@ -34,7 +41,19 @@ export interface GenerateStructuredContentOptions {
   runId?: number | null;
   /** Whose AI switch applies (school AI policy); default "mis". */
   app?: AiApp;
+  /**
+   * Answer with this key instead of the school chain (a user's own provider account,
+   * PERSONAL_AI_PROVIDERS_PLAN.md §7.1). Only this provider is tried; there is no fallback
+   * here, because whether to fall back to School AI is the caller's decision. The school's
+   * quotas, cooldowns and dead-key parking are neither consulted nor touched.
+   */
+  credential?: ProviderCredential & { provider: string; credentialId?: number };
+  /** My AI routing for an interactive call by a person; never set on bulk or background work. */
+  personal?: PersonalOption;
 }
+
+export { PersonalAIError, personalAIErrorCode } from "./errors";
+export type { PersonalAIErrorCode } from "./errors";
 
 /**
  * Thrown when no provider can take the call because every free quota is used up (or held in
@@ -60,6 +79,23 @@ export async function generateStructuredContent<T = any>(
   // School AI policy (AI_USAGE_CONTROL_PLAN.md §4.4): nothing reaches a provider while
   // AI is off -- AiDisabledError, a 403 AI_DISABLED, whatever route or job called us.
   await assertAiAppEnabled(options?.app ?? "mis");
+  if (options?.credential) return generateWithCredential<T>(params, options, options.credential);
+  if (options?.personal && !options.bulk) {
+    // Loaded on first use: the provider layer must not pull My AI's database, access and
+    // activity modules into everything that imports it (or its tests' mocks).
+    const { withPersonalAi } = await import("../ai/personal/run");
+    const { personal, ...rest } = options;
+    const { result, ai } = await withPersonalAi(
+      personal.who,
+      personal,
+      {
+        personal: (credential) => generateStructuredContent<T>(params, { ...rest, credential }),
+        school: () => generateStructuredContent<T>(params, rest),
+      },
+      (r) => ({ provider: r.providerUsed, model: r.model }),
+    );
+    return { ...result, ai };
+  }
   const providers = orderedProviders(options?.providerOrder ?? roleOrder(options?.role));
   const exclude = new Set(options?.excludeProviders ?? []);
   const quotaBlocked: Record<string, Unavailable | "QUOTA"> = {};
@@ -100,6 +136,7 @@ export async function generateStructuredContent<T = any>(
         actor_user_id: options?.actorUserId ?? null,
         course_id: options?.courseId ?? null,
         run_id: options?.runId ?? null,
+        app: options?.app ?? "mis",
         occurred_at: startedAt,
       });
       return { data: result.data, providerUsed: provider.name, model: result.model, usage: result.usage };
@@ -118,6 +155,7 @@ export async function generateStructuredContent<T = any>(
         actor_user_id: options?.actorUserId ?? null,
         course_id: options?.courseId ?? null,
         run_id: options?.runId ?? null,
+        app: options?.app ?? "mis",
         occurred_at: startedAt,
       });
       if (isDeadProviderError(err)) {
@@ -143,4 +181,45 @@ export async function generateStructuredContent<T = any>(
   }
   if (failuresAllQuota && blocked) throw new AIQuotaExhaustedError(quotaBlocked);
   throw new ServiceUnavailableError(friendlyAIErrorMessage(lastErr));
+}
+
+async function generateWithCredential<T>(
+  params: GenerateJSONParams,
+  options: GenerateStructuredContentOptions,
+  credential: NonNullable<GenerateStructuredContentOptions["credential"]>,
+): Promise<GenerateStructuredContentResult<T>> {
+  const provider = providerByName(credential.provider);
+  if (!provider) throw new PersonalAIError("AI_PERSONAL_FAILED", credential.provider);
+  const startedAt = new Date();
+  const base = {
+    feature: options.feature ?? params.schemaName ?? "unknown",
+    role: options.role ?? null,
+    bulk: options.bulk,
+    provider: provider.name,
+    actor_user_id: options.actorUserId ?? null,
+    course_id: options.courseId ?? null,
+    run_id: options.runId ?? null,
+    app: options.app ?? "mis",
+    route: "personal" as const,
+    credential_id: credential.credentialId ?? null,
+    occurred_at: startedAt,
+  };
+  try {
+    const result = await provider.generateJSON<T>(params, credential);
+    logAIUsage({
+      ...base,
+      model: result.model,
+      ok: true,
+      latency_ms: Date.now() - startedAt.getTime(),
+      input_tokens: result.usage?.input_tokens ?? null,
+      output_tokens: result.usage?.output_tokens ?? null,
+    });
+    return { data: result.data, providerUsed: provider.name, model: result.model, usage: result.usage };
+  } catch (err: any) {
+    // The provider's message can echo the key back, so only the class and status are logged.
+    const errorClass = classifyAIError(err);
+    logger.warn(`Personal AI key (${provider.name}) failed`, { class: errorClass, status: err?.status });
+    logAIUsage({ ...base, model: credential.model ?? null, ok: false, error_class: errorClass, latency_ms: Date.now() - startedAt.getTime() });
+    throw new PersonalAIError(personalAIErrorCode(err), provider.name);
+  }
 }

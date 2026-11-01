@@ -1,3 +1,5 @@
+import { ServiceUnavailableError } from "../../errors/CustomError";
+
 // Every provider SDK throws its own shape of error (the @google/genai SDK puts the raw
 // provider error JSON straight into `.message`; OpenAI-compatible clients set `.status`).
 // Centralize "is this a quota/rate-limit error" and "what should the teacher see" here so
@@ -25,6 +27,8 @@ const isSafetyBlock = (err: any): boolean => {
 export const friendlyAIErrorMessage = (err: any): string => {
   // Refused by the school AI policy (services/ai/policy.ts): its message is already for people.
   if (err?.code === "AI_DISABLED" && typeof err?.message === "string") return err.message;
+  // The person's own key failed (My AI): say what to fix ("out of credit", "refused").
+  if (/^AI_(KEY|PERSONAL)_/.test(String(err?.code ?? "")) && typeof err?.message === "string") return err.message;
   if (isQuotaError(err)) {
     return "The AI is temporarily rate-limited. Please try again in a few minutes.";
   }
@@ -65,3 +69,29 @@ export const classifyAIError = (err: any): AIErrorClass => {
   if (isSafetyBlock(err)) return "SAFETY";
   return "OTHER";
 };
+
+// --- A user's own key (My AI, PERSONAL_AI_PROVIDERS_PLAN.md §7.1) --------------------------
+
+export type PersonalAIErrorCode = "AI_KEY_INVALID" | "AI_KEY_NO_CREDIT" | "AI_KEY_RATE_LIMITED" | "AI_PERSONAL_FAILED";
+
+const PERSONAL_AI_MESSAGES: Record<PersonalAIErrorCode, string> = {
+  AI_KEY_INVALID: "Your AI key was refused by the provider. Check it in My AI.",
+  AI_KEY_NO_CREDIT: "Your AI account is out of credit.",
+  AI_KEY_RATE_LIMITED: "Your AI account is rate-limited right now. Try again shortly.",
+  AI_PERSONAL_FAILED: "Your AI provider could not answer. Please try again.",
+};
+
+/** A call on a user's own key failed. The code says why, so the UI can tell them what to fix. */
+export class PersonalAIError extends ServiceUnavailableError {
+  constructor(readonly code: PersonalAIErrorCode, readonly provider: string) {
+    super(PERSONAL_AI_MESSAGES[code]);
+  }
+}
+
+export function personalAIErrorCode(err: any): PersonalAIErrorCode {
+  const raw = [err?.message, err?.error?.message, err?.code, err?.error?.code].filter(Boolean).join(" ");
+  if (err?.status === 402 || /insufficient_quota|insufficient (balance|credits)|payment required/i.test(raw)) return "AI_KEY_NO_CREDIT";
+  if (isDeadProviderError(err)) return "AI_KEY_INVALID";
+  if (isQuotaError(err)) return "AI_KEY_RATE_LIMITED";
+  return "AI_PERSONAL_FAILED";
+}

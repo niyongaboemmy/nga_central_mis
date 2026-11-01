@@ -92,6 +92,8 @@ export interface AILessonGenerationStatus {
   message: string;
   lessonId?: number;
   error?: string;
+  /** Which AI wrote the plan (School AI or the teacher's own key). */
+  ai?: import("./myAi").AiRouteMeta | null;
 }
 
 export const lessonPlanApi = {
@@ -104,6 +106,7 @@ export const lessonPlanApi = {
     lessonId?: number,
     lessonDate?: string,
     customPrompt?: string,
+    aiRoute?: string,
   ) =>
     apiService.post<{ success: boolean; data: { jobId: string } }>(
       "/lesson-plans/ai-generate",
@@ -113,6 +116,7 @@ export const lessonPlanApi = {
         session_hours: sessionHours,
         lesson_date: lessonDate,
         custom_prompt: customPrompt,
+        ...(aiRoute ? { aiRoute } : {}),
       },
     ),
 

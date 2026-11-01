@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import { aiMetaOf } from "../../api/myAi";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import {
   ArrowLeft,
@@ -284,13 +285,15 @@ const LessonNoteEditorPage: React.FC = () => {
     instruction: string,
     selectionHtml?: string,
     wholeNoteHtml?: string,
-  ): Promise<string> => {
+    aiRoute?: string,
+  ) => {
     const res = await lessonNotesApi.proposeAIEdit(noteId, {
       instruction,
       selection_html: selectionHtml,
       whole_note_html: wholeNoteHtml,
+      ...(aiRoute ? { aiRoute } : {}),
     });
-    return res.data.data.html;
+    return { html: res.data.data.html, ai: aiMetaOf(res.data) };
   };
 
   useEffect(() => {

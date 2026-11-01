@@ -72,13 +72,16 @@ import { QUICK_PROMPTS } from "./quickPrompts";
 import { Activity, InlineCheck, Reveal } from "../elearning/interactive/nodes";
 import { CodePlayground } from "../elearning/interactive/playgroundNode";
 import { normalizePreLineBreaks } from "../codePlayground/codeText";
+import AiSourceControl, { AiAnsweredBy } from "../ai/AiSourceControl";
+import type { AiRouteMeta } from "../../api/myAi";
 
 interface Props {
   initialContent: any;
   editable: boolean;
   onChange: (json: any, html: string) => void;
   onUploadImage: (file: File) => Promise<string>;
-  onRequestAIEdit: (instruction: string, selectionHtml?: string, wholeNoteHtml?: string) => Promise<string>;
+  /** Returns the revised HTML, or it with which AI wrote it (`aiRoute`: My AI choice for this request). */
+  onRequestAIEdit: (instruction: string, selectionHtml?: string, wholeNoteHtml?: string, aiRoute?: string) => Promise<string | { html: string; ai?: AiRouteMeta | null }>;
   onAIEditAccepted: (instruction: string) => void;
   /** Renders the note body as a centered, fixed-width A4-like page with side margins
    * instead of stretching edge to edge — only worth the visual overhead in fullscreen,
@@ -271,7 +274,8 @@ const LessonNoteRichEditor: React.FC<Props> = ({
   const [aiPanelOpen, setAiPanelOpen] = useState(false);
   const [instruction, setInstruction] = useState("");
   const [aiLoading, setAiLoading] = useState(false);
-  const [proposal, setProposal] = useState<{ originalHtml: string; revisedHtml: string; range: { from: number; to: number } | null } | null>(null);
+  const [proposal, setProposal] = useState<{ originalHtml: string; revisedHtml: string; range: { from: number; to: number } | null; ai?: AiRouteMeta | null } | null>(null);
+  const [aiRoute, setAiRoute] = useState("");
   // Captured the moment the AI panel opens, not read live off the editor — otherwise
   // clicking into the instruction input (which can shift focus/selection) would silently
   // drop the very passage the teacher just highlighted.
@@ -560,15 +564,17 @@ const LessonNoteRichEditor: React.FC<Props> = ({
       // For a whole-note edit, send the editor's live HTML rather than relying on the
       // last autosave having landed — autosave is debounced, so content typed moments
       // ago could otherwise still read back as empty/stale on the server.
-      const revisedHtml = await onRequestAIEdit(
+      const revised = await onRequestAIEdit(
         finalInstruction,
         capturedSelection?.html,
         capturedSelection ? undefined : editor.getHTML(),
+        aiRoute || undefined,
       );
       setProposal({
         originalHtml: capturedSelection?.html ?? editor.getHTML(),
-        revisedHtml,
+        revisedHtml: typeof revised === "string" ? revised : revised.html,
         range: capturedSelection?.range ?? null,
+        ai: typeof revised === "string" ? null : revised.ai,
       });
     } catch (err: any) {
       showToast(err?.response?.data?.message || "AI could not revise this content", "error");
@@ -1109,10 +1115,14 @@ const LessonNoteRichEditor: React.FC<Props> = ({
                   {aiLoading ? "Thinking..." : "Generate"}
                 </button>
               </div>
+              <AiSourceControl task="author" value={aiRoute} onChange={setAiRoute} disabled={aiLoading} />
             </div>
           ) : (
             <div className="flex flex-col gap-3">
-              <span className="text-xs font-semibold text-violet-700 dark:text-violet-300">Review the AI's proposed change</span>
+              <span className="flex flex-wrap items-center gap-2 text-xs font-semibold text-violet-700 dark:text-violet-300">
+                Review the AI's proposed change
+                <AiAnsweredBy ai={proposal.ai} />
+              </span>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-64 overflow-y-auto">
                 <div className="rounded-lg border border-gray-200 dark:border-gray-700/50 bg-white dark:bg-gray-800 p-3">
                   <div className="text-[10px] uppercase tracking-wide text-gray-400 mb-1.5">Before</div>

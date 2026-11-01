@@ -48,6 +48,9 @@ import {
  */
 import * as cheerio from "cheerio";
 import { assertAi } from "../services/ai/gate";
+import { personalFor } from "../services/ai/personal/routes";
+import type { PersonalOption } from "../services/aiProviders/generate";
+import type { AiRouteMeta } from "../services/ai/personal/run";
 
 interface AIExtractedEntry {
   week_number: number;
@@ -100,8 +103,9 @@ const aiExtractedEntrySchema: JSONSchema = {
 const extractEntriesWithAI = async (
   documentText: string,
   subjectName: string,
-): Promise<AIExtractedEntry[]> => {
-  const { data: parsed } = await generateStructuredContent<{
+  who: { actorUserId?: number; personal?: PersonalOption } = {},
+): Promise<{ entries: AIExtractedEntry[]; ai: AiRouteMeta | null }> => {
+  const { data: parsed, ai } = await generateStructuredContent<{
     entries?: AIExtractedEntry[];
   }>({
     schemaName: "scheme_of_work_entries",
@@ -148,12 +152,15 @@ repeated structure to tell entries apart):
 """
 ${documentText}
 """`,
-  });
+  }, { feature: "scheme_of_work_entries", actorUserId: who.actorUserId, personal: who.personal });
 
   const list = Array.isArray(parsed.entries) ? parsed.entries : [];
-  return list
-    .filter((e) => e && typeof e.topic === "string" && e.topic.trim())
-    .sort((a, b) => (a.week_number || 0) - (b.week_number || 0));
+  return {
+    entries: list
+      .filter((e) => e && typeof e.topic === "string" && e.topic.trim())
+      .sort((a, b) => (a.week_number || 0) - (b.week_number || 0)),
+    ai: ai ?? null,
+  };
 };
 
 export const uploadAndExtractScheme = asyncHandler(
@@ -404,6 +411,8 @@ export const uploadAndExtractScheme = asyncHandler(
     });
 
     let usedAIExtraction = false;
+    // Which AI read the document, when the AI fallback ran (null otherwise).
+    let ai: AiRouteMeta | null = null;
 
     if (entries.length === 0) {
       if (!isAnyProviderConfigured()) {
@@ -433,10 +442,13 @@ export const uploadAndExtractScheme = asyncHandler(
         .where(eq(Subject.subject_id, subjectId))
         .limit(1);
 
-      const aiEntries = await extractEntriesWithAI(
+      const extracted = await extractEntriesWithAI(
         rawText,
         subjectRecord?.name || "this subject",
+        { actorUserId: Number(req.user.userId), personal: await personalFor(req, "author") },
       );
+      const aiEntries = extracted.entries;
+      ai = extracted.ai;
 
       if (aiEntries.length === 0) {
         throw new ValidationError(
@@ -581,6 +593,7 @@ export const uploadAndExtractScheme = asyncHandler(
     successResponse(res, "Scheme of work extracted and saved successfully", {
       schemeId,
       entriesCount: entries.length,
+      ai,
     });
   },
 );

@@ -1,3 +1,5 @@
+import type { AiRouteMeta } from "./ai/personal/run";
+
 export type CurriculumImportJobStatus =
   | "parsing"
   | "analyzing"
@@ -29,6 +31,8 @@ export interface CurriculumImportJobState {
   sourceFilename?: string;
   elements?: ImportedElement[];
   error?: string;
+  /** Which AI read the document (school or the user's own key), for the "via …" chip. */
+  ai?: AiRouteMeta | null;
   updatedAt: number;
 }
 

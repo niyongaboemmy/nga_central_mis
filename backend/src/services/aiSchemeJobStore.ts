@@ -1,4 +1,5 @@
 import { ImportedElement } from "./curriculumImportJobStore";
+import type { AiRouteMeta } from "./ai/personal/run";
 
 export type AISchemeJobStatus =
   | "parsing"
@@ -18,6 +19,8 @@ export interface AISchemeJobState {
   schemeId?: number;
   entriesCount?: number;
   error?: string;
+  /** Which AI planned the weeks (school or the teacher's own key), for the "via …" chip. */
+  ai?: AiRouteMeta | null;
   updatedAt: number;
   /** Set when curriculum generation was requested and ran (subject had none) — awaiting the
    * user's confirm/skip decision, reusing the "Import from Curriculum" preview+confirm flow. */

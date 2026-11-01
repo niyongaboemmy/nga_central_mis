@@ -81,6 +81,20 @@ if (config.nodeEnv !== "test") {
   setTimeout(runMentorshipSweep, 90_000);
   setInterval(runMentorshipSweep, 3 * 60 * 60 * 1000).unref();
 
+  // My AI: once a day, re-check people's own AI keys used in the last 30 days, so a revoked
+  // key or an empty account shows up in My AI before the next call fails.
+  const runKeySweep = async () => {
+    try {
+      const { sweepCredentials } = await import("./services/ai/personal/credentials");
+      const r = await sweepCredentials();
+      if (r.checked) logger.info(`[my-ai] key sweep: ${r.checked} checked, ${r.changed} changed`);
+    } catch (error) {
+      logger.error("[my-ai] key sweep failed", { error });
+    }
+  };
+  setTimeout(runKeySweep, 5 * 60_000);
+  setInterval(runKeySweep, 24 * 60 * 60 * 1000).unref();
+
   // Access control v2 (ACCESS_LEVELS_RBAC_IMPLEMENTATION_PLAN.md): register
   // the MIS capability manifest, seed presets/rules (insert-only), then keep
   // rule-owned grants converged with placements once a day. Never throws;

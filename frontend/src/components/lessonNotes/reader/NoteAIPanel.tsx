@@ -17,6 +17,8 @@ import {
 } from "lucide-react";
 import { lessonNotesApi, NoteAskAnswer } from "../../../api/lessonNotes";
 import { enhanceCodeBlocks } from "../../codeWindow/codeWindow";
+import AiSourceControl, { AiAnsweredBy, aiRouteBody } from "../../ai/AiSourceControl";
+import type { AiRouteMeta } from "../../../api/myAi";
 
 export type AskMode = "explain" | "simplify" | "example" | "define" | "quiz";
 
@@ -40,6 +42,8 @@ interface Message {
   followUps?: string[];
   grounded?: boolean;
   error?: boolean;
+  /** Which AI answered (My AI). */
+  ai?: AiRouteMeta | null;
 }
 
 interface Props {
@@ -113,6 +117,7 @@ const NoteAIPanel: React.FC<Props> = ({
   const [input, setInput] = useState("");
   const [pendingSelection, setPendingSelection] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [aiRoute, setAiRoute] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const lastRequestId = useRef<number>(0);
@@ -160,6 +165,7 @@ const NoteAIPanel: React.FC<Props> = ({
           selection_text: selection,
           mode,
           history,
+          ...aiRouteBody(aiRoute),
         });
         const answer: NoteAskAnswer = res.data.data;
         setMessages((prev) => [
@@ -171,6 +177,7 @@ const NoteAIPanel: React.FC<Props> = ({
             keyPoints: answer.key_points,
             followUps: answer.follow_ups,
             grounded: answer.grounded,
+            ai: answer.ai ?? null,
           },
         ]);
       } catch (err: any) {
@@ -189,7 +196,7 @@ const NoteAIPanel: React.FC<Props> = ({
         setBusy(false);
       }
     },
-    [busy, messages, noteId],
+    [busy, messages, noteId, aiRoute],
   );
 
   // Requests arriving from the reader's selection toolbar / header buttons.
@@ -335,6 +342,7 @@ const NoteAIPanel: React.FC<Props> = ({
                         }`}
                       >
                         {m.html ? <AssistantBody html={m.html} /> : <p>{m.text}</p>}
+                        {m.ai && <AiAnsweredBy ai={m.ai} className="mt-2" />}
 
                         {m.keyPoints && m.keyPoints.length > 0 && (
                           <div className="mt-3 pt-3 border-t border-gray-200/70 dark:border-gray-700/60">
@@ -445,6 +453,7 @@ const NoteAIPanel: React.FC<Props> = ({
                   {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ArrowUp className="w-3.5 h-3.5" />}
                 </button>
               </div>
+              <AiSourceControl task="assist" value={aiRoute} onChange={setAiRoute} className="mt-1.5 px-1" />
               <p className="flex items-center gap-1 text-[10px] text-gray-400 mt-1.5 px-1">
                 <CornerDownLeft className="w-2.5 h-2.5" /> Enter to send · AI answers can be imperfect — always
                 double-check against the note.

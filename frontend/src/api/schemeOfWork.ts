@@ -137,6 +137,8 @@ export interface AIGenerationStatus {
   /** Learning Outcome numbers the AI attached to each generated week — resolve via
    * schemeOfWorkApi.linkCriteria once a proposed curriculum is confirmed. */
   entryLoNumbers?: Record<string, number>;
+  /** Which AI wrote the scheme (School AI or the teacher's own key). */
+  ai?: import("./myAi").AiRouteMeta | null;
 }
 
 export interface DetectedContentItem {

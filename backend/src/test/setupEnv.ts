@@ -6,8 +6,10 @@ dotenv.config();
 // real dev database — see scripts/reset-test-db.ts for how it's created.
 // TEST_DB_NAME lets a second worktree run the suite against its own clone
 // without dropping the schema another checkout is testing against.
-process.env.DB_NAME =
-  process.env.TEST_DB_NAME || `${process.env.DB_NAME || "nga_central_mis"}_test`;
+// Idempotent: with isolate:false this file runs again for every test file in the same
+// process, and the database pool is created lazily, so "_test" must not pile up.
+const baseDbName = process.env.DB_NAME || "nga_central_mis";
+process.env.DB_NAME = process.env.TEST_DB_NAME || (baseDbName.endsWith("_test") ? baseDbName : `${baseDbName}_test`);
 process.env.NODE_ENV = "test";
 
 // The production pool intentionally uses a single connection; the test

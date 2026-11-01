@@ -95,10 +95,18 @@ async function ensureDayLoaded(provider: string, now = new Date()): Promise<Prov
   s.used = 0;
   s.loaded = true;
   try {
-    const [row] = await db
-      .select({ n: sql<number>`COUNT(*)` })
-      .from(AIUsageLog)
-      .where(and(eq(AIUsageLog.provider, provider), gte(AIUsageLog.occurred_at, new Date(start))));
+    const since = gte(AIUsageLog.occurred_at, new Date(start));
+    const count = (onlySchool: boolean) =>
+      db
+        .select({ n: sql<number>`COUNT(*)` })
+        .from(AIUsageLog)
+        // A user's own key (route 'personal') never uses up the school's free quota.
+        .where(and(eq(AIUsageLog.provider, provider), since, ...(onlySchool ? [eq(AIUsageLog.route, "school")] : [])));
+    // Before migration 122 there is no route column, and no personal rows either.
+    const [row] = await count(true).catch((error: any) => {
+      if (error?.code === "ER_BAD_FIELD_ERROR") return count(false);
+      throw error;
+    });
     s.used = Number(row?.n ?? 0);
   } catch (error: any) {
     // Missing table (migration not applied) or a DB hiccup: count from zero rather than

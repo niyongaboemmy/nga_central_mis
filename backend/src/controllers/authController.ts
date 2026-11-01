@@ -37,6 +37,7 @@ import config from "../config";
 import logger from "../utils/logger";
 import { recordActivity } from "../utils/activityLogger";
 import { getAiPolicy } from "../services/ai/policy";
+import { routesVersion } from "../services/ai/personal/routes";
 import { notifyLogout } from "../services/sso/backchannelLogout";
 import { clientIpOf, deviceIdOf, trackAuth } from "../services/activity/authEvents";
 import { checkBlocked } from "../services/activity/blocklist";
@@ -610,11 +611,15 @@ export const verifySession = asyncHandler(async (req: any, res: any) => {
     .limit(1);
   // School AI policy version (AI_USAGE_CONTROL_PLAN.md §4.3): a spoke seeing a new
   // value refetches GET /integrations/ai-policy, so a flip reaches every app in minutes.
-  const aiPolicyVersion = (await getAiPolicy()).v;
+  const aiPolicy = await getAiPolicy();
+  // My AI (PERSONAL_AI_PROVIDERS_PLAN.md §10.2): a new value means this person's own AI keys
+  // or "what answers what" changed, so the app refetches GET /integrations/ai/routes.
+  const aiRoutesVersion = aiPolicy.personal.enabled ? await routesVersion(Number(req.user.userId)) : 0;
   successResponse(res, "Token valid", {
     userId: req.user.userId,
     access_version: accessVersion,
-    ai_policy_v: aiPolicyVersion,
+    ai_policy_v: aiPolicy.v,
+    ai_routes_v: aiRoutesVersion,
     ...profileMedia({ user_id: req.user.userId, ...row }),
   });
 });

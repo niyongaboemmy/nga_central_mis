@@ -1,11 +1,14 @@
 import OpenAI from "openai";
-import { AIProvider, GenerateJSONParams, ProviderResult } from "./types";
+import { AIProvider, GenerateJSONParams, ProviderCredential, ProviderResult } from "./types";
 import { matchesSchema } from "./schemaValidator";
 
 const isConfigured = () => !!process.env.GLM_API_KEY;
 
+const BASE_URL = "https://api.z.ai/api/paas/v4";
+
 let client: OpenAI | null = null;
-function getClient(): OpenAI {
+function getClient(credential?: ProviderCredential): OpenAI {
+  if (credential) return new OpenAI({ apiKey: credential.apiKey, baseURL: credential.baseUrl || BASE_URL, timeout: 150_000 });
   if (!client) {
     // GLM-4.5-Flash defaults to "thinking" (chain-of-thought) mode on, which measured
     // 30-60s+ for a lesson-note-length prompt — an explicit timeout stops a stuck
@@ -16,7 +19,7 @@ function getClient(): OpenAI {
     // job (not inline with the HTTP request), so it's safe to give it much more room.
     client = new OpenAI({
       apiKey: process.env.GLM_API_KEY,
-      baseURL: "https://api.z.ai/api/paas/v4",
+      baseURL: BASE_URL,
       timeout: 150_000,
     });
   }
@@ -31,10 +34,10 @@ export const glmProvider: AIProvider = {
   // response must be checked against it after the fact (see matchesSchema below).
   supportsStrictSchema: false,
 
-  async generateJSON<T = any>(params: GenerateJSONParams): Promise<ProviderResult<T>> {
-    const model = process.env.GLM_MODEL || "glm-4.5-flash";
+  async generateJSON<T = any>(params: GenerateJSONParams, credential?: ProviderCredential): Promise<ProviderResult<T>> {
+    const model = credential?.model || process.env.GLM_MODEL || "glm-4.5-flash";
 
-    const completion = await getClient().chat.completions.create({
+    const completion = await getClient(credential).chat.completions.create({
       model,
       thinking: { type: "disabled" },
       ...(params.maxOutputTokens ? { max_tokens: params.maxOutputTokens } : {}),

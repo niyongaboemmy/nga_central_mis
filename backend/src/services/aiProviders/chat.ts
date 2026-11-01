@@ -6,7 +6,13 @@ import { isCoolingDown, isParkedDead, markCoolingDown, markDead } from "./regist
 import { logAIUsage } from "./usageLog";
 import { freeModels, isFreeModel } from "./openrouterProvider";
 import { assertAiAppEnabled } from "../ai/policy";
-import type { AiApp } from "../../vendor/nga-access";
+import type { AiApp, AiProviderId } from "../../vendor/nga-access";
+import type { ProviderCredential } from "./types";
+import { PersonalAIError, personalAIErrorCode } from "./errors";
+import { PROVIDERS } from "../ai/personal/providers";
+import { safeFetch } from "../ai/personal/safeFetch";
+import type { AiRouteMeta } from "../ai/personal/run";
+import type { PersonalOption } from "./generate";
 
 /**
  * Streaming chat on the providers MIS already has keys for (NGA Desktop "Ask AI";
@@ -46,6 +52,8 @@ interface ChatTarget {
   extra?: () => Record<string, unknown>;
   /** Refuse a reply the account would be charged for (OpenRouter). */
   check?: (chunk: any) => void;
+  /** Custom endpoints (My AI): the SSRF-guarded fetch. */
+  fetch?: typeof fetch;
 }
 
 const env = (k: string) => (process.env[k] || "").trim();
@@ -157,6 +165,8 @@ export function scrub(text: string): string {
 export interface ChatRun {
   provider: string;
   model: string;
+  /** Which AI answered, when the call went through My AI. */
+  ai?: AiRouteMeta;
 }
 
 export class ChatUnavailableError extends Error {
@@ -166,9 +176,11 @@ export class ChatUnavailableError extends Error {
 }
 
 /** For tests: replace the client factory. */
-let makeClient = (t: ChatTarget) => new OpenAI({ apiKey: t.apiKey(), baseURL: t.baseURL(), timeout: 90_000, maxRetries: 0 });
+const defaultClient = (t: ChatTarget) =>
+  new OpenAI({ apiKey: t.apiKey(), baseURL: t.baseURL(), timeout: 90_000, maxRetries: 0, ...(t.fetch ? { fetch: t.fetch as any } : {}) });
+let makeClient = defaultClient;
 export function setChatClientFactory(f: ((t: ChatTarget) => any) | null) {
-  makeClient = f ?? ((t: ChatTarget) => new OpenAI({ apiKey: t.apiKey(), baseURL: t.baseURL(), timeout: 90_000, maxRetries: 0 }));
+  makeClient = f ?? defaultClient;
 }
 
 /**
@@ -192,9 +204,26 @@ export async function streamChat(opts: {
   bulk?: boolean;
   /** Whose AI switch applies (school AI policy): "desktop" for NGA Desktop, default "mis". */
   app?: AiApp;
+  /**
+   * Answer on a user's own key (My AI, PERSONAL_AI_PROVIDERS_PLAN.md §7.1): only that
+   * provider, no school fallback, no school quota. Failures are PersonalAIError.
+   */
+  credential?: ProviderCredential & { provider: string; credentialId?: number };
+  /** My AI routing (see personalFor()); the answer says which AI replied. */
+  personal?: PersonalOption;
 }): Promise<ChatRun> {
   // School AI policy (plan §4.4): refused before any provider is tried (AiDisabledError).
   await assertAiAppEnabled(opts.app ?? "mis");
+  if (opts.credential) return streamPersonal(opts, opts.credential);
+  if (opts.personal && !opts.bulk) {
+    const { withPersonalAi } = await import("../ai/personal/run"); // see generate.ts
+    const { personal, ...rest } = opts;
+    const { result, ai } = await withPersonalAi(personal.who, personal, {
+      personal: (credential) => streamChat({ ...rest, credential }),
+      school: () => streamChat(rest),
+    });
+    return { ...result, ai };
+  }
   const order = chatOrder(opts.audience).filter((t) => (!opts.only || opts.only.includes(t.name)) && !opts.exclude?.includes(t.name));
   let attempted = 0;
   let quotaOnly = true;
@@ -232,12 +261,12 @@ export async function streamChat(opts: {
         }
       }
       if (!sent) throw Object.assign(new Error(`${t.name} returned an empty answer`), { status: 502 });
-      logAIUsage({ feature: opts.feature, role: "interactive", provider: t.name, model, ok: true, latency_ms: Date.now() - startedAt.getTime(), output_tokens: Math.round(outputChars / 4), actor_user_id: opts.actorUserId, occurred_at: startedAt });
+      logAIUsage({ feature: opts.feature, app: opts.app ?? "mis", role: "interactive", provider: t.name, model, ok: true, latency_ms: Date.now() - startedAt.getTime(), output_tokens: Math.round(outputChars / 4), actor_user_id: opts.actorUserId, occurred_at: startedAt });
       return { provider: t.name, model };
     } catch (err: any) {
       lastErr = err;
       const cls = opts.signal?.aborted ? "ABORTED" : classifyAIError(err);
-      logAIUsage({ feature: opts.feature, role: "interactive", provider: t.name, model, ok: false, error_class: cls, latency_ms: Date.now() - startedAt.getTime(), actor_user_id: opts.actorUserId, occurred_at: startedAt });
+      logAIUsage({ feature: opts.feature, app: opts.app ?? "mis", role: "interactive", provider: t.name, model, ok: false, error_class: cls, latency_ms: Date.now() - startedAt.getTime(), actor_user_id: opts.actorUserId, occurred_at: startedAt });
       if (opts.signal?.aborted) throw err;
       logger.warn(`[ai-chat] ${t.name} failed`, { error: err?.message, class: cls });
       if (isDeadProviderError(err)) {
@@ -260,6 +289,86 @@ export async function streamChat(opts: {
     throw new ChatUnavailableError("QUOTA", "The free AI services are busy or out of today's quota. Please try again later.");
   logger.warn("[ai-chat] every provider failed", { error: lastErr?.message });
   throw new ChatUnavailableError("FAILED", "The AI couldn't answer right now. Please try again.");
+}
+
+/** The one-off chat target for a user's own key; never cached, never in CHAT_TARGETS. */
+export function personalChatTarget(c: ProviderCredential & { provider: string }): ChatTarget {
+  const info = PROVIDERS[c.provider as AiProviderId];
+  const freeOnly = c.provider === "openrouter" && c.freeOnly !== false;
+  return {
+    name: c.provider,
+    allowsMinors: true,
+    isConfigured: () => true,
+    baseURL: () => c.baseUrl || info?.chatBaseUrl || "",
+    apiKey: () => c.apiKey,
+    models: () => [c.model || info?.defaultModel || ""],
+    ...(c.provider === "custom" ? { fetch: safeFetch as typeof fetch } : {}),
+    ...(c.provider === "openrouter" ? { extra: () => ({ provider: freeOnly ? { data_collection: "deny" } : undefined }) } : {}),
+    ...(freeOnly
+      ? {
+          check: (chunk: any) => {
+            if (chunk?.model && !isFreeModel(String(chunk.model))) throw Object.assign(new Error("OpenRouter served a paid model"), { status: 402 });
+          },
+        }
+      : {}),
+  };
+}
+
+async function streamPersonal(
+  opts: Parameters<typeof streamChat>[0],
+  credential: ProviderCredential & { provider: string; credentialId?: number },
+): Promise<ChatRun> {
+  const t = personalChatTarget(credential);
+  const model = t.models()[0];
+  if (!t.baseURL() || !model) throw new PersonalAIError("AI_PERSONAL_FAILED", credential.provider);
+  if (credential.provider === "openrouter" && credential.freeOnly !== false && !isFreeModel(model)) {
+    throw new PersonalAIError("AI_PERSONAL_FAILED", credential.provider);
+  }
+  const startedAt = new Date();
+  const base = {
+    feature: opts.feature,
+    app: opts.app ?? "mis",
+    role: "interactive",
+    provider: t.name,
+    model,
+    route: "personal" as const,
+    credential_id: credential.credentialId ?? null,
+    actor_user_id: opts.actorUserId,
+    occurred_at: startedAt,
+  };
+  let outputChars = 0;
+  try {
+    const stream: any = await makeClient(t).chat.completions.create(
+      {
+        model,
+        stream: true,
+        max_tokens: LIMITS.maxOutputTokens,
+        temperature: 0.4,
+        messages: [{ role: "system", content: opts.system }, ...opts.messages.map((m) => ({ role: m.role, content: scrub(m.content) }))],
+        ...(t.extra?.() ?? {}),
+      } as any,
+      { signal: opts.signal },
+    );
+    for await (const chunk of stream) {
+      t.check?.(chunk);
+      const text = chunk?.choices?.[0]?.delta?.content;
+      if (typeof text === "string" && text) {
+        outputChars += text.length;
+        opts.onText(text);
+      }
+    }
+    if (!outputChars) throw Object.assign(new Error(`${t.name} returned an empty answer`), { status: 502 });
+    logAIUsage({ ...base, ok: true, latency_ms: Date.now() - startedAt.getTime(), output_tokens: Math.round(outputChars / 4) });
+    return { provider: t.name, model };
+  } catch (err: any) {
+    const cls = opts.signal?.aborted ? "ABORTED" : classifyAIError(err);
+    logAIUsage({ ...base, ok: false, error_class: cls, latency_ms: Date.now() - startedAt.getTime() });
+    if (opts.signal?.aborted) throw err;
+    // The provider's message can echo the key back, so only the class and status are logged.
+    logger.warn(`[ai-chat] personal key (${t.name}) failed`, { class: cls, status: err?.status });
+    if (outputChars) throw new ChatUnavailableError("FAILED", "The answer was cut off. Please try again.");
+    throw new PersonalAIError(personalAIErrorCode(err), t.name);
+  }
 }
 
 /** A whole reply (no streaming to the user): the tutor drafts and checks before anything is shown. */

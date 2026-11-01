@@ -22,6 +22,9 @@ import UpdateBanner from "./components/ui/UpdateBanner";
 import CodePlaygroundHost from "./components/codePlayground/CodePlaygroundHost";
 // The editor and runner load with the page, not with the app.
 const CodePlaygroundPage = lazy(() => import("./components/codePlayground/CodePlaygroundPage"));
+// My AI: people's own AI keys and which AI answers what (PERSONAL_AI_PROVIDERS_PLAN.md §9).
+const MyAiPage = lazy(() => import("./components/myAi/MyAiPage"));
+const OpenRouterCallback = lazy(() => import("./components/myAi/OpenRouterCallback"));
 import DesktopUpdateBanner from "./components/apps/DesktopUpdateBanner";
 import { NotificationProvider } from "./contexts/NotificationContext";
 import { ConfirmProvider } from "./contexts/ConfirmContext";
@@ -777,6 +780,32 @@ function App() {
                 <ProtectedRoute>
                   <SystemLayoutWrapper>
                     <SettingsPage />
+                  </SystemLayoutWrapper>
+                </ProtectedRoute>
+              }
+            />
+
+            {/* My AI: the signed-in person's own AI keys (PERSONAL_AI_PROVIDERS_PLAN.md §9.1) */}
+            <Route
+              path="/my-ai"
+              element={
+                <ProtectedRoute>
+                  <SystemLayoutWrapper>
+                    <Suspense fallback={<div className="m-6 h-40 animate-pulse rounded-3xl bg-white dark:bg-gray-800/30" />}>
+                      <MyAiPage />
+                    </Suspense>
+                  </SystemLayoutWrapper>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/my-ai/openrouter-callback"
+              element={
+                <ProtectedRoute>
+                  <SystemLayoutWrapper>
+                    <Suspense fallback={null}>
+                      <OpenRouterCallback />
+                    </Suspense>
                   </SystemLayoutWrapper>
                 </ProtectedRoute>
               }

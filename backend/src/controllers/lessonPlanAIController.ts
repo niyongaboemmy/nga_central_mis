@@ -27,6 +27,8 @@ import {
   isAnyProviderConfigured,
   JSONSchema,
 } from "../services/aiProviders";
+import type { PersonalOption } from "../services/aiProviders/generate";
+import { personalFor } from "../services/ai/personal/routes";
 
 const lessonPlanSchema: JSONSchema = {
   type: "object",
@@ -167,10 +169,13 @@ const generateLessonPlan = async (context: {
   instructorName: string;
   totalMinutes: number;
   customPrompt?: string;
+  // My AI routing, resolved from the request before the job started (no req in here).
+  personal?: PersonalOption;
+  actorUserId?: number;
 }) => {
   const hours = (context.totalMinutes / 60).toFixed(2).replace(/\.00$/, "");
 
-  const { data: parsed } = await generateStructuredContent<any>({
+  const { data: parsed, ai } = await generateStructuredContent<any>({
     schemaName: "lesson_plan",
     schema: lessonPlanSchema,
     prompt: `You are ${context.instructorName || "an experienced, subject-matter-expert teacher"},
@@ -216,7 +221,7 @@ adjusting the plan above to honor them without ignoring the scheme-of-work conte
 "${context.customPrompt}"`
         : ""
     }`,
-  });
+  }, { feature: "lesson_plan", actorUserId: context.actorUserId, personal: context.personal });
 
   if (!parsed.outcomes || !Array.isArray(parsed.outcomes) || parsed.outcomes.length === 0) {
     throw new ValidationError(
@@ -231,7 +236,7 @@ adjusting the plan above to honor them without ignoring the scheme-of-work conte
   }
   parsed.total_duration_minutes = context.totalMinutes;
 
-  return parsed;
+  return { plan: parsed, ai: ai ?? null };
 };
 
 const processJob = async (
@@ -250,6 +255,7 @@ const processJob = async (
     // "this class struggles with fractions, add a recap") — optional, added
     // on top of the scheme-of-work-derived prompt rather than replacing it.
     customPrompt?: string;
+    personal?: PersonalOption;
   },
 ) => {
   try {
@@ -289,7 +295,7 @@ const processJob = async (
 
     updateJob(jobId, { status: "analyzing", message: "Analyzing this week with AI..." });
 
-    const generated = await generateLessonPlan({
+    const { plan: generated, ai } = await generateLessonPlan({
       subjectName: subjectName || "this subject",
       classGroupName: classGroupName || "",
       termName: termName || "",
@@ -305,6 +311,8 @@ const processJob = async (
       instructorName,
       totalMinutes: params.totalMinutes,
       customPrompt: params.customPrompt,
+      personal: params.personal,
+      actorUserId: params.userId,
     });
 
     updateJob(jobId, { status: "structuring", message: "Structuring lesson plan..." });
@@ -372,6 +380,7 @@ const processJob = async (
       status: "done",
       message: "Lesson plan generated successfully!",
       lessonId,
+      ai,
     });
   } catch (err: any) {
     logger.error("AI lesson plan generation failed", { jobId, error: err?.message });
@@ -438,6 +447,8 @@ export const startAILessonGeneration = asyncHandler(async (req: any, res: any) =
   }
 
   const userId = req.user.userId;
+  // Resolved now: the job runs after the response, without the request.
+  const personal = await personalFor(req, "author");
   const jobId = randomUUID();
   createJob(jobId, userId);
 
@@ -450,6 +461,7 @@ export const startAILessonGeneration = asyncHandler(async (req: any, res: any) =
     totalMinutes,
     lessonDate,
     customPrompt,
+    personal,
   });
 });
 
@@ -468,5 +480,6 @@ export const getAILessonGenerationStatus = asyncHandler(async (req: any, res: an
     message: job.message,
     lessonId: job.lessonId,
     error: job.error,
+    ai: job.ai ?? null,
   });
 });

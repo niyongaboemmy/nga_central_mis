@@ -17,6 +17,8 @@ import {
   isAnyProviderConfigured,
   JSONSchema,
 } from "../services/aiProviders";
+import { personalFor } from "../services/ai/personal/routes";
+import type { AiRouteMeta } from "../services/ai/personal/run";
 
 /** Fetches a subject's Performance Criteria (number + description), joined through its Elements. */
 export const getSubjectCriteria = async (subjectId: number) => {
@@ -157,8 +159,10 @@ export const suggestEntryCriteria = asyncHandler(async (req: any, res: any) => {
     .join("\n");
 
   let matchedNumbers: string[] = [];
+  let ai: AiRouteMeta | null = null;
+  const personal = await personalFor(req, "author");
   try {
-    const { data: parsed } = await generateStructuredContent<{ criteria_numbers?: any[] }>({
+    const result = await generateStructuredContent<{ criteria_numbers?: any[] }>({
       schemaName: "criteria_suggestion",
       schema: suggestionSchema,
       prompt: `A teacher wrote the following Scheme of Work entry for one week of a subject:
@@ -178,7 +182,9 @@ meaning — the entry's wording will NOT match the criteria's wording exactly (t
 independently), so use your understanding of the subject matter, not text similarity. It is
 completely fine to return an empty list if nothing genuinely corresponds — do not force a match.
 Return only the criteria_number values (e.g. "1.1", "2.3") of genuine matches.`,
-    });
+    }, { feature: "criteria_suggestion", actorUserId: Number(req.user.userId), personal });
+    const parsed = result.data;
+    ai = result.ai ?? null;
     matchedNumbers = Array.isArray(parsed.criteria_numbers)
       ? parsed.criteria_numbers.map((n: any) => String(n).trim())
       : [];
@@ -190,7 +196,7 @@ Return only the criteria_number values (e.g. "1.1", "2.3") of genuine matches.`,
 
   const matched = criteria.filter((c) => matchedNumbers.includes(c.criteria_number));
 
-  successResponse(res, "Criteria suggested", { criteria: matched });
+  successResponse(res, "Criteria suggested", { criteria: matched, ai });
 });
 
 /**
@@ -459,8 +465,11 @@ export const bulkSuggestCriteria = asyncHandler(async (req: any, res: any) => {
     .join("\n");
 
   const entryCriteriaNumbers: Record<string, string[]> = {};
+  let ai: AiRouteMeta | null = null;
+  // One call for the whole scheme (not a loop over entries), so the teacher's own AI may answer it.
+  const personal = await personalFor(req, "author");
   try {
-    const { data: parsed } = await generateStructuredContent<{ matches?: any[] }>({
+    const result = await generateStructuredContent<{ matches?: any[] }>({
       schemaName: "bulk_criteria_suggestion",
       schema: bulkSuggestionSchema,
       prompt: `A teacher's existing Scheme of Work has the following weekly entries:
@@ -479,7 +488,9 @@ independently), so use your understanding of the subject matter, not text simila
 and expected for an entry to match zero, one, or a few — never force a match that doesn't
 genuinely fit. Return one result per entry, identified by its exact week_number, with the matching
 criteria_number values (e.g. "1.1", "2.3").`,
-    });
+    }, { feature: "bulk_criteria_suggestion", actorUserId: Number(req.user.userId), personal });
+    const parsed = result.data;
+    ai = result.ai ?? null;
     const matches = Array.isArray(parsed.matches) ? parsed.matches : [];
     for (const m of matches) {
       if (m?.week_number && Array.isArray(m.criteria_numbers)) {
@@ -508,5 +519,6 @@ criteria_number values (e.g. "1.1", "2.3").`,
   successResponse(res, "Bulk criteria matching complete", {
     taggedCount,
     entriesProcessed: targets.length,
+    ai,
   });
 });

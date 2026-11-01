@@ -1,5 +1,5 @@
 import OpenAI from "openai";
-import { AIProvider, GenerateJSONParams } from "./types";
+import { AIProvider, GenerateJSONParams, ProviderCredential, ProviderResult } from "./types";
 import { matchesSchema } from "./schemaValidator";
 import logger from "../../utils/logger";
 
@@ -37,29 +37,37 @@ export function freeModels(): string[] {
 
 const isConfigured = () => !!process.env.OPENROUTER_API_KEY;
 
-let client: OpenAI | null = null;
-function getClient(): OpenAI {
-  if (!client) {
-    // OpenRouter is OpenAI-compatible. The attribution headers are optional; they only label
-    // this app on the OpenRouter usage dashboard.
-    client = new OpenAI({
-      apiKey: process.env.OPENROUTER_API_KEY,
-      baseURL: process.env.OPENROUTER_BASE_URL || "https://openrouter.ai/api/v1",
-      timeout: 150_000,
-      // OpenRouter already falls back across the models list; one SDK retry is enough.
-      maxRetries: 1,
-      defaultHeaders: {
-        "X-Title": "NGA MIS",
-        ...(process.env.OPENROUTER_SITE_URL ? { "HTTP-Referer": process.env.OPENROUTER_SITE_URL } : {}),
-      },
-    });
-  }
-  return client;
+// OpenRouter is OpenAI-compatible. The attribution headers are optional; they only label
+// this app on the OpenRouter usage dashboard.
+function clientFor(apiKey: string | undefined, baseURL?: string): OpenAI {
+  return new OpenAI({
+    apiKey,
+    baseURL: baseURL || process.env.OPENROUTER_BASE_URL || "https://openrouter.ai/api/v1",
+    timeout: 150_000,
+    // OpenRouter already falls back across the models list; one SDK retry is enough.
+    maxRetries: 1,
+    defaultHeaders: {
+      "X-Title": "NGA MIS",
+      ...(process.env.OPENROUTER_SITE_URL ? { "HTTP-Referer": process.env.OPENROUTER_SITE_URL } : {}),
+    },
+  });
 }
 
-async function complete(messages: OpenAI.ChatCompletionMessageParam[], maxOutputTokens?: number, json?: boolean) {
-  const models = freeModels();
-  const completion: any = await getClient().chat.completions.create({
+// Rebuilt when the env key or URL changes (tests, a key rotated without a restart).
+let client: { sig: string; c: OpenAI } | null = null;
+function getClient(credential?: ProviderCredential): OpenAI {
+  if (credential) return clientFor(credential.apiKey, credential.baseUrl);
+  const sig = `${process.env.OPENROUTER_API_KEY}|${process.env.OPENROUTER_BASE_URL}`;
+  if (client?.sig !== sig) client = { sig, c: clientFor(process.env.OPENROUTER_API_KEY) };
+  return client.c;
+}
+
+async function complete(messages: OpenAI.ChatCompletionMessageParam[], maxOutputTokens?: number, json?: boolean, credential?: ProviderCredential) {
+  // The school key is always free-only; a user's own key may opt out (freeOnly: false).
+  const freeOnly = credential?.freeOnly ?? true;
+  const models = credential?.model ? [credential.model] : freeModels();
+  if (freeOnly && !models.every(isFreeModel)) throw new Error("OpenRouter: only free models are allowed here");
+  const completion: any = await getClient(credential).chat.completions.create({
     model: models[0],
     // OpenRouter-only field, passed through in the request body by the SDK.
     ...({ models } as {}),
@@ -77,11 +85,15 @@ async function complete(messages: OpenAI.ChatCompletionMessageParam[], maxOutput
   }
   const served = String(completion.model || "");
   const cost = Number(completion.usage?.cost || 0);
-  if (!isFreeModel(served) || cost > 0) {
+  if (freeOnly && (!isFreeModel(served) || cost > 0)) {
     logger.error(`OpenRouter served a non-free model (${served}, cost ${cost}); reply discarded`);
     throw new Error("OpenRouter served a non-free model");
   }
-  return String(completion.choices?.[0]?.message?.content || "");
+  return {
+    text: String(completion.choices?.[0]?.message?.content || ""),
+    model: served,
+    usage: { input_tokens: completion.usage?.prompt_tokens, output_tokens: completion.usage?.completion_tokens },
+  };
 }
 
 export const openrouterProvider: AIProvider = {
@@ -91,8 +103,8 @@ export const openrouterProvider: AIProvider = {
   // so the reply is validated with matchesSchema (like GLM and DeepSeek).
   supportsStrictSchema: false,
 
-  async generateJSON<T = any>(params: GenerateJSONParams): Promise<T> {
-    const text = await complete(
+  async generateJSON<T = any>(params: GenerateJSONParams, credential?: ProviderCredential): Promise<ProviderResult<T>> {
+    const { text, model, usage } = await complete(
       [
         {
           role: "system",
@@ -102,6 +114,7 @@ export const openrouterProvider: AIProvider = {
       ],
       params.maxOutputTokens,
       true,
+      credential,
     );
     const parsed = JSON.parse(text || "{}") as T;
 
@@ -109,6 +122,6 @@ export const openrouterProvider: AIProvider = {
       throw new Error("OpenRouter response did not match the expected schema");
     }
 
-    return parsed;
+    return { data: parsed, model, usage };
   },
 };

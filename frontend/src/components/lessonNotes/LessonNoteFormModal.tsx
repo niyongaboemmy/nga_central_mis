@@ -28,6 +28,8 @@ import {
   isPdfBackedNote,
 } from "../../api/lessonNotes";
 import { useDeleteLessonNote } from "./useDeleteLessonNote";
+import AiSourceControl, { AiAnsweredBy, aiRouteBody } from "../ai/AiSourceControl";
+import { answeredByText } from "../../api/myAi";
 import { useAcademicPeriod } from "../../contexts/AcademicPeriodContext";
 import { useToast } from "../../contexts/ToastContext";
 import SelectField from "../ui/SelectField";
@@ -98,6 +100,7 @@ const LessonNoteFormModal: React.FC<Props> = ({ isOpen, onClose, initialSubjectI
   // Once the teacher edits the title we stop suggesting one from the curriculum selection.
   const [titleTouched, setTitleTouched] = useState(false);
   const [extraInstructions, setExtraInstructions] = useState("");
+  const [aiRoute, setAiRoute] = useState("");
   const [creating, setCreating] = useState(false);
   const [jobStatus, setJobStatus] = useState<AINoteGenerationStatus | null>(null);
   const [mode, setMode] = useState<CreateMode>("blank");
@@ -297,11 +300,13 @@ const LessonNoteFormModal: React.FC<Props> = ({ isOpen, onClose, initialSubjectI
         setJobStatus(status);
         if (status.status === "done") {
           clearInterval(interval);
-          showToast("Lesson note generated and saved as a draft — review it, then publish when ready.", "success");
+          const via = answeredByText(status.ai);
+          const note = via && via.tone !== "school" ? ` ${via.text}` : "";
+          showToast(`Lesson note generated and saved as a draft — review it, then publish when ready.${note}`, via?.tone === "fallback" ? "warning" : "success");
           setTimeout(() => {
             onClose();
             navigate(`/lesson-notes/${status.noteId}`);
-          }, 900);
+          }, note ? 2500 : 900);
         } else if (status.status === "error") {
           clearInterval(interval);
           showToast(status.error || "AI generation failed", "error");
@@ -332,6 +337,7 @@ const LessonNoteFormModal: React.FC<Props> = ({ isOpen, onClose, initialSubjectI
         class_group_id: classGroupId ? Number(classGroupId) : undefined,
         academic_term_id: selectedTermId ?? undefined,
         extra_instructions: extraInstructions.trim() || undefined,
+        ...aiRouteBody(aiRoute),
       });
       setJobStatus({ status: "loading", stepIndex: 1, totalSteps: 4, message: "Loading curriculum context..." });
       pollJob(res.data.data.jobId);
@@ -569,6 +575,7 @@ const LessonNoteFormModal: React.FC<Props> = ({ isOpen, onClose, initialSubjectI
             </div>
             <p className="font-medium text-gray-800 dark:text-gray-100">Lesson note generated!</p>
             <p className="text-xs text-gray-400">Saved as a draft — opening it now...</p>
+            <AiAnsweredBy ai={jobStatus.ai} />
           </div>
         ) : (
           <div className="flex flex-col items-center gap-4 py-6">
@@ -848,6 +855,7 @@ const LessonNoteFormModal: React.FC<Props> = ({ isOpen, onClose, initialSubjectI
                   <p className="text-xs text-gray-400 mt-1">
                     These are extra constraints for the AI — they can't override the selected topic or its curriculum criteria.
                   </p>
+                  <AiSourceControl task="author" value={aiRoute} onChange={setAiRoute} className="mt-2" />
                 </div>
               )}
 

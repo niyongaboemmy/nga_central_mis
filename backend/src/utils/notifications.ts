@@ -45,7 +45,9 @@ export type NotificationKind =
   | "mentorship_checkin_waiting"
   | "mentorship_checkin_escalated"
   | "mentorship_assigned"
-  | "mentorship_ended";
+  | "mentorship_ended"
+  // My AI (services/ai/personal): your own AI key stopped working.
+  | "ai_key_problem";
 
 export interface NotifyUserInput {
   userId: number;
@@ -75,7 +77,8 @@ export interface NotifyUserInput {
     | "cover_lesson"
     | "family_digest"
     | "mentee_checkin"
-    | "mentor_assignment";
+    | "mentor_assignment"
+    | "ai_credential";
   subjectId: number;
   actorId?: number;
 }

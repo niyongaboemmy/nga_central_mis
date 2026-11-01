@@ -16,7 +16,10 @@ import {
   isAnyProviderConfigured,
   friendlyAIErrorMessage,
   JSONSchema,
+  PersonalAIError,
 } from "../services/aiProviders";
+import { personalFor } from "../services/ai/personal/routes";
+import type { AiRouteMeta } from "../services/ai/personal/run";
 import logger from "../utils/logger";
 
 const insightsSchema: JSONSchema = {
@@ -148,6 +151,8 @@ export const generateMenteeAIInsights = asyncHandler(async (req: any, res: any) 
     : "(no self-submitted check-ins from the mentee)";
 
   let parsed: { summary?: string; strengths?: string[]; concerns?: string[]; recommended_focus?: string };
+  let ai: AiRouteMeta | null = null;
+  const personal = await personalFor(req, "author");
   try {
     const result = await generateStructuredContent<typeof parsed>({
       schemaName: "mentee_insights",
@@ -167,10 +172,13 @@ ${checkinLines}
 Based strictly on this record, produce a concise, evidence-grounded analysis for the mentor. Do not invent facts
 not supported by the record above. If there is genuinely nothing concerning, say so plainly rather than manufacturing
 a concern.`,
-    });
+    }, { feature: "mentee_insights", actorUserId: Number(req.user.userId), personal });
     parsed = result.data;
+    ai = result.ai ?? null;
   } catch (err: any) {
     logger.error("Mentorship AI insights generation failed", { error: err?.message, studentId, mentorId });
+    // The user's own key failed with no fallback: keep its code (AI_KEY_INVALID...) for the client.
+    if (err instanceof PersonalAIError) throw err;
     throw new ValidationError(friendlyAIErrorMessage(err));
   }
 
@@ -186,5 +194,6 @@ a concern.`,
     concerns: Array.isArray(parsed.concerns) ? parsed.concerns : [],
     recommended_focus: parsed.recommended_focus ?? null,
     based_on_sessions: sessions.length,
+    ai,
   });
 });

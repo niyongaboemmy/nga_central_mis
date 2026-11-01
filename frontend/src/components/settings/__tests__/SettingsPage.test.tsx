@@ -85,4 +85,63 @@ describe("Settings -> AI", () => {
     expect(await screen.findByText("AI is turned off for the school.")).toBeInTheDocument();
     expect(screen.queryByRole("switch")).toBeNull();
   });
+
+  it("My AI rules: turning it on and limiting students' providers saves policy.personal; Gemini/DeepSeek are never offered to students", async () => {
+    api.get.mockResolvedValue({ data: { data: { policy: policy(), me: { hasAiUse: true, canManage: true } } } });
+    api.save.mockResolvedValue({ data: { data: { policy: policy({ v: 5 }), updatedByName: null } } });
+    renderPage();
+
+    fireEvent.click(await screen.findByRole("switch", { name: "My AI for the school" }));
+    fireEvent.click(screen.getByRole("switch", { name: "Students may add their own keys" }));
+    const students = screen.getByRole("group", { name: "Providers for students" });
+    expect(within(students).getByRole("checkbox", { name: "Google Gemini" })).toBeDisabled();
+    expect(within(students).getByRole("checkbox", { name: "DeepSeek" })).toBeDisabled();
+    expect(within(students).getByText(/18 or older/)).toBeInTheDocument();
+    fireEvent.click(within(students).getByRole("checkbox", { name: "Groq" }));
+    fireEvent.click(screen.getByRole("button", { name: /Save changes/ }));
+
+    await waitFor(() =>
+      expect(api.save).toHaveBeenCalledWith(
+        "/ai-policy",
+        expect.objectContaining({
+          personal: expect.objectContaining({ enabled: true, students: expect.objectContaining({ allowed: true, providers: ["openrouter", "groq"] }) }),
+        }),
+      ),
+    );
+  });
+
+  it("an unchanged My AI section is not sent, and the usage board shows aggregates when the server allows it", async () => {
+    api.get.mockImplementation((url: string) =>
+      url === "/my-ai/admin/usage"
+        ? Promise.resolve({
+            data: {
+              data: {
+                days: 30,
+                byRoute: [
+                  { app: "mis", route: "school", calls: 40, failures: 1 },
+                  { app: "mis", route: "personal", calls: 12, failures: 0 },
+                ],
+                byProvider: [{ provider: "openai", route: "personal", calls: 12, failures: 0, tokens: 3400 }],
+                keys: [{ provider: "openai", status: "active", count: 3 }],
+                peopleWithKeys: 2,
+                schoolQuotas: [{ provider: "gemini", daily_limit: 250, used_today: 10, remaining: 240, bulk_remaining: 200, resets_at: "2026-11-02T00:00:00Z" }],
+                vaultConfigured: true,
+              },
+            },
+          })
+        : Promise.resolve({ data: { data: { policy: policy(), me: { hasAiUse: true, canManage: true } } } }),
+    );
+    api.save.mockResolvedValue({ data: { data: { policy: policy({ v: 5 }), updatedByName: null } } });
+    renderPage();
+
+    const board = await screen.findByRole("region", { name: /Providers & usage/ });
+    expect(within(board).getByText("People with keys").nextSibling).toHaveTextContent("2");
+    const byApp = within(board).getByRole("table", { name: /Calls by app/ });
+    expect(within(byApp).getByRole("row", { name: /MIS 40 12 1/ })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("switch", { name: "AI grading on submit" }));
+    fireEvent.click(screen.getByRole("button", { name: /Save changes/ }));
+    await waitFor(() => expect(api.save).toHaveBeenCalled());
+    expect(api.save.mock.calls[0][1]).not.toHaveProperty("personal");
+  });
 });

@@ -30,6 +30,8 @@ import homeRoutes from "./routes/home";
 import codePlaygroundRoutes from "./routes/codePlayground";
 import elearningRoutes from "./routes/elearning";
 import aiPolicyRoutes from "./routes/aiPolicy";
+import myAiRoutes from "./routes/myAi";
+import aiGatewayRoutes from "./routes/aiGateway";
 import { wireFilesModule } from "./services/files/assets";
 
 // File previews + file text for the Lesson Studio (job handlers, context-pack source).
@@ -146,6 +148,8 @@ app.use("/lesson-notes", lessonNoteRoutes);
 app.use("/elearning", elearningRoutes);
 // School AI policy (AI_USAGE_CONTROL_PLAN.md §4): Settings -> AI and every AI button's pre-check.
 app.use("/ai-policy", aiPolicyRoutes);
+// My AI: people's own AI keys (PERSONAL_AI_PROVIDERS_PLAN.md §9-10).
+app.use("/my-ai", myAiRoutes);
 app.use("/database", databaseRoutes);
 app.use("/notifications", notificationRoutes);
 // Access control v2 (ACCESS_LEVELS_RBAC_IMPLEMENTATION_PLAN.md) -- snapshot,
@@ -161,6 +165,7 @@ app.use("/reminders", reminderRoutes);
 // Machine-to-machine, IntegrationToken-authenticated, read-only. Mounted last
 // among the API routers so it is obvious it shares no middleware with the
 // user-session routes above it.
+app.use("/integrations/ai", aiGatewayRoutes);
 app.use("/integrations", integrationRoutes);
 // Usage analytics & live monitoring console (ANALYTICS_* capabilities).
 app.use("/monitor", monitorRoutes);
