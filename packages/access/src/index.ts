@@ -9,7 +9,7 @@
  * vendor an exact copy (see packages/access/README.md) -- never edit a copy.
  */
 
-export const ACCESS_CORE_VERSION = "1.5.0";
+export const ACCESS_CORE_VERSION = "1.6.0";
 
 // ---------------------------------------------------------------------------
 // Vocabulary
@@ -529,6 +529,8 @@ export interface AiPolicy {
   thirdPartyExtensionsStaff: boolean;
   /** "My AI": users' own provider keys (PERSONAL_AI_PROVIDERS_PLAN.md §4). Default off. */
   personal: AiPersonalPolicy;
+  /** People's own Claude/ChatGPT subscriptions (REUSING_AI_SUBSCRIPTIONS_ANALYSIS.md). Default off. */
+  external: AiExternalPolicy;
   updated_at?: string | null;
   updated_by?: number | null;
 }
@@ -549,6 +551,7 @@ export const AI_POLICY_DEFAULT: AiPolicy = {
     fallbackToSchool: true,
     apps: {},
   },
+  external: { connector: false, handoff: false, pupilNames: "with_consent" },
 };
 
 /** Coerce stored/remote JSON into a policy. Anything unreadable stays off. */
@@ -568,6 +571,7 @@ export function normalizeAiPolicy(raw: unknown): AiPolicy {
     // Absent (a policy saved before this field existed) means the default: on for staff.
     thirdPartyExtensionsStaff: r.thirdPartyExtensionsStaff !== false,
     personal: normalizeAiPersonalPolicy(r.personal),
+    external: normalizeAiExternalPolicy(r.external),
     updated_at: typeof r.updated_at === "string" ? r.updated_at : null,
     updated_by: Number.isFinite(Number(r.updated_by)) && r.updated_by != null ? Number(r.updated_by) : null,
   };
@@ -845,3 +849,33 @@ export function decidePersonalRoute(
   }
   return { route, reason: "PERSONAL", fallbackToSchool: p.fallbackToSchool && route.fallback === "school" };
 }
+
+// ---------------------------------------------------------------------------
+// External AI: people's own Claude / ChatGPT subscriptions (REUSING_AI_SUBSCRIPTIONS_ANALYSIS.md)
+// ---------------------------------------------------------------------------
+// A subscription can never be used by the NGA apps directly (vendor terms). Two legitimate
+// routes instead, both staff-only (AI_EXTERNAL_CONNECT) and both behind decideAi():
+//   connector  NGA as an MCP server added to the person's own Claude/ChatGPT: read tools,
+//              and write tools that only ever create drafts a person confirms in the app.
+//   handoff    "Open in Claude/ChatGPT" with NGA's prompt, then "Paste the answer" back.
+// Pupil-identifying data leaves the school only with the person's existing access AND an
+// explicit per-session consent ("with_consent"), or never.
+
+export interface AiExternalPolicy {
+  connector: boolean;
+  handoff: boolean;
+  pupilNames: "never" | "with_consent";
+}
+
+export function normalizeAiExternalPolicy(raw: unknown): AiExternalPolicy {
+  const r = (raw && typeof raw === "object" ? raw : {}) as Record<string, any>;
+  return {
+    connector: r.connector === true,
+    handoff: r.handoff === true,
+    pupilNames: r.pupilNames === "never" ? "never" : "with_consent",
+  };
+}
+
+/** May pupil-identifying data go to the person's external AI for this request? */
+export const externalPupilDataAllowed = (p: AiPolicy | null | undefined, consented: boolean) =>
+  !!p && p.external.pupilNames === "with_consent" && consented === true;

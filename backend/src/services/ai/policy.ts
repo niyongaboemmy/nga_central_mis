@@ -114,6 +114,7 @@ export async function setAiPolicy(patch: unknown, actorId: number): Promise<AiPo
     ...before,
     apps: { ...before.apps },
     features: { ...before.features },
+    external: { ...before.external },
     personal: {
       ...before.personal,
       staff: { ...before.personal.staff },
@@ -157,6 +158,22 @@ export async function setAiPolicy(patch: unknown, actorId: number): Promise<AiPo
     after.thirdPartyExtensionsStaff = p.thirdPartyExtensionsStaff === true;
   }
   if ("personal" in p) applyPersonalPatch(p.personal, after, errors, bool);
+  if ("external" in p) {
+    const x = p.external;
+    if (!x || typeof x !== "object" || Array.isArray(x)) errors.push("external must be an object");
+    else {
+      for (const k of ["connector", "handoff"] as const) {
+        if (k in x) {
+          bool(`external.${k}`, x[k]);
+          after.external[k] = x[k] === true;
+        }
+      }
+      if ("pupilNames" in x) {
+        if (x.pupilNames !== "never" && x.pupilNames !== "with_consent") errors.push('external.pupilNames must be "never" or "with_consent"');
+        else after.external.pupilNames = x.pupilNames;
+      }
+    }
+  }
   if (errors.length) throw new ValidationError(errors.join("; "), errors);
 
   after.v = Math.max(1, before.v) + 1;
@@ -169,6 +186,7 @@ export async function setAiPolicy(patch: unknown, actorId: number): Promise<AiPo
     thirdPartyExtensions: after.thirdPartyExtensions,
     thirdPartyExtensionsStaff: after.thirdPartyExtensionsStaff,
     personal: after.personal,
+    external: after.external,
   };
   await db.execute(sql`
     INSERT INTO PlatformSetting (setting_key, value, updated_by, updated_at)
@@ -215,6 +233,9 @@ export function policyDiff(a: AiPolicy, b: AiPolicy): { field: string; from: unk
   cmp("personal.inAssessments", pa.inAssessments, pb.inAssessments);
   cmp("personal.fallbackToSchool", pa.fallbackToSchool, pb.fallbackToSchool);
   for (const app of AI_PERSONAL_APPS) cmp(`personal.apps.${app}`, pa.apps[app] !== false, pb.apps[app] !== false);
+  cmp("external.connector", a.external.connector, b.external.connector);
+  cmp("external.handoff", a.external.handoff, b.external.handoff);
+  cmp("external.pupilNames", a.external.pupilNames, b.external.pupilNames);
   return out;
 }
 

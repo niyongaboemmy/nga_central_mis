@@ -9,8 +9,9 @@ import { resolvePersonal, type PersonalCallContext, type PersonalWho } from "./r
  * every MIS AI endpoint as `ai` and by the gateway to the other apps.
  */
 export interface AiRouteMeta {
-  route: "personal" | "school";
-  reason: AiPersonalReason;
+  /** "handoff": the person pasted the answer from their own Claude/ChatGPT. */
+  route: "personal" | "school" | "handoff";
+  reason: AiPersonalReason | "HANDOFF";
   provider?: string;
   model?: string;
   credentialId?: number;

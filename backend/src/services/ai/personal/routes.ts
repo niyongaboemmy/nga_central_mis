@@ -19,6 +19,7 @@ import {
 import { loadPersona } from "../../desktop/assistant";
 import { decideAny, misAccessMode, requestSnapshot } from "../../access/policy";
 import { getAiPolicy } from "../policy";
+import { HandoffForbiddenError, parseHandoff, type AiHandoff } from "../handoff";
 import { isVaultConfigured } from "../../secrets/vault";
 import { loadSecret, usedToday, userPersonalUsedToday, type CredentialSecret } from "./credentials";
 import { PROVIDERS } from "./providers";
@@ -30,6 +31,20 @@ import { PROVIDERS } from "./providers";
 
 export const CAP_STAFF = "AI_PERSONAL_PROVIDERS";
 export const CAP_STUDENT = "AI_PERSONAL_PROVIDERS_STUDENT";
+export const CAP_EXTERNAL = "AI_EXTERNAL_CONNECT";
+
+/** The legacy permission list decides in shadow mode, the v2 snapshot in enforce mode. */
+export async function requestHasCap(req: any, cap: string): Promise<boolean> {
+  let has = Array.isArray(req.user?.permissions) && req.user.permissions.includes(cap);
+  if (misAccessMode() === "enforce") {
+    try {
+      has = decideAny(await requestSnapshot(req), [cap], null, null).allowed;
+    } catch {
+      /* keep the legacy answer */
+    }
+  }
+  return has;
+}
 
 const rows = (r: unknown): any[] => (Array.isArray(r) && Array.isArray(r[0]) ? r[0] : (r as any[]));
 const missingTable = (e: any) => e?.code === "ER_NO_SUCH_TABLE" || e?.cause?.code === "ER_NO_SUCH_TABLE";
@@ -160,6 +175,8 @@ export type RouteOverride = "school" | { credentialId: number; model?: string } 
 export interface PersonalCallContext {
   app: AiPersonalApp;
   task: AiTask;
+  /** "Open in Claude/ChatGPT" / "Paste the answer" (services/ai/handoff.ts). */
+  handoff?: AiHandoff;
   inAssessment?: boolean;
   system?: boolean;
   override?: RouteOverride;
@@ -239,6 +256,12 @@ export async function personalFor(
 ): Promise<(PersonalCallContext & { who: PersonalWho }) | undefined> {
   if (!req?.user?.userId) return undefined;
   const policy = await getAiPolicy();
+  const handoff = parseHandoff(req.body?.aiHandoff);
+  if (handoff) {
+    if (!policy.external.handoff) throw new HandoffForbiddenError("Open in Claude / ChatGPT is turned off for the school.", "AI_HANDOFF_OFF");
+    if (!(await requestHasCap(req, CAP_EXTERNAL))) throw new HandoffForbiddenError("Your role cannot use your own Claude or ChatGPT with NGA.", "AI_HANDOFF_NOT_ALLOWED");
+    return { app: "mis", task, ...extra, handoff, who: await personalWhoFromRequest(req) };
+  }
   if (!policy.personal.enabled || policy.personal.apps.mis === false) return undefined;
   return { app: "mis", task, ...extra, override: extra.override ?? parseOverride(req.body?.aiRoute ?? req.query?.aiRoute), who: await personalWhoFromRequest(req) };
 }

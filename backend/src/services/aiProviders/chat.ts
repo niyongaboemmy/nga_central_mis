@@ -211,9 +211,25 @@ export async function streamChat(opts: {
   credential?: ProviderCredential & { provider: string; credentialId?: number };
   /** My AI routing (see personalFor()); the answer says which AI replied. */
   personal?: PersonalOption;
+  /** The conversation carries pupil-identifying data (see generate.ts pupilData). */
+  pupilData?: boolean;
 }): Promise<ChatRun> {
   // School AI policy (plan §4.4): refused before any provider is tried (AiDisabledError).
   await assertAiAppEnabled(opts.app ?? "mis");
+  const handoff = opts.personal?.handoff;
+  if (handoff && !opts.bulk) {
+    // "Open in Claude / ChatGPT" / "Paste the answer" (services/ai/handoff.ts).
+    const { HandoffPrompt, chatHandoffPrompt } = await import("../ai/handoff");
+    if (handoff.mode === "prompt") {
+      const { assertHandoffPupilData } = await import("./generate");
+      await assertHandoffPupilData(opts.pupilData, handoff.pupilConsent);
+      throw new HandoffPrompt({ prompt: scrub(chatHandoffPrompt(opts.system, opts.messages)), expects: "text" });
+    }
+    const text = handoff.text.trim();
+    opts.onText(text);
+    logAIUsage({ feature: opts.feature, app: opts.app ?? "mis", role: "interactive", provider: "handoff", model: "pasted", ok: true, route: "handoff", actor_user_id: opts.actorUserId, occurred_at: new Date() });
+    return { provider: "handoff", model: "pasted", ai: { route: "handoff", reason: "HANDOFF" } };
+  }
   if (opts.credential) return streamPersonal(opts, opts.credential);
   if (opts.personal && !opts.bulk) {
     const { withPersonalAi } = await import("../ai/personal/run"); // see generate.ts

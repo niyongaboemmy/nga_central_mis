@@ -5,7 +5,10 @@ import { providerByName, orderedProviders, isCoolingDown, markCoolingDown, isPar
 import { isQuotaError, isDeadProviderError, friendlyAIErrorMessage, classifyAIError, PersonalAIError, personalAIErrorCode } from "./errors";
 import { acquireSlot, checkAvailability, noteAttempt, Unavailable } from "./limiter";
 import { logAIUsage } from "./usageLog";
-import { assertAiAppEnabled } from "../ai/policy";
+import { assertAiAppEnabled, getAiPolicy } from "../ai/policy";
+import { HandoffForbiddenError, HandoffPrompt, jsonHandoffPrompt, readPastedJson } from "../ai/handoff";
+import { scrub } from "./chat";
+import { externalPupilDataAllowed } from "../../vendor/nga-access";
 import type { AiApp } from "../../vendor/nga-access";
 import type { AiRouteMeta } from "../ai/personal/run";
 import type { PersonalCallContext, PersonalWho } from "../ai/personal/routes";
@@ -50,6 +53,11 @@ export interface GenerateStructuredContentOptions {
   credential?: ProviderCredential & { provider: string; credentialId?: number };
   /** My AI routing for an interactive call by a person; never set on bulk or background work. */
   personal?: PersonalOption;
+  /**
+   * The prompt carries pupil-identifying data (a named student's record). "Open in Claude /
+   * ChatGPT" then needs the school's policy and the person's consent for this request.
+   */
+  pupilData?: boolean;
 }
 
 export { PersonalAIError, personalAIErrorCode } from "./errors";
@@ -79,6 +87,7 @@ export async function generateStructuredContent<T = any>(
   // School AI policy (AI_USAGE_CONTROL_PLAN.md §4.4): nothing reaches a provider while
   // AI is off -- AiDisabledError, a 403 AI_DISABLED, whatever route or job called us.
   await assertAiAppEnabled(options?.app ?? "mis");
+  if (options?.personal?.handoff && !options.bulk) return handoffJson<T>(params, options);
   if (options?.credential) return generateWithCredential<T>(params, options, options.credential);
   if (options?.personal && !options.bulk) {
     // Loaded on first use: the provider layer must not pull My AI's database, access and
@@ -222,4 +231,37 @@ async function generateWithCredential<T>(
     logAIUsage({ ...base, model: credential.model ?? null, ok: false, error_class: errorClass, latency_ms: Date.now() - startedAt.getTime() });
     throw new PersonalAIError(personalAIErrorCode(err), provider.name);
   }
+}
+
+/** Pupil data may leave only with the school's policy and this person's consent. */
+export async function assertHandoffPupilData(pupilData: boolean | undefined, consent: boolean | undefined): Promise<void> {
+  if (!pupilData) return;
+  if (!externalPupilDataAllowed(await getAiPolicy(), consent === true)) {
+    throw new HandoffForbiddenError(
+      "This prompt includes a pupil's details. Tick \"Include pupil details\" to take it to your own AI, or use the school's AI.",
+      "AI_HANDOFF_PUPIL_CONSENT",
+    );
+  }
+}
+
+/** "Open in Claude / ChatGPT" (prompt) and "Paste the answer" (import); services/ai/handoff.ts. */
+async function handoffJson<T>(params: GenerateJSONParams, options: GenerateStructuredContentOptions): Promise<GenerateStructuredContentResult<T>> {
+  const handoff = options.personal!.handoff!;
+  if (handoff.mode === "prompt") {
+    await assertHandoffPupilData(options.pupilData, handoff.pupilConsent);
+    throw new HandoffPrompt({ prompt: scrub(jsonHandoffPrompt(params.prompt, params.schema)), expects: "json", schemaName: params.schemaName });
+  }
+  const data = readPastedJson<T>(handoff.text, params.schema);
+  logAIUsage({
+    feature: options.feature ?? params.schemaName ?? "unknown",
+    role: options.role ?? null,
+    provider: "handoff",
+    model: "pasted",
+    ok: true,
+    actor_user_id: options.actorUserId ?? null,
+    app: options.app ?? "mis",
+    route: "handoff",
+    occurred_at: new Date(),
+  });
+  return { data, providerUsed: "handoff", model: "pasted", ai: { route: "handoff", reason: "HANDOFF" } };
 }
