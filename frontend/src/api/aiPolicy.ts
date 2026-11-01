@@ -19,7 +19,7 @@ export interface AiPolicyView {
      * "Open in my AI" + "Paste the answer" for this person (policy.external.handoff and
      * AI_EXTERNAL_CONNECT); pupilConsent: a prompt with pupil details may go out when ticked.
      */
-    external?: { handoff: boolean; pupilConsent: boolean };
+    external?: { handoff: boolean; pupilConsent: boolean; connector?: boolean };
   };
   /** Who made the last change (super admins only). */
   updatedByName?: string | null;

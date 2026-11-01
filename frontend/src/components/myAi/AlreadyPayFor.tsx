@@ -19,15 +19,15 @@ const link = (href: string, label: string) => (
   </a>
 );
 
-function plans(handoff: boolean): Array<{ name: string; options: Option[] }> {
+function plans(handoff: boolean, connectorOn: boolean): Array<{ name: string; options: Option[] }> {
   const openIn = (where: string): Option =>
     handoff
       ? { title: "Open in my AI", badge: "Available here", tone: "green", text: <>Next to every AI button, choose "Open in my AI ▾ → {where}", send the prompt there, then paste the answer back.</> }
       : { title: "Open in my AI", badge: "Off at this school", tone: "slate", text: <>When the school turns it on, every AI button gets "Open in my AI ▾ → {where}" and a "Paste the answer" box.</> };
   const connector = (where: string): Option => ({
     title: `The NGA connector for ${where}`,
-    badge: "Coming",
-    tone: "blue",
+    badge: connectorOn ? "Available here" : "Off at this school",
+    tone: connectorOn ? "green" : "slate",
     text: (
       <>
         Add NGA to your own {where} so it can read your timetable and schemes and save drafts you confirm in the app. See{" "}
@@ -86,10 +86,12 @@ function plans(handoff: boolean): Array<{ name: string; options: Option[] }> {
 
 /** Each subscription and its honest options; also used in the Add AI wizard. */
 export const SubscriptionOptions: React.FC<{ className?: string }> = ({ className = "" }) => {
-  const handoff = !!useAiPolicy()?.me?.external?.handoff;
+  const external = useAiPolicy()?.me?.external;
+  const handoff = !!external?.handoff;
+  const connectorOn = !!external?.connector;
   return (
     <div className={`grid grid-cols-1 gap-3 md:grid-cols-2 ${className}`}>
-      {plans(handoff).map((p) => (
+      {plans(handoff, connectorOn).map((p) => (
         <section key={p.name} aria-label={p.name} className="rounded-2xl border border-slate-200 p-4 dark:border-gray-700/50">
           <h3 className="text-sm font-semibold text-slate-900 dark:text-white">{p.name}</h3>
           <ul className="mt-2 space-y-2">

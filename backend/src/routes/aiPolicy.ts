@@ -63,7 +63,12 @@ router.get(
           hasAiUse: aiUse,
           canManage: manage,
           // pupilConsent: a pupil-data prompt may go out when this person ticks consent.
-          external: { handoff, pupilConsent: handoff && policy.external.pupilNames === "with_consent" },
+          // connector: this person may add NGA to their own Claude/ChatGPT (the MCP connector).
+          external: {
+            handoff,
+            pupilConsent: handoff && policy.external.pupilNames === "with_consent",
+            connector: policy.enabled && policy.apps.mis !== false && aiUse && policy.external.connector && externalCap,
+          },
         },
         // Who made the last change, for Settings -> AI.
         ...(manage && { updatedByName: await nameOf(policy.updated_by) }),

@@ -253,12 +253,12 @@ describe("GET /ai-policy tells the UI whether hand-off is available", () => {
   it("on with the capability, off without it or when the school turns it off", async () => {
     setAiPolicyForTests(ON);
     const yes = await request(app).get("/ai-policy").set(auth(teacherId));
-    expect(yes.body.data.me.external).toEqual({ handoff: true, pupilConsent: true });
+    expect(yes.body.data.me.external).toEqual({ handoff: true, pupilConsent: true, connector: false });
 
     const noCap = await createUser({ userType: "TEACHER" });
     await assignRole(noCap, await createRoleWithPermissions("HANDOFF_NOCAP", ["AI_USE"]));
     const no = await request(app).get("/ai-policy").set(auth(noCap));
-    expect(no.body.data.me.external).toEqual({ handoff: false, pupilConsent: false });
+    expect(no.body.data.me.external).toEqual({ handoff: false, pupilConsent: false, connector: false });
 
     setAiPolicyForTests({ enabled: true } as Partial<AiPolicy>);
     const off = await request(app).get("/ai-policy").set(auth(teacherId));
