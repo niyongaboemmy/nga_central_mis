@@ -2,18 +2,25 @@ import { ServiceUnavailableError } from "../../errors/CustomError";
 import logger from "../../utils/logger";
 import { AIRole, GenerateJSONParams, ProviderCredential, TokenUsage } from "./types";
 import { providerByName, orderedProviders, isCoolingDown, markCoolingDown, isParkedDead, markDead, roleOrder } from "./registry";
-import { isQuotaError, isDeadProviderError, friendlyAIErrorMessage, classifyAIError } from "./errors";
+import { isQuotaError, isDeadProviderError, friendlyAIErrorMessage, classifyAIError, PersonalAIError, personalAIErrorCode } from "./errors";
 import { acquireSlot, checkAvailability, noteAttempt, Unavailable } from "./limiter";
 import { logAIUsage } from "./usageLog";
 import { assertAiAppEnabled } from "../ai/policy";
 import type { AiApp } from "../../vendor/nga-access";
+import { withPersonalAi, type AiRouteMeta } from "../ai/personal/run";
+import type { PersonalCallContext, PersonalWho } from "../ai/personal/routes";
 
 export interface GenerateStructuredContentResult<T> {
   data: T;
   providerUsed: string;
   model?: string;
   usage?: TokenUsage;
+  /** Which AI answered (school or the user's own key), when the call went through My AI. */
+  ai?: AiRouteMeta;
 }
+
+/** Let the user's own key answer when their My AI routes say so (see personalFor()). */
+export type PersonalOption = PersonalCallContext & { who: PersonalWho };
 
 export interface GenerateStructuredContentOptions {
   /** Try these providers, in this order, instead of AI_PROVIDER_ORDER — see orderedProviders(). */
@@ -41,31 +48,12 @@ export interface GenerateStructuredContentOptions {
    * quotas, cooldowns and dead-key parking are neither consulted nor touched.
    */
   credential?: ProviderCredential & { provider: string; credentialId?: number };
+  /** My AI routing for an interactive call by a person; never set on bulk or background work. */
+  personal?: PersonalOption;
 }
 
-export type PersonalAIErrorCode = "AI_KEY_INVALID" | "AI_KEY_NO_CREDIT" | "AI_KEY_RATE_LIMITED" | "AI_PERSONAL_FAILED";
-
-const PERSONAL_AI_MESSAGES: Record<PersonalAIErrorCode, string> = {
-  AI_KEY_INVALID: "Your AI key was refused by the provider. Check it in My AI.",
-  AI_KEY_NO_CREDIT: "Your AI account is out of credit.",
-  AI_KEY_RATE_LIMITED: "Your AI account is rate-limited right now. Try again shortly.",
-  AI_PERSONAL_FAILED: "Your AI provider could not answer. Please try again.",
-};
-
-/** A call on a user's own key failed. The code says why, so the UI can tell them what to fix. */
-export class PersonalAIError extends ServiceUnavailableError {
-  constructor(readonly code: PersonalAIErrorCode, readonly provider: string) {
-    super(PERSONAL_AI_MESSAGES[code]);
-  }
-}
-
-export function personalAIErrorCode(err: any): PersonalAIErrorCode {
-  const raw = [err?.message, err?.error?.message, err?.code, err?.error?.code].filter(Boolean).join(" ");
-  if (err?.status === 402 || /insufficient_quota|insufficient (balance|credits)|payment required/i.test(raw)) return "AI_KEY_NO_CREDIT";
-  if (isDeadProviderError(err)) return "AI_KEY_INVALID";
-  if (isQuotaError(err)) return "AI_KEY_RATE_LIMITED";
-  return "AI_PERSONAL_FAILED";
-}
+export { PersonalAIError, personalAIErrorCode } from "./errors";
+export type { PersonalAIErrorCode } from "./errors";
 
 /**
  * Thrown when no provider can take the call because every free quota is used up (or held in
@@ -92,6 +80,19 @@ export async function generateStructuredContent<T = any>(
   // AI is off -- AiDisabledError, a 403 AI_DISABLED, whatever route or job called us.
   await assertAiAppEnabled(options?.app ?? "mis");
   if (options?.credential) return generateWithCredential<T>(params, options, options.credential);
+  if (options?.personal && !options.bulk) {
+    const { personal, ...rest } = options;
+    const { result, ai } = await withPersonalAi(
+      personal.who,
+      personal,
+      {
+        personal: (credential) => generateStructuredContent<T>(params, { ...rest, credential }),
+        school: () => generateStructuredContent<T>(params, rest),
+      },
+      (r) => ({ provider: r.providerUsed, model: r.model }),
+    );
+    return { ...result, ai };
+  }
   const providers = orderedProviders(options?.providerOrder ?? roleOrder(options?.role));
   const exclude = new Set(options?.excludeProviders ?? []);
   const quotaBlocked: Record<string, Unavailable | "QUOTA"> = {};

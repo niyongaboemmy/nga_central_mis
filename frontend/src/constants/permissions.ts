@@ -124,6 +124,9 @@ export const Permissions = {
   // school-wide AI policy (restricted to the platform owner).
   AI_USE: "AI_USE",
   AI_POLICY_MANAGE: "AI_POLICY_MANAGE",
+  AI_PERSONAL_PROVIDERS: "AI_PERSONAL_PROVIDERS",
+  AI_PERSONAL_PROVIDERS_STUDENT: "AI_PERSONAL_PROVIDERS_STUDENT",
+  AI_PROVIDERS_MANAGE: "AI_PROVIDERS_MANAGE",
   EARLY_WARNING_VIEW: "EARLY_WARNING_VIEW",
 
   // Curriculum & Subject Materials

@@ -5,12 +5,16 @@ import { recordActivity } from "../../utils/activityLogger";
 import logger from "../../utils/logger";
 import {
   AI_APPS,
+  AI_PERSONAL_APPS,
   AI_POLICY_DEFAULT,
+  AI_PROVIDER_IDS,
   AI_REASON_MESSAGES,
   aiAppEnabled,
   normalizeAiPolicy,
   type AiApp,
+  type AiPersonalApp,
   type AiPolicy,
+  type AiProviderId,
   type AiReason,
 } from "../../vendor/nga-access";
 
@@ -110,6 +114,12 @@ export async function setAiPolicy(patch: unknown, actorId: number): Promise<AiPo
     ...before,
     apps: { ...before.apps },
     features: { ...before.features },
+    personal: {
+      ...before.personal,
+      staff: { ...before.personal.staff },
+      students: { ...before.personal.students },
+      apps: { ...before.personal.apps },
+    },
   };
 
   if ("enabled" in p) {
@@ -146,6 +156,7 @@ export async function setAiPolicy(patch: unknown, actorId: number): Promise<AiPo
     bool("thirdPartyExtensionsStaff", p.thirdPartyExtensionsStaff);
     after.thirdPartyExtensionsStaff = p.thirdPartyExtensionsStaff === true;
   }
+  if ("personal" in p) applyPersonalPatch(p.personal, after, errors, bool);
   if (errors.length) throw new ValidationError(errors.join("; "), errors);
 
   after.v = Math.max(1, before.v) + 1;
@@ -157,6 +168,7 @@ export async function setAiPolicy(patch: unknown, actorId: number): Promise<AiPo
     assessments: after.assessments,
     thirdPartyExtensions: after.thirdPartyExtensions,
     thirdPartyExtensionsStaff: after.thirdPartyExtensionsStaff,
+    personal: after.personal,
   };
   await db.execute(sql`
     INSERT INTO PlatformSetting (setting_key, value, updated_by, updated_at)
@@ -192,7 +204,80 @@ export function policyDiff(a: AiPolicy, b: AiPolicy): { field: string; from: unk
   cmp("assessments", a.assessments, b.assessments);
   cmp("thirdPartyExtensions", a.thirdPartyExtensions, b.thirdPartyExtensions);
   cmp("thirdPartyExtensionsStaff", a.thirdPartyExtensionsStaff, b.thirdPartyExtensionsStaff);
+  const pa = a.personal, pb = b.personal;
+  cmp("personal.enabled", pa.enabled, pb.enabled);
+  cmp("personal.staff.allowed", pa.staff.allowed, pb.staff.allowed);
+  cmp("personal.staff.providers", pa.staff.providers.join(","), pb.staff.providers.join(","));
+  cmp("personal.staff.customEndpoints", pa.staff.customEndpoints, pb.staff.customEndpoints);
+  cmp("personal.students.allowed", pa.students.allowed, pb.students.allowed);
+  cmp("personal.students.providers", pa.students.providers.join(","), pb.students.providers.join(","));
+  cmp("personal.students.maxDailyRequests", pa.students.maxDailyRequests, pb.students.maxDailyRequests);
+  cmp("personal.inAssessments", pa.inAssessments, pb.inAssessments);
+  cmp("personal.fallbackToSchool", pa.fallbackToSchool, pb.fallbackToSchool);
+  for (const app of AI_PERSONAL_APPS) cmp(`personal.apps.${app}`, pa.apps[app] !== false, pb.apps[app] !== false);
   return out;
+}
+
+/** Settings -> AI -> My AI (PERSONAL_AI_PROVIDERS_PLAN.md §4.1). Same strictness as the rest. */
+function applyPersonalPatch(raw: unknown, after: AiPolicy, errors: string[], bool: (k: string, v: unknown) => void) {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return void errors.push("personal must be an object");
+  const q = raw as Record<string, any>;
+  const providers = (k: string, v: unknown): AiProviderId[] | null => {
+    if (!Array.isArray(v) || v.some((x) => !AI_PROVIDER_IDS.includes(x))) {
+      errors.push(`${k} must be a list of: ${AI_PROVIDER_IDS.join(", ")}`);
+      return null;
+    }
+    return [...new Set(v as AiProviderId[])];
+  };
+  const pp = after.personal;
+  if ("enabled" in q) {
+    bool("personal.enabled", q.enabled);
+    pp.enabled = q.enabled === true;
+  }
+  if ("staff" in q) {
+    const st = q.staff ?? {};
+    if ("allowed" in st) {
+      bool("personal.staff.allowed", st.allowed);
+      pp.staff.allowed = st.allowed === true;
+    }
+    if ("providers" in st) pp.staff.providers = providers("personal.staff.providers", st.providers) ?? pp.staff.providers;
+    if ("customEndpoints" in st) {
+      bool("personal.staff.customEndpoints", st.customEndpoints);
+      pp.staff.customEndpoints = st.customEndpoints === true;
+    }
+  }
+  if ("students" in q) {
+    const su = q.students ?? {};
+    if ("allowed" in su) {
+      bool("personal.students.allowed", su.allowed);
+      pp.students.allowed = su.allowed === true;
+    }
+    if ("providers" in su) pp.students.providers = providers("personal.students.providers", su.providers) ?? pp.students.providers;
+    if ("maxDailyRequests" in su) {
+      const n = su.maxDailyRequests;
+      if (!Number.isInteger(n) || n < 0 || n > 10000) errors.push("personal.students.maxDailyRequests must be a whole number 0–10000");
+      else pp.students.maxDailyRequests = n;
+    }
+  }
+  if ("inAssessments" in q) {
+    if (q.inAssessments !== "never" && q.inAssessments !== "allowed") errors.push('personal.inAssessments must be "never" or "allowed"');
+    else pp.inAssessments = q.inAssessments;
+  }
+  if ("fallbackToSchool" in q) {
+    bool("personal.fallbackToSchool", q.fallbackToSchool);
+    pp.fallbackToSchool = q.fallbackToSchool === true;
+  }
+  if ("apps" in q) {
+    if (!q.apps || typeof q.apps !== "object" || Array.isArray(q.apps)) errors.push("personal.apps must be an object");
+    else
+      for (const [app, v] of Object.entries(q.apps)) {
+        if (!AI_PERSONAL_APPS.includes(app as AiPersonalApp)) errors.push(`Unknown app "${app}" in personal.apps`);
+        else {
+          bool(`personal.apps.${app}`, v);
+          pp.apps[app as AiPersonalApp] = v === true;
+        }
+      }
+  }
 }
 
 /**
