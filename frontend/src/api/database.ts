@@ -134,15 +134,18 @@ export interface AiSqlResult {
   sql: string;
   explanation: string | null;
   providerUsed: string;
+  /** Which AI answered (School AI or the person's own key, PERSONAL_AI_PROVIDERS_PLAN.md §9.3). */
+  ai?: import("./myAi").AiRouteMeta | null;
 }
 
 export const generateSqlWithAI = async (
   prompt: string,
   table?: string,
+  aiRoute?: string,
 ): Promise<AiSqlResult> => {
   const response = await api.post(
     "/database/query/ai-generate",
-    { prompt, table },
+    { prompt, table, ...(aiRoute ? { aiRoute } : {}) },
     { headers: dbHeaders() },
   );
   return response.data.data;

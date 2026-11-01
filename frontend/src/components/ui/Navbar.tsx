@@ -9,7 +9,9 @@ import NavSearch from "./NavSearch";
 import NotificationBell from "./NotificationBell";
 import MenteesQuickAccess from "./MenteesQuickAccess";
 import NavAppActions from "../apps/NavAppActions";
-import { LayoutGrid } from "lucide-react";
+import { KeyRound, LayoutGrid } from "lucide-react";
+import { useAccess } from "../../hooks/useAccess";
+import { usePermissions } from "../../hooks/usePermissions";
 import UserAvatar from "./UserAvatar";
 
 interface NavbarProps {
@@ -40,6 +42,11 @@ const Navbar: React.FC<NavbarProps> = ({
 }) => {
   const location = useLocation();
   const { user, logout } = useUser();
+  // My AI (own AI keys): staff hold AI_PERSONAL_PROVIDERS, students the _STUDENT variant.
+  const access = useAccess();
+  const { hasPermission } = usePermissions();
+  const myAiCaps = ["AI_PERSONAL_PROVIDERS", "AI_PERSONAL_PROVIDERS_STUDENT"];
+  const canMyAi = access.can(myAiCaps) || myAiCaps.some((c) => hasPermission(c));
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isUserDropdownOpen, setIsUserDropdownOpen] = useState(false);
   const [isSystemsMenuOpen, setIsSystemsMenuOpen] = useState(false);
@@ -276,6 +283,19 @@ const Navbar: React.FC<NavbarProps> = ({
                         </svg>
                         <span>Change Password</span>
                       </button>
+                      {canMyAi && (
+                        <Link to="/my-ai">
+                          <button
+                            onClick={() => {
+                              setIsUserDropdownOpen(false);
+                            }}
+                            className="w-full text-left px-4 py-2 text-sm text-text-secondary-light dark:text-text-secondary-dark/70 hover:bg-surface-light dark:hover:bg-surface-dark flex items-center space-x-2"
+                          >
+                            <KeyRound className="w-4 h-4" aria-hidden />
+                            <span>My AI</span>
+                          </button>
+                        </Link>
+                      )}
                       <Link to={"/settings"}>
                         <button
                           onClick={() => {

@@ -186,6 +186,8 @@ export interface AINoteGenerationStatus {
   error?: string;
   /** Which AI provider answered (gemini/groq/deepseek/openrouter/glm) — informational, no UI surfaces this yet. */
   providerUsed?: string;
+  /** Which AI wrote the note (School AI or the teacher's own key). */
+  ai?: import("./myAi").AiRouteMeta | null;
 }
 
 export interface PromptPreset {
@@ -234,6 +236,8 @@ export interface NoteAskAnswer {
   /** false when the note itself doesn't cover the question — the UI flags this to the student. */
   grounded: boolean;
   provider_used: string;
+  /** Which AI answered (School AI or the person's own key). */
+  ai?: import("./myAi").AiRouteMeta | null;
 }
 
 export interface SharedNoteDetail {
@@ -367,14 +371,16 @@ export const lessonNotesApi = {
     class_group_id?: number;
     academic_term_id?: number;
     extra_instructions?: string;
+    /** My AI: "" / "school" / "<credentialId>:<model>" for this request only. */
+    aiRoute?: string;
   }) =>
     apiService.post<{ data: { jobId: string } }>("/lesson-notes/ai-generate", data),
 
   getAIGenerateStatus: (jobId: string) =>
     apiService.get<{ data: AINoteGenerationStatus }>(`/lesson-notes/ai-generate/${jobId}/status`),
 
-  proposeAIEdit: (id: number, data: { instruction: string; selection_html?: string; whole_note_html?: string }) =>
-    apiService.post<{ data: { html: string } }>(`/lesson-notes/${id}/ai-edit`, data),
+  proposeAIEdit: (id: number, data: { instruction: string; selection_html?: string; whole_note_html?: string; aiRoute?: string }) =>
+    apiService.post<{ data: { html: string; ai?: import("./myAi").AiRouteMeta | null } }>(`/lesson-notes/${id}/ai-edit`, data),
 
   listVersions: (id: number) => apiService.get<{ data: LessonNoteVersion[] }>(`/lesson-notes/${id}/versions`),
 
@@ -400,6 +406,7 @@ export const lessonNotesApi = {
       selection_text?: string;
       mode?: "explain" | "simplify" | "example" | "define" | "quiz";
       history?: { role: "user" | "assistant"; content: string }[];
+      aiRoute?: string;
     },
   ) => apiService.post<{ data: NoteAskAnswer }>(`/lesson-notes/shared-with-me/${id}/ask`, data),
 

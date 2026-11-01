@@ -1,6 +1,9 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Bot, Code2, GraduationCap, History, KeyRound, LayoutGrid, Save, Settings as SettingsIcon } from "lucide-react";
+import { normalizeAiPersonalPolicy } from "../../vendor/nga-access";
+import PersonalAiPolicyCard from "./PersonalAiPolicyCard";
+import ProvidersUsagePanel from "./ProvidersUsagePanel";
 import { AI_OFF_MESSAGE, aiPolicyApi, aiUnavailableReason, loadAiPolicy, rememberAiPolicy, type AiApp, type AiPolicy, type AiPolicyView } from "../../api/aiPolicy";
 import { Card, CardTitle, EmptyState, Muted, Spinner, inputCls, primaryBtn, secondaryBtn } from "../officeHours/ohUi";
 import SelectField from "../ui/SelectField";
@@ -32,7 +35,7 @@ const TURNS_OFF = [
   "AI grading on submit (short answers fall back to keyword marking)",
 ];
 
-type Draft = Pick<AiPolicy, "enabled" | "apps" | "features" | "assessments" | "thirdPartyExtensions" | "thirdPartyExtensionsStaff">;
+type Draft = Pick<AiPolicy, "enabled" | "apps" | "features" | "assessments" | "thirdPartyExtensions" | "thirdPartyExtensionsStaff" | "personal">;
 const draftOf = (p: AiPolicy): Draft => ({
   enabled: p.enabled,
   apps: { ...p.apps },
@@ -41,6 +44,8 @@ const draftOf = (p: AiPolicy): Draft => ({
   thirdPartyExtensions: p.thirdPartyExtensions,
   // Default on: a policy saved before the staff switch existed allows staff tools.
   thirdPartyExtensionsStaff: p.thirdPartyExtensionsStaff !== false,
+  // My AI (people's own keys); a policy saved before it existed reads as the defaults (off).
+  personal: normalizeAiPersonalPolicy(p.personal),
 });
 
 const Switch: React.FC<{ on: boolean; onChange: (v: boolean) => void; label: string; disabled?: boolean; id?: string }> = ({ on, onChange, label, disabled, id }) => (
@@ -107,7 +112,10 @@ const AiPolicyCard: React.FC<{ view: AiPolicyView; onSaved: (v: AiPolicyView) =>
     }
     setBusy(true);
     try {
-      const r = await aiPolicyApi.save(draft);
+      // The My AI rules go only when they changed, so older servers keep accepting the rest.
+      const { personal, ...rest } = draft;
+      const personalChanged = JSON.stringify(personal) !== JSON.stringify(draftOf(p).personal);
+      const r = await aiPolicyApi.save(personalChanged ? draft : rest);
       const next: AiPolicyView = { ...view, policy: r.data.data.policy, updatedByName: r.data.data.updatedByName };
       rememberAiPolicy(next);
       onSaved(next);
@@ -219,6 +227,8 @@ const AiPolicyCard: React.FC<{ view: AiPolicyView; onSaved: (v: AiPolicyView) =>
         </div>
       </Card>
 
+      <PersonalAiPolicyCard value={draft.personal} onChange={(personal) => setDraft({ ...draft, personal })} />
+
       <Card labelledBy="ai-roles">
         <CardTitle id="ai-roles" icon={<KeyRound className="h-4 w-4" aria-hidden />}>Who may use AI</CardTitle>
         <Muted>
@@ -272,13 +282,20 @@ const SettingsPage: React.FC = () => {
       ) : !view ? (
         <Spinner label="Loading settings" />
       ) : view.me.canManage ? (
-        <AiPolicyCard view={view} onSaved={setView} />
+        <>
+          <AiPolicyCard view={view} onSaved={setView} />
+          <ProvidersUsagePanel />
+        </>
       ) : (
         <>
           <Card labelledBy="ai-mine">
             <CardTitle id="ai-mine" icon={<Bot className="h-4 w-4" aria-hidden />}>AI tools</CardTitle>
             <Muted>{mine ?? "AI tools are available to you. In quizzes and assignments your teacher's setting decides."}</Muted>
+            <Link to="/my-ai" className={`${secondaryBtn} mt-3`}>
+              <KeyRound className="h-4 w-4" aria-hidden /> My AI: your own AI keys
+            </Link>
           </Card>
+          <ProvidersUsagePanel />
           <Muted className="text-center">More settings are on the way.</Muted>
         </>
       )}

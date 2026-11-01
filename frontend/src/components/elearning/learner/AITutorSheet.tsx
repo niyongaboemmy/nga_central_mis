@@ -7,6 +7,8 @@ import { useNavigate } from "react-router-dom";
 import { useMotion } from "../../../design/motion";
 import Mascot from "../ui/Mascot";
 import RichHtml from "../../codeWindow/RichHtml";
+import AiSourceControl, { AiAnsweredBy, aiRouteBody } from "../../ai/AiSourceControl";
+import { aiMetaOf, type AiRouteMeta } from "../../../api/myAi";
 
 interface Turn {
   role: "user" | "assistant";
@@ -14,6 +16,8 @@ interface Turn {
   citations?: { item_id: number; title: string; section_id: number }[];
   grounded?: boolean;
   follow_ups?: string[];
+  /** Which AI answered (My AI). */
+  ai?: AiRouteMeta | null;
 }
 
 interface Props {
@@ -31,6 +35,7 @@ const AITutorSheet: React.FC<Props> = ({ courseId, sectionId, open, onClose }) =
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
+  const [aiRoute, setAiRoute] = useState("");
   const listRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -54,9 +59,9 @@ const AITutorSheet: React.FC<Props> = ({ courseId, sectionId, open, onClose }) =
     setBusy(true);
     const mode = /quiz me/i.test(q) ? "quiz" : /simpler|simple words/i.test(q) ? "simpler" : /example/i.test(q) ? "example" : "";
     try {
-      const r = await elearningApi.askTutor(courseId, { question: q, section_id: sectionId, mode });
+      const r = await elearningApi.askTutor(courseId, { question: q, section_id: sectionId, mode, ...aiRouteBody(aiRoute) });
       const d = r.data.data;
-      setTurns((t) => [...t, { role: "assistant", html: d.answer_html, citations: d.citations, grounded: d.grounded, follow_ups: d.follow_ups }]);
+      setTurns((t) => [...t, { role: "assistant", html: d.answer_html, citations: d.citations, grounded: d.grounded, follow_ups: d.follow_ups, ai: aiMetaOf(r.data) }]);
     } catch (e: any) {
       const reason = isTimeout(e)
         ? "I'm taking longer than usual to read your notes. Ask me again in a moment."
@@ -108,6 +113,7 @@ const AITutorSheet: React.FC<Props> = ({ courseId, sectionId, open, onClose }) =
                   <motion.div key={i} {...m("reveal")} className="mr-4 px-3 py-2 rounded-2xl rounded-bl-md el-chip">
                     {t.grounded === false && <p className="text-[11px] text-warning-700 dark:text-warning-500 mb-1">Not in your notes — take this with care.</p>}
                     <RichHtml className="prose prose-sm dark:prose-invert max-w-none" html={t.html} codeOptions={{ foldAfter: 12 }} />
+                    {t.ai && <AiAnsweredBy ai={t.ai} className="mt-1" />}
                     {t.citations && t.citations.length > 0 && (
                       <ul className="mt-2 flex flex-wrap gap-1.5" aria-label="Sources">
                         {t.citations.map((c) => (
@@ -131,6 +137,7 @@ const AITutorSheet: React.FC<Props> = ({ courseId, sectionId, open, onClose }) =
               )}
               {busy && <p className="text-xs text-slate-600 dark:text-slate-300 flex items-center gap-1.5"><Loader2 className="w-3.5 h-3.5 animate-spin" /> Reading your notes…</p>}
             </div>
+            <AiSourceControl task="assist" value={aiRoute} onChange={setAiRoute} disabled={busy} className="px-3 pt-2" />
 
             <form
               onSubmit={(e) => {

@@ -11,7 +11,7 @@ import { useAccess } from "../../hooks/useAccess";
 import { useMentorshipRole } from "../../hooks/useMentorshipRole";
 import { useOptionalAcademicPeriod } from "../../contexts/AcademicPeriodContext";
 import { BarChart3, CalendarOff, Grid3x3, Target, HeartHandshake, Radar, ShieldAlert, ShieldCheck, UserPlus, Baby } from "lucide-react";
-import { BellRing, Bot, CalendarDays, Clock4, Gamepad2, House, SquareTerminal, Users2 } from "lucide-react";
+import { BellRing, Bot, CalendarDays, KeyRound, Clock4, Gamepad2, House, SquareTerminal, Users2 } from "lucide-react";
 
 interface SidebarProps {
   isCollapsed?: boolean;
@@ -141,6 +141,16 @@ const Sidebar: React.FC<SidebarProps> = ({
       path: "/me/activity",
       section: "you",
       icon: <Activity className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
+    },
+    {
+      // My AI (PERSONAL_AI_PROVIDERS_PLAN.md §9.1): your own AI keys and which AI answers what.
+      // Staff hold AI_PERSONAL_PROVIDERS, students AI_PERSONAL_PROVIDERS_STUDENT.
+      label: "My AI",
+      path: "/my-ai",
+      section: "you",
+      icon: <KeyRound className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
+      requiredCapability: [Permissions.AI_PERSONAL_PROVIDERS, Permissions.AI_PERSONAL_PROVIDERS_STUDENT],
+      orPermission: [Permissions.AI_PERSONAL_PROVIDERS, Permissions.AI_PERSONAL_PROVIDERS_STUDENT],
     },
     {
       label: "Profile",

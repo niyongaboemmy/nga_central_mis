@@ -19,6 +19,7 @@
     { "key": "mis.reminders", "label": "Reminders", "module": "Home", "patterns": ["/reminders"] },
     { "key": "mis.profile", "label": "Profile", "module": "Account", "patterns": ["/profile"] },
     { "key": "mis.my_activity", "label": "My activity", "module": "Account", "patterns": ["/me/activity"] },
+    { "key": "mis.my_ai", "label": "My AI", "module": "Account", "patterns": ["/my-ai", "/my-ai/openrouter-callback"] },
 
     { "key": "mis.my_subjects", "label": "My subjects (teaching)", "module": "Teaching", "patterns": ["/my-subjects"] },
     { "key": "mis.my_students", "label": "My students", "module": "Teaching", "patterns": ["/my-students"] },

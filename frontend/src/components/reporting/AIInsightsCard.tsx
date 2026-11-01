@@ -2,6 +2,8 @@ import React, { useState } from "react";
 import { Sparkles, RefreshCw, TrendingUp, AlertTriangle, Target } from "lucide-react";
 import { mentorshipApi, MenteeAIInsights } from "../../api/mentorship";
 import { useToast } from "../../contexts/ToastContext";
+import AiSourceControl, { AiAnsweredBy } from "../ai/AiSourceControl";
+import { aiMetaOf, type AiRouteMeta } from "../../api/myAi";
 
 interface Props {
   studentId: number;
@@ -11,13 +13,16 @@ const AIInsightsCard: React.FC<Props> = ({ studentId }) => {
   const { showToast } = useToast();
   const [insights, setInsights] = useState<MenteeAIInsights | null>(null);
   const [loading, setLoading] = useState(false);
+  const [aiRoute, setAiRoute] = useState("");
+  const [ai, setAi] = useState<AiRouteMeta | null>(null);
 
   const handleGenerate = async () => {
     setLoading(true);
     try {
-      const res = await mentorshipApi.generateMenteeAIInsights(studentId);
+      const res = await mentorshipApi.generateMenteeAIInsights(studentId, aiRoute);
       const data = (res as any).data?.data ?? (res as any).data;
       setInsights(data ?? null);
+      setAi(aiMetaOf((res as any).data));
     } catch (err: any) {
       showToast(err?.response?.data?.message ?? "Failed to generate AI insights", "error");
     } finally {
@@ -44,6 +49,8 @@ const AIInsightsCard: React.FC<Props> = ({ studentId }) => {
         </button>
       </div>
 
+      <AiSourceControl task="author" value={aiRoute} onChange={setAiRoute} disabled={loading} className="mb-3" />
+
       {!insights && !loading && (
         <p className="text-xs text-violet-600/70 dark:text-violet-400/70">
           Ask AI to summarize this mentee's recent sessions, grades, and check-ins into a quick briefing.
@@ -56,6 +63,7 @@ const AIInsightsCard: React.FC<Props> = ({ studentId }) => {
 
       {insights && !loading && (
         <div className="space-y-3">
+          <AiAnsweredBy ai={ai} />
           <p className="text-sm text-gray-700 dark:text-gray-300">{insights.summary}</p>
 
           {insights.strengths.length > 0 && (

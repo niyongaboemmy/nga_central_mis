@@ -1,5 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Navigate } from "react-router-dom";
+import AiSourceControl, { AiAnsweredBy } from "./ai/AiSourceControl";
+import type { AiRouteMeta } from "../api/myAi";
 import CodeMirror from "@uiw/react-codemirror";
 import { sql as sqlLang } from "@codemirror/lang-sql";
 import {
@@ -212,7 +214,8 @@ const DatabaseManagement: React.FC = () => {
   const [aiPanelOpen, setAiPanelOpen] = useState(false);
   const [aiPrompt, setAiPrompt] = useState("");
   const [aiGenerating, setAiGenerating] = useState(false);
-  const [aiNote, setAiNote] = useState<{ explanation: string | null; providerUsed: string } | null>(null);
+  const [aiNote, setAiNote] = useState<{ explanation: string | null; providerUsed: string; ai?: AiRouteMeta | null } | null>(null);
+  const [aiRoute, setAiRoute] = useState("");
 
   const [history, setHistory] = useState<QueryLogEntry[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -391,9 +394,9 @@ const DatabaseManagement: React.FC = () => {
     setAiGenerating(true);
     setAiNote(null);
     try {
-      const result = await generateSqlWithAI(aiPrompt.trim(), selectedTable || undefined);
+      const result = await generateSqlWithAI(aiPrompt.trim(), selectedTable || undefined, aiRoute);
       setQueryText(result.sql);
-      setAiNote({ explanation: result.explanation, providerUsed: result.providerUsed });
+      setAiNote({ explanation: result.explanation, providerUsed: result.providerUsed, ai: result.ai });
       showToast("SQL query drafted — review before running", "success");
     } catch (err: any) {
       showToast(err?.response?.data?.message || "AI could not generate a query", "error");
@@ -860,6 +863,7 @@ const DatabaseManagement: React.FC = () => {
                         rows={2}
                         className="w-full px-3 py-2 text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-white resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
                       />
+                      <AiSourceControl task="author" value={aiRoute} onChange={setAiRoute} disabled={aiGenerating} />
                       <div className="flex items-center justify-between">
                         <span className="text-[11px] text-gray-500 dark:text-gray-400">
                           Drafts a query for you to review — it never runs automatically.
@@ -879,6 +883,7 @@ const DatabaseManagement: React.FC = () => {
                           <span className="text-gray-400">(via {aiNote.providerUsed})</span>
                         </p>
                       )}
+                      {aiNote?.ai && <AiAnsweredBy ai={aiNote.ai} />}
                     </ModernCard>
                   )}
 
