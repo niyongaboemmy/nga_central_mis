@@ -1,5 +1,5 @@
 import OpenAI from "openai";
-import { AIProvider, GenerateJSONParams } from "./types";
+import { AIProvider, GenerateJSONParams, ProviderResult } from "./types";
 import { matchesSchema } from "./schemaValidator";
 
 const isConfigured = () => !!process.env.DEEPSEEK_API_KEY;
@@ -29,7 +29,7 @@ export const deepseekProvider: AIProvider = {
   // (no constrained decoding), so the response is checked with matchesSchema below.
   supportsStrictSchema: false,
 
-  async generateJSON<T = any>(params: GenerateJSONParams): Promise<T> {
+  async generateJSON<T = any>(params: GenerateJSONParams): Promise<ProviderResult<T>> {
     const model = process.env.DEEPSEEK_MODEL || "deepseek-chat";
 
     const completion = await getClient().chat.completions.create({
@@ -55,6 +55,10 @@ export const deepseekProvider: AIProvider = {
       throw new Error("DeepSeek response did not match the expected schema");
     }
 
-    return parsed;
+    return {
+      data: parsed,
+      model: completion.model || model,
+      usage: { input_tokens: completion.usage?.prompt_tokens, output_tokens: completion.usage?.completion_tokens },
+    };
   },
 };

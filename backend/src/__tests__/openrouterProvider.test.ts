@@ -14,7 +14,7 @@ const saved = { ...process.env };
 
 const ok = (model: string, content: string, cost = 0) => ({
   status: 200,
-  json: { id: "x", object: "chat.completion", model, usage: { cost }, choices: [{ index: 0, finish_reason: "stop", message: { role: "assistant", content } }] },
+  json: { id: "x", object: "chat.completion", model, usage: { cost, prompt_tokens: 12, completion_tokens: 3 }, choices: [{ index: 0, finish_reason: "stop", message: { role: "assistant", content } }] },
 });
 
 beforeAll(async () => {
@@ -62,7 +62,11 @@ describe("OpenRouter provider: free models only", () => {
   it("sends the free list as the models fallback array in json_object mode", async () => {
     process.env.OPENROUTER_MODELS = "a/one:free,google/gemini-2.5-flash,b/two:free";
     reply = () => ok("b/two:free", "{\"ok\":true}");
-    await expect(openrouterProvider.generateJSON({ prompt: "hi", schema, maxOutputTokens: 500 } as any)).resolves.toEqual({ ok: true });
+    await expect(openrouterProvider.generateJSON({ prompt: "hi", schema, maxOutputTokens: 500 } as any)).resolves.toEqual({
+      data: { ok: true },
+      model: "b/two:free",
+      usage: { input_tokens: 12, output_tokens: 3 },
+    });
     expect(lastBody.model).toBe("a/one:free");
     expect(lastBody.models).toEqual(["a/one:free", "b/two:free"]);
     expect(lastBody.response_format).toEqual({ type: "json_object" });

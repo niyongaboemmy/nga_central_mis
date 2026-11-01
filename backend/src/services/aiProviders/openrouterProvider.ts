@@ -1,5 +1,5 @@
 import OpenAI from "openai";
-import { AIProvider, GenerateJSONParams } from "./types";
+import { AIProvider, GenerateJSONParams, ProviderResult } from "./types";
 import { matchesSchema } from "./schemaValidator";
 import logger from "../../utils/logger";
 
@@ -81,7 +81,11 @@ async function complete(messages: OpenAI.ChatCompletionMessageParam[], maxOutput
     logger.error(`OpenRouter served a non-free model (${served}, cost ${cost}); reply discarded`);
     throw new Error("OpenRouter served a non-free model");
   }
-  return String(completion.choices?.[0]?.message?.content || "");
+  return {
+    text: String(completion.choices?.[0]?.message?.content || ""),
+    model: served,
+    usage: { input_tokens: completion.usage?.prompt_tokens, output_tokens: completion.usage?.completion_tokens },
+  };
 }
 
 export const openrouterProvider: AIProvider = {
@@ -91,8 +95,8 @@ export const openrouterProvider: AIProvider = {
   // so the reply is validated with matchesSchema (like GLM and DeepSeek).
   supportsStrictSchema: false,
 
-  async generateJSON<T = any>(params: GenerateJSONParams): Promise<T> {
-    const text = await complete(
+  async generateJSON<T = any>(params: GenerateJSONParams): Promise<ProviderResult<T>> {
+    const { text, model, usage } = await complete(
       [
         {
           role: "system",
@@ -109,6 +113,6 @@ export const openrouterProvider: AIProvider = {
       throw new Error("OpenRouter response did not match the expected schema");
     }
 
-    return parsed;
+    return { data: parsed, model, usage };
   },
 };
