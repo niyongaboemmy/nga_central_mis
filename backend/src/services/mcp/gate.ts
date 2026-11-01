@@ -69,14 +69,16 @@ export async function assertConnectorAllowed(p: McpPerson, feature: AiFeature = 
 }
 
 /**
- * Everything for one MCP request: the account still ACTIVE, the token issued under the
- * person's current token_version (logout / deactivation end it), then the policy checks.
+ * Everything for one MCP request: the account still ACTIVE, then the policy checks.
+ *
+ * Deliberately NOT tied to token_version: signing out of the MIS (which bumps it) must not
+ * disconnect Claude/ChatGPT, like any connected app. A connection ends when the person
+ * revokes it in My AI, when the account is deactivated (revokeUserTokens), or on expiry.
  */
-export async function assertConnectorSession(userId: number, tokenVersion: number): Promise<McpPerson> {
+export async function assertConnectorSession(userId: number, _tokenVersion?: number): Promise<McpPerson> {
   const state = await getUserSessionState(userId);
   if (!state) throw new ConnectorError("SESSION_REVOKED", 401);
   if (state.status !== "ACTIVE") throw new ConnectorError("ACCOUNT_INACTIVE", 401);
-  if ((state.token_version ?? 0) !== tokenVersion) throw new ConnectorError("SESSION_REVOKED", 401);
   const p = await loadPerson(userId);
   await assertConnectorAllowed(p);
   return p;

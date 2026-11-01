@@ -330,7 +330,8 @@ export function mcpPublicRouter(): Router {
           return oauthError(res, 400, "invalid_grant", "The refresh token was already used.");
         }
         const tv = await userOk(t.userId);
-        if (tv === null || tv !== t.tokenVersion) {
+        // token_version is not compared: a MIS sign-out must not disconnect the person's AI app.
+        if (tv === null) {
           await revokeFamily(t.familyId);
           return oauthError(res, 400, "invalid_grant", "Your NGA sign-in has ended. Connect NGA again.");
         }
