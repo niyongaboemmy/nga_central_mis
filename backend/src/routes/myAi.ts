@@ -23,7 +23,7 @@ import {
 } from "../services/ai/personal/credentials";
 import { completeOpenRouterConnect, startOpenRouterConnect } from "../services/ai/personal/openrouterOAuth";
 import { CATALOG_FETCHED_AT, PROVIDERS, estimateCostUsd, modelsFor } from "../services/ai/personal/providers";
-import { listRoutes, personalWhoFromRequest, replaceRoutes } from "../services/ai/personal/routes";
+import { listRoutes, personalWhoFromRequest, replaceRoutes, resolvedRouteMap } from "../services/ai/personal/routes";
 import { isVaultConfigured } from "../services/secrets/vault";
 import {
   AI_PERSONAL_APPS,
@@ -112,6 +112,16 @@ router.get(
         catalogDate: CATALOG_FETCHED_AT,
       },
     });
+  }),
+);
+
+/** What answers each task in the MIS for me, and the keys I may pick per request ("Answers with ▾"). */
+router.get(
+  "/resolved",
+  asyncHandler(async (req: any, res: any) => {
+    const { policy, who } = await context(req);
+    res.set("Cache-Control", "private, no-store");
+    res.json({ success: true, data: await resolvedRouteMap(who, "mis", policy) });
   }),
 );
 

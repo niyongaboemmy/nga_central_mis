@@ -250,3 +250,31 @@ export function parseOverride(raw: unknown): RouteOverride {
   const m = /^(\d{1,12})(?::(.{1,120}))?$/.exec(raw.trim());
   return m ? { credentialId: Number(m[1]), model: m[2] } : undefined;
 }
+
+/**
+ * What answers each task for this person in this app, plus the keys they may pick for a
+ * single request (no secrets). Feeds "Answers with ▾" in every app's AI panels.
+ */
+export async function resolvedRouteMap(who: PersonalWho, app: AiPersonalApp, policy?: AiPolicy) {
+  const p = policy ?? (await getAiPolicy());
+  const [routes, v] = await Promise.all([listRoutes(who.userId), routesVersion(who.userId)]);
+  const byTask = Object.fromEntries(
+    AI_TASKS.map((task) => {
+      const d = decidePersonalRoute(p, { app, task, isStudent: who.isStudent, hasPersonalCap: who.hasPersonalCap }, routes);
+      return [
+        task,
+        d.route
+          ? { route: "personal", reason: d.reason, credentialId: d.route.credentialId, provider: d.route.provider, model: d.route.model, label: d.route.label, fallbackToSchool: d.fallbackToSchool }
+          : { route: "school", reason: d.reason },
+      ];
+    }),
+  );
+  const open = p.personal.enabled && p.personal.apps[app] !== false && isVaultConfigured();
+  const choices = open
+    ? routes
+        .filter((r) => r.status === "active" && (!r.allowedApps || r.allowedApps.includes(app)) && personalProviderAllowed(p.personal, r.provider, who.isStudent))
+        .map((r) => ({ credentialId: r.credentialId, provider: r.provider, model: r.model, label: r.label }))
+        .filter((r, i, a) => a.findIndex((x) => x.credentialId === r.credentialId && x.model === r.model) === i)
+    : [];
+  return { v, policyV: p.v, enabled: open, byTask, choices };
+}

@@ -9,9 +9,8 @@ import { generateStructuredContent } from "../services/aiProviders/generate";
 import { completeChat, streamChat, trimConversation } from "../services/aiProviders/chat";
 import { PersonalAIError } from "../services/aiProviders/errors";
 import { noteCredentialFailure, touchCredential } from "../services/ai/personal/credentials";
-import { listRoutes, parseOverride, personalWhoFromUserId, resolvePersonal, routesVersion } from "../services/ai/personal/routes";
-import { AI_TASKS, decidePersonalRoute, type AiPersonalApp, type AiTask } from "../vendor/nga-access";
-import { getAiPolicy } from "../services/ai/policy";
+import { parseOverride, personalWhoFromUserId, resolvePersonal, resolvedRouteMap } from "../services/ai/personal/routes";
+import { AI_TASKS, type AiPersonalApp, type AiTask } from "../vendor/nga-access";
 import logger from "../utils/logger";
 
 /**
@@ -60,20 +59,9 @@ router.get("/routes", invoke, async (req: any, res: any, next: any) => {
   try {
     const c = await caller(req, res);
     if (!c) return;
-    const [policy, who, routes, v] = await Promise.all([getAiPolicy(), personalWhoFromUserId(c.userId), listRoutes(c.userId), routesVersion(c.userId)]);
-    const byTask = Object.fromEntries(
-      AI_TASKS.map((task) => {
-        const d = decidePersonalRoute(policy, { app: c.app, task, isStudent: who.isStudent, hasPersonalCap: who.hasPersonalCap }, routes);
-        return [task, d.route ? { route: "personal", reason: d.reason, credentialId: d.route.credentialId, provider: d.route.provider, model: d.route.model, label: d.route.label, fallbackToSchool: d.fallbackToSchool } : { route: "school", reason: d.reason }];
-      }),
-    );
-    // Keys this person allowed in this app, for a one-off choice in the app's AI panel.
-    const choices = routes
-      .filter((r) => r.status === "active" && (!r.allowedApps || r.allowedApps.includes(c.app)))
-      .map((r) => ({ credentialId: r.credentialId, provider: r.provider, model: r.model, label: r.label }))
-      .filter((r, i, a) => a.findIndex((x) => x.credentialId === r.credentialId && x.model === r.model) === i);
+    const data = await resolvedRouteMap(await personalWhoFromUserId(c.userId), c.app);
     res.set("Cache-Control", "no-store");
-    res.json({ success: true, data: { v, policyV: policy.v, enabled: policy.personal.enabled && policy.personal.apps[c.app] !== false, byTask, choices } });
+    res.json({ success: true, data });
   } catch (e) {
     next(e);
   }
