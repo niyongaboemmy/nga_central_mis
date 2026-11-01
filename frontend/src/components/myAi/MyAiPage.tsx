@@ -10,6 +10,7 @@ import CredentialCard from "./CredentialCard";
 import RoutesEditor from "./RoutesEditor";
 import TryIt from "./TryIt";
 import { KeyCostTable, SubscriptionOptions } from "./AlreadyPayFor";
+import ConnectedAiApps from "./ConnectedAiApps";
 import { statusSummary } from "./routesModel";
 import { forgetModels } from "./useModels";
 
@@ -220,6 +221,9 @@ const MyAiPage: React.FC = () => {
           <KeyCostTable />
         </Card>
       )}
+      <div id="connected-apps" className="scroll-mt-20">
+        <ConnectedAiApps />
+      </div>
     </div>
   );
 };
