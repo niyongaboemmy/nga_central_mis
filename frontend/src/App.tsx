@@ -24,6 +24,7 @@ import CodePlaygroundHost from "./components/codePlayground/CodePlaygroundHost";
 const CodePlaygroundPage = lazy(() => import("./components/codePlayground/CodePlaygroundPage"));
 // My AI: people's own AI keys and which AI answers what (PERSONAL_AI_PROVIDERS_PLAN.md §9).
 const MyAiPage = lazy(() => import("./components/myAi/MyAiPage"));
+const OAuthConsentPage = lazy(() => import("./components/oauth/OAuthConsentPage"));
 const OpenRouterCallback = lazy(() => import("./components/myAi/OpenRouterCallback"));
 import DesktopUpdateBanner from "./components/apps/DesktopUpdateBanner";
 import { NotificationProvider } from "./contexts/NotificationContext";
@@ -384,6 +385,16 @@ function App() {
             {/* NGA desktop app: sign in through the browser, Postman-style (public, unwrapped). */}
             <Route path="/desktop/signin" element={<DesktopBrowserSignIn />} />
             <Route path="/desktop/complete" element={<DesktopSignInComplete />} />
+            {/* The NGA connector: someone's own Claude / ChatGPT asks to connect (public, unwrapped;
+                it shows the sign-in form itself when needed). Backend services/mcp/routes.ts. */}
+            <Route
+              path="/oauth/authorize"
+              element={
+                <Suspense fallback={null}>
+                  <OAuthConsentPage />
+                </Suspense>
+              }
+            />
 
             {/* Code Playground -- write and run code in any language, full screen
                 (no sidebar). CODE_PLAYGROUND_USE, every role by default. */}

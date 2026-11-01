@@ -9,6 +9,7 @@ import AddAiWizard from "./AddAiWizard";
 import CredentialCard from "./CredentialCard";
 import RoutesEditor from "./RoutesEditor";
 import TryIt from "./TryIt";
+import ConnectedAiApps from "./ConnectedAiApps";
 import { statusSummary } from "./routesModel";
 import { forgetModels } from "./useModels";
 
@@ -204,6 +205,7 @@ const MyAiPage: React.FC = () => {
           />
         </>
       )}
+      <ConnectedAiApps />
     </div>
   );
 };
