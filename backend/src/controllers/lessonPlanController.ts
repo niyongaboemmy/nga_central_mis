@@ -307,6 +307,7 @@ export const deleteLessonPlan = async (req: Request, res: Response) => {
 import * as cheerio from "cheerio";
 import { aiDecisionFor } from "../services/ai/gate";
 import { personalFor } from "../services/ai/personal/routes";
+import { mustRethrowAiError } from "../services/ai/handoff";
 
 export const extractLessonPlan = asyncHandler(async (req: any, res: any) => {
   if (!req.file) {
@@ -342,6 +343,7 @@ ${html}`,
         { ...extracted, ai: ai ?? null },
       );
     } catch (err) {
+      if (mustRethrowAiError(err)) throw err;
       logger.warn("AI lesson plan extraction failed, falling back to deterministic extraction", {
         error: (err as Error).message,
       });

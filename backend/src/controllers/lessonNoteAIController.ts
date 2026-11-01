@@ -43,6 +43,7 @@ import logger from "../utils/logger";
 import { CODE_HTML_RULE } from "../utils/aiCodeRules";
 import { assertAi } from "../services/ai/gate";
 import { personalFor } from "../services/ai/personal/routes";
+import { handoffModeOf } from "../services/ai/handoff";
 import type { PersonalOption } from "../services/aiProviders/generate";
 import type { AiRouteMeta } from "../services/ai/personal/run";
 
@@ -306,6 +307,8 @@ the notes (not just the topic name verbatim).${extraInstructionsBlock}`,
 
     updateJob(jobId, { status: "done", message: "Lesson note generated!", noteId, providerUsed, ai: ai ?? null });
   } catch (err: any) {
+    // A hand-off runs inline (startAINoteGeneration): its prompt or error goes to the request.
+    if (handoffModeOf(params.personal)) throw err;
     logger.error("AI lesson note generation failed", { jobId, error: err?.message });
     updateJob(jobId, {
       status: "error",
@@ -374,18 +377,26 @@ export const startAINoteGeneration = asyncHandler(async (req: any, res: any) => 
   // Resolved now: the job runs after the response, without the request.
   const personal = await personalFor(req, "author");
   const jobId = randomUUID();
-  createJob(jobId, userId);
-
-  successResponse(res, "AI note generation started", { jobId }, 202);
-
-  processGenerateJob(jobId, {
+  const params = {
     userId,
     source,
     classGroupId: class_group_id ? parseInt(class_group_id, 10) : null,
     academicTermId: academic_term_id ? parseInt(academic_term_id, 10) : null,
     extraInstructions: extraInstructions || null,
     personal,
-  });
+  };
+
+  // Hand-off runs inline: prompt mode creates no job and stops at the AI step with the prompt
+  // (200 { handoff }), nothing saved; import mode finishes before the 202 (first poll: "done").
+  const mode = handoffModeOf(personal);
+  if (mode !== "prompt") createJob(jobId, userId);
+  if (mode) {
+    await processGenerateJob(jobId, params);
+    return successResponse(res, "AI note generated from your pasted answer", { jobId }, 202);
+  }
+
+  successResponse(res, "AI note generation started", { jobId }, 202);
+  processGenerateJob(jobId, params);
 });
 
 export const getAINoteGenerationStatus = asyncHandler(async (req: any, res: any) => {

@@ -204,3 +204,40 @@ export function estimateCostUsd(provider: AiProviderId, model: string, input?: n
   if (!m || m.cost_in == null || m.cost_out == null) return null;
   return ((input ?? 0) * m.cost_in + (output ?? 0) * m.cost_out) / 1_000_000;
 }
+
+/**
+ * "What a key really costs" (REUSING_AI_SUBSCRIPTIONS_ANALYSIS.md §4): a heavy month of school
+ * work (20 lesson notes, 30 question batches, 20 rubrics, 200 chat turns, 50 mail drafts).
+ */
+export const HEAVY_MONTH = { inputTokens: 640_000, outputTokens: 385_000 };
+
+/** The models people ask about, cheapest first in each family. */
+const COST_MODELS: Array<[AiProviderId, string]> = [
+  ["anthropic", "claude-haiku-5-5"],
+  ["openai", "gpt-6-luna"],
+  ["deepseek", "deepseek-v4-flash"],
+  ["gemini", "gemini-3.5-flash-lite"],
+  ["gemini", "gemini-3.8-flash"],
+  ["openai", "gpt-6.1-terra"],
+  ["anthropic", "claude-sonnet-5-5"],
+  ["anthropic", "claude-opus-5-5"],
+];
+
+/** One row per headline model the catalogue prices, with the heavy month's cost in USD. */
+export function monthlyCosts() {
+  return COST_MODELS.flatMap(([provider, id]) => {
+    const m = catalogModel(provider, id);
+    if (!m || m.cost_in == null || m.cost_out == null) return [];
+    return [
+      {
+        provider,
+        providerLabel: PROVIDERS[provider]?.label ?? provider,
+        model: m.id,
+        name: m.name,
+        cost_in: m.cost_in,
+        cost_out: m.cost_out,
+        monthlyUsd: estimateCostUsd(provider, m.id, HEAVY_MONTH.inputTokens, HEAVY_MONTH.outputTokens) ?? 0,
+      },
+    ];
+  }).sort((a, b) => a.monthlyUsd - b.monthlyUsd);
+}

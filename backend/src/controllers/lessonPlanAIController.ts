@@ -29,6 +29,7 @@ import {
 } from "../services/aiProviders";
 import type { PersonalOption } from "../services/aiProviders/generate";
 import { personalFor } from "../services/ai/personal/routes";
+import { handoffModeOf } from "../services/ai/handoff";
 
 const lessonPlanSchema: JSONSchema = {
   type: "object",
@@ -383,6 +384,8 @@ const processJob = async (
       ai,
     });
   } catch (err: any) {
+    // A hand-off runs inline (startAILessonGeneration): its prompt or error goes to the request.
+    if (handoffModeOf(params.personal)) throw err;
     logger.error("AI lesson plan generation failed", { jobId, error: err?.message });
     updateJob(jobId, {
       status: "error",
@@ -450,11 +453,7 @@ export const startAILessonGeneration = asyncHandler(async (req: any, res: any) =
   // Resolved now: the job runs after the response, without the request.
   const personal = await personalFor(req, "author");
   const jobId = randomUUID();
-  createJob(jobId, userId);
-
-  successResponse(res, "AI lesson plan generation started", { jobId }, 202);
-
-  processJob(jobId, {
+  const params = {
     userId,
     entryId: parseInt(entry_id, 10),
     lessonId: lesson_id ? parseInt(lesson_id, 10) : undefined,
@@ -462,7 +461,20 @@ export const startAILessonGeneration = asyncHandler(async (req: any, res: any) =
     lessonDate,
     customPrompt,
     personal,
-  });
+  };
+
+  // "Open in my AI" / "Paste the answer" run inline. Prompt mode creates no job: the run stops
+  // at the AI step with the prompt (HandoffPrompt -> 200 { handoff }) before anything is saved.
+  // Import mode is instant, so the job finishes before the 202 and the first poll reads "done".
+  const mode = handoffModeOf(personal);
+  if (mode !== "prompt") createJob(jobId, userId);
+  if (mode) {
+    await processJob(jobId, params);
+    return successResponse(res, "AI lesson plan generated from your pasted answer", { jobId }, 202);
+  }
+
+  successResponse(res, "AI lesson plan generation started", { jobId }, 202);
+  processJob(jobId, params);
 });
 
 export const getAILessonGenerationStatus = asyncHandler(async (req: any, res: any) => {

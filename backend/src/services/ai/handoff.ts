@@ -1,6 +1,7 @@
 import { CustomError, ValidationError } from "../../errors/CustomError";
 import type { JSONSchema } from "../aiProviders/types";
 import { matchesSchema } from "../aiProviders/schemaValidator";
+import { PersonalAIError } from "../aiProviders/errors";
 
 /**
  * "Open in Claude / ChatGPT" + "Paste the answer" (REUSING_AI_SUBSCRIPTIONS_ANALYSIS.md §3.2).
@@ -41,10 +42,40 @@ export class HandoffForbiddenError extends CustomError {
   }
 }
 
+/** A pasted answer in the wrong shape (400). The person fixes it; nothing falls back. */
+export class HandoffPasteError extends ValidationError {
+  readonly code = "AI_HANDOFF_FORMAT";
+}
+
+/**
+ * Errors an AI call site must re-throw unchanged rather than swallow or rewrap: the
+ * prompt-mode stop, hand-off refusals, a bad paste and the user's own key failing.
+ *
+ *   } catch (err) {
+ *     if (mustRethrowAiError(err)) throw err;
+ *     ...
+ */
+export const mustRethrowAiError = (e: unknown): boolean =>
+  isHandoffPrompt(e) ||
+  e instanceof HandoffForbiddenError ||
+  e instanceof HandoffPasteError ||
+  e instanceof PersonalAIError;
+
+/** Whether a call is a hand-off ("Open in my AI" or "Paste the answer"), and which. */
+export const handoffModeOf = (personal: { handoff?: AiHandoff } | undefined | null): AiHandoff["mode"] | null => personal?.handoff?.mode ?? null;
+
 const MAX_PASTE = 200_000;
 
 /** `aiHandoff` from a request body. Anything malformed is ignored (normal AI call). */
 export function parseHandoff(raw: unknown): AiHandoff | undefined {
+  // Multipart forms (document uploads) carry it as a JSON string.
+  if (typeof raw === "string" && raw.trim().startsWith("{")) {
+    try {
+      raw = JSON.parse(raw);
+    } catch {
+      return undefined;
+    }
+  }
   if (!raw || typeof raw !== "object") return undefined;
   const r = raw as Record<string, unknown>;
   if (r.mode === "prompt") return { mode: "prompt", pupilConsent: r.pupilConsent === true };
@@ -85,7 +116,7 @@ export function readPastedJson<T>(text: string, schema: JSONSchema): T {
       /* try the next candidate */
     }
   }
-  throw new ValidationError(
+  throw new HandoffPasteError(
     "The pasted answer isn't in the expected format. Paste the whole reply, including the ```json block, or ask your AI to answer again in that format.",
   );
 }

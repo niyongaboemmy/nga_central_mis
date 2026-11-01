@@ -19,6 +19,7 @@ import {
   PersonalAIError,
 } from "../services/aiProviders";
 import { personalFor } from "../services/ai/personal/routes";
+import { mustRethrowAiError } from "../services/ai/handoff";
 import type { AiRouteMeta } from "../services/ai/personal/run";
 import logger from "../utils/logger";
 
@@ -172,13 +173,15 @@ ${checkinLines}
 Based strictly on this record, produce a concise, evidence-grounded analysis for the mentor. Do not invent facts
 not supported by the record above. If there is genuinely nothing concerning, say so plainly rather than manufacturing
 a concern.`,
-    }, { feature: "mentee_insights", actorUserId: Number(req.user.userId), personal });
+    // A named mentee's record: "Open in my AI" needs the school's policy and the mentor's consent.
+    }, { feature: "mentee_insights", actorUserId: Number(req.user.userId), personal, pupilData: true });
     parsed = result.data;
     ai = result.ai ?? null;
   } catch (err: any) {
     logger.error("Mentorship AI insights generation failed", { error: err?.message, studentId, mentorId });
-    // The user's own key failed with no fallback: keep its code (AI_KEY_INVALID...) for the client.
-    if (err instanceof PersonalAIError) throw err;
+    // The user's own key failed with no fallback (AI_KEY_INVALID...), a hand-off prompt or
+    // refusal, or a pasted answer in the wrong shape: the client needs each one as it is.
+    if (err instanceof PersonalAIError || mustRethrowAiError(err)) throw err;
     throw new ValidationError(friendlyAIErrorMessage(err));
   }
 

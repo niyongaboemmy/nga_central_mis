@@ -18,6 +18,7 @@ import {
   JSONSchema,
 } from "../services/aiProviders";
 import { personalFor } from "../services/ai/personal/routes";
+import { mustRethrowAiError } from "../services/ai/handoff";
 import type { AiRouteMeta } from "../services/ai/personal/run";
 
 /** Fetches a subject's Performance Criteria (number + description), joined through its Elements. */
@@ -189,6 +190,7 @@ Return only the criteria_number values (e.g. "1.1", "2.3") of genuine matches.`,
       ? parsed.criteria_numbers.map((n: any) => String(n).trim())
       : [];
   } catch (err) {
+    if (mustRethrowAiError(err)) throw err;
     logger.warn("Failed to parse AI criteria suggestion response", {
       error: (err as Error).message,
     });
@@ -500,6 +502,8 @@ criteria_number values (e.g. "1.1", "2.3").`,
       }
     }
   } catch (err) {
+    // Re-thrown before the overwrite below: a prompt-mode request must change nothing.
+    if (mustRethrowAiError(err)) throw err;
     logger.warn("Failed to parse bulk AI criteria suggestion response", {
       error: (err as Error).message,
     });
