@@ -147,7 +147,7 @@ export async function replaceRoutes(userId: number, input: unknown): Promise<AiP
     for (const r of clean) {
       await tx.execute(sql`
         INSERT INTO AiRoute (user_id, app, task, credential_id, model, fallback, updated_at)
-        VALUES (${userId}, ${r.app}, ${r.task}, ${r.credentialId}, ${r.model}, ${r.fallback}, UTC_TIMESTAMP())`);
+        VALUES (${userId}, ${r.app}, ${r.task}, ${r.credentialId}, ${r.model}, ${r.fallback}, ${new Date()})`);
     }
   });
   await recordActivity(userId, "AI_ROUTES_UPDATE", `Changed which AI answers what (${clean.length} choice${clean.length === 1 ? "" : "s"})`, "AiRoute", undefined, { routes: clean }, userId);

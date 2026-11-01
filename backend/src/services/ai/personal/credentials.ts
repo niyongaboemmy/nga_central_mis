@@ -75,6 +75,13 @@ const json = <T>(v: unknown, fallback: T): T => {
   }
 };
 const iso = (v: unknown) => (v ? new Date(v as any).toISOString() : null);
+// Dates go to MySQL as JS Dates (like every Drizzle write), never UTC_TIMESTAMP(): the
+// connection reads DATETIMEs in the server's zone, so mixing the two shifts times locally.
+const startOfUtcDay = () => {
+  const d = new Date();
+  d.setUTCHours(0, 0, 0, 0);
+  return d;
+};
 const aad = (id: number, owner: number | null, provider: string) => `aicred|v1|${id}|${owner ?? "school"}|${provider}`;
 
 const asApps = (v: unknown): AiPersonalApp[] => {
@@ -218,7 +225,7 @@ export async function createCredential(who: Who, input: CredentialInput): Promis
     VALUES (${who.userId}, ${provider}, ${input.authType ?? "api_key"}, ${common.label!}, ${baseUrl}, ${placeholder}, ${placeholder}, ${placeholder},
       ${placeholder}, ${placeholder}, ${placeholder}, 0, '', ${check.status}, ${check.detail},
       CAST(${JSON.stringify(common.allowedApps ?? AI_PERSONAL_APPS)} AS JSON), ${common.dailyRequestCap ?? null}, ${freeOnly ? 1 : 0},
-      CAST(${JSON.stringify(check.models)} AS JSON), CAST(${JSON.stringify(check.balance)} AS JSON), UTC_TIMESTAMP())`);
+      CAST(${JSON.stringify(check.models)} AS JSON), CAST(${JSON.stringify(check.balance)} AS JSON), ${new Date()})`);
   const id = Number(res?.[0]?.insertId ?? res?.insertId);
   try {
     await writeSealed(id, who.userId, provider, apiKey);
@@ -270,7 +277,7 @@ async function saveCheck(id: number, check: Awaited<ReturnType<typeof validateKe
     UPDATE AiCredential SET status = ${check.status}, status_detail = ${check.detail},
       models_cache = ${check.models.length ? sql`CAST(${JSON.stringify(check.models)} AS JSON)` : sql`models_cache`},
       balance = ${check.balance ? sql`CAST(${JSON.stringify(check.balance)} AS JSON)` : sql`balance`},
-      last_validated_at = UTC_TIMESTAMP()
+      last_validated_at = ${new Date()}
     WHERE credential_id = ${id}`);
 }
 
@@ -318,7 +325,7 @@ export async function loadSecret(id: number, ownerUserId: number | null): Promis
 
 /** Successful personal calls: when the key was last used. Fire-and-forget. */
 export function touchCredential(id: number): void {
-  db.execute(sql`UPDATE AiCredential SET last_used_at = UTC_TIMESTAMP(), status = IF(status IN ('rate_limited','unreachable'), 'active', status), status_detail = IF(status IN ('rate_limited','unreachable'), NULL, status_detail) WHERE credential_id = ${id}`).catch(
+  db.execute(sql`UPDATE AiCredential SET last_used_at = ${new Date()}, status = IF(status IN ('rate_limited','unreachable'), 'active', status), status_detail = IF(status IN ('rate_limited','unreachable'), NULL, status_detail) WHERE credential_id = ${id}`).catch(
     (e: any) => logger.warn("[my-ai] could not mark key used", { error: e?.message }),
   );
 }
@@ -361,7 +368,7 @@ export async function noteCredentialFailure(id: number, code: string): Promise<v
 /** Personal calls on this key today (successful or not), for its daily cap. */
 export async function usedToday(credentialId: number): Promise<number> {
   const [r] = rows(
-    await db.execute(sql`SELECT COUNT(*) AS n FROM AIUsageLog WHERE credential_id = ${credentialId} AND occurred_at >= UTC_DATE()`),
+    await db.execute(sql`SELECT COUNT(*) AS n FROM AIUsageLog WHERE credential_id = ${credentialId} AND occurred_at >= ${startOfUtcDay()}`),
   );
   return Number(r?.n ?? 0);
 }
@@ -369,7 +376,7 @@ export async function usedToday(credentialId: number): Promise<number> {
 /** A student's personal calls today across all their keys (students.maxDailyRequests). */
 export async function userPersonalUsedToday(userId: number): Promise<number> {
   const [r] = rows(
-    await db.execute(sql`SELECT COUNT(*) AS n FROM AIUsageLog WHERE actor_user_id = ${userId} AND route = 'personal' AND occurred_at >= UTC_DATE()`),
+    await db.execute(sql`SELECT COUNT(*) AS n FROM AIUsageLog WHERE actor_user_id = ${userId} AND route = 'personal' AND occurred_at >= ${startOfUtcDay()}`),
   );
   return Number(r?.n ?? 0);
 }
@@ -395,8 +402,8 @@ export async function sweepCredentials(limit = 50): Promise<{ checked: number; c
       await db.execute(sql`
         SELECT credential_id, owner_user_id, status FROM AiCredential
         WHERE owner_user_id IS NOT NULL AND status <> 'disabled'
-          AND last_used_at >= UTC_TIMESTAMP() - INTERVAL 30 DAY
-          AND (last_validated_at IS NULL OR last_validated_at < UTC_TIMESTAMP() - INTERVAL 1 DAY)
+          AND last_used_at >= ${new Date(Date.now() - 30 * 86_400_000)}
+          AND (last_validated_at IS NULL OR last_validated_at < ${new Date(Date.now() - 86_400_000)})
         ORDER BY last_validated_at LIMIT ${limit}`),
     );
   } catch (e: any) {
