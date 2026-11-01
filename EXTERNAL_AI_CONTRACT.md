@@ -115,3 +115,13 @@ Rules for results:
 | Task Mentor | `tm_list_my_courses`, `tm_search_question_bank`, `tm_list_assignments`, `tm_list_submissions_to_grade` (pupilData) | `tm_add_questions_draft`, `tm_draft_rubric`, `tm_draft_feedback` (pupilData; never released) |
 | Tupo | — | `tupo_draft_mail` (saved in Drafts, never sent) |
 | Tendo | `da_list_rules` | `da_draft_rule` (inactive until a person approves) |
+
+### MIS side (implemented, `backend/src/services/mcp/`)
+
+- **Endpoints:** `POST /mcp` (Streamable HTTP, stateless JSON; GET/DELETE answer 405), `/.well-known/oauth-protected-resource[/mcp]`, `/.well-known/oauth-authorization-server`, `POST /oauth/register` (DCR), `GET /oauth/authorize` (→ MIS page `/oauth/authorize`), `POST /oauth/token`, `POST /oauth/revoke`. Migration 126.
+- **Scopes:** `nga.read` (read tools), `nga.drafts` (draft tools), `pupil_names` (only from the unticked consent box, and only while `pupilNames === "with_consent"`). The MIS lists and relays a `draft` tool only when the token holds `nga.drafts`.
+- **Relay token:** the MIS signs a 5-minute MIS JWT `{ userId, tokenVersion, purpose: "mcp-relay" }` (issuer `nga-mis`, audience `nga-mcp-relay`) for each `GET /api/integration/mcp/tools` and `POST /api/integration/mcp/call`. Verify it with MIS `/auth/verify` as usual. Tools are cached per person for 60 seconds.
+- **Names:** the MIS drops an app's tool unless its name starts with that app's prefix (`tm_`, `tupo_`, `da_`), and skips an app whose `policy.apps` switch is off.
+- **`mis_propose_scheme_week` saves nothing.** A Scheme of Work week has no draft state: a new `SchemeOfWorkEntry` joins the scheme and the validators' PENDING queue at once. The tool checks the week and returns it with a link to the scheme, where the teacher adds it.
+- **Ends a connection:** Revoke in My AI, account deactivation, or anything that bumps the person's `token_version` (including an MIS logout). The person then connects again from their AI app.
+

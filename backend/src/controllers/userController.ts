@@ -67,6 +67,7 @@ import {
 } from "../services/activeUsers";
 import { notifyLogout } from "../services/sso/backchannelLogout";
 import { disableCredentialsOf } from "../services/ai/personal/credentials";
+import { revokeUserTokens } from "../services/mcp/oauthStore";
 import { signOutEverywhereLocal } from "../services/activity/control";
 
 /** A disabled / suspended account loses every session at once: bump
@@ -82,6 +83,8 @@ const endSessionsForDeactivation = async (userId: number) => {
   void notifyLogout(userId).catch(() => undefined);
   // Their own AI keys stop too (My AI); they re-test them in My AI if reactivated.
   await disableCredentialsOf(userId);
+  // And their NGA connector in Claude / ChatGPT (services/mcp).
+  await revokeUserTokens(userId);
 };
 import {
   generateStudentRegistrationNumber,
