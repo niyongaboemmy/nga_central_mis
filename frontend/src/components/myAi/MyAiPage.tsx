@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { FlaskConical, KeyRound, ListTree, Plus, ShieldCheck, Sparkles } from "lucide-react";
+import { CreditCard, FlaskConical, KeyRound, ListTree, Plus, ShieldCheck, Sparkles } from "lucide-react";
 import { Card, CardTitle, EmptyState, Muted, Spinner, primaryBtn, secondaryBtn } from "../officeHours/ohUi";
 import { loadAiPolicy } from "../../api/aiPolicy";
 import { errorMessage, myAiApi, type MyAiCredential, type MyAiView } from "../../api/myAi";
@@ -9,6 +9,8 @@ import AddAiWizard from "./AddAiWizard";
 import CredentialCard from "./CredentialCard";
 import RoutesEditor from "./RoutesEditor";
 import TryIt from "./TryIt";
+import { KeyCostTable, SubscriptionOptions } from "./AlreadyPayFor";
+import ConnectedAiApps from "./ConnectedAiApps";
 import { statusSummary } from "./routesModel";
 import { forgetModels } from "./useModels";
 
@@ -204,6 +206,24 @@ const MyAiPage: React.FC = () => {
           />
         </>
       )}
+
+      {view && (
+        <Card labelledBy="myai-subscriptions">
+          <CardTitle id="myai-subscriptions" icon={<CreditCard className="h-4 w-4" aria-hidden />}>
+            I already pay for…
+          </CardTitle>
+          <Muted className="mb-3">
+            A ChatGPT, Claude or Gemini subscription can't be plugged into NGA: the providers don't allow other websites to use it. Here is what it can do with
+            NGA, and what a key would really cost.
+          </Muted>
+          <SubscriptionOptions />
+          <h3 className="mb-1 mt-5 text-sm font-semibold text-slate-900 dark:text-white">What a key really costs</h3>
+          <KeyCostTable />
+        </Card>
+      )}
+      <div id="connected-apps" className="scroll-mt-20">
+        <ConnectedAiApps />
+      </div>
     </div>
   );
 };

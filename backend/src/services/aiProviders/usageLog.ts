@@ -20,7 +20,7 @@ export interface AIUsageRow {
   /** Which app's feature asked (migration 122). */
   app?: string | null;
   /** Whose key answered: the school's env keys, or a user's own (migration 122). */
-  route?: "school" | "personal";
+  route?: "school" | "personal" | "handoff";
   credential_id?: number | null;
   occurred_at: Date;
 }

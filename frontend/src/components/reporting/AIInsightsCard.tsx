@@ -3,6 +3,7 @@ import { Sparkles, RefreshCw, TrendingUp, AlertTriangle, Target } from "lucide-r
 import { mentorshipApi, MenteeAIInsights } from "../../api/mentorship";
 import { useToast } from "../../contexts/ToastContext";
 import AiSourceControl, { AiAnsweredBy } from "../ai/AiSourceControl";
+import HandoffControl from "../ai/HandoffControl";
 import { aiMetaOf, type AiRouteMeta } from "../../api/myAi";
 
 interface Props {
@@ -50,6 +51,17 @@ const AIInsightsCard: React.FC<Props> = ({ studentId }) => {
       </div>
 
       <AiSourceControl task="author" value={aiRoute} onChange={setAiRoute} disabled={loading} className="mb-3" />
+      {/* The prompt is this mentee's record: it leaves only with the mentor's tick (pupilData). */}
+      <HandoffControl
+        pupilData
+        className="mb-3"
+        disabled={loading}
+        run={(extra) => mentorshipApi.generateMenteeAIInsights(studentId, undefined, extra).then((r) => r.data)}
+        onImported={(body) => {
+          setInsights(body?.data ?? null);
+          setAi(aiMetaOf(body));
+        }}
+      />
 
       {!insights && !loading && (
         <p className="text-xs text-violet-600/70 dark:text-violet-400/70">

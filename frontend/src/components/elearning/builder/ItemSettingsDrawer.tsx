@@ -13,7 +13,8 @@ import {
   Wand2,
   X,
 } from "lucide-react";
-import { CompletionRule, CourseItem, CurriculumOutcomePick, elearningApi, isTimeout } from "../../../api/elearning";
+import { CompletionRule, CourseItem, CurriculumOutcomePick, elearningApi, isTimeout, type PageDraft } from "../../../api/elearning";
+import HandoffControl from "../../ai/HandoffControl";
 import { lessonNotesApi } from "../../../api/lessonNotes";
 import { apiService } from "../../../services/api";
 import { useToast } from "../../../contexts/ToastContext";
@@ -252,6 +253,20 @@ const ItemSettingsDrawer: React.FC<Props> = ({ item, curriculum, onClose, onSave
     }
   };
 
+  const applyPageDraft = (d: PageDraft) => {
+    setPageHtml(d.content_html);
+    setPageJson(null); // the editor re-seeds from HTML
+    setPageKey((k) => k + 1);
+    if (d.title && (!title || title === "New page")) setTitle(d.title);
+    // Tick the criteria the draft says it teaches, so alignment follows the content.
+    if (context && d.covered_criteria?.length) {
+      const matched = context.criteria.filter((c) => d.covered_criteria.includes(c.criteria_number)).map((c) => c.criteria_id);
+      if (matched.length) setCriteriaIds((ids) => [...new Set([...ids, ...matched])]);
+    }
+    setAiInstruction("");
+    showToast("Draft written — edit anything before saving", "success");
+  };
+
   /** Writes (or extends) the page from the week's topic, objective and criteria. */
   const writePage = async () => {
     if (!item) return;
@@ -261,18 +276,7 @@ const ItemSettingsDrawer: React.FC<Props> = ({ item, curriculum, onClose, onSave
         instruction: aiInstruction || undefined,
         content_html: pageHtml || undefined,
       });
-      const d = r.data.data;
-      setPageHtml(d.content_html);
-      setPageJson(null); // the editor re-seeds from HTML
-      setPageKey((k) => k + 1);
-      if (d.title && (!title || title === "New page")) setTitle(d.title);
-      // Tick the criteria the draft says it teaches, so alignment follows the content.
-      if (context && d.covered_criteria?.length) {
-        const matched = context.criteria.filter((c) => d.covered_criteria.includes(c.criteria_number)).map((c) => c.criteria_id);
-        if (matched.length) setCriteriaIds((ids) => [...new Set([...ids, ...matched])]);
-      }
-      setAiInstruction("");
-      showToast("Draft written — edit anything before saving", "success");
+      applyPageDraft(r.data.data);
     } catch (e: any) {
       showToast(aiError(e, "write that page"), "error");
     } finally {
@@ -541,6 +545,16 @@ const ItemSettingsDrawer: React.FC<Props> = ({ item, curriculum, onClose, onSave
                     {writingPage ? "Writing…" : pageHtml ? "Improve with AI" : "Write it with AI"}
                   </motion.button>
                 </div>
+                <HandoffControl
+                  className="mb-2"
+                  disabled={writingPage}
+                  run={(extra) =>
+                    elearningApi
+                      .generatePage(item.item_id, { instruction: aiInstruction || undefined, content_html: pageHtml || undefined, ...extra })
+                      .then((r) => r.data)
+                  }
+                  onImported={(body) => applyPageDraft(body.data)}
+                />
                 <div className={`rounded-xl border border-gray-200 dark:border-white/10 overflow-hidden ${wide ? "min-h-[520px]" : "min-h-[320px]"}`}>
                   <LessonNoteRichEditor
                     key={pageKey}

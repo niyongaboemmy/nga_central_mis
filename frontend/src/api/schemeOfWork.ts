@@ -283,6 +283,7 @@ export const schemeOfWorkApi = {
     subject_name?: string;
     week_label?: string;
     prompt: string;
+    aiHandoff?: unknown;
   }) =>
     apiService.post<{ success: boolean; data: EntryAISuggestion }>(
       "/scheme-of-work/entries/ai-suggest",

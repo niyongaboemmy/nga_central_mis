@@ -7,12 +7,13 @@ import { asyncHandler } from "../middleware/asyncHandler";
 import { decideAny, requestSnapshot } from "../services/access/policy";
 import { hasAiUse } from "../services/ai/gate";
 import { getAiPolicy, setAiPolicy } from "../services/ai/policy";
+import { CAP_EXTERNAL, requestHasCap } from "../services/ai/personal/routes";
 import { getUserRoleNames } from "../utils/auth";
 import logger from "../utils/logger";
 
 /**
  * School AI policy (AI_USAGE_CONTROL_PLAN.md §4.2):
- *   GET /ai-policy   any signed-in user: { policy, me: { hasAiUse, canManage } } -- the
+ *   GET /ai-policy   any signed-in user: { policy, me: { hasAiUse, canManage, external } } -- the
  *                    UI hides or explains AI buttons from it
  *   PUT /ai-policy   AI_POLICY_MANAGE and SUPER_ADMIN (both): partial policy; bumps v
  * Machine reads go through GET /integrations/ai-policy.
@@ -50,13 +51,25 @@ router.use(authenticate);
 router.get(
   "/",
   asyncHandler(async (req: any, res: any) => {
-    const [policy, aiUse, manage] = await Promise.all([getAiPolicy(), hasAiUse(req), canManage(req)]);
+    const [policy, aiUse, manage, externalCap] = await Promise.all([getAiPolicy(), hasAiUse(req), canManage(req), requestHasCap(req, CAP_EXTERNAL).catch(() => false)]);
+    // "Open in my AI" + "Paste the answer" (EXTERNAL_AI_CONTRACT.md §1) for this person in the MIS.
+    const handoff = policy.enabled && policy.apps.mis !== false && aiUse && policy.external.handoff && externalCap;
     res.set("Cache-Control", "private, no-store");
     res.json({
       success: true,
       data: {
         policy,
-        me: { hasAiUse: aiUse, canManage: manage },
+        me: {
+          hasAiUse: aiUse,
+          canManage: manage,
+          // pupilConsent: a pupil-data prompt may go out when this person ticks consent.
+          // connector: this person may add NGA to their own Claude/ChatGPT (the MCP connector).
+          external: {
+            handoff,
+            pupilConsent: handoff && policy.external.pupilNames === "with_consent",
+            connector: policy.enabled && policy.apps.mis !== false && aiUse && policy.external.connector && externalCap,
+          },
+        },
         // Who made the last change, for Settings -> AI.
         ...(manage && { updatedByName: await nameOf(policy.updated_by) }),
       },

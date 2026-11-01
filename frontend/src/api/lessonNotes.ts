@@ -373,13 +373,15 @@ export const lessonNotesApi = {
     extra_instructions?: string;
     /** My AI: "" / "school" / "<credentialId>:<model>" for this request only. */
     aiRoute?: string;
+    /** "Open in my AI" / "Paste the answer" (HandoffControl). */
+    aiHandoff?: unknown;
   }) =>
     apiService.post<{ data: { jobId: string } }>("/lesson-notes/ai-generate", data),
 
   getAIGenerateStatus: (jobId: string) =>
     apiService.get<{ data: AINoteGenerationStatus }>(`/lesson-notes/ai-generate/${jobId}/status`),
 
-  proposeAIEdit: (id: number, data: { instruction: string; selection_html?: string; whole_note_html?: string; aiRoute?: string }) =>
+  proposeAIEdit: (id: number, data: { instruction: string; selection_html?: string; whole_note_html?: string; aiRoute?: string; aiHandoff?: unknown }) =>
     apiService.post<{ data: { html: string; ai?: import("./myAi").AiRouteMeta | null } }>(`/lesson-notes/${id}/ai-edit`, data),
 
   listVersions: (id: number) => apiService.get<{ data: LessonNoteVersion[] }>(`/lesson-notes/${id}/versions`),
@@ -407,6 +409,7 @@ export const lessonNotesApi = {
       mode?: "explain" | "simplify" | "example" | "define" | "quiz";
       history?: { role: "user" | "assistant"; content: string }[];
       aiRoute?: string;
+      aiHandoff?: unknown;
     },
   ) => apiService.post<{ data: NoteAskAnswer }>(`/lesson-notes/shared-with-me/${id}/ask`, data),
 

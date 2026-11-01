@@ -79,6 +79,15 @@ const serve = (myAi: unknown, canManage = false) =>
     if (url === "/ai-policy") return ok({ policy: { enabled: true, apps: {} }, me: { hasAiUse: true, canManage } });
     if (url.startsWith("/my-ai/credentials/")) return ok([{ id: "gpt-4o-mini", name: "GPT-4o mini", json: true, cost_in: 0.15, cost_out: 0.6 }]);
     if (url === "/my-ai/resolved") return ok({ enabled: true, byTask: {}, choices: [] });
+    if (url === "/my-ai/costs")
+      return ok({
+        month: { inputTokens: 640000, outputTokens: 385000 },
+        catalogDate: "2026-11-01",
+        models: [
+          { provider: "anthropic", providerLabel: "Anthropic", model: "claude-haiku-5-5", name: "Claude Haiku 5.5", cost_in: 0.1, cost_out: 0.5, monthlyUsd: 0.2565 },
+          { provider: "anthropic", providerLabel: "Anthropic", model: "claude-sonnet-5-5", name: "Claude Sonnet 5.5", cost_in: 2, cost_out: 10, monthlyUsd: 5.13 },
+        ],
+      });
     return Promise.reject(new Error(`unexpected GET ${url}`));
   });
 
@@ -181,5 +190,18 @@ describe("My AI page", () => {
     } finally {
       Object.defineProperty(window, "location", { configurable: true, value: original });
     }
+  });
+  it("'I already pay for…' gives each subscription's honest options and what a key costs", async () => {
+    serve(view({ blocked: { code: "PERSONAL_OFF", message: "My AI is turned off for the school." } }));
+    renderPage();
+    const card = await screen.findByRole("region", { name: /I already pay for/ });
+    for (const plan of ["ChatGPT Plus / Pro", "Claude Pro / Max / Team", "Gemini / Google AI Pro", "GitHub Copilot"]) {
+      expect(within(card).getByRole("region", { name: plan })).toBeInTheDocument();
+    }
+    expect(within(card).getByText(/include monthly API credits/)).toBeInTheDocument();
+    expect(within(card).getByText(/Gemini and NotebookLM free/)).toBeInTheDocument();
+    const table = await within(card).findByRole("table", { name: /heavy month/ });
+    expect(within(table).getByRole("row", { name: /Claude Haiku 5.5.*\$0\.26/ })).toBeInTheDocument();
+    expect(within(table).getByRole("row", { name: /Claude Sonnet 5.5.*\$5\.13/ })).toBeInTheDocument();
   });
 });

@@ -167,11 +167,11 @@ describe("routes", () => {
     const s = await request(app).get("/ai-policy").set(auth(student));
     expect(s.status).toBe(200);
     expect(s.body.data.policy).toHaveProperty("enabled");
-    expect(s.body.data.me).toEqual({ hasAiUse: false, canManage: false });
+    expect(s.body.data.me).toMatchObject({ hasAiUse: false, canManage: false });
     const t = await request(app).get("/ai-policy").set(auth(teacher));
-    expect(t.body.data.me).toEqual({ hasAiUse: true, canManage: false });
+    expect(t.body.data.me).toMatchObject({ hasAiUse: true, canManage: false });
     const sa = await request(app).get("/ai-policy").set(auth(superAdmin));
-    expect(sa.body.data.me).toEqual({ hasAiUse: true, canManage: true });
+    expect(sa.body.data.me).toMatchObject({ hasAiUse: true, canManage: true });
   });
 
   it("PUT /ai-policy: 403 for ADMIN (even holding the permission), 200 for SUPER_ADMIN", async () => {

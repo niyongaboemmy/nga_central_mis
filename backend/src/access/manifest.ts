@@ -177,6 +177,7 @@ export const MIS_MANIFEST = defineManifest({
     AI_POLICY_MANAGE: W("Turn AI on or off for the school and its apps", "SYSTEM", { ...SCHOOL_ONLY, restricted: true }),
     AI_PERSONAL_PROVIDERS: W("Use your own AI provider keys (My AI)", "SYSTEM", SCHOOL_ONLY),
     AI_PERSONAL_PROVIDERS_STUDENT: W("Students: use your own AI provider keys (My AI)", "SYSTEM", SCHOOL_ONLY),
+    AI_EXTERNAL_CONNECT: W("Use your own Claude/ChatGPT with NGA (connector, open-in)", "SYSTEM", SCHOOL_ONLY),
     AI_PROVIDERS_MANAGE: W("See AI provider health and usage for the school", "SYSTEM", { ...SCHOOL_ONLY, restricted: true }),
   },
 });

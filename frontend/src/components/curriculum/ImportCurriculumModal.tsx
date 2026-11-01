@@ -9,6 +9,7 @@ import {
   ListChecks,
 } from "lucide-react";
 import Modal from "../ui/Modal";
+import HandoffControl from "../ai/HandoffControl";
 import {
   curriculumImportApi,
   CurriculumImportStatus,
@@ -229,6 +230,28 @@ const ImportCurriculumModal: React.FC<ImportCurriculumModalProps> = ({
                 database.
               </p>
             </div>
+            <HandoffControl
+              disabled={isSubmitting}
+              beforeRun={() => {
+                if (file) return true;
+                showToast("Choose a curriculum document first", "error");
+                return false;
+              }}
+              run={(extra) => {
+                const formData = new FormData();
+                formData.append("file", file!);
+                if (subjectName) formData.append("subject_name", subjectName);
+                formData.append("aiHandoff", JSON.stringify(extra.aiHandoff));
+                return curriculumImportApi.start(subjectId, formData).then((r) => r.data);
+              }}
+              onImported={(body: any) => {
+                // The pasted answer is already read: the first poll lands on the preview.
+                const jid = body.data.jobId;
+                setJobId(jid);
+                setStep("processing");
+                startPolling(jid);
+              }}
+            />
             <div className="flex justify-end gap-3 pt-1">
               <button
                 onClick={handleClose}

@@ -22,7 +22,7 @@ import {
   updateCredential,
 } from "../services/ai/personal/credentials";
 import { completeOpenRouterConnect, startOpenRouterConnect } from "../services/ai/personal/openrouterOAuth";
-import { CATALOG_FETCHED_AT, PROVIDERS, estimateCostUsd, modelsFor } from "../services/ai/personal/providers";
+import { CATALOG_FETCHED_AT, HEAVY_MONTH, PROVIDERS, estimateCostUsd, modelsFor, monthlyCosts } from "../services/ai/personal/providers";
 import { listRoutes, personalWhoFromRequest, replaceRoutes, resolvedRouteMap } from "../services/ai/personal/routes";
 import { isVaultConfigured } from "../services/secrets/vault";
 import {
@@ -112,6 +112,14 @@ router.get(
         catalogDate: CATALOG_FETCHED_AT,
       },
     });
+  }),
+);
+
+/** "What a key really costs": a heavy month on each headline model, from the shipped catalogue. */
+router.get(
+  "/costs",
+  asyncHandler(async (_req: any, res: any) => {
+    res.json({ success: true, data: { month: HEAVY_MONTH, catalogDate: CATALOG_FETCHED_AT, models: monthlyCosts() } });
   }),
 );
 

@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Navigate } from "react-router-dom";
 import AiSourceControl, { AiAnsweredBy } from "./ai/AiSourceControl";
+import HandoffControl from "./ai/HandoffControl";
 import type { AiRouteMeta } from "../api/myAi";
 import CodeMirror from "@uiw/react-codemirror";
 import { sql as sqlLang } from "@codemirror/lang-sql";
@@ -389,15 +390,18 @@ const DatabaseManagement: React.FC = () => {
     }
   };
 
+  const applyAiSql = (result: { sql: string; explanation?: string | null; providerUsed: string; ai?: any }) => {
+    setQueryText(result.sql);
+    setAiNote({ explanation: result.explanation ?? null, providerUsed: result.providerUsed, ai: result.ai });
+    showToast("SQL query drafted — review before running", "success");
+  };
+
   const handleAiGenerate = async () => {
     if (!aiPrompt.trim()) return;
     setAiGenerating(true);
     setAiNote(null);
     try {
-      const result = await generateSqlWithAI(aiPrompt.trim(), selectedTable || undefined, aiRoute);
-      setQueryText(result.sql);
-      setAiNote({ explanation: result.explanation, providerUsed: result.providerUsed, ai: result.ai });
-      showToast("SQL query drafted — review before running", "success");
+      applyAiSql(await generateSqlWithAI(aiPrompt.trim(), selectedTable || undefined, aiRoute));
     } catch (err: any) {
       showToast(err?.response?.data?.message || "AI could not generate a query", "error");
     } finally {
@@ -864,6 +868,12 @@ const DatabaseManagement: React.FC = () => {
                         className="w-full px-3 py-2 text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-white resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
                       />
                       <AiSourceControl task="author" value={aiRoute} onChange={setAiRoute} disabled={aiGenerating} />
+                      <HandoffControl
+                        disabled={aiGenerating}
+                        beforeRun={() => !!aiPrompt.trim()}
+                        run={(extra) => generateSqlWithAI(aiPrompt.trim(), selectedTable || undefined, undefined, extra)}
+                        onImported={applyAiSql}
+                      />
                       <div className="flex items-center justify-between">
                         <span className="text-[11px] text-gray-500 dark:text-gray-400">
                           Drafts a query for you to review — it never runs automatically.

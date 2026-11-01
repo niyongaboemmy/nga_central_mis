@@ -14,6 +14,7 @@ import { isAnyProviderConfigured } from "../services/aiProviders";
 import type { PersonalOption } from "../services/aiProviders/generate";
 import type { AiRouteMeta } from "../services/ai/personal/run";
 import { personalFor } from "../services/ai/personal/routes";
+import { handoffModeOf } from "../services/ai/handoff";
 import {
   createImportJob,
   getImportJob,
@@ -65,6 +66,8 @@ const processImportJob = async (
       ai,
     });
   } catch (err: any) {
+    // A hand-off runs inline (startCurriculumImport): its prompt or error goes to the request.
+    if (handoffModeOf(who.personal)) throw err;
     logger.error("AI curriculum import failed", { jobId, error: err?.message });
     updateImportJob(jobId, {
       status: "error",
@@ -101,13 +104,21 @@ export const startCurriculumImport = asyncHandler(async (req: any, res: any) => 
   const userId = req.user.userId;
   const personal = await personalFor(req, "author");
   const jobId = randomUUID();
+  const subjectName = req.body.subject_name || subject.name;
 
-  createImportJob(jobId, userId, id);
+  // Hand-off runs inline: prompt mode creates no job and stops at the AI step with the prompt
+  // (200 { handoff }); import mode finishes before the 202, so the first poll reads "done".
+  const mode = handoffModeOf(personal);
+  if (mode !== "prompt") createImportJob(jobId, userId, id);
+  if (mode) {
+    await processImportJob(jobId, req.file, subjectName, { userId: Number(userId), personal });
+    return successResponse(res, "Curriculum read from your pasted answer", { jobId }, 202);
+  }
 
   successResponse(res, "Curriculum import started", { jobId }, 202);
 
   // Fire-and-forget: progress is tracked via the job store and polled by the client.
-  processImportJob(jobId, req.file, req.body.subject_name || subject.name, { userId: Number(userId), personal });
+  processImportJob(jobId, req.file, subjectName, { userId: Number(userId), personal });
 });
 
 export const getCurriculumImportStatus = asyncHandler(

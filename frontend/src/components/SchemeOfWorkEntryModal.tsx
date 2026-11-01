@@ -5,6 +5,7 @@ import {
   LinkedCriteria,
   schemeOfWorkApi,
   DEFAULT_ENTRY_PROMPT_TEMPLATE,
+  type EntryAISuggestion,
 } from "../api/schemeOfWork";
 import { competenciesApi, SubjectCompetency } from "../api/curriculum";
 import { useToast } from "../contexts/ToastContext";
@@ -26,6 +27,7 @@ import {
   ListChecks,
 } from "lucide-react";
 import SelectField from "./ui/SelectField";
+import HandoffControl from "./ai/HandoffControl";
 
 interface SchemeOfWorkEntryModalProps {
   isOpen: boolean;
@@ -166,20 +168,7 @@ const SchemeOfWorkEntryModal: React.FC<SchemeOfWorkEntryModalProps> = ({
         week_label: formData.week_number || undefined,
         prompt: aiPrompt,
       });
-      const suggestion = resp.data.data;
-      setFormData((prev) => ({
-        ...prev,
-        topic: suggestion.topic,
-        sub_topic: suggestion.sub_topic ?? prev.sub_topic,
-        objective: suggestion.objective,
-        methodology: suggestion.methodology,
-        resources: suggestion.resources,
-        evaluation: suggestion.evaluation,
-        duration: suggestion.duration ?? prev.duration,
-        learning_place: suggestion.learning_place ?? prev.learning_place,
-        observation: suggestion.observation ?? prev.observation,
-      }));
-      showToast("AI suggestion applied — review before saving", "success");
+      applySuggestion(resp.data.data);
     } catch (error: any) {
       showToast(
         error.response?.data?.message || "Could not generate content",
@@ -188,6 +177,22 @@ const SchemeOfWorkEntryModal: React.FC<SchemeOfWorkEntryModalProps> = ({
     } finally {
       setIsGenerating(false);
     }
+  };
+
+  const applySuggestion = (suggestion: EntryAISuggestion) => {
+    setFormData((prev) => ({
+      ...prev,
+      topic: suggestion.topic,
+      sub_topic: suggestion.sub_topic ?? prev.sub_topic,
+      objective: suggestion.objective,
+      methodology: suggestion.methodology,
+      resources: suggestion.resources,
+      evaluation: suggestion.evaluation,
+      duration: suggestion.duration ?? prev.duration,
+      learning_place: suggestion.learning_place ?? prev.learning_place,
+      observation: suggestion.observation ?? prev.observation,
+    }));
+    showToast("AI suggestion applied — review before saving", "success");
   };
 
   const handleSuggestCriteria = async () => {
@@ -292,6 +297,16 @@ const SchemeOfWorkEntryModal: React.FC<SchemeOfWorkEntryModalProps> = ({
                 )}
                 {isGenerating ? "Generating..." : "Generate Content"}
               </button>
+              <HandoffControl
+                disabled={isGenerating}
+                beforeRun={() => !!aiPrompt.trim()}
+                run={(extra) =>
+                  schemeOfWorkApi
+                    .suggestEntryContent({ subject_name: subjectName, week_label: formData.week_number || undefined, prompt: aiPrompt, ...extra })
+                    .then((r) => r.data)
+                }
+                onImported={(body) => applySuggestion(body.data)}
+              />
             </div>
           )}
         </div>

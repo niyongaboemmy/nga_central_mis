@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from "express";
+import { isHandoffPrompt } from "../services/ai/handoff";
 
 export class AppError extends Error {
   statusCode: number;
@@ -16,6 +17,8 @@ export const errorHandler = (
   res: Response,
   next: NextFunction,
 ) => {
+  // "Open in Claude / ChatGPT": a prompt-mode AI request stops here with the prompt, not an error.
+  if (isHandoffPrompt(err)) return res.status(200).json({ success: true, handoff: err.payload });
   console.error(err.stack);
 
   // Handle custom errors with status codes

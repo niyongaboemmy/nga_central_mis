@@ -8,6 +8,7 @@ import { useMotion } from "../../../design/motion";
 import Mascot from "../ui/Mascot";
 import RichHtml from "../../codeWindow/RichHtml";
 import AiSourceControl, { AiAnsweredBy, aiRouteBody } from "../../ai/AiSourceControl";
+import HandoffControl from "../../ai/HandoffControl";
 import { aiMetaOf, type AiRouteMeta } from "../../../api/myAi";
 
 interface Turn {
@@ -51,17 +52,21 @@ const AITutorSheet: React.FC<Props> = ({ courseId, sectionId, open, onClose }) =
     if (el && typeof el.scrollTo === "function") el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
   }, [turns, busy]);
 
+  const modeOf = (q: string) => (/quiz me/i.test(q) ? "quiz" : /simpler|simple words/i.test(q) ? "simpler" : /example/i.test(q) ? "example" : "");
+  const answerTurn = (body: any): Turn => {
+    const d = body.data;
+    return { role: "assistant", html: d.answer_html, citations: d.citations, grounded: d.grounded, follow_ups: d.follow_ups, ai: aiMetaOf(body) };
+  };
+
   const ask = async (question: string) => {
     const q = question.trim();
     if (!q || busy) return;
     setInput("");
     setTurns((t) => [...t, { role: "user", html: q }]);
     setBusy(true);
-    const mode = /quiz me/i.test(q) ? "quiz" : /simpler|simple words/i.test(q) ? "simpler" : /example/i.test(q) ? "example" : "";
     try {
-      const r = await elearningApi.askTutor(courseId, { question: q, section_id: sectionId, mode, ...aiRouteBody(aiRoute) });
-      const d = r.data.data;
-      setTurns((t) => [...t, { role: "assistant", html: d.answer_html, citations: d.citations, grounded: d.grounded, follow_ups: d.follow_ups, ai: aiMetaOf(r.data) }]);
+      const r = await elearningApi.askTutor(courseId, { question: q, section_id: sectionId, mode: modeOf(q), ...aiRouteBody(aiRoute) });
+      setTurns((t) => [...t, answerTurn(r.data)]);
     } catch (e: any) {
       const reason = isTimeout(e)
         ? "I'm taking longer than usual to read your notes. Ask me again in a moment."
@@ -138,6 +143,16 @@ const AITutorSheet: React.FC<Props> = ({ courseId, sectionId, open, onClose }) =
               {busy && <p className="text-xs text-slate-600 dark:text-slate-300 flex items-center gap-1.5"><Loader2 className="w-3.5 h-3.5 animate-spin" /> Reading your notes…</p>}
             </div>
             <AiSourceControl task="assist" value={aiRoute} onChange={setAiRoute} disabled={busy} className="px-3 pt-2" />
+            <HandoffControl
+              className="px-3 pt-2"
+              disabled={busy}
+              beforeRun={() => !!input.trim()}
+              run={(extra) => elearningApi.askTutor(courseId, { question: input.trim(), section_id: sectionId, mode: modeOf(input), ...extra }).then((r) => r.data)}
+              onImported={(body) => {
+                setTurns((t) => [...t, { role: "user", html: input.trim() }, answerTurn(body)]);
+                setInput("");
+              }}
+            />
 
             <form
               onSubmit={(e) => {

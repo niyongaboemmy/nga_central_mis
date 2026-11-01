@@ -132,7 +132,8 @@ export interface MyAiUsage {
  * key, or the school's AI, maybe because their key failed (`fallbackFrom`).
  */
 export interface AiRouteMeta {
-  route: "personal" | "school";
+  /** "handoff": the person pasted their own AI's answer ("Paste the answer"). */
+  route: "personal" | "school" | "handoff";
   reason?: AiPersonalReason;
   provider?: string;
   model?: string;
@@ -140,6 +141,13 @@ export interface AiRouteMeta {
   label?: string;
   fallbackFrom?: string;
   skipped?: "DAILY_CAP" | "STUDENT_CAP";
+}
+
+/** "What a key really costs": a heavy month of school work on each headline model. */
+export interface MyAiCosts {
+  month: { inputTokens: number; outputTokens: number };
+  catalogDate: string;
+  models: Array<{ provider: AiProviderId; providerLabel: string; model: string; name: string; cost_in: number; cost_out: number; monthlyUsd: number }>;
 }
 
 // Validation calls the provider (up to 10 s) and the playground runs two generations.
@@ -161,6 +169,7 @@ export const myAiApi = {
   openRouterStart: (callbackUrl: string) => api.post<Envelope<{ url: string }>>("/my-ai/oauth/openrouter/start", { callbackUrl }),
   openRouterComplete: (body: { code: string; state: string; freeOnly?: boolean }) =>
     api.post<Envelope<MyAiCredential>>("/my-ai/oauth/openrouter/complete", body, SLOW),
+  costs: () => api.get<Envelope<MyAiCosts>>("/my-ai/costs"),
   adminUsage: (days = 30) => api.get<Envelope<MyAiUsage>>("/my-ai/admin/usage", { params: { days } }),
 };
 
@@ -243,6 +252,7 @@ const FALLBACK_TEXT: Record<string, string> = {
 /** "via My Claude · claude-haiku" / "Your key was out of credit; School AI answered." / null. */
 export function answeredByText(ai: AiRouteMeta | null | undefined): { text: string; tone: "personal" | "fallback" | "school" } | null {
   if (!ai || typeof ai !== "object") return null;
+  if (ai.route === "handoff") return { text: "via your own AI (pasted)", tone: "personal" };
   if (ai.route === "personal") {
     const name = ai.label || ai.provider || "AI";
     return { text: `via ${/^my\s/i.test(name) ? name : `My ${name}`}${ai.model ? ` · ${ai.model}` : ""}`, tone: "personal" };

@@ -25,6 +25,7 @@ import { createJob, getJob, updateJob } from "../services/aiSchemeJobStore";
 import type { PersonalOption } from "../services/aiProviders/generate";
 import type { AiRouteMeta } from "../services/ai/personal/run";
 import { personalFor } from "../services/ai/personal/routes";
+import { handoffModeOf } from "../services/ai/handoff";
 import { ImportedElement } from "../services/curriculumImportJobStore";
 import { assertTeacherOwnsScheme } from "../utils/schemeAuthorization";
 import {
@@ -792,6 +793,8 @@ const processJob = async (
       ...(autoTaggedCriteriaCount !== undefined ? { autoTaggedCriteriaCount } : {}),
     });
   } catch (err: any) {
+    // A hand-off runs inline (startAIGeneration): its prompt or error goes to the request.
+    if (handoffModeOf(params.personal)) throw err;
     logger.error("AI scheme generation failed", { jobId, error: err?.message });
     updateJob(jobId, {
       status: "error",
@@ -952,16 +955,16 @@ export const startAIGeneration = asyncHandler(async (req: any, res: any) => {
 
   // Resolved now: the job runs after the response, without the request.
   const personal = await personalFor(req, "author");
+  const mode = handoffModeOf(personal);
+  if (mode && shouldGenerateCurriculum) {
+    // Two AI answers (curriculum, then weeks) can't come from one paste.
+    throw new ValidationError(
+      "Your own AI answers one request at a time. Untick \"also create the curriculum\" (or import the curriculum first), then generate the scheme.",
+    );
+  }
   const jobId = randomUUID();
-
-  createJob(jobId, userId);
-
-  successResponse(res, "AI scheme generation started", { jobId }, 202);
-
   const numWeeksOverride = num_weeks ? parseInt(num_weeks, 10) : undefined;
-
-  // Fire-and-forget: progress is tracked via the job store and polled by the client.
-  processJob(jobId, usingExistingCurriculum ? null : req.file, {
+  const params = {
     userId,
     subjectId,
     classGroupId: parseInt(class_group_id),
@@ -979,7 +982,21 @@ export const startAIGeneration = asyncHandler(async (req: any, res: any) => {
         : undefined,
     shouldGenerateCurriculum,
     personal,
-  });
+  };
+  const file = usingExistingCurriculum ? null : req.file;
+
+  // Hand-off runs inline: prompt mode creates no job and stops at the AI step with the prompt
+  // (200 { handoff }) before anything is saved; import mode finishes before the 202.
+  if (mode !== "prompt") createJob(jobId, userId);
+  if (mode) {
+    await processJob(jobId, file, params);
+    return successResponse(res, "Scheme of work generated from your pasted answer", { jobId }, 202);
+  }
+
+  successResponse(res, "AI scheme generation started", { jobId }, 202);
+
+  // Fire-and-forget: progress is tracked via the job store and polled by the client.
+  processJob(jobId, file, params);
 });
 
 export const getAIGenerationStatus = asyncHandler(

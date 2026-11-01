@@ -50,12 +50,19 @@ import { desktopToolsRouter } from "./routes/desktopTools";
 import { authenticate } from "./middleware/auth";
 import { serveAvatar, serveCover } from "./controllers/avatarController";
 import { jwks, ssoIssuer } from "./services/sso/signingKey";
+import { mcpConnectionsRouter, mcpConsentRouter, mcpPublicRouter } from "./services/mcp/routes";
 
 const app = express();
 
 // nginx terminates TLS on the same box and forwards X-Forwarded-For. Without this,
 // req.ip is always 127.0.0.1 (plan G1), and analytics, rate limits and logs all see one client.
 app.set("trust proxy", "loopback");
+
+// The NGA connector (REUSING_AI_SUBSCRIPTIONS_ANALYSIS.md §3.1): OAuth metadata, client
+// registration, token endpoint and POST /mcp. Before the app's CORS (these are called by
+// Anthropic's / OpenAI's servers, with open CORS and no cookies), its 30 MB parser and the
+// request log (token requests carry secrets). services/mcp/routes.ts.
+app.use(mcpPublicRouter());
 
 // CORS configuration
 app.use(
@@ -149,6 +156,9 @@ app.use("/elearning", elearningRoutes);
 // School AI policy (AI_USAGE_CONTROL_PLAN.md §4): Settings -> AI and every AI button's pre-check.
 app.use("/ai-policy", aiPolicyRoutes);
 // My AI: people's own AI keys (PERSONAL_AI_PROVIDERS_PLAN.md §9-10).
+// The consent page's API and My AI -> Connected AI apps (services/mcp/routes.ts).
+app.use("/oauth", mcpConsentRouter());
+app.use("/my-ai/connections", mcpConnectionsRouter());
 app.use("/my-ai", myAiRoutes);
 app.use("/database", databaseRoutes);
 app.use("/notifications", notificationRoutes);

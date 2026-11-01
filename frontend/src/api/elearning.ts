@@ -448,13 +448,13 @@ export const elearningApi = {
     apiService.get<Data<PickerDocument[]>>(`/elearning/courses/${courseId}/pickers/subject-documents`),
   // --- AI (long-running; see AI_TIMEOUT_MS) ---
   itemContext: (itemId: number) => apiService.get<Data<any>>(`/elearning/items/${itemId}/context`),
-  generatePage: (itemId: number, body: { instruction?: string; content_html?: string }) =>
+  generatePage: (itemId: number, body: { instruction?: string; content_html?: string; aiHandoff?: unknown }) =>
     apiService.post<Data<PageDraft>>(`/elearning/items/${itemId}/generate-page`, body, aiRequest),
   generateCheck: (itemId: number, body: { title?: string; description?: string; count?: number }) =>
     apiService.post<Data<{ questions: any[]; provider_used: string }>>(`/elearning/items/${itemId}/generate-check`, body, aiRequest),
   suggestCriteria: (itemId: number, body: { title?: string; description?: string; content_html?: string }) =>
     apiService.post<Data<{ criteria_ids: number[]; criteria: CriterionChip[] }>>(`/elearning/items/${itemId}/suggest-criteria`, body, aiRequest),
-  askTutor: (courseId: number, body: { question: string; section_id?: number | null; mode?: string; aiRoute?: string }) =>
+  askTutor: (courseId: number, body: { question: string; section_id?: number | null; mode?: string; aiRoute?: string; aiHandoff?: unknown }) =>
     apiService.post<Data<any>>(`/elearning/my/courses/${courseId}/ask`, body, aiRequest),
 
   coverage: (courseId: number, basePath = "/elearning/courses") => apiService.get<Data<CourseCoverage>>(`${basePath}/${courseId}/coverage`),
