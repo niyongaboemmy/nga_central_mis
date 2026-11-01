@@ -11,7 +11,7 @@ import type { ProviderCredential } from "./types";
 import { PersonalAIError, personalAIErrorCode } from "./errors";
 import { PROVIDERS } from "../ai/personal/providers";
 import { safeFetch } from "../ai/personal/safeFetch";
-import { withPersonalAi, type AiRouteMeta } from "../ai/personal/run";
+import type { AiRouteMeta } from "../ai/personal/run";
 import type { PersonalOption } from "./generate";
 
 /**
@@ -216,6 +216,7 @@ export async function streamChat(opts: {
   await assertAiAppEnabled(opts.app ?? "mis");
   if (opts.credential) return streamPersonal(opts, opts.credential);
   if (opts.personal && !opts.bulk) {
+    const { withPersonalAi } = await import("../ai/personal/run"); // see generate.ts
     const { personal, ...rest } = opts;
     const { result, ai } = await withPersonalAi(personal.who, personal, {
       personal: (credential) => streamChat({ ...rest, credential }),

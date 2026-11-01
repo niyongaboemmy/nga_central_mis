@@ -7,7 +7,7 @@ import { acquireSlot, checkAvailability, noteAttempt, Unavailable } from "./limi
 import { logAIUsage } from "./usageLog";
 import { assertAiAppEnabled } from "../ai/policy";
 import type { AiApp } from "../../vendor/nga-access";
-import { withPersonalAi, type AiRouteMeta } from "../ai/personal/run";
+import type { AiRouteMeta } from "../ai/personal/run";
 import type { PersonalCallContext, PersonalWho } from "../ai/personal/routes";
 
 export interface GenerateStructuredContentResult<T> {
@@ -81,6 +81,9 @@ export async function generateStructuredContent<T = any>(
   await assertAiAppEnabled(options?.app ?? "mis");
   if (options?.credential) return generateWithCredential<T>(params, options, options.credential);
   if (options?.personal && !options.bulk) {
+    // Loaded on first use: the provider layer must not pull My AI's database, access and
+    // activity modules into everything that imports it (or its tests' mocks).
+    const { withPersonalAi } = await import("../ai/personal/run");
     const { personal, ...rest } = options;
     const { result, ai } = await withPersonalAi(
       personal.who,

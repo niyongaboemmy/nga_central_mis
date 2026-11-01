@@ -53,11 +53,13 @@ function clientFor(apiKey: string | undefined, baseURL?: string): OpenAI {
   });
 }
 
-let client: OpenAI | null = null;
+// Rebuilt when the env key or URL changes (tests, a key rotated without a restart).
+let client: { sig: string; c: OpenAI } | null = null;
 function getClient(credential?: ProviderCredential): OpenAI {
   if (credential) return clientFor(credential.apiKey, credential.baseUrl);
-  if (!client) client = clientFor(process.env.OPENROUTER_API_KEY);
-  return client;
+  const sig = `${process.env.OPENROUTER_API_KEY}|${process.env.OPENROUTER_BASE_URL}`;
+  if (client?.sig !== sig) client = { sig, c: clientFor(process.env.OPENROUTER_API_KEY) };
+  return client.c;
 }
 
 async function complete(messages: OpenAI.ChatCompletionMessageParam[], maxOutputTokens?: number, json?: boolean, credential?: ProviderCredential) {

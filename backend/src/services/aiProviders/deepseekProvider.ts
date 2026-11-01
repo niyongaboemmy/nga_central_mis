@@ -6,10 +6,14 @@ const isConfigured = () => !!process.env.DEEPSEEK_API_KEY;
 
 const BASE_URL = "https://api.deepseek.com";
 
+// Rebuilt when the env key or URL changes (tests, a key rotated without a restart).
 let client: OpenAI | null = null;
+let clientSig = "";
 function getClient(credential?: ProviderCredential): OpenAI {
   if (credential) return new OpenAI({ apiKey: credential.apiKey, baseURL: credential.baseUrl || BASE_URL, timeout: 150_000 });
-  if (!client) {
+  const sig = `${process.env.DEEPSEEK_API_KEY}|${process.env.DEEPSEEK_BASE_URL}`;
+  if (!client || sig !== clientSig) {
+    clientSig = sig;
     // DeepSeek's API is OpenAI-compatible. Long generations (multi-page lesson content)
     // run as background jobs, so give it the same generous timeout as GLM.
     client = new OpenAI({
