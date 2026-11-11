@@ -7,6 +7,9 @@
  * Migration 127 backfills every existing System to KNOWN_SERVICE_SCOPES, so
  * nothing changes until an operator narrows a list.
  *
+ * `System` is backquoted: SYSTEM is a reserved word since MySQL 8.0.3 (prod runs
+ * 8.4; the 5.7 test server accepts it bare).
+ *
  * Read with raw SQL on purpose: adding the column to the shared `System`
  * Drizzle object would break `select().from(System)` on un-migrated servers.
  */
@@ -41,7 +44,7 @@ const missingColumn = (err: any) => err?.code === "ER_BAD_FIELD_ERROR" || err?.c
 /** null = legacy (every scope); otherwise the System's scope list. */
 export async function readSystemScopes(systemId: number): Promise<string[] | null> {
   try {
-    const result: any = await primaryDb().execute(sql`SELECT scopes FROM System WHERE system_id = ${systemId} LIMIT 1`);
+    const result: any = await primaryDb().execute(sql`SELECT scopes FROM \`System\` WHERE system_id = ${systemId} LIMIT 1`);
     const rows = Array.isArray(result) ? result[0] : result;
     const raw = rows?.[0]?.scopes;
     return raw === null || raw === undefined ? null : parseScopes(raw);
@@ -53,7 +56,7 @@ export async function readSystemScopes(systemId: number): Promise<string[] | nul
 
 export async function writeSystemScopes(systemId: number, scopes: string[] | null): Promise<void> {
   try {
-    await primaryDb().execute(sql`UPDATE System SET scopes = ${scopes ? scopes.join(",") : null} WHERE system_id = ${systemId}`);
+    await primaryDb().execute(sql`UPDATE \`System\` SET scopes = ${scopes ? scopes.join(",") : null} WHERE system_id = ${systemId}`);
   } catch (err) {
     if (!missingColumn(err)) throw err;
   }
