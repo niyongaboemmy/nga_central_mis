@@ -13,7 +13,7 @@ import { EASE, cx } from "./parts";
 export const LiveContext = createContext(false);
 
 /** Counts up every `ms` while live; frozen otherwise. */
-function useTick(ms: number): number {
+export function useTick(ms: number): number {
   const live = useContext(LiveContext);
   const [t, setT] = useState(0);
   useEffect(() => {
