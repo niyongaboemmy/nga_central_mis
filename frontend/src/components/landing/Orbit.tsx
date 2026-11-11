@@ -24,7 +24,7 @@ const Ring: React.FC<{
       transition={{ repeat: Infinity, ease: "linear", duration }}
     >
       <div
-        className="absolute rounded-full border border-dashed border-slate-300/70 dark:border-white/10"
+        className="absolute rounded-full border border-[var(--lp-hair)]"
         style={{ inset: `${50 - radius}%` }}
         aria-hidden
       />
@@ -51,31 +51,27 @@ const OUTER = ALL_FEATURES.filter((_, i) => i % 3 === 0).slice(0, 10);
 const Orbit: React.FC = () => {
   const reduced = useReducedMotion();
   return (
-    <div className="relative mx-auto aspect-square w-full max-w-[min(480px,88vw)]" aria-hidden>
-      {/* glow */}
-      <motion.div
-        className="absolute inset-[22%] rounded-full bg-gradient-to-br from-brand-500/40 via-indigo-500/30 to-amber-400/30 blur-3xl"
-        animate={reduced ? undefined : { scale: [1, 1.12, 1], opacity: [0.7, 1, 0.7] }}
-        transition={{ repeat: Infinity, duration: 6, ease: "easeInOut" }}
-      />
-      <Ring radius={47} duration={90} reverse>
+    <div className="relative mx-auto aspect-square w-full max-w-[min(480px,78vw)]" aria-hidden>
+      {/* soft light behind the mark */}
+      <div className="absolute inset-[30%] rounded-full bg-[var(--lp-blue)]/15 blur-3xl" />
+      <Ring radius={47} duration={120} reverse>
         {OUTER.map(({ icon: Icon, label }) => (
           <span
             key={label}
             title={label}
-            className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white/90 text-slate-600 shadow-sm backdrop-blur dark:border-white/10 dark:bg-slate-900/80 dark:text-slate-300 sm:h-10 sm:w-10"
+            className="flex h-10 w-10 items-center justify-center rounded-full bg-[var(--lp-card)] text-[var(--lp-text)] shadow-[0_4px_14px_rgba(0,0,0,0.08)] ring-1 ring-[var(--lp-hair)] sm:h-11 sm:w-11"
           >
-            <Icon className="h-4 w-4" />
+            <Icon className="h-[18px] w-[18px]" strokeWidth={1.75} />
           </span>
         ))}
       </Ring>
-      <Ring radius={31} duration={50}>
+      <Ring radius={31} duration={70}>
         {APPS.map(({ key, icon: Icon, grad, name }) => (
           <span key={key} className="flex flex-col items-center gap-1">
-            <span className={`flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br ${grad} text-white shadow-lg ring-4 ring-white/70 dark:ring-slate-950/70 sm:h-14 sm:w-14`}>
-              <Icon className="h-6 w-6" />
+            <span className={`flex h-12 w-12 items-center justify-center rounded-[16px] bg-gradient-to-br ${grad} text-white shadow-[0_8px_24px_rgba(0,113,227,0.25)] sm:h-14 sm:w-14 sm:rounded-[18px]`}>
+              <Icon className="h-6 w-6" strokeWidth={1.75} />
             </span>
-            <span className="whitespace-nowrap rounded-full bg-white/90 px-2 py-0.5 text-[10px] font-bold text-slate-700 shadow-sm dark:bg-slate-900/90 dark:text-slate-200 sm:text-xs">
+            <span className="whitespace-nowrap text-[11px] font-medium text-[var(--lp-muted)] sm:text-xs">
               {name}
             </span>
           </span>
@@ -85,8 +81,8 @@ const Orbit: React.FC = () => {
         <motion.div
           initial={reduced ? false : { scale: 0.6, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
-          transition={{ type: "spring", stiffness: 160, damping: 14 }}
-          className="rounded-[2rem] shadow-2xl shadow-brand-600/40"
+          transition={{ duration: 1, ease: [0.25, 0.1, 0.25, 1] }}
+          className="rounded-[2rem] shadow-[0_24px_60px_rgba(0,113,227,0.35)]"
         >
           <AmashuriMark size={112} animated live />
         </motion.div>

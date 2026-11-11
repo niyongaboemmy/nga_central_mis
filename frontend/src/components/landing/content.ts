@@ -41,6 +41,8 @@ import {
 export interface Feature {
   icon: LucideIcon;
   label: string;
+  /** a few words under the label in the module explorer */
+  hint?: string;
 }
 
 export interface AppInfo {
@@ -52,6 +54,8 @@ export interface AppInfo {
   grad: string;
   /** soft glow colour behind the card on hover */
   glow: string;
+  /** the app's solid colour (borders, rings, tilt glow) */
+  accent: string;
   features: Feature[];
 }
 
@@ -61,17 +65,18 @@ export const APPS: AppInfo[] = [
     name: "Central MIS",
     tagline: "Run the school",
     icon: Building2,
-    grad: "from-blue-500 to-indigo-600",
-    glow: "rgba(59,108,255,0.35)",
+    grad: "from-blue-600 to-blue-800",
+    glow: "rgba(47,86,217,0.35)",
+    accent: "#2f56d9",
     features: [
-      { icon: CalendarDays, label: "Timetable & calendar" },
-      { icon: BookOpen, label: "E-learning" },
-      { icon: Sparkles, label: "AI Lesson Studio" },
-      { icon: LayoutGrid, label: "Competency map" },
-      { icon: HeartHandshake, label: "Mentorship" },
-      { icon: Shield, label: "Safeguarding" },
-      { icon: Clock, label: "Office hours" },
-      { icon: BarChart3, label: "Analytics" },
+      { icon: CalendarDays, label: "Timetable & calendar", hint: "Every lesson, every room" },
+      { icon: BookOpen, label: "E-learning", hint: "Courses that publish themselves" },
+      { icon: Sparkles, label: "AI Lesson Studio", hint: "Lessons drafted in minutes" },
+      { icon: LayoutGrid, label: "Competency map", hint: "Skills, not just marks" },
+      { icon: HeartHandshake, label: "Mentorship", hint: "Every student has someone" },
+      { icon: Shield, label: "Safeguarding", hint: "Concerns never get lost" },
+      { icon: Clock, label: "Office hours", hint: "Book a teacher's time" },
+      { icon: BarChart3, label: "Analytics", hint: "See how the school runs" },
     ],
   },
   {
@@ -79,16 +84,17 @@ export const APPS: AppInfo[] = [
     name: "Task Mentor",
     tagline: "Teach & assess",
     icon: ClipboardCheck,
-    grad: "from-violet-500 to-fuchsia-600",
-    glow: "rgba(168,85,247,0.35)",
+    grad: "from-sky-500 to-blue-600",
+    glow: "rgba(14,165,233,0.35)",
+    accent: "#0ea5e9",
     features: [
-      { icon: PenLine, label: "Quizzes & assignments" },
-      { icon: Sparkles, label: "AI questions" },
-      { icon: Code2, label: "Code runner" },
-      { icon: Terminal, label: "TMCode editor" },
-      { icon: FileText, label: "Paper answer sheets" },
-      { icon: Eye, label: "Proctoring" },
-      { icon: Trophy, label: "Rankings" },
+      { icon: PenLine, label: "Quizzes & assignments", hint: "Set, submit, grade" },
+      { icon: Sparkles, label: "AI questions", hint: "Question banks on demand" },
+      { icon: Code2, label: "Code runner", hint: "Run code in 20+ languages" },
+      { icon: Terminal, label: "TMCode editor", hint: "A real IDE for exams" },
+      { icon: FileText, label: "Paper answer sheets", hint: "Print, scan, auto-mark" },
+      { icon: Eye, label: "Proctoring", hint: "Fair online exams" },
+      { icon: Trophy, label: "Rankings", hint: "Progress made visible" },
     ],
   },
   {
@@ -96,14 +102,15 @@ export const APPS: AppInfo[] = [
     name: "Tendo",
     tagline: "Attendance & discipline",
     icon: UserCheck,
-    grad: "from-emerald-500 to-teal-600",
-    glow: "rgba(16,185,129,0.35)",
+    grad: "from-cyan-500 to-sky-700",
+    glow: "rgba(6,182,212,0.35)",
+    accent: "#06b6d4",
     features: [
-      { icon: UserCheck, label: "Class registers" },
-      { icon: WifiOff, label: "Works offline" },
-      { icon: Wifi, label: "RFID check-in" },
-      { icon: Gavel, label: "Discipline records" },
-      { icon: Calendar, label: "Daily schedule" },
+      { icon: UserCheck, label: "Class registers", hint: "Roll call in seconds" },
+      { icon: WifiOff, label: "Works offline", hint: "No signal, no problem" },
+      { icon: Wifi, label: "RFID check-in", hint: "Tap a card at the gate" },
+      { icon: Gavel, label: "Discipline records", hint: "Fair and on record" },
+      { icon: Calendar, label: "Daily schedule", hint: "Today at a glance" },
     ],
   },
   {
@@ -111,13 +118,14 @@ export const APPS: AppInfo[] = [
     name: "Tupo",
     tagline: "Talk together",
     icon: MessageCircle,
-    grad: "from-amber-400 to-orange-500",
-    glow: "rgba(245,158,11,0.35)",
+    grad: "from-blue-400 to-blue-600",
+    glow: "rgba(59,130,246,0.35)",
+    accent: "#3b82f6",
     features: [
-      { icon: MessageCircle, label: "Chat" },
-      { icon: Mail, label: "School mail" },
-      { icon: Newspaper, label: "News feed" },
-      { icon: Video, label: "Meetings" },
+      { icon: MessageCircle, label: "Chat", hint: "Classes and staff rooms" },
+      { icon: Mail, label: "School mail", hint: "Inbox for the whole school" },
+      { icon: Newspaper, label: "News feed", hint: "School news, one place" },
+      { icon: Video, label: "Meetings", hint: "Video calls built in" },
     ],
   },
 ];

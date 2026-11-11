@@ -1,23 +1,23 @@
 import React, { useEffect, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Bell, CalendarDays, Check, Clock, MessageCircle, PenLine, Send, Sparkles, UserCheck, type LucideIcon } from "lucide-react";
-import { SectionTitle, cx } from "./parts";
+import { EASE, SectionHead, cx } from "./parts";
 
 /**
- * "See it move": six highlights, each a tiny animated scene instead of a
- * paragraph. Auto-advances; pointer or focus on the list pauses it.
+ * "See it in motion": six highlights, each a small animated scene instead of
+ * a paragraph, all in blue. The list is plain text -- the active line turns
+ * dark and a hairline under it counts down; pointer or focus pauses.
  */
 
 const DURATION = 5200;
+const BLUES = ["bg-[#0071e3]", "bg-[#4da3ff]", "bg-[#a8d1ff]", "bg-[#0058b0]", "bg-[#77b9ff]", "bg-[#cfe5ff]"];
 
 // ---- scenes ---------------------------------------------------------------
 
-const COLORS = ["bg-blue-500", "bg-violet-500", "bg-emerald-500", "bg-amber-400", "bg-rose-500", "bg-cyan-500"];
-
 const TimetableScene: React.FC = () => (
-  <div className="grid h-full grid-cols-5 gap-1.5 p-4">
-    {["M", "T", "W", "T", "F"].map((d, i) => (
-      <div key={i} className="text-center text-[11px] font-bold text-slate-400">{d}</div>
+  <div className="grid h-full grid-cols-5 content-center gap-2 p-6">
+    {["Mon", "Tue", "Wed", "Thu", "Fri"].map((d) => (
+      <div key={d} className="pb-1 text-center text-xs font-semibold text-[var(--lp-muted)]">{d}</div>
     ))}
     {Array.from({ length: 20 }).map((_, i) => {
       const filled = (i * 7) % 5 !== 0;
@@ -25,14 +25,13 @@ const TimetableScene: React.FC = () => (
       return (
         <motion.div
           key={i}
-          initial={{ opacity: 0, scale: 0.4 }}
-          animate={{ opacity: 1, scale: now ? [1, 1.08, 1] : 1 }}
-          transition={{ delay: i * 0.05, duration: now ? 1.2 : 0.3, repeat: now ? Infinity : 0, repeatDelay: 0.4 }}
+          initial={{ opacity: 0, scale: 0.6 }}
+          animate={{ opacity: 1, scale: now ? [1, 1.06, 1] : 1 }}
+          transition={{ delay: i * 0.04, duration: now ? 1.4 : 0.4, ease: EASE, repeat: now ? Infinity : 0, repeatDelay: 0.6 }}
           className={cx(
-            "h-9 rounded-lg",
-            filled ? COLORS[i % COLORS.length] : "border border-dashed border-slate-300 dark:border-white/15",
-            filled && "opacity-90",
-            now && "ring-2 ring-amber-300 ring-offset-2 ring-offset-white dark:ring-offset-slate-900",
+            "h-10 rounded-xl",
+            filled ? BLUES[i % BLUES.length] : "bg-[var(--lp-hair)]",
+            now && "ring-2 ring-[var(--lp-blue)] ring-offset-2 ring-offset-[var(--lp-card)]",
           )}
         />
       );
@@ -41,30 +40,30 @@ const TimetableScene: React.FC = () => (
 );
 
 const AiScene: React.FC = () => (
-  <div className="flex h-full flex-col gap-2.5 p-5">
-    <div className="flex items-center gap-2 text-sm font-bold text-violet-600 dark:text-violet-300">
-      <motion.span animate={{ rotate: [0, 20, -10, 0], scale: [1, 1.2, 1] }} transition={{ repeat: Infinity, duration: 1.6 }}>
-        <Sparkles className="h-5 w-5" />
+  <div className="flex h-full flex-col justify-center gap-3 p-7">
+    <div className="flex items-center gap-2 text-sm font-semibold text-[var(--lp-blue)]">
+      <motion.span animate={{ rotate: [0, 18, -8, 0], scale: [1, 1.15, 1] }} transition={{ repeat: Infinity, duration: 1.8 }}>
+        <Sparkles className="h-5 w-5" strokeWidth={1.75} />
       </motion.span>
-      Photosynthesis · S2
+      Photosynthesis · Senior 2
     </div>
-    {[92, 78, 85, 60].map((w, i) => (
+    {[92, 78, 86, 58, 70].map((w, i) => (
       <motion.div
         key={i}
-        className="h-3 rounded-full bg-gradient-to-r from-violet-400/80 to-fuchsia-400/60"
-        initial={{ width: 0 }}
-        animate={{ width: `${w}%` }}
-        transition={{ delay: 0.2 + i * 0.35, duration: 0.6, ease: "easeOut" }}
+        className="h-2.5 rounded-full bg-gradient-to-r from-[#0071e3] to-[#77b9ff]"
+        initial={{ width: 0, opacity: 0.4 }}
+        animate={{ width: `${w}%`, opacity: 1 }}
+        transition={{ delay: 0.2 + i * 0.3, duration: 0.7, ease: EASE }}
       />
     ))}
-    <div className="mt-auto flex gap-2">
+    <div className="mt-3 flex gap-2">
       {["Slides", "Quiz", "Notes"].map((t, i) => (
         <motion.span
           key={t}
-          initial={{ opacity: 0, y: 10, scale: 0.8 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          transition={{ delay: 1.8 + i * 0.2, type: "spring", stiffness: 300, damping: 16 }}
-          className="rounded-full bg-violet-100 px-3 py-1 text-xs font-bold text-violet-700 dark:bg-violet-500/20 dark:text-violet-200"
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 1.9 + i * 0.15, duration: 0.5, ease: EASE }}
+          className="rounded-full bg-[var(--lp-blue-soft)] px-3 py-1 text-xs font-semibold text-[var(--lp-blue)]"
         >
           {t}
         </motion.span>
@@ -74,55 +73,58 @@ const AiScene: React.FC = () => (
 );
 
 const AssessScene: React.FC = () => {
-  const bars = [55, 80, 68, 92, 74, 86];
+  const bars = [52, 78, 66, 92, 72, 86];
   return (
-    <div className="flex h-full items-end gap-5 p-5">
-      <div className="flex h-full flex-1 items-end gap-2">
+    <div className="flex h-full items-end gap-6 p-7">
+      <div className="flex h-[85%] flex-1 items-end gap-2.5">
         {bars.map((h, i) => (
           <motion.div
             key={i}
-            className="flex-1 rounded-t-lg bg-gradient-to-t from-fuchsia-600 to-violet-400"
+            className="flex-1 rounded-t-lg bg-gradient-to-t from-[#0058b0] to-[#4da3ff]"
             initial={{ height: 0 }}
             animate={{ height: `${h}%` }}
-            transition={{ delay: i * 0.12, duration: 0.7, ease: [0.2, 0.8, 0.2, 1] }}
+            transition={{ delay: i * 0.1, duration: 0.8, ease: EASE }}
           />
         ))}
       </div>
-      <div className="relative mb-2 h-24 w-24 shrink-0">
+      <div className="relative mb-3 h-24 w-24 shrink-0">
         <svg viewBox="0 0 36 36" className="h-full w-full -rotate-90">
-          <circle cx="18" cy="18" r="15.5" fill="none" strokeWidth="4" className="stroke-slate-200 dark:stroke-white/10" />
+          <circle cx="18" cy="18" r="15.5" fill="none" strokeWidth="3.5" stroke="var(--lp-hair)" />
           <motion.circle
-            cx="18" cy="18" r="15.5" fill="none" strokeWidth="4" strokeLinecap="round" className="stroke-violet-500"
-            initial={{ pathLength: 0 }} animate={{ pathLength: 0.86 }} transition={{ duration: 1.2, delay: 0.4 }}
+            cx="18" cy="18" r="15.5" fill="none" strokeWidth="3.5" strokeLinecap="round" stroke="var(--lp-blue)"
+            initial={{ pathLength: 0 }} animate={{ pathLength: 0.86 }} transition={{ duration: 1.3, delay: 0.4, ease: EASE }}
           />
         </svg>
-        <span className="absolute inset-0 flex items-center justify-center text-lg font-extrabold text-slate-800 dark:text-white">86%</span>
+        <span className="absolute inset-0 flex items-center justify-center text-xl font-semibold tracking-tight text-[var(--lp-text)]">86%</span>
       </div>
     </div>
   );
 };
 
 const AttendanceScene: React.FC = () => (
-  <ul className="flex h-full flex-col justify-center gap-2 p-5">
+  <ul className="flex h-full flex-col justify-center gap-2.5 p-7">
     {[0, 1, 2, 3, 4].map((i) => {
       const late = i === 3;
       return (
         <motion.li
           key={i}
-          initial={{ opacity: 0, x: -16 }}
+          initial={{ opacity: 0, x: -12 }}
           animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: i * 0.12 }}
-          className="flex items-center gap-3 rounded-xl bg-slate-50 px-3 py-2 dark:bg-white/5"
+          transition={{ delay: i * 0.1, duration: 0.5, ease: EASE }}
+          className="flex items-center gap-3 rounded-2xl bg-[var(--lp-alt)] px-3.5 py-2.5"
         >
-          <span className="h-7 w-7 rounded-full bg-gradient-to-br from-slate-300 to-slate-400 dark:from-slate-600 dark:to-slate-700" />
-          <span className="h-2.5 flex-1 rounded-full bg-slate-200 dark:bg-white/10" style={{ maxWidth: `${50 + ((i * 13) % 35)}%` }} />
+          <span className="h-7 w-7 rounded-full bg-[var(--lp-hair)]" />
+          <span className="h-2 flex-1 rounded-full bg-[var(--lp-hair)]" style={{ maxWidth: `${48 + ((i * 13) % 34)}%` }} />
           <motion.span
             initial={{ scale: 0 }}
-            animate={{ scale: [0, 1.25, 1] }}
-            transition={{ delay: 0.8 + i * 0.3, duration: 0.35 }}
-            className={cx("flex h-7 w-7 items-center justify-center rounded-full text-white", late ? "bg-amber-400" : "bg-emerald-500")}
+            animate={{ scale: 1 }}
+            transition={{ delay: 0.8 + i * 0.28, type: "spring", stiffness: 400, damping: 20 }}
+            className={cx(
+              "flex h-7 w-7 items-center justify-center rounded-full",
+              late ? "bg-[var(--lp-blue-soft)] text-[var(--lp-blue)]" : "bg-[var(--lp-blue)] text-white",
+            )}
           >
-            {late ? <Clock className="h-4 w-4" /> : <Check className="h-4 w-4" />}
+            {late ? <Clock className="h-4 w-4" strokeWidth={2} /> : <Check className="h-4 w-4" strokeWidth={2.5} />}
           </motion.span>
         </motion.li>
       );
@@ -132,31 +134,31 @@ const AttendanceScene: React.FC = () => (
 
 const ChatScene: React.FC = () => {
   const msgs = [
-    { me: false, w: "70%" },
-    { me: true, w: "55%" },
-    { me: false, w: "62%" },
-    { me: true, w: "40%" },
+    { me: false, w: "68%" },
+    { me: true, w: "52%" },
+    { me: false, w: "60%" },
+    { me: true, w: "38%" },
   ];
   return (
-    <div className="flex h-full flex-col justify-end gap-2 p-5">
+    <div className="flex h-full flex-col justify-end gap-2 p-7">
       {msgs.map((m, i) => (
         <motion.div
           key={i}
-          initial={{ opacity: 0, y: 14, scale: 0.9 }}
+          initial={{ opacity: 0, y: 12, scale: 0.96 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
-          transition={{ delay: 0.3 + i * 0.6, type: "spring", stiffness: 300, damping: 22 }}
-          className={cx("h-9 rounded-2xl", m.me ? "self-end rounded-br-md bg-gradient-to-r from-amber-400 to-orange-500" : "self-start rounded-bl-md bg-slate-200 dark:bg-white/10")}
+          transition={{ delay: 0.3 + i * 0.55, duration: 0.5, ease: EASE }}
+          className={cx("h-9 rounded-[18px]", m.me ? "self-end rounded-br-md bg-[#0a84ff]" : "self-start rounded-bl-md bg-[var(--lp-seg)]")}
           style={{ width: m.w }}
         />
       ))}
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: [0, 1, 1, 0] }}
-        transition={{ delay: 2.8, duration: 2, repeat: Infinity }}
-        className="flex w-16 gap-1 self-start rounded-2xl bg-slate-200 px-3 py-3 dark:bg-white/10"
+        transition={{ delay: 2.6, duration: 2.2, repeat: Infinity }}
+        className="flex w-16 gap-1 self-start rounded-[18px] bg-[var(--lp-seg)] px-3.5 py-3"
       >
         {[0, 1, 2].map((d) => (
-          <motion.span key={d} className="h-2 w-2 rounded-full bg-slate-500" animate={{ y: [0, -4, 0] }} transition={{ repeat: Infinity, duration: 0.8, delay: d * 0.15 }} />
+          <motion.span key={d} className="h-2 w-2 rounded-full bg-[var(--lp-muted)]" animate={{ opacity: [0.3, 1, 0.3] }} transition={{ repeat: Infinity, duration: 1, delay: d * 0.18 }} />
         ))}
       </motion.div>
     </div>
@@ -164,44 +166,42 @@ const ChatScene: React.FC = () => {
 };
 
 const RemindersScene: React.FC = () => {
-  const notes: Array<{ icon: LucideIcon; tint: string }> = [
-    { icon: Bell, tint: "bg-brand-500" },
-    { icon: Send, tint: "bg-sky-500" },
-    { icon: CalendarDays, tint: "bg-emerald-500" },
-  ];
+  const notes: LucideIcon[] = [Bell, Send, CalendarDays];
   return (
-    <div className="flex h-full items-center justify-center p-4">
-      <div className="relative h-full w-40 rounded-[1.6rem] border-4 border-slate-800 bg-slate-100 p-2 dark:border-slate-600 dark:bg-slate-950">
-        <div className="mx-auto mb-2 h-1.5 w-10 rounded-full bg-slate-800 dark:bg-slate-600" />
-        {notes.map((n, i) => (
-          <motion.div
-            key={i}
-            initial={{ opacity: 0, y: -30, scale: 0.9 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            transition={{ delay: 0.3 + i * 0.7, type: "spring", stiffness: 260, damping: 20 }}
-            className="mb-1.5 flex items-center gap-2 rounded-xl bg-white p-2 shadow dark:bg-slate-800"
-          >
-            <span className={cx("flex h-6 w-6 shrink-0 items-center justify-center rounded-lg text-white", n.tint)}>
-              <n.icon className="h-3.5 w-3.5" />
-            </span>
-            <span className="flex-1 space-y-1">
-              <span className="block h-1.5 w-full rounded-full bg-slate-300 dark:bg-slate-600" />
-              <span className="block h-1.5 w-2/3 rounded-full bg-slate-200 dark:bg-slate-700" />
-            </span>
-          </motion.div>
-        ))}
+    <div className="flex h-full items-center justify-center p-5">
+      <div className="relative h-full w-44 rounded-[2rem] bg-[var(--lp-text)] p-1.5 shadow-xl">
+        <div className="h-full rounded-[1.6rem] bg-gradient-to-b from-[#cfe5ff] to-[#4da3ff] p-2.5 pt-7">
+          <div className="absolute left-1/2 top-3 h-4 w-14 -translate-x-1/2 rounded-full bg-[var(--lp-text)]" />
+          {notes.map((Icon, i) => (
+            <motion.div
+              key={i}
+              initial={{ opacity: 0, y: -24, scale: 0.94 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              transition={{ delay: 0.3 + i * 0.65, duration: 0.6, ease: EASE }}
+              className="mb-1.5 flex items-center gap-2 rounded-2xl bg-white/85 p-2 shadow-sm backdrop-blur"
+            >
+              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-[#0071e3] text-white">
+                <Icon className="h-3.5 w-3.5" strokeWidth={2} />
+              </span>
+              <span className="flex-1 space-y-1">
+                <span className="block h-1.5 w-full rounded-full bg-slate-400/60" />
+                <span className="block h-1.5 w-2/3 rounded-full bg-slate-300/70" />
+              </span>
+            </motion.div>
+          ))}
+        </div>
       </div>
     </div>
   );
 };
 
-const SCENES: Array<{ key: string; label: string; app: string; icon: LucideIcon; tint: string; Scene: React.FC }> = [
-  { key: "timetable", label: "Timetable", app: "Central MIS", icon: CalendarDays, tint: "from-blue-500 to-indigo-600", Scene: TimetableScene },
-  { key: "ai", label: "AI lessons", app: "Central MIS", icon: Sparkles, tint: "from-violet-500 to-fuchsia-600", Scene: AiScene },
-  { key: "assess", label: "Assessments", app: "Task Mentor", icon: PenLine, tint: "from-fuchsia-500 to-violet-600", Scene: AssessScene },
-  { key: "attendance", label: "Attendance", app: "Tendo", icon: UserCheck, tint: "from-emerald-500 to-teal-600", Scene: AttendanceScene },
-  { key: "chat", label: "Messages", app: "Tupo", icon: MessageCircle, tint: "from-amber-400 to-orange-500", Scene: ChatScene },
-  { key: "reminders", label: "Reminders", app: "Everywhere", icon: Bell, tint: "from-sky-500 to-blue-600", Scene: RemindersScene },
+const SCENES: Array<{ key: string; label: string; app: string; icon: LucideIcon; Scene: React.FC }> = [
+  { key: "timetable", label: "Timetable", app: "Central MIS", icon: CalendarDays, Scene: TimetableScene },
+  { key: "ai", label: "AI lessons", app: "Central MIS", icon: Sparkles, Scene: AiScene },
+  { key: "assess", label: "Assessments", app: "Task Mentor", icon: PenLine, Scene: AssessScene },
+  { key: "attendance", label: "Attendance", app: "Tendo", icon: UserCheck, Scene: AttendanceScene },
+  { key: "chat", label: "Messages", app: "Tupo", icon: MessageCircle, Scene: ChatScene },
+  { key: "reminders", label: "Reminders", app: "Everywhere", icon: Bell, Scene: RemindersScene },
 ];
 
 const Showcase: React.FC = () => {
@@ -216,16 +216,16 @@ const Showcase: React.FC = () => {
     return () => window.clearTimeout(t);
   }, [active, auto]);
 
-  const { Scene, label, app, icon: Icon, tint } = SCENES[active];
+  const { Scene, label, app, icon: Icon } = SCENES[active];
   return (
-    <section id="features" className="scroll-mt-24 px-4 py-12 sm:py-16">
+    <section id="features" className="scroll-mt-16 bg-[var(--lp-bg)] px-4 py-24 sm:py-32">
       <div className="mx-auto max-w-6xl">
-        <SectionTitle kicker="Features" title="See it move." />
-        <div className="mt-10 grid items-center gap-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
+        <SectionHead eyebrow="Features" title="See it in motion." sub="The everyday work of a school, made simple." />
+        <div className="mt-14 grid items-center gap-10 lg:grid-cols-[minmax(0,4fr)_minmax(0,8fr)] lg:gap-16">
           <div
             role="tablist"
             aria-label="Features"
-            className="grid grid-cols-3 gap-2 lg:grid-cols-1"
+            className="flex gap-1 overflow-x-auto [scrollbar-width:none] lg:flex-col lg:gap-0"
             onPointerEnter={() => setPaused(true)}
             onPointerLeave={() => setPaused(false)}
             onFocus={() => setPaused(true)}
@@ -240,24 +240,19 @@ const Showcase: React.FC = () => {
                   aria-selected={on}
                   aria-controls="showcase-stage"
                   onClick={() => setActive(i)}
-                  className={cx(
-                    "relative flex flex-col items-center gap-2 overflow-hidden rounded-2xl border p-3 text-center transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 lg:flex-row lg:p-4 lg:text-left",
-                    on ? "border-transparent bg-white shadow-lg dark:bg-slate-900" : "border-slate-200 bg-white/50 hover:bg-white dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/10",
-                  )}
+                  className="relative shrink-0 px-3 py-3 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lp-blue)] lg:px-0 lg:py-4"
                 >
-                  <span className={cx("flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-white bg-gradient-to-br", s.tint, !on && "opacity-60")}>
-                    <s.icon className="h-5 w-5" aria-hidden />
+                  <span className={cx("block text-lg font-semibold tracking-tight transition-colors duration-300 lg:text-2xl", on ? "text-[var(--lp-text)]" : "text-[var(--lp-muted)]/70 hover:text-[var(--lp-muted)]")}>
+                    {s.label}
                   </span>
-                  <span className="min-w-0">
-                    <span className="block text-sm font-bold text-slate-900 dark:text-white lg:text-base">{s.label}</span>
-                    <span className="hidden text-xs font-medium text-slate-500 dark:text-slate-400 lg:block">{s.app}</span>
-                  </span>
+                  <span className={cx("hidden text-sm transition-colors lg:block", on ? "text-[var(--lp-muted)]" : "text-transparent")}>{s.app}</span>
+                  <span className="absolute bottom-0 left-3 right-3 h-[2px] rounded-full bg-[var(--lp-hair)] lg:left-0 lg:right-auto lg:w-40" aria-hidden />
                   {on && (
                     <motion.span
                       key={`${s.key}-${active}-${auto}`}
-                      className={cx("absolute bottom-0 left-0 h-1 bg-gradient-to-r", s.tint)}
-                      initial={{ width: auto ? "0%" : "100%" }}
-                      animate={{ width: "100%" }}
+                      className="absolute bottom-0 left-3 right-3 h-[2px] origin-left rounded-full bg-[var(--lp-blue)] lg:left-0 lg:right-auto lg:w-40"
+                      initial={{ scaleX: auto ? 0 : 1 }}
+                      animate={{ scaleX: 1 }}
                       transition={{ duration: auto ? DURATION / 1000 : 0, ease: "linear" }}
                       aria-hidden
                     />
@@ -267,34 +262,31 @@ const Showcase: React.FC = () => {
             })}
           </div>
 
-          <div id="showcase-stage" role="tabpanel" aria-label={label} className="relative">
-            <div className={cx("absolute -inset-4 rounded-[2.5rem] bg-gradient-to-br opacity-25 blur-2xl transition-all duration-700", tint)} aria-hidden />
-            <div className="relative overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-white/10 dark:bg-slate-900">
-              <div className="flex items-center gap-2 border-b border-slate-100 px-4 py-3 dark:border-white/10">
-                <span className="flex gap-1.5" aria-hidden>
-                  <span className="h-2.5 w-2.5 rounded-full bg-rose-400" />
-                  <span className="h-2.5 w-2.5 rounded-full bg-amber-400" />
-                  <span className="h-2.5 w-2.5 rounded-full bg-emerald-400" />
-                </span>
-                <span className="ml-2 flex items-center gap-1.5 text-xs font-bold text-slate-500 dark:text-slate-400">
-                  <Icon className="h-3.5 w-3.5" aria-hidden />
-                  {app}
-                </span>
-              </div>
-              <div className="h-72 sm:h-80">
-                <AnimatePresence mode="wait">
-                  <motion.div
-                    key={SCENES[active].key}
-                    className="h-full"
-                    initial={reduced ? { opacity: 0 } : { opacity: 0, y: 16 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={reduced ? { opacity: 0 } : { opacity: 0, y: -16 }}
-                    transition={{ duration: 0.3 }}
-                  >
-                    <Scene />
-                  </motion.div>
-                </AnimatePresence>
-              </div>
+          <div id="showcase-stage" role="tabpanel" aria-label={label} className="overflow-hidden rounded-[28px] bg-[var(--lp-card)] shadow-[0_20px_60px_rgba(0,0,0,0.08)] ring-1 ring-[var(--lp-hair)]">
+            <div className="flex items-center gap-2 border-b border-[var(--lp-hair)] px-5 py-3.5">
+              <span className="flex gap-1.5" aria-hidden>
+                <span className="h-3 w-3 rounded-full bg-[var(--lp-seg)]" />
+                <span className="h-3 w-3 rounded-full bg-[var(--lp-seg)]" />
+                <span className="h-3 w-3 rounded-full bg-[var(--lp-seg)]" />
+              </span>
+              <span className="ml-3 flex items-center gap-1.5 text-xs font-medium text-[var(--lp-muted)]">
+                <Icon className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden />
+                {app}
+              </span>
+            </div>
+            <div className="h-80 sm:h-96">
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={SCENES[active].key}
+                  className="h-full"
+                  initial={reduced ? { opacity: 0 } : { opacity: 0, scale: 0.98 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, transition: { duration: 0.2 } }}
+                  transition={{ duration: 0.5, ease: EASE }}
+                >
+                  <Scene />
+                </motion.div>
+              </AnimatePresence>
             </div>
           </div>
         </div>
