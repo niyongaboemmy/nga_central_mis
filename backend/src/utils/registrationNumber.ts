@@ -70,6 +70,10 @@ export const resetRegistrationSequence = async (): Promise<void> => {
 
 /** Atomically claims and returns the next value of the global sequence. */
 export const nextRegistrationSequence = async (): Promise<number> => {
+  // A school database provisioned after migration 073 has the table but not its
+  // single row (provisioning copies catalogue rows only): start its counter at 0.
+  // Outside the transaction -- inside it, concurrent claims deadlock on the insert.
+  await db.execute(sql`INSERT IGNORE INTO RegistrationSequence (id, current_value) VALUES (${SEQUENCE_ROW_ID}, 0)`);
   return await db.transaction(async (tx) => {
     await tx
       .update(RegistrationSequence)

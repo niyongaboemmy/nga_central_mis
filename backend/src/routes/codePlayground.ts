@@ -5,6 +5,8 @@ import { Permissions } from "../utils/permissions";
 import { asyncHandler } from "../middleware/asyncHandler";
 import { perMinute } from "../middleware/rateLimit";
 import { successResponse } from "../utils/response";
+import { consumeTenantLimit } from "../services/tenantMgmt/featureGate";
+import { limitRefusal } from "../services/tenantMgmt/entitlements";
 import { openSessionEvents, RunnerError, runCode, runnerLanguages, sessionInput, startSession, stopSession, validSessionId } from "../services/codePlayground/relay";
 
 /**
@@ -34,6 +36,17 @@ const sessionToken = (req: any): string | null => {
 };
 
 const fail = (res: any, status: number, code: string, message: string) => res.status(status).json({ success: false, code, message });
+
+/**
+ * One run off the school's package allowance (limit.code_runs_day); answers the
+ * 403 PACKAGE_LIMIT itself and returns false when today's runs are used up.
+ */
+async function takeTenantRun(res: any): Promise<boolean> {
+  const check = await consumeTenantLimit("limit.code_runs_day");
+  if (check.ok) return true;
+  res.status(403).json(limitRefusal(check));
+  return false;
+}
 
 /** The program in a run/session request, checked; answers the error itself and returns null when invalid. */
 function parseProgram(raw: any, res: any) {
@@ -89,6 +102,7 @@ router.post(
     if (!parsed) return;
     const { language, code, entry, stdin, extra } = parsed;
     if (!runs.take(scopedKey("u", req.user.userId))) return fail(res, 429, "RATE_LIMITED", "Too many runs — wait a minute and try again.");
+    if (!(await takeTenantRun(res))) return;
 
     try {
       successResponse(res, "Ran", await runCode(token, { language, code, entry, stdin, files: extra }));
@@ -111,6 +125,7 @@ router.post(
     const parsed = parseProgram(req.body, res);
     if (!parsed) return;
     if (!runs.take(scopedKey("u", req.user.userId))) return fail(res, 429, "RATE_LIMITED", "Too many runs — wait a minute and try again.");
+    if (!(await takeTenantRun(res))) return;
     try {
       successResponse(res, "Started", { id: await startSession(token, { language: parsed.language, code: parsed.code, entry: parsed.entry, files: parsed.extra }) }, 201);
     } catch (e) {

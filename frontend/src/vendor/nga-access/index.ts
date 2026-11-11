@@ -1,6 +1,6 @@
 // VENDORED from nga_central_mis/packages/access/src/index.ts -- do not edit.
 // Re-sync with: node nga_central_mis/packages/access/sync.mjs <this dir>
-// sha256:3e82e94bf94080d5ad03623a2ee1519edf8c463fb944af19c9c46a6017355c7d
+// sha256:bb115684fc2febcd2dab903da44a2ea073b5a453b73bcd67066facef9be95bdd
 /**
  * @nga/access -- the shared access-decision core.
  *
@@ -12,7 +12,7 @@
  * vendor an exact copy (see packages/access/README.md) -- never edit a copy.
  */
 
-export const ACCESS_CORE_VERSION = "1.6.0";
+export const ACCESS_CORE_VERSION = "1.7.0";
 
 // ---------------------------------------------------------------------------
 // Vocabulary
@@ -247,6 +247,26 @@ export interface GrantInfo {
   valid_until: string | null;
 }
 
+/**
+ * The school the snapshot was compiled in and what its package includes
+ * (tenant management §3.1). Capabilities the package lacks are already left
+ * out of `caps`; this block lets an app explain why ("not in your package")
+ * instead of only hiding a button. Optional: MIS before 1.7 never sends it.
+ */
+export interface SnapshotTenant {
+  tid: number;
+  slug: string;
+  /** Package code: starter | gold | premium | max. */
+  pkg: string;
+  status: string;
+  /** APP entitlement keys ("app.taskmentor", ...). */
+  apps: string[];
+  /** FEATURE entitlement keys ("feature.elearning", ...). */
+  features: string[];
+  /** LIMIT key -> value; null = unlimited. */
+  limits: Record<string, number | null>;
+}
+
 export interface AccessSnapshot {
   /** User.access_version at compile time */
   v: number;
@@ -270,6 +290,8 @@ export interface AccessSnapshot {
   home: string | null;
   systems: string[];
   generated_at: string;
+  /** The school and its package (core 1.7+). */
+  tenant?: SnapshotTenant;
 }
 
 export interface Decision {

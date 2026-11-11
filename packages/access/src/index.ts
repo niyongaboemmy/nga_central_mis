@@ -9,7 +9,7 @@
  * vendor an exact copy (see packages/access/README.md) -- never edit a copy.
  */
 
-export const ACCESS_CORE_VERSION = "1.6.0";
+export const ACCESS_CORE_VERSION = "1.7.0";
 
 // ---------------------------------------------------------------------------
 // Vocabulary
@@ -244,6 +244,26 @@ export interface GrantInfo {
   valid_until: string | null;
 }
 
+/**
+ * The school the snapshot was compiled in and what its package includes
+ * (tenant management §3.1). Capabilities the package lacks are already left
+ * out of `caps`; this block lets an app explain why ("not in your package")
+ * instead of only hiding a button. Optional: MIS before 1.7 never sends it.
+ */
+export interface SnapshotTenant {
+  tid: number;
+  slug: string;
+  /** Package code: starter | gold | premium | max. */
+  pkg: string;
+  status: string;
+  /** APP entitlement keys ("app.taskmentor", ...). */
+  apps: string[];
+  /** FEATURE entitlement keys ("feature.elearning", ...). */
+  features: string[];
+  /** LIMIT key -> value; null = unlimited. */
+  limits: Record<string, number | null>;
+}
+
 export interface AccessSnapshot {
   /** User.access_version at compile time */
   v: number;
@@ -267,6 +287,8 @@ export interface AccessSnapshot {
   home: string | null;
   systems: string[];
   generated_at: string;
+  /** The school and its package (core 1.7+). */
+  tenant?: SnapshotTenant;
 }
 
 export interface Decision {

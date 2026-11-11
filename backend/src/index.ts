@@ -141,6 +141,14 @@ if (config.nodeEnv !== "test" && process.env.REMINDERS_SCHEDULER !== "false") {
     .then(({ startReminderScheduler }) => startReminderScheduler())
     .catch((error) => logger.error("[reminders] scheduler failed to start", { error }));
 }
+// Tenant management daily jobs (MULTI_TENANCY_TENANT_MANAGEMENT_PLAN.md §6.7-6.8): renewals,
+// GRACE / SUSPENDED moves, retention digest, application expiry, usage fan-out.
+// Control plane only; TENANT_MGMT_JOBS=false switches it off.
+if (config.nodeEnv !== "test") {
+  import("./services/tenantMgmt/jobs")
+    .then(({ startTenantMgmtScheduler }) => startTenantMgmtScheduler())
+    .catch((error) => logger.error("[tenantMgmt] scheduler failed to start", { error }));
+}
 // Mandatory office hours (OFFICE_HOURS_IMPLEMENTATION_PLAN.md §7.4): session materialisation,
 // register reminders, escalations, digests and the nightly reconcile. Idempotent and keyed.
 // OFFICE_HOURS_SCHEDULER=false switches it off.

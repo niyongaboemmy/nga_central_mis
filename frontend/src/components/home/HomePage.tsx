@@ -24,6 +24,7 @@ import { NeedsYouList } from "./NeedsYouList";
 import { NextUpHero, TodayCard } from "./TodaySections";
 import { CommsCard, GlanceTiles, QuickActions, SourceHealth, type UpdateEntry, UpdatesCard } from "./SideCards";
 import { Skeleton } from "./ui";
+import SetupChecklistCard from "../tenantMgmt/account/SetupChecklistCard";
 
 // ─── Home ───────────────────────────────────────────────────────────────────
 //
@@ -294,6 +295,8 @@ const HomePage: React.FC = () => {
           </button>
         </div>
       </header>
+
+      <SetupChecklistCard />
 
       <p className="sr-only" aria-live="polite">
         {blockingCount > 0 ? `${blockingCount} ${blockingCount === 1 ? "item needs" : "items need"} you now.` : "Nothing urgent."}

@@ -70,6 +70,8 @@ import {
 import { notifyLogout } from "../services/sso/backchannelLogout";
 import { disableCredentialsOf } from "../services/ai/personal/credentials";
 import { revokeUserTokens } from "../services/mcp/oauthStore";
+import { checkPeopleLimit } from "../services/tenantMgmt/featureGate";
+import { limitRefusal } from "../services/tenantMgmt/entitlements";
 import { signOutEverywhereLocal } from "../services/activity/control";
 
 /** A disabled / suspended account loses every session at once: bump
@@ -545,7 +547,7 @@ export const getCurrentUser = asyncHandler(async (req: any, res: any) => {
 
   // Get all active systems
   // No client_secret -- see utils/publicSystems.ts.
-  const systems = await getPublicSystems();
+  const systems = await getPublicSystems(undefined, userId);
 
   successResponse(res, "User profile retrieved successfully", {
     user: withAvatar(user[0]),
@@ -877,6 +879,18 @@ export const createUser = asyncHandler(async (req: any, res: any) => {
     email: sanitizedEmail,
     createdBy: req.user?.userId,
   });
+
+  // Package head-count limit (tenant management §3.3): the new person's type
+  // is that of their first role, as the profile below records it.
+  if ((status || "ACTIVE") === "ACTIVE") {
+    let intendedType: string | null = null;
+    if (roles && Array.isArray(roles) && roles.length > 0) {
+      const [firstRole] = await db.select({ name: Role.name }).from(Role).where(eq(Role.role_id, roles[0])).limit(1);
+      intendedType = firstRole?.name?.toUpperCase() ?? null;
+    }
+    const limit = await checkPeopleLimit(intendedType);
+    if (!limit.ok) return res.status(403).json(limitRefusal(limit));
+  }
 
   // Insert user
   await db.insert(User).values({
@@ -1231,6 +1245,11 @@ export const bulkCreateUsers = asyncHandler(async (req: any, res: any) => {
       | "STAFF";
   }
 
+  // Package head-count limit (tenant management §3.3): refuse the import when not
+  // even one more person fits; otherwise rows past the limit fail one by one.
+  const headCount = await checkPeopleLimit(validatedUserType);
+  if (!headCount.ok) return res.status(403).json(limitRefusal(headCount));
+
   for (let i = 0; i < data.length; i++) {
     const row = data[i] as any;
     const rowNum = i + 2; // Excel row number (1-based, with header)
@@ -1296,6 +1315,16 @@ export const bulkCreateUsers = asyncHandler(async (req: any, res: any) => {
 
       // Format date
       const dateOfBirth = formatDateForMySQL(row.date_of_birth?.toString());
+
+      if (headCount.limit !== null) {
+        // Counted afresh: each row before this one is already saved.
+        const fits = await checkPeopleLimit(validatedUserType);
+        if (!fits.ok) {
+          errors.push(`Row ${rowNum}: ${fits.message}`);
+          failedCount++;
+          continue;
+        }
+      }
 
       // Insert user
       await db.insert(User).values({

@@ -17,6 +17,16 @@ import { TenantCtx } from "../vendor/nga-tenancy";
 import { controlDb, isControlPlaneMissing } from "../db/platform";
 import { TenantSystem } from "../db/platformSchema";
 import { responseTenant } from "./claims";
+import { APP_KEYS } from "../services/tenantMgmt/catalog";
+import { hasApp } from "../services/tenantMgmt/entitlements";
+import { safeEntitlements } from "../services/tenantMgmt/featureGate";
+
+/** SSO client id -> APP entitlement key, for the catalogue apps that are SSO clients. */
+export const APP_KEY_BY_CLIENT: Record<string, string> = Object.fromEntries(
+  Object.entries(APP_KEYS)
+    .filter(([, v]) => v.client)
+    .map(([k, v]) => [v.client as string, k]),
+);
 
 /** The ACTIVE TenantSystem ids ("all" only for the primary of an install without a control plane). */
 export async function assignedSystemIds(tenant: TenantCtx = responseTenant()): Promise<"all" | Set<number>> {
@@ -37,13 +47,44 @@ export async function isSystemAssigned(systemId: number, tenant: TenantCtx = res
   return ids === "all" || ids.has(systemId);
 }
 
-/** Keep only the systems the tenant may open. */
-export async function filterAssignedSystems<T extends { system_id: number }>(
+/**
+ * Is a catalogue app (Task Mentor, Tendo, Tupo -- by its SSO client id) in the
+ * tenant's package (APP entitlement, plan §3.1)? Any other client is not a
+ * package matter: true. Unrestricted without a control plane.
+ */
+export async function isClientEntitled(clientId: string | null | undefined, tenant: TenantCtx = responseTenant()): Promise<boolean> {
+  const appKey = clientId ? APP_KEY_BY_CLIENT[clientId] : undefined;
+  if (!appKey) return true;
+  return hasApp(await safeEntitlements(tenant.tid), appKey);
+}
+
+/**
+ * Why the tenant may not open this System, or null when it may: assigned
+ * (TenantSystem ACTIVE) AND, for a catalogue app, in the package. The SSO
+ * authorize / token exchange refuse on either.
+ */
+export async function systemRefusal(
+  system: { system_id: number; client_id?: string | null },
+  tenant: TenantCtx = responseTenant(),
+): Promise<"SYSTEM_NOT_ASSIGNED" | "APP_NOT_IN_PACKAGE" | null> {
+  if (!(await isSystemAssigned(system.system_id, tenant))) return "SYSTEM_NOT_ASSIGNED";
+  if (!(await isClientEntitled(system.client_id, tenant))) return "APP_NOT_IN_PACKAGE";
+  return null;
+}
+
+/** Keep only the systems the tenant may open (assigned, and in the package when the row says its client). */
+export async function filterAssignedSystems<T extends { system_id: number; client_id?: string | null }>(
   systems: T[],
   tenant: TenantCtx = responseTenant(),
 ): Promise<T[]> {
   const ids = await assignedSystemIds(tenant);
-  return ids === "all" ? systems : systems.filter((s) => ids.has(s.system_id));
+  const assigned = ids === "all" ? systems : systems.filter((s) => ids.has(s.system_id));
+  const ent = await safeEntitlements(tenant.tid);
+  if (ent.unrestricted) return assigned;
+  return assigned.filter((s) => {
+    const appKey = s.client_id ? APP_KEY_BY_CLIENT[s.client_id] : undefined;
+    return !appKey || hasApp(ent, appKey);
+  });
 }
 
 /** Assign (or re-activate) a System for a tenant -- provisioning / the primary console. */

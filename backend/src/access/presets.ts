@@ -61,6 +61,10 @@ const ACCESS_ADMIN: PresetCap[] = [
   "VIEW_LEADERSHIP_STRUCTURE",
 ];
 
+// Tenant management (MULTI_TENANCY_TENANT_MANAGEMENT_PLAN.md §4): platform staff of the
+// primary tenant. PLATFORM_* caps are dropped by the compiler outside the primary tenant.
+const PLATFORM_VIEW: PresetCap[] = [["PLATFORM_TENANTS_VIEW", "detail"]];
+
 const MIS_PRESETS: PresetDef[] = [
   {
     key: "platform_owner",
@@ -84,6 +88,73 @@ const MIS_PRESETS: PresetDef[] = [
       "ANALYTICS_USER_VIEW",
       "ANALYTICS_LOCATION_VIEW",
       "ANALYTICS_USER_CONTROL",
+      "ANALYTICS_CONFIGURE",
+      ...PLATFORM_VIEW,
+      "PLATFORM_APPLICATIONS_REVIEW",
+      "PLATFORM_APPLICATIONS_DECIDE",
+      "PLATFORM_BILLING_INVOICE",
+      "PLATFORM_BILLING_CONFIRM",
+      "PLATFORM_BILLING_WAIVE",
+      "PLATFORM_TENANTS_LIFECYCLE",
+      "PLATFORM_TENANTS_ENTITLEMENTS",
+      "PLATFORM_PACKAGES_MANAGE",
+      "PLATFORM_SUPPORT_ACCESS",
+      ["PLATFORM_AUDIT_VIEW", "detail"],
+      "SCHOOL_SETTINGS_MANAGE",
+      "SCHOOL_BILLING_MANAGE",
+    ],
+  },
+  {
+    key: "platform_reviewer",
+    name: "Platform Reviewer",
+    description: "Reviews school applications and recommends a decision. No school data.",
+    category: "Platform",
+    scopes: ["PLATFORM"],
+    platformOnly: true,
+    caps: [...PLATFORM_VIEW, "PLATFORM_APPLICATIONS_REVIEW"],
+  },
+  {
+    key: "platform_finance",
+    name: "Platform Finance",
+    description: "Issues invoices and confirms payments. No school data.",
+    category: "Platform",
+    scopes: ["PLATFORM"],
+    platformOnly: true,
+    caps: [...PLATFORM_VIEW, "PLATFORM_BILLING_INVOICE", "PLATFORM_BILLING_CONFIRM"],
+  },
+  {
+    key: "platform_support",
+    name: "Platform Support",
+    description: "Sees school health and opens support sessions a school granted.",
+    category: "Platform",
+    scopes: ["PLATFORM"],
+    platformOnly: true,
+    caps: [...PLATFORM_VIEW, "PLATFORM_SUPPORT_ACCESS"],
+  },
+  {
+    key: "school_owner",
+    name: "School Owner",
+    description: "The school's own super administrator: people, access, apps, branding and subscription.",
+    category: "Leadership",
+    scopes: ["SCHOOL"],
+    maxHolders: 2,
+    caps: [
+      ...ACCESS_ADMIN,
+      "ACCESS_ROLES_MANAGE",
+      "ACCESS_RULES_MANAGE",
+      "ACCESS_GRANTS_RESTRICTED",
+      "ACCESS_PREVIEW_AS",
+      "ACCESS_AUDIT_VIEW",
+      "MANAGE_DEPARTMENTS",
+      "SCHOOL_SETTINGS_MANAGE",
+      "SCHOOL_BILLING_MANAGE",
+      // Not AI_POLICY_MANAGE: the school switch stays with the platform owner preset
+      // (a new school's super admin holds it through SUPER_ADMIN).
+      "AI_USE",
+      "OFFICE_HOURS_CONFIGURE",
+      "DESKTOP_TOOLS_CONFIGURE",
+      ["USAGE_INSIGHTS_VIEW", "summary"],
+      "ANALYTICS_VIEW",
       "ANALYTICS_CONFIGURE",
     ],
   },

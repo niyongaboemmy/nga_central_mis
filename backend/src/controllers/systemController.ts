@@ -1,7 +1,7 @@
 import { Request, Response } from "express";
 import { db as tenantDb, primaryDb } from "../db";
 import { responseTenant } from "../tenancy/claims";
-import { assignSystem, filterAssignedSystems } from "../tenancy/systems";
+import { assignSystem, filterAssignedSystems, systemRefusal } from "../tenancy/systems";
 import { PRIMARY_TENANT_ID } from "../vendor/nga-tenancy";
 import { parseScopes, writeSystemScopes } from "../tenancy/systemScopes";
 
@@ -368,6 +368,12 @@ export const assignSystemToRoleInSchool = async (
       .where(eq(System.system_id, system_id));
     if (system.length === 0)
       return res.status(404).json({ message: "System not found" });
+
+    // Only the school's own apps (TenantSystem, in its package) can go to its roles (plan §4).
+    const refusal = await systemRefusal(system[0]);
+    if (refusal) {
+      return res.status(403).json({ success: false, code: refusal, message: "This app is not enabled for your school" });
+    }
 
     // Check if assignments exists
     const existing = await db

@@ -19,7 +19,7 @@ import { User } from "../db/schema";
 import { dbForTenant } from "../db";
 import { lookupDirectory, normIdentifier, syncDirectoryUser } from "./directory";
 import { findTenant, getTenant } from "./registry";
-import { TenantRefusal, primaryTenant, tenantRefusal } from "./express";
+import { TenantRefusal, isSuspendedRefusal, primaryTenant, tenantRefusal } from "./express";
 
 export type LoginResolution =
   | { kind: "one"; tenant: TenantCtx; explicit: boolean }
@@ -30,7 +30,9 @@ export async function resolveLoginTenants(identifier: string, explicitTenant?: u
   if (explicitTenant !== undefined && explicitTenant !== null && explicitTenant !== "") {
     const t = await findTenant(explicitTenant);
     const refusal = tenantRefusal(t);
-    if (refusal) return { kind: "refused", refusal: t ? refusal : { ...refusal, status: 400 } };
+    // A SUSPENDED school still signs in its billing owners (tenant management §6.7):
+    // the sign-in checks the capability once the user is known (authController).
+    if (refusal && !isSuspendedRefusal(t, refusal)) return { kind: "refused", refusal: t ? refusal : { ...refusal, status: 400 } };
     return { kind: "one", tenant: t!, explicit: true };
   }
 
@@ -51,7 +53,10 @@ export async function resolveLoginTenants(identifier: string, explicitTenant?: u
   const usable = tenants.filter((t) => isTenantUsable(t.status));
   if (usable.length === 1) return { kind: "one", tenant: usable[0], explicit: false };
   if (usable.length > 1) return { kind: "many", tenants: usable };
-  // Only unusable schools know this person: say why (pending / suspended).
+  // Only unusable schools know this person: a suspended one may still let a billing
+  // owner in (checked after the password); otherwise say why (pending / suspended).
+  const suspendedOne = tenants.find((t) => t.status === "SUSPENDED");
+  if (suspendedOne) return { kind: "one", tenant: suspendedOne, explicit: false };
   return { kind: "refused", refusal: tenantRefusal(tenants[0])! };
 }
 
@@ -84,3 +89,25 @@ export function sendChoose(res: any, tenants: TenantCtx[]) {
   });
 }
 
+
+/**
+ * Tenant management §6.2: no school account opened with these credentials, but a
+ * verified school applicant did -> the onboarding token (never a session) so the
+ * frontend routes to /onboarding. Null otherwise. Lazy import: no cycle with auth.
+ */
+export async function applicantSignIn(identifier: string, password: string): Promise<{ token: string; status: string } | null> {
+  if (!identifier || typeof password !== "string" || !password) return null;
+  const { onboardingLoginFor } = await import("../services/tenantMgmt/applicants");
+  return onboardingLoginFor(identifier, password);
+}
+
+/** Google sign-in: the e-mail is Google-verified, so a verified applicant gets the onboarding token. */
+export async function applicantGoogleSignIn(email: string): Promise<{ token: string; status: string } | null> {
+  if (!email) return null;
+  const { onboardingTokenForVerifiedEmail } = await import("../services/tenantMgmt/applicants");
+  return onboardingTokenForVerifiedEmail(email);
+}
+
+export function sendOnboarding(res: any, onboarding: { token: string; status: string }) {
+  return res.status(200).json({ success: true, onboarding, data: { onboarding } });
+}

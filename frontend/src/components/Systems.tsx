@@ -34,6 +34,8 @@ import {
 import { getSchools, School } from "../api/schools";
 import { getRoles, Role } from "../api/users";
 import SelectField from "./ui/SelectField";
+import { CLIENT_APP_KEYS, isSystemEntitled, useTenantStatus } from "./tenantMgmt/account/usePackage";
+import { LockedCard } from "./tenantMgmt/account/LockedFeature";
 
 // Modern System Card with Actions Overlay
 const SystemCard = ({
@@ -455,6 +457,9 @@ const AssignModal = ({
 
   const [loading, setLoading] = useState(false);
   const { showToast } = useToast();
+  // Role assignment is limited to the apps in the school's package (tenant-management plan §6.6 step 7).
+  const { data: tenantStatus } = useTenantStatus();
+  const roleEntitled = isSystemEntitled(system.client_id, tenantStatus?.entitlements);
 
   useEffect(() => {
     if (isOpen) {
@@ -610,6 +615,8 @@ const AssignModal = ({
               {loading ? "Processing..." : "Grant Access"}
             </button>
           </motion.div>
+        ) : !roleEntitled ? (
+          <LockedCard feature={CLIENT_APP_KEYS[system.client_id ?? ""] ?? ""} label={system.name} />
         ) : (
           <motion.div
             initial={{ opacity: 0, x: 20 }}
@@ -901,4 +908,5 @@ const Systems = () => {
   );
 };
 
+export { AssignModal };
 export default Systems;

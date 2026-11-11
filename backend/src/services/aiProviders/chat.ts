@@ -1,7 +1,7 @@
 import OpenAI from "openai";
 import logger from "../../utils/logger";
 import { classifyAIError, isDeadProviderError, isQuotaError } from "./errors";
-import { acquireSlot, checkAvailability, noteAttempt } from "./limiter";
+import { acquireSlot, checkAvailability, consumeAiRequest, noteAttempt } from "./limiter";
 import { isCoolingDown, isParkedDead, markCoolingDown, markDead } from "./registry";
 import { logAIUsage } from "./usageLog";
 import { freeModels, isFreeModel } from "./openrouterProvider";
@@ -241,6 +241,9 @@ export async function streamChat(opts: {
     return { ...result, ai };
   }
   const order = chatOrder(opts.audience).filter((t) => (!opts.only || opts.only.includes(t.name)) && !opts.exclude?.includes(t.name));
+  // The school's daily AI allowance (see generate.ts): refused before any provider is tried;
+  // nothing counted when none is configured.
+  if (order.some((t) => t.isConfigured())) await consumeAiRequest();
   let attempted = 0;
   let quotaOnly = true;
   let lastErr: any = null;

@@ -19,6 +19,7 @@ import { usePermissions } from "../hooks/usePermissions";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import SchoolPicker from "./auth/SchoolPicker";
 import { TENANT_MESSAGES, isTenantRefusal, type SchoolChoice } from "../lib/tenant";
+import { setOnboardingToken } from "../api/tenantMgmt";
 import {
   Lock,
   Mail,
@@ -39,6 +40,7 @@ import {
   GraduationCap,
   Link2,
   Building2,
+  School,
 } from "lucide-react";
 import LOGO from "../assets/logo.png";
 
@@ -729,6 +731,15 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
     if (isTenantRefusal(code)) return TENANT_MESSAGES[code];
     return error?.response?.data?.message || fallback;
   };
+  /** An applicant (no school yet) gets an onboarding token instead of a session. */
+  const takeOnboarding = (response: unknown): boolean => {
+    const r = response as { onboarding?: { token?: string }; data?: { onboarding?: { token?: string } } } | null | undefined;
+    const token = r?.onboarding?.token ?? r?.data?.onboarding?.token;
+    if (!token) return false;
+    setOnboardingToken(token);
+    navigate("/onboarding");
+    return true;
+  };
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [otp, setOtp] = useState("");
@@ -777,6 +788,7 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
 
     try {
       const response = await login(tenant ? { username, password, tenant } : { username, password });
+      if (takeOnboarding(response)) return;
       if (response?.choose?.length) {
         retryWithSchool.current = (slug) => signInWithPassword(slug);
         setSchoolChoices(response.choose);
@@ -934,6 +946,7 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
     setAuthError("");
     try {
       const response = await googleLogin(credential, undefined, undefined, tenant);
+      if (takeOnboarding(response)) return;
       if (response && response.choose?.length) {
         retryWithSchool.current = (slug) => signInWithGoogle(credential, slug);
         setSchoolChoices(response.choose);
@@ -2334,6 +2347,14 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                     >
                       Forgot your password or New Account?
                     </motion.button>
+                    <button
+                      type="button"
+                      onClick={() => navigate("/register-school")}
+                      className="mt-3 mx-auto flex items-center justify-center gap-1.5 rounded-full border border-blue-200 dark:border-blue-400/40 px-4 py-1.5 text-sm font-semibold text-blue-700 hover:bg-blue-50 dark:text-blue-300 dark:hover:bg-blue-400/10 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                    >
+                      <School className="w-4 h-4" aria-hidden="true" />
+                      Register your school
+                    </button>
                   </motion.div>
                 </motion.div>
               </motion.div>

@@ -43,6 +43,7 @@ import {
 import { getRoles, Role } from "../api/users";
 import { useConfirm } from "../contexts/ConfirmContext";
 import SelectField from "./ui/SelectField";
+import { isSystemEntitled, useTenantStatus } from "./tenantMgmt/account/usePackage";
 
 // Modern School Card Component
 const SchoolCard = ({
@@ -176,6 +177,9 @@ const SchoolConfigurationModal = ({
 
   const [loading, setLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState<number | null>(null); // system_id for toggles
+  // Only the apps the school's package includes can be given to roles (tenant management §4).
+  const tenantStatus = useTenantStatus();
+  const roleSystems = schoolSystems.filter((sys) => isSystemEntitled(sys.client_id, tenantStatus.data?.entitlements));
   const { showToast } = useToast();
 
   useEffect(() => {
@@ -444,7 +448,7 @@ const SchoolConfigurationModal = ({
                       className="w-full pl-4 pr-10 py-3 bg-gray-50 dark:bg-slate-900/50 border border-gray-200 dark:border-slate-700/30 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 dark:text-white appearance-none transition-all"
                     >
                       <option value="">Choose a module...</option>
-                      {schoolSystems.map((sys) => (
+                      {roleSystems.map((sys) => (
                         <option key={sys.system_id} value={sys.system_id}>
                           {sys.name}
                         </option>

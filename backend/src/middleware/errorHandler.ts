@@ -30,9 +30,14 @@ export const errorHandler = (
   // A typed `code` (AI_DISABLED, TUTOR_OFF, AI_QUOTA_EXHAUSTED...) and, for an AI
   // refusal, its `reason` travel at the top level next to `message`.
   if (err.statusCode) {
+    // A package refusal (services/tenantMgmt/featureGate.ts) sends the full limitRefusal body.
+    if (err.code === "PACKAGE_LIMIT" && err.details) return res.status(err.statusCode).json(err.details);
+    // Tenant management state machine (services/tenantMgmt/stateMachine.ts): its
+    // ConflictError carries the code in errors[0]; surface it as `code`.
+    const code = typeof err.code === "string" ? err.code : err.errors?.[0]?.code === "INVALID_TRANSITION" ? "INVALID_TRANSITION" : undefined;
     return res.status(err.statusCode).json({
       success: false,
-      ...(typeof err.code === "string" && { code: err.code }),
+      ...(code && { code }),
       ...(typeof err.reason === "string" && err.code === "AI_DISABLED" && { reason: err.reason }),
       message: err.message,
       ...(err.errors && { errors: err.errors }),

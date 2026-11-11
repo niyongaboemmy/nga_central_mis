@@ -216,3 +216,15 @@ export function resetLimiterState(): void {
   state.clear();
   slots.clear();
 }
+
+/**
+ * Tenant management (plan §3.1): one request off the school's package allowance
+ * (limit.ai_requests_day), counted in the control plane. Throws PackageLimitError
+ * (403 PACKAGE_LIMIT) once today's allowance is used up; unlimited / no control
+ * plane = always allowed. Loaded lazily so the provider layer's tests need no
+ * control plane.
+ */
+export async function consumeAiRequest(): Promise<void> {
+  const { consumeOrThrow } = await import("../tenantMgmt/featureGate");
+  await consumeOrThrow("limit.ai_requests_day");
+}

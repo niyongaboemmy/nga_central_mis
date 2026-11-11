@@ -8,7 +8,7 @@ import { db, primaryDb } from "../db";
 import { PRIMARY_TENANT_ID, parseTid, runWithTenant } from "../vendor/nga-tenancy";
 import { responseTenant, tenantBlock, tenantClaims } from "../tenancy/claims";
 import { tenantFromClaims } from "../tenancy/express";
-import { isSystemAssigned } from "../tenancy/systems";
+import { systemRefusal } from "../tenancy/systems";
 import { hashClientSecret } from "../utils/ssoClientSecret";
 import { eq, and } from "drizzle-orm";
 import {
@@ -66,11 +66,15 @@ export const authorizeSSO = asyncHandler(async (req: any, res: any) => {
   }
 
   // Multi-tenancy ([MIS-A7]): the user's school must have this app assigned
-  // (TenantSystem, ACTIVE -- the primary too: no implicit "all", see tenancy/systems.ts).
-  if (!(await isSystemAssigned(client[0].system_id))) {
-    logger.warn(`SSO Reject: system ${client_id} not assigned to tenant ${responseTenant().tid}`);
-    const err: any = new AuthorizationError("This app is not enabled for your school");
-    err.code = "SYSTEM_NOT_ASSIGNED";
+  // (TenantSystem, ACTIVE -- the primary too: no implicit "all", see tenancy/systems.ts)
+  // and, for Task Mentor / Tendo / Tupo, in its package (APP entitlement, plan §3.3).
+  const refusal = await systemRefusal(client[0]);
+  if (refusal) {
+    logger.warn(`SSO Reject: system ${client_id} for tenant ${responseTenant().tid}: ${refusal}`);
+    const err: any = new AuthorizationError(
+      refusal === "APP_NOT_IN_PACKAGE" ? "This app is not in your school's package" : "This app is not enabled for your school",
+    );
+    err.code = refusal;
     throw err;
   }
 
@@ -167,7 +171,7 @@ export const getSSOToken = asyncHandler(async (req: any, res: any) => {
     err.code = resolved.refusal.code;
     throw err;
   }
-  if (!(await isSystemAssigned(client[0].system_id, resolved.tenant))) {
+  if (await systemRefusal(client[0], resolved.tenant)) {
     throw new AuthenticationError("Invalid client credentials");
   }
   req.tenant = resolved.tenant;
@@ -249,7 +253,7 @@ const exchangeCodeInTenant = async (req: any, res: any, code: string, client_id:
 
   // Get all active systems
   // No client_secret -- see utils/publicSystems.ts.
-  const systems = await getPublicSystems();
+  const systems = await getPublicSystems(undefined, userId);
 
   // Generate JWT
   const token = jwt.sign(

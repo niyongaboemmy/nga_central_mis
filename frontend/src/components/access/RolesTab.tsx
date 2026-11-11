@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react";
-import { ChevronRight, Plus, Users as UsersIcon } from "lucide-react";
+import { ChevronRight, Lock, Plus, Users as UsersIcon } from "lucide-react";
 import { useToast } from "../../contexts/ToastContext";
 import { useConfirm } from "../../contexts/ConfirmContext";
 import {
@@ -12,6 +12,7 @@ import {
 import type { Depth, ScopeType } from "../../vendor/nga-access";
 import { btnGhost, btnPrimary, DEPTH_INFO, DepthPill, Empty, inputCls, Panel, SCOPE_LABELS } from "./shared";
 import SelectField from "../ui/SelectField";
+import { isPrimaryTenantSession, usePackageLocks } from "../tenantMgmt/account/usePackage";
 
 const APP_LABEL: Record<string, string> = { mis: "Central MIS", tm: "Task Mentor", da: "Discipline & Attendance", tupo: "Tupo" };
 const MANUAL_SCOPES: ScopeType[] = ["PLATFORM", "SCHOOL", "PROGRAM", "DEPARTMENT", "GRADE", "CLASS_GROUP", "SUBJECT_CLASS", "MENTEES", "CHILDREN", "SELF"];
@@ -59,17 +60,21 @@ export const RoleEditor: React.FC<{
     onClose();
   };
 
+  // Package locks (tenant-management plan §3.3): badge what the package lacks; hide platform caps outside the primary school.
+  const lockedFeature = usePackageLocks();
+  const hidePlatform = !isPrimaryTenantSession();
   const apps = useMemo(() => Array.from(new Set(catalog.capabilities.map((c) => c.app))).sort(), [catalog]);
   const grouped = useMemo(() => {
     const out = new Map<string, CatalogCapability[]>();
     for (const c of catalog.capabilities) {
       if (c.app !== app || (c.deprecated && !sel[c.name])) continue;
+      if (hidePlatform && c.key.startsWith("PLATFORM_")) continue;
       if (filter && !`${c.label} ${c.key}`.toLowerCase().includes(filter.toLowerCase())) continue;
       const d = c.domain ?? "OTHER";
       out.set(d, [...(out.get(d) ?? []), c]);
     }
     return [...out.entries()].sort(([a], [b]) => a.localeCompare(b));
-  }, [catalog, app, filter, sel]);
+  }, [catalog, app, filter, sel, hidePlatform]);
 
   const counts = useMemo(() => {
     const byApp: Record<string, number> = {};
@@ -159,6 +164,16 @@ export const RoleEditor: React.FC<{
                       <div className="break-words">
                         {c.label} {c.deprecated && <span className="text-rose-600 text-xs">(removed from app)</span>}
                         {c.restricted && <span className="ml-1 text-rose-600 text-[11px]">restricted</span>}
+                        {lockedFeature(c.app, c.key) && (
+                          <span
+                            className="ml-1 inline-flex items-center gap-0.5 rounded-full bg-amber-100 px-1.5 py-px align-middle text-[11px] font-semibold text-amber-800 dark:bg-amber-400/15 dark:text-amber-200"
+                            title="Not in your package"
+                            data-testid={`pkg-lock-${c.key}`}
+                          >
+                            <Lock className="h-3 w-3" aria-hidden />
+                            <span className="sr-only">Not in your package</span>
+                          </span>
+                        )}
                       </div>
                       <div className="text-[11px] text-slate-600 dark:text-slate-300">{c.key}{!c.scopeable && " · school-wide only"}</div>
                     </div>
