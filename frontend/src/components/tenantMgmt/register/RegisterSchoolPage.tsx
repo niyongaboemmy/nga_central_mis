@@ -12,7 +12,8 @@ import {
 } from "../../../api/tenantMgmt";
 import { Burst } from "../kit";
 import ThemeToggle from "../../ui/ThemeToggle";
-import LOGO from "../../../assets/logo.png";
+import { AmashuriLogo } from "../../brand/AmashuriLogo";
+import { isRegistrationSite } from "../../../utils/registrationSite";
 import StepSchool from "./StepSchool";
 import StepPackage from "./StepPackage";
 import StepAdmin from "./StepAdmin";
@@ -123,15 +124,26 @@ const Submitted: React.FC<{ app: Application }> = ({ app }) => {
 };
 
 /**
- * Public self-registration, /register-school (MULTI_TENANCY_TENANT_MANAGEMENT_PLAN.md §6.1).
+ * Public self-registration: /register on amashuri.com, /register-school on the MIS
+ * (MULTI_TENANCY_TENANT_MANAGEMENT_PLAN.md §6.1). `?package=gold&cycle=YEAR`
+ * (the landing page's package cards) preselects the package.
  * School -> Package -> Administrator (OTP; the draft is created here) -> Review & submit.
  */
+/** The landing page's package cards link here with ?package=&cycle= (only fills an empty choice). */
+const withPackageFromUrl = (w: WizardState): WizardState => {
+  const q = new URLSearchParams(window.location.search);
+  const pkg = q.get("package");
+  const cycle = q.get("cycle");
+  if (!pkg || w.requestedPackage) return w;
+  return { ...w, requestedPackage: pkg, billingCycle: cycle === "YEAR" || cycle === "TERM" ? cycle : w.billingCycle };
+};
+
 const RegisterSchoolPage: React.FC = () => {
   const [wiz, setWiz] = useState<WizardState>(() => {
     const w = loadWizard();
     // a verified step without the token (signed out / expired) must be redone
     if (w.verifiedEmail && !getOnboardingToken()) return { ...w, verifiedEmail: null, applicationId: null, step: Math.min(w.step, 2) };
-    return w;
+    return withPackageFromUrl(w);
   });
   const [dir, setDir] = useState(1);
   const [logo, setLogo] = useState<File | null>(null);
@@ -254,9 +266,8 @@ const RegisterSchoolPage: React.FC = () => {
     <main className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-brand-50 px-4 py-6 dark:from-slate-950 dark:via-slate-950 dark:to-slate-900 sm:py-10">
       <div className="mx-auto max-w-3xl">
         <header className="mb-6 flex items-center justify-between gap-3">
-          <Link to="/login" className="flex items-center gap-2 rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500">
-            <img src={LOGO} alt="" className="h-9 w-9 rounded-xl" />
-            <span className="font-bold text-slate-900 dark:text-white">Amashuri</span>
+          <Link to={isRegistrationSite() ? "/" : "/login"} className="rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500">
+            <AmashuriLogo size={34} />
           </Link>
           <div className="flex items-center gap-1">
             <Link to="/onboarding" className={ghostBtn}>

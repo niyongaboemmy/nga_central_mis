@@ -7,7 +7,7 @@ import { useMotion } from "../../../design/motion";
 import { EmptyState, JourneyStepper, StatusPill, Timeline } from "../kit";
 import ConfirmDialog from "../../ui/ConfirmDialog";
 import ThemeToggle from "../../ui/ThemeToggle";
-import LOGO from "../../../assets/logo.png";
+import { AmashuriMark } from "../../brand/AmashuriLogo";
 import { cx, ghostBtn, iconBtn, primaryBtn } from "../register/fields";
 import ActionCards from "./ActionCards";
 import { ProvisioningSteps } from "./LiveBits";
@@ -82,7 +82,7 @@ const TrackerView: React.FC<{ me: OnboardingMe; error: string | null; reload: ()
   const header = (
     <header className="mb-5 flex items-center justify-between gap-2">
       <div className="flex min-w-0 items-center gap-2">
-        <img src={LOGO} alt="" className="h-9 w-9 rounded-xl" />
+        <AmashuriMark size={36} />
         <span className="truncate text-sm font-medium text-slate-700 dark:text-slate-200">{me.account.fullName}</span>
       </div>
       <div className="flex items-center gap-1">

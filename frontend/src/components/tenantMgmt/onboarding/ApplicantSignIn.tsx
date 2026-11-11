@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import { AtSign, Clock, KeyRound, LogIn, School } from "lucide-react";
 import { publicApi, setOnboardingToken, type OnboardingMe } from "../../../api/tenantMgmt";
 import { useMotion } from "../../../design/motion";
-import LOGO from "../../../assets/logo.png";
+import { AmashuriMark } from "../../brand/AmashuriLogo";
 import { ErrorLine, Field, RateLimitNotice, Shake, ghostBtn, inputCls, primaryBtn } from "../register/fields";
 import { apiErr, type ApiErr } from "../register/wizardState";
 
@@ -41,7 +41,7 @@ const ApplicantSignIn: React.FC<{ expired?: boolean; onSignedIn: (token: string,
     <main className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-50 via-white to-brand-50 px-4 py-10 dark:from-slate-950 dark:via-slate-950 dark:to-slate-900">
       <motion.section {...m("reveal")} aria-labelledby="applicant-signin" className="w-full max-w-sm rounded-3xl border border-slate-200 bg-white p-6 shadow-xl dark:border-slate-800 dark:bg-slate-900">
         <div className="mb-5 flex flex-col items-center gap-2 text-center">
-          <img src={LOGO} alt="" className="h-12 w-12 rounded-2xl" />
+          <AmashuriMark size={48} animated />
           <h1 ref={heading} id="applicant-signin" tabIndex={-1} className="text-xl font-bold text-slate-900 focus:outline-none dark:text-white">
             My application
           </h1>
