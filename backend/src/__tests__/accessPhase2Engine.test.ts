@@ -32,6 +32,7 @@ import { holdersOf } from "../services/access/admin";
 import { authorizeIn } from "../services/access/policy";
 import { authenticate } from "../middleware/auth";
 import { decide, scopeFor } from "../vendor/nga-access";
+import { assignTestSystems } from "../test/systems";
 
 /**
  * Access control v2 -- Phase 2 (plan §3, §7): snapshot compiler, depth,
@@ -459,6 +460,7 @@ describe("holders and manifests", () => {
     } else {
       await db.update(System).set({ client_secret: secret, status: "ACTIVE" }).where(eq(System.client_id, clientId));
     }
+    await assignTestSystems(clientId);
     const basic = `Basic ${Buffer.from(`${clientId}:${secret}`).toString("base64")}`;
     const manifest = {
       app: "tm",

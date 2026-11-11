@@ -8,6 +8,7 @@ dotenv.config({ path: path.resolve(__dirname, "../.env") });
 import config from "./config";
 import logger from "./utils/logger";
 import app from "./app";
+import { tenantJob } from "./tenancy/jobs";
 
 // Graceful shutdown: flush buffered activity first (pm2 kill_timeout allows ~8 s).
 const shutdown = (signal: string) => {
@@ -36,19 +37,21 @@ server.timeout = 0;
 // E-learning sweeps (ELEARNING_MODULE_IMPLEMENTATION_PLAN.md §3.2 / §3.6). Auto-publish is
 // also applied lazily on every course read, so this only exists for notifications and to
 // keep sections current while nobody is looking. Skipped under test.
+// Every loop below runs once per active school (MIS-A15): tenantJob() enters each
+// tenant's context, isolates failures, locks per (job, tid) and adds a small jitter.
 if (config.nodeEnv !== "test") {
-  const runSweeps = async () => {
+  const runSweeps = tenantJob("elearning-sweeps", async (tenant) => {
     try {
       const { publishDueSections } = await import("./services/elearning/courseSeeding");
       const { sweepDueSoon, sweepEmptyPublishedSections } = await import("./services/elearning/courseNotifications");
       await publishDueSections();
       const due = await sweepDueSoon();
       const empty = await sweepEmptyPublishedSections();
-      if (due || empty) logger.info(`[elearning] sweep: ${due} due-soon, ${empty} empty-week notifications`);
+      if (due || empty) logger.info(`[elearning] t${tenant.tid} sweep: ${due} due-soon, ${empty} empty-week notifications`);
     } catch (error) {
-      logger.error("[elearning] sweep failed", { error });
+      logger.error("[elearning] sweep failed", { error, tid: tenant.tid });
     }
-  };
+  });
   // Lesson Studio generation worker (ELEARNING_AI_LESSON_STUDIO_IMPLEMENTATION_PLAN.md §8.5):
   // durable, claim-guarded, resumes after a restart. ELEARNING_STUDIO_WORKER=false switches it off.
   if (process.env.ELEARNING_STUDIO_WORKER !== "false") {
@@ -69,29 +72,29 @@ if (config.nodeEnv !== "test") {
 
   // Mentee check-ins nobody opened: nudge the mentor once, escalate an
   // unanswered concern/wellbeing check-in to the coordinators once.
-  const runMentorshipSweep = async () => {
+  const runMentorshipSweep = tenantJob("mentorship-sweep", async (tenant) => {
     try {
       const { sweepWaitingCheckIns } = await import("./services/mentorship/notify");
       const r = await sweepWaitingCheckIns();
-      if (r.nudged || r.escalated) logger.info(`[mentorship] sweep: ${r.nudged} nudged, ${r.escalated} escalated`);
+      if (r.nudged || r.escalated) logger.info(`[mentorship] t${tenant.tid} sweep: ${r.nudged} nudged, ${r.escalated} escalated`);
     } catch (error) {
-      logger.error("[mentorship] sweep failed", { error });
+      logger.error("[mentorship] sweep failed", { error, tid: tenant.tid });
     }
-  };
+  });
   setTimeout(runMentorshipSweep, 90_000);
   setInterval(runMentorshipSweep, 3 * 60 * 60 * 1000).unref();
 
   // My AI: once a day, re-check people's own AI keys used in the last 30 days, so a revoked
   // key or an empty account shows up in My AI before the next call fails.
-  const runKeySweep = async () => {
+  const runKeySweep = tenantJob("my-ai-key-sweep", async (tenant) => {
     try {
       const { sweepCredentials } = await import("./services/ai/personal/credentials");
       const r = await sweepCredentials();
-      if (r.checked) logger.info(`[my-ai] key sweep: ${r.checked} checked, ${r.changed} changed`);
+      if (r.checked) logger.info(`[my-ai] t${tenant.tid} key sweep: ${r.checked} checked, ${r.changed} changed`);
     } catch (error) {
-      logger.error("[my-ai] key sweep failed", { error });
+      logger.error("[my-ai] key sweep failed", { error, tid: tenant.tid });
     }
-  };
+  });
   setTimeout(runKeySweep, 5 * 60_000);
   setInterval(runKeySweep, 24 * 60 * 60 * 1000).unref();
 
@@ -101,20 +104,21 @@ if (config.nodeEnv !== "test") {
   // ACCESS_V2_BOOTSTRAP=false switches it off.
   import("./services/access/registry")
     .then(async ({ ensureAccessRegistry, accessTablesPresent }) => {
-      await ensureAccessRegistry();
+      // Each school's database has its own registry copy (manifest, presets, rules).
+      await tenantJob("access-registry", () => ensureAccessRegistry())();
       if (process.env.ACCESS_V2_BOOTSTRAP === "false") return;
-      const reconcile = async () => {
+      const reconcile = tenantJob("access-reconcile", async (tenant) => {
         try {
           if (!(await accessTablesPresent())) return;
           const { syncRuleGrants } = await import("./services/access/ruleEngine");
           const r = await syncRuleGrants();
           if (r.created + r.ended + r.reactivated + r.repointed > 0) {
-            logger.info(`[access] reconcile: +${r.created} ~${r.reactivated + r.repointed} -${r.ended}`);
+            logger.info(`[access] t${tenant.tid} reconcile: +${r.created} ~${r.reactivated + r.repointed} -${r.ended}`);
           }
         } catch (error) {
-          logger.error("[access] reconcile failed", { error });
+          logger.error("[access] reconcile failed", { error, tid: tenant.tid });
         }
-      };
+      });
       setTimeout(reconcile, 60_000);
       setInterval(reconcile, 24 * 60 * 60 * 1000).unref();
     })

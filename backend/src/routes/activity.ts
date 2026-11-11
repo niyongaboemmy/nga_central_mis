@@ -1,9 +1,11 @@
 import express from "express";
 import zlib from "zlib";
 import logger from "../utils/logger";
-import { requireServiceToken } from "../middleware/serviceAuth";
+import { requireServiceToken, serviceMayActFor } from "../middleware/serviceAuth";
+import { runWithTenant, type TenantCtx } from "../vendor/nga-tenancy";
 import { resolveActivityUser } from "../middleware/activityAuth";
 import { perMinute } from "../middleware/rateLimit";
+import { scopedKey } from "../tenancy/scoped";
 import { activityOrigins, activitySourceClients } from "../services/activity/apps";
 import { activityTablesPresent, q } from "../services/activity/db";
 import { ingestEnvelope, ingestServerEvent } from "../services/activity/ingest";
@@ -113,7 +115,7 @@ router.post("/sync", ...bodyParsers, async (req: any, res) => {
       out.did = env.did;
       out.dt = deviceToken(env.did);
     }
-  } else if (!userPerMinute.take(`u:${userId}`)) {
+  } else if (!userPerMinute.take(scopedKey("u", userId))) {
     return accepted(res, { ok: false, error: "rate_limited" });
   }
 
@@ -131,6 +133,12 @@ router.post("/sync", ...bodyParsers, async (req: any, res) => {
 /**
  * POST /activity/ingest — coalesced batches from a satellite relay (HTTP Basic SSO
  * client credentials). The writing app is decided by the client id, never the body.
+ *
+ * Multi-tenancy: a relay serving several schools (Tupo) batches them together, so each
+ * batch / server event may carry `tid`; without one it belongs to the X-NGA-Tenant
+ * school (tenant 1 when absent). Items are grouped by tid, the System must be assigned
+ * to every tid it writes for (else that group is refused and counted as rejected),
+ * and each group is written inside its own tenant -- never mixed in one database.
  */
 router.post("/ingest", ...bodyParsers, requireServiceToken("activity:write"), async (req: any, res) => {
   const now = clock.now();
@@ -138,7 +146,6 @@ router.post("/ingest", ...bodyParsers, requireServiceToken("activity:write"), as
   const app = clientId ? activitySourceClients().get(clientId) : undefined;
   if (!app) return res.status(403).json({ success: false, message: "This client may not write activity" });
   if (!relayPerMinute.take(`r:${clientId}`)) return res.status(429).json({ success: false, message: "Too many batches" });
-  if (!(await activityTablesPresent())) return res.status(202).json({ accepted: 0 });
 
   let body: any;
   try {
@@ -149,35 +156,68 @@ router.post("/ingest", ...bodyParsers, requireServiceToken("activity:write"), as
   const parsed = relayBatchSchema.safeParse(body);
   if (!parsed.success) return res.status(400).json({ success: false, message: "Invalid batch" });
 
+  // Group by school; the header's tenant (already verified by requireServiceToken) is the default.
+  const headerTenant: TenantCtx = req.tenant;
+  type Group = { batches: typeof parsed.data.batches; events: typeof parsed.data.server_events };
+  const groups = new Map<number, Group>();
+  const groupOf = (tid: number | undefined) => {
+    const key = tid ?? headerTenant.tid;
+    let g = groups.get(key);
+    if (!g) groups.set(key, (g = { batches: [], events: [] }));
+    return g;
+  };
+  for (const b of parsed.data.batches) groupOf(b.tid).batches.push(b);
+  for (const se of parsed.data.server_events) groupOf(se.tid).events.push(se);
+
   let acceptedN = 0;
   let rejected = 0;
-  const commands: { user_id: number | null; did: string; cmd: unknown }[] = [];
-  for (const b of parsed.data.batches) {
-    const env = envelopeSchema.safeParse(b.envelope);
-    if (!env.success) {
-      rejected++;
-      continue;
+  const refused: { tid: number; code: string }[] = [];
+  const commands: { tid: number; user_id: number | null; did: string; cmd: unknown }[] = [];
+
+  const ingestGroup = async (tenant: TenantCtx, g: Group) => {
+    if (!(await activityTablesPresent())) return; // that school's database is not migrated yet
+    for (const b of g.batches) {
+      const env = envelopeSchema.safeParse(b.envelope);
+      if (!env.success) {
+        rejected++;
+        continue;
+      }
+      const e = env.data;
+      if (!b.user_id && !verifyDeviceToken(e.did, e.dt)) e.did = newDeviceId();
+      try {
+        const r = await ingestEnvelope(e, { app, userId: b.user_id ?? null, ip: normalizeIp(b.ip ?? null), ua: b.ua ?? null, receivedAt: now });
+        acceptedN += r.accepted;
+        rejected += r.rejected;
+        if (r.cmd) commands.push({ tid: tenant.tid, user_id: b.user_id ?? null, did: e.did, cmd: r.cmd });
+      } catch (error: any) {
+        rejected++;
+        logger.error("[activity] relay batch failed", { app, tid: tenant.tid, error: error?.message ?? error });
+      }
     }
-    const e = env.data;
-    if (!b.user_id && !verifyDeviceToken(e.did, e.dt)) e.did = newDeviceId();
-    try {
-      const r = await ingestEnvelope(e, { app, userId: b.user_id ?? null, ip: normalizeIp(b.ip ?? null), ua: b.ua ?? null, receivedAt: now });
-      acceptedN += r.accepted;
-      rejected += r.rejected;
-      if (r.cmd) commands.push({ user_id: b.user_id ?? null, did: e.did, cmd: r.cmd });
-    } catch (error: any) {
-      rejected++;
-      logger.error("[activity] relay batch failed", { app, error: error?.message ?? error });
+    for (const se of g.events) {
+      try {
+        if (await ingestServerEvent({ app, name: se.n, at: Math.min(now, se.t), id: se.id, userId: se.user_id ?? null, deviceId: se.did ?? null, ip: se.ip ?? null, params: se.p })) acceptedN++;
+      } catch {
+        rejected++;
+      }
     }
+  };
+
+  for (const [tid, g] of groups) {
+    let tenant: TenantCtx | null = tid === headerTenant.tid ? headerTenant : null;
+    if (!tenant) {
+      const check = await serviceMayActFor(req.service, tid);
+      if (!check.tenant) {
+        refused.push({ tid, code: check.code });
+        rejected += g.batches.length + g.events.length;
+        logger.warn("[activity] relay wrote for a school it is not enabled for", { app, clientId, tid, code: check.code });
+        continue;
+      }
+      tenant = check.tenant;
+    }
+    await runWithTenant(tenant, () => ingestGroup(tenant!, g));
   }
-  for (const se of parsed.data.server_events) {
-    try {
-      if (await ingestServerEvent({ app, name: se.n, at: Math.min(now, se.t), id: se.id, userId: se.user_id ?? null, deviceId: se.did ?? null, ip: se.ip ?? null, params: se.p })) acceptedN++;
-    } catch {
-      rejected++;
-    }
-  }
-  return res.status(202).json({ accepted: acceptedN, rejected, commands });
+  return res.status(202).json({ accepted: acceptedN, rejected, commands, ...(refused.length ? { refused } : {}) });
 });
 
 export default router;

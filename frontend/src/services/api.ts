@@ -91,6 +91,13 @@ api.interceptors.response.use(
           window.location.href = "/";
         }
       }
+    } else if (error.response?.status === 403 && isSchoolUnavailable(error)) {
+      // The school this session belongs to is pending or suspended (multi-tenancy):
+      // the whole app is closed for it, not this one action.
+      const code = (error.response?.data as { code?: string } | undefined)?.code;
+      if (!window.location.pathname.startsWith("/onboarding")) {
+        window.location.href = code === "TENANT_PENDING" ? "/onboarding" : "/onboarding?status=suspended";
+      }
     } else if (error.response?.status === 403) {
       // An AI feature refused by the school AI policy (code AI_DISABLED, backend
       // services/ai/policy.ts) or the AI Tutor switch says why, e.g. "AI is turned off
@@ -109,6 +116,14 @@ api.interceptors.response.use(
     return Promise.reject(error);
   },
 );
+
+/** 403 TENANT_PENDING / TENANT_SUSPENDED on a signed-in call (not the sign-in form itself). */
+function isSchoolUnavailable(error: AxiosError): boolean {
+  const code = (error.response?.data as { code?: string } | undefined)?.code;
+  if (code !== "TENANT_PENDING" && code !== "TENANT_SUSPENDED") return false;
+  const url = error.config?.url ?? "";
+  return !url.includes("/auth/login") && !url.includes("/auth/google") && !url.includes("/auth/forgot-password");
+}
 
 // Export toast store for use in App.tsx
 export { ToastStore };

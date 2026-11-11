@@ -1,5 +1,7 @@
 import { asyncHandler } from "../middleware/asyncHandler";
 import { successResponse } from "../utils/response";
+import { tenantTimezone } from "../tenancy/timezone";
+import { scopedKey } from "../tenancy/scoped";
 import { AuthorizationError, ValidationError } from "../errors/CustomError";
 import { buildHomeOverview } from "../services/home/buildHomeOverview";
 import { engineReady, requestSnapshot } from "../services/access/policy";
@@ -76,7 +78,7 @@ export const getHomeAppSummary = asyncHandler(async (req: any, res: any) => {
 
   const userId = req.user.userId as number;
   const yearId = optInt(req.body?.academic_year_id);
-  const cacheKey = `${userId}|${yearId ?? "cur"}`;
+  const cacheKey = scopedKey("lens-hint") + `|${userId}|${yearId ?? "cur"}`;
   let hint = lensHintCache.get(cacheKey);
   if (!hint || Date.now() - hint.at > 60_000) {
     const { year } = await resolvePeriod(yearId);
@@ -95,7 +97,7 @@ export const getHomeAppSummary = asyncHandler(async (req: any, res: any) => {
     token,
     {
       date: typeof req.body?.date === "string" ? req.body.date.slice(0, 10) : undefined,
-      tz: process.env.SCHOOL_TIMEZONE || "Africa/Kigali",
+      tz: tenantTimezone(),
       lenses: hint.lenses,
       lessons,
     },

@@ -1,3 +1,4 @@
+import { TenantScopedMap } from "../../tenancy/scoped";
 import type { Response } from "express";
 
 /**
@@ -6,7 +7,8 @@ import type { Response } from "express";
  * Single pm2 process, like the e-learning presence stream; clients fall back
  * to polling if the stream drops.
  */
-const subscribers = new Map<number, Set<Response>>();
+// Session ids repeat across school databases: one topic map per tenant.
+const subscribers = new TenantScopedMap<number, Set<Response>>();
 
 export const subscribeSession = (sessionId: number, res: Response) => {
   res.setHeader("Content-Type", "text/event-stream");
@@ -15,15 +17,16 @@ export const subscribeSession = (sessionId: number, res: Response) => {
   res.setHeader("X-Accel-Buffering", "no");
   res.flushHeaders?.();
   res.write("retry: 5000\n\n");
-  const set = subscribers.get(sessionId) ?? new Set<Response>();
+  const mine = subscribers.current(); // the close handler may run outside the request context
+  const set = mine.get(sessionId) ?? new Set<Response>();
   set.add(res);
-  subscribers.set(sessionId, set);
+  mine.set(sessionId, set);
   const ping = setInterval(() => res.write(": ping\n\n"), 25_000);
   ping.unref?.();
   res.on("close", () => {
     clearInterval(ping);
     set.delete(res);
-    if (!set.size) subscribers.delete(sessionId);
+    if (!set.size && mine.get(sessionId) === set) mine.delete(sessionId);
   });
 };
 

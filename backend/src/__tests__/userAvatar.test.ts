@@ -14,6 +14,7 @@ import { renderAvatar, renderCover, parseAvatarCrop, AVATAR_SIZES, COVER_SIZES }
 import { avatarSignature, avatarUrls, coverUrls, verifyAvatarSignature, verifyMediaSignature } from "../services/avatar/urls";
 import { db } from "../db";
 import { System } from "../db/schema";
+import { assignTestSystems } from "../test/systems";
 
 /** Solid-colour test picture; `split` paints the right half blue. */
 async function picture(
@@ -317,6 +318,7 @@ describe("profile cover API and profile-media lookup", () => {
     await db.insert(System).values({
       name: `Tupo avatars ${clientId}`, client_id: clientId, client_secret: "s3cret", icon_url: "x", home_url: "x", status: "ACTIVE",
     } as any);
+    await assignTestSystems(clientId);
   });
 
   const uploadCover = (file: Buffer) =>

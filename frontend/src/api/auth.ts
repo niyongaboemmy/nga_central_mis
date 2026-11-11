@@ -1,15 +1,21 @@
 import { AxiosResponse } from "axios";
 import api from "../services/api";
 import { setToken, removeToken } from "../utils/auth";
+import type { SchoolChoice } from "../lib/tenant";
 
 export interface LoginData {
   username: string;
   password: string;
+  /** The school to sign in to (slug or tid) after a `choose` answer. */
+  tenant?: string;
 }
 
 export interface LoginResponse {
   tempToken: string;
   requiresOTP: boolean;
+  /** Several schools know this account: pick one and sign in again with `tenant`. */
+  choose?: SchoolChoice[];
+  requiresTenant?: boolean;
   // Only present outside production, where the backend skips sending the
   // OTP email and returns the code directly for the UI to auto-fill.
   devOtp?: string;
@@ -92,17 +98,23 @@ export const verifyOTP = async (
   }
 };
 
-export interface GoogleLoginResponse extends VerifyOTPResponse {}
+export interface GoogleLoginResponse extends VerifyOTPResponse {
+  choose?: SchoolChoice[];
+  requiresTenant?: boolean;
+}
 
 export const googleLogin = async (
   credential: string,
   onSuccess?: (response: GoogleLoginResponse) => void,
   onError?: (error: any) => void,
+  tenant?: string,
 ): Promise<GoogleLoginResponse | void> => {
   try {
     const response: AxiosResponse<BackendResponse<GoogleLoginResponse>> =
-      await api.post("/auth/google", { credential });
+      await api.post("/auth/google", tenant ? { credential, tenant } : { credential });
 
+    // Several schools: no session yet, the caller asks which one.
+    if (response.data.data?.choose?.length) return response.data.data;
     setToken(response.data.data!.token);
 
     if (onSuccess) {

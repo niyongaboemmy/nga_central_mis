@@ -8,6 +8,7 @@ import { db } from "../db";
 import { System } from "../db/schema";
 import { createUser, signToken } from "../test/fixtures";
 import { buildLogoutToken, LOGOUT_EVENT, notifyLogout, setLogoutTransport, validBackchannelUri } from "../services/sso/backchannelLogout";
+import { assignTestSystems } from "../test/systems";
 
 const tag = `slo_${Date.now()}`;
 
@@ -29,6 +30,7 @@ describe("Single sign-out (OIDC Back-Channel Logout)", () => {
       { name: `${tag}_off`, client_id: `${tag}_off`, icon_url: "x", home_url: "https://c.test", backchannel_logout_uri: "https://c.test/bcl", status: "DISABLED" },
       { name: `${tag}_none`, client_id: `${tag}_none`, icon_url: "x", home_url: "https://d.test", status: "ACTIVE" },
     ] as any);
+    await assignTestSystems([`${tag}_a`, `${tag}_b`, `${tag}_off`, `${tag}_none`]);
   });
   afterEach(() => setLogoutTransport(null));
 

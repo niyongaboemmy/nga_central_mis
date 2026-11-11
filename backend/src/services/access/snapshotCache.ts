@@ -1,5 +1,6 @@
 import { AccessSnapshot } from "../../vendor/nga-access";
 import { compileSnapshot, currentAccessVersion } from "./compile";
+import { responseTenant } from "../../tenancy/claims";
 
 /**
  * In-process snapshot cache keyed by (user, access_version, app, year).
@@ -27,7 +28,9 @@ export async function getSnapshot(
   app: string,
   opts: { yearId?: number | null; maxStaleMs?: number } = {},
 ): Promise<AccessSnapshot> {
-  const slot = `${userId}|${app}|${opts.yearId === undefined ? "cur" : opts.yearId}`;
+  // Keyed by tenant first: user ids repeat across tenant databases.
+  const tid = responseTenant().tid;
+  const slot = `t${tid}|${userId}|${app}|${opts.yearId === undefined ? "cur" : opts.yearId}`;
   // Shadow-mode comparisons only feed a review log, so they may reuse a
   // recent snapshot without the version read -- production's pool has a
   // single connection and this runs on every guarded request.
@@ -37,7 +40,7 @@ export async function getSnapshot(
   }
 
   const v = await currentAccessVersion(userId);
-  const key = `${userId}|${v}|${app}|${opts.yearId === undefined ? "cur" : opts.yearId}`;
+  const key = `t${tid}|${userId}|${v}|${app}|${opts.yearId === undefined ? "cur" : opts.yearId}`;
   const hit = cache.get(key);
   if (hit && Date.now() - hit.at < TTL_MS) {
     latest.set(slot, hit);

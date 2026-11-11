@@ -11,6 +11,9 @@ dotenv.config();
 const baseDbName = process.env.DB_NAME || "nga_central_mis";
 process.env.DB_NAME = process.env.TEST_DB_NAME || (baseDbName.endsWith("_test") ? baseDbName : `${baseDbName}_test`);
 process.env.NODE_ENV = "test";
+// The multi-tenancy control plane of the test run (tenancy/registry.ts). Never the
+// dev one; while it isn't provisioned the registry answers "tenant 1 only".
+process.env.PLATFORM_DB_NAME = process.env.TEST_PLATFORM_DB_NAME || `${process.env.DB_NAME}_platform`;
 
 // The production pool intentionally uses a single connection; the test
 // suite fires many rapid sequential Supertest requests against that same

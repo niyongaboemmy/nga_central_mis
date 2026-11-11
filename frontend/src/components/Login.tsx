@@ -16,7 +16,9 @@ import {
 } from "../api/auth";
 import { useUser } from "../contexts/UserContext";
 import { usePermissions } from "../hooks/usePermissions";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import SchoolPicker from "./auth/SchoolPicker";
+import { TENANT_MESSAGES, isTenantRefusal, type SchoolChoice } from "../lib/tenant";
 import {
   Lock,
   Mail,
@@ -712,6 +714,21 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
   const { refreshUser, user: currentUser } = useUser();
   const { getUserPermissions } = usePermissions();
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+  // Multi-tenancy: an account known to several schools gets a "choose your school"
+  // dialog; the sign-in is then sent again with the chosen school.
+  const [schoolChoices, setSchoolChoices] = useState<SchoolChoice[] | null>(null);
+  const retryWithSchool = useRef<((slug: string) => Promise<void>) | null>(null);
+  /** A school that can't be used yet says why (pending -> the review page). */
+  const signInError = (error: any, fallback: string): string | null => {
+    const code = error?.response?.data?.code;
+    if (code === "TENANT_PENDING") {
+      navigate("/onboarding");
+      return null;
+    }
+    if (isTenantRefusal(code)) return TENANT_MESSAGES[code];
+    return error?.response?.data?.message || fallback;
+  };
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [otp, setOtp] = useState("");
@@ -754,25 +771,35 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
       window.removeEventListener("resize", updateGoogleButtonWidth);
   }, []);
 
-  const handleCredentialsSubmit = async (e: any) => {
-    e.preventDefault();
+  const signInWithPassword = async (tenant?: string) => {
     setLoading(true);
     setAuthError("");
 
     try {
-      const response = await login({ username, password });
+      const response = await login(tenant ? { username, password, tenant } : { username, password });
+      if (response?.choose?.length) {
+        retryWithSchool.current = (slug) => signInWithPassword(slug);
+        setSchoolChoices(response.choose);
+        return;
+      }
+      setSchoolChoices(null);
       if (response?.requiresOTP) {
         setTempToken(response.tempToken);
         setDevOtp(response.devOtp || "");
         setStep("otp");
       }
     } catch (error: any) {
-      setAuthError(
-        error.response?.data?.message || "Login failed. Please try again.",
-      );
+      setSchoolChoices(null);
+      const message = signInError(error, "Login failed. Please try again.");
+      if (message) setAuthError(message);
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleCredentialsSubmit = async (e: any) => {
+    e.preventDefault();
+    await signInWithPassword();
   };
 
   const handleForgotEmailSubmit = async (e: any) => {
@@ -902,6 +929,27 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
     }, 800);
   };
 
+  const signInWithGoogle = async (credential: string, tenant?: string) => {
+    setLoading(true);
+    setAuthError("");
+    try {
+      const response = await googleLogin(credential, undefined, undefined, tenant);
+      if (response && response.choose?.length) {
+        retryWithSchool.current = (slug) => signInWithGoogle(credential, slug);
+        setSchoolChoices(response.choose);
+        return;
+      }
+      setSchoolChoices(null);
+      await completeSuccessfulLogin();
+    } catch (error: any) {
+      setSchoolChoices(null);
+      const message = signInError(error, "Google sign-in failed. Please try again.");
+      if (message) setAuthError(message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleGoogleSuccess = async (
     credentialResponse: CredentialResponse,
   ) => {
@@ -909,19 +957,7 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
       setAuthError("Google sign-in did not return a credential.");
       return;
     }
-    setLoading(true);
-    setAuthError("");
-    try {
-      await googleLogin(credentialResponse.credential);
-      await completeSuccessfulLogin();
-    } catch (error: any) {
-      setAuthError(
-        error.response?.data?.message ||
-          "Google sign-in failed. Please try again.",
-      );
-    } finally {
-      setLoading(false);
-    }
+    await signInWithGoogle(credentialResponse.credential);
   };
 
   const handleGoogleError = () => {
@@ -2329,6 +2365,16 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
           </div>
         </div>
       </div>
+      <SchoolPicker
+        schools={schoolChoices}
+        busy={loading}
+        onClose={() => setSchoolChoices(null)}
+        onChoose={(school) => {
+          const retry = retryWithSchool.current;
+          setSchoolChoices(null);
+          if (retry) void retry(school.slug);
+        }}
+      />
     </motion.div>
   );
 };

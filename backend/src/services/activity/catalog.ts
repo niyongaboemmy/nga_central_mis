@@ -1,3 +1,4 @@
+import { tenantLocal } from "../../tenancy/scoped";
 import { APP_CODE, APP_BY_CODE, AppKey } from "./apps";
 import { exec, q } from "./db";
 import { clock } from "./runtime";
@@ -21,11 +22,12 @@ interface Cached {
   at: number;
   byApp: Map<AppKey, Map<string, FeatureDef>>;
 }
-let cache: Cached | null = null;
+// Per school (tenant): ids and settings differ between tenant databases.
+const st = tenantLocal(() => ({ cache: (null) as Cached | null }));
 const TTL = 60_000;
 
 export const loadCatalog = async (force = false) => {
-  if (!force && cache && clock.now() - cache.at < TTL) return cache.byApp;
+  if (!force && st().cache && clock.now() - st().cache!.at < TTL) return st().cache!.byApp;
   const byApp = new Map<AppKey, Map<string, FeatureDef>>();
   try {
     const rows = await q<any>("SELECT app, feature_key, label, module, patterns, is_event, key_event, is_public FROM AnalyticsFeature");
@@ -46,11 +48,11 @@ export const loadCatalog = async (force = false) => {
   } catch {
     /* un-migrated: empty */
   }
-  cache = { at: clock.now(), byApp };
+  st().cache = { at: clock.now(), byApp };
   return byApp;
 };
 
-export const cachedCatalog = () => cache?.byApp ?? new Map<AppKey, Map<string, FeatureDef>>();
+export const cachedCatalog = () => st().cache?.byApp ?? new Map<AppKey, Map<string, FeatureDef>>();
 
 export const isKeyEvent = (app: AppKey, name: string) => !!cachedCatalog().get(app)?.get(name)?.key_event;
 
@@ -94,6 +96,6 @@ export const saveCatalog = async (app: AppKey, version: string | null, features:
   if (clean.length) {
     await exec(`DELETE FROM AnalyticsFeature WHERE app = ? AND feature_key NOT IN (?)`, [APP_CODE[app], clean.map((f) => f.key)]);
   }
-  cache = null;
+  st().cache = null;
   return clean.length;
 };

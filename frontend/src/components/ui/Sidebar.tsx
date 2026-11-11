@@ -4,6 +4,7 @@ import { ANALYTICS_TABS } from "../analytics/nav";
 import { School, Server, Activity, Database, GraduationCap, LayoutGrid, MonitorCheck, LayoutDashboard } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useUser } from "../../contexts/UserContext";
+import { useTenantBranding } from "../../hooks/useTenantBranding";
 import { Permissions } from "../../constants/permissions";
 import { getToken } from "../../utils/auth";
 import { requestAppsDialog } from "../apps/openAppsDialog";
@@ -78,6 +79,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   const location = useLocation();
   const navigate = useNavigate();
   const { user } = useUser();
+  const brand = useTenantBranding();
   const access = useAccess();
   const selectedYearId = useOptionalAcademicPeriod()?.selectedYearId;
   const mentorship = useMentorshipRole(user?.user?.user_id, selectedYearId);
@@ -1035,9 +1037,13 @@ const Sidebar: React.FC<SidebarProps> = ({
         } p-4 border-b border-border-light dark:border-gray-700/30`}
       >
         {!isCollapsed && (
-          <div className="flex items-center space-x-3">
-            <span className="text-lg font-bold text-text-primary-light dark:text-text-primary-dark">
-              Menus
+          <div className="flex items-center space-x-3 min-w-0">
+            {/* Another school's name and logo; NGA keeps the original header. */}
+            {!brand.isPrimary && brand.logoUrl && (
+              <img src={brand.logoUrl} alt="" className="w-7 h-7 rounded-full object-cover shrink-0" />
+            )}
+            <span className="text-lg font-bold text-text-primary-light dark:text-text-primary-dark truncate" title={brand.isPrimary ? undefined : brand.name}>
+              {brand.isPrimary ? "Menus" : brand.name}
             </span>
           </div>
         )}
@@ -1101,7 +1107,7 @@ const Sidebar: React.FC<SidebarProps> = ({
         {profileItem && isVisible(profileItem) && renderNavItem(profileItem)}
         {!isCollapsed && (
           <div className="mt-2 text-xs text-text-secondary-light dark:text-slate-300 text-center">
-            NGA MIS v1.0
+            {brand.isPrimary ? "NGA MIS v1.0" : `${brand.name} · MIS`}
           </div>
         )}
       </div>

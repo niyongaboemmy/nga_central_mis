@@ -1,4 +1,5 @@
 import { EventEmitter } from "events";
+import { localToUtcMs, tzOffsetMs } from "../../tenancy/timezone";
 
 /**
  * Shared runtime bits for the activity engine: an overridable clock (tests drive time
@@ -43,7 +44,12 @@ class ActivityBus extends EventEmitter {
 export const activityBus = new ActivityBus();
 activityBus.setMaxListeners(50);
 
-/** Kigali is UTC+2 with no DST, so day bucketing is a fixed offset. */
-export const TZ_OFFSET_MS = 2 * 60 * 60 * 1000;
-export const kigaliDay = (ms: number) => new Date(ms + TZ_OFFSET_MS).toISOString().slice(0, 10);
-export const kigaliHour = (ms: number) => new Date(ms + TZ_OFFSET_MS).getUTCHours();
+/**
+ * Day/hour bucketing in the school's timezone (the current tenant's; Kigali =
+ * UTC+2 with no DST for NGA). The "kigali" names are kept for history.
+ */
+export const tzOffset = (ms: number = clock.now()) => tzOffsetMs(ms);
+/** Wall-clock ms in the school zone -> UTC ms. */
+export const schoolLocalToUtc = (localMs: number) => localToUtcMs(localMs);
+export const kigaliDay = (ms: number) => new Date(ms + tzOffset(ms)).toISOString().slice(0, 10);
+export const kigaliHour = (ms: number) => new Date(ms + tzOffset(ms)).getUTCHours();

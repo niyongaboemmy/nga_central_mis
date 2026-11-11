@@ -27,6 +27,7 @@ import { MIS_MANIFEST } from "../access/manifest";
 import { isV2OnlyCapability } from "../access/v2Only";
 import { PRESETS } from "../access/presets";
 import { normalizeAiPolicy } from "../vendor/nga-access";
+import { assignTestSystems } from "../test/systems";
 
 /**
  * AI usage control, MIS side (AI_USAGE_CONTROL_PLAN.md §3–§4, migration 121): the school
@@ -224,6 +225,7 @@ describe("routes", () => {
     // What the spokes use: their SSO client id and secret as HTTP Basic.
     const clientId = `aip_${crypto.randomBytes(6).toString("hex")}`;
     await db.insert(System).values({ name: `AI policy ${clientId}`, client_id: clientId, client_secret: "s3cret", icon_url: "x", home_url: "x", status: "ACTIVE" } as any);
+    await assignTestSystems(clientId);
     const basic = (secret: string) => `Basic ${Buffer.from(`${clientId}:${secret}`).toString("base64")}`;
     expect((await request(app).get("/integrations/ai-policy").set("Authorization", basic("wrong"))).status).toBe(401);
     const ok = await request(app).get("/integrations/ai-policy").set("Authorization", basic("s3cret"));

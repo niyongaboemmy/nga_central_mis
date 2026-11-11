@@ -1,3 +1,5 @@
+import { responseTenant } from "../../tenancy/claims";
+import { TenantScopedMap } from "../../tenancy/scoped";
 import { createHash } from "crypto";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { db } from "../../db";
@@ -198,7 +200,7 @@ export async function syncManifest(
   return result;
 }
 
-const manifestCache = new Map<string, Manifest | null>();
+const manifestCache = new TenantScopedMap<string, Manifest | null>(); // per school database
 
 /** Latest published manifest of an app (MIS falls back to the code copy). */
 export async function getManifest(app: string): Promise<Manifest | null> {
@@ -304,7 +306,12 @@ export async function ensurePresets(): Promise<PresetApplyResult> {
   const applied = await db.select().from(AccessPresetLink);
   const appliedSet = new Set(applied.map((a) => `${a.preset_key}|${a.perm_name}`));
 
+  // platform_only presets (Platform Owner, IT Support) belong to the platform
+  // owner -- the primary school -- and are never created in another school's DB
+  // (provisioning does not copy them either; tenancy/provision.ts).
+  const primaryHere = responseTenant().isPrimary;
   for (const preset of PRESETS) {
+    if (preset.platformOnly && !primaryHere) continue;
     // 1) Find or create the role.
     let [role] = await db
       .select()

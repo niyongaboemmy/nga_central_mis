@@ -1,3 +1,4 @@
+import { tenantHeaders } from "../../tenancy/claims";
 import crypto from "crypto";
 import { and, eq, gte, inArray, isNull, lte, ne, or, sql } from "drizzle-orm";
 import { db } from "../../db";
@@ -187,7 +188,7 @@ let standingFetcher: (token: string) => Promise<{ students: TaskMentorStanding[]
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), Number(process.env.HOME_APP_TIMEOUT_MS) || 8000);
   try {
-    const res = await fetch(`${tm.apiBaseUrl}/api/integration/student-standing`, { headers: { Authorization: `Bearer ${token}` }, signal: controller.signal });
+    const res = await fetch(`${tm.apiBaseUrl}/api/integration/student-standing`, { headers: { Authorization: `Bearer ${token}`, ...tenantHeaders() }, signal: controller.signal });
     if (!res.ok) return null;
     const json: any = await res.json().catch(() => null);
     const data = json?.data;

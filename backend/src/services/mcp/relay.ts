@@ -1,4 +1,5 @@
 import jwt from "jsonwebtoken";
+import { responseTenant, tenantClaims, tenantHeaders } from "../../tenancy/claims";
 import { getUserTokenVersion } from "../../middleware/auth";
 import logger from "../../utils/logger";
 import type { AiApp, AiPolicy } from "../../vendor/nga-access";
@@ -28,7 +29,7 @@ export function appForTool(name: string): HomeApp | null {
 /** A 5-minute MIS token for the person, for this relay only. */
 export async function mintRelayToken(userId: number, username?: string | null): Promise<string> {
   const tokenVersion = (await getUserTokenVersion(userId)) ?? 0;
-  return jwt.sign({ userId, username: username ?? undefined, tokenVersion, purpose: "mcp-relay" }, process.env.JWT_SECRET!, {
+  return jwt.sign({ userId, username: username ?? undefined, tokenVersion, purpose: "mcp-relay", ...tenantClaims() }, process.env.JWT_SECRET!, {
     expiresIn: "5m",
     issuer: "nga-mis",
     audience: "nga-mcp-relay",
@@ -57,14 +58,16 @@ function sanitiseTool(app: HomeApp, raw: any): McpTool | null {
   };
 }
 
-const cache = new Map<number, { at: number; tools: McpTool[] }>();
-export const forgetAppTools = (userId?: number) => (userId === undefined ? cache.clear() : cache.delete(userId));
+// Keyed "t<tid>:<userId>": user ids repeat across tenant databases.
+const cache = new Map<string, { at: number; tools: McpTool[] }>();
+const toolsKey = (userId: number) => `t${responseTenant().tid}:${userId}`;
+export const forgetAppTools = (userId?: number) => (userId === undefined ? cache.clear() : cache.delete(toolsKey(userId)));
 
 async function fetchJson(url: string, init: RequestInit): Promise<{ status: number; body: any }> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs());
   try {
-    const res = await fetch(url, { ...init, signal: controller.signal });
+    const res = await fetch(url, { ...init, headers: { ...((init.headers as Record<string, string>) ?? {}), ...tenantHeaders() }, signal: controller.signal });
     const body = await res.json().catch(() => null);
     return { status: res.status, body };
   } finally {
@@ -74,7 +77,7 @@ async function fetchJson(url: string, init: RequestInit): Promise<{ status: numb
 
 /** Every configured app's tools for this person (cached 60 s per person). Never throws. */
 export async function appTools(userId: number, policy: AiPolicy, username?: string | null): Promise<McpTool[]> {
-  const hit = cache.get(userId);
+  const hit = cache.get(toolsKey(userId));
   if (hit && Date.now() - hit.at < CACHE_MS) return hit.tools;
   const apps = configuredApps().filter((a) => policy.apps[POLICY_APP[a.source]] !== false);
   if (apps.length === 0) return [];
@@ -96,7 +99,7 @@ export async function appTools(userId: number, policy: AiPolicy, username?: stri
     }),
   );
   const tools = lists.flat();
-  cache.set(userId, { at: Date.now(), tools });
+  cache.set(toolsKey(userId), { at: Date.now(), tools });
   return tools;
 }
 

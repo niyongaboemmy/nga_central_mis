@@ -1,5 +1,7 @@
 import logger from "../../utils/logger";
 import { exec } from "./db";
+import { runWithTenant } from "../../vendor/nga-tenancy";
+import { tenantLocal } from "../../tenancy/scoped";
 
 /**
  * Buffered writes for the activity engine (plan §5.3). Ingest never waits on the
@@ -92,29 +94,49 @@ interface UserStateDelta {
 }
 
 const MAX_EVENTS = 50_000;
-let events: EventRow[] = [];
-const sessions = new Map<number, SessionRow>();
-const devices = new Map<string, DeviceDelta>();
-const ips = new Map<string, IpDelta>();
-const userIps = new Map<string, PairDelta>();
-const deviceIps = new Map<string, PairDelta>();
-const userStates = new Map<number, UserStateDelta>();
+
+/**
+ * One set of buffers per school (tenant): rows are queued in the request's tenant and
+ * each tenant's buffers are flushed inside that tenant, so a batch never mixes schools
+ * and always lands in its own database (MIS-A15).
+ */
+interface Buffers {
+  events: EventRow[];
+  sessions: Map<number, SessionRow>;
+  devices: Map<string, DeviceDelta>;
+  ips: Map<string, IpDelta>;
+  userIps: Map<string, PairDelta>;
+  deviceIps: Map<string, PairDelta>;
+  userStates: Map<number, UserStateDelta>;
+}
+const emptyBuffers = (): Buffers => ({
+  events: [],
+  sessions: new Map(),
+  devices: new Map(),
+  ips: new Map(),
+  userIps: new Map(),
+  deviceIps: new Map(),
+  userStates: new Map(),
+});
+const buffers = tenantLocal(emptyBuffers);
 
 export const stats = { flushed: 0, dropped: 0, failures: 0, lastFlushAt: 0, lastFlushMs: 0, lastError: null as string | null };
 
 export const queueEvent = (row: EventRow) => {
-  if (events.length >= MAX_EVENTS) {
-    events.shift();
+  const b = buffers();
+  if (b.events.length >= MAX_EVENTS) {
+    b.events.shift();
     stats.dropped++;
   }
-  events.push(row);
+  b.events.push(row);
 };
 
 export const queueSession = (row: SessionRow) => {
-  sessions.set(row.session_id, { ...row });
+  buffers().sessions.set(row.session_id, { ...row });
 };
 
 export const queueDevice = (d: DeviceDelta) => {
+  const devices = buffers().devices;
   const cur = devices.get(d.device_id);
   if (!cur) {
     devices.set(d.device_id, { ...d });
@@ -138,6 +160,7 @@ export const queueDevice = (d: DeviceDelta) => {
 
 export const queueIp = (ip: Buffer, geoId: number | null, label: string | null, at: Date, failed = 0) => {
   const k = ip.toString("hex");
+  const ips = buffers().ips;
   const cur = ips.get(k);
   if (!cur) ips.set(k, { ip, geo_id: geoId, network_label: label, first: at, last: at, failed });
   else {
@@ -159,10 +182,11 @@ const queuePair = (m: Map<string, PairDelta>, a: number | string, ip: Buffer, at
     if (at < cur.first) cur.first = at;
   }
 };
-export const queueUserIp = (userId: number, ip: Buffer, at: Date) => queuePair(userIps, userId, ip, at);
-export const queueDeviceIp = (deviceId: string, ip: Buffer, at: Date) => queuePair(deviceIps, deviceId, ip, at);
+export const queueUserIp = (userId: number, ip: Buffer, at: Date) => queuePair(buffers().userIps, userId, ip, at);
+export const queueDeviceIp = (deviceId: string, ip: Buffer, at: Date) => queuePair(buffers().deviceIps, deviceId, ip, at);
 
 export const queueUserState = (d: UserStateDelta) => {
+  const userStates = buffers().userStates;
   const cur = userStates.get(d.user_id);
   if (!cur) {
     userStates.set(d.user_id, { ...d, first_seen_by_app: { ...d.first_seen_by_app } });
@@ -189,32 +213,39 @@ const placeholders = (cols: number, rows: number) =>
 
 let flushing: Promise<void> | null = null;
 
-/** Write everything buffered. Concurrent callers share one flush. */
+/**
+ * Write everything buffered, for every school, each inside its own tenant (one
+ * school's failing database never blocks the others). Concurrent callers share one flush.
+ */
 export const flushActivity = async (): Promise<void> => {
   if (flushing) return flushing;
-  flushing = doFlush().finally(() => {
+  flushing = (async () => {
+    for (const { ctx, value } of buffers.all()) {
+      await runWithTenant(ctx, () => doFlush(value));
+    }
+  })().finally(() => {
     flushing = null;
   });
   return flushing;
 };
 
-const doFlush = async () => {
+const doFlush = async (b: Buffers) => {
   const started = Date.now();
   // Swap buffers first so ingest keeps appending while we write.
-  const ev = events;
-  events = [];
-  const ss = [...sessions.values()];
-  sessions.clear();
-  const dv = [...devices.values()];
-  devices.clear();
-  const ip = [...ips.values()];
-  ips.clear();
-  const ui = [...userIps.values()];
-  userIps.clear();
-  const di = [...deviceIps.values()];
-  deviceIps.clear();
-  const us = [...userStates.values()];
-  userStates.clear();
+  const ev = b.events;
+  b.events = [];
+  const ss = [...b.sessions.values()];
+  b.sessions.clear();
+  const dv = [...b.devices.values()];
+  b.devices.clear();
+  const ip = [...b.ips.values()];
+  b.ips.clear();
+  const ui = [...b.userIps.values()];
+  b.userIps.clear();
+  const di = [...b.deviceIps.values()];
+  b.deviceIps.clear();
+  const us = [...b.userStates.values()];
+  b.userStates.clear();
 
   try {
     // Sessions first, so a report reading an event's session_id finds it.
@@ -329,29 +360,22 @@ const doFlush = async () => {
     stats.lastError = String(error?.message ?? error).slice(0, 300);
     logger.error("[activity] flush failed", { error: stats.lastError });
     // Put events back once (bounded). Upserts are idempotent enough to retry as well.
-    if (ev.length && events.length + ev.length <= MAX_EVENTS) events = ev.concat(events);
+    if (ev.length && b.events.length + ev.length <= MAX_EVENTS) b.events = ev.concat(b.events);
     else stats.dropped += ev.length;
-    for (const s of ss) if (!sessions.has(s.session_id)) sessions.set(s.session_id, s);
+    for (const s of ss) if (!b.sessions.has(s.session_id)) b.sessions.set(s.session_id, s);
   } finally {
     stats.lastFlushAt = Date.now();
     stats.lastFlushMs = Date.now() - started;
   }
 };
 
-export const bufferDepth = () => ({
-  events: events.length,
-  sessions: sessions.size,
-  devices: devices.size,
-  ips: ips.size,
-});
+/** The current school's buffer depth. */
+export const bufferDepth = () => {
+  const b = buffers();
+  return { events: b.events.length, sessions: b.sessions.size, devices: b.devices.size, ips: b.ips.size };
+};
 
-/** Tests: drop everything buffered without writing. */
+/** Tests: drop everything buffered (every school) without writing. */
 export const resetWriter = () => {
-  events = [];
-  sessions.clear();
-  devices.clear();
-  ips.clear();
-  userIps.clear();
-  deviceIps.clear();
-  userStates.clear();
+  buffers.resetAll();
 };

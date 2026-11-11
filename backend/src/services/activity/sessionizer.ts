@@ -1,3 +1,4 @@
+import { TenantScopedMap, TenantScopedSet } from "../../tenancy/scoped";
 import { APP_BIT, APP_CODE, AppKey, APP_BY_CODE } from "./apps";
 import { q } from "./db";
 import { clock } from "./runtime";
@@ -27,7 +28,7 @@ export interface OpenSession extends SessionRow {
   engagedNotified: boolean;
 }
 
-const open = new Map<string, OpenSession>();
+const open = new TenantScopedMap<string, OpenSession>();
 let counter = 0;
 let lastMs = 0;
 const nextId = () => {
@@ -87,7 +88,7 @@ const toRow = (s: OpenSession): SessionRow => {
  * to a session of their own time, not to whatever session is open now. They get their
  * own session chain per device, timed out like any other.
  */
-const late = new Map<string, OpenSession>();
+const late = new TenantScopedMap<string, OpenSession>();
 
 export const touchSession = (t: TouchInput): TouchResult => {
   const current = open.get(t.deviceId) ?? null;
@@ -112,13 +113,13 @@ const touchLate = (t: TouchInput): TouchResult => {
   return applyTouch(t, s, late, res);
 };
 
-const closeIn = (s: OpenSession, map: Map<string, OpenSession>) => {
+const closeIn = (s: OpenSession, map: TenantScopedMap<string, OpenSession>) => {
   s.ended_at = new Date(s.lastActivityMs);
   queueSession(toRow(s));
   map.delete(s.device_id);
 };
 
-const applyTouch = (t: TouchInput, s: OpenSession | null, map: Map<string, OpenSession>, res: TouchResult): TouchResult => {
+const applyTouch = (t: TouchInput, s: OpenSession | null, map: TenantScopedMap<string, OpenSession>, res: TouchResult): TouchResult => {
 
   if (!s) {
     // A beat alone never opens a session (an idle open tab is not a visit).
@@ -269,7 +270,7 @@ export const reloadOpenSessions = async () => {
 
 export const openSessionCount = () => open.size;
 export const resetSessions = () => {
-  open.clear();
-  late.clear();
+  open.clearAll();
+  late.clearAll();
 };
 

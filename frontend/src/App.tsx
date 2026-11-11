@@ -8,6 +8,8 @@ import {
   useLocation,
 } from "react-router-dom";
 import Login from "./components/Login";
+import TenantGate from "./components/auth/TenantGate";
+import OnboardingPending from "./components/auth/OnboardingPending";
 import Profile from "./components/Profile";
 import Dashboard from "./components/Dashboard";
 import SuperAdminDashboard from "./components/SuperAdminDashboard";
@@ -134,7 +136,8 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({
     return <Navigate to="/login" replace />;
   }
 
-  return <>{children}</>;
+  // The school must be usable (pending -> /onboarding); see components/auth/TenantGate.tsx.
+  return <TenantGate>{children}</TenantGate>;
 };
 
 // Public Route wrapper (redirects to dashboard if already logged in, unless explicit SSO request)
@@ -364,6 +367,9 @@ function App() {
                 on every exported PDF. Deliberately unwrapped (no ProtectedRoute/PublicRoute):
                 it must render identically for an anonymous scanner and a logged-in user. */}
             <Route path="/verify/:schemeId" element={<SchemeVerifyPage />} />
+
+            {/* A school that is not usable yet (multi-tenancy): "under review" / "suspended". */}
+            <Route path="/onboarding" element={<OnboardingPending />} />
 
             {/* Dashboard - protected with sidebar */}
             {/* Home -- what needs me across every module, today, and how my

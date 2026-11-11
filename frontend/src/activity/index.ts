@@ -8,7 +8,7 @@ import catalog from "./mis.catalog.json";
  * The MIS posts straight to its own API: `/activity/sync`, authenticated by the session
  * token, or anonymous on public pages. The other apps go through their own relay.
  */
-const OFFLINE_USER_KEY = "nga.user.offlineCache";
+import { currentUserCacheKey } from "../lib/tenant";
 
 const userIdFromToken = (token: string | null): number | null => {
   if (!token) return null;
@@ -23,7 +23,8 @@ const userIdFromToken = (token: string | null): number | null => {
 
 const cachedUserType = (): string | null => {
   try {
-    const u = JSON.parse(localStorage.getItem(OFFLINE_USER_KEY) || "null");
+    const key = currentUserCacheKey();
+    const u = JSON.parse((key && localStorage.getItem(key)) || "null");
     return u?.profile?.user_type ?? null;
   } catch {
     return null;

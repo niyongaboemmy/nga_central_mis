@@ -1,4 +1,5 @@
 import logger from "../../utils/logger";
+import { scopedKey } from "../../tenancy/scoped";
 import { localIsoDate, resolvePeriod, toIsoDate, weekOfTerm, weeksInTerm } from "../academicPeriod";
 import { resolveHomeAccess } from "./access";
 import { configuredApps } from "./apps";
@@ -59,7 +60,8 @@ export async function buildHomeOverview(
   const access = await resolveHomeAccess(userId, yearId);
   const now = new Date();
   const todayIso = localIsoDate(now);
-  const key = `${userId}|${access.source}|${access.snapshot.v}|${todayIso}|${termId}|${yearId}`;
+  // Tenant-keyed: user ids repeat across schools.
+  const key = scopedKey("home") + `|${userId}|${access.source}|${access.snapshot.v}|${todayIso}|${termId}|${yearId}`;
   const hit = cache.get(key);
   if (!q.refresh && hit && Date.now() - hit.at < CACHE_TTL_MS) return hit.value;
 

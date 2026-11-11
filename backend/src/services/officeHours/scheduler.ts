@@ -8,6 +8,8 @@ import { notifyEscalations, registerOfficeHoursNotifier } from "./notify";
 import { reconcileOfficeHours } from "./reconcile";
 import { ensureAllSessions } from "./sessions";
 import { expireTransfers } from "./transfers";
+import { tenantJob } from "../../tenancy/jobs";
+import { tenantLocal } from "../../tenancy/scoped";
 
 /**
  * Office-hours background jobs (plan §7.4). One minute tick in this single
@@ -16,10 +18,12 @@ import { expireTransfers } from "./transfers";
  * restart that repeats one only refreshes notices. OFFICE_HOURS_SCHEDULER=false
  * switches it off; tests never start it.
  */
-const lastRun = new Map<string, string>();
-let running = false;
+// Per school: each tenant has its own "already ran today" memory and its own clock.
+const lastRunOf = tenantLocal(() => new Map<string, string>());
+const runningOf = tenantLocal(() => ({ on: false }));
 
 const once = async (key: string, period: string, fn: () => Promise<unknown>) => {
+  const lastRun = lastRunOf();
   if (lastRun.get(key) === period) return;
   lastRun.set(key, period);
   try {
@@ -31,9 +35,10 @@ const once = async (key: string, period: string, fn: () => Promise<unknown>) => 
 };
 
 export const tick = async () => {
-  if (running) return;
+  const state = runningOf();
+  if (state.on) return;
   if (!(await officeHoursReady())) return; // migration 102 not applied yet
-  running = true;
+  state.on = true;
   try {
     const at = kigaliParts(now());
     const hour = at.minutes / 60;
@@ -60,12 +65,14 @@ export const tick = async () => {
     }
     if (dowOfYmd(at.ymd) === 5 && at.minutes >= 17 * 60 + 30) await once("weekly-digest", at.ymd, () => weeklyDigests());
   } finally {
-    running = false;
+    state.on = false;
   }
 };
 
+const tickAll = tenantJob("office-hours", () => tick());
+
 export const startOfficeHoursScheduler = () => {
   registerOfficeHoursNotifier();
-  setTimeout(() => void tick(), 40_000).unref();
-  setInterval(() => void tick(), 60_000).unref();
+  setTimeout(() => void tickAll(), 40_000).unref();
+  setInterval(() => void tickAll(), 60_000).unref();
 };

@@ -1,3 +1,4 @@
+import { scopedKey } from "../tenancy/scoped";
 import express, { type RequestHandler } from "express";
 import { sql } from "drizzle-orm";
 import { db } from "../db";
@@ -201,7 +202,7 @@ router.post(
     } catch (e: any) {
       return res.status(400).json({ success: false, message: e?.message || "Bad request" });
     }
-    if (!burst.take(String(userId))) return res.status(429).json({ success: false, code: "SLOW_DOWN", message: "Too many messages in a minute. Please wait a moment." });
+    if (!burst.take(scopedKey("u", userId))) return res.status(429).json({ success: false, code: "SLOW_DOWN", message: "Too many messages in a minute. Please wait a moment." });
     if (persona === "student") return tutorTurn(req, res, userId, firstName, messages);
     const limit = dailyLimit(persona);
     const used = await usedToday(userId);

@@ -1,5 +1,6 @@
 import { and, eq, inArray, isNull, lte, gte, or } from "drizzle-orm";
 import { db } from "../../db";
+import { responseTenant } from "../../tenancy/claims";
 import {
   AccessGrant,
   AccessPermission,
@@ -70,12 +71,17 @@ export async function loadActiveGrants(
           : or(isNull(AccessGrant.academic_year_id), eq(AccessGrant.academic_year_id, yearId)),
       ),
     );
-  return rows.map((r) => ({
-    ...r.grant,
-    role_name: r.role_name,
-    role_preset: r.role_preset,
-    platform_only: r.platform_only,
-  }));
+  // ADR-6: platform powers live only in the primary tenant. A PLATFORM-scope
+  // grant stored in any other tenant's DB is ignored.
+  const primary = responseTenant().isPrimary;
+  return rows
+    .filter((r) => primary || r.grant.scope_type !== "PLATFORM")
+    .map((r) => ({
+      ...r.grant,
+      role_name: r.role_name,
+      role_preset: r.role_preset,
+      platform_only: r.platform_only,
+    }));
 }
 
 const uniq = (xs: number[]) => Array.from(new Set(xs));
@@ -386,7 +392,8 @@ export async function compileSnapshot(
     user: {
       id: userId,
       persona: profile[0]?.user_type ?? null,
-      school_id: grants[0]?.school_id ?? 1,
+      // Token contract v2: the real tenant id (one School row per tenant DB, school_id = tid).
+      school_id: responseTenant().tid,
       class_groups:
         account[0]?.status === "ACTIVE"
           ? await learnerClassGroups(userId, profile[0]?.user_type ?? null, yearId)

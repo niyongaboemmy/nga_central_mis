@@ -1,10 +1,11 @@
 import express from "express";
 import { and, desc, eq, gte, inArray, isNull } from "drizzle-orm";
-import { authenticate } from "../middleware/auth";
+import { authenticate, authenticateIdentityRead } from "../middleware/auth";
 import { asyncHandler } from "../middleware/asyncHandler";
 import { requireServiceToken } from "../middleware/serviceAuth";
 import { successResponse } from "../utils/response";
-import { db } from "../db";
+import { db, primaryDb } from "../db";
+import { tenantBlock } from "../tenancy/claims";
 import {
   AccessAudit,
   AccessManifestRow,
@@ -108,7 +109,7 @@ router.put(
     // Client credentials identify a System; it may only publish its own app.
     const systemId = -Number(req.service?.tokenId);
     const [system] = systemId > 0
-      ? await db.select({ client_id: System.client_id }).from(System).where(eq(System.system_id, systemId)).limit(1)
+      ? await primaryDb().select({ client_id: System.client_id }).from(System).where(eq(System.system_id, systemId)).limit(1)
       : [];
     if (!system || appForClient(system.client_id) !== app || app === "mis") {
       throw new AuthorizationError(`This client may not publish the "${app}" manifest`);
@@ -167,15 +168,18 @@ router.post(
 // ---------------------------------------------------------------------------
 // Everything below is for signed-in users
 // ---------------------------------------------------------------------------
-router.use(authenticate);
-
-/** My access snapshot for one app (plan §7.1). */
+/** My access snapshot for one app (plan §7.1). Identity read: also takes the MCP relay token. */
 router.get(
   "/me",
+  authenticateIdentityRead,
   asyncHandler(async (req: any, res: any) => {
-    successResponse(res, "Access snapshot", await getSnapshot(req.user.userId, appParam(req.query.app)));
+    // Token contract v2: the snapshot's user.school_id is the real tid, plus the tenant block.
+    const snapshot = await getSnapshot(req.user.userId, appParam(req.query.app));
+    successResponse(res, "Access snapshot", { ...snapshot, tenant: tenantBlock() });
   }),
 );
+
+router.use(authenticate);
 
 /** "Why can / can't X do Y here?" -- own decisions, or anyone's with Studio access. */
 router.get(

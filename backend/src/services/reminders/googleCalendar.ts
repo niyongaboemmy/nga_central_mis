@@ -1,6 +1,9 @@
 import crypto from "crypto";
 import { and, eq, gte, notInArray } from "drizzle-orm";
+import { tenantTimezone } from "../../tenancy/timezone";
 import { db } from "../../db";
+import { PRIMARY_TENANT_ID } from "../../vendor/nga-tenancy";
+import { scopeTid } from "../../tenancy/scoped";
 import { GoogleCalendarEvent, GoogleCalendarLink } from "../../db/reminderSchema";
 import logger from "../../utils/logger";
 import { collectOccurrences, type Occurrence } from "./occurrences";
@@ -59,7 +62,9 @@ export const setGoogleTransport = (fn: GoogleFetch | null) => {
 export const buildAuthUrl = (userId: number) => {
   const cfg = googleConfig();
   if (!cfg) return null;
-  const state = signState({ uid: userId, n: crypto.randomBytes(8).toString("hex") }, 10 * 60_000);
+  // The callback is public (no session on Google's redirect): the signed state names
+  // the user AND the school, and the callback runs in that school only.
+  const state = signState({ uid: userId, tid: scopeTid("google connect"), n: crypto.randomBytes(8).toString("hex") }, 10 * 60_000);
   const params = new URLSearchParams({
     client_id: cfg.clientId,
     redirect_uri: cfg.redirectUri,
@@ -98,12 +103,26 @@ const emailFromIdToken = (idToken?: string) => {
   }
 };
 
-/** OAuth callback: store the (encrypted) refresh token, create the calendar, first sync. */
+/** The school a valid, unexpired connect state was issued in (pre-tenancy states: the primary). */
+export const connectStateTid = (state: string): number | null => {
+  const payload = verifyState<{ uid: number; tid?: number }>(state);
+  if (!payload?.uid) return null;
+  if (payload.tid === undefined) return PRIMARY_TENANT_ID;
+  const tid = Number(payload.tid);
+  return Number.isSafeInteger(tid) && tid > 0 ? tid : null;
+};
+
+/**
+ * OAuth callback: store the (encrypted) refresh token, create the calendar, first sync.
+ * Must run inside the school the state names (the controller enters it); a state of
+ * another school is refused here too.
+ */
 export const completeConnect = async (code: string, state: string) => {
   const cfg = googleConfig();
   if (!cfg) throw new Error("Google Calendar is not configured");
-  const payload = verifyState<{ uid: number }>(state);
+  const payload = verifyState<{ uid: number; tid?: number }>(state);
   if (!payload?.uid) throw new Error("This sign-in link expired. Start again from the Reminders page.");
+  if (connectStateTid(state) !== scopeTid("google connect")) throw new Error("This sign-in link belongs to another school.");
   const tokens = await tokenRequest({
     code,
     client_id: cfg.clientId,
@@ -165,8 +184,8 @@ export const eventBody = (occ: Occurrence, prefs: ReminderPreferences) => {
     summary: occ.title,
     location: occ.location ?? undefined,
     description: [occ.detail, `Open in NGA: ${appUrl(occ.link)}`].filter(Boolean).join("\n"),
-    start: { dateTime: occ.start.toISOString(), timeZone: "Africa/Kigali" },
-    end: { dateTime: end.toISOString(), timeZone: "Africa/Kigali" },
+    start: { dateTime: occ.start.toISOString(), timeZone: tenantTimezone() },
+    end: { dateTime: end.toISOString(), timeZone: tenantTimezone() },
     reminders: { useDefault: false, overrides: offsets.map((minutes) => ({ method: "popup", minutes })) },
     extendedProperties: { private: { ngaKey: occ.key } },
     source: { title: "NGA", url: appUrl(occ.link) },
@@ -183,7 +202,7 @@ const ensureCalendar = async (token: string, link: typeof GoogleCalendarLink.$in
   const created = await api(token, "POST", "/calendars", {
     summary: "NGA · My Timetable",
     description: "Lessons, deadlines and meetings from New Generation Academy. Managed by NGA — changes here are overwritten.",
-    timeZone: "Africa/Kigali",
+    timeZone: tenantTimezone(),
   });
   if (created.status !== 200) throw new Error(`Couldn't create the NGA calendar (${created.status})`);
   const calendarId = created.json.id as string;

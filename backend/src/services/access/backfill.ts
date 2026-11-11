@@ -1,4 +1,5 @@
 import { and, eq, inArray, isNull } from "drizzle-orm";
+import { responseTenant } from "../../tenancy/claims";
 import { db } from "../../db";
 import { AccessGrant, AccessRole } from "../../db/accessSchema";
 import {
@@ -41,14 +42,12 @@ export interface BackfillReport {
   needsAttention: Array<{ userId: number; username: string; issue: string }>;
 }
 
+/**
+ * The school new grants belong to: the current tenant (ADR-4 -- in each tenant
+ * DB the single School row has school_id = tid).
+ */
 export async function defaultSchoolId(): Promise<number> {
-  const [row] = await db
-    .select({ id: School.school_id })
-    .from(School)
-    .where(eq(School.status, "ACTIVE"))
-    .orderBy(School.school_id)
-    .limit(1);
-  return row?.id ?? 1;
+  return responseTenant().tid;
 }
 
 export async function backfillLegacyGrants(

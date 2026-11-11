@@ -1,5 +1,7 @@
 import { and, eq, gt, inArray, isNull, lte, notInArray } from "drizzle-orm";
 import { db } from "../../db";
+import { scopeCtx, scopeTid } from "../../tenancy/scoped";
+import { runWithTenant, type TenantCtx } from "../../vendor/nga-tenancy";
 import { User } from "../../db/schema";
 import { ReminderJob } from "../../db/reminderSchema";
 import logger from "../../utils/logger";
@@ -138,29 +140,43 @@ export const escalateUnacked = async (
 
 // ─── Google Calendar re-sync ─────────────────────────────────────────────────
 
-const pending = new Set<number>();
-let timer: NodeJS.Timeout | null = null;
+// Per school: user ids repeat across school databases, so each tenant has its own
+// pending set and timer, and the timer re-enters that tenant before reading anything.
+const googleSoon = new Map<number, { ctx: TenantCtx; pending: Set<number>; timer: NodeJS.Timeout | null }>();
 /** Coalesce bursts (a teacher editing a quiz several times) into one sync. */
 const GOOGLE_DEBOUNCE_MS = 20_000;
 
+/** Test hook: the user ids waiting for a Google re-sync in the current tenant. */
+export const pendingGoogleSync = (): number[] => Array.from(googleSoon.get(scopeTid())?.pending ?? []);
+
 /** Re-sync the Google calendars of these users soon, if they connected one. */
-export const syncGoogleSoon = (userIds: number[]) => {
-  if (!googleConfig() || process.env.NODE_ENV === "test") return;
-  for (const id of userIds) if (Number.isInteger(id) && id > 0) pending.add(id);
-  if (timer || pending.size === 0) return;
-  timer = setTimeout(async () => {
-    timer = null;
-    const batch = Array.from(pending);
-    pending.clear();
-    try {
-      const linked = await db
-        .select({ user_id: GoogleCalendarLink.user_id })
-        .from(GoogleCalendarLink)
-        .where(and(eq(GoogleCalendarLink.status, "active"), inArray(GoogleCalendarLink.user_id, batch)));
-      for (const { user_id } of linked) await syncGoogleCalendar(Number(user_id));
-    } catch (error) {
-      logger.error("[reminders] google re-sync failed", { error });
-    }
-  }, GOOGLE_DEBOUNCE_MS);
-  timer.unref?.();
+export const syncGoogleSoon = (userIds: number[], opts: { force?: boolean; delayMs?: number } = {}) => {
+  if (!opts.force && (!googleConfig() || process.env.NODE_ENV === "test")) return;
+  const ctx = scopeCtx("google re-sync");
+  let st = googleSoon.get(ctx.tid);
+  if (!st) {
+    st = { ctx, pending: new Set(), timer: null };
+    googleSoon.set(ctx.tid, st);
+  }
+  for (const id of userIds) if (Number.isInteger(id) && id > 0) st.pending.add(id);
+  if (st.timer || st.pending.size === 0) return;
+  const state = st;
+  state.timer = setTimeout(() => {
+    runWithTenant(state.ctx, async () => {
+      state.timer = null;
+      const batch = Array.from(state.pending);
+      state.pending.clear();
+      if (!batch.length) return;
+      try {
+        const linked = await db
+          .select({ user_id: GoogleCalendarLink.user_id })
+          .from(GoogleCalendarLink)
+          .where(and(eq(GoogleCalendarLink.status, "active"), inArray(GoogleCalendarLink.user_id, batch)));
+        for (const { user_id } of linked) await syncGoogleCalendar(Number(user_id));
+      } catch (error) {
+        logger.error("[reminders] google re-sync failed", { error, data: { tid: state.ctx.tid } });
+      }
+    });
+  }, opts.delayMs ?? GOOGLE_DEBOUNCE_MS);
+  state.timer.unref?.();
 };

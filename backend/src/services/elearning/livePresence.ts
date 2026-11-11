@@ -1,3 +1,5 @@
+import { TenantScopedMap } from "../../tenancy/scoped";
+import { tenantJob } from "../../tenancy/jobs";
 import { Response } from "express";
 import logger from "../../utils/logger";
 
@@ -115,9 +117,10 @@ export interface LiveEvent {
  *  decays by itself, without anything having to write to it again. */
 type StoredWatcher = Omit<Watcher, "active" | "dwell_seconds">;
 
-const watchersByCourse = new Map<number, Map<number, StoredWatcher>>();
-const recentByCourse = new Map<number, NonNullable<LiveEvent["progress"]>[]>();
-const subscribersByCourse = new Map<number, Set<Response>>();
+// Per school: course and user ids repeat across tenant databases (MIS-A15).
+const watchersByCourse = new TenantScopedMap<number, Map<number, StoredWatcher>>();
+const recentByCourse = new TenantScopedMap<number, NonNullable<LiveEvent["progress"]>[]>();
+const subscribersByCourse = new TenantScopedMap<number, Set<Response>>();
 
 const send = (res: Response, event: LiveEvent) => {
   try {
@@ -343,13 +346,14 @@ export function recordProgress(
 
 /** Attaches one teacher's SSE stream to a course. Returns the detach function. */
 export function subscribe(courseId: number, res: Response): () => void {
-  if (!subscribersByCourse.has(courseId))
-    subscribersByCourse.set(courseId, new Set());
-  subscribersByCourse.get(courseId)!.add(res);
+  // Captured now: the detach runs from a socket close handler, maybe outside the context.
+  const mine = subscribersByCourse.current();
+  if (!mine.has(courseId)) mine.set(courseId, new Set());
+  mine.get(courseId)!.add(res);
   return () => {
-    const subs = subscribersByCourse.get(courseId);
+    const subs = mine.get(courseId);
     subs?.delete(res);
-    if (subs && subs.size === 0) subscribersByCourse.delete(courseId);
+    if (subs && subs.size === 0) mine.delete(courseId);
   };
 }
 
@@ -362,9 +366,17 @@ export function subscriberCount(courseId: number): number {
  * class closes their laptops. Also doubles as the SSE keep-alive tick.
  */
 let sweep: NodeJS.Timeout | null = null;
+const sweepTenants = tenantJob("live-presence", () => sweepOnce(), { jitterMs: 0 });
 export function startLiveSweep(): void {
   if (sweep) return;
-  sweep = setInterval(() => {
+  sweep = setInterval(() => void sweepTenants(), SWEEP_MS);
+  sweep.unref();
+  logger.info("[elearning] live presence sweep started");
+}
+
+/** One sweep of the current school's streams (exported for tests). */
+export function sweepOnce(): void {
+  {
     for (const courseId of [...subscribersByCourse.keys()]) {
       const before = watchersByCourse.get(courseId)?.size ?? 0;
       const watchers = listWatchers(courseId);
@@ -384,14 +396,12 @@ export function startLiveSweep(): void {
         }
       }
     }
-  }, SWEEP_MS);
-  sweep.unref();
-  logger.info("[elearning] live presence sweep started");
+  }
 }
 
 /** Test helper — clears every in-memory map. */
 export function __resetLive(): void {
-  watchersByCourse.clear();
-  recentByCourse.clear();
-  subscribersByCourse.clear();
+  watchersByCourse.clearAll();
+  recentByCourse.clearAll();
+  subscribersByCourse.clearAll();
 }

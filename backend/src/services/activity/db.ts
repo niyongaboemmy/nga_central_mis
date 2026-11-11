@@ -1,4 +1,6 @@
 import mysql from "mysql2/promise";
+import { poolFor, closePools } from "../../db/pools";
+import { resolveDataTid } from "../../tenancy/context";
 
 /**
  * A dedicated connection pool for platform activity (USAGE_ANALYTICS_IMPLEMENTATION_PLAN.md §5.3).
@@ -11,33 +13,7 @@ import mysql from "mysql2/promise";
  * Hub trap where a bare Date in raw SQL was formatted in the host zone. Every column in
  * migration 095 is UTC.
  */
-let pool: mysql.Pool | null = null;
-
-export const activityPool = (): mysql.Pool => {
-  if (!pool) {
-    pool = mysql.createPool({
-      host: process.env.DB_HOST,
-      port: parseInt(process.env.DB_PORT || "3306", 10),
-      user: process.env.DB_USERNAME,
-      password: process.env.DB_PASSWORD,
-      database: process.env.DB_NAME,
-      connectionLimit: parseInt(process.env.ACTIVITY_DB_CONNECTION_LIMIT || "2", 10),
-      waitForConnections: true,
-      queueLimit: 0,
-      timezone: "Z",
-      supportBigNumbers: true,
-      bigNumberStrings: false,
-      enableKeepAlive: true,
-      idleTimeout: 60_000,
-    });
-    // The session zone must be UTC too, or UNIX_TIMESTAMP()/FROM_UNIXTIME()/NOW() in SQL
-    // would read our UTC DATETIMEs in the server's local zone.
-    (pool as any).pool?.on?.("connection", (conn: any) => {
-      conn.query("SET time_zone = '+00:00'");
-    });
-  }
-  return pool;
-};
+export const activityPool = (): mysql.Pool => poolFor(resolveDataTid("analytics database access"), "activity");
 
 export type Row = Record<string, any>;
 
@@ -54,27 +30,25 @@ export const exec = async (sql: string, params: any[] = []): Promise<mysql.Resul
 
 /** Close the pool (tests / graceful shutdown). */
 export const closeActivityPool = async () => {
-  if (pool) {
-    const p = pool;
-    pool = null;
-    await p.end().catch(() => undefined);
-  }
+  await closePools("activity");
 };
 
 /** Are the 095 tables present? Lets every entry point fail soft on an un-migrated server. */
-let tablesPresent: boolean | null = null;
-let checkedAt = 0;
+const presence = new Map<number, { ok: boolean; at: number }>(); // per tenant database
 export const activityTablesPresent = async (): Promise<boolean> => {
-  if (tablesPresent === true) return true;
-  if (tablesPresent === false && Date.now() - checkedAt < 60_000) return false;
+  const tid = resolveDataTid("analytics database access");
+  const hit = presence.get(tid);
+  if (hit?.ok === true) return true;
+  if (hit && Date.now() - hit.at < 60_000) return false;
+  let ok = false;
   try {
     const rows = await q<{ n: number }>(
       "SELECT COUNT(*) AS n FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN ('AnalyticsEvent','AnalyticsSession','AnalyticsSetting')",
     );
-    tablesPresent = Number(rows[0]?.n) === 3;
+    ok = Number(rows[0]?.n) === 3;
   } catch {
-    tablesPresent = false;
+    ok = false;
   }
-  checkedAt = Date.now();
-  return tablesPresent;
+  presence.set(tid, { ok, at: Date.now() });
+  return ok;
 };

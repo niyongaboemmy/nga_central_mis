@@ -1,3 +1,5 @@
+import { isTenantUsable, runWithTenant } from "../vendor/nga-tenancy";
+import { findTenant } from "../tenancy/registry";
 import { Request, Response } from "express";
 import { db } from "../db";
 import { School } from "../db/schema";
@@ -233,6 +235,20 @@ export const uploadSchoolLogo = async (req: Request & { file?: Express.Multer.Fi
  * shape School.logo/partner_logo had before the upload endpoint existed).
  */
 export const getSchoolLogo = async (req: Request, res: Response) => {
+  // Public: a cookie must not decide which school's logo this is. ?tenant=<slug|tid>
+  // (from GET /tenant/branding) names the school; without it, NGA / the caller's school.
+  const ref = req.query.tenant;
+  if (typeof ref === "string" && ref) {
+    const tenant = await findTenant(ref).catch(() => null);
+    // Usable schools only (see GET /tenant/branding): no logos of pending / suspended / archived ones.
+    if (!tenant || !isTenantUsable(tenant.status)) return res.status(404).json({ message: "School not found" });
+    (req as any).tenant = tenant;
+    return runWithTenant(tenant, () => serveSchoolLogo(req, res));
+  }
+  return serveSchoolLogo(req, res);
+};
+
+const serveSchoolLogo = async (req: Request, res: Response) => {
   try {
     const { id, slot } = req.params;
     if (slot !== "primary" && slot !== "partner" && slot !== "documents") {

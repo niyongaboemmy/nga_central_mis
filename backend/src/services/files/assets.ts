@@ -99,6 +99,9 @@ export async function derivativesOf(sha: string): Promise<Partial<Record<Variant
   return Object.fromEntries(rows.map((r) => [r.variant, r]));
 }
 
+// Dedup is keyed (tid, sha): FileDerivative lives in each school's database and the
+// storage path below is tenant-prefixed by the file-server client (nga_central_mis/t/<tid>/…),
+// so identical bytes uploaded by two schools are converted and stored once per school.
 async function saveDerivative(sha: string, variant: Variant, localPath: string, ext: string, meta?: Record<string, unknown>) {
   const remote = `elearning/derivatives/${sha}/${variant.toLowerCase()}.${ext}`;
   await storageService.uploadFile(localPath, remote);

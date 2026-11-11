@@ -1,5 +1,6 @@
 import { and, eq, gte, inArray, lte, sql } from "drizzle-orm";
 import { db } from "../../db";
+import { scopedKey } from "../../tenancy/scoped";
 import { Permission, Role, RolePermission, User, UserRole } from "../../db/schema";
 import { OfficeHourAssignment, OfficeHourSchedule, OfficeHourSession } from "../../db/officeHoursSchema";
 import { notifyPerson } from "../notifications/notifyPerson";
@@ -67,6 +68,7 @@ export const morningDigest = async () => {
   return byHost.size;
 };
 
+// Keyed "t<tid>:<session>:<stage>": session ids repeat across school databases.
 const sentStages = new Set<string>();
 /** Test hook. */
 export const resetRegisterReminders = () => sentStages.clear();
@@ -81,7 +83,7 @@ export const registerReminders = async () => {
   const today = at.ymd;
   const out: Array<{ sessionId: number; stage: string }> = [];
   const remind = async (r: Awaited<ReturnType<typeof sessionsOn>>[number], stage: "due" | "missing" | "yesterday") => {
-    const key = `${r.s.session_id}:${stage}`;
+    const key = scopedKey(r.s.session_id, stage);
     if (sentStages.has(key)) return;
     if (!(await expectedAssignments(r.s.schedule_id, r.s.session_date)).length) return;
     sentStages.add(key);

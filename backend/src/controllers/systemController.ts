@@ -1,5 +1,15 @@
 import { Request, Response } from "express";
-import { db } from "../db";
+import { db as tenantDb, primaryDb } from "../db";
+import { responseTenant } from "../tenancy/claims";
+import { assignSystem, filterAssignedSystems } from "../tenancy/systems";
+import { PRIMARY_TENANT_ID } from "../vendor/nga-tenancy";
+import { parseScopes, writeSystemScopes } from "../tenancy/systemScopes";
+
+// System rows are global (the primary tenant's DB); only the primary tenant
+// manages them ([MIS-A17]). Everything else in this file is tenant data.
+const db = tenantDb;
+const platformOnly = (res: Response) =>
+  res.status(403).json({ success: false, code: "PLATFORM_ONLY", message: "Only the platform manages systems." });
 import {
   System,
   SchoolSystemAssignment,
@@ -14,9 +24,11 @@ import { eq, and, desc, gte, lte, like } from "drizzle-orm";
 import crypto from "crypto";
 import { auditCsv, auditFacets, listAuditLogs, parseAuditFilters, summarizeAuditLogs } from "../services/auditLog";
 import { validBackchannelUri } from "../services/sso/backchannelLogout";
-import { isHashedClientSecret } from "../utils/ssoClientSecret";
+import { hashClientSecret, isHashedClientSecret } from "../utils/ssoClientSecret";
 
 export const createSystem = async (req: Request, res: Response) => {
+  if (!responseTenant().isPrimary) return platformOnly(res);
+  const db = primaryDb();
   try {
     const {
       name,
@@ -57,16 +69,25 @@ export const createSystem = async (req: Request, res: Response) => {
       client_secret = crypto.randomBytes(32).toString("hex");
     }
 
+    // Stored as a bcrypt hash ([MIS-A12]); the plaintext is returned once, below.
     await db.insert(System).values({
       name,
       description,
       client_id,
-      client_secret,
+      client_secret: client_secret ? await hashClientSecret(client_secret) : client_secret,
       allowed_redirect_uris,
       icon_url,
       home_url,
       backchannel_logout_uri: backchannel_logout_uri ?? null,
     });
+    const [created] = await db.select({ id: System.system_id }).from(System).where(eq(System.name, name)).limit(1);
+    // Service scopes ([MIS-A11]); omitted = legacy (every scope).
+    if (req.body.scopes !== undefined && created) await writeSystemScopes(created.id, parseScopes(req.body.scopes));
+    // Systems are assigned per school, the primary included (tenancy/systems.ts):
+    // a System made on the primary console is NGA's unless told otherwise.
+    if (created && req.body.assign_primary !== false) {
+      await assignSystem(PRIMARY_TENANT_ID, created.id).catch((error) => console.error("Error assigning system to tenant 1:", error));
+    }
 
     res.status(201).json({
       message: "System created successfully",
@@ -80,7 +101,12 @@ export const createSystem = async (req: Request, res: Response) => {
 
 export const getAllSystems = async (req: Request, res: Response) => {
   try {
-    const systems = await db.select().from(System);
+    const systems = await primaryDb().select().from(System);
+    if (!responseTenant().isPrimary) {
+      // A school sees only its assigned apps, never their secrets.
+      const mine = await filterAssignedSystems(systems);
+      return res.status(200).json(mine.map(({ client_secret: _s, ...rest }) => rest));
+    }
     res.status(200).json(systems);
   } catch (error) {
     console.error("Error fetching systems:", error);
@@ -89,6 +115,8 @@ export const getAllSystems = async (req: Request, res: Response) => {
 };
 
 export const getSystemById = async (req: Request, res: Response) => {
+  if (!responseTenant().isPrimary) return platformOnly(res);
+  const db = primaryDb();
   try {
     const { id } = req.params;
     const systems = await db
@@ -108,6 +136,8 @@ export const getSystemById = async (req: Request, res: Response) => {
 };
 
 export const updateSystem = async (req: Request, res: Response) => {
+  if (!responseTenant().isPrimary) return platformOnly(res);
+  const db = primaryDb();
   try {
     const { id } = req.params;
     const {
@@ -150,8 +180,10 @@ export const updateSystem = async (req: Request, res: Response) => {
 
     // Generate new secret if client_id is being set for the first time
     let client_secret = existingSystem[0].client_secret;
+    let storedSecret = client_secret;
     if (client_id && !existingSystem[0].client_id) {
       client_secret = crypto.randomBytes(32).toString("hex");
+      storedSecret = await hashClientSecret(client_secret);
     }
 
     await db
@@ -161,7 +193,7 @@ export const updateSystem = async (req: Request, res: Response) => {
         description,
         status,
         client_id,
-        client_secret,
+        client_secret: storedSecret,
         allowed_redirect_uris,
         icon_url,
         home_url,
@@ -169,6 +201,7 @@ export const updateSystem = async (req: Request, res: Response) => {
         ...(backchannel_logout_uri === undefined ? {} : { backchannel_logout_uri }),
       })
       .where(eq(System.system_id, Number(id)));
+    if (req.body.scopes !== undefined) await writeSystemScopes(Number(id), parseScopes(req.body.scopes));
 
     res.status(200).json({
       message: "System updated successfully",
@@ -186,6 +219,8 @@ export const updateSystem = async (req: Request, res: Response) => {
 };
 
 export const deleteSystem = async (req: Request, res: Response) => {
+  if (!responseTenant().isPrimary) return platformOnly(res);
+  const db = primaryDb();
   try {
     const { id } = req.params;
     const systemId = Number(id);

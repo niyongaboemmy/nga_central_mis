@@ -1,6 +1,10 @@
 import crypto from "crypto";
 import { and, eq, gt, lt } from "drizzle-orm";
 import { db } from "../../db";
+import { PRIMARY_TENANT_ID, isTenantUsable, runWithTenant } from "../../vendor/nga-tenancy";
+import { scopeTid } from "../../tenancy/scoped";
+import { usableTenant } from "../../tenancy/express";
+import { listTenants } from "../../tenancy/registry";
 import { ReminderJob, TelegramLink, TelegramLinkCode } from "../../db/reminderSchema";
 import logger from "../../utils/logger";
 import { apiUrl, appUrl } from "./webPush";
@@ -88,8 +92,10 @@ const LINK_TTL_MS = 15 * 60_000;
 export const createLinkCode = async (userId: number, now = new Date()) => {
   const cfg = telegramConfig();
   if (!cfg) return null;
-  // Telegram start parameters allow up to 64 chars of A-Za-z0-9_-.
-  const code = crypto.randomBytes(24).toString("base64url");
+  // Telegram start parameters allow up to 64 chars of A-Za-z0-9_-. One bot serves
+  // every school, so the code names its school: "t<tid>_<secret>" (looked up in
+  // that school's database only).
+  const code = `t${scopeTid("telegram link")}_${crypto.randomBytes(24).toString("base64url")}`;
   await db.delete(TelegramLinkCode).where(eq(TelegramLinkCode.user_id, userId));
   await db.delete(TelegramLinkCode).where(lt(TelegramLinkCode.expires_at, now));
   await db.insert(TelegramLinkCode).values({ code, user_id: userId, expires_at: new Date(now.getTime() + LINK_TTL_MS) });
@@ -129,7 +135,13 @@ export const sendTelegramReminder = async (
   const buttons =
     job.source_type === "test"
       ? []
-      : [[{ text: "✅ Got it", callback_data: `ack:${job.job_id}` }, { text: "⏰ Snooze 5 min", callback_data: `snooze:${job.job_id}` }]];
+      : [
+          [
+            // ":<tid>" -- the webhook is shared by every school (pre-tenancy buttons: the primary).
+            { text: "✅ Got it", callback_data: `ack:${job.job_id}:${scopeTid("telegram button")}` },
+            { text: "⏰ Snooze 5 min", callback_data: `snooze:${job.job_id}:${scopeTid("telegram button")}` },
+          ],
+        ];
   const open = [{ text: "Open in NGA", url: appUrl(job.link) }];
   try {
     const message = {
@@ -173,8 +185,65 @@ export interface UpdateActions {
 
 const reply = (chatId: number, text: string) => call("sendMessage", { chat_id: chatId, text }).catch(() => undefined);
 
-/** Handle one Telegram update. Never throws: Telegram retries failed webhooks. */
+/** The school a link code belongs to (pre-tenancy codes: the primary). */
+export const linkCodeTid = (code: string): number => {
+  const m = /^t([1-9][0-9]{0,9})_/.exec(code);
+  return m ? Number(m[1]) : PRIMARY_TENANT_ID;
+};
+
+/** Run `fn` inside school `tid` when it is usable; otherwise resolve to `fallback`. */
+const inTenant = async <T>(tid: number, fallback: T, fn: () => Promise<T>): Promise<T> => {
+  const tenant = await usableTenant(tid);
+  return tenant ? runWithTenant(tenant, fn) : fallback;
+};
+
+/**
+ * Handle one Telegram update. Never throws: Telegram retries failed webhooks.
+ * The webhook has no session and serves every school: each branch enters the
+ * school named by the link code / button data before touching a database.
+ */
 export const handleTelegramUpdate = async (update: any, actions: UpdateActions, now = new Date()) => {
+  try {
+    const message = update?.message;
+    if (message?.chat?.id && typeof message.text === "string") {
+      const [command, arg] = message.text.trim().split(/\s+/, 2);
+      if (command === "/start" && arg) {
+        const chatId = Number(message.chat.id);
+        const linked = await inTenant(linkCodeTid(arg), "expired", () => handleUpdateHere(update, actions, now));
+        if (linked === "expired") await reply(chatId, "That link has expired. Open Reminders in NGA and press “Connect Telegram” again.");
+        return linked;
+      }
+      if (command === "/stop") {
+        // The chat may be linked in several schools: turn it off in each.
+        let stopped = false;
+        for (const t of await listTenants().catch(() => [])) {
+          if (!isTenantUsable(t.status)) continue;
+          const r = await runWithTenant(t, () => handleUpdateHere(update, actions, now, { quietStop: true }));
+          if (r === "stopped") stopped = true;
+        }
+        if (!stopped) await reply(Number(message.chat.id), "This chat isn't connected to NGA.");
+        return "stopped";
+      }
+      return handleUpdateHere(update, actions, now);
+    }
+    const cb = update?.callback_query;
+    if (cb?.id && typeof cb.data === "string") {
+      const tid = Number(cb.data.split(":")[2] ?? PRIMARY_TENANT_ID);
+      const r = await inTenant(Number.isSafeInteger(tid) && tid > 0 ? tid : 0, "rejected", () => handleUpdateHere(update, actions, now));
+      if (r === "rejected" && !(await usableTenant(tid))) {
+        await call("answerCallbackQuery", { callback_query_id: cb.id, text: "This reminder isn't yours." }).catch(() => undefined);
+      }
+      return r;
+    }
+    return "ignored";
+  } catch (error) {
+    logger.error("[reminders] telegram update failed", { error });
+    return "error";
+  }
+};
+
+/** The update, inside one school's context. */
+const handleUpdateHere = async (update: any, actions: UpdateActions, now: Date, opts: { quietStop?: boolean } = {}) => {
   try {
     const message = update?.message;
     if (message?.chat?.id && typeof message.text === "string") {
@@ -186,10 +255,7 @@ export const handleTelegramUpdate = async (update: any, actions: UpdateActions, 
           .from(TelegramLinkCode)
           .where(and(eq(TelegramLinkCode.code, arg), gt(TelegramLinkCode.expires_at, now)))
           .limit(1);
-        if (!code) {
-          await reply(chatId, "That link has expired. Open Reminders in NGA and press “Connect Telegram” again.");
-          return "expired";
-        }
+        if (!code) return "expired";
         await db.delete(TelegramLinkCode).where(eq(TelegramLinkCode.code, arg));
         // One chat per user, and one user per chat (a shared phone relinks).
         await db.delete(TelegramLink).where(eq(TelegramLink.chat_id, chatId));
@@ -201,8 +267,8 @@ export const handleTelegramUpdate = async (update: any, actions: UpdateActions, 
       if (command === "/stop") {
         const [link] = await db.select().from(TelegramLink).where(eq(TelegramLink.chat_id, chatId)).limit(1);
         if (link) await unlinkTelegram(link.user_id);
-        else await reply(chatId, "This chat isn't connected to NGA.");
-        return "stopped";
+        else if (!opts.quietStop) await reply(chatId, "This chat isn't connected to NGA.");
+        return link ? "stopped" : "not_linked";
       }
       if (command === "/start") {
         await reply(chatId, "Hi! To get NGA reminders here, open Reminders in NGA and press “Connect Telegram”.");

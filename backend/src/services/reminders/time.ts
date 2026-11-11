@@ -1,15 +1,17 @@
 /**
- * Kigali wall-clock helpers for the Reminder Hub.
+ * School wall-clock helpers for the Reminder Hub (the names say "kigali" for
+ * history: they now use the current tenant's timezone, tenancy/timezone.ts).
  *
- * Africa/Kigali is UTC+2 all year (no daylight saving), so a fixed offset is
- * exact -- no tz database needed, and the server's own TZ never matters: every
- * function here works on UTC instants and derives the Kigali calendar from
- * them. Timetable slots store "HH:MM" strings and a JS-style day_of_week
+ * Africa/Kigali is UTC+2 all year (no daylight saving), so for NGA a fixed
+ * offset stays exact, and the server's own TZ never matters: every function
+ * here works on UTC instants and derives the school calendar from them. Timetable slots store "HH:MM" strings and a JS-style day_of_week
  * (0 = Sunday), so this is the one place those become real instants.
  */
 
+import { localToUtcMs, tzOffsetMs } from "../../tenancy/timezone";
+
+/** Africa/Kigali's offset (NGA's default); other schools use their own zone. */
 export const KIGALI_OFFSET_MIN = 120;
-const OFFSET_MS = KIGALI_OFFSET_MIN * 60_000;
 const DAY_MS = 86_400_000;
 
 export interface KigaliParts {
@@ -24,7 +26,7 @@ export interface KigaliParts {
 const pad = (n: number) => String(n).padStart(2, "0");
 
 export const kigaliParts = (at: Date): KigaliParts => {
-  const shifted = new Date(at.getTime() + OFFSET_MS);
+  const shifted = new Date(at.getTime() + tzOffsetMs(at));
   return {
     ymd: `${shifted.getUTCFullYear()}-${pad(shifted.getUTCMonth() + 1)}-${pad(shifted.getUTCDate())}`,
     dow: shifted.getUTCDay(),
@@ -49,7 +51,7 @@ export const formatClock = (minutes: number): string =>
 /** The UTC instant of a Kigali date + wall-clock time. */
 export const kigaliInstant = (ymd: string, minutes: number): Date => {
   const [y, m, d] = ymd.split("-").map(Number);
-  return new Date(Date.UTC(y, m - 1, d) + minutes * 60_000 - OFFSET_MS);
+  return new Date(localToUtcMs(Date.UTC(y, m - 1, d) + minutes * 60_000));
 };
 
 export const addDaysYmd = (ymd: string, days: number): string => {

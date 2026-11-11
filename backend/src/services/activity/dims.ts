@@ -1,3 +1,4 @@
+import { TenantScopedMap, TenantScopedSet } from "../../tenancy/scoped";
 import crypto from "crypto";
 import { q, exec } from "./db";
 import { GeoInfo, geoKey, lookupGeo } from "./geoip";
@@ -7,8 +8,8 @@ import { parseUa, ParsedUa } from "./ua";
  * Dimension rows (AnalyticsUa, AnalyticsGeo) resolved to ids with in-memory caches, so
  * the hot path does at most one insert the first time a UA or place is seen.
  */
-const uaCache = new Map<string, { id: number; parsed: ParsedUa }>();
-const geoCache = new Map<string, number>();
+const uaCache = new TenantScopedMap<string, { id: number; parsed: ParsedUa }>();
+const geoCache = new TenantScopedMap<string, number>();
 const CACHE_MAX = 20_000;
 const trim = <K, V>(m: Map<K, V>) => {
   if (m.size > CACHE_MAX) m.delete(m.keys().next().value as K);
@@ -57,7 +58,7 @@ export const resolveGeo = async (ip: string | null): Promise<{ id: number | null
 };
 
 /** Geo rows by id for reports / live views (small table, cached). */
-const geoById = new Map<number, GeoInfo & { geo_id: number }>();
+const geoById = new TenantScopedMap<number, GeoInfo & { geo_id: number }>();
 export const geoRows = async (ids: (number | null | undefined)[]) => {
   const missing = [...new Set(ids.filter((i): i is number => !!i && !geoById.has(i)))];
   if (missing.length) {
@@ -68,11 +69,11 @@ export const geoRows = async (ids: (number | null | undefined)[]) => {
     for (const r of rows)
       geoById.set(r.geo_id, { ...r, lat: r.lat === null ? null : Number(r.lat), lon: r.lon === null ? null : Number(r.lon) });
   }
-  return geoById;
+  return geoById.current();
 };
 
 export const clearDimCaches = () => {
-  uaCache.clear();
-  geoCache.clear();
-  geoById.clear();
+  uaCache.clearAll();
+  geoCache.clearAll();
+  geoById.clearAll();
 };

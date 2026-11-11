@@ -1,3 +1,4 @@
+import { tenantLocal } from "../../tenancy/scoped";
 import { eq } from "drizzle-orm";
 import { db } from "../../db";
 import { AcademicTerm } from "../../db/schema";
@@ -167,19 +168,20 @@ export const officeHoursEnabled = () => process.env.OFFICE_HOURS_ENABLED !== "fa
  * (Reminder Hub planning, Home, the scheduler) skip office hours instead of
  * failing. Checked once a minute; a "present" answer is cached for good.
  */
-let tablesPresent: boolean | null = null;
-let checkedAt = 0;
+// Per school database: one tenant may be migrated before another.
+const readyState = tenantLocal(() => ({ tablesPresent: null as boolean | null, checkedAt: 0 }));
 export const officeHoursReady = async (): Promise<boolean> => {
   if (!officeHoursEnabled()) return false;
-  if (tablesPresent) return true;
-  if (tablesPresent === false && Date.now() - checkedAt < 60_000) return false;
+  const st = readyState();
+  if (st.tablesPresent) return true;
+  if (st.tablesPresent === false && Date.now() - st.checkedAt < 60_000) return false;
   try {
     const { sql } = await import("drizzle-orm");
     const rows = (await db.execute(sql`SELECT COUNT(*) AS n FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN ('OfficeHourSession', 'OfficeHourStudentDateLock')`)) as any;
-    tablesPresent = Number(rows?.[0]?.[0]?.n ?? 0) === 2;
+    st.tablesPresent = Number(rows?.[0]?.[0]?.n ?? 0) === 2;
   } catch {
-    tablesPresent = false;
+    st.tablesPresent = false;
   }
-  checkedAt = Date.now();
-  return tablesPresent;
+  st.checkedAt = Date.now();
+  return st.tablesPresent;
 };

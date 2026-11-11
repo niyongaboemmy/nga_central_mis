@@ -28,8 +28,8 @@ export const validVerifier = (value: unknown): value is string =>
 
 export const challengeOf = (verifier: string) => crypto.createHash("sha256").update(verifier).digest("base64url");
 
-export const issueHandoffCode = (userId: number, challenge: string, secret: string): string =>
-  jwt.sign({ sub: String(userId), ch: challenge }, secret, {
+export const issueHandoffCode = (userId: number, challenge: string, secret: string, tid?: number): string =>
+  jwt.sign({ sub: String(userId), ch: challenge, ...(tid ? { tid } : {}) }, secret, {
     audience: AUDIENCE,
     expiresIn: HANDOFF_TTL_SECONDS,
     jwtid: crypto.randomBytes(12).toString("base64url"),
@@ -37,7 +37,7 @@ export const issueHandoffCode = (userId: number, challenge: string, secret: stri
 
 const used = new Map<string, number>(); // jti -> expiry (ms)
 
-export type RedeemResult = { ok: true; userId: number } | { ok: false; reason: "invalid" | "expired" | "used" | "mismatch" };
+export type RedeemResult = { ok: true; userId: number; tid?: number } | { ok: false; reason: "invalid" | "expired" | "used" | "mismatch" };
 
 export const redeemHandoffCode = (code: unknown, verifier: unknown, secret: string, now = Date.now()): RedeemResult => {
   if (typeof code !== "string" || !validVerifier(verifier)) return { ok: false, reason: "invalid" };
@@ -54,5 +54,8 @@ export const redeemHandoffCode = (code: unknown, verifier: unknown, secret: stri
   const actual = Buffer.from(challengeOf(verifier));
   if (expected.length !== actual.length || !crypto.timingSafeEqual(expected, actual)) return { ok: false, reason: "mismatch" };
   const userId = Number(payload.sub);
-  return Number.isInteger(userId) && userId > 0 ? { ok: true, userId } : { ok: false, reason: "invalid" };
+  const tid = Number(payload.tid);
+  return Number.isInteger(userId) && userId > 0
+    ? { ok: true, userId, ...(Number.isSafeInteger(tid) && tid > 0 ? { tid } : {}) }
+    : { ok: false, reason: "invalid" };
 };

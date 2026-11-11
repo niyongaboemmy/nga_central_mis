@@ -21,6 +21,11 @@ export const errorHandler = (
   if (isHandoffPrompt(err)) return res.status(200).json({ success: true, handoff: err.payload });
   console.error(err.stack);
 
+  // Fail closed (multi-tenancy): data access ran without a tenant context.
+  if (err?.code === "TENANT_CONTEXT_MISSING") {
+    return res.status(500).json({ success: false, code: "TENANT_CONTEXT_MISSING", message: "This request has no school context." });
+  }
+
   // Handle custom errors with status codes
   // A typed `code` (AI_DISABLED, TUTOR_OFF, AI_QUOTA_EXHAUSTED...) and, for an AI
   // refusal, its `reason` travel at the top level next to `message`.

@@ -5,6 +5,7 @@ import {
   googleLogin,
   forgotPassword,
   verifyResetOTP,
+  verifyResetOTPTicket,
   resetPassword,
   changePassword,
   confirmDbAccess,
@@ -14,7 +15,7 @@ import {
   createDesktopHandoff,
   redeemDesktopHandoff,
 } from "../controllers/authController";
-import { authenticate } from "../middleware/auth";
+import { authenticate, authenticateFor, authenticateIdentityRead } from "../middleware/auth";
 
 const router = express.Router();
 
@@ -30,11 +31,12 @@ router.get("/session", authenticate, getSession);
 // heavy profile/roles/systems payload getSession assembles. Meant to be
 // polled periodically by spoke apps (TaskMentor, Tendo, ...) so an MIS
 // logout ends their session too, not just this one.
-router.get("/verify", authenticate, verifySession);
-router.post("/verify-otp", authenticate, verifyOTP);
+router.get("/verify", authenticateIdentityRead, verifySession);
+// The narrow tokens (middleware/auth.ts authenticateFor): `authenticate` refuses them.
+router.post("/verify-otp", authenticateFor.loginOtp, verifyOTP);
 router.post("/forgot-password", forgotPassword);
-router.post("/verify-reset-otp", authenticate, verifyResetOTP);
-router.post("/reset-password", authenticate, resetPassword);
+router.post("/verify-reset-otp", verifyResetOTPTicket, authenticateFor.resetRequest, verifyResetOTP);
+router.post("/reset-password", authenticateFor.resetConfirm, resetPassword);
 router.post("/change-password", authenticate, changePassword);
 router.post("/confirm-db-access", authenticate, confirmDbAccess);
 

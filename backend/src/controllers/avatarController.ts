@@ -11,6 +11,8 @@ import { avatarStoragePath, coverStoragePath, profileMedia, verifyMediaSignature
 import { inArray } from "drizzle-orm";
 import { db } from "../db";
 import { User } from "../db/schema";
+import { PRIMARY_TENANT_ID, isTenantUsable, parseTid, runWithTenant } from "../vendor/nga-tenancy";
+import { getTenant, primaryTenant } from "../tenancy";
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -179,39 +181,53 @@ const notFound = (res: Response) => res.status(404).json({ success: false, messa
 /**
  * GET /avatars/:userId/:version/:file and /covers/... -- public, but only with a valid
  * signature. Old versions are deleted from storage on replace/remove, so they 404.
+ *
+ * The school comes from the URL, never from a cookie the browser happens to send:
+ * /avatars/<userId>/... is NGA (tenant 1, every pre-tenancy URL), /avatars/t/<tid>/...
+ * is school <tid> (its signature covers the tid).
  */
 const serveMedia = (kind: "avatar" | "cover") =>
   asyncHandler(async (req: any, res: Response) => {
     const userId = Number(req.params.userId);
     const version = Number(req.params.version);
+    const tid = req.params.tid === undefined ? PRIMARY_TENANT_ID : parseTid(req.params.tid);
     const pattern = kind === "avatar" ? /^(sm|md|lg)\.webp$/ : /^(md|lg)\.webp$/;
     const match = pattern.exec(String(req.params.file));
     if (
       !match ||
+      !tid ||
       !Number.isSafeInteger(userId) || userId <= 0 ||
       !Number.isSafeInteger(version) || version <= 0 ||
-      !verifyMediaSignature(kind, userId, version, req.query.s)
+      !verifyMediaSignature(kind, userId, version, req.query.s, tid)
     ) {
       notFound(res);
       return;
     }
-    const path =
-      kind === "avatar"
-        ? avatarStoragePath(userId, version, match[1] as AvatarSize)
-        : coverStoragePath(userId, version, match[1] as CoverSize);
-    // Loaded by <img> on the sibling apps' origins and inside the desktop app.
-    res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
-    try {
-      await storage.streamTo(res, path, { contentType: "image/webp", cacheSeconds: 31536000 });
-    } catch (err: any) {
-      if (res.headersSent) return;
-      if (err?.statusCode === 404) {
-        notFound(res);
-        return;
-      }
-      throw err;
+    const tenant = tid === PRIMARY_TENANT_ID ? await primaryTenant() : await getTenant(tid);
+    if (!tenant || !isTenantUsable(tenant.status)) {
+      notFound(res);
+      return;
     }
+    req.tenant = tenant; // later layers re-enter it (tenancy/express.ts)
+    await runWithTenant(tenant, () => streamMedia(kind, res, userId, version, match[1]));
   });
+
+const streamMedia = async (kind: "avatar" | "cover", res: Response, userId: number, version: number, size: string) => {
+  const path =
+    kind === "avatar" ? avatarStoragePath(userId, version, size as AvatarSize) : coverStoragePath(userId, version, size as CoverSize);
+  // Loaded by <img> on the sibling apps' origins and inside the desktop app.
+  res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+  try {
+    await storage.streamTo(res, path, { contentType: "image/webp", cacheSeconds: 31536000 });
+  } catch (err: any) {
+    if (res.headersSent) return;
+    if (err?.statusCode === 404) {
+      notFound(res);
+      return;
+    }
+    throw err;
+  }
+};
 
 export const serveAvatar = serveMedia("avatar");
 export const serveCover = serveMedia("cover");

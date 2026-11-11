@@ -1,3 +1,4 @@
+import { tenantHeaders } from "../../tenancy/claims";
 import logger from "../../utils/logger";
 import { AttentionItem, GlanceTile, Tier } from "./contract";
 
@@ -210,7 +211,7 @@ export async function fetchAppSummary(
   try {
     const res = await fetch(`${app.apiBaseUrl}/api/integration/home-summary`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${misToken}` },
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${misToken}`, ...tenantHeaders() },
       body: JSON.stringify(body ?? {}),
       signal: controller.signal,
     });

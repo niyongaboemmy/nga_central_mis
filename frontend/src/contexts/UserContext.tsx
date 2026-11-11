@@ -11,20 +11,27 @@ import { logout as apiLogout, checkSession } from "../api/auth";
 import { removeToken, getToken } from "../utils/auth";
 import { endActivity } from "../vendor/nga-activity";
 import { primeAvatars } from "../lib/avatarDirectory";
+import { PRIMARY_TID, currentUserCacheKey, forgetIdentity, noteIdentity } from "../lib/tenant";
 
-/** Last profile seen on this device -- only ever used while offline (refreshUser). */
-const USER_CACHE_KEY = "nga.user.offlineCache";
+/**
+ * Last profile seen on this device -- only ever used while offline (refreshUser).
+ * Keyed by school + person (lib/tenant.ts), so one school's profile never opens
+ * another school's session.
+ */
 const rememberUser = (value: unknown) => {
   try {
-    if (value) localStorage.setItem(USER_CACHE_KEY, JSON.stringify(value));
-    else localStorage.removeItem(USER_CACHE_KEY);
+    const key = currentUserCacheKey();
+    if (!key) return;
+    if (value) localStorage.setItem(key, JSON.stringify(value));
+    else localStorage.removeItem(key);
   } catch {
     /* private mode / quota: offline start just won't be available */
   }
 };
 const recalledUser = () => {
   try {
-    const raw = localStorage.getItem(USER_CACHE_KEY);
+    const key = currentUserCacheKey();
+    const raw = key ? localStorage.getItem(key) : null;
     return raw ? JSON.parse(raw) : null;
   } catch {
     return null;
@@ -75,6 +82,8 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({
         }
       }
 
+      // A different school or person than last time: drop the old one's caches first.
+      if (userData?.user?.user_id) await noteIdentity(userData.tenant?.tid ?? PRIMARY_TID, userData.user.user_id);
       setUser(userData || null);
       rememberUser(userData || null);
       // Lists elsewhere on the page show your own face from the photo directory.
@@ -116,6 +125,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({
     apiLogout();
     removeToken();
     rememberUser(null);
+    void forgetIdentity();
     setUser(null);
   };
 

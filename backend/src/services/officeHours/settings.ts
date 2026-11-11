@@ -1,3 +1,4 @@
+import { tenantLocal } from "../../tenancy/scoped";
 import { eq } from "drizzle-orm";
 import { db } from "../../db";
 import { OfficeHourSetting } from "../../db/officeHoursSchema";
@@ -36,18 +37,21 @@ const DEFAULTS: OfficeHourSettings = {
   updated_at: null,
 };
 
-let cache: { at: number; value: OfficeHourSettings } | null = null;
+// One cached row per school (OfficeHourSetting lives in each tenant database).
+const cacheOf = tenantLocal(() => ({ entry: null as { at: number; value: OfficeHourSettings } | null }));
 const TTL_MS = 60_000;
 
 export const invalidateSettings = () => {
-  cache = null;
+  cacheOf().entry = null;
 };
 
 export const getSettings = async (): Promise<OfficeHourSettings> => {
+  const slot = cacheOf();
+  const cache = slot.entry;
   if (cache && Date.now() - cache.at < TTL_MS) return cache.value;
   const [row] = await db.select().from(OfficeHourSetting).where(eq(OfficeHourSetting.id, 1)).limit(1);
   const value = row ?? DEFAULTS;
-  cache = { at: Date.now(), value };
+  slot.entry = { at: Date.now(), value };
   return value;
 };
 

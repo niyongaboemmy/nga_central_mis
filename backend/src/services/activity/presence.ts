@@ -1,3 +1,4 @@
+import { TenantScopedMap, TenantScopedSet } from "../../tenancy/scoped";
 import { AppKey, APPS } from "./apps";
 import { GeoInfo } from "./geoip";
 import { activityBus, clock } from "./runtime";
@@ -57,15 +58,15 @@ export interface Person {
   status: TabStatus | "offline";
 }
 
-const people = new Map<string, Person>();
-const dirty = new Set<string>();
-const removed = new Set<string>();
+const people = new TenantScopedMap<string, Person>();
+const dirty = new TenantScopedSet<string>();
+const removed = new TenantScopedSet<string>();
 
 // ---------------------------------------------------------------------------
 // Per-minute history for the "last 30 minutes" chart.
 // ---------------------------------------------------------------------------
 type MinuteBucket = Map<AppKey, { users: Set<string>; visitors: Set<string> }>;
-const minutes = new Map<number, MinuteBucket>();
+const minutes = new TenantScopedMap<number, MinuteBucket>();
 const minuteOf = (ms: number) => Math.floor(ms / 60_000);
 
 export const noteMinute = (app: AppKey, key: string, at: number) => {
@@ -150,7 +151,7 @@ export interface BeatInput {
 }
 
 /** Tabs that said "gone": a late beat sent BEFORE the goodbye must not resurrect them. */
-const gone = new Map<string, number>();
+const gone = new TenantScopedMap<string, number>();
 const GONE_TTL_MS = 5 * 60_000;
 
 export const personKey = (userId: number | null, deviceId: string) => (userId ? `u:${userId}` : `d:${deviceId}`);
@@ -418,9 +419,9 @@ export const takeDiffs = () => {
 };
 
 export const resetPresence = () => {
-  people.clear();
-  gone.clear();
-  dirty.clear();
-  removed.clear();
-  minutes.clear();
+  people.clearAll();
+  gone.clearAll();
+  dirty.clearAll();
+  removed.clearAll();
+  minutes.clearAll();
 };

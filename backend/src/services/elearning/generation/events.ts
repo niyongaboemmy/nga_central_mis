@@ -1,4 +1,5 @@
 import { EventEmitter } from "events";
+import { scopedKey } from "../../../tenancy/scoped";
 
 /**
  * In-process fan-out of run progress to SSE listeners (one backend process — same approach
@@ -19,10 +20,11 @@ const bus = new EventEmitter();
 bus.setMaxListeners(500);
 
 export function emitRunEvent(event: RunEvent): void {
-  bus.emit(`run:${event.run_id}`, event);
+  bus.emit(scopedKey("run", event.run_id), event); // run ids repeat across schools
 }
 
 export function onRunEvent(runId: number, listener: (e: RunEvent) => void): () => void {
-  bus.on(`run:${runId}`, listener);
-  return () => bus.off(`run:${runId}`, listener);
+  const key = scopedKey("run", runId);
+  bus.on(key, listener);
+  return () => bus.off(key, listener);
 }

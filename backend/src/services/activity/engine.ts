@@ -11,6 +11,8 @@ import { getSettings } from "./settings";
 import { flushActivity } from "./writer";
 import { activityNightlyHooks, rollupTick } from "./rollup";
 import { expireWatches, refreshWatches, startWatchMatcher } from "./watches";
+import { TenantScopedSet, tenantLocal } from "../../tenancy/scoped";
+import { tenantJob } from "../../tenancy/jobs";
 
 /**
  * Starts the activity engine's timers (plan §9): buffered flush every 2 s, presence
@@ -19,16 +21,19 @@ import { expireWatches, refreshWatches, startWatchMatcher } from "./watches";
  * call flushActivity() / sweepPresence() themselves.
  */
 type LiveListener = (msg: { type: string; [k: string]: unknown }) => void;
-const listeners = new Set<LiveListener>();
+// Per school: a console only ever sees its own school's live stream.
+const listeners = new TenantScopedSet<LiveListener>();
 
 export const subscribeLive = (fn: LiveListener) => {
-  listeners.add(fn);
-  return () => listeners.delete(fn);
+  // Captured now: the detach runs from a socket close handler, maybe outside the context.
+  const mine = listeners.current();
+  mine.add(fn);
+  return () => mine.delete(fn);
 };
 export const liveListenerCount = () => listeners.size;
 
 const broadcast = (msg: { type: string; [k: string]: unknown }) => {
-  for (const fn of listeners) {
+  for (const fn of [...listeners]) {
     try {
       fn(msg);
     } catch {
@@ -45,10 +50,11 @@ export const pushLiveDiffs = () => {
 
 // Logins, failed logins, launches and key events go straight to the live event stream,
 // and the last 50 are kept so a console opened now isn't empty.
-const recent: Record<string, unknown>[] = [];
-export const recentLiveEvents = () => [...recent];
+const recentOf = tenantLocal(() => [] as Record<string, unknown>[]);
+export const recentLiveEvents = () => [...recentOf()];
 activityBus.on("signal", (s: any) => {
   if (s.type !== "live_event") return;
+  const recent = recentOf();
   recent.unshift(s.event);
   if (recent.length > 50) recent.pop();
   broadcast({ type: "event", event: s.event });
@@ -57,52 +63,76 @@ activityBus.on("signal", (s: any) => {
 let timers: NodeJS.Timeout[] = [];
 let started = false;
 
-export const startActivityEngine = async () => {
-  if (started) return;
-  started = true;
+/**
+ * Per-school start-up (once per tenant, retried each minute while migration 095 is
+ * missing there): settings, catalog, blocks, watches, open sessions, presence history.
+ */
+const tenantStart = tenantLocal(() => ({ ready: false, checkedAt: 0 }));
+const ensureTenantStarted = async (): Promise<boolean> => {
+  const st = tenantStart();
+  if (st.ready) return true;
+  if (Date.now() - st.checkedAt < 60_000 && st.checkedAt) return false;
+  st.checkedAt = Date.now();
+  if (!(await activityTablesPresent())) {
+    logger.warn("[activity] migration 095 not applied; activity engine idle for this school");
+    return false;
+  }
   try {
-    if (!(await activityTablesPresent())) {
-      logger.warn("[activity] migration 095 not applied; activity engine idle");
-      started = false;
-      return;
-    }
     await getSettings();
     // The MIS publishes its own feature catalog; the other apps push theirs via the relay.
     await saveCatalog("mis", misCatalog.version, misCatalog.features as any);
     await loadCatalog(true);
     await refreshBlocks(true);
     await refreshWatches(true);
-    startWatchMatcher();
-    activityNightlyHooks.push(expireWatches);
     const reloaded = await reloadOpenSessions();
     await seedPresenceHistory();
-    logger.info(`[activity] engine started (${reloaded} open sessions reloaded)`);
+    logger.info(`[activity] engine started for this school (${reloaded} open sessions reloaded)`);
   } catch (error) {
     logger.error("[activity] engine start failed", { error });
   }
-  const every = (ms: number, fn: () => unknown) => {
-    const t = setInterval(() => {
-      Promise.resolve()
-        .then(fn)
-        .catch((error) => logger.error("[activity] timer failed", { error }));
-    }, ms);
+  st.ready = true;
+  return true;
+};
+
+export const startActivityEngine = async () => {
+  if (started) return;
+  started = true;
+  startWatchMatcher();
+  activityNightlyHooks.push(expireWatches);
+  await tenantJob("activity-start", () => ensureTenantStarted())();
+  // Each timer visits every active school in its own context (tenantJob); the
+  // per-(job, tid) lock keeps a slow school from overlapping itself.
+  const every = (name: string, ms: number, fn: () => unknown, jitterMs?: number) => {
+    const tick = tenantJob(`activity-${name}`, async () => {
+      if (!(await ensureTenantStarted())) return;
+      await fn();
+    }, jitterMs === undefined ? {} : { jitterMs });
+    const t = setInterval(() => void tick(), ms);
     t.unref();
     timers.push(t);
+    return tick;
   };
-  every(2_000, flushActivity);
-  every(2_000, pushLiveDiffs);
-  every(15_000, () => {
+  // flushActivity writes every school's buffers itself (each inside its tenant).
+  const flushTimer = setInterval(() => {
+    Promise.resolve()
+      .then(flushActivity)
+      .catch((error) => logger.error("[activity] timer failed", { error }));
+  }, 2_000);
+  flushTimer.unref();
+  timers.push(flushTimer);
+  every("diffs", 2_000, pushLiveDiffs, 0);
+  every("presence", 15_000, () => {
     presence.sweepPresence();
-  });
-  every(60_000, () => {
+  }, 0);
+  every("sessions", 60_000, () => {
     sweepSessions();
   });
-  every(30_000, () => getSettings());
-  every(30_000, () => refreshBlocks());
-  every(10_000, () => broadcast({ type: "ping", at: new Date(clock.now()).toISOString() }));
+  every("settings", 30_000, () => getSettings());
+  every("blocks", 30_000, () => refreshBlocks());
+  every("ping", 10_000, () => broadcast({ type: "ping", at: new Date(clock.now()).toISOString() }), 0);
   // Rollups for today every 5 min (+ the nightly maintenance run inside rollupTick).
-  every(5 * 60_000, rollupTick);
-  setTimeout(() => void rollupTick().catch((error) => logger.error("[activity] rollup failed", { error })), 20_000).unref();
+  const rollups = every("rollup", 5 * 60_000, rollupTick);
+  setTimeout(() => void rollups(), 20_000).unref();
 };
 
 export const stopActivityEngine = async () => {

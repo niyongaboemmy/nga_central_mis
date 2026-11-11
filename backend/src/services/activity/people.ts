@@ -1,3 +1,4 @@
+import { TenantScopedMap, TenantScopedSet } from "../../tenancy/scoped";
 import { q } from "./db";
 import { clock } from "./runtime";
 
@@ -21,7 +22,7 @@ export interface UserInfo {
   loadedAt: number;
 }
 
-const users = new Map<number, UserInfo>();
+const users = new TenantScopedMap<number, UserInfo>();
 const USER_TTL_MS = 5 * 60_000;
 
 export const loadUsers = async (ids: number[]): Promise<Map<number, UserInfo>> => {
@@ -110,7 +111,7 @@ export interface DeviceInfo {
   preciseLocState: "unasked" | "granted" | "denied";
   loadedAt: number;
 }
-const devices = new Map<string, DeviceInfo>();
+const devices = new TenantScopedMap<string, DeviceInfo>();
 const DEVICE_MAX = 50_000;
 
 export const loadDevice = async (deviceId: string): Promise<DeviceInfo> => {
@@ -145,8 +146,8 @@ export const loadDevice = async (deviceId: string): Promise<DeviceInfo> => {
 export const cachedDevice = (deviceId: string) => devices.get(deviceId) ?? null;
 
 export const clearPeopleCaches = () => {
-  users.clear();
-  devices.clear();
+  users.clearAll();
+  devices.clearAll();
 };
 
 export const parseJson = (v: unknown): any => {

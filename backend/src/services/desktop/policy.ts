@@ -1,5 +1,6 @@
 import type { Occurrence } from "../reminders/occurrences";
 import { addDaysYmd, kigaliInstant, kigaliParts } from "../reminders/time";
+import { tenantTimezone } from "../../tenancy/timezone";
 
 /**
  * When NGA Desktop's games and the student AI pause (docs/TOOLS_HUB_IMPLEMENTATION_PLAN.md §6.1):
@@ -24,7 +25,8 @@ export interface Policy {
   generatedAt: string;
   /** Re-fetch by then (end of the Kigali day). */
   validUntil: string;
-  timezone: "Africa/Kigali";
+  /** IANA zone of the school (the tenant's; NGA: Africa/Kigali). */
+  timezone: string;
   windows: LockWindow[];
   exam: { active: boolean; until: string | null; label: string | null };
 }
@@ -63,7 +65,7 @@ export function buildPolicy(occ: Occurrence[], now = new Date()): Policy {
   return {
     generatedAt: t,
     validUntil: dayEnd.toISOString(),
-    timezone: "Africa/Kigali",
+    timezone: tenantTimezone(),
     windows,
     exam: { active: !!exam, until: exam?.to ?? null, label: exam?.label ?? null },
   };
