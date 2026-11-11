@@ -115,7 +115,7 @@ const PlanCard: React.FC<{ pkg: PackageInfo; scale: Scale; cycle: "TERM" | "YEAR
       transition={{ duration: 0.8, delay: index * 0.1, ease: EASE }}
       whileHover={reduced ? undefined : { y: -6 }}
       className={cx(
-        "group flex w-[84%] shrink-0 snap-center flex-col rounded-[28px] sm:w-auto bg-[var(--lp-card)] p-7 shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition-shadow duration-500 hover:shadow-[0_24px_60px_rgba(0,0,0,0.10)]",
+        "group relative flex w-[84%] shrink-0 snap-center flex-col rounded-[28px] sm:w-auto bg-[var(--lp-card)] p-7 shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition-shadow duration-500 hover:shadow-[0_24px_60px_rgba(0,0,0,0.10)]",
         popular ? "ring-2 ring-[var(--lp-blue)]" : "ring-1 ring-[var(--lp-hair)]",
       )}
     >
