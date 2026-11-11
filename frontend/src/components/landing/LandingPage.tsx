@@ -26,6 +26,7 @@ const TOKENS = `
   --lp-text: #1d1d1f; --lp-muted: #6e6e73;
   --lp-blue: #0071e3; --lp-blue-soft: rgba(0,113,227,0.09);
   --lp-hair: rgba(0,0,0,0.08); --lp-seg: #e8e8ed; --lp-nav: rgba(255,255,255,0.72);
+  --lp-glow-a: rgba(0,113,227,0.16); --lp-glow-b: rgba(90,200,250,0.16); --lp-glow-c: rgba(41,151,255,0.12);
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", Inter, "Helvetica Neue", Arial, sans-serif;
   -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
 }
@@ -34,7 +35,19 @@ const TOKENS = `
   --lp-text: #f5f5f7; --lp-muted: #a1a1a6;
   --lp-blue: #2997ff; --lp-blue-soft: rgba(41,151,255,0.15);
   --lp-hair: rgba(255,255,255,0.12); --lp-seg: rgba(255,255,255,0.10); --lp-nav: rgba(22,22,23,0.72);
-}`;
+  --lp-glow-a: rgba(0,113,227,0.34); --lp-glow-b: rgba(90,200,250,0.18); --lp-glow-c: rgba(41,151,255,0.22);
+}
+/* hero backdrop: three blurred glows drifting slowly (transform only) */
+.lp-glow { position: absolute; border-radius: 9999px; filter: blur(80px); will-change: transform; }
+@keyframes lp-drift-a { from { transform: translate3d(-50%, 0, 0) scale(1); } to { transform: translate3d(-44%, 6%, 0) scale(1.12); } }
+@keyframes lp-drift-b { from { transform: translate3d(0, 0, 0) scale(1); } to { transform: translate3d(12%, -8%, 0) scale(1.15); } }
+@keyframes lp-drift-c { from { transform: translate3d(0, 0, 0) scale(1.05); } to { transform: translate3d(-14%, 10%, 0) scale(0.95); } }
+@keyframes lp-sheen { from { background-position: 0% 50%; } to { background-position: 100% 50%; } }
+.lp-glow-a { animation: lp-drift-a 22s ease-in-out infinite alternate; }
+.lp-glow-b { animation: lp-drift-b 28s ease-in-out infinite alternate; }
+.lp-glow-c { animation: lp-drift-c 25s ease-in-out infinite alternate; }
+.lp-sheen { background-size: 200% auto; animation: lp-sheen 9s ease-in-out infinite alternate; }
+@media (prefers-reduced-motion: reduce) { .lp-glow, .lp-sheen { animation: none !important; } }`;
 
 const NAV = [
   { href: "#apps", label: "Apps" },
@@ -81,6 +94,20 @@ const Nav: React.FC = () => {
   );
 };
 
+/**
+ * A quiet mesh gradient behind the hero: three blurred blue glows drifting on
+ * 22-28 s cycles, fading into the page at the bottom. Still when motion is
+ * reduced (TOKENS).
+ */
+const HeroBackdrop: React.FC = () => (
+  <div className="pointer-events-none absolute inset-0 -z-10" aria-hidden>
+    <div className="lp-glow lp-glow-a left-1/2 top-[-18rem] h-[44rem] w-[64rem] max-w-[160vw]" style={{ background: "radial-gradient(closest-side, var(--lp-glow-a), transparent)" }} />
+    <div className="lp-glow lp-glow-b left-[-12rem] top-[18rem] h-[30rem] w-[36rem]" style={{ background: "radial-gradient(closest-side, var(--lp-glow-b), transparent)" }} />
+    <div className="lp-glow lp-glow-c right-[-10rem] top-[28rem] h-[32rem] w-[38rem]" style={{ background: "radial-gradient(closest-side, var(--lp-glow-c), transparent)" }} />
+    <div className="absolute inset-x-0 bottom-0 h-48 bg-gradient-to-b from-transparent to-[var(--lp-bg)]" />
+  </div>
+);
+
 const Hero: React.FC = () => {
   const reduced = useReducedMotion();
   const ref = useRef<HTMLElement>(null);
@@ -91,8 +118,9 @@ const Hero: React.FC = () => {
   const words = ["Every", "school", "activity."];
 
   return (
-    <section id="top" ref={ref} className="relative overflow-hidden bg-[var(--lp-bg)] px-4 pb-16 pt-32 sm:pt-40">
-      <div className="mx-auto max-w-4xl text-center">
+    <section id="top" ref={ref} className="relative isolate overflow-hidden bg-[var(--lp-bg)] px-4 pb-16 pt-32 sm:pt-40">
+      <HeroBackdrop />
+      <div className="relative mx-auto max-w-4xl text-center">
         <motion.p
           initial={reduced ? { opacity: 0 } : { opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
@@ -115,7 +143,7 @@ const Hero: React.FC = () => {
             </React.Fragment>
           ))}
           <motion.span
-            className="block bg-gradient-to-r from-[#0071e3] via-[#2997ff] to-[#5ac8fa] bg-clip-text pb-2 text-transparent"
+            className="lp-sheen block bg-gradient-to-r from-[#0071e3] via-[#5ac8fa] to-[#0071e3] bg-clip-text pb-2 text-transparent"
             initial={reduced ? { opacity: 0 } : { opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.9, delay: 0.45, ease: EASE }}
@@ -146,7 +174,7 @@ const Hero: React.FC = () => {
           </a>
         </motion.div>
       </div>
-      <motion.div style={{ scale, opacity: fade }} className="mt-14 sm:mt-16">
+      <motion.div style={{ scale, opacity: fade }} className="relative mt-14 sm:mt-16">
         <Orbit />
       </motion.div>
     </section>
