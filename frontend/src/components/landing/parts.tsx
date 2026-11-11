@@ -1,112 +1,109 @@
 import React from "react";
 import { motion, useReducedMotion } from "framer-motion";
-import { ALL_FEATURES, JOURNEY, type Feature } from "./content";
+import { ALL_FEATURES, JOURNEY } from "./content";
+
+/**
+ * Shared pieces of the landing page. The look follows Apple's discipline:
+ * a few colour tokens (--lp-*, set on the page root in LandingPage), big
+ * tight headlines with one grey line under them, generous space, one action
+ * colour (blue), and motion that eases in rather than bounces.
+ */
 
 export const cx = (...c: Array<string | false | null | undefined>) => c.filter(Boolean).join(" ");
 
-export const SectionTitle: React.FC<{ kicker: string; title: string; className?: string }> = ({ kicker, title, className }) => {
+/** Apple's ease: quick start, long soft landing. */
+export const EASE = [0.25, 0.1, 0.25, 1] as const;
+
+/** Fade and rise into view, once. */
+export const Reveal: React.FC<{ children: React.ReactNode; delay?: number; className?: string; y?: number }> = ({ children, delay = 0, className, y = 28 }) => {
   const reduced = useReducedMotion();
   return (
     <motion.div
-      initial={reduced ? false : { opacity: 0, y: 16 }}
+      className={className}
+      initial={reduced ? { opacity: 0 } : { opacity: 0, y }}
       whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true }}
-      transition={{ duration: 0.45 }}
-      className={cx("text-center", className)}
+      viewport={{ once: true, margin: "-80px" }}
+      transition={{ duration: 0.8, delay, ease: EASE }}
     >
-      <span className="inline-flex items-center gap-1.5 rounded-full bg-brand-50 px-3 py-1 text-xs font-bold uppercase tracking-wider text-brand-700 dark:bg-brand-500/15 dark:text-brand-200">
-        <span className="h-1.5 w-1.5 rounded-[2px] bg-amber-400" aria-hidden />
-        {kicker}
-      </span>
-      <h2 className="mt-3 text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white sm:text-4xl">{title}</h2>
+      {children}
     </motion.div>
   );
 };
 
-/** An endless row of feature chips; pauses under the pointer, wraps when motion is reduced. */
-const MarqueeRow: React.FC<{ items: Feature[]; reverse?: boolean; duration: number }> = ({ items, reverse, duration }) => {
-  const reduced = useReducedMotion();
-  if (reduced) {
-    return (
-      <ul className="flex flex-wrap justify-center gap-2 px-4">
-        {items.map((f) => (
-          <Chip key={f.label} f={f} />
-        ))}
-      </ul>
-    );
-  }
-  return (
-    <div className="group relative flex overflow-hidden [mask-image:linear-gradient(to_right,transparent,black_10%,black_90%,transparent)]">
-      <ul
-        className="flex shrink-0 gap-2 pr-2 [animation:amashuri-marquee_var(--d)_linear_infinite] group-hover:[animation-play-state:paused]"
-        style={{ ["--d" as string]: `${duration}s`, animationDirection: reverse ? "reverse" : "normal" }}
-      >
-        {[...items, ...items].map((f, i) => (
-          <Chip key={`${f.label}-${i}`} f={f} hidden={i >= items.length} />
-        ))}
-      </ul>
-    </div>
-  );
-};
-
-const Chip: React.FC<{ f: Feature; hidden?: boolean }> = ({ f, hidden }) => (
-  <li
-    aria-hidden={hidden || undefined}
-    className="flex shrink-0 items-center gap-2 rounded-full border border-slate-200 bg-white px-3.5 py-2 text-sm font-semibold text-slate-700 shadow-sm dark:border-white/10 dark:bg-slate-900/70 dark:text-slate-200"
-  >
-    <f.icon className="h-4 w-4 text-brand-600 dark:text-brand-200" aria-hidden />
-    {f.label}
-  </li>
+export const SectionHead: React.FC<{ eyebrow?: string; title: string; sub?: string; className?: string }> = ({ eyebrow, title, sub, className }) => (
+  <Reveal className={cx("mx-auto max-w-3xl text-center", className)}>
+    {eyebrow && <p className="mb-3 text-sm font-semibold text-[var(--lp-blue)] sm:text-base">{eyebrow}</p>}
+    <h2 className="text-[2.5rem] font-semibold leading-[1.05] tracking-[-0.035em] text-[var(--lp-text)] sm:text-6xl">{title}</h2>
+    {sub && <p className="mx-auto mt-4 max-w-xl text-lg leading-relaxed text-[var(--lp-muted)] sm:text-xl">{sub}</p>}
+  </Reveal>
 );
 
+/** Blue pill, Apple's primary action. */
+export const pillPrimary =
+  "inline-flex items-center justify-center gap-1.5 rounded-full bg-[var(--lp-blue)] px-6 py-3 text-[17px] font-medium text-white transition-[filter,transform] hover:brightness-110 active:scale-[0.98] focus:outline-none focus-visible:ring-4 focus-visible:ring-[var(--lp-blue)]/30";
+/** Text link with a chevron, Apple's secondary action. */
+export const linkChevron =
+  "group inline-flex items-center gap-0.5 text-[17px] font-medium text-[var(--lp-blue)] hover:underline focus:outline-none focus-visible:underline";
+
+/** A quiet, endless line of feature names; stops under the pointer, wraps when motion is reduced. */
 export const FeatureMarquee: React.FC = () => {
-  const half = Math.ceil(ALL_FEATURES.length / 2);
+  const reduced = useReducedMotion();
+  const items = ALL_FEATURES;
+  const row = (hidden: boolean) =>
+    items.map((f, i) => (
+      <li key={`${f.label}-${hidden}-${i}`} aria-hidden={hidden || undefined} className="flex shrink-0 items-center gap-2 text-[15px] font-medium text-[var(--lp-muted)]">
+        <f.icon className="h-[18px] w-[18px] text-[var(--lp-text)]" strokeWidth={1.75} aria-hidden />
+        {f.label}
+      </li>
+    ));
   return (
-    <section className="py-10" aria-label="Everything included">
-      <style>{`@keyframes amashuri-marquee { from { transform: translateX(0) } to { transform: translateX(-50%) } }`}</style>
-      <div className="space-y-3">
-        <MarqueeRow items={ALL_FEATURES.slice(0, half)} duration={45} />
-        <MarqueeRow items={ALL_FEATURES.slice(half)} duration={50} reverse />
-      </div>
+    <section aria-label="Everything included" className="border-y border-[var(--lp-hair)] py-6">
+      <style>{`@keyframes lp-marquee { from { transform: translateX(0) } to { transform: translateX(-50%) } }`}</style>
+      {reduced ? (
+        <ul className="mx-auto flex max-w-5xl flex-wrap justify-center gap-x-8 gap-y-3 px-4">{row(false)}</ul>
+      ) : (
+        <div className="group flex overflow-hidden [mask-image:linear-gradient(to_right,transparent,black_12%,black_88%,transparent)]">
+          <ul className="flex shrink-0 gap-10 pr-10 [animation:lp-marquee_70s_linear_infinite] group-hover:[animation-play-state:paused]">
+            {row(false)}
+            {row(true)}
+          </ul>
+        </div>
+      )}
     </section>
   );
 };
 
-/** Register -> Review -> Approve & pay -> Go live; the line fills as it scrolls in. */
+/** Four numbered steps; a hairline fills between them as the row scrolls in. */
 export const Journey: React.FC = () => {
   const reduced = useReducedMotion();
   return (
-    <section id="how" className="scroll-mt-24 px-4 py-12 sm:py-16">
-      <div className="mx-auto max-w-4xl">
-        <SectionTitle kicker="How to join" title="Live in four steps." />
-        <ol className="relative mt-12 grid grid-cols-4 gap-2">
-          <div className="absolute left-[12.5%] right-[12.5%] top-7 h-1 rounded-full bg-slate-200 dark:bg-white/10" aria-hidden />
+    <section id="how" className="scroll-mt-16 border-t border-[var(--lp-hair)] bg-[var(--lp-bg)] px-4 py-24 sm:py-32">
+      <div className="mx-auto max-w-5xl">
+        <SectionHead eyebrow="How to join" title="Live in four steps." sub="Register online. We review, you pay, your school goes live." />
+        <ol className="relative mt-16 grid grid-cols-2 gap-x-6 gap-y-12 sm:grid-cols-4">
+          <div className="absolute left-[12.5%] right-[12.5%] top-6 hidden h-px bg-[var(--lp-hair)] sm:block" aria-hidden />
           <motion.div
-            className="absolute left-[12.5%] top-7 h-1 rounded-full bg-gradient-to-r from-brand-500 via-indigo-500 to-emerald-500"
-            initial={reduced ? { width: "75%" } : { width: 0 }}
+            className="absolute left-[12.5%] top-6 hidden h-px bg-[var(--lp-blue)] sm:block"
+            initial={{ width: reduced ? "75%" : 0 }}
             whileInView={{ width: "75%" }}
-            viewport={{ once: true, margin: "-80px" }}
-            transition={{ duration: 1.6, ease: "easeInOut" }}
+            viewport={{ once: true, margin: "-100px" }}
+            transition={{ duration: 1.8, ease: EASE }}
             aria-hidden
           />
           {JOURNEY.map((s, i) => (
             <motion.li
               key={s.label}
-              className="relative flex flex-col items-center gap-3 text-center"
-              initial={reduced ? false : { opacity: 0, scale: 0.6 }}
-              whileInView={{ opacity: 1, scale: 1 }}
-              viewport={{ once: true, margin: "-80px" }}
-              transition={{ type: "spring", stiffness: 260, damping: 18, delay: reduced ? 0 : 0.2 + i * 0.4 }}
+              className="relative flex flex-col items-center text-center"
+              initial={reduced ? { opacity: 0 } : { opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: "-100px" }}
+              transition={{ duration: 0.7, delay: reduced ? 0 : 0.25 + i * 0.35, ease: EASE }}
             >
-              <span
-                className={cx(
-                  "flex h-14 w-14 items-center justify-center rounded-2xl text-white shadow-lg ring-4 ring-white dark:ring-slate-950",
-                  i === JOURNEY.length - 1 ? "bg-gradient-to-br from-emerald-500 to-teal-600" : "bg-gradient-to-br from-brand-500 to-indigo-600",
-                )}
-              >
-                <s.icon className="h-6 w-6" aria-hidden />
+              <span className="relative flex h-12 w-12 items-center justify-center rounded-full bg-[var(--lp-card)] text-[var(--lp-blue)] shadow-[0_2px_12px_rgba(0,0,0,0.08)] ring-1 ring-[var(--lp-hair)]">
+                <s.icon className="h-5 w-5" strokeWidth={1.75} aria-hidden />
               </span>
-              <span className="text-sm font-bold text-slate-800 dark:text-slate-100 sm:text-base">{s.label}</span>
+              <span className="mt-4 text-sm font-semibold tabular-nums text-[var(--lp-muted)]">0{i + 1}</span>
+              <span className="mt-1 text-xl font-semibold tracking-tight text-[var(--lp-text)]">{s.label}</span>
             </motion.li>
           ))}
         </ol>
