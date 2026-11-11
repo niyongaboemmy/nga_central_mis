@@ -245,8 +245,13 @@ async function findIntegrationToken(hash: string, tenant: TenantCtx) {
  * invalid token costs one indexed miss and leaks nothing about which part was
  * wrong — every failure returns the same message.
  */
+// Express 4 does not catch a rejected async middleware: the request would hang.
+// Hand any failure to the error handler instead.
 export const requireServiceToken =
-  (scope: string) => async (req: any, res: any, next: any) => {
+  (scope: string) => (req: any, res: any, next: any) =>
+    serviceTokenCheck(scope, req, res, next).catch(next);
+
+const serviceTokenCheck = async (scope: string, req: any, res: any, next: any) => {
     const header: string | undefined = req.header("Authorization");
 
     // Two accepted shapes, one meaning: "a registered partner is calling".
