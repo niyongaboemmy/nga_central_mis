@@ -1,5 +1,6 @@
 import { and, eq, inArray, isNotNull, ne, or, sql } from "drizzle-orm";
 import { db } from "../../../db";
+import { scopedKey } from "../../../tenancy/scoped";
 import {
   COURSE_ITEM_TYPES,
   CourseGenerationRun,
@@ -218,13 +219,15 @@ const aiOptions = (ctx: ExecContext, feature: string) => ({
 // Placement reads "which notes are already in the course" and then writes; two weeks doing
 // that at once would both place the same note. One placement per course at a time (there is
 // one backend process, so an in-memory chain is enough).
-const placementLocks = new Map<number, Promise<unknown>>();
+// Keyed "t<tid>:<course>": course ids repeat across school databases.
+const placementLocks = new Map<string, Promise<unknown>>();
 function withCourseLock<T>(courseId: number, fn: () => Promise<T>): Promise<T> {
-  const previous = placementLocks.get(courseId) ?? Promise.resolve();
+  const key = scopedKey("course", courseId);
+  const previous = placementLocks.get(key) ?? Promise.resolve();
   const next = previous.catch(() => undefined).then(fn);
-  placementLocks.set(courseId, next);
+  placementLocks.set(key, next);
   return next.finally(() => {
-    if (placementLocks.get(courseId) === next) placementLocks.delete(courseId);
+    if (placementLocks.get(key) === next) placementLocks.delete(key);
   });
 }
 

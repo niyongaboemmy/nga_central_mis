@@ -1,3 +1,4 @@
+import { tenantLocal } from "../../tenancy/scoped";
 import { sql } from "drizzle-orm";
 import { db } from "../../db";
 import { CustomError, ValidationError } from "../../errors/CustomError";
@@ -33,7 +34,9 @@ import {
 const KEY = "ai_policy";
 const TTL_MS = 30_000;
 
-let cache: { at: number; value: AiPolicy } | null = null;
+// One cached policy per school: PlatformSetting lives in each tenant database, and
+// /integrations/ai-policy answers for the X-NGA-Tenant school.
+const cacheOf = tenantLocal(() => ({ entry: null as { at: number; value: AiPolicy } | null }));
 /** Tests pin a policy instead of writing the shared table. */
 let override: AiPolicy | null = null;
 
@@ -74,23 +77,24 @@ async function readStored(): Promise<AiPolicy> {
 /** The current policy (30 s cache). Never throws; an unreadable store means off. */
 export async function getAiPolicy(): Promise<AiPolicy> {
   if (override) return override;
-  if (cache && Date.now() - cache.at < TTL_MS) return cache.value;
+  const slot = cacheOf();
+  if (slot.entry && Date.now() - slot.entry.at < TTL_MS) return slot.entry.value;
   const value = await readStored();
-  cache = { at: Date.now(), value };
+  slot.entry = { at: Date.now(), value };
   return value;
 }
 
 /** Synchronous read of the last cached value (hot paths that cannot await). */
-export const cachedAiPolicy = (): AiPolicy => override ?? cache?.value ?? closed();
+export const cachedAiPolicy = (): AiPolicy => override ?? cacheOf().entry?.value ?? closed();
 
 export const invalidateAiPolicy = () => {
-  cache = null;
+  cacheOf().entry = null;
 };
 
 /** For tests: pin the policy (null = read the database again). */
 export function setAiPolicyForTests(p: Partial<AiPolicy> | null) {
   override = p ? normalizeAiPolicy({ ...AI_POLICY_DEFAULT, v: 1, ...p }) : null;
-  cache = null;
+  cacheOf.resetAll();
 }
 
 /** Shorthand for tests: everything on. */

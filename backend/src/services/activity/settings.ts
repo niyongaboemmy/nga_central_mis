@@ -1,3 +1,4 @@
+import { tenantLocal } from "../../tenancy/scoped";
 import { q, exec } from "./db";
 import { parseCidr } from "./ip";
 
@@ -51,11 +52,12 @@ const NUMERIC_BOUNDS: Partial<Record<keyof ActivitySettings, [number, number]>> 
   bot_threshold: [10, 100],
 };
 
-let cache: { at: number; value: ActivitySettings } | null = null;
+// Per school (tenant): ids and settings differ between tenant databases.
+const st = tenantLocal(() => ({ cache: (null) as { at: number; value: ActivitySettings } | null }));
 const TTL_MS = 30_000;
 
 export const getSettings = async (): Promise<ActivitySettings> => {
-  if (cache && Date.now() - cache.at < TTL_MS) return cache.value;
+  if (st().cache && Date.now() - st().cache!.at < TTL_MS) return st().cache!.value;
   const value: ActivitySettings = { ...DEFAULT_SETTINGS };
   try {
     const rows = await q<{ setting_key: string; value: any }>(
@@ -71,15 +73,15 @@ export const getSettings = async (): Promise<ActivitySettings> => {
   }
   // Hard switch for incidents: ACTIVITY_COLLECT=off wins over the stored setting.
   if (String(process.env.ACTIVITY_COLLECT ?? "").toLowerCase() === "off") value.collect_enabled = false;
-  cache = { at: Date.now(), value };
+  st().cache = { at: Date.now(), value };
   return value;
 };
 
 /** Synchronous read of the last cached value (hot paths that cannot await). */
-export const cachedSettings = (): ActivitySettings => cache?.value ?? DEFAULT_SETTINGS;
+export const cachedSettings = (): ActivitySettings => st().cache?.value ?? DEFAULT_SETTINGS;
 
 export const invalidateSettings = () => {
-  cache = null;
+  st().cache = null;
 };
 
 const safeJson = (s: string) => {

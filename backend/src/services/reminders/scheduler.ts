@@ -4,6 +4,7 @@ import { expandAll } from "./expander";
 import { loadVapidKeys } from "./webPush";
 import { ensureTelegramWebhook } from "./telegram";
 import { syncAllGoogleCalendars } from "./googleCalendar";
+import { tenantJob } from "../../tenancy/jobs";
 
 const DISPATCH_EVERY_MS = 60_000;
 const EXPAND_EVERY_MS = 30 * 60_000;
@@ -22,47 +23,22 @@ export const startReminderScheduler = () => {
   started = true;
   loadVapidKeys();
 
-  let dispatching = false;
-  const dispatch = async () => {
-    if (dispatching) return;
-    dispatching = true;
-    try {
-      const { sent } = await dispatchDue();
-      if (sent) logger.info(`[reminders] sent ${sent} reminder(s)`);
-    } catch (error) {
-      logger.error("[reminders] dispatch tick failed", { error });
-    } finally {
-      dispatching = false;
-    }
-  };
+  // Each loop runs once per school; tenantJob's (job, tid) lock replaces the old
+  // in-process "already running" flags, so one school's slow tick never blocks another.
+  const dispatch = tenantJob("reminders-dispatch", async (tenant) => {
+    const { sent } = await dispatchDue();
+    if (sent) logger.info(`[reminders] t${tenant.tid} sent ${sent} reminder(s)`);
+  });
 
-  let expanding = false;
-  const expand = async () => {
-    if (expanding) return;
-    expanding = true;
-    try {
-      const { users, planned } = await expandAll();
-      if (users) logger.info(`[reminders] planned ${planned} reminder(s) for ${users} user(s)`);
-    } catch (error) {
-      logger.error("[reminders] expand tick failed", { error });
-    } finally {
-      expanding = false;
-    }
-  };
+  const expand = tenantJob("reminders-expand", async (tenant) => {
+    const { users, planned } = await expandAll();
+    if (users) logger.info(`[reminders] t${tenant.tid} planned ${planned} reminder(s) for ${users} user(s)`);
+  });
 
-  let googleSyncing = false;
-  const googleSync = async () => {
-    if (googleSyncing) return;
-    googleSyncing = true;
-    try {
-      const synced = await syncAllGoogleCalendars();
-      if (synced) logger.info(`[reminders] synced ${synced} Google calendar(s)`);
-    } catch (error) {
-      logger.error("[reminders] google sync tick failed", { error });
-    } finally {
-      googleSyncing = false;
-    }
-  };
+  const googleSync = tenantJob("reminders-google", async (tenant) => {
+    const synced = await syncAllGoogleCalendars();
+    if (synced) logger.info(`[reminders] t${tenant.tid} synced ${synced} Google calendar(s)`);
+  });
 
   // Telegram needs to know where to deliver updates (idempotent).
   setTimeout(() => {

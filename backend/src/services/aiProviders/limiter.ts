@@ -2,6 +2,7 @@ import { and, eq, gte, sql } from "drizzle-orm";
 import { db } from "../../db";
 import { AIUsageLog } from "../../db/schema";
 import logger from "../../utils/logger";
+import { scopeTid } from "../../tenancy/scoped";
 
 /**
  * Free-tier quota keeping (LESSON_STUDIO plan §7.3, decision D2: no AI budget).
@@ -14,6 +15,11 @@ import logger from "../../utils/logger";
  *
  * A provider that is out of quota is skipped *before* calling it, so a 15-week run moves
  * to the next provider without paying a failed round trip each time.
+ *
+ * Multi-tenancy (MIS-S2): the daily and per-minute counters are kept per school (tid),
+ * loaded from that school's own AIUsageLog, so one school can't use up another's quota.
+ * The concurrency gate stays per provider for the whole process: it protects the
+ * shared platform keys and this host, not a school's allowance.
  */
 
 interface ProviderLimits {
@@ -72,17 +78,34 @@ interface ProviderState {
   used: number;
   loaded: boolean;
   minute: number[]; // attempt timestamps in the last 60 s
+}
+interface SlotState {
   running: number;
   waiters: Array<() => void>;
 }
 
+/** Quota counters, keyed `t<tid>:<provider>`. */
 const state = new Map<string, ProviderState>();
+/** Concurrency gates, keyed by provider (process-wide). */
+const slots = new Map<string, SlotState>();
+
+const stateKey = (provider: string, tid: number = scopeTid("AI quota")) => `t${tid}:${provider}`;
 
 function stateOf(provider: string): ProviderState {
-  let s = state.get(provider);
+  const key = stateKey(provider);
+  let s = state.get(key);
   if (!s) {
-    s = { dayStart: 0, used: 0, loaded: false, minute: [], running: 0, waiters: [] };
-    state.set(provider, s);
+    s = { dayStart: 0, used: 0, loaded: false, minute: [] };
+    state.set(key, s);
+  }
+  return s;
+}
+
+function slotOf(provider: string): SlotState {
+  let s = slots.get(provider);
+  if (!s) {
+    s = { running: 0, waiters: [] };
+    slots.set(provider, s);
   }
   return s;
 }
@@ -146,7 +169,7 @@ export function noteAttempt(provider: string, now = new Date()): void {
 
 /** Per-provider concurrency gate. Resolves with a release function. */
 export async function acquireSlot(provider: string): Promise<() => void> {
-  const s = stateOf(provider);
+  const s = slotOf(provider);
   const max = limitsFor(provider).concurrency;
   if (s.running >= max) await new Promise<void>((resolve) => s.waiters.push(resolve));
   s.running += 1;
@@ -191,4 +214,5 @@ export async function quotaSnapshot(providers: string[], now = new Date()): Prom
 /** Tests only: forget all counters. */
 export function resetLimiterState(): void {
   state.clear();
+  slots.clear();
 }

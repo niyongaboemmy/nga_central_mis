@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import { db } from "../../db";
+import { scopedKey, tenantLocal } from "../../tenancy/scoped";
 import { AccessShadowDiff } from "../../db/accessSchema";
 import {
   AccessSnapshot,
@@ -33,22 +34,23 @@ export function misAccessMode(): AccessMode {
   return process.env.NODE_ENV === "test" ? "off" : "shadow";
 }
 
-let engineReadyAt = 0;
-let engineReadyValue = false;
+// Per school database: each tenant DB is migrated on its own.
+const engineState = tenantLocal(() => ({ at: 0, value: false }));
 /**
  * Are migration 090's tables there? Checked at most every 5 minutes, so a
  * server running this code before the migration neither errors nor logs on
  * every request -- shadow comparisons are simply skipped.
  */
 export async function engineReady(): Promise<boolean> {
-  if (Date.now() - engineReadyAt < 5 * 60 * 1000) return engineReadyValue;
+  const st = engineState();
+  if (Date.now() - st.at < 5 * 60 * 1000) return st.value;
   try {
-    engineReadyValue = await accessTablesPresent();
+    st.value = await accessTablesPresent();
   } catch {
-    engineReadyValue = false;
+    st.value = false;
   }
-  engineReadyAt = Date.now();
-  return engineReadyValue;
+  st.at = Date.now();
+  return st.value;
 }
 
 /** The requesting user's MIS snapshot, memoised on the request. */
@@ -90,7 +92,7 @@ export async function recordShadowDiff(entry: {
   v2: Decision;
   target?: Target | null;
 }) {
-  const key = `${entry.userId}|${entry.capability}|${entry.route}|${entry.legacyAllowed}|${entry.v2.allowed}`;
+  const key = scopedKey("diff") + `|${entry.userId}|${entry.capability}|${entry.route}|${entry.legacyAllowed}|${entry.v2.allowed}`;
   const last = recentDiffs.get(key) ?? 0;
   if (Date.now() - last < DIFF_THROTTLE_MS) return;
   recentDiffs.set(key, Date.now());

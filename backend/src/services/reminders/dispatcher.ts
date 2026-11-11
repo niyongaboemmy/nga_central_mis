@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import { and, eq, gte, inArray, lt, lte, notInArray, sql } from "drizzle-orm";
 import { db } from "../../db";
+import { scopeTid } from "../../tenancy/scoped";
 import { PushSubscription, ReminderJob } from "../../db/reminderSchema";
 import { notifyUser } from "../../utils/notifications";
 import logger from "../../utils/logger";
@@ -74,7 +75,8 @@ export const describeJob = (job: Pick<JobRow, "source_type" | "title" | "body" |
  */
 export const buildPayload = (job: JobRow, now: Date) => {
   const { title, body } = describeJob(job, now);
-  const sig = signAction(job.job_id, job.user_id);
+  const tid = scopeTid("reminder action link");
+  const sig = signAction(job.job_id, job.user_id, tid);
   const url = appUrl(job.link);
   return JSON.stringify({
     web_push: 8030,
@@ -92,8 +94,8 @@ export const buildPayload = (job: JobRow, now: Date) => {
         url,
         critical: Number(job.critical) === 1,
         eventStart: new Date(job.event_start as any).toISOString(),
-        ackUrl: apiUrl(`/reminders/actions/${job.job_id}/ack?sig=${sig}`),
-        snoozeUrl: apiUrl(`/reminders/actions/${job.job_id}/snooze?sig=${sig}`),
+        ackUrl: apiUrl(`/reminders/actions/${job.job_id}/ack?sig=${sig}&t=${tid}`),
+        snoozeUrl: apiUrl(`/reminders/actions/${job.job_id}/snooze?sig=${sig}&t=${tid}`),
       },
     },
   });

@@ -1,3 +1,4 @@
+import { TenantScopedMap } from "../../tenancy/scoped";
 import { and, eq, gte, inArray, notInArray, sql } from "drizzle-orm";
 import { syncGoogleSoon } from "./channels";
 import { db } from "../../db";
@@ -149,7 +150,7 @@ export const cancelPendingJobs = async (userId: number, now = new Date()) => {
  * and cancel the reminder the newer plan just made. Calls queue per user;
  * each runs on the database as it is when its turn comes.
  */
-const planning = new Map<number, Promise<unknown>>();
+const planning = new TenantScopedMap<number, Promise<unknown>>(); // user ids repeat across schools
 export const expandForUser = (userId: number, now?: Date): Promise<{ planned: number; cancelled: number }> => {
   const previous = planning.get(userId) ?? Promise.resolve();
   const run = previous.catch(() => undefined).then(() => planForUser(userId, now ?? new Date()));

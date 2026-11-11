@@ -1,10 +1,11 @@
+import { TenantScopedMap, TenantScopedSet, tenantLocal } from "../../tenancy/scoped";
 import logger from "../../utils/logger";
 import { exec, q } from "./db";
 import { cidrContains, ipToBuffer, ipToString, parseCidr } from "./ip";
 import { notifyPerson } from "./notify";
 import { cachedUser, loadUsers } from "./people";
 import { personByKey } from "./presence";
-import { activityBus, ActivitySignal, clock, TZ_OFFSET_MS } from "./runtime";
+import { activityBus, ActivitySignal, clock, tzOffset } from "./runtime";
 import { getSettings } from "./settings";
 import { visitorCode } from "./tokens";
 import { holdersOf } from "./userMonitor";
@@ -71,23 +72,23 @@ const parse = (r: any): WatchRow => ({
 });
 
 const nameOf = async (userId: number) => (await loadUsers([userId])).get(userId)?.name ?? `User ${userId}`;
-const fmtDate = (d: Date) => new Date(d.getTime() + TZ_OFFSET_MS).toISOString().slice(0, 16).replace("T", " ");
+const fmtDate = (d: Date) => new Date(d.getTime() + tzOffset(d.getTime())).toISOString().slice(0, 16).replace("T", " ");
 
 // ---------------------------------------------------------------------------
 // In-memory index of active watches (refreshed on every change and every minute)
 // ---------------------------------------------------------------------------
-let active: WatchRow[] = [];
-let loadedAt = 0;
+// Per school (tenant): ids and settings differ between tenant databases.
+const st = tenantLocal(() => ({ active: ([]) as WatchRow[], loadedAt: (0) as number, recipientsCache: (null) as { at: number; ids: number[] } | null, adminCache: (null) as { at: number; ids: number[] } | null }));
 export const refreshWatches = async (force = false) => {
-  if (!force && clock.now() - loadedAt < 60_000) return active;
+  if (!force && clock.now() - st().loadedAt < 60_000) return st().active;
   try {
     const rows = await q<any>(`SELECT * FROM AnalyticsWatch WHERE status = 'active' AND expires_at > ?`, [new Date(clock.now())]);
-    active = rows.map(parse);
+    st().active = rows.map(parse);
   } catch {
-    active = [];
+    st().active = [];
   }
-  loadedAt = clock.now();
-  return active;
+  st().loadedAt = clock.now();
+  return st().active;
 };
 
 // ---------------------------------------------------------------------------
@@ -236,7 +237,7 @@ export const listWatches = async (filter: { status?: string; userId?: number } =
 // ---------------------------------------------------------------------------
 // Alerts
 // ---------------------------------------------------------------------------
-const lastFired = new Map<string, number>();
+const lastFired = new TenantScopedMap<string, number>();
 const COOLDOWN_MS = 10 * 60_000;
 
 export interface AlertInput {
@@ -334,7 +335,7 @@ export const ackAlert = async (id: number, actorId: number) =>
 // ---------------------------------------------------------------------------
 // Matcher
 // ---------------------------------------------------------------------------
-const failures = new Map<string, number[]>(); // key → failure timestamps
+const failures = new TenantScopedMap<string, number[]>(); // key → failure timestamps
 const noteFailure = (key: string, at: number, windowMs: number) => {
   const list = (failures.get(key) ?? []).filter((t) => at - t < windowMs);
   list.push(at);
@@ -342,13 +343,13 @@ const noteFailure = (key: string, at: number, windowMs: number) => {
   if (failures.size > 50_000) failures.delete(failures.keys().next().value as string);
   return list.length;
 };
-const usernamesByIp = new Map<string, Map<string, number>>();
+const usernamesByIp = new TenantScopedMap<string, Map<string, number>>();
 
 const inOffHours = async (at: number, rule: Rule) => {
   const s = await getSettings();
   const from = rule.from ?? s.school_hours.from;
   const to = rule.to ?? s.school_hours.to;
-  const local = new Date(at + TZ_OFFSET_MS);
+  const local = new Date(at + tzOffset(at));
   const hm = `${String(local.getUTCHours()).padStart(2, "0")}:${String(local.getUTCMinutes()).padStart(2, "0")}`;
   const dow = local.getUTCDay();
   const schoolDay = s.school_hours.days.includes(dow);
@@ -380,7 +381,7 @@ export const handleSignal = async (s: ActivitySignal) => {
   const deviceId = "deviceId" in s ? s.deviceId : null;
   const ip = "ip" in s ? (s.ip as string | null) : null;
 
-  for (const w of active) {
+  for (const w of st().active) {
     if (new Date(w.expires_at).getTime() < now) continue;
     if (!matchesTarget(w, userId, deviceId, ip)) continue;
     for (const rule of w.rules) {
@@ -483,28 +484,26 @@ export const handleSignal = async (s: ActivitySignal) => {
   }
 };
 
-let recipientsCache: { at: number; ids: number[] } | null = null;
 const securityRecipients = async () => {
-  if (recipientsCache && clock.now() - recipientsCache.at < 5 * 60_000) return recipientsCache.ids;
+  if (st().recipientsCache && clock.now() - st().recipientsCache!.at < 5 * 60_000) return st().recipientsCache!.ids;
   const ids = await holdersOf("ANALYTICS_CONFIGURE").catch(() => []);
-  recipientsCache = { at: clock.now(), ids };
+  st().recipientsCache = { at: clock.now(), ids };
   return ids;
 };
-let adminCache: { at: number; ids: number[] } | null = null;
 const adminIds = async () => {
-  if (adminCache && clock.now() - adminCache.at < 5 * 60_000) return adminCache.ids;
+  if (st().adminCache && clock.now() - st().adminCache!.at < 5 * 60_000) return st().adminCache!.ids;
   const rows = await q<any>(`SELECT user_id FROM UserProfile WHERE user_type = 'ADMIN'`).catch(() => []);
-  adminCache = { at: clock.now(), ids: rows.map((r) => Number(r.user_id)) };
-  return adminCache.ids;
+  st().adminCache = { at: clock.now(), ids: rows.map((r) => Number(r.user_id)) };
+  return st().adminCache!.ids;
 };
 
 export const resetWatchState = () => {
-  lastFired.clear();
-  failures.clear();
-  usernamesByIp.clear();
-  recipientsCache = null;
-  adminCache = null;
-  loadedAt = 0;
+  lastFired.clearAll();
+  failures.clearAll();
+  usernamesByIp.clearAll();
+  st().recipientsCache = null;
+  st().adminCache = null;
+  st().loadedAt = 0;
 };
 
 /** Subscribe the matcher to the activity bus (once per process). */

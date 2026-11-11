@@ -1,4 +1,6 @@
 import bcrypt from "bcryptjs";
+import { queueDirectorySync, removeDirectoryUser } from "../tenancy/directory";
+import { tenantBlock } from "../tenancy/claims";
 import { avatarUrls, profileMedia, withAvatar } from "../services/avatar/urls";
 import { getPublicSystems } from "../utils/publicSystems";
 import crypto from "crypto";
@@ -560,6 +562,8 @@ export const getCurrentUser = asyncHandler(async (req: any, res: any) => {
     allPrograms,
     allGrades,
     systems,
+    // Token contract v2: the school this account belongs to.
+    tenant: tenantBlock(),
   });
 });
 
@@ -889,6 +893,7 @@ export const createUser = asyncHandler(async (req: any, res: any) => {
     .where(eq(User.username, sanitizedUsername))
     .limit(1);
   const newUserId = newUserResult[0]?.user_id;
+  if (newUserId) queueDirectorySync(newUserId);
 
   // Generate random password
   const randomPassword = crypto.randomBytes(8).toString("hex");
@@ -1089,6 +1094,7 @@ export const updateUser = asyncHandler(async (req: any, res: any) => {
 
   if (Object.keys(updateData).length > 0) {
     await db.update(User).set(updateData).where(eq(User.user_id, userId));
+    queueDirectorySync(userId);
   }
   if (updateData.status && updateData.status !== existingUser[0].status) {
     // Persona grants follow the account status (rules only cover ACTIVE users).
@@ -1142,6 +1148,7 @@ export const deleteUser = asyncHandler(async (req: any, res: any) => {
   });
 
   await db.delete(User).where(eq(User.user_id, userId));
+  void removeDirectoryUser(userId);
 
   // Record activity
   if (req.user?.userId) {
@@ -1305,6 +1312,8 @@ export const bulkCreateUsers = asyncHandler(async (req: any, res: any) => {
         .where(eq(User.username, sanitizeString(username)))
         .limit(1);
       const newUserId = newUserResult[0]?.user_id;
+      if (newUserId) queueDirectorySync(newUserId);
+  if (newUserId) queueDirectorySync(newUserId);
 
       // Generate random password
       const randomPassword = crypto.randomBytes(8).toString("hex");
@@ -1817,6 +1826,7 @@ export const disableUser = asyncHandler(async (req: any, res: any) => {
     .update(User)
     .set({ status: "INACTIVE" })
     .where(eq(User.user_id, userId));
+  queueDirectorySync(userId);
   // Persona grants follow the account status (rules only cover ACTIVE users).
   await applyPlacementChange([userId], req.user?.userId);
   // Their open sessions end now, here and in every app (single sign-out).
@@ -1868,6 +1878,7 @@ export const enableUser = asyncHandler(async (req: any, res: any) => {
     .update(User)
     .set({ status: "ACTIVE" })
     .where(eq(User.user_id, userId));
+  queueDirectorySync(userId);
   await applyPlacementChange([userId], req.user?.userId);
 
   // Record activity

@@ -4,7 +4,12 @@ import { activitySourceClients } from "../services/activity/apps";
 import jwt from "jsonwebtoken";
 import { getPublicSystems } from "../utils/publicSystems";
 import crypto from "crypto";
-import { db } from "../db";
+import { db, primaryDb } from "../db";
+import { PRIMARY_TENANT_ID, parseTid, runWithTenant } from "../vendor/nga-tenancy";
+import { responseTenant, tenantBlock, tenantClaims } from "../tenancy/claims";
+import { tenantFromClaims } from "../tenancy/express";
+import { isSystemAssigned } from "../tenancy/systems";
+import { hashClientSecret } from "../utils/ssoClientSecret";
 import { eq, and } from "drizzle-orm";
 import {
   System,
@@ -18,6 +23,7 @@ import {
 } from "../db/schema";
 import { getEffectivePermissions } from "../utils/auth";
 import { verifyClientSecret } from "../utils/ssoClientSecret";
+import { AuthorizationError } from "../errors/CustomError";
 import {
   AuthenticationError,
   ValidationError,
@@ -44,8 +50,8 @@ export const authorizeSSO = asyncHandler(async (req: any, res: any) => {
     throw new ValidationError("Only response_type='code' is supported");
   }
 
-  // Verify SSO client (via System table)
-  const client = await db
+  // Verify SSO client (via System table -- global, in the primary tenant's DB)
+  const client = await primaryDb()
     .select()
     .from(System)
     .where(eq(System.client_id, client_id))
@@ -57,6 +63,15 @@ export const authorizeSSO = asyncHandler(async (req: any, res: any) => {
 
   if (client[0].status !== "ACTIVE") {
     throw new AuthenticationError("System is disabled");
+  }
+
+  // Multi-tenancy ([MIS-A7]): the user's school must have this app assigned
+  // (TenantSystem, ACTIVE -- the primary too: no implicit "all", see tenancy/systems.ts).
+  if (!(await isSystemAssigned(client[0].system_id))) {
+    logger.warn(`SSO Reject: system ${client_id} not assigned to tenant ${responseTenant().tid}`);
+    const err: any = new AuthorizationError("This app is not enabled for your school");
+    err.code = "SYSTEM_NOT_ASSIGNED";
+    throw err;
   }
 
   // Verify redirect URI
@@ -75,8 +90,12 @@ export const authorizeSSO = asyncHandler(async (req: any, res: any) => {
     );
   }
 
-  // Generate auth code
-  const code = crypto.randomBytes(32).toString("hex");
+  // Generate auth code. The exchange (/sso/token) is server-to-server with no
+  // user context, so a non-primary tenant's code says which tenant DB holds it:
+  // "<tid>.<hex>". Primary-tenant codes keep the legacy bare-hex shape.
+  const tenantNow = responseTenant();
+  const rawCode = crypto.randomBytes(32).toString("hex");
+  const code = tenantNow.tid === PRIMARY_TENANT_ID ? rawCode : `${tenantNow.tid}.${rawCode}`;
   const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minute expiration
 
   await db.insert(SSOCode).values({
@@ -123,7 +142,7 @@ export const getSSOToken = asyncHandler(async (req: any, res: any) => {
   // Verify client (via System table). The secret is compared in constant
   // time and may be stored either as a bcrypt hash or (legacy) in plaintext
   // -- see utils/ssoClientSecret.ts.
-  const client = await db
+  const client = await primaryDb()
     .select()
     .from(System)
     .where(eq(System.client_id, client_id))
@@ -137,6 +156,25 @@ export const getSSOToken = asyncHandler(async (req: any, res: any) => {
     throw new AuthenticationError("Invalid client credentials");
   }
 
+  // The code names its tenant ("<tid>.<hex>"; bare hex = primary). Everything
+  // below -- the code row, the user, the token -- belongs to that tenant.
+  const dot = String(code).indexOf(".");
+  const codeTid = dot > 0 ? parseTid(String(code).slice(0, dot)) : PRIMARY_TENANT_ID;
+  if (!codeTid) throw new AuthenticationError("Invalid or already used authorization code");
+  const resolved = await tenantFromClaims({ tid: codeTid });
+  if (resolved.refusal) {
+    const err: any = new AuthenticationError(resolved.refusal.message);
+    err.code = resolved.refusal.code;
+    throw err;
+  }
+  if (!(await isSystemAssigned(client[0].system_id, resolved.tenant))) {
+    throw new AuthenticationError("Invalid client credentials");
+  }
+  req.tenant = resolved.tenant;
+  await runWithTenant(resolved.tenant, () => exchangeCodeInTenant(req, res, code, client_id, client[0]));
+});
+
+const exchangeCodeInTenant = async (req: any, res: any, code: string, client_id: string, client: { system_id: number }) => {
   // Verify code
   const ssoCode = await db
     .select()
@@ -144,7 +182,7 @@ export const getSSOToken = asyncHandler(async (req: any, res: any) => {
     .where(
       and(
         eq(SSOCode.code, code),
-        eq(SSOCode.system_id, client[0].system_id),
+        eq(SSOCode.system_id, client.system_id),
         eq(SSOCode.is_used, 0),
       ),
     )
@@ -229,6 +267,8 @@ export const getSSOToken = asyncHandler(async (req: any, res: any) => {
       // therefore any spoke app session built on it) before its natural
       // 24h expiry.
       tokenVersion: user[0].token_version || 0,
+      // Token contract v2 (packages/tenancy/CONTRACT.md §2).
+      ...tenantClaims(),
     },
     config.jwtSecret,
     // iss/aud identify who minted the token and which client it was minted
@@ -255,8 +295,9 @@ export const getSSOToken = asyncHandler(async (req: any, res: any) => {
     ...profileMedia(user[0]),
     permissions,
     access_version: accessVersion,
+    tenant: tenantBlock(),
   });
-});
+};
 
 /**
  * Register a new SSO System (Admin Only)
@@ -277,6 +318,10 @@ export const registerSSOClient = asyncHandler(async (req: any, res: any) => {
     );
   }
 
+  // Systems are global: only the primary tenant manages them.
+  if (!responseTenant().isPrimary) throw new AuthorizationError("Only the platform can register SSO clients");
+  const db = primaryDb();
+
   // Check if system with this client_id already exists
   const existing = await db
     .select()
@@ -291,11 +336,12 @@ export const registerSSOClient = asyncHandler(async (req: any, res: any) => {
   // Generate a random client secret
   const client_secret = crypto.randomBytes(32).toString("hex");
 
+  // Stored as a bcrypt hash ([MIS-A12]); the plaintext is shown once, below.
   await db.insert(System).values({
     name,
     description,
     client_id,
-    client_secret,
+    client_secret: await hashClientSecret(client_secret),
     allowed_redirect_uris,
     icon_url,
     home_url,

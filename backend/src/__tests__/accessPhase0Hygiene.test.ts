@@ -25,6 +25,7 @@ import {
   isHashedClientSecret,
   verifyClientSecret,
 } from "../utils/ssoClientSecret";
+import { assignTestSystems } from "../test/systems";
 
 /**
  * Access control v2 -- Phase 0 (ACCESS_LEVELS_RBAC_IMPLEMENTATION_PLAN.md §11):
@@ -74,6 +75,7 @@ async function createSystem(secret: string, status: "ACTIVE" | "DISABLED" = "ACT
     home_url: "http://localhost",
     status,
   })) as any;
+  await assignTestSystems(clientId);
   return { systemId: res.insertId as number, clientId };
 }
 

@@ -20,6 +20,7 @@ import {
 import { listCourseMembers } from "../services/elearning/courseMembership";
 import { setLogoutTransport } from "../services/sso/backchannelLogout";
 import { parseStatusFilter } from "../services/activeUsers";
+import { assignTestSystems } from "../test/systems";
 
 // ACTIVE_USERS_CONTRACTS.md: lists of people (rosters, pickers, recipients,
 // counts) return ACTIVE users only; admin user management keeps everyone but
@@ -124,6 +125,7 @@ describe("Active users only (MIS)", () => {
       backchannel_logout_uri: "https://au.test/bcl",
       status: "ACTIVE",
     } as any);
+    await assignTestSystems(clientId);
   });
   afterEach(() => setLogoutTransport(null));
 

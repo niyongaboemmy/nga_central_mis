@@ -1,6 +1,9 @@
 import crypto from "crypto";
 import { eq } from "drizzle-orm";
+import { tenantTimezone } from "../../tenancy/timezone";
 import { db } from "../../db";
+import { PRIMARY_TENANT_ID } from "../../vendor/nga-tenancy";
+import { scopeTid } from "../../tenancy/scoped";
 import { CalendarFeedToken } from "../../db/reminderSchema";
 import { collectOccurrences, type Occurrence } from "./occurrences";
 import { getPreferences, type ReminderPreferences } from "./preferences";
@@ -17,8 +20,22 @@ import { appUrl } from "./webPush";
 
 export const FEED_WEEKS = 8;
 
+/**
+ * Tokens are "t<tid>.<secret>": the public feed URL has no session, so the token
+ * names its school and is then looked up in that school's database only (a
+ * tampered prefix finds nothing). Tokens issued before multi-tenancy have no
+ * prefix and belong to the primary school.
+ */
+const FEED_TOKEN_RE = /^(?:t([1-9][0-9]{0,9})\.)?([A-Za-z0-9_-]{20,64})$/;
+
+export const feedTokenTid = (token: string): number | null => {
+  const m = FEED_TOKEN_RE.exec(String(token || ""));
+  if (!m || token.length > 64) return null;
+  return m[1] ? Number(m[1]) : PRIMARY_TENANT_ID;
+};
+
 export const issueFeedToken = async (userId: number) => {
-  const token = crypto.randomBytes(32).toString("base64url");
+  const token = `t${scopeTid("calendar feed")}.${crypto.randomBytes(32).toString("base64url")}`;
   await db
     .insert(CalendarFeedToken)
     .values({ user_id: userId, token })
@@ -36,7 +53,8 @@ export const revokeFeedToken = async (userId: number) => {
 };
 
 export const userForFeedToken = async (token: string) => {
-  if (!/^[A-Za-z0-9_-]{20,64}$/.test(token)) return null;
+  const tid = feedTokenTid(token);
+  if (!tid || tid !== scopeTid("calendar feed")) return null;
   const [row] = await db.select().from(CalendarFeedToken).where(eq(CalendarFeedToken.token, token)).limit(1);
   if (!row) return null;
   db.update(CalendarFeedToken)
@@ -91,7 +109,7 @@ export const buildIcs = (occurrences: Occurrence[], prefs: ReminderPreferences, 
     "CALSCALE:GREGORIAN",
     "METHOD:PUBLISH",
     "X-WR-CALNAME:NGA · My Timetable",
-    "X-WR-TIMEZONE:Africa/Kigali",
+    `X-WR-TIMEZONE:${tenantTimezone()}`,
     "X-WR-CALDESC:Lessons\\, activities and deadlines from NGA",
     // Refresh hints; Apple and Outlook honour them, Google ignores them.
     "REFRESH-INTERVAL;VALUE=DURATION:PT1H",

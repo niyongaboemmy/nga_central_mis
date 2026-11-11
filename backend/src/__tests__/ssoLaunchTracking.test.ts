@@ -7,6 +7,7 @@ import { System } from "../db/schema";
 import { createUser, signToken } from "../test/fixtures";
 import { q } from "../services/activity/db";
 import { isServerToServer } from "../controllers/ssoController";
+import { assignTestSystems } from "../test/systems";
 
 /**
  * "Opened Task Mentor / Tendo / Tupo" counts a person's browser asking for an SSO code,
@@ -21,6 +22,7 @@ beforeAll(async () => {
   user = await createUser({ userType: "TEACHER" });
   clientId = `client_${crypto.randomBytes(6).toString("hex")}`;
   await db.insert(System).values({ name: `Test ${clientId}`, client_id: clientId, client_secret: "s", allowed_redirect_uris: "http://localhost/cb", icon_url: "x", home_url: "http://localhost", status: "ACTIVE" } as any);
+  await assignTestSystems(clientId);
 }, 60_000);
 
 const authorize = (ua: string | null) => {

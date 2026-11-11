@@ -17,6 +17,7 @@ import { setValidationFetch, validateKey } from "../services/ai/personal/validat
 import { personalWhoFromUserId } from "../services/ai/personal/routes";
 import { completeOpenRouterConnect, setOpenRouterOAuthFetch, startOpenRouterConnect } from "../services/ai/personal/openrouterOAuth";
 import { AI_POLICY_DEFAULT, decidePersonalRoute, normalizeAiPolicy, type AiPersonalRoute, type AiPolicy } from "../vendor/nga-access";
+import { assignTestSystems } from "../test/systems";
 
 /**
  * My AI (PERSONAL_AI_PROVIDERS_PLAN.md): the vault, the route decision, the SSRF guard, key
@@ -351,6 +352,7 @@ describe("gateway for Task Mentor, Tupo and Tendo", () => {
   beforeAll(async () => {
     process.env.ACCESS_APP_CLIENTS = `tm=${clientId}`;
     await db.insert(System).values({ name: `My AI ${clientId}`, client_id: clientId, client_secret: "s3cret", icon_url: "x", home_url: "x", status: "ACTIVE" } as any);
+    await assignTestSystems(clientId);
   });
   afterAll(async () => {
     await db.delete(System).where(eq(System.client_id, clientId));

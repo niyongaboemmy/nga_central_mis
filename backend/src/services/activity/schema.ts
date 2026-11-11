@@ -78,6 +78,8 @@ export const relayBatchSchema = z.object({
   batches: z
     .array(
       z.object({
+        /** The school the batch happened in (multi-tenant relays); default: X-NGA-Tenant. */
+        tid: z.coerce.number().int().positive().optional(),
         user_id: z.number().int().positive().nullable(),
         ip: z.string().max(64).nullable().optional(),
         ua: z.string().max(512).nullable().optional(),
@@ -90,6 +92,7 @@ export const relayBatchSchema = z.object({
   server_events: z
     .array(
       z.object({
+        tid: z.coerce.number().int().positive().optional(),
         id: z.string().regex(ULID_RE),
         n: z.string().regex(EVENT_NAME_RE),
         t: z.number().int().positive(),

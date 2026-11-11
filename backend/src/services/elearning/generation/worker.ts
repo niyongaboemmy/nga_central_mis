@@ -6,6 +6,8 @@ import { notifyUsers } from "../../../utils/notifications";
 import { AIQuotaExhaustedError, AiDisabledError, friendlyAIErrorMessage, nextQuotaReset, limitsFor, orderedProviders } from "../../aiProviders";
 import { ARTIFACT_ORDER, executeTask, GenerationOutputError, RunRow, TaskRow } from "./execute";
 import { emitRunEvent } from "./events";
+import { scopeTid } from "../../../tenancy/scoped";
+import { tenantJob } from "../../../tenancy/jobs";
 
 /**
  * The durable generation worker (LESSON_STUDIO plan §8.5). All state is in MySQL, so a
@@ -25,9 +27,17 @@ const HEARTBEAT_MS = 15 * 1000;
 const QUOTA_RETRY_MS = 30 * 60 * 1000;
 const concurrency = () => Math.max(1, Math.min(8, Number(process.env.ELEARNING_AI_CONCURRENCY) || 3));
 
-const running = new Map<number, Promise<void>>();
+// Keyed `${tid}:${task_id}`: task ids repeat across school databases. The size stays
+// process-wide on purpose -- ELEARNING_AI_CONCURRENCY caps AI calls on this host.
+const running = new Map<string, Promise<void>>();
+const runKey = (taskId: number) => `${scopeTid()}:${taskId}`;
+const runningHere = () => {
+  const prefix = `${scopeTid()}:`;
+  return [...running.keys()].filter((k) => k.startsWith(prefix));
+};
 let timer: NodeJS.Timeout | null = null;
-let ticking = false;
+const ticking = new Set<number>(); // per tenant
+const tickAll = tenantJob("studio-worker", () => tick(), { jitterMs: 0 });
 
 const MODE_PRIORITY: Record<string, number> = { PREVIEW: 0, REGENERATE_ITEM: 0, SINGLE_WEEK: 1, FULL: 2 };
 const TERMINAL_OK = new Set(["SUCCEEDED", "SKIPPED"]);
@@ -35,9 +45,9 @@ const TERMINAL_BAD = new Set(["FAILED", "CANCELLED", "DISMISSED"]);
 
 export function startGenerationWorker(): void {
   if (timer) return;
-  timer = setInterval(() => void tick().catch((error) => logger.error("[studio] worker tick failed", { error })), 2000);
+  timer = setInterval(() => void tickAll(), 2000);
   timer.unref();
-  setTimeout(() => void tick().catch(() => undefined), 5000).unref();
+  setTimeout(() => void tickAll(), 5000).unref();
 }
 
 /** Nudge the worker now (a run was just created / resumed) instead of waiting for the timer. */
@@ -68,7 +78,7 @@ async function recoverStale(now: Date) {
     .select({ task_id: CourseGenerationTask.task_id })
     .from(CourseGenerationTask)
     .where(and(eq(CourseGenerationTask.status, "RUNNING"), lte(CourseGenerationTask.heartbeat_at, cutoff)));
-  const ids = stale.map((s) => s.task_id).filter((id) => !running.has(id));
+  const ids = stale.map((s) => s.task_id).filter((id) => !running.has(runKey(id)));
   if (ids.length) {
     await db.update(CourseGenerationTask).set({ status: "QUEUED", claimed_at: null }).where(and(inArray(CourseGenerationTask.task_id, ids), eq(CourseGenerationTask.status, "RUNNING")));
     logger.info(`[studio] recovered ${ids.length} stale task(s)`);
@@ -132,8 +142,9 @@ export async function claim(task: Pick<TaskRow, "task_id">): Promise<boolean> {
 
 /** One worker pass. Returns how many tasks it started. */
 export async function tick(at = new Date()): Promise<number> {
-  if (ticking) return 0;
-  ticking = true;
+  const tid = scopeTid();
+  if (ticking.has(tid)) return 0;
+  ticking.add(tid);
   // MySQL DATETIME has whole seconds and 5.7 *rounds* the fraction, so a not_before written
   // as "now" can be stored up to a second ahead. Compare against now + 1 s.
   const now = new Date(at.getTime() + 1000);
@@ -147,12 +158,13 @@ export async function tick(at = new Date()): Promise<number> {
     for (const task of ready) {
       if (!(await claim(task))) continue;
       started += 1;
-      const p = runTask(task.task_id).finally(() => running.delete(task.task_id));
-      running.set(task.task_id, p);
+      const key = runKey(task.task_id);
+      const p = runTask(task.task_id).finally(() => running.delete(key));
+      running.set(key, p);
     }
     return started;
   } finally {
-    ticking = false;
+    ticking.delete(tid);
   }
 }
 
@@ -304,7 +316,8 @@ export async function refreshRunStatus(runId: number) {
 export async function drainWorker(maxTicks = 50, now?: () => Date): Promise<void> {
   for (let i = 0; i < maxTicks; i++) {
     const started = await tick(now ? now() : new Date());
-    if (running.size) await Promise.all([...running.values()]);
-    if (started === 0 && running.size === 0) return;
+    const mine = runningHere();
+    if (mine.length) await Promise.all(mine.map((k) => running.get(k)));
+    if (started === 0 && runningHere().length === 0) return;
   }
 }

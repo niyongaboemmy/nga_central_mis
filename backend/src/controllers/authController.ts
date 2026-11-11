@@ -43,6 +43,70 @@ import { clientIpOf, deviceIdOf, trackAuth } from "../services/activity/authEven
 import { checkBlocked } from "../services/activity/blocklist";
 import { signOutEverywhereLocal } from "../services/activity/control";
 import { getCurrentAcademicYearId } from "../utils/academicYear";
+import { TenantCtx, runWithTenant } from "../vendor/nga-tenancy";
+import { resolveLoginTenants, sendChoose } from "../tenancy/loginResolver";
+import { sendRefusal, tenantFromClaims } from "../tenancy/express";
+import { tenantBlock, tenantClaims } from "../tenancy/claims";
+import { lookupDirectory, queueDirectorySync } from "../tenancy/directory";
+import { findTenant, getTenant } from "../tenancy/registry";
+import { primaryTenant } from "../tenancy/express";
+import { isTenantUsable } from "../vendor/nga-tenancy";
+import { MAX_RESET_CANDIDATES, ResetCandidate, isResetTicket, openResetTicket, sealResetTicket } from "../utils/resetTicket";
+
+/**
+ * Multi-tenancy: find the school for an unauthenticated sign-in step and run
+ * `fn` inside it. Returns false when a response (choose / refusal) was sent.
+ * `narrow` (password sign-in) keeps only the schools where the credentials
+ * are right, so the picker never lists a school the password doesn't open.
+ */
+const withSignInTenant = async (
+  req: any,
+  res: any,
+  identifier: string,
+  fn: () => Promise<unknown>,
+  narrow?: () => Promise<boolean>,
+): Promise<void> => {
+  const r = await resolveLoginTenants(identifier, req.body?.tenant);
+  if (r.kind === "refused") {
+    sendRefusal(res, r.refusal);
+    return;
+  }
+  let tenant: TenantCtx;
+  if (r.kind === "many") {
+    let candidates = r.tenants;
+    if (narrow) {
+      const matching: TenantCtx[] = [];
+      for (const t of r.tenants) if (await runWithTenant(t, narrow).catch(() => false)) matching.push(t);
+      if (matching.length > 0) candidates = matching;
+      else candidates = [r.tenants[0]]; // fails in there with the usual "Invalid credentials"
+    }
+    if (candidates.length > 1) {
+      sendChoose(res, candidates);
+      return;
+    }
+    tenant = candidates[0];
+  } else {
+    tenant = r.tenant;
+  }
+  req.tenant = tenant;
+  await runWithTenant(tenant, fn);
+};
+
+/** Does this identifier + password open an ACTIVE account in the current tenant? */
+const passwordMatches = async (identifier: string, password: string): Promise<boolean> => {
+  const [u] = await db
+    .select({ user_id: User.user_id, status: User.status })
+    .from(User)
+    .where(validateEmail(identifier) ? eq(User.email, identifier) : eq(User.username, identifier))
+    .limit(1);
+  if (!u || u.status !== "ACTIVE") return false;
+  const [cred] = await db
+    .select({ password_hash: AuthCredential.password_hash })
+    .from(AuthCredential)
+    .where(eq(AuthCredential.user_id, u.user_id))
+    .limit(1);
+  return !!cred && (await bcrypt.compare(password, cred.password_hash));
+};
 
 export const login = asyncHandler(async (req: any, res: any) => {
   const { username, password } = req.body;
@@ -56,6 +120,18 @@ export const login = asyncHandler(async (req: any, res: any) => {
     throw new ValidationError("Username/email and password are required");
   }
 
+  // Which school: explicit `tenant` (slug or tid), else the Account Directory
+  // (several schools -> only those the password opens; still several -> choose).
+  await withSignInTenant(
+    req,
+    res,
+    sanitizedInput,
+    () => loginInTenant(req, res, sanitizedInput, sanitizedPassword),
+    () => passwordMatches(sanitizedInput, sanitizedPassword),
+  );
+});
+
+const loginInTenant = async (req: any, res: any, sanitizedInput: string, sanitizedPassword: string) => {
   logger.info(`Login attempt for: ${sanitizedInput}`);
 
   // A device or IP an administrator blocked (Usage & Monitoring → Visitors / IP lookup).
@@ -146,6 +222,7 @@ export const login = asyncHandler(async (req: any, res: any) => {
       username: user[0].username,
       requiresOTP: true,
       tokenVersion: user[0].token_version || 0,
+      ...tenantClaims(),
     },
     config.jwtSecret,
     { expiresIn: `${config.otp.expiryMinutes}m` },
@@ -162,9 +239,10 @@ export const login = asyncHandler(async (req: any, res: any) => {
       // Only present outside production, where the OTP email is skipped so
       // the frontend can auto-fill the code instead of hitting a real inbox.
       ...(config.envType !== "production" && { devOtp: otp }),
+      tenant: tenantBlock(),
     },
   );
-});
+};
 
 const googleClient = new OAuth2Client(config.google.clientId);
 
@@ -327,6 +405,8 @@ const completeLogin = async (
       // See middleware/auth.ts -- lets logout revoke this token before its
       // natural 24h expiry.
       tokenVersion: user[0].token_version || 0,
+      // Token contract v2 (packages/tenancy/CONTRACT.md §2).
+      ...tenantClaims(),
     },
     config.jwtSecret,
     { expiresIn: "24h" },
@@ -379,7 +459,11 @@ const completeLogin = async (
     allPrograms,
     allGrades,
     systems,
+    tenant: tenantBlock(),
   });
+
+  // Self-healing Account Directory entry (sign-in can find this school next time).
+  queueDirectorySync(userId);
 };
 
 export const verifyOTP = asyncHandler(async (req: any, res: any) => {
@@ -438,7 +522,12 @@ export const googleLogin = asyncHandler(async (req: any, res: any) => {
   }
 
   const sanitizedEmail = sanitizeString(payload.email);
+  const googleSub = payload.sub;
 
+  await withSignInTenant(req, res, sanitizedEmail, () => googleLoginInTenant(req, res, sanitizedEmail, googleSub));
+});
+
+const googleLoginInTenant = async (req: any, res: any, sanitizedEmail: string, googleSub: string) => {
   const user = await db
     .select()
     .from(User)
@@ -469,12 +558,12 @@ export const googleLogin = asyncHandler(async (req: any, res: any) => {
   if (auth.length > 0 && !auth[0].google_id) {
     await db
       .update(AuthCredential)
-      .set({ google_id: payload.sub })
+      .set({ google_id: googleSub })
       .where(eq(AuthCredential.user_id, user[0].user_id));
   }
 
   await completeLogin(user[0].user_id, res, "GOOGLE_OAUTH", req);
-});
+};
 
 /**
  * NGA desktop app, step 1 (in the person's browser, signed in to MIS):
@@ -485,7 +574,7 @@ export const createDesktopHandoff = asyncHandler(async (req: any, res: any) => {
   if (!validChallenge(challenge)) {
     return errorResponse(res, "Invalid challenge", 400);
   }
-  const code = issueHandoffCode(req.user.userId, challenge, config.jwtSecret);
+  const code = issueHandoffCode(req.user.userId, challenge, config.jwtSecret, tenantClaims().tid);
   successResponse(res, "Desktop sign-in code issued", { code, expiresIn: HANDOFF_TTL_SECONDS });
 });
 
@@ -503,16 +592,24 @@ export const redeemDesktopHandoff = asyncHandler(async (req: any, res: any) => {
       400,
     );
   }
+  // The code says which school issued it (legacy codes: the primary tenant).
+  const resolved = await tenantFromClaims({ tid: result.tid });
+  if (resolved.refusal) return sendRefusal(res, resolved.refusal);
+  req.tenant = resolved.tenant;
+  await runWithTenant(resolved.tenant, () => redeemDesktopHandoffInTenant(req, res, result.userId));
+});
+
+const redeemDesktopHandoffInTenant = async (req: any, res: any, userId: number) => {
   // Same gates as the other logins: blocked device/IP, account not active.
   if (await checkBlocked(deviceIdOf(req), clientIpOf(req)).catch(() => null)) {
     return errorResponse(res, "Sign-in from this device is blocked.", 403);
   }
-  const user = await db.select().from(User).where(eq(User.user_id, result.userId));
+  const user = await db.select().from(User).where(eq(User.user_id, userId));
   if (!user[0] || user[0].status !== "ACTIVE") {
     return errorResponse(res, "This account can't sign in.", 403);
   }
-  await completeLogin(result.userId, res, "DESKTOP_BROWSER", req);
-});
+  await completeLogin(userId, res, "DESKTOP_BROWSER", req);
+};
 
 export const getSession = asyncHandler(async (req: any, res: any) => {
   const userId = req.user.userId;
@@ -585,6 +682,7 @@ export const getSession = asyncHandler(async (req: any, res: any) => {
     permissions,
     roles,
     systems,
+    tenant: tenantBlock(),
   });
 });
 
@@ -621,6 +719,7 @@ export const verifySession = asyncHandler(async (req: any, res: any) => {
     ai_policy_v: aiPolicy.v,
     ai_routes_v: aiRoutesVersion,
     ...profileMedia({ user_id: req.user.userId, ...row }),
+    tenant: tenantBlock(),
   });
 });
 
@@ -666,54 +765,93 @@ export const forgotPassword = asyncHandler(async (req: any, res: any) => {
 
   const sanitizedEmail = sanitizeString(email);
 
-  // Find user by email
-  const user = await db
-    .select()
-    .from(User)
-    .where(eq(User.email, sanitizedEmail))
-    .limit(1);
-
-  if (user.length === 0) {
-    // Don't reveal if user exists or not
-    logger.info(
-      `Password reset requested for non-existent email: ${sanitizedEmail}`,
-    );
+  // No account / school enumeration: the answer is the same whether this e-mail is
+  // unknown, known to one school or to several. Every school that knows it gets its
+  // own code (stored in, and only valid for, that school); the opaque ticket lists
+  // where codes went, and verify-reset-otp tries the code in each of them.
+  const tenants = await resetTenants(sanitizedEmail, req.body?.tenant);
+  const candidates: ResetCandidate[] = [];
+  for (const tenant of tenants) {
+    const found = await runWithTenant(tenant, async () => {
+      const [u] = await db.select().from(User).where(eq(User.email, sanitizedEmail)).limit(1);
+      if (!u || u.status !== "ACTIVE") return null;
+      return u;
+    }).catch(() => null);
+    if (!found || candidates.length >= MAX_RESET_CANDIDATES) continue;
+    candidates.push({ tid: tenant.tid, uid: found.user_id, tv: found.token_version || 0 });
+    // Not awaited: sending (or not) must not change how long the answer takes.
+    runWithTenant(tenant, () => {
+      setImmediate(() => {
+        sendOTPByEmail(found.user_id, found.email!, "PASSWORD_RESET")
+          .then(() => logger.info(`Password reset OTP sent for user: ${found.username} (tenant ${tenant.tid})`))
+          .catch((error) => logger.error("Password reset OTP failed", { error: error?.message, tid: tenant.tid }));
+        trackAuth(req, { kind: "password_reset", outcome: "info", userId: found.user_id, usernameAttempted: sanitizedEmail });
+      });
+    });
+  }
+  if (candidates.length === 0) {
+    logger.info(`Password reset requested for an e-mail no school knows: ${sanitizedEmail}`);
     trackAuth(req, { kind: "password_reset", outcome: "failure", reason: "unknown_user", usernameAttempted: sanitizedEmail });
-    successResponse(
-      res,
-      "If an account exists with this email, a verification code has been sent.",
-    );
-    return;
   }
 
-  // Send OTP for password reset
-  await sendOTPByEmail(user[0].user_id, user[0].email, "PASSWORD_RESET");
-  trackAuth(req, { kind: "password_reset", outcome: "info", userId: user[0].user_id, usernameAttempted: sanitizedEmail });
+  const tempToken = sealResetTicket(candidates, Math.max(config.otp.expiryMinutes, 10) * 60);
+  successResponse(res, "If an account exists with this email, a verification code has been sent.", {
+    tempToken,
+    requiresOTP: true,
+  });
+});
 
-  // Generate temporary token for password reset flow. Carries tokenVersion
-  // for the same reason as the login temp token above: /auth/verify-reset-otp
-  // goes through `authenticate`.
-  const tempToken = jwt.sign(
-    {
-      userId: user[0].user_id,
-      email: user[0].email,
-      purpose: "PASSWORD_RESET",
-      tokenVersion: user[0].token_version || 0,
-    },
-    config.jwtSecret,
-    { expiresIn: `${Math.max(config.otp.expiryMinutes, 10)}m` },
+/** The usable schools a reset may concern: an explicit one, the directory's, else NGA. */
+const resetTenants = async (email: string, explicit: unknown): Promise<TenantCtx[]> => {
+  if (explicit !== undefined && explicit !== null && explicit !== "") {
+    const t = await findTenant(explicit).catch(() => null);
+    return t && isTenantUsable(t.status) ? [t] : [];
+  }
+  const hits = await lookupDirectory(email).catch(() => null);
+  if (!hits || hits.length === 0) return [await primaryTenant()];
+  const tids = Array.from(new Set(hits.map((h) => h.tid))).sort((a, b) => a - b);
+  const tenants = (await Promise.all(tids.map((tid) => getTenant(tid).catch(() => null)))).filter(
+    (t): t is TenantCtx => !!t && isTenantUsable(t.status),
   );
+  return tenants;
+};
 
-  logger.info(`Password reset OTP sent for user: ${user[0].username}`);
-
-  successResponse(
-    res,
-    "If an account exists with this email, a verification code has been sent.",
-    {
-      tempToken,
-      requiresOTP: true,
-    },
-  );
+/**
+ * POST /auth/verify-reset-otp with the forgot-password ticket (`Bearer rt1.…`): try
+ * the code in each school the ticket lists; the first that accepts it issues the
+ * reset token (carrying that school's tid). A legacy JWT tempToken falls through to
+ * `authenticate` + verifyResetOTP.
+ */
+export const verifyResetOTPTicket = asyncHandler(async (req: any, res: any, next: any) => {
+  const header: string = req.get?.("Authorization") || "";
+  const token = header.startsWith("Bearer ") ? header.slice(7).trim() : "";
+  if (!isResetTicket(token)) return next();
+  const { otp } = req.body;
+  if (!otp) throw new ValidationError("OTP is required");
+  const candidates = openResetTicket(token);
+  if (!candidates) throw new AuthenticationError("Invalid or expired OTP");
+  for (const c of candidates) {
+    const tenant = await getTenant(c.tid).catch(() => null);
+    if (!tenant || !isTenantUsable(tenant.status)) continue;
+    const resetToken = await runWithTenant(tenant, async () => {
+      const [u] = await db.select({ status: User.status, tv: User.token_version }).from(User).where(eq(User.user_id, c.uid)).limit(1);
+      if (!u || u.status !== "ACTIVE" || (u.tv || 0) !== c.tv) return null;
+      if (!(await verifyOTPUtil(c.uid, String(otp), "PASSWORD_RESET"))) return null;
+      return jwt.sign(
+        { userId: c.uid, purpose: "PASSWORD_RESET_CONFIRM", tokenVersion: u.tv || 0, ...tenantClaims(tenant) },
+        config.jwtSecret,
+        { expiresIn: "10m" },
+      );
+    });
+    if (!resetToken) continue;
+    req.tenant = tenant;
+    logger.info(`Password reset OTP verified for userId: ${c.uid} (tenant ${tenant.tid})`);
+    return successResponse(res, "OTP verified. Please enter your new password.", {
+      resetToken,
+      requiresNewPassword: true,
+    });
+  }
+  throw new AuthenticationError("Invalid or expired OTP");
 });
 
 export const verifyResetOTP = asyncHandler(async (req: any, res: any) => {
@@ -733,7 +871,7 @@ export const verifyResetOTP = asyncHandler(async (req: any, res: any) => {
   // Generate a new temporary token for password reset completion. /auth/reset-password
   // is behind `authenticate`, so this carries tokenVersion too.
   const resetToken = jwt.sign(
-    { userId, purpose: "PASSWORD_RESET_CONFIRM", tokenVersion: (await getUserTokenVersion(userId)) ?? 0 },
+    { userId, purpose: "PASSWORD_RESET_CONFIRM", tokenVersion: (await getUserTokenVersion(userId)) ?? 0, ...tenantClaims() },
     config.jwtSecret,
     { expiresIn: "10m" },
   );
@@ -897,7 +1035,7 @@ export const confirmDbAccess = asyncHandler(async (req: any, res: any) => {
   // /auth/confirm-db-access and the step-up guard run through `authenticate`,
   // so this carries tokenVersion as well.
   const dbAccessToken = jwt.sign(
-    { userId, dbAccess: true, tokenVersion: (await getUserTokenVersion(userId)) ?? 0 },
+    { userId, dbAccess: true, tokenVersion: (await getUserTokenVersion(userId)) ?? 0, ...tenantClaims() },
     config.jwtSecret,
     { expiresIn: "20m" },
   );

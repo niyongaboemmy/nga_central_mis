@@ -1,5 +1,6 @@
 import { and, desc, eq, gte, inArray, isNull, lte, ne, sql } from "drizzle-orm";
 import { db } from "../../db";
+import { scopedKey } from "../../tenancy/scoped";
 import {
   AcademicCalendar,
   CalendarSlot,
@@ -1245,7 +1246,7 @@ export async function oversightProvider(ctx: ProviderContext): Promise<ProviderR
       if (!def.levels.includes(lens.type as any)) continue;
       if (!heldAt(snapshot, def.capability, lens, def.minDepth).allowed) continue;
       const node = lens.type === "SCHOOL" ? "SCHOOL" : lens.key;
-      const cacheKey = `${ctx.access.userId}|${ctx.access.snapshot.v}|${metric}|${node}`;
+      const cacheKey = scopedKey("insight") + `|${ctx.access.userId}|${ctx.access.snapshot.v}|${metric}|${node}`;
       try {
         let hit = insightCache.get(cacheKey);
         if (!hit || Date.now() - hit.at > INSIGHT_TTL_MS) {

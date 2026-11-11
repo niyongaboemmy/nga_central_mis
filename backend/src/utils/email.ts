@@ -1,3 +1,4 @@
+import { currentRealTenantOrNull } from "../tenancy/context";
 import nodemailer from "nodemailer";
 import config from "../config";
 import logger from "./logger";
@@ -9,6 +10,24 @@ interface EmailOptions {
   html: string;
   text?: string;
 }
+
+/**
+ * Sender identity per school (MIS-S8): the SMTP transport stays global, the display
+ * name and the product name in the message come from the tenant. NGA (tenant 1) keeps
+ * EMAIL_FROM_NAME and "NGA Central MIS" exactly as before.
+ */
+export function senderName(): string {
+  const t = currentRealTenantOrNull();
+  if (!t || t.isPrimary) return config.email.fromName;
+  return t.name;
+}
+export function productName(): string {
+  const t = currentRealTenantOrNull();
+  if (!t || t.isPrimary) return "NGA Central MIS";
+  return `${t.name} MIS`;
+}
+
+const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
 
 class EmailService {
   private transporter: nodemailer.Transporter;
@@ -149,7 +168,7 @@ class EmailService {
       }
 
       const mailOptions = {
-        from: `"${config.email.fromName}" <${config.email.from}>`,
+        from: `"${senderName().replace(/"/g, "")}" <${config.email.from}>`,
         to: options.to,
         subject: options.subject,
         html: options.html,
@@ -203,7 +222,7 @@ class EmailService {
         </div>
         <p>This code will expire in 10 minutes.</p>
         <p>If you didn't request this code, please ignore this email.</p>
-        <p>Best regards,<br>${config.email.fromName} Team</p>
+        <p>Best regards,<br>${esc(senderName())} Team</p>
       </div>
     `;
 
@@ -219,7 +238,7 @@ class EmailService {
       If you didn't request this code, please ignore this email.
 
       Best regards,
-      ${config.email.fromName} Team
+      ${senderName()} Team
     `;
 
     await this.sendEmail({
@@ -240,7 +259,7 @@ class EmailService {
   ): Promise<boolean> {
     const html = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h2 style="color: #333;">Welcome to NGA Central MIS</h2>
+        <h2 style="color: #333;">Welcome to ${esc(productName())}</h2>
         <p>Hello,</p>
         <p>Your account has been created successfully. Here are your login credentials:</p>
         <div style="background-color: #f4f4f4; padding: 20px; margin: 20px 0; border-radius: 8px;">
@@ -250,12 +269,12 @@ class EmailService {
         <p style="color: #d32f2f; font-weight: bold;">Important: You will be required to change your password on your first login.</p>
         <p>Please log in and update your password immediately for security reasons.</p>
         <p>If you have any questions, please contact support.</p>
-        <p>Best regards,<br>${config.email.fromName} Team</p>
+        <p>Best regards,<br>${esc(senderName())} Team</p>
       </div>
     `;
 
     const text = `
-      Welcome to NGA Central MIS
+      Welcome to ${productName()}
 
       Hello,
 
@@ -271,14 +290,14 @@ class EmailService {
       If you have any questions, please contact support.
 
       Best regards,
-      ${config.email.fromName} Team
+      ${senderName()} Team
     `;
 
     // Don't throw error if email fails - just log and continue
     return await this.sendEmail(
       {
         to: email,
-        subject: "Your NGA Central MIS Account Credentials",
+        subject: `Your ${productName()} Account Credentials`,
         html,
         text,
       },

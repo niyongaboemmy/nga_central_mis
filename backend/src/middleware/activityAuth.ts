@@ -1,5 +1,9 @@
 import jwt from "jsonwebtoken";
 import { q } from "../services/activity/db";
+import { responseTenant } from "../tenancy/claims";
+import { legacyDefaultTid } from "../tenancy/context";
+import { scopeTid } from "../tenancy/scoped";
+import { tidFromClaims } from "../vendor/nga-tenancy";
 
 /**
  * Light authentication for the activity collector (plan §5.3).
@@ -12,24 +16,26 @@ import { q } from "../services/activity/db";
  *
  * Never rejects: a missing or invalid token simply means "anonymous".
  */
-const versions = new Map<number, { v: number | null; at: number }>();
+// Keyed "t<tid>:<userId>" -- user ids repeat across tenant databases.
+const versions = new Map<string, { v: number | null; at: number }>();
+const vkey = (userId: number) => `t${responseTenant().tid}:${userId}`;
 const TTL_MS = 30_000;
 
 const currentVersion = async (userId: number): Promise<number | null> => {
-  const hit = versions.get(userId);
+  const hit = versions.get(vkey(userId));
   if (hit && Date.now() - hit.at < TTL_MS) return hit.v;
   const rows = await q<{ token_version: number; status: string }>(
     "SELECT token_version, status FROM User WHERE user_id = ? LIMIT 1",
     [userId],
   );
   const v = rows[0] && rows[0].status === "ACTIVE" ? Number(rows[0].token_version ?? 0) : null;
-  versions.set(userId, { v, at: Date.now() });
-  if (versions.size > 20_000) versions.delete(versions.keys().next().value as number);
+  versions.set(vkey(userId), { v, at: Date.now() });
+  if (versions.size > 20_000) versions.delete(versions.keys().next().value as string);
   return v;
 };
 
 /** Forget a cached version (logout / sign-out everywhere act immediately in-process). */
-export const invalidateActivityAuth = (userId: number) => versions.delete(userId);
+export const invalidateActivityAuth = (userId: number) => versions.delete(vkey(userId));
 
 export const tokenFromRequest = (req: any): string | null => {
   const h = req.get?.("Authorization");
@@ -46,6 +52,15 @@ export const resolveActivityUser = async (req: any): Promise<number | null> => {
     if (decoded?.requiresOTP || decoded?.dbAccess) return null; // half-finished login, step-up token
     const userId = Number(decoded?.userId);
     if (!Number.isInteger(userId) || userId <= 0) return null;
+    // A token speaks for one school: user ids repeat across schools, so a token of
+    // school B must never be read as user N of the school this request runs in.
+    let here: number;
+    try {
+      here = scopeTid("activity auth");
+    } catch {
+      return null;
+    }
+    if (tidFromClaims(decoded, legacyDefaultTid()) !== here) return null;
     const v = await currentVersion(userId);
     if (v === null || (decoded.tokenVersion ?? 0) !== v) return null;
     return userId;

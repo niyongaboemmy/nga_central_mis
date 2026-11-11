@@ -51,12 +51,24 @@ import { authenticate } from "./middleware/auth";
 import { serveAvatar, serveCover } from "./controllers/avatarController";
 import { jwks, ssoIssuer } from "./services/sso/signingKey";
 import { mcpConnectionsRouter, mcpConsentRouter, mcpPublicRouter } from "./services/mcp/routes";
+import platformRoutes from "./routes/platform";
+import tenantBrandingRoutes from "./routes/tenantBranding";
+import { installExpressTenantBinding, tenantMiddleware } from "./tenancy/express";
+
+// Multi-tenancy: handlers resumed from stream callbacks (multer...) re-enter
+// their request's tenant context (tenancy/express.ts).
+installExpressTenantBinding();
 
 const app = express();
 
 // nginx terminates TLS on the same box and forwards X-Forwarded-For. Without this,
 // req.ip is always 127.0.0.1 (plan G1), and analytics, rate limits and logs all see one client.
 app.set("trust proxy", "loopback");
+
+// Every request runs in a tenant context: the MIS JWT's tenant, or (shadow
+// mode only) the primary tenant. authenticate / service auth / sign-in narrow
+// it further (tenancy/express.ts, CONTRACT.md §6).
+app.use(tenantMiddleware);
 
 // The NGA connector (REUSING_AI_SUBSCRIPTIONS_ANALYSIS.md §3.1): OAuth metadata, client
 // registration, token endpoint and POST /mcp. Before the app's CORS (these are called by
@@ -135,8 +147,10 @@ app.get("/", (req, res) => {
 app.use("/auth", authRoutes);
 app.use("/users", userRoutes);
 // Profile pictures: public but signed + versioned URLs (services/avatar/urls.ts).
-app.get("/avatars/:userId/:version/:file", serveAvatar);
+app.get("/avatars/:userId/:version/:file", serveAvatar); // NGA (tenant 1)
 app.get("/covers/:userId/:version/:file", serveCover);
+app.get("/avatars/t/:tid/:userId/:version/:file", serveAvatar); // school <tid>
+app.get("/covers/t/:tid/:userId/:version/:file", serveCover);
 app.use("/permissions", permissionRoutes);
 app.use("/documents", documentRoutes);
 app.use("/academics", academicRoutes);
@@ -176,6 +190,9 @@ app.use("/reminders", reminderRoutes);
 // among the API routers so it is obvious it shares no middleware with the
 // user-session routes above it.
 app.use("/integrations/ai", aiGatewayRoutes);
+// Tenant registry for spoke apps (packages/tenancy/CONTRACT.md §4).
+app.use("/platform", platformRoutes);
+app.use("/tenant", tenantBrandingRoutes); // public branding (MIS-S10)
 app.use("/integrations", integrationRoutes);
 // Usage analytics & live monitoring console (ANALYTICS_* capabilities).
 app.use("/monitor", monitorRoutes);

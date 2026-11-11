@@ -1,4 +1,5 @@
 import { and, eq } from "drizzle-orm";
+import { responseTenant } from "../../tenancy/claims";
 import { db } from "../../db";
 import {
   ClassGroup,
@@ -326,7 +327,7 @@ export async function buildLegacySnapshot(params: {
     v: 0,
     app: "mis",
     core: "legacy",
-    user: { id: userId, persona, school_id: 1 },
+    user: { id: userId, persona, school_id: responseTenant().tid },
     year: yearId,
     caps,
     grants,

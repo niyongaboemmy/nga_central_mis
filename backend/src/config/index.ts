@@ -53,6 +53,38 @@ interface Config {
   };
 }
 
+/**
+ * Secrets never have a fallback in code (MIS-A18). In production a missing one stops the
+ * process at startup with the list of what is missing; development and tests get
+ * harmless local placeholders only (MAMP's root/root, no SMTP password).
+ */
+const PRODUCTION_SECRETS = ["JWT_SECRET", "DB_PASSWORD", "SMTP_PASS"] as const;
+
+type Env = Record<string, string | undefined>;
+
+export function isProductionEnv(env: Env = process.env): boolean {
+  return (env.ENV_TYPE || "development") === "production" || env.NODE_ENV === "production";
+}
+
+/** The secrets this environment must provide but doesn't (empty = fine). */
+export function missingRequiredSecrets(env: Env = process.env): string[] {
+  const required: string[] = ["JWT_SECRET"];
+  if (isProductionEnv(env)) required.push(...PRODUCTION_SECRETS.filter((k) => k !== "JWT_SECRET"));
+  else if ((env.DB_CONNECTION || "local") === "remote") required.push("DB_PASSWORD_REMOTE");
+  return [...new Set(required)].filter((k) => !String(env[k] ?? "").trim());
+}
+
+/** Throws (startup) when a required secret is missing. */
+export function assertRequiredSecrets(env: Env = process.env): void {
+  const missing = missingRequiredSecrets(env);
+  if (missing.length > 0) {
+    throw new Error(
+      `Missing required environment variables: ${missing.join(", ")}` +
+        (isProductionEnv(env) ? " (production never falls back to built-in secrets)" : ""),
+    );
+  }
+}
+
 // Database configuration - supports local and remote switching
 const dbConnection = process.env.DB_CONNECTION || "local";
 
@@ -62,7 +94,7 @@ const databaseConfig: DatabaseConfig =
         host: process.env.DB_HOST_REMOTE || "mysql.uk.cloudlogin.co",
         port: parseInt(process.env.DB_PORT_REMOTE || "3306", 10),
         username: process.env.DB_USERNAME_REMOTE || "ngarw_mis",
-        password: process.env.DB_PASSWORD_REMOTE || "NgaMisDbPass@90",
+        password: process.env.DB_PASSWORD_REMOTE || "",
         name: process.env.DB_NAME_REMOTE || "ngarw_mis",
       }
     : {
@@ -125,7 +157,7 @@ const productionConfig: Config = {
     host: process.env.DB_HOST || "mysql.uk.cloudlogin.co",
     port: parseInt(process.env.DB_PORT || "3306", 10),
     username: process.env.DB_USERNAME || "ngarw_mis",
-    password: process.env.DB_PASSWORD || "NgaMisDbPass@90",
+    password: process.env.DB_PASSWORD || "", // required: assertRequiredSecrets()
     name: process.env.DB_NAME || "ngarw_nga_central_mis",
   },
   cors: {
@@ -145,7 +177,7 @@ const productionConfig: Config = {
       host: process.env.SMTP_HOST || "mail.hackflix.net",
       port: parseInt(process.env.SMTP_PORT || "465"),
       user: process.env.SMTP_USER || "mis@nga.ac.rw",
-      pass: process.env.SMTP_PASS || "NgaMisMailPas@90",
+      pass: process.env.SMTP_PASS || "", // required: assertRequiredSecrets()
     },
     imap: {
       host: process.env.IMAP_HOST || "mail.hackflix.net",
@@ -172,15 +204,8 @@ const envType = process.env.ENV_TYPE || "development";
 
 const config = envType === "production" ? productionConfig : developmentConfig;
 
-// Validate required environment variables
-const requiredEnvVars = ["JWT_SECRET"];
-const missingEnvVars = requiredEnvVars.filter((envVar) => !process.env[envVar]);
-
-if (missingEnvVars.length > 0) {
-  throw new Error(
-    `Missing required environment variables: ${missingEnvVars.join(", ")}`,
-  );
-}
+// Validate required environment variables (fail fast).
+assertRequiredSecrets(process.env);
 
 // Log environment info
 console.log(`🚀 Running in ${config.envType} mode`);

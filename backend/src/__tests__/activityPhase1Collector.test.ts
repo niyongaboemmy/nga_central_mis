@@ -27,6 +27,7 @@ import { parseUa } from "../services/activity/ua";
 import { sanitizeRoute } from "../services/activity/schema";
 import { redactBody } from "../middleware/requestLogger";
 import { invalidateActivityAuth } from "../middleware/activityAuth";
+import { assignTestSystems } from "../test/systems";
 
 /**
  * USAGE_ANALYTICS_IMPLEMENTATION_PLAN.md — Phase 0 + Phase 1 (collector, sessions,
@@ -358,6 +359,7 @@ describe("Relay ingest (/activity/ingest)", () => {
       name: `TM relay test ${clientId}`, client_id: clientId, client_secret: secret, allowed_redirect_uris: "http://localhost",
       icon_url: "x", home_url: "http://localhost", status: "ACTIVE",
     } as any);
+    await assignTestSystems(clientId);
   });
   afterAll(() => {
     delete process.env.ACTIVITY_SOURCE_CLIENTS;

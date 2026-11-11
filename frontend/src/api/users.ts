@@ -93,6 +93,8 @@ export interface Grade {
 }
 
 export interface UserWithProfile {
+  /** The school this session belongs to (multi-tenancy; NGA = tid 1). */
+  tenant?: import("../lib/tenant").TenantInfo | null;
   user: User;
   profile: UserProfile | null;
   avatar?: Avatar | null;

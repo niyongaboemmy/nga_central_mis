@@ -1,5 +1,7 @@
 import logger from "./logger";
 import { AppError } from "../middleware/errorHandler";
+import { PRIMARY_TENANT_ID, tenantPathFor } from "../vendor/nga-tenancy";
+import { resolveDataTid } from "../tenancy/context";
 
 // Drop-in replacement for the old FTP-backed utils/ftp.ts, same method
 // names/signatures, so every caller (documentController, curriculumController,
@@ -21,11 +23,36 @@ const FILE_SERVER_TIMEOUT_MS = parseInt(
 
 // Every path this backend passes to the file-server is namespaced under
 // its own app folder so it can never collide with another app's files in
-// the shared storage root.
+// the shared storage root -- and, with multi-tenancy (MIS-A14, contract §8),
+// under the school: `nga_central_mis/t/<tid>/<remotePath>`. The remote paths
+// callers store in the database stay the same ("avatars/12", "<userId>/x.pdf");
+// only the storage location carries the tenant, so ids that repeat across
+// school databases can never collide in storage.
 const NAMESPACE = "nga_central_mis";
 
-function namespaced(remotePath: string): string {
+/** The school the current request/job stores files for. */
+const storageTid = () => resolveDataTid("file storage");
+
+/** Where a new write goes: nga_central_mis/t/<tid>/<remotePath>. */
+export function namespaced(remotePath: string, tid: number = storageTid()): string {
+  return tenantPathFor(tid, NAMESPACE, remotePath);
+}
+
+/** The pre-tenancy location (tenant 1's existing files). */
+export function legacyNamespaced(remotePath: string): string {
   return `${NAMESPACE}/${remotePath}`;
+}
+
+/**
+ * Where a read may find the file, in order: the tenant path, then -- for the
+ * primary tenant only, while FILE_SERVER_LEGACY_READ is not "false" -- the old
+ * un-tenanted path, so every file stored before tenancy keeps resolving. Other
+ * schools never fall back: the legacy tree is NGA's.
+ */
+export function readCandidates(remotePath: string, tid: number = storageTid()): string[] {
+  const out = [namespaced(remotePath, tid)];
+  if (tid === PRIMARY_TENANT_ID && process.env.FILE_SERVER_LEGACY_READ !== "false") out.push(legacyNamespaced(remotePath));
+  return out;
 }
 
 async function request(
@@ -100,9 +127,7 @@ class FileServerService {
   }
 
   async downloadToBuffer(remotePath: string): Promise<Buffer> {
-    const res = await request(
-      `/files?path=${encodeURIComponent(namespaced(remotePath))}`,
-    );
+    const res = await this.firstFound(remotePath);
     if (!res.ok) {
       throw new Error(`Failed to download file: ${res.status}`);
     }
@@ -131,20 +156,23 @@ class FileServerService {
       cacheSeconds?: number;
     } = {},
   ): Promise<void> {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), FILE_SERVER_TIMEOUT_MS);
-    let upstream: Response;
-    try {
-      upstream = await fetch(`${FILE_SERVER_URL}/files?path=${encodeURIComponent(namespaced(remotePath))}`, {
-        signal: controller.signal,
-        headers: { "X-API-Key": FILE_SERVER_API_KEY, ...(opts.range ? { Range: opts.range } : {}) },
-      });
-    } catch (err: any) {
+    let upstream!: Response;
+    for (const candidate of readCandidates(remotePath)) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), FILE_SERVER_TIMEOUT_MS);
+      try {
+        upstream = await fetch(`${FILE_SERVER_URL}/files?path=${encodeURIComponent(candidate)}`, {
+          signal: controller.signal,
+          headers: { "X-API-Key": FILE_SERVER_API_KEY, ...(opts.range ? { Range: opts.range } : {}) },
+        });
+      } catch (err: any) {
+        clearTimeout(timer);
+        if (err?.name === "AbortError") throw new AppError("File storage did not respond in time", 504);
+        throw err;
+      }
       clearTimeout(timer);
-      if (err?.name === "AbortError") throw new AppError("File storage did not respond in time", 504);
-      throw err;
+      if (upstream.status !== 404) break;
     }
-    clearTimeout(timer);
     if (upstream.status === 404) throw new AppError("File not found in storage", 404);
     if (upstream.status === 416) {
       res.status(416).setHeader("Content-Range", upstream.headers.get("content-range") || "");
@@ -182,7 +210,7 @@ class FileServerService {
 
   /** Streams a stored file to a local path (for conversion / text extraction), never buffering it. */
   async downloadToFile(remotePath: string, localPath: string): Promise<number> {
-    const res = await request(`/files?path=${encodeURIComponent(namespaced(remotePath))}`, {}, { timeout: false });
+    const res = await this.firstFound(remotePath, { timeout: false });
     if (!res.ok || !res.body) throw new Error(`Failed to download file: ${res.status}`);
     const fs = await import("fs");
     const { Readable } = await import("stream");
@@ -192,14 +220,24 @@ class FileServerService {
   }
 
   async deleteFile(remotePath: string): Promise<void> {
-    const res = await request(
-      `/files?path=${encodeURIComponent(namespaced(remotePath))}`,
-      { method: "DELETE" },
-    );
-    if (!res.ok && res.status !== 404) {
-      throw new Error(`Failed to delete file: ${res.status}`);
+    // Every location the file may be in (tenant 1: the new and the legacy path).
+    for (const candidate of readCandidates(remotePath)) {
+      const res = await request(`/files?path=${encodeURIComponent(candidate)}`, { method: "DELETE" });
+      if (!res.ok && res.status !== 404) {
+        throw new Error(`Failed to delete file: ${res.status}`);
+      }
     }
     logger.info(`File deleted: ${remotePath}`);
+  }
+
+  /** GET the first candidate location that exists (404 moves on to the next). */
+  private async firstFound(remotePath: string, opts: { timeout?: boolean } = {}): Promise<Response> {
+    let res!: Response;
+    for (const candidate of readCandidates(remotePath)) {
+      res = await request(`/files?path=${encodeURIComponent(candidate)}`, {}, opts);
+      if (res.status !== 404) return res;
+    }
+    return res;
   }
 
   async createDirectory(remotePath: string): Promise<void> {
@@ -216,12 +254,13 @@ class FileServerService {
 
   async fileExists(remotePath: string): Promise<boolean> {
     try {
-      const res = await request(
-        `/files/exists?path=${encodeURIComponent(namespaced(remotePath))}`,
-      );
-      if (!res.ok) return false;
-      const data = (await res.json()) as { exists: boolean };
-      return data.exists;
+      for (const candidate of readCandidates(remotePath)) {
+        const res = await request(`/files/exists?path=${encodeURIComponent(candidate)}`);
+        if (!res.ok) continue;
+        const data = (await res.json()) as { exists: boolean };
+        if (data.exists) return true;
+      }
+      return false;
     } catch (error) {
       if (error instanceof AppError) throw error;
       logger.error("file-server exists check failed:", error);

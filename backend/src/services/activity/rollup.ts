@@ -1,6 +1,7 @@
 import logger from "../../utils/logger";
 import { activityPool, exec, q } from "./db";
-import { clock, kigaliDay, TZ_OFFSET_MS } from "./runtime";
+import { clock, kigaliDay, schoolLocalToUtc, tzOffset } from "./runtime";
+import { tenantLocal } from "../../tenancy/scoped";
 import { getSettings } from "./settings";
 
 /**
@@ -14,8 +15,8 @@ import { getSettings } from "./settings";
 
 /** UTC bounds of a Kigali calendar day ("2026-10-01" → [2026-09-30T22:00Z, 2026-10-01T22:00Z)). */
 export const dayBounds = (day: string): [Date, Date] => {
-  const start = new Date(`${day}T00:00:00.000Z`).getTime() - TZ_OFFSET_MS;
-  return [new Date(start), new Date(start + 86_400_000)];
+  const local = new Date(`${day}T00:00:00.000Z`).getTime();
+  return [new Date(schoolLocalToUtc(local)), new Date(schoolLocalToUtc(local + 86_400_000))];
 };
 export const addDays = (day: string, n: number) =>
   new Date(new Date(`${day}T00:00:00.000Z`).getTime() + n * 86_400_000).toISOString().slice(0, 10);
@@ -287,17 +288,17 @@ export const refreshIpCounts = async () => {
 // ---------------------------------------------------------------------------
 // Scheduling (started by engine.ts)
 // ---------------------------------------------------------------------------
-let lastNightly = "";
+const nightly = tenantLocal(() => ({ last: "" })); // per tenant: each school has its own night
 export const rollupTick = async () => {
   const today = todayKigali();
   await rollupDay(today);
   // Just after midnight, finish yesterday too.
-  const kigaliMinutes = Math.floor(((clock.now() + TZ_OFFSET_MS) % 86_400_000) / 60_000);
+  const kigaliMinutes = Math.floor(((clock.now() + tzOffset()) % 86_400_000) / 60_000);
   if (kigaliMinutes < 15) await rollupDay(addDays(today, -1));
   // Nightly between 01:30 and 06:00 Kigali (quiet hours): late events, partitions,
   // retention, IP counts. A restart during the day never triggers it.
-  if (kigaliMinutes >= 90 && kigaliMinutes < 360 && lastNightly !== today) {
-    lastNightly = today;
+  if (kigaliMinutes >= 90 && kigaliMinutes < 360 && nightly().last !== today) {
+    nightly().last = today;
     for (let d = 1; d <= 3; d++) await rollupDay(addDays(today, -d));
     await maintainPartitions().catch((error) => logger.error("[activity] partition maintenance failed", { error }));
     const pruned = await pruneRetention();

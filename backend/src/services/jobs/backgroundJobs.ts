@@ -2,6 +2,8 @@ import { and, eq, inArray, lte, sql } from "drizzle-orm";
 import { db } from "../../db";
 import { BackgroundJob } from "../../db/schema";
 import logger from "../../utils/logger";
+import { scopeTid } from "../../tenancy/scoped";
+import { tenantJob } from "../../tenancy/jobs";
 
 /**
  * A small durable job queue (LESSON_STUDIO plan §10.3) for work that must run out of the
@@ -25,13 +27,17 @@ export async function enqueueJob(kind: string, payload: Record<string, unknown>,
   return ins.insertId as number;
 }
 
-let running = false;
+// One job at a time per school database; the timer visits every school in turn
+// (tenantJob runs them sequentially, so conversions never run in parallel here either).
+const running = new Set<number>();
 let timer: NodeJS.Timeout | null = null;
+const tickAll = tenantJob("background-jobs", () => runJobsOnce(), { jitterMs: 0 });
 
 /** Runs ready jobs one after another until none is ready. Returns how many ran. */
 export async function runJobsOnce(now = new Date()): Promise<number> {
-  if (running) return 0;
-  running = true;
+  const tid = scopeTid();
+  if (running.has(tid)) return 0;
+  running.add(tid);
   let ran = 0;
   try {
     // Restart recovery: a job left RUNNING by a dead process goes back to the queue.
@@ -78,16 +84,16 @@ export async function runJobsOnce(now = new Date()): Promise<number> {
       }
     }
   } finally {
-    running = false;
+    running.delete(tid);
   }
   return ran;
 }
 
 export function startJobWorker(): void {
   if (timer) return;
-  timer = setInterval(() => void runJobsOnce().catch((error) => logger.error("[jobs] tick failed", { error })), 15_000);
+  timer = setInterval(() => void tickAll(), 15_000);
   timer.unref();
-  setTimeout(() => void runJobsOnce().catch(() => undefined), 8000).unref();
+  setTimeout(() => void tickAll(), 8000).unref();
 }
 
 /** Tests: is anything still queued for these kinds? */

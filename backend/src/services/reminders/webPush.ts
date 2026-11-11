@@ -125,11 +125,20 @@ export const endpointHash = (endpoint: string) =>
  */
 const actionSecret = () => process.env.REMINDERS_ACTION_SECRET || process.env.JWT_SECRET || "nga-reminders-dev";
 
-export const signAction = (jobId: number, userId: number) =>
-  crypto.createHmac("sha256", actionSecret()).update(`${jobId}.${userId}`).digest("base64url").slice(0, 32);
+/**
+ * `tid` set: the signature also covers the school (links carry it as `&t=<tid>`), so a
+ * button of school B can never act on job N of school A. Without `tid`: the
+ * pre-tenancy form, still accepted for the primary school's old notifications.
+ */
+export const signAction = (jobId: number, userId: number, tid?: number) =>
+  crypto
+    .createHmac("sha256", actionSecret())
+    .update(tid === undefined ? `${jobId}.${userId}` : `t${tid}.${jobId}.${userId}`)
+    .digest("base64url")
+    .slice(0, 32);
 
-export const verifyAction = (jobId: number, userId: number, signature: string) => {
-  const expected = Buffer.from(signAction(jobId, userId));
+export const verifyAction = (jobId: number, userId: number, signature: string, tid?: number) => {
+  const expected = Buffer.from(signAction(jobId, userId, tid));
   const given = Buffer.from(String(signature || ""));
   return expected.length === given.length && crypto.timingSafeEqual(expected, given);
 };

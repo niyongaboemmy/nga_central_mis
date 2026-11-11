@@ -11,6 +11,7 @@ import {
   createProgramGradeClassGroup,
   createStudentClassGroup,
 } from "../test/fixtures";
+import { assignTestSystems } from "../test/systems";
 
 // 2026-10-12: a student could not see their assigned mentor. The My Mentor
 // page and /mentorship/my-mentor required SUBMIT_MENTEE_CHECKIN, which
@@ -62,6 +63,7 @@ describe("Students reach their mentor", () => {
     await db.insert(System).values({
       name: `Tupo mentorship ${tag}`, client_id: clientId, client_secret: "s3cret", icon_url: "x", home_url: "x", status: "ACTIVE",
     } as any);
+    await assignTestSystems(clientId);
   });
 
   it("a student with a mentor but no check-in permission sees the mentor's full contact card", async () => {

@@ -13,6 +13,7 @@ import { ANONYMOUS_EVENTS, ANONYMOUS_MAX_EVENTS, Envelope, sanitizeRoute, WireEv
 import { touchSession } from "./sessionizer";
 import { ActivitySettings, campusRanges, getSettings } from "./settings";
 import { ulid, visitorCode } from "./tokens";
+import { scopedKey } from "../../tenancy/scoped";
 import { queueDevice, queueDeviceIp, queueEvent, queueIp, queueUserIp, queueUserState } from "./writer";
 
 /**
@@ -56,6 +57,7 @@ const isDuplicate = (id: string, now: number) => {
     lastPrune = now;
     for (const [k, exp] of seen) if (exp < now) seen.delete(k);
   }
+  id = scopedKey(id); // per school: relays batch several schools together
   if (seen.has(id)) return true;
   seen.set(id, now + DEDUPE_TTL);
   return false;
@@ -92,14 +94,19 @@ const noteHealth = (app: AppKey, n: number, now: number) => {
 // ---------------------------------------------------------------------------
 // Pending commands for a user's / device's next sync (best-effort "sign out this device").
 // ---------------------------------------------------------------------------
+// Keyed "t<tid>:u:<id>" / "t<tid>:d:<did>": user ids repeat across schools, and one
+// browser keeps one device id when it signs in to two schools.
 const commands = new Map<string, { type: "end"; until: number }>();
 export const queueCommand = (target: { userId?: number; deviceId?: string }, ttlMs = 10 * 60_000) => {
   const until = clock.now() + ttlMs;
-  if (target.userId) commands.set(`u:${target.userId}`, { type: "end", until });
-  if (target.deviceId) commands.set(`d:${target.deviceId}`, { type: "end", until });
+  if (target.userId) commands.set(scopedKey("u", target.userId), { type: "end", until });
+  if (target.deviceId) commands.set(scopedKey("d", target.deviceId), { type: "end", until });
+  if (commands.size > 20_000) for (const [k, c] of commands) if (c.until < clock.now()) commands.delete(k);
 };
+/** Test hook: is a command pending for this user in the current tenant? */
+export const hasPendingUserCommand = (userId: number) => commands.has(scopedKey("u", userId));
 const takeCommand = (userId: number | null, deviceId: string) => {
-  for (const k of [`d:${deviceId}`, userId ? `u:${userId}` : ""]) {
+  for (const k of [scopedKey("d", deviceId), userId ? scopedKey("u", userId) : ""]) {
     const c = k && commands.get(k);
     if (c) {
       commands.delete(k);

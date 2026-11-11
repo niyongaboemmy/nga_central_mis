@@ -8,6 +8,7 @@
     { "key": "mis.login", "label": "Sign-in page", "module": "Public", "patterns": ["/login"], "public": true },
     { "key": "mis.password_recovery", "label": "Password recovery", "module": "Public", "patterns": ["/password-recovery"], "public": true },
     { "key": "mis.scheme_verify", "label": "Verify a scheme of work", "module": "Public", "patterns": ["/verify/:schemeId"], "public": true },
+    { "key": "mis.onboarding", "label": "School under review", "module": "Public", "patterns": ["/onboarding"], "public": true },
     { "key": "mis.apps", "label": "Get the apps", "module": "Public", "patterns": ["/apps"], "public": true },
     { "key": "mis.desktop_signin", "label": "Desktop app: sign in through the browser", "module": "Public", "patterns": ["/desktop/signin"], "public": true },
     { "key": "mis.desktop_signin_complete", "label": "Desktop app: finishing sign-in", "module": "Public", "patterns": ["/desktop/complete"], "public": true },

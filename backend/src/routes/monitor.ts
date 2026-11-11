@@ -13,7 +13,9 @@ import * as presence from "../services/activity/presence";
 import { clock } from "../services/activity/runtime";
 import { getSettings, updateSettings } from "../services/activity/settings";
 import { openSessionCount } from "../services/activity/sessionizer";
-import { consumeStreamTicket, issueStreamTicket } from "../services/activity/tokens";
+import { consumeStreamTicket, issueStreamTicket, streamTicketTid } from "../services/activity/tokens";
+import { getTenant } from "../tenancy/registry";
+import { enterTenant, tenantRefusal } from "../tenancy/express";
 import { bufferDepth, stats as writerStats } from "../services/activity/writer";
 import { logFromReq } from "../services/activity/accessLog";
 import { asyncHandler } from "../middleware/asyncHandler";
@@ -143,11 +145,15 @@ router.post(
 router.get(
   "/live/stream",
   asyncHandler(async (req: any, res: any, next: any) => {
-    const userId = consumeStreamTicket(req.query.ticket);
+    // The ticket names its school; the stream runs there (never in the cookie's school).
+    const tid = streamTicketTid(req.query.ticket);
+    const tenant = tid ? await getTenant(tid) : null;
+    if (!tenant || tenantRefusal(tenant)) return res.status(401).json({ message: "Invalid or expired stream ticket" });
+    const userId = consumeStreamTicket(req.query.ticket, tenant.tid);
     if (!userId) return res.status(401).json({ message: "Invalid or expired stream ticket" });
     // Re-use the normal capability check with a synthetic user on the request.
     req.user = { userId, permissions: [] };
-    next();
+    enterTenant(req, tenant, next);
   }),
   can(["ANALYTICS_VIEW", "ANALYTICS_LIVE_VIEW"]),
   asyncHandler(async (req: any, res: any) => {

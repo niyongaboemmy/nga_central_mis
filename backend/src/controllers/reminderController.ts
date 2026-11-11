@@ -34,9 +34,12 @@ import {
   completeConnect,
   disconnectGoogle,
   getGoogleLink,
+  connectStateTid,
   googleConfig,
   syncGoogleCalendar,
 } from "../services/reminders/googleCalendar";
+import { enterTenant, usableTenant } from "../tenancy/express";
+import { PRIMARY_TENANT_ID, parseTid } from "../vendor/nga-tenancy";
 import { ESCALATE_AFTER_MS } from "../services/reminders/channels";
 import {
   apiUrl,
@@ -49,6 +52,7 @@ import {
   buildFeedForUser,
   getFeedToken,
   issueFeedToken,
+  feedTokenTid,
   revokeFeedToken,
   userForFeedToken,
 } from "../services/reminders/calendarFeed";
@@ -208,7 +212,11 @@ export const googleCallback = async (req: any, res: any) => {
   const back = (result: string) => res.redirect(302, appUrl(`/reminders?google=${result}`));
   if (req.query?.error) return back(req.query.error === "access_denied" ? "denied" : "error");
   try {
-    await completeConnect(String(req.query?.code || ""), String(req.query?.state || ""));
+    // The signed state names the school; the cookie (if any) is ignored.
+    const state = String(req.query?.state || "");
+    const tenant = await usableTenant(connectStateTid(state));
+    if (!tenant) return back("error");
+    await enterTenant(req, tenant, () => completeConnect(String(req.query?.code || ""), state));
     return back("connected");
   } catch (error: any) {
     logger.warn("[reminders] google connect failed", { data: { error: String(error?.message || error) } });
@@ -385,12 +393,22 @@ export const notificationAction = asyncHandler(async (req: any, res: any) => {
   const jobId = jobIdParam(req);
   const action = req.params?.action;
   if (action !== "ack" && action !== "snooze") throw new ValidationError("Unknown action");
+  // `t` names the school (it is inside the signature); links sent before
+  // multi-tenancy carry none and belong to the primary school.
+  const signedTid = req.query?.t === undefined ? null : parseTid(req.query.t);
+  if (req.query?.t !== undefined && !signedTid) return res.status(403).json({ success: false, message: "Invalid or expired action link" });
+  const tenant = await usableTenant(signedTid ?? PRIMARY_TENANT_ID);
+  if (!tenant) return res.status(403).json({ success: false, message: "Invalid or expired action link" });
+  return enterTenant(req, tenant, () => runAction(req, res, jobId, action, signedTid));
+});
+
+const runAction = async (req: any, res: any, jobId: number, action: "ack" | "snooze", signedTid: number | null) => {
   const [job] = await db
     .select({ user_id: ReminderJob.user_id })
     .from(ReminderJob)
     .where(eq(ReminderJob.job_id, jobId))
     .limit(1);
-  if (!job || !verifyAction(jobId, job.user_id, String(req.query?.sig || ""))) {
+  if (!job || !verifyAction(jobId, job.user_id, String(req.query?.sig || ""), signedTid ?? undefined)) {
     return res.status(403).json({ success: false, message: "Invalid or expired action link" });
   }
   if (action === "ack") {
@@ -399,7 +417,7 @@ export const notificationAction = asyncHandler(async (req: any, res: any) => {
   }
   const result = await snoozeJob(jobId, job.user_id);
   successResponse(res, result.ok ? "Snoozed for 5 minutes" : "Too late to snooze", result);
-});
+};
 
 // ─── Calendar feed ───────────────────────────────────────────────────────────
 
@@ -420,9 +438,15 @@ export const deleteFeed = asyncHandler(async (req: any, res: any) => {
 
 export const serveFeed = asyncHandler(async (req: any, res: any) => {
   const token = String(req.params?.token || "").replace(/\.ics$/, "");
-  const userId = await userForFeedToken(token);
-  if (!userId) return res.status(404).type("text/plain").send("Calendar not found");
-  const ics = await buildFeedForUser(userId);
+  // The token names its school ("t<tid>.<secret>"; older tokens: the primary). It is
+  // looked up in that school's database only, so changing the prefix finds nothing.
+  const tenant = await usableTenant(feedTokenTid(token));
+  if (!tenant) return res.status(404).type("text/plain").send("Calendar not found");
+  const ics = await enterTenant(req, tenant, async () => {
+    const userId = await userForFeedToken(token);
+    return userId ? buildFeedForUser(userId) : null;
+  });
+  if (ics === null) return res.status(404).type("text/plain").send("Calendar not found");
   res.set({
     "Content-Type": "text/calendar; charset=utf-8",
     "Content-Disposition": 'inline; filename="nga-timetable.ics"',

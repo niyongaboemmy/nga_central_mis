@@ -1,7 +1,9 @@
 import crypto from "crypto";
 import jwt from "jsonwebtoken";
 import { and, eq, isNotNull } from "drizzle-orm";
-import { db } from "../../db";
+import { primaryDb } from "../../db";
+import { responseTenant } from "../../tenancy/claims";
+import { filterAssignedSystems } from "../../tenancy/systems";
 import { System } from "../../db/schema";
 import logger from "../../utils/logger";
 import { loadSigningKey, ssoIssuer } from "./signingKey";
@@ -28,7 +30,7 @@ import { loadSigningKey, ssoIssuer } from "./signingKey";
 
 export const LOGOUT_EVENT = "http://schemas.openid.net/event/backchannel-logout";
 
-export const buildLogoutToken = (misUserId: number, clientId: string, now = Date.now()) => {
+export const buildLogoutToken = (misUserId: number, clientId: string, now = Date.now(), tid: number = responseTenant().tid) => {
   const key = loadSigningKey();
   if (!key) return null;
   const iat = Math.floor(now / 1000);
@@ -40,6 +42,8 @@ export const buildLogoutToken = (misUserId: number, clientId: string, now = Date
       exp: iat + 120, // short-lived: a logout token is used once, immediately
       jti: crypto.randomUUID(),
       sub: String(misUserId),
+      // Contract §2: MIS user ids repeat across tenants -- spokes revoke on (tid, sub).
+      tid,
       events: { [LOGOUT_EVENT]: {} },
     },
     key.privateKey,
@@ -73,13 +77,13 @@ export interface LogoutDelivery {
 }
 
 /** Deliver to one app, retrying transient failures (never throws). */
-const deliver = async (system: { name: string; client_id: string | null; backchannel_logout_uri: string | null }, misUserId: number, retryDelays: number[]) => {
+const deliver = async (system: { name: string; client_id: string | null; backchannel_logout_uri: string | null }, misUserId: number, retryDelays: number[], tid: number) => {
   const result: LogoutDelivery = { system: system.name, status: null, attempts: 0 };
   for (let i = 0; i <= retryDelays.length; i++) {
     if (i > 0) await sleep(retryDelays[i - 1]);
     result.attempts++;
     // A fresh token per attempt (new jti, fresh iat).
-    const token = buildLogoutToken(misUserId, system.client_id!);
+    const token = buildLogoutToken(misUserId, system.client_id!, Date.now(), tid);
     if (!token) return result;
     try {
       result.status = await post(system.backchannel_logout_uri!, new URLSearchParams({ logout_token: token }).toString());
@@ -98,16 +102,20 @@ const deliver = async (system: { name: string; client_id: string | null; backcha
  */
 export const notifyLogout = async (misUserId: number, opts: { retryDelays?: number[] } = {}): Promise<LogoutDelivery[]> => {
   if (!loadSigningKey()) return [];
-  const systems = await db
-    .select({ name: System.name, client_id: System.client_id, backchannel_logout_uri: System.backchannel_logout_uri })
+  // The tenant is read now: the deliveries below outlive the request.
+  const tenant = responseTenant();
+  const all = await primaryDb()
+    .select({ system_id: System.system_id, name: System.name, client_id: System.client_id, backchannel_logout_uri: System.backchannel_logout_uri })
     .from(System)
     .where(and(eq(System.status, "ACTIVE"), isNotNull(System.backchannel_logout_uri), isNotNull(System.client_id)));
+  // Only the apps this school uses hold sessions of its users.
+  const systems = await filterAssignedSystems(all, tenant);
   const results = await Promise.all(
-    systems.filter((s) => s.backchannel_logout_uri).map((s) => deliver(s, misUserId, opts.retryDelays ?? [1000, 4000])),
+    systems.filter((s) => s.backchannel_logout_uri).map((s) => deliver(s, misUserId, opts.retryDelays ?? [1000, 4000], tenant.tid)),
   );
   const failed = results.filter((r) => r.status === null || r.status >= 300);
   if (failed.length) {
-    logger.warn("[sso] back-channel logout not delivered to some apps", { data: { misUserId, failed } });
+    logger.warn("[sso] back-channel logout not delivered to some apps", { data: { tid: tenant.tid, misUserId, failed } });
   }
   return results;
 };

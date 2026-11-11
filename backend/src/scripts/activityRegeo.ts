@@ -20,7 +20,7 @@ dotenv.config({ path: path.resolve(__dirname, "../../.env") });
 async function main() {
   const dry = process.argv.includes("--dry-run");
   // Imported after dotenv so the activity pool sees the database settings.
-  const { q, exec, activityPool } = await import("../services/activity/db");
+  const { q, exec, closeActivityPool } = await import("../services/activity/db");
   const { resolveGeo } = await import("../services/activity/dims");
   const { geoDbStatus } = await import("../services/activity/geoip");
   const { ipToString } = await import("../services/activity/ip");
@@ -50,7 +50,7 @@ async function main() {
   console.log(`${ips.length} IPs known, ${changed.length} gain or change a place.`);
   for (const [label, n] of [...places].sort((a, b) => b[1] - a[1]).slice(0, 15)) console.log(`  ${String(n).padStart(4)}  ${label}`);
   if (dry || changed.length === 0) {
-    await activityPool().end();
+    await closeActivityPool();
     return;
   }
 
@@ -80,7 +80,7 @@ async function main() {
     }
     console.log(`Rebuilt ${n} daily rollups (${sorted[0]} → ${today}).`);
   }
-  await activityPool().end();
+  await closeActivityPool();
 }
 
 const addDay = (d: string) => {

@@ -1,3 +1,4 @@
+import { scopedKey } from "../tenancy/scoped";
 import express from "express";
 import { authenticate, authorize } from "../middleware/auth";
 import { Permissions } from "../utils/permissions";
@@ -87,7 +88,7 @@ router.post(
     const parsed = parseProgram(req.body, res);
     if (!parsed) return;
     const { language, code, entry, stdin, extra } = parsed;
-    if (!runs.take(String(req.user.userId))) return fail(res, 429, "RATE_LIMITED", "Too many runs — wait a minute and try again.");
+    if (!runs.take(scopedKey("u", req.user.userId))) return fail(res, 429, "RATE_LIMITED", "Too many runs — wait a minute and try again.");
 
     try {
       successResponse(res, "Ran", await runCode(token, { language, code, entry, stdin, files: extra }));
@@ -109,7 +110,7 @@ router.post(
     if (!token) return fail(res, 401, "SESSION_EXPIRED", "Sign in again to run code.");
     const parsed = parseProgram(req.body, res);
     if (!parsed) return;
-    if (!runs.take(String(req.user.userId))) return fail(res, 429, "RATE_LIMITED", "Too many runs — wait a minute and try again.");
+    if (!runs.take(scopedKey("u", req.user.userId))) return fail(res, 429, "RATE_LIMITED", "Too many runs — wait a minute and try again.");
     try {
       successResponse(res, "Started", { id: await startSession(token, { language: parsed.language, code: parsed.code, entry: parsed.entry, files: parsed.extra }) }, 201);
     } catch (e) {

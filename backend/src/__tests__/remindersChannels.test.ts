@@ -31,6 +31,7 @@ import { eventBody, setGoogleTransport, syncGoogleCalendar, buildAuthUrl } from 
 import { seal, signState, verifyState } from "../services/reminders/secretBox";
 import { kigaliInstant } from "../services/reminders/time";
 import type { PushSender } from "../services/reminders/webPush";
+import { assignTestSystems } from "../test/systems";
 
 /**
  * Reminder Hub, part two: the other NGA apps feeding it (batch Source API,
@@ -79,6 +80,7 @@ describe("Reminder Hub: integrations and channels", () => {
       icon_url: "https://example.test/i.png",
       home_url: "https://example.test",
     } as any);
+    await assignTestSystems(clientId);
   });
 
   afterAll(async () => {
@@ -300,7 +302,7 @@ describe("Reminder Hub: integrations and channels", () => {
       // Current Bot API field, not the deprecated disable_web_page_preview.
       expect(sent!.body.link_preview_options).toEqual({ is_disabled: true });
       expect(sent!.body.disable_web_page_preview).toBeUndefined();
-      expect(sent!.body.reply_markup.inline_keyboard[0].map((b: any) => b.callback_data)).toEqual([`ack:${job.job_id}`, `snooze:${job.job_id}`]);
+      expect(sent!.body.reply_markup.inline_keyboard[0].map((b: any) => b.callback_data)).toEqual([`ack:${job.job_id}:1`, `snooze:${job.job_id}:1`]); // ":<tid>" -- one bot serves every school
       expect(sent!.body.reply_markup.inline_keyboard[1][0].url).toBe("https://taskmentor.example/quizzes/9/take");
 
       // "Got it" from the linked chat acks; from another chat it's refused.
@@ -312,7 +314,7 @@ describe("Reminder Hub: integrations and channels", () => {
         snooze: async () => ({ ok: true }),
       };
       expect(await handleTelegramUpdate({ callback_query: { id: "q1", data: `ack:${job.job_id}`, message: { chat: { id: 999 } } } }, actions)).toBe("rejected");
-      expect(await handleTelegramUpdate({ callback_query: { id: "q2", data: `ack:${job.job_id}`, message: { chat: { id: 777001 }, message_id: 5 } } }, actions)).toBe("ack");
+      expect(await handleTelegramUpdate({ callback_query: { id: "q2", data: `ack:${job.job_id}:1`, message: { chat: { id: 777001 }, message_id: 5 } } }, actions)).toBe("ack");
       const [acked] = await db.select().from(ReminderJob).where(eq(ReminderJob.job_id, job.job_id));
       expect(acked.acked_at).not.toBeNull();
     });

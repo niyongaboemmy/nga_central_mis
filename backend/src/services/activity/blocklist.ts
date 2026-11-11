@@ -1,3 +1,4 @@
+import { tenantLocal } from "../../tenancy/scoped";
 import { exec, q } from "./db";
 import { cidrContains, ipToBuffer, parseCidr } from "./ip";
 import { clock } from "./runtime";
@@ -13,17 +14,17 @@ interface ActiveBlock {
   expires: number;
   m?: { buf: Buffer; bits: number } | null;
 }
-let blocks: ActiveBlock[] = [];
-let loadedAt = 0;
+// Per school (tenant): ids and settings differ between tenant databases.
+const st = tenantLocal(() => ({ blocks: ([]) as ActiveBlock[], loadedAt: (0) as number }));
 
 export const refreshBlocks = async (force = false) => {
-  if (!force && clock.now() - loadedAt < 30_000) return blocks;
+  if (!force && clock.now() - st().loadedAt < 30_000) return st().blocks;
   try {
     const rows = await q<any>(
       `SELECT id, kind, value, expires_at FROM AnalyticsBlock WHERE revoked_at IS NULL AND expires_at > ?`,
       [new Date(clock.now())],
     );
-    blocks = rows.map((r) => ({
+    st().blocks = rows.map((r) => ({
       id: r.id,
       kind: r.kind,
       value: r.value,
@@ -31,17 +32,17 @@ export const refreshBlocks = async (force = false) => {
       m: r.kind === "device" ? null : parseCidr(r.value),
     }));
   } catch {
-    blocks = [];
+    st().blocks = [];
   }
-  loadedAt = clock.now();
-  return blocks;
+  st().loadedAt = clock.now();
+  return st().blocks;
 };
 
 /** Synchronous check against the cached list (refreshed every 30 s by callers). */
 export const isBlocked = (deviceId: string | null, ip: string | null): ActiveBlock | null => {
   const now = clock.now();
   const buf = ip ? ipToBuffer(ip) : null;
-  for (const b of blocks) {
+  for (const b of st().blocks) {
     if (b.expires <= now) continue;
     if (b.kind === "device" && deviceId && b.value === deviceId) return b;
     if (b.kind !== "device" && b.m && buf && cidrContains(b.m, buf)) return b;

@@ -1,4 +1,6 @@
 import crypto from "crypto";
+import { PRIMARY_TENANT_ID } from "../../vendor/nga-tenancy";
+import { scopeTid } from "../../tenancy/scoped";
 
 /**
  * Small HMAC tokens used by the collector (plan §5.1, §5.3, §9.4):
@@ -42,19 +44,36 @@ export const visitorCode = (did: string) => {
   return `V-${out}`;
 };
 
-export const issueBeaconTicket = (userId: number, did: string, ttlMs = 10 * 60_000) => {
-  const body = `${userId}.${did}.${Date.now() + ttlMs}`;
+/** The school the current request runs for, or null (never throws). */
+const hereTid = (): number | null => {
+  try {
+    return scopeTid("activity ticket");
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * Beacon and stream tickets carry the school they were issued in (user ids repeat
+ * across schools): a ticket is honoured only by a request running in that school.
+ * Tickets minted before multi-tenancy (no tid part) belong to the primary school.
+ */
+export const issueBeaconTicket = (userId: number, did: string, ttlMs = 10 * 60_000, tid: number = scopeTid("beacon ticket")) => {
+  const body = `${userId}.${did}.${Date.now() + ttlMs}.${tid}`;
   return `${body}.${mac(`bt.${body}`).slice(0, 32)}`;
 };
 
 export const verifyBeaconTicket = (ticket: unknown, did: string): number | null => {
   if (typeof ticket !== "string") return null;
   const parts = ticket.split(".");
-  if (parts.length !== 4) return null;
-  const [uid, tDid, exp, sig] = parts;
-  const body = `${uid}.${tDid}.${exp}`;
+  if (parts.length !== 4 && parts.length !== 5) return null;
+  const sig = parts[parts.length - 1];
+  const [uid, tDid, exp] = parts;
+  const tid = parts.length === 5 ? Number(parts[3]) : PRIMARY_TENANT_ID;
+  const body = parts.slice(0, -1).join(".");
   if (!safeEqual(mac(`bt.${body}`).slice(0, 32), sig)) return null;
   if (tDid !== did || Number(exp) < Date.now()) return null;
+  if (tid !== hereTid()) return null;
   const n = Number(uid);
   return Number.isInteger(n) && n > 0 ? n : null;
 };
@@ -62,21 +81,25 @@ export const verifyBeaconTicket = (ticket: unknown, did: string): number | null 
 /** Single-use stream tickets. Kept in memory, which is fine for the single MIS process. */
 const usedStreamTickets = new Map<string, number>();
 
-export const issueStreamTicket = (userId: number, ttlMs = 60_000) => {
+export const issueStreamTicket = (userId: number, ttlMs = 60_000, tid: number = scopeTid("stream ticket")) => {
   const nonce = crypto.randomBytes(9).toString("base64url");
-  const body = `${userId}.${Date.now() + ttlMs}.${nonce}`;
+  const body = `${userId}.${Date.now() + ttlMs}.${nonce}.${tid}`;
   return `${body}.${mac(`st.${body}`).slice(0, 32)}`;
 };
 
-export const consumeStreamTicket = (ticket: unknown): number | null => {
+/** The user a stream ticket was issued to, or null. `tid` (default: the request's) must match. */
+export const consumeStreamTicket = (ticket: unknown, tid: number | null = hereTid()): number | null => {
   if (typeof ticket !== "string") return null;
   const parts = ticket.split(".");
-  if (parts.length !== 4) return null;
-  const [uid, exp, nonce, sig] = parts;
-  const body = `${uid}.${exp}.${nonce}`;
+  if (parts.length !== 4 && parts.length !== 5) return null;
+  const sig = parts[parts.length - 1];
+  const [uid, exp, nonce] = parts;
+  const ticketTid = parts.length === 5 ? Number(parts[3]) : PRIMARY_TENANT_ID;
+  const body = parts.slice(0, -1).join(".");
   if (!safeEqual(mac(`st.${body}`).slice(0, 32), sig)) return null;
   const expMs = Number(exp);
   if (expMs < Date.now() || usedStreamTickets.has(nonce)) return null;
+  if (ticketTid !== tid) return null;
   usedStreamTickets.set(nonce, expMs);
   if (usedStreamTickets.size > 1000) {
     const now = Date.now();
@@ -84,6 +107,18 @@ export const consumeStreamTicket = (ticket: unknown): number | null => {
   }
   const n = Number(uid);
   return Number.isInteger(n) && n > 0 ? n : null;
+};
+
+/** The school a (validly signed) stream ticket was issued in, or null. */
+export const streamTicketTid = (ticket: unknown): number | null => {
+  if (typeof ticket !== "string") return null;
+  const parts = ticket.split(".");
+  if (parts.length === 4) return PRIMARY_TENANT_ID;
+  if (parts.length !== 5) return null;
+  const body = parts.slice(0, -1).join(".");
+  if (!safeEqual(mac(`st.${body}`).slice(0, 32), parts[4])) return null;
+  const n = Number(parts[3]);
+  return Number.isSafeInteger(n) && n > 0 ? n : null;
 };
 
 /** 26-char ULID (Crockford base32): 48-bit ms time + 80 bits of randomness. */

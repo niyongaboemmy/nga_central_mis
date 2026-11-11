@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import ThemeToggle from "./ThemeToggle";
 import LOGO from "../../assets/logo.png";
+import { useTenantBranding } from "../../hooks/useTenantBranding";
 import { useUser } from "../../contexts/UserContext";
 import SystemsMenu from "./SystemsMenu";
 import AcademicPeriodSelector from "./AcademicPeriodSelector";
@@ -42,6 +43,17 @@ const Navbar: React.FC<NavbarProps> = ({
 }) => {
   const location = useLocation();
   const { user, logout } = useUser();
+  // NGA keeps its own mark; any other school shows its name and logo (MIS-S10).
+  const brand = useTenantBranding();
+  const brandMark = (size: string) =>
+    brand.isPrimary || brand.logoUrl ? (
+      <img src={brand.isPrimary ? LOGO : brand.logoUrl!} alt={brand.isPrimary ? "NGA Central MIS" : brand.name} className={`${size} rounded-full object-cover`} />
+    ) : (
+      <span aria-hidden="true" className={`${size} rounded-full bg-blue-600 text-white font-bold flex items-center justify-center`}>
+        {brand.name.slice(0, 1).toUpperCase()}
+      </span>
+    );
+  const brandName = brand.isPrimary ? "NGA MIS" : brand.name;
   // My AI (own AI keys): staff hold AI_PERSONAL_PROVIDERS, students the _STUDENT variant.
   const access = useAccess();
   const { hasPermission } = usePermissions();
@@ -143,24 +155,16 @@ const Navbar: React.FC<NavbarProps> = ({
                   onClick={onNavigateBack}
                   className="flex items-center space-x-3 group"
                 >
-                  <img
-                    src={LOGO}
-                    alt="NGA Central MIS"
-                    className="w-9 h-9 rounded-full group-hover:shadow-lg transition-shadow"
-                  />
-                  <span className="text-xl font-bold text-text-primary-light dark:text-text-primary-dark">
-                    NGA MIS
+                  <span className="group-hover:shadow-lg transition-shadow rounded-full">{brandMark("w-9 h-9")}</span>
+                  <span className="text-xl font-bold text-text-primary-light dark:text-text-primary-dark truncate max-w-[14rem]">
+                    {brandName}
                   </span>
                 </button>
               ) : (
                 <div className="flex items-center space-x-3">
-                  <img
-                    src={LOGO}
-                    alt="NGA Central MIS"
-                    className="w-10 h-10 rounded-full"
-                  />
-                  <span className="text-xl font-bold text-text-primary-light dark:text-text-primary-dark">
-                    NGA MIS
+                  {brandMark("w-10 h-10")}
+                  <span className="text-xl font-bold text-text-primary-light dark:text-text-primary-dark truncate max-w-[14rem]">
+                    {brandName}
                   </span>
                 </div>
               )}

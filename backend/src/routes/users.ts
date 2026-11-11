@@ -54,7 +54,7 @@ import {
   lookupAvatars,
 } from "../controllers/avatarController";
 import { requireServiceToken } from "../middleware/serviceAuth";
-import { authenticate, authorize } from "../middleware/auth";
+import { authenticate, authorize, authenticateIdentityRead } from "../middleware/auth";
 
 const router = express.Router();
 
@@ -77,7 +77,8 @@ const upload = multer({
   },
 });
 
-router.get("/me", authenticate, getCurrentUser);
+// Identity read: also takes the MCP relay token (middleware/auth.ts).
+router.get("/me", authenticateIdentityRead, getCurrentUser);
 router.put("/me/profile", authenticate, updateCurrentUserProfile);
 router.patch("/me/theme", authenticate, updateThemePreference);
 // Central profile picture, shown by every NGA app (services/avatar/).

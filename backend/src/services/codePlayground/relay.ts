@@ -1,3 +1,4 @@
+import { tenantHeaders } from "../../tenancy/claims";
 import { configuredApps } from "../home/apps";
 
 // ============================================================================
@@ -97,7 +98,7 @@ async function call(path: string, token: string, init: { method: "GET" | "POST" 
   try {
     res = await fetch(`${tm.apiBaseUrl}/api/integration/code${path}`, {
       method: init.method,
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}`, ...tenantHeaders() },
       body: init.body === undefined ? undefined : JSON.stringify(init.body),
       signal: controller.signal,
     });
@@ -212,7 +213,7 @@ export async function openSessionEvents(token: string, id: string, signal: Abort
   if (!tm) throw new RunnerError(503, "RUNNER_NOT_CONNECTED", "The code runner is not connected to the MIS yet.");
   let res: Response;
   try {
-    res = await fetch(`${tm.apiBaseUrl}/api/integration/code/sessions/${id}/events`, { headers: { Authorization: `Bearer ${token}`, Accept: "text/event-stream" }, signal });
+    res = await fetch(`${tm.apiBaseUrl}/api/integration/code/sessions/${id}/events`, { headers: { Authorization: `Bearer ${token}`, Accept: "text/event-stream", ...tenantHeaders() }, signal });
   } catch {
     throw new RunnerError(503, "RUNNER_UNAVAILABLE", "The code runner can't be reached right now. Try again in a moment.");
   }
