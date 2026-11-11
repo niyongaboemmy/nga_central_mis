@@ -5,7 +5,10 @@ import { asyncHandler } from "../middleware/asyncHandler";
 import { requireServiceToken } from "../middleware/serviceAuth";
 import { successResponse } from "../utils/response";
 import { db, primaryDb } from "../db";
-import { tenantBlock } from "../tenancy/claims";
+import { responseTenant, tenantBlock } from "../tenancy/claims";
+import { APP_KEYS, FEATURES, featureOfCapability, isPlatformCap } from "../services/tenantMgmt/catalog";
+import { allowsCapability } from "../services/tenantMgmt/entitlements";
+import { safeEntitlements } from "../services/tenantMgmt/featureGate";
 import {
   AccessAudit,
   AccessManifestRow,
@@ -239,6 +242,40 @@ router.get(
         deprecated: r.deprecated_at !== null,
       })),
     });
+  }),
+);
+
+/**
+ * Capabilities the school's package does not include, for the Access Studio's
+ * lock badges (tenant management §3.1; contract: accessLocksApi in
+ * frontend/src/api/tenantMgmt.ts): app -> capability key -> what it needs (a
+ * FEATURE key, or the APP key when the whole app is not in the package).
+ * Platform capabilities are not a package matter and never listed.
+ */
+router.get(
+  "/package-locks",
+  requireCapability("ACCESS_STUDIO_VIEW"),
+  asyncHandler(async (_req: any, res: any) => {
+    const tenant = responseTenant();
+    const ent = await safeEntitlements(tenant.tid);
+    const locked: Record<string, Record<string, string>> = {};
+    if (!ent.unrestricted) {
+      const rows = await db
+        .select({ name: AccessPermission.name, app: AccessPermission.app, cap_key: AccessPermission.cap_key })
+        .from(AccessPermission)
+        .where(and(eq(AccessPermission.status, "ACTIVE"), isNull(AccessPermission.deprecated_at)));
+      for (const r of rows) {
+        const app = r.app ?? "mis";
+        const key = r.cap_key ?? r.name;
+        if (isPlatformCap(key) || allowsCapability(ent, app, key, tenant.isPrimary)) continue;
+        const appKey = Object.entries(APP_KEYS).find(([, v]) => v.accessApp === app)?.[0];
+        const needs = appKey && !ent.apps.includes(appKey) ? appKey : featureOfCapability(app, key);
+        if (needs) (locked[app] ??= {})[key] = needs;
+      }
+    }
+    const features: Record<string, string> = { ...FEATURES };
+    for (const [k, v] of Object.entries(APP_KEYS)) features[k] = v.label;
+    successResponse(res, "Package locks", { pkg: ent.unrestricted ? tenant.pkg : ent.pkg, locked, features });
   }),
 );
 

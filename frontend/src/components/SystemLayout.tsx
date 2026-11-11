@@ -7,6 +7,7 @@ import { useUser } from "../contexts/UserContext";
 import { ReminderNudge } from "./reminders/ReminderNudge";
 import ProfilePhotoPrompt from "./profile/ProfilePhotoPrompt";
 import AppsDialog from "./apps/AppsDialog";
+import TenantStatusBanner from "./tenantMgmt/account/TenantStatusBanner";
 
 interface SystemLayoutProps {
   children: React.ReactNode;
@@ -122,6 +123,7 @@ const SystemLayout: React.FC<SystemLayoutProps> = ({
               {title}
             </h1>
           )}
+          {showSidebar && user && <TenantStatusBanner />}
           {children}
         </div>
       </main>

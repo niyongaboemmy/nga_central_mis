@@ -31,7 +31,7 @@ const SCHOOL_ONLY = { scopeable: false };
 export const MIS_MANIFEST = defineManifest({
   app: "mis",
   name: "Central MIS",
-  version: "2026.10.25",
+  version: "2026.11.11",
   capabilities: {
     // People & accounts
     MANAGE_USERS: W("Create, update and deactivate users", "PEOPLE"),
@@ -179,6 +179,24 @@ export const MIS_MANIFEST = defineManifest({
     AI_PERSONAL_PROVIDERS_STUDENT: W("Students: use your own AI provider keys (My AI)", "SYSTEM", SCHOOL_ONLY),
     AI_EXTERNAL_CONNECT: W("Use your own Claude/ChatGPT with NGA (connector, open-in)", "SYSTEM", SCHOOL_ONLY),
     AI_PROVIDERS_MANAGE: W("See AI provider health and usage for the school", "SYSTEM", { ...SCHOOL_ONLY, restricted: true }),
+
+    // Tenant management (MULTI_TENANCY_TENANT_MANAGEMENT_PLAN.md §4). PLATFORM_* are honoured only
+    // inside the primary tenant (the snapshot compiler drops them elsewhere) and never come
+    // from a package. v2-only; services/tenantMgmt/catalog.ts names them.
+    PLATFORM_TENANTS_VIEW: R("See schools on the platform, their health and usage (aggregates)", "SYSTEM", ["summary", "detail"], SCHOOL_ONLY),
+    PLATFORM_APPLICATIONS_REVIEW: W("Review school applications, ask for changes, comment", "SYSTEM", SCHOOL_ONLY),
+    PLATFORM_APPLICATIONS_DECIDE: W("Approve or reject school applications", "SYSTEM", { ...SCHOOL_ONLY, restricted: true }),
+    PLATFORM_BILLING_INVOICE: W("Issue, edit and void invoices", "FINANCE", SCHOOL_ONLY),
+    PLATFORM_BILLING_CONFIRM: W("Confirm or reject payments", "FINANCE", { ...SCHOOL_ONLY, restricted: true }),
+    PLATFORM_BILLING_WAIVE: W("Waive a school's payment", "FINANCE", { ...SCHOOL_ONLY, restricted: true }),
+    PLATFORM_TENANTS_LIFECYCLE: W("Suspend, reactivate, archive or delete schools", "SYSTEM", { ...SCHOOL_ONLY, restricted: true }),
+    PLATFORM_TENANTS_ENTITLEMENTS: W("Change a school's package and add overrides", "SYSTEM", { ...SCHOOL_ONLY, restricted: true }),
+    PLATFORM_PACKAGES_MANAGE: W("Edit the package catalogue and prices", "SYSTEM", { ...SCHOOL_ONLY, restricted: true }),
+    PLATFORM_SUPPORT_ACCESS: W("Open a support session a school granted", "SYSTEM", { ...SCHOOL_ONLY, restricted: true }),
+    PLATFORM_AUDIT_VIEW: R("View the platform audit log", "SYSTEM", ["detail"], SCHOOL_ONLY),
+    // A school's own account with the platform: profile/branding and its subscription.
+    SCHOOL_SETTINGS_MANAGE: W("Manage the school profile, branding and setup", "SYSTEM", SCHOOL_ONLY),
+    SCHOOL_BILLING_MANAGE: W("See the subscription, pay invoices, grant support access", "FINANCE", SCHOOL_ONLY),
   },
 });
 

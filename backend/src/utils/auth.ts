@@ -3,6 +3,9 @@ import { eq, and, notLike, notInArray } from "drizzle-orm";
 import { UserRole, Role, RolePermission, Permission } from "../db/schema";
 import { ALL_PERMISSIONS } from "./permissions";
 import { V2_ONLY_CAPABILITIES } from "../access/v2Only";
+import { responseTenant } from "../tenancy/claims";
+import { allowsCapability } from "../services/tenantMgmt/entitlements";
+import { safeEntitlements } from "../services/tenantMgmt/featureGate";
 
 export const SUPER_ADMIN_ROLE = "SUPER_ADMIN";
 
@@ -77,8 +80,22 @@ export const getEffectivePermissions = async (
   // production pool holds a single connection.
   const roleNames = await getUserRoleNames(userId);
   const dbPermissions = await getUserPermissions(userId);
-  if (!roleNames.includes(SUPER_ADMIN_ROLE)) {
-    return Array.from(new Set(dbPermissions));
-  }
-  return Array.from(new Set([...(ALL_PERMISSIONS as string[]), ...dbPermissions]));
+  const all = roleNames.includes(SUPER_ADMIN_ROLE)
+    ? Array.from(new Set([...(ALL_PERMISSIONS as string[]), ...dbPermissions]))
+    : Array.from(new Set(dbPermissions));
+  return withinPackage(all);
+};
+
+/**
+ * Tenant management (plan §3.1): the legacy list obeys the school's package
+ * exactly like the access snapshot (services/access/compile.ts) -- a
+ * permission whose feature the package lacks is dropped, so MIS routes and
+ * the spokes reading the SSO token both stop offering it. Cached entitlements;
+ * unrestricted without a control plane.
+ */
+const withinPackage = async (names: string[]): Promise<string[]> => {
+  const tenant = responseTenant();
+  const ent = await safeEntitlements(tenant.tid);
+  if (ent.unrestricted) return names;
+  return names.filter((n) => allowsCapability(ent, "mis", n, tenant.isPrimary));
 };

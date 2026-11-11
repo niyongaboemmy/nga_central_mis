@@ -53,7 +53,12 @@ import { jwks, ssoIssuer } from "./services/sso/signingKey";
 import { mcpConnectionsRouter, mcpConsentRouter, mcpPublicRouter } from "./services/mcp/routes";
 import platformRoutes from "./routes/platform";
 import tenantBrandingRoutes from "./routes/tenantBranding";
+import onboardingRoutes, { publicPackagesRouter } from "./routes/onboarding";
+import platformConsoleRoutes from "./routes/platformConsole";
+import platformTenantRoutes from "./routes/platformTenants";
+import tenantAccountRoutes from "./routes/tenantAccount";
 import { installExpressTenantBinding, tenantMiddleware } from "./tenancy/express";
+import { requireFeature, requireStorage } from "./services/tenantMgmt/featureGate";
 
 // Multi-tenancy: handlers resumed from stream callbacks (multer...) re-enter
 // their request's tenant context (tenancy/express.ts).
@@ -144,6 +149,40 @@ app.get("/", (req, res) => {
   });
 });
 
+// Package gates (MULTI_TENANCY_TENANT_MANAGEMENT_PLAN.md §3.1): MIS features whose routes are
+// not all capability-gated answer 403 PACKAGE_FEATURE when the school's package lacks them
+// (capability-gated ones are already handled by the snapshot compiler). Uploads of content
+// stop at the storage limit. All pass through without a control plane (R7) and on Max.
+// services/tenantMgmt/featureGate.ts.
+for (const path of [
+  "/elearning/studio",
+  "/elearning/blueprints",
+  "/elearning/courses/:id/studio",
+  "/elearning/courses/:id/generation",
+  "/elearning/generation",
+  "/elearning/sections/:id/context-pack",
+  "/elearning/sections/:id/drafts",
+  "/elearning/items/:id/regenerate",
+  "/elearning/items/:id/dismiss-draft",
+  "/elearning/my/courses/:id/ask",
+]) {
+  app.use(path, requireFeature("feature.ai_lesson_studio"));
+}
+app.use("/elearning", requireFeature("feature.elearning"));
+app.use("/office-hours", requireFeature("feature.office_hours"));
+app.use("/safeguarding", requireFeature("feature.safeguarding"));
+app.use("/mentorship", requireFeature("feature.mentorship"));
+app.use("/competency", requireFeature("feature.competency_map"));
+// Connecting a channel needs the feature; disconnecting never does (a downgrade keeps the way out).
+app.use("/reminders/telegram/link", requireFeature("feature.reminders.telegram"));
+app.use(["/reminders/google/connect", "/reminders/google/sync"], requireFeature("feature.reminders.google_calendar"));
+// New partner tokens need the feature; existing ones keep working (data kept, §3.3).
+app.post("/systems/integration-tokens", requireFeature("feature.integration_api"));
+app.use(["/oauth", "/my-ai/connections"], requireFeature("feature.mcp"));
+for (const path of ["/documents", "/elearning", "/lesson-notes", "/curriculum", "/scheme-of-work"]) {
+  app.use(path, requireStorage());
+}
+
 app.use("/auth", authRoutes);
 app.use("/users", userRoutes);
 // Profile pictures: public but signed + versioned URLs (services/avatar/urls.ts).
@@ -192,7 +231,14 @@ app.use("/reminders", reminderRoutes);
 app.use("/integrations/ai", aiGatewayRoutes);
 // Tenant registry for spoke apps (packages/tenancy/CONTRACT.md §4).
 app.use("/platform", platformRoutes);
+// Tenant management (MULTI_TENANCY_TENANT_MANAGEMENT_PLAN.md §7): public catalogue +
+// self-registration, the applicant tracker, the primary console, the school's own account.
+app.use("/packages", publicPackagesRouter);
+app.use("/onboarding", onboardingRoutes);
+app.use("/platform", platformConsoleRoutes);
+app.use("/platform", platformTenantRoutes);
 app.use("/tenant", tenantBrandingRoutes); // public branding (MIS-S10)
+app.use("/tenant", tenantAccountRoutes);
 app.use("/integrations", integrationRoutes);
 // Usage analytics & live monitoring console (ANALYTICS_* capabilities).
 app.use("/monitor", monitorRoutes);

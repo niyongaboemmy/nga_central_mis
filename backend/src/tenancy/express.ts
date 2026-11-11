@@ -89,6 +89,40 @@ export function sendRefusal(res: any, r: TenantRefusal) {
   return res.status(r.status).json({ success: false, code: r.code, message: r.message });
 }
 
+// ---------------------------------------------------------------------------
+// Suspended schools (tenant management §6.7): billing owners only, billing paths only
+// ---------------------------------------------------------------------------
+
+/** A refusal that a billing owner may still get past (SUSPENDED -- not ARCHIVED / PENDING). */
+export const isSuspendedRefusal = (tenant: TenantCtx | null, r: TenantRefusal | null): boolean =>
+  !!tenant && !!r && r.code === "TENANT_SUSPENDED" && tenant.status === "SUSPENDED";
+
+/** Where a SUSPENDED school's billing owner may go: sign-in, their identity, the school account. */
+const SUSPENDED_PATHS = [/^\/auth(\/|$)/, /^\/users\/me(\/|$)/, /^\/tenant(\/|$)/];
+
+export function suspendedPathAllowed(url: string): boolean {
+  const p = String(url || "").split("?")[0].replace(/^\/api(?=\/)/, "");
+  return SUSPENDED_PATHS.some((re) => re.test(p));
+}
+
+/** Does `userId` (current tenant context) hold SCHOOL_BILLING_MANAGE? */
+export async function holdsBillingCapability(userId: number): Promise<boolean> {
+  try {
+    const { getSnapshot } = await import("../services/access/snapshotCache");
+    const snap: any = await getSnapshot(userId, "mis");
+    return Boolean(snap?.caps?.SCHOOL_BILLING_MANAGE?.length);
+  } catch {
+    return false;
+  }
+}
+
+/** For a session of a SUSPENDED school: the refusal to send, or null when this request may pass. */
+export async function suspendedSessionRefusal(req: any, userId: number): Promise<TenantRefusal | null> {
+  const refusal: TenantRefusal = { status: 403, code: "TENANT_SUSPENDED", message: "This school's access is suspended." };
+  if (!suspendedPathAllowed(req.originalUrl ?? req.url ?? "")) return refusal;
+  return (await holdsBillingCapability(userId)) ? null : refusal;
+}
+
 /**
  * The tenant a verified MIS token speaks for: tidFromClaims with the
  * TENANCY_LEGACY_DEFAULT_TID rule, then the registry. Returns the refusal to

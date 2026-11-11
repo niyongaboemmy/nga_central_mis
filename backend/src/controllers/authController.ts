@@ -44,8 +44,8 @@ import { checkBlocked } from "../services/activity/blocklist";
 import { signOutEverywhereLocal } from "../services/activity/control";
 import { getCurrentAcademicYearId } from "../utils/academicYear";
 import { TenantCtx, runWithTenant } from "../vendor/nga-tenancy";
-import { resolveLoginTenants, sendChoose } from "../tenancy/loginResolver";
-import { sendRefusal, tenantFromClaims } from "../tenancy/express";
+import { applicantGoogleSignIn, applicantSignIn, resolveLoginTenants, sendChoose, sendOnboarding } from "../tenancy/loginResolver";
+import { holdsBillingCapability, sendRefusal, tenantFromClaims } from "../tenancy/express";
 import { tenantBlock, tenantClaims } from "../tenancy/claims";
 import { lookupDirectory, queueDirectorySync } from "../tenancy/directory";
 import { findTenant, getTenant } from "../tenancy/registry";
@@ -163,6 +163,9 @@ const loginInTenant = async (req: any, res: any, sanitizedInput: string, sanitiz
 
   if (user.length === 0) {
     logger.warn(`Failed login attempt: user ${sanitizedInput} not found`);
+    // A school applicant (tenant management §6.2) signs in here too.
+    const onboarding = await applicantSignIn(sanitizedInput, sanitizedPassword);
+    if (onboarding) return sendOnboarding(res, onboarding);
     trackAuth(req, { kind: "login", outcome: "failure", reason: "unknown_user", usernameAttempted: sanitizedInput });
     throw new AuthenticationError("Invalid credentials");
   }
@@ -196,8 +199,18 @@ const loginInTenant = async (req: any, res: any, sanitizedInput: string, sanitiz
     logger.warn(
       `Failed login attempt: invalid password for user ${sanitizedInput}`,
     );
+    // Someone with a school account may also be registering another school.
+    const onboarding = await applicantSignIn(sanitizedInput, sanitizedPassword);
+    if (onboarding) return sendOnboarding(res, onboarding);
     trackAuth(req, { kind: "login", outcome: "failure", reason: "bad_password", userId: user[0].user_id, usernameAttempted: sanitizedInput });
     throw new AuthenticationError("Invalid credentials");
+  }
+
+  // A SUSPENDED school signs in its billing owners only (tenant management §6.7).
+  if (req.tenant?.status === "SUSPENDED" && !(await holdsBillingCapability(user[0].user_id))) {
+    trackAuth(req, { kind: "login", outcome: "failure", reason: "tenant_suspended", userId: user[0].user_id, usernameAttempted: sanitizedInput });
+    sendRefusal(res, { status: 403, code: "TENANT_SUSPENDED", message: "This school's access is suspended." });
+    return;
   }
 
   // Send OTP for 2FA
@@ -386,7 +399,7 @@ const completeLogin = async (
 
   // Get all active systems
   // No client_secret -- see utils/publicSystems.ts.
-  const systems = await getPublicSystems();
+  const systems = await getPublicSystems(undefined, userId);
 
   // Generate final JWT token
   const token = jwt.sign(
@@ -535,6 +548,8 @@ const googleLoginInTenant = async (req: any, res: any, sanitizedEmail: string, g
     .limit(1);
 
   if (user.length === 0) {
+    const onboarding = await applicantGoogleSignIn(sanitizedEmail);
+    if (onboarding) return sendOnboarding(res, onboarding);
     logger.warn(`Google login attempt for unknown email: ${sanitizedEmail}`);
     trackAuth(req, { kind: "google", outcome: "failure", reason: "unknown_user", usernameAttempted: sanitizedEmail });
     throw new AuthenticationError(
@@ -673,7 +688,7 @@ export const getSession = asyncHandler(async (req: any, res: any) => {
 
   // Get all active systems
   // No client_secret -- see utils/publicSystems.ts.
-  const systems = await getPublicSystems();
+  const systems = await getPublicSystems(undefined, userId);
 
   successResponse(res, "Session retrieved", {
     user: withAvatar(user[0]),

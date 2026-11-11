@@ -3,7 +3,7 @@ import logger from "../../utils/logger";
 import { AIRole, GenerateJSONParams, ProviderCredential, TokenUsage } from "./types";
 import { providerByName, orderedProviders, isCoolingDown, markCoolingDown, isParkedDead, markDead, roleOrder } from "./registry";
 import { isQuotaError, isDeadProviderError, friendlyAIErrorMessage, classifyAIError, PersonalAIError, personalAIErrorCode } from "./errors";
-import { acquireSlot, checkAvailability, noteAttempt, Unavailable } from "./limiter";
+import { acquireSlot, checkAvailability, consumeAiRequest, noteAttempt, Unavailable } from "./limiter";
 import { logAIUsage } from "./usageLog";
 import { assertAiAppEnabled, getAiPolicy } from "../ai/policy";
 import { HandoffForbiddenError, HandoffPrompt, jsonHandoffPrompt, readPastedJson } from "../ai/handoff";
@@ -107,6 +107,10 @@ export async function generateStructuredContent<T = any>(
   }
   const providers = orderedProviders(options?.providerOrder ?? roleOrder(options?.role));
   const exclude = new Set(options?.excludeProviders ?? []);
+  // The school's daily AI allowance (package limit.ai_requests_day): one request per call on
+  // the school's providers -- a person's own key (My AI, above) never counts against it, and
+  // nothing is counted when no provider is configured (the "not configured" answer stands).
+  if (providers.some((p) => p.isConfigured() && !exclude.has(p.name))) await consumeAiRequest();
   const quotaBlocked: Record<string, Unavailable | "QUOTA"> = {};
   let lastErr: any = null;
   let attempted = 0;

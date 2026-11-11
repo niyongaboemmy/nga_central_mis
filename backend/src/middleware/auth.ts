@@ -5,7 +5,7 @@ import { User } from "../db/schema";
 import { ValidationError } from "../errors/CustomError";
 import { getEffectivePermissions } from "../utils/auth";
 import { shadowCompareLegacy } from "../services/access/policy";
-import { enterTenant, sendRefusal, tenantFromClaims } from "../tenancy/express";
+import { enterTenant, isSuspendedRefusal, sendRefusal, suspendedSessionRefusal, tenantFromClaims } from "../tenancy/express";
 import { TENANT_HEADER, parseTid, tidFromClaims } from "../vendor/nga-tenancy";
 import { legacyDefaultTid } from "../tenancy/context";
 
@@ -46,7 +46,7 @@ export const ACCOUNT_INACTIVE_BODY = {
  * nothing about what the token is FOR. Audiences minted by the MIS for one
  * narrow job; such a token is never a session.
  */
-const NON_SESSION_AUDIENCES = new Set(["nga-mcp-relay", "nga-mcp-consent", "nga-desktop-handoff"]);
+const NON_SESSION_AUDIENCES = new Set(["nga-mcp-relay", "nga-mcp-consent", "nga-desktop-handoff", "nga-onboarding"]);
 
 /**
  * Why `decoded` is not a person's session token, or null when it is one.
@@ -108,6 +108,11 @@ const authenticateWith = (accept: (decoded: any) => boolean) => async (req: any,
     return res.status(401).json({ message: "Invalid token" });
   }
   if (!accept(decoded)) {
+    // A school applicant (tenant management §6.2) is signed in, but has no school yet:
+    // the app answers "pending", so the frontend sends them to the progress tracker.
+    if (nonSessionReason(decoded) === "audience" && [].concat(decoded.aud).includes("nga-onboarding" as never)) {
+      return res.status(403).json({ success: false, code: "TENANT_PENDING", message: "Your school is not active yet." });
+    }
     return res.status(401).json({ message: "Invalid token" });
   }
 
@@ -121,8 +126,11 @@ const authenticateWith = (accept: (decoded: any) => boolean) => async (req: any,
   } catch {
     return res.status(503).json({ message: "School directory unavailable, please retry." });
   }
-  if (resolved.refusal) return sendRefusal(res, resolved.refusal);
-  const tenant = resolved.tenant;
+  // A SUSPENDED school still lets its billing owners in, on the billing paths only
+  // (tenant management §6.7) -- decided below, once the user is known.
+  const suspended = isSuspendedRefusal(resolved.tenant, resolved.refusal);
+  if (resolved.refusal && !suspended) return sendRefusal(res, resolved.refusal);
+  const tenant = resolved.tenant!;
   // A spoke forwarding the user's token may also send X-NGA-Tenant; it must agree (§3).
   const headerTid = req.header?.(TENANT_HEADER);
   if (headerTid !== undefined && headerTid !== "" && parseTid(headerTid) !== tenant.tid) {
@@ -162,6 +170,24 @@ const authenticateWith = (accept: (decoded: any) => boolean) => async (req: any,
       req.user.tid = tenant.tid;
     } catch (error) {
       return res.status(401).json({ message: "Invalid token" });
+    }
+    // Tenant management gates (suspended school; consented support sessions, §6.9).
+    try {
+      if (suspended) {
+        const r = await suspendedSessionRefusal(req, req.user.userId);
+        if (r) return sendRefusal(res, r);
+      }
+      if (decoded.support) {
+        const { supportClaimOf, supportRefusal } = await import("../services/tenantMgmt/support");
+        const support = supportClaimOf(decoded) ?? { sid: 0, mode: "READ" as const };
+        const r = await supportRefusal(support, req, tenant.tid, {
+          platformUserId: Number(decoded.act?.sub) || null,
+          userId: req.user.userId,
+        });
+        if (r) return res.status(r.status).json({ success: false, code: r.code, message: r.message });
+      }
+    } catch {
+      return res.status(503).json({ message: "Access check unavailable, please retry." });
     }
     next();
   });

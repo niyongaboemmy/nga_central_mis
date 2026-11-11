@@ -10,6 +10,14 @@ import {
 import Login from "./components/Login";
 import TenantGate from "./components/auth/TenantGate";
 import OnboardingPending from "./components/auth/OnboardingPending";
+// Tenant management (MULTI_TENANCY_TENANT_MANAGEMENT_PLAN.md §8)
+const RegisterSchoolPage = lazy(() => import("./components/tenantMgmt/register/RegisterSchoolPage"));
+const OnboardingTracker = lazy(() => import("./components/tenantMgmt/onboarding/OnboardingTracker"));
+const PlatformConsole = lazy(() => import("./components/tenantMgmt/platform/PlatformConsole"));
+const SubscriptionPage = lazy(() => import("./components/tenantMgmt/account/SubscriptionPage"));
+const SupportAccessPage = lazy(() => import("./components/tenantMgmt/account/SupportAccessPage"));
+const SupportSessionLanding = lazy(() => import("./components/tenantMgmt/platform/SupportSessionLanding"));
+import { isRegistrationSite, misHref } from "./utils/registrationSite";
 import Profile from "./components/Profile";
 import Dashboard from "./components/Dashboard";
 import SuperAdminDashboard from "./components/SuperAdminDashboard";
@@ -283,6 +291,28 @@ const ClassTeacherCalendarPageWrapper: React.FC = () => {
   return <ClassTeacherCalendarPage />;
 };
 
+// The public registration site (amashuri.com): a school starts at "/", the MIS
+// lives on its own host -- any other path is sent there (utils/registrationSite.ts).
+const LeaveForMis: React.FC = () => {
+  const { pathname, search, hash } = useLocation();
+  useEffect(() => {
+    window.location.replace(misHref(`${pathname}${search}${hash}`));
+  }, [pathname, search, hash]);
+  return null;
+};
+
+const RegistrationSiteRoutes: React.FC = () => (
+  <Routes>
+    <Route path="/" element={<Suspense fallback={null}><RegisterSchoolPage /></Suspense>} />
+    <Route path="/register-school" element={<Navigate to="/" replace />} />
+    <Route
+      path="/onboarding"
+      element={<Suspense fallback={null}><OnboardingTracker /></Suspense>}
+    />
+    <Route path="*" element={<LeaveForMis />} />
+  </Routes>
+);
+
 // Initialize toast store for API interceptor
 const ToastInitializer: React.FC<{ children: React.ReactNode }> = ({
   children,
@@ -315,6 +345,7 @@ function App() {
             {/* Page views → Usage & Monitoring (patterns only, never ids). */}
             <ActivityRouterTracker />
             <ActivityNotice />
+            {isRegistrationSite() ? <RegistrationSiteRoutes /> : (
             <Routes>
 
             {/* Landing page */}
@@ -368,8 +399,59 @@ function App() {
                 it must render identically for an anonymous scanner and a logged-in user. */}
             <Route path="/verify/:schemeId" element={<SchemeVerifyPage />} />
 
-            {/* A school that is not usable yet (multi-tenancy): "under review" / "suspended". */}
-            <Route path="/onboarding" element={<OnboardingPending />} />
+            {/* Tenant management: a school registers itself, then follows its application.
+                /onboarding serves applicants (onboarding token) and, with ?status=suspended,
+                a signed-in school that is not usable (OnboardingPending). */}
+            <Route path="/register-school" element={<Suspense fallback={null}><RegisterSchoolPage /></Suspense>} />
+            <Route path="/support-session" element={<Suspense fallback={null}><SupportSessionLanding /></Suspense>} />
+            <Route
+              path="/onboarding"
+              element={
+                new URLSearchParams(window.location.search).get("status") === "suspended" ? (
+                  <OnboardingPending />
+                ) : (
+                  <Suspense fallback={null}>
+                    <OnboardingTracker />
+                  </Suspense>
+                )
+              }
+            />
+            <Route
+              path="/platform/*"
+              element={
+                <ProtectedRoute>
+                  <SystemLayoutWrapper>
+                    <Suspense fallback={null}>
+                      <PlatformConsole />
+                    </Suspense>
+                  </SystemLayoutWrapper>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/settings/subscription"
+              element={
+                <ProtectedRoute>
+                  <SystemLayoutWrapper>
+                    <Suspense fallback={null}>
+                      <SubscriptionPage />
+                    </Suspense>
+                  </SystemLayoutWrapper>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/settings/support"
+              element={
+                <ProtectedRoute>
+                  <SystemLayoutWrapper>
+                    <Suspense fallback={null}>
+                      <SupportAccessPage />
+                    </Suspense>
+                  </SystemLayoutWrapper>
+                </ProtectedRoute>
+              }
+            />
 
             {/* Dashboard - protected with sidebar */}
             {/* Home -- what needs me across every module, today, and how my
@@ -1226,6 +1308,7 @@ function App() {
             {/* Fallback route */}
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
+            )}
         </Router>
         </AcademicPeriodProvider>
       </MetadataProvider>

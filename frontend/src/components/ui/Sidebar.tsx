@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, Globe2, Gem } from "lucide-react";
 import { ANALYTICS_TABS } from "../analytics/nav";
 import { School, Server, Activity, Database, GraduationCap, LayoutGrid, MonitorCheck, LayoutDashboard } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -830,6 +830,21 @@ const Sidebar: React.FC<SidebarProps> = ({
       section: "admin",
       icon: <Gamepad2 className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
       requiredPermission: Permissions.DESKTOP_TOOLS_CONFIGURE,
+    },
+    // Tenant management: the primary tenant's console, and each school's own subscription.
+    {
+      label: "Platform",
+      path: "/platform",
+      section: "admin",
+      icon: <Globe2 className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
+      requiredCapability: ["PLATFORM_TENANTS_VIEW", "PLATFORM_APPLICATIONS_REVIEW", "PLATFORM_BILLING_INVOICE", "PLATFORM_SUPPORT_ACCESS"],
+    },
+    {
+      label: "Subscription",
+      path: "/settings/subscription",
+      section: "admin",
+      icon: <Gem className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
+      requiredCapability: "SCHOOL_BILLING_MANAGE",
     },
     {
       label: "Schools",

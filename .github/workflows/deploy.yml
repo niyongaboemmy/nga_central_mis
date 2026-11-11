@@ -42,6 +42,10 @@ jobs:
           VITE_APP_NAME: NGA Central MIS
           VITE_APP_VERSION: 1.0.0
           VITE_WEBSITE_URL: https://amashuri.com
+          # A school registers at amashuri.com; the MIS stays on its subdomain
+          # (frontend/src/utils/registrationSite.ts).
+          VITE_REGISTRATION_SITE_URL: https://amashuri.com
+          VITE_MIS_APP_URL: https://mis.amashuri.com
           VITE_GOOGLE_CLIENT_ID: 913204130540-5hrfp5ridotig5ebd7ar424vhecq8bab.apps.googleusercontent.com
         run: |
           npm ci

@@ -55,6 +55,7 @@ export async function brandingFor(tenant: TenantCtx) {
         if (school[col]) logos[slot] = `${publicApiBase()}/schools/${school.school_id}/logo/${slot}${q}`;
       }
     }
+    const primaryColor = await readPrimaryColor();
     return {
       tid: tenant.tid,
       slug: tenant.slug,
@@ -65,7 +66,10 @@ export async function brandingFor(tenant: TenantCtx) {
       school_id: school?.school_id ?? null,
       logos,
       logo_url: logos.primary,
-      primary_color: await readPrimaryColor(),
+      primary_color: primaryColor,
+      // camelCase aliases: frontend/src/api/tenantMgmt.ts publicApi.branding
+      logoUrl: logos.primary,
+      primaryColor,
     };
   });
 }

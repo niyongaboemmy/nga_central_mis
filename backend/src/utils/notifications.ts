@@ -47,7 +47,10 @@ export type NotificationKind =
   | "mentorship_assigned"
   | "mentorship_ended"
   // My AI (services/ai/personal): your own AI key stopped working.
-  | "ai_key_problem";
+  | "ai_key_problem"
+  // Tenant management (services/tenantMgmt/notify.ts): platform staff and school owners.
+  | "platform_event"
+  | "tenant_billing";
 
 export interface NotifyUserInput {
   userId: number;
@@ -78,7 +81,11 @@ export interface NotifyUserInput {
     | "family_digest"
     | "mentee_checkin"
     | "mentor_assignment"
-    | "ai_credential";
+    | "ai_credential"
+    | "platform_application"
+    | "platform_invoice"
+    | "platform_payment"
+    | "tenant";
   subjectId: number;
   actorId?: number;
 }

@@ -29,6 +29,8 @@ import {
   ScopeType,
 } from "../../vendor/nga-access";
 import { getCurrentAcademicYearId } from "../../utils/academicYear";
+import { allowsCapability } from "../tenantMgmt/entitlements";
+import { safeEntitlements } from "../tenantMgmt/featureGate";
 
 /**
  * Compiles a user's active grants into an AccessSnapshot for one app
@@ -348,6 +350,12 @@ export async function compileSnapshot(
   // A disabled or suspended account holds nothing, whatever grants remain.
   const grants = account[0]?.status === "ACTIVE" ? loaded : [];
 
+  // Tenant management (plan §3.1): a capability the school's package lacks is
+  // left out -- the apps' can(cap) simply answers false, no app code changes.
+  // PLATFORM_* never survive outside the primary tenant, whatever role holds them.
+  const tenant = responseTenant();
+  const ent = await safeEntitlements(tenant.tid);
+
   const caps = await loadRoleCaps(uniq(grants.map((g) => g.role_id)), app);
   const capsByRole = new Map<number, RoleCap[]>();
   for (const c of caps) {
@@ -379,6 +387,7 @@ export async function compileSnapshot(
       // narrower node -- a programme lead cannot own "the SSO clients of
       // programme 2".
       if (!c.scopeable && !wide) continue;
+      if (!allowsCapability(ent, c.app, c.cap_key ?? c.name, tenant.isPrimary)) continue;
       const key = app === "*" ? c.name : c.cap_key ?? c.name;
       (out[key] ??= []).push({ depth: effectiveDepth(c), scope, via: [g.grant_id] });
       appsWithCaps.add(c.app);
@@ -393,7 +402,7 @@ export async function compileSnapshot(
       id: userId,
       persona: profile[0]?.user_type ?? null,
       // Token contract v2: the real tenant id (one School row per tenant DB, school_id = tid).
-      school_id: responseTenant().tid,
+      school_id: tenant.tid,
       class_groups:
         account[0]?.status === "ACTIVE"
           ? await learnerClassGroups(userId, profile[0]?.user_type ?? null, yearId)
@@ -405,5 +414,14 @@ export async function compileSnapshot(
     home: homeFor(grants),
     systems: Array.from(appsWithCaps).sort(),
     generated_at: new Date().toISOString(),
+    tenant: {
+      tid: tenant.tid,
+      slug: tenant.slug,
+      pkg: ent.unrestricted ? tenant.pkg : ent.pkg,
+      status: tenant.status,
+      apps: ent.apps,
+      features: ent.features,
+      limits: ent.limits,
+    },
   };
 }
