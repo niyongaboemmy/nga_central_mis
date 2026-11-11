@@ -127,15 +127,16 @@ const Hero: React.FC = () => {
           </motion.span>
           <h1 className="mt-5 text-4xl font-extrabold leading-[1.05] tracking-tight text-slate-900 dark:text-white sm:text-6xl">
             {words.map((w, i) => (
+              <React.Fragment key={w}>
               <motion.span
-                key={w}
-                className="mr-[0.25em] inline-block"
+                className="inline-block"
                 initial={reduced ? false : { opacity: 0, y: 24, filter: "blur(6px)" }}
                 animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
                 transition={{ delay: 0.1 + i * 0.12, duration: 0.5 }}
               >
                 {w}
-              </motion.span>
+              </motion.span>{" "}
+              </React.Fragment>
             ))}
             <motion.span
               className="block bg-gradient-to-r from-brand-600 via-indigo-500 to-amber-500 bg-[length:200%_auto] bg-clip-text text-transparent dark:from-brand-200 dark:via-indigo-300 dark:to-amber-300"
