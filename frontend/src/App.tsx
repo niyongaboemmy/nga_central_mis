@@ -17,6 +17,7 @@ const PlatformConsole = lazy(() => import("./components/tenantMgmt/platform/Plat
 const SubscriptionPage = lazy(() => import("./components/tenantMgmt/account/SubscriptionPage"));
 const SupportAccessPage = lazy(() => import("./components/tenantMgmt/account/SupportAccessPage"));
 const SupportSessionLanding = lazy(() => import("./components/tenantMgmt/platform/SupportSessionLanding"));
+import { isRegistrationSite, misHref } from "./utils/registrationSite";
 import Profile from "./components/Profile";
 import Dashboard from "./components/Dashboard";
 import SuperAdminDashboard from "./components/SuperAdminDashboard";
@@ -290,6 +291,28 @@ const ClassTeacherCalendarPageWrapper: React.FC = () => {
   return <ClassTeacherCalendarPage />;
 };
 
+// The public registration site (amashuri.com): a school starts at "/", the MIS
+// lives on its own host -- any other path is sent there (utils/registrationSite.ts).
+const LeaveForMis: React.FC = () => {
+  const { pathname, search, hash } = useLocation();
+  useEffect(() => {
+    window.location.replace(misHref(`${pathname}${search}${hash}`));
+  }, [pathname, search, hash]);
+  return null;
+};
+
+const RegistrationSiteRoutes: React.FC = () => (
+  <Routes>
+    <Route path="/" element={<Suspense fallback={null}><RegisterSchoolPage /></Suspense>} />
+    <Route path="/register-school" element={<Navigate to="/" replace />} />
+    <Route
+      path="/onboarding"
+      element={<Suspense fallback={null}><OnboardingTracker /></Suspense>}
+    />
+    <Route path="*" element={<LeaveForMis />} />
+  </Routes>
+);
+
 // Initialize toast store for API interceptor
 const ToastInitializer: React.FC<{ children: React.ReactNode }> = ({
   children,
@@ -322,6 +345,7 @@ function App() {
             {/* Page views → Usage & Monitoring (patterns only, never ids). */}
             <ActivityRouterTracker />
             <ActivityNotice />
+            {isRegistrationSite() ? <RegistrationSiteRoutes /> : (
             <Routes>
 
             {/* Landing page */}
@@ -1284,6 +1308,7 @@ function App() {
             {/* Fallback route */}
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
+            )}
         </Router>
         </AcademicPeriodProvider>
       </MetadataProvider>

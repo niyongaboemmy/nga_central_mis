@@ -109,6 +109,8 @@ export async function notifyPlatformStaff(input: {
 }
 
 const appBase = () => (process.env.FRONTEND_URL || process.env.APP_URL || "https://mis.amashuri.com").replace(/\/$/, "");
+/** Applicants follow their application on the public registration site (amashuri.com). */
+const registrationBase = () => (process.env.REGISTRATION_SITE_URL || "").replace(/\/$/, "") || appBase();
 
 /** A short branded e-mail with one button. `link` may be a path ("/onboarding"). */
 export async function sendMail(to: string, subject: string, body: string, link?: string, cta = "Open"): Promise<boolean> {
@@ -133,7 +135,8 @@ export async function emailApplicant(accountId: number, subject: string, body: s
   try {
     const [rows] = await controlPool().query<RowDataPacket[]>("SELECT email_norm FROM ApplicantAccount WHERE account_id = ?", [accountId]);
     const to = rows[0]?.email_norm;
-    return to ? sendMail(String(to), subject, body, link, cta) : false;
+    const href = link && !link.startsWith("http") ? `${registrationBase()}${link}` : link;
+    return to ? sendMail(String(to), subject, body, href, cta) : false;
   } catch {
     return false;
   }

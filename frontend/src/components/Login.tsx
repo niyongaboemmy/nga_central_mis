@@ -20,6 +20,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import SchoolPicker from "./auth/SchoolPicker";
 import { TENANT_MESSAGES, isTenantRefusal, type SchoolChoice } from "../lib/tenant";
 import { setOnboardingToken } from "../api/tenantMgmt";
+import { registerSchoolHref } from "../utils/registrationSite";
 import {
   Lock,
   Mail,
@@ -2349,7 +2350,11 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                     </motion.button>
                     <button
                       type="button"
-                      onClick={() => navigate("/register-school")}
+                      onClick={() => {
+                        const href = registerSchoolHref();
+                        if (href.startsWith("http")) window.location.assign(href);
+                        else navigate(href);
+                      }}
                       className="mt-3 mx-auto flex items-center justify-center gap-1.5 rounded-full border border-blue-200 dark:border-blue-400/40 px-4 py-1.5 text-sm font-semibold text-blue-700 hover:bg-blue-50 dark:text-blue-300 dark:hover:bg-blue-400/10 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
                     >
                       <School className="w-4 h-4" aria-hidden="true" />
