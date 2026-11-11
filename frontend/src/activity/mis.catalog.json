@@ -80,7 +80,7 @@
     { "key": "mis.logs_history", "label": "Logs history", "module": "Platform", "patterns": ["/logs-history"] },
     { "key": "mis.family_ai_tutor", "label": "AI Tutor for my children", "module": "Platform", "patterns": ["/family/ai-tutor"] },
     { "key": "mis.safeguarding", "label": "Safeguarding", "module": "Platform", "patterns": ["/safeguarding"] },
-    { "key": "mis.register_school", "label": "Register a school", "module": "Public", "patterns": ["/register-school"], "public": true },
+    { "key": "mis.register_school", "label": "Register a school", "module": "Public", "patterns": ["/register-school", "/register"], "public": true },
     { "key": "mis.platform_console", "label": "Platform console", "module": "Platform", "patterns": ["/platform"] },
     { "key": "mis.support_session", "label": "Support session", "module": "Public", "patterns": ["/support-session"], "public": true },
     { "key": "mis.subscription", "label": "Subscription", "module": "Platform", "patterns": ["/settings/subscription"] },

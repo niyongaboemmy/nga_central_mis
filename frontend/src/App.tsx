@@ -17,7 +17,8 @@ const PlatformConsole = lazy(() => import("./components/tenantMgmt/platform/Plat
 const SubscriptionPage = lazy(() => import("./components/tenantMgmt/account/SubscriptionPage"));
 const SupportAccessPage = lazy(() => import("./components/tenantMgmt/account/SupportAccessPage"));
 const SupportSessionLanding = lazy(() => import("./components/tenantMgmt/platform/SupportSessionLanding"));
-import { isRegistrationSite, misHref } from "./utils/registrationSite";
+import { isRegistrationSite, misHref, useRegistrationSiteHead } from "./utils/registrationSite";
+const LandingPage = lazy(() => import("./components/landing/LandingPage"));
 import Profile from "./components/Profile";
 import Dashboard from "./components/Dashboard";
 import SuperAdminDashboard from "./components/SuperAdminDashboard";
@@ -301,17 +302,21 @@ const LeaveForMis: React.FC = () => {
   return null;
 };
 
-const RegistrationSiteRoutes: React.FC = () => (
-  <Routes>
-    <Route path="/" element={<Suspense fallback={null}><RegisterSchoolPage /></Suspense>} />
-    <Route path="/register-school" element={<Navigate to="/" replace />} />
-    <Route
-      path="/onboarding"
-      element={<Suspense fallback={null}><OnboardingTracker /></Suspense>}
-    />
-    <Route path="*" element={<LeaveForMis />} />
-  </Routes>
-);
+const RegistrationSiteRoutes: React.FC = () => {
+  useRegistrationSiteHead();
+  return (
+    <Routes>
+      <Route path="/" element={<Suspense fallback={null}><LandingPage /></Suspense>} />
+      <Route path="/register" element={<Suspense fallback={null}><RegisterSchoolPage /></Suspense>} />
+      <Route path="/register-school" element={<Navigate to="/register" replace />} />
+      <Route
+        path="/onboarding"
+        element={<Suspense fallback={null}><OnboardingTracker /></Suspense>}
+      />
+      <Route path="*" element={<LeaveForMis />} />
+    </Routes>
+  );
+};
 
 // Initialize toast store for API interceptor
 const ToastInitializer: React.FC<{ children: React.ReactNode }> = ({
@@ -341,7 +346,7 @@ function App() {
           <Router basename="/">
             {/* Asks to install the web app on load, where NGA Desktop doesn't run
                 (phones, tablets, Chromebooks). Computers get NGA Desktop at /apps. */}
-            {webAppInstallFits() && <AutoInstallPrompt />}
+            {webAppInstallFits() && !isRegistrationSite() && <AutoInstallPrompt />}
             {/* Page views → Usage & Monitoring (patterns only, never ids). */}
             <ActivityRouterTracker />
             <ActivityNotice />
@@ -403,6 +408,7 @@ function App() {
                 /onboarding serves applicants (onboarding token) and, with ?status=suspended,
                 a signed-in school that is not usable (OnboardingPending). */}
             <Route path="/register-school" element={<Suspense fallback={null}><RegisterSchoolPage /></Suspense>} />
+            <Route path="/register" element={<Navigate to="/register-school" replace />} />
             <Route path="/support-session" element={<Suspense fallback={null}><SupportSessionLanding /></Suspense>} />
             <Route
               path="/onboarding"

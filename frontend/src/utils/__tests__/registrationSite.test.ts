@@ -22,7 +22,7 @@ describe("registration site", () => {
     vi.stubEnv("VITE_REGISTRATION_SITE_URL", "https://amashuri.com");
     vi.stubEnv("VITE_MIS_APP_URL", "https://mis.amashuri.com");
     // jsdom runs on localhost: not the registration site
-    expect(registerSchoolHref()).toBe("https://amashuri.com/");
+    expect(registerSchoolHref()).toBe("https://amashuri.com/register");
     expect(misHref("/login")).toBe("/login");
   });
 });
