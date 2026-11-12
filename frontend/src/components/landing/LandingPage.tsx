@@ -1,11 +1,13 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { MotionConfig, motion, useReducedMotion, useScroll, useTransform } from "framer-motion";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, KeyRound, MonitorSmartphone, WifiOff } from "lucide-react";
 import ThemeToggle from "../ui/ThemeToggle";
 import { AmashuriLogo, AmashuriMark } from "../brand/AmashuriLogo";
 import { misHref } from "../../utils/registrationSite";
-import Orbit from "./Orbit";
+import HeroShowcase from "./HeroShowcase";
+import { APPS } from "./content";
+import { LiveDot } from "./widgets";
 import AppsSection from "./AppsSection";
 import Showcase from "./Showcase";
 import Packages from "./Packages";
@@ -26,6 +28,7 @@ const TOKENS = `
   --lp-text: #1d1d1f; --lp-muted: #6e6e73;
   --lp-blue: #0071e3; --lp-blue-soft: rgba(0,113,227,0.09);
   --lp-hair: rgba(0,0,0,0.08); --lp-seg: #e8e8ed; --lp-nav: rgba(255,255,255,0.72);
+  --lp-glass: rgba(255,255,255,0.82);
   --lp-glow-a: rgba(0,113,227,0.16); --lp-glow-b: rgba(90,200,250,0.16); --lp-glow-c: rgba(41,151,255,0.12);
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", Inter, "Helvetica Neue", Arial, sans-serif;
   -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
@@ -35,6 +38,7 @@ const TOKENS = `
   --lp-text: #f5f5f7; --lp-muted: #a1a1a6;
   --lp-blue: #2997ff; --lp-blue-soft: rgba(41,151,255,0.15);
   --lp-hair: rgba(255,255,255,0.12); --lp-seg: rgba(255,255,255,0.10); --lp-nav: rgba(22,22,23,0.72);
+  --lp-glass: rgba(28,28,30,0.78);
   --lp-glow-a: rgba(0,113,227,0.34); --lp-glow-b: rgba(90,200,250,0.18); --lp-glow-c: rgba(41,151,255,0.22);
 }
 /* hero backdrop: three blurred glows drifting slowly (transform only) */
@@ -108,76 +112,149 @@ const HeroBackdrop: React.FC = () => (
   </div>
 );
 
+const FACTS: Array<{ icon: React.FC<{ className?: string }>; label: string }> = [
+  { icon: KeyRound, label: "One sign-in" },
+  { icon: WifiOff, label: "Works offline" },
+  { icon: MonitorSmartphone, label: "Desktop & mobile" },
+];
+
+/**
+ * The hero introduces the ecosystem: the pitch on the left with the four
+ * apps as chips, the product on the right (HeroShowcase) -- live UI, not a
+ * screenshot. Chips and showcase share `focus`: hovering a chip rings that
+ * app's piece; left alone, the focus tours the four apps.
+ */
 const Hero: React.FC = () => {
   const reduced = useReducedMotion();
   const ref = useRef<HTMLElement>(null);
+  const [focus, setFocus] = useState(APPS[0].key);
+  const [held, setHeld] = useState(false);
+  const [inView, setInView] = useState(true);
   const { scrollYProgress } = useScroll({ target: ref, offset: ["start start", "end start"] });
-  // the visual settles in as the page moves, like a product shot
-  const scale = useTransform(scrollYProgress, [0, 1], [1, reduced ? 1 : 0.88]);
-  const fade = useTransform(scrollYProgress, [0, 0.9], [1, reduced ? 1 : 0.3]);
-  const words = ["Every", "school", "activity."];
+  const shotY = useTransform(scrollYProgress, [0, 1], [0, reduced ? 0 : 60]);
+
+  useEffect(() => {
+    if (reduced || held || !inView) return;
+    const t = window.setTimeout(() => {
+      const i = APPS.findIndex((a) => a.key === focus);
+      setFocus(APPS[(i + 1) % APPS.length].key);
+    }, 3200);
+    return () => window.clearTimeout(t);
+  }, [focus, held, inView, reduced]);
+
+  const rise = (delay: number) => ({
+    initial: reduced ? { opacity: 0 } : { opacity: 0, y: 24 },
+    animate: { opacity: 1, y: 0 },
+    transition: { duration: 0.9, delay, ease: EASE },
+  });
 
   return (
-    <section id="top" ref={ref} className="relative isolate overflow-hidden bg-[var(--lp-bg)] px-4 pb-16 pt-32 sm:pt-40">
+    <motion.section
+      id="top"
+      ref={ref}
+      onViewportEnter={() => setInView(true)}
+      onViewportLeave={() => setInView(false)}
+      className="relative isolate overflow-hidden bg-[var(--lp-bg)] px-4 pb-16 pt-28 sm:pt-36 lg:pb-20"
+    >
       <HeroBackdrop />
-      <div className="relative mx-auto max-w-4xl text-center">
-        <motion.p
-          initial={reduced ? { opacity: 0 } : { opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, ease: EASE }}
-          className="text-lg font-semibold text-[var(--lp-muted)] sm:text-xl"
-        >
-          amashuri<span className="text-[var(--lp-blue)]">.</span> school activities management
-        </motion.p>
-        <h1 className="mt-4 text-[3.25rem] font-semibold leading-[1.02] tracking-[-0.045em] text-[var(--lp-text)] sm:text-[5.5rem]">
-          {words.map((w, i) => (
-            <React.Fragment key={w}>
-              <motion.span
-                className="inline-block"
-                initial={reduced ? { opacity: 0 } : { opacity: 0, y: 30 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.9, delay: 0.1 + i * 0.1, ease: EASE }}
-              >
-                {w}
-              </motion.span>{" "}
-            </React.Fragment>
-          ))}
+      <div className="relative mx-auto grid max-w-6xl items-center gap-14 lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] lg:gap-10">
+        {/* the pitch */}
+        <div className="text-center lg:text-left">
           <motion.span
-            className="lp-sheen block bg-gradient-to-r from-[#0071e3] via-[#5ac8fa] to-[#0071e3] bg-clip-text pb-2 text-transparent"
-            initial={reduced ? { opacity: 0 } : { opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.9, delay: 0.45, ease: EASE }}
+            {...rise(0)}
+            className="inline-flex items-center gap-2 rounded-full bg-[var(--lp-glass)] px-3 py-1.5 text-[13px] font-medium text-[var(--lp-text)] shadow-[0_2px_10px_rgba(0,0,0,0.06)] ring-1 ring-[var(--lp-hair)] backdrop-blur"
           >
-            One platform.
+            <LiveDot />
+            The school operating system
           </motion.span>
-        </h1>
-        <motion.p
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.9, delay: 0.7, ease: EASE }}
-          className="mx-auto mt-5 max-w-xl text-xl leading-relaxed text-[var(--lp-muted)] sm:text-2xl"
-        >
-          Lessons, assessments, attendance and messages. Together.
-        </motion.p>
+          <motion.h1 {...rise(0.1)} className="mt-6 text-[3rem] font-semibold leading-[1.02] tracking-[-0.045em] text-[var(--lp-text)] sm:text-[4.5rem] lg:text-[4.75rem]">
+            Your whole school.{" "}
+            <span className="lp-sheen block bg-gradient-to-r from-[#0071e3] via-[#5ac8fa] to-[#0071e3] bg-clip-text pb-2 text-transparent">One place.</span>
+          </motion.h1>
+          <motion.p {...rise(0.25)} className="mx-auto mt-5 max-w-lg text-xl leading-relaxed text-[var(--lp-muted)] lg:mx-0">
+            Four connected apps for lessons, assessments, attendance and messages. One sign-in for everyone.
+          </motion.p>
+          <motion.div {...rise(0.4)} className="mt-8 flex flex-col items-center gap-5 sm:flex-row sm:justify-center lg:justify-start">
+            <Link to="/register" className={pillPrimary}>
+              Register your school
+            </Link>
+            <a href={misHref("/login")} className={linkChevron}>
+              Sign in
+              <ChevronRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" aria-hidden />
+            </a>
+          </motion.div>
+
+          {/* the ecosystem, as chips that drive the showcase */}
+          <motion.ul
+            {...rise(0.55)}
+            className="mt-10 flex flex-wrap justify-center gap-2 lg:justify-start"
+            aria-label="The four apps"
+            onPointerLeave={() => setHeld(false)}
+          >
+            {APPS.map((a) => {
+              const on = a.key === focus;
+              const Icon = a.icon;
+              return (
+                <li key={a.key}>
+                  <button
+                    type="button"
+                    onPointerEnter={() => {
+                      setHeld(true);
+                      setFocus(a.key);
+                    }}
+                    onFocus={() => {
+                      setHeld(true);
+                      setFocus(a.key);
+                    }}
+                    onBlur={() => setHeld(false)}
+                    onClick={() => document.getElementById("apps")?.scrollIntoView({ behavior: reduced ? "auto" : "smooth" })}
+                    className={cx(
+                      "relative flex items-center gap-2 rounded-full px-3 py-2 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lp-blue)]",
+                      on ? "text-[var(--lp-text)]" : "text-[var(--lp-muted)] hover:text-[var(--lp-text)]",
+                    )}
+                  >
+                    {on && (
+                      <motion.span
+                        layoutId="hero-chip"
+                        className="absolute inset-0 rounded-full bg-[var(--lp-glass)] shadow-[0_4px_14px_rgba(0,0,0,0.08)] ring-1 ring-[var(--lp-hair)]"
+                        transition={{ type: "spring", stiffness: 400, damping: 34 }}
+                      />
+                    )}
+                    <span className={cx("relative flex h-6 w-6 items-center justify-center rounded-lg bg-gradient-to-br text-white", a.grad)}>
+                      <Icon className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
+                    </span>
+                    <span className="relative">{a.name}</span>
+                  </button>
+                </li>
+              );
+            })}
+          </motion.ul>
+
+          <motion.ul {...rise(0.7)} className="mt-6 flex flex-wrap justify-center gap-x-6 gap-y-2 text-sm text-[var(--lp-muted)] lg:justify-start">
+            {FACTS.map(({ icon: Icon, label }) => (
+              <li key={label} className="flex items-center gap-1.5">
+                <Icon className="h-4 w-4 text-[var(--lp-blue)]" aria-hidden />
+                {label}
+              </li>
+            ))}
+          </motion.ul>
+        </div>
+
+        {/* the product */}
         <motion.div
-          initial={reduced ? { opacity: 0 } : { opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, delay: 0.85, ease: EASE }}
-          className="mt-9 flex flex-col items-center justify-center gap-5 sm:flex-row sm:gap-8"
+          style={{ y: shotY }}
+          initial={reduced ? { opacity: 0 } : { opacity: 0, y: 40, scale: 0.97 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ duration: 1.1, delay: 0.3, ease: EASE }}
+          className="flex justify-center sm:block sm:px-12 lg:px-0"
         >
-          <Link to="/register" className={pillPrimary}>
-            Register your school
-          </Link>
-          <a href={misHref("/login")} className={linkChevron}>
-            Sign in
-            <ChevronRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" aria-hidden />
-          </a>
+          {/* phones: the shot keeps its proportions and scales down, like a product photo */}
+          <div className="w-[540px] shrink-0 [zoom:0.6] min-[430px]:[zoom:0.68] min-[520px]:[zoom:0.85] sm:w-auto sm:[zoom:1]">
+            <HeroShowcase focus={focus} live={inView && !reduced} />
+          </div>
         </motion.div>
       </div>
-      <motion.div style={{ scale, opacity: fade }} className="relative mt-14 sm:mt-16">
-        <Orbit />
-      </motion.div>
-    </section>
+    </motion.section>
   );
 };
 
