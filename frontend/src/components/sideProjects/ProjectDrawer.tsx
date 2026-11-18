@@ -287,7 +287,7 @@ const ProjectDrawer: React.FC<DrawerProps> = ({
             aria-modal="true"
             data-drawer
             aria-label={p?.title ?? "Project"}
-            className={`relative flex h-full w-full flex-col overflow-hidden border-l border-slate-200 bg-slate-50 transition-[max-width] duration-300 ease-out dark:border-gray-700/50 dark:bg-gray-900 ${max ? "max-w-full" : "max-w-3xl"}`}
+            className={`relative flex h-full w-full flex-col overflow-hidden border-l border-slate-200 bg-slate-50 transition-[max-width] duration-300 ease-out dark:border-gray-800 dark:bg-gray-950 ${max ? "max-w-full" : "max-w-3xl"}`}
             initial={{ x: "100%" }}
             animate={{ x: 0 }}
             exit={{ x: "100%" }}
@@ -295,7 +295,7 @@ const ProjectDrawer: React.FC<DrawerProps> = ({
           >
             {/* Header: compact identity row, owner line, stage track, then tabs */}
             <div className="relative shrink-0">
-              <div className="border-b border-slate-200/80 bg-white px-4 pb-3 pt-4 sm:px-5 dark:border-gray-700/40 dark:bg-gray-900">
+              <div className="bg-white px-4 pb-1 pt-4 sm:px-5 dark:bg-gray-900">
                 <div className="flex items-start gap-3">
                   {/* Cover thumbnail, or the category glyph on a soft tint */}
                   <span
@@ -512,11 +512,11 @@ const ProjectDrawer: React.FC<DrawerProps> = ({
                 )}
               </div>
 
-              {/* Tabs: pills, scroll with fading edges */}
+              {/* Tabs: quiet text tabs, a 2px blue underline slides to the active one */}
               {p && (
-                <div className="relative border-b border-slate-200/80 bg-white/70 backdrop-blur dark:border-gray-700/40 dark:bg-gray-900/60">
+                <div className="relative bg-white dark:bg-gray-900">
                   <nav
-                    className="no-scrollbar flex gap-1 overflow-x-auto px-4 py-2.5 [mask-image:linear-gradient(to_right,transparent,black_16px,black_calc(100%-24px),transparent)]"
+                    className="no-scrollbar flex gap-1 overflow-x-auto border-b border-slate-200 px-3 sm:px-4 dark:border-gray-800"
                     role="tablist"
                     aria-label="Project sections"
                   >
@@ -531,27 +531,23 @@ const ProjectDrawer: React.FC<DrawerProps> = ({
                             type="button"
                             aria-selected={on}
                             onClick={() => setTab(t.key)}
-                            className={`relative flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-2 text-xs font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${on ? "text-white" : "text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-white"}`}
+                            className={`group relative flex shrink-0 items-center gap-1.5 px-1 pb-3 pt-3 text-[13px] transition-colors focus:outline-none ${on ? "font-semibold text-slate-900 dark:text-white" : "font-medium text-slate-500 hover:text-slate-900 dark:text-gray-400 dark:hover:text-white"}`}
                           >
+                            <span className="pointer-events-none absolute inset-x-0 inset-y-1.5 rounded-lg transition-colors group-hover:bg-slate-100 group-focus-visible:ring-2 group-focus-visible:ring-blue-500 dark:group-hover:bg-gray-800" aria-hidden />
+                            <span className="relative flex items-center gap-1.5 px-2">
+                              <t.icon className={`h-4 w-4 ${on ? "text-blue-600 dark:text-blue-400" : ""}`} aria-hidden />
+                              {t.label}
+                              {t.count !== undefined && t.count > 0 && (
+                                <span className={`text-[11px] font-medium tabular-nums text-slate-500 dark:text-gray-400`}>{t.count}</span>
+                              )}
+                            </span>
                             {on && (
                               <motion.span
-                                layoutId="sp-tab"
-                                className="absolute inset-0 rounded-full bg-blue-600 "
-                                transition={{
-                                  type: "spring",
-                                  stiffness: 380,
-                                  damping: 32,
-                                }}
+                                layoutId="sp-tab-line"
+                                className="absolute inset-x-1 -bottom-px h-0.5 rounded-full bg-blue-600 dark:bg-blue-400"
+                                transition={{ type: "spring", stiffness: 420, damping: 36 }}
+                                aria-hidden
                               />
-                            )}
-                            <t.icon className="relative h-4 w-4" aria-hidden />
-                            <span className="relative">{t.label}</span>
-                            {t.count !== undefined && t.count > 0 && (
-                              <span
-                                className={`relative min-w-[18px] rounded-full px-1.5 text-center text-[10px] tabular-nums ${on ? "bg-blue-800 text-white" : "bg-slate-200/80 text-slate-600 dark:bg-gray-700 dark:text-gray-300"}`}
-                              >
-                                {t.count}
-                              </span>
                             )}
                           </button>
                         );

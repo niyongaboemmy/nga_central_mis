@@ -139,7 +139,9 @@ const StageTimeline: React.FC<{
             <p className="text-xs text-slate-500 dark:text-gray-400">
               {p.startDate && p.targetDate
                 ? `${fmt(dayOf(p.startDate))} – ${fmt(dayOf(p.targetDate))}`
-                : "No dates yet"}
+                : p.targetDate
+                  ? `Closes ${fmt(dayOf(p.targetDate))} · no start date`
+                  : "No dates yet"}
             </p>
           </div>
         </div>
@@ -184,7 +186,7 @@ const StageTimeline: React.FC<{
           className="mt-4 flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-slate-200 p-5 text-sm font-semibold text-slate-500 transition enabled:hover:border-blue-300 enabled:hover:bg-blue-50/50 enabled:hover:text-blue-700 dark:border-gray-700/60 dark:text-gray-400"
         >
           <CalendarRange className="h-4 w-4" aria-hidden />{" "}
-          {canEdit ? "Set the start and closing dates" : "No plan yet"}
+          {canEdit ? (p.targetDate ? "Add the start date to plan each stage" : "Set the start and closing dates") : "No plan yet"}
         </button>
       ) : (
         <div
