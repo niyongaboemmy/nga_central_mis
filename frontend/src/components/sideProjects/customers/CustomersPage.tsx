@@ -78,7 +78,11 @@ const CustomersPage: React.FC = () => {
       <PageHeader
         icon={Briefcase}
         title="Customers"
-        subtitle="Who your projects are for. Registered once, shared by every project."
+        subtitle={
+          me?.customers === "own"
+            ? "Customers you registered and the customers of projects you are in."
+            : "Who your projects are for. Registered once, shared by every project."
+        }
         actions={
           <button type="button" className={primaryBtn} onClick={() => setModal({ customer: null })}>
             <Plus className="h-4 w-4" /> Register a customer
@@ -125,7 +129,7 @@ const CustomersPage: React.FC = () => {
             <Briefcase className="h-6 w-6" aria-hidden />
           </span>
           <p className="text-sm font-semibold text-slate-800 dark:text-gray-100">{q ? "No customer matches" : "No customers yet"}</p>
-          <p className="max-w-sm text-xs text-slate-500 dark:text-gray-400">Register the people and companies you build for. Any project can then pick them.</p>
+          <p className="max-w-sm text-xs text-slate-500 dark:text-gray-400">{me?.customers === "own" ? "Register the people and companies you build for, then pick them on your projects." : "Register the people and companies you build for. Any project can then pick them."}</p>
           <button type="button" className={primaryBtn} onClick={() => setModal({ customer: null })}>
             <Plus className="h-4 w-4" /> Register a customer
           </button>

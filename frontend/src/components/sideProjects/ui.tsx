@@ -316,6 +316,46 @@ export const Skeleton: React.FC<{ className?: string }> = ({ className = "" }) =
   <div className={`animate-pulse rounded-xl bg-slate-200/70 dark:bg-gray-700/40 ${className}`} />
 );
 
+/**
+ * One stat tile for the whole feature: a soft tinted icon badge on top, then the number (an
+ * optional unit trails it in muted ink) and a sentence-case label. Stacked, so it fits narrow cards.
+ * Blue by default; good / bad / warn only when the number itself is a state.
+ */
+export type StatTone = "blue" | "good" | "bad" | "warn";
+const STAT_TONE: Record<StatTone, { badge: string; value: string }> = {
+  blue: { badge: "bg-blue-500/10 text-blue-600 dark:bg-blue-400/15 dark:text-blue-300", value: "text-slate-900 dark:text-white" },
+  good: { badge: "bg-green-500/10 text-green-700 dark:bg-green-400/15 dark:text-green-300", value: "text-green-700 dark:text-green-300" },
+  bad: { badge: "bg-red-500/10 text-red-600 dark:bg-red-400/15 dark:text-red-300", value: "text-red-700 dark:text-red-300" },
+  warn: { badge: "bg-amber-500/10 text-amber-700 dark:bg-amber-400/15 dark:text-amber-300", value: "text-amber-800 dark:text-amber-200" },
+};
+export const StatTile: React.FC<{
+  icon: React.ElementType;
+  label: string;
+  value?: React.ReactNode;
+  unit?: string;
+  tone?: StatTone;
+  loading?: boolean;
+  className?: string;
+}> = ({ icon: Icon, label, value, unit, tone = "blue", loading, className = "" }) => {
+  const t = STAT_TONE[tone];
+  return (
+    <div className={`min-w-0 rounded-2xl bg-slate-50 p-3.5 dark:bg-white/[0.04] ${className}`}>
+      <span className={`flex h-9 w-9 items-center justify-center rounded-xl ${t.badge}`}>
+        <Icon className="h-[18px] w-[18px]" strokeWidth={2} aria-hidden />
+      </span>
+      {loading ? (
+        <Skeleton className="mt-3 h-6 w-12" />
+      ) : (
+        <p className={`mt-3 flex items-baseline gap-1 text-2xl font-bold leading-7 tabular-nums tracking-tight ${t.value}`}>
+          {value}
+          {unit && <span className="text-xs font-medium tracking-normal text-slate-500 dark:text-gray-400">{unit}</span>}
+        </p>
+      )}
+      <p className="mt-0.5 text-xs font-medium leading-4 text-slate-600 dark:text-gray-300">{label}</p>
+    </div>
+  );
+};
+
 export const FieldError: React.FC<{ message?: string | null; id?: string }> = ({ message, id }) =>
   message ? (
     <p id={id} role="alert" className="mt-1 flex items-center gap-1 text-xs font-medium text-red-600 dark:text-red-400">

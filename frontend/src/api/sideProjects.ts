@@ -187,6 +187,8 @@ export interface Period {
   totalDays: number | null;
   daysLeftProject: number | null;
   elapsedPct: number | null;
+  /** No start date: the provisional start the stage plan is drawn from. */
+  assumedStart?: string | null;
 }
 
 export interface ReportFile {
@@ -398,6 +400,8 @@ export interface Me {
   assigned: boolean;
   /** may choose a project's classification (SIDE_PROJECTS_CLASSIFY, never a student) */
   classify?: boolean;
+  /** "own": a student sees only their customers and their projects' customers */
+  customers?: "all" | "own";
 }
 
 export interface FilterOptions {

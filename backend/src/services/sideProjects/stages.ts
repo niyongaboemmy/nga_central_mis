@@ -159,6 +159,25 @@ export interface PeriodView {
   totalDays: number | null;
   daysLeftProject: number | null;
   elapsedPct: number | null;
+  /** Set when the project has no start date: the day the stage plan is drawn from (provisional). */
+  assumedStart: string | null;
+}
+
+/**
+ * No start date yet: draw a provisional stage plan from the day the project was created (or
+ * started) to its closing date, so the overview never says "no plan" while stages and a closing
+ * date exist. Nothing is stored; saving dates in the plan editor replaces it.
+ */
+export function provisionalPlan(
+  p: { start_date: string | null; target_date: string | null; created_at: string; started_at?: string | null },
+  plan: PlanRow[],
+): { plan: PlanRow[]; assumedStart: string | null } {
+  if (p.start_date) return { plan, assumedStart: null };
+  if (plan.length) return { plan, assumedStart: plan[0].start };
+  if (!p.target_date) return { plan, assumedStart: null };
+  const start = (p.started_at || p.created_at).slice(0, 10);
+  if (daysBetween(start, p.target_date) + 1 < MIN_PROJECT_DAYS) return { plan, assumedStart: null };
+  return { plan: defaultPlan(start, p.target_date), assumedStart: start };
 }
 
 /** Everything the drawer shows about time. Pure apart from the inputs. */
@@ -167,6 +186,7 @@ export function periodView(
   plan: PlanRow[],
   logs: Array<{ stage: string; entered_at: string; left_at: string | null }>,
   now: Date,
+  assumedStart: string | null = null,
 ): PeriodView {
   const nowMs = now.getTime();
   const today = now.toISOString().slice(0, 10);
@@ -203,7 +223,7 @@ export function periodView(
     };
   });
   const onHold = logs.filter((l) => l.stage === "ON_HOLD").reduce((acc, l) => acc + ms(l), 0) / DAY;
-  const start = p.start_date ?? p.created_at.slice(0, 10);
+  const start = p.start_date ?? assumedStart ?? p.created_at.slice(0, 10);
   const total = p.target_date ? daysBetween(start, p.target_date) + 1 : null;
   const elapsed = daysBetween(start, today);
   return {
@@ -214,6 +234,7 @@ export function periodView(
     totalDays: total,
     daysLeftProject: p.target_date ? daysBetween(today, p.target_date) : null,
     elapsedPct: total ? Math.max(0, Math.min(100, Math.round((elapsed / total) * 100))) : null,
+    assumedStart,
   };
 }
 

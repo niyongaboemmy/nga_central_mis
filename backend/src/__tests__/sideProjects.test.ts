@@ -910,53 +910,90 @@ describe("teams, implementation plan and tasks (migration 133)", () => {
 
 describe("customers shared across projects (migration 133)", () => {
   let cid: number;
-  // Every production role holds SIDE_PROJECTS_MANAGE_OWN (migration 129); the lead too.
-  beforeAll(() => owners.add(lead));
+  // Every production role holds SIDE_PROJECTS_MANAGE_OWN (migration 129); the lead and staff too.
+  beforeAll(() => {
+    owners.add(lead);
+    owners.add(teacherA);
+  });
   const png = async () => (await import("sharp")).default({ create: { width: 40, height: 40, channels: 3, background: "#2a78d6" } }).png().toBuffer();
+  const ids = async (who: number) => ((await api().get("/side-projects/customers").set(as(who))).body.data as any[]).map((c) => c.id);
 
   it("registers a customer once (with a logo); duplicates are refused", async () => {
-    const r = await api().post("/side-projects/customers").set(as(alice)).field("name", "Kigali Green Farms").field("kind", "COMPANY").field("email", "info@greenfarms.rw").attach("logo", await png(), "logo.png");
+    const r = await api().post("/side-projects/customers").set(as(teacherA)).field("name", "Kigali Green Farms").field("kind", "COMPANY").field("email", "info@greenfarms.rw").attach("logo", await png(), "logo.png");
     expect(r.status, JSON.stringify(r.body)).toBe(200);
     cid = r.body.data.id;
     expect(r.body.data).toMatchObject({ name: "Kigali Green Farms", kind: "COMPANY", projects: 0 });
     expect(r.body.data.logoAssetId).toBeTruthy();
-    const dupe = await api().post("/side-projects/customers").set(as(carol)).field("name", "  kigali   green farms ");
-    expect(dupe.status).toBe(409);
+    const staffDupe = await api().post("/side-projects/customers").set(as(lead)).field("name", "  kigali   green farms ");
+    expect(staffDupe.status).toBe(409);
+    expect(staffDupe.body.message ?? staffDupe.body.error?.message ?? JSON.stringify(staffDupe.body)).toMatch(/pick it from the list/);
+    // A student who can't see the school's record is told who can attach it, not shown it.
+    const studentDupe = await api().post("/side-projects/customers").set(as(carol)).field("name", "Kigali Green Farms");
+    expect(studentDupe.status).toBe(409);
+    expect(JSON.stringify(studentDupe.body)).toMatch(/staff member/);
     expect((await api().post("/side-projects/customers").set(as(carol)).field("name", "Bad mail").field("email", "nope")).body.field).toBe("email");
     expect((await api().post("/side-projects/customers").set(as(carol)).field("name", "Svg Co").attach("logo", Buffer.from("<svg xmlns='http://www.w3.org/2000/svg'/>"), "logo.svg")).status).toBe(400);
-    const logo = await api().get(`/side-projects/customers/${cid}/logo`).set(as(carol));
+    const logo = await api().get(`/side-projects/customers/${cid}/logo`).set(as(lead));
     expect(logo.status).toBe(200);
     expect(String(logo.headers["content-type"])).toMatch(/image/);
   });
 
-  it("any project can pick a registered customer", async () => {
+  it("students see only their own customers and those of projects they are in", async () => {
+    expect(await ids(teacherA)).toContain(cid);
+    expect(await ids(lead)).toContain(cid);
+    expect(await ids(carol)).not.toContain(cid);
+    expect((await api().get(`/side-projects/customers/${cid}`).set(as(carol))).status).toBe(404);
+    expect((await api().get(`/side-projects/customers/${cid}/logo`).set(as(carol))).status).toBe(404); // unused school customer
+    const sneak = await api().post("/side-projects").set(as(carol)).field("title", "Sneaky pick").field("problemStatement", PROBLEM).field(DATES).field("customerMode", "CUSTOMER").field("customerId", String(cid)).attach("concept", pdf(), "c.pdf");
+    expect(sneak.status).toBe(400);
+    expect(sneak.body.field).toBe("customerId");
+
+    const mine = (await api().post("/side-projects/customers").set(as(carol)).field("name", "Carol's Bakery")).body.data;
+    expect(await ids(carol)).toContain(mine.id);
+    expect(await ids(alice)).not.toContain(mine.id);
+    const aliceOwn = await createProject(alice, "Alice idea");
+    expect((await api().patch(`/side-projects/${aliceOwn}`).set(as(alice)).send({ customerMode: "CUSTOMER", customerId: mine.id })).body.field).toBe("customerId");
+
+    // A staff teammate attaches the school customer to Carol's project: now it is hers to see (and only hers).
+    const p = await createProject(carol, "Farm sensors", { customerMode: "CUSTOMER", customerId: String(mine.id) });
+    await db.execute(sql`INSERT INTO SideProjectMember (project_id, user_id, status, invited_by, added_at, responded_at) VALUES (${p}, ${teacherA}, 'ACCEPTED', ${carol}, UTC_TIMESTAMP(), UTC_TIMESTAMP())`);
+    const attach = await api().patch(`/side-projects/${p}`).set(as(teacherA)).send({ customerMode: "CUSTOMER", customerId: cid });
+    expect(attach.status, JSON.stringify(attach.body)).toBe(200);
+    expect(await ids(carol)).toContain(cid);
+    expect((await api().get(`/side-projects/customers/${cid}`).set(as(carol))).body.data.projects).toBe(1);
+    expect(await ids(alice)).not.toContain(cid);
+    expect((await api().get(`/side-projects/customers/${cid}/logo`).set(as(alice))).status).toBe(200); // shown on its project card
+    // Carol saves other fields with the staff-chosen customer in place.
+    expect((await api().patch(`/side-projects/${p}`).set(as(carol)).send({ customerMode: "CUSTOMER", customerId: cid, description: "Soil sensors for farms" })).status).toBe(200);
+  });
+
+  it("any project can pick a customer it may see", async () => {
     const list = (await api().get("/side-projects/customers").query({ q: "green" }).set(as(carol))).body.data;
     expect(list.some((c: any) => c.id === cid)).toBe(true);
     const missing = await api().post("/side-projects").set(as(carol)).field("title", "No customer chosen").field("problemStatement", PROBLEM).field(DATES).field("customerMode", "CUSTOMER").attach("concept", pdf(), "c.pdf");
     expect(missing.body.field).toBe("customerId");
-    const p = await createProject(carol, "Farm sensors", { customerMode: "CUSTOMER", customerId: String(cid) });
-    const d = (await api().get(`/side-projects/${p}`).set(as(carol))).body.data;
+    const p = await createProject(teacherA, "Farm dashboard", { customerMode: "CUSTOMER", customerId: String(cid) });
+    const before = (await api().get(`/side-projects/customers/${cid}`).set(as(teacherA))).body.data.projects;
+    const d = (await api().get(`/side-projects/${p}`).set(as(teacherA))).body.data;
     expect(d.customerMode).toBe("CUSTOMER");
     expect(d.customerDetail).toMatchObject({ id: cid, name: "Kigali Green Farms" });
     expect(d.customer).toMatchObject({ id: cid, name: "Kigali Green Farms" });
     const own = await createProject(alice, "Own idea");
     expect((await api().get(`/side-projects/${own}`).set(as(alice))).body.data.customerMode).toBe("OWN");
-    expect((await api().patch(`/side-projects/${own}`).set(as(alice)).send({ customerMode: "CUSTOMER", customerId: cid })).status).toBe(200);
-    expect((await api().get(`/side-projects/${own}`).set(as(alice))).body.data.customerDetail.id).toBe(cid);
-    expect((await api().get(`/side-projects/customers/${cid}`).set(as(alice))).body.data.projects).toBe(2);
+    expect(before).toBe(2); // Carol's project and this one
     const mon = (await api().get("/side-projects/monitor/projects").query({ customerId: cid, pageSize: 50 }).set(as(lead))).body.data;
     expect(mon.rows.length).toBe(2);
   });
 
   it("only the registrar (or the lead) edits; a customer in use is archived, not deleted", async () => {
     expect((await api().patch(`/side-projects/customers/${cid}`).set(as(carol)).field("phone", "+250 788 000 000")).status).toBe(403);
-    const ok = await api().patch(`/side-projects/customers/${cid}`).set(as(alice)).field("phone", "+250 788 000 000").field("contactName", "Jeanne");
+    const ok = await api().patch(`/side-projects/customers/${cid}`).set(as(teacherA)).field("phone", "+250 788 000 000").field("contactName", "Jeanne");
     expect(ok.status).toBe(200);
     expect(ok.body.data).toMatchObject({ phone: "+250 788 000 000", contactName: "Jeanne" });
-    const rm = await api().delete(`/side-projects/customers/${cid}`).set(as(alice));
+    const rm = await api().delete(`/side-projects/customers/${cid}`).set(as(teacherA));
     expect(rm.body.data.archived).toBe(true);
-    expect((await api().get("/side-projects/customers").set(as(alice))).body.data.some((c: any) => c.id === cid)).toBe(false);
-    const pick = await api().post("/side-projects").set(as(carol)).field("title", "Archived pick").field("problemStatement", PROBLEM).field(DATES).field("customerMode", "CUSTOMER").field("customerId", String(cid)).attach("concept", pdf(), "c.pdf");
+    expect(await ids(teacherA)).not.toContain(cid);
+    const pick = await api().post("/side-projects").set(as(teacherA)).field("title", "Archived pick").field("problemStatement", PROBLEM).field(DATES).field("customerMode", "CUSTOMER").field("customerId", String(cid)).attach("concept", pdf(), "c.pdf");
     expect(pick.body.field).toBe("customerId");
     expect((await api().post(`/side-projects/customers/${cid}/restore`).set(as(lead))).status).toBe(200);
     const fresh = (await api().post("/side-projects/customers").set(as(carol)).field("name", "Temporary Ltd")).body.data;
