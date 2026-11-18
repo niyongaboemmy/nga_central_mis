@@ -765,7 +765,8 @@ export function sideProjectsRouter(
     own,
     handle(async (req) => {
       const a = await studentAccess(req);
-      const userId = await members.invite(a, uid(req), { userId: req.body?.userId, regNumber: req.body?.regNumber });
+      const b = req.body ?? {};
+      const userId = await members.invite(a, uid(req), { userId: b.userId, regNumber: b.regNumber, roleKey: b.roleKey, roleTitle: b.roleTitle, responsibilities: b.responsibilities });
       await notify.onInvite(Number(a.project.project_id), uid(req), userId);
       return { userId };
     }),

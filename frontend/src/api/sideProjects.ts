@@ -295,7 +295,7 @@ export interface ProjectDetail extends ProjectCard {
   outcomeSummary: string | null;
   startDate: string | null;
   startedAt: string | null;
-  owner: { id: number; name: string; regNumber: string | null; type: string; avatar: string | null };
+  owner: { id: number; name: string; regNumber: string | null; type: string; avatar: string | null; roleTitle?: string | null; responsibilities?: string | null };
   supervisor: { id: number; name: string } | null;
   verifiedBy: string | null;
   academicYear: { id: number; name: string } | null;
@@ -555,7 +555,7 @@ export const sideProjectsApi = {
 
   comment: (id: number, body: string) => api.post(`${B}/${id}/comments`, { body }),
   removeComment: (id: number, cid: number) => api.delete(`${B}/${id}/comments/${cid}`),
-  invite: (id: number, who: { userId?: number; regNumber?: string }) => api.post(`${B}/${id}/members`, who),
+  invite: (id: number, who: { userId?: number; regNumber?: string; roleKey?: RoleKey; roleTitle?: string; responsibilities?: string }) => api.post(`${B}/${id}/members`, who),
   removeMember: (id: number, userId: number) => api.delete(`${B}/${id}/members/${userId}`),
   respondInvite: (id: number, accept: boolean) => api.post(`${B}/invitations/${id}`, { accept }),
 
