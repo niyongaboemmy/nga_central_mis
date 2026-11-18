@@ -1,10 +1,10 @@
 import React from "react";
 import { motion } from "framer-motion";
-import { AlertTriangle, BadgeCheck, Clock3, Flame, GanttChartSquare, ListChecks, NotebookPen, PauseCircle } from "lucide-react";
+import { AlertTriangle, BadgeCheck, CalendarClock, Clock3, Flame, GanttChartSquare, ListChecks, ListTodo, NotebookPen, OctagonAlert, PauseCircle, Target, Timer, Users } from "lucide-react";
 import type { MonitorRow, Summary } from "../../../api/sideProjects";
 import UserAvatar from "../../ui/UserAvatar";
 import { StageChip } from "../ProjectCard";
-import { ProgressRing, STATUS_META, cardCls, dayWord, statusColor, useIsDark } from "../ui";
+import { ProgressRing, STATUS_META, StatTile, type StatTone, cardCls, dayWord, statusColor, useIsDark } from "../ui";
 
 const Panel: React.FC<{ title: string; icon: React.ElementType; children: React.ReactNode; action?: React.ReactNode; className?: string }> = ({ title, icon: Icon, children, action, className = "" }) => (
   <section className={`${cardCls} p-4 ${className}`}>
@@ -151,19 +151,10 @@ export const ReportingInsights: React.FC<{ s: Summary; onOpen: (id: number) => v
           <p className="text-xs text-slate-500 dark:text-gray-400">reported in the last 7 days</p>
         </div>
       </div>
-      <div className="mt-4 grid grid-cols-3 gap-2">
-        {[
-          { icon: NotebookPen, label: "Reports", value: r.reportsThisWeek },
-          { icon: Clock3, label: "Hours", value: r.hoursThisWeek },
-          { icon: AlertTriangle, label: "Quiet 14d+", value: r.quietCount },
-        ].map((t) => (
-          <div key={t.label} className="rounded-2xl bg-slate-50 px-3 py-2.5 dark:bg-gray-800/40">
-            <p className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500 dark:text-gray-400">
-              <t.icon className="h-3 w-3" aria-hidden /> {t.label}
-            </p>
-            <p className="mt-0.5 text-lg font-extrabold tabular-nums text-slate-900 dark:text-white">{t.value}</p>
-          </div>
-        ))}
+      <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
+        <StatTile icon={NotebookPen} label="Reports" value={r.reportsThisWeek} />
+        <StatTile icon={Clock3} label="Hours" value={r.hoursThisWeek} unit="h" />
+        <StatTile icon={AlertTriangle} label="Quiet 14d+" value={r.quietCount} tone={r.quietCount ? "warn" : "blue"} />
       </div>
       {detail && r.quiet.length > 0 && (
         <div className="mt-4 rounded-2xl bg-slate-50 p-2 dark:bg-gray-800/40">
@@ -191,14 +182,14 @@ export const DeliveryInsights: React.FC<{ s: Summary; onOpen: (id: number) => vo
   const d = s.delivery;
   if (!d) return null;
   const planPct = d.planItems ? Math.round((d.planDone / d.planItems) * 100) : 0;
-  const tiles: Array<[string, React.ReactNode, boolean?]> = [
-    ["Projects with a plan", d.withPlan],
-    ["Team projects", d.teamProjects],
-    ["Open tasks", d.open],
-    ["Overdue tasks", d.overdue, d.overdue > 0],
-    ["Blocked tasks", d.blocked, d.blocked > 0],
-    ["Avg cycle time", d.avgCycleDays === null ? "–" : `${d.avgCycleDays}d`],
-    ["On time", d.onTimeRate === null ? "–" : `${d.onTimeRate}%`],
+  const tiles: Array<[React.ElementType, string, React.ReactNode, StatTone?]> = [
+    [GanttChartSquare, "With a plan", d.withPlan],
+    [Users, "Team projects", d.teamProjects],
+    [ListTodo, "Open tasks", d.open],
+    [CalendarClock, "Overdue tasks", d.overdue, d.overdue > 0 ? "bad" : undefined],
+    [OctagonAlert, "Blocked tasks", d.blocked, d.blocked > 0 ? "bad" : undefined],
+    [Timer, "Avg cycle time", d.avgCycleDays === null ? "–" : d.avgCycleDays],
+    [Target, "On time", d.onTimeRate === null ? "–" : `${d.onTimeRate}%`],
   ];
   return (
     <Panel title="Plans & tasks" icon={ListChecks} action={<span className="text-[11px] font-semibold text-slate-500 dark:text-gray-400">{d.total} tasks in all</span>}>
@@ -224,12 +215,9 @@ export const DeliveryInsights: React.FC<{ s: Summary; onOpen: (id: number) => vo
           </div>
         </div>
       </div>
-      <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
-        {tiles.map(([label, value, bad]) => (
-          <div key={label} className="rounded-2xl bg-slate-50 px-3 py-2 dark:bg-gray-800/60">
-            <p className="truncate text-[10px] font-semibold uppercase tracking-wide text-slate-500 dark:text-gray-400">{label}</p>
-            <p className={`mt-0.5 text-lg font-extrabold tabular-nums ${bad ? "text-red-700 dark:text-red-300" : "text-slate-900 dark:text-white"}`}>{value}</p>
-          </div>
+      <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-4">
+        {tiles.map(([icon, label, value, tone], n) => (
+          <StatTile key={label} icon={icon} label={label} value={value} unit={n === 5 && d.avgCycleDays !== null ? "days" : undefined} tone={tone} />
         ))}
       </div>
       {detail && d.atRisk.length > 0 && (

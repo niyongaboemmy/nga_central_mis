@@ -66,6 +66,9 @@ const StageTimeline: React.FC<{
   const [tip, setTip] = useState<Tip>(null);
   const box = useRef<HTMLDivElement>(null);
   const period = p.period;
+  // No start date: the backend draws a provisional plan from the day the project was created.
+  const startDate = p.startDate ?? period.assumedStart ?? null;
+  const assumed = !p.startDate && !!period.assumedStart;
   const today = Math.floor(Date.now() / DAY);
 
   const geo = useMemo(() => {
@@ -118,8 +121,8 @@ const StageTimeline: React.FC<{
 
   const current = period.stages.find((s) => s.state === "current");
   const dayN =
-    period.totalDays && p.startDate
-      ? Math.min(period.totalDays, Math.max(1, today - dayOf(p.startDate) + 1))
+    period.totalDays && startDate
+      ? Math.min(period.totalDays, Math.max(1, today - dayOf(startDate) + 1))
       : null;
 
   return (
@@ -137,8 +140,8 @@ const StageTimeline: React.FC<{
               Time in each stage
             </h3>
             <p className="text-xs text-slate-500 dark:text-gray-400">
-              {p.startDate && p.targetDate
-                ? `${fmt(dayOf(p.startDate))} – ${fmt(dayOf(p.targetDate))}`
+              {startDate && p.targetDate
+                ? `${fmt(dayOf(startDate))} – ${fmt(dayOf(p.targetDate))}${assumed ? " · suggested" : ""}`
                 : p.targetDate
                   ? `Closes ${fmt(dayOf(p.targetDate))} · no start date`
                   : "No dates yet"}
@@ -178,7 +181,7 @@ const StageTimeline: React.FC<{
         </div>
       </div>
 
-      {!p.startDate || !p.targetDate ? (
+      {!startDate || !p.targetDate ? (
         <button
           type="button"
           disabled={!canEdit}
@@ -186,7 +189,7 @@ const StageTimeline: React.FC<{
           className="mt-4 flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-slate-900/[0.07] p-5 text-sm font-semibold text-slate-500 transition enabled:hover:border-blue-300 enabled:hover:bg-blue-50/50 enabled:hover:text-blue-700 dark:enabled:hover:border-blue-500/50 dark:enabled:hover:bg-blue-500/10 dark:enabled:hover:text-blue-300 dark:border-white/10 dark:text-gray-400"
         >
           <CalendarRange className="h-4 w-4" aria-hidden />{" "}
-          {canEdit ? (p.targetDate ? "Add the start date to plan each stage" : "Set the start and closing dates") : "No plan yet"}
+          {canEdit ? (p.targetDate ? "Add the start date to plan each stage" : "Set the start and closing dates") : p.targetDate ? "Stage dates not set yet" : "No dates set yet"}
         </button>
       ) : (
         <div
@@ -411,10 +414,23 @@ const StageTimeline: React.FC<{
                 <span className="font-bold">
                   {STATUS_META[current.stage].label}
                 </span>{" "}
-                is planned to end in{" "}
-                {current.daysLeft === 0 ? "today" : dayWord(current.daysLeft)}.
+                is planned to end{" "}
+                {current.daysLeft === 0 ? "today" : `in ${dayWord(current.daysLeft)}`}.
               </p>
             )}
+          {assumed && (
+            <div className="mt-3 flex items-start gap-2.5 rounded-xl bg-blue-50 px-3 py-2.5 text-xs text-blue-800 dark:bg-blue-500/10 dark:text-blue-200">
+              <CalendarRange className="mt-px h-4 w-4 shrink-0" aria-hidden />
+              <p>
+                Suggested stage dates, counted from {fmt(dayOf(period.assumedStart!))} until the closing date. Nothing is saved until the dates are set.{" "}
+                {canEdit && (
+                  <button type="button" onClick={() => setEdit(true)} className="font-semibold underline underline-offset-2 hover:no-underline">
+                    Set the start date
+                  </button>
+                )}
+              </p>
+            </div>
+          )}
         </div>
       )}
 
@@ -444,7 +460,7 @@ export const PlanModal: React.FC<{
 
   useEffect(() => {
     if (!open) return;
-    const s = p.startDate ?? new Date().toISOString().slice(0, 10);
+    const s = p.startDate ?? p.period.assumedStart ?? new Date().toISOString().slice(0, 10);
     const t = p.targetDate ?? "";
     setStart(s);
     setTarget(t);

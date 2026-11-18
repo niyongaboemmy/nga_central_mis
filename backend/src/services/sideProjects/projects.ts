@@ -8,8 +8,8 @@ import { ProjectAccess } from "./access";
 import { avatarUrls } from "../avatar/urls";
 import * as v from "./validate";
 import { addDocument, documentsOf, mediaOf, storeProjectFiles, Upload, writtenConceptFile, docKindsFor } from "./files";
-import { getCustomer, resolveCustomer } from "./customers";
-import { daysBetween, defaultPlan, ensureStageLogs, loadLogs, loadPlan, periodView, planFromEnds, recordStageChange, rescalePlan, savePlan } from "./stages";
+import { getCustomer, customerScope, resolveCustomer } from "./customers";
+import { daysBetween, defaultPlan, ensureStageLogs, loadLogs, loadPlan, periodView, planFromEnds, provisionalPlan, recordStageChange, rescalePlan, savePlan } from "./stages";
 import { reportsOf } from "./progress";
 
 /**
@@ -148,7 +148,7 @@ export async function createProject(ownerId: number, by: number, input: CreateIn
   await assertTitleFree(ownerId, title);
   const snap = await ownerSnapshot(ownerId);
   const kind = kindFor(snap.isStudent, input.kind, !!opts.canClassify);
-  const customer = (await resolveCustomer(input.customerMode, input.customerId)) ?? { mode: "OWN" as const, id: null };
+  const customer = (await resolveCustomer(input.customerMode, input.customerId, await customerScope(by))) ?? { mode: "OWN" as const, id: null };
 
   // Store the concept before the project row exists, so a refused file creates nothing.
   let conceptAsset = null;
@@ -221,7 +221,12 @@ export async function updateBasics(a: ProjectAccess, by: number, input: BasicsIn
       await recordEvent(Number(p.project_id), by, "SUPERVISOR", p.supervisor_user_id ? String(p.supervisor_user_id) : null, sup ? String(sup) : null);
     }
   }
-  const customer = await resolveCustomer(input.customerMode, input.customerId);
+  const customer = await resolveCustomer(
+    input.customerMode,
+    input.customerId,
+    await customerScope(by, a.manageAny),
+    p.customer_id ? Number(p.customer_id) : null,
+  );
   if (customer) {
     set.push(sql`customer_mode = ${customer.mode}, customer_id = ${customer.id}`);
     if ((customer.id ?? null) !== (p.customer_id ? Number(p.customer_id) : null)) {
@@ -509,12 +514,17 @@ export async function projectDetail(a: ProjectAccess) {
       FROM SideProjectMember m JOIN UserProfile p ON p.user_id = m.user_id WHERE m.project_id = ${id} ORDER BY m.added_at`),
   ]);
   const card = shapeCard(row);
-  const [plan, logs] = await Promise.all([loadPlan(id), loadLogs(id)]);
+  const [stored, logs] = await Promise.all([loadPlan(id), loadLogs(id)]);
+  const { plan, assumedStart } = provisionalPlan(
+    { start_date: row.startDate || null, target_date: row.targetDate || null, created_at: row.createdAt, started_at: row.startedAt || null },
+    stored,
+  );
   const period = periodView(
     { status: row.status, paused_from: row.pausedFrom ?? null, start_date: row.startDate || null, target_date: row.targetDate || null, created_at: row.createdAt },
     plan,
     logs,
     new Date(),
+    assumedStart,
   );
   return {
     ...card,

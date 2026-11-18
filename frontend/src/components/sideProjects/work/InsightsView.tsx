@@ -4,7 +4,7 @@ import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Too
 import { AlertTriangle, CalendarClock, CheckCircle2, Clock3, Gauge, Hourglass, ListTodo, OctagonAlert, RefreshCw, Target, Timer, Users } from "lucide-react";
 import { failure, sideProjectsApi, type Delivery, type ProjectDetail } from "../../../api/sideProjects";
 import UserAvatar from "../../ui/UserAvatar";
-import { Skeleton, cardCls, useIsDark } from "../ui";
+import { Skeleton, StatTile, cardCls, useIsDark } from "../ui";
 import { PLAN_META, ROLE_META, TASK_META, fmtDay } from "./meta";
 
 const tokens = (dark: boolean) => ({
@@ -33,15 +33,6 @@ const Tip: React.FC<{ active?: boolean; payload?: any[]; label?: string; fmt?: (
     </div>
   );
 };
-
-const Kpi: React.FC<{ icon: React.ElementType; label: string; value: React.ReactNode; tone?: "bad" | "good" }> = ({ icon: Icon, label, value, tone }) => (
-  <div className="rounded-2xl bg-slate-50 px-3 py-2.5 dark:bg-gray-800/60">
-    <p className="flex items-center gap-1.5 text-[11px] font-medium text-slate-500 dark:text-gray-400">
-      <Icon className="h-3.5 w-3.5" aria-hidden /> {label}
-    </p>
-    <p className={`mt-0.5 text-xl font-bold tabular-nums ${tone === "bad" ? "text-red-700 dark:text-red-300" : tone === "good" ? "text-green-700 dark:text-green-300" : "text-slate-900 dark:text-white"}`}>{value}</p>
-  </div>
-);
 
 const days = (n: number | null) => (n === null ? "–" : `${n}d`);
 
@@ -100,13 +91,13 @@ const InsightsView: React.FC<{ p: ProjectDetail; refreshKey?: unknown }> = ({ p,
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
-        <Kpi icon={ListTodo} label="Open tasks" value={k.open} />
-        <Kpi icon={CheckCircle2} label="Done" value={k.done} tone={k.done ? "good" : undefined} />
-        <Kpi icon={CalendarClock} label="Overdue" value={k.overdue} tone={k.overdue ? "bad" : undefined} />
-        <Kpi icon={OctagonAlert} label="Blocked" value={k.blocked} tone={k.blocked ? "bad" : undefined} />
-        <Kpi icon={Timer} label="Avg cycle time" value={days(k.avgCycleDays)} />
-        <Kpi icon={Target} label="On time" value={k.onTimeRate === null ? "–" : `${k.onTimeRate}%`} />
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6">
+        <StatTile icon={ListTodo} label="Open tasks" value={k.open} />
+        <StatTile icon={CheckCircle2} label="Done" value={k.done} tone={k.done ? "good" : undefined} />
+        <StatTile icon={CalendarClock} label="Overdue" value={k.overdue} tone={k.overdue ? "bad" : undefined} />
+        <StatTile icon={OctagonAlert} label="Blocked" value={k.blocked} tone={k.blocked ? "bad" : undefined} />
+        <StatTile icon={Timer} label="Avg cycle time" value={k.avgCycleDays === null ? "–" : k.avgCycleDays} unit={k.avgCycleDays === null ? undefined : "days"} />
+        <StatTile icon={Target} label="On time" value={k.onTimeRate === null ? "–" : `${k.onTimeRate}%`} />
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">

@@ -116,6 +116,7 @@ export function sideProjectsRouter(
         review: !!v.review && !isEmptyScope(v.review),
         manageAny: v.manageAny,
         supervising: supervising.total,
+        customers: (await customers.customerScope(uid(req), v.manageAny)) === null ? "all" : "own",
       };
     }),
   );
@@ -300,21 +301,23 @@ export function sideProjectsRouter(
       if (req.file?.path) await import("fs").then((fs) => fs.promises.rm(req.file.path, { force: true })).catch(() => undefined);
     }
   };
-  router.get("/customers", own, handle(async (req) => customers.listCustomers(String(req.query.q ?? ""), { archived: req.query.archived === "1" })));
-  router.get("/customers/:cid", own, handle(async (req) => customers.getCustomer(idParam(req, "cid"))));
+  // Students see only their own customers and those of projects they are in (customers.ts).
+  const custScope = async (req: any) => customers.customerScope(uid(req), (await viewer(req)).manageAny);
+  router.get("/customers", own, handle(async (req) => customers.listCustomers(String(req.query.q ?? ""), { archived: req.query.archived === "1", scope: await custScope(req) })));
+  router.get("/customers/:cid", own, handle(async (req) => customers.getCustomer(idParam(req, "cid"), await custScope(req))));
   router.post(
     "/customers",
     own,
     uploadRateLimit,
     upload.single("logo"),
-    handle(async (req) => withTemp(req, () => customers.createCustomer(uid(req), req.body ?? {}, req.file ?? null))),
+    handle(async (req) => withTemp(req, async () => customers.createCustomer(uid(req), req.body ?? {}, req.file ?? null, await custScope(req)))),
   );
   router.patch(
     "/customers/:cid",
     own,
     uploadRateLimit,
     upload.single("logo"),
-    handle(async (req) => withTemp(req, async () => customers.updateCustomer(uid(req), (await viewer(req)).manageAny, idParam(req, "cid"), req.body ?? {}, req.file ?? null))),
+    handle(async (req) => withTemp(req, async () => customers.updateCustomer(uid(req), (await viewer(req)).manageAny, idParam(req, "cid"), req.body ?? {}, req.file ?? null, await custScope(req)))),
   );
   router.delete("/customers/:cid", own, handle(async (req) => customers.removeCustomer(uid(req), (await viewer(req)).manageAny, idParam(req, "cid"))));
   router.post(
@@ -328,7 +331,7 @@ export function sideProjectsRouter(
   router.get(
     "/customers/:cid/logo",
     handle(async (req, res) => {
-      const asset = await customers.logoAsset(idParam(req, "cid"));
+      const asset = await customers.logoAsset(idParam(req, "cid"), await custScope(req));
       await files.streamAsset(res, asset, req.query.variant, { range: req.headers.range });
       return undefined;
     }),

@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Activity as ActivityIcon, CalendarCheck2, Clock3, Flame, RefreshCw, Trophy } from "lucide-react";
 import { failure, sideProjectsApi, type Activity } from "../../../api/sideProjects";
-import { Skeleton, cardCls, useIsDark } from "../ui";
+import { Skeleton, StatTile, cardCls, useIsDark } from "../ui";
 
 /**
  * Daily work as a contribution calendar: one cell per day (weeks as columns, Monday on top),
@@ -117,19 +117,10 @@ const ContributionGraph: React.FC<{ projectId: number; refreshKey?: unknown }> =
 
       {/* stats */}
       <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
-        {[
-          { icon: CalendarCheck2, label: "Active days", value: s?.activeDays },
-          { icon: Clock3, label: "Hours logged", value: s ? Math.round(s.hours * 10) / 10 : undefined },
-          { icon: Flame, label: "Current streak", value: s ? `${s.currentStreak}d` : undefined },
-          { icon: Trophy, label: "Longest streak", value: s ? `${s.longestStreak}d` : undefined },
-        ].map((t) => (
-          <div key={t.label} className="rounded-2xl bg-slate-50 px-3 py-2.5 dark:bg-gray-800/40">
-            <p className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500 dark:text-gray-400">
-              <t.icon className="h-3 w-3" aria-hidden /> {t.label}
-            </p>
-            {data ? <p className="mt-0.5 text-lg font-extrabold tabular-nums text-slate-900 dark:text-white">{t.value}</p> : <Skeleton className="mt-1.5 h-5 w-12" />}
-          </div>
-        ))}
+        <StatTile icon={CalendarCheck2} label="Active days" value={s?.activeDays} loading={!data} />
+        <StatTile icon={Clock3} label="Hours logged" value={s ? Math.round(s.hours * 10) / 10 : undefined} unit="h" loading={!data} />
+        <StatTile icon={Flame} label="Current streak" value={s?.currentStreak} unit={s?.currentStreak === 1 ? "day" : "days"} loading={!data} />
+        <StatTile icon={Trophy} label="Longest streak" value={s?.longestStreak} unit={s?.longestStreak === 1 ? "day" : "days"} loading={!data} />
       </div>
 
       <div ref={box} className="relative mt-4" onMouseLeave={() => setTip(null)}>
