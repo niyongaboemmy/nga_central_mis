@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Briefcase, Lightbulb, Check, ExternalLink, Figma, Quote, Tag, Trophy, FileText, Github, Globe, Link2, Pencil, Plus, Store, Trash2, UserCheck, Video, X } from "lucide-react";
+import { BookOpenText, Briefcase, ChevronDown, Lightbulb, Check, ExternalLink, Figma, Tag, Target, Trophy, FileText, Github, Globe, Link2, Pencil, Plus, Store, Trash2, UserCheck, Video, X } from "lucide-react";
 import { failure, sideProjectsApi, type Category, type LinkKind, type ProjectDetail } from "../../../api/sideProjects";
 import { useToast } from "../../../contexts/ToastContext";
 import UserAvatar from "../../ui/UserAvatar";
@@ -10,7 +10,7 @@ import type { Customer } from "../../../api/sideProjects";
 import ContributionGraph from "./ContributionGraph";
 import { CategoryPicker, PersonPicker, TagInput, checkGithub, checkHttps } from "../fields";
 import { Field, FormSection, IconInput, TextArea } from "../form";
-import { CATEGORY_ICON, FieldError, iconBtn, inputCls, inputErrCls, primaryBtn, secondaryBtn, Spinner, cardCls } from "../ui";
+import { ABSTRACT_MAX, ABSTRACT_MIN, CATEGORY_ICON, FieldError, iconBtn, inputCls, inputErrCls, primaryBtn, secondaryBtn, Spinner, cardCls } from "../ui";
 
 const LINK_ICON: Record<LinkKind, React.ElementType> = { VIDEO: Video, DESIGN: Figma, DOCS: FileText, STORE: Store, OTHER: Link2 };
 const LINK_KINDS: LinkKind[] = ["VIDEO", "DESIGN", "DOCS", "STORE", "OTHER"];
@@ -37,6 +37,11 @@ const OverviewPanel: React.FC<{ p: ProjectDetail; categories: Category[]; onSave
   const save = async () => {
     const e: Record<string, string> = {};
     if (f.title.trim().length < 3) e.title = "At least 3 characters";
+    const ab = f.abstract.trim();
+    if (ab || p.abstract) {
+      if (ab.length < ABSTRACT_MIN) e.abstract = `${ABSTRACT_MIN - ab.length} more characters`;
+      else if (ab.length > ABSTRACT_MAX) e.abstract = `At most ${ABSTRACT_MAX} characters`;
+    }
     if (f.problemStatement.trim().length < 30) e.problemStatement = "At least 30 characters";
     const g = checkGithub(f.githubUrl);
     if (g) e.githubUrl = g;
@@ -53,6 +58,7 @@ const OverviewPanel: React.FC<{ p: ProjectDetail; categories: Category[]; onSave
     try {
       await sideProjectsApi.update(p.id, {
         title: f.title,
+        ...(f.abstract.trim() ? { abstract: f.abstract.trim() } : {}),
         problemStatement: f.problemStatement,
         description: f.description,
         categoryId: f.categoryId,
@@ -96,30 +102,23 @@ const OverviewPanel: React.FC<{ p: ProjectDetail; categories: Category[]; onSave
           )}
         </div>
 
-        {/* Problem (and outcome) */}
-        <section className={`${cardCls} p-5`}>
-          <div className="flex items-start gap-3">
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-50 text-blue-600 dark:bg-blue-500/15 dark:text-blue-300">
-              <Quote className="h-4 w-4" aria-hidden />
+        {/* Abstract first: the project in a few sentences, then the problem and the approach */}
+        <AbstractCard p={p} canEdit={canEdit} onSaved={onSaved} />
+        <div className={`grid gap-3 ${p.description ? "md:grid-cols-2" : ""}`}>
+          <StoryCard icon={Target} title="The problem" text={p.problemStatement} />
+          {p.description && <StoryCard icon={Lightbulb} title="The approach" text={p.description} />}
+        </div>
+        {p.outcomeSummary && (
+          <div className="flex items-start gap-3 rounded-2xl bg-emerald-50 p-4 dark:bg-emerald-500/10">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-500/15 text-emerald-700 dark:text-emerald-300">
+              <Trophy className="h-[18px] w-[18px]" aria-hidden />
             </span>
-            <div className="min-w-0 flex-1">
-              <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-gray-400">The problem</p>
-              <p className="mt-1 whitespace-pre-line text-[15px] leading-relaxed text-slate-800 dark:text-gray-100">{p.problemStatement}</p>
-              {p.description && <p className="mt-3 whitespace-pre-line border-t border-slate-900/[0.05] pt-3 text-sm leading-relaxed text-slate-600 dark:border-white/[0.06] dark:text-gray-300">{p.description}</p>}
+            <div>
+              <p className="text-sm font-semibold text-emerald-900 dark:text-emerald-100">Outcome</p>
+              <p className="mt-0.5 text-sm leading-6 text-emerald-900/90 dark:text-emerald-100/90">{p.outcomeSummary}</p>
             </div>
           </div>
-          {p.outcomeSummary && (
-            <div className="mt-4 flex items-start gap-3 rounded-2xl bg-emerald-50 p-4 dark:bg-emerald-500/10">
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white">
-                <Trophy className="h-4 w-4" aria-hidden />
-              </span>
-              <div>
-                <p className="text-[11px] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-300">Outcome</p>
-                <p className="mt-0.5 text-sm text-emerald-900 dark:text-emerald-100">{p.outcomeSummary}</p>
-              </div>
-            </div>
-          )}
-        </section>
+        )}
 
         {/* Facts */}
         <div className="grid gap-3 sm:grid-cols-3">
@@ -252,6 +251,9 @@ const OverviewPanel: React.FC<{ p: ProjectDetail; categories: Category[]; onSave
           <Field label="Title" htmlFor="ov-title" counter={{ value: f.title, min: 3, max: 150 }} error={errors.title}>
             <input id="ov-title" value={f.title} onChange={(e) => set("title", e.target.value)} className={`${inputCls} font-semibold ${errors.title ? inputErrCls : ""}`} />
           </Field>
+          <Field label="Abstract" htmlFor="ov-abstract" counter={{ value: f.abstract, min: ABSTRACT_MIN, max: ABSTRACT_MAX }} error={errors.abstract} hint="Introduce the project in two or three sentences: what it is and who it is for.">
+            <TextArea id="ov-abstract" rows={3} value={f.abstract} onChange={(e) => set("abstract", e.target.value)} invalid={!!errors.abstract} placeholder="A web app that…" />
+          </Field>
           <Field label="Problem it solves" htmlFor="ov-problem" counter={{ value: f.problemStatement, min: 30, max: 3000 }} error={errors.problemStatement}>
             <TextArea id="ov-problem" rows={3} value={f.problemStatement} onChange={(e) => set("problemStatement", e.target.value)} invalid={!!errors.problemStatement} />
           </Field>
@@ -317,7 +319,7 @@ const OverviewPanel: React.FC<{ p: ProjectDetail; categories: Category[]; onSave
 
         <FormSection title="Supervision" icon={UserCheck}>
           <Field label="Supervisor" icon={UserCheck}>
-            <PersonPicker value={f.supervisor} onChange={(v) => set("supervisor", v)} search={sideProjectsApi.supervisors} placeholder="Search a teacher" error={errors.supervisorId} />
+            <PersonPicker value={f.supervisor} onChange={(v) => set("supervisor", v)} search={(q: string) => sideProjectsApi.supervisors(q, p.id)} placeholder="Search a teacher" error={errors.supervisorId} />
           </Field>
         </FormSection>
       </div>
@@ -343,7 +345,7 @@ const hostOf = (u: string) => {
 
 const FactTile: React.FC<{ label: string; icon: React.ElementType; children: React.ReactNode }> = ({ label, icon: Icon, children }) => (
   <div className={`${cardCls} flex flex-col p-4`}>
-    <p className="mb-3 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-gray-400">
+    <p className="mb-3 flex items-center gap-1.5 text-xs font-medium text-slate-500 dark:text-gray-400">
       <Icon className="h-3.5 w-3.5" aria-hidden /> {label}
     </p>
     {children}
@@ -353,6 +355,7 @@ const FactTile: React.FC<{ label: string; icon: React.ElementType; children: Rea
 function init(p: ProjectDetail) {
   return {
     title: p.title,
+    abstract: p.abstract ?? "",
     problemStatement: p.problemStatement,
     description: p.description ?? "",
     categoryId: p.category?.id ?? null,
@@ -369,3 +372,143 @@ function init(p: ProjectDetail) {
 }
 
 export default OverviewPanel;
+
+const words = (t: string) => t.trim().split(/\s+/).filter(Boolean).length;
+
+/**
+ * The abstract opens the project. The team adds or edits it in place (2-3 sentences); a project
+ * without one shows the team a prompt and everyone else a quiet note.
+ */
+const AbstractCard: React.FC<{ p: ProjectDetail; canEdit: boolean; onSaved: () => void }> = ({ p, canEdit, onSaved }) => {
+  const { showToast } = useToast();
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(p.abstract ?? "");
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    if (!editing) setDraft(p.abstract ?? "");
+  }, [p.abstract, editing]);
+  const len = draft.trim().length;
+
+  const save = async () => {
+    if (len < ABSTRACT_MIN) return setError(`${ABSTRACT_MIN - len} more characters`);
+    if (len > ABSTRACT_MAX) return setError(`At most ${ABSTRACT_MAX} characters`);
+    setBusy(true);
+    try {
+      await sideProjectsApi.update(p.id, { abstract: draft.trim() });
+      setEditing(false);
+      setError(null);
+      showToast("Abstract saved", "success");
+      onSaved();
+    } catch (err) {
+      const x = failure(err, "The abstract wasn't saved");
+      setError(x.message);
+      showToast(x.message, "error");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <section className={`${cardCls} group p-5 sm:p-6`} aria-labelledby="sp-abstract-title">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2.5">
+          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-500/10 text-blue-600 dark:bg-blue-400/15 dark:text-blue-300">
+            <BookOpenText className="h-[18px] w-[18px]" aria-hidden />
+          </span>
+          <h4 id="sp-abstract-title" className="text-sm font-semibold text-slate-900 dark:text-white">Abstract</h4>
+        </div>
+        <div className="flex items-center gap-2">
+          {p.abstract && !editing && (
+            <span className="text-xs text-slate-500 dark:text-gray-400">{words(p.abstract)} words · under a minute</span>
+          )}
+          {canEdit && p.abstract && !editing && (
+            <button type="button" aria-label="Edit the abstract" onClick={() => setEditing(true)} className={`${iconBtn} opacity-70 transition group-hover:opacity-100`}>
+              <Pencil className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
+      </div>
+
+      {editing ? (
+        <div className="mt-4">
+          <label htmlFor="sp-abstract-edit" className="sr-only">Abstract</label>
+          <textarea
+            id="sp-abstract-edit"
+            autoFocus
+            rows={3}
+            value={draft}
+            onChange={(e) => {
+              setDraft(e.target.value);
+              setError(null);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") setEditing(false);
+              if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) save();
+            }}
+            placeholder="A web app that… It helps… so that…"
+            aria-invalid={!!error}
+            aria-describedby="sp-abstract-help"
+            className={`${inputCls} min-h-[96px] resize-y text-[15px] leading-7 ${error ? inputErrCls : ""}`}
+          />
+          <div id="sp-abstract-help" className="mt-2 flex flex-wrap items-center justify-between gap-2">
+            <p className={`text-xs ${error ? "text-red-600 dark:text-red-400" : "text-slate-500 dark:text-gray-400"}`}>
+              {error ?? "Two or three sentences: what it is, who it is for, what it changes."}
+            </p>
+            <div className="flex items-center gap-2">
+              <span className={`text-xs tabular-nums ${len > ABSTRACT_MAX || (len > 0 && len < ABSTRACT_MIN) ? "text-red-600 dark:text-red-400" : "text-slate-500 dark:text-gray-400"}`}>
+                {len}/{ABSTRACT_MAX}
+              </span>
+              <button type="button" onClick={() => setEditing(false)} className={`${secondaryBtn} !min-h-[34px] !px-3.5 !py-1 !text-xs`}>
+                Cancel
+              </button>
+              <button type="button" onClick={save} disabled={busy} className={`${primaryBtn} !min-h-[34px] !px-3.5 !py-1 !text-xs`}>
+                {busy ? <Spinner className="h-3.5 w-3.5" /> : <Check className="h-3.5 w-3.5" />} Save
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : p.abstract ? (
+        <p className="mt-4 whitespace-pre-line text-[17px] leading-8 text-slate-800 dark:text-gray-100">{p.abstract}</p>
+      ) : canEdit ? (
+        <button
+          type="button"
+          onClick={() => setEditing(true)}
+          className="mt-4 flex w-full items-center gap-3 rounded-2xl border border-dashed border-blue-500/30 bg-blue-50/50 px-4 py-4 text-left transition hover:border-blue-500/60 hover:bg-blue-50 dark:border-blue-400/25 dark:bg-blue-500/[0.06] dark:hover:bg-blue-500/10"
+        >
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-600 text-white">
+            <Plus className="h-4 w-4" aria-hidden />
+          </span>
+          <span>
+            <span className="block text-sm font-semibold text-blue-800 dark:text-blue-200">Add an abstract</span>
+            <span className="block text-xs text-blue-800 dark:text-blue-200/90">Introduce the project in two or three sentences, so readers know what it is before the details.</span>
+          </span>
+        </button>
+      ) : (
+        <p className="mt-4 text-sm text-slate-500 dark:text-gray-400">The team hasn't written an abstract yet.</p>
+      )}
+    </section>
+  );
+};
+
+/** A titled block of project text; long text folds with "Read more". */
+const StoryCard: React.FC<{ icon: React.ElementType; title: string; text: string }> = ({ icon: Icon, title, text }) => {
+  const [open, setOpen] = useState(false);
+  const long = text.length > 320 || text.split("\n").length > 5;
+  return (
+    <section className={`${cardCls} flex flex-col p-5`}>
+      <div className="flex items-center gap-2.5">
+        <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-100 text-slate-600 dark:bg-white/[0.06] dark:text-gray-300">
+          <Icon className="h-[18px] w-[18px]" aria-hidden />
+        </span>
+        <h4 className="text-sm font-semibold text-slate-900 dark:text-white">{title}</h4>
+      </div>
+      <p className={`mt-3 whitespace-pre-line text-sm leading-6 text-slate-700 dark:text-gray-300 ${long && !open ? "line-clamp-5" : ""}`}>{text}</p>
+      {long && (
+        <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} className="mt-2 inline-flex items-center gap-1 self-start text-xs font-semibold text-blue-700 hover:text-blue-800 dark:text-blue-300 dark:hover:text-blue-200">
+          {open ? "Show less" : "Read more"} <ChevronDown className={`h-3.5 w-3.5 transition ${open ? "rotate-180" : ""}`} aria-hidden />
+        </button>
+      )}
+    </section>
+  );
+};

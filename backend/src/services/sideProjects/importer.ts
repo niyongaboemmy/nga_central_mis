@@ -25,6 +25,7 @@ const HEADERS: Record<string, string> = {
   registration_number: "reg", reg_number: "reg", "reg. number": "reg", "reg number": "reg", regnumber: "reg", registration: "reg",
   email: "email", "e-mail": "email", owner_email: "email",
   title: "title", "project title": "title", project: "title",
+  abstract: "abstract", summary: "abstract", introduction: "abstract",
   problem_statement: "problem", "problem statement": "problem", problem: "problem",
   description: "description",
   status: "status",
@@ -40,7 +41,7 @@ const STATUS_WORDS: Record<string, string> = {
   completed: "COMPLETED", complete: "COMPLETED", done: "COMPLETED", finished: "COMPLETED",
 };
 
-type SheetRow = { line: number; reg?: string; email?: string; title?: string; problem?: string; description?: string; status?: string; category?: string; tech?: string; github?: string; access?: string };
+type SheetRow = { line: number; reg?: string; email?: string; title?: string; abstract?: string; problem?: string; description?: string; status?: string; category?: string; tech?: string; github?: string; access?: string };
 
 export function parseSheet(buf: Buffer): SheetRow[] {
   let wb: XLSX.WorkBook;
@@ -103,7 +104,7 @@ export async function runImport(buf: Buffer, by: number, dryRun: boolean) {
         row.projectId = await createProject(
           Number(student.id),
           by,
-          { title, problemStatement: problem, description: r.description, categoryId: cat?.id ?? null, techTags: r.tech ?? "", githubUrl: r.github, accessUrl: r.access, status },
+          { title, abstract: r.abstract && r.abstract.length >= 40 ? r.abstract.slice(0, 400) : undefined, problemStatement: problem, description: r.description, categoryId: cat?.id ?? null, techTags: r.tech ?? "", githubUrl: r.github, accessUrl: r.access, status },
           { conceptPending: true, allowAnyStatus: true },
         );
         await notifyMany([Number(student.id)], "side_project_concept", `Add the concept note for ${title}`, "Your project was added to the MIS. Upload its concept note.", row.projectId, false);

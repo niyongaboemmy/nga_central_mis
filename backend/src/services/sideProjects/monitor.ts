@@ -79,7 +79,7 @@ async function loadRows(scope: ScopeEntry | null, f: MonitorFilters) {
     f.assignedTo
       ? sql`(sp.owner_user_id <> ${f.assignedTo} AND (sp.supervisor_user_id = ${f.assignedTo} OR EXISTS (SELECT 1 FROM SideProjectMember am WHERE am.project_id = sp.project_id AND am.user_id = ${f.assignedTo} AND am.status = 'ACCEPTED')))`
       : f.supervisedBy
-        ? sql`sp.supervisor_user_id = ${f.supervisedBy}`
+        ? sql`(sp.supervisor_user_id = ${f.supervisedBy} AND sp.owner_user_id <> ${f.supervisedBy})`
         : scopeCondition(scope),
   ];
   conds.push(f.archived ? sql`sp.archived_at IS NOT NULL` : sql`sp.archived_at IS NULL`);
@@ -416,7 +416,7 @@ export async function exportRows(scope: ScopeEntry | null, f: MonitorFilters, fo
 }
 
 /** Filter options for the bar (only what the viewer can see). */
-export async function filterOptions(scope: ScopeEntry | null) {
+export async function filterOptions(scope: ScopeEntry | null, opts: { supervisorId?: number } = {}) {
   const [years, classes, categories] = await Promise.all([
     many(sql`SELECT academic_year_id AS id, name, is_current AS isCurrent FROM AcademicYear ORDER BY start_date DESC, academic_year_id DESC LIMIT 12`),
     many(sql`
@@ -429,6 +429,7 @@ export async function filterOptions(scope: ScopeEntry | null) {
   ]);
   const customers = await many(sql`
     SELECT DISTINCT c.customer_id AS id, c.name FROM SideProjectCustomer c JOIN SideProject sp ON sp.customer_id = c.customer_id AND sp.deleted_at IS NULL
+    ${opts.supervisorId ? sql`WHERE sp.supervisor_user_id = ${opts.supervisorId} AND sp.owner_user_id <> ${opts.supervisorId}` : sql``}
     ORDER BY c.name LIMIT 300`);
   return { years: years.map((y) => ({ ...y, isCurrent: Number(y.isCurrent) === 1 })), classes, categories, customers: customers.map((c) => ({ id: Number(c.id), name: c.name })) };
 }

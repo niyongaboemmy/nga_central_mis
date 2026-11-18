@@ -19,6 +19,7 @@ import { reportsOf } from "./progress";
 
 export interface BasicsInput {
   title?: unknown;
+  abstract?: unknown;
   problemStatement?: unknown;
   description?: unknown;
   categoryId?: unknown;
@@ -44,9 +45,22 @@ async function validCategory(id: unknown): Promise<number | null> {
   return n;
 }
 
-async function validSupervisor(id: unknown): Promise<number | null> {
+/**
+ * Supervising is its own role: the supervisor guides and reviews from outside the team, so they
+ * can't be the project's owner or one of its teammates (invited or accepted).
+ */
+/** A brief summary: two or three sentences. */
+export const ABSTRACT_MIN = 40;
+export const ABSTRACT_MAX = 400;
+
+async function validSupervisor(id: unknown, ctx: { ownerId: number; projectId?: number }): Promise<number | null> {
   if (id === undefined || id === null || id === "") return null;
   const n = Number(id);
+  if (n === ctx.ownerId) fail(400, "SUPERVISOR_IS_OWNER", "The project owner can't supervise their own project: choose another staff member", "supervisorId");
+  if (ctx.projectId) {
+    const m = await one(sql`SELECT status FROM SideProjectMember WHERE project_id = ${ctx.projectId} AND user_id = ${n}`);
+    if (m) fail(400, "SUPERVISOR_IS_MEMBER", "This person is on the team: a supervisor guides the project from outside the team", "supervisorId");
+  }
   const u = await one(sql`
     SELECT u.user_id FROM User u JOIN UserProfile p ON p.user_id = u.user_id
     WHERE u.user_id = ${n} AND u.status = 'ACTIVE' AND p.user_type <> 'STUDENT' AND p.user_type <> 'PARENT'`);
@@ -126,7 +140,9 @@ export async function createProject(ownerId: number, by: number, input: CreateIn
   }
   // The stage plan: the boundaries the person chose, or the default split.
   const plan = start && target ? (input.stagePlan ? planFromEnds(start, target, parseEnds(input.stagePlan)) : defaultPlan(start, target)) : null;
-  const supervisor = await validSupervisor(input.supervisorId);
+  // The abstract opens the project: a brief summary, required except for imported rows.
+  const abstract = v.text(input.abstract, "abstract", { min: ABSTRACT_MIN, max: ABSTRACT_MAX, required: !opts.conceptPending, label: "Abstract" });
+  const supervisor = await validSupervisor(input.supervisorId, { ownerId });
   const links = v.links(input.links);
   const statusRaw = String(input.status ?? "IDEA").toUpperCase();
   if (!(STATUSES as readonly string[]).includes(statusRaw)) fail(400, "VALIDATION", "Unknown status", "status");
@@ -166,11 +182,11 @@ export async function createProject(ownerId: number, by: number, input: CreateIn
   let projectId: number;
   try {
     const r = await db.execute(sql`
-      INSERT INTO SideProject (owner_user_id, kind, customer_mode, customer_id, title, title_key, problem_statement, description, category_id, tech_tags, status,
+      INSERT INTO SideProject (owner_user_id, kind, customer_mode, customer_id, title, title_key, abstract, problem_statement, description, category_id, tech_tags, status,
         board_position, github_url, access_url, supervisor_user_id, academic_year_id, last_active_year_id, class_group_id,
         reg_number_snapshot, student_name_snapshot, concept_pending, start_date, target_date, started_at, completed_at,
         last_activity_at, created_by, created_at, updated_at)
-      VALUES (${ownerId}, ${kind}, ${customer.mode}, ${customer.id}, ${title}, ${titleKey(title)}, ${problem}, ${description}, ${categoryId}, ${JSON.stringify(tags)}, ${status},
+      VALUES (${ownerId}, ${kind}, ${customer.mode}, ${customer.id}, ${title}, ${titleKey(title)}, ${abstract ?? null}, ${problem}, ${description}, ${categoryId}, ${JSON.stringify(tags)}, ${status},
         ${Number(pos?.p ?? 0)}, ${github}, ${access}, ${supervisor}, ${snap.yearId}, ${snap.yearId}, ${snap.classId},
         ${snap.reg}, ${snap.name}, ${conceptAsset ? 0 : 1}, ${start}, ${target},
         ${status !== "IDEA" ? sql`UTC_TIMESTAMP()` : null}, ${status === "COMPLETED" ? sql`UTC_TIMESTAMP()` : null},
@@ -197,6 +213,8 @@ export async function updateBasics(a: ProjectAccess, by: number, input: BasicsIn
     await assertTitleFree(Number(p.owner_user_id), title, Number(p.project_id));
     set.push(sql`title = ${title}`, sql`title_key = ${titleKey(title)}`);
   }
+  if (input.abstract !== undefined)
+    set.push(sql`abstract = ${v.text(input.abstract, "abstract", { min: ABSTRACT_MIN, max: ABSTRACT_MAX, required: true, label: "Abstract" })}`);
   if (input.problemStatement !== undefined) set.push(sql`problem_statement = ${v.text(input.problemStatement, "problemStatement", { min: 30, max: 3000, required: true, label: "Problem statement" })}`);
   if (input.description !== undefined) set.push(sql`description = ${v.text(input.description, "description", { max: 5000, label: "Description" })}`);
   if (input.categoryId !== undefined) set.push(sql`category_id = ${await validCategory(input.categoryId)}`);
@@ -215,7 +233,7 @@ export async function updateBasics(a: ProjectAccess, by: number, input: BasicsIn
     if (!old.length || startChanged || targetChanged) await savePlan(Number(p.project_id), old.length ? rescalePlan(old, start, target) : defaultPlan(start, target));
   }
   if (input.supervisorId !== undefined) {
-    const sup = await validSupervisor(input.supervisorId);
+    const sup = await validSupervisor(input.supervisorId, { ownerId: Number(p.owner_user_id), projectId: Number(p.project_id) });
     set.push(sql`supervisor_user_id = ${sup}`);
     if ((sup ?? null) !== (p.supervisor_user_id ? Number(p.supervisor_user_id) : null)) {
       await recordEvent(Number(p.project_id), by, "SUPERVISOR", p.supervisor_user_id ? String(p.supervisor_user_id) : null, sup ? String(sup) : null);
@@ -473,7 +491,7 @@ export async function projectDetail(a: ProjectAccess) {
   const id = Number(a.project.project_id);
   await ensureStageLogs([id]);
   const row = await one(sql`
-    SELECT ${cardColumns}, sp.problem_statement AS problemStatement, sp.description, sp.outcome_summary AS outcomeSummary,
+    SELECT ${cardColumns}, sp.abstract, sp.problem_statement AS problemStatement, sp.description, sp.outcome_summary AS outcomeSummary,
            ${ymd("sp.start_date")} AS startDate, ${iso("sp.started_at")} AS startedAt,
            sp.reg_number_snapshot AS regSnapshot, sp.student_name_snapshot AS nameSnapshot,
            op.registration_number AS regNumber, op.user_type AS ownerType, ${fullName("op")} AS ownerName, ou.avatar_version AS ownerAvatar,
@@ -528,6 +546,7 @@ export async function projectDetail(a: ProjectAccess) {
   );
   return {
     ...card,
+    abstract: row.abstract ?? null,
     problemStatement: row.problemStatement,
     description: row.description,
     outcomeSummary: row.outcomeSummary,
@@ -585,12 +604,17 @@ export async function tagSuggestions(q: string) {
   return [...counts.values()].filter((c) => !needle || c.tag.toLowerCase().includes(needle)).sort((a, b) => b.n - a.n).slice(0, 20).map((c) => c.tag);
 }
 
-export async function supervisorCandidates(q: string) {
+/** Staff who may supervise; never the owner (the asker on a new project) or the project's team. */
+export async function supervisorCandidates(q: string, ctx: { askerId: number; projectId?: number | null } = { askerId: 0 }) {
   const needle = `%${clip(q, 60)}%`;
+  const project = ctx.projectId ? await one(sql`SELECT owner_user_id FROM SideProject WHERE project_id = ${ctx.projectId} AND deleted_at IS NULL`) : null;
+  const ownerId = project ? Number(project.owner_user_id) : ctx.askerId;
   return many(sql`
     SELECT u.user_id AS id, ${fullName("p")} AS name, p.user_type AS type
     FROM User u JOIN UserProfile p ON p.user_id = u.user_id
     WHERE u.status = 'ACTIVE' AND p.user_type IN ('TEACHER', 'STAFF', 'ADMIN')
+      AND u.user_id <> ${ownerId}
+      ${project ? sql`AND NOT EXISTS (SELECT 1 FROM SideProjectMember m WHERE m.project_id = ${ctx.projectId} AND m.user_id = u.user_id)` : sql``}
       AND (${needle} = '%%' OR CONCAT(COALESCE(p.first_name,''), ' ', COALESCE(p.last_name,'')) LIKE ${needle})
     ORDER BY p.first_name, p.last_name LIMIT 20`);
 }

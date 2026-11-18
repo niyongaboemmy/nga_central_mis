@@ -28,6 +28,8 @@ export async function invite(a: ProjectAccess, by: number, who: { userId?: unkno
   if (!s || s.status !== "ACTIVE") fail(404, "PERSON_NOT_FOUND", "No active person matches", "regNumber");
   const userId = Number(s.user_id);
   if (userId === Number(a.project.owner_user_id)) fail(409, "ALREADY_MEMBER", "That's the project owner", "regNumber");
+  if (a.project.supervisor_user_id && userId === Number(a.project.supervisor_user_id))
+    fail(409, "IS_SUPERVISOR", "This person supervises the project: a supervisor guides it from outside the team", "regNumber");
   const n = await one(sql`SELECT COUNT(*) AS n FROM SideProjectMember WHERE project_id = ${a.project.project_id}`);
   if (Number(n?.n ?? 0) >= MAX_MEMBERS) fail(400, "TEAM_FULL", `A team has at most ${MAX_MEMBERS + 1} people`, "regNumber");
   const exists = await one(sql`SELECT status FROM SideProjectMember WHERE project_id = ${a.project.project_id} AND user_id = ${userId}`);
