@@ -1189,3 +1189,29 @@ describe("tasks can go to any teammate, invited or accepted", () => {
     expect(off.status).toBe(400);
   });
 });
+
+describe("team positions (migration 137)", () => {
+  beforeAll(() => owners.add(insights));
+  it("sets a custom position with the invitation and changes it any time, also for the owner", async () => {
+    const p = await createProject(insights, "Positions project");
+    const inv = await api().post(`/side-projects/${p}/members`).set(as(insights)).send({ userId: bob, roleKey: "DESIGNER", roleTitle: "  UI/UX   designer ", responsibilities: "Screens and the style guide" });
+    expect(inv.status, JSON.stringify(inv.body)).toBe(200);
+    let d = (await api().get(`/side-projects/${p}`).set(as(insights))).body.data;
+    expect(d.members.find((m: any) => m.id === bob)).toMatchObject({ status: "INVITED", roleKey: "DESIGNER", roleTitle: "UI/UX designer", responsibilities: "Screens and the style guide" });
+    // still invited: the position can change
+    expect((await api().patch(`/side-projects/${p}/members/${bob}`).set(as(insights)).send({ roleTitle: "Product designer" })).status).toBe(200);
+    expect((await api().patch(`/side-projects/${p}/members/${bob}`).set(as(insights)).send({ roleTitle: "x".repeat(61) })).body.field).toBe("roleTitle");
+    // the owner's own position
+    expect((await api().patch(`/side-projects/${p}/members/${insights}`).set(as(insights)).send({ roleTitle: "Project manager", responsibilities: "Plan and demos" })).status).toBe(200);
+    expect((await api().patch(`/side-projects/${p}/members/${insights}`).set(as(insights)).send({ isManager: false })).status).toBe(400);
+    d = (await api().get(`/side-projects/${p}`).set(as(insights))).body.data;
+    expect(d.owner).toMatchObject({ roleTitle: "Project manager", responsibilities: "Plan and demos" });
+    expect(d.members.find((m: any) => m.id === bob).roleTitle).toBe("Product designer");
+    // a plain teammate can't change positions; a manager can, but not the right to assign
+    await api().post(`/side-projects/invitations/${p}`).set(as(bob)).send({ accept: true });
+    expect((await api().patch(`/side-projects/${p}/members/${bob}`).set(as(bob)).send({ roleTitle: "Boss" })).status).toBe(403);
+    expect((await api().patch(`/side-projects/${p}/members/${bob}`).set(as(insights)).send({ isManager: true })).status).toBe(200);
+    expect((await api().patch(`/side-projects/${p}/members/${bob}`).set(as(bob)).send({ roleTitle: "Design lead" })).status).toBe(200);
+    expect((await api().patch(`/side-projects/${p}/members/${bob}`).set(as(bob)).send({ isManager: false })).status).toBe(403);
+  });
+});

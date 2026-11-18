@@ -14,7 +14,7 @@ export type Teammate = { id: number; name: string; avatar?: string | null; role?
 
 /** The team: owner first, then teammates (accepted, then invited); everyone can be given work. */
 export const teamOf = (p: ProjectDetail): Teammate[] => [
-  { id: p.owner.id, name: p.owner.name, avatar: p.owner.avatar, role: "Owner", owner: true },
+  { id: p.owner.id, name: p.owner.name, avatar: p.owner.avatar, role: p.owner.roleTitle || "Owner", owner: true },
   ...[...p.members]
     .sort((a, b) => (a.status === b.status ? 0 : a.status === "ACCEPTED" ? -1 : 1))
     .map((m) => ({ id: m.id, name: m.name, role: m.roleTitle || ROLE_META[m.roleKey]?.label || null, invited: m.status === "INVITED" })),

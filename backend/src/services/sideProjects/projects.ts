@@ -491,7 +491,7 @@ export async function projectDetail(a: ProjectAccess) {
   const id = Number(a.project.project_id);
   await ensureStageLogs([id]);
   const row = await one(sql`
-    SELECT ${cardColumns}, sp.abstract, sp.problem_statement AS problemStatement, sp.description, sp.outcome_summary AS outcomeSummary,
+    SELECT ${cardColumns}, sp.abstract, sp.owner_role_title AS ownerRoleTitle, sp.owner_responsibilities AS ownerResponsibilities, sp.problem_statement AS problemStatement, sp.description, sp.outcome_summary AS outcomeSummary,
            ${ymd("sp.start_date")} AS startDate, ${iso("sp.started_at")} AS startedAt,
            sp.reg_number_snapshot AS regSnapshot, sp.student_name_snapshot AS nameSnapshot,
            op.registration_number AS regNumber, op.user_type AS ownerType, ${fullName("op")} AS ownerName, ou.avatar_version AS ownerAvatar,
@@ -558,6 +558,8 @@ export async function projectDetail(a: ProjectAccess) {
       regNumber: row.regNumber || row.regSnapshot,
       type: String(row.ownerType || "STUDENT").toUpperCase(),
       avatar: avatarUrls(Number(row.ownerId), row.ownerAvatar == null ? null : Number(row.ownerAvatar))?.sm ?? null,
+      roleTitle: row.ownerRoleTitle ?? null,
+      responsibilities: row.ownerResponsibilities ?? null,
     },
     supervisor: row.supervisorId ? { id: Number(row.supervisorId), name: row.supervisorName } : null,
     verifiedBy: row.verifiedByName || null,

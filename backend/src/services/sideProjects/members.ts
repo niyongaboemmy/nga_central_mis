@@ -15,7 +15,7 @@ const MAX_MEMBERS = 8;
  * Invite someone to the team: picked from the people search (`userId`) or typed as a
  * registration number. Anyone active may join -- students, staff, parents.
  */
-export async function invite(a: ProjectAccess, by: number, who: { userId?: unknown; regNumber?: unknown }) {
+export async function invite(a: ProjectAccess, by: number, who: { userId?: unknown; regNumber?: unknown } & PositionInput) {
   if (!a.isOwner && !a.manageAny) fail(403, "NOT_OWNER", "Only the project owner can invite");
   const reg = clip(who.regNumber, 20);
   const id = Number(who.userId);
@@ -36,9 +36,11 @@ export async function invite(a: ProjectAccess, by: number, who: { userId?: unkno
   if (exists) fail(409, "ALREADY_MEMBER", exists.status === "INVITED" ? "Already invited" : "Already in the team", "regNumber");
   // Inviting someone makes a personal project a team project.
   if (a.project.team_mode !== "TEAM") await db.execute(sql`UPDATE SideProject SET team_mode = 'TEAM' WHERE project_id = ${a.project.project_id}`);
+  // The position can be set with the invitation (and changed any time after).
+  const pos = parsePosition(who);
   await db.execute(sql`
-    INSERT INTO SideProjectMember (project_id, user_id, status, invited_by, added_at)
-    VALUES (${a.project.project_id}, ${userId}, 'INVITED', ${by}, UTC_TIMESTAMP())`);
+    INSERT INTO SideProjectMember (project_id, user_id, status, invited_by, added_at, role_key, role_title, responsibilities)
+    VALUES (${a.project.project_id}, ${userId}, 'INVITED', ${by}, UTC_TIMESTAMP(), ${pos.roleKey ?? "DEVELOPER"}, ${pos.roleTitle ?? null}, ${pos.responsibilities ?? null})`);
   await recordEvent(Number(a.project.project_id), by, "MEMBER_INVITED", null, String(userId));
   return userId;
 }
@@ -93,24 +95,58 @@ export async function setMode(a: ProjectAccess, by: number, raw: unknown) {
 }
 
 /** A teammate's role, responsibilities and whether they may plan and assign work. */
-export async function updateMember(a: ProjectAccess, by: number, userId: number, body: { roleKey?: unknown; roleTitle?: unknown; responsibilities?: unknown; isManager?: unknown }) {
-  if (!a.isOwner && !a.manageAny) fail(403, "NOT_OWNER", "Only the project owner can change roles");
-  const m = await one(sql`SELECT role_key, is_manager FROM SideProjectMember WHERE project_id = ${a.project.project_id} AND user_id = ${userId}`);
-  if (!m) fail(404, "NOT_FOUND", "Not a member");
-  const sets: ReturnType<typeof sql>[] = [];
+type PositionInput = { roleKey?: unknown; roleTitle?: unknown; responsibilities?: unknown; isManager?: unknown };
+
+/** Validated position fields (only the ones sent). */
+function parsePosition(body: PositionInput) {
+  const out: { roleKey?: string; roleTitle?: string | null; responsibilities?: string | null } = {};
   if (body.roleKey !== undefined) {
     const k = String(body.roleKey).toUpperCase();
     if (!(ROLE_KEYS as readonly string[]).includes(k)) fail(400, "VALIDATION", "Unknown role", "roleKey");
-    sets.push(sql`role_key = ${k}`);
+    out.roleKey = k;
   }
-  if (body.roleTitle !== undefined) sets.push(sql`role_title = ${clip(body.roleTitle, 60) || null}`);
+  if (body.roleTitle !== undefined) {
+    const t = String(body.roleTitle ?? "").trim().replace(/\s+/g, " ");
+    if (t.length > 60) fail(400, "VALIDATION", "At most 60 characters", "roleTitle");
+    out.roleTitle = t || null;
+  }
   if (body.responsibilities !== undefined) {
     const r = String(body.responsibilities ?? "").trim();
     if (r.length > 1000) fail(400, "VALIDATION", "At most 1000 characters", "responsibilities");
-    sets.push(sql`responsibilities = ${r || null}`);
+    out.responsibilities = r || null;
   }
+  return out;
+}
+
+/**
+ * A teammate's position on this project (role, custom title, responsibilities) and, for the
+ * owner only, the right to plan and assign. Changeable any time, also while the invitation is
+ * pending. The owner or a team manager edits positions; the owner's own position lives on the
+ * project (migration 137).
+ */
+export async function updateMember(a: ProjectAccess, by: number, userId: number, body: PositionInput) {
+  if (!a.canManage) fail(403, "NOT_MANAGER", "Only the owner or a team manager can change positions");
+  const pos = parsePosition(body);
+  const projectId = Number(a.project.project_id);
+  if (userId === Number(a.project.owner_user_id)) {
+    if (body.isManager !== undefined || pos.roleKey !== undefined) fail(400, "VALIDATION", "The owner always leads and assigns", "roleKey");
+    const sets: ReturnType<typeof sql>[] = [];
+    if (pos.roleTitle !== undefined) sets.push(sql`owner_role_title = ${pos.roleTitle}`);
+    if (pos.responsibilities !== undefined) sets.push(sql`owner_responsibilities = ${pos.responsibilities}`);
+    if (!sets.length) return;
+    await db.execute(sql`UPDATE SideProject SET ${sql.join(sets, sql`, `)} WHERE project_id = ${projectId}`);
+    await recordEvent(projectId, by, "MEMBER_ROLE", null, String(userId), pos.roleTitle ?? undefined);
+    return;
+  }
+  const m = await one(sql`SELECT role_key, is_manager FROM SideProjectMember WHERE project_id = ${projectId} AND user_id = ${userId}`);
+  if (!m) fail(404, "NOT_FOUND", "Not a member");
+  if (body.isManager !== undefined && !a.isOwner && !a.manageAny) fail(403, "NOT_OWNER", "Only the project owner decides who can assign tasks", "isManager");
+  const sets: ReturnType<typeof sql>[] = [];
+  if (pos.roleKey !== undefined) sets.push(sql`role_key = ${pos.roleKey}`);
+  if (pos.roleTitle !== undefined) sets.push(sql`role_title = ${pos.roleTitle}`);
+  if (pos.responsibilities !== undefined) sets.push(sql`responsibilities = ${pos.responsibilities}`);
   if (body.isManager !== undefined) sets.push(sql`is_manager = ${body.isManager === true || body.isManager === "true" || body.isManager === 1 ? 1 : 0}`);
   if (!sets.length) return;
-  await db.execute(sql`UPDATE SideProjectMember SET ${sql.join(sets, sql`, `)} WHERE project_id = ${a.project.project_id} AND user_id = ${userId}`);
-  await recordEvent(Number(a.project.project_id), by, "MEMBER_ROLE", null, String(userId));
+  await db.execute(sql`UPDATE SideProjectMember SET ${sql.join(sets, sql`, `)} WHERE project_id = ${projectId} AND user_id = ${userId}`);
+  await recordEvent(projectId, by, "MEMBER_ROLE", null, String(userId), pos.roleTitle ?? undefined);
 }

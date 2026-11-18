@@ -53,6 +53,35 @@ export const ROLE_META: Record<RoleKey, { label: string; icon: React.ElementType
 };
 export const ROLE_KEYS: RoleKey[] = ["LEAD", "DEVELOPER", "DESIGNER", "TESTER", "RESEARCHER", "ANALYST", "DOCUMENTER", "OTHER"];
 
+/** Common positions on a project; any custom title is allowed too. */
+export const POSITION_SUGGESTIONS = [
+  "Project manager",
+  "Frontend developer",
+  "Backend developer",
+  "Full-stack developer",
+  "Mobile developer",
+  "UI/UX designer",
+  "QA tester",
+  "Data analyst",
+  "Hardware engineer",
+  "Researcher",
+  "Technical writer",
+  "Scrum master",
+];
+
+/** The role family a position belongs to (drives the icon and insights grouping). */
+export function roleKeyFor(title: string, fallback: RoleKey = "OTHER"): RoleKey {
+  const t = title.toLowerCase();
+  if (/(lead|manager|scrum|owner|coordinator|head)/.test(t)) return "LEAD";
+  if (/(design|ui|ux|artist|illustrat)/.test(t)) return "DESIGNER";
+  if (/(test|qa|quality)/.test(t)) return "TESTER";
+  if (/(research)/.test(t)) return "RESEARCHER";
+  if (/(analy|data|business)/.test(t)) return "ANALYST";
+  if (/(writer|document|content)/.test(t)) return "DOCUMENTER";
+  if (/(develop|engineer|program|coder|devops|frontend|backend|full-stack|fullstack|mobile|hardware|embedded)/.test(t)) return "DEVELOPER";
+  return fallback;
+}
+
 export const StatusChip: React.FC<{ meta: Meta; size?: "sm" | "md"; className?: string }> = ({ meta, size = "sm", className = "" }) => (
   <span className={`inline-flex items-center gap-1 rounded-full font-semibold ${size === "sm" ? "px-2 py-0.5 text-[11px]" : "px-2.5 py-1 text-xs"} ${meta.chip} ${className}`}>
     <meta.icon className={size === "sm" ? "h-3 w-3" : "h-3.5 w-3.5"} aria-hidden />
