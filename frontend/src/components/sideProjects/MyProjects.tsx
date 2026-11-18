@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Archive, ClipboardCheck, Kanban, List, Plus, Search, Sparkles, X, Mail } from "lucide-react";
+import { Archive, ClipboardCheck, Gauge, Kanban, Lightbulb, List, Plus, Search, X, Mail } from "lucide-react";
+import PageHeader from "./PageHeader";
 import { failure, sideProjectsApi, type Category, type ProjectCard, type Status } from "../../api/sideProjects";
 import { useToast } from "../../contexts/ToastContext";
 import { useUser } from "../../contexts/UserContext";
@@ -9,11 +10,8 @@ import Board from "./Board";
 import CreateWizard from "./CreateWizard";
 import ProjectDrawer from "./ProjectDrawer";
 import { MoveDialog } from "./MoveDialog";
-import { CATEGORY_ICON, DocChips, EmptyArt, GlassRing, HealthDot, PATH, ProgressBar, ReviewBadge, Skeleton, STATUS_META, STATUS_ORDER, StatusPill, pathStage, primaryBtn, statusColor, timeAgo, useIsDark, cardCls } from "./ui";
+import { CATEGORY_ICON, DocChips, EmptyArt, HealthDot, PATH, ProgressBar, ReviewBadge, Skeleton, STATUS_META, STATUS_ORDER, StatusPill, pathStage, primaryBtn, statusColor, timeAgo, useIsDark, cardCls } from "./ui";
 import { StageChip } from "./ProjectCard";
-
-/** Light tints of the stage hues that read on the blue hero. */
-const HERO_TINT: Record<Status, string> = { IDEA: "#fdba74", PLANNING: "#6ee7b7", IN_PROGRESS: "#ffffff", TESTING: "#f9a8d4", COMPLETED: "#86efac", ON_HOLD: "#cbd5e1" };
 
 type Pending = { id: number; to: Status; from: Status; title: string; hasLink: boolean; hasImage: boolean; resolve: (ok: boolean) => void };
 
@@ -151,61 +149,38 @@ const MyProjects: React.FC = () => {
 
   return (
     <div className="mx-auto max-w-7xl space-y-5 px-4 py-6">
-      {/* Hero */}
-      <motion.section initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-blue-700 via-blue-600 to-blue-500 p-5 text-white sm:p-6">
-        <div className="pointer-events-none absolute inset-0" aria-hidden>
-          <motion.span className="absolute -right-16 -top-16 h-64 w-64 rounded-full bg-white/10" animate={{ scale: [1, 1.06, 1] }} transition={{ repeat: Infinity, duration: 6 }} />
-          <span className="absolute -bottom-20 right-40 h-48 w-48 rounded-full bg-blue-300/20" />
-          <Sparkles className="absolute right-6 top-6 h-10 w-10 text-white/20" />
-        </div>
-        <div className="relative flex flex-wrap items-center justify-between gap-6">
-          <div className="min-w-0 flex-1">
-            <h1 className="text-2xl font-extrabold tracking-tight sm:text-3xl">My projects</h1>
-            <div className="mt-1 flex flex-wrap items-center gap-2">
-              <p className="text-sm text-white/80">Plan, build and ship your ideas.</p>
-              {assigned && assigned.total > 0 && (
-                <Link to="/assigned-projects" className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1 text-xs font-semibold ring-1 ring-inset ring-white/25 backdrop-blur transition hover:bg-white/25 focus:outline-none focus-visible:ring-2 focus-visible:ring-white">
-                  <ClipboardCheck className="h-3.5 w-3.5" aria-hidden /> Assigned to me
-                  <span className="rounded-full bg-white px-1.5 text-[10px] font-bold tabular-nums text-blue-700">{assigned.total}</span>
-                  {assigned.review > 0 && <span className="text-[10px] font-medium text-white/85">· {assigned.review} to review</span>}
-                </Link>
-              )}
-            </div>
-            <div className="mt-4 flex flex-wrap items-center gap-2">
-              {STATUS_ORDER.filter((s) => s !== "ON_HOLD" || counts.ON_HOLD > 0).map((s) => {
-                const M = STATUS_META[s];
-                return (
-                  <span key={s} className={`inline-flex items-center gap-1.5 rounded-full bg-white/15 py-1 pl-1 pr-3 ring-1 ring-white/20 backdrop-blur ${counts[s] ? "" : "opacity-60"}`} title={`${M.label}: ${counts[s]}`}>
-                    <span className="flex h-6 w-6 items-center justify-center rounded-full" style={{ backgroundColor: HERO_TINT[s] + "40" }}>
-                      <M.icon className="h-3.5 w-3.5" aria-hidden />
-                    </span>
-                    <span className="text-sm font-extrabold tabular-nums">{counts[s]}</span>
-                    <span className="text-[11px] font-medium text-white/85">{M.label}</span>
-                  </span>
-                );
-              })}
-            </div>
-            {total > 0 && (
-              <div className="mt-4 flex h-2 max-w-md gap-1 overflow-hidden rounded-full" role="img" aria-label={STATUS_ORDER.map((s) => `${STATUS_META[s].label} ${counts[s]}`).join(", ")}>
-                {STATUS_ORDER.map((s) =>
-                  counts[s] ? (
-                    <motion.span key={s} className="h-full rounded-full" style={{ backgroundColor: HERO_TINT[s] }} initial={{ flexGrow: 0 }} animate={{ flexGrow: counts[s] }} transition={{ duration: 0.8 }} />
-                  ) : null,
-                )}
-              </div>
+      <PageHeader
+        icon={Lightbulb}
+        title="My projects"
+        subtitle={
+          <>
+            <span>Plan, build and ship your ideas.</span>
+            {assigned && assigned.total > 0 && (
+              <Link to="/assigned-projects" className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-semibold text-blue-700 transition hover:bg-blue-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:bg-blue-500/15 dark:text-blue-300 dark:hover:bg-blue-500/25">
+                <ClipboardCheck className="h-3.5 w-3.5" aria-hidden /> Assigned to me · {assigned.total}
+                {assigned.review > 0 && <span className="font-medium">({assigned.review} to review)</span>}
+              </Link>
+            )}
+          </>
+        }
+        actions={
+          <button type="button" className={primaryBtn} onClick={() => setWizard("IDEA")}>
+            <Plus className="h-4 w-4" /> New project
+          </button>
+        }
+        stats={[
+          ...STATUS_ORDER.filter((s) => s !== "ON_HOLD" || counts.ON_HOLD > 0).map((s) => ({ label: STATUS_META[s].label, value: cards ? counts[s] : undefined, icon: STATUS_META[s].icon })),
+          { label: "Average progress", value: cards ? `${avg}%` : undefined, icon: Gauge },
+        ]}
+      >
+        {total > 0 && (
+          <div className="mt-3 flex h-1.5 gap-[2px] overflow-hidden rounded-full" role="img" aria-label={STATUS_ORDER.map((s) => `${STATUS_META[s].label} ${counts[s]}`).join(", ")}>
+            {STATUS_ORDER.map((s) =>
+              counts[s] ? <motion.span key={s} className="h-full rounded-full" style={{ backgroundColor: statusColor(s, dark) }} initial={{ flexGrow: 0 }} animate={{ flexGrow: counts[s] }} transition={{ duration: 0.8 }} /> : null,
             )}
           </div>
-          <div className="flex items-center gap-4">
-            <GlassRing value={avg} size={84} caption="avg." accent="#6ee7b7" label={`Average progress ${avg}%`} />
-            <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }} type="button" onClick={() => setWizard("IDEA")} className="inline-flex items-center gap-2 rounded-full bg-white px-5 py-3 text-sm font-bold text-blue-700 transition hover:bg-blue-50 focus:outline-none focus-visible:ring-4 focus-visible:ring-white/50">
-              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-600 text-white">
-                <Plus className="h-4 w-4" />
-              </span>
-              New project
-            </motion.button>
-          </div>
-        </div>
-      </motion.section>
+        )}
+      </PageHeader>
 
       {invites.length > 0 && (
         <div className="flex flex-wrap gap-2">

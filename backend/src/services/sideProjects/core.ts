@@ -13,7 +13,20 @@ export const CAP = {
   VIEW: "SIDE_PROJECTS_VIEW",
   REVIEW: "SIDE_PROJECTS_REVIEW",
   ANY: "SIDE_PROJECTS_MANAGE_ANY",
+  /** choose a project's classification (migration 132); never a student account */
+  CLASSIFY: "SIDE_PROJECTS_CLASSIFY",
 } as const;
+
+/** Classification (migration 132). Students' projects are always STUDENT. */
+export const KINDS = ["STUDENT", "DELIVERY_STUDIO", "INDIVIDUAL"] as const;
+export type Kind = (typeof KINDS)[number];
+export const isKind = (k: unknown): k is Kind => typeof k === "string" && (KINDS as readonly string[]).includes(k.toUpperCase());
+
+/** Whether this account is a student's (they may never choose the classification). */
+export async function isStudentAccount(userId: number) {
+  const r = await one(sql`SELECT user_type FROM UserProfile WHERE user_id = ${userId}`);
+  return String(r?.user_type ?? "").toUpperCase() === "STUDENT";
+}
 
 /** Lifecycle (migration 131). IN_PROGRESS is shown as "Building". ON_HOLD is a pause. */
 export const STATUSES = ["IDEA", "PLANNING", "IN_PROGRESS", "TESTING", "COMPLETED", "ON_HOLD"] as const;

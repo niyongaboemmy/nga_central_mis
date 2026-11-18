@@ -2,8 +2,7 @@ import { sql, SQL } from "drizzle-orm";
 import { db } from "../../db";
 import { getCurrentAcademicYearId } from "../../utils/academicYear";
 import {
-  clip, DocType, fail, fullName, inList, insertId, iso, limits, many, one, recordEvent, Status, STATUSES, titleKey, touch, ymd,
-} from "./core";
+  clip, DocType, fail, fullName, inList, insertId, iso, limits, many, one, recordEvent, Status, STATUSES, titleKey, touch, ymd, CAP, isKind, isStudentAccount, KINDS, type Kind } from "./core";
 import { healthOf, progressOf, transition } from "./lifecycle";
 import { ProjectAccess } from "./access";
 import { avatarUrls } from "../avatar/urls";
@@ -75,7 +74,7 @@ async function ownerSnapshot(ownerId: number) {
   const cls = yearId && isStudent
     ? await one(sql`SELECT MIN(class_group_id) AS id FROM StudentClassGroup WHERE user_id = ${ownerId} AND academic_year_id = ${yearId} AND status = 'ACTIVE'`)
     : null;
-  return { yearId, classId: cls?.id ? Number(cls.id) : null, reg: s.registration_number ?? null, name: String(s.name || "").slice(0, 201) };
+  return { yearId, isStudent, classId: cls?.id ? Number(cls.id) : null, reg: s.registration_number ?? null, name: String(s.name || "").slice(0, 201) };
 }
 
 export interface CreateInput extends BasicsInput {
@@ -84,13 +83,29 @@ export interface CreateInput extends BasicsInput {
   stagePlan?: unknown;
   concept?: Upload | null;
   conceptWritten?: unknown;
+  /** STUDENT | DELIVERY_STUDIO | INDIVIDUAL (ignored for students' projects) */
+  kind?: unknown;
+}
+
+/**
+ * The classification a new project gets: a student's project is always STUDENT; otherwise the
+ * one asked for when the creator may classify, else INDIVIDUAL.
+ */
+export function kindFor(ownerIsStudent: boolean, requested: unknown, canClassify: boolean): Kind {
+  if (ownerIsStudent) return "STUDENT";
+  if (requested !== undefined && requested !== null && requested !== "") {
+    if (!isKind(requested)) fail(400, "VALIDATION", "Unknown project type", "kind");
+    if (!canClassify) fail(403, "NOT_ALLOWED", "You can't choose the project type", "kind");
+    return String(requested).toUpperCase() as Kind;
+  }
+  return "INDIVIDUAL";
 }
 
 /**
  * Creates a project. The concept note is mandatory (an upload or the written form) unless
  * `conceptPending` (imported rows, staff-created placeholders).
  */
-export async function createProject(ownerId: number, by: number, input: CreateInput, opts: { conceptPending?: boolean; allowAnyStatus?: boolean } = {}) {
+export async function createProject(ownerId: number, by: number, input: CreateInput, opts: { conceptPending?: boolean; allowAnyStatus?: boolean; canClassify?: boolean } = {}) {
   const title = v.text(input.title, "title", { min: 3, max: 150, required: true, label: "Title" })!;
   const problem = v.text(input.problemStatement, "problemStatement", { min: 30, max: 3000, required: true, label: "Problem statement" })!;
   const description = v.text(input.description, "description", { max: 5000, label: "Description" });
@@ -128,6 +143,7 @@ export async function createProject(ownerId: number, by: number, input: CreateIn
 
   await assertTitleFree(ownerId, title);
   const snap = await ownerSnapshot(ownerId);
+  const kind = kindFor(snap.isStudent, input.kind, !!opts.canClassify);
 
   // Store the concept before the project row exists, so a refused file creates nothing.
   let conceptAsset = null;
@@ -145,11 +161,11 @@ export async function createProject(ownerId: number, by: number, input: CreateIn
   let projectId: number;
   try {
     const r = await db.execute(sql`
-      INSERT INTO SideProject (owner_user_id, title, title_key, problem_statement, description, category_id, tech_tags, status,
+      INSERT INTO SideProject (owner_user_id, kind, title, title_key, problem_statement, description, category_id, tech_tags, status,
         board_position, github_url, access_url, supervisor_user_id, academic_year_id, last_active_year_id, class_group_id,
         reg_number_snapshot, student_name_snapshot, concept_pending, start_date, target_date, started_at, completed_at,
         last_activity_at, created_by, created_at, updated_at)
-      VALUES (${ownerId}, ${title}, ${titleKey(title)}, ${problem}, ${description}, ${categoryId}, ${JSON.stringify(tags)}, ${status},
+      VALUES (${ownerId}, ${kind}, ${title}, ${titleKey(title)}, ${problem}, ${description}, ${categoryId}, ${JSON.stringify(tags)}, ${status},
         ${Number(pos?.p ?? 0)}, ${github}, ${access}, ${supervisor}, ${snap.yearId}, ${snap.yearId}, ${snap.classId},
         ${snap.reg}, ${snap.name}, ${conceptAsset ? 0 : 1}, ${start}, ${target},
         ${status !== "IDEA" ? sql`UTC_TIMESTAMP()` : null}, ${status === "COMPLETED" ? sql`UTC_TIMESTAMP()` : null},
@@ -333,7 +349,7 @@ export async function uploadDocument(a: ProjectAccess, by: number, type: DocType
 
 /** Card columns shared by the board and the monitor list (aliases from projectFrom). */
 export const cardColumns = sql`
-  sp.project_id AS id, sp.title, sp.status, sp.board_position AS boardPosition, sp.review_state AS reviewState,
+  sp.project_id AS id, sp.title, sp.status, sp.kind, sp.board_position AS boardPosition, sp.review_state AS reviewState,
   sp.progress_mode AS progressMode, sp.progress_manual AS progressManual, sp.tech_tags AS techTags,
   sp.github_url AS githubUrl, sp.access_url AS accessUrl, sp.cover_asset_id AS coverAssetId,
   sp.concept_pending AS conceptPending, sp.owner_user_id AS ownerId, sp.supervisor_user_id AS supervisorId,
@@ -380,6 +396,7 @@ export function shapeCard(r: any, now = new Date()) {
     id: Number(r.id),
     title: r.title,
     status: r.status as Status,
+    kind: (r.kind as Kind) || "INDIVIDUAL",
     boardPosition: Number(r.boardPosition || 0),
     reviewState: r.reviewState,
     progress: progressOf({ status: r.status, paused_from: r.pausedFrom, progress_mode: r.progressMode, progress_manual: r.progressManual == null ? null : Number(r.progressManual) }, ms),
@@ -539,4 +556,21 @@ export async function supervisorCandidates(q: string) {
     WHERE u.status = 'ACTIVE' AND p.user_type IN ('TEACHER', 'STAFF', 'ADMIN')
       AND (${needle} = '%%' OR CONCAT(COALESCE(p.first_name,''), ' ', COALESCE(p.last_name,'')) LIKE ${needle})
     ORDER BY p.first_name, p.last_name LIMIT 20`);
+}
+
+/**
+ * Changes the classification. Only an account that holds SIDE_PROJECTS_CLASSIFY and is not a
+ * student, on a project it may edit (or as the projects lead); a student's project stays STUDENT
+ * unless a non-student moves it.
+ */
+export async function setKind(a: ProjectAccess, by: number, perms: string[], raw: unknown) {
+  if (!isKind(raw)) fail(400, "VALIDATION", `Choose one of ${KINDS.join(", ")}`, "kind");
+  const kind = String(raw).toUpperCase() as Kind;
+  if (!perms.includes(CAP.CLASSIFY) || (await isStudentAccount(by))) fail(403, "NOT_ALLOWED", "You can't change the project type", "kind");
+  if (!a.canEdit && !a.manageAny) fail(403, "NOT_ALLOWED", "You can't change this project", "kind");
+  const from = String(a.project.kind ?? "INDIVIDUAL");
+  if (from === kind) return kind;
+  await db.execute(sql`UPDATE SideProject SET kind = ${kind}, updated_at = UTC_TIMESTAMP() WHERE project_id = ${a.project.project_id}`);
+  await recordEvent(Number(a.project.project_id), by, "KIND", from, kind);
+  return kind;
 }

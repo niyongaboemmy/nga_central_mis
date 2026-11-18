@@ -4,7 +4,8 @@ import {
   AlertOctagon, Bot, BrainCircuit, CheckCircle2, CircleDashed, Clock3, Cpu, FileCheck2, FileClock, FileText, Gamepad2, Globe,
   FlaskConical, Hourglass, LineChart, PencilRuler, Lightbulb, Loader2, PauseCircle, Rocket, ShieldCheck, Smartphone, Sparkles, UploadCloud, BadgeCheck, MessageSquareWarning,
 } from "lucide-react";
-import type { DocType, Health, ReviewState, Stage, Status } from "../../api/sideProjects";
+import type { DocType, Health, Kind, ReviewState, Stage, Status } from "../../api/sideProjects";
+import { Building2, GraduationCap, UserRound } from "lucide-react";
 
 /**
  * Side projects visual language. Stage colours are a validated five-slot categorical order
@@ -104,6 +105,27 @@ export const REVIEW_META: Record<ReviewState, { label: string; icon: React.Eleme
   CHANGES_REQUESTED: { label: "Changes requested", icon: MessageSquareWarning, cls: "bg-amber-100 text-amber-900 dark:bg-amber-500/15 dark:text-amber-100" },
   AWAITING_VERIFICATION: { label: "Awaiting verification", icon: Hourglass, cls: "bg-blue-100 text-blue-900 dark:bg-blue-500/15 dark:text-blue-100" },
   VERIFIED: { label: "Verified", icon: ShieldCheck, cls: "bg-emerald-100 text-emerald-900 dark:bg-emerald-500/15 dark:text-emerald-100" },
+};
+
+/** Classification (migration 132): identity, so icon + label, neutral ink (blue-only palette). */
+export const KIND_META: Record<Kind, { label: string; short: string; icon: React.ElementType; hint: string }> = {
+  STUDENT: { label: "Student project", short: "Student", icon: GraduationCap, hint: "Built by a student" },
+  DELIVERY_STUDIO: { label: "NGA Delivery Studio project", short: "Delivery Studio", icon: Building2, hint: "Delivered by the NGA Delivery Studio" },
+  INDIVIDUAL: { label: "Individual project", short: "Individual", icon: UserRound, hint: "A personal project" },
+};
+export const KINDS: Kind[] = ["STUDENT", "DELIVERY_STUDIO", "INDIVIDUAL"];
+
+export const KindChip: React.FC<{ kind: Kind; size?: "sm" | "md"; className?: string }> = ({ kind, size = "sm", className = "" }) => {
+  const m = KIND_META[kind] ?? KIND_META.INDIVIDUAL;
+  return (
+    <span
+      title={m.label}
+      className={`inline-flex items-center gap-1 rounded-full bg-slate-100 font-semibold text-slate-700 dark:bg-gray-700/60 dark:text-gray-200 ${size === "sm" ? "px-2 py-0.5 text-[11px]" : "px-2.5 py-1 text-xs"} ${className}`}
+    >
+      <m.icon className={size === "sm" ? "h-3 w-3" : "h-3.5 w-3.5"} aria-hidden />
+      {m.short}
+    </span>
+  );
 };
 
 export const DOC_META: Record<DocType, { label: string; short: string; icon: React.ElementType; required: boolean }> = {

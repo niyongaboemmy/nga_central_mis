@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { Github, ExternalLink, Images, MessageCircle, Users, MoreHorizontal, Mail, Target, Timer, PauseCircle } from "lucide-react";
 import { fileUrl, type ProjectCard as Card, type Status } from "../../api/sideProjects";
 import UserAvatar from "../ui/UserAvatar";
-import { CATEGORY_ICON, DocChips, HealthDot, ProgressBar, ReviewBadge, STATUS_META, STATUS_ORDER, dayWord, pathStage, statusColor, timeAgo, useIsDark } from "./ui";
+import { KindChip, CATEGORY_ICON, DocChips, HealthDot, ProgressBar, ReviewBadge, STATUS_META, STATUS_ORDER, dayWord, pathStage, statusColor, timeAgo, useIsDark } from "./ui";
 
 export interface ProjectCardProps {
   card: Card & { student?: { id: number; name: string; regNumber: string | null; avatar: string | null }; class?: { name: string } | null };
@@ -77,6 +77,11 @@ const ProjectCardView: React.FC<ProjectCardProps> = ({ card, onOpen, onMove, dra
               </span>
             )}
           </div>
+          {card.kind && card.kind !== "STUDENT" && (
+            <div className="absolute bottom-2 left-2">
+              <KindChip kind={card.kind} className="!bg-white/90 dark:!bg-gray-900/80" />
+            </div>
+          )}
           <div className="absolute right-2 top-2 flex gap-1">
             <ReviewBadge state={card.reviewState} compact />
             {invited && (

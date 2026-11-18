@@ -7,6 +7,8 @@ const api = vi.hoisted(() => ({
   me: vi.fn(),
   assigned: vi.fn(),
   addReport: vi.fn(),
+  setKind: vi.fn(),
+  removeUpdate: vi.fn(),
   mine: vi.fn(),
   categories: vi.fn(),
   transition: vi.fn(),
@@ -28,11 +30,15 @@ import { StageChip, moveTargets } from "../ProjectCard";
 import PlanEditor, { clampEnds, defaultEnds, endsToDates, rangesOf, spanDays } from "../PlanEditor";
 import { buildWeeks, levelOf, scoreOf } from "../panels/ContributionGraph";
 import ReportModal from "../panels/ReportModal";
+import ReportsFeed from "../panels/ReportsFeed";
+import KindControl from "../KindControl";
+import PageHeader from "../PageHeader";
 
 const card = (over: Partial<ProjectCard>): ProjectCard => ({
   id: 1,
   title: "Smart irrigation",
   status: "IDEA",
+  kind: "STUDENT",
   boardPosition: 0,
   reviewState: "NONE",
   progress: 0,
@@ -255,5 +261,58 @@ describe("side projects: progress report", () => {
     expect(files).toEqual([]);
     expect(toast).toHaveBeenCalledWith("Report saved", "success");
     expect(onSaved).toHaveBeenCalled();
+  });
+});
+
+describe("side projects: classification, header and reports feed", () => {
+  beforeEach(() => vi.clearAllMocks());
+  const iso = (offset: number) => {
+    const d = new Date();
+    return new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) - offset * 86_400_000).toISOString().slice(0, 10);
+  };
+  const report = (id: number, offset: number, over: Record<string, unknown> = {}) => ({
+    id, did: `Work ${id}`, nextSteps: null, blockers: null, mood: null, hours: 1, stage: "IN_PROGRESS", workDate: iso(offset), createdAt: new Date().toISOString(), editedAt: null, authorId: 5, author: "Aline Uwase", files: [], ...over,
+  });
+  const detail = (updates: any[]) => ({ id: 7, title: "Smart irrigation", status: "IN_PROGRESS", kind: "INDIVIDUAL", updates, rights: { edit: true, manageAny: false } }) as any;
+
+  it("shows the type as a chip, or a menu for people who may change it", async () => {
+    api.setKind.mockResolvedValue({ kind: "DELIVERY_STUDIO" });
+    const onChanged = vi.fn();
+    const { rerender } = render(<KindControl p={detail([])} canChange={false} onChanged={onChanged} />);
+    expect(screen.getByText("Individual")).toBeInTheDocument();
+    expect(screen.queryByRole("button")).toBeNull();
+    rerender(<KindControl p={detail([])} canChange onChanged={onChanged} />);
+    fireEvent.click(screen.getByRole("button", { name: /Project type: Individual project/ }));
+    fireEvent.click(screen.getByRole("menuitemradio", { name: /NGA Delivery Studio project/ }));
+    await waitFor(() => expect(api.setKind).toHaveBeenCalledWith(7, "DELIVERY_STUDIO"));
+    expect(toast).toHaveBeenCalledWith("Now a nga delivery studio project", "success");
+    expect(onChanged).toHaveBeenCalled();
+  });
+
+  it("renders the shared page header with stats (skeleton while loading)", () => {
+    render(<PageHeader icon={() => null} title="My projects" subtitle="Plan, build and ship." stats={[{ label: "Idea", value: 3 }, { label: "Building", value: undefined }]} />);
+    expect(screen.getByRole("heading", { name: "My projects" })).toBeInTheDocument();
+    expect(screen.getByText("3")).toBeInTheDocument();
+    expect(screen.getByText("Building")).toBeInTheDocument();
+  });
+
+  it("guides a first report when there is none", () => {
+    render(<ReportsFeed p={detail([])} meId={5} onChanged={vi.fn()} />);
+    expect(screen.getByText("No reports yet")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Record the first report/ })).toBeInTheDocument();
+  });
+
+  it("groups reports by week, searches, and nudges when today has no report", () => {
+    const reports = [report(1, 4), report(2, 5, { blockers: "Waiting for parts" }), report(3, 20), report(4, 40)];
+    render(<ReportsFeed p={detail(reports)} meId={5} onChanged={vi.fn()} />);
+    expect(screen.getByText(/No report for 4 days/)).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { expanded: true }).length).toBeGreaterThanOrEqual(2);
+    fireEvent.change(screen.getByLabelText("Search reports"), { target: { value: "Work 3" } });
+    expect(screen.getByText("Work 3")).toBeInTheDocument();
+    expect(screen.queryByText("Work 1")).toBeNull();
+    fireEvent.change(screen.getByLabelText("Search reports"), { target: { value: "" } });
+    fireEvent.click(screen.getByRole("radio", { name: /Blockers/ }));
+    expect(screen.getByText("Waiting for parts")).toBeInTheDocument();
+    expect(screen.queryByText("Work 1")).toBeNull();
   });
 });

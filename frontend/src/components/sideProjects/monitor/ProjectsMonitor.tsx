@@ -2,8 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
-  ArrowDown, ArrowUp, ChevronLeft, ChevronRight, Download, FileSpreadsheet, Filter, Github, Globe, Kanban, LayoutDashboard, List, RefreshCw, Search, Upload, UserCheck, X, ShieldAlert, GraduationCap, Briefcase,
-} from "lucide-react";
+  ArrowDown, ArrowUp, ChevronLeft, ChevronRight, Download, FileSpreadsheet, Filter, Github, Globe, Kanban, LayoutDashboard, List, RefreshCw, Search, Upload, UserCheck, X, ShieldAlert, GraduationCap, Briefcase, FolderKanban } from "lucide-react";
 import { failure, sideProjectsApi, type Category, type FilterOptions, type Me, type MonitorRow, type Summary } from "../../../api/sideProjects";
 import { useUser } from "../../../contexts/UserContext";
 import UserAvatar from "../../ui/UserAvatar";
@@ -12,12 +11,13 @@ import { TYPE_LABEL } from "../fields";
 import Board from "../Board";
 import ProjectDrawer from "../ProjectDrawer";
 import Dashboard, { type DrillFilter } from "./Dashboard";
+import PageHeader, { HeaderTabs } from "../PageHeader";
 import ImportDialog from "./ImportDialog";
 import { StageChip } from "../ProjectCard";
-import { pathStage, chipCls, STATUS_SOLID, DocChips, EmptyArt, HEALTH_META, HealthDot, ProgressBar, ReviewBadge, Skeleton, STATUS_META, STATUS_ORDER, StatusPill, cardCls, secondaryBtn, statusColor, timeAgo, useIsDark, REVIEW_META } from "../ui";
+import { KIND_META, KINDS, KindChip, iconBtn, primaryBtn, pathStage, chipCls, STATUS_SOLID, DocChips, EmptyArt, HEALTH_META, HealthDot, ProgressBar, ReviewBadge, Skeleton, STATUS_META, STATUS_ORDER, StatusPill, cardCls, secondaryBtn, statusColor, timeAgo, useIsDark, REVIEW_META } from "../ui";
 
 type Tab = "dashboard" | "list" | "board" | "supervising";
-const FILTER_KEYS = ["yearId", "yearMode", "ownerType", "classId", "status", "review", "categoryId", "health", "hasGithub", "hasAccess", "missing", "q"] as const;
+const FILTER_KEYS = ["yearId", "yearMode", "ownerType", "kind", "classId", "status", "review", "categoryId", "health", "hasGithub", "hasAccess", "missing", "q"] as const;
 
 const selectCls = "min-w-0 max-w-full rounded-full border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/15 dark:border-gray-700/60 dark:bg-gray-800/40 dark:text-gray-100";
 
@@ -150,37 +150,39 @@ const ProjectsMonitor: React.FC = () => {
 
   return (
     <div className="mx-auto max-w-[96rem] space-y-4 px-4 py-6">
-      <motion.header initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 via-blue-900 to-blue-700 p-5 text-white ">
-        <div className="absolute -right-10 -top-10 h-48 w-48 rounded-full bg-white/5" aria-hidden />
-        <div className="absolute -bottom-16 right-32 h-40 w-40 rounded-full bg-blue-500/20" aria-hidden />
-        <div className="relative flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-extrabold tracking-tight">All projects</h1>
-            <p className="mt-1 flex items-center gap-2 text-xs text-white/70">
-              {loading ? <RefreshCw className="h-3.5 w-3.5 animate-spin" aria-hidden /> : <span className="h-2 w-2 rounded-full bg-emerald-400 " aria-hidden />}
-              {refreshedAt ? `Updated ${timeAgo(refreshedAt.toISOString())}` : "Loading"}
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
+      <PageHeader
+        icon={FolderKanban}
+        title="All projects"
+        subtitle={
+          <span className="inline-flex items-center gap-1.5">
+            {loading ? <RefreshCw className="h-3.5 w-3.5 animate-spin" aria-hidden /> : <span className="h-2 w-2 rounded-full bg-green-500" aria-hidden />}
+            {refreshedAt ? `Updated ${timeAgo(refreshedAt.toISOString())}` : "Loading"}
+          </span>
+        }
+        actions={
+          <>
             {detail && (
               <>
-                <a href={sideProjectsApi.exportUrl({ ...filters }, "xlsx")} className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-2 text-sm font-semibold backdrop-blur hover:bg-white/20"><FileSpreadsheet className="h-4 w-4" /> Excel</a>
-                <a href={sideProjectsApi.exportUrl({ ...filters }, "csv")} className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-2 text-sm font-semibold backdrop-blur hover:bg-white/20"><Download className="h-4 w-4" /> CSV</a>
+                <a href={sideProjectsApi.exportUrl({ ...filters }, "xlsx")} className={`${secondaryBtn} !min-h-[36px] !px-3.5 !py-1.5`}>
+                  <FileSpreadsheet className="h-4 w-4" /> Excel
+                </a>
+                <a href={sideProjectsApi.exportUrl({ ...filters }, "csv")} className={`${secondaryBtn} !min-h-[36px] !px-3.5 !py-1.5`}>
+                  <Download className="h-4 w-4" /> CSV
+                </a>
               </>
             )}
-            {me?.manageAny && <button type="button" onClick={() => setImportOpen(true)} className="inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-2 text-sm font-bold text-blue-700 hover:bg-blue-50"><Upload className="h-4 w-4" /> Import</button>}
-            <button type="button" onClick={load} aria-label="Refresh" className="rounded-full bg-white/10 p-2 hover:bg-white/20"><RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} /></button>
-          </div>
-        </div>
-        <nav className="relative mt-4 flex gap-1" role="tablist">
-          {tabs.filter((t) => t.show).map((t) => (
-            <button key={t.key} type="button" role="tab" aria-selected={effectiveTab === t.key} onClick={() => patch({ tab: t.key })} className={`relative inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-sm font-semibold transition ${effectiveTab === t.key ? "text-blue-700" : "text-white/80 hover:bg-white/10"}`}>
-              {effectiveTab === t.key && <motion.span layoutId="spm-tab" className="absolute inset-0 rounded-full bg-white " />}
-              <t.icon className="relative h-4 w-4" aria-hidden /> <span className="relative">{t.label}</span>
+            {me?.manageAny && (
+              <button type="button" onClick={() => setImportOpen(true)} className={`${primaryBtn} !min-h-[36px] !px-4 !py-1.5`}>
+                <Upload className="h-4 w-4" /> Import
+              </button>
+            )}
+            <button type="button" onClick={load} aria-label="Refresh" title="Refresh" className={iconBtn}>
+              <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
             </button>
-          ))}
-        </nav>
-      </motion.header>
+          </>
+        }
+        tabs={<HeaderTabs label="Views" value={effectiveTab} onChange={(k) => patch({ tab: k })} items={tabs.filter((t) => t.show).map((t) => ({ key: t.key, label: t.label, icon: t.icon }))} />}
+      />
 
       {/* Filters: search and quick chips first, then the dropdowns that refine. */}
       <div className={`${cardCls} space-y-3 p-3 sm:p-4`}>
@@ -237,6 +239,10 @@ const ProjectsMonitor: React.FC = () => {
           <span className="inline-flex items-center gap-1.5 pr-1 text-xs font-semibold text-slate-500 dark:text-gray-400">
             <Filter className="h-3.5 w-3.5" aria-hidden /> Refine
           </span>
+        <SelectField aria-label="Project type" className={selectCls} value={params.get("kind") ?? "all"} onChange={(e) => patch({ kind: e.target.value === "all" ? null : e.target.value })}>
+          <option value="all">Any type</option>
+          {KINDS.map((k) => <option key={k} value={k}>{KIND_META[k].label}</option>)}
+        </SelectField>
         <SelectField aria-label="Academic year" className={selectCls} value={params.get("yearId") ?? "all"} onChange={(e) => patch({ yearId: e.target.value === "all" ? null : e.target.value, allYears: e.target.value === "all" ? "1" : null })}>
           <option value="all">All years</option>
           {opts?.years.map((y) => <option key={y.id} value={y.id}>{y.name}</option>)}
@@ -312,6 +318,7 @@ const ProjectsMonitor: React.FC = () => {
                           <p className="truncate font-semibold text-slate-800 dark:text-white">{r.title}</p>
                           <div className="mt-0.5 flex items-center gap-1.5">
                             {r.category && <span className="inline-flex items-center gap-1 text-[11px] text-slate-600 dark:text-gray-300"><span className="h-2 w-2 rounded-full" style={{ backgroundColor: r.category.color }} aria-hidden />{r.category.name}</span>}
+                            <KindChip kind={r.kind} />
                             <ReviewBadge state={r.reviewState} compact />
                           </div>
                         </td>

@@ -67,7 +67,7 @@ const PLATFORM_VIEW: PresetCap[] = [["PLATFORM_TENANTS_VIEW", "detail"]];
 
 // Student side projects (STUDENT_PROJECTS_IMPLEMENTATION_PLAN.md §4.3). Migration 128 seeds the
 // same links for roles that already have holders.
-const SIDE_PROJECTS_REVIEWER: PresetCap[] = [["SIDE_PROJECTS_VIEW", "detail"], "SIDE_PROJECTS_REVIEW"];
+const SIDE_PROJECTS_REVIEWER: PresetCap[] = [["SIDE_PROJECTS_VIEW", "detail"], "SIDE_PROJECTS_REVIEW", "SIDE_PROJECTS_CLASSIFY"];
 const SIDE_PROJECTS_FULL: PresetCap[] = [...SIDE_PROJECTS_REVIEWER, "SIDE_PROJECTS_MANAGE_ANY"];
 
 const MIS_PRESETS: PresetDef[] = [
@@ -482,7 +482,7 @@ const MIS_PRESETS: PresetDef[] = [
     description: "Baseline for every teacher (own calendar, own records). Teaching power comes from Subject/Class Teacher grants.",
     category: "Teaching",
     scopes: ["SELF"],
-    caps: ["AI_USE", "AI_PERSONAL_PROVIDERS", "AI_EXTERNAL_CONNECT", "OFFICE_HOURS_MANAGE_OWN", "VIEW_LEADERSHIP_STRUCTURE", "CODE_PLAYGROUND_USE", "SIDE_PROJECTS_MANAGE_OWN", ["SIDE_PROJECTS_ASSIGNED", "detail"]],
+    caps: ["AI_USE", "AI_PERSONAL_PROVIDERS", "AI_EXTERNAL_CONNECT", "OFFICE_HOURS_MANAGE_OWN", "VIEW_LEADERSHIP_STRUCTURE", "CODE_PLAYGROUND_USE", "SIDE_PROJECTS_MANAGE_OWN", ["SIDE_PROJECTS_ASSIGNED", "detail"], "SIDE_PROJECTS_CLASSIFY"],
   },
   {
     key: "support_staff",
@@ -491,7 +491,7 @@ const MIS_PRESETS: PresetDef[] = [
     description: "Baseline for non-teaching staff.",
     category: "Operations",
     scopes: ["SELF"],
-    caps: ["VIEW_LEADERSHIP_STRUCTURE", "CODE_PLAYGROUND_USE", "SIDE_PROJECTS_MANAGE_OWN", ["SIDE_PROJECTS_ASSIGNED", "detail"]],
+    caps: ["VIEW_LEADERSHIP_STRUCTURE", "CODE_PLAYGROUND_USE", "SIDE_PROJECTS_MANAGE_OWN", ["SIDE_PROJECTS_ASSIGNED", "detail"], "SIDE_PROJECTS_CLASSIFY"],
   },
   {
     key: "student",
