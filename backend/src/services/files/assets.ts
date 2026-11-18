@@ -47,7 +47,7 @@ export async function storeAsset(input: {
   originalName: string;
   size: number;
   ownerUserId: number;
-  scope: "COURSE" | "RUN_REFERENCE" | "SUBJECT" | "SUBMISSION";
+  scope: "COURSE" | "RUN_REFERENCE" | "SUBJECT" | "SUBMISSION" | "PROJECT";
   courseId?: number | null;
   subjectId?: number | null;
 }): Promise<AssetRow> {

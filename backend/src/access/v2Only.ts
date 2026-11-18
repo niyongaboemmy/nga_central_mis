@@ -26,6 +26,10 @@ export const V2_ONLY_CAPABILITIES = new Set([
   "ANALYTICS_USER_CONTROL",
   "ANALYTICS_CONFIGURE",
   "USAGE_INSIGHTS_VIEW",
+  // Student side projects (migration 128); SIDE_PROJECTS_MANAGE_OWN stays legacy-visible.
+  "SIDE_PROJECTS_VIEW",
+  "SIDE_PROJECTS_REVIEW",
+  "SIDE_PROJECTS_MANAGE_ANY",
   // Tenant management (services/tenantMgmt/catalog.ts)
   "PLATFORM_TENANTS_VIEW",
   "PLATFORM_APPLICATIONS_REVIEW",

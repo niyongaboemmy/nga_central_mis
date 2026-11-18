@@ -117,6 +117,8 @@ export const Permissions = {
   // NGA Desktop tools (games settings)
   DESKTOP_TOOLS_CONFIGURE: "DESKTOP_TOOLS_CONFIGURE",
   SAFEGUARDING_MANAGE: "SAFEGUARDING_MANAGE",
+  // Student side projects (migration 128). VIEW / REVIEW / MANAGE_ANY are v2-only (useAccess).
+  SIDE_PROJECTS_MANAGE_OWN: "SIDE_PROJECTS_MANAGE_OWN",
   // Code Playground: every role by default (backend migration 120)
   CODE_PLAYGROUND_USE: "CODE_PLAYGROUND_USE",
 

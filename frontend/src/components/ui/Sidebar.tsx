@@ -12,6 +12,8 @@ import { useAccess } from "../../hooks/useAccess";
 import { useMentorshipRole } from "../../hooks/useMentorshipRole";
 import { useOptionalAcademicPeriod } from "../../contexts/AcademicPeriodContext";
 import { BarChart3, CalendarOff, Grid3x3, Target, HeartHandshake, Radar, ShieldAlert, ShieldCheck, UserPlus, Baby } from "lucide-react";
+import { Lightbulb, FolderKanban } from "lucide-react";
+import { useSupervisingCount } from "../sideProjects/useSupervising";
 import { BellRing, Bot, CalendarDays, KeyRound, Clock4, Gamepad2, House, SquareTerminal, Users2 } from "lucide-react";
 
 interface SidebarProps {
@@ -83,6 +85,8 @@ const Sidebar: React.FC<SidebarProps> = ({
   const access = useAccess();
   const selectedYearId = useOptionalAcademicPeriod()?.selectedYearId;
   const mentorship = useMentorshipRole(user?.user?.user_id, selectedYearId);
+  const userType = String(user?.profile?.user_type ?? "").toUpperCase();
+  const supervising = useSupervisingCount(userType !== "STUDENT" && userType !== "PARENT" && !!user && !access.can("SIDE_PROJECTS_VIEW"));
 
   const hasPermission = (perm?: string | string[]) => {
     if (!perm) return true;
@@ -769,6 +773,15 @@ const Sidebar: React.FC<SidebarProps> = ({
       userTypes: ["STUDENT"],
     },
     {
+      // Student side projects (STUDENT_PROJECTS_IMPLEMENTATION_PLAN.md §6).
+      label: "My projects",
+      path: "/my-projects",
+      section: "learning",
+      icon: <Lightbulb className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
+      userTypes: ["STUDENT"],
+      requiredPermission: Permissions.SIDE_PROJECTS_MANAGE_OWN,
+    },
+    {
       label: "Wellbeing",
       path: "/wellbeing",
       section: "learning",
@@ -795,6 +808,22 @@ const Sidebar: React.FC<SidebarProps> = ({
       section: "oversight",
       icon: <Radar className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
       requiredCapability: "EARLY_WARNING_VIEW",
+    },
+    {
+      label: "Student projects",
+      path: "/projects-monitor",
+      section: "oversight",
+      icon: <FolderKanban className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
+      requiredCapability: "SIDE_PROJECTS_VIEW",
+    },
+    {
+      // Supervisors without SIDE_PROJECTS_VIEW still reach the projects they supervise.
+      label: "Supervised projects",
+      path: "/projects-monitor",
+      section: "oversight",
+      icon: <FolderKanban className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
+      when: supervising > 0,
+      badge: supervising || undefined,
     },
     {
       label: "Safeguarding",

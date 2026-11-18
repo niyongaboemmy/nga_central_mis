@@ -1,0 +1,63 @@
+import { sql } from "drizzle-orm";
+import { db } from "../../db";
+import { clip, fail, fullName, many, one, recordEvent } from "./core";
+import { ProjectAccess } from "./access";
+
+/**
+ * Team projects (plan Phase 5): the owner invites classmates by registration number; an
+ * invited student accepts or declines. Accepted members edit like the owner, but only the
+ * owner deletes, archives and manages the team.
+ */
+
+const MAX_MEMBERS = 8;
+
+export async function invite(a: ProjectAccess, by: number, regNumber: unknown) {
+  if (!a.isOwner && !a.manageAny) fail(403, "NOT_OWNER", "Only the project owner can invite");
+  const reg = clip(regNumber, 20);
+  if (!reg) fail(400, "VALIDATION", "Enter a registration number", "regNumber");
+  const s = await one(sql`
+    SELECT u.user_id, u.status, p.user_type FROM UserProfile p JOIN User u ON u.user_id = p.user_id
+    WHERE p.registration_number = ${reg}`);
+  if (!s || String(s.user_type).toUpperCase() !== "STUDENT" || s.status !== "ACTIVE") fail(404, "STUDENT_NOT_FOUND", "No active student has this registration number", "regNumber");
+  const userId = Number(s.user_id);
+  if (userId === Number(a.project.owner_user_id)) fail(409, "ALREADY_MEMBER", "That's the project owner", "regNumber");
+  const n = await one(sql`SELECT COUNT(*) AS n FROM SideProjectMember WHERE project_id = ${a.project.project_id}`);
+  if (Number(n?.n ?? 0) >= MAX_MEMBERS) fail(400, "TEAM_FULL", `A team has at most ${MAX_MEMBERS + 1} people`, "regNumber");
+  const exists = await one(sql`SELECT status FROM SideProjectMember WHERE project_id = ${a.project.project_id} AND user_id = ${userId}`);
+  if (exists) fail(409, "ALREADY_MEMBER", exists.status === "INVITED" ? "Already invited" : "Already in the team", "regNumber");
+  await db.execute(sql`
+    INSERT INTO SideProjectMember (project_id, user_id, status, invited_by, added_at)
+    VALUES (${a.project.project_id}, ${userId}, 'INVITED', ${by}, UTC_TIMESTAMP())`);
+  await recordEvent(Number(a.project.project_id), by, "MEMBER_INVITED", null, String(userId));
+  return userId;
+}
+
+export async function respond(projectId: number, userId: number, accept: boolean) {
+  const m = await one(sql`SELECT status FROM SideProjectMember WHERE project_id = ${projectId} AND user_id = ${userId}`);
+  if (!m || m.status !== "INVITED") fail(404, "NOT_FOUND", "Invitation not found");
+  if (accept) {
+    await db.execute(sql`UPDATE SideProjectMember SET status = 'ACCEPTED', responded_at = UTC_TIMESTAMP() WHERE project_id = ${projectId} AND user_id = ${userId}`);
+  } else {
+    await db.execute(sql`DELETE FROM SideProjectMember WHERE project_id = ${projectId} AND user_id = ${userId}`);
+  }
+  await recordEvent(projectId, userId, accept ? "MEMBER_JOINED" : "MEMBER_DECLINED", null, String(userId));
+}
+
+export async function removeMember(a: ProjectAccess, by: number, userId: number) {
+  const self = userId === by;
+  if (!self && !a.isOwner && !a.manageAny) fail(403, "NOT_OWNER", "Only the project owner can remove members");
+  const r = await one(sql`SELECT 1 AS x FROM SideProjectMember WHERE project_id = ${a.project.project_id} AND user_id = ${userId}`);
+  if (!r) fail(404, "NOT_FOUND", "Not a member");
+  await db.execute(sql`DELETE FROM SideProjectMember WHERE project_id = ${a.project.project_id} AND user_id = ${userId}`);
+  await recordEvent(Number(a.project.project_id), by, self ? "MEMBER_LEFT" : "MEMBER_REMOVED", null, String(userId));
+}
+
+export async function classmates(userId: number, q: string) {
+  const needle = `%${clip(q, 60)}%`;
+  return many(sql`
+    SELECT u.user_id AS id, ${fullName("p")} AS name, p.registration_number AS regNumber
+    FROM User u JOIN UserProfile p ON p.user_id = u.user_id
+    WHERE u.status = 'ACTIVE' AND p.user_type = 'STUDENT' AND u.user_id <> ${userId} AND p.registration_number IS NOT NULL
+      AND (CONCAT(COALESCE(p.first_name,''), ' ', COALESCE(p.last_name,'')) LIKE ${needle} OR p.registration_number LIKE ${needle})
+    ORDER BY p.first_name LIMIT 10`);
+}

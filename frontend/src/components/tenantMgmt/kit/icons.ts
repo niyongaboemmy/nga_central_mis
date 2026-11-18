@@ -1,4 +1,5 @@
 import {
+  Lightbulb,
   BarChart3,
   Bell,
   BookOpen,
@@ -56,6 +57,7 @@ export const ENT_ICONS: Record<string, LucideIcon> = {
   "feature.safeguarding": Shield,
   "feature.mentorship": HeartHandshake,
   "feature.competency_map": LayoutGrid,
+  "feature.student_projects": Lightbulb,
   "feature.reminders.push": Bell,
   "feature.reminders.telegram": Send,
   "feature.reminders.google_calendar": Calendar,

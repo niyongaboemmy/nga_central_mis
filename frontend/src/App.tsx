@@ -14,6 +14,8 @@ import OnboardingPending from "./components/auth/OnboardingPending";
 const RegisterSchoolPage = lazy(() => import("./components/tenantMgmt/register/RegisterSchoolPage"));
 const OnboardingTracker = lazy(() => import("./components/tenantMgmt/onboarding/OnboardingTracker"));
 const PlatformConsole = lazy(() => import("./components/tenantMgmt/platform/PlatformConsole"));
+const MyProjects = lazy(() => import("./components/sideProjects/MyProjects"));
+const ProjectsMonitor = lazy(() => import("./components/sideProjects/monitor/ProjectsMonitor"));
 const SubscriptionPage = lazy(() => import("./components/tenantMgmt/account/SubscriptionPage"));
 const SupportAccessPage = lazy(() => import("./components/tenantMgmt/account/SupportAccessPage"));
 const SupportSessionLanding = lazy(() => import("./components/tenantMgmt/platform/SupportSessionLanding"));
@@ -1139,6 +1141,30 @@ function App() {
                 <ProtectedRoute>
                   <SystemLayoutWrapper>
                     <Safeguarding />
+                  </SystemLayoutWrapper>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/my-projects"
+              element={
+                <ProtectedRoute>
+                  <SystemLayoutWrapper>
+                    <Suspense fallback={null}>
+                      <MyProjects />
+                    </Suspense>
+                  </SystemLayoutWrapper>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/projects-monitor"
+              element={
+                <ProtectedRoute>
+                  <SystemLayoutWrapper>
+                    <Suspense fallback={null}>
+                      <ProjectsMonitor />
+                    </Suspense>
                   </SystemLayoutWrapper>
                 </ProtectedRoute>
               }

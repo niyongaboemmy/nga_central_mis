@@ -65,6 +65,11 @@ const ACCESS_ADMIN: PresetCap[] = [
 // primary tenant. PLATFORM_* caps are dropped by the compiler outside the primary tenant.
 const PLATFORM_VIEW: PresetCap[] = [["PLATFORM_TENANTS_VIEW", "detail"]];
 
+// Student side projects (STUDENT_PROJECTS_IMPLEMENTATION_PLAN.md §4.3). Migration 128 seeds the
+// same links for roles that already have holders.
+const SIDE_PROJECTS_REVIEWER: PresetCap[] = [["SIDE_PROJECTS_VIEW", "detail"], "SIDE_PROJECTS_REVIEW"];
+const SIDE_PROJECTS_FULL: PresetCap[] = [...SIDE_PROJECTS_REVIEWER, "SIDE_PROJECTS_MANAGE_ANY"];
+
 const MIS_PRESETS: PresetDef[] = [
   {
     key: "platform_owner",
@@ -75,7 +80,7 @@ const MIS_PRESETS: PresetDef[] = [
     scopes: ["PLATFORM"],
     maxHolders: 2,
     platformOnly: true,
-    caps: ["AI_USE", "AI_POLICY_MANAGE", "AI_PERSONAL_PROVIDERS", "AI_EXTERNAL_CONNECT", "AI_PROVIDERS_MANAGE", "STAFF_COVER_MANAGE", ["EARLY_WARNING_VIEW", "detail"], "SAFEGUARDING_MANAGE", "OFFICE_HOURS_MANAGE_ANY", ["OFFICE_HOURS_VIEW", "detail"], "OFFICE_HOURS_CONFIGURE", "DESKTOP_TOOLS_CONFIGURE", "TOOLS_TRANSLATIONS_MANAGE", ["USAGE_INSIGHTS_VIEW", "summary"], 
+    caps: [...SIDE_PROJECTS_FULL, "AI_USE", "AI_POLICY_MANAGE", "AI_PERSONAL_PROVIDERS", "AI_EXTERNAL_CONNECT", "AI_PROVIDERS_MANAGE", "STAFF_COVER_MANAGE", ["EARLY_WARNING_VIEW", "detail"], "SAFEGUARDING_MANAGE", "OFFICE_HOURS_MANAGE_ANY", ["OFFICE_HOURS_VIEW", "detail"], "OFFICE_HOURS_CONFIGURE", "DESKTOP_TOOLS_CONFIGURE", "TOOLS_TRANSLATIONS_MANAGE", ["USAGE_INSIGHTS_VIEW", "summary"], 
       ...ACCESS_ADMIN,
       "ACCESS_ROLES_MANAGE",
       "ACCESS_RULES_MANAGE",
@@ -138,7 +143,7 @@ const MIS_PRESETS: PresetDef[] = [
     category: "Leadership",
     scopes: ["SCHOOL"],
     maxHolders: 2,
-    caps: [
+    caps: [...SIDE_PROJECTS_FULL, 
       ...ACCESS_ADMIN,
       "ACCESS_ROLES_MANAGE",
       "ACCESS_RULES_MANAGE",
@@ -166,7 +171,7 @@ const MIS_PRESETS: PresetDef[] = [
     category: "Leadership",
     scopes: ["SCHOOL"],
     maxHolders: 1,
-    caps: ["AI_USE", "AI_PERSONAL_PROVIDERS", "AI_EXTERNAL_CONNECT", "STAFF_COVER_MANAGE", ["EARLY_WARNING_VIEW", "detail"], "SAFEGUARDING_MANAGE", "OFFICE_HOURS_MANAGE_ANY", ["OFFICE_HOURS_VIEW", "detail"], "OFFICE_HOURS_CONFIGURE", "DESKTOP_TOOLS_CONFIGURE", ["USAGE_INSIGHTS_VIEW", "summary"], 
+    caps: [...SIDE_PROJECTS_FULL, "AI_USE", "AI_PERSONAL_PROVIDERS", "AI_EXTERNAL_CONNECT", "STAFF_COVER_MANAGE", ["EARLY_WARNING_VIEW", "detail"], "SAFEGUARDING_MANAGE", "OFFICE_HOURS_MANAGE_ANY", ["OFFICE_HOURS_VIEW", "detail"], "OFFICE_HOURS_CONFIGURE", "DESKTOP_TOOLS_CONFIGURE", ["USAGE_INSIGHTS_VIEW", "summary"], 
       ...ACCESS_ADMIN,
       "ACCESS_ROLES_MANAGE",
       "ACCESS_RULES_MANAGE",
@@ -203,7 +208,7 @@ const MIS_PRESETS: PresetDef[] = [
     category: "Leadership",
     scopes: ["SCHOOL"],
     maxHolders: 1,
-    caps: ["AI_USE", "AI_PERSONAL_PROVIDERS", "AI_EXTERNAL_CONNECT", "STAFF_COVER_MANAGE", ["EARLY_WARNING_VIEW", "detail"], "OFFICE_HOURS_MANAGE_ANY", ["OFFICE_HOURS_VIEW", "detail"], ["USAGE_INSIGHTS_VIEW", "summary"], 
+    caps: [...SIDE_PROJECTS_REVIEWER, "AI_USE", "AI_PERSONAL_PROVIDERS", "AI_EXTERNAL_CONNECT", "STAFF_COVER_MANAGE", ["EARLY_WARNING_VIEW", "detail"], "OFFICE_HOURS_MANAGE_ANY", ["OFFICE_HOURS_VIEW", "detail"], ["USAGE_INSIGHTS_VIEW", "summary"], 
       ...ACCESS_ADMIN,
       "MANAGE_DEPARTMENTS",
       "VIEW_ACADEMICS",
@@ -233,7 +238,7 @@ const MIS_PRESETS: PresetDef[] = [
     description: "Academic lead for one or more programmes.",
     category: "Leadership",
     scopes: ["PROGRAM", "SCHOOL"],
-    caps: ["AI_USE", "AI_PERSONAL_PROVIDERS", "AI_EXTERNAL_CONNECT", "STAFF_COVER_MANAGE", ["EARLY_WARNING_VIEW", "detail"], "OFFICE_HOURS_MANAGE_ANY", ["OFFICE_HOURS_VIEW", "detail"], ["USAGE_INSIGHTS_VIEW", "summary"], 
+    caps: [...SIDE_PROJECTS_REVIEWER, "AI_USE", "AI_PERSONAL_PROVIDERS", "AI_EXTERNAL_CONNECT", "STAFF_COVER_MANAGE", ["EARLY_WARNING_VIEW", "detail"], "OFFICE_HOURS_MANAGE_ANY", ["OFFICE_HOURS_VIEW", "detail"], ["USAGE_INSIGHTS_VIEW", "summary"], 
       ...ACCESS_ADMIN,
       "VIEW_ACADEMICS",
       "VIEW_PROGRAM_USERS",
@@ -263,7 +268,7 @@ const MIS_PRESETS: PresetDef[] = [
     description: "Coordinates a programme; granted automatically from programme-lead assignments.",
     category: "Leadership",
     scopes: ["PROGRAM"],
-    caps: ["AI_USE", "AI_PERSONAL_PROVIDERS", "AI_EXTERNAL_CONNECT", ["EARLY_WARNING_VIEW", "detail"], "OFFICE_HOURS_MANAGE_ANY", ["OFFICE_HOURS_VIEW", "detail"], ["USAGE_INSIGHTS_VIEW", "summary"], ...ACCESS_ADMIN, ["VIEW_ATTENDANCE", "summary"], ["VIEW_RESULTS", "summary"]],
+    caps: [...SIDE_PROJECTS_REVIEWER, "AI_USE", "AI_PERSONAL_PROVIDERS", "AI_EXTERNAL_CONNECT", ["EARLY_WARNING_VIEW", "detail"], "OFFICE_HOURS_MANAGE_ANY", ["OFFICE_HOURS_VIEW", "detail"], ["USAGE_INSIGHTS_VIEW", "summary"], ...ACCESS_ADMIN, ["VIEW_ATTENDANCE", "summary"], ["VIEW_RESULTS", "summary"]],
   },
   {
     key: "deputy_head_discipline",
@@ -326,7 +331,7 @@ const MIS_PRESETS: PresetDef[] = [
     description: "Homeroom teacher of a class group; granted automatically from class-teacher assignments.",
     category: "Teaching",
     scopes: ["CLASS_GROUP", "GRADE"],
-    caps: ["AI_USE", "AI_PERSONAL_PROVIDERS", "AI_EXTERNAL_CONNECT", ["EARLY_WARNING_VIEW", "detail"], "OFFICE_HOURS_MANAGE_OWN", ["OFFICE_HOURS_VIEW", "detail"], ["USAGE_INSIGHTS_VIEW", "summary"], "VIEW_LEADERSHIP_STRUCTURE", ["VIEW_ATTENDANCE", "detail"], ["VIEW_RESULTS", "detail"]],
+    caps: [...SIDE_PROJECTS_REVIEWER, "AI_USE", "AI_PERSONAL_PROVIDERS", "AI_EXTERNAL_CONNECT", ["EARLY_WARNING_VIEW", "detail"], "OFFICE_HOURS_MANAGE_OWN", ["OFFICE_HOURS_VIEW", "detail"], ["USAGE_INSIGHTS_VIEW", "summary"], "VIEW_LEADERSHIP_STRUCTURE", ["VIEW_ATTENDANCE", "detail"], ["VIEW_RESULTS", "detail"]],
   },
   {
     key: "subject_teacher",
@@ -355,7 +360,7 @@ const MIS_PRESETS: PresetDef[] = [
     description: "Mentors a list of students; granted automatically from mentor assignments.",
     category: "Welfare",
     scopes: ["MENTEES"],
-    caps: ["AI_USE", "AI_PERSONAL_PROVIDERS", "AI_EXTERNAL_CONNECT", "OFFICE_HOURS_MANAGE_OWN", ["VIEW_RESULTS", "detail"], ["VIEW_ATTENDANCE", "detail"]],
+    caps: [["SIDE_PROJECTS_VIEW", "detail"], "AI_USE", "AI_PERSONAL_PROVIDERS", "AI_EXTERNAL_CONNECT", "OFFICE_HOURS_MANAGE_OWN", ["VIEW_RESULTS", "detail"], ["VIEW_ATTENDANCE", "detail"]],
   },
   {
     key: "school_administrator",
@@ -385,7 +390,7 @@ const MIS_PRESETS: PresetDef[] = [
       "Add-on: programme dashboards and grade/class summaries (results, attendance, discipline trends) with no individual records.",
     category: "Leadership",
     scopes: ["SCHOOL", "PROGRAM"],
-    caps: [["USAGE_INSIGHTS_VIEW", "summary"], 
+    caps: [["SIDE_PROJECTS_VIEW", "summary"], ["USAGE_INSIGHTS_VIEW", "summary"], 
       ["VIEW_RESULTS", "summary"],
       ["VIEW_ATTENDANCE", "summary"],
       ["VIEW_REPORTS", "summary"],
@@ -393,6 +398,14 @@ const MIS_PRESETS: PresetDef[] = [
       ["VIEW_ALL_TEACHERS_SCHEME_OF_WORK_LIST", "summary"],
       ["VIEW_ACADEMICS", "summary"],
     ],
+  },
+  {
+    key: "side_projects_lead",
+    name: "Student Projects Lead",
+    description: "Runs the students' side-projects programme: follows, reviews and verifies every project, imports the list.",
+    category: "Leadership",
+    scopes: ["SCHOOL"],
+    caps: [...SIDE_PROJECTS_FULL, "VIEW_LEADERSHIP_STRUCTURE"],
   },
   {
     key: "registrar",
@@ -487,7 +500,7 @@ const MIS_PRESETS: PresetDef[] = [
     description: "Learner self-service.",
     category: "Learner",
     scopes: ["SELF"],
-    caps: [["OFFICE_HOURS_VIEW_SELF", "detail"], "SUBMIT_MENTEE_CHECKIN", "CODE_PLAYGROUND_USE"],
+    caps: ["SIDE_PROJECTS_MANAGE_OWN", ["OFFICE_HOURS_VIEW_SELF", "detail"], "SUBMIT_MENTEE_CHECKIN", "CODE_PLAYGROUND_USE"],
   },
   {
     key: "parent",
