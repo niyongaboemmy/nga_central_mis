@@ -62,7 +62,7 @@ const SortableCard: React.FC<{ card: AnyCard; onOpen: (id: number) => void; onMo
           onKeyDown={onKeyDown}
           aria-roledescription="draggable project"
           aria-label={`Drag ${card.title}`}
-          className="absolute left-1/2 top-1 -translate-x-1/2 rounded-full bg-white/90 px-2 py-0.5 text-slate-500 opacity-0 shadow transition focus:opacity-100 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-500/40 group-hover/drag:opacity-100 dark:bg-gray-900/90 dark:text-gray-300"
+          className="absolute left-1/2 top-1 -translate-x-1/2 rounded-full bg-white/90 px-2 py-0.5 text-slate-500 opacity-0 transition focus:opacity-100 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-500/40 group-hover/drag:opacity-100 dark:bg-gray-900/90 dark:text-gray-300"
         >
           <GripHorizontal className="h-3.5 w-3.5" aria-hidden />
         </button>
@@ -86,11 +86,11 @@ const Column: React.FC<{ status: Status; ids: number[]; byId: Map<number, AnyCar
     >
       <header className="mb-3 flex items-center justify-between px-1">
         <div className="flex items-center gap-2">
-          <span className="flex h-8 w-8 items-center justify-center rounded-xl text-white shadow-sm" style={{ backgroundColor: color }}>
+          <span className="flex h-8 w-8 items-center justify-center rounded-xl text-white " style={{ backgroundColor: color }}>
             <M.icon className="h-4 w-4" aria-hidden />
           </span>
           <h2 className="text-sm font-bold text-slate-800 dark:text-gray-100">{M.label}</h2>
-          <motion.span key={ids.length} initial={{ scale: 1.4 }} animate={{ scale: 1 }} className="rounded-full bg-white px-2 py-0.5 text-xs font-bold tabular-nums text-slate-700 shadow-sm dark:bg-gray-800/40 dark:text-gray-200">
+          <motion.span key={ids.length} initial={{ scale: 1.4 }} animate={{ scale: 1 }} className="rounded-full bg-white px-2 py-0.5 text-xs font-bold tabular-nums text-slate-700 dark:bg-gray-800/40 dark:text-gray-200">
             {ids.length}
           </motion.span>
         </div>

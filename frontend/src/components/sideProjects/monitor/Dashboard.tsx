@@ -26,7 +26,7 @@ const useChartTokens = () => {
 
 const Tip: React.FC<{ active?: boolean; payload?: any[]; label?: string; fmt?: (l: string) => string }> = ({ active, payload, label, fmt }) =>
   active && payload?.length ? (
-    <div className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs shadow-float dark:border-gray-700/60 dark:bg-gray-800/40">
+    <div className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs dark:border-gray-700/60 dark:bg-gray-800/40">
       <p className="mb-1 font-bold text-slate-800 dark:text-white">{fmt ? fmt(String(label)) : label}</p>
       {payload.map((p) => (
         <p key={p.dataKey} className="flex items-center gap-2 text-slate-600 dark:text-gray-300">
@@ -60,7 +60,7 @@ const Tile: React.FC<{ icon: React.ElementType; value: React.ReactNode; label: s
   return (
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay }}>
       {onClick ? (
-        <button type="button" onClick={onClick} className={`${cardCls} w-full p-4 text-left transition hover:-translate-y-0.5 hover:shadow-float focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-500/30`}>{Body}</button>
+        <button type="button" onClick={onClick} className={`${cardCls} w-full p-4 text-left transition hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-500/30`}>{Body}</button>
       ) : (
         <div className={`${cardCls} p-4`}>{Body}</div>
       )}
@@ -169,7 +169,7 @@ const Dashboard: React.FC<{ s: Summary; onDrill: (f: DrillFilter) => void; onOpe
         <Tile icon={FolderKanban} value={s.totals.projects} label="Projects" delay={0} onClick={detail ? () => onDrill({}) : undefined} />
         <Tile icon={Users} value={s.totals.participation !== null ? `${s.totals.participation}%` : s.totals.students} label={s.totals.participation !== null ? `${s.totals.studentOwners} of ${s.totals.population} students` : "Owners"} tone="text-teal-700 bg-teal-50 dark:bg-teal-500/15 dark:text-teal-200" delay={0.03} />
         <Tile icon={BadgeCheck} value={s.totals.completedThisTerm} label={`Completed · ${s.totals.termLabel}`} delta={delta} tone="text-emerald-700 bg-emerald-50 dark:bg-emerald-500/15 dark:text-emerald-200" delay={0.06} onClick={detail ? () => onDrill({ status: "COMPLETED" }) : undefined} />
-        <Tile icon={Hourglass} value={s.totals.awaitingVerification} label="Awaiting verification" tone="text-sky-700 bg-sky-50 dark:bg-sky-500/15 dark:text-sky-200" delay={0.09} onClick={detail ? () => onDrill({ review: "AWAITING_VERIFICATION" }) : undefined} />
+        <Tile icon={Hourglass} value={s.totals.awaitingVerification} label="Awaiting verification" tone="text-blue-700 bg-blue-50 dark:bg-blue-500/15 dark:text-blue-200" delay={0.09} onClick={detail ? () => onDrill({ review: "AWAITING_VERIFICATION" }) : undefined} />
         <Tile icon={PauseCircle} value={s.totals.stale} label="No recent activity" tone="text-amber-700 bg-amber-50 dark:bg-amber-500/15 dark:text-amber-200" delay={0.12} onClick={detail ? () => onDrill({ health: "STALE" }) : undefined} />
         <Tile icon={Clock3} value={s.totals.overdue} label="Overdue" tone="text-red-700 bg-red-50 dark:bg-red-500/15 dark:text-red-200" delay={0.15} onClick={detail ? () => onDrill({ health: "OVERDUE" }) : undefined} />
         <Tile icon={AlertOctagon} value={s.totals.blocked} label="Blocked" tone="text-orange-700 bg-orange-50 dark:bg-orange-500/15 dark:text-orange-200" delay={0.18} onClick={detail ? () => onDrill({ health: "BLOCKED" }) : undefined} />
@@ -177,7 +177,7 @@ const Dashboard: React.FC<{ s: Summary; onDrill: (f: DrillFilter) => void; onOpe
         <Tile icon={Github} value={s.totals.projects ? `${Math.round((s.totals.withGithub / s.totals.projects) * 100)}%` : "—"} label="With GitHub" tone="text-slate-700 bg-slate-100 dark:bg-gray-700/50 dark:text-gray-200" delay={0.24} onClick={detail ? () => onDrill({ hasGithub: "1" }) : undefined} />
         <Tile icon={AlertTriangle} value={s.totals.changesRequested} label="Changes requested" tone="text-yellow-800 bg-yellow-50 dark:bg-yellow-500/15 dark:text-yellow-200" delay={0.3} onClick={detail ? () => onDrill({ review: "CHANGES_REQUESTED" }) : undefined} />
         <Tile icon={Briefcase} value={s.totals.staffProjects} label="Staff & others' projects" tone="text-slate-700 bg-slate-100 dark:bg-gray-700/50 dark:text-gray-200" delay={0.36} onClick={detail ? () => onDrill({ ownerType: "STAFF" }) : undefined} />
-        <Tile icon={Activity} value={`${s.totals.avgProgress}%`} label="Average progress" tone="text-cyan-700 bg-cyan-50 dark:bg-cyan-500/15 dark:text-cyan-200" delay={0.33} />
+        <Tile icon={Activity} value={`${s.totals.avgProgress}%`} label="Average progress" tone="text-blue-700 bg-blue-50 dark:bg-blue-500/15 dark:text-blue-200" delay={0.33} />
       </div>
 
       <Panel title="Pipeline" icon={FolderKanban}>
@@ -295,7 +295,7 @@ const Dashboard: React.FC<{ s: Summary; onDrill: (f: DrillFilter) => void; onOpe
                       <span className="line-clamp-1 text-xs font-bold text-white">{r.title}</span>
                       <span className="line-clamp-1 text-[10px] text-white/80">{r.student.name}</span>
                     </span>
-                    {r.reviewState === "VERIFIED" && <BadgeCheck className="absolute left-2 top-2 h-5 w-5 text-white drop-shadow" aria-label="Verified" />}
+                    {r.reviewState === "VERIFIED" && <BadgeCheck className="absolute left-2 top-2 h-5 w-5 text-white " aria-label="Verified" />}
                   </button>
                 );
               })}

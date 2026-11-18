@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
-import { Archive, ArchiveRestore, Clock, FileStack, Images, LayoutGrid, MessagesSquare, MoreVertical, Target, Trash2, Users, Wrench, X, GraduationCap, Hash, CalendarRange, Briefcase } from "lucide-react";
+import { Archive, ArchiveRestore, Clock, FileStack, Images, LayoutGrid, MessagesSquare, MoreVertical, Target, Trash2, Users, Wrench, X, GraduationCap, Hash, CalendarRange, Check } from "lucide-react";
 import { failure, fileUrl, sideProjectsApi, type Category, type ProjectDetail, type Status } from "../../api/sideProjects";
 import { useToast } from "../../contexts/ToastContext";
 import { useConfirm } from "../../contexts/ConfirmContext";
@@ -13,7 +13,7 @@ import ProgressPanel from "./panels/ProgressPanel";
 import { FeedbackPanel, InviteBanner, TeamPanel, TimelinePanel } from "./panels/ActivityPanels";
 import { TYPE_LABEL } from "./fields";
 import { MoveDialog } from "./MoveDialog";
-import { STATUS_SOLID, CATEGORY_ICON, HealthDot, ProgressRing, ReviewBadge, Skeleton, STATUS_META, STATUS_ORDER, statusColor, useIsDark } from "./ui";
+import { GlassRing, STATUS_SOLID, CATEGORY_ICON, HealthDot, ReviewBadge, Skeleton, STATUS_META, STATUS_ORDER, statusColor, useIsDark } from "./ui";
 
 type Tab = "overview" | "documents" | "gallery" | "progress" | "timeline" | "feedback" | "team";
 
@@ -139,129 +139,185 @@ const ProjectDrawer: React.FC<DrawerProps> = ({ projectId, mode, meId, categorie
             aria-modal="true"
             data-drawer
             aria-label={p?.title ?? "Project"}
-            className="relative flex h-full w-full max-w-3xl flex-col overflow-hidden bg-slate-50 shadow-2xl dark:bg-gray-900"
+            className="relative flex h-full w-full max-w-3xl flex-col overflow-hidden border-l border-slate-200 bg-slate-50 dark:border-gray-700/50 dark:bg-gray-900"
             initial={{ x: "100%" }}
             animate={{ x: 0 }}
             exit={{ x: "100%" }}
             transition={{ type: "spring", damping: 30, stiffness: 280 }}
           >
-            {/* Hero */}
+            {/* Header: cover, identity, status, tabs */}
             <div className="relative shrink-0">
-              <div className="relative h-36 overflow-hidden" style={{ background: `linear-gradient(135deg, ${accent}, ${accent}99)` }}>
-                {p?.coverAssetId && <img src={fileUrl(p.coverAssetId, "thumb")} alt="" className="absolute inset-0 h-full w-full object-cover opacity-60" />}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" />
-                {!p?.coverAssetId && <CatIcon className="absolute -right-6 -top-6 h-40 w-40 text-white/15" aria-hidden />}
-                <div className="absolute right-3 top-3 flex gap-1">
-                  {ownerActions && (
-                    <div className="relative">
-                      <button type="button" aria-label="More" aria-haspopup="menu" aria-expanded={menu} onClick={() => setMenu((m) => !m)} className="rounded-full bg-black/25 p-2 text-white backdrop-blur hover:bg-black/40">
-                        <MoreVertical className="h-5 w-5" />
-                      </button>
-                      {menu && (
-                        <div role="menu" className="absolute right-0 top-11 z-10 w-48 overflow-hidden rounded-2xl border border-slate-200 bg-white p-1.5 shadow-float dark:border-gray-700/60 dark:bg-gray-800">
-                          <button role="menuitem" type="button" onClick={doArchive} className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 dark:text-gray-100 dark:hover:bg-gray-700/50">
-                            {p?.archivedAt ? <ArchiveRestore className="h-4 w-4" /> : <Archive className="h-4 w-4" />} {p?.archivedAt ? "Restore" : "Archive"}
-                          </button>
-                          <button role="menuitem" type="button" onClick={doDelete} className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10">
-                            <Trash2 className="h-4 w-4" /> Delete
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                  <button type="button" aria-label="Close" onClick={onClose} className="rounded-full bg-black/25 p-2 text-white backdrop-blur hover:bg-black/40">
-                    <X className="h-5 w-5" />
-                  </button>
-                </div>
-                <div className="absolute bottom-3 left-4 right-24 text-white">
-                  {p ? (
-                    <>
-                      <div className="mb-1 flex flex-wrap items-center gap-1.5">
-                        <ReviewBadge state={p.reviewState} />
-                        {p.archivedAt && <span className="rounded-full bg-white/20 px-2 py-0.5 text-[11px] font-semibold"><Archive className="mr-1 inline h-3 w-3" />Archived</span>}
-                      </div>
-                      <h2 className="line-clamp-2 text-xl font-extrabold leading-tight drop-shadow">{p.title}</h2>
-                    </>
+              <div className="relative h-44 overflow-hidden" style={{ background: `linear-gradient(135deg, ${accent} 0%, ${accent}cc 45%, #0f172a 130%)` }}>
+                {p?.coverAssetId && <img src={fileUrl(p.coverAssetId, "thumb")} alt="" className="absolute inset-0 h-full w-full scale-105 object-cover opacity-30 blur-sm" />}
+                <div className="absolute inset-0 bg-gradient-to-b from-slate-900/30 via-slate-900/35 to-slate-900/80" aria-hidden />
+                <motion.span className="absolute -right-10 -top-12 h-48 w-48 rounded-full bg-white/10" animate={{ scale: [1, 1.08, 1] }} transition={{ repeat: Infinity, duration: 7 }} aria-hidden />
+                <span className="absolute -bottom-16 left-1/3 h-40 w-40 rounded-full bg-white/5" aria-hidden />
+
+                {/* Top bar */}
+                <div className="absolute inset-x-0 top-0 flex items-center justify-between gap-2 p-4">
+                  {p?.category ? (
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1 text-xs font-semibold text-white ring-1 ring-inset ring-white/25 backdrop-blur-md">
+                      <CatIcon className="h-3.5 w-3.5" aria-hidden /> {p.category.name}
+                    </span>
                   ) : (
-                    <Skeleton className="h-7 w-2/3 !bg-white/30" />
+                    <span />
                   )}
-                </div>
-                {p && (
-                  <div className="absolute bottom-3 right-4">
-                    <div className="rounded-full bg-white/95 p-1 shadow-lg dark:bg-gray-900/90">
-                      <ProgressRing value={p.progress} size={56} stroke={5} color={statusColor(p.status, dark)} />
-                    </div>
+                  <div className="flex items-center gap-1.5">
+                    {ownerActions && (
+                      <div className="relative">
+                        <button type="button" aria-label="More" aria-haspopup="menu" aria-expanded={menu} onClick={() => setMenu((m) => !m)} className="flex h-9 w-9 items-center justify-center rounded-full bg-white/15 text-white ring-1 ring-inset ring-white/25 backdrop-blur-md transition hover:bg-white/25 focus:outline-none focus-visible:ring-2 focus-visible:ring-white">
+                          <MoreVertical className="h-[18px] w-[18px]" />
+                        </button>
+                        {menu && (
+                          <div role="menu" className="absolute right-0 top-11 z-10 w-48 overflow-hidden rounded-2xl border border-slate-200 bg-white p-1.5 dark:border-gray-700/60 dark:bg-gray-800">
+                            <button role="menuitem" type="button" onClick={doArchive} className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 dark:text-gray-100 dark:hover:bg-gray-700/50">
+                              {p?.archivedAt ? <ArchiveRestore className="h-4 w-4" /> : <Archive className="h-4 w-4" />} {p?.archivedAt ? "Restore" : "Archive"}
+                            </button>
+                            <button role="menuitem" type="button" onClick={doDelete} className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10">
+                              <Trash2 className="h-4 w-4" /> Delete
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    <button type="button" aria-label="Close" onClick={onClose} className="flex h-9 w-9 items-center justify-center rounded-full bg-white/15 text-white ring-1 ring-inset ring-white/25 backdrop-blur-md transition hover:rotate-90 hover:bg-white/25 focus:outline-none focus-visible:ring-2 focus-visible:ring-white">
+                      <X className="h-[18px] w-[18px]" />
+                    </button>
                   </div>
-                )}
+                </div>
+
+                {/* Title + glass progress */}
+                <div className="absolute inset-x-0 bottom-0 flex items-end justify-between gap-4 p-5">
+                  <div className="min-w-0 flex-1 text-white">
+                    {p ? (
+                      <>
+                        <div className="mb-2 flex flex-wrap items-center gap-1.5">
+                          <span className="inline-flex items-center gap-1 rounded-full bg-white/15 px-2.5 py-1 text-[11px] font-semibold ring-1 ring-inset ring-white/25 backdrop-blur-md">
+                            {React.createElement(STATUS_META[p.status].icon, { className: "h-3 w-3", "aria-hidden": true })} {STATUS_META[p.status].label}
+                          </span>
+                          <ReviewBadge state={p.reviewState} />
+                          {p.archivedAt && (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-white/15 px-2.5 py-1 text-[11px] font-semibold ring-1 ring-inset ring-white/25">
+                              <Archive className="h-3 w-3" aria-hidden /> Archived
+                            </span>
+                          )}
+                        </div>
+                        <h2 className="line-clamp-2 text-2xl font-extrabold leading-tight tracking-tight ">{p.title}</h2>
+                      </>
+                    ) : (
+                      <Skeleton className="h-8 w-2/3 !bg-white/25" />
+                    )}
+                  </div>
+                  {p && <GlassRing value={p.progress} caption={p.status === "COMPLETED" ? "done" : "progress"} accent={p.status === "COMPLETED" ? "#6ee7b7" : "#93c5fd"} />}
+                </div>
               </div>
 
               {p && (
-                <div className="space-y-3 border-b border-slate-200 bg-white px-4 py-3 dark:border-gray-700/40 dark:bg-gray-800/40">
-                  {/* Student identity strip */}
-                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-slate-600 dark:text-gray-300">
-                    <span className="flex items-center gap-2 font-semibold text-slate-800 dark:text-white">
-                      <UserAvatar name={p.owner.name} src={p.owner.avatar} userId={p.owner.id} size={26} decorative /> {p.owner.name}
-                    </span>
-                    {p.owner.type !== "STUDENT" && (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-0.5 font-semibold text-blue-700 dark:bg-blue-500/15 dark:text-blue-200">
-                        <Briefcase className="h-3 w-3" aria-hidden /> {TYPE_LABEL[p.owner.type] ?? p.owner.type}
+                <div className="space-y-4 border-b border-slate-200/80 bg-white/70 px-5 py-4 backdrop-blur dark:border-gray-700/40 dark:bg-gray-900/60">
+                  {/* Owner + meta */}
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <UserAvatar name={p.owner.name} src={p.owner.avatar} userId={p.owner.id} size={40} decorative />
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-bold text-slate-900 dark:text-white">{p.owner.name}</p>
+                        <p className="text-xs text-slate-500 dark:text-gray-400">{TYPE_LABEL[p.owner.type] ?? "Student"}{p.members.filter((m) => m.status === "ACCEPTED").length ? ` · team of ${p.members.filter((m) => m.status === "ACCEPTED").length + 1}` : ""}</p>
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      {p.owner.regNumber && (
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-2.5 py-1 font-mono text-[11px] font-semibold text-slate-700 dark:bg-gray-800 dark:text-gray-200" title="Registration number">
+                          <Hash className="h-3 w-3 text-slate-400" aria-hidden /> {p.owner.regNumber}
+                        </span>
+                      )}
+                      {p.class && (
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-700 dark:bg-gray-800 dark:text-gray-200" title="Class">
+                          <GraduationCap className="h-3 w-3 text-slate-400" aria-hidden /> {p.class.name}
+                          {p.class.grade ? <span className="font-normal text-slate-600 dark:text-gray-300">· {p.class.grade}</span> : null}
+                        </span>
+                      )}
+                      {p.academicYear && (
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-700 dark:bg-gray-800 dark:text-gray-200" title="Academic year">
+                          <CalendarRange className="h-3 w-3 text-slate-400" aria-hidden /> {p.academicYear.name}
+                        </span>
+                      )}
+                      <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 dark:bg-gray-800">
+                        <HealthDot health={p.health} withLabel />
                       </span>
-                    )}
-                    {p.owner.regNumber && <span className="flex items-center gap-1 font-mono"><Hash className="h-3.5 w-3.5" aria-hidden />{p.owner.regNumber}</span>}
-                    {p.class && <span className="flex items-center gap-1"><GraduationCap className="h-3.5 w-3.5" aria-hidden />{p.class.name}{p.class.grade ? ` · ${p.class.grade}` : ""}</span>}
-                    {p.academicYear && <span className="flex items-center gap-1"><CalendarRange className="h-3.5 w-3.5" aria-hidden />{p.academicYear.name}</span>}
-                    <HealthDot health={p.health} withLabel />
+                    </div>
                   </div>
-                  {/* Status stepper — clickable for the team (and the lead's correction) */}
-                  <ol className="flex items-center gap-1" aria-label="Status">
+
+                  {/* Status: one segmented track */}
+                  <ol className="relative grid grid-cols-3 gap-1 rounded-full bg-slate-100 p-1 dark:bg-gray-800" aria-label="Status">
                     {STATUS_ORDER.map((s, i) => {
                       const M = STATUS_META[s];
-                      const reached = STATUS_ORDER.indexOf(p.status) >= i;
-                      const clickable = (mode === "student" && p.rights.edit) || (mode === "staff" && p.rights.manageAny);
+                      const idx = STATUS_ORDER.indexOf(p.status);
+                      const current = s === p.status;
+                      const done = i < idx;
+                      const clickable = ((mode === "student" && p.rights.edit) || (mode === "staff" && p.rights.manageAny)) && !current;
                       return (
-                        <li key={s} className="flex flex-1 items-center gap-1">
+                        <li key={s} className="relative">
+                          {current && <motion.span layoutId="sp-status" className="absolute inset-0 rounded-full " style={{ backgroundColor: STATUS_SOLID[s] }} transition={{ type: "spring", stiffness: 380, damping: 30 }} />}
                           <button
                             type="button"
-                            disabled={!clickable || s === p.status}
+                            disabled={!clickable}
                             onClick={() => stepTo(s)}
-                            aria-current={s === p.status ? "step" : undefined}
-                            className={`flex flex-1 items-center justify-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold transition ${s === p.status ? "text-white shadow-sm" : reached ? `${M.soft} ${M.text} ring-1 ${M.ring}` : "bg-slate-100 text-slate-600 dark:bg-gray-700/50 dark:text-gray-300"} ${clickable && s !== p.status ? "hover:scale-[1.03] hover:ring-2 hover:ring-blue-500/40" : ""}`}
-                            style={s === p.status ? { backgroundColor: STATUS_SOLID[s] } : undefined}
+                            aria-current={current ? "step" : undefined}
+                            title={clickable ? `Move to ${M.label}` : M.label}
+                            className={`relative flex h-9 w-full items-center justify-center gap-1.5 rounded-full text-xs font-bold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
+                              current ? "text-white" : done ? `${M.text} hover:bg-white dark:hover:bg-gray-700` : "text-slate-600 hover:bg-white hover:text-slate-900 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-white"
+                            } disabled:cursor-default`}
                           >
-                            <M.icon className="h-3.5 w-3.5" aria-hidden /> {M.label}
+                            {done ? (
+                              <span className="flex h-4 w-4 items-center justify-center rounded-full text-white" style={{ backgroundColor: statusColor(s, dark) }}>
+                                <Check className="h-2.5 w-2.5" aria-hidden />
+                              </span>
+                            ) : (
+                              <M.icon className="h-3.5 w-3.5" aria-hidden />
+                            )}
+                            <span>{M.label}</span>
                           </button>
-                          {i < 2 && <span className={`h-0.5 w-3 rounded ${STATUS_ORDER.indexOf(p.status) > i ? "bg-slate-400" : "bg-slate-200 dark:bg-gray-700/50"}`} aria-hidden />}
                         </li>
                       );
                     })}
-                    {mode === "staff" && p.rights.manageAny && <li className="list-none"><Wrench className="ml-1 h-4 w-4 text-slate-400" aria-label="Status corrections are logged" /></li>}
                   </ol>
+                  {mode === "staff" && p.rights.manageAny && (
+                    <p className="-mt-2 flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-gray-400">
+                      <Wrench className="h-3 w-3" aria-hidden /> Status changes made here are logged as corrections.
+                    </p>
+                  )}
                 </div>
               )}
 
-              {/* Tabs */}
+              {/* Tabs: pills, scroll with fading edges */}
               {p && (
-                <nav className="flex gap-1 overflow-x-auto border-b border-slate-200 bg-white px-2 dark:border-gray-700/40 dark:bg-gray-800/40" role="tablist" aria-label="Project sections">
-                  {tabs.filter((t) => !t.hide).map((t) => (
-                    <button
-                      key={t.key}
-                      role="tab"
-                      type="button"
-                      aria-selected={tab === t.key}
-                      onClick={() => setTab(t.key)}
-                      className={`relative flex shrink-0 items-center gap-1.5 px-3 py-2.5 text-xs font-semibold transition ${tab === t.key ? "text-blue-700 dark:text-blue-200" : "text-slate-500 hover:text-slate-800 dark:text-gray-400 dark:hover:text-white"}`}
-                    >
-                      <t.icon className="h-4 w-4" aria-hidden />
-                      <span className="hidden sm:inline">{t.label}</span>
-                      {t.count !== undefined && t.count > 0 && <span className="rounded-full bg-slate-100 px-1.5 text-[10px] tabular-nums dark:bg-gray-700/50">{t.count}</span>}
-                      {tab === t.key && <motion.span layoutId="sp-tab" className="absolute inset-x-1 -bottom-px h-0.5 rounded-full bg-blue-600" />}
-                    </button>
-                  ))}
-                </nav>
+                <div className="relative border-b border-slate-200/80 bg-white/70 backdrop-blur dark:border-gray-700/40 dark:bg-gray-900/60">
+                  <nav className="no-scrollbar flex gap-1 overflow-x-auto px-4 py-2.5 [mask-image:linear-gradient(to_right,transparent,black_16px,black_calc(100%-24px),transparent)]" role="tablist" aria-label="Project sections">
+                    {tabs.filter((t) => !t.hide).map((t) => {
+                      const on = tab === t.key;
+                      return (
+                        <button
+                          key={t.key}
+                          role="tab"
+                          type="button"
+                          aria-selected={on}
+                          onClick={() => setTab(t.key)}
+                          className={`relative flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-2 text-xs font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${on ? "text-white" : "text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-white"}`}
+                        >
+                          {on && <motion.span layoutId="sp-tab" className="absolute inset-0 rounded-full bg-blue-600 " transition={{ type: "spring", stiffness: 380, damping: 32 }} />}
+                          <t.icon className="relative h-4 w-4" aria-hidden />
+                          <span className="relative">{t.label}</span>
+                          {t.count !== undefined && t.count > 0 && (
+                            <span className={`relative min-w-[18px] rounded-full px-1.5 text-center text-[10px] tabular-nums ${on ? "bg-white/25 text-white" : "bg-slate-200/80 text-slate-600 dark:bg-gray-700 dark:text-gray-300"}`}>{t.count}</span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </nav>
+                </div>
               )}
             </div>
 
-            <div className="flex-1 overflow-y-auto p-4">
+            <div className="flex-1 overflow-y-auto p-5">
               {error ? (
                 <p className="mt-10 text-center text-sm font-medium text-red-600">{error}</p>
               ) : !p ? (

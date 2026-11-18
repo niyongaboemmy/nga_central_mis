@@ -265,7 +265,7 @@ INSERT IGNORE INTO `SideProjectCategory` (`slug`, `name`, `icon`, `color`, `sort
   ('game', 'Game', 'gamepad', '#10b981', 6),
   ('data', 'Data / Analytics', 'chart', '#06b6d4', 7),
   ('security', 'Cybersecurity', 'shield', '#64748b', 8),
-  ('other', 'Other', 'sparkles', '#0284c7', 9);
+  ('other', 'Other', 'sparkles', '#1d4ed8', 9);
 
 -- 7) Refresh holders' access snapshots now ---------------------------------------------------
 CREATE TEMPORARY TABLE `tmp_128_bump` (`role_id` BIGINT NOT NULL, PRIMARY KEY (`role_id`));

@@ -15,10 +15,10 @@ const EVENT_ICON: Record<string, { icon: React.ElementType; color: string }> = {
   STATUS: { icon: ArrowRightLeft, color: "#2a78d6" },
   CORRECTION: { icon: Wrench, color: "#ec835a" },
   DOC: { icon: FilePlus2, color: "#1baf7a" },
-  MEDIA: { icon: Images, color: "#0ea5e9" },
+  MEDIA: { icon: Images, color: "#2563eb" },
   MEDIA_REMOVED: { icon: Trash2, color: "#94a3b8" },
   MILESTONE: { icon: Target, color: "#0ca30c" },
-  REVIEW: { icon: ShieldCheck, color: "#0ea5e9" },
+  REVIEW: { icon: ShieldCheck, color: "#2563eb" },
   SUPERVISOR: { icon: UserCheck, color: "#0d9488" },
   ARCHIVE: { icon: Archive, color: "#94a3b8" },
   RESTORE: { icon: ArchiveRestore, color: "#3b6cff" },
@@ -59,7 +59,7 @@ export const TimelinePanel: React.FC<{ p: ProjectDetail }> = ({ p }) => {
         return (
           <motion.li key={e.id} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: Math.min(i, 15) * 0.02 }} className="relative flex gap-3 pb-3">
             {i < p.events.length - 1 && <span className="absolute left-[15px] top-8 h-[calc(100%-1.5rem)] w-0.5 bg-slate-200 dark:bg-gray-700/50" aria-hidden />}
-            <span className="relative z-[1] flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-white shadow-sm" style={{ backgroundColor: color }}>
+            <span className="relative z-[1] flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-white " style={{ backgroundColor: color }}>
               <m.icon className="h-4 w-4" aria-hidden />
             </span>
             <div className="min-w-0 flex-1 pt-1">
@@ -219,11 +219,11 @@ export const InviteBanner: React.FC<{ p: ProjectDetail; onDone: (accepted: boole
     }
   };
   return (
-    <motion.div initial={{ y: -8, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="flex items-center gap-3 rounded-2xl bg-gradient-to-r from-blue-700 to-sky-600 p-3 text-white shadow-float">
+    <motion.div initial={{ y: -8, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="flex items-center gap-3 rounded-2xl bg-gradient-to-r from-blue-700 to-blue-600 p-3 text-white ">
       <UserAvatar name={p.owner.name} userId={p.owner.id} size={36} ring />
       <Mail className="h-5 w-5" aria-hidden />
       <span className="flex-1 text-sm font-semibold">{p.owner.name}</span>
-      <button type="button" className="rounded-full bg-white/15 px-3 py-1.5 text-sm font-semibold hover:bg-white/25" onClick={() => respond(false)} disabled={busy !== null}>{busy === false ? <Spinner className="h-4 w-4" /> : <X className="h-4 w-4" />}</button>
+      <button type="button" aria-label="Decline the invitation" className="rounded-full bg-white/15 px-3 py-1.5 text-sm font-semibold hover:bg-white/25" onClick={() => respond(false)} disabled={busy !== null}>{busy === false ? <Spinner className="h-4 w-4" /> : <X className="h-4 w-4" />}</button>
       <button type="button" className="inline-flex items-center gap-1 rounded-full bg-white px-3 py-1.5 text-sm font-bold text-blue-700 hover:bg-blue-50" onClick={() => respond(true)} disabled={busy !== null}>{busy === true ? <Spinner className="h-4 w-4" /> : <Check className="h-4 w-4" />} Join</button>
     </motion.div>
   );

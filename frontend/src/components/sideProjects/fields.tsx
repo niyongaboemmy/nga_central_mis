@@ -55,9 +55,9 @@ export const CategoryPicker: React.FC<{ categories: Category[]; value: number | 
           whileTap={{ scale: 0.95 }}
           onClick={() => onChange(on ? null : c.id)}
           className={`group relative flex flex-col items-center gap-2 rounded-2xl border-2 px-2 py-3 text-[11px] font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
-            on ? "bg-white text-slate-900 shadow-md dark:bg-gray-800/60 dark:text-white" : "border-slate-200 bg-white text-slate-600 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-sm dark:border-gray-700/60 dark:bg-gray-800/30 dark:text-gray-300"
+            on ? "bg-white text-slate-900 dark:bg-gray-800/60 dark:text-white" : "border-slate-200 bg-white text-slate-600 hover:-translate-y-0.5 hover:border-slate-300 dark:border-gray-700/60 dark:bg-gray-800/30 dark:text-gray-300"
           }`}
-          style={on ? { borderColor: c.color, boxShadow: `0 8px 20px -12px ${c.color}` } : undefined}
+          style={on ? { borderColor: c.color } : undefined}
         >
           <span className="flex h-9 w-9 items-center justify-center rounded-full transition" style={{ backgroundColor: on ? c.color : `${c.color}17`, color: on ? "#fff" : c.color }}>
             <Icon className="h-[18px] w-[18px]" aria-hidden />
@@ -187,7 +187,7 @@ export const PersonPicker: React.FC<{
         {busy && open && <Spinner className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />}
       </div>
       {open && list.length > 0 && (
-        <div className="absolute z-30 mt-2 max-h-60 w-full overflow-auto rounded-2xl border border-slate-200 bg-white p-1.5 shadow-float dark:border-gray-700/60 dark:bg-gray-800/40">
+        <div className="absolute z-30 mt-2 max-h-60 w-full overflow-auto rounded-2xl border border-slate-200 bg-white p-1.5 dark:border-gray-700/60 dark:bg-gray-800/40">
           {list.map((p) => (
             <button
               key={p.id}

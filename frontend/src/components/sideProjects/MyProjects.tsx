@@ -9,7 +9,7 @@ import Board from "./Board";
 import CreateWizard from "./CreateWizard";
 import ProjectDrawer from "./ProjectDrawer";
 import { MoveDialog } from "./MoveDialog";
-import { CATEGORY_ICON, DocChips, EmptyArt, HealthDot, ProgressBar, ProgressRing, ReviewBadge, Skeleton, STATUS_META, STATUS_ORDER, StatusPill, primaryBtn, statusColor, timeAgo, useIsDark, cardCls } from "./ui";
+import { CATEGORY_ICON, DocChips, EmptyArt, GlassRing, HealthDot, ProgressBar, ReviewBadge, Skeleton, STATUS_META, STATUS_ORDER, StatusPill, primaryBtn, statusColor, timeAgo, useIsDark, cardCls } from "./ui";
 
 type Pending = { id: number; to: Status; from: Status; title: string; hasLink: boolean; hasImage: boolean; resolve: (ok: boolean) => void };
 
@@ -130,10 +130,10 @@ const MyProjects: React.FC = () => {
   return (
     <div className="mx-auto max-w-7xl space-y-5 px-4 py-6">
       {/* Hero */}
-      <motion.section initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-blue-700 via-blue-600 to-sky-500 p-5 text-white shadow-float sm:p-6">
+      <motion.section initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-blue-700 via-blue-600 to-blue-500 p-5 text-white sm:p-6">
         <div className="pointer-events-none absolute inset-0" aria-hidden>
           <motion.span className="absolute -right-16 -top-16 h-64 w-64 rounded-full bg-white/10" animate={{ scale: [1, 1.06, 1] }} transition={{ repeat: Infinity, duration: 6 }} />
-          <span className="absolute -bottom-20 right-40 h-48 w-48 rounded-full bg-sky-300/20" />
+          <span className="absolute -bottom-20 right-40 h-48 w-48 rounded-full bg-blue-300/20" />
           <Sparkles className="absolute right-6 top-6 h-10 w-10 text-white/20" />
         </div>
         <div className="relative flex flex-wrap items-center justify-between gap-6">
@@ -165,13 +165,8 @@ const MyProjects: React.FC = () => {
             )}
           </div>
           <div className="flex items-center gap-4">
-            <div className="flex flex-col items-center gap-1">
-              <div className="rounded-full bg-white p-1.5 shadow-lg">
-                <ProgressRing value={avg} size={72} stroke={7} color="#10b981" label={`Average progress ${avg}%`} />
-              </div>
-              <span className="text-[11px] font-semibold text-white/85">Avg. progress</span>
-            </div>
-            <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }} type="button" onClick={() => setWizard("IDEA")} className="inline-flex items-center gap-2 rounded-full bg-white px-5 py-3 text-sm font-bold text-blue-700 shadow-lg shadow-blue-900/20 transition hover:bg-blue-50 focus:outline-none focus-visible:ring-4 focus-visible:ring-white/50">
+            <GlassRing value={avg} size={84} caption="avg." accent="#6ee7b7" label={`Average progress ${avg}%`} />
+            <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }} type="button" onClick={() => setWizard("IDEA")} className="inline-flex items-center gap-2 rounded-full bg-white px-5 py-3 text-sm font-bold text-blue-700 transition hover:bg-blue-50 focus:outline-none focus-visible:ring-4 focus-visible:ring-white/50">
               <span className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-600 text-white">
                 <Plus className="h-4 w-4" />
               </span>
@@ -203,7 +198,7 @@ const MyProjects: React.FC = () => {
             const Icon = CATEGORY_ICON[c.icon] ?? CATEGORY_ICON.sparkles;
             const on = cat === c.id;
             return (
-              <button key={c.id} type="button" role="radio" aria-checked={on} title={c.name} aria-label={c.name} onClick={() => setCat(on ? null : c.id)} className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full border transition ${on ? "border-transparent text-white shadow" : "border-slate-200 bg-white hover:border-slate-300 dark:border-gray-700/60 dark:bg-gray-800/40"}`} style={on ? { backgroundColor: c.color } : undefined}>
+              <button key={c.id} type="button" role="radio" aria-checked={on} title={c.name} aria-label={c.name} onClick={() => setCat(on ? null : c.id)} className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full border transition ${on ? "border-transparent text-white " : "border-slate-200 bg-white hover:border-slate-300 dark:border-gray-700/60 dark:bg-gray-800/40"}`} style={on ? { backgroundColor: c.color } : undefined}>
                 <Icon className="h-4 w-4" style={on ? undefined : { color: c.color }} />
               </button>
             );

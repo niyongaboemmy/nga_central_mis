@@ -59,7 +59,7 @@ export const MoveDialog: React.FC<{
           <motion.span animate={{ x: [0, 4, 0] }} transition={{ repeat: Infinity, duration: 1.4 }} className="text-slate-400">
             <ArrowRight className="h-4 w-4" aria-hidden />
           </motion.span>
-          <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold text-white shadow-sm" style={{ backgroundColor: STATUS_SOLID[to] }}>
+          <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold text-white " style={{ backgroundColor: STATUS_SOLID[to] }}>
             <T.icon className="h-3.5 w-3.5" aria-hidden /> {T.label}
           </span>
         </div>
