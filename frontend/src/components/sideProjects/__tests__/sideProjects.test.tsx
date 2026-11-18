@@ -18,7 +18,8 @@ vi.mock("../../../contexts/ConfirmContext", () => ({ useConfirm: () => async () 
 vi.mock("../../../contexts/UserContext", () => ({ useUser: () => ({ user: { user: { user_id: 5 }, profile: { user_type: "STUDENT" } } }) }));
 
 import MyProjects from "../MyProjects";
-import { MoveDialog, checkGithub, normaliseGithub } from "../fields";
+import { checkGithub, normaliseGithub } from "../fields";
+import { MoveDialog } from "../MoveDialog";
 import Board from "../Board";
 
 const card = (over: Partial<ProjectCard>): ProjectCard => ({

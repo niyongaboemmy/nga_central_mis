@@ -26,10 +26,10 @@ const useChartTokens = () => {
 
 const Tip: React.FC<{ active?: boolean; payload?: any[]; label?: string; fmt?: (l: string) => string }> = ({ active, payload, label, fmt }) =>
   active && payload?.length ? (
-    <div className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs shadow-float dark:border-slate-600 dark:bg-slate-800">
+    <div className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs shadow-float dark:border-gray-700/60 dark:bg-gray-800/40">
       <p className="mb-1 font-bold text-slate-800 dark:text-white">{fmt ? fmt(String(label)) : label}</p>
       {payload.map((p) => (
-        <p key={p.dataKey} className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
+        <p key={p.dataKey} className="flex items-center gap-2 text-slate-600 dark:text-gray-300">
           <span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: p.color || p.fill }} />
           {p.name}: <span className="font-bold tabular-nums text-slate-800 dark:text-white">{p.value}</span>
         </p>
@@ -40,27 +40,27 @@ const Tip: React.FC<{ active?: boolean; payload?: any[]; label?: string; fmt?: (
 const monthLabel = (m: string) => new Date(`${m}-01T00:00:00Z`).toLocaleDateString(undefined, { month: "short", year: "2-digit", timeZone: "UTC" });
 
 const Tile: React.FC<{ icon: React.ElementType; value: React.ReactNode; label: string; tone?: string; onClick?: () => void; delta?: number | null; spark?: number[]; delay?: number }> = ({
-  icon: Icon, value, label, tone = "text-brand-600 bg-brand-50 dark:bg-brand-500/15 dark:text-brand-200", onClick, delta, delay = 0,
+  icon: Icon, value, label, tone = "text-blue-600 bg-blue-50 dark:bg-blue-500/15 dark:text-blue-200", onClick, delta, delay = 0,
 }) => {
   const Body = (
     <>
       <div className="flex items-start justify-between">
         <span className={`flex h-10 w-10 items-center justify-center rounded-xl ${tone}`}><Icon className="h-5 w-5" aria-hidden /></span>
         {delta !== undefined && delta !== null && (
-          <span className={`inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-bold ${delta > 0 ? "bg-green-100 text-green-800 dark:bg-green-500/15 dark:text-green-300" : delta < 0 ? "bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-300" : "bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300"}`}>
+          <span className={`inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-bold ${delta > 0 ? "bg-green-100 text-green-800 dark:bg-green-500/15 dark:text-green-300" : delta < 0 ? "bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-300" : "bg-slate-100 text-slate-600 dark:bg-gray-700/50 dark:text-gray-300"}`}>
             {delta > 0 ? <TrendingUp className="h-3 w-3" /> : delta < 0 ? <TrendingDown className="h-3 w-3" /> : <Minus className="h-3 w-3" />}
             {delta > 0 ? `+${delta}` : delta}
           </span>
         )}
       </div>
       <p className="mt-3 text-2xl font-extrabold tabular-nums text-slate-800 dark:text-white">{value}</p>
-      <p className="text-xs font-medium text-slate-600 dark:text-slate-300">{label}</p>
+      <p className="text-xs font-medium text-slate-600 dark:text-gray-300">{label}</p>
     </>
   );
   return (
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay }}>
       {onClick ? (
-        <button type="button" onClick={onClick} className={`${cardCls} w-full p-4 text-left transition hover:-translate-y-0.5 hover:shadow-float focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand-500/30`}>{Body}</button>
+        <button type="button" onClick={onClick} className={`${cardCls} w-full p-4 text-left transition hover:-translate-y-0.5 hover:shadow-float focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-500/30`}>{Body}</button>
       ) : (
         <div className={`${cardCls} p-4`}>{Body}</div>
       )}
@@ -106,7 +106,7 @@ const Pipeline: React.FC<{ s: Summary; onDrill: (f: DrillFilter) => void }> = ({
           );
         })}
       </div>
-      <div className="mt-2 flex flex-wrap gap-3 text-xs text-slate-600 dark:text-slate-300">
+      <div className="mt-2 flex flex-wrap gap-3 text-xs text-slate-600 dark:text-gray-300">
         {STATUS_ORDER.map((st) => (
           <span key={st} className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: statusColor(st, dark) }} />{STATUS_META[st].label} · {Math.round((s.totals.byStatus[st] / total) * 100)}%</span>
         ))}
@@ -131,7 +131,7 @@ const Heat: React.FC<{ weeks: Summary["weeks"] }> = ({ weeks }) => {
           );
         })}
       </div>
-      <div className="mt-2 flex items-center justify-between text-[10px] text-slate-500 dark:text-slate-400">
+      <div className="mt-2 flex items-center justify-between text-[10px] text-slate-500 dark:text-gray-400">
         <span>{weeks[0]?.week}</span>
         <span className="flex items-center gap-1">0 {ramp.slice(1).map((c) => <span key={c} className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: c }} />)} {max}</span>
       </div>
@@ -142,11 +142,11 @@ const Heat: React.FC<{ weeks: Summary["weeks"] }> = ({ weeks }) => {
 const AttentionRow: React.FC<{ r: MonitorRow; onOpen: (id: number) => void }> = ({ r, onOpen }) => {
   const H = HEALTH_META[r.health];
   return (
-    <button type="button" onClick={() => onOpen(r.id)} className="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left transition hover:bg-slate-50 dark:hover:bg-slate-700/40">
+    <button type="button" onClick={() => onOpen(r.id)} className="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left transition hover:bg-slate-50 dark:hover:bg-gray-700/40">
       <UserAvatar name={r.student.name} src={r.student.avatar} userId={r.student.id} size={32} decorative />
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-semibold text-slate-800 dark:text-white">{r.title}</p>
-        <p className="truncate text-[11px] text-slate-500 dark:text-slate-400">{r.student.name}{r.class ? ` · ${r.class.name}` : ""} · {timeAgo(r.lastActivityAt)}</p>
+        <p className="truncate text-[11px] text-slate-500 dark:text-gray-400">{r.student.name}{r.class ? ` · ${r.class.name}` : ""} · {timeAgo(r.lastActivityAt)}</p>
       </div>
       {r.conceptPending && <FileWarning className="h-4 w-4 text-red-500" aria-label="Concept needed" />}
       <ReviewBadge state={r.reviewState} compact />
@@ -174,9 +174,9 @@ const Dashboard: React.FC<{ s: Summary; onDrill: (f: DrillFilter) => void; onOpe
         <Tile icon={Clock3} value={s.totals.overdue} label="Overdue" tone="text-red-700 bg-red-50 dark:bg-red-500/15 dark:text-red-200" delay={0.15} onClick={detail ? () => onDrill({ health: "OVERDUE" }) : undefined} />
         <Tile icon={AlertOctagon} value={s.totals.blocked} label="Blocked" tone="text-orange-700 bg-orange-50 dark:bg-orange-500/15 dark:text-orange-200" delay={0.18} onClick={detail ? () => onDrill({ health: "BLOCKED" }) : undefined} />
         <Tile icon={FileWarning} value={s.totals.conceptPending} label="Concept needed" tone="text-rose-700 bg-rose-50 dark:bg-rose-500/15 dark:text-rose-200" delay={0.21} onClick={detail ? () => onDrill({ missing: "CONCEPT" }) : undefined} />
-        <Tile icon={Github} value={s.totals.projects ? `${Math.round((s.totals.withGithub / s.totals.projects) * 100)}%` : "—"} label="With GitHub" tone="text-slate-700 bg-slate-100 dark:bg-slate-700 dark:text-slate-200" delay={0.24} onClick={detail ? () => onDrill({ hasGithub: "1" }) : undefined} />
+        <Tile icon={Github} value={s.totals.projects ? `${Math.round((s.totals.withGithub / s.totals.projects) * 100)}%` : "—"} label="With GitHub" tone="text-slate-700 bg-slate-100 dark:bg-gray-700/50 dark:text-gray-200" delay={0.24} onClick={detail ? () => onDrill({ hasGithub: "1" }) : undefined} />
         <Tile icon={AlertTriangle} value={s.totals.changesRequested} label="Changes requested" tone="text-yellow-800 bg-yellow-50 dark:bg-yellow-500/15 dark:text-yellow-200" delay={0.3} onClick={detail ? () => onDrill({ review: "CHANGES_REQUESTED" }) : undefined} />
-        <Tile icon={Briefcase} value={s.totals.staffProjects} label="Staff & others' projects" tone="text-slate-700 bg-slate-100 dark:bg-slate-700 dark:text-slate-200" delay={0.36} onClick={detail ? () => onDrill({ ownerType: "STAFF" }) : undefined} />
+        <Tile icon={Briefcase} value={s.totals.staffProjects} label="Staff & others' projects" tone="text-slate-700 bg-slate-100 dark:bg-gray-700/50 dark:text-gray-200" delay={0.36} onClick={detail ? () => onDrill({ ownerType: "STAFF" }) : undefined} />
         <Tile icon={Activity} value={`${s.totals.avgProgress}%`} label="Average progress" tone="text-cyan-700 bg-cyan-50 dark:bg-cyan-500/15 dark:text-cyan-200" delay={0.33} />
       </div>
 
@@ -185,12 +185,12 @@ const Dashboard: React.FC<{ s: Summary; onDrill: (f: DrillFilter) => void; onOpe
       </Panel>
 
       <div className="grid gap-4 lg:grid-cols-3">
-        <Panel title="Started vs completed" icon={TrendingUp} className="lg:col-span-2" action={<button type="button" className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700" aria-pressed={table} aria-label="Show as table" onClick={() => setTable((v) => !v)}><Table2 className="h-4 w-4" /></button>}>
+        <Panel title="Started vs completed" icon={TrendingUp} className="lg:col-span-2" action={<button type="button" className="rounded-full p-1.5 text-slate-400 hover:bg-slate-100 dark:hover:bg-gray-700/50" aria-pressed={table} aria-label="Show as table" onClick={() => setTable((v) => !v)}><Table2 className="h-4 w-4" /></button>}>
           {table ? (
             <div className="max-h-64 overflow-auto">
               <table className="w-full text-xs">
                 <thead><tr className="text-left text-slate-500"><th className="py-1">Month</th><th>Started</th><th>Completed</th></tr></thead>
-                <tbody>{s.months.map((m) => <tr key={m.month} className="border-t border-slate-100 dark:border-slate-700"><td className="py-1">{monthLabel(m.month)}</td><td className="tabular-nums">{m.created}</td><td className="tabular-nums">{m.completed}</td></tr>)}</tbody>
+                <tbody>{s.months.map((m) => <tr key={m.month} className="border-t border-slate-100 dark:border-gray-700/40"><td className="py-1">{monthLabel(m.month)}</td><td className="tabular-nums">{m.created}</td><td className="tabular-nums">{m.completed}</td></tr>)}</tbody>
               </table>
             </div>
           ) : (
@@ -211,7 +211,7 @@ const Dashboard: React.FC<{ s: Summary; onDrill: (f: DrillFilter) => void; onOpe
                   </AreaChart>
                 </ResponsiveContainer>
               </div>
-              <div className="mt-1 flex gap-4 text-xs text-slate-600 dark:text-slate-300">
+              <div className="mt-1 flex gap-4 text-xs text-slate-600 dark:text-gray-300">
                 <span className="flex items-center gap-1.5"><span className="h-0.5 w-4 rounded" style={{ backgroundColor: t.s1 }} />Started</span>
                 <span className="flex items-center gap-1.5"><span className="h-0.5 w-4 rounded" style={{ backgroundColor: t.s3 }} />Completed</span>
               </div>
@@ -243,7 +243,7 @@ const Dashboard: React.FC<{ s: Summary; onDrill: (f: DrillFilter) => void; onOpe
                   </BarChart>
                 </ResponsiveContainer>
               </div>
-              <div className="mt-2 flex gap-3 text-xs text-slate-600 dark:text-slate-300">
+              <div className="mt-2 flex gap-3 text-xs text-slate-600 dark:text-gray-300">
                 {STATUS_ORDER.map((st) => <span key={st} className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: statusColor(st, t.dark) }} />{STATUS_META[st].label}</span>)}
               </div>
             </>
@@ -256,8 +256,8 @@ const Dashboard: React.FC<{ s: Summary; onDrill: (f: DrillFilter) => void; onOpe
                 const max = Math.max(1, ...s.byCategory.map((x) => x.count));
                 return (
                   <li key={c.name} className="text-xs">
-                    <div className="mb-0.5 flex justify-between text-slate-600 dark:text-slate-300"><span>{c.name}</span><span className="font-bold tabular-nums text-slate-800 dark:text-white">{c.count}</span></div>
-                    <div className="h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-700"><motion.div className="h-full rounded-full" style={{ backgroundColor: t.s1 }} initial={{ width: 0 }} animate={{ width: `${(c.count / max) * 100}%` }} /></div>
+                    <div className="mb-0.5 flex justify-between text-slate-600 dark:text-gray-300"><span>{c.name}</span><span className="font-bold tabular-nums text-slate-800 dark:text-white">{c.count}</span></div>
+                    <div className="h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-gray-700/50"><motion.div className="h-full rounded-full" style={{ backgroundColor: t.s1 }} initial={{ width: 0 }} animate={{ width: `${(c.count / max) * 100}%` }} /></div>
                   </li>
                 );
               })}
@@ -269,7 +269,7 @@ const Dashboard: React.FC<{ s: Summary; onDrill: (f: DrillFilter) => void; onOpe
                 const max = Math.max(1, s.topTech[0]?.count ?? 1);
                 const w = 0.75 + (x.count / max) * 0.5;
                 return (
-                  <motion.span key={x.tag} initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: i * 0.03 }} className="rounded-lg bg-brand-50 px-2 py-1 font-semibold text-brand-800 dark:bg-brand-500/15 dark:text-brand-100" style={{ fontSize: `${w}rem` }} title={`${x.count} projects`}>
+                  <motion.span key={x.tag} initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: i * 0.03 }} className="rounded-lg bg-blue-50 px-2 py-1 font-semibold text-blue-800 dark:bg-blue-500/15 dark:text-blue-100" style={{ fontSize: `${w}rem` }} title={`${x.count} projects`}>
                     {x.tag} <span className="text-[10px] font-bold opacity-70">{x.count}</span>
                   </motion.span>
                 );

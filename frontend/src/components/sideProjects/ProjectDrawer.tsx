@@ -11,7 +11,8 @@ import DocumentsPanel from "./panels/DocumentsPanel";
 import GalleryPanel from "./panels/GalleryPanel";
 import ProgressPanel from "./panels/ProgressPanel";
 import { FeedbackPanel, InviteBanner, TeamPanel, TimelinePanel } from "./panels/ActivityPanels";
-import { MoveDialog, TYPE_LABEL } from "./fields";
+import { TYPE_LABEL } from "./fields";
+import { MoveDialog } from "./MoveDialog";
 import { STATUS_SOLID, CATEGORY_ICON, HealthDot, ProgressRing, ReviewBadge, Skeleton, STATUS_META, STATUS_ORDER, statusColor, useIsDark } from "./ui";
 
 type Tab = "overview" | "documents" | "gallery" | "progress" | "timeline" | "feedback" | "team";
@@ -138,7 +139,7 @@ const ProjectDrawer: React.FC<DrawerProps> = ({ projectId, mode, meId, categorie
             aria-modal="true"
             data-drawer
             aria-label={p?.title ?? "Project"}
-            className="relative flex h-full w-full max-w-3xl flex-col overflow-hidden bg-slate-50 shadow-2xl dark:bg-slate-900"
+            className="relative flex h-full w-full max-w-3xl flex-col overflow-hidden bg-slate-50 shadow-2xl dark:bg-gray-900"
             initial={{ x: "100%" }}
             animate={{ x: 0 }}
             exit={{ x: "100%" }}
@@ -157,11 +158,11 @@ const ProjectDrawer: React.FC<DrawerProps> = ({ projectId, mode, meId, categorie
                         <MoreVertical className="h-5 w-5" />
                       </button>
                       {menu && (
-                        <div role="menu" className="absolute right-0 top-11 z-10 w-48 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-float dark:border-slate-600 dark:bg-slate-800">
-                          <button role="menuitem" type="button" onClick={doArchive} className="flex w-full items-center gap-2 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 dark:text-slate-100 dark:hover:bg-slate-700">
+                        <div role="menu" className="absolute right-0 top-11 z-10 w-48 overflow-hidden rounded-2xl border border-slate-200 bg-white p-1.5 shadow-float dark:border-gray-700/60 dark:bg-gray-800">
+                          <button role="menuitem" type="button" onClick={doArchive} className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 dark:text-gray-100 dark:hover:bg-gray-700/50">
                             {p?.archivedAt ? <ArchiveRestore className="h-4 w-4" /> : <Archive className="h-4 w-4" />} {p?.archivedAt ? "Restore" : "Archive"}
                           </button>
-                          <button role="menuitem" type="button" onClick={doDelete} className="flex w-full items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10">
+                          <button role="menuitem" type="button" onClick={doDelete} className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10">
                             <Trash2 className="h-4 w-4" /> Delete
                           </button>
                         </div>
@@ -187,7 +188,7 @@ const ProjectDrawer: React.FC<DrawerProps> = ({ projectId, mode, meId, categorie
                 </div>
                 {p && (
                   <div className="absolute bottom-3 right-4">
-                    <div className="rounded-full bg-white/95 p-1 shadow-lg dark:bg-slate-900/90">
+                    <div className="rounded-full bg-white/95 p-1 shadow-lg dark:bg-gray-900/90">
                       <ProgressRing value={p.progress} size={56} stroke={5} color={statusColor(p.status, dark)} />
                     </div>
                   </div>
@@ -195,14 +196,14 @@ const ProjectDrawer: React.FC<DrawerProps> = ({ projectId, mode, meId, categorie
               </div>
 
               {p && (
-                <div className="space-y-3 border-b border-slate-200 bg-white px-4 py-3 dark:border-slate-700 dark:bg-slate-800">
+                <div className="space-y-3 border-b border-slate-200 bg-white px-4 py-3 dark:border-gray-700/40 dark:bg-gray-800/40">
                   {/* Student identity strip */}
-                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-slate-600 dark:text-slate-300">
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-slate-600 dark:text-gray-300">
                     <span className="flex items-center gap-2 font-semibold text-slate-800 dark:text-white">
                       <UserAvatar name={p.owner.name} src={p.owner.avatar} userId={p.owner.id} size={26} decorative /> {p.owner.name}
                     </span>
                     {p.owner.type !== "STUDENT" && (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-brand-50 px-2 py-0.5 font-semibold text-brand-700 dark:bg-brand-500/15 dark:text-brand-200">
+                      <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-0.5 font-semibold text-blue-700 dark:bg-blue-500/15 dark:text-blue-200">
                         <Briefcase className="h-3 w-3" aria-hidden /> {TYPE_LABEL[p.owner.type] ?? p.owner.type}
                       </span>
                     )}
@@ -224,12 +225,12 @@ const ProjectDrawer: React.FC<DrawerProps> = ({ projectId, mode, meId, categorie
                             disabled={!clickable || s === p.status}
                             onClick={() => stepTo(s)}
                             aria-current={s === p.status ? "step" : undefined}
-                            className={`flex flex-1 items-center justify-center gap-1.5 rounded-xl px-2 py-1.5 text-xs font-bold transition ${s === p.status ? "text-white shadow-sm" : reached ? `${M.soft} ${M.text} ring-1 ${M.ring}` : "bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300"} ${clickable && s !== p.status ? "hover:scale-[1.03] hover:ring-2 hover:ring-brand-500/40" : ""}`}
+                            className={`flex flex-1 items-center justify-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold transition ${s === p.status ? "text-white shadow-sm" : reached ? `${M.soft} ${M.text} ring-1 ${M.ring}` : "bg-slate-100 text-slate-600 dark:bg-gray-700/50 dark:text-gray-300"} ${clickable && s !== p.status ? "hover:scale-[1.03] hover:ring-2 hover:ring-blue-500/40" : ""}`}
                             style={s === p.status ? { backgroundColor: STATUS_SOLID[s] } : undefined}
                           >
                             <M.icon className="h-3.5 w-3.5" aria-hidden /> {M.label}
                           </button>
-                          {i < 2 && <span className={`h-0.5 w-3 rounded ${STATUS_ORDER.indexOf(p.status) > i ? "bg-slate-400" : "bg-slate-200 dark:bg-slate-700"}`} aria-hidden />}
+                          {i < 2 && <span className={`h-0.5 w-3 rounded ${STATUS_ORDER.indexOf(p.status) > i ? "bg-slate-400" : "bg-slate-200 dark:bg-gray-700/50"}`} aria-hidden />}
                         </li>
                       );
                     })}
@@ -240,7 +241,7 @@ const ProjectDrawer: React.FC<DrawerProps> = ({ projectId, mode, meId, categorie
 
               {/* Tabs */}
               {p && (
-                <nav className="flex gap-1 overflow-x-auto border-b border-slate-200 bg-white px-2 dark:border-slate-700 dark:bg-slate-800" role="tablist" aria-label="Project sections">
+                <nav className="flex gap-1 overflow-x-auto border-b border-slate-200 bg-white px-2 dark:border-gray-700/40 dark:bg-gray-800/40" role="tablist" aria-label="Project sections">
                   {tabs.filter((t) => !t.hide).map((t) => (
                     <button
                       key={t.key}
@@ -248,12 +249,12 @@ const ProjectDrawer: React.FC<DrawerProps> = ({ projectId, mode, meId, categorie
                       type="button"
                       aria-selected={tab === t.key}
                       onClick={() => setTab(t.key)}
-                      className={`relative flex shrink-0 items-center gap-1.5 px-3 py-2.5 text-xs font-semibold transition ${tab === t.key ? "text-brand-700 dark:text-brand-200" : "text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white"}`}
+                      className={`relative flex shrink-0 items-center gap-1.5 px-3 py-2.5 text-xs font-semibold transition ${tab === t.key ? "text-blue-700 dark:text-blue-200" : "text-slate-500 hover:text-slate-800 dark:text-gray-400 dark:hover:text-white"}`}
                     >
                       <t.icon className="h-4 w-4" aria-hidden />
                       <span className="hidden sm:inline">{t.label}</span>
-                      {t.count !== undefined && t.count > 0 && <span className="rounded-full bg-slate-100 px-1.5 text-[10px] tabular-nums dark:bg-slate-700">{t.count}</span>}
-                      {tab === t.key && <motion.span layoutId="sp-tab" className="absolute inset-x-1 -bottom-px h-0.5 rounded-full bg-brand-600" />}
+                      {t.count !== undefined && t.count > 0 && <span className="rounded-full bg-slate-100 px-1.5 text-[10px] tabular-nums dark:bg-gray-700/50">{t.count}</span>}
+                      {tab === t.key && <motion.span layoutId="sp-tab" className="absolute inset-x-1 -bottom-px h-0.5 rounded-full bg-blue-600" />}
                     </button>
                   ))}
                 </nav>

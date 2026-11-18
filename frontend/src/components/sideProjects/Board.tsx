@@ -62,7 +62,7 @@ const SortableCard: React.FC<{ card: AnyCard; onOpen: (id: number) => void; onMo
           onKeyDown={onKeyDown}
           aria-roledescription="draggable project"
           aria-label={`Drag ${card.title}`}
-          className="absolute left-1/2 top-1 -translate-x-1/2 rounded-full bg-white/90 px-2 py-0.5 text-slate-500 opacity-0 shadow transition focus:opacity-100 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand-500/40 group-hover/drag:opacity-100 dark:bg-slate-900/90 dark:text-slate-300"
+          className="absolute left-1/2 top-1 -translate-x-1/2 rounded-full bg-white/90 px-2 py-0.5 text-slate-500 opacity-0 shadow transition focus:opacity-100 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-500/40 group-hover/drag:opacity-100 dark:bg-gray-900/90 dark:text-gray-300"
         >
           <GripHorizontal className="h-3.5 w-3.5" aria-hidden />
         </button>
@@ -81,7 +81,7 @@ const Column: React.FC<{ status: Status; ids: number[]; byId: Map<number, AnyCar
     <section
       ref={setNodeRef}
       aria-label={`${M.label} column`}
-      className={`flex min-h-[18rem] flex-col rounded-3xl border p-3 transition ${hot ? "border-transparent ring-2" : "border-slate-200/70 dark:border-slate-700/70"} ${M.soft}`}
+      className={`flex min-h-[18rem] flex-col rounded-3xl border p-3 transition ${hot ? "border-transparent ring-2" : "border-slate-200/70 dark:border-gray-700/40"} ${M.soft}`}
       style={hot ? ({ ["--tw-ring-color" as any]: color } as React.CSSProperties) : undefined}
     >
       <header className="mb-3 flex items-center justify-between px-1">
@@ -89,13 +89,13 @@ const Column: React.FC<{ status: Status; ids: number[]; byId: Map<number, AnyCar
           <span className="flex h-8 w-8 items-center justify-center rounded-xl text-white shadow-sm" style={{ backgroundColor: color }}>
             <M.icon className="h-4 w-4" aria-hidden />
           </span>
-          <h2 className="text-sm font-bold text-slate-800 dark:text-slate-100">{M.label}</h2>
-          <motion.span key={ids.length} initial={{ scale: 1.4 }} animate={{ scale: 1 }} className="rounded-full bg-white px-2 py-0.5 text-xs font-bold tabular-nums text-slate-700 shadow-sm dark:bg-slate-800 dark:text-slate-200">
+          <h2 className="text-sm font-bold text-slate-800 dark:text-gray-100">{M.label}</h2>
+          <motion.span key={ids.length} initial={{ scale: 1.4 }} animate={{ scale: 1 }} className="rounded-full bg-white px-2 py-0.5 text-xs font-bold tabular-nums text-slate-700 shadow-sm dark:bg-gray-800/40 dark:text-gray-200">
             {ids.length}
           </motion.span>
         </div>
         {onAdd && status !== "COMPLETED" && (
-          <button type="button" onClick={onAdd} aria-label={`New project in ${M.label}`} className="rounded-xl p-1.5 text-slate-500 transition hover:bg-white hover:text-slate-800 dark:hover:bg-slate-800 dark:hover:text-white">
+          <button type="button" onClick={onAdd} aria-label={`New project in ${M.label}`} className="rounded-full p-1.5 text-slate-500 transition hover:bg-white hover:text-slate-800 dark:hover:bg-gray-800/60 dark:hover:text-white">
             <Plus className="h-4 w-4" />
           </button>
         )}
@@ -103,7 +103,7 @@ const Column: React.FC<{ status: Status; ids: number[]; byId: Map<number, AnyCar
       <div className="flex flex-1 flex-col gap-3">
         {children}
         {ids.length === 0 && (
-          <div className={`flex flex-1 flex-col items-center justify-center rounded-2xl border-2 border-dashed py-8 ${hot ? "border-current" : "border-slate-300/70 dark:border-slate-600"}`} style={hot ? { color } : undefined}>
+          <div className={`flex flex-1 flex-col items-center justify-center rounded-2xl border-2 border-dashed py-8 ${hot ? "border-current" : "border-slate-300/70 dark:border-gray-700/60"}`} style={hot ? { color } : undefined}>
             <EmptyArt icon={M.icon} className="scale-75 opacity-80" />
           </div>
         )}
