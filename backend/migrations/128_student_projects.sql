@@ -258,14 +258,14 @@ CREATE TABLE IF NOT EXISTS `SideProjectComment` (
 -- 6) Categories -----------------------------------------------------------------------------
 INSERT IGNORE INTO `SideProjectCategory` (`slug`, `name`, `icon`, `color`, `sort`) VALUES
   ('web', 'Web app', 'globe', '#3b82f6', 1),
-  ('mobile', 'Mobile app', 'smartphone', '#8b5cf6', 2),
+  ('mobile', 'Mobile app', 'smartphone', '#14b8a6', 2),
   ('ai', 'AI / ML', 'brain', '#ec4899', 3),
   ('iot', 'IoT / Embedded', 'cpu', '#f59e0b', 4),
   ('robotics', 'Robotics / Hardware', 'bot', '#ef4444', 5),
   ('game', 'Game', 'gamepad', '#10b981', 6),
   ('data', 'Data / Analytics', 'chart', '#06b6d4', 7),
   ('security', 'Cybersecurity', 'shield', '#64748b', 8),
-  ('other', 'Other', 'sparkles', '#a855f7', 9);
+  ('other', 'Other', 'sparkles', '#0284c7', 9);
 
 -- 7) Refresh holders' access snapshots now ---------------------------------------------------
 CREATE TEMPORARY TABLE `tmp_128_bump` (`role_id` BIGINT NOT NULL, PRIMARY KEY (`role_id`));

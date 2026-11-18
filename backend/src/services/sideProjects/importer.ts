@@ -23,6 +23,7 @@ export interface ImportRow {
 
 const HEADERS: Record<string, string> = {
   registration_number: "reg", reg_number: "reg", "reg. number": "reg", "reg number": "reg", regnumber: "reg", registration: "reg",
+  email: "email", "e-mail": "email", owner_email: "email",
   title: "title", "project title": "title", project: "title",
   problem_statement: "problem", "problem statement": "problem", problem: "problem",
   description: "description",
@@ -38,7 +39,7 @@ const STATUS_WORDS: Record<string, string> = {
   completed: "COMPLETED", complete: "COMPLETED", done: "COMPLETED", finished: "COMPLETED",
 };
 
-type SheetRow = { line: number; reg?: string; title?: string; problem?: string; description?: string; status?: string; category?: string; tech?: string; github?: string; access?: string };
+type SheetRow = { line: number; reg?: string; email?: string; title?: string; problem?: string; description?: string; status?: string; category?: string; tech?: string; github?: string; access?: string };
 
 export function parseSheet(buf: Buffer): SheetRow[] {
   let wb: XLSX.WorkBook;
@@ -69,21 +70,24 @@ export async function runImport(buf: Buffer, by: number, dryRun: boolean) {
   for (const r of sheet) {
     const errors: string[] = [];
     const reg = r.reg ?? "";
+    const email = (r.email ?? "").toLowerCase();
     const title = r.title ?? "";
     const status = STATUS_WORDS[(r.status ?? "").toLowerCase()] ?? ((STATUSES as readonly string[]).includes((r.status ?? "").toUpperCase()) ? (r.status ?? "").toUpperCase() : r.status ? "" : "IDEA");
     let student: any = null;
-    if (!reg) errors.push("Registration number missing");
+    // Anyone may own a project: students by registration number, everyone else by email.
+    if (!reg && !email) errors.push("Registration number or email missing");
     else {
       student = await one(sql`
         SELECT u.user_id AS id, u.status, p.user_type AS type, TRIM(CONCAT(COALESCE(p.first_name,''),' ',COALESCE(p.last_name,''))) AS name
-        FROM UserProfile p JOIN User u ON u.user_id = p.user_id WHERE p.registration_number = ${reg}`);
-      if (!student || String(student.type).toUpperCase() !== "STUDENT") errors.push("No student has this registration number");
-      else if (student.status !== "ACTIVE") errors.push("Student account is not active");
+        FROM UserProfile p JOIN User u ON u.user_id = p.user_id
+        WHERE ${reg ? sql`p.registration_number = ${reg}` : sql`LOWER(u.email) = ${email}`} LIMIT 1`);
+      if (!student) errors.push(reg ? "Nobody has this registration number" : "Nobody has this email");
+      else if (student.status !== "ACTIVE") errors.push("This account is not active");
     }
     if (title.length < 3) errors.push("Title missing or too short");
     if (!status) errors.push(`Unknown status "${r.status}"`);
     const problem = r.problem && r.problem.length >= 30 ? r.problem : `${r.problem || title}. (Imported: the student should complete this problem statement.)`.padEnd(30, ".");
-    const key = `${reg}|${titleKey(title)}`;
+    const key = `${reg || email}|${titleKey(title)}`;
     if (seen.has(key)) errors.push("Duplicate row in the file");
     seen.add(key);
     if (student?.id && title) {
@@ -92,7 +96,7 @@ export async function runImport(buf: Buffer, by: number, dryRun: boolean) {
     }
     const catName = (r.category ?? "").toLowerCase();
     const cat = catName ? cats.find((c) => c.slug === catName || c.name === catName) : null;
-    const row: ImportRow = { line: r.line, regNumber: reg, student: student?.name ?? null, title, status: status || String(r.status ?? ""), ok: errors.length === 0, errors };
+    const row: ImportRow = { line: r.line, regNumber: reg || email, student: student?.name ?? null, title, status: status || String(r.status ?? ""), ok: errors.length === 0, errors };
     if (row.ok && !dryRun) {
       try {
         row.projectId = await createProject(
@@ -113,5 +117,6 @@ export async function runImport(buf: Buffer, by: number, dryRun: boolean) {
 }
 
 export const TEMPLATE_CSV =
-  "registration_number,title,problem_statement,status,category,technologies,github_url,access_url\n" +
-  "2026NGA0001,Smart irrigation,\"Farmers waste water because they cannot see soil moisture in real time.\",In progress,iot,\"Arduino, C++\",https://github.com/owner/repo,\n";
+  "registration_number,email,title,problem_statement,status,category,technologies,github_url,access_url\n" +
+  "2026NGA0001,,Smart irrigation,\"Farmers waste water because they cannot see soil moisture in real time.\",In progress,iot,\"Arduino, C++\",https://github.com/owner/repo,\n" +
+  ",teacher@school.example,Robotics club kit,\"The club has no shared kit to teach control loops to beginners.\",Idea,robotics,Arduino,,\n";

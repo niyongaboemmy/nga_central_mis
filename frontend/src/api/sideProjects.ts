@@ -82,7 +82,7 @@ export interface ProjectDetail extends ProjectCard {
   outcomeSummary: string | null;
   startDate: string | null;
   startedAt: string | null;
-  owner: { id: number; name: string; regNumber: string | null; avatar: string | null };
+  owner: { id: number; name: string; regNumber: string | null; type: string; avatar: string | null };
   supervisor: { id: number; name: string } | null;
   verifiedBy: string | null;
   academicYear: { id: number; name: string } | null;
@@ -94,12 +94,13 @@ export interface ProjectDetail extends ProjectCard {
   updates: Array<{ id: number; did: string; nextSteps: string | null; blockers: string | null; mood: number | null; createdAt: string; authorId: number; author: string }>;
   comments: Array<{ id: number; kind: "COMMENT" | "CHANGES_REQUESTED" | "VERIFIED"; body: string; createdAt: string; authorId: number; author: string; authorType: string }>;
   events: Array<{ id: number; type: string; fromValue: string | null; toValue: string | null; note: string | null; createdAt: string; actorId: number | null; actor: string }>;
-  members: Array<{ id: number; status: "INVITED" | "ACCEPTED"; name: string; regNumber: string | null }>;
+  members: Array<{ id: number; status: "INVITED" | "ACCEPTED"; name: string; regNumber: string | null; type: string }>;
   rights: { edit: boolean; owner: boolean; review: boolean; manageAny: boolean; supervisor: boolean };
 }
 
 export interface MonitorRow extends ProjectCard {
-  student: { id: number; name: string; regNumber: string | null; avatar: string | null };
+  /** The owner (any user type; named `student` for history). */
+  student: { id: number; name: string; regNumber: string | null; type: string; avatar: string | null };
   class: { id: number; name: string; gradeId: number; grade: string; programId: number; program: string } | null;
   year: { id: number; name: string } | null;
   supervisor: { id: number; name: string } | null;
@@ -113,6 +114,9 @@ export interface Summary {
     students: number;
     population: number;
     participation: number | null;
+    studentOwners: number;
+    studentProjects: number;
+    staffProjects: number;
     byStatus: Record<Status, number>;
     completedThisTerm: number;
     completedPreviousTerm: number;
@@ -211,7 +215,8 @@ export const sideProjectsApi = {
   categories: () => api.get<Data<Category[]>>(`${B}/categories`).then((r) => r.data.data),
   tags: (q: string) => api.get<Data<string[]>>(`${B}/tags`, { params: { q } }).then((r) => r.data.data),
   supervisors: (q: string) => api.get<Data<Array<{ id: number; name: string; type: string }>>>(`${B}/supervisors`, { params: { q } }).then((r) => r.data.data),
-  classmates: (q: string) => api.get<Data<Array<{ id: number; name: string; regNumber: string }>>>(`${B}/classmates`, { params: { q } }).then((r) => r.data.data),
+  /** Everyone active (team invites): students, staff, parents. */
+  people: (q: string) => api.get<Data<Array<{ id: number; name: string; regNumber: string | null; type: string }>>>(`${B}/people`, { params: { q } }).then((r) => r.data.data),
 
   mine: (archived = false) => api.get<Data<ProjectCard[]>>(`${B}/mine`, { params: archived ? { archived: 1 } : {} }).then((r) => r.data.data),
   get: (id: number) => api.get<Data<ProjectDetail>>(`${B}/${id}`).then((r) => r.data.data),
@@ -245,7 +250,7 @@ export const sideProjectsApi = {
 
   comment: (id: number, body: string) => api.post(`${B}/${id}/comments`, { body }),
   removeComment: (id: number, cid: number) => api.delete(`${B}/${id}/comments/${cid}`),
-  invite: (id: number, regNumber: string) => api.post(`${B}/${id}/members`, { regNumber }),
+  invite: (id: number, who: { userId?: number; regNumber?: string }) => api.post(`${B}/${id}/members`, who),
   removeMember: (id: number, userId: number) => api.delete(`${B}/${id}/members/${userId}`),
   respondInvite: (id: number, accept: boolean) => api.post(`${B}/invitations/${id}`, { accept }),
 

@@ -776,9 +776,9 @@ const Sidebar: React.FC<SidebarProps> = ({
       // Student side projects (STUDENT_PROJECTS_IMPLEMENTATION_PLAN.md §6).
       label: "My projects",
       path: "/my-projects",
-      section: "learning",
+      section: "workspace",
       icon: <Lightbulb className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,
-      userTypes: ["STUDENT"],
+      // Everyone may own projects (migration 129 gives every role SIDE_PROJECTS_MANAGE_OWN).
       requiredPermission: Permissions.SIDE_PROJECTS_MANAGE_OWN,
     },
     {
@@ -810,7 +810,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       requiredCapability: "EARLY_WARNING_VIEW",
     },
     {
-      label: "Student projects",
+      label: "All projects",
       path: "/projects-monitor",
       section: "oversight",
       icon: <FolderKanban className={`${isCollapsed ? "w-5 h-5" : "w-4 h-4"}`} />,

@@ -61,15 +61,17 @@ async function assertTitleFree(ownerId: number, title: string, exceptId?: number
   if (r) fail(409, "DUPLICATE_TITLE", "You already have a project with this title", "title");
 }
 
-async function studentSnapshot(studentId: number) {
+/** Who owns the project: any active user. Students also get their class stamped. */
+async function ownerSnapshot(ownerId: number) {
   const s = await one(sql`
     SELECT u.user_id, u.status, p.user_type, p.registration_number, ${fullName("p")} AS name
-    FROM User u JOIN UserProfile p ON p.user_id = u.user_id WHERE u.user_id = ${studentId}`);
-  if (!s || String(s.user_type).toUpperCase() !== "STUDENT") fail(400, "VALIDATION", "Projects belong to students", "studentId");
-  if (s.status !== "ACTIVE") fail(400, "VALIDATION", "This student's account is not active", "studentId");
+    FROM User u JOIN UserProfile p ON p.user_id = u.user_id WHERE u.user_id = ${ownerId}`);
+  if (!s) fail(400, "VALIDATION", "Choose the project owner", "studentId");
+  if (s.status !== "ACTIVE") fail(400, "VALIDATION", "This account is not active", "studentId");
   const yearId = await getCurrentAcademicYearId();
-  const cls = yearId
-    ? await one(sql`SELECT MIN(class_group_id) AS id FROM StudentClassGroup WHERE user_id = ${studentId} AND academic_year_id = ${yearId} AND status = 'ACTIVE'`)
+  const isStudent = String(s.user_type).toUpperCase() === "STUDENT";
+  const cls = yearId && isStudent
+    ? await one(sql`SELECT MIN(class_group_id) AS id FROM StudentClassGroup WHERE user_id = ${ownerId} AND academic_year_id = ${yearId} AND status = 'ACTIVE'`)
     : null;
   return { yearId, classId: cls?.id ? Number(cls.id) : null, reg: s.registration_number ?? null, name: String(s.name || "").slice(0, 201) };
 }
@@ -115,7 +117,7 @@ export async function createProject(ownerId: number, by: number, input: CreateIn
   if (!input.concept && !written && !opts.conceptPending) fail(400, "CONCEPT_REQUIRED", "The concept note is required", "concept");
 
   await assertTitleFree(ownerId, title);
-  const snap = await studentSnapshot(ownerId);
+  const snap = await ownerSnapshot(ownerId);
 
   // Store the concept before the project row exists, so a refused file creates nothing.
   let conceptAsset = null;
@@ -361,7 +363,7 @@ export async function projectDetail(a: ProjectAccess) {
     SELECT ${cardColumns}, sp.problem_statement AS problemStatement, sp.description, sp.outcome_summary AS outcomeSummary,
            ${ymd("sp.start_date")} AS startDate, ${iso("sp.started_at")} AS startedAt,
            sp.reg_number_snapshot AS regSnapshot, sp.student_name_snapshot AS nameSnapshot,
-           op.registration_number AS regNumber, ${fullName("op")} AS ownerName, ou.avatar_version AS ownerAvatar,
+           op.registration_number AS regNumber, op.user_type AS ownerType, ${fullName("op")} AS ownerName, ou.avatar_version AS ownerAvatar,
            ${fullName("sv")} AS supervisorName,
            ay.name AS yearName, sp.academic_year_id AS yearId,
            cg.name AS className, cg.class_group_id AS classId, g.name AS gradeName, pr.name AS programName,
@@ -398,7 +400,7 @@ export async function projectDetail(a: ProjectAccess) {
       FROM SideProjectEvent e LEFT JOIN UserProfile p ON p.user_id = e.actor_id
       WHERE e.project_id = ${id} ORDER BY e.created_at DESC, e.event_id DESC LIMIT 150`),
     many(sql`
-      SELECT m.user_id AS id, m.status, ${fullName("p")} AS name, p.registration_number AS regNumber
+      SELECT m.user_id AS id, m.status, ${fullName("p")} AS name, p.registration_number AS regNumber, p.user_type AS type
       FROM SideProjectMember m JOIN UserProfile p ON p.user_id = m.user_id WHERE m.project_id = ${id} ORDER BY m.added_at`),
   ]);
   const card = shapeCard(row);
@@ -413,6 +415,7 @@ export async function projectDetail(a: ProjectAccess) {
       id: Number(row.ownerId),
       name: row.ownerName || row.nameSnapshot,
       regNumber: row.regNumber || row.regSnapshot,
+      type: String(row.ownerType || "STUDENT").toUpperCase(),
       avatar: avatarUrls(Number(row.ownerId), row.ownerAvatar == null ? null : Number(row.ownerAvatar))?.sm ?? null,
     },
     supervisor: row.supervisorId ? { id: Number(row.supervisorId), name: row.supervisorName } : null,

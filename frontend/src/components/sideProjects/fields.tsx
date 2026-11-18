@@ -122,17 +122,20 @@ export const TagInput: React.FC<{ value: string[]; onChange: (v: string[]) => vo
 };
 
 /** Search-as-you-type person picker (staff for supervisors, classmates for teams). */
+type Person = { id: number; name: string; regNumber?: string | null; type?: string };
+export const TYPE_LABEL: Record<string, string> = { STUDENT: "Student", TEACHER: "Teacher", STAFF: "Staff", ADMIN: "Admin", PARENT: "Parent" };
+
 export const PersonPicker: React.FC<{
   value: { id: number; name: string } | null;
-  onChange: (v: { id: number; name: string; regNumber?: string } | null) => void;
-  search: (q: string) => Promise<Array<{ id: number; name: string; regNumber?: string }>>;
+  onChange: (v: Person | null) => void;
+  search: (q: string) => Promise<Person[]>;
   placeholder: string;
   error?: string | null;
 }> = ({ value, onChange, search, placeholder, error }) => {
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [list, setList] = useState<Array<{ id: number; name: string; regNumber?: string }>>([]);
+  const [list, setList] = useState<Person[]>([]);
   const box = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!open) return;
@@ -190,7 +193,11 @@ export const PersonPicker: React.FC<{
             >
               <UserAvatar name={p.name} userId={p.id} size={24} decorative />
               <span className="flex-1 truncate text-slate-700 dark:text-slate-100">{p.name}</span>
-              {p.regNumber && <span className="text-[10px] font-mono text-slate-500">{p.regNumber}</span>}
+              {p.regNumber ? (
+                <span className="text-[10px] font-mono text-slate-500 dark:text-slate-400">{p.regNumber}</span>
+              ) : p.type ? (
+                <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600 dark:bg-slate-700 dark:text-slate-300">{TYPE_LABEL[p.type] ?? p.type}</span>
+              ) : null}
             </button>
           ))}
         </div>

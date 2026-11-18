@@ -6,7 +6,7 @@ import {
 import { failure, sideProjectsApi, type ProjectDetail, type Status } from "../../../api/sideProjects";
 import { useToast } from "../../../contexts/ToastContext";
 import UserAvatar from "../../ui/UserAvatar";
-import { CharMeter, PersonPicker } from "../fields";
+import { CharMeter, PersonPicker, TYPE_LABEL } from "../fields";
 import { DOC_META, FieldError, inputCls, inputErrCls, primaryBtn, secondaryBtn, Spinner, STATUS_META, statusColor, timeAgo, useIsDark, cardCls } from "../ui";
 
 const EVENT_ICON: Record<string, { icon: React.ElementType; color: string }> = {
@@ -15,11 +15,11 @@ const EVENT_ICON: Record<string, { icon: React.ElementType; color: string }> = {
   STATUS: { icon: ArrowRightLeft, color: "#2a78d6" },
   CORRECTION: { icon: Wrench, color: "#ec835a" },
   DOC: { icon: FilePlus2, color: "#1baf7a" },
-  MEDIA: { icon: Images, color: "#6250d6" },
+  MEDIA: { icon: Images, color: "#0ea5e9" },
   MEDIA_REMOVED: { icon: Trash2, color: "#94a3b8" },
   MILESTONE: { icon: Target, color: "#0ca30c" },
   REVIEW: { icon: ShieldCheck, color: "#0ea5e9" },
-  SUPERVISOR: { icon: UserCheck, color: "#8b5cf6" },
+  SUPERVISOR: { icon: UserCheck, color: "#0d9488" },
   ARCHIVE: { icon: Archive, color: "#94a3b8" },
   RESTORE: { icon: ArchiveRestore, color: "#3b6cff" },
   MEMBER_INVITED: { icon: Mail, color: "#3b6cff" },
@@ -148,15 +148,15 @@ export const FeedbackPanel: React.FC<{ p: ProjectDetail; staff: boolean; onChang
 
 export const TeamPanel: React.FC<{ p: ProjectDetail; meId: number; onChanged: () => void; onLeft: () => void }> = ({ p, meId, onChanged, onLeft }) => {
   const { showToast } = useToast();
-  const [pick, setPick] = useState<{ id: number; name: string; regNumber?: string } | null>(null);
+  const [pick, setPick] = useState<{ id: number; name: string } | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const invite = async () => {
-    if (!pick?.regNumber) return setErr("Choose a classmate");
+    if (!pick) return setErr("Choose a person");
     setBusy(true);
     setErr(null);
     try {
-      await sideProjectsApi.invite(p.id, pick.regNumber);
+      await sideProjectsApi.invite(p.id, { userId: pick.id });
       setPick(null);
       showToast("Invitation sent", "success");
       onChanged();
@@ -173,7 +173,7 @@ export const TeamPanel: React.FC<{ p: ProjectDetail; meId: number; onChanged: ()
           <UserAvatar name={p.owner.name} userId={p.owner.id} src={p.owner.avatar} size={36} />
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-bold text-slate-800 dark:text-white">{p.owner.name}</p>
-            <p className="font-mono text-[11px] text-slate-500">{p.owner.regNumber}</p>
+            <p className="font-mono text-[11px] text-slate-500 dark:text-slate-400">{p.owner.regNumber ?? TYPE_LABEL[p.owner.type] ?? ""}</p>
           </div>
           <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-900 dark:bg-amber-500/20 dark:text-amber-100">Owner</span>
         </li>
@@ -182,7 +182,7 @@ export const TeamPanel: React.FC<{ p: ProjectDetail; meId: number; onChanged: ()
             <UserAvatar name={m.name} userId={m.id} size={36} />
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-bold text-slate-800 dark:text-white">{m.name}</p>
-              <p className="font-mono text-[11px] text-slate-500">{m.regNumber}</p>
+              <p className="font-mono text-[11px] text-slate-500 dark:text-slate-400">{m.regNumber ?? TYPE_LABEL[m.type] ?? ""}</p>
             </div>
             {m.status === "INVITED" ? <Mail className="h-4 w-4 text-brand-500" aria-label="Invited" /> : <Users className="h-4 w-4 text-emerald-500" aria-label="Member" />}
             {(p.rights.owner || m.id === meId) && (
@@ -199,7 +199,7 @@ export const TeamPanel: React.FC<{ p: ProjectDetail; meId: number; onChanged: ()
       </ul>
       {p.rights.owner && (
         <div className={`${cardCls} flex flex-col gap-2 p-3 sm:flex-row sm:items-start`}>
-          <div className="flex-1"><PersonPicker value={pick} onChange={setPick} search={sideProjectsApi.classmates} placeholder="Name or registration number" error={err} /></div>
+          <div className="flex-1"><PersonPicker value={pick} onChange={setPick} search={sideProjectsApi.people} placeholder="Name, email or registration number" error={err} /></div>
           <button type="button" className={primaryBtn} onClick={invite} disabled={busy || !pick}>{busy ? <Spinner className="h-4 w-4" /> : <UserPlus className="h-4 w-4" />} Invite</button>
         </div>
       )}
@@ -219,7 +219,7 @@ export const InviteBanner: React.FC<{ p: ProjectDetail; onDone: (accepted: boole
     }
   };
   return (
-    <motion.div initial={{ y: -8, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="flex items-center gap-3 rounded-2xl bg-gradient-to-r from-brand-600 to-indigo-600 p-3 text-white shadow-float">
+    <motion.div initial={{ y: -8, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="flex items-center gap-3 rounded-2xl bg-gradient-to-r from-brand-700 to-sky-600 p-3 text-white shadow-float">
       <UserAvatar name={p.owner.name} userId={p.owner.id} size={36} ring />
       <Mail className="h-5 w-5" aria-hidden />
       <span className="flex-1 text-sm font-semibold">{p.owner.name}</span>

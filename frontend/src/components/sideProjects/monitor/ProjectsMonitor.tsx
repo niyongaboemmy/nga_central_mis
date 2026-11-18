@@ -2,12 +2,13 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
-  ArrowDown, ArrowUp, ChevronLeft, ChevronRight, Download, FileSpreadsheet, Filter, Github, Globe, Kanban, LayoutDashboard, List, RefreshCw, Search, Upload, UserCheck, X, ShieldAlert,
+  ArrowDown, ArrowUp, ChevronLeft, ChevronRight, Download, FileSpreadsheet, Filter, Github, Globe, Kanban, LayoutDashboard, List, RefreshCw, Search, Upload, UserCheck, X, ShieldAlert, GraduationCap, Briefcase,
 } from "lucide-react";
 import { failure, sideProjectsApi, type Category, type FilterOptions, type Me, type MonitorRow, type Summary } from "../../../api/sideProjects";
 import { useUser } from "../../../contexts/UserContext";
 import UserAvatar from "../../ui/UserAvatar";
 import SelectField from "../../ui/SelectField";
+import { TYPE_LABEL } from "../fields";
 import Board from "../Board";
 import ProjectDrawer from "../ProjectDrawer";
 import Dashboard, { type DrillFilter } from "./Dashboard";
@@ -15,7 +16,7 @@ import ImportDialog from "./ImportDialog";
 import { DocChips, EmptyArt, HEALTH_META, HealthDot, ProgressBar, ReviewBadge, Skeleton, STATUS_META, STATUS_ORDER, StatusPill, cardCls, secondaryBtn, statusColor, timeAgo, useIsDark, REVIEW_META } from "../ui";
 
 type Tab = "dashboard" | "list" | "board" | "supervising";
-const FILTER_KEYS = ["yearId", "yearMode", "classId", "status", "review", "categoryId", "health", "hasGithub", "hasAccess", "missing", "q"] as const;
+const FILTER_KEYS = ["yearId", "yearMode", "ownerType", "classId", "status", "review", "categoryId", "health", "hasGithub", "hasAccess", "missing", "q"] as const;
 
 const selectCls = "min-w-0 max-w-full rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-500/15 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100";
 
@@ -148,12 +149,12 @@ const ProjectsMonitor: React.FC = () => {
 
   return (
     <div className="mx-auto max-w-[96rem] space-y-4 px-4 py-6">
-      <motion.header initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 via-indigo-900 to-brand-700 p-5 text-white shadow-float">
+      <motion.header initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 via-blue-900 to-brand-700 p-5 text-white shadow-float">
         <div className="absolute -right-10 -top-10 h-48 w-48 rounded-full bg-white/5" aria-hidden />
         <div className="absolute -bottom-16 right-32 h-40 w-40 rounded-full bg-brand-500/20" aria-hidden />
         <div className="relative flex flex-wrap items-center justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-extrabold tracking-tight">Student projects</h1>
+            <h1 className="text-2xl font-extrabold tracking-tight">All projects</h1>
             <p className="mt-1 flex items-center gap-2 text-xs text-white/70">
               {loading ? <RefreshCw className="h-3.5 w-3.5 animate-spin" aria-hidden /> : <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_8px] shadow-emerald-400" aria-hidden />}
               {refreshedAt ? `Updated ${timeAgo(refreshedAt.toISOString())}` : "Loading"}
@@ -166,13 +167,13 @@ const ProjectsMonitor: React.FC = () => {
                 <a href={sideProjectsApi.exportUrl({ ...filters }, "csv")} className="inline-flex items-center gap-1.5 rounded-xl bg-white/10 px-3 py-2 text-sm font-semibold backdrop-blur hover:bg-white/20"><Download className="h-4 w-4" /> CSV</a>
               </>
             )}
-            {me?.manageAny && <button type="button" onClick={() => setImportOpen(true)} className="inline-flex items-center gap-1.5 rounded-xl bg-white px-3 py-2 text-sm font-bold text-indigo-800 shadow hover:bg-indigo-50"><Upload className="h-4 w-4" /> Import</button>}
+            {me?.manageAny && <button type="button" onClick={() => setImportOpen(true)} className="inline-flex items-center gap-1.5 rounded-xl bg-white px-3 py-2 text-sm font-bold text-brand-700 shadow hover:bg-brand-50"><Upload className="h-4 w-4" /> Import</button>}
             <button type="button" onClick={load} aria-label="Refresh" className="rounded-xl bg-white/10 p-2 hover:bg-white/20"><RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} /></button>
           </div>
         </div>
         <nav className="relative mt-4 flex gap-1" role="tablist">
           {tabs.filter((t) => t.show).map((t) => (
-            <button key={t.key} type="button" role="tab" aria-selected={effectiveTab === t.key} onClick={() => patch({ tab: t.key })} className={`relative inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold transition ${effectiveTab === t.key ? "text-indigo-900" : "text-white/80 hover:bg-white/10"}`}>
+            <button key={t.key} type="button" role="tab" aria-selected={effectiveTab === t.key} onClick={() => patch({ tab: t.key })} className={`relative inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold transition ${effectiveTab === t.key ? "text-brand-700" : "text-white/80 hover:bg-white/10"}`}>
               {effectiveTab === t.key && <motion.span layoutId="spm-tab" className="absolute inset-0 rounded-xl bg-white shadow" />}
               <t.icon className="relative h-4 w-4" aria-hidden /> <span className="relative">{t.label}</span>
             </button>
@@ -183,16 +184,30 @@ const ProjectsMonitor: React.FC = () => {
       {/* Filter bar: one row, every control a chip or a compact select */}
       <div className={`${cardCls} flex flex-wrap items-center gap-2 p-3`}>
         <Filter className="h-4 w-4 text-slate-400" aria-hidden />
-        <SelectField aria-label="Academic year" className={selectCls} value={params.get("yearId") ?? ""} onChange={(e) => patch({ yearId: e.target.value || null, allYears: e.target.value ? null : "1" })}>
-          <option value="">All years</option>
+        <SelectField aria-label="Academic year" className={selectCls} value={params.get("yearId") ?? "all"} onChange={(e) => patch({ yearId: e.target.value === "all" ? null : e.target.value, allYears: e.target.value === "all" ? "1" : null })}>
+          <option value="all">All years</option>
           {opts?.years.map((y) => <option key={y.id} value={y.id}>{y.name}</option>)}
         </SelectField>
-        <SelectField aria-label="Class" className={selectCls} value={params.get("classId") ?? ""} onChange={(e) => patch({ classId: e.target.value || null })}>
-          <option value="">All classes</option>
+        <SelectField aria-label="Class" className={selectCls} value={params.get("classId") ?? "all"} onChange={(e) => patch({ classId: e.target.value === "all" ? null : e.target.value })}>
+          <option value="all">All classes</option>
           {classesByProgram.map(([prog, cls]) => (
             <optgroup key={prog} label={prog}>{cls.map((c) => <option key={c.id} value={c.id}>{c.name} · {c.grade}</option>)}</optgroup>
           ))}
         </SelectField>
+        <div className="flex gap-1" role="radiogroup" aria-label="Owner">
+          {([
+            ["STUDENT", GraduationCap, "Students"],
+            ["STAFF", Briefcase, "Staff & others"],
+          ] as const).map(([k, Icon, label]) => {
+            const on = params.get("ownerType") === k;
+            return (
+              <button key={k} type="button" role="radio" aria-checked={on} title={label} onClick={() => patch({ ownerType: on ? null : k })} className={`inline-flex items-center gap-1 rounded-xl border px-2.5 py-1.5 text-xs font-semibold transition ${on ? "border-transparent bg-brand-600 text-white shadow" : "border-slate-200 text-slate-600 hover:border-slate-300 dark:border-slate-600 dark:text-slate-300"}`}>
+                <Icon className="h-3.5 w-3.5" /> <span className="hidden md:inline">{label}</span>
+              </button>
+            );
+          })}
+        </div>
+        <span className="h-5 w-px bg-slate-200 dark:bg-slate-600" aria-hidden />
         <div className="flex gap-1" role="radiogroup" aria-label="Status">
           {STATUS_ORDER.map((s) => {
             const M = STATUS_META[s];
@@ -204,20 +219,20 @@ const ProjectsMonitor: React.FC = () => {
             );
           })}
         </div>
-        <SelectField aria-label="Health" className={selectCls} value={params.get("health") ?? ""} onChange={(e) => patch({ health: e.target.value || null })}>
-          <option value="">Any health</option>
+        <SelectField aria-label="Health" className={selectCls} value={params.get("health") ?? "all"} onChange={(e) => patch({ health: e.target.value === "all" ? null : e.target.value })}>
+          <option value="all">Any health</option>
           {(["ON_TRACK", "STALE", "OVERDUE", "BLOCKED"] as const).map((h) => <option key={h} value={h}>{HEALTH_META[h].label}</option>)}
         </SelectField>
-        <SelectField aria-label="Review" className={selectCls} value={params.get("review") ?? ""} onChange={(e) => patch({ review: e.target.value || null })}>
-          <option value="">Any review</option>
+        <SelectField aria-label="Review" className={selectCls} value={params.get("review") ?? "all"} onChange={(e) => patch({ review: e.target.value === "all" ? null : e.target.value })}>
+          <option value="all">Any review</option>
           {(["CHANGES_REQUESTED", "AWAITING_VERIFICATION", "VERIFIED"] as const).map((r) => <option key={r} value={r}>{REVIEW_META[r]!.label}</option>)}
         </SelectField>
-        <SelectField aria-label="Category" className={selectCls} value={params.get("categoryId") ?? ""} onChange={(e) => patch({ categoryId: e.target.value || null })}>
-          <option value="">Any category</option>
+        <SelectField aria-label="Category" className={selectCls} value={params.get("categoryId") ?? "all"} onChange={(e) => patch({ categoryId: e.target.value === "all" ? null : e.target.value })}>
+          <option value="all">Any category</option>
           {opts?.categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
         </SelectField>
-        <SelectField aria-label="Missing document" className={selectCls} value={params.get("missing") ?? ""} onChange={(e) => patch({ missing: e.target.value || null })}>
-          <option value="">Any documents</option>
+        <SelectField aria-label="Missing document" className={selectCls} value={params.get("missing") ?? "all"} onChange={(e) => patch({ missing: e.target.value === "all" ? null : e.target.value })}>
+          <option value="all">Any documents</option>
           <option value="CONCEPT">Concept needed</option>
           <option value="SRS">No SRS</option>
           <option value="IMPLEMENTATION_PLAN">No plan</option>
@@ -235,7 +250,7 @@ const ProjectsMonitor: React.FC = () => {
         })}
         <div className="relative ml-auto min-w-[12rem] flex-1 sm:max-w-xs">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden />
-          <input defaultValue={params.get("q") ?? ""} onKeyDown={(e) => e.key === "Enter" && patch({ q: (e.target as HTMLInputElement).value.trim() || null })} onBlur={(e) => e.target.value.trim() !== (params.get("q") ?? "") && patch({ q: e.target.value.trim() || null })} placeholder="Student, reg. number, title, tech" aria-label="Search" className="w-full rounded-xl border border-slate-200 bg-white py-1.5 pl-9 pr-3 text-xs outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-500/15 dark:border-slate-600 dark:bg-slate-800 dark:text-white" />
+          <input defaultValue={params.get("q") ?? ""} onKeyDown={(e) => e.key === "Enter" && patch({ q: (e.target as HTMLInputElement).value.trim() || null })} onBlur={(e) => e.target.value.trim() !== (params.get("q") ?? "") && patch({ q: e.target.value.trim() || null })} placeholder="Owner, reg. number, title, tech" aria-label="Search" className="w-full rounded-xl border border-slate-200 bg-white py-1.5 pl-9 pr-3 text-xs outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-500/15 dark:border-slate-600 dark:bg-slate-800 dark:text-white" />
         </div>
         {filterCount > 0 && (
           <button type="button" onClick={() => patch(Object.fromEntries(FILTER_KEYS.filter((k) => k !== "yearId").map((k) => [k, null])))} className="inline-flex items-center gap-1 rounded-xl bg-slate-100 px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-100">
@@ -260,7 +275,7 @@ const ProjectsMonitor: React.FC = () => {
                 <table className="w-full min-w-[60rem] text-left text-sm">
                   <thead className="bg-slate-50 text-[11px] uppercase tracking-wide text-slate-500 dark:bg-slate-800/80 dark:text-slate-400">
                     <tr>
-                      <SortHead k="student">Student</SortHead>
+                      <SortHead k="student">Owner</SortHead>
                       <SortHead k="class">Class</SortHead>
                       <SortHead k="title">Project</SortHead>
                       <SortHead k="status">Status</SortHead>
@@ -278,7 +293,7 @@ const ProjectsMonitor: React.FC = () => {
                             <UserAvatar name={r.student.name} src={r.student.avatar} userId={r.student.id} size={32} decorative />
                             <div className="min-w-0">
                               <p className="truncate font-semibold text-slate-800 dark:text-white">{r.student.name}</p>
-                              <p className="font-mono text-[11px] text-slate-500 dark:text-slate-400">{r.student.regNumber ?? "—"}</p>
+                              <p className="font-mono text-[11px] text-slate-500 dark:text-slate-400">{r.student.regNumber ?? TYPE_LABEL[r.student.type] ?? "—"}</p>
                             </div>
                           </div>
                         </td>

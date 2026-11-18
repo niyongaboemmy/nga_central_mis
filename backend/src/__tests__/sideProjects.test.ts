@@ -4,6 +4,7 @@
 // (migration 128) with the in-memory file-server.
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import express from "express";
+import http from "http";
 import request from "supertest";
 import sharp from "sharp";
 import fs from "fs";
@@ -47,6 +48,12 @@ app.use(
 );
 const as = (id: number) => ({ "X-Test-User": String(id) });
 
+// One server for the whole file, bound to 127.0.0.1. api() would open a fresh server on
+// every call listening on all interfaces with a random port; another local process holding the
+// same port number on IPv4 then answers instead (phantom 401/404s seen on a busy dev machine).
+let server: http.Server;
+const api = () => request(server);
+
 let yearId: number, prevCurrent: number[];
 let classA: number, classB: number, gradeA: number, programA: number;
 let alice: number, bob: number, carol: number, teacherA: number, lead: number, insights: number, supervisor: number, outsider: number;
@@ -63,7 +70,7 @@ async function png(): Promise<Buffer> {
 }
 
 async function createProject(owner: number, title: string, extra: Record<string, string> = {}) {
-  const r = await request(app)
+  const r = await api()
     .post("/side-projects")
     .set(as(owner))
     .field("title", title)
@@ -78,6 +85,9 @@ async function createProject(owner: number, title: string, extra: Record<string,
 }
 
 beforeAll(async () => {
+  server = await new Promise<http.Server>((resolve) => {
+    const srv = http.createServer(app).listen(0, "127.0.0.1", () => resolve(srv));
+  });
   prevCurrent = rows(await db.execute(sql`SELECT academic_year_id AS id FROM AcademicYear WHERE is_current = 1`)).map((r) => Number(r.id));
   ({ academicYearId: yearId } = await createAcademicPeriod());
   await db.execute(sql`UPDATE AcademicYear SET is_current = IF(academic_year_id = ${yearId}, 1, 0)`);
@@ -107,6 +117,7 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
+  await new Promise((resolve) => server.close(resolve));
   const users = [alice, bob, carol, teacherA, lead, insights, supervisor, outsider];
   const ul = sql.join(users.map((i) => sql`${i}`), sql`, `);
   const ids = rows(await db.execute(sql`SELECT project_id AS id FROM SideProject WHERE owner_user_id IN (${ul})`)).map((r) => Number(r.id));
@@ -207,22 +218,22 @@ describe("student projects", () => {
   let p1: number;
 
   it("refuses a project without a concept note, and without a real problem statement", async () => {
-    const noConcept = await request(app).post("/side-projects").set(as(alice)).send({ title: "No concept", problemStatement: PROBLEM });
+    const noConcept = await api().post("/side-projects").set(as(alice)).send({ title: "No concept", problemStatement: PROBLEM });
     expect(noConcept.status).toBe(400);
     expect(noConcept.body).toMatchObject({ code: "CONCEPT_REQUIRED", field: "concept" });
-    const shortProblem = await request(app).post("/side-projects").set(as(alice)).field("title", "Short").field("problemStatement", "too short").attach("concept", pdf(), "c.pdf");
+    const shortProblem = await api().post("/side-projects").set(as(alice)).field("title", "Short").field("problemStatement", "too short").attach("concept", pdf(), "c.pdf");
     expect(shortProblem.status).toBe(400);
     expect(shortProblem.body.field).toBe("problemStatement");
-    const badFile = await request(app).post("/side-projects").set(as(alice)).field("title", "Bad file").field("problemStatement", PROBLEM).attach("concept", Buffer.from("MZ..."), "setup.exe");
+    const badFile = await api().post("/side-projects").set(as(alice)).field("title", "Bad file").field("problemStatement", PROBLEM).attach("concept", Buffer.from("MZ..."), "setup.exe");
     expect(badFile.status).toBe(400);
     expect(badFile.body.code).toBe("FILE_REFUSED");
-    const badGit = await request(app).post("/side-projects").set(as(alice)).field("title", "Bad git").field("problemStatement", PROBLEM).field("githubUrl", "https://example.com/x").attach("concept", pdf(), "c.pdf");
+    const badGit = await api().post("/side-projects").set(as(alice)).field("title", "Bad git").field("problemStatement", PROBLEM).field("githubUrl", "https://example.com/x").attach("concept", pdf(), "c.pdf");
     expect(badGit.body.field).toBe("githubUrl");
   });
 
   it("creates with the concept, stamps reg number, year and class, and shows it on the board", async () => {
     p1 = await createProject(alice, "Smart irrigation", { githubUrl: "github.com/nga/irrigation.git/" });
-    const r = await request(app).get(`/side-projects/${p1}`).set(as(alice));
+    const r = await api().get(`/side-projects/${p1}`).set(as(alice));
     expect(r.status).toBe(200);
     const d = r.body.data;
     expect(d).toMatchObject({ title: "Smart irrigation", status: "IDEA", githubUrl: "https://github.com/nga/irrigation", conceptPending: false });
@@ -231,104 +242,104 @@ describe("student projects", () => {
     expect(d.class.id).toBe(classA);
     expect(d.documents.CONCEPT.current).toMatchObject({ version: 1, ext: "pdf" });
     expect(d.techTags).toEqual(["Arduino", "C++"]);
-    const board = await request(app).get("/side-projects/mine").set(as(alice));
+    const board = await api().get("/side-projects/mine").set(as(alice));
     expect(board.body.data.map((c: any) => c.id)).toContain(p1);
-    const dup = await request(app).post("/side-projects").set(as(alice)).field("title", "smart  IRRIGATION").field("problemStatement", PROBLEM).attach("concept", pdf(), "c.pdf");
+    const dup = await api().post("/side-projects").set(as(alice)).field("title", "smart  IRRIGATION").field("problemStatement", PROBLEM).attach("concept", pdf(), "c.pdf");
     expect(dup.status).toBe(409);
     expect(dup.body.code).toBe("DUPLICATE_TITLE");
   });
 
   it("accepts a written concept instead of a file", async () => {
-    const r = await request(app)
+    const r = await api()
       .post("/side-projects")
       .set(as(alice))
       .send({ title: "Library finder", problemStatement: PROBLEM, conceptWritten: { users: "Students looking for books", solution: "A web app that indexes the school library shelves by QR code.", impact: "Books found in seconds" } });
     expect(r.status, JSON.stringify(r.body)).toBe(200);
     created.push(r.body.data.id);
-    const d = (await request(app).get(`/side-projects/${r.body.data.id}`).set(as(alice))).body.data;
+    const d = (await api().get(`/side-projects/${r.body.data.id}`).set(as(alice))).body.data;
     expect(d.documents.CONCEPT.current).toMatchObject({ source: "WRITTEN", ext: "md" });
   });
 
   it("hides a project from other students (404) and refuses edits from them", async () => {
-    expect((await request(app).get(`/side-projects/${p1}`).set(as(bob))).status).toBe(404);
-    expect((await request(app).patch(`/side-projects/${p1}`).set(as(bob)).send({ title: "Mine now" })).status).toBe(404);
-    expect((await request(app).get(`/side-projects/${p1}`).set(as(teacherA))).status).toBe(403); // not a student route user
+    expect((await api().get(`/side-projects/${p1}`).set(as(bob))).status).toBe(404);
+    expect((await api().patch(`/side-projects/${p1}`).set(as(bob)).send({ title: "Mine now" })).status).toBe(404);
+    expect((await api().get(`/side-projects/${p1}`).set(as(teacherA))).status).toBe(403); // not a student route user
   });
 
   it("moves through the board with the lifecycle rules", async () => {
-    const skip = await request(app).post(`/side-projects/${p1}/transition`).set(as(alice)).send({ to: "COMPLETED", outcomeSummary: "x".repeat(40) });
+    const skip = await api().post(`/side-projects/${p1}/transition`).set(as(alice)).send({ to: "COMPLETED", outcomeSummary: "x".repeat(40) });
     expect(skip.status).toBe(409);
     expect(skip.body.code).toBe("SKIP_NOT_ALLOWED");
-    const go = await request(app).post(`/side-projects/${p1}/transition`).set(as(alice)).send({ to: "IN_PROGRESS", position: 0 });
+    const go = await api().post(`/side-projects/${p1}/transition`).set(as(alice)).send({ to: "IN_PROGRESS", position: 0 });
     expect(go.status).toBe(200);
     expect(go.body.data).toMatchObject({ from: "IDEA", to: "IN_PROGRESS" });
-    const order = await request(app).patch("/side-projects/board/order").set(as(alice)).send({ status: "IN_PROGRESS", ids: [p1] });
+    const order = await api().patch("/side-projects/board/order").set(as(alice)).send({ status: "IN_PROGRESS", ids: [p1] });
     expect(order.status).toBe(200);
-    const d = (await request(app).get(`/side-projects/${p1}`).set(as(alice))).body.data;
+    const d = (await api().get(`/side-projects/${p1}`).set(as(alice))).body.data;
     expect(d.status).toBe("IN_PROGRESS");
     expect(d.startedAt).toBeTruthy();
     expect(d.events.some((e: any) => e.type === "STATUS" && e.toValue === "IN_PROGRESS")).toBe(true);
   });
 
   it("versions documents, keeps the concept mandatory, refuses wrong kinds", async () => {
-    const srs = await request(app).post(`/side-projects/${p1}/documents/srs`).set(as(alice)).attach("file", pdf(), "srs.pdf");
+    const srs = await api().post(`/side-projects/${p1}/documents/srs`).set(as(alice)).attach("file", pdf(), "srs.pdf");
     expect(srs.status, JSON.stringify(srs.body)).toBe(200);
-    const v2 = await request(app).post(`/side-projects/${p1}/documents/concept`).set(as(alice)).attach("file", pdf(), "concept-v2.pdf");
+    const v2 = await api().post(`/side-projects/${p1}/documents/concept`).set(as(alice)).attach("file", pdf(), "concept-v2.pdf");
     expect(v2.body.data.version).toBe(2);
-    const img = await request(app).post(`/side-projects/${p1}/documents/srs`).set(as(alice)).attach("file", await png(), "srs.png");
+    const img = await api().post(`/side-projects/${p1}/documents/srs`).set(as(alice)).attach("file", await png(), "srs.png");
     expect(img.status).toBe(400);
-    const d = (await request(app).get(`/side-projects/${p1}`).set(as(alice))).body.data;
+    const d = (await api().get(`/side-projects/${p1}`).set(as(alice))).body.data;
     expect(d.documents.CONCEPT.versions).toHaveLength(2);
     expect(d.documents.CONCEPT.current.name).toBe("concept-v2.pdf");
     expect(d.documents.SRS.current).toBeTruthy();
   });
 
   it("uploads gallery files with a thumbnail and a cover, serves them only to viewers", async () => {
-    const up = await request(app).post(`/side-projects/${p1}/media`).set(as(alice)).attach("files", await png(), "screen.png").attach("files", pdf(), "poster.pdf");
+    const up = await api().post(`/side-projects/${p1}/media`).set(as(alice)).attach("files", await png(), "screen.png").attach("files", pdf(), "poster.pdf");
     expect(up.status, JSON.stringify(up.body)).toBe(200);
-    const d = (await request(app).get(`/side-projects/${p1}`).set(as(alice))).body.data;
+    const d = (await api().get(`/side-projects/${p1}`).set(as(alice))).body.data;
     expect(d.media).toHaveLength(2);
     const image = d.media.find((m: any) => m.kind === "image");
     expect(image.hasThumb).toBe(true);
     expect(d.coverAssetId).toBe(image.assetId);
-    const thumb = await request(app).get(`/side-projects/files/${image.assetId}?variant=thumb`).set(as(alice));
+    const thumb = await api().get(`/side-projects/files/${image.assetId}?variant=thumb`).set(as(alice));
     expect(thumb.status).toBe(200);
     expect(thumb.headers["content-type"]).toBe("image/png");
-    expect((await request(app).get(`/side-projects/files/${image.assetId}`).set(as(bob))).status).toBe(404);
-    expect((await request(app).get(`/side-projects/files/${image.assetId}`).set(as(teacherA))).status).toBe(200); // class teacher of A
-    expect((await request(app).get(`/side-projects/files/${image.assetId}`).set(as(outsider))).status).toBe(404);
-    const caption = await request(app).patch(`/side-projects/${p1}/media/${image.id}`).set(as(alice)).send({ caption: "Dashboard" });
+    expect((await api().get(`/side-projects/files/${image.assetId}`).set(as(bob))).status).toBe(404);
+    expect((await api().get(`/side-projects/files/${image.assetId}`).set(as(teacherA))).status).toBe(200); // class teacher of A
+    expect((await api().get(`/side-projects/files/${image.assetId}`).set(as(outsider))).status).toBe(404);
+    const caption = await api().patch(`/side-projects/${p1}/media/${image.id}`).set(as(alice)).send({ caption: "Dashboard" });
     expect(caption.status).toBe(200);
-    const exe = await request(app).post(`/side-projects/${p1}/media`).set(as(alice)).attach("files", Buffer.from("x"), "virus.bat");
+    const exe = await api().post(`/side-projects/${p1}/media`).set(as(alice)).attach("files", Buffer.from("x"), "virus.bat");
     expect(exe.status).toBe(400);
   });
 
   it("tracks progress with milestones and updates", async () => {
-    const m1 = (await request(app).post(`/side-projects/${p1}/milestones`).set(as(alice)).send({ title: "Sensor wiring" })).body.data.id;
-    await request(app).post(`/side-projects/${p1}/milestones`).set(as(alice)).send({ title: "Dashboard", dueDate: "2026-12-20" });
-    await request(app).patch(`/side-projects/${p1}/milestones/${m1}`).set(as(alice)).send({ done: true });
-    const bad = await request(app).post(`/side-projects/${p1}/updates`).set(as(alice)).send({ did: "" });
+    const m1 = (await api().post(`/side-projects/${p1}/milestones`).set(as(alice)).send({ title: "Sensor wiring" })).body.data.id;
+    await api().post(`/side-projects/${p1}/milestones`).set(as(alice)).send({ title: "Dashboard", dueDate: "2026-12-20" });
+    await api().patch(`/side-projects/${p1}/milestones/${m1}`).set(as(alice)).send({ done: true });
+    const bad = await api().post(`/side-projects/${p1}/updates`).set(as(alice)).send({ did: "" });
     expect(bad.status).toBe(400);
     expect(bad.body.field).toBe("did");
-    const u = await request(app).post(`/side-projects/${p1}/updates`).set(as(alice)).send({ did: "Wired the moisture sensor", nextSteps: "Build the dashboard", mood: 4 });
+    const u = await api().post(`/side-projects/${p1}/updates`).set(as(alice)).send({ did: "Wired the moisture sensor", nextSteps: "Build the dashboard", mood: 4 });
     expect(u.status).toBe(200);
-    const d = (await request(app).get(`/side-projects/${p1}`).set(as(alice))).body.data;
+    const d = (await api().get(`/side-projects/${p1}`).set(as(alice))).body.data;
     expect(d.progress).toBe(50);
     expect(d.updates[0].did).toBe("Wired the moisture sensor");
     expect(d.milestones[0].done).toBe(true);
   });
 
   it("invites a teammate who can edit after accepting, but not delete", async () => {
-    const inv = await request(app).post(`/side-projects/${p1}/members`).set(as(alice)).send({ regNumber: `SPB${bob}` });
+    const inv = await api().post(`/side-projects/${p1}/members`).set(as(alice)).send({ regNumber: `SPB${bob}` });
     expect(inv.status).toBe(200);
-    expect((await request(app).post(`/side-projects/${p1}/members`).set(as(alice)).send({ regNumber: "NOPE" })).body.code).toBe("STUDENT_NOT_FOUND");
-    const invited = (await request(app).get("/side-projects/mine").set(as(bob))).body.data.find((c: any) => c.id === p1);
+    expect((await api().post(`/side-projects/${p1}/members`).set(as(alice)).send({ regNumber: "NOPE" })).body.code).toBe("PERSON_NOT_FOUND");
+    const invited = (await api().get("/side-projects/mine").set(as(bob))).body.data.find((c: any) => c.id === p1);
     expect(invited.myRole).toBe("INVITED");
-    expect((await request(app).patch(`/side-projects/${p1}`).set(as(bob)).send({ description: "x" })).status).toBe(403);
-    await request(app).post(`/side-projects/invitations/${p1}`).set(as(bob)).send({ accept: true });
-    const edit = await request(app).patch(`/side-projects/${p1}`).set(as(bob)).send({ description: "Bob joined the team." });
+    expect((await api().patch(`/side-projects/${p1}`).set(as(bob)).send({ description: "x" })).status).toBe(403);
+    await api().post(`/side-projects/invitations/${p1}`).set(as(bob)).send({ accept: true });
+    const edit = await api().patch(`/side-projects/${p1}`).set(as(bob)).send({ description: "Bob joined the team." });
     expect(edit.status).toBe(200);
-    expect((await request(app).post(`/side-projects/${p1}/archive`).set(as(bob))).status).toBe(403);
+    expect((await api().post(`/side-projects/${p1}/archive`).set(as(bob))).status).toBe(403);
   });
 });
 
@@ -340,33 +351,33 @@ describe("monitor, review and supervision", () => {
   });
 
   it("scopes the list to the viewer's classes", async () => {
-    const t = await request(app).get("/side-projects/monitor/projects").set(as(teacherA));
+    const t = await api().get("/side-projects/monitor/projects").set(as(teacherA));
     expect(t.status).toBe(200);
     const ids = t.body.data.rows.map((r: any) => r.id);
     expect(ids).toContain(p1);
     expect(ids).not.toContain(pc);
-    const all = await request(app).get("/side-projects/monitor/projects?pageSize=200").set(as(lead));
+    const all = await api().get("/side-projects/monitor/projects?pageSize=200").set(as(lead));
     expect(all.body.data.rows.map((r: any) => r.id)).toEqual(expect.arrayContaining([p1, pc]));
     const row = all.body.data.rows.find((r: any) => r.id === p1);
     expect(row.student.regNumber).toBe(`SPA${alice}`);
     expect(row.class.id).toBe(classA);
-    const filtered = await request(app).get(`/side-projects/monitor/projects?status=IN_PROGRESS&classId=${classA}&pageSize=200`).set(as(lead));
+    const filtered = await api().get(`/side-projects/monitor/projects?status=IN_PROGRESS&classId=${classA}&pageSize=200`).set(as(lead));
     expect(filtered.body.data.rows.every((r: any) => r.status === "IN_PROGRESS" && r.class.id === classA)).toBe(true);
-    expect((await request(app).get(`/side-projects/monitor/projects/${pc}`).set(as(teacherA))).status).toBe(404);
-    expect((await request(app).get("/side-projects/monitor/projects").set(as(outsider))).status).toBe(403);
+    expect((await api().get(`/side-projects/monitor/projects/${pc}`).set(as(teacherA))).status).toBe(404);
+    expect((await api().get("/side-projects/monitor/projects").set(as(outsider))).status).toBe(403);
   });
 
   it("gives summary-only viewers aggregates without names or projects", async () => {
-    const s = await request(app).get("/side-projects/monitor/summary").set(as(insights));
+    const s = await api().get("/side-projects/monitor/summary").set(as(insights));
     expect(s.status).toBe(200);
     expect(s.body.data.depth).toBe("summary");
     expect(s.body.data.totals.projects).toBeGreaterThanOrEqual(2);
     expect(s.body.data.attention).toEqual([]);
     expect(s.body.data.recentCompleted).toEqual([]);
     expect(s.body.data.byClass.every((c: any) => c.students >= 5 || c.name === "Other")).toBe(true);
-    expect((await request(app).get("/side-projects/monitor/projects").set(as(insights))).status).toBe(403);
-    expect((await request(app).get(`/side-projects/monitor/projects/${p1}`).set(as(insights))).status).toBe(404);
-    const d = await request(app).get("/side-projects/monitor/summary").set(as(lead));
+    expect((await api().get("/side-projects/monitor/projects").set(as(insights))).status).toBe(403);
+    expect((await api().get(`/side-projects/monitor/projects/${p1}`).set(as(insights))).status).toBe(404);
+    const d = await api().get("/side-projects/monitor/summary").set(as(lead));
     expect(d.body.data.depth).toBe("detail");
     expect(d.body.data.months).toHaveLength(12);
     expect(d.body.data.weeks).toHaveLength(16);
@@ -374,23 +385,23 @@ describe("monitor, review and supervision", () => {
   });
 
   it("reviews: changes requested, the student answers, completion, verification", async () => {
-    const vNo = await request(app).post(`/side-projects/${p1}/review`).set(as(teacherA)).send({ kind: "VERIFIED" });
+    const vNo = await api().post(`/side-projects/${p1}/review`).set(as(teacherA)).send({ kind: "VERIFIED" });
     expect(vNo.body.code).toBe("NOT_COMPLETED");
-    const ch = await request(app).post(`/side-projects/${p1}/review`).set(as(teacherA)).send({ kind: "CHANGES_REQUESTED", body: "Add the SRS non-functional requirements." });
+    const ch = await api().post(`/side-projects/${p1}/review`).set(as(teacherA)).send({ kind: "CHANGES_REQUESTED", body: "Add the SRS non-functional requirements." });
     expect(ch.status).toBe(200);
-    let d = (await request(app).get(`/side-projects/${p1}`).set(as(alice))).body.data;
+    let d = (await api().get(`/side-projects/${p1}`).set(as(alice))).body.data;
     expect(d.reviewState).toBe("CHANGES_REQUESTED");
     const notes = rows(await db.execute(sql`SELECT kind FROM Notification WHERE user_id = ${alice} AND kind = 'side_project_changes_requested'`));
     expect(notes.length).toBe(1);
-    await request(app).post(`/side-projects/${p1}/comments`).set(as(alice)).send({ body: "Added them, thanks!" });
-    d = (await request(app).get(`/side-projects/${p1}`).set(as(alice))).body.data;
+    await api().post(`/side-projects/${p1}/comments`).set(as(alice)).send({ body: "Added them, thanks!" });
+    d = (await api().get(`/side-projects/${p1}`).set(as(alice))).body.data;
     expect(d.reviewState).toBe("NONE");
-    const done = await request(app).post(`/side-projects/${p1}/transition`).set(as(alice)).send({ to: "COMPLETED", outcomeSummary: "The garden waters itself and logs moisture every hour." });
+    const done = await api().post(`/side-projects/${p1}/transition`).set(as(alice)).send({ to: "COMPLETED", outcomeSummary: "The garden waters itself and logs moisture every hour." });
     expect(done.body.data.reviewState).toBe("AWAITING_VERIFICATION");
-    expect((await request(app).post(`/side-projects/${pc}/review`).set(as(teacherA)).send({ kind: "COMMENT", body: "Nice" })).status).toBe(404);
-    const ver = await request(app).post(`/side-projects/${p1}/review`).set(as(teacherA)).send({ kind: "VERIFIED" });
+    expect((await api().post(`/side-projects/${pc}/review`).set(as(teacherA)).send({ kind: "COMMENT", body: "Nice" })).status).toBe(404);
+    const ver = await api().post(`/side-projects/${p1}/review`).set(as(teacherA)).send({ kind: "VERIFIED" });
     expect(ver.status).toBe(200);
-    d = (await request(app).get(`/side-projects/monitor/projects/${p1}`).set(as(lead))).body.data;
+    d = (await api().get(`/side-projects/monitor/projects/${p1}`).set(as(lead))).body.data;
     expect(d).toMatchObject({ status: "COMPLETED", reviewState: "VERIFIED", progress: 100 });
     expect(d.verifiedBy).toBeTruthy();
     const audit = rows(await db.execute(sql`SELECT action_type FROM ActivityLog WHERE user_id = ${lead} AND action_type = 'SIDE_PROJECT_VIEW'`));
@@ -398,50 +409,117 @@ describe("monitor, review and supervision", () => {
   });
 
   it("a supervisor sees and reviews only the projects they supervise", async () => {
-    expect((await request(app).get(`/side-projects/monitor/projects/${pc}`).set(as(supervisor))).status).toBe(404);
-    const set = await request(app).patch(`/side-projects/${pc}`).set(as(carol)).send({ supervisorId: supervisor });
+    expect((await api().get(`/side-projects/monitor/projects/${pc}`).set(as(supervisor))).status).toBe(404);
+    const set = await api().patch(`/side-projects/${pc}`).set(as(carol)).send({ supervisorId: supervisor });
     expect(set.status).toBe(200);
-    expect((await request(app).get(`/side-projects/monitor/projects/${pc}`).set(as(supervisor))).status).toBe(200);
-    expect((await request(app).get(`/side-projects/monitor/projects/${p1}`).set(as(supervisor))).status).toBe(404);
-    const list = await request(app).get("/side-projects/monitor/projects?scope=supervising").set(as(supervisor));
+    expect((await api().get(`/side-projects/monitor/projects/${pc}`).set(as(supervisor))).status).toBe(200);
+    expect((await api().get(`/side-projects/monitor/projects/${p1}`).set(as(supervisor))).status).toBe(404);
+    const list = await api().get("/side-projects/monitor/projects?scope=supervising").set(as(supervisor));
     expect(list.body.data.rows.map((r: any) => r.id)).toEqual([pc]);
-    const me = await request(app).get("/side-projects/me").set(as(supervisor));
+    const me = await api().get("/side-projects/me").set(as(supervisor));
     expect(me.body.data).toMatchObject({ view: null, supervising: 1 });
-    expect((await request(app).post(`/side-projects/${pc}/review`).set(as(supervisor)).send({ kind: "COMMENT", body: "Great start" })).status).toBe(200);
-    const badSup = await request(app).patch(`/side-projects/${pc}`).set(as(carol)).send({ supervisorId: bob });
+    expect((await api().post(`/side-projects/${pc}/review`).set(as(supervisor)).send({ kind: "COMMENT", body: "Great start" })).status).toBe(200);
+    const badSup = await api().patch(`/side-projects/${pc}`).set(as(carol)).send({ supervisorId: bob });
     expect(badSup.body.field).toBe("supervisorId");
   });
 
   it("exports the filtered rows and audits it", async () => {
-    const csv = await request(app).get("/side-projects/monitor/export?format=csv").set(as(lead));
+    const csv = await api().get("/side-projects/monitor/export?format=csv").set(as(lead));
     expect(csv.status).toBe(200);
     expect(csv.text).toContain("Reg. number");
     expect(csv.text).toContain(`SPA${alice}`);
-    expect((await request(app).get("/side-projects/monitor/export").set(as(insights))).status).toBe(403);
+    expect((await api().get("/side-projects/monitor/export").set(as(insights))).status).toBe(403);
     const audit = rows(await db.execute(sql`SELECT 1 FROM ActivityLog WHERE user_id = ${lead} AND action_type = 'SIDE_PROJECT_EXPORT'`));
     expect(audit.length).toBe(1);
   });
 
   it("lets the lead correct a status with a reason, archive and delete; others can't", async () => {
-    expect((await request(app).patch(`/side-projects/admin/projects/${pc}/status`).set(as(teacherA)).send({ to: "COMPLETED", reason: "x" })).status).toBe(403);
-    const noReason = await request(app).patch(`/side-projects/admin/projects/${pc}/status`).set(as(lead)).send({ to: "COMPLETED" });
+    expect((await api().patch(`/side-projects/admin/projects/${pc}/status`).set(as(teacherA)).send({ to: "COMPLETED", reason: "x" })).status).toBe(403);
+    const noReason = await api().patch(`/side-projects/admin/projects/${pc}/status`).set(as(lead)).send({ to: "COMPLETED" });
     expect(noReason.body.code).toBe("REASON_REQUIRED");
-    const fix = await request(app).patch(`/side-projects/admin/projects/${pc}/status`).set(as(lead)).send({ to: "COMPLETED", reason: "Demoed at the fair" });
+    const fix = await api().patch(`/side-projects/admin/projects/${pc}/status`).set(as(lead)).send({ to: "COMPLETED", reason: "Demoed at the fair" });
     expect(fix.status).toBe(200);
     const ev = rows(await db.execute(sql`SELECT type FROM SideProjectEvent WHERE project_id = ${pc} AND type = 'CORRECTION'`));
     expect(ev.length).toBe(1);
   });
 });
 
+describe("projects for everyone (not only students)", () => {
+  let tp: number;
+  beforeAll(() => {
+    owners.add(teacherA);
+    owners.add(supervisor);
+  });
+
+  it("migration 129 grants SIDE_PROJECTS_MANAGE_OWN to every role and recolours violet categories", async () => {
+    // Other test files create roles after the migration ran on this shared database: apply the
+    // migration's grant statement again (it is idempotent), then every role must hold the cap.
+    const text = fs.readFileSync(path.join(__dirname, "../../migrations/129_side_projects_everyone.sql"), "utf8");
+    const grant = text.slice(text.indexOf("INSERT INTO `RolePermission`"), text.indexOf(";", text.indexOf("INSERT INTO `RolePermission`")));
+    await db.execute(sql.raw(grant));
+    await db.execute(sql.raw(grant));
+    const [r] = rows(await db.execute(sql`
+      SELECT (SELECT COUNT(*) FROM Role) AS roles,
+             (SELECT COUNT(DISTINCT rp.role_id) FROM RolePermission rp JOIN Permission p ON p.perm_id = rp.perm_id WHERE p.name = 'SIDE_PROJECTS_MANAGE_OWN') AS holders`));
+    expect(Number(r.holders)).toBe(Number(r.roles));
+    const colours = rows(await db.execute(sql`SELECT color FROM SideProjectCategory WHERE color IN ('#8b5cf6', '#a855f7')`));
+    expect(colours).toHaveLength(0);
+  });
+
+  it("a teacher creates and runs their own project, with no class stamped", async () => {
+    tp = await createProject(teacherA, "Staff robotics kit");
+    const d = (await api().get(`/side-projects/${tp}`).set(as(teacherA))).body.data;
+    expect(d.owner).toMatchObject({ id: teacherA, type: "TEACHER" });
+    expect(d.class).toBeNull();
+    expect((await api().post(`/side-projects/${tp}/transition`).set(as(teacherA)).send({ to: "IN_PROGRESS" })).status).toBe(200);
+    const board = (await api().get("/side-projects/mine").set(as(teacherA))).body.data;
+    expect(board.map((c: any) => c.id)).toContain(tp);
+  });
+
+  it("invites anyone to the team: a staff member by id, a student by registration number", async () => {
+    const people = await api().get("/side-projects/people?q=Test").set(as(teacherA));
+    expect(people.status).toBe(200);
+    expect(people.body.data.some((p: any) => p.type && p.type !== "STUDENT")).toBe(true);
+    expect((await api().post(`/side-projects/${tp}/members`).set(as(teacherA)).send({ userId: supervisor })).status).toBe(200);
+    expect((await api().post(`/side-projects/${tp}/members`).set(as(teacherA)).send({ regNumber: `SPC${carol}` })).status).toBe(200);
+    await api().post(`/side-projects/invitations/${tp}`).set(as(supervisor)).send({ accept: true });
+    expect((await api().patch(`/side-projects/${tp}`).set(as(supervisor)).send({ description: "Co-owned by staff." })).status).toBe(200);
+    expect((await api().post(`/side-projects/${tp}/members`).set(as(teacherA)).send({ userId: 999999999 })).body.code).toBe("PERSON_NOT_FOUND");
+  });
+
+  it("the monitor shows the owner type, filters by it, and class scopes don't reach staff projects", async () => {
+    const staff = await api().get("/side-projects/monitor/projects?ownerType=STAFF&pageSize=200").set(as(lead));
+    expect(staff.body.data.rows.map((r: any) => r.id)).toContain(tp);
+    expect(staff.body.data.rows.every((r: any) => r.student.type !== "STUDENT")).toBe(true);
+    const studs = await api().get("/side-projects/monitor/projects?ownerType=STUDENT&pageSize=200").set(as(lead));
+    expect(studs.body.data.rows.map((r: any) => r.id)).not.toContain(tp);
+    const cls = await api().get("/side-projects/monitor/projects?pageSize=200").set(as(teacherA));
+    expect(cls.body.data.rows.map((r: any) => r.id)).not.toContain(tp);
+    const sum = (await api().get("/side-projects/monitor/summary").set(as(lead))).body.data;
+    expect(sum.totals.staffProjects).toBeGreaterThanOrEqual(1);
+    expect(sum.byClass.some((c: any) => c.name === "Staff & others")).toBe(true);
+    const csv = await api().get("/side-projects/monitor/export?format=csv&ownerType=STAFF").set(as(lead));
+    expect(csv.text).toContain("Owner type");
+    expect(csv.text).toContain("Staff robotics kit");
+  });
+
+  it("imports a staff member's project by email", async () => {
+    const [u] = rows(await db.execute(sql`SELECT email FROM User WHERE user_id = ${supervisor}`));
+    const csv = `email,title,status\n${u.email},Teachers' lab booking,Idea\n`;
+    const r = await api().post("/side-projects/admin/import?dryRun=0").set(as(lead)).attach("file", Buffer.from(csv), "list.csv");
+    expect(r.body.data).toMatchObject({ valid: 1, invalid: 0 });
+  });
+});
+
 describe("delete rules, import and sweep", () => {
   it("a student deletes only an unreviewed idea", async () => {
     const idea = await createProject(carol, "Throwaway idea");
-    expect((await request(app).delete(`/side-projects/${idea}`).set(as(carol))).status).toBe(200);
-    expect((await request(app).get(`/side-projects/${idea}`).set(as(carol))).status).toBe(404);
+    expect((await api().delete(`/side-projects/${idea}`).set(as(carol))).status).toBe(200);
+    expect((await api().get(`/side-projects/${idea}`).set(as(carol))).status).toBe(404);
     // the title is free again
     await createProject(carol, "Throwaway idea");
     const p1 = rows(await db.execute(sql`SELECT project_id AS id FROM SideProject WHERE owner_user_id = ${alice} AND title = 'Smart irrigation'`))[0].id;
-    expect((await request(app).delete(`/side-projects/${p1}`).set(as(alice))).body.code).toBe("DELETE_NOT_ALLOWED");
+    expect((await api().delete(`/side-projects/${p1}`).set(as(alice))).body.code).toBe("DELETE_NOT_ALLOWED");
   });
 
   it("imports by registration number with a dry run, then asks for the concept", async () => {
@@ -452,20 +530,20 @@ describe("delete rules, import and sweep", () => {
       `SPB${bob},Bus tracker,Idea,,`,
       `SPC${carol},Solar charger,Weird,,`,
     ].join("\n");
-    const dry = await request(app).post("/side-projects/admin/import").set(as(lead)).attach("file", Buffer.from(csv), "list.csv");
+    const dry = await api().post("/side-projects/admin/import").set(as(lead)).attach("file", Buffer.from(csv), "list.csv");
     expect(dry.status, JSON.stringify(dry.body)).toBe(200);
     expect(dry.body.data).toMatchObject({ dryRun: true, total: 4, valid: 1, invalid: 3 });
-    expect((await request(app).post("/side-projects/admin/import").set(as(teacherA)).attach("file", Buffer.from(csv), "list.csv")).status).toBe(403);
-    const go = await request(app).post("/side-projects/admin/import?dryRun=0").set(as(lead)).attach("file", Buffer.from(csv), "list.csv");
+    expect((await api().post("/side-projects/admin/import").set(as(teacherA)).attach("file", Buffer.from(csv), "list.csv")).status).toBe(403);
+    const go = await api().post("/side-projects/admin/import?dryRun=0").set(as(lead)).attach("file", Buffer.from(csv), "list.csv");
     expect(go.body.data.valid).toBe(1);
     const p = rows(await db.execute(sql`SELECT project_id, status, concept_pending FROM SideProject WHERE owner_user_id = ${bob} AND title = 'Bus tracker'`))[0];
     expect(p).toMatchObject({ status: "IN_PROGRESS", concept_pending: 1 });
     // Concept pending: can't be moved forward until the concept arrives.
-    await request(app).post(`/side-projects/${p.project_id}/transition`).set(as(bob)).send({ to: "IDEA" });
-    const blocked = await request(app).post(`/side-projects/${p.project_id}/transition`).set(as(bob)).send({ to: "IN_PROGRESS" });
+    await api().post(`/side-projects/${p.project_id}/transition`).set(as(bob)).send({ to: "IDEA" });
+    const blocked = await api().post(`/side-projects/${p.project_id}/transition`).set(as(bob)).send({ to: "IN_PROGRESS" });
     expect(blocked.body.code).toBe("CONCEPT_REQUIRED");
-    await request(app).post(`/side-projects/${p.project_id}/documents/concept`).set(as(bob)).attach("file", pdf(), "c.pdf");
-    expect((await request(app).post(`/side-projects/${p.project_id}/transition`).set(as(bob)).send({ to: "IN_PROGRESS" })).status).toBe(200);
+    await api().post(`/side-projects/${p.project_id}/documents/concept`).set(as(bob)).attach("file", pdf(), "c.pdf");
+    expect((await api().post(`/side-projects/${p.project_id}/transition`).set(as(bob)).send({ to: "IN_PROGRESS" })).status).toBe(200);
   });
 
   it("nudges stale projects once and supervisors get a digest", async () => {
@@ -480,7 +558,7 @@ describe("delete rules, import and sweep", () => {
     expect(again.stale).toBe(0);
     const sup = rows(await db.execute(sql`SELECT kind FROM Notification WHERE user_id = ${supervisor} AND kind = 'side_project_digest'`));
     expect(sup.length).toBe(1);
-    const lm = await request(app).get(`/side-projects/monitor/projects?health=STALE&pageSize=200`).set(as(lead));
+    const lm = await api().get(`/side-projects/monitor/projects?health=STALE&pageSize=200`).set(as(lead));
     expect(lm.body.data.rows.map((r: any) => r.id)).toContain(pc);
   });
 });

@@ -582,3 +582,19 @@ Phases 0–5 are built. Phase 6 (GitHub facts, parents' view, Home tile, showcas
 - Frontend: 1070 tests pass (including the no-native-select rule), `tsc` clean, `vite build` succeeds.
 - Real access engine (demo DB): super admin → VIEW detail + MANAGE_ANY; student → MANAGE_OWN; a supervising teacher → no capability, 4 supervised projects.
 - Browser (Puppeteer, local servers): axe WCAG 2 AA clean on every new view in light/dark and desktop/phone (the only remaining hits are the existing sidebar section headings); no horizontal overflow; end-to-end flows pass: wizard validation, create with concept upload, gallery upload and cover, milestone + update, keyboard drag, pointer drag, complete dialog, lead search + verify, import dry run + import.
+
+---
+
+## 12. Projects for everyone (2026-11-18, follow-up)
+
+Not only students run projects: every user (teachers, staff, admins, parents, students) has **My projects** with the same board, wizard, documents, gallery, progress, feedback and team features.
+
+| Area | Change |
+|---|---|
+| Permission | Migration **129** grants `SIDE_PROJECTS_MANAGE_OWN` to every role (pattern of 120), records the preset links and bumps every holder's `access_version`. The persona baselines `teaching_staff`, `support_staff` and `parent` carry it in `presets.ts` (students already did). |
+| Ownership | Any active user can own a project. Students still get their class and registration number stamped; others have no class. |
+| Teams | Invite anyone through a people search (name, email or registration number) or by registration number. `GET /side-projects/people` replaces `/classmates`. |
+| Monitor | Rows carry the owner's type. New owner filter (Students / Staff & others), a "Staff & others' projects" tile, a "Staff & others" bar in By class, an "Owner type" export column. Participation stays a student measure. Class, grade and programme scopes reach students only; staff projects are seen by school-wide viewers, supervisors and team members. |
+| Import | Owners are matched by registration number **or email** (the template has both columns). |
+| Navigation | "My projects" moved to the Workspace section for everyone. The monitor is now called "All projects". |
+| Colours | No violet, purple or indigo anywhere in the feature (the primary colour is blue). Migration 129 recolours the seeded "Mobile app" and "Other" categories (`#14b8a6`, `#0284c7`) when nobody changed them. |

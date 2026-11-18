@@ -46,7 +46,7 @@ const ImportDialog: React.FC<{ open: boolean; onClose: () => void; onDone: () =>
       <div className="space-y-4">
         {!res ? (
           <>
-            <Dropzone onFiles={(f) => check(f[0])} accept=".csv,.xlsx,.xls" busy={busy} progress={busy ? 60 : 0} error={err} label="Drop the list (.csv, .xlsx)" hint="registration_number · title · status · category · github_url · access_url" icon={FileSpreadsheet} />
+            <Dropzone onFiles={(f) => check(f[0])} accept=".csv,.xlsx,.xls" busy={busy} progress={busy ? 60 : 0} error={err} label="Drop the list (.csv, .xlsx)" hint="registration_number or email · title · status · category · github_url · access_url" icon={FileSpreadsheet} />
             <a href={sideProjectsApi.templateUrl()} className="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-600 hover:underline dark:text-brand-200"><Download className="h-3.5 w-3.5" /> Template</a>
           </>
         ) : (
