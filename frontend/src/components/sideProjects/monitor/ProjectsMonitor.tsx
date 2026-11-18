@@ -12,12 +12,13 @@ import Board from "../Board";
 import ProjectDrawer from "../ProjectDrawer";
 import Dashboard, { type DrillFilter } from "./Dashboard";
 import PageHeader, { HeaderTabs } from "../PageHeader";
+import { ProjectLogo } from "../Branding";
 import ImportDialog from "./ImportDialog";
 import { StageChip } from "../ProjectCard";
 import { KIND_META, KINDS, KindChip, iconBtn, primaryBtn, pathStage, chipCls, STATUS_SOLID, DocChips, EmptyArt, HEALTH_META, HealthDot, ProgressBar, ReviewBadge, Skeleton, STATUS_META, STATUS_ORDER, StatusPill, cardCls, secondaryBtn, statusColor, timeAgo, useIsDark, REVIEW_META } from "../ui";
 
 type Tab = "dashboard" | "list" | "board" | "supervising";
-const FILTER_KEYS = ["yearId", "yearMode", "ownerType", "kind", "classId", "status", "review", "categoryId", "health", "hasGithub", "hasAccess", "missing", "q"] as const;
+const FILTER_KEYS = ["yearId", "yearMode", "ownerType", "kind", "customerId", "classId", "status", "review", "categoryId", "health", "hasGithub", "hasAccess", "missing", "q"] as const;
 
 const selectCls = "min-w-0 max-w-full rounded-full border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/15 dark:border-gray-700/60 dark:bg-gray-800/40 dark:text-gray-100";
 
@@ -189,7 +190,7 @@ const ProjectsMonitor: React.FC = () => {
         <div className="flex flex-wrap items-center gap-2">
           <div className="relative min-w-[14rem] flex-1 sm:max-w-sm">
             <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden />
-            <input defaultValue={params.get("q") ?? ""} onKeyDown={(e) => e.key === "Enter" && patch({ q: (e.target as HTMLInputElement).value.trim() || null })} onBlur={(e) => e.target.value.trim() !== (params.get("q") ?? "") && patch({ q: e.target.value.trim() || null })} placeholder="Search owner, reg. number, title, tech" aria-label="Search" className="h-10 w-full rounded-full border border-slate-200 bg-slate-50 pl-11 pr-4 text-sm outline-none transition focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/15 dark:border-gray-700/60 dark:bg-gray-800/40 dark:text-white" />
+            <input defaultValue={params.get("q") ?? ""} onKeyDown={(e) => e.key === "Enter" && patch({ q: (e.target as HTMLInputElement).value.trim() || null })} onBlur={(e) => e.target.value.trim() !== (params.get("q") ?? "") && patch({ q: e.target.value.trim() || null })} placeholder="Search owner, reg. number, title, tech" aria-label="Search" className="h-10 w-full rounded-full border border-slate-200 bg-slate-50 pl-11 pr-4 text-sm outline-none transition focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/15 dark:border-gray-700/60 dark:bg-gray-800/40 dark:text-white dark:focus:bg-gray-900" />
           </div>
           <div className="flex gap-1.5" role="radiogroup" aria-label="Owner">
             {([
@@ -229,7 +230,7 @@ const ProjectsMonitor: React.FC = () => {
             );
           })}
           {filterCount > 0 && (
-            <motion.button initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} type="button" onClick={() => patch(Object.fromEntries(FILTER_KEYS.filter((k) => k !== "yearId").map((k) => [k, null])))} className="ml-auto inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700 transition hover:bg-blue-100 dark:bg-blue-500/15 dark:text-blue-200">
+            <motion.button initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} type="button" onClick={() => patch(Object.fromEntries(FILTER_KEYS.filter((k) => k !== "yearId").map((k) => [k, null])))} className="ml-auto inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700 transition hover:bg-blue-100 dark:bg-blue-500/15 dark:text-blue-200 dark:hover:bg-blue-500/25">
               <X className="h-3.5 w-3.5" /> Clear
               <span className="flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-blue-600 px-1 text-[10px] text-white">{filterCount}</span>
             </motion.button>
@@ -239,6 +240,12 @@ const ProjectsMonitor: React.FC = () => {
           <span className="inline-flex items-center gap-1.5 pr-1 text-xs font-semibold text-slate-500 dark:text-gray-400">
             <Filter className="h-3.5 w-3.5" aria-hidden /> Refine
           </span>
+        {opts?.customers && opts.customers.length > 0 && (
+          <SelectField aria-label="Customer" className={selectCls} value={params.get("customerId") ?? "all"} onChange={(e) => patch({ customerId: e.target.value === "all" ? null : e.target.value })}>
+            <option value="all">Any customer</option>
+            {opts.customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </SelectField>
+        )}
         <SelectField aria-label="Project type" className={selectCls} value={params.get("kind") ?? "all"} onChange={(e) => patch({ kind: e.target.value === "all" ? null : e.target.value })}>
           <option value="all">Any type</option>
           {KINDS.map((k) => <option key={k} value={k}>{KIND_META[k].label}</option>)}
@@ -303,7 +310,7 @@ const ProjectsMonitor: React.FC = () => {
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-gray-700/40">
                     {rows.rows.map((r, i) => (
-                      <motion.tr key={r.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.012 }} onClick={() => openProject(r.id)} onKeyDown={(e) => e.key === "Enter" && openProject(r.id)} tabIndex={0} className="cursor-pointer transition hover:bg-blue-50/50 focus:bg-blue-50/60 focus:outline-none dark:hover:bg-gray-700/40">
+                      <motion.tr key={r.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.012 }} onClick={() => openProject(r.id)} onKeyDown={(e) => e.key === "Enter" && openProject(r.id)} tabIndex={0} className="cursor-pointer transition hover:bg-blue-50/50 focus:bg-blue-50/60 focus:outline-none dark:hover:bg-gray-700/40 dark:focus:bg-gray-700/50">
                         <td className="px-3 py-2.5">
                           <div className="flex items-center gap-2">
                             <UserAvatar name={r.student.name} src={r.student.avatar} userId={r.student.id} size={32} decorative />
@@ -315,7 +322,10 @@ const ProjectsMonitor: React.FC = () => {
                         </td>
                         <td className="px-3 py-2.5 text-xs text-slate-600 dark:text-gray-300">{r.class ? <><p className="font-semibold">{r.class.name}</p><p className="text-[11px] text-slate-600 dark:text-gray-300">{r.year?.name}</p></> : "—"}</td>
                         <td className="max-w-[18rem] px-3 py-2.5">
-                          <p className="truncate font-semibold text-slate-800 dark:text-white">{r.title}</p>
+                          <p className="flex items-center gap-2 truncate font-semibold text-slate-800 dark:text-white">
+                            <ProjectLogo logoAssetId={r.logoAssetId} category={r.category} accent={r.category?.color ?? statusColor(pathStage(r.status, r.pausedFrom), dark)} size={24} rounded="rounded-lg" />
+                            <span className="truncate">{r.title}</span>
+                          </p>
                           <div className="mt-0.5 flex items-center gap-1.5">
                             {r.category && <span className="inline-flex items-center gap-1 text-[11px] text-slate-600 dark:text-gray-300"><span className="h-2 w-2 rounded-full" style={{ backgroundColor: r.category.color }} aria-hidden />{r.category.name}</span>}
                             <KindChip kind={r.kind} />

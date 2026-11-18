@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import { db } from "../../db";
 import { limits, many, recordEvent } from "./core";
 import { notifyMany } from "./notify";
+import { nudgeOverdueTasks } from "./work";
 
 /**
  * Weekly nudges (plan §7.6), run from index.ts per school:
@@ -57,7 +58,8 @@ export async function sweepSideProjects(now = new Date()) {
     if (p.sup) await notifyMany([Number(p.sup)], "side_project_stage_overdue", `${p.title}: ${label[p.status]} is overdue`, "A project you supervise is past its stage plan.", Number(p.id), true);
     await recordEvent(Number(p.id), null, "NUDGE_STAGE", null, p.status);
   }
-  return { stale: staleRows.length, supervisors: digest.size, conceptPending: pending.length, stageOverdue: overStage.length };
+  const tasksOverdue = await nudgeOverdueTasks();
+  return { stale: staleRows.length, supervisors: digest.size, conceptPending: pending.length, stageOverdue: overStage.length, tasksOverdue };
 }
 
 /** Used by tests to age a project. */

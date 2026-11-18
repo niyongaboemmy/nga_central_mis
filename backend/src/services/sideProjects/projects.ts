@@ -8,6 +8,7 @@ import { ProjectAccess } from "./access";
 import { avatarUrls } from "../avatar/urls";
 import * as v from "./validate";
 import { addDocument, documentsOf, mediaOf, storeProjectFiles, Upload, writtenConceptFile, docKindsFor } from "./files";
+import { getCustomer, resolveCustomer } from "./customers";
 import { daysBetween, defaultPlan, ensureStageLogs, loadLogs, loadPlan, periodView, planFromEnds, recordStageChange, rescalePlan, savePlan } from "./stages";
 import { reportsOf } from "./progress";
 
@@ -30,6 +31,9 @@ export interface BasicsInput {
   progressMode?: unknown;
   progressManual?: unknown;
   links?: unknown;
+  /** OWN or CUSTOMER (migration 133) */
+  customerMode?: unknown;
+  customerId?: unknown;
 }
 
 async function validCategory(id: unknown): Promise<number | null> {
@@ -144,6 +148,7 @@ export async function createProject(ownerId: number, by: number, input: CreateIn
   await assertTitleFree(ownerId, title);
   const snap = await ownerSnapshot(ownerId);
   const kind = kindFor(snap.isStudent, input.kind, !!opts.canClassify);
+  const customer = (await resolveCustomer(input.customerMode, input.customerId)) ?? { mode: "OWN" as const, id: null };
 
   // Store the concept before the project row exists, so a refused file creates nothing.
   let conceptAsset = null;
@@ -161,11 +166,11 @@ export async function createProject(ownerId: number, by: number, input: CreateIn
   let projectId: number;
   try {
     const r = await db.execute(sql`
-      INSERT INTO SideProject (owner_user_id, kind, title, title_key, problem_statement, description, category_id, tech_tags, status,
+      INSERT INTO SideProject (owner_user_id, kind, customer_mode, customer_id, title, title_key, problem_statement, description, category_id, tech_tags, status,
         board_position, github_url, access_url, supervisor_user_id, academic_year_id, last_active_year_id, class_group_id,
         reg_number_snapshot, student_name_snapshot, concept_pending, start_date, target_date, started_at, completed_at,
         last_activity_at, created_by, created_at, updated_at)
-      VALUES (${ownerId}, ${kind}, ${title}, ${titleKey(title)}, ${problem}, ${description}, ${categoryId}, ${JSON.stringify(tags)}, ${status},
+      VALUES (${ownerId}, ${kind}, ${customer.mode}, ${customer.id}, ${title}, ${titleKey(title)}, ${problem}, ${description}, ${categoryId}, ${JSON.stringify(tags)}, ${status},
         ${Number(pos?.p ?? 0)}, ${github}, ${access}, ${supervisor}, ${snap.yearId}, ${snap.yearId}, ${snap.classId},
         ${snap.reg}, ${snap.name}, ${conceptAsset ? 0 : 1}, ${start}, ${target},
         ${status !== "IDEA" ? sql`UTC_TIMESTAMP()` : null}, ${status === "COMPLETED" ? sql`UTC_TIMESTAMP()` : null},
@@ -214,6 +219,13 @@ export async function updateBasics(a: ProjectAccess, by: number, input: BasicsIn
     set.push(sql`supervisor_user_id = ${sup}`);
     if ((sup ?? null) !== (p.supervisor_user_id ? Number(p.supervisor_user_id) : null)) {
       await recordEvent(Number(p.project_id), by, "SUPERVISOR", p.supervisor_user_id ? String(p.supervisor_user_id) : null, sup ? String(sup) : null);
+    }
+  }
+  const customer = await resolveCustomer(input.customerMode, input.customerId);
+  if (customer) {
+    set.push(sql`customer_mode = ${customer.mode}, customer_id = ${customer.id}`);
+    if ((customer.id ?? null) !== (p.customer_id ? Number(p.customer_id) : null)) {
+      await recordEvent(Number(p.project_id), by, "CUSTOMER", p.customer_id ? String(p.customer_id) : null, customer.id ? String(customer.id) : null);
     }
   }
   if (input.progressMode !== undefined) {
@@ -349,9 +361,15 @@ export async function uploadDocument(a: ProjectAccess, by: number, type: DocType
 
 /** Card columns shared by the board and the monitor list (aliases from projectFrom). */
 export const cardColumns = sql`
-  sp.project_id AS id, sp.title, sp.status, sp.kind, sp.board_position AS boardPosition, sp.review_state AS reviewState,
+  sp.project_id AS id, sp.title, sp.status, sp.kind, sp.team_mode AS teamMode, sp.customer_mode AS customerMode,
+  sp.customer_id AS customerId, (SELECT cu.name FROM SideProjectCustomer cu WHERE cu.customer_id = sp.customer_id) AS customerName,
+  (SELECT cu.logo_asset_id FROM SideProjectCustomer cu WHERE cu.customer_id = sp.customer_id) AS customerLogo,
+  (SELECT COUNT(*) FROM SideProjectPlanItem pi WHERE pi.project_id = sp.project_id AND pi.kind = 'FEATURE' AND pi.status <> 'CANCELLED') AS planTotal,
+  (SELECT COUNT(*) FROM SideProjectPlanItem pi WHERE pi.project_id = sp.project_id AND pi.kind = 'FEATURE' AND pi.status = 'DONE') AS planDone,
+  (SELECT COUNT(*) FROM SideProjectTask tk WHERE tk.project_id = sp.project_id AND tk.status NOT IN ('DONE', 'CANCELLED')) AS taskOpen,
+  (SELECT COUNT(*) FROM SideProjectTask tk WHERE tk.project_id = sp.project_id AND tk.status = 'DONE') AS taskDone, sp.board_position AS boardPosition, sp.review_state AS reviewState,
   sp.progress_mode AS progressMode, sp.progress_manual AS progressManual, sp.tech_tags AS techTags,
-  sp.github_url AS githubUrl, sp.access_url AS accessUrl, sp.cover_asset_id AS coverAssetId,
+  sp.github_url AS githubUrl, sp.access_url AS accessUrl, sp.cover_asset_id AS coverAssetId, sp.logo_asset_id AS logoAssetId,
   sp.concept_pending AS conceptPending, sp.owner_user_id AS ownerId, sp.supervisor_user_id AS supervisorId,
   sp.paused_from AS pausedFrom, ${iso("sp.stage_entered_at")} AS stageEnteredAt,
   (SELECT DATE_FORMAT(st.planned_end, '%Y-%m-%d') FROM SideProjectStage st WHERE st.project_id = sp.project_id AND st.stage = IF(sp.status = 'ON_HOLD', sp.paused_from, sp.status)) AS stageEnd,
@@ -399,7 +417,11 @@ export function shapeCard(r: any, now = new Date()) {
     kind: (r.kind as Kind) || "INDIVIDUAL",
     boardPosition: Number(r.boardPosition || 0),
     reviewState: r.reviewState,
-    progress: progressOf({ status: r.status, paused_from: r.pausedFrom, progress_mode: r.progressMode, progress_manual: r.progressManual == null ? null : Number(r.progressManual) }, ms),
+    progress: progressOf({ status: r.status, paused_from: r.pausedFrom, progress_mode: r.progressMode, progress_manual: r.progressManual == null ? null : Number(r.progressManual) }, ms, { total: Number(r.planTotal || 0), done: Number(r.planDone || 0) }),
+    teamMode: (r.teamMode as "PERSONAL" | "TEAM") || "PERSONAL",
+    customer: r.customerId ? { id: Number(r.customerId), name: r.customerName as string, logoAssetId: r.customerLogo ? Number(r.customerLogo) : null } : null,
+    plan: { total: Number(r.planTotal || 0), done: Number(r.planDone || 0) },
+    tasks: { open: Number(r.taskOpen || 0), done: Number(r.taskDone || 0) },
     health: healthOf({ status: r.status, last_activity_at: r.lastActivityAt, target_date: r.targetDate, stage_end: r.status === "ON_HOLD" ? null : r.stageEnd }, { overdueMilestones: Number(r.msOverdue || 0), lastUpdateBlocked: Number(r.lastBlocked || 0) === 1 }, now, limits().staleDays),
     pausedFrom: (r.pausedFrom as Status) || null,
     stage: stageTiming(r, now),
@@ -408,6 +430,7 @@ export function shapeCard(r: any, now = new Date()) {
     githubUrl: r.githubUrl || null,
     accessUrl: r.accessUrl || null,
     coverAssetId: r.coverAssetId ? Number(r.coverAssetId) : null,
+    logoAssetId: r.logoAssetId ? Number(r.logoAssetId) : null,
     conceptPending: Number(r.conceptPending) === 1,
     docs: { CONCEPT: docs.includes("CONCEPT"), SRS: docs.includes("SRS"), IMPLEMENTATION_PLAN: docs.includes("IMPLEMENTATION_PLAN") },
     mediaCount: Number(r.mediaCount || 0),
@@ -481,7 +504,8 @@ export async function projectDetail(a: ProjectAccess) {
       FROM SideProjectEvent e LEFT JOIN UserProfile p ON p.user_id = e.actor_id
       WHERE e.project_id = ${id} ORDER BY e.created_at DESC, e.event_id DESC LIMIT 150`),
     many(sql`
-      SELECT m.user_id AS id, m.status, ${fullName("p")} AS name, p.registration_number AS regNumber, p.user_type AS type
+      SELECT m.user_id AS id, m.status, ${fullName("p")} AS name, p.registration_number AS regNumber, p.user_type AS type,
+             m.role_key AS roleKey, m.role_title AS roleTitle, m.responsibilities, m.is_manager AS isManager
       FROM SideProjectMember m JOIN UserProfile p ON p.user_id = m.user_id WHERE m.project_id = ${id} ORDER BY m.added_at`),
   ]);
   const card = shapeCard(row);
@@ -517,11 +541,14 @@ export async function projectDetail(a: ProjectAccess) {
     updates,
     comments,
     events,
-    members,
+    members: members.map((m) => ({ ...m, isManager: Number(m.isManager) === 1 })),
     period,
     /** every actual stay in a stage, oldest first (the Gantt draws these) */
     stays: logs.map((l) => ({ stage: l.stage, enteredAt: l.entered_at, leftAt: l.left_at })),
-    rights: { edit: a.canEdit, owner: a.isOwner, review: a.canReview, manageAny: a.manageAny, supervisor: a.isSupervisor },
+    teamMode: (row.teamMode as "PERSONAL" | "TEAM") || "PERSONAL",
+    customerMode: (row.customerMode as "OWN" | "CUSTOMER") || "OWN",
+    customerDetail: row.customerId ? await getCustomer(Number(row.customerId)).catch(() => null) : null,
+    rights: { edit: a.canEdit, owner: a.isOwner, review: a.canReview, manageAny: a.manageAny, supervisor: a.isSupervisor, manage: a.canManage },
   };
 }
 

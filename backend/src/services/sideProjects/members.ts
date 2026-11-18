@@ -1,6 +1,6 @@
 import { sql } from "drizzle-orm";
 import { db } from "../../db";
-import { clip, fail, fullName, many, one, recordEvent } from "./core";
+import { clip, fail, fullName, many, one, recordEvent, ROLE_KEYS, TEAM_MODES } from "./core";
 import { ProjectAccess } from "./access";
 
 /**
@@ -32,6 +32,8 @@ export async function invite(a: ProjectAccess, by: number, who: { userId?: unkno
   if (Number(n?.n ?? 0) >= MAX_MEMBERS) fail(400, "TEAM_FULL", `A team has at most ${MAX_MEMBERS + 1} people`, "regNumber");
   const exists = await one(sql`SELECT status FROM SideProjectMember WHERE project_id = ${a.project.project_id} AND user_id = ${userId}`);
   if (exists) fail(409, "ALREADY_MEMBER", exists.status === "INVITED" ? "Already invited" : "Already in the team", "regNumber");
+  // Inviting someone makes a personal project a team project.
+  if (a.project.team_mode !== "TEAM") await db.execute(sql`UPDATE SideProject SET team_mode = 'TEAM' WHERE project_id = ${a.project.project_id}`);
   await db.execute(sql`
     INSERT INTO SideProjectMember (project_id, user_id, status, invited_by, added_at)
     VALUES (${a.project.project_id}, ${userId}, 'INVITED', ${by}, UTC_TIMESTAMP())`);
@@ -70,4 +72,42 @@ export async function people(userId: number, q: string, opts: { students?: boole
       AND (CONCAT(COALESCE(p.first_name,''), ' ', COALESCE(p.last_name,'')) LIKE ${needle}
            OR p.registration_number LIKE ${needle} OR u.email LIKE ${needle})
     ORDER BY p.first_name, p.last_name LIMIT 12`);
+}
+
+/** Personal (owner only) or team. Back to personal only once the team is empty. */
+export async function setMode(a: ProjectAccess, by: number, raw: unknown) {
+  if (!a.isOwner && !a.manageAny) fail(403, "NOT_OWNER", "Only the project owner can change this");
+  const mode = String(raw ?? "").toUpperCase();
+  if (!(TEAM_MODES as readonly string[]).includes(mode)) fail(400, "VALIDATION", "Choose personal or team", "mode");
+  if (mode === "PERSONAL") {
+    const n = await one(sql`SELECT COUNT(*) AS n FROM SideProjectMember WHERE project_id = ${a.project.project_id}`);
+    if (Number(n?.n ?? 0) > 0) fail(409, "HAS_MEMBERS", "Remove the teammates first", "mode");
+  }
+  if (mode === a.project.team_mode) return mode;
+  await db.execute(sql`UPDATE SideProject SET team_mode = ${mode}, updated_at = UTC_TIMESTAMP() WHERE project_id = ${a.project.project_id}`);
+  await recordEvent(Number(a.project.project_id), by, "TEAM_MODE", String(a.project.team_mode ?? "PERSONAL"), mode);
+  return mode;
+}
+
+/** A teammate's role, responsibilities and whether they may plan and assign work. */
+export async function updateMember(a: ProjectAccess, by: number, userId: number, body: { roleKey?: unknown; roleTitle?: unknown; responsibilities?: unknown; isManager?: unknown }) {
+  if (!a.isOwner && !a.manageAny) fail(403, "NOT_OWNER", "Only the project owner can change roles");
+  const m = await one(sql`SELECT role_key, is_manager FROM SideProjectMember WHERE project_id = ${a.project.project_id} AND user_id = ${userId}`);
+  if (!m) fail(404, "NOT_FOUND", "Not a member");
+  const sets: ReturnType<typeof sql>[] = [];
+  if (body.roleKey !== undefined) {
+    const k = String(body.roleKey).toUpperCase();
+    if (!(ROLE_KEYS as readonly string[]).includes(k)) fail(400, "VALIDATION", "Unknown role", "roleKey");
+    sets.push(sql`role_key = ${k}`);
+  }
+  if (body.roleTitle !== undefined) sets.push(sql`role_title = ${clip(body.roleTitle, 60) || null}`);
+  if (body.responsibilities !== undefined) {
+    const r = String(body.responsibilities ?? "").trim();
+    if (r.length > 1000) fail(400, "VALIDATION", "At most 1000 characters", "responsibilities");
+    sets.push(sql`responsibilities = ${r || null}`);
+  }
+  if (body.isManager !== undefined) sets.push(sql`is_manager = ${body.isManager === true || body.isManager === "true" || body.isManager === 1 ? 1 : 0}`);
+  if (!sets.length) return;
+  await db.execute(sql`UPDATE SideProjectMember SET ${sql.join(sets, sql`, `)} WHERE project_id = ${a.project.project_id} AND user_id = ${userId}`);
+  await recordEvent(Number(a.project.project_id), by, "MEMBER_ROLE", null, String(userId));
 }

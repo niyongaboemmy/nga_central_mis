@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Github, ExternalLink, Images, MessageCircle, Users, MoreHorizontal, Mail, Target, Timer, PauseCircle } from "lucide-react";
 import { fileUrl, type ProjectCard as Card, type Status } from "../../api/sideProjects";
 import UserAvatar from "../ui/UserAvatar";
+import { ProjectLogo } from "./Branding";
 import { KindChip, CATEGORY_ICON, DocChips, HealthDot, ProgressBar, ReviewBadge, STATUS_META, STATUS_ORDER, dayWord, pathStage, statusColor, timeAgo, useIsDark } from "./ui";
 
 export interface ProjectCardProps {
@@ -64,10 +65,19 @@ const ProjectCardView: React.FC<ProjectCardProps> = ({ card, onOpen, onMove, dra
         <div className="relative h-24 w-full overflow-hidden" style={{ background: `linear-gradient(135deg, ${accent}26, ${accent}0d)` }}>
           {card.coverAssetId ? (
             <img src={fileUrl(card.coverAssetId, "thumb")} alt="" loading="lazy" className="h-full w-full object-cover transition duration-500 group-hover:scale-105" />
+          ) : card.logoAssetId ? (
+            <div className="flex h-full items-center justify-center">
+              <ProjectLogo logoAssetId={card.logoAssetId} category={card.category} accent={accent} size={52} rounded="rounded-2xl" />
+            </div>
           ) : (
             <div className="flex h-full items-center justify-center">
               <CatIcon className="h-10 w-10 opacity-70" style={{ color: accent }} aria-hidden />
             </div>
+          )}
+          {card.coverAssetId && card.logoAssetId && (
+            <span className="absolute bottom-2 left-2">
+              <ProjectLogo logoAssetId={card.logoAssetId} category={card.category} accent={accent} size={32} rounded="rounded-lg" className="ring-2 ring-white dark:ring-gray-900" />
+            </span>
           )}
           <div className="absolute left-2 top-2 flex gap-1">
             {card.category && (
@@ -166,7 +176,7 @@ const ProjectCardView: React.FC<ProjectCardProps> = ({ card, onOpen, onMove, dra
               setMenu((m) => !m);
             }}
             onPointerDown={(e) => e.stopPropagation()}
-            className="rounded-lg p-1 text-slate-400 opacity-0 transition hover:bg-slate-100 hover:text-slate-700 focus:opacity-100 group-hover:opacity-100 dark:hover:bg-gray-700/50"
+            className="rounded-lg p-1 text-slate-400 opacity-0 transition hover:bg-slate-100 hover:text-slate-700 focus:opacity-100 group-hover:opacity-100 dark:text-gray-500 dark:hover:bg-gray-700/50 dark:hover:text-gray-200"
           >
             <MoreHorizontal className="h-4 w-4" />
           </button>

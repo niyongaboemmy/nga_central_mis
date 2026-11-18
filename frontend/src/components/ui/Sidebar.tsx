@@ -12,7 +12,7 @@ import { useAccess } from "../../hooks/useAccess";
 import { useMentorshipRole } from "../../hooks/useMentorshipRole";
 import { useOptionalAcademicPeriod } from "../../contexts/AcademicPeriodContext";
 import { BarChart3, CalendarOff, Grid3x3, Target, HeartHandshake, Radar, ShieldAlert, ShieldCheck, UserPlus, Baby } from "lucide-react";
-import { Lightbulb, FolderKanban, ClipboardCheck } from "lucide-react";
+import { Lightbulb, FolderKanban, ClipboardCheck, Briefcase as BriefcaseIcon } from "lucide-react";
 import { useSupervisingCount } from "../sideProjects/useSupervising";
 import { BellRing, Bot, CalendarDays, KeyRound, Clock4, Gamepad2, House, SquareTerminal, Users2 } from "lucide-react";
 
@@ -795,6 +795,12 @@ const Sidebar: React.FC<SidebarProps> = ({
           requiredPermission: Permissions.SIDE_PROJECTS_ASSIGNED,
           userTypes: ["TEACHER", "STAFF", "ADMIN"],
           badge: supervising || undefined,
+        },
+        {
+          label: "Customers",
+          path: "/project-customers",
+          icon: <BriefcaseIcon className="w-3.5 h-3.5" />,
+          requiredPermission: Permissions.SIDE_PROJECTS_MANAGE_OWN,
         },
         {
           label: "All projects",

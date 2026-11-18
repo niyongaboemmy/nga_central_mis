@@ -325,7 +325,7 @@ export const FieldError: React.FC<{ message?: string | null; id?: string }> = ({
   ) : null;
 
 /* Tokens shared with the rest of the MIS (ui/Button, ui/Input, officeHours/ohUi): rounded-full
- * blue buttons, rounded-2xl inputs with a soft blue focus ring, rounded-3xl cards, translucent
+ * blue buttons, rounded-2xl inputs with a soft blue focus ring, rounded-2xl cards, translucent
  * gray surfaces in dark mode. */
 export const inputCls =
   "w-full min-h-[44px] rounded-2xl border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 hover:border-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/15 dark:border-gray-700/60 dark:bg-gray-800/40 dark:text-gray-100 dark:placeholder:text-gray-500 dark:hover:border-gray-600";

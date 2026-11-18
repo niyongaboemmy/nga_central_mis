@@ -22,6 +22,141 @@ export interface Category {
   color: string;
 }
 
+/** Teams, plan and tasks (migration 133). */
+export type TeamMode = "PERSONAL" | "TEAM";
+export type RoleKey = "LEAD" | "DEVELOPER" | "DESIGNER" | "TESTER" | "RESEARCHER" | "ANALYST" | "DOCUMENTER" | "OTHER";
+export type PlanStatus = "BACKLOG" | "PLANNED" | "IN_PROGRESS" | "IN_REVIEW" | "BLOCKED" | "DONE" | "CANCELLED";
+export type TaskStatus = "TODO" | "IN_PROGRESS" | "IN_REVIEW" | "BLOCKED" | "DONE" | "CANCELLED";
+export type Priority = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+
+export interface PlanItem {
+  id: number;
+  parentId: number | null;
+  kind: "PHASE" | "FEATURE";
+  title: string;
+  description: string | null;
+  status: PlanStatus;
+  statusMode: "AUTO" | "MANUAL";
+  priority: Priority;
+  stage: Stage | null;
+  ownerId: number | null;
+  ownerName: string | null;
+  startDate: string | null;
+  dueDate: string | null;
+  estimateHours: number | null;
+  sort: number;
+  doneAt: string | null;
+  statusChangedAt: string | null;
+}
+
+export interface Task {
+  id: number;
+  projectId: number;
+  planItemId: number;
+  title: string;
+  description: string | null;
+  status: TaskStatus;
+  priority: Priority;
+  assigneeId: number | null;
+  assigneeName: string | null;
+  dueDate: string | null;
+  estimateHours: number | null;
+  blockedReason: string | null;
+  sort: number;
+  startedAt: string | null;
+  completedAt: string | null;
+  statusChangedAt: string | null;
+  createdAt: string;
+  createdBy: number | null;
+  spentHours: number;
+  overdue: boolean;
+  projectTitle?: string;
+  planItemTitle?: string;
+}
+
+export interface TaskDetail extends Task {
+  history: Array<{ id: number; fromStatus: TaskStatus | null; toStatus: TaskStatus; note: string | null; at: string; actorId: number | null; actor: string }>;
+  logs: Array<{ id: number; userId: number; name: string; workDate: string; hours: number; note: string | null; createdAt: string }>;
+}
+
+export interface PlanData {
+  items: PlanItem[];
+  tasks: Task[];
+}
+
+export interface PlanTemplate {
+  key: string;
+  label: string;
+  categories: string[];
+  phases: Array<{ title: string; stage: Stage; features: string[] }>;
+}
+
+export interface DeliveryKpis {
+  total: number;
+  byStatus: Record<TaskStatus, number>;
+  open: number;
+  done: number;
+  overdue: number;
+  blocked: number;
+  avgCycleDays: number | null;
+  medianCycleDays: number | null;
+  avgLeadDays: number | null;
+  onTimeRate: number | null;
+  openEstimateHours: number;
+}
+
+export interface MemberReport {
+  id: number;
+  name: string;
+  owner: boolean;
+  roleKey: RoleKey;
+  roleTitle: string | null;
+  responsibilities: string | null;
+  isManager: boolean;
+  assigned: number;
+  inProgress: number;
+  inReview: number;
+  blocked: number;
+  todo: number;
+  done: number;
+  overdue: number;
+  avgCycleDays: number | null;
+  onTimeRate: number | null;
+  openEstimateHours: number;
+  hoursLogged: number;
+  reports: number;
+  lastReport: string | null;
+}
+
+export interface Delivery {
+  kpis: DeliveryKpis & { unassigned: number; planItems: number; planDone: number };
+  burndown: Array<{ date: string; scope: number; remaining: number }>;
+  throughput: Array<{ week: string; done: number }>;
+  statusTime: Array<{ status: TaskStatus; avgDays: number; samples: number }>;
+  planByStatus: Partial<Record<PlanStatus, number>>;
+  latePlan: Array<{ id: number; title: string; due: string; status: PlanStatus }>;
+  members: MemberReport[];
+}
+
+export type CustomerKind = "PERSON" | "COMPANY" | "SCHOOL" | "NGO" | "GOVERNMENT" | "OTHER";
+export interface Customer {
+  id: number;
+  name: string;
+  kind: CustomerKind;
+  contactName: string | null;
+  email: string | null;
+  phone: string | null;
+  website: string | null;
+  address: string | null;
+  description: string | null;
+  logoAssetId: number | null;
+  projects?: number;
+  createdBy: number | null;
+  createdByName: string | null;
+  createdAt: string | null;
+  archived: boolean;
+}
+
 export interface StageTiming {
   enteredAt: string | null;
   daysIn: number | null;
@@ -94,11 +229,17 @@ export interface ProjectCard {
   health: Health;
   pausedFrom: Status | null;
   stage: StageTiming;
+  teamMode?: TeamMode;
+  customer?: { id: number; name: string; logoAssetId: number | null } | null;
+  plan?: { total: number; done: number };
+  tasks?: { open: number; done: number };
   milestones: { total: number; done: number };
   techTags: string[];
   githubUrl: string | null;
   accessUrl: string | null;
   coverAssetId: number | null;
+  /** optional project logo (migration 133) */
+  logoAssetId?: number | null;
   conceptPending: boolean;
   docs: Record<DocType, boolean>;
   mediaCount: number;
@@ -164,8 +305,11 @@ export interface ProjectDetail extends ProjectCard {
   stays: Array<{ stage: Status; enteredAt: string; leftAt: string | null }>;
   comments: Array<{ id: number; kind: "COMMENT" | "CHANGES_REQUESTED" | "VERIFIED"; body: string; createdAt: string; authorId: number; author: string; authorType: string }>;
   events: Array<{ id: number; type: string; fromValue: string | null; toValue: string | null; note: string | null; createdAt: string; actorId: number | null; actor: string }>;
-  members: Array<{ id: number; status: "INVITED" | "ACCEPTED"; name: string; regNumber: string | null; type: string }>;
-  rights: { edit: boolean; owner: boolean; review: boolean; manageAny: boolean; supervisor: boolean };
+  members: Array<{ id: number; status: "INVITED" | "ACCEPTED"; name: string; regNumber: string | null; type: string; roleKey: RoleKey; roleTitle: string | null; responsibilities: string | null; isManager: boolean }>;
+  teamMode: TeamMode;
+  customerMode: "OWN" | "CUSTOMER";
+  customerDetail: Customer | null;
+  rights: { edit: boolean; owner: boolean; review: boolean; manageAny: boolean; supervisor: boolean; manage: boolean };
 }
 
 export interface MonitorRow extends ProjectCard {
@@ -241,6 +385,7 @@ export interface Summary {
     quietCount: number;
     quiet: Array<MonitorRow & { lastReport: string | null; daysSinceReport: number | null }>;
   };
+  delivery?: DeliveryKpis & { teamProjects: number; withPlan: number; planItems: number; planDone: number; atRisk: Array<{ id: number; title: string; overdue: number; blocked: number; open: number }> };
 }
 
 export interface Me {
@@ -259,6 +404,7 @@ export interface FilterOptions {
   years: Array<{ id: number; name: string; isCurrent: boolean }>;
   classes: Array<{ id: number; name: string; gradeId: number; grade: string; programId: number; program: string }>;
   categories: Category[];
+  customers?: Array<{ id: number; name: string }>;
 }
 
 export interface ImportResult {
@@ -363,6 +509,36 @@ export const sideProjectsApi = {
     api.post<Data<{ id: number }>>(`${B}/${id}/updates`, toForm(body as unknown as Record<string, unknown>, { files }), onUp(progress)).then((r) => r.data.data),
   editReport: (id: number, uid: number, body: ReportBody & { removeFiles?: number[] }, files: File[], progress?: Progress) =>
     api.patch(`${B}/${id}/updates/${uid}`, toForm(body as unknown as Record<string, unknown>, { files }), onUp(progress)),
+  setBranding: (id: number, which: "cover" | "logo", file: File, progress?: Progress) =>
+    api.post<Data<{ assetId: number }>>(`${B}/${id}/branding/${which}`, toForm({}, { file }), onUp(progress)).then((r) => r.data.data),
+  clearBranding: (id: number, which: "cover" | "logo") => api.delete(`${B}/${id}/branding/${which}`),
+  setTeamMode: (id: number, mode: TeamMode) => api.patch(`${B}/${id}/team`, { mode }),
+  updateMember: (id: number, userId: number, body: { roleKey?: RoleKey; roleTitle?: string; responsibilities?: string; isManager?: boolean }) => api.patch(`${B}/${id}/members/${userId}`, body),
+  plan: (id: number) => api.get<Data<PlanData>>(`${B}/${id}/plan`).then((r) => r.data.data),
+  planTemplates: (id: number) => api.get<Data<{ suggested: string; templates: PlanTemplate[] }>>(`${B}/${id}/plan/templates`).then((r) => r.data.data),
+  generatePlan: (id: number, template: string, append = false) => api.post<Data<{ created: number }>>(`${B}/${id}/plan/generate`, { template, append }).then((r) => r.data.data),
+  createPlanItem: (id: number, body: Record<string, unknown>) => api.post<Data<{ id: number }>>(`${B}/${id}/plan/items`, body).then((r) => r.data.data),
+  updatePlanItem: (id: number, itemId: number, body: Record<string, unknown>) => api.patch(`${B}/${id}/plan/items/${itemId}`, body),
+  deletePlanItem: (id: number, itemId: number) => api.delete(`${B}/${id}/plan/items/${itemId}`),
+  orderPlan: (id: number, parentId: number | null, ids: number[]) => api.patch(`${B}/${id}/plan/order`, { parentId, ids }),
+  createTask: (id: number, body: Record<string, unknown>) => api.post<Data<{ id: number }>>(`${B}/${id}/tasks`, body).then((r) => r.data.data),
+  updateTask: (id: number, taskId: number, body: Record<string, unknown>) => api.patch(`${B}/${id}/tasks/${taskId}`, body),
+  moveTask: (id: number, taskId: number, to: TaskStatus, note?: string) => api.post<Data<{ status: TaskStatus }>>(`${B}/${id}/tasks/${taskId}/status`, { to, note }).then((r) => r.data.data),
+  deleteTask: (id: number, taskId: number) => api.delete(`${B}/${id}/tasks/${taskId}`),
+  task: (id: number, taskId: number) => api.get<Data<TaskDetail>>(`${B}/${id}/tasks/${taskId}`).then((r) => r.data.data),
+  logWork: (id: number, taskId: number, body: { workDate: string; hours: number; note?: string }) => api.post(`${B}/${id}/tasks/${taskId}/logs`, body),
+  deleteLog: (id: number, taskId: number, logId: number) => api.delete(`${B}/${id}/tasks/${taskId}/logs/${logId}`),
+  delivery: (id: number) => api.get<Data<Delivery>>(`${B}/${id}/delivery`).then((r) => r.data.data),
+  customers: (q = "", archived = false) => api.get<Data<Customer[]>>(`${B}/customers`, { params: { q, ...(archived ? { archived: 1 } : {}) } }).then((r) => r.data.data),
+  createCustomer: (fields: Record<string, unknown>, logo: File | null) => api.post<Data<Customer>>(`${B}/customers`, toForm(fields, { logo }), onUp()).then((r) => r.data.data),
+  updateCustomer: (id: number, fields: Record<string, unknown>, logo: File | null) => api.patch<Data<Customer>>(`${B}/customers/${id}`, toForm(fields, { logo }), onUp()).then((r) => r.data.data),
+  removeCustomer: (id: number) => api.delete<Data<{ archived: boolean }>>(`${B}/customers/${id}`).then((r) => r.data.data),
+  restoreCustomer: (id: number) => api.post(`${B}/customers/${id}/restore`),
+  customerLogoUrl: (id: number, asset: number | null, variant: "thumb" | "original" = "thumb") => {
+    const t = getToken();
+    return `${API_BASE_URL}${B}/customers/${id}/logo?variant=${variant}&v=${asset ?? 0}${t ? `&token=${encodeURIComponent(t)}` : ""}`;
+  },
+  myTasks: () => api.get<Data<Task[]>>(`${B}/my-tasks`).then((r) => r.data.data),
   setKind: (id: number, kind: Kind) => api.patch<Data<{ kind: Kind }>>(`${B}/${id}/kind`, { kind }).then((r) => r.data.data),
   activity: (id: number, days = 182) => api.get<Data<Activity>>(`${B}/${id}/activity`, { params: { days } }).then((r) => r.data.data),
   updatePlan: (id: number, body: { startDate: string; targetDate: string; stagePlan?: string[] }) =>

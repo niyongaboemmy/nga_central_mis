@@ -1,3 +1,4 @@
+import { scopeDelivery } from "./delivery";
 import { sql, SQL } from "drizzle-orm";
 import * as XLSX from "xlsx";
 import { ScopeEntry } from "../../vendor/nga-access";
@@ -39,6 +40,7 @@ export interface MonitorFilters {
   ownerType?: "STUDENT" | "STAFF" | null;
   /** classification (migration 132) */
   kind?: "STUDENT" | "DELIVERY_STUDIO" | "INDIVIDUAL" | null;
+  customerId?: number | null;
 }
 
 const num = (v: unknown) => (v === undefined || v === null || v === "" || Number.isNaN(Number(v)) ? null : Number(v));
@@ -63,6 +65,7 @@ export function parseFilters(q: Record<string, unknown>): MonitorFilters {
     q: s(q.q),
     archived: bool(q.archived) === true,
     ownerType: q.ownerType === "STUDENT" || q.ownerType === "STAFF" ? q.ownerType : null,
+    customerId: num(q.customerId),
     kind: q.kind === "STUDENT" || q.kind === "DELIVERY_STUDIO" || q.kind === "INDIVIDUAL" ? q.kind : null,
   };
 }
@@ -97,6 +100,7 @@ async function loadRows(scope: ScopeEntry | null, f: MonitorFilters) {
   }
   if (f.supervisorId) conds.push(sql`sp.supervisor_user_id = ${f.supervisorId}`);
   if (f.kind) conds.push(sql`sp.kind = ${f.kind}`);
+  if (f.customerId) conds.push(sql`sp.customer_id = ${f.customerId}`);
   if (f.ownerType === "STUDENT") conds.push(sql`up.user_type = 'STUDENT'`);
   if (f.ownerType === "STAFF") conds.push(sql`(up.user_type IS NULL OR up.user_type <> 'STUDENT')`);
   if (f.q) {
@@ -308,6 +312,8 @@ export async function summary(scope: ScopeEntry | null, f: MonitorFilters, depth
   byClass.sort((a, b) => sumStatus(b) - sumStatus(a));
   const stageInsights = await stagesInsight(rows, depth);
   const reporting = await reportingInsight(rows, depth);
+  const deliveryBlock = await scopeDelivery(rows.map((r) => r.id));
+  if (depth !== "detail") deliveryBlock.atRisk = [];
 
   const population = await studentsInScope(f.supervisedBy ? null : scope, f);
   const attentionScore = (p: MonitorRow) =>
@@ -364,6 +370,7 @@ export async function summary(scope: ScopeEntry | null, f: MonitorFilters, depth
     ...detailLists,
     stages: stageInsights,
     reporting,
+    delivery: deliveryBlock,
   };
 }
 
@@ -378,6 +385,7 @@ export async function exportRows(scope: ScopeEntry | null, f: MonitorFilters, fo
     Programme: p.class?.program ?? "",
     "Academic year": p.year?.name ?? "",
     Title: p.title,
+    Customer: (p as any).customer?.name ?? "Own initiative",
     Type: p.kind === "DELIVERY_STUDIO" ? "NGA Delivery Studio" : p.kind === "STUDENT" ? "Student project" : "Individual project",
     Category: p.category?.name ?? "",
     Technologies: (p.techTags as string[]).join(", "),
@@ -419,7 +427,10 @@ export async function filterOptions(scope: ScopeEntry | null) {
       ORDER BY pr.name, g.level_order, cg.name`),
     many(sql`SELECT category_id AS id, name, color, icon, slug FROM SideProjectCategory WHERE is_active = 1 ORDER BY sort`),
   ]);
-  return { years: years.map((y) => ({ ...y, isCurrent: Number(y.isCurrent) === 1 })), classes, categories };
+  const customers = await many(sql`
+    SELECT DISTINCT c.customer_id AS id, c.name FROM SideProjectCustomer c JOIN SideProject sp ON sp.customer_id = c.customer_id AND sp.deleted_at IS NULL
+    ORDER BY c.name LIMIT 300`);
+  return { years: years.map((y) => ({ ...y, isCurrent: Number(y.isCurrent) === 1 })), classes, categories, customers: customers.map((c) => ({ id: Number(c.id), name: c.name })) };
 }
 
 /**

@@ -20,10 +20,10 @@ import {
   CalendarRange,
   Maximize2,
   Minimize2,
+  ListChecks,
 } from "lucide-react";
 import {
   failure,
-  fileUrl,
   sideProjectsApi,
   type Category,
   type ProjectDetail,
@@ -39,12 +39,15 @@ import ProgressPanel from "./panels/ProgressPanel";
 import {
   FeedbackPanel,
   InviteBanner,
-  TeamPanel,
   TimelinePanel,
 } from "./panels/ActivityPanels";
 import { TYPE_LABEL } from "./fields";
 import { MoveDialog } from "./MoveDialog";
 import StageTrack from "./StageTrack";
+import WorkPanel from "./work/WorkPanel";
+import TeamPanel from "./work/TeamPanel";
+import { CustomerLogo } from "./customers/CustomerParts";
+import { AddCoverButton, CoverBand, EditableLogo } from "./Branding";
 import {
   CATEGORY_ICON,
   HealthDot,
@@ -62,6 +65,7 @@ import { useSpMe } from "./useMe";
 
 type Tab =
   | "overview"
+  | "plan"
   | "documents"
   | "gallery"
   | "progress"
@@ -78,7 +82,7 @@ export interface DrawerProps {
   onChanged: () => void;
   /** Student: move through the lifecycle (the parent handles dialogs and refusals). */
   onMove?: (id: number, to: Status) => Promise<boolean>;
-  initialTab?: Tab;
+  initialTab?: Tab | string;
 }
 
 /** One project, everything about it, in a side sheet shared by students and staff. */
@@ -97,14 +101,12 @@ const ProjectDrawer: React.FC<DrawerProps> = ({
   const confirm = useConfirm();
   const [p, setP] = useState<ProjectDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [tab, setTab] = useState<Tab>(initialTab ?? "overview");
+  const [tab, setTab] = useState<Tab>((initialTab as Tab) ?? "overview");
   const [menu, setMenu] = useState(false);
   const [correct, setCorrect] = useState<Status | null>(null);
   const [busy, setBusy] = useState(false);
   const [moveErr, setMoveErr] = useState<string | null>(null);
   const me = useSpMe();
-  const [thumbBroken, setThumbBroken] = useState(false);
-  useEffect(() => setThumbBroken(false), [projectId]);
   // Maximised: the sheet takes the whole screen (remembered on this device).
   const [max, setMax] = useState(() => {
     try {
@@ -139,7 +141,7 @@ const ProjectDrawer: React.FC<DrawerProps> = ({
 
   useEffect(() => {
     setP(null);
-    setTab(initialTab ?? "overview");
+    setTab((initialTab as Tab) ?? "overview");
     setMenu(false);
     load();
   }, [projectId, load, initialTab]);
@@ -180,6 +182,7 @@ const ProjectDrawer: React.FC<DrawerProps> = ({
   }> = p
     ? [
         { key: "overview", icon: LayoutGrid, label: "Overview" },
+        { key: "plan", icon: ListChecks, label: "Plan", count: p.tasks?.open || undefined },
         {
           key: "documents",
           icon: FileStack,
@@ -295,23 +298,23 @@ const ProjectDrawer: React.FC<DrawerProps> = ({
           >
             {/* Header: compact identity row, owner line, stage track, then tabs */}
             <div className="relative shrink-0">
-              <div className="bg-white px-4 pb-1 pt-4 sm:px-5 dark:bg-gray-900">
+              {p && <CoverBand projectId={p.id} coverAssetId={p.coverAssetId} canEdit={p.rights.edit} onChanged={changed} />}
+              <div className={`bg-white px-4 pb-1 sm:px-5 dark:bg-gray-900 ${p?.coverAssetId ? "pt-2" : "pt-4"}`}>
                 <div className="flex items-start gap-3">
-                  {/* Cover thumbnail, or the category glyph on a soft tint */}
-                  <span
-                    className="relative flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-2xl"
-                    style={{ backgroundColor: `${accent}1f`, color: accent }}
-                  >
-                    <CatIcon className="h-6 w-6" aria-hidden />
-                    {p?.coverAssetId && !thumbBroken && (
-                      <img
-                        src={fileUrl(p.coverAssetId, "thumb")}
-                        alt=""
-                        onError={() => setThumbBroken(true)}
-                        className="absolute inset-0 h-full w-full object-cover"
-                      />
-                    )}
-                  </span>
+                  {/* Logo (or the category glyph); the team changes it on hover */}
+                  {p ? (
+                    <EditableLogo
+                      projectId={p.id}
+                      logoAssetId={p.logoAssetId ?? null}
+                      category={p.category}
+                      accent={accent}
+                      canEdit={p.rights.edit}
+                      onChanged={changed}
+                      className={p.coverAssetId ? "-mt-10" : ""}
+                    />
+                  ) : (
+                    <Skeleton className="h-[52px] w-[52px] !rounded-2xl" />
+                  )}
                   <div className="min-w-0 flex-1">
                     {p ? (
                       <>
@@ -341,6 +344,11 @@ const ProjectDrawer: React.FC<DrawerProps> = ({
                               {p.category.name}
                             </span>
                           )}
+                          {p.customerDetail && (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 py-0.5 pl-0.5 pr-2 text-[11px] font-semibold text-slate-700 dark:bg-gray-700/60 dark:text-gray-200" title={`For ${p.customerDetail.name}`}>
+                              <CustomerLogo c={p.customerDetail} size={16} className="!rounded-full" /> {p.customerDetail.name}
+                            </span>
+                          )}
                           <ReviewBadge state={p.reviewState} />
                           {p.archivedAt && (
                             <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-700 dark:bg-gray-700/60 dark:text-gray-200">
@@ -349,6 +357,7 @@ const ProjectDrawer: React.FC<DrawerProps> = ({
                             </span>
                           )}
                           <HealthDot health={p.health} withLabel />
+                          {p.rights.edit && !p.coverAssetId && <AddCoverButton projectId={p.id} onChanged={changed} />}
                         </div>
                       </>
                     ) : (
@@ -597,6 +606,7 @@ const ProjectDrawer: React.FC<DrawerProps> = ({
                         wide={max}
                       />
                     )}
+                    {tab === "plan" && <WorkPanel p={p} meId={meId} onChanged={changed} wide={max} />}
                     {tab === "documents" && (
                       <DocumentsPanel p={p} onChanged={changed} />
                     )}

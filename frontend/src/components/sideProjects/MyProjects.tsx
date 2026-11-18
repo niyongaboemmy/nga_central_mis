@@ -1,8 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Archive, ClipboardCheck, Gauge, Kanban, Lightbulb, List, Plus, Search, X, Mail } from "lucide-react";
+import { Archive, ClipboardCheck, Gauge, Kanban, Lightbulb, List, ListChecks, Plus, Search, X, Mail } from "lucide-react";
 import PageHeader from "./PageHeader";
+import MyTasks from "./work/MyTasks";
+import { ProjectLogo } from "./Branding";
 import { failure, sideProjectsApi, type Category, type ProjectCard, type Status } from "../../api/sideProjects";
 import { useToast } from "../../contexts/ToastContext";
 import { useUser } from "../../contexts/UserContext";
@@ -29,9 +31,9 @@ const MyProjects: React.FC = () => {
   const [cards, setCards] = useState<ProjectCard[] | null>(null);
   const [archived, setArchived] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [view, setView] = useState<"board" | "list">(() => {
+  const [view, setView] = useState<"board" | "list" | "tasks">(() => {
     try {
-      return (localStorage.getItem("sp.view") as "board" | "list") || "board";
+      return (localStorage.getItem("sp.view") as "board" | "list" | "tasks") || "board";
     } catch {
       return "board";
     }
@@ -46,7 +48,7 @@ const MyProjects: React.FC = () => {
   // Staff with the Assigned projects page get a shortcut to it (and its count) here.
   const [assigned, setAssigned] = useState<{ total: number; review: number } | null>(null);
   const openId = Number(params.get("project")) || null;
-  const [drawerTab, setDrawerTab] = useState<"documents" | undefined>(undefined);
+  const [drawerTab, setDrawerTab] = useState<string | undefined>(() => params.get("tab") ?? undefined);
   const cardsRef = useRef<ProjectCard[] | null>(null);
   cardsRef.current = cards;
 
@@ -78,11 +80,11 @@ const MyProjects: React.FC = () => {
     }
   }, [view]);
 
-  const open = (id: number | null, tab?: "documents") => {
+  const open = (id: number | null, tab?: string) => {
     setDrawerTab(tab);
     const next = new URLSearchParams(params);
     if (id) next.set("project", String(id));
-    else next.delete("project");
+    else (next.delete("project"), next.delete("tab"));
     setParams(next, { replace: true });
   };
 
@@ -185,7 +187,7 @@ const MyProjects: React.FC = () => {
       {invites.length > 0 && (
         <div className="flex flex-wrap gap-2">
           {invites.map((c) => (
-            <button key={c.id} type="button" onClick={() => open(c.id)} className="inline-flex items-center gap-2 rounded-full border-2 border-dashed border-blue-300 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-800 hover:bg-blue-100 dark:border-blue-500/40 dark:bg-blue-500/10 dark:text-blue-100">
+            <button key={c.id} type="button" onClick={() => open(c.id)} className="inline-flex items-center gap-2 rounded-full border-2 border-dashed border-blue-300 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-800 hover:bg-blue-100 dark:border-blue-500/40 dark:hover:bg-blue-500/20 dark:bg-blue-500/10 dark:text-blue-100">
               <Mail className="h-4 w-4" /> {c.title} <span className="text-xs font-normal">· {c.ownerName}</span>
             </button>
           ))}
@@ -204,7 +206,7 @@ const MyProjects: React.FC = () => {
             const Icon = CATEGORY_ICON[c.icon] ?? CATEGORY_ICON.sparkles;
             const on = cat === c.id;
             return (
-              <button key={c.id} type="button" role="radio" aria-checked={on} title={c.name} aria-label={c.name} onClick={() => setCat(on ? null : c.id)} className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full border transition ${on ? "border-transparent text-white " : "border-slate-200 bg-white hover:border-slate-300 dark:border-gray-700/60 dark:bg-gray-800/40"}`} style={on ? { backgroundColor: c.color } : undefined}>
+              <button key={c.id} type="button" role="radio" aria-checked={on} title={c.name} aria-label={c.name} onClick={() => setCat(on ? null : c.id)} className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full border transition ${on ? "border-transparent text-white " : "border-slate-200 bg-white hover:border-slate-300 dark:border-gray-700/60 dark:bg-gray-800/40 dark:hover:border-gray-600"}`} style={on ? { backgroundColor: c.color } : undefined}>
                 <Icon className="h-4 w-4" style={on ? undefined : { color: c.color }} />
               </button>
             );
@@ -215,6 +217,7 @@ const MyProjects: React.FC = () => {
           <span className="mx-0.5 h-5 w-px bg-slate-200 dark:bg-slate-600" />
           <button type="button" aria-pressed={view === "board"} title="Board" aria-label="Board" onClick={() => setView("board")} className={`rounded-full p-1.5 ${view === "board" ? "bg-blue-600 text-white" : "text-slate-500"}`}><Kanban className="h-4 w-4" /></button>
           <button type="button" aria-pressed={view === "list"} title="List" aria-label="List" onClick={() => setView("list")} className={`rounded-full p-1.5 ${view === "list" ? "bg-blue-600 text-white" : "text-slate-500"}`}><List className="h-4 w-4" /></button>
+          <button type="button" aria-pressed={view === "tasks"} title="My tasks" aria-label="My tasks" onClick={() => setView("tasks")} className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1.5 text-xs font-semibold ${view === "tasks" ? "bg-blue-600 text-white" : "text-slate-500 dark:text-gray-400"}`}><ListChecks className="h-4 w-4" /> <span className="hidden sm:inline">My tasks</span></button>
         </div>
       </div>
 
@@ -225,7 +228,7 @@ const MyProjects: React.FC = () => {
         </div>
       ) : !cards ? (
         <div className="flex gap-3 overflow-hidden" aria-busy="true" aria-label="Loading projects">{PATH.map((s) => <Skeleton key={s} className="h-80 w-[17rem] shrink-0 xl:flex-1" />)}</div>
-      ) : cards.length === 0 && !archived ? (
+      ) : cards.length === 0 && !archived && view !== "tasks" ? (
         <motion.div initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }} className={`${cardCls} flex flex-col items-center gap-4 p-10 text-center`}>
           <EmptyArt />
           <div className="flex items-center gap-2 text-slate-400" aria-hidden>
@@ -241,6 +244,8 @@ const MyProjects: React.FC = () => {
           </div>
           <button type="button" className={primaryBtn} onClick={() => setWizard("IDEA")}><Plus className="h-4 w-4" /> New project</button>
         </motion.div>
+      ) : view === "tasks" ? (
+        <MyTasks onOpenProject={(id) => open(id, "plan")} />
       ) : view === "board" && !archived ? (
         <Board cards={shown} onOpen={(id) => open(id)} onMove={move} onReorder={(s, ids) => sideProjectsApi.order(s, ids).catch(() => showToast("The new order wasn't saved", "warning"))} onAdd={(s) => setWizard(s)} />
       ) : (
@@ -249,12 +254,7 @@ const MyProjects: React.FC = () => {
           {shown.map((c) => (
             <button key={c.id} type="button" onClick={() => open(c.id)} className="flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-slate-50 dark:hover:bg-gray-700/40">
               {(() => {
-                const M = STATUS_META[c.status];
-                return (
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl" style={{ backgroundColor: statusColor(c.status, dark) + "1f", color: statusColor(pathStage(c.status, c.pausedFrom), dark) }} aria-hidden>
-                    <M.icon className="h-5 w-5" />
-                  </span>
-                );
+                return <ProjectLogo logoAssetId={c.logoAssetId} category={c.category} accent={c.category?.color ?? statusColor(pathStage(c.status, c.pausedFrom), dark)} size={40} />;
               })()}
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">

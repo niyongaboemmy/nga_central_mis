@@ -13,6 +13,10 @@ import * as files from "../services/sideProjects/files";
 import * as progress from "../services/sideProjects/progress";
 import * as reviewSvc from "../services/sideProjects/review";
 import * as members from "../services/sideProjects/members";
+import * as work from "../services/sideProjects/work";
+import * as customers from "../services/sideProjects/customers";
+import { projectDelivery } from "../services/sideProjects/delivery";
+import { assertManage } from "../services/sideProjects/access";
 import * as monitor from "../services/sideProjects/monitor";
 import * as notify from "../services/sideProjects/notify";
 import { runImport, TEMPLATE_CSV } from "../services/sideProjects/importer";
@@ -288,6 +292,50 @@ export function sideProjectsRouter(
   // Assigned projects: everything I supervise or help build (SIDE_PROJECTS_ASSIGNED).
   router.get("/assigned", assigned, handle(async (req) => monitor.assignedProjects(uid(req), monitor.parseFilters(req.query))));
   router.get("/people", own, handle(async (req) => members.people(uid(req), String(req.query.q ?? ""))));
+  // Customers, shared by every project (migration 133). Logos are images only (no SVG).
+  const withTemp = async <T,>(req: any, fn: () => Promise<T>) => {
+    try {
+      return await fn();
+    } finally {
+      if (req.file?.path) await import("fs").then((fs) => fs.promises.rm(req.file.path, { force: true })).catch(() => undefined);
+    }
+  };
+  router.get("/customers", own, handle(async (req) => customers.listCustomers(String(req.query.q ?? ""), { archived: req.query.archived === "1" })));
+  router.get("/customers/:cid", own, handle(async (req) => customers.getCustomer(idParam(req, "cid"))));
+  router.post(
+    "/customers",
+    own,
+    uploadRateLimit,
+    upload.single("logo"),
+    handle(async (req) => withTemp(req, () => customers.createCustomer(uid(req), req.body ?? {}, req.file ?? null))),
+  );
+  router.patch(
+    "/customers/:cid",
+    own,
+    uploadRateLimit,
+    upload.single("logo"),
+    handle(async (req) => withTemp(req, async () => customers.updateCustomer(uid(req), (await viewer(req)).manageAny, idParam(req, "cid"), req.body ?? {}, req.file ?? null))),
+  );
+  router.delete("/customers/:cid", own, handle(async (req) => customers.removeCustomer(uid(req), (await viewer(req)).manageAny, idParam(req, "cid"))));
+  router.post(
+    "/customers/:cid/restore",
+    own,
+    handle(async (req) => {
+      await customers.restoreCustomer(uid(req), (await viewer(req)).manageAny, idParam(req, "cid"));
+      return { ok: true };
+    }),
+  );
+  router.get(
+    "/customers/:cid/logo",
+    handle(async (req, res) => {
+      const asset = await customers.logoAsset(idParam(req, "cid"));
+      await files.streamAsset(res, asset, req.query.variant, { range: req.headers.range });
+      return undefined;
+    }),
+  );
+
+  // The caller's tasks across every project (migration 133).
+  router.get("/my-tasks", own, handle(async (req) => work.myTasks(uid(req))));
 
   router.post(
     "/",
@@ -527,6 +575,126 @@ export function sideProjectsRouter(
       return { ok: true };
     }),
   );
+  // Optional cover image and logo (migration 133): the team, or the lead.
+  router.post(
+    "/:id/branding/:which",
+    uploadRateLimit,
+    upload.single("file"),
+    handle(async (req) => {
+      const which = req.params.which === "logo" ? "logo" : req.params.which === "cover" ? "cover" : null;
+      let a;
+      try {
+        if (!which) fail(404, "NOT_FOUND", "Unknown image");
+        a = await anyAccess(req);
+        assertEdit(a);
+      } catch (e) {
+        if (req.file?.path) await import("fs").then((fs) => fs.promises.rm(req.file!.path, { force: true })).catch(() => undefined);
+        throw e;
+      }
+      return files.setBranding(Number(a.project.project_id), uid(req), which!, req.file ?? null);
+    }),
+  );
+  router.delete(
+    "/:id/branding/:which",
+    handle(async (req) => {
+      const which = req.params.which === "logo" ? "logo" : req.params.which === "cover" ? "cover" : null;
+      if (!which) fail(404, "NOT_FOUND", "Unknown image");
+      const a = await anyAccess(req);
+      assertEdit(a);
+      await files.clearBranding(Number(a.project.project_id), uid(req), which as "cover" | "logo");
+      return { ok: true };
+    }),
+  );
+
+  // ------------------------------------------------------------------ team, plan and tasks (migration 133)
+  router.patch(
+    "/:id/team",
+    handle(async (req) => {
+      const a = await anyAccess(req);
+      return { mode: await members.setMode(a, uid(req), req.body?.mode) };
+    }),
+  );
+  router.patch(
+    "/:id/members/:userId",
+    handle(async (req) => {
+      const a = await anyAccess(req);
+      await members.updateMember(a, uid(req), idParam(req, "userId"), req.body ?? {});
+      return { ok: true };
+    }),
+  );
+  router.get("/:id/plan", handle(async (req) => work.planOf(Number((await anyAccess(req)).project.project_id))));
+  router.get("/:id/plan/templates", handle(async (req) => work.templates(await anyAccess(req))));
+  router.post(
+    "/:id/plan/generate",
+    handle(async (req) => {
+      const a = await anyAccess(req);
+      assertManage(a);
+      return work.generatePlan(a, uid(req), req.body ?? {});
+    }),
+  );
+  router.post(
+    "/:id/plan/items",
+    handle(async (req) => {
+      const a = await anyAccess(req);
+      assertManage(a);
+      return { id: await work.createItem(a, uid(req), req.body ?? {}) };
+    }),
+  );
+  router.patch(
+    "/:id/plan/order",
+    handle(async (req) => {
+      const a = await anyAccess(req);
+      assertManage(a);
+      const ids = Array.isArray(req.body?.ids) ? req.body.ids.map(Number).filter((n: number) => Number.isInteger(n) && n > 0) : [];
+      await work.reorderItems(a, req.body?.parentId ? Number(req.body.parentId) : null, ids);
+      return { ok: true };
+    }),
+  );
+  router.patch(
+    "/:id/plan/items/:itemId",
+    handle(async (req) => {
+      const a = await anyAccess(req);
+      assertManage(a);
+      await work.updateItem(a, uid(req), idParam(req, "itemId"), req.body ?? {});
+      return { ok: true };
+    }),
+  );
+  router.delete(
+    "/:id/plan/items/:itemId",
+    handle(async (req) => {
+      const a = await anyAccess(req);
+      assertManage(a);
+      await work.deleteItem(a, uid(req), idParam(req, "itemId"));
+      return { ok: true };
+    }),
+  );
+  router.post("/:id/tasks", handle(async (req) => ({ id: await work.createTask(await anyAccess(req), uid(req), req.body ?? {}) })));
+  router.get("/:id/tasks/:taskId", handle(async (req) => work.taskDetail(await anyAccess(req), idParam(req, "taskId"))));
+  router.patch(
+    "/:id/tasks/:taskId",
+    handle(async (req) => {
+      await work.updateTask(await anyAccess(req), uid(req), idParam(req, "taskId"), req.body ?? {});
+      return { ok: true };
+    }),
+  );
+  router.post("/:id/tasks/:taskId/status", handle(async (req) => work.moveTask(await anyAccess(req), uid(req), idParam(req, "taskId"), req.body ?? {})));
+  router.delete(
+    "/:id/tasks/:taskId",
+    handle(async (req) => {
+      await work.deleteTask(await anyAccess(req), uid(req), idParam(req, "taskId"));
+      return { ok: true };
+    }),
+  );
+  router.post("/:id/tasks/:taskId/logs", handle(async (req) => ({ id: await work.addLog(await anyAccess(req), uid(req), idParam(req, "taskId"), req.body ?? {}) })));
+  router.delete(
+    "/:id/tasks/:taskId/logs/:logId",
+    handle(async (req) => {
+      await work.deleteLog(await anyAccess(req), uid(req), idParam(req, "taskId"), idParam(req, "logId"));
+      return { ok: true };
+    }),
+  );
+  router.get("/:id/delivery", handle(async (req) => projectDelivery(Number((await anyAccess(req)).project.project_id))));
+
   // Classification: Student / NGA Delivery Studio / Individual (the team or the lead; never students).
   router.patch(
     "/:id/kind",

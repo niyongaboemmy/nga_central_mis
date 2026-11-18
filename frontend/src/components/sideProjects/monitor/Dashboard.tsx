@@ -6,7 +6,7 @@ import {
 } from "lucide-react";
 import { fileUrl, type Kind, type Health, type MonitorRow, type Status, type Summary } from "../../../api/sideProjects";
 import UserAvatar from "../../ui/UserAvatar";
-import { ReportingInsights, StageInsights } from "./Insights";
+import { DeliveryInsights, ReportingInsights, StageInsights } from "./Insights";
 import { KIND_META, KINDS, STATUS_SOLID, HEALTH_META, ReviewBadge, STATUS_META, STATUS_ORDER, statusColor, timeAgo, useIsDark, cardCls, CATEGORY_ICON } from "../ui";
 
 export type DrillFilter = Partial<{ kind: Kind; ownerType: "STUDENT" | "STAFF"; status: Status; review: string; health: Health; missing: string; hasGithub: string; hasAccess: string; classId: number }>;
@@ -211,6 +211,8 @@ const Dashboard: React.FC<{ s: Summary; onDrill: (f: DrillFilter) => void; onOpe
           <ReportingInsights s={s} onOpen={onOpen} detail={detail} />
         </div>
       )}
+
+      <DeliveryInsights s={s} onOpen={onOpen} detail={detail} />
 
       <div className="grid gap-4 lg:grid-cols-3">
         <Panel title="Started vs completed" icon={TrendingUp} className="lg:col-span-2" action={<button type="button" className="rounded-full p-1.5 text-slate-400 hover:bg-slate-100 dark:hover:bg-gray-700/50" aria-pressed={table} aria-label="Show as table" onClick={() => setTable((v) => !v)}><Table2 className="h-4 w-4" /></button>}>

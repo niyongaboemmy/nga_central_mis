@@ -183,7 +183,7 @@ const StageTimeline: React.FC<{
           type="button"
           disabled={!canEdit}
           onClick={() => setEdit(true)}
-          className="mt-4 flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-slate-200 p-5 text-sm font-semibold text-slate-500 transition enabled:hover:border-blue-300 enabled:hover:bg-blue-50/50 enabled:hover:text-blue-700 dark:border-gray-700/60 dark:text-gray-400"
+          className="mt-4 flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-slate-200 p-5 text-sm font-semibold text-slate-500 transition enabled:hover:border-blue-300 enabled:hover:bg-blue-50/50 enabled:hover:text-blue-700 dark:enabled:hover:border-blue-500/50 dark:enabled:hover:bg-blue-500/10 dark:enabled:hover:text-blue-300 dark:border-gray-700/60 dark:text-gray-400"
         >
           <CalendarRange className="h-4 w-4" aria-hidden />{" "}
           {canEdit ? (p.targetDate ? "Add the start date to plan each stage" : "Set the start and closing dates") : "No plan yet"}
